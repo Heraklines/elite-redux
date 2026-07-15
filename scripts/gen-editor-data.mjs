@@ -439,8 +439,8 @@ console.log("species/items/trainers: run the dump tool (see header) — they com
 
 // BGM catalog: every track that ships in the er-assets audio/bgm dir, so the
 // Custom Trainers editor can offer a per-trainer BATTLE MUSIC picker. Each entry
-// is { key, battle } where key = the filename without ".mp3" and battle =
-// key.startsWith("battle_") (so battle themes can be listed first in the picker).
+// keeps any source/license metadata already authored in editor/data/bgm.json;
+// scanning only adds missing files and removes catalog rows whose MP3 disappeared.
 // The er-assets dir is resolved the same way as the trainer sprites above:
 // $ER_ASSETS_DIR, then ../er-assets, then the local checkout.
 {
@@ -463,7 +463,18 @@ console.log("species/items/trainers: run the dump tool (see header) — they com
       .filter(f => f.endsWith(".mp3"))
       .map(f => f.slice(0, -".mp3".length))
       .sort();
-    const bgm = keys.map(key => ({ key, battle: key.startsWith("battle_") }));
+    let existing = [];
+    if (existsSync("editor/data/bgm.json")) {
+      try {
+        existing = JSON.parse(read("editor/data/bgm.json"));
+      } catch {
+        console.warn("bgm: existing catalog is invalid JSON; rebuilding basic entries.");
+      }
+    }
+    const existingByKey = new Map(
+      existing.filter(entry => entry && typeof entry.key === "string").map(entry => [entry.key, entry]),
+    );
+    const bgm = keys.map(key => ({ ...existingByKey.get(key), key, battle: key.startsWith("battle_") }));
     writeFileSync("editor/data/bgm.json", `${JSON.stringify(bgm, null, 2)}\n`);
     const battleCount = bgm.filter(b => b.battle).length;
     console.log(`bgm: ${bgm.length} tracks (${battleCount} battle themes).`);

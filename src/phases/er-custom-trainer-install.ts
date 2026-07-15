@@ -19,6 +19,7 @@ import type { EnemyPokemon } from "#field/pokemon";
 import { Trainer } from "#field/trainer";
 import type { PersistentModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { PokemonHeldItemModifierType } from "#modifiers/modifier-type";
+import { trainerConfigs } from "#trainers/trainer-config";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 /**
@@ -85,7 +86,22 @@ export function installErCustomTrainerForCurrentWave(): void {
     // to the base sprite for a single-sprite class, so a bad pairing never breaks.
     // The authored name (assigned next) survives the variant (see getName).
     const variant = resolved.gender === "f" ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT;
-    const trainer = new Trainer(resolved.trainerType as TrainerType, variant);
+    const baseConfig = trainerConfigs[resolved.trainerType as TrainerType];
+    const configOverride = resolved.trainerSpriteKey && baseConfig ? baseConfig.clone() : undefined;
+    if (configOverride) {
+      const spriteKey = resolved.trainerSpriteKey;
+      const gendered = resolved.trainerSpriteGenders;
+      configOverride.hasGenders = gendered;
+      configOverride.getSpriteKey = female => `${spriteKey}${gendered ? `_${female ? "f" : "m"}` : ""}`;
+    }
+    const trainer = new Trainer(
+      resolved.trainerType as TrainerType,
+      variant,
+      undefined,
+      undefined,
+      undefined,
+      configOverride,
+    );
     trainer.name = resolved.name;
     // Per-trainer BATTLE MUSIC (this battle only). trainerConfigs[type] is a
     // SHARED singleton, so we must NOT mutate config.battleBgm — instead we

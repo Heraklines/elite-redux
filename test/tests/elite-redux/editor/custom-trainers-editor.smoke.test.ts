@@ -61,6 +61,7 @@ interface EditorHarness {
   spByConst: Map<string, unknown>;
   spById: Map<number, unknown>;
   trainerClassByName: Map<string, { name: string; sprite: string; genders: boolean }>;
+  trainerSpriteByKey: Map<string, { key: string; spriteKey: string; label: string; genders: boolean }>;
   SHINY_EFFECTS: { palette: any[]; surface: any[]; around: any[] };
   shinyEffectById: Map<string, { id: string; label: string; accent: string; category: string }>;
   TRAINER_FX: { id: string; label: string; accent: string }[];
@@ -134,7 +135,7 @@ beforeAll(() => {
       blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName, ctrLiveToEdit,
       ctrBuildBaselines, hashCtrTrainerEntry, markCustomTrainersSaved,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
-      ctr, ctrConfig, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
+      ctr, ctrConfig, spByConst, spById, trainerClassByName, trainerSpriteByKey, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
       get HELD_ITEMS(){ return HELD_ITEMS; }, set HELD_ITEMS(v){ HELD_ITEMS = v; },
@@ -180,6 +181,7 @@ beforeEach(() => {
   ct.trainerClassByName.clear();
   ct.trainerClassByName.set("ACE_TRAINER", { name: "ACE_TRAINER", sprite: "ace_trainer", genders: true });
   ct.trainerClassByName.set("HIKER", { name: "HIKER", sprite: "hiker", genders: false });
+  ct.trainerSpriteByKey.clear();
   // Shiny Lab effect registry fixture (a couple per category).
   ct.SHINY_EFFECTS.palette.length = 0;
   ct.SHINY_EFFECTS.surface.length = 0;
@@ -1237,6 +1239,25 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect(icons.length).toBe(1);
     // No <img> for an unresolvable species: the box stands in as the placeholder.
     expect(card.querySelectorAll(".ctr-card-mon img").length).toBe(0);
+  });
+
+  it("serializes a reusable uploaded sprite key without changing the trainer class", () => {
+    ct.trainerSpriteByKey.set("staff_rival", {
+      key: "staff_rival",
+      spriteKey: "staff_rival",
+      label: "Staff Rival",
+      genders: false,
+    });
+    const key = newTrainer("Uploaded Art");
+    setSpecies(0, "SPECIES_PIKACHU");
+    ct.ctr.current[key].trainerClass = "HIKER";
+    ct.ctr.current[key].trainerSprite = "staff_rival";
+
+    const { deltas, bad } = ct.buildDeltas();
+    const saved = (deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(bad).toEqual([]);
+    expect(saved.trainerClass).toBe("HIKER");
+    expect(saved.trainerSprite).toBe("staff_rival");
   });
 
   it("prior-surface smoke still holds: member collapse/expand + the battle-music picker render", () => {

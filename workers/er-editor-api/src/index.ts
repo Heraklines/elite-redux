@@ -52,6 +52,8 @@ interface Env {
   GITHUB_REPO: string;
   GITHUB_BRANCH: string;
   GITHUB_WORKFLOW_FILE?: string;
+  /** Workflow that imports YouTube videos/playlists into the BGM catalog. */
+  MEDIA_IMPORT_WORKFLOW_FILE?: string;
   EDITOR_PASSWORD: string;
   ALLOWED_ORIGIN: string;
   /** Sprite asset repo for /upload-assets (default "Heraklines/er-assets").
@@ -651,6 +653,12 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
     }
     if (!isName(t.trainerClass)) {
       return { ok: false, error: `${key}: trainerClass must be a TrainerType NAME` };
+    }
+    if (
+      t.trainerSprite !== undefined
+      && !(typeof t.trainerSprite === "string" && /^[a-z0-9_]{2,64}$/.test(t.trainerSprite))
+    ) {
+      return { ok: false, error: `${key}: trainerSprite must be a catalog key ([a-z0-9_], 2-64 chars)` };
     }
     if (t.gender !== undefined && t.gender !== "m" && t.gender !== "f") {
       return { ok: false, error: `${key}: gender must be "m" or "f"` };
@@ -1340,6 +1348,299 @@ async function handleUploadAssets(body: UploadAssetsBody, env: Env): Promise<Res
   return json({ ok: true, commit: newCommit.sha, files: files.length }, 200, env);
 }
 
+interface TrainerSpriteUploadBody {
+  password?: string;
+  key?: string;
+  label?: string;
+  genders?: boolean;
+  kind?: string;
+  tags?: string[];
+  author?: string;
+  license?: string;
+  sourceUrl?: string;
+  rightsConfirmed?: boolean;
+  deployStaging?: boolean;
+  files?: { variant?: "single" | "m" | "f"; pngBase64?: string; atlas?: unknown }[];
+}
+
+async function commitAssetTree(
+  env: Env,
+  entries: readonly { path: string; contentBase64: string }[],
+  message: string,
+): Promise<{ ok: true; commit: string } | { ok: false; error: string }> {
+  const repo = env.ASSETS_REPO || "Heraklines/er-assets";
+  const branch = env.ASSETS_BRANCH || "main";
+  const api = `https://api.github.com/repos/${repo}`;
+  const headers = { ...ghHeaders(env), "Content-Type": "application/json" };
+  const refRes = await fetch(`${api}/git/ref/heads/${branch}`, { headers: ghHeaders(env) });
+  if (!refRes.ok) {
+    return { ok: false, error: `assets repo read failed: ${refRes.status} (does the PAT cover ${repo}?)` };
+  }
+  const headSha = ((await refRes.json()) as { object: { sha: string } }).object.sha;
+  const commitRes = await fetch(`${api}/git/commits/${headSha}`, { headers: ghHeaders(env) });
+  if (!commitRes.ok) {
+    return { ok: false, error: `assets commit read failed: ${commitRes.status}` };
+  }
+  const baseTree = ((await commitRes.json()) as { tree: { sha: string } }).tree.sha;
+  const tree: { path: string; mode: string; type: string; sha: string }[] = [];
+  for (const entry of entries) {
+    const blobRes = await fetch(`${api}/git/blobs`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ content: entry.contentBase64, encoding: "base64" }),
+    });
+    if (!blobRes.ok) {
+      return { ok: false, error: `blob create failed for ${entry.path}: ${blobRes.status}` };
+    }
+    tree.push({
+      path: entry.path,
+      mode: "100644",
+      type: "blob",
+      sha: ((await blobRes.json()) as { sha: string }).sha,
+    });
+  }
+  const treeRes = await fetch(`${api}/git/trees`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ base_tree: baseTree, tree }),
+  });
+  if (!treeRes.ok) {
+    return { ok: false, error: `assets tree create failed: ${treeRes.status}` };
+  }
+  const treeSha = ((await treeRes.json()) as { sha: string }).sha;
+  const nextCommitRes = await fetch(`${api}/git/commits`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ message, tree: treeSha, parents: [headSha] }),
+  });
+  if (!nextCommitRes.ok) {
+    return { ok: false, error: `assets commit create failed: ${nextCommitRes.status}` };
+  }
+  const nextSha = ((await nextCommitRes.json()) as { sha: string }).sha;
+  const updateRes = await fetch(`${api}/git/refs/heads/${branch}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ sha: nextSha, force: false }),
+  });
+  return updateRes.ok
+    ? { ok: true, commit: nextSha }
+    : { ok: false, error: `assets ref update failed: ${updateRes.status}` };
+}
+
+function decodeBase64Utf8(value: string): string {
+  const binary = atob(value.replace(/\s/g, ""));
+  return new TextDecoder().decode(Uint8Array.from(binary, char => char.charCodeAt(0)));
+}
+
+async function updateTrainerSpriteCatalog(
+  body: TrainerSpriteUploadBody,
+  env: Env,
+): Promise<{ ok: true; commit: string } | { ok: false; error: string }> {
+  const path = "src/data/elite-redux/er-custom-trainer-sprites.json";
+  const api = `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${path}`;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const readRes = await fetch(`${api}?ref=${encodeURIComponent(env.GITHUB_BRANCH)}`, { headers: ghHeaders(env) });
+    if (!readRes.ok) {
+      return { ok: false, error: `sprite catalog read failed: ${readRes.status}` };
+    }
+    const live = (await readRes.json()) as { sha: string; content: string };
+    let catalog: Record<string, unknown>;
+    try {
+      catalog = JSON.parse(decodeBase64Utf8(live.content)) as Record<string, unknown>;
+    } catch {
+      return { ok: false, error: "sprite catalog contains invalid JSON" };
+    }
+    const key = body.key as string;
+    catalog[key] = {
+      label: (body.label as string).trim(),
+      spriteKey: key,
+      genders: body.genders === true,
+      kind: (body.kind || "other").trim(),
+      tags: body.tags || [],
+      author: (body.author || "").trim(),
+      license: body.license,
+      sourceUrl: (body.sourceUrl || "").trim(),
+    };
+    const putRes = await fetch(api, {
+      method: "PUT",
+      headers: { ...ghHeaders(env), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `editor: trainer sprite ${key}`,
+        content: toBase64(`${JSON.stringify(sortKeysDeep(catalog), null, 2)}\n`),
+        sha: live.sha,
+        branch: env.GITHUB_BRANCH,
+      }),
+    });
+    if (putRes.ok) {
+      return { ok: true, commit: ((await putRes.json()) as { commit: { sha: string } }).commit.sha };
+    }
+    if (putRes.status !== 409) {
+      return { ok: false, error: `sprite catalog update failed: ${putRes.status} ${await putRes.text()}` };
+    }
+  }
+  return { ok: false, error: "sprite catalog changed repeatedly; retry the upload" };
+}
+
+async function handleTrainerSpriteUpload(body: TrainerSpriteUploadBody, env: Env): Promise<Response> {
+  if (env.EDITOR_PASSWORD && body.password !== env.EDITOR_PASSWORD) {
+    return json({ ok: false, error: "unauthorized" }, 401, env);
+  }
+  const key = body.key || "";
+  const label = body.label || "";
+  const license = body.license || "unknown";
+  if (!/^[a-z0-9_]{2,64}$/.test(key) || label.trim().length === 0 || label.length > 80) {
+    return json({ ok: false, error: "key or label is invalid" }, 400, env);
+  }
+  if (!new Set(["original", "cc0", "cc-by", "permission", "unknown"]).has(license)) {
+    return json({ ok: false, error: "unknown license value" }, 400, env);
+  }
+  if (body.rightsConfirmed !== true) {
+    return json({ ok: false, error: "rights confirmation is required" }, 400, env);
+  }
+  if (
+    !Array.isArray(body.tags)
+    || body.tags.length > 12
+    || body.tags.some(tag => typeof tag !== "string" || tag.trim().length === 0 || tag.length > 32)
+    || (body.author !== undefined && (typeof body.author !== "string" || body.author.length > 80))
+    || (body.kind !== undefined && (typeof body.kind !== "string" || !/^[a-z0-9_-]{1,40}$/.test(body.kind)))
+  ) {
+    return json({ ok: false, error: "sprite metadata is invalid" }, 400, env);
+  }
+  if (body.sourceUrl && (body.sourceUrl.length > 500 || !/^https?:\/\//i.test(body.sourceUrl))) {
+    return json({ ok: false, error: "source URL is invalid" }, 400, env);
+  }
+  const files = body.files || [];
+  const expected = body.genders ? new Set(["m", "f"]) : new Set(["single"]);
+  if (files.length !== expected.size || files.some(file => !file.variant || !expected.delete(file.variant))) {
+    return json(
+      { ok: false, error: body.genders ? "male and female files are required" : "one sprite file is required" },
+      400,
+      env,
+    );
+  }
+  const assetEntries: { path: string; contentBase64: string }[] = [];
+  for (const file of files) {
+    if (
+      typeof file.pngBase64 !== "string"
+      || file.pngBase64.length < 12
+      || file.pngBase64.length > 4_000_000
+      || !file.pngBase64.replace(/^data:image\/png;base64,/, "").startsWith("iVBORw0KGgo")
+    ) {
+      return json({ ok: false, error: `${file.variant}: PNG is missing or too large` }, 400, env);
+    }
+    if (!isPlainObject(file.atlas) || !isPlainObject(file.atlas.frames)) {
+      return json({ ok: false, error: `${file.variant}: atlas JSON is invalid` }, 400, env);
+    }
+    const suffix = file.variant === "single" ? "" : `_${file.variant}`;
+    const base = `images/trainer/${key}${suffix}`;
+    assetEntries.push({ path: `${base}.png`, contentBase64: file.pngBase64.replace(/^data:image\/png;base64,/, "") });
+    assetEntries.push({ path: `${base}.json`, contentBase64: toBase64(`${JSON.stringify(file.atlas, null, 2)}\n`) });
+  }
+  body.license = license;
+  const assets = await commitAssetTree(env, assetEntries, `editor: trainer sprite ${key}`);
+  if (!assets.ok) {
+    return json({ ok: false, error: assets.error }, 502, env);
+  }
+  const catalog = await updateTrainerSpriteCatalog(body, env);
+  if (!catalog.ok) {
+    return json({ ok: false, error: catalog.error, assetsCommitted: true, assetsCommit: assets.commit }, 502, env);
+  }
+  if (body.deployStaging !== false) {
+    const deploy = await triggerDeploy(env);
+    if (!deploy.ok) {
+      return json({ ok: false, error: deploy.error, assetsCommitted: true, catalogCommitted: true }, 502, env);
+    }
+  }
+  return json({ ok: true, assetsCommit: assets.commit, catalogCommit: catalog.commit, key }, 200, env);
+}
+
+interface MediaImportBody {
+  password?: string;
+  urls?: string[];
+  keyPrefix?: string;
+  splitChapters?: boolean;
+  requireCreativeCommons?: boolean;
+  deployStaging?: boolean;
+  rightsConfirmed?: boolean;
+  author?: string;
+}
+
+async function handleMediaImport(body: MediaImportBody, env: Env): Promise<Response> {
+  if (env.EDITOR_PASSWORD && body.password !== env.EDITOR_PASSWORD) {
+    return json({ ok: false, error: "unauthorized" }, 401, env);
+  }
+  const urls = body.urls || [];
+  if (
+    !Array.isArray(urls)
+    || urls.length === 0
+    || urls.length > 20
+    || urls.some(
+      url => typeof url !== "string" || url.length > 500 || !/^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(url),
+    )
+  ) {
+    return json({ ok: false, error: "provide 1-20 YouTube video or playlist URLs" }, 400, env);
+  }
+  if (body.rightsConfirmed !== true) {
+    return json({ ok: false, error: "rights confirmation is required" }, 400, env);
+  }
+  const keyPrefix = (body.keyPrefix || "battle_custom").trim();
+  if (!/^[a-z0-9_]{2,40}$/.test(keyPrefix)) {
+    return json({ ok: false, error: "key prefix must use lowercase letters, numbers, and underscores" }, 400, env);
+  }
+  const workflow = env.MEDIA_IMPORT_WORKFLOW_FILE || "deploy-staging.yml";
+  const dispatch = await fetch(
+    `https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/${workflow}/dispatches`,
+    {
+      method: "POST",
+      headers: { ...ghHeaders(env), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ref: env.GITHUB_BRANCH,
+        inputs: {
+          operation: "import_music",
+          source_urls: urls.join("\n"),
+          key_prefix: keyPrefix,
+          split_chapters: body.splitChapters === false ? "false" : "true",
+          require_creative_commons: body.requireCreativeCommons === true ? "true" : "false",
+          deploy_staging: body.deployStaging === true ? "true" : "false",
+          author: (body.author || "").slice(0, 40),
+        },
+      }),
+    },
+  );
+  return dispatch.status === 204
+    ? json({ ok: true, queued: true }, 202, env)
+    : json({ ok: false, error: `media import dispatch failed: ${dispatch.status} ${await dispatch.text()}` }, 502, env);
+}
+
+async function handleMediaJobs(password: string | undefined, env: Env): Promise<Response> {
+  if (env.EDITOR_PASSWORD && password !== env.EDITOR_PASSWORD) {
+    return json({ ok: false, error: "unauthorized" }, 401, env);
+  }
+  const workflow = env.MEDIA_IMPORT_WORKFLOW_FILE || "deploy-staging.yml";
+  const response = await fetch(
+    `https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/${workflow}/runs?branch=${encodeURIComponent(env.GITHUB_BRANCH)}&per_page=10`,
+    { headers: ghHeaders(env) },
+  );
+  if (!response.ok) {
+    return json({ ok: false, error: `media jobs read failed: ${response.status}` }, 502, env);
+  }
+  const data = (await response.json()) as {
+    workflow_runs?: {
+      id: number;
+      status: string;
+      conclusion: string | null;
+      html_url: string;
+      created_at: string;
+      display_title?: string;
+    }[];
+  };
+  return json(
+    { ok: true, runs: (data.workflow_runs || []).filter(run => run.display_title === "Import YouTube BGM") },
+    200,
+    env,
+  );
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -1387,6 +1688,33 @@ export default {
         return json({ ok: false, error: "invalid JSON body" }, 400, env);
       }
       return handleUploadAssets(body, env);
+    }
+    if (url.pathname === "/upload-trainer-sprite" && request.method === "POST") {
+      let body: TrainerSpriteUploadBody;
+      try {
+        body = (await request.json()) as TrainerSpriteUploadBody;
+      } catch {
+        return json({ ok: false, error: "invalid JSON body" }, 400, env);
+      }
+      return handleTrainerSpriteUpload(body, env);
+    }
+    if (url.pathname === "/import-media" && request.method === "POST") {
+      let body: MediaImportBody;
+      try {
+        body = (await request.json()) as MediaImportBody;
+      } catch {
+        return json({ ok: false, error: "invalid JSON body" }, 400, env);
+      }
+      return handleMediaImport(body, env);
+    }
+    if (url.pathname === "/media-jobs" && request.method === "POST") {
+      let body: { password?: string };
+      try {
+        body = (await request.json()) as { password?: string };
+      } catch {
+        return json({ ok: false, error: "invalid JSON body" }, 400, env);
+      }
+      return handleMediaJobs(body.password, env);
     }
 
     if (url.pathname === "/devlog" && request.method === "POST") {

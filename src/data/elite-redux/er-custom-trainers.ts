@@ -103,6 +103,7 @@ import { isDevToolsEnabled } from "#app/dev-tools/registry";
 import { allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
+import { getErCustomTrainerSprite } from "#data/elite-redux/er-custom-trainer-sprites";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   encodeErShinyLabPreset,
@@ -301,6 +302,8 @@ export interface ErCustomTrainer {
   name: string;
   /** TrainerType enum NAME (sprite); resolved to a numeric `TrainerType`. */
   trainerClass: string;
+  /** Optional key from er-custom-trainer-sprites.json. Appearance only; class behavior is unchanged. */
+  trainerSprite?: string;
   /**
    * Which gendered sprite the trainer fields, for classes that ship both an `_m`
    * and `_f` sprite (see `hasGenders`). "f" fields the female sprite; "m"/absent
@@ -437,6 +440,10 @@ export interface ErCustomTrainerResolved {
   id: number;
   name: string;
   trainerType: number;
+  /** Uploaded sprite atlas key, or "" to use the trainer class sprite. */
+  trainerSpriteKey: string;
+  /** Whether the uploaded sprite uses `_m` and `_f` atlas variants. */
+  trainerSpriteGenders: boolean;
   /** "f" fields the female sprite variant (classes with `hasGenders`); "m" otherwise. */
   gender: "m" | "f";
   /** Whether the encounter should be a double (also true for a pending triple). */
@@ -846,11 +853,14 @@ function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResol
   const challengeValue = challenge === "none" ? null : normalizeChallengeValue(entry.challengeValue);
   const minWave = Number.isInteger(entry.minWave) && (entry.minWave as number) >= 1 ? (entry.minWave as number) : 1;
   const maxWave = Number.isInteger(entry.maxWave) && (entry.maxWave as number) >= minWave ? (entry.maxWave as number) : 200;
+  const trainerSprite = getErCustomTrainerSprite(entry.trainerSprite);
   return {
     key,
     id: entry.id,
     name: entry.name.trim(),
     trainerType,
+    trainerSpriteKey: trainerSprite?.spriteKey ?? "",
+    trainerSpriteGenders: trainerSprite?.genders ?? false,
     gender: entry.gender === "f" ? "f" : "m",
     // A triple falls back to a double until #902 lands triples support.
     isDouble: battleType === "double" || battleType === "triple",

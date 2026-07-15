@@ -82,6 +82,12 @@ const BGM_AUDIO_BASE = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/au
 let bgmPreviewAudio = null; // the single shared HTMLAudioElement
 let bgmPreviewKey = null; // the key currently playing, or null
 
+// Staff-uploaded trainer art catalog + transient upload previews. Catalog entries
+// live in the game data repo; PNG/atlas pairs live in er-assets.
+let TRAINER_SPRITES = [];
+const trainerSpriteByKey = new Map();
+const preparedTrainerSprites = { single: null, m: null, f: null };
+
 // Live egg-move source (er-egg-moves.json, keyed by species CONST → move NAMEs),
 // used by the per-member move-legality helper (levelup ∪ TM ∪ egg).
 let EGG_MOVES_LIVE = {};
@@ -1970,6 +1976,7 @@ function blankCtrTrainer() {
     id: max + 1,
     name: "",
     trainerClass: "ACE_TRAINER",
+    trainerSprite: "",
     gender: "m",
     battleType: "single",
     difficulties: ["ace", "elite", "hell"],
@@ -1994,6 +2001,7 @@ function ctrLiveToEdit(entry) {
     id: entry.id,
     name: entry.name ?? "",
     trainerClass: entry.trainerClass ?? "ACE_TRAINER",
+    trainerSprite: trainerSpriteByKey.has(entry.trainerSprite) ? entry.trainerSprite : "",
     gender: entry.gender === "f" ? "f" : "m",
     battleType: entry.battleType ?? "single",
     difficulties: Array.isArray(entry.difficulties) ? entry.difficulties.slice() : ["ace", "elite", "hell"],
@@ -2781,6 +2789,10 @@ function renderTrainerFrame(file, el, opts) {
 /** True when the CURRENT trainer's class ships both `_m`/`_f` sprites (hasGenders). */
 function ctrClassHasGenders() {
   const t = ctrCur();
+  const uploaded = t ? trainerSpriteByKey.get(t.trainerSprite || "") : null;
+  if (uploaded) {
+    return uploaded.genders === true;
+  }
   const entry = t ? trainerClassByName.get((t.trainerClass || "").trim().toUpperCase()) : null;
   return !!(entry && entry.genders);
 }
@@ -2805,6 +2817,17 @@ function updateCtrSpritePreview() {
   if (!box) {
     return;
   }
+  const t = ctrCur();
+  const uploaded = t ? trainerSpriteByKey.get(t.trainerSprite || "") : null;
+  if (uploaded) {
+    const file = `${uploaded.spriteKey || uploaded.key}${uploaded.genders ? `_${t.gender === "f" ? "f" : "m"}` : ""}`;
+    const frame = document.createElement("div");
+    frame.className = "ctr-sprite-frame";
+    box.innerHTML = "";
+    box.appendChild(frame);
+    renderTrainerFrame(file, frame);
+    return;
+  }
   const input = document.getElementById("ctr-class");
   const name = input ? input.value.trim().toUpperCase() : "";
   const entry = trainerClassByName.get(name);
@@ -2813,7 +2836,6 @@ function updateCtrSpritePreview() {
     box.innerHTML = '<span class="dyn">no sprite for this class</span>';
     return;
   }
-  const t = ctrCur();
   // Gendered class: field ONLY the selected variant (default "m"); single-sprite
   // class: its lone sprite (gender has no meaning).
   const files = entry.genders ? [`${entry.sprite}_${t && t.gender === "f" ? "f" : "m"}`] : [entry.sprite];
@@ -2981,6 +3003,10 @@ function ctrPreviewPanelHtml(t) {
 /** The trainer-sprite atlas file for a list card (selected gender variant), or ""
  *  when the class ships no sprite (unknown class -> neutral placeholder box). */
 function ctrCardSpriteFile(t) {
+  const uploaded = trainerSpriteByKey.get(t.trainerSprite || "");
+  if (uploaded) {
+    return `${uploaded.spriteKey || uploaded.key}${uploaded.genders ? `_${t.gender === "f" ? "f" : "m"}` : ""}`;
+  }
   const entry = trainerClassByName.get((t.trainerClass || "").trim().toUpperCase());
   if (!entry) {
     return "";
@@ -3061,11 +3087,18 @@ function renderCustomTrainers(root) {
           </label>`
         : "";
     const bgmSel = ctrBgmOptions(t.battleBgm || "");
+    const spriteSel = TRAINER_SPRITES.map(
+      sprite =>
+        `<option value="${esc(sprite.key)}"${t.trainerSprite === sprite.key ? " selected" : ""}>${esc(sprite.label || prettify(sprite.key))}</option>`,
+    ).join("");
     form = `<div class="ctr-form">
       <fieldset class="ctr-sec"><legend>Identity</legend>
         <label>Name <input type="text" id="ctr-name" maxlength="24" value="${esc(t.name || "")}" style="width:200px" /></label>
         <label>Id <input type="text" id="ctr-id" value="${t.id}" readonly tabindex="-1" style="width:80px;opacity:.6" /></label>
         <label>Sprite / class <input type="text" id="ctr-class" list="trainerclass-list" value="${esc(t.trainerClass || "")}" style="width:170px" spellcheck="false" /></label>
+        <label title="Optional uploaded appearance. Battle behavior still comes from Sprite / class.">Uploaded art
+          <select id="ctr-sprite"><option value="">(class sprite)</option>${spriteSel}</select>
+        </label>
         <button type="button" id="ctr-browse-class" title="Browse trainer classes by sprite">Browse…</button>
         ${ctrGenderPickerHtml(t)}
         <div class="ctr-bgm-row">
@@ -3186,6 +3219,9 @@ function onCustomTrainerInput(el) {
     el.value = t.trainerClass;
     // Live preview without a full re-render (keeps the input cursor).
     updateCtrSpritePreview();
+  } else if (el.id === "ctr-sprite") {
+    t.trainerSprite = trainerSpriteByKey.has(el.value) ? el.value : "";
+    render();
   } else if (el.id === "ctr-minwave") {
     t.minWave = Number(el.value) || 1;
   } else if (el.id === "ctr-maxwave") {
@@ -3275,6 +3311,10 @@ function onCustomTrainerChange(el) {
   } else if (el.id === "ctr-class") {
     // Blur: a class change can flip whether the gender picker applies, so re-render.
     t.trainerClass = el.value.trim().toUpperCase();
+    render();
+    return true;
+  } else if (el.id === "ctr-sprite") {
+    t.trainerSprite = trainerSpriteByKey.has(el.value) ? el.value : "";
     render();
     return true;
   } else if (el.classList.contains("ctr-gender-radio")) {
@@ -3603,6 +3643,373 @@ function onCustomTrainerClick(e) {
   return false;
 }
 
+function assetLicenseBadge(value) {
+  const license = value || "unknown";
+  return `<span class="license ${esc(license)}">${esc(license)}</span>`;
+}
+
+function renderAssets(root) {
+  const tracks = BGM_LIST.map(track => {
+    const title = track.title || prettify(track.key);
+    const detail = [
+      track.artist,
+      track.key,
+      track.splitMethod === "whole" && track.needsManualSplit ? "manual split needed" : "",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+    return `<div class="asset-track">
+      <div><strong>${esc(title)} ${assetLicenseBadge(track.license)}</strong><small>${esc(detail)}</small>${track.sourceUrl ? `<small><a href="${esc(track.sourceUrl)}" target="_blank" rel="noreferrer">Source and attribution</a></small>` : ""}</div>
+      <button type="button" data-asset-bgm="${esc(track.key)}" title="Preview track">Play</button>
+    </div>`;
+  }).join("");
+  root.innerHTML = `<div class="asset-grid">
+    <section class="asset-panel">
+      <h2>Battle music</h2>
+      <div class="asset-form">
+        <label>YouTube videos or playlists<textarea id="asset-media-urls" placeholder="https://www.youtube.com/watch?v=...\nhttps://www.youtube.com/playlist?list=..."></textarea></label>
+        <div class="asset-row">
+          <label>Key prefix <input id="asset-media-prefix" value="battle_custom" maxlength="40" /></label>
+          <label>Staff name <input id="asset-media-author" maxlength="40" /></label>
+        </div>
+        <div class="asset-row">
+          <label><input type="checkbox" id="asset-split" checked /> Split chapters and timestamps</label>
+          <label><input type="checkbox" id="asset-require-cc" /> Require Creative Commons</label>
+          <label><input type="checkbox" id="asset-deploy" checked /> Deploy staging</label>
+        </div>
+        <label><span><input type="checkbox" id="asset-media-rights" /> I confirm we may use and store this audio.</span></label>
+        <div class="asset-row">
+          <button type="button" id="asset-import" class="primary">Queue import</button>
+          <button type="button" id="asset-refresh-jobs">Refresh jobs</button>
+        </div>
+        <div id="asset-jobs" class="asset-jobs"></div>
+      </div>
+      <h2 style="margin-top:18px">Music catalog</h2>
+      <div class="asset-catalog">${tracks || '<span class="dyn">No tracks found.</span>'}</div>
+    </section>
+    <section class="asset-panel">
+      <h2>Trainer sprites</h2>
+      <div class="asset-form">
+        <div class="asset-row">
+          <label>Label <input id="asset-sprite-label" maxlength="80" /></label>
+          <label>Key <input id="asset-sprite-key" maxlength="64" placeholder="trainer_name" /></label>
+        </div>
+        <div class="asset-row">
+          <label>Classification <select id="asset-sprite-kind"><option>rival</option><option>leader</option><option>elite</option><option>villain</option><option selected>other</option></select></label>
+          <label>Tags <input id="asset-sprite-tags" maxlength="180" placeholder="region, theme" /></label>
+          <label><input type="checkbox" id="asset-sprite-gendered" /> M/F pair</label>
+        </div>
+        <div class="asset-row">
+          <label>License <select id="asset-sprite-license"><option value="original">Original</option><option value="cc0">CC0</option><option value="cc-by">CC BY</option><option value="permission">Permission</option><option value="unknown">Unknown</option></select></label>
+          <label>Artist <input id="asset-sprite-author" maxlength="80" /></label>
+        </div>
+        <label>Source URL <input id="asset-sprite-source" type="url" maxlength="500" /></label>
+        <div class="asset-row">
+          <label>Single <input id="asset-file-single" type="file" accept="image/png,image/webp,image/jpeg" /></label>
+          <label>Male <input id="asset-file-m" type="file" accept="image/png,image/webp,image/jpeg" /></label>
+          <label>Female <input id="asset-file-f" type="file" accept="image/png,image/webp,image/jpeg" /></label>
+        </div>
+        <div class="sprite-previews">
+          <div id="asset-preview-a" class="sprite-preview"><span class="dyn">single / male</span></div>
+          <div id="asset-preview-b" class="sprite-preview"><span class="dyn">female</span></div>
+        </div>
+        <label><span><input type="checkbox" id="asset-sprite-rights" /> I confirm we may use and distribute this art.</span></label>
+        <label><span><input type="checkbox" id="asset-sprite-deploy" checked /> Deploy staging after upload.</span></label>
+        <button type="button" id="asset-upload-sprite" class="primary">Process and upload</button>
+      </div>
+      <h2 style="margin-top:18px">Uploaded art</h2>
+      <div class="asset-catalog">${TRAINER_SPRITES.map(sprite => `<div class="asset-track"><div><strong>${esc(sprite.label || sprite.key)} ${assetLicenseBadge(sprite.license)}</strong><small>${esc([sprite.kind, ...(sprite.tags || [])].filter(Boolean).join(" | "))}</small></div><button type="button" data-asset-sprite="${esc(sprite.key)}" title="Open Custom Trainers">Use</button></div>`).join("") || '<span class="dyn">No uploaded trainer art.</span>'}</div>
+    </section>
+  </div>`;
+  paintPreparedTrainerSprites();
+}
+
+function paintPreparedTrainerSprites() {
+  const first = preparedTrainerSprites.single || preparedTrainerSprites.m;
+  const a = document.getElementById("asset-preview-a");
+  const b = document.getElementById("asset-preview-b");
+  if (a && first) {
+    a.innerHTML = `<img src="${first.dataUrl}" alt="Processed trainer sprite" />`;
+  }
+  if (b && preparedTrainerSprites.f) {
+    b.innerHTML = `<img src="${preparedTrainerSprites.f.dataUrl}" alt="Processed female trainer sprite" />`;
+  }
+}
+
+async function processTrainerSprite(file) {
+  const bitmap = await createImageBitmap(file);
+  if (bitmap.width > 2048 || bitmap.height > 2048) {
+    bitmap.close();
+    throw new Error("Sprite dimensions must not exceed 2048x2048");
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const { data } = image;
+  const corners = [0, canvas.width - 1, (canvas.height - 1) * canvas.width, canvas.width * canvas.height - 1];
+  const opaqueCorners = corners.filter(index => data[index * 4 + 3] > 180);
+  const bg = [255, 255, 255];
+  if (opaqueCorners.length > 0) {
+    for (let channel = 0; channel < 3; channel++) {
+      bg[channel] = Math.round(
+        opaqueCorners.reduce((sum, index) => sum + data[index * 4 + channel], 0) / opaqueCorners.length,
+      );
+    }
+  }
+  const seen = new Uint8Array(canvas.width * canvas.height);
+  const queue = [];
+  const matches = index => {
+    const p = index * 4;
+    if (data[p + 3] < 24) {
+      return true;
+    }
+    const dr = data[p] - bg[0];
+    const dg = data[p + 1] - bg[1];
+    const db = data[p + 2] - bg[2];
+    return (
+      dr * dr + dg * dg + db * db <= 42 * 42
+      || (bg.every(v => v > 235) && data[p] > 238 && data[p + 1] > 238 && data[p + 2] > 238)
+    );
+  };
+  const seed = index => {
+    if (!seen[index] && matches(index)) {
+      seen[index] = 1;
+      queue.push(index);
+    }
+  };
+  for (let x = 0; x < canvas.width; x++) {
+    seed(x);
+    seed((canvas.height - 1) * canvas.width + x);
+  }
+  for (let y = 0; y < canvas.height; y++) {
+    seed(y * canvas.width);
+    seed(y * canvas.width + canvas.width - 1);
+  }
+  for (const index of queue) {
+    data[index * 4 + 3] = 0;
+    const x = index % canvas.width;
+    const y = Math.floor(index / canvas.width);
+    if (x > 0) {
+      seed(index - 1);
+    }
+    if (x + 1 < canvas.width) {
+      seed(index + 1);
+    }
+    if (y > 0) {
+      seed(index - canvas.width);
+    }
+    if (y + 1 < canvas.height) {
+      seed(index + canvas.width);
+    }
+  }
+  let minX = canvas.width;
+  let minY = canvas.height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      if (data[(y * canvas.width + x) * 4 + 3] > 0) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+  if (maxX < minX || maxY < minY) {
+    throw new Error("Background removal left no visible sprite pixels");
+  }
+  ctx.putImageData(image, 0, 0);
+  const width = maxX - minX + 1;
+  const height = maxY - minY + 1;
+  const output = document.createElement("canvas");
+  output.width = width;
+  output.height = height;
+  output.getContext("2d").drawImage(canvas, minX, minY, width, height, 0, 0, width, height);
+  const dataUrl = output.toDataURL("image/png");
+  return {
+    dataUrl,
+    pngBase64: dataUrl.split(",")[1],
+    atlas: {
+      frames: {
+        "0001.png": {
+          frame: { x: 0, y: 0, w: width, h: height },
+          rotated: false,
+          trimmed: false,
+          spriteSourceSize: { x: 0, y: 0, w: width, h: height },
+          sourceSize: { w: width, h: height },
+        },
+      },
+      meta: {
+        app: "Elite Redux editor",
+        version: "1.0",
+        image: "sprite.png",
+        format: "RGBA8888",
+        size: { w: width, h: height },
+        scale: "1",
+      },
+    },
+  };
+}
+
+async function onAssetFileChange(input) {
+  const variant = input.id.replace("asset-file-", "");
+  const file = input.files?.[0];
+  if (!file || !(variant in preparedTrainerSprites)) {
+    return;
+  }
+  setStatus(`Processing ${file.name}...`);
+  try {
+    preparedTrainerSprites[variant] = await processTrainerSprite(file);
+    paintPreparedTrainerSprites();
+    setStatus(`${file.name} is cropped and ready.`);
+  } catch (error) {
+    setStatus(`Sprite processing failed: ${error.message || error}`, ERR);
+  }
+}
+
+async function queueMediaImport() {
+  const password = (document.getElementById("password")?.value || "").trim();
+  const urls = (document.getElementById("asset-media-urls")?.value || "")
+    .split(/\r?\n/)
+    .map(value => value.trim())
+    .filter(Boolean);
+  const response = await fetch(`${WORKER_URL}/import-media`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      password,
+      urls,
+      keyPrefix: document.getElementById("asset-media-prefix")?.value.trim(),
+      splitChapters: document.getElementById("asset-split")?.checked,
+      requireCreativeCommons: document.getElementById("asset-require-cc")?.checked,
+      deployStaging: document.getElementById("asset-deploy")?.checked,
+      rightsConfirmed: document.getElementById("asset-media-rights")?.checked,
+      author: document.getElementById("asset-media-author")?.value.trim(),
+    }),
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || `HTTP ${response.status}`);
+  }
+  setStatus("Music import queued. Refresh jobs for runner status.");
+  await refreshMediaJobs();
+}
+
+async function refreshMediaJobs() {
+  const password = (document.getElementById("password")?.value || "").trim();
+  const response = await fetch(`${WORKER_URL}/media-jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || `HTTP ${response.status}`);
+  }
+  const box = document.getElementById("asset-jobs");
+  if (box) {
+    box.innerHTML =
+      (result.runs || [])
+        .map(
+          run =>
+            `<a class="asset-job" href="${esc(run.html_url)}" target="_blank" rel="noreferrer"><span>${esc(new Date(run.created_at).toLocaleString())}</span><b>${esc(run.conclusion || run.status)}</b></a>`,
+        )
+        .join("") || '<span class="dyn">No import jobs yet.</span>';
+  }
+}
+
+async function uploadTrainerSprite() {
+  const gendered = document.getElementById("asset-sprite-gendered")?.checked === true;
+  const files = gendered
+    ? [
+        { variant: "m", ...preparedTrainerSprites.m },
+        { variant: "f", ...preparedTrainerSprites.f },
+      ]
+    : [{ variant: "single", ...preparedTrainerSprites.single }];
+  if (files.some(file => !file.pngBase64)) {
+    throw new Error(
+      gendered ? "Choose and process both male and female files" : "Choose and process a single sprite file",
+    );
+  }
+  const body = {
+    password: (document.getElementById("password")?.value || "").trim(),
+    key: document
+      .getElementById("asset-sprite-key")
+      ?.value.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, ""),
+    label: document.getElementById("asset-sprite-label")?.value.trim(),
+    genders: gendered,
+    kind: document.getElementById("asset-sprite-kind")?.value,
+    tags: (document.getElementById("asset-sprite-tags")?.value || "")
+      .split(",")
+      .map(tag => tag.trim())
+      .filter(Boolean),
+    author: document.getElementById("asset-sprite-author")?.value.trim(),
+    license: document.getElementById("asset-sprite-license")?.value,
+    sourceUrl: document.getElementById("asset-sprite-source")?.value.trim(),
+    rightsConfirmed: document.getElementById("asset-sprite-rights")?.checked,
+    deployStaging: document.getElementById("asset-sprite-deploy")?.checked,
+    files: files.map(file => ({ variant: file.variant, pngBase64: file.pngBase64, atlas: file.atlas })),
+  };
+  const response = await fetch(`${WORKER_URL}/upload-trainer-sprite`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || `HTTP ${response.status}`);
+  }
+  setStatus(`Trainer sprite ${result.key} uploaded. It appears after the editor refreshes.`);
+}
+
+function onAssetsClick(event) {
+  const bgm = event.target.closest("[data-asset-bgm]");
+  if (bgm) {
+    bgmPlay(bgm.dataset.assetBgm);
+    return true;
+  }
+  const use = event.target.closest("[data-asset-sprite]");
+  if (use) {
+    activeTab = "customtrainers";
+    document
+      .querySelectorAll("nav.tabs button")
+      .forEach(button => button.classList.toggle("active", button.dataset.tab === activeTab));
+    render();
+    return true;
+  }
+  const action = async fn => {
+    try {
+      event.target.disabled = true;
+      await fn();
+    } catch (error) {
+      setStatus(error.message || String(error), ERR);
+    } finally {
+      event.target.disabled = false;
+    }
+  };
+  if (event.target.closest("#asset-import")) {
+    void action(queueMediaImport);
+    return true;
+  }
+  if (event.target.closest("#asset-refresh-jobs")) {
+    void action(refreshMediaJobs);
+    return true;
+  }
+  if (event.target.closest("#asset-upload-sprite")) {
+    void action(uploadTrainerSprite);
+    return true;
+  }
+  return false;
+}
+
 function render() {
   const root = $("#content");
   if (activeTab === "eggmoves") {
@@ -3623,6 +4030,8 @@ function render() {
     renderCustomTrainers(root);
   } else if (activeTab === "addmon") {
     renderAddMon(root);
+  } else if (activeTab === "assets") {
+    renderAssets(root);
   } else {
     renderGame(root);
   }
@@ -3884,6 +4293,9 @@ function onPokedexClick(e) {
 
 // Click targets on the Trainers tab (toggle cards, knob resets, filter chips).
 function onClick(e) {
+  if (activeTab === "assets" && onAssetsClick(e)) {
+    return;
+  }
   if (POKEDEX_TABS.has(activeTab) && onPokedexClick(e)) {
     return;
   }
@@ -4432,11 +4844,13 @@ function buildDeltas() {
     // Serialize gender ONLY when the class has gendered sprites AND "f" is picked
     // (default "m" is omitted so unaffected entries stay byte-clean).
     const classEntry = trainerClassByName.get(t.trainerClass);
-    const genderF = classEntry && classEntry.genders && t.gender === "f";
+    const uploadedSprite = trainerSpriteByKey.get(t.trainerSprite || "");
+    const genderF = (uploadedSprite?.genders || classEntry?.genders) && t.gender === "f";
     ctrDelta[key] = {
       id: t.id,
       name: t.name.trim(),
       trainerClass: t.trainerClass,
+      ...(trainerSpriteByKey.has(t.trainerSprite) ? { trainerSprite: t.trainerSprite } : {}),
       ...(genderF ? { gender: "f" } : {}),
       battleType: t.battleType || "single",
       difficulties: t.difficulties.length > 0 ? t.difficulties : ["ace", "elite", "hell"],
@@ -4724,6 +5138,7 @@ async function init() {
       heldItemsData,
       challengeValuesData,
       challengePresetsData,
+      trainerSpritesData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -4769,6 +5184,7 @@ async function init() {
       fetchJson("./data/challenge-values.json", {}),
       // Named challenge presets (generated). Fallback → [] (preset picker hides).
       fetchJson("./data/challenge-presets.json", []),
+      fetchJson(`${RAW_BASE}/er-custom-trainer-sprites.json${bust}`, {}),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -4853,8 +5269,19 @@ async function init() {
     // group alpha-sorted) so the picker surfaces battle tracks up top.
     BGM_LIST = (Array.isArray(bgmData) ? bgmData : [])
       .filter(b => b && typeof b.key === "string")
-      .map(b => ({ key: b.key, battle: b.battle === true }))
+      .map(b => ({ ...b, key: b.key, battle: b.battle === true }))
       .sort((a, b) => (a.battle === b.battle ? a.key.localeCompare(b.key) : a.battle ? -1 : 1));
+
+    trainerSpriteByKey.clear();
+    TRAINER_SPRITES = Object.entries(
+      trainerSpritesData && typeof trainerSpritesData === "object" ? trainerSpritesData : {},
+    )
+      .filter(([key, value]) => /^[a-z0-9_]{2,64}$/.test(key) && value && typeof value === "object")
+      .map(([key, value]) => ({ key, spriteKey: key, ...value }))
+      .sort((a, b) => String(a.label || a.key).localeCompare(String(b.label || b.key)));
+    for (const sprite of TRAINER_SPRITES) {
+      trainerSpriteByKey.set(sprite.key, sprite);
+    }
 
     // Shiny Lab effect registry: build the per-category lists + an id→entry index
     // (with its category) for the per-mon shiny picker and the preview swatch.
@@ -5028,6 +5455,10 @@ async function init() {
     // `change` fires once per completed edit (blur / pick from list) → one undo step,
     // and on the Trainers tab it refreshes the default/overridden badges.
     content.addEventListener("change", e => {
+      if (activeTab === "assets" && e.target.id?.startsWith("asset-file-")) {
+        void onAssetFileChange(e.target);
+        return;
+      }
       if (activeTab === "customtrainers" && onCustomTrainerChange(e.target)) {
         return;
       }

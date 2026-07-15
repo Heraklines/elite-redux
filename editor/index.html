@@ -9,6 +9,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
     <title>Elite Redux — Balancing Editor</title>
     <style>
       :root {
@@ -38,11 +39,11 @@
       #status { margin-left: auto; color: var(--muted); }
       nav.tabs {
         display: flex; gap: 4px; padding: 8px 16px 0; background: var(--panel);
-        border-bottom: 1px solid var(--line);
+        border-bottom: 1px solid var(--line); overflow-x: auto;
       }
       nav.tabs button {
         border-radius: 8px 8px 0 0; border-bottom: none; padding: 7px 14px;
-        background: var(--panel2); color: var(--muted);
+        background: var(--panel2); color: var(--muted); flex: none;
       }
       nav.tabs button.active { background: var(--bg); color: var(--text); font-weight: 600; }
       nav.tabs button .dot { color: var(--accent); margin-left: 4px; }
@@ -205,6 +206,28 @@
       .ctr-intro-row, .ctr-effect-row { margin-top: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
       .ctr-effect-row select { max-width: 180px; }
       .ctr-preview-effect { margin-top: 6px; font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+      /* ---- Media assets ---- */
+      .asset-grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr); gap: 16px; padding: 16px; max-width: 1280px; }
+      .asset-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
+      .asset-panel h2 { margin: 0 0 10px; font-size: 15px; }
+      .asset-form { display: grid; gap: 10px; }
+      .asset-form label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+      .asset-form textarea { min-height: 100px; resize: vertical; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: 12px/1.5 ui-monospace, monospace; }
+      .asset-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .asset-row > label { display: inline-flex; flex-direction: row; align-items: center; gap: 5px; }
+      .asset-catalog { display: grid; gap: 6px; max-height: 430px; overflow: auto; }
+      .asset-track { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2); }
+      .asset-track strong, .asset-track small { display: block; overflow-wrap: anywhere; }
+      .asset-track small { color: var(--muted); }
+      .license { display: inline-block; margin-left: 5px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: 10px; text-transform: uppercase; }
+      .license.cc-by, .license.cc0, .license.original { color: var(--ok); border-color: var(--ok); }
+      .license.youtube-standard, .license.unknown { color: var(--warn); border-color: var(--warn); }
+      .sprite-previews { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 8px; }
+      .sprite-preview { min-height: 150px; display: grid; place-items: center; background: #0d0d14; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+      .sprite-preview img { max-width: 100%; max-height: 220px; image-rendering: pixelated; object-fit: contain; }
+      .asset-jobs { display: grid; gap: 5px; margin-top: 10px; }
+      .asset-job { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
+      @media (max-width: 820px) { .asset-grid { grid-template-columns: 1fr; } }
       /* Trainer sprite-gender radio picker. */
       .ctr-gender { font-size: 12px; display: inline-flex; gap: 8px; align-items: center; }
       .ctr-gender label { margin-right: 0; }
@@ -367,6 +390,7 @@
       <button type="button" data-tab="items">🎒 Items</button>
       <button type="button" data-tab="trainers">🤺 Trainers</button>
       <button type="button" data-tab="customtrainers">🧑‍🏫 Custom Trainers</button>
+      <button type="button" data-tab="assets">🎵 Assets</button>
       <button type="button" data-tab="game">🎛 Game</button>
       <button type="button" data-tab="addmon">➕ Add a Mon</button>
     </nav>
