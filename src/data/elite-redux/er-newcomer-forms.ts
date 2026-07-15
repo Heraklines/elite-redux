@@ -46,13 +46,49 @@ import { ER_MYCELIAL_NETWORK_ABILITY_ID } from "#data/elite-redux/abilities/myce
 import { ER_LAST_HOST_ABILITY_ID } from "#data/elite-redux/abilities/last-host";
 import { ER_CLEANSING_LIGHT_ABILITY_ID } from "#data/elite-redux/abilities/cleansing-light";
 import { ER_QUICKENING_GRACE_ABILITY_ID } from "#data/elite-redux/abilities/quickening-grace";
-import { ER_DECOMPOSER_ABILITY_ID, ER_PURE_GOOD_ABILITY_ID } from "#data/elite-redux/abilities/composite-newcomers";
+import {
+  ER_DECOMPOSER_ABILITY_ID,
+  ER_FIRST_SERPENT_ABILITY_ID,
+  ER_GALE_BLOOM_ABILITY_ID,
+  ER_PURE_GOOD_ABILITY_ID,
+  ER_TITAN_ABILITY_ID,
+  ER_BRAIN_FOOD_ABILITY_ID,
+} from "#data/elite-redux/abilities/composite-newcomers";
 
 /** ER-custom / newcomer ability ids are real `allAbilities` keys; narrow the type. */
 const ab = (id: number): AbilityId => id as AbilityId;
 
-/** On the Prowl — ER draft 648 -> pokerogue ability id (via ER_ID_MAP). */
-const ON_THE_PROWL = 5352;
+// ---------------------------------------------------------------------------
+// ER-custom active/innate ability ids used below. The 5900-range are the manual
+// newcomer/batch abilities; the others are ER draft abilities resolved to their
+// pokerogue id via ER_ID_MAP at authoring time (verified live by the seam test,
+// which asserts every id resolves to a real allAbilities entry).
+// ---------------------------------------------------------------------------
+const ON_THE_PROWL = 5352; // ER draft 648
+const COWARD = 5165; // ER draft 429
+const SELF_REPAIR = 5151; // ER draft 415
+const SLIME_MOLD = 5734; // ER draft 1033
+const RAGING_BOXER = 5057; // ER draft 319
+const STYGIAN_RUSH = 5279; // ER draft 558
+const PREDATOR = 5101; // ER draft 363
+// 5900-range innates carried by the megas/primals below.
+const BORROWED_TIME = 5910;
+const RELATIVITY = 5911;
+const TANGLED_SEED = 5903;
+const COMMON_ROOT = 5904;
+const DANDELION_BURST = 5907;
+const SYNCHRONIZED_CURRENT = 5921;
+const POSITIVE_FEEDBACK = 5922;
+const NEGATIVE_FEEDBACK = 5923;
+const CLOSED_CIRCUIT = 5924;
+const CAPACITOR_BANK = 5925;
+const FAULT_CURRENT = 5926;
+const OVERLOADED = 5927;
+const DRACONIC_VOODOO = 5930;
+const HYDRAPEX = 5931;
+const BAD_SPLICE = 5932;
+const WORLD_IN_PIECES = 5917;
+const GENESIS_SUPERNOVA = 5937;
 
 /**
  * A hand-authored newcomer mega/primal form. Injected onto {@linkcode baseSpecies}
@@ -129,6 +165,125 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     innates: [ab(ER_DECOMPOSER_ABILITY_ID), ab(ER_MYCELIAL_NETWORK_ABILITY_ID), ab(ER_LAST_HOST_ABILITY_ID)],
     item: FormChangeItem.PARASECTITE,
     learnMoves: [MoveId.LEAF_BLADE],
+  },
+  // #1 Mega Hydreigon X — Dark/Dragon. Active Strong Jaw; innates Hydrapex
+  // (5931), Draconic Voodoo (5930), First Serpent (5933). Stone Hydreigonite X.
+  {
+    baseSpecies: SpeciesId.HYDREIGON,
+    formKey: "mega-x",
+    formName: "Mega X",
+    slug: "mega_hydreigon_x",
+    types: [PokemonType.DARK, PokemonType.DRAGON],
+    stats: [92, 165, 123, 115, 90, 115],
+    actives: [AbilityId.STRONG_JAW, AbilityId.STRONG_JAW, AbilityId.STRONG_JAW],
+    innates: [ab(HYDRAPEX), ab(DRACONIC_VOODOO), ab(ER_FIRST_SERPENT_ABILITY_ID)],
+    item: FormChangeItem.HYDREIGONITE_X,
+  },
+  // #5 Mega Shuckle Y — Bug/Psychic. Active Battle Armor / Coward / Self Repair;
+  // innates Borrowed Time (5910), Relativity (5911), Slime Mold. Stone Shucklite Y.
+  {
+    baseSpecies: SpeciesId.SHUCKLE,
+    formKey: "mega-y",
+    formName: "Mega Y",
+    slug: "mega_shuckle_y",
+    types: [PokemonType.BUG, PokemonType.PSYCHIC],
+    stats: [50, 50, 200, 130, 200, 20],
+    actives: [AbilityId.BATTLE_ARMOR, ab(COWARD), ab(SELF_REPAIR)],
+    innates: [ab(BORROWED_TIME), ab(RELATIVITY), ab(SLIME_MOLD)],
+    item: FormChangeItem.SHUCKLITE_Y,
+  },
+  // #11 Mega Electivire X — Electric/Dark/Ground (N-type). Active Gorilla Tactics
+  // / Raging Boxer / Stygian Rush; innates Overloaded (5927), Capacitor Bank
+  // (5925), Fault Current (5926). Stone Electivirite X.
+  {
+    baseSpecies: SpeciesId.ELECTIVIRE,
+    formKey: "mega-x",
+    formName: "Mega X",
+    slug: "mega_electivire_x",
+    types: [PokemonType.ELECTRIC, PokemonType.DARK, PokemonType.GROUND],
+    stats: [95, 163, 107, 85, 130, 60],
+    actives: [AbilityId.GORILLA_TACTICS, ab(RAGING_BOXER), ab(STYGIAN_RUSH)],
+    innates: [ab(OVERLOADED), ab(CAPACITOR_BANK), ab(FAULT_CURRENT)],
+    item: FormChangeItem.ELECTIVIRITE_X,
+  },
+  // #15 Mega Jumpluff — Grass/Flying/Fairy (N-type). Active Gale Bloom (5944);
+  // innates Tangled Seed (5903), Common Root (5904), Dandelion Burst (5907).
+  // Stone Jumpluffite.
+  {
+    baseSpecies: SpeciesId.JUMPLUFF,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "mega_jumpluff",
+    types: [PokemonType.GRASS, PokemonType.FLYING, PokemonType.FAIRY],
+    stats: [75, 115, 90, 100, 105, 150],
+    actives: [ab(ER_GALE_BLOOM_ABILITY_ID), ab(ER_GALE_BLOOM_ABILITY_ID), ab(ER_GALE_BLOOM_ABILITY_ID)],
+    innates: [ab(TANGLED_SEED), ab(COMMON_ROOT), ab(DANDELION_BURST)],
+    item: FormChangeItem.JUMPLUFFITE,
+  },
+  // #13 Mega Minun — Electric/Fairy (physical). Active Transistor / Closed Circuit
+  // (5924) / Lightning Rod; innates Minus, Synchronized Current (5921), Negative
+  // Feedback (5923). Stone Minunite.
+  {
+    baseSpecies: SpeciesId.MINUN,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "mega_minun",
+    types: [PokemonType.ELECTRIC, PokemonType.FAIRY],
+    stats: [60, 125, 95, 55, 85, 125],
+    actives: [AbilityId.TRANSISTOR, ab(CLOSED_CIRCUIT), AbilityId.LIGHTNING_ROD],
+    innates: [AbilityId.MINUS, ab(SYNCHRONIZED_CURRENT), ab(NEGATIVE_FEEDBACK)],
+    item: FormChangeItem.MINUNITE,
+  },
+  // #14 Mega Plusle — Electric/Fairy (special). Active Pretty Privilege / Closed
+  // Circuit (5924) / Friend Guard; innates Plus, Synchronized Current (5921),
+  // Positive Feedback (5922). Stone Plusleite. (Pretty Privilege = ER draft 628.)
+  {
+    baseSpecies: SpeciesId.PLUSLE,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "mega_plusle",
+    types: [PokemonType.ELECTRIC, PokemonType.FAIRY],
+    stats: [60, 55, 95, 115, 105, 115],
+    actives: [ab(5332), ab(CLOSED_CIRCUIT), AbilityId.FRIEND_GUARD],
+    innates: [AbilityId.PLUS, ab(SYNCHRONIZED_CURRENT), ab(POSITIVE_FEEDBACK)],
+    item: FormChangeItem.PLUSLEITE,
+  },
+  // #3 Primal Regigigas — Normal/Rock/Ice/Steel/Electric/Dragon (SIX types).
+  // Active Predator / Stall / Raging Boxer; innates Titan (5934), World in Pieces
+  // (5917), Self Repair. Orb Planetary Orb. Reversion form (like other primals):
+  // holding the orb triggers the "primal" form, Mega-Bracelet gated in the pool.
+  {
+    baseSpecies: SpeciesId.REGIGIGAS,
+    formKey: "primal",
+    formName: "Primal",
+    slug: "primal_regigigas",
+    types: [
+      PokemonType.NORMAL,
+      PokemonType.ROCK,
+      PokemonType.ICE,
+      PokemonType.STEEL,
+      PokemonType.ELECTRIC,
+      PokemonType.DRAGON,
+    ],
+    stats: [140, 170, 145, 70, 145, 100],
+    actives: [ab(PREDATOR), AbilityId.STALL, ab(RAGING_BOXER)],
+    innates: [ab(ER_TITAN_ABILITY_ID), ab(WORLD_IN_PIECES), ab(SELF_REPAIR)],
+    item: FormChangeItem.PLANETARY_ORB,
+  },
+  // #6 Primal Mew — Psychic. Active Bad Splice (5932); innates Brain Food (5936),
+  // Genesis Supernova (5937), and the PARKED "Shattered Psyche" slot (AbilityId.NONE
+  // placeholder — maintainer to supply the definition). Orb Embryonic Orb.
+  {
+    baseSpecies: SpeciesId.MEW,
+    formKey: "primal",
+    formName: "Primal",
+    slug: "primal_mew",
+    types: [PokemonType.PSYCHIC],
+    stats: [100, 110, 130, 110, 130, 120],
+    actives: [ab(BAD_SPLICE), ab(BAD_SPLICE), ab(BAD_SPLICE)],
+    // NONE = parked Shattered Psyche slot (documented TODO; not yet defined).
+    innates: [ab(ER_BRAIN_FOOD_ABILITY_ID), ab(GENESIS_SUPERNOVA), AbilityId.NONE],
+    item: FormChangeItem.EMBRYONIC_ORB,
   },
 ];
 

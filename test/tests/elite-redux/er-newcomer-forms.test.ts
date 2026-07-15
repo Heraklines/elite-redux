@@ -26,6 +26,7 @@ import { isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { ER_NEWCOMER_FORMS } from "#data/elite-redux/er-newcomer-forms";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { SpeciesFormChangeItemTrigger } from "#data/pokemon-forms/form-change-triggers";
+import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
@@ -71,8 +72,12 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
       expect([form.ability1, form.ability2, form.abilityHidden]).toEqual([...def.actives]);
       // Innate triple.
       expect([...form.getPassiveAbilities()]).toEqual([...def.innates]);
-      // Every referenced ability id is a live allAbilities entry.
+      // Every referenced ability id is a live allAbilities entry (NONE = a
+      // documented parked slot, e.g. Primal Mew's Shattered Psyche — skip it).
       for (const id of [...def.actives, ...def.innates]) {
+        if (id === AbilityId.NONE) {
+          continue;
+        }
         expect(allAbilities[id], `ability ${id} exists for ${def.formName}`).toBeDefined();
         expect(allAbilities[id].id).toBe(id);
       }
