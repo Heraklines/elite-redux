@@ -65,6 +65,7 @@ import {
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
+  notifyCoopWaveContinuationSurfaceReady,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_CROSSROADS_CHOICE_KINDS, COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
@@ -393,6 +394,10 @@ export class ErCrossroadsPhase extends Phase {
         this.clearCrossroadsCommitRecovery();
         this.coopOwnerPromptState = "open";
         getCoopUiMirror()?.beginSession("owner", UiMode.OPTION_SELECT, mirrorSeq);
+        // Crossroads can be the first actionable surface after the every-ten-wave market. Publishing from
+        // the real, active picker keeps the retained WAVE_ADVANCE journal closed until a player can act;
+        // merely queuing this phase is deliberately insufficient.
+        notifyCoopWaveContinuationSurfaceReady(wave);
       });
   }
 
@@ -495,6 +500,9 @@ export class ErCrossroadsPhase extends Phase {
       }
       this.clearCrossroadsCommitRecovery();
       getCoopUiMirror()?.beginSession("watcher", UiMode.OPTION_SELECT, mirrorSeq);
+      // The watcher is a real public continuation too. Only the authoritative guest runtime can consume
+      // this notification, so owner parity cannot leave the retained wave waiting on the wrong renderer.
+      notifyCoopWaveContinuationSurfaceReady(wave);
     } catch {
       /* cosmetic - the awaited relay still drives the authoritative apply below */
     }
