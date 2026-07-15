@@ -66,6 +66,7 @@ import {
   getCoopRuntime,
   getCoopUiMirror,
   notifyCoopWaveContinuationSurfaceReady,
+  runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_CROSSROADS_CHOICE_KINDS, COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
@@ -143,6 +144,8 @@ export class ErCrossroadsPhase extends Phase {
   private readonly coopSourceWave: number;
   private readonly coopSourceTurn: number;
   private readonly coopSourceBiomeId: BiomeId;
+  /** Runtime that constructed this phase; async picker completion may resume under the other harness client. */
+  private readonly coopOwningRuntime = getCoopRuntime();
 
   constructor(sourceWave: number | null = null) {
     super();
@@ -397,8 +400,18 @@ export class ErCrossroadsPhase extends Phase {
         // Crossroads can be the first actionable surface after the every-ten-wave market. Publishing from
         // the real, active picker keeps the retained WAVE_ADVANCE journal closed until a player can act;
         // merely queuing this phase is deliberately insufficient.
-        notifyCoopWaveContinuationSurfaceReady(wave);
+        this.notifyCoopContinuationSurfaceReady();
       });
+  }
+
+  /** Publish only after the phase's own runtime and scene are installed together. */
+  private notifyCoopContinuationSurfaceReady(): void {
+    const notify = () => notifyCoopWaveContinuationSurfaceReady(this.coopSourceWave);
+    if (this.coopOwningRuntime == null) {
+      notify();
+      return;
+    }
+    runWhenCoopRuntimeActive(this.coopOwningRuntime, notify);
   }
 
   /** OWNER terminal: relay the Stay(0)/Leave(1) choice, then apply it locally. */
@@ -502,7 +515,7 @@ export class ErCrossroadsPhase extends Phase {
       getCoopUiMirror()?.beginSession("watcher", UiMode.OPTION_SELECT, mirrorSeq);
       // The watcher is a real public continuation too. Only the authoritative guest runtime can consume
       // this notification, so owner parity cannot leave the retained wave waiting on the wrong renderer.
-      notifyCoopWaveContinuationSurfaceReady(wave);
+      this.notifyCoopContinuationSurfaceReady();
     } catch {
       /* cosmetic - the awaited relay still drives the authoritative apply below */
     }
