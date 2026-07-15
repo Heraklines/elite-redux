@@ -178,6 +178,19 @@ const signalServer = createServer((request, response) => {
 });
 
 async function configurePage(page, label, browserErrors, sourceAssetMisses) {
+  // Keep references to every native peer connection created by the sealed production bundle. The test later
+  // injects a connectionState=failed event while its real DataChannel is still open, reproducing the browser
+  // failure shape that previously stayed falsely healthy. This observer does not replace or mock WebRTC.
+  await page.evaluateOnNewDocument(() => {
+    const NativePeerConnection = globalThis.RTCPeerConnection;
+    globalThis.__coopBrowserPeerConnections = [];
+    globalThis.RTCPeerConnection = class TrackedPeerConnection extends NativePeerConnection {
+      constructor(...args) {
+        super(...args);
+        globalThis.__coopBrowserPeerConnections.push(this);
+      }
+    };
+  });
   // Stub only services that the transport checkpoint does not own. This removes known sealed-preview noise
   // without weakening page errors, co-op console errors, or arbitrary failed-resource diagnostics.
   await page.setRequestInterception(true);
@@ -342,7 +355,13 @@ try {
     if (new TextEncoder().encode(expected).byteLength !== targetBytes) {
       throw new Error("browser checkpoint fixture is not exactly 512 KiB");
     }
-    globalThis.__coopBrowserProbe = { expected, received: null, checkpointCount: 0, continued: 0 };
+    globalThis.__coopBrowserProbe = {
+      expected,
+      received: null,
+      checkpointCount: 0,
+      continued: 0,
+      pcFailureContinued: 0,
+    };
     globalThis.__coopBrowserRuntime.localTransport.onMessage(message => {
       if (message.t === "resumeCheckpoint" && message.checkpointId === "browser-midchunk-checkpoint") {
         globalThis.__coopBrowserProbe.checkpointCount++;
@@ -350,6 +369,9 @@ try {
       }
       if (message.t === "stallBeat" && message.waitingMs === 424_242) {
         globalThis.__coopBrowserProbe.continued++;
+      }
+      if (message.t === "stallBeat" && message.waitingMs === 515_151) {
+        globalThis.__coopBrowserProbe.pcFailureContinued++;
       }
     });
   });
@@ -451,12 +473,71 @@ try {
     polling: 50,
   });
 
+  const firstRejoin = await Promise.all([browserStatus(hostPage), browserStatus(guestPage)]);
+  if (firstRejoin.some(state => state.transport !== "connected" || state.generation < 1)) {
+    throw new Error(`mid-chunk hot rejoin failed: ${JSON.stringify(firstRejoin)}`);
+  }
+
+  // Browser regression: the RTCPeerConnection can reach failed while Chromium leaves its DataChannel open.
+  // Dispatch the native event against the tracked production PC with an injected failed state. The production
+  // adapter must retire that stuck-open carrier, emit one disconnect, and complete another real SDP/ICE rejoin.
+  const pcFailureTargetGeneration = firstRejoin[0].generation + 1;
+  const failedOpenCarrier = await hostPage.evaluate(() => {
+    const runtime = globalThis.__coopBrowserRuntime;
+    const transport = runtime.localTransport;
+    const wire = transport.wire;
+    const peerConnections = globalThis.__coopBrowserPeerConnections ?? [];
+    const pc = peerConnections.at(-1);
+    if (pc == null) {
+      throw new Error("browser peer-connection tracker captured no live connection");
+    }
+    const channelStateBefore = wire.readyState;
+    if (channelStateBefore !== "open") {
+      throw new Error(`peer failure fixture requires an open DataChannel, got ${channelStateBefore}`);
+    }
+    Object.defineProperty(pc, "connectionState", { configurable: true, get: () => "failed" });
+    pc.dispatchEvent(new Event("connectionstatechange"));
+    return {
+      channelStateBefore,
+      connectionCount: peerConnections.length,
+      generationBefore: transport.connectionGeneration(),
+      transportAfterEvent: transport.state,
+    };
+  });
+  if (failedOpenCarrier.channelStateBefore !== "open" || failedOpenCarrier.transportAfterEvent !== "disconnected") {
+    throw new Error(`failed-with-open-channel was not propagated immediately: ${JSON.stringify(failedOpenCarrier)}`);
+  }
+
+  await Promise.all([
+    hostPage.waitForFunction(
+      generation =>
+        globalThis.__coopBrowserRuntime?.localTransport?.state === "connected"
+        && globalThis.__coopBrowserRuntime?.localTransport?.connectionGeneration?.() >= generation,
+      { timeout: 90_000, polling: 250 },
+      pcFailureTargetGeneration,
+    ),
+    guestPage.waitForFunction(
+      generation =>
+        globalThis.__coopBrowserRuntime?.localTransport?.state === "connected"
+        && globalThis.__coopBrowserRuntime?.localTransport?.connectionGeneration?.() >= generation,
+      { timeout: 90_000, polling: 250 },
+      pcFailureTargetGeneration,
+    ),
+  ]);
+  await hostPage.evaluate(() => {
+    globalThis.__coopBrowserRuntime.localTransport.send({ t: "stallBeat", waitingMs: 515_151 });
+  });
+  await guestPage.waitForFunction(() => globalThis.__coopBrowserProbe?.pcFailureContinued === 1, {
+    timeout: 15_000,
+    polling: 50,
+  });
+
   const rejoined = await Promise.all([browserStatus(hostPage), browserStatus(guestPage)]);
   if (
     rejoined.some(
       state =>
         state.transport !== "connected"
-        || state.generation < 1
+        || state.generation < pcFailureTargetGeneration
         || !state.snapshot?.partnerConnected
         || state.versionMismatch
         || state.fingerprintMismatch,
@@ -475,7 +556,7 @@ try {
     );
   }
   process.stdout.write(
-    `[coop-browser] PASS native WebRTC handshake + exact 512KiB UTF-8 mid-chunk restart + hot rejoin + continued traffic ${JSON.stringify({ checkpointFixture, exactCheckpoint, rejoined })}\n`,
+    `[coop-browser] PASS native WebRTC handshake + exact 512KiB UTF-8 mid-chunk restart + failed-PC/open-channel recovery + hot rejoin + continued traffic ${JSON.stringify({ checkpointFixture, exactCheckpoint, failedOpenCarrier, rejoined })}\n`,
   );
 } catch (error) {
   process.stderr.write(`[coop-browser] FAIL ${error.stack ?? error}\n`);
