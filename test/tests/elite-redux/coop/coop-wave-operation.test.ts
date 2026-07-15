@@ -166,7 +166,12 @@ describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
         biomeChange: () => true,
       }),
     ).toEqual({ trainerWin: false, runContinues: false, eggLapse: false, biomeChange: false });
-    expect(coopWaveAdvanceSanctionedTails(terminal)).toEqual(["VictoryPhase", "BattleEndPhase", "GameOverPhase"]);
+    expect(coopWaveAdvanceSanctionedTails(terminal)).toEqual([
+      "VictoryPhase",
+      "BattleEndPhase",
+      "CoopVictorySealPhase",
+      "GameOverPhase",
+    ]);
     expect(
       isValidCoopWaveAdvancePayload({ ...terminal, biomeChange: true }),
       "a terminal victory cannot also authorize a biome destination",

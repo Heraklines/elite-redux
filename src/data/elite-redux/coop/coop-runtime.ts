@@ -1102,6 +1102,8 @@ export interface CoopAutomaticVictorySealIdentity {
 interface CoopPendingAutomaticVictorySeal {
   readonly identity: CoopAutomaticVictorySealIdentity;
   readonly transition: CoopWaveAdvancePayload;
+  /** BattleEnd may legitimately advance the ambient turn once; freeze that post-battle address for sealing. */
+  readonly settlementTurn: number;
 }
 
 function usesRetainedCoopWaveTransaction(runtime: CoopRuntime | null = active): boolean {
@@ -1187,7 +1189,8 @@ export function deferCoopAutomaticVictorySealAtBattleEnd(identity: CoopAutomatic
     || identity.turn == null
     || identity.turn < 0
     || currentWave !== identity.wave
-    || currentTurn !== identity.turn
+    || !Number.isSafeInteger(currentTurn)
+    || currentTurn !== identity.turn + 1
   ) {
     failCoopSharedSession(
       "The automatic victory boundary did not match BattleEnd "
@@ -1200,8 +1203,11 @@ export function deferCoopAutomaticVictorySealAtBattleEnd(identity: CoopAutomatic
     failCoopSharedSession(`A duplicate automatic victory boundary was staged for wave ${identity.wave}.`);
     return true;
   }
-  pendingAutomaticVictorySeals.set(runtime, { identity, transition });
-  coopLog("progression", `HOST automatic victory settlement deferred wave=${identity.wave} turn=${identity.turn}`);
+  pendingAutomaticVictorySeals.set(runtime, { identity, transition, settlementTurn: currentTurn });
+  coopLog(
+    "progression",
+    `HOST automatic victory settlement deferred wave=${identity.wave} sourceTurn=${identity.turn} settlementTurn=${currentTurn}`,
+  );
   return true;
 }
 
@@ -4344,16 +4350,21 @@ export function sealCoopAutomaticVictoryBoundary(identity: CoopAutomaticVictoryS
   }
   const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
   const currentTurn = globalScene.currentBattle?.turn ?? -1;
-  if (identity.turn == null || identity.turn < 0 || currentWave !== identity.wave || currentTurn !== identity.turn) {
+  if (
+    identity.turn == null
+    || identity.turn < 0
+    || currentWave !== identity.wave
+    || currentTurn !== pending.settlementTurn
+  ) {
     failCoopSharedSession(
-      `The automatic victory seal address drifted from ${identity.wave}:${identity.turn ?? "unresolved"} `
-        + `to ${currentWave}:${currentTurn}.`,
+      `The automatic victory seal address drifted from source ${identity.wave}:${identity.turn ?? "unresolved"} `
+        + `through settlement ${identity.wave}:${pending.settlementTurn} to ${currentWave}:${currentTurn}.`,
     );
     return false;
   }
 
-  const capturedState = captureCoopAuthoritativeBattleState(identity.turn);
-  if (capturedState == null || capturedState.wave !== identity.wave || capturedState.turn !== identity.turn) {
+  const capturedState = captureCoopAuthoritativeBattleState(pending.settlementTurn);
+  if (capturedState == null || capturedState.wave !== identity.wave || capturedState.turn !== pending.settlementTurn) {
     failCoopSharedSession(`Could not capture the complete automatic victory state for wave ${identity.wave}.`);
     return false;
   }
@@ -4366,7 +4377,7 @@ export function sealCoopAutomaticVictoryBoundary(identity: CoopAutomaticVictoryS
   sendCoopWaveEndStateCompatibility(identity.wave, state);
   coopLog(
     "progression",
-    `HOST automatic victory settlement sealed wave=${identity.wave} turn=${identity.turn} tick=${state.tick}`,
+    `HOST automatic victory settlement sealed wave=${identity.wave} sourceTurn=${identity.turn} settlementTurn=${pending.settlementTurn} tick=${state.tick}`,
   );
   return true;
 }

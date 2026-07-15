@@ -36,6 +36,7 @@ import {
 } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   clearCoopRuntime,
+  consumeCoopPendingWaveAdvance,
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
@@ -1239,6 +1240,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const partner = getCoopRuntime()!.partnerTransport!;
     sendWaveAdvance(partner, "win");
     await new Promise(resolve => setTimeout(resolve, 0));
+    expect(
+      consumeCoopPendingWaveAdvance()?.transition?.wave,
+      "the test adopts the retained transition before constructing its host-stated VictoryPhase",
+    ).toBe(sourceWave);
 
     // Reproduce C1 exactly: the retained source is ordinary wave 11, while mutable ambient state already
     // advertises wave 12 as MYSTERY_ENCOUNTER without an encounter object. The old ambient classifier called
