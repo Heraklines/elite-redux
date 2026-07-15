@@ -623,6 +623,32 @@ function hasSemanticSurface(rig, surfaceId, cursors) {
 }
 
 /**
+ * Return the first registered between-wave surface observed since this wave began.
+ *
+ * A phase/owner marker can precede the handler's actionable semantic projection by much
+ * longer than the short UNKNOWN-surface budget on a CPU-constrained Chromium runner. That
+ * is a known surface waiting for production UI readiness, not an unhandled surface. Keep
+ * it under the immutable between-wave deadline while preserving the short loud-fail for a
+ * phase that has no driver at all.
+ */
+export function findRegisteredSurface(rig, dispatch, cursors, handledIndex = new Map()) {
+  return (
+    dispatch.find(driver => {
+      if (driver.v2SurfaceId && hasSemanticSurface(rig, driver.v2SurfaceId, cursors)) {
+        return Object.values(rig.clients).some(client => {
+          const event = client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, driver.v2SurfaceId);
+          return event != null && event.index > (handledIndex.get(`${driver.name}:${client.label}`) ?? -1);
+        });
+      }
+      return Object.values(rig.clients).some(client => {
+        const event = client.evidence.find(driver.present, cursors[client.label] ?? 0);
+        return event != null && event.index > (handledIndex.get(`${driver.name}:${client.label}`) ?? -1);
+      });
+    }) ?? null
+  );
+}
+
+/**
  * Find the OWNER client + the evidence event that identifies this appearance, or null.
  *
  * `strict` (every loud-fail run - gating + nightly; false only under the explicit
@@ -795,6 +821,8 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
   const deadline = Date.now() + rig.config.timeoutMs * 3;
   let stallSince = 0;
   let lastPhaseProgress = phaseProgressSignature(clients);
+  let lastRegisteredSurface = null;
+  let drivenSurfacePhaseSignature = null;
 
   while (Date.now() < deadline) {
     if (
@@ -830,13 +858,39 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
     const drove = await driveOnePendingSurface(rig, dispatch, surfaceCursors, handledIndex, stats, !policy.autoFirst);
     if (drove) {
       stallSince = 0;
+      lastRegisteredSurface = drove;
       lastPhaseProgress = phaseProgressSignature(clients);
+      drivenSurfacePhaseSignature = lastPhaseProgress;
       continue;
     }
 
     const phaseSignature = phaseProgressSignature(clients);
+    if (drivenSurfacePhaseSignature === phaseSignature) {
+      // The public input was spent on a readiness-proven handler, but its reciprocal
+      // material/continuation barrier has not started another phase yet. This is still
+      // completion of the registered surface, bounded by the immutable outer deadline.
+      stallSince = 0;
+      await delay(150);
+      continue;
+    }
+    drivenSurfacePhaseSignature = null;
+
+    // A registered surface can be visible while its real handler is still animating or
+    // typing narration. Run 29436980968 needed 15.5s for reward-shop readiness on a loaded
+    // Chromium runner; treating it as UNKNOWN after 8s made the gold-standard campaign fail
+    // before a human could act. The immutable outer deadline still catches a handler that
+    // never becomes ready or a handled surface that never completes.
+    const registeredSurface = findRegisteredSurface(rig, dispatch, surfaceCursors, handledIndex);
+    if (registeredSurface != null) {
+      lastRegisteredSurface = registeredSurface.name;
+      stallSince = 0;
+      await delay(150);
+      continue;
+    }
+
     if (phaseSignature !== lastPhaseProgress) {
       lastPhaseProgress = phaseSignature;
+      lastRegisteredSurface = null;
       stallSince = 0;
     } else if (stallSince === 0) {
       stallSince = Date.now();
@@ -863,6 +917,12 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
   }
 
   const parked = latestStartPhase(clients);
+  if (lastRegisteredSurface != null) {
+    throw new Error(
+      `[campaign-readiness] registered surface ${lastRegisteredSurface} never became actionable or completed `
+        + `before the between-wave deadline; latest phase=${parked?.name ?? "unknown"}`,
+    );
+  }
   throw new Error(
     `wave ${waveOrdinal}: clients never reached the next command surface before the between-wave deadline; `
       + `latest phase=${parked?.name ?? "unknown"}`,

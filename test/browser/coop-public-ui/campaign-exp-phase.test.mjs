@@ -10,6 +10,7 @@ import {
   createAnimationProgressBudget,
   createBattlePromptAdvancer,
   driveBattleFallback,
+  findRegisteredSurface,
   resolveSurfaceOwner,
   waitForOutcomeBounded,
 } from "./campaign.mjs";
@@ -245,6 +246,42 @@ test("semantic owner is not driven until the visible handler accepts input", () 
     resolveSurfaceOwner(rig, driver, cursors, handled, true),
     null,
     "an already-driven semantic appearance waits for the phase to advance instead of becoming malformed",
+  );
+});
+
+test("a registered reward waiting for handler readiness is not classified as an unknown surface", () => {
+  const authority = fakeClient("authority", ["OWNER drives reward screen"]);
+  const renderer = fakeClient("renderer", ["Start Phase SelectModifierPhase"]);
+  const rig = { host: authority, clients: { authority, renderer } };
+  const driver = {
+    name: "reward",
+    present: /OWNER drives reward screen/u,
+    v2SurfaceId: "reward-shop",
+    owner: { marker: /OWNER drives reward screen/u },
+  };
+  const cursors = { authority: 0, renderer: 0 };
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "reward-shop",
+      localSeat: 0,
+      ownerSeat: 0,
+      ready: { handlerActive: true, awaitingActionInput: false },
+    },
+  });
+
+  assert.equal(resolveSurfaceOwner(rig, driver, cursors, new Map(), true), null);
+  assert.equal(
+    findRegisteredSurface(rig, [driver], cursors),
+    driver,
+    "the campaign must wait under its bounded readiness deadline instead of spending the UNKNOWN timer",
+  );
+  const handled = new Map([["reward:authority", authority.evidence.events.at(-1).index]]);
+  assert.equal(
+    findRegisteredSurface(rig, [driver], cursors, handled),
+    null,
+    "historical evidence from a completed surface must not hide a later unknown phase",
   );
 });
 
