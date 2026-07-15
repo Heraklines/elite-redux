@@ -1,0 +1,52 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: 150
+run: 29435951070 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T17-20-51Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:interaction] interactionCounter() read -> 4 (role=guest)
+[coop:health] tick=2g turn=1 wave=5 counter=4 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=1s transport=connected journal=0/0 queue=0
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[32mStart Phase: ShowAbilityPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[32mStart Phase: StatStageChangePhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[32mStart Phase: MessagePhase[39m
+[34mFoe Sentret’s Speed rose sharply![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[32mStart Phase: HideAbilityPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:stream] host RE-SEND unacked turn commit e=1826955311091469 wave=3 turn=1 rev=16
+[coop:transport] send host t=turnResolution e=1826955311091469 wave=3 turn=1 rev=16 events=8 checksum=d844fe37107643ea
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:transport] recv guest t=turnResolution e=1826955311091469 wave=3 turn=1 rev=16 events=8 checksum=d844fe37107643ea handlers=1
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:transport] send guest t=requestTurnCommit e=1826955311091469 wave=3 turn=1 rev=16
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:transport] recv host t=requestTurnCommit e=1826955311091469 wave=3 turn=1 rev=16 handlers=1
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[32mStart Phase: StatStageChangePhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[32mStart Phase: MessagePhase[39m
+[34mFoe Sentret’s Sp. Atk fell![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[32mStart Phase: ShowAbilityPhase[39m
+
