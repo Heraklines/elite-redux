@@ -66,6 +66,7 @@ const ER_STATUS_BADGES: Record<string, { label: string; color: string }> = {
   bleed: { label: "BLEED", color: "#ff5555" },
   frostbite: { label: "FROST", color: "#8fe0ff" },
   fear: { label: "FEAR", color: "#c98bff" },
+  commanded: { label: "CMND", color: "#ffd166" },
 };
 
 export abstract class BattleInfo extends Phaser.GameObjects.Container {
@@ -550,6 +551,8 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
         frame = "frostbite";
       } else if (pokemon.getTag(BattlerTagType.ER_FEAR)) {
         frame = "fear";
+      } else if (pokemon.getTag(BattlerTagType.ER_COMMANDED)) {
+        frame = "commanded";
       }
     }
 

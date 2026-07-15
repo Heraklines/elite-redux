@@ -32,6 +32,7 @@
 import { type AbAttr, ConditionalCritAbAttr, PostFaintAbAttr } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { ER_PUPPET_STRINGS_ABILITY_ID, PuppetStringsAbAttr } from "#data/elite-redux/abilities/puppet-strings";
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
@@ -202,6 +203,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
         archetype: "unknown",
       },
       pokerogueId: ER_SILKEN_DECREE_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_PUPPET_STRINGS_ABILITY_ID,
+        name: "Puppet Strings",
+        description:
+          "When this Pokemon damages a poisoned foe with a Psychic-type move, that foe becomes Commanded: its next action is hijacked (it strikes an ally in doubles, or itself in singles; a status move fails). Once per foe's switch-in.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_PUPPET_STRINGS_ABILITY_ID,
     },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
@@ -392,6 +403,10 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_SILKEN_DECREE_ABILITY_ID) {
     builder.attr(SilkenDecreeAbAttr);
+  }
+
+  if (pokerogueId === ER_PUPPET_STRINGS_ABILITY_ID) {
+    builder.attr(PuppetStringsAbAttr);
   }
 
   const ability = builder.build();

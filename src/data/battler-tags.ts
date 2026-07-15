@@ -4416,6 +4416,106 @@ export class ErEmpoweredSwitchInTag extends BattlerTag {
 }
 
 /**
+ * ER "Commanded" (applied by Puppet Strings): a one-turn volatile that hijacks the
+ * bearer's next action. When the bearer is about to move (PRE_MOVE lapse):
+ *   - a STATUS move simply FAILS (the phase is cancelled);
+ *   - a DAMAGING move in doubles/triples is redirected to a random living ALLY
+ *     (seeded pick via {@linkcode Pokemon.randBattleSeedInt}); the move otherwise
+ *     resolves normally against that ally;
+ *   - a DAMAGING move in singles is cancelled and the bearer instead takes 40% of
+ *     that move's self-computed damage (its own move against its own defenses, no
+ *     crit, no secondary effects, no contact procs).
+ * The tag then expires. If the bearer never gets to act, it expires at the end of
+ * the turn it was due to act ({@linkcode BattlerTagLapseType.TURN_END} + turnCount
+ * 2: it is applied mid-turn, survives that turn's end, and expires the following
+ * turn's end). Non-serializable (a transient one-turn effect).
+ *
+ * Distinct from vanilla {@linkcode BattlerTagType.COMMANDED} (Tatsugiri's Commander).
+ */
+export class ErCommandedTag extends BattlerTag {
+  public override readonly tagType = BattlerTagType.ER_COMMANDED;
+  constructor(sourceId?: number) {
+    super(
+      BattlerTagType.ER_COMMANDED,
+      [BattlerTagLapseType.PRE_MOVE, BattlerTagLapseType.TURN_END],
+      2,
+      MoveId.NONE,
+      sourceId,
+    );
+  }
+
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    // Enforce "once per switch-in": mark the bearer so Puppet Strings cannot
+    // re-command it until it switches out (summonData reset clears this flag).
+    pokemon.summonData.erCommandedUsedThisSwitchIn = true;
+    globalScene.phaseManager.queueMessage(
+      i18next.t("battlerTags:erCommandedOnAdd", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+        defaultValue: `${getPokemonNameWithAffix(pokemon)} fell under puppet strings!`,
+      }),
+    );
+  }
+
+  override lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
+    if (lapseType === BattlerTagLapseType.TURN_END) {
+      // Standard tick-down: turnCount 2 → survive the turn it was applied, expire
+      // at the end of the following turn (the turn it was due to act).
+      return super.lapse(pokemon, lapseType);
+    }
+    if (lapseType !== BattlerTagLapseType.PRE_MOVE) {
+      return true;
+    }
+    this.hijackAction(pokemon);
+    // The command is consumed by this action; expire regardless of outcome.
+    return false;
+  }
+
+  /** Apply the Commanded effect to the bearer's in-flight move. */
+  private hijackAction(pokemon: Pokemon): void {
+    const phase = globalScene.phaseManager.getCurrentPhase();
+    if (!phase.is("MovePhase") || phase.pokemon !== pokemon) {
+      // Defensive: not actually the bearer's move (should not happen from the
+      // move-phase PRE_MOVE lapse). Consume the command anyway.
+      return;
+    }
+    const move = phase.move.getMove();
+    globalScene.phaseManager.queueMessage(
+      i18next.t("battlerTags:erCommandedLapse", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+        defaultValue: `${getPokemonNameWithAffix(pokemon)} is being controlled!`,
+      }),
+    );
+
+    // Status move → the move simply fails.
+    if (move.category === MoveCategory.STATUS) {
+      phase.cancel();
+      return;
+    }
+
+    // Damaging move in doubles/triples → redirect to a random living ally.
+    const allies = pokemon.getAllies().filter(a => !!a && !a.isFainted());
+    if (allies.length > 0) {
+      const ally = allies[pokemon.randBattleSeedInt(allies.length)];
+      // Mutate the phase's live target list in place (resolveRedirectTarget reads
+      // targets[0] as its base, so this redirect is respected).
+      const targets = phase.targets;
+      targets.splice(0, targets.length, ally.getBattlerIndex());
+      return;
+    }
+
+    // Damaging move in singles → cancel and hit self for 40% of the move's damage
+    // computed against the bearer's own defenses (no crit, no secondary effects).
+    const { damage } = pokemon.getAttackDamage({ source: pokemon, move, isCritical: false, simulated: true });
+    const selfDamage = toDmgValue(damage * 0.4, 1);
+    phase.cancel();
+    if (selfDamage > 0) {
+      pokemon.damageAndUpdate(selfDamage, { result: HitResult.INDIRECT });
+    }
+  }
+}
+
+/**
  * Retrieves a {@linkcode BattlerTag} based on the provided tag type, turn count, source move, and source ID.
  * @param sourceId - The ID of the pokemon adding the tag
  * @returns The corresponding {@linkcode BattlerTag} object.
@@ -4645,6 +4745,8 @@ export function getBattlerTag(
       return new ErQuashedTag(turnCount || 5);
     case BattlerTagType.ER_EMPOWERED_SWITCH_IN:
       return new ErEmpoweredSwitchInTag();
+    case BattlerTagType.ER_COMMANDED:
+      return new ErCommandedTag(sourceId);
   }
 }
 
@@ -4793,6 +4895,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ER_ENRAGE]: ErEnrageTag;
   [BattlerTagType.ER_QUASHED]: ErQuashedTag;
   [BattlerTagType.ER_EMPOWERED_SWITCH_IN]: ErEmpoweredSwitchInTag;
+  [BattlerTagType.ER_COMMANDED]: ErCommandedTag;
 };
 
 /**
