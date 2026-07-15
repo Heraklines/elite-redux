@@ -1403,25 +1403,30 @@ export class DuoPublicUiRig {
     this.lastWaveCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
-    let cursors = Object.fromEntries(
+    let commandCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0]),
     );
+    let pendingCommandProof = null;
     for (let turn = 1; turn <= this.config.maxTurns; turn++) {
-      await Promise.all(Object.values(this.clients).map(client => client.waitForLocalCommand(cursors[client.label])));
-      await Promise.all(Object.values(this.clients).map(client => client.checkpoint(`turn-${turn}-command`)));
-      const from = Object.fromEntries(
-        Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
+      const { outcomeCursors } = await this.driveSequentialCommandRound(
+        commandCursors,
+        this.config.keys.battle,
+        `turn-${turn}-first-move`,
       );
-      await Promise.all(
-        Object.values(this.clients).map(client => client.sequence(this.config.keys.battle, `turn-${turn}-first-move`)),
-      );
-
-      const outcome = await this.waitForPostTurnOutcome(from);
-      if (outcome.kind === "reward") {
-        await this.assertSharedSurface("reward", from, `turn-${turn}-reward`, {
+      if (pendingCommandProof != null) {
+        await this.assertSharedSurface("command", pendingCommandProof.cursors, pendingCommandProof.name, {
           expectedWave: this.activeBattleWave,
         });
-        await this.assertRetainedContinuation(from, `turn-${turn}-reward`);
+        await this.assertRetainedContinuation(pendingCommandProof.cursors, pendingCommandProof.name);
+        pendingCommandProof = null;
+      }
+
+      const outcome = await this.waitForPostTurnOutcome(outcomeCursors);
+      if (outcome.kind === "reward") {
+        await this.assertSharedSurface("reward", outcomeCursors, `turn-${turn}-reward`, {
+          expectedWave: this.activeBattleWave,
+        });
+        await this.assertRetainedContinuation(outcomeCursors, `turn-${turn}-reward`);
         return turn;
       }
       if (outcome.kind === "faint") {
@@ -1431,14 +1436,77 @@ export class DuoPublicUiRig {
         await this.driveReplacement(outcome.client);
       }
       if (outcome.kind === "command") {
-        await this.assertSharedSurface("command", from, `turn-${turn}-next-command`, {
-          expectedWave: this.activeBattleWave,
-        });
-        await this.assertRetainedContinuation(from, `turn-${turn}-next-command`);
+        // Command ownership opens sequentially: submitting the first owner's next-turn command is
+        // what lets the partner's command UI open. Defer the two-sided convergence proof until the
+        // next command round has observed both public surfaces; their evidence remains address-exact.
+        pendingCommandProof = { cursors: outcomeCursors, name: `turn-${turn}-next-command` };
       }
-      cursors = from;
+      commandCursors = outcomeCursors;
     }
     throw new Error(`Battle did not reach rewards in ${this.config.maxTurns} public command rounds`);
+  }
+
+  /**
+   * Submit one reciprocal co-op command round in the order the real UIs become actionable.
+   *
+   * The second player's CommandPhase is intentionally gated by the first player's public choice.
+   * Waiting for both clients before sending either choice therefore deadlocks a healthy game. This
+   * driver observes one owned semantic command surface, submits only that client's configured public
+   * key sequence, then observes and submits the partner's surface. No scene/runtime state is read or
+   * mutated; the returned cursors exclude these command surfaces so the post-turn outcome cannot
+   * mistake the just-submitted round for the next one.
+   */
+  async driveSequentialCommandRound(from, keys, purpose) {
+    const clients = Object.values(this.clients);
+    const pending = new Set(clients.map(client => client.label));
+    const outcomeCursors = {};
+    const commandEvents = {};
+    const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
+    let advanceBattlePrompt = null;
+
+    while (pending.size > 0 && Date.now() < progressBudget.observe()) {
+      let droveCommand = false;
+      for (const client of clients) {
+        if (!pending.has(client.label)) {
+          continue;
+        }
+        const event = findOwnedCommandOrTerminal(client, from[client.label] ?? 0);
+        if (event == null) {
+          continue;
+        }
+        if (event.kind !== "browser-surface2" && !LOCAL_COMMAND.test(event.text ?? "")) {
+          throw new Error(`${client.label}: shared session terminated before ${purpose}: ${event.text}`);
+        }
+        commandEvents[client.label] = event;
+        outcomeCursors[client.label] = client.evidence.cursor();
+        await client.checkpoint(`${purpose}-${client.label}-command`);
+        await client.sequence(keys, `${purpose}-${client.label}`);
+        pending.delete(client.label);
+        droveCommand = true;
+        // Re-scan after every submission: that public choice may synchronously open the peer UI.
+        break;
+      }
+      if (droveCommand) {
+        continue;
+      }
+      advanceBattlePrompt ??= createBattlePromptAdvancer(this, from, {}, `${purpose}-prompt-frontier`);
+      if (await advanceBattlePrompt()) {
+        continue;
+      }
+      await delay(100);
+    }
+
+    if (pending.size > 0) {
+      throw new Error(`${purpose}: timed out waiting for sequential command owners ${[...pending].join(", ")}`);
+    }
+    for (const client of clients) {
+      client.evidence.record("sequential-command-proof", {
+        purpose,
+        commandEventIndex: commandEvents[client.label]?.index ?? null,
+        outcomeCursor: outcomeCursors[client.label],
+      });
+    }
+    return { commandEvents, outcomeCursors };
   }
 
   async waitForPostTurnOutcome(from) {
@@ -1461,9 +1529,16 @@ export class DuoPublicUiRig {
           return { kind: "faint", client };
         }
       }
-      const commands = values.map(client => client.evidence.find(LOCAL_COMMAND, from[client.label]));
-      if (commands.every(Boolean)) {
-        return { kind: "command" };
+      // The next command frontier is healthy as soon as ONE addressed owner UI opens. Its
+      // public choice unlocks the partner's UI, so requiring both here creates a harness-only
+      // deadlock. driveSequentialCommandRound consumes this frontier one owner at a time.
+      const commandClient = values.find(client => findOwnedCommandOrTerminal(client, from[client.label]) != null);
+      if (commandClient) {
+        const event = findOwnedCommandOrTerminal(commandClient, from[commandClient.label]);
+        if (event?.kind !== "browser-surface2" && !LOCAL_COMMAND.test(event?.text ?? "")) {
+          throw new Error(`${commandClient.label}: shared session terminated at the post-turn frontier: ${event?.text}`);
+        }
+        return { kind: "command", client: commandClient };
       }
       await advanceBattlePrompt();
       await delay(100);

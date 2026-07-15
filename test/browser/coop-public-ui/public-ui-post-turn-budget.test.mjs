@@ -21,6 +21,10 @@ class FakeEvidence {
     this.events.push({ index: this.events.length, kind, ...detail });
   }
 
+  cursor() {
+    return this.events.length;
+  }
+
   find(pattern, from = 0) {
     return this.events.slice(from).find(event => pattern.test(event.text ?? ""));
   }
@@ -41,6 +45,22 @@ class FakeEvidence {
     }
     return event;
   }
+}
+
+function ownedCommand(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
+  return {
+    kind: "browser-surface2",
+    observation: {
+      operationClass: "command",
+      surfaceId: "command:command",
+      phase: "CommandPhase",
+      uiMode: "COMMAND",
+      address,
+      localSeat,
+      seatsWithInput: [localSeat],
+      ready: { handlerActive: true },
+    },
+  };
 }
 
 function at(ms) {
@@ -173,6 +193,48 @@ test("command wait drains an owned semantic surface buffered as its deadline cal
 
   const result = await PublicUiClient.prototype.waitForLocalCommand.call(client, 0);
   assert.equal(result, evidence.events[0]);
+});
+
+test("sequential command driver submits the first owner before waiting for the partner UI", async () => {
+  const order = [];
+  const firstEvidence = new FakeEvidence("first");
+  const secondEvidence = new FakeEvidence("second");
+  firstEvidence.push(ownedCommand(0));
+  const first = {
+    label: "first",
+    publicSeat: 0,
+    evidence: firstEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("first");
+      secondEvidence.push(ownedCommand(1));
+    },
+  };
+  const second = {
+    label: "second",
+    publicSeat: 1,
+    evidence: secondEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("second");
+    },
+  };
+  const rig = {
+    clients: { first, second },
+    config: { timeoutMs: 1_000 },
+  };
+
+  const result = await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
+    rig,
+    { first: 0, second: 0 },
+    ["Space", "Space", "Space"],
+    "turn-2",
+  );
+
+  assert.deepEqual(order, ["first", "second"]);
+  assert.deepEqual(result.outcomeCursors, { first: 1, second: 1 });
+  assert.equal(firstEvidence.events.at(-1).kind, "sequential-command-proof");
+  assert.equal(secondEvidence.events.at(-1).kind, "sequential-command-proof");
 });
 
 test("reward leave waits for the exact owned actionable semantic shop surface", async () => {

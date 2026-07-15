@@ -133,6 +133,16 @@ if (
 if (!harness?.includes("createBattlePromptAdvancer(this, from") || !harness.includes("await advanceBattlePrompt()")) {
   failures.push("public-ui-harness.mjs: post-turn waits must drive readiness-proven public battle prompts");
 }
+if (
+  !harness?.includes("driveSequentialCommandRound(")
+  || !harness.includes("pending.delete(client.label)")
+  || !harness.includes('record("sequential-command-proof"')
+  || !harness.includes("const commandClient = values.find(")
+) {
+  failures.push(
+    "public-ui-harness.mjs: reciprocal commands must be submitted in public owner-UI order without waiting for both surfaces",
+  );
+}
 
 const browserEntry = await readFile(new URL("../../../scripts/coop-browser-entry.ts", import.meta.url), "utf8");
 if (!browserEntry.includes("import type { Pokemon }") || browserEntry.includes("export {};")) {

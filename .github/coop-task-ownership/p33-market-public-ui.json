@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "p33-market-public-ui",
+  "branch": "ci/coop/p33-market-public-ui",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "0792a92cbfbfb0de513ad87c0c242e3d8f702529",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-market-public-ui.json",
+    "scripts/coop-browser-entry.ts",
+    "test/browser/coop-public-ui/**"
+  ]
+}
