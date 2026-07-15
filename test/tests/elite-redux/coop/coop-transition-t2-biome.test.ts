@@ -59,6 +59,7 @@ import {
   resetErMapNodes,
   setMapTravelTarget,
 } from "#data/elite-redux/er-map-nodes";
+import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
@@ -1318,8 +1319,74 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         lostCallback.startPresentationIntro(true);
         await vi.advanceTimersByTimeAsync(17_000);
         expect(lostEnd, "lost tween and text callbacks still reach the authoritative terminal").toHaveBeenCalledOnce();
+
+        const humanWait = new NewBiomeEncounterPhase() as unknown as {
+          coopAuthoritativeGuest: boolean;
+          coopBoundaryStillLive(requirePermit?: boolean): boolean;
+          isBoundedAuthoritativeCoop(): boolean;
+          armTerminalWatchdog(authoritativeGuest: boolean): void;
+          setInteractivePresentationWaiting(waiting: boolean): void;
+          end(): void;
+        };
+        humanWait.coopAuthoritativeGuest = false;
+        humanWait.coopBoundaryStillLive = () => true;
+        humanWait.isBoundedAuthoritativeCoop = () => true;
+        const humanWaitEnd = vi.spyOn(humanWait, "end").mockImplementation(() => {});
+        humanWait.armTerminalWatchdog(false);
+        humanWait.setInteractivePresentationWaiting(true);
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(
+          humanWaitEnd,
+          "a real player may read trainer/ME dialogue longer than the mechanical watchdog",
+        ).not.toHaveBeenCalled();
+        humanWait.setInteractivePresentationWaiting(false);
+        await vi.advanceTimersByTimeAsync(12_000);
+        expect(
+          humanWaitEnd,
+          "the bounded recovery resumes only after the human-owned UI resolves",
+        ).toHaveBeenCalledOnce();
       } finally {
         vi.useRealTimers();
+      }
+
+      const battle = rig.guestScene.currentBattle;
+      const originalBattleType = battle.battleType;
+      const originalTrainer = battle.trainer;
+      let trainerDialogueCallback: (() => void) | undefined;
+      const trainerDialogue = vi
+        .spyOn(rig.guestScene.ui, "showDialogue")
+        .mockImplementation((_text, _name, _delay, callback) => {
+          trainerDialogueCallback = callback ?? undefined;
+        });
+      try {
+        battle.battleType = BattleType.TRAINER;
+        battle.trainer = {
+          untint: vi.fn(),
+          playAnim: vi.fn(),
+          applyErGhostAuraFx: vi.fn(),
+          getEncounterMessages: () => ["A deliberately human-paced trainer line."],
+          getName: () => "Lifecycle Tester",
+          config: { hasCharSprite: false },
+        } as never;
+        let live = true;
+        const waiting = vi.fn();
+        const startedBeforeLateCallback = battle.started;
+        const queueBeforeLateCallback = [...rig.guestScene.phaseManager.getQueuedPhaseNames()];
+        const phase = new EncounterPhase();
+        phase.doEncounterCommon(false, () => live, waiting);
+        expect(waiting).toHaveBeenLastCalledWith(true);
+        expect(trainerDialogueCallback).toBeTypeOf("function");
+        live = false;
+        trainerDialogueCallback?.();
+        await Promise.resolve();
+        expect(battle.started, "a late trainer callback cannot alter the replacement battle start state").toBe(
+          startedBeforeLateCallback,
+        );
+        expect(rig.guestScene.phaseManager.getQueuedPhaseNames()).toEqual(queueBeforeLateCallback);
+      } finally {
+        trainerDialogue.mockRestore();
+        battle.battleType = originalBattleType;
+        battle.trainer = originalTrainer;
       }
 
       const retained = new NewBiomeEncounterPhase() as unknown as {

@@ -8,7 +8,12 @@ import {
   finalizeCoopBiomeTransitionEncounterPermit,
   getCoopBiomeTransitionTailPermit,
 } from "#data/elite-redux/coop/coop-renderer-gate";
-import { coopSessionGeneration, failCoopSharedSession, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import {
+  coopSessionGeneration,
+  failCoopSharedSession,
+  getCoopController,
+  getCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
 import { EncounterPhase, materializeCoopAdoptedEnemyField } from "#phases/encounter-phase";
 
@@ -22,6 +27,9 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
   private coopGeneration = -1;
   private coopWave = -1;
   private coopBattle: typeof globalScene.currentBattle | null = null;
+  private coopRuntime: ReturnType<typeof getCoopRuntime> = null;
+  private coopController: ReturnType<typeof getCoopController> = null;
+  private coopSessionEpoch = -1;
   private coopAuthoritativeGuest = false;
   private coopOperationId: string | null = null;
   private coopPresentationPreparing = false;
@@ -32,6 +40,8 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
   private coopMysteryContinuationQueued = false;
   private coopEndInFlight = false;
   private coopCompleted = false;
+  private coopInteractivePresentationPending = false;
+  private coopPermitRecoveryAttempts = 0;
   private coopIntroTimer: ReturnType<typeof setTimeout> | null = null;
   private coopTerminalTimer: ReturnType<typeof setTimeout> | null = null;
   private coopEndTimer: ReturnType<typeof setTimeout> | null = null;
@@ -44,6 +54,9 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
       this.coopGeneration = coopSessionGeneration();
       this.coopWave = globalScene.currentBattle?.waveIndex ?? -1;
       this.coopBattle = globalScene.currentBattle;
+      this.coopRuntime = getCoopRuntime();
+      this.coopController = getCoopController();
+      this.coopSessionEpoch = this.coopController?.sessionEpoch ?? -1;
       this.coopAuthoritativeGuest = currentlyAuthoritativeGuest;
     }
     // Once captured, this object is permanently a co-op phase. A teardown may make the *current* runtime
@@ -104,7 +117,9 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
       return;
     }
 
-    // Host runs the real Encounter terminal hooks once. The queue shift remains separately retryable below.
+    // Host runs the real Encounter terminal hooks once. These hooks are not transactional: a throw may
+    // happen after phases or presentation state were already written, so retrying the whole method can
+    // duplicate structural work. Fail the shared session instead of replaying an unknown partial prefix.
     this.coopEndInFlight = true;
     try {
       this.coopEndTimer = setTimeout(() => {
@@ -115,8 +130,13 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
       super.end();
       this.coopEncounterHooksScheduled = true;
     } catch (error) {
-      coopWarn("runtime", "NewBiome host encounter terminal hooks threw; phase remains retryable", error);
-      this.parkForAuthoritativePermit(() => this.end());
+      this.clearAllTimers();
+      coopWarn(
+        "runtime",
+        "NewBiome host encounter terminal hooks failed after entering a non-transactional seam",
+        error,
+      );
+      failCoopSharedSession(`NewBiome host terminal hooks failed for transition ${this.coopOperationId ?? "unknown"}`);
     } finally {
       this.coopEndInFlight = false;
     }
@@ -208,7 +228,6 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
     try {
       globalScene.playBgm(undefined, true);
       if (!this.coopEncounterPrepared) {
-        this.coopEncounterPrepared = true;
         for (const pokemon of globalScene.getPlayerParty()) {
           if (pokemon) {
             pokemon.resetBattleAndWaveData();
@@ -217,11 +236,15 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
             }
           }
         }
+        this.coopEncounterPrepared = true;
       }
       this.startPresentationIntro(false);
     } catch (error) {
-      coopWarn("runtime", "NewBiome host presentation setup threw; terminal watchdog remains authoritative", error);
-      this.armTerminalWatchdog(false);
+      // Battle/wave reset and PostBiomeChange abilities are mechanical and non-transactional. A partially
+      // applied prefix cannot be made safe by advancing the presentation watchdog.
+      this.clearAllTimers();
+      coopWarn("runtime", "NewBiome host mechanical preparation failed closed", error);
+      failCoopSharedSession(`NewBiome host preparation failed for transition ${this.coopOperationId ?? "unknown"}`);
     }
   }
 
@@ -281,8 +304,13 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
             this.finishAuthoritativeGuestPresentation();
           }
         } else {
-          // The host performs the real setup, but its authority boundary never waits forever on encounter text.
-          this.doEncounterCommon(false);
+          // Human-owned dialogue is not a timeout. The callback chain is lifetime-fenced, and the mechanical
+          // watchdog is suspended while a real trainer/ME surface is awaiting input.
+          this.doEncounterCommon(
+            false,
+            () => this.coopBoundaryStillLive(),
+            waiting => this.setInteractivePresentationWaiting(waiting),
+          );
         }
       } catch (error) {
         coopWarn("runtime", "NewBiome presentation operation threw; terminal watchdog will recover", error);
@@ -304,6 +332,10 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
     }
     this.coopTerminalTimer = setTimeout(() => {
       if (this.coopCompleted || !this.coopBoundaryStillLive()) {
+        return;
+      }
+      if (this.coopInteractivePresentationPending) {
+        // Never skip a real player's dialogue and never let its late callback mutate the replacement phase.
         return;
       }
       if (authoritativeGuest) {
@@ -340,6 +372,13 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
     if (this.coopPermitRecoveryShown || !this.coopBoundaryStillLive(false)) {
       return;
     }
+    this.coopPermitRecoveryAttempts++;
+    if (this.coopPermitRecoveryAttempts > 2) {
+      failCoopSharedSession(
+        `The shared new-biome encounter lost its exact permit after bounded recovery at wave ${this.coopWave}.`,
+      );
+      return;
+    }
     this.coopPermitRecoveryShown = true;
     void globalScene.ui
       .setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.coopBoundaryStillLive(false))
@@ -365,13 +404,42 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
           null,
           true,
         );
+      })
+      .catch(error => {
+        if (!this.coopBoundaryStillLive(false)) {
+          return;
+        }
+        this.coopPermitRecoveryShown = false;
+        coopWarn("runtime", "NewBiome recovery surface failed to open", error);
+        this.parkForAuthoritativePermit(retry);
       });
+  }
+
+  /** Keep a mechanical recovery timer from overtaking a live human-owned dialogue surface. */
+  private setInteractivePresentationWaiting(waiting: boolean): void {
+    if (!this.coopBoundaryStillLive()) {
+      return;
+    }
+    this.coopInteractivePresentationPending = waiting;
+    if (waiting) {
+      this.clearTimer("terminal");
+    } else {
+      this.armTerminalWatchdog(this.coopAuthoritativeGuest);
+    }
+  }
+
+  /** EncounterPhase's asset/UI promise chain must share this exact retained transition lifetime. */
+  protected override isEncounterPresentationBoundaryLive(): boolean {
+    return this.coopBoundaryStillLive();
   }
 
   private coopBoundaryStillLive(requirePermit = true): boolean {
     if (
       this.coopGeneration < 0
       || coopSessionGeneration() !== this.coopGeneration
+      || getCoopRuntime() !== this.coopRuntime
+      || getCoopController() !== this.coopController
+      || this.coopController?.sessionEpoch !== this.coopSessionEpoch
       || globalScene.gameMode?.isCoop !== true
       || getCoopController()?.netcodeMode !== "authoritative"
       || globalScene.currentBattle !== this.coopBattle

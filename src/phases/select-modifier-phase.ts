@@ -2147,7 +2147,11 @@ export class SelectModifierPhase extends BattlePhase {
         this.coopAwaitTerminalMaterialApplied(operationId!);
         return true;
       }
-      globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+      // This retained terminal already owns the structural continuation. Do not defer the queue shift behind
+      // a cosmetic mode-transition promise: a scene/context replacement can outlive that promise and leave
+      // the watcher parked after it has already materialized and ACKed the authoritative result.
+      void globalScene.ui.setMode(UiMode.MESSAGE);
+      super.end();
       this.coopAdvanceInteraction();
       return true;
     }

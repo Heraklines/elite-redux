@@ -214,7 +214,7 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
     await withClient(rig.guestCtx, async () => {
       const owned = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
       const ally = owned.getAllies()[0];
-      vi.spyOn(ally, "getTag").mockReturnValue({ getSourcePokemon: () => owned } as never);
+      vi.spyOn(ally, "getTag").mockReturnValue({ sourceId: owned.id, getSourcePokemon: () => owned } as never);
       rig.guestScene.currentBattle.turnCommands = {};
       new CommandPhase(COOP_GUEST_FIELD_INDEX).start();
       await drainLoopback();

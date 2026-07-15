@@ -795,6 +795,12 @@ export class UI extends Phaser.GameObjects.Container {
     args: any[],
     isCurrent?: () => boolean,
   ): Promise<void> {
+    // A bounded caller can arrive after its phase/session was replaced. Reject it before claiming a new
+    // transition generation or reading scene-owned state: teardown may already have removed gameMode, and
+    // a stale attempt must not supersede the replacement screen's legitimate transition.
+    if (isCurrent?.() === false) {
+      return Promise.resolve();
+    }
     const transitionGeneration = ++this.modeTransitionGeneration;
     const attemptCurrent = (): boolean =>
       transitionGeneration === this.modeTransitionGeneration && (isCurrent?.() ?? true);
@@ -807,7 +813,7 @@ export class UI extends Phaser.GameObjects.Container {
     // Co-op (#633): keep the live-cursor mirror's engine surface attached so the WATCHER
     // can replay the owner's relayed buttons even while the local human is idle (its screen
     // opens via setMode, not via local input). Cheap + idempotent; hard no-op in solo.
-    if (globalScene.gameMode.isCoop) {
+    if (globalScene.gameMode?.isCoop === true) {
       getCoopUiMirror()?.attach(this.coopMirrorEngine());
       // #840 unmirrored-screen tripwire. DEV/staging only (coopWarn is silenced in prod), zero
       // behavior change: surface a non-mirrored interactive screen opening on this client while the

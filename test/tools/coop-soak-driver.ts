@@ -3125,6 +3125,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         }
       });
       const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+      let retainedTerminalDrovePostMystery = false;
 
       if (!noRewardShop) {
         // Start the owner shop synchronously so its option stream + arrival are queued, then flush them under
@@ -3179,12 +3180,22 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
               await withClient(rig.guestCtx, () => drainLoopback());
               await withClient(rig.hostCtx, () => drainLoopback());
               if (
-                rig.hostRuntime.controller.interactionCounter() === counterBefore + 1
-                && rig.guestRuntime.controller.interactionCounter() === counterBefore + 1
+                rig.hostScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase"
+                && rig.guestScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase"
               ) {
                 break;
               }
             }
+            // Peer materialization completes the embedded shop terminal. Production's scheduler then runs
+            // the retained EggLapse/PostMystery tail, where the ME owns its single +1 interaction commit.
+            // The interceptor runner must execute that real tail before asserting the post-ME counter.
+            await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
+            retainedTerminalDrovePostMystery = true;
+            await withClient(rig.guestCtx, async () => {
+              for (let i = 0; i < 8; i++) {
+                await drainLoopback();
+              }
+            });
             if (
               rig.hostRuntime.controller.interactionCounter() !== counterBefore + 1
               || rig.guestRuntime.controller.interactionCounter() !== counterBefore + 1
@@ -3212,7 +3223,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           }
         });
       }
-      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
+      if (!retainedTerminalDrovePostMystery) {
+        await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
+      }
       await withClient(rig.guestCtx, async () => {
         // The shop handoff marks the replay detached/settled before the true 9M terminal. Drain first so
         // meResync + LEAVE apply and advance the guest, then assert the replay's terminal guard.

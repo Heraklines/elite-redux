@@ -1,5 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
+import { captureCoopAuthoritativeBattleState, captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   adoptCoopBiomeTransitionSwitchPermit,
@@ -8,7 +10,12 @@ import {
   markCoopBiomeTransitionHistoryRecorded,
   markCoopBiomeTransitionSwitchPrepared,
 } from "#data/elite-redux/coop/coop-renderer-gate";
-import { coopSessionGeneration, failCoopSharedSession, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import {
+  coopSessionGeneration,
+  failCoopSharedSession,
+  getCoopBattleStreamer,
+  getCoopController,
+} from "#data/elite-redux/coop/coop-runtime";
 import {
   type ErRouteNode,
   erBiomeRoutingActive,
@@ -29,6 +36,7 @@ import type { BiomeId } from "#enums/biome-id";
 import { UiMode } from "#enums/ui-mode";
 import { getBiomeKey } from "#field/arena";
 import { BattlePhase } from "#phases/battle-phase";
+import { captureCoopEncounterAuthority } from "#phases/encounter-phase";
 import { getBiomeName } from "#utils/common";
 
 export class SwitchBiomePhase extends BattlePhase {
@@ -137,6 +145,7 @@ export class SwitchBiomePhase extends BattlePhase {
         this.discardAlreadyMaterializedBattleAdvance(permit, sourceWave);
         this.prepareAuthoritativeTransition(authoritativeGuest, permit, sourceWave);
         this.materializeCoopTransition();
+        this.republishRetainedBattleAuthority(authoritativeGuest, permit, sourceWave);
         this.end();
       } catch (error) {
         coopWarn("runtime", "SwitchBiomePhase preparation/materialization threw; exact plan remains retryable", error);
@@ -407,6 +416,41 @@ export class SwitchBiomePhase extends BattlePhase {
       globalScene.lastEnemyTrainer.destroy();
       globalScene.lastEnemyTrainer = null;
     }
+  }
+
+  /**
+   * Retained WAVE_ADVANCE may install and publish the destination battle before this queued Switch tail
+   * rolls the host's route graph and biome structure. Re-publish that same immutable wave carrier after the
+   * plan is applied, otherwise the renderer correctly waits with empty routes and reaches Command with a
+   * permanently stale `erMapState`. Ordinary source-wave ordering publishes later in EncounterPhase and is
+   * therefore a no-op here.
+   */
+  private republishRetainedBattleAuthority(
+    authoritativeGuest: boolean,
+    permit: NonNullable<ReturnType<typeof getCoopBiomeTransitionTailPermit>>,
+    ambientWave: number,
+  ): void {
+    if (authoritativeGuest || ambientWave !== permit.nextWave || getCoopController()?.role !== "host") {
+      return;
+    }
+    const battle = globalScene.currentBattle;
+    const streamer = getCoopBattleStreamer();
+    if (battle == null || streamer == null || battle.waveIndex !== permit.nextWave) {
+      throw new Error(`Retained biome boundary ${permit.operationId} lost its destination carrier`);
+    }
+    const authoritativeState = captureCoopAuthoritativeBattleState(battle.turn);
+    if (authoritativeState == null) {
+      throw new Error(`Retained biome boundary ${permit.operationId} could not capture post-switch state`);
+    }
+    streamer.sendEnemyParty(
+      battle.waveIndex,
+      captureCoopEnemies(),
+      battle.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
+      battle.battleType,
+      authoritativeState,
+      captureCoopEncounterAuthority(battle),
+    );
+    coopLog("replay", `host RE-BROADCAST retained wave ${battle.waveIndex} after biome route/structure preparation`);
   }
 
   override end(): void {
