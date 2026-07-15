@@ -516,8 +516,8 @@
     "endless": false,
     "id": 70005,
     "introDialogue": "bla bla bla, back in my days bla bla bla great pokemon war bla bla bla...",
-    "maxWave": 80,
-    "minWave": 40,
+    "maxWave": 60,
+    "minWave": 50,
     "name": "Lt Surge",
     "team": [
       {
