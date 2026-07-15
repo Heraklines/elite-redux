@@ -85,8 +85,7 @@ describe("co-op causal barrier tracing", () => {
     const pair = createLoopbackPair();
     const host = new CoopDurabilityManager(pair.host);
     const guest = new CoopDurabilityManager(pair.guest, {
-      extractKey: message =>
-        message.t === "envelope" ? { cls: "op:global", seq: message.envelope.revision } : null,
+      extractKey: message => (message.t === "envelope" ? { cls: "op:global", seq: message.envelope.revision } : null),
       apply: () => "applied",
     });
     const committed = envelope();

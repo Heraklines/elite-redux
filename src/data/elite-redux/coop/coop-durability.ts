@@ -955,11 +955,7 @@ export class CoopDurabilityManager {
     this.off = transport.onMessage(msg => this.onMessage(msg));
   }
 
-  private recordOperationCausalStage(
-    authority: CoopOperationAuthorityAddress,
-    stage: string,
-    detail?: string,
-  ): void {
+  private recordOperationCausalStage(authority: CoopOperationAuthorityAddress, stage: string, detail?: string): void {
     const stageKey = `${operationAuthorityKey(authority)}:${this.transport.role}:${stage}:${detail ?? ""}`;
     if (this.tracedOperationStages.has(stageKey)) {
       return;
