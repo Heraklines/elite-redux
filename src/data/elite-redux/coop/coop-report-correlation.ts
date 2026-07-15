@@ -115,9 +115,14 @@ export function createCoopReportCorrelation(input: CoopReportCorrelationInput): 
     membershipRevision != null && membershipConnectionGeneration != null
       ? { revision: membershipRevision, connectionGeneration: membershipConnectionGeneration }
       : null;
-  const build: ErBuildIdentityV1 =
-    normalizeErBuildIdentity(input.build)
-    ?? { version: 1, id: "unknown", source: "unknown", sha: null, workflow: null, deployment: null };
+  const build: ErBuildIdentityV1 = normalizeErBuildIdentity(input.build) ?? {
+    version: 1,
+    id: "unknown",
+    source: "unknown",
+    sha: null,
+    workflow: null,
+    deployment: null,
+  };
   return {
     version: 1,
     pairKey: pairKey({ sessionId, runId, epoch, seed }),
