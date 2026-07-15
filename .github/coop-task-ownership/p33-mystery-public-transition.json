@@ -51,6 +51,7 @@
     "src/phases/coop-replay-learn-move-batch.ts",
     "src/phases/coop-replay-learn-move-phase.ts",
     "src/phases/coop-replay-phases.ts",
+    "src/phases/coop-replay-turn-phase.ts",
     "src/phases/encounter-phase.ts",
     "src/phases/er-ability-capsule-phase.ts",
     "src/phases/er-greater-ability-capsule-phase.ts",
