@@ -1887,6 +1887,20 @@ export class DuoPublicUiRig {
         await client.checkpoint(`${purpose}-${client.label}-command`);
         await client.sequence(keys, `${purpose}-${client.label}`);
         pending.delete(client.label);
+        const commandAddress = event.observation?.address;
+        if (
+          pending.size > 0
+          && Number.isSafeInteger(commandAddress?.epoch)
+          && Number.isSafeInteger(commandAddress?.wave)
+          && Number.isSafeInteger(commandAddress?.turn)
+        ) {
+          // The reciprocal command surface is intentionally sequential. Once one player submits, the peer can
+          // still be rendering the preceding turn, so its last command observation is not required to match yet.
+          // Pin prompt admission to the exact public address that authorized this submission instead.
+          advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, `${purpose}-prompt-frontier`, {
+            expectedCommandAddress: `${commandAddress.epoch}:${commandAddress.wave}:${commandAddress.turn}`,
+          });
+        }
         droveCommand = true;
         // Re-scan after every submission: that public choice may synchronously open the peer UI.
         break;
