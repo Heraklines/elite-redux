@@ -1,0 +1,51 @@
+===== COOP SOAK RESULT =====
+profile: god-b
+verdict: FAIL
+waves_requested: 45
+run: 29408214386 (ci/coop/p33-auto-victory-seal)
+timestamp: 2026-07-15T10-29-52Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20365441 WAVES=45 - replay this run with:  SOAK_SEED=20365441 SOAK_WAVES=45 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: -1, termSeq: -1, wasOwner: false }
+[coop:transport] state host disconnected -> closed
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > retained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [32m7778[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:280:3[39m
+
+[33m[39m[32m·[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mError[22m: Timed out in waitUntil![39m
+[36m [2m❯[22m PhaseInterceptor.run test/framework/phase-interceptor.ts:[2m191:16[22m[39m
+    [90m189|[39m       [35mthis[39m[33m.[39m[34mlogPhase[39m(currentPhase[33m.[39mphaseName)[33m;[39m
+    [90m190|[39m       currentPhase[33m.[39m[34mstart[39m()[33m;[39m
+    [90m191|[39m       await vi.waitUntil(() => this.state !== "running", { interval: 5…
+    [90m   |[39m                [31m^[39m
+    [90m192|[39m     } [35mcatch[39m (error) {
+    [90m193|[39m       [35mthrow[39m error [35minstanceof[39m [33mError[39m
+[90m [2m❯[22m PhaseInterceptor.to test/framework/phase-interceptor.ts:[2m130:16[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m574:12[22m[39m
+[90m [2m❯[22m crossCommandBoundaryWithReplayGuest test/tools/coop-soak-driver.ts:[2m2080:7[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m3806:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m175:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 10:28:39
+[2m   Duration [22m 71.78s[2m (transform 19.62s, setup 23.83s, import 269ms, tests 46.82s, environment 702ms)[22m
+
