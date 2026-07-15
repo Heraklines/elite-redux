@@ -1,0 +1,51 @@
+===== COOP SOAK RESULT =====
+profile: god-b
+verdict: FAIL
+waves_requested: 200
+run: 29442234745 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T18-52-37Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20365444 WAVES=200 - replay this run with:  SOAK_SEED=20365444 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mError[22m: cannot materialize mirrored guest input from LoginPhase; queued=[TitlePhase][39m
+[36m [2m❯[22m materializeMirroredGuestInputTurn test/tools/coop-duo-harness.ts:[2m1612:11[22m[39m
+    [90m1610|[39m   const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+    [90m1611|[39m   if (current?.phaseName !== "TitlePhase" || queued.length !== 0) {
+    [90m1612|[39m     throw new Error(
+    [90m   |[39m           [31m^[39m
+    [90m1613|[39m       `cannot materialize mirrored guest input from ${current?.phaseNa…
+    [90m1614|[39m     );
+[90m [2m❯[22m test/tools/coop-soak-driver.ts:[2m4078:42[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m633:18[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4078:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m175:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[31m[1mError[22m: cannot materialize mirrored guest input from LoginPhase; queued=[TitlePhase][39m
+[36m [2m❯[22m materializeMirroredGuestInputTurn test/tools/coop-duo-harness.ts:[2m1612:11[22m[39m
+    [90m1610|[39m   const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+    [90m1611|[39m   if (current?.phaseName !== "TitlePhase" || queued.length !== 0) {
+    [90m1612|[39m     throw new Error(
+    [90m   |[39m           [31m^[39m
+    [90m1613|[39m       `cannot materialize mirrored guest input from ${current?.phaseNa…
+    [90m1614|[39m     );
+[90m [2m❯[22m test/tools/coop-soak-driver.ts:[2m4078:42[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m633:18[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4078:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m292:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m   Start at [22m 18:52:07
+[2m   Duration [22m 29.77s[2m (transform 19.59s, setup 23.72s, import 256ms, tests 4.93s, environment 703ms)[22m
+
