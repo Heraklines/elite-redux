@@ -27,6 +27,7 @@ import { pokemonEvolutions, pokemonPrevolutions } from "#balance/pokemon-evoluti
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
 import { allAbilities } from "#data/data-lists";
+import { Egg } from "#data/egg";
 import {
   ER_ASTOOT_SPECIES_ID,
   ER_DISCUPID_SPECIES_ID,
@@ -116,7 +117,7 @@ describe.skipIf(!RUN)("ER newcomer new-species seam", () => {
   });
 
   it("evolutions fire only AT level 50; the branched chooser offers Astoot", async () => {
-    await game.classicMode.startBattle([SpeciesId.MAGIKARP]);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
 
     for (const [base, targetId] of [
       [SpeciesId.TENTACRUEL, ER_TENTALECT_SPECIES_ID],
@@ -138,7 +139,7 @@ describe.skipIf(!RUN)("ER newcomer new-species seam", () => {
   });
 
   it("evolving carries the N-typing onto the live mon and registers the dex entry", async () => {
-    await game.classicMode.startBattle([SpeciesId.MAGIKARP]);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
     const tentacruel = game.scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.TENTACRUEL), 50);
     const evo = tentacruel.getValidEvolutions().find(e => (e.speciesId as number) === ER_TENTALECT_SPECIES_ID)!;
     expect(evo).toBeDefined();
@@ -181,7 +182,7 @@ describe.skipIf(!RUN)("ER newcomer new-species seam", () => {
     expect(Object.hasOwn(eggTiers, ER_PARTNER_EEVEE_SPECIES_ID)).toBe(false);
 
     // Regitube: registered Water standalone, egg tier + starter cost, kit resolves.
-    const regi = getPokemonSpecies(ER_REGITUBE_SPECIES_ID);
+    const regi = getPokemonSpecies(ER_REGITUBE_SPECIES_ID as SpeciesId);
     expect(regi?.name).toBe("Regitube");
     expect(regi.type1).toBe(PokemonType.WATER);
     expect([...regi.baseStats]).toEqual([200, 50, 100, 80, 100, 50]);
@@ -190,6 +191,13 @@ describe.skipIf(!RUN)("ER newcomer new-species seam", () => {
     for (const id of [regi.ability1, regi.ability2, regi.abilityHidden, ...regi.getPassiveAbilities()]) {
       expect(allAbilities[id], `Regitube ability ${id} exists`).toBeDefined();
     }
+  });
+
+  it("Regitube hatches from an egg as its (only) base form (#133/#352)", async () => {
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const hatched = new Egg({ scene: game.scene, species: ER_REGITUBE_SPECIES_ID as SpeciesId }).generatePlayerPokemon()
+      .species.speciesId as number;
+    expect(hatched).toBe(ER_REGITUBE_SPECIES_ID);
   });
 
   it("the base Eevee family stays byte-identical (partner clones never mutate it)", () => {

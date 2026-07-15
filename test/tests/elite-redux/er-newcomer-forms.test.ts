@@ -117,4 +117,39 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
     const moves = pokemonSpeciesLevelMoves[SpeciesId.PARASECT];
     expect(moves.some(([, moveId]) => moveId === MoveId.LEAF_BLADE)).toBe(true);
   });
+
+  it("covers all 12 newcomer forms incl. the two additive mega-z rows (collision resolved)", () => {
+    expect(ER_NEWCOMER_FORMS).toHaveLength(12);
+
+    // Mega Skarmory Z is ADDITIVE: it does not disturb the existing ER Mega
+    // Skarmory Y, and lands on a distinct `mega-z` formIndex.
+    const skarmory = getPokemonSpecies(SpeciesId.SKARMORY);
+    expect(
+      skarmory.forms.some(f => f.formKey === "mega-y"),
+      "existing Mega Skarmory Y untouched",
+    ).toBe(true);
+    const skZ = skarmory.forms.find(f => f.formKey === "mega-z");
+    expect(skZ, "Mega Skarmory Z injected").toBeDefined();
+    expect([...skZ!.baseStats]).toEqual([75, 135, 70, 135, 70, 110]);
+    expect(new Set([skZ!.type1, skZ!.type2, ...skZ!.getExtraTypes()])).toEqual(
+      new Set([PokemonType.STEEL, PokemonType.FLYING, PokemonType.DRAGON]),
+    );
+
+    // Mega Dragonite Z is a THIRD mega alongside `mega` + `mega-y`.
+    const dragonite = getPokemonSpecies(SpeciesId.DRAGONITE);
+    expect(
+      dragonite.forms.some(f => f.formKey === "mega"),
+      "existing Dragonite mega untouched",
+    ).toBe(true);
+    expect(
+      dragonite.forms.some(f => f.formKey === "mega-y"),
+      "existing Dragonite mega-y untouched",
+    ).toBe(true);
+    const drZ = dragonite.forms.find(f => f.formKey === "mega-z");
+    expect(drZ, "Mega Dragonite Z injected").toBeDefined();
+    expect([...drZ!.baseStats]).toEqual([91, 144, 144, 110, 110, 101]);
+    expect(new Set([drZ!.type1, drZ!.type2, ...drZ!.getExtraTypes()])).toEqual(
+      new Set([PokemonType.DRAGON, PokemonType.FLYING, PokemonType.STEEL]),
+    );
+  });
 });
