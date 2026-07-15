@@ -54,7 +54,6 @@
     "test/tools/render-ui-page.test.ts",
     "test/tools/ui-baselines/**",
     "test/utils/report-correlation.test.ts",
-    "workers/er-coop-api/src/p33-signaling.ts",
     "workers/er-editor-api/src/index.ts",
     "workers/er-telemetry/**"
   ]
