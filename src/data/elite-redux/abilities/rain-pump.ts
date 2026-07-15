@@ -5,7 +5,7 @@
  */
 
 // =============================================================================
-// Elite Redux — bespoke ability `Rain Pump` (Regitube).
+// Elite Redux — bespoke ability `Rain Pump`.
 //
 // "At the end of each turn while it is raining (ordinary Rain OR the primal
 // Heavy Rain), every one of the holder's moves recovers 1 PP (never above its

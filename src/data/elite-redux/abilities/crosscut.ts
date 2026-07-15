@@ -5,7 +5,7 @@
  */
 
 // =============================================================================
-// Elite Redux — bespoke ability `Crosscut` (Mega Scam).
+// Elite Redux — bespoke ability `Crosscut`.
 //
 // "Eligible single-hit SLICING and LAUNCHER (pulse/aura) attacks strike TWICE —
 // one blade physical, one special. Each hit lands at 70% power. Multi-hit moves

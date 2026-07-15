@@ -5,7 +5,7 @@
  */
 
 // =============================================================================
-// Elite Redux — bespoke ability `Rendezvous` (Discupid trio, item 3).
+// Elite Redux — bespoke ability `Rendezvous` (link-driven trio, item 3).
 //
 // DOUBLES/TRIPLES innate (inert in singles). On entry the holder LINKs to a
 // nearest living ally (see `link.ts`). During a turn in which BOTH the holder

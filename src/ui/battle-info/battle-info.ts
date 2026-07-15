@@ -131,7 +131,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected type2Icon: Phaser.GameObjects.Sprite;
   protected type3Icon: Phaser.GameObjects.Sprite;
   /**
-   * ER N-type substrate: icons for a 4th+ type (Primal Regigigas is sextuple-typed).
+   * ER N-type substrate: icons for a 4th+ type (some holders are sextuple-typed).
    * Created lazily so a mon with ≤3 types renders byte-identically to before.
    */
   protected extraTypeIcons: Phaser.GameObjects.Sprite[] = [];

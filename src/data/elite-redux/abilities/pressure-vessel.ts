@@ -5,7 +5,7 @@
  */
 
 // =============================================================================
-// Elite Redux — bespoke ability `Pressure Vessel` (Regitube).
+// Elite Redux — bespoke ability `Pressure Vessel`.
 //
 // "The holder's Defense and Special Defense scale LINEARLY with how much PP it
 // has left across its whole moveset. At 100% total PP the multiplier is 1.5x; at

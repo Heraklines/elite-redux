@@ -5,7 +5,7 @@
  */
 
 // =============================================================================
-// Elite Redux — bespoke ability `Chivalry` (Mega Dragonite).
+// Elite Redux — bespoke ability `Chivalry`.
 //
 // DOUBLES / TRIPLES: the holder takes 50% of the DIRECT damage aimed at its
 // ally. NERF (binding): the transferred share is a RAW HP deduction — it is NOT

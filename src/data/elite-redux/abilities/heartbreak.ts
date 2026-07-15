@@ -5,7 +5,7 @@
  */
 
 // =============================================================================
-// Elite Redux — bespoke ability `Heartbreak` (Discupid trio, item 4).
+// Elite Redux — bespoke ability `Heartbreak` (link-driven trio, item 4).
 //
 // DOUBLES/TRIPLES innate (inert in singles). On entry the holder LINKs to a
 // nearest living ally (see `link.ts`). When that linked ally FAINTS, the holder

@@ -5,7 +5,7 @@
  */
 
 // =============================================================================
-// Elite Redux — bespoke ability `Life Preserver` (Regitube).
+// Elite Redux — bespoke ability `Life Preserver`.
 //
 // "Once per battle, when this Pokemon's active ALLY would faint from DIRECT
 // attack damage, that ally survives at 1 HP and the attacker becomes Drenched

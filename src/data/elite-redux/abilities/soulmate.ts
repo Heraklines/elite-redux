@@ -5,7 +5,7 @@
  */
 
 // =============================================================================
-// Elite Redux — bespoke ability `Soulmate` (Discupid trio, item 2).
+// Elite Redux — bespoke ability `Soulmate` (link-driven trio, item 2).
 //
 // DOUBLES/TRIPLES innate (inert in singles — no ally to link). On entry the
 // holder forms a LINK to a nearest living ally (see `link.ts`). While linked:

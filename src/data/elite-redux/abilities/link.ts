@@ -10,7 +10,7 @@
 // A generic "soul-link" between the holder and ONE allied active Pokemon,
 // formed on entry and torn down when EITHER end leaves the field. Built as a
 // standalone mechanic so the maintainer can reuse it on other upcoming mons
-// (the Discupid trio — Soulmate / Rendezvous / Heartbreak — is the first
+// (the link-driven trio — Soulmate / Rendezvous / Heartbreak — is the first
 // consumer).
 //
 // DEFAULTS (documented in the batch report):

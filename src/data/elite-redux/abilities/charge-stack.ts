@@ -5,7 +5,7 @@
  */
 
 // =============================================================================
-// Elite Redux — CHARGE STACK state primitive (Mega Electivire X trio, Batch 3).
+// Elite Redux — CHARGE STACK state primitive (Batch 3 charge-stacking trio).
 //
 // Reuses the concept of vanilla CHARGED (the one-use `TypeBoostTag` that doubles
 // the next Electric move — see `battler-tags.ts` `BattlerTagType.CHARGED`), but
