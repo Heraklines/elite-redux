@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "taskId": "p33-terminal-turn-convergence",
+  "branch": "ci/coop/p33-terminal-turn-convergence",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "1ce00e36ae2edfcc828a7df63953046a36ae4f3b",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-terminal-turn-convergence.json",
+    "src/phases/coop-replay-phases.ts",
+    "test/tests/elite-redux/coop/coop-duo-me-battle-reward.test.ts",
+    "test/tests/elite-redux/coop/coop-guest-renderer.test.ts",
+    "test/tests/elite-redux/coop/coop-single-turn-win-finalize.test.ts"
+  ]
+}

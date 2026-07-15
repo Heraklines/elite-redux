@@ -193,10 +193,10 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       ).toBe(true);
 
       // Exercise the REAL guest finalize DECISION after an authoritative commit:
-      // with the ME battle won it must run the ME victory tail (pushNew VictoryPhase), NOT increment into a
-      // phantom turn N+1. `end()` is stubbed so the branch decision runs without the phase's queue-shift
-      // side effects (we assert the decision, not the downstream VictoryPhase). Reverting the #847 branch
-      // flips this to an incrementTurn (turnAfter+1, no VictoryPhase) - the compile-safe FAILS-BEFORE.
+      // with the ME battle won it must run the ME victory tail (pushNew VictoryPhase), mirror the host's
+      // settled numeric turn, and NOT queue a phantom command. `end()` is stubbed so the branch decision
+      // runs without the phase's queue-shift side effects (we assert the decision, not the downstream VictoryPhase). Reverting the #847 branch
+      // flips this to an increment without VictoryPhase - the compile-safe FAILS-BEFORE.
       const pushNewSpy = vi.spyOn(rig.guestScene.phaseManager, "pushNew");
       const turnBefore = rig.guestScene.currentBattle.turn;
       const finalize = new CoopFinalizeTurnPhase(turnBefore, {} as CoopBattleCheckpoint, "test-checksum");
@@ -213,8 +213,8 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
     expect(queued.names, "guest did NOT open a phantom next-command (no CommandPhase queued) (#847)").not.toContain(
       "CommandPhase",
     );
-    expect(queued.turnAfter, "the ME victory tail does NOT increment the turn (no phantom turn N+1)").toBe(
-      queued.turnBefore,
+    expect(queued.turnAfter, "the ME renderer mirrors the host's settled turn without queuing CommandPhase").toBe(
+      queued.turnBefore + 1,
     );
 
     // ===== DEFECT (1) CROSS-BARRIER RELEASE over the REAL runtime rendezvous: reproduce the exact deadlock

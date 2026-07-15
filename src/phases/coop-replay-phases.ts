@@ -1586,14 +1586,25 @@ export class CoopFinalizeTurnPhase extends Phase {
       // freeze). Detect the ME-battle win DIRECTLY (spawned ME battle, all enemies fainted per the host's
       // authoritative checkpoint) and run the ME victory tail instead of looping into a new command.
       const meBattleWon = !waveEnding && coopMeHandoffBattleWon();
+      // The host's real TurnEndPhase already advanced the settled battle cursor before it captured this
+      // turn's authority frame. A renderer must mirror that NUMERIC boundary even when it suppresses the
+      // TurnEndPhase itself: incrementTurn() only advances and resets the battle cursor; it does not queue
+      // TurnInit/Command or execute damaging end-of-turn mechanics. Omitting it left a real browser pair
+      // on reward:<wave>:hostTurn+1 vs reward:<wave>:guestTurn with otherwise byte-identical state.
+      const advanceRenderedTurnBoundary = (): void => {
+        globalScene.currentBattle.incrementTurn();
+        globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
+      };
       if (waveEnding) {
         // FINAL turn of an already-/about-to-be-resolved wave: be TERMINAL. Run the wave-advance tail
-        // (VictoryPhase / BattleEnd / GameOver - exactly once, one-shot + wave-guarded) and DO NOT queue
-        // the guest's turn-end phases - that would loop into a phantom next turn the host already passed.
+        // (VictoryPhase / BattleEnd / GameOver - exactly once, one-shot + wave-guarded), mirror the host's
+        // settled numeric turn cursor, and DO NOT queue the guest's turn-end phases - those phases would
+        // execute mechanics and loop into a phantom command for a turn the host already passed.
         coopWarn(
           "replay",
           `guest finalize turn=${this.turn}: suppressing phantom turn after wave-advance signaled wave=${wave} (terminal final turn, NOT queuing turn-end)`,
         );
+        advanceRenderedTurnBoundary();
         // #790 regression fix: the stale-duplicate mark is scoped to the wave it was set in.
         // waveIndex may not tick before the next wave's first replay phase starts, so clear the
         // mark NOW (the wave boundary) or the new wave's turn 1 is killed as a "stale duplicate".
@@ -1608,6 +1619,7 @@ export class CoopFinalizeTurnPhase extends Phase {
           "replay",
           `guest finalize turn=${this.turn}: suppressing phantom turn after ME battle-handoff WIN (running ME victory tail, NOT queuing turn-end)`,
         );
+        advanceRenderedTurnBoundary();
         getCoopBattleStreamer()?.clearFinalizedMark();
         queueCoopMeBattleVictoryTail();
       } else {
@@ -1622,8 +1634,7 @@ export class CoopFinalizeTurnPhase extends Phase {
         // TurnStartPhase -> CoopReplayTurnPhase for turn N+1. Victory still arrives ONLY via the host's
         // waveResolved -> maybeRunCoopWaveAdvance. Solo / host / lockstep keep the original turn-end run.
         if (isCoopAuthoritativeGuest()) {
-          globalScene.currentBattle.incrementTurn();
-          globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
+          advanceRenderedTurnBoundary();
         } else {
           globalScene.phaseManager.queueTurnEndPhases();
         }
