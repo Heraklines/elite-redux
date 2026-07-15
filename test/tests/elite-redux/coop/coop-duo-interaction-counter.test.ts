@@ -43,7 +43,6 @@ import {
   buildDuo,
   type DuoRig,
   drainLoopback,
-  driveClientPhaseQueueTo,
   driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   forceItemRewards,
@@ -285,16 +284,15 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     );
 
     // ===== The NEXT battle resolves turns 1-2 with NO stall (the wedge the counter drift caused). =====
-    await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase", false);
-    });
-    const guestCommand = await withClient(rig.guestCtx, () => driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"));
-    expect(rig.hostScene.currentBattle.waveIndex, "host crossed into wave 2").toBe(2);
-    expect(guestCommand.phaseName, "guest crossed the real queue into wave 2").toBe("CommandPhase");
-    expect(rig.guestScene.currentBattle.waveIndex, "guest adopted wave 2").toBe(2);
-
+    // Let the public command driver bring BOTH engines to the reciprocal boundary. Stopping the host before
+    // CommandPhase and then starting only the guest would correctly keep its UI closed under the hardened
+    // barrier; that old harness order asserted the very one-sided opening production now forbids.
     for (let t = 0; t < 2; t++) {
       await driveDuoGuestTackleThroughPublicUi(game, rig);
+      if (t === 0) {
+        expect(rig.hostScene.currentBattle.waveIndex, "host crossed into wave 2").toBe(2);
+        expect(rig.guestScene.currentBattle.waveIndex, "guest adopted wave 2").toBe(2);
+      }
       const w2turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig, true);
       await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, w2turn));

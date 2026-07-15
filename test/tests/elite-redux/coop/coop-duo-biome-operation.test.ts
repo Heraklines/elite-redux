@@ -226,11 +226,13 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
     // It relays the biome AND commits the typed intent (dual-run). =====
     const ownerCap = installUiCapture(ownerCtx.scene);
     try {
-      setErPendingNodes([
-        { biome: BiomeId.FOREST, revealed: true },
-        { biome: ownerBiome, revealed: true },
-      ] satisfies ErRouteNode[]);
       await withClient(ownerCtx, async () => {
+        // Route state is runtime-scoped. Seed it while the owner's complete client context is active, just
+        // as an independent browser would, rather than leaking the last ambient client's map into this leg.
+        setErPendingNodes([
+          { biome: BiomeId.FOREST, revealed: true },
+          { biome: ownerBiome, revealed: true },
+        ] satisfies ErRouteNode[]);
         setCoopBiomeInteractionStart(counterBefore);
         liveSelectBiome().start();
         await Promise.resolve();
@@ -247,11 +249,11 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
     // relay, and ADOPTS it THROUGH the operation primitive (adoptBiomeWatcherChoice gate). =====
     const watcherCap = installUiCapture(watcherCtx.scene);
     try {
-      setErPendingNodes([
-        { biome: BiomeId.FOREST, revealed: true },
-        { biome: ownerBiome, revealed: true },
-      ] satisfies ErRouteNode[]);
       await withClient(watcherCtx, async () => {
+        setErPendingNodes([
+          { biome: BiomeId.FOREST, revealed: true },
+          { biome: ownerBiome, revealed: true },
+        ] satisfies ErRouteNode[]);
         setCoopBiomeInteractionStart(counterBefore);
         liveSelectBiome().start();
         for (let i = 0; i < 80; i++) {
@@ -410,11 +412,11 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
 
     const ownerCap = installUiCapture(rig.hostScene);
     try {
-      setErPendingNodes([
-        { biome: fallbackBiome, revealed: true },
-        { biome: ownerBiome, revealed: true },
-      ] satisfies ErRouteNode[]);
       await withClient(rig.hostCtx, async () => {
+        setErPendingNodes([
+          { biome: fallbackBiome, revealed: true },
+          { biome: ownerBiome, revealed: true },
+        ] satisfies ErRouteNode[]);
         setCoopBiomeInteractionStart(pinned);
         liveSelectBiome().start();
         await Promise.resolve();
@@ -428,11 +430,11 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
 
     const watcherCap = installUiCapture(rig.guestScene);
     try {
-      setErPendingNodes([
-        { biome: fallbackBiome, revealed: true },
-        { biome: ownerBiome, revealed: true },
-      ] satisfies ErRouteNode[]);
       await withClient(rig.guestCtx, async () => {
+        setErPendingNodes([
+          { biome: fallbackBiome, revealed: true },
+          { biome: ownerBiome, revealed: true },
+        ] satisfies ErRouteNode[]);
         setCoopBiomeInteractionStart(pinned);
         liveSelectBiome().start();
         for (let i = 0; i < 80; i++) {

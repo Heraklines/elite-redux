@@ -677,12 +677,8 @@ export class CommandPhase extends FieldPhase {
     }
     void pendingBarrier.then(crossed => {
       if (crossed) {
-        // The guest can reach turn-1 CommandPhase first and consume the PRE-summon enemyPartySync while
-        // the host is still draining PostSummon. The host publishes its refreshed full authority before it
-        // arrives at this same rendezvous; RTCDataChannel ordering therefore puts that refresh ahead of the
-        // arrival that releases us. Re-consume at the crossed boundary so entry stat stages/weather/forms
-        // land before public input opens, instead of leaving the refreshed carrier buffered until too late.
-        this.tryCoopCheckpointSync();
+        // The single continuation funnel re-consumes the latest wave-start authority immediately before
+        // public input opens, including after a retained phase-route displacement.
         this.enterOwnCommandBoundary();
       }
     });
@@ -690,6 +686,15 @@ export class CommandPhase extends FieldPhase {
 
   /** Execute a forced owned-slot action only after the reciprocal command boundary, else open its UI. */
   private enterOwnCommandBoundary(): void {
+    // This is the single continuation funnel for every reciprocal-command path: synchronous arrival,
+    // delayed arrival, and a command point temporarily displaced by a retained Crossroads/biome route.
+    // Re-consume the latest wave-start authority here, immediately before public input can open. A renderer
+    // may have consumed the pre-summon carrier when it first reached CommandPhase, then received the host's
+    // post-PostSummon/biome-preparation refresh while that command point was rerouted. Applying only in the
+    // ordinary rendezvous callback left that newer carrier buffered and opened input with stale map/biome
+    // state. The consume is one-shot and host-safe, so making the funnel own it covers every route without
+    // deriving or mutating guest mechanics.
+    this.tryCoopCheckpointSync();
     // The authoritative guest can reach its owned slot before the host has completed PostSummon. In that
     // race, the first checkCommander() above legitimately sees no CommandedTag, then the post-summon
     // checkpoint consumed at the reciprocal barrier materializes the tag. Re-evaluate at the actual
