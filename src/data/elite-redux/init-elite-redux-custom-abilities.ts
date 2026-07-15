@@ -39,6 +39,7 @@ import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abili
 import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
 import { ER_PRESSURE_VESSEL_ABILITY_ID, PressureVesselAbAttr } from "#data/elite-redux/abilities/pressure-vessel";
 import { ER_PUPPET_STRINGS_ABILITY_ID, PuppetStringsAbAttr } from "#data/elite-redux/abilities/puppet-strings";
+import { ER_QUICKENING_GRACE_ABILITY_ID, QuickeningGraceAbAttr } from "#data/elite-redux/abilities/quickening-grace";
 import { ER_RAIN_PUMP_ABILITY_ID, RainPumpAbAttr } from "#data/elite-redux/abilities/rain-pump";
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
 import { ER_SPORE_BED_ABILITY_ID } from "#data/elite-redux/abilities/spore-bed";
@@ -314,6 +315,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_RAIN_PUMP_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_QUICKENING_GRACE_ABILITY_ID,
+        name: "Quickening Grace",
+        description:
+          "Once per turn, the first attacking two-turn charge move selected by an ally executes immediately, skipping its charge turn. Does not affect Geomancy, status moves, or recharge moves.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_QUICKENING_GRACE_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -543,6 +554,10 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_RAIN_PUMP_ABILITY_ID) {
     builder.attr(RainPumpAbAttr);
+  }
+
+  if (pokerogueId === ER_QUICKENING_GRACE_ABILITY_ID) {
+    builder.attr(QuickeningGraceAbAttr);
   }
 
   const ability = builder.build();
