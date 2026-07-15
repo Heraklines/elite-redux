@@ -1176,8 +1176,35 @@ export function deferCoopAutomaticVictorySealAtBattleEnd(identity: CoopAutomatic
     failCoopSharedSession(`The automatic victory boundary for wave ${identity.wave} lost its owning runtime.`);
     return true;
   }
-  if (runtime.controller.role !== "host" || !usesRetainedCoopWaveTransaction(runtime)) {
-    failCoopSharedSession(`A non-host attempted to stage the automatic victory boundary for wave ${identity.wave}.`);
+  if (!usesRetainedCoopWaveTransaction(runtime)) {
+    failCoopSharedSession(`The automatic victory boundary for wave ${identity.wave} lost retained delivery.`);
+    return true;
+  }
+  if (runtime.controller.role === "guest") {
+    const staged = getCoopStagedWaveAdvanceTransaction(identity.wave, identity.binding);
+    const payload = staged?.envelope.pendingOperation?.payload;
+    if (
+      staged == null
+      || staged.dataApplied !== true
+      || !isValidCoopWaveAdvancePayload(payload)
+      || payload.outcome !== "win"
+      || payload.wave !== identity.wave
+    ) {
+      failCoopSharedSession(
+        `The renderer reached BattleEnd before the retained automatic victory state for wave ${identity.wave} `
+          + `(applied ${staged?.dataApplied === true}).`,
+      );
+      return true;
+    }
+    // The complete host image has already been admitted. Skip the legacy/raw BattleEnd publisher and let
+    // the queued CoopVictorySealPhase prove the same staged identity before any continuation surface opens.
+    coopLog("progression", `GUEST automatic victory settlement deferred wave=${identity.wave}`);
+    return true;
+  }
+  if (runtime.controller.role !== "host") {
+    failCoopSharedSession(
+      `An unknown co-op seat attempted to stage the automatic victory boundary for wave ${identity.wave}.`,
+    );
     return true;
   }
   const transition = pendingHostWaveTransitions.get(identity.wave);
