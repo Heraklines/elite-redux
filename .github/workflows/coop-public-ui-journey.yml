@@ -140,21 +140,31 @@ jobs:
             src/dev-tools/registry.ts \
             src/ui/handlers/starter-select-ui-handler.ts \
             test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
+            test/browser/coop-public-ui/campaign-policy.mjs \
+            test/browser/coop-public-ui/campaign.mjs \
             test/browser/coop-public-ui/campaign-nav.mjs \
+            test/browser/coop-public-ui/check-campaign-boundary.mjs \
             test/browser/coop-public-ui/check-public-boundary.mjs \
             test/browser/coop-public-ui/commander-evidence.test.mjs \
             test/browser/coop-public-ui/config.mjs \
             test/browser/coop-public-ui/evidence.mjs \
             test/browser/coop-public-ui/journeys.mjs \
+            test/browser/coop-public-ui/market-gold-standard.test.mjs \
+            test/browser/coop-public-ui/market-journey.mjs \
             test/browser/coop-public-ui/preview-server.mjs \
             test/browser/coop-public-ui/provision-accounts.mjs \
             test/browser/coop-public-ui/public-ui-harness.mjs \
             test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs \
+            test/browser/coop-public-ui/run-campaign.mjs \
             test/browser/coop-public-ui/run.mjs \
+            test/browser/coop-public-ui/terminal-watchdog.mjs \
             test/browser/coop-public-ui/vite.config.mjs
 
       - name: Enforce public-driver boundary
         run: node test/browser/coop-public-ui/check-public-boundary.mjs
+
+      - name: Enforce public campaign-driver boundary
+        run: node test/browser/coop-public-ui/check-campaign-boundary.mjs
 
       - name: Verify browser fan-out checkout isolation
         run: node --test test/browser/coop-public-ui/browser-workflow-fanout.test.mjs
@@ -164,6 +174,9 @@ jobs:
 
       - name: Verify strict Commander browser evidence contracts
         run: node --test test/browser/coop-public-ui/commander-evidence.test.mjs
+
+      - name: Verify strict Wide Lens market contracts
+        run: node --test test/browser/coop-public-ui/market-gold-standard.test.mjs
 
       - name: Build normal application with CI-only read-only observer
         env:
@@ -240,12 +253,12 @@ jobs:
           COOP_UI_GUEST_TITLE_NEW_GAME_KEYS: ${{ inputs.guest_title_keys || '[]' }}
           COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'fast' && '70') || (inputs.cadence == 'slow' && '420') || '180' }}
           COOP_UI_SETTLE_DELAY_MS: ${{ (inputs.cadence == 'fast' && '300') || (inputs.cadence == 'slow' && '1300') || '750' }}
-          # This profile drives a real wave-10/20/30 market through public keys. It requires
-          # one paid Wide Lens purchase, proves both clients' money/item/stock projections,
-          # leaves normally, and advances again. Decade markets have the same owner parity
-          # without an odd intervening interaction, so this single journey does not claim
-          # both-owner-seat coverage.
-          COOP_UI_CAMPAIGN_WAVES: "30"
+          # The continuous wave-1 -> wave-20 profile naturally reaches the wave-10 guest-owned
+          # and wave-20 host-owned markets (boss auto-grants do not consume an interaction).
+          # Both visits must buy Wide Lens, return to the same grid, leave normally and prove
+          # the following public command surface. This is one real run, so no save/runtime
+          # fixture or cross-job aggregation can counterfeit the owner alternation.
+          COOP_UI_CAMPAIGN_WAVES: "20"
           COOP_UI_CAMPAIGN_MODE: gating
           COOP_UI_RENDER_PROFILE: animations-skipped-depth
           COOP_UI_REWARD_MODE: leave
@@ -253,8 +266,8 @@ jobs:
           COOP_UI_MARKET_MODE: ${{ inputs.journey == 'market-wide-lens' && 'target-held' || 'leave' }}
           COOP_UI_MARKET_TARGET_ID: WIDE_LENS
           COOP_UI_MARKET_SECOND_PURCHASE: "1"
-          COOP_UI_MARKET_REQUIRED_PURCHASES: ${{ inputs.journey == 'market-wide-lens' && '1' || '0' }}
-          COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: "0"
+          COOP_UI_MARKET_REQUIRED_PURCHASES: ${{ inputs.journey == 'market-wide-lens' && '2' || '0' }}
+          COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: ${{ inputs.journey == 'market-wide-lens' && '1' || '0' }}
           # A measured 537 MB screenshot-enabled CDP performance trace starved two real 10x clients.
           # Normal two-player fidelity keeps PNGs, semantic/network JSONL, key latency, render and
           # WebRTC evidence while omitting only that optional timeline. Manual diagnostics may opt in.

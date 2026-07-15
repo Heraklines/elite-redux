@@ -14,7 +14,7 @@ import {
   SHARED_SESSION_TERMINAL,
 } from "./campaign-policy.mjs";
 import { delay } from "./evidence.mjs";
-import { driveTargetedMarket } from "./market-journey.mjs";
+import { assertMarketCoverage, driveTargetedMarket } from "./market-journey.mjs";
 
 const START_PHASE = /Start Phase (\w+)/u;
 const ANIMATION_PROGRESS_PHASE = /Start Phase (MoveEffectPhase|MoveAnimPhase|CoopMoveAnimReplayPhase)/u;
@@ -782,6 +782,15 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
         allowAddressRepeat: true,
       });
       rig.activeBattleWave = boundary.wave;
+      if (stats.market != null) {
+        stats.market.continuation = {
+          status: "command",
+          epoch: boundary.epoch,
+          wave: boundary.wave,
+          turn: boundary.turn,
+          stateDigest: boundary.stateDigest,
+        };
+      }
       return { status: "continue" };
     }
 
@@ -908,17 +917,7 @@ export async function runCampaign(rig) {
     if (status === "continue" && wavesCleared >= policy.targetWaves) {
       await assertRenderProfileExecution(rig, policy, progress);
     }
-    if (marketCoverage.purchases.length < policy.market.requiredPurchases) {
-      throw new Error(
-        `market coverage bought ${marketCoverage.purchases.length} ${policy.market.targetId} items; required ${policy.market.requiredPurchases}`,
-      );
-    }
-    if (
-      policy.market.requireBothOwnerSeats
-      && new Set(marketCoverage.purchases.map(purchase => purchase.ownerSeat)).size < 2
-    ) {
-      throw new Error("market coverage did not buy through both interaction-owner seat parities");
-    }
+    assertMarketCoverage(marketCoverage, policy.market);
   } finally {
     rig.marketCoverage = marketCoverage;
     await progress.summary({

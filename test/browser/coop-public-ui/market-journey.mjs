@@ -27,6 +27,61 @@ function catalogKey(observation) {
   );
 }
 
+/**
+ * Seal the campaign-level market contract after every visited market has reached its
+ * next public command surface. A two-parity run is only green when Wide Lens was paid
+ * for through both stable seats, never merely because two purchases happened under one
+ * owner or because a market screen appeared.
+ */
+export function assertMarketCoverage(
+  coverage,
+  { targetId = "WIDE_LENS", requiredPurchases = 0, requireBothOwnerSeats = false } = {},
+) {
+  const visits = Array.isArray(coverage?.visits) ? coverage.visits : [];
+  const purchases = Array.isArray(coverage?.purchases) ? coverage.purchases : [];
+  if (purchases.length < requiredPurchases) {
+    throw new Error(`market coverage bought ${purchases.length} ${targetId} items; required ${requiredPurchases}`);
+  }
+  const ownerSeats = assertMarketPurchaseProofs(purchases, targetId);
+  if (requireBothOwnerSeats && JSON.stringify(ownerSeats) !== "[0,1]") {
+    throw new Error(
+      `market coverage did not buy ${targetId} through both interaction-owner seat parities; observed ${JSON.stringify(ownerSeats)}`,
+    );
+  }
+  visits.forEach(assertMarketVisitContinuation);
+  return Object.freeze({ targetId, purchaseCount: purchases.length, ownerSeats, visitCount: visits.length });
+}
+
+function assertMarketPurchaseProofs(purchases, targetId) {
+  for (const purchase of purchases) {
+    if (purchase?.targetId !== targetId) {
+      throw new Error(
+        `market coverage claimed ${targetId} with an unexpected ${purchase?.targetId ?? "unknown"} proof`,
+      );
+    }
+    if (![0, 1].includes(purchase.ownerSeat)) {
+      throw new Error(`market coverage has invalid owner seat ${purchase.ownerSeat}`);
+    }
+  }
+  return [...new Set(purchases.map(purchase => purchase.ownerSeat))].sort();
+}
+
+function assertMarketVisitContinuation(visit) {
+  const interaction = visit?.pinnedInteraction ?? "unknown";
+  if (visit?.leaveRequestedViaPublicConfirmation !== true) {
+    throw new Error(`market visit at interaction ${interaction} did not use the public leave confirmation`);
+  }
+  if (visit?.continuation?.status !== "command") {
+    throw new Error(`market visit at interaction ${interaction} did not prove a next public command`);
+  }
+  const sourceWave = visit.purchases?.[0]?.address?.wave;
+  if (Number.isSafeInteger(sourceWave) && visit.continuation.wave <= sourceWave) {
+    throw new Error(
+      `market visit at wave ${sourceWave} did not advance to a later battle wave (${visit.continuation.wave})`,
+    );
+  }
+}
+
 /** Exact non-wrapping directions through the market's visible 4x4 grid. */
 export function planMarketGridKeys(currentIndex, targetIndex, columns = MARKET_COLUMNS) {
   if (
@@ -370,5 +425,7 @@ export async function driveTargetedMarket(
     targetStatus: primary.status,
     targetReason: primary.reason ?? null,
     purchases,
+    leaveRequestedViaPublicConfirmation: true,
+    continuation: null,
   };
 }

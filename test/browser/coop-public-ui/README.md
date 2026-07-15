@@ -142,16 +142,21 @@ projection, navigates the real 4x4 canvas grid to `COOP_UI_MARKET_TARGET_ID` (de
 the real party picker, chooses `COOP_UI_MARKET_PARTY_SLOT`, confirms APPLY, proves the paid money change,
 held-item quantity, and one stock-ledger decrement on both clients, then verifies the market stayed open.
 It buys the same already-proven compatible held item again when stock/money permit, then leaves through
-the normal confirmation. Set
-`COOP_UI_MARKET_REQUIRED_PURCHASES=2` and `COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS=1` for the two-parity
-gold-standard run. Because a fresh run's market stock is seed-dependent, that strict profile needs a
-prepared deterministic save/account pair or a sufficiently calibrated campaign seed; it never substitutes
-a different item while claiming Wide Lens coverage.
+the normal confirmation and requires both clients to converge on the next public command surface. The
+`market-wide-lens` workflow uses one continuous fresh wave-1 -> wave-20 run with
+`COOP_UI_MARKET_REQUIRED_PURCHASES=2` and `COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS=1`: the wave-10 market
+is guest-owned and the wave-20 market is host-owned under the natural interaction schedule. The market
+stock is seed-dependent, so a run without affordable Wide Lens stock at both parities fails loudly and
+remains evidence for checkpoint calibration; the driver never substitutes another item or mutates stock
+while claiming Wide Lens coverage.
 
 Dropping or reordering a WebRTC market terminal is intentionally not injected by this public driver. Doing
 so would require mutating the page's private DataChannel, which violates the human-equivalent boundary.
-That fault belongs in the loopback/transport fault matrix; this browser lane proves the natural retained
-terminal over real staging WebRTC and public inputs.
+The closest exact fault layer is `coop-duo-biome-market-continuation.test.ts` (dropped raw biomeShop buy +
+leave relays still materialize in ordinal order) plus `coop-reward-authoritative-result.test.ts`
+(dropped/reordered/delayed immutable results, including the typed market terminal, apply and render once
+in revision order). This browser lane proves the natural retained terminal over real staging WebRTC and
+public inputs; the external co-op gate owns those fault tests.
 
 ## Run speed and the fidelity-profile split
 
