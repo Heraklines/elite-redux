@@ -1219,5 +1219,220 @@
     ],
     "trainerClass": "BLAINE",
     "weight": 100
+  },
+  "TRAINER_70010": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70010,
+    "maxWave": 160,
+    "minWave": 150,
+    "name": "Crime Leader",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 128
+        },
+        "level": null,
+        "moves": [
+          "ROLLOUT",
+          "RAPID_SPIN",
+          "KNOCK_OFF",
+          "BULLDOZE"
+        ],
+        "species": 232
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "SITRUS_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "POISON_JAB",
+              "DRILL_RUN",
+              "PRECIPICE_BLADES",
+              "MEGAHORN"
+            ],
+            "sanityOff": true,
+            "species": 34,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 2,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "LUM_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "ER_POISON_GEM"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "POISON_JAB",
+              "BERSERKER_HORN",
+              "PRECIPICE_BLADES",
+              "POWER_UP_PUNCH"
+            ],
+            "sanityOff": true,
+            "species": 10512,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "STEALTH_ROCK",
+              "VENOSHOCK",
+              "TOXIC_SPIKES",
+              "VENOM_DRENCH"
+            ],
+            "species": 31,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "STEALTH_ROCK",
+              "EARTHQUAKE",
+              "TOXIC_SPIKES",
+              "THUNDERBOLT"
+            ],
+            "species": 10513,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "BODY_PRESS",
+              "GEM_MISSILE",
+              "COIL",
+              "RLNA"
+            ],
+            "species": 10064,
+            "weight": 7
+          },
+          {
+            "abilitySlot": 0,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              },
+              {
+                "count": 1,
+                "item": "HARD_STONE"
+              },
+              {
+                "count": 1,
+                "item": "ER_DRAGON_GEM"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              },
+              {
+                "count": 1,
+                "item": "SITRUS_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "JAGGED_FANGS",
+              "SANDSTORM",
+              "DRAGON_DANCE",
+              "DRACO_METEOR"
+            ],
+            "species": 10631,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "TWISTED_SPOON"
+          },
+          {
+            "count": 1,
+            "item": "IRON"
+          },
+          {
+            "count": 1,
+            "item": "CALCIUM"
+          },
+          {
+            "count": 1,
+            "item": "CARBOS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "PSYSTRIKE",
+          "AURA_SPHERE",
+          "FLAMETHROWER",
+          "RLA"
+        ],
+        "slotChance": 15,
+        "species": 150
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "BLACK_GLASSES"
+          },
+          {
+            "count": 1,
+            "item": "ENIGMA_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ER_STEEL_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BRAVE_BIRD",
+          "STEEL_WING",
+          "BLACK_MAGIC",
+          "MIRROR_MOVE"
+        ],
+        "species": 430
+      }
+    ],
+    "trainerClass": "GIOVANNI",
+    "weight": 100
   }
 }
