@@ -3113,6 +3113,7 @@ function renderCustomTrainers(root) {
       ${warnings.length > 0 ? `<div class="ctr-warn">⚠ ${warnings.map(esc).join("<br>⚠ ")}</div>` : ""}
       ${notes.length > 0 ? `<div class="ctr-note">ℹ ${notes.map(esc).join("<br>ℹ ")}</div>` : ""}
       <div class="full" style="display:flex;gap:10px;align-items:center;margin-top:8px">
+        <button type="button" id="ctr-clone" title="Duplicate this trainer as a NEW trainer (fresh id, name + ' (copy)'). The server assigns the real id/key on save.">⧉ Clone trainer</button>
         <button type="button" id="ctr-delete" style="color:var(--err,#c0392b)">🗑 Delete trainer</button>
         <span class="dyn">Changes save with the global “Save”/“Commit & Deploy” buttons.</span>
       </div>
@@ -3453,6 +3454,30 @@ function onCustomTrainerClick(e) {
     ctrOpenMembers.add(0); // the fresh member starts expanded
     bgmStop();
     render();
+    return true;
+  }
+  if (e.target.closest("#ctr-clone")) {
+    // Clone the SELECTED trainer as a NEW trainer: deep-copy its whole content,
+    // mint a fresh provisional id/key (like #ctr-new) and suffix the name " (copy)".
+    // The server assigns the real id/key on save (the round-7/9 re-key machinery),
+    // so a clone is just a new-trainer entry carrying the copied content.
+    const src = ctrSelected ? ctr.current[ctrSelected] : null;
+    if (src) {
+      const clone = JSON.parse(JSON.stringify(src)); // deep copy (plain edit data)
+      clone.id = blankCtrTrainer().id; // next free provisional id in 70000-79999
+      const suffix = " (copy)";
+      const base = (src.name || "").trim();
+      clone.name = (base + suffix).length <= 24 ? base + suffix : base.slice(0, 24 - suffix.length) + suffix;
+      let key = `TRAINER_${clone.id}`;
+      while (ctr.current[key]) {
+        key += "_2";
+      }
+      ctr.current[key] = clone;
+      ctrSelected = key;
+      ctrResetMemberUiState();
+      bgmStop();
+      render();
+    }
     return true;
   }
   const t = ctrCur();

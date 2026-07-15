@@ -803,6 +803,63 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].victoryDialogue.length).toBe(200);
   });
 
+  it("clone trainer: deep-copies the whole trainer as a NEW entry (fresh id/key, name + ' (copy)')", () => {
+    const key = newTrainer("Ace Rico");
+    const src = ct.ctr.current[key];
+    setSpecies(0, "SPECIES_PIKACHU");
+    // Give it some content to prove a DEEP copy (a 2nd member + a challenge).
+    ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
+    setSpecies(1, "SPECIES_SNORLAX");
+    src.challenge = "monotype";
+    src.challengeValue = 10;
+    ct.render();
+
+    const beforeKeys = Object.keys(ct.ctr.current);
+    // The Clone button renders next to Delete.
+    const cloneBtn = q("#ctr-clone");
+    expect(cloneBtn).not.toBeNull();
+    ct.onCustomTrainerClick({ target: cloneBtn! });
+
+    // A brand-new entry was added and is now selected.
+    const afterKeys = Object.keys(ct.ctr.current);
+    expect(afterKeys.length).toBe(beforeKeys.length + 1);
+    const newKey = ct.ctrSelected!;
+    expect(newKey).not.toBe(key);
+    const clone = ct.ctr.current[newKey];
+
+    // Fresh provisional id (different, still in the 70000 band) + suffixed name.
+    expect(clone.id).not.toBe(src.id);
+    expect(clone.id).toBeGreaterThanOrEqual(70001);
+    expect(clone.name).toBe("Ace Rico (copy)");
+    // Deep-copied content: same team + challenge, but a SEPARATE object graph.
+    expect(clone.team.length).toBe(2);
+    expect(clone.team[0].species).toBe("SPECIES_PIKACHU");
+    expect(clone.team[1].species).toBe("SPECIES_SNORLAX");
+    expect(clone.challenge).toBe("monotype");
+    expect(clone.challengeValue).toBe(10);
+    expect(clone).not.toBe(src);
+    expect(clone.team).not.toBe(src.team);
+    // Editing the clone must not mutate the source (proves the deep copy).
+    clone.team[0].species = "SPECIES_RAICHU";
+    expect(src.team[0].species).toBe("SPECIES_PIKACHU");
+
+    // The clone is a NEW (never-loaded) entry, so it serializes with its fresh id
+    // and the server assigns the real id/key on save (no baseline for it).
+    const delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[newKey];
+    expect(delta).toBeDefined();
+    expect(delta.id).toBe(clone.id);
+    expect(delta.name).toBe("Ace Rico (copy)");
+
+    // The long-name case caps to 24 chars while preserving the " (copy)" suffix.
+    newTrainer("A Very Very Long Trainer Name");
+    setSpecies(0, "SPECIES_PIKACHU");
+    ct.render();
+    ct.onCustomTrainerClick({ target: q("#ctr-clone")! });
+    const longClone = ct.ctr.current[ct.ctrSelected!];
+    expect(longClone.name.length).toBeLessThanOrEqual(24);
+    expect(longClone.name.endsWith(" (copy)")).toBe(true);
+  });
+
   it("fusion move-pool union: a move legal only on the fusion partner is NOT flagged illegal", () => {
     // Base Pikachu learns THUNDERBOLT; fusion partner Machamp learns CROSS_CHOP.
     // A fused member can legally know EITHER (union), so CROSS_CHOP must pass on
