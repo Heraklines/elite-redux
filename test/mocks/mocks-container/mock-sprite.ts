@@ -36,7 +36,7 @@ export class MockSprite implements MockGameObject {
   public set alpha(value: number) {
     this.phaserSprite.alpha = value;
   }
-  constructor(textureManager, x, y, texture) {
+  constructor(textureManager, x, y, texture, frame?: string | number) {
     this.textureManager = textureManager;
     this.scene = textureManager.scene;
     // @ts-expect-error
@@ -50,7 +50,7 @@ export class MockSprite implements MockGameObject {
     // Phaser.GameObjects.Sprite.prototype.disable = this.disable;
 
     // Phaser.GameObjects.Sprite.prototype.texture = { frameTotal: 1, get: () => null };
-    this.phaserSprite = new Phaser.GameObjects.Sprite(textureManager.scene, x, y, texture);
+    this.phaserSprite = new Phaser.GameObjects.Sprite(textureManager.scene, x, y, texture, frame);
     this.pipelineData = {};
     this.texture = {
       key: texture || "",
@@ -59,6 +59,10 @@ export class MockSprite implements MockGameObject {
       // fallback) then take their base-frame branch instead of throwing on a missing method.
       has: (_frame?: string | number) => false,
     };
+    // Phaser exposes a Textures.Frame object whose public `name` is the atlas frame supplied to
+    // scene.add.sprite(...). The mock factory used to discard that fourth argument and left this wrapper's
+    // frame undefined, so production reads such as `sprite.frame.name` crashed only in HEADLESS tests.
+    this.frame = { name: frame ?? 0 };
     this.anims = {
       pause: () => null,
       stop: () => null,
@@ -168,7 +172,7 @@ export class MockSprite implements MockGameObject {
 
   setFrame(frame, _updateSize?: boolean, _updateOrigin?: boolean): this {
     // Sets the frame this Game Object will use to render with.
-    this.frame = frame;
+    this.frame = { name: frame };
     return this;
   }
 
