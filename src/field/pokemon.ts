@@ -59,6 +59,7 @@ import { allAbilities, allMoves } from "#data/data-lists";
 import { erApplyChivalry } from "#data/elite-redux/abilities/chivalry";
 import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
+import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
@@ -5788,6 +5789,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!isIndirectDamage && source && damage > 0) {
       damage -= erApplyChivalry(this, damage);
     }
+    // ER Soulmate (ability 5918): on a DIRECT hit, if this Pokemon's linked
+    // partner carries Soulmate, 25% is redirected to that partner as raw HP.
+    if (!isIndirectDamage && source && damage > 0) {
+      damage -= erApplySoulmateRedirect(this, damage);
+    }
     // ER Life Preserver (ability 5916): once per battle, a DIRECT attack that
     // would faint this Pokemon is clamped to leave it at 1 HP if a living ally
     // carries the ability — and the attacker is Drenched. Direct hits only
@@ -5817,6 +5823,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public heal(amount: number): number {
     const healAmount = Math.min(amount, this.getMaxHp() - this.hp);
     this.hp += healAmount;
+    // ER Soulmate (ability 5918): 50% of the direct healing a Soulmate holder
+    // receives is copied to its linked ally (guarded against recursion).
+    erApplySoulmateHealCopy(this, healAmount);
     return healAmount;
   }
 

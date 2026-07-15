@@ -36,39 +36,13 @@
 // move or leaves the field (whichever first) — documented.
 // =============================================================================
 
-import { MoveTypeChartOverrideAttr } from "#data/moves/move";
+import { DualTypeMoveAttr } from "#data/moves/move";
 import { MoveCategory } from "#enums/move-category";
 import { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
-import type { NumberHolder } from "#utils/value-holder";
 
-/**
- * Move attr granting a `secondType` for effectiveness. Multiplies the move's
- * type-chart multiplier by the target's matchup against `secondType` — the exact
- * mechanism Flying Press uses for Flying. Attach to a move (or a scripted-move
- * clone) to make it dual-type for damage effectiveness.
- */
-export class DualTypeMoveAttr extends MoveTypeChartOverrideAttr {
-  public readonly secondType: PokemonType;
-
-  constructor(secondType: PokemonType) {
-    super();
-    this.secondType = secondType;
-  }
-
-  apply(
-    user: Pokemon,
-    target: Pokemon,
-    _move: Move,
-    args: [multiplier: NumberHolder, types: readonly PokemonType[], moveType: PokemonType],
-  ): boolean {
-    const [multiplier] = args;
-    // Exclude `move` (like Flying Press) so this attr does not re-trigger itself.
-    multiplier.value *= target.getAttackTypeEffectiveness(this.secondType, { source: user });
-    return true;
-  }
-}
+export { DualTypeMoveAttr };
 
 /** Per-target dual-type prime: the target's next physical move becomes primary/second. */
 interface DualTypePrime {

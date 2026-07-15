@@ -46,6 +46,7 @@ import {
   ER_CROSSCUT_ABILITY_ID,
 } from "#data/elite-redux/abilities/crosscut";
 import { DandelionBurstAbAttr, ER_DANDELION_BURST_ABILITY_ID } from "#data/elite-redux/abilities/dandelion-burst";
+import { ER_HEARTBREAK_ABILITY_ID, HeartbreakAbAttr } from "#data/elite-redux/abilities/heartbreak";
 import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abilities/last-host";
 import { ER_LIFE_PRESERVER_ABILITY_ID, LifePreserverAbAttr } from "#data/elite-redux/abilities/life-preserver";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
@@ -58,7 +59,9 @@ import {
   RelativityAbAttr,
   RelativityDefenseReductionAbAttr,
 } from "#data/elite-redux/abilities/relativity";
+import { ER_RENDEZVOUS_ABILITY_ID, RendezvousAbAttr } from "#data/elite-redux/abilities/rendezvous";
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
+import { ER_SOULMATE_ABILITY_ID, SoulmateAbAttr } from "#data/elite-redux/abilities/soulmate";
 import { ER_SPORE_BED_ABILITY_ID } from "#data/elite-redux/abilities/spore-bed";
 import { ER_TANGLED_SEED_ABILITY_ID, TangledSeedAbAttr } from "#data/elite-redux/abilities/tangled-seed";
 import {
@@ -409,6 +412,36 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_WORLD_IN_PIECES_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_SOULMATE_ABILITY_ID,
+        name: "Soulmate",
+        description:
+          "On entry this Pokemon links to a nearby ally. 25% of the direct damage the linked ally takes is redirected to this Pokemon as raw HP, and 50% of the direct healing this Pokemon receives is copied to the linked ally.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_SOULMATE_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_RENDEZVOUS_ABILITY_ID,
+        name: "Rendezvous",
+        description:
+          "On entry this Pokemon links to a nearby ally. If both linked Pokemon target the same opponent in one turn, the second move dealt gains 20% power and both restore 5% of their max HP.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_RENDEZVOUS_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_HEARTBREAK_ABILITY_ID,
+        name: "Heartbreak",
+        description:
+          "On entry this Pokemon links to a nearby ally. When that ally faints, this Pokemon gains +1 Speed and +1 in its higher attacking stat, and loses 1 stage of Defense and Sp. Def.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_HEARTBREAK_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -672,6 +705,18 @@ function buildCustomAbility(
     builder.attr(WorldInPiecesRemoveTypeAbAttr);
     builder.attr(WorldInPiecesSpeedAbAttr);
     builder.attr(WorldInPiecesRestoreAbAttr);
+  }
+
+  if (pokerogueId === ER_SOULMATE_ABILITY_ID) {
+    builder.attr(SoulmateAbAttr);
+  }
+
+  if (pokerogueId === ER_RENDEZVOUS_ABILITY_ID) {
+    builder.attr(RendezvousAbAttr);
+  }
+
+  if (pokerogueId === ER_HEARTBREAK_ABILITY_ID) {
+    builder.attr(HeartbreakAbAttr);
   }
 
   const ability = builder.build();

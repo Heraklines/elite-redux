@@ -5,6 +5,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { ConditionalProtectTag } from "#data/arena-tag";
 import { MoveAnim } from "#data/battle-anims";
 import { ProtectedTag, SemiInvulnerableTag, SubstituteTag, TypeBoostTag } from "#data/battler-tags";
+import { erBatch3OnTargetHit } from "#data/elite-redux/abilities/batch3-on-hit";
 import {
   ConditionalAlwaysHitAbAttr,
   erMoveAlwaysHitsForUserType,
@@ -927,6 +928,14 @@ export class MoveEffectPhase extends PokemonPhase {
     this.applyHeldItemFlinchCheck(user, target, dealsDamage);
     this.applyOnGetHitAbEffects(user, target, dmgTuple);
     applyAbAttrs("PostAttackAbAttr", { pokemon: user, opponent: target, move: this.move, hitResult, damage });
+
+    // ER Batch 3 same-turn "linked/aligned pair" effects (Rendezvous heal,
+    // Synchronized Current paralysis, Closed Circuit extra hit) + turn-attack
+    // ledger recording. Runs after PostAttack so second-actor triggers see the
+    // first actor's already-recorded hit.
+    if (this.move.is("AttackMove")) {
+      erBatch3OnTargetHit(user, target, dealsDamage);
+    }
 
     // We assume only enemy Pokemon are able to have the EnemyAttackStatusEffectChanceModifier from tokens
     if (!user.isPlayer() && this.move.is("AttackMove")) {
