@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "taskId": "p33-modifier-auto-boundary-ffec",
+  "branch": "ci/coop/p33-modifier-auto-boundary-ffec",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "ffec851b40180d7ecc543237636c5e4a8d6a3763",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-modifier-auto-boundary-ffec.json",
+    "src/data/elite-redux/coop/coop-trainer-victory-boundary.ts",
+    "src/phases/encounter-phase.ts",
+    "src/phases/trainer-victory-phase.ts",
+    "test/tests/elite-redux/coop/coop-trainer-victory-boundary.test.ts",
+    "test/tools/coop-duo-harness.ts"
+  ]
+}
