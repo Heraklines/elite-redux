@@ -328,6 +328,17 @@ export interface ErCustomTrainer {
   spawnChance?: number;
   challenge?: ErCustomTrainerChallenge;
   /**
+   * Optional VALUE parameter for a value-bearing `challenge` (mono-type / mono-gen
+   * / mono-color / usage-tier / ...). When set, the trainer's challenge gate
+   * additionally requires the ACTIVE run's challenge value to EQUAL this (using the
+   * game's own value encoding: SINGLE_TYPE = PokemonType index + 1, MONO_COLOR =
+   * ER color index + 1, SINGLE_GENERATION = the gen number with 10 = RDX, etc.).
+   * Absent => any value of that challenge qualifies (the original behavior).
+   * Ignored for `none` and for pure-toggle challenges (value is always 1 there).
+   * Integer >= 1; invalid/absent => unset.
+   */
+  challengeValue?: number;
+  /**
    * er-assets `audio/bgm/<key>.mp3` key (filename without `.mp3`) that plays for
    * THIS battle only. Trimmed; empty/absent/invalid => the trainer's default
    * theme. Charset `[a-z0-9_]+` (mirrors the editor + worker validator).
@@ -439,6 +450,12 @@ export interface ErCustomTrainerResolved {
   /** Relative pick weight when a spawn window fires (integer >= 1; default 100). */
   weight: number;
   challenge: ErCustomTrainerChallenge;
+  /**
+   * The value the ACTIVE run's challenge must equal for this trainer to pass the
+   * challenge gate, or `null` when unset (any value of that challenge qualifies -
+   * the original behavior). See {@linkcode ErCustomTrainer.challengeValue}.
+   */
+  challengeValue: number | null;
   /** er-assets bgm key to play for this battle only, or "" for the default theme. */
   battleBgm: string;
   /** Normalized intro blurb shown at battle start, or "" for the default class line. */
@@ -588,6 +605,21 @@ export function normalizeIntroDialogue(value: unknown): string {
  */
 export function normalizeTrainerEffect(value: unknown): string {
   return isKnownTrainerAuraId(value) ? value : "";
+}
+
+/**
+ * Normalize an authored `challengeValue` to a positive integer, or `null` when
+ * absent/invalid (non-number, non-finite, < 1). `null` => unset (the challenge
+ * gate requires only that the challenge is active, any value - original behavior).
+ * The per-challenge maximum is enforced by the run itself (each `Challenge` clamps
+ * its own value); here we only require a positive integer.
+ */
+export function normalizeChallengeValue(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+  const n = Math.floor(value);
+  return n >= 1 ? n : null;
 }
 
 /**
@@ -810,6 +842,8 @@ function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResol
     entry.battleType === "double" || entry.battleType === "triple" ? entry.battleType : "single";
   const challenge: ErCustomTrainerChallenge =
     entry.challenge && entry.challenge in CHALLENGE_MAP ? entry.challenge : "none";
+  // A challengeValue only means anything alongside a real challenge; drop it for "none".
+  const challengeValue = challenge === "none" ? null : normalizeChallengeValue(entry.challengeValue);
   const minWave = Number.isInteger(entry.minWave) && (entry.minWave as number) >= 1 ? (entry.minWave as number) : 1;
   const maxWave = Number.isInteger(entry.maxWave) && (entry.maxWave as number) >= minWave ? (entry.maxWave as number) : 200;
   return {
@@ -827,6 +861,7 @@ function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResol
     endless: entry.endless === true,
     weight: resolveErCustomTrainerWeight(entry.weight, entry.spawnChance),
     challenge,
+    challengeValue,
     battleBgm: normalizeBattleBgm(entry.battleBgm),
     introDialogue: normalizeDialogueLine(entry.introDialogue),
     victoryDialogue: normalizeDialogueLine(entry.victoryDialogue),
@@ -1099,6 +1134,35 @@ function legalMovePool(speciesId: number, wantStatus: boolean): readonly number[
 }
 
 /**
+ * The legal-move pool an RLA/RLNA token draws from for a resolved member: the
+ * member's own species pool, UNIONED with its FUSION partner's pool when fused.
+ * A fusion can legally know moves from BOTH species (mirrors how the game builds a
+ * fused mon's learnset), so a fused member's random legal move may come from either
+ * side. Returned SORTED by move id (deterministic walk order). A non-fused member
+ * returns exactly {@linkcode legalMovePool} (byte-identical to the old behavior).
+ */
+function legalMovePoolForMember(member: ErCustomTrainerMemberResolved, wantStatus: boolean): readonly number[] {
+  const base = legalMovePool(member.speciesId, wantStatus);
+  if (!member.fusion) {
+    return base;
+  }
+  const fusion = legalMovePool(member.fusion.speciesId, wantStatus);
+  if (fusion.length === 0) {
+    return base;
+  }
+  if (base.length === 0) {
+    return fusion;
+  }
+  const set = new Set<number>(base);
+  for (const id of fusion) {
+    set.add(id);
+  }
+  const out = [...set];
+  out.sort((a, b) => a - b);
+  return out;
+}
+
+/**
  * Seeded pick of a legal move for one RLA/RLNA token slot: start at
  * `hashSeed(...move...) % pool.length` and walk FORWARD deterministically until a
  * move not already in `used` is found (no duplicates within the moveset). Returns
@@ -1148,7 +1212,7 @@ export function resolveErCustomTrainerMoveIds(
       used.add(spec.id);
       return;
     }
-    const pool = legalMovePool(member.speciesId, spec.token === "RLNA");
+    const pool = legalMovePoolForMember(member, spec.token === "RLNA");
     const picked = pickTokenMove(seed, key, slotIndex, moveIndex, pool, used);
     if (picked !== undefined) {
       chosen.push(picked);
@@ -1158,11 +1222,28 @@ export function resolveErCustomTrainerMoveIds(
   return chosen;
 }
 
-function challengeActive(challenge: ErCustomTrainerChallenge): boolean {
+/**
+ * Whether the active run satisfies a trainer's challenge-exclusivity gate:
+ *   - `none` => always true.
+ *   - otherwise the run must have the mapped challenge ACTIVE (value !== 0).
+ *   - AND, when `challengeValue` is set, the run's challenge VALUE must EQUAL it
+ *     (the game's own encoding: SINGLE_TYPE = type+1, MONO_COLOR = color+1,
+ *     SINGLE_GENERATION = gen with 10 = RDX, USAGE_TIER = tier, ...). An unset
+ *     `challengeValue` (null) accepts any value - the original behavior.
+ */
+function challengeActive(challenge: ErCustomTrainerChallenge, challengeValue: number | null = null): boolean {
   if (challenge === "none") {
     return true;
   }
-  return globalScene.gameMode.hasChallenge(CHALLENGE_MAP[challenge]) === true;
+  const id = CHALLENGE_MAP[challenge];
+  if (globalScene.gameMode.hasChallenge(id) !== true) {
+    return false;
+  }
+  if (challengeValue === null) {
+    return true;
+  }
+  const activeValue = globalScene.gameMode.challenges.find(c => c.id === id)?.value ?? 0;
+  return activeValue === challengeValue;
 }
 
 /**
@@ -1192,7 +1273,7 @@ function isErCustomTrainerEligible(
   if (waveIndex < trainer.minWave || (!trainer.endless && waveIndex > trainer.maxWave)) {
     return false;
   }
-  return ignoreChallenge || challengeActive(trainer.challenge);
+  return ignoreChallenge || challengeActive(trainer.challenge, trainer.challengeValue);
 }
 
 // --- DEV-ONLY force path (staff testing) -------------------------------------

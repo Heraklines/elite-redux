@@ -50,6 +50,9 @@ interface EditorHarness {
   hashCtrTrainerEntry(entry: unknown): string;
   markCustomTrainersSaved(delta: Record<string, unknown>, data: Record<string, unknown>): void;
   CTR_LIVE: Record<string, any>;
+  HELD_ITEMS: { key: string; label: string; category: string }[];
+  CHALLENGE_VALUES: Record<string, { value: number; label: string }[]>;
+  CHALLENGE_PRESETS: { name: string; challenge: string; challengeValue: number }[];
   ctr: { current: Record<string, any>; baseline: Record<string, any> };
   ctrConfig: {
     current: { windowSize: number; windowChancePct: number };
@@ -134,6 +137,9 @@ beforeAll(() => {
       ctr, ctrConfig, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
+      get HELD_ITEMS(){ return HELD_ITEMS; }, set HELD_ITEMS(v){ HELD_ITEMS = v; },
+      get CHALLENGE_VALUES(){ return CHALLENGE_VALUES; }, set CHALLENGE_VALUES(v){ CHALLENGE_VALUES = v; },
+      get CHALLENGE_PRESETS(){ return CHALLENGE_PRESETS; }, set CHALLENGE_PRESETS(v){ CHALLENGE_PRESETS = v; },
       setTab(v){ activeTab = v; },
     };`;
   const dom = new JSDOM(HARNESS_HTML, { runScripts: "outside-only", pretendToBeVisual: true });
@@ -187,6 +193,35 @@ beforeEach(() => {
   seedShiny("palette", "inferno", "Inferno", "#ff6a24");
   seedShiny("surface", "holofoil", "Holo Foil", "#7fe0ff");
   seedShiny("around", "zaps", "Zaps", "#ffd27a");
+  // Held-item catalog fixture: at least one of each grouped category so the
+  // picker's grouping can be asserted (booster/berry/gem/utility).
+  ct.HELD_ITEMS = [
+    { key: "CHARCOAL", label: "Charcoal", category: "booster" },
+    { key: "SILK_SCARF", label: "Silk Scarf", category: "booster" },
+    { key: "SITRUS_BERRY", label: "Sitrus Berry", category: "berry" },
+    { key: "ER_FIRE_GEM", label: "Fire Gem", category: "gem" },
+    { key: "LEFTOVERS", label: "Leftovers", category: "utility" },
+  ];
+  // Challenge VALUE option lists fixture: a couple of parameterizable kinds
+  // (mono-type / mono-gen) so the value dropdown can be exercised. `inverse` is
+  // deliberately absent -> not parameterizable (no value dropdown).
+  ct.CHALLENGE_VALUES = {
+    monotype: [
+      { value: 9, label: "Steel" },
+      { value: 10, label: "Fire" },
+      { value: 11, label: "Water" },
+    ],
+    monogen: [
+      { value: 1, label: "Gen 1" },
+      { value: 10, label: "RDX (Elite Redux)" },
+    ],
+  };
+  // Named challenge presets fixture (mined from the achievement catalog).
+  ct.CHALLENGE_PRESETS = [
+    { name: "I Cast Fireball!", challenge: "monotype", challengeValue: 10 },
+    { name: "Extra Ordinary", challenge: "monotype", challengeValue: 1 },
+    { name: "Redux Means Redux", challenge: "monogen", challengeValue: 10 },
+  ];
   // Ghost Trainer FX aura catalog fixture (the per-trainer sprite-effect picker).
   ct.TRAINER_FX.length = 0;
   ct.trainerFxById.clear();
@@ -766,6 +801,305 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     victory.value = "z".repeat(250);
     ct.onCustomTrainerInput(victory);
     expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].victoryDialogue.length).toBe(200);
+  });
+
+  it("clone trainer: deep-copies the whole trainer as a NEW entry (fresh id/key, name + ' (copy)')", () => {
+    const key = newTrainer("Ace Rico");
+    const src = ct.ctr.current[key];
+    setSpecies(0, "SPECIES_PIKACHU");
+    // Give it some content to prove a DEEP copy (a 2nd member + a challenge).
+    ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
+    setSpecies(1, "SPECIES_SNORLAX");
+    src.challenge = "monotype";
+    src.challengeValue = 10;
+    ct.render();
+
+    const beforeKeys = Object.keys(ct.ctr.current);
+    // The Clone button renders next to Delete.
+    const cloneBtn = q("#ctr-clone");
+    expect(cloneBtn).not.toBeNull();
+    ct.onCustomTrainerClick({ target: cloneBtn! });
+
+    // A brand-new entry was added and is now selected.
+    const afterKeys = Object.keys(ct.ctr.current);
+    expect(afterKeys.length).toBe(beforeKeys.length + 1);
+    const newKey = ct.ctrSelected!;
+    expect(newKey).not.toBe(key);
+    const clone = ct.ctr.current[newKey];
+
+    // Fresh provisional id (different, still in the 70000 band) + suffixed name.
+    expect(clone.id).not.toBe(src.id);
+    expect(clone.id).toBeGreaterThanOrEqual(70001);
+    expect(clone.name).toBe("Ace Rico (copy)");
+    // Deep-copied content: same team + challenge, but a SEPARATE object graph.
+    expect(clone.team.length).toBe(2);
+    expect(clone.team[0].species).toBe("SPECIES_PIKACHU");
+    expect(clone.team[1].species).toBe("SPECIES_SNORLAX");
+    expect(clone.challenge).toBe("monotype");
+    expect(clone.challengeValue).toBe(10);
+    expect(clone).not.toBe(src);
+    expect(clone.team).not.toBe(src.team);
+    // Editing the clone must not mutate the source (proves the deep copy).
+    clone.team[0].species = "SPECIES_RAICHU";
+    expect(src.team[0].species).toBe("SPECIES_PIKACHU");
+
+    // The clone is a NEW (never-loaded) entry, so it serializes with its fresh id
+    // and the server assigns the real id/key on save (no baseline for it).
+    const delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[newKey];
+    expect(delta).toBeDefined();
+    expect(delta.id).toBe(clone.id);
+    expect(delta.name).toBe("Ace Rico (copy)");
+
+    // The long-name case caps to 24 chars while preserving the " (copy)" suffix.
+    newTrainer("A Very Very Long Trainer Name");
+    setSpecies(0, "SPECIES_PIKACHU");
+    ct.render();
+    ct.onCustomTrainerClick({ target: q("#ctr-clone")! });
+    const longClone = ct.ctr.current[ct.ctrSelected!];
+    expect(longClone.name.length).toBeLessThanOrEqual(24);
+    expect(longClone.name.endsWith(" (copy)")).toBe(true);
+  });
+
+  it("fusion move-pool union: a move legal only on the fusion partner is NOT flagged illegal", () => {
+    // Base Pikachu learns THUNDERBOLT; fusion partner Machamp learns CROSS_CHOP.
+    // A fused member can legally know EITHER (union), so CROSS_CHOP must pass on
+    // the fused member but be flagged on the non-fused one.
+    ct.moveById.set(85, { id: 85, name: "Thunderbolt" });
+    ct.moveById.set(238, { id: 238, name: "Cross Chop" });
+    ct.MOVE_SET.add("THUNDERBOLT");
+    ct.MOVE_SET.add("CROSS_CHOP");
+    ct.learn.current.SPECIES_PIKACHU = [[1, 85]]; // Pikachu -> Thunderbolt
+    ct.learn.current.SPECIES_MACHAMP = [[1, 238]]; // Machamp -> Cross Chop
+    ct.legalMovesCache.clear();
+    addSpecies("SPECIES_MACHAMP", 68, "Machamp");
+
+    const key = newTrainer();
+    const t = ct.ctr.current[key];
+    setSpecies(0, "SPECIES_PIKACHU");
+    const m = t.team[0];
+
+    // Non-fused: CROSS_CHOP (Machamp-only) is illegal; THUNDERBOLT is legal.
+    expect(ct.ctrMoveIllegal(m, "CROSS_CHOP")).toBe(true);
+    expect(ct.ctrMoveIllegal(m, "THUNDERBOLT")).toBe(false);
+
+    // Fuse with Machamp -> the union now covers CROSS_CHOP too (no longer illegal),
+    // and the base's THUNDERBOLT stays legal.
+    const fusOn = q('.ctr-fusion-on[data-idx="0"]') as HTMLInputElement;
+    fusOn.checked = true;
+    ct.onCustomTrainerChange(fusOn);
+    const fusSp = q('.ctr-fusion-species[data-idx="0"]') as HTMLInputElement;
+    fusSp.value = "SPECIES_MACHAMP";
+    ct.onCustomTrainerInput(fusSp);
+    ct.onCustomTrainerChange(fusSp);
+    expect(m.fusion.species).toBe("SPECIES_MACHAMP");
+    expect(ct.ctrMoveIllegal(m, "CROSS_CHOP")).toBe(false); // fusion-partner move now legal
+    expect(ct.ctrMoveIllegal(m, "THUNDERBOLT")).toBe(false); // base move still legal
+    // A move on NEITHER species is still flagged.
+    expect(ct.ctrMoveIllegal(m, "SURF")).toBe(true);
+  });
+
+  it("copy member: into a slot (first empty / new) and as a new possibility (weight 100, auto-weighted)", () => {
+    const key = newTrainer();
+    const t = ct.ctr.current[key];
+    setSpecies(0, "SPECIES_PIKACHU");
+    // Give the lead a distinctive moveset so we can prove a DEEP clone.
+    const mv0 = q('.ctr-move[data-idx="0"][data-slot="0"]') as HTMLInputElement;
+    mv0.value = "THUNDERBOLT";
+    ct.onCustomTrainerInput(mv0);
+
+    // The Copy picker renders on the member.
+    const copy = q('.ctr-copy[data-idx="0"]') as HTMLSelectElement;
+    expect(copy).not.toBeNull();
+
+    // --- Target A: copy into a slot. The blank trainer has only the lead, so the
+    // copy appends as a NEW slot (no other empty slot exists).
+    copy.value = "slot:auto";
+    ct.onCustomTrainerChange(copy);
+    expect(t.team.length).toBe(2);
+    // Slot 2 is a deep clone of the lead (species + moves), a SEPARATE object.
+    expect(t.team[1].species).toBe("SPECIES_PIKACHU");
+    expect(t.team[1].moves[0]).toBe("THUNDERBOLT");
+    expect(t.team[1]).not.toBe(t.team[0]);
+    t.team[1].species = "SPECIES_RAICHU"; // mutating the copy must not touch the source
+    expect(t.team[0].species).toBe("SPECIES_PIKACHU");
+    t.team[1].species = "SPECIES_PIKACHU";
+
+    // --- Target B: copy the lead AS A NEW POSSIBILITY of slot 2. Slot 2 becomes a
+    // weighted slot with a 2nd possibility at weight 100.
+    ct.render();
+    const copy0 = q('.ctr-copy[data-idx="0"]') as HTMLSelectElement;
+    copy0.value = "poss:1";
+    ct.onCustomTrainerChange(copy0);
+    expect(t.team[1].weighted).toBe(true);
+    expect(t.team[1].variants.length).toBe(2);
+    // The appended possibility is the deep-cloned lead at weight 100.
+    const appended = t.team[1].variants[1];
+    expect(appended.species).toBe("SPECIES_PIKACHU");
+    expect(appended.moves[0]).toBe("THUNDERBOLT");
+    expect(appended.weight).toBe(100);
+
+    // --- Slot target when an EMPTY slot exists: fills it rather than appending.
+    // Add a blank 3rd member, then copy the lead into the first empty slot.
+    ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
+    expect(t.team.length).toBe(3);
+    expect(t.team[2].species).toBe(""); // blank/empty
+    ct.render();
+    const copyLead = q('.ctr-copy[data-idx="0"]') as HTMLSelectElement;
+    copyLead.value = "slot:auto";
+    ct.onCustomTrainerChange(copyLead);
+    // Filled the empty slot 3 (no new slot appended).
+    expect(t.team.length).toBe(3);
+    expect(t.team[2].species).toBe("SPECIES_PIKACHU");
+    expect(t.team[2].moves[0]).toBe("THUNDERBOLT");
+  });
+
+  it("named challenge preset picker sets the challenge + value fields and serializes", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // The preset picker is a SEPARATE select from the main challenge dropdown.
+    const preset = q("#ctr-challenge-preset") as HTMLSelectElement;
+    expect(preset).not.toBeNull();
+    expect(q("#ctr-challenge")).not.toBeNull();
+    expect(preset).not.toBe(q("#ctr-challenge")); // distinct controls
+    // It offers the seeded presets grouped by kind (optgroups) + a placeholder.
+    expect(preset.querySelector("option")!.getAttribute("value")).toBe(""); // placeholder first
+    expect([...preset.querySelectorAll("optgroup")].length).toBeGreaterThanOrEqual(2);
+    const presetVals = [...preset.querySelectorAll("option")].map(o => (o as HTMLOptionElement).value);
+    expect(presetVals).toContain("monotype:10"); // I Cast Fireball!
+    expect(presetVals).toContain("monogen:10"); // Redux Means Redux
+
+    // Pick "I Cast Fireball!" (monotype:10) -> both fields are set under the hood.
+    preset.value = "monotype:10";
+    ct.onCustomTrainerChange(preset);
+    expect(ct.ctr.current[key].challenge).toBe("monotype");
+    expect(ct.ctr.current[key].challengeValue).toBe(10);
+    // The main dropdown + value dropdown now reflect it (single gating mechanism).
+    expect((q("#ctr-challenge") as HTMLSelectElement).value).toBe("monotype");
+    expect((q("#ctr-challenge-value") as HTMLSelectElement).value).toBe("10");
+    let delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challenge).toBe("monotype");
+    expect(delta.challengeValue).toBe(10);
+
+    // Applying a mono-gen preset re-points both fields.
+    const preset2 = q("#ctr-challenge-preset") as HTMLSelectElement;
+    preset2.value = "monogen:10";
+    ct.onCustomTrainerChange(preset2);
+    expect(ct.ctr.current[key].challenge).toBe("monogen");
+    expect(ct.ctr.current[key].challengeValue).toBe(10);
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challenge).toBe("monogen");
+    expect(delta.challengeValue).toBe(10);
+  });
+
+  it("challenge value dropdown appears for parameterizable kinds, serializes, and clears otherwise", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // Default challenge is "none" -> no value dropdown.
+    expect(q("#ctr-challenge-value")).toBeNull();
+    let delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challengeValue).toBeUndefined();
+
+    // Pick a parameterizable challenge (mono-type) -> the value dropdown appears.
+    const chall = q("#ctr-challenge") as HTMLSelectElement;
+    chall.value = "monotype";
+    ct.onCustomTrainerChange(chall);
+    const valSel = q("#ctr-challenge-value") as HTMLSelectElement;
+    expect(valSel).not.toBeNull();
+    // The option list is the seeded mono-type values + a "(any value)" first entry.
+    const optVals = [...valSel.querySelectorAll("option")].map(o => (o as HTMLOptionElement).value);
+    expect(optVals[0]).toBe(""); // "(any value)"
+    expect(optVals).toContain("10"); // Fire
+    // Still unset -> not serialized (any value qualifies).
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challenge).toBe("monotype");
+    expect(delta.challengeValue).toBeUndefined();
+
+    // Pick Fire (10) -> challengeValue serializes.
+    valSel.value = "10";
+    ct.onCustomTrainerChange(valSel);
+    expect(ct.ctr.current[key].challengeValue).toBe(10);
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challengeValue).toBe(10);
+
+    // Switch to a NON-parameterizable challenge (inverse) -> dropdown gone AND the
+    // stale value is dropped (never serialized under a valueless challenge).
+    chall.value = "inverse";
+    ct.onCustomTrainerChange(chall);
+    expect(q("#ctr-challenge-value")).toBeNull();
+    expect(ct.ctr.current[key].challengeValue).toBeNull();
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challenge).toBe("inverse");
+    expect(delta.challengeValue).toBeUndefined();
+
+    // Back to mono-gen, pick the RDX pseudo-gen (10) -> serializes.
+    chall.value = "monogen";
+    ct.onCustomTrainerChange(chall);
+    const valSel2 = q("#ctr-challenge-value") as HTMLSelectElement;
+    valSel2.value = "10";
+    ct.onCustomTrainerChange(valSel2);
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challenge).toBe("monogen");
+    expect(delta.challengeValue).toBe(10);
+  });
+
+  it("held-item picker is fed from the full grouped catalog (booster/berry/gem/utility)", () => {
+    newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // Add a held-item row (the member is expanded by default) so the picker input
+    // + its datalist render.
+    ct.onCustomTrainerClick({ target: q('.ctr-held-add[data-idx="0"]')! });
+    const input = q('.ctr-held-item[data-idx="0"][data-heldidx="0"]') as HTMLInputElement;
+    expect(input).not.toBeNull();
+    // The input references the shared held-item datalist rendered in the section.
+    expect(input.getAttribute("list")).toBe("helditems-list");
+    const dl = q("#helditems-list") as HTMLDataListElement;
+    expect(dl).not.toBeNull();
+    const opts = [...dl.querySelectorAll("option")] as HTMLOptionElement[];
+    const values = opts.map(o => o.value);
+    // Every catalog key is offered, incl. the new type-booster / berry / gem keys.
+    expect(values).toContain("CHARCOAL");
+    expect(values).toContain("SITRUS_BERRY");
+    expect(values).toContain("ER_FIRE_GEM");
+    expect(values).toContain("LEFTOVERS");
+    // Grouped: boosters come before berries before gems before utility.
+    const firstIdx = k => values.indexOf(k);
+    expect(firstIdx("CHARCOAL")).toBeLessThan(firstIdx("SITRUS_BERRY"));
+    expect(firstIdx("SITRUS_BERRY")).toBeLessThan(firstIdx("ER_FIRE_GEM"));
+    expect(firstIdx("ER_FIRE_GEM")).toBeLessThan(firstIdx("LEFTOVERS"));
+    // Each option's text tags its category for at-a-glance grouping.
+    const charcoal = opts.find(o => o.value === "CHARCOAL")!;
+    expect(charcoal.textContent).toMatch(/booster/i);
+    const berry = opts.find(o => o.value === "SITRUS_BERRY")!;
+    expect(berry.textContent).toMatch(/berry/i);
+  });
+
+  it("dialogue fields are relabeled from the TRAINER's point of view (bindings unchanged)", () => {
+    // The maintainer ruling: keep the JSON schema (victoryDialogue = trainer
+    // defeated, defeatDialogue = trainer wins) but relabel the editor inputs so a
+    // staff author can't confuse whose win it is. The input ids/bindings are the
+    // SAME; only the labels change.
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // Both inputs still exist with their original ids (schema/binding unchanged).
+    const winsInput = q("#ctr-defeat") as HTMLInputElement; // bound to defeatDialogue
+    const defeatedInput = q("#ctr-victory") as HTMLInputElement; // bound to victoryDialogue
+    expect(winsInput).not.toBeNull();
+    expect(defeatedInput).not.toBeNull();
+    // The visible <label> wrapping each input names the TRAINER's outcome.
+    const winsLabel = winsInput.closest("label")!.textContent || "";
+    const defeatedLabel = defeatedInput.closest("label")!.textContent || "";
+    expect(winsLabel).toMatch(/trainer\s+WINS/i);
+    expect(defeatedLabel).toMatch(/trainer\s+is\s+DEFEATED/i);
+
+    // Typing into the WINS field still serializes as defeatDialogue (trainer wins);
+    // the DEFEATED field still serializes as victoryDialogue (player wins).
+    winsInput.value = "You never stood a chance.";
+    ct.onCustomTrainerInput(winsInput);
+    defeatedInput.value = "Impressive... you have earned this.";
+    ct.onCustomTrainerInput(defeatedInput);
+    const delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.defeatDialogue).toBe("You never stood a chance."); // trainer wins
+    expect(delta.victoryDialogue).toBe("Impressive... you have earned this."); // trainer defeated
   });
 
   it("clicking the readonly trainer Id field never clears the team (BUG regression)", () => {

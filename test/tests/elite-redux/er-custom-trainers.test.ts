@@ -31,6 +31,7 @@ import {
   buildErCustomTrainerMember,
   clearErCustomTrainerDevForce,
   type ErCustomTrainerMemberResolved,
+  erCustomTrainerHeldModifierConfigs,
   erCustomTrainerWindowIndex,
   erCustomTrainerWindowWave,
   getErCustomTrainerDevForce,
@@ -39,6 +40,7 @@ import {
   isErCustomTrainerDevForceArmed,
   markErCustomTrainerUsed,
   normalizeBattleBgm,
+  normalizeChallengeValue,
   normalizeDialogueLine,
   normalizeErCustomTrainerSpawnConfig,
   normalizeIntroDialogue,
@@ -988,6 +990,158 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // A plain mon stays non-forced (no erShinyLab stamped).
     const plain = buildErCustomTrainerMember(resolved.members[1], 1, 50, false);
     expect(plain!.customPokemonData.erShinyLab).toBeUndefined();
+  });
+
+  // ---- ROUND 10 / FEATURE 3: challenge VALUE gate ---------------------------
+  it("normalizeChallengeValue keeps a positive int, else null", () => {
+    expect(normalizeChallengeValue(10)).toBe(10);
+    expect(normalizeChallengeValue(1)).toBe(1);
+    expect(normalizeChallengeValue(3.9)).toBe(3); // floored
+    expect(normalizeChallengeValue(0)).toBeNull();
+    expect(normalizeChallengeValue(-2)).toBeNull();
+    expect(normalizeChallengeValue(undefined)).toBeNull();
+    expect(normalizeChallengeValue("10")).toBeNull();
+  });
+
+  it("challengeValue resolves; the gate requires the run's challenge VALUE to match when set", () => {
+    const T = {
+      // Mono-Fire (SINGLE_TYPE value 10 = PokemonType.FIRE + 1): only under a Fire run.
+      FIRE_ONLY: {
+        id: 70060,
+        name: "Fire Only",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 200,
+        challenge: "monotype",
+        challengeValue: 10,
+        team: [{ species: SpeciesId.CHARIZARD }],
+      },
+      // Same challenge, no value: any monotype value qualifies (original behavior).
+      ANY_TYPE: {
+        id: 70061,
+        name: "Any Type",
+        trainerClass: "PSYCHIC",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 200,
+        challenge: "monotype",
+        team: [{ species: SpeciesId.ALAKAZAM }],
+      },
+    };
+    setErCustomTrainersForTesting(T as never);
+    const byKey = new Map(getErCustomTrainers().map(t => [t.key, t]));
+    expect(byKey.get("FIRE_ONLY")!.challengeValue).toBe(10);
+    expect(byKey.get("ANY_TYPE")!.challengeValue).toBeNull();
+
+    globalScene.seed = "CHALLSEED";
+    setErDifficulty("ace");
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 100 });
+
+    // No SINGLE_TYPE challenge active: neither trainer's gate passes.
+    resetErCustomTrainerTracking();
+    expect(playRun(1, 200).length).toBe(0);
+
+    // Run is Mono-WATER (value 11): ANY_TYPE (unset value) qualifies; FIRE_ONLY
+    // (needs value 10) does NOT.
+    globalScene.gameMode.setChallengeValue(Challenges.SINGLE_TYPE, 11);
+    resetErCustomTrainerTracking();
+    const waterKeys = new Set(playRun(1, 200).map(p => p.key));
+    expect(waterKeys.has("ANY_TYPE")).toBe(true);
+    expect(waterKeys.has("FIRE_ONLY")).toBe(false);
+
+    // Run is Mono-FIRE (value 10): FIRE_ONLY now qualifies too.
+    globalScene.gameMode.setChallengeValue(Challenges.SINGLE_TYPE, 10);
+    resetErCustomTrainerTracking();
+    const fireKeys = new Set(playRun(1, 200).map(p => p.key));
+    expect(fireKeys.has("FIRE_ONLY")).toBe(true);
+  });
+
+  // ---- ROUND 10 / FEATURE 6: held-item full catalog -------------------------
+  it("held items: a berry, a type booster and an elemental gem all resolve onto the enemy", () => {
+    // The resolver now handles three families: plain keyed items (gems, fixed
+    // items), the ATTACK_TYPE_BOOSTER family (a generic generator specialized by
+    // PokemonType), and the BERRY family (specialized by BerryType). All three
+    // must field on an authored enemy.
+    const member: ErCustomTrainerMemberResolved = {
+      speciesId: SpeciesId.PIKACHU,
+      formIndex: 0,
+      level: 50,
+      moveIds: [],
+      moveSpecs: [],
+      abilitySlot: 0,
+      fusion: null,
+      heldItemKeys: [
+        { key: "SITRUS_BERRY", count: 1 }, // BERRY family (was unresolvable before)
+        { key: "CHARCOAL", count: 1 }, // ATTACK_TYPE_BOOSTER family (Fire booster)
+        { key: "ER_FIRE_GEM", count: 2 }, // plain ER elemental-gem key (already resolved)
+        { key: "LEFTOVERS", count: 1 }, // plain fixed held item (back-compat)
+      ],
+      shinyLook: null,
+      shinyName: "",
+    };
+    const configs = erCustomTrainerHeldModifierConfigs(member);
+    // All four keys resolve to a held-item modifier (newModifier present).
+    expect(configs.length).toBe(4);
+    for (const c of configs) {
+      expect(typeof (c.modifier as { newModifier?: unknown }).newModifier).toBe("function");
+    }
+    // Counts pass through (the gem authored count 2 is preserved).
+    expect(configs[2].stackCount).toBe(2);
+
+    // A bogus key still resolves to nothing (dropped), and an unknown-but-plausible
+    // berry/booster typo does too (never crashes, never a phantom item).
+    const bogus: ErCustomTrainerMemberResolved = { ...member, heldItemKeys: [{ key: "NOT_A_REAL_ITEM", count: 1 }] };
+    expect(erCustomTrainerHeldModifierConfigs(bogus).length).toBe(0);
+  });
+
+  // ---- ROUND 10 / FEATURE 7: fusion move-pool union (RLA/RLNA) --------------
+  it("RLA/RLNA on a FUSED member draws from the UNION of both species' legal pools", () => {
+    // A base member (Pikachu) vs. the SAME member fused with Machamp. Its 4 RLA
+    // slots resolve from a seeded walk of the legal pool; a fused member's pool is
+    // the UNION of both species, so the fused universe is a strict SUPERSET of the
+    // base-only universe (Machamp contributes Fighting moves Pikachu can't learn).
+    const rlaMember = (fusion: ErCustomTrainerMemberResolved["fusion"]): ErCustomTrainerMemberResolved => ({
+      speciesId: SpeciesId.PIKACHU,
+      formIndex: 0,
+      level: 50,
+      moveIds: [],
+      moveSpecs: [
+        { kind: "token", token: "RLA" },
+        { kind: "token", token: "RLA" },
+        { kind: "token", token: "RLA" },
+        { kind: "token", token: "RLA" },
+      ],
+      abilitySlot: 0,
+      fusion,
+      heldItemKeys: [],
+      shinyLook: null,
+      shinyName: "",
+    });
+    const universe = (member: ErCustomTrainerMemberResolved): Set<number> => {
+      const out = new Set<number>();
+      for (let i = 0; i < 120; i++) {
+        for (const id of resolveErCustomTrainerMoveIds(`SEED${i}`, "FUSEKEY", 0, member)) {
+          out.add(id);
+        }
+      }
+      return out;
+    };
+    const baseOnly = universe(rlaMember(null));
+    const fused = universe(rlaMember({ speciesId: SpeciesId.MACHAMP, formIndex: 0, abilitySlot: 0 }));
+
+    // Every base-reachable move is still reachable when fused (union superset)...
+    for (const id of baseOnly) {
+      expect(fused.has(id)).toBe(true);
+    }
+    // ...and the fusion adds moves the base alone never reaches (strict superset).
+    expect(fused.size).toBeGreaterThan(baseOnly.size);
+
+    // Determinism: the same seed + member yields the identical ordered moveset.
+    const fusedMember = rlaMember({ speciesId: SpeciesId.MACHAMP, formIndex: 0, abilitySlot: 0 });
+    expect(resolveErCustomTrainerMoveIds("SEED7", "FUSEKEY", 0, fusedMember)).toEqual(
+      resolveErCustomTrainerMoveIds("SEED7", "FUSEKEY", 0, fusedMember),
+    );
   });
 
   // ---- FEATURE 1: weighted slot variants -----------------------------------

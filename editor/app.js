@@ -1533,6 +1533,35 @@ const HELD_ITEM_OPTIONS = [
   "MULTI_LENS",
 ];
 
+// Full held-item catalog (editor/data/held-items.json): the complete set of
+// enemy-legal keys the game-side resolveHeldItemKey can field, grouped by
+// category so the held-item picker can offer type boosters, berries and gems
+// (not just the old curated 22). Loaded in init(); falls back to the curated
+// HELD_ITEM_OPTIONS (as "utility") when the generated file is absent so the
+// picker is never empty. The runtime resolver is the source of truth — keys
+// stay free-form, this list is just ergonomics.
+let HELD_ITEMS = HELD_ITEM_OPTIONS.map(key => ({ key, label: prettify(key), category: "utility" }));
+const HELD_CATEGORY_ORDER = ["booster", "berry", "gem", "utility"];
+const HELD_CATEGORY_LABEL = { booster: "type booster", berry: "berry", gem: "gem", utility: "utility" };
+
+/** Held-item picker <option>s, sorted by category (boosters → berries → gems →
+ *  utility) then label, each tagged with its category for at-a-glance grouping. */
+function heldItemsDatalistHtml() {
+  const catRank = k => {
+    const i = HELD_CATEGORY_ORDER.indexOf(k);
+    return i < 0 ? HELD_CATEGORY_ORDER.length : i;
+  };
+  const sorted = [...HELD_ITEMS].sort(
+    (a, b) => catRank(a.category) - catRank(b.category) || (a.label || a.key).localeCompare(b.label || b.key),
+  );
+  return `<datalist id="helditems-list">${sorted
+    .map(
+      h =>
+        `<option value="${esc(h.key)}">${esc(h.label || prettify(h.key))} · ${esc(HELD_CATEGORY_LABEL[h.category] || h.category || "item")}</option>`,
+    )
+    .join("")}</datalist>`;
+}
+
 // BST curve (defaults from er-balance-knobs: er.elite.bstCaps / er.hell.bstCaps,
 // #418/#419). Pairs are [up-to-wave, cap]; past the last wave there is no cap.
 const BST_CAPS = {
@@ -1575,6 +1604,45 @@ const CHALLENGE_OPTIONS = [
   "usagetier",
   "triples",
 ];
+// Challenge VALUE option lists (editor/data/challenge-values.json), keyed by the
+// challenge key above. A challenge present here is "parameterizable": the editor
+// shows a second dropdown of human options mapped to the game's numeric value
+// encoding. Loaded in init(); empty until then (the value dropdown just hides).
+let CHALLENGE_VALUES = {};
+/** Whether a challenge key carries a VALUE parameter (has an option list). */
+function ctrChallengeIsParameterizable(challenge) {
+  return Array.isArray(CHALLENGE_VALUES[challenge]) && CHALLENGE_VALUES[challenge].length > 0;
+}
+/** Normalize an authored challengeValue: a positive integer, else null (unset). */
+function normalizeCtrChallengeValue(value) {
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n >= 1 ? n : null;
+}
+
+// Named challenge PRESETS (editor/data/challenge-presets.json): {name, challenge,
+// challengeValue} configs mined from the achievement catalog (themed mono-type /
+// mono-gen runs). A SEPARATE picker from the main challenge dropdown; picking one
+// just SETS the challenge kind + value fields (one gating mechanism under the
+// hood). Loaded in init(); empty until then (the preset picker hides).
+let CHALLENGE_PRESETS = [];
+/** <optgroup>s for the preset picker, grouped by challenge kind (its label). */
+function ctrPresetOptionsHtml() {
+  const groups = new Map();
+  for (const p of CHALLENGE_PRESETS) {
+    if (!groups.has(p.challenge)) {
+      groups.set(p.challenge, []);
+    }
+    groups.get(p.challenge).push(p);
+  }
+  let html = "";
+  for (const [kind, list] of groups) {
+    const groupLabel = CHALLENGE_LABELS[kind] || kind;
+    html += `<optgroup label="${esc(groupLabel)}">${list
+      .map(p => `<option value="${esc(p.challenge)}:${p.challengeValue}">${esc(p.name)}</option>`)
+      .join("")}</optgroup>`;
+  }
+  return html;
+}
 const CHALLENGE_LABELS = {
   none: "None",
   inverse: "Inverse Battle",
@@ -1910,6 +1978,7 @@ function blankCtrTrainer() {
     endless: false,
     weight: 100,
     challenge: "none",
+    challengeValue: null,
     battleBgm: "",
     introDialogue: "",
     victoryDialogue: "",
@@ -1936,6 +2005,8 @@ function ctrLiveToEdit(entry) {
     // absent both => 100. New saves always write `weight`.
     weight: resolveCtrWeight(entry.weight, entry.spawnChance),
     challenge: entry.challenge ?? "none",
+    // Optional challenge VALUE (mono-type/gen/color/... parameter); positive int or null.
+    challengeValue: normalizeCtrChallengeValue(entry.challengeValue),
     // Trimmed bgm key; anything not [a-z0-9_] (or absent) normalizes to "" (none).
     battleBgm: normalizeCtrBattleBgm(entry.battleBgm),
     introDialogue: typeof entry.introDialogue === "string" ? entry.introDialogue.slice(0, 200) : "",
@@ -2162,13 +2233,37 @@ function legalMovesFor(speciesConst) {
   return out;
 }
 
+/** The legal-move pool for a MEMBER: its species' pool UNIONED with its FUSION
+ *  partner's pool when fused (a fusion can legally know moves from both species,
+ *  mirroring the game's fused learnset + the RLA/RLNA install-time union). A
+ *  non-fused member returns exactly legalMovesFor(species) (the cached Set, not
+ *  mutated). */
+function legalMovesForMember(m) {
+  const base = legalMovesFor(m.species);
+  if (!m || !m.fusion || !m.fusion.species) {
+    return base;
+  }
+  const fus = legalMovesFor(m.fusion.species);
+  if (fus.size === 0) {
+    return base;
+  }
+  if (base.size === 0) {
+    return fus;
+  }
+  const out = new Set(base);
+  for (const mv of fus) {
+    out.add(mv);
+  }
+  return out;
+}
+
 /** True when enforcement is ON for this member AND `move` is not in its legal pool.
  *  The RLA/RLNA tokens are ALWAYS legal (resolved to a legal move at install). */
 function ctrMoveIllegal(m, move) {
   if (m.sanityOff || !move || ctrIsMoveToken(move)) {
     return false;
   }
-  const legal = legalMovesFor(m.species);
+  const legal = legalMovesForMember(m);
   // An empty pool = no legality data for this species; don't flag (never blocks).
   return legal.size > 0 && !legal.has(move);
 }
@@ -2179,7 +2274,7 @@ function ctrIllegalMoves(m) {
   if (m.sanityOff) {
     return [];
   }
-  const legal = legalMovesFor(m.species);
+  const legal = legalMovesForMember(m);
   if (legal.size === 0) {
     return [];
   }
@@ -2294,7 +2389,89 @@ function ctrSlotControlsHtml(m, i) {
       ${n > 1 ? `<button type="button" class="ctr-var-del" data-idx="${i}" title="Remove this possibility">✕ possibility</button>` : ""}
     </span>`;
   }
-  return `<div class="ctr-slot-ctrls">${slotProb}${weightedToggle}${weightedCtrls}</div>`;
+  return `<div class="ctr-slot-ctrls">${slotProb}${weightedToggle}${weightedCtrls}${ctrCopyControlHtml(i)}</div>`;
+}
+
+/** The per-member "Copy" picker: copies the CURRENTLY-SHOWN possibility either
+ *  into a slot (first empty / new slot) or as a new possibility of a chosen slot
+ *  (weight 100, auto-weighted). A SEPARATE control from the possibility +/✕. */
+function ctrCopyControlHtml(i) {
+  const t = ctrCur();
+  if (!t) {
+    return "";
+  }
+  const slotOpts = t.team
+    .map((s, si) => {
+      const nm = s.species ? spByConst.get(s.species)?.name || s.species : "(empty)";
+      return `<option value="poss:${si}">Slot ${si + 1}: ${esc(nm)}</option>`;
+    })
+    .join("");
+  // A slot target is available when there is an empty slot OR room to append.
+  const canSlot = t.team.length < 6 || t.team.some(s => !s.species);
+  return `<select class="ctr-copy" data-idx="${i}" title="Copy this Pokémon (the currently-shown possibility) elsewhere">
+    <option value="">⧉ Copy…</option>
+    <optgroup label="Copy into a slot">
+      <option value="slot:auto"${canSlot ? "" : " disabled"}>First empty / new slot</option>
+    </optgroup>
+    <optgroup label="Copy as a possibility of">${slotOpts}</optgroup>
+  </select>`;
+}
+
+/** Build a fresh single-possibility SLOT object from cloned member fields. */
+function ctrSlotFromFields(fields) {
+  return {
+    ...ctrCopyMemberFields(fields),
+    slotChance: 100,
+    weighted: false,
+    cur: 0,
+    variants: [{ ...ctrCopyMemberFields(fields), weight: 1 }],
+  };
+}
+
+/** Execute a member Copy command ("slot:auto" | "poss:<idx>") from source slot `srcIdx`. */
+function ctrCopyMember(t, srcIdx, cmd) {
+  const src = t.team[srcIdx];
+  if (!src) {
+    return;
+  }
+  ctrEnsureSlot(src);
+  ctrSyncCurrentVariant(src); // fold live edits into the shown possibility first
+  const fields = ctrCopyMemberFields(src); // deep clone of the SHOWN possibility
+  if (cmd === "slot:auto") {
+    // Least-destructive: fill the first EMPTY slot (species ""), else append a new
+    // slot when there is room. A full, all-filled team can't take a slot copy.
+    const emptyIdx = t.team.findIndex(s => !s.species);
+    if (emptyIdx >= 0) {
+      t.team[emptyIdx] = ctrSlotFromFields(fields);
+      ctrSetSel.set(emptyIdx, -1);
+      ctrOpenMembers.add(emptyIdx);
+      ctrFocusIdx = emptyIdx;
+    } else if (t.team.length < 6) {
+      t.team.push(ctrSlotFromFields(fields));
+      ctrOpenMembers.add(t.team.length - 1);
+      ctrFocusIdx = t.team.length - 1;
+    } else {
+      setStatus("Team is full (6 members) — no empty slot to copy into.");
+    }
+    return;
+  }
+  const poss = cmd.match(/^poss:(\d+)$/);
+  if (poss) {
+    const targetIdx = Number(poss[1]);
+    const target = t.team[targetIdx];
+    if (!target) {
+      return;
+    }
+    ctrEnsureSlot(target);
+    ctrSyncCurrentVariant(target);
+    // Append as a new possibility (weight 100), auto-enabling the weighted slot.
+    target.weighted = true;
+    target.variants.push({ ...ctrCopyMemberFields(fields), weight: 100 });
+    ctrLoadVariant(target, target.variants.length - 1);
+    ctrSetSel.set(targetIdx, -1);
+    ctrOpenMembers.add(targetIdx);
+    ctrFocusIdx = targetIdx;
+  }
 }
 
 /** The <option>s for one shiny-effect category select: "(none)" + the registry. */
@@ -2465,7 +2642,8 @@ function ctrMemberHtml(m, i) {
   // offers the RLA/RLNA tokens FIRST, then the legal pool when we HAVE data (else
   // the full move set so a data gap never traps the user; matches the save gate).
   const enforce = !m.sanityOff;
-  const legal = enforce ? legalMovesFor(m.species) : null;
+  // Union the fusion partner's legal moves so a fused mon's datalist offers both.
+  const legal = enforce ? legalMovesForMember(m) : null;
   const useLegalList = enforce && legal && legal.size > 0;
   const poolNames = useLegalList ? [...legal].sort() : [...MOVE_SET].sort();
   const tokenOpts = ["RLA", "RLNA"]
@@ -2856,6 +3034,32 @@ function renderCustomTrainers(root) {
     const challSel = CHALLENGE_OPTIONS.map(
       c => `<option value="${c}"${t.challenge === c ? " selected" : ""}>${CHALLENGE_LABELS[c]}</option>`,
     ).join("");
+    // Value dropdown: shown only for a value-bearing challenge (mono-type/gen/
+    // color/...). "(any value)" leaves challengeValue unset (any value qualifies).
+    const challValueSel = ctrChallengeIsParameterizable(t.challenge)
+      ? `<label class="ctr-challvalue-lbl" title="Restrict this trainer to ONE specific value of the chosen challenge (e.g. a specific mono-type). '(any value)' matches any value of that challenge.">Value
+          <select id="ctr-challenge-value">
+            <option value=""${t.challengeValue == null ? " selected" : ""}>(any value)</option>
+            ${CHALLENGE_VALUES[t.challenge]
+              .map(
+                o =>
+                  `<option value="${o.value}"${t.challengeValue === o.value ? " selected" : ""}>${esc(o.label)}</option>`,
+              )
+              .join("")}
+          </select>
+        </label>`
+      : "";
+    // Named-preset picker (SEPARATE from the main dropdown). Picking one just SETS
+    // the challenge kind + value below. Placeholder-only when nothing is chosen.
+    const challPresetSel =
+      CHALLENGE_PRESETS.length > 0
+        ? `<label class="ctr-preset-lbl" title="Named challenge configurations from the achievement catalog (themed mono-type / mono-gen runs). Picking one SETS the Challenge exclusivity + Value fields.">Named preset
+            <select id="ctr-challenge-preset">
+              <option value="">(apply a named preset…)</option>
+              ${ctrPresetOptionsHtml()}
+            </select>
+          </label>`
+        : "";
     const bgmSel = ctrBgmOptions(t.battleBgm || "");
     form = `<div class="ctr-form">
       <fieldset class="ctr-sec"><legend>Identity</legend>
@@ -2875,13 +3079,14 @@ function renderCustomTrainers(root) {
           <label title="Line shown when this trainer's battle starts (up to 200 chars). Players can turn these off with the 'Skip custom trainer intros' setting.">Intro blurb
             <input type="text" id="ctr-intro" maxlength="200" value="${esc(t.introDialogue || "")}" placeholder="Shown at battle start (optional)" style="width:320px" />
           </label>
-          <label title="Line shown when the PLAYER beats this trainer (up to 200 chars). Uses the same dialogue routine ghost trainers use for their victory line.">Victory line
-            <input type="text" id="ctr-victory" maxlength="200" value="${esc(t.victoryDialogue || "")}" placeholder="When the player wins (optional)" style="width:280px" />
+          <label title="Line this trainer says when it BEATS the player (the trainer wins and the player's run ends). Up to 200 chars. Uses the same dialogue routine ghost trainers use.">Line when the trainer WINS
+            <input type="text" id="ctr-defeat" maxlength="200" value="${esc(t.defeatDialogue || "")}" placeholder="Trainer's taunt when it beats you (optional)" style="width:280px" />
           </label>
-          <label title="Line shown when this trainer BEATS the player (up to 200 chars). Uses the same routine ghost trainers use for their defeat line.">Defeat line
-            <input type="text" id="ctr-defeat" maxlength="200" value="${esc(t.defeatDialogue || "")}" placeholder="When the trainer wins (optional)" style="width:280px" />
+          <label title="Line this trainer says when it is DEFEATED (the player wins the battle). Up to 200 chars. Uses the same dialogue routine ghost trainers use.">Line when the trainer is DEFEATED
+            <input type="text" id="ctr-victory" maxlength="200" value="${esc(t.victoryDialogue || "")}" placeholder="Trainer's line when you beat it (optional)" style="width:280px" />
           </label>
         </div>
+        <p class="hint" style="margin:2px 0 0">Heads-up: "wins/defeated" is from the TRAINER's point of view. The DEFEATED line plays when you beat the trainer; the WINS line plays when the trainer beats you.</p>
         <div class="ctr-effect-row">
           <label title="A visual aura rendered around this trainer's sprite in battle, reusing the Ghost Trainer FX aura effects. '(none)' is the plain sprite.">Sprite effect
             <select id="ctr-effect">${ctrEffectOptions(t.trainerEffect || "")}</select>
@@ -2897,6 +3102,8 @@ function renderCustomTrainers(root) {
         <label title="Relative odds this trainer is the one fielded when a spawn window fires (weight / total weight among eligible trainers). Higher = more likely. Default 100.">Weight <input type="number" id="ctr-weight" value="${normalizeCtrWeight(t.weight)}" min="1" step="1" style="width:72px" /></label>
         <br /><label>Battle type <select id="ctr-battletype">${battleSel}</select></label>
         <label>Challenge exclusivity <select id="ctr-challenge">${challSel}</select></label>
+        ${challValueSel}
+        ${challPresetSel}
         <p class="hint" style="margin:6px 0 0">Spawning is capped GLOBALLY by the Spawn density panel above (how often ANY custom trainer appears). When a window fires, ONE trainer is picked by weight among the eligible not-yet-used trainers, then it appears once at a wave in its range, sliding forward past boss/fixed/mystery waves. No repeats per run.</p>
       </fieldset>
       <fieldset class="full ctr-sec"><legend>Team (1-6)</legend>
@@ -2906,6 +3113,7 @@ function renderCustomTrainers(root) {
       ${warnings.length > 0 ? `<div class="ctr-warn">⚠ ${warnings.map(esc).join("<br>⚠ ")}</div>` : ""}
       ${notes.length > 0 ? `<div class="ctr-note">ℹ ${notes.map(esc).join("<br>ℹ ")}</div>` : ""}
       <div class="full" style="display:flex;gap:10px;align-items:center;margin-top:8px">
+        <button type="button" id="ctr-clone" title="Duplicate this trainer as a NEW trainer (fresh id, name + ' (copy)'). The server assigns the real id/key on save.">⧉ Clone trainer</button>
         <button type="button" id="ctr-delete" style="color:var(--err,#c0392b)">🗑 Delete trainer</button>
         <span class="dyn">Changes save with the global “Save”/“Commit & Deploy” buttons.</span>
       </div>
@@ -2929,7 +3137,8 @@ function renderCustomTrainers(root) {
         <div class="ctr-layout-main">${form}</div>
         ${panel}
       </div>
-    </div>`;
+    </div>
+    ${heldItemsDatalistHtml()}`;
   // The sprite preview reads the live CDN atlas, so paint it after the DOM exists.
   updateCtrSpritePreview();
   // Paint each list card's trainer sprite (lazy CDN atlas crop, ~44px tall). The
@@ -3075,6 +3284,32 @@ function onCustomTrainerChange(el) {
     return true;
   } else if (el.id === "ctr-challenge") {
     t.challenge = el.value;
+    // A challengeValue only applies to a value-bearing challenge; drop it when the
+    // new kind can't carry one (or is "none"). Re-render so the value dropdown
+    // appears/disappears for the new kind.
+    if (!ctrChallengeIsParameterizable(t.challenge)) {
+      t.challengeValue = null;
+    }
+    render();
+    return true;
+  } else if (el.id === "ctr-challenge-value") {
+    // "(any value)" -> null (unset); otherwise the chosen numeric value.
+    t.challengeValue = el.value === "" ? null : normalizeCtrChallengeValue(el.value);
+    refreshChrome();
+    return true;
+  } else if (el.id === "ctr-challenge-preset") {
+    // Named preset: SET the challenge kind + value (one gating mechanism). The
+    // encoded value is "<challenge>:<value>". Placeholder ("") is a no-op. The
+    // picker re-renders to a placeholder (the applied fields show below).
+    if (el.value) {
+      const [kind, val] = el.value.split(":");
+      if (CHALLENGE_OPTIONS.includes(kind)) {
+        t.challenge = kind;
+        t.challengeValue = normalizeCtrChallengeValue(val);
+      }
+    }
+    render();
+    return true;
   } else if (el.id === "ctr-effect") {
     // Pick a trainer sprite effect (aura); re-render so the preview swatch updates.
     t.trainerEffect = normalizeCtrTrainerEffect(el.value);
@@ -3088,6 +3323,14 @@ function onCustomTrainerChange(el) {
     return true;
   } else if (el.id === "ctr-endless") {
     t.endless = el.checked;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-copy") && m) {
+    // Copy the shown possibility into a slot / as a new possibility, then reset the
+    // picker to its placeholder on re-render.
+    if (el.value) {
+      ctrCopyMember(t, idx, el.value);
+    }
     render();
     return true;
   } else if (el.classList.contains("ctr-weighted") && m) {
@@ -3211,6 +3454,30 @@ function onCustomTrainerClick(e) {
     ctrOpenMembers.add(0); // the fresh member starts expanded
     bgmStop();
     render();
+    return true;
+  }
+  if (e.target.closest("#ctr-clone")) {
+    // Clone the SELECTED trainer as a NEW trainer: deep-copy its whole content,
+    // mint a fresh provisional id/key (like #ctr-new) and suffix the name " (copy)".
+    // The server assigns the real id/key on save (the round-7/9 re-key machinery),
+    // so a clone is just a new-trainer entry carrying the copied content.
+    const src = ctrSelected ? ctr.current[ctrSelected] : null;
+    if (src) {
+      const clone = JSON.parse(JSON.stringify(src)); // deep copy (plain edit data)
+      clone.id = blankCtrTrainer().id; // next free provisional id in 70000-79999
+      const suffix = " (copy)";
+      const base = (src.name || "").trim();
+      clone.name = (base + suffix).length <= 24 ? base + suffix : base.slice(0, 24 - suffix.length) + suffix;
+      let key = `TRAINER_${clone.id}`;
+      while (ctr.current[key]) {
+        key += "_2";
+      }
+      ctr.current[key] = clone;
+      ctrSelected = key;
+      ctrResetMemberUiState();
+      bgmStop();
+      render();
+    }
     return true;
   }
   const t = ctrCur();
@@ -4180,6 +4447,11 @@ function buildDeltas() {
       // any old spawnChance on load, but new saves are weight-only.
       weight: normalizeCtrWeight(t.weight),
       challenge: t.challenge || "none",
+      // challengeValue: serialize ONLY for a value-bearing challenge with a value
+      // set (not "(any value)"). Omitted otherwise (byte-clean; any-value default).
+      ...(ctrChallengeIsParameterizable(t.challenge) && normalizeCtrChallengeValue(t.challengeValue) !== null
+        ? { challengeValue: normalizeCtrChallengeValue(t.challengeValue) }
+        : {}),
       ...(normalizeCtrBattleBgm(t.battleBgm) ? { battleBgm: normalizeCtrBattleBgm(t.battleBgm) } : {}),
       // Intro blurb: trimmed + 200-char cap; omit when empty (byte-clean default).
       ...((t.introDialogue || "").trim() ? { introDialogue: (t.introDialogue || "").trim().slice(0, 200) } : {}),
@@ -4449,6 +4721,9 @@ async function init() {
       bgmData,
       shinyEffectsData,
       trainerFxData,
+      heldItemsData,
+      challengeValuesData,
+      challengePresetsData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -4488,6 +4763,12 @@ async function init() {
       fetchJson("./data/shiny-effects.json", { palette: [], surface: [], around: [] }),
       // Ghost Trainer FX aura catalog (generated). Fallback → empty (picker offers "(none)").
       fetchJson("./data/trainer-fx.json", []),
+      // Held-item catalog (generated). Fallback → the curated HELD_ITEM_OPTIONS below.
+      fetchJson("./data/held-items.json", []),
+      // Challenge VALUE option lists (generated). Fallback → {} (value dropdown hides).
+      fetchJson("./data/challenge-values.json", {}),
+      // Named challenge presets (generated). Fallback → [] (preset picker hides).
+      fetchJson("./data/challenge-presets.json", []),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -4599,6 +4880,37 @@ async function init() {
       trainerFxById.set(e.id, e);
     }
 
+    // Held-item catalog: the full grouped picker (booster/berry/gem/utility). Fall
+    // back to the curated HELD_ITEM_OPTIONS (as "utility") when the generated file
+    // is absent or malformed, so the picker is never empty.
+    if (Array.isArray(heldItemsData) && heldItemsData.length > 0) {
+      HELD_ITEMS = heldItemsData
+        .filter(h => h && typeof h.key === "string" && h.key.length > 0)
+        .map(h => ({
+          key: h.key,
+          label: typeof h.label === "string" && h.label ? h.label : prettify(h.key),
+          category: typeof h.category === "string" && h.category ? h.category : "utility",
+        }));
+    }
+
+    // Challenge VALUE option lists: the per-kind human options for the value
+    // dropdown. Keep only well-formed {value:number,label:string} arrays.
+    if (challengeValuesData && typeof challengeValuesData === "object") {
+      CHALLENGE_VALUES = {};
+      for (const [kind, opts] of Object.entries(challengeValuesData)) {
+        if (Array.isArray(opts)) {
+          CHALLENGE_VALUES[kind] = opts.filter(o => o && typeof o.value === "number" && typeof o.label === "string");
+        }
+      }
+    }
+
+    // Named challenge presets: keep only well-formed {name,challenge,challengeValue}.
+    if (Array.isArray(challengePresetsData)) {
+      CHALLENGE_PRESETS = challengePresetsData.filter(
+        p => p && typeof p.name === "string" && typeof p.challenge === "string" && typeof p.challengeValue === "number",
+      );
+    }
+
     // Egg-move source + factory-set index for the per-member legality/set helpers.
     EGG_MOVES_LIVE = eggLive && typeof eggLive === "object" ? eggLive : {};
     factoryByConst.clear();
@@ -4692,10 +5004,9 @@ async function init() {
     tcdl.id = "trainerclass-list";
     tcdl.innerHTML = TRAINER_CLASSES.map(t => `<option value="${t.name}">${prettify(t.name)}</option>`).join("");
     document.body.appendChild(tcdl);
-    const hidl = document.createElement("datalist");
-    hidl.id = "helditems-list";
-    hidl.innerHTML = HELD_ITEM_OPTIONS.map(k => `<option value="${k}">${prettify(k)}</option>`).join("");
-    document.body.appendChild(hidl);
+    // NB: the held-item datalist (#helditems-list) is rendered INSIDE the Custom
+    // Trainers section (heldItemsDatalistHtml) so it reflects the full grouped
+    // HELD_ITEMS catalog loaded above — no global body-level datalist here.
 
     render();
     setStatus(`${SPECIES.length} species, ${ITEMS.length} items loaded.`);
