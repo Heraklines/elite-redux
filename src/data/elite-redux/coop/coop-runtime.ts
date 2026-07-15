@@ -3422,7 +3422,20 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
     ) {
       return false;
     }
-    return maybeMarkCoopWaveContinuationReady(payload.wave, binding);
+    const continuationReady = maybeMarkCoopWaveContinuationReady(payload.wave, binding);
+    if (
+      !continuationReady
+      && coopHasPendingWaveAdvance()
+      && globalScene.phaseManager?.getCurrentPhase()?.phaseName !== "CoopWaveAdvanceBoundaryPhase"
+      && !globalScene.phaseManager?.hasPhaseOfType("CoopWaveAdvanceBoundaryPhase")
+    ) {
+      // The retained op may land AFTER CoopFinalizeTurnPhase already inspected pendingWaveAdvance. Appending
+      // (never unshifting) a dedicated wake preserves the presentation -> checkpoint ordering while ensuring
+      // the queue cannot empty into a phantom next turn without consuming the host-stated transition.
+      globalScene.phaseManager.pushNew("CoopWaveAdvanceBoundaryPhase");
+      coopLog("runtime", `wave-advance JOURNAL queued safe-boundary wake wave=${payload.wave}`);
+    }
+    return continuationReady;
   } catch (e) {
     coopWarn("runtime", "wave-advance JOURNAL materialize threw (handled)", e);
     return false;

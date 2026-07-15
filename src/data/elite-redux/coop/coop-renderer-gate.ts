@@ -110,6 +110,7 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   // ── COOP REPLAY / RENDER FAMILY (§3.1) - the guest's OWN render + adopt pipeline ──
   "CoopReplayTurnPhase", // the guest's per-turn render driver
   "CoopFinalizeTurnPhase", // guest turn-finalize + checksum verify
+  "CoopWaveAdvanceBoundaryPhase", // late retained wave op -> same safe-boundary tail materializer
   "CoopReplayMePhase", // mystery-encounter render on the guest
   "CoopReplayLearnMovePhase", // learn-move render on the guest
   "CoopMoveAnimReplayPhase", // move-anim replay (renders the denied MovePhase)

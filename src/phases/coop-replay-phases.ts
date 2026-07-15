@@ -1811,6 +1811,28 @@ export class CoopFinalizeTurnPhase extends Phase {
 }
 
 /**
+ * GUEST: deterministic safe-boundary wake for a retained WAVE_ADVANCE that arrived after the final turn's
+ * {@linkcode CoopFinalizeTurnPhase} already checked the pending latch. The journal receiver appends this
+ * phase to the BACK of the phase tree, so it can never overtake replay presentation or checkpoint apply.
+ * Once those phases drain it invokes the exact same one-shot materializer as normal finalization.
+ *
+ * This phase deliberately owns no timer and no transition logic. The retained operation is the wake, the
+ * phase queue is the safe-boundary scheduler, and {@linkcode consumeCoopPendingWaveAdvance} remains the sole
+ * exactly-once gate. If normal finalization consumed the operation first, this is an immediate no-op.
+ */
+export class CoopWaveAdvanceBoundaryPhase extends Phase {
+  public readonly phaseName = "CoopWaveAdvanceBoundaryPhase";
+
+  public start(): void {
+    try {
+      CoopFinalizeTurnPhase.runPendingWaveAdvanceTail();
+    } finally {
+      this.end();
+    }
+  }
+}
+
+/**
  * MINOR-1 (#633, converge-or-give-up cap): the count of CONSECUTIVE resyncs whose target divergence
  * (the host's checksum = the "dimensions" being healed) failed to heal. Keyed by host checksum so a
  * NEW divergence resets the counter. After {@linkcode COOP_RESYNC_RESUMMON_GIVE_UP} failures on the
