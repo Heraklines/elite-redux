@@ -17,6 +17,8 @@ const [
   { canonicalize, fnv1a64 },
   { getCoopRuntime },
   { BattlerTagType },
+  { Command },
+  { MoveId },
   { PokemonModifierType },
   { StatusEffect },
   { UiMode },
@@ -26,6 +28,8 @@ const [
   import("../src/data/elite-redux/coop/coop-battle-checksum"),
   import("../src/data/elite-redux/coop/coop-runtime"),
   import("../src/enums/battler-tag-type"),
+  import("../src/enums/command"),
+  import("../src/enums/move-id"),
   import("../src/modifier/modifier-type"),
   import("../src/enums/status-effect"),
   import("../src/enums/ui-mode"),
@@ -651,9 +655,13 @@ function observeBiomeMarket(): void {
 }
 
 /**
- * Emit a strict, read-only Commander boundary marker while a real CommandPhase is active.
- * The public driver uses this only as an assertion oracle: it still supplies the Dondozo's
- * move through the canvas and proves the hidden Tatsugiri's generated skip via rendezvous logs.
+ * Emit a strict, read-only Commander boundary marker while a real CommandPhase is active. A hidden
+ * Commander owner's automatic phase can start and finish between two 100ms observer samples, so that
+ * owner may also attest the same boundary from the immediately following turn-start/replay phase, but
+ * only while its exact generated inert skip remains in the addressed turn command ledger.
+ *
+ * The public driver uses this only as an assertion oracle: it still supplies the Dondozo's move through
+ * the canvas and proves the hidden Tatsugiri's generated skip via rendezvous logs.
  */
 function observeCommanderBoundary(): void {
   try {
@@ -661,7 +669,7 @@ function observeCommanderBoundary(): void {
     const membership = runtime?.membership.snapshot();
     const battle = globalScene?.currentBattle;
     const phase = globalScene?.phaseManager?.getCurrentPhase()?.phaseName;
-    if (runtime == null || membership?.state !== "active" || battle == null || phase !== "CommandPhase") {
+    if (runtime == null || membership?.state !== "active" || battle == null || phase == null) {
       return;
     }
     const commanded = globalScene.getPlayerParty().find(pokemon => pokemon.getTag(BattlerTagType.COMMANDED) != null);
@@ -670,6 +678,16 @@ function observeCommanderBoundary(): void {
     const commanderOwnerRole = (commander as (Pokemon & { readonly coopOwner?: "host" | "guest" }) | undefined)
       ?.coopOwner;
     if (commanded == null || commander == null || (commanderOwnerRole !== "host" && commanderOwnerRole !== "guest")) {
+      return;
+    }
+    const commanderCommand = battle.turnCommands[commander.getBattlerIndex()];
+    const ownerAutomaticPhaseClosed =
+      runtime.controller.role === commanderOwnerRole
+      && (phase === "TurnStartPhase" || phase === "CoopReplayTurnPhase")
+      && commanderCommand?.command === Command.FIGHT
+      && commanderCommand.move?.move === MoveId.NONE
+      && commanderCommand.skip === true;
+    if (phase !== "CommandPhase" && !ownerAutomaticPhaseClosed) {
       return;
     }
     const { digest: stateDigest } = computeMechanicalDigest();
@@ -681,6 +699,7 @@ function observeCommanderBoundary(): void {
       epoch: runtime.controller.sessionEpoch,
       membershipRevision: membership.revision,
       connectionGeneration: membership.connectionGeneration,
+      observationPhase: phase,
       wave: battle.waveIndex,
       turn: battle.turn,
       point: `cmd:${battle.waveIndex}:${battle.turn}`,

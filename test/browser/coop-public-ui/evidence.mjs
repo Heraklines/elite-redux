@@ -322,6 +322,7 @@ export function commanderObservationView(text) {
     || value.membershipRevision <= 0
     || !Number.isSafeInteger(value.connectionGeneration)
     || value.connectionGeneration < 0
+    || !["CommandPhase", "TurnStartPhase", "CoopReplayTurnPhase"].includes(value.observationPhase)
     || !Number.isSafeInteger(value.wave)
     || value.wave <= 0
     || !Number.isSafeInteger(value.turn)
