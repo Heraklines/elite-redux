@@ -202,6 +202,25 @@ export function describeCoopWaveAdvanceOperationBinding(binding: CoopWaveAdvance
   };
 }
 
+/**
+ * The one received wave transaction whose DATA has not reached BattleEnd yet. A phase binds to this durable
+ * identity rather than ambient `currentBattle`, which an egg/biome tail may already have replaced.
+ * Multiple unresolved waves are ambiguous and deliberately return null so the caller fails closed.
+ */
+export function getCoopPendingWaveAdvanceBoundary(
+  binding?: CoopWaveAdvanceOperationBinding | null,
+): { readonly wave: number; readonly victoryKind: CoopWaveAdvancePayload["victoryKind"] } | null {
+  const unresolved = [...state(binding).stagedWaveTransactions.values()].filter(staged => !staged.dataApplied);
+  if (unresolved.length !== 1) {
+    return null;
+  }
+  const payload = unresolved[0].envelope.pendingOperation?.payload;
+  if (!isValidCoopWaveAdvancePayload(payload)) {
+    return null;
+  }
+  return { wave: payload.wave, victoryKind: payload.victoryKind };
+}
+
 /** Missing or role-mismatched runtime state is a programming error, never a process-global fallback. */
 export function captureCoopWaveAdvanceOperationBinding(expectedRole?: CoopRole): CoopWaveAdvanceOperationBinding {
   const opState = getActiveCoopRuntimeOpState();

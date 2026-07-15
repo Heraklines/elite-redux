@@ -18,6 +18,7 @@ import {
 import { coopAuthorityContinuationSurface } from "#data/elite-redux/coop/coop-ui-registry";
 import {
   type CoopWaveAdvanceOperationBinding,
+  getCoopPendingWaveAdvanceBoundary,
   isValidCoopWaveAdvancePayload,
   registerCoopWaveAdvanceBoundaryDataApplier,
 } from "#data/elite-redux/coop/coop-wave-operation";
@@ -133,8 +134,12 @@ export class BattleEndPhase extends BattlePhase {
 
     this.isVictory = isVictory;
     this.retainedWaveBinding = getCoopWaveAdvanceRuntimeBinding();
-    this.retainedSourceWave = globalScene.currentBattle?.waveIndex ?? -1;
-    this.retainedSourceWasTrainer = globalScene.currentBattle?.trainer != null;
+    const retainedBoundary = getCoopPendingWaveAdvanceBoundary(this.retainedWaveBinding);
+    this.retainedSourceWave = retainedBoundary?.wave ?? globalScene.currentBattle?.waveIndex ?? -1;
+    this.retainedSourceWasTrainer =
+      retainedBoundary == null
+        ? globalScene.currentBattle?.trainer != null
+        : retainedBoundary.victoryKind === "trainer";
   }
 
   start() {
