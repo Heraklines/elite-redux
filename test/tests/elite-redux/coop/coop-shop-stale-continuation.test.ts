@@ -118,9 +118,7 @@ describe.skipIf(!RUN)("coop #872 - stale shop continuation is dropped, not an NP
     const owner = installScene({ waveIndex: 46 });
     const phase = new SelectModifierPhase();
     owner.setCurrent({ phaseName: "CommandPhase" });
-    await expect(
-      phase["coopOpenOwnerShopAfterBarrier"](() => false, false, true),
-    ).resolves.toBeUndefined();
+    await expect(phase["coopOpenOwnerShopAfterBarrier"](() => false, false, true)).resolves.toBeUndefined();
     expect(setMode).not.toHaveBeenCalled();
   });
 
