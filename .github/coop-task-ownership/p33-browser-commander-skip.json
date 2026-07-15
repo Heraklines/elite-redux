@@ -18,6 +18,7 @@
     "test/browser/coop-public-ui/evidence.mjs",
     "test/browser/coop-public-ui/journeys.mjs",
     "test/browser/coop-public-ui/public-ui-harness.mjs",
+    "test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs",
     "test/browser/coop-public-ui/run.mjs"
   ]
 }
