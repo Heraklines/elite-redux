@@ -217,6 +217,13 @@ type MeTerminalArm = Promise<{
   action: Awaited<ReturnType<NonNullable<ReturnType<typeof getCoopInteractionRelay>>["awaitInteractionChoice"]>>;
 }>;
 
+/**
+ * The embedded-shop edge participates in the same ordered replay pump as ME presentations. Reward stock
+ * can be retained before a reconnecting guest installs this phase, but it must not jump ahead of already
+ * buffered quiz/repeated-round presentations that causally precede the shop.
+ */
+type MeShopArm = Promise<{ tag: "shop"; key: string }>;
+
 type CoopMeBattleDestination = Extract<CoopMeTerminalPayload["destination"], { kind: "battle" }>;
 type CoopMeContinueDestination = Extract<CoopMeTerminalPayload["destination"], { kind: "continue" }>;
 
@@ -245,6 +252,8 @@ export class CoopReplayMePhase extends Phase {
   private boundController: ReturnType<typeof getCoopController> = null;
   private boundGeneration = -1;
   private boundScene: typeof globalScene | null = null;
+  /** Once-resolved shop edge, inherited by every outcome-pump re-arm just like the terminal arm. */
+  private liveShopArm: MeShopArm | undefined;
 
   /** Exact scene/runtime/controller/generation/replay/pin fence for every detached UI continuation. */
   private boundaryStillLive(): boolean {
@@ -338,6 +347,11 @@ export class CoopReplayMePhase extends Phase {
     // each client is its own realm, so the guard never fires; in the harness the buffered options
     // stay in the inbox and the fast-path check on the next same-scene entry picks them up.
     const registeringScene = globalScene;
+    let resolveShopArm: ((value: { tag: "shop"; key: string }) => void) | null = null;
+    this.liveShopArm = new Promise(resolve => {
+      resolveShopArm = resolve;
+    });
+    let shopEdgeRetained = false;
     relay.onRewardOptionsBuffered = key => {
       if (!this.boundaryStillLive()) {
         return;
@@ -349,38 +363,13 @@ export class CoopReplayMePhase extends Phase {
         coopLog("me", "shop-handoff notification under a foreign scene (harness ctx); deferring", { key });
         return;
       }
-      // #860 (Professor quiz stuck, sibling of #859): on the QUIZ-class MEs the phantom battle
-      // chain runs BEFORE this handoff arrives, so the shop phase queued below can never START -
-      // the guest then misses its counter-6 shop window entirely, and the #859 dissolve at the
-      // TERMINAL (85s later) advances the counter first, re-keying the pending shop one number
-      // past the host's buffered options/pick (guest awaits key 7:0, data sits at 6:0 -> stuck).
-      // Dissolve the phantom HERE, the moment the shop handoff lands, so the shop opens at the
-      // still-pinned counter. No-op when nothing is parked (the gift-ME ordering); guarded so a
-      // genuine battle-handoff replay turn is never touched.
-      if (!coopMeHandoffBattleStarted()) {
-        abortActiveCoopReplayTurnPhase("ME embedded-shop handoff (#860)");
-      }
-      // #818: a reward shop can FOLLOW a quiz handoff (Dormant Guardian's relic screen after
-      // the braille trial). Once the QUIZ already settled this phase DETACHED, settleForWatcherShop's
-      // `settled` guard would no-op, so open the guest shop DIRECTLY here - exactly once
-      // (shopHandedOff). #828: the SelectModifierPhase resolves its role from the ME OWNER (watcher on
-      // a host-owned ME, pick owner on a guest-owned one). The detached race the quiz re-armed still
-      // runs the ME-end leave/advance.
-      if (this.settledDetached) {
-        if (!this.shopHandedOff) {
-          this.shopHandedOff = true;
-          coopLog(
-            "me",
-            "reward shop FOLLOWS the quiz handoff - opening guest ME-owner-role shop directly (#818/#828)",
-            {
-              counter: this.interactionCounter,
-            },
-          );
-          openGuestMeEmbeddedShop(this.interactionCounter); // #832: BiomeShopPhase for trader/market MEs, SelectModifierPhase otherwise
-        }
+      if (shopEdgeRetained) {
         return;
       }
-      this.settleForWatcherShop(relay);
+      shopEdgeRetained = true;
+      coopLog("me", "embedded reward-shop edge retained behind the ME presentation pump", { key });
+      resolveShopArm?.({ tag: "shop", key });
+      resolveShopArm = null;
     };
     // The option carrier can beat this phase during a slow guest transition/rejoin. The relay retains
     // that carrier, but assigning a callback does not replay an already-buffered notification. Without
@@ -394,6 +383,36 @@ export class CoopReplayMePhase extends Phase {
       relay.onRewardOptionsBuffered(shopKeyPrefix);
     }
     this.awaitHostPresentationThenEnter(relay);
+  }
+
+  /**
+   * Materialize the retained shop edge only after every already-buffered ME presentation ahead of it has
+   * won the replay race. This keeps slow/rejoining clients on the causal UI order: selector rounds, quiz,
+   * then reward shop.
+   */
+  private handleEmbeddedShopHandoff(relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>, key: string): void {
+    if (!this.boundaryStillLive()) {
+      return;
+    }
+    // #860 (Professor quiz stuck, sibling of #859): dissolve only when the shop actually becomes the
+    // executable surface. Doing it on carrier arrival could preempt buffered quiz/repeated-round surfaces.
+    if (!coopMeHandoffBattleStarted()) {
+      abortActiveCoopReplayTurnPhase("ME embedded-shop handoff (#860)");
+    }
+    if (this.settledDetached) {
+      if (!this.shopHandedOff) {
+        this.shopHandedOff = true;
+        coopLog("me", "reward shop FOLLOWS the quiz handoff - opening guest ME-owner-role shop directly (#818/#828)", {
+          counter: this.interactionCounter,
+          key,
+        });
+        openGuestMeEmbeddedShop(this.interactionCounter);
+      }
+      return;
+    }
+    if (!this.settled) {
+      this.settleForWatcherShop(relay);
+    }
   }
 
   /** Await and adopt the exact host selector; a null/malformed result re-requests control, never re-derives. */
@@ -721,7 +740,11 @@ export class CoopReplayMePhase extends Phase {
       // surface does not depend on a periodic resend timer before DATA+destination can complete atomically.
       this.boundRuntime?.durability?.reconnect();
     }
-    void Promise.race([outcomeArm, terminalArm]).then(winner => {
+    // The shop arm is deliberately ordered after the outcome arm. If a lagging/rejoining guest has both
+    // buffered, Promise.race preserves this array order for already-resolved promises, so every causally
+    // earlier quiz/repeated-round presentation drains before the reward shop becomes executable.
+    const raceArms = this.liveShopArm == null ? [outcomeArm, terminalArm] : [outcomeArm, this.liveShopArm, terminalArm];
+    void Promise.race(raceArms).then(winner => {
       if (raceDone) {
         return;
       }
@@ -741,6 +764,10 @@ export class CoopReplayMePhase extends Phase {
           action: winner.action == null ? "null" : winner.action.choice,
         });
         this.handleTerminalAction(winner.action);
+        return;
+      }
+      if (winner.tag === "shop") {
+        this.handleEmbeddedShopHandoff(relay, winner.key);
         return;
       }
       const outcome = winner.outcome;

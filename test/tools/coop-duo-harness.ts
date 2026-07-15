@@ -3054,25 +3054,28 @@ export async function drainGuestMeReplayNewRounds(replay: Phase, expected: numbe
 // ---------------------------------------------------------------------------
 
 /**
- * Build the GUEST's OWN embedded reward-shop {@linkcode SelectModifierPhase} and START it as the reward
- * pick OWNER (#828). Because the shop pins the (odd) ME interaction counter, its start() resolves the pick
- * to the ME owner (the guest) and, since the HOST is the reward OPTION owner, ADOPTS the host's streamed
- * option list (buffer-hit) before opening the interactive owner screen. Drains under the guest ctx until
- * the adopt lands (typeOptions filled). Returns the shop seam so the caller can assert `coopWatcher ===
- * false` (the guest DRIVES) and relay the leave/pick. MUST be called inside withClient(guestCtx) AFTER the
- * host's embedded shop has started + streamed its options (so the adopt buffer-hits). Does NOT end the
- * detached phase: the guest's live CoopReplayMePhase owns the ME terminal (leave + advance), so ending
- * this detached artifact would shiftPhase() that live phase off the queue.
+ * Obtain the GUEST's production-queued embedded reward shop after CoopReplayMePhase performs its real
+ * #821/#828 handoff. The old helper constructed and started a detached second SelectModifierPhase; that
+ * let a synthetic phase send the leave while the player's real current phase remained open, so the duo
+ * lane did not model a browser and could strand the host watcher. MUST be called inside withClient(guestCtx)
+ * after the host streams its options. Drains until the queued phase is current and its adopted options land.
  */
 export async function startGuestMeShopOwner(guestScene: BattleScene): Promise<ShopPhaseSeam> {
-  const shop = guestScene.phaseManager.create("SelectModifierPhase") as unknown as ShopPhaseSeam;
-  shop.start();
-  // The owner path is async (adopt the host's streamed options -> open the screen); drain until it lands.
-  for (let i = 0; i < 8; i++) {
+  let shop: ShopPhaseSeam | null = null;
+  for (let i = 0; i < 16; i++) {
     await drainLoopback();
-    if ((shop.typeOptions as unknown[]).length > 0) {
+    const current = guestScene.phaseManager.getCurrentPhase();
+    if (current?.phaseName === "SelectModifierPhase") {
+      shop = current as unknown as ShopPhaseSeam;
+    }
+    if (shop != null && (shop.typeOptions as unknown[]).length > 0) {
       break;
     }
+  }
+  if (shop == null) {
+    throw new Error(
+      `guest ME shop handoff FAILED: expected production SelectModifierPhase current, got ${guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}`,
+    );
   }
   return shop;
 }
@@ -3080,14 +3083,17 @@ export async function startGuestMeShopOwner(guestScene: BattleScene): Promise<Sh
 /**
  * Relay the GUEST reward-shop OWNER's LEAVE synchronously (#828) - the SEND ONLY, without flushing the
  * loopback, so the HOST's reward pick-WATCHER await resolves UNDER the host ctx on the next drain (the
- * cross-ctx footgun the top-level pick handshake also dodges). Mirrors the leave path of
- * {@linkcode driveHostRewardShopOwner} (coopEndMirror + coopRelaySend(LEAVE)) but deliberately does NOT
- * end() the detached guest shop (see {@linkcode startGuestMeShopOwner}) nor advance the counter (the ME
- * owns the single advance - MAJOR-3 no-ops it anyway). MUST be called inside withClientSync(guestCtx).
+ * cross-ctx footgun the top-level pick handshake also dodges). Mirrors the production leave path. A
+ * retained guest-owner intent parks this real phase until the host watcher returns its authoritative
+ * result; otherwise the phase ends immediately. The ME pin suppresses any extra interaction advance.
  */
 export function relayGuestMeShopLeaveSync(guestShop: ShopPhaseSeam): void {
   guestShop.coopEndMirror();
-  guestShop.coopRelaySend(/* COOP_INTERACTION_LEAVE */ -1, undefined, "skip");
+  const parkedForAuthority = guestShop.coopRelaySend(/* COOP_INTERACTION_LEAVE */ -1, undefined, "skip");
+  if (!parkedForAuthority) {
+    guestShop.end();
+    guestShop.coopAdvanceInteraction();
+  }
 }
 
 // ---------------------------------------------------------------------------
