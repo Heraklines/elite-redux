@@ -118,8 +118,8 @@
     ],
     "endless": false,
     "id": 70002,
-    "maxWave": 20,
-    "minWave": 10,
+    "maxWave": 30,
+    "minWave": 15,
     "name": "Brock",
     "team": [
       {
@@ -410,7 +410,7 @@
     ],
     "endless": false,
     "id": 70004,
-    "maxWave": 40,
+    "maxWave": 50,
     "minWave": 30,
     "name": "Misty",
     "team": [
@@ -518,7 +518,7 @@
     "endless": false,
     "id": 70005,
     "introDialogue": "bla bla bla, back in my days bla bla bla great pokemon war bla bla bla...",
-    "maxWave": 60,
+    "maxWave": 70,
     "minWave": 50,
     "name": "Lt Surge",
     "team": [
@@ -581,6 +581,161 @@
     ],
     "trainerClass": "LT_SURGE",
     "victoryDialogue": "50 years too early to fight me kid!",
+    "weight": 100
+  },
+  "TRAINER_70006": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70006,
+    "maxWave": 90,
+    "minWave": 70,
+    "name": "Erika",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ER_POISON_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "TOXIC",
+          "SOIL_DRAIN",
+          "SUNNY_DAY",
+          "VENOM_DRENCH"
+        ],
+        "species": 71
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "GANLON_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SALAC_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SEED_BOMB",
+          "ANCIENT_POWER",
+          "POISON_JAB",
+          "THIEF"
+        ],
+        "species": 465
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 2,
+            "item": "IRON"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SLEEP_POWDER",
+          "SOLAR_BEAM",
+          "LEECH_SEED",
+          "NIGHT_SHADE"
+        ],
+        "species": 45
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "TAILWIND",
+              "CREEPING_THORNS",
+              "ACROBATICS",
+              "SUNNY_DAY"
+            ],
+            "species": 189,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 0,
+              "formIndex": 0,
+              "species": 6101
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "TAILWIND",
+              "MISTY_EXPLOSION",
+              "RLA",
+              "SUNNY_DAY"
+            ],
+            "shiny": {
+              "palette": "solarflare",
+              "surface": "phosphor"
+            },
+            "species": 189,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "CHLOROBLAST",
+          "TRIPLE_AXEL",
+          "SUCKER_PUNCH",
+          "GRASSY_TERRAIN"
+        ],
+        "species": 908
+      }
+    ],
+    "trainerClass": "ERIKA",
     "weight": 100
   }
 }
