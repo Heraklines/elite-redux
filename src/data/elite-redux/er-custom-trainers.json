@@ -1002,6 +1002,7 @@
     "battleType": "single",
     "challenge": "none",
     "difficulties": [
+      "youngster",
       "ace",
       "elite",
       "hell"
