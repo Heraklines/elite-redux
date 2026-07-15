@@ -8,6 +8,7 @@ import { initTrainerTypeDialogue } from "#data/dialogue";
 import { wireEliteReduxManualComposites } from "#data/elite-redux/abilities/composite-newcomers";
 import { registerErFinalBossFormChange } from "#data/elite-redux/er-final-boss";
 import { applyNewcomerLearnsetAdditions, injectNewcomerForms } from "#data/elite-redux/er-newcomer-forms";
+import { applyErNewcomerSpeciesLearnsets, injectErNewcomerSpecies } from "#data/elite-redux/er-newcomer-species";
 import {
   initEliteReduxCSourceCorrections,
   remapEliteReduxMoveIdsByName,
@@ -86,6 +87,19 @@ export function initializeGame() {
   }
   console.info(
     `[er-b1b] registered ${customResult.customsAdded} ER-custom species (skipped ${customResult.customsAlreadyPresent} already present + ${customResult.skippedDegenerate} degenerate stubs)`,
+  );
+  // Elite Redux: hand-authored newcomer SPECIES (3 evolution-only fakemon +
+  // Regitube + the partner-Eevee family). Registered as ErCustomSpecies with
+  // N-typing + kits + evolution edges + Omniform mappings. Must run AFTER
+  // initEliteReduxSpecies() (base eeveelution kits final -> partner clones exact)
+  // and AFTER initEliteReduxCustomSpecies() (ErCustomSpecies plumbing ready), and
+  // BEFORE initEliteReduxEvolutions() so its prevolutions rebuild picks up the edges.
+  const newcomerSpeciesResult = injectErNewcomerSpecies();
+  if (newcomerSpeciesResult.errors.length > 0) {
+    console.warn("[er-newcomer-species] issues:", newcomerSpeciesResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-newcomer-species] registered ${newcomerSpeciesResult.speciesRegistered} species (skipped ${newcomerSpeciesResult.speciesAlreadyPresent}), ${newcomerSpeciesResult.evolutionEdges} evo edges, ${newcomerSpeciesResult.omniformMappings} Omniform mappings`,
   );
   // Elite Redux Phase B1c: data-driven mega/primal/origin FORM injection for
   // every ER mega — including ER-custom (Redux) megas, which B1a skips. Must run
@@ -273,6 +287,11 @@ export function initializeGame() {
   // AFTER initEliteReduxMovesets rebuilds the table from the ER dump.
   const newcomerLearnAdds = applyNewcomerLearnsetAdditions();
   console.info(`[er-newcomer-forms] applied ${newcomerLearnAdds} learnset additions`);
+  // Newcomer SPECIES learnsets (evolution clones + additions, Regitube, partner
+  // family clones). MUST run AFTER initEliteReduxMovesets rebuilds the table from
+  // the dump so the CLONED pre-evo/base source learnsets are final.
+  const newcomerSpeciesLearn = applyErNewcomerSpeciesLearnsets();
+  console.info(`[er-newcomer-species] wired ${newcomerSpeciesLearn} species learnsets`);
   // Elite Redux Phase B6: wire ER per-species level evolution requirements
   // into pokerogue's `pokemonEvolutions` table (kinds 0/3/4 — LEVEL,
   // LEVEL_MALE, LEVEL_FEMALE). Form changes (kinds 1/2/5 — MEGA, PRIMAL,

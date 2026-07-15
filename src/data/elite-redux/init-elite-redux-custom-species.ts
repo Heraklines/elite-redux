@@ -229,6 +229,12 @@ class ErCustomSpecies extends PokemonSpecies {
   private static readonly _draftNames = new Map<number, string>();
   /** Pokerogue speciesId → ER sprite slug (e.g. 10000 → "phantowl"). */
   private static readonly _spriteSlugs = new Map<number, string>();
+  /**
+   * Pokerogue speciesId → explicit cry-audio key. Used by hand-authored newcomer
+   * species that ship their OWN cry asset (e.g. Tentalect). When absent,
+   * `getCryKey` falls back to the crash-safe `cry/<id>` scheme below.
+   */
+  private static readonly _cryKeys = new Map<number, string>();
 
   /**
    * Override of the base `localize()`. Looks up the draft name installed
@@ -248,6 +254,11 @@ class ErCustomSpecies extends PokemonSpecies {
   /** Register the ER sprite slug for a pokerogue species id. */
   static registerSpriteSlug(id: number, slug: string): void {
     ErCustomSpecies._spriteSlugs.set(id, slug);
+  }
+
+  /** Register an explicit cry-audio key for a pokerogue species id. */
+  static registerCryKey(id: number, cryKey: string): void {
+    ErCustomSpecies._cryKeys.set(id, cryKey);
   }
 
   /** ER sprite slug for a pokerogue species id, or undefined if not an ER custom. */
@@ -352,7 +363,7 @@ class ErCustomSpecies extends PokemonSpecies {
    * silent instead of crashing.
    */
   override getCryKey(_formIndex?: number): string {
-    return `cry/${this.speciesId}`;
+    return ErCustomSpecies._cryKeys.get(this.speciesId) ?? `cry/${this.speciesId}`;
   }
 
   /**
@@ -427,6 +438,10 @@ export interface ErEditorMonSpec {
   abilities: readonly [number, number, number];
   innates: readonly [number, number, number];
   catchRate: number;
+  /** N-type static model: types 3..N (beyond type1/type2). Optional. */
+  extraTypes?: readonly PokemonType[] | undefined;
+  /** Explicit cry-audio key hook (hand-authored newcomer species with own cry). */
+  cryKey?: string | undefined;
 }
 
 /**
@@ -471,6 +486,12 @@ export function registerErEditorMon(spec: ErEditorMonSpec): boolean {
     false,
   );
   species.setPassives([spec.innates[0], spec.innates[1], spec.innates[2]]);
+  if (spec.extraTypes && spec.extraTypes.length > 0) {
+    species.setExtraTypes(spec.extraTypes);
+  }
+  if (spec.cryKey) {
+    ErCustomSpecies.registerCryKey(spec.speciesId, spec.cryKey);
+  }
   ErCustomSpecies.registerSpriteSlug(spec.speciesId, spec.slug);
   if (!starterColors[spec.speciesId]) {
     starterColors[spec.speciesId] = ["ffffff", "ffffff"];

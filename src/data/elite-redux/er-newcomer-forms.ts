@@ -89,6 +89,17 @@ const HYDRAPEX = 5931;
 const BAD_SPLICE = 5932;
 const WORLD_IN_PIECES = 5917;
 const GENESIS_SUPERNOVA = 5937;
+// Mega Skarmory Z / Mega Dragonite Z (formKey-collision rows, cleared 2026-07-15).
+const POWER_EDGE = 5362; // ER draft
+const KEEN_EDGE = 5009; // ER custom
+const CROSSCUT = 5908; // batch newcomer
+const ELUDE = 5511; // ER draft
+const PUNCTURE = 5942; // composite (Deep Cuts + Pinnacle Blade)
+const CHIVALRY = 5909; // batch newcomer
+const MEGA_DRILL = 5684; // ER draft
+const WEIGHTED_SCALES = 5938; // composite (Steelworker + Multiscale)
+const KNIGHTS_HONOR = 5939; // bespoke (Def/SpDef King's Wrath)
+const POWER_CORE = 5105; // ER draft
 
 /**
  * A hand-authored newcomer mega/primal form. Injected onto {@linkcode baseSpecies}
@@ -125,12 +136,10 @@ export interface NewcomerFormDef {
  * The newcomer form table. Kits/stats/typings are verbatim from
  * `docs/fakemon-newcomer-patch.md`.
  *
- * NOTE: only formKey-collision-FREE forms are wired here. Two doc megas collide
- * with an EXISTING ER mega on the same species+formKey and need a maintainer
- * decision (replace vs. new key) before wiring:
- *   - Mega Skarmory Y  (Skarmory already has an ER `mega-y` = ER 1889),
- *   - Mega Dragonite Z (Dragonite already has `mega` + `mega-y`; no `mega-z` key).
- * They are intentionally omitted here (documented in the patch report).
+ * NOTE: the two formKey-collision rows are now wired with a DEDICATED `mega-z`
+ * key (maintainer decision 2026-07-15), additive alongside the existing ER megas:
+ *   - Mega Skarmory Z  (new `mega-z`; the existing ER Mega Skarmory Y is untouched),
+ *   - Mega Dragonite Z (new `mega-z`; a third mega alongside Dragonite `mega` + `mega-y`).
  */
 export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
   // #4 Mega Xerneas — Fairy. Active Limber; innates Quickening Grace (5913),
@@ -284,6 +293,37 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     // NONE = parked Shattered Psyche slot (documented TODO; not yet defined).
     innates: [ab(ER_BRAIN_FOOD_ABILITY_ID), ab(GENESIS_SUPERNOVA), AbilityId.NONE],
     item: FormChangeItem.EMBRYONIC_ORB,
+  },
+  // #9 Mega Skarmory Z — Steel/Flying/Dragon (N-type). Additive `mega-z` key
+  // alongside the EXISTING ER Mega Skarmory Y (formKey collision resolved by the
+  // maintainer 2026-07-15: new key, Y untouched). Active Light Metal / Power Edge
+  // / Keen Edge; innates Crosscut (5908), Elude (5511), Puncture (5942). Stone
+  // Skarmorite Z. Sprite slug er_mega_skarmory_z (disk art is mega_scam_y_*).
+  {
+    baseSpecies: SpeciesId.SKARMORY,
+    formKey: "mega-z",
+    formName: "Mega Z",
+    slug: "mega_skarmory_z",
+    types: [PokemonType.STEEL, PokemonType.FLYING, PokemonType.DRAGON],
+    stats: [75, 135, 70, 135, 70, 110],
+    actives: [AbilityId.LIGHT_METAL, ab(POWER_EDGE), ab(KEEN_EDGE)],
+    innates: [ab(CROSSCUT), ab(ELUDE), ab(PUNCTURE)],
+    item: FormChangeItem.SKARMORITE_Z,
+  },
+  // #7 Mega Dragonite Z — Dragon/Flying/Steel (N-type). Additive THIRD mega key
+  // (`mega-z`) alongside Dragonite's existing mega + mega-y. Active Chivalry
+  // (5909) / Mega Drill / Stamina; innates Weighted Scales (5938), Knight's Honor
+  // (5939), Power Core. Stone Dragoninite Z. Slug er_mega_dragonite_z.
+  {
+    baseSpecies: SpeciesId.DRAGONITE,
+    formKey: "mega-z",
+    formName: "Mega Z",
+    slug: "mega_dragonite_z",
+    types: [PokemonType.DRAGON, PokemonType.FLYING, PokemonType.STEEL],
+    stats: [91, 144, 144, 110, 110, 101],
+    actives: [ab(CHIVALRY), ab(MEGA_DRILL), AbilityId.STAMINA],
+    innates: [ab(WEIGHTED_SCALES), ab(KNIGHTS_HONOR), ab(POWER_CORE)],
+    item: FormChangeItem.DRAGONINITE_Z,
   },
 ];
 

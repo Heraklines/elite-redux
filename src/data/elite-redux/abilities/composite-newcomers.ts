@@ -57,6 +57,19 @@ export const ER_PUNCTURE_ABILITY_ID = 5942;
 export const ER_RAINBOW_FISH_ABILITY_ID = 5943;
 export const ER_GALE_BLOOM_ABILITY_ID = 5944;
 export const ER_DECOMPOSER_ABILITY_ID = 5945;
+// Partner-Eevee family (fakemon newcomer patch). Each partner species grafts
+// Omniform (5929) onto its base kit's FIRST innate as a composite [innate +
+// Omniform], so the original innate stays fully live while the family can
+// adapt/chain across forms. 9 entries: partner Eevee + 8 partner eeveelutions.
+export const ER_PARTNER_EEVEE_ABILITY_ID = 5946;
+export const ER_PARTNER_VAPOREON_ABILITY_ID = 5947;
+export const ER_PARTNER_JOLTEON_ABILITY_ID = 5948;
+export const ER_PARTNER_FLAREON_ABILITY_ID = 5949;
+export const ER_PARTNER_ESPEON_ABILITY_ID = 5950;
+export const ER_PARTNER_UMBREON_ABILITY_ID = 5951;
+export const ER_PARTNER_LEAFEON_ABILITY_ID = 5952;
+export const ER_PARTNER_GLACEON_ABILITY_ID = 5953;
+export const ER_PARTNER_SYLVEON_ABILITY_ID = 5954;
 
 /**
  * A single manual-composite definition: the display name, the verbatim short
@@ -91,6 +104,21 @@ const AIR_BLOWER = 5058;
 const HARUKAZE = 5534;
 const PARASITIC_SPORES = 5314;
 const ITCHY_DEFENSE = 5207;
+// Omniform (5929) — the graft constituent for the partner-Eevee family. Resolved
+// live via `allAbilities[5929]`; its `OmniformAbAttr` is copied into every partner
+// composite so the composite drives the adaptive transform AND keeps the base
+// innate's own effect. The remaining constituents are each base eeveelution's
+// FIRST innate (verified live from the ER-patched kit at authoring time).
+const OMNIFORM = 5929;
+const FLUFFY = 218; // base Eevee innate[0]
+const WATER_VEIL = 41; // base Vaporeon innate[0]
+const SHORT_CIRCUIT = 5060; // base Jolteon innate[0] (ER custom)
+const FLASH_FIRE = 18; // base Flareon innate[0]
+const MAGIC_BOUNCE = 156; // base Espeon innate[0]
+const SELF_SUFFICIENT = 5045; // base Umbreon innate[0] (ER custom)
+const KEEN_EDGE = 5009; // base Leafeon innate[0] (ER custom)
+const ICE_BODY = 115; // base Glaceon innate[0]
+const PIXILATE = 182; // base Sylveon innate[0]
 
 /**
  * The manual-composite registry, keyed by pokerogue ability id. This is the
@@ -167,6 +195,65 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
     name: "Decomposer",
     description: "Parasitic Spores + Itchy Defense.",
     constituents: [PARASITIC_SPORES, ITCHY_DEFENSE],
+  },
+  // Partner-Eevee family (fakemon newcomer patch). Each entry grafts Omniform
+  // onto the base eeveelution's FIRST innate: the original innate stays fully
+  // active (its detailed description surfaces via #201) AND the composite carries
+  // Omniform's adaptive-transform attr so the partner form can chain across the
+  // family. The `name` keeps the base innate's name (no invented pitch names).
+  [ER_PARTNER_EEVEE_ABILITY_ID]: {
+    id: ER_PARTNER_EEVEE_ABILITY_ID,
+    name: "Fluffy",
+    description: "Fluffy + Omniform.",
+    constituents: [FLUFFY, OMNIFORM],
+  },
+  [ER_PARTNER_VAPOREON_ABILITY_ID]: {
+    id: ER_PARTNER_VAPOREON_ABILITY_ID,
+    name: "Water Veil",
+    description: "Water Veil + Omniform.",
+    constituents: [WATER_VEIL, OMNIFORM],
+  },
+  [ER_PARTNER_JOLTEON_ABILITY_ID]: {
+    id: ER_PARTNER_JOLTEON_ABILITY_ID,
+    name: "Short Circuit",
+    description: "Short Circuit + Omniform.",
+    constituents: [SHORT_CIRCUIT, OMNIFORM],
+  },
+  [ER_PARTNER_FLAREON_ABILITY_ID]: {
+    id: ER_PARTNER_FLAREON_ABILITY_ID,
+    name: "Flash Fire",
+    description: "Flash Fire + Omniform.",
+    constituents: [FLASH_FIRE, OMNIFORM],
+  },
+  [ER_PARTNER_ESPEON_ABILITY_ID]: {
+    id: ER_PARTNER_ESPEON_ABILITY_ID,
+    name: "Magic Bounce",
+    description: "Magic Bounce + Omniform.",
+    constituents: [MAGIC_BOUNCE, OMNIFORM],
+  },
+  [ER_PARTNER_UMBREON_ABILITY_ID]: {
+    id: ER_PARTNER_UMBREON_ABILITY_ID,
+    name: "Self Sufficient",
+    description: "Self Sufficient + Omniform.",
+    constituents: [SELF_SUFFICIENT, OMNIFORM],
+  },
+  [ER_PARTNER_LEAFEON_ABILITY_ID]: {
+    id: ER_PARTNER_LEAFEON_ABILITY_ID,
+    name: "Keen Edge",
+    description: "Keen Edge + Omniform.",
+    constituents: [KEEN_EDGE, OMNIFORM],
+  },
+  [ER_PARTNER_GLACEON_ABILITY_ID]: {
+    id: ER_PARTNER_GLACEON_ABILITY_ID,
+    name: "Ice Body",
+    description: "Ice Body + Omniform.",
+    constituents: [ICE_BODY, OMNIFORM],
+  },
+  [ER_PARTNER_SYLVEON_ABILITY_ID]: {
+    id: ER_PARTNER_SYLVEON_ABILITY_ID,
+    name: "Pixilate",
+    description: "Pixilate + Omniform.",
+    constituents: [PIXILATE, OMNIFORM],
   },
 };
 

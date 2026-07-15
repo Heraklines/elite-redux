@@ -361,4 +361,7 @@ export enum FormChangeItem {
   JUMPLUFFITE,
   PLANETARY_ORB,
   EMBRYONIC_ORB,
+  // Mega Skarmory Z (fakemon patch): additive `mega-z` alongside the existing ER
+  // Mega Skarmory Y. Dragonite Z reuses DRAGONINITE_Z above.
+  SKARMORITE_Z,
 }
