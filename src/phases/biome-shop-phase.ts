@@ -70,6 +70,7 @@ import { type SelectModifierCoopContinuation, SelectModifierPhase } from "#phase
 import { SHOP_TYPE_BY_BIOME } from "#ui/handlers/biome-shop-ui-handler";
 import { NumberHolder } from "#utils/common";
 import i18next from "i18next";
+import Phaser from "phaser";
 
 /**
  * #673 TEST KNOB: legacy co-op tests advance x0 waves without driving the (now enabled) co-op
@@ -538,14 +539,44 @@ export class BiomeShopPhase extends SelectModifierPhase {
    */
   private restoreCoopMarketRollbackState(
     rollbackState: NonNullable<ReturnType<typeof captureCoopAuthoritativeBattleState>>,
+    rngState: string,
   ): boolean {
     rollbackState.tick = Math.max(rollbackState.tick, coopAppliedStateTick() + 1);
     // `authoritativeGuest` controls guest-only material adoption details. A retained guest-owned market is
     // executed by the host, so treating that host rollback as a guest apply can corrupt the local authority
     // boundary (and the two-engine harness's next context). Legacy guest-side execution still uses true.
-    const restored = applyCoopAuthoritativeBattleState(rollbackState, getCoopController()?.role === "guest");
-    const failures = drainCoopApplyFailures();
-    return restored && failures.length === 0;
+    try {
+      const restored = applyCoopAuthoritativeBattleState(rollbackState, getCoopController()?.role === "guest");
+      const optionalShapeRestored = restored && this.restoreCoopMarketOptionalMonShape(rollbackState);
+      const failures = drainCoopApplyFailures();
+      return restored && optionalShapeRestored && failures.length === 0;
+    } finally {
+      // The receiver apply intentionally sows the streamed wave seed. A failed LOCAL host execution must
+      // instead be invisible to future rolls, so restore the exact pre-buy cursor after all material work.
+      Phaser.Math.RND.state(rngState);
+    }
+  }
+
+  /** Preserve optional Pokemon wire fields whose receiver representation canonicalizes absence to null. */
+  private restoreCoopMarketOptionalMonShape(
+    rollbackState: NonNullable<ReturnType<typeof captureCoopAuthoritativeBattleState>>,
+  ): boolean {
+    try {
+      const liveById = new Map(
+        [...globalScene.getPlayerParty(), ...globalScene.getEnemyParty()].map(mon => [mon.id, mon] as const),
+      );
+      for (const data of [...rollbackState.playerParty, ...rollbackState.enemyParty]) {
+        const mon = liveById.get(data.id);
+        if (mon != null && data.fusionSpecies === undefined) {
+          // applyAuthoritativeMonData maps an absent fusion species to null. Both mean "not fused" to the
+          // engine, but only undefined reproduces the captured immutable wire image byte-for-byte.
+          (mon as unknown as { fusionSpecies?: unknown }).fusionSpecies = undefined;
+        }
+      }
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -1163,6 +1194,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       }
     }
     const atomic = controller != null && cost !== -1;
+    const rollbackRngState = atomic ? Phaser.Math.RND.state() : null;
     const rollbackState = atomic ? captureCoopAuthoritativeBattleState(globalScene.currentBattle?.turn ?? 0) : null;
     if (atomic && rollbackState == null) {
       failCoopSharedSession(`Biome market buy ${operationIdToCommit ?? "legacy"} had no rollback image`);
@@ -1209,8 +1241,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
       this.pendingIndex = pendingIndexBefore;
       this.coopPendingAuthorityOperationId = pendingAuthorityOperationId;
       let rolledBack = !atomic;
-      if (rollbackState != null) {
-        rolledBack = this.restoreCoopMarketRollbackState(rollbackState);
+      if (rollbackState != null && rollbackRngState != null) {
+        rolledBack = this.restoreCoopMarketRollbackState(rollbackState, rollbackRngState);
       }
       // Keep even the visible balance exact if the comprehensive rollback reports a structured failure.
       // The shared terminal below prevents further play, but its diagnostic must describe the true before-image.

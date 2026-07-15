@@ -393,9 +393,11 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       prepareHostMarketIntent(phase, 1, 0, [0, 1_900, 0, 100]);
       const before = marketMaterialSignature();
       const hpBefore = target.hp;
+      const rngBefore = Phaser.Math.RND.state();
       const terminalBoundary = observeBeforeTerminalReset(rig.hostScene, () => ({
         material: marketMaterialSignature(),
         hp: target.hp,
+        rng: Phaser.Math.RND.state(),
         qtys: [...phase.qtys],
         pendingIndex: phase.pendingIndex,
         queued: rig.hostScene.phaseManager.getQueuedPhaseNames(),
@@ -404,6 +406,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       const addModifierSpy = vi.spyOn(rig.hostScene, "addModifier").mockImplementation(() => {
         rig.hostScene.money = 17;
         target.hp = 1;
+        Phaser.Math.RND.frac();
         (rig.hostScene.modifiers as unknown[]).push(leakedHeldItem!);
         (rig.hostScene.phaseManager as unknown as { unshiftPhase(queued: unknown): void }).unshiftPhase(phase.copy());
         throw new Error("injected TM apply failure after partial mutation");
@@ -422,6 +425,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
 
       expect(observed.material, "money, party data, and held items return to the exact before-image").toBe(before);
       expect(observed.hp).toBe(hpBefore);
+      expect(observed.rng, "a failed modifier cannot consume the authoritative RNG cursor").toBe(rngBefore);
       expect(observed.qtys).toEqual([1]);
       expect(observed.pendingIndex).toBe(0);
       expect(
