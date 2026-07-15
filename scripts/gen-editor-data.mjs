@@ -48,8 +48,7 @@ let erMoveCount = 0;
   // ER customs: enum-key derived from each draft's display name.
   const t = read("src/data/elite-redux/er-moves.ts");
   const re = /"name":\s*"([^"]+)"/g;
-  let m;
-  while ((m = re.exec(t)) !== null) {
+  for (let m = re.exec(t); m !== null; m = re.exec(t)) {
     const key = moveNameToEnumKey(m[1]);
     if (key && key !== "NONE" && /^[A-Z]/.test(key)) {
       moves.push(key);
@@ -230,7 +229,10 @@ mkdirSync("editor/data", { recursive: true });
   }
 
   writeFileSync("editor/data/held-items.json", `${JSON.stringify(held, null, 2)}\n`);
-  const byCat = held.reduce((acc, h) => ((acc[h.category] = (acc[h.category] || 0) + 1), acc), {});
+  const byCat = held.reduce((acc, h) => {
+    acc[h.category] = (acc[h.category] || 0) + 1;
+    return acc;
+  }, {});
   console.log(
     `held-items: ${held.length} (${byCat.booster} booster / ${byCat.berry} berry / ${byCat.gem} gem / ${byCat.utility} utility).`,
   );
@@ -359,8 +361,7 @@ mkdirSync("editor/data", { recursive: true });
   // (which would shift every name by one).
   const re =
     /new ChallengeAchv\(\s*"([^"]+)"(?:(?!new ChallengeAchv\()[\s\S])*?c instanceof (SingleTypeChallenge|SingleGenerationChallenge)\s*&&\s*c\.value === (\w+)/g;
-  let m;
-  while ((m = re.exec(achvSrc)) !== null) {
+  for (let m = re.exec(achvSrc); m !== null; m = re.exec(achvSrc)) {
     const [, localeKey, className, rawValue] = m;
     const kind = CLASS_TO_KIND[className];
     if (!kind) {
@@ -370,7 +371,7 @@ mkdirSync("editor/data", { recursive: true });
     if (!Number.isInteger(value) || value < 1) {
       continue;
     }
-    const name = achvNames[localeKey] && achvNames[localeKey].name ? achvNames[localeKey].name : localeKey;
+    const name = achvNames[localeKey]?.name ? achvNames[localeKey].name : localeKey;
     presets.push({ name, challenge: kind, challengeValue: value });
   }
   // Stable order: by challenge kind, then value.

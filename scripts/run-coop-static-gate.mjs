@@ -109,9 +109,15 @@ if (typecheck.status !== 0) {
 // Markdown is intentionally ignored by this repository's Biome configuration. Passing a docs-only
 // checkpoint to `biome check` makes Biome exit non-zero with "No files were processed", even though the
 // non-vacuous diff and full TypeScript ratchet above both ran. Restrict this list to formats Biome owns.
+// `--no-errors-on-unmatched` (the flag every package.json biome script already uses) covers the same
+// trap for a checkpoint whose only Biome-owned changes are files the config ignores — e.g. a worker-
+// written `er-custom-trainers*.json` save, which is excluded in biome.jsonc as generated data.
 const biomeFiles = [...changed].filter(file => /\.(?:[cm]?[jt]sx?|jsonc?|ya?ml)$/.test(file));
 if (biomeFiles.length > 0) {
-  const biome = run(command, ["exec", "biome", "check", ...biomeFiles], { stdio: "inherit", encoding: undefined });
+  const biome = run(command, ["exec", "biome", "check", "--no-errors-on-unmatched", ...biomeFiles], {
+    stdio: "inherit",
+    encoding: undefined,
+  });
   if (biome.status !== 0) {
     process.exit(biome.status ?? 1);
   }
