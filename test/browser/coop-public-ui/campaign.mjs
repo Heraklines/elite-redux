@@ -560,6 +560,18 @@ function findSemanticOwnerClient(rig, surfaceId, cursors) {
 }
 
 /**
+ * Whether either browser has observed this exact semantic surface since the current
+ * campaign cursor. A phase-start marker can precede its interactive UI by several
+ * message prompts, so phase presence alone is not evidence that an owner marker is
+ * malformed yet.
+ */
+function hasSemanticSurface(rig, surfaceId, cursors) {
+  return Object.values(rig.clients).some(
+    client => client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, surfaceId) != null,
+  );
+}
+
+/**
  * Find the OWNER client + the evidence event that identifies this appearance, or null.
  *
  * `strict` (every loud-fail run - gating + nightly; false only under the explicit
@@ -600,6 +612,13 @@ function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) {
     const v2Owner = findSemanticOwnerClient(rig, driver.v2SurfaceId, cursors);
     if (v2Owner) {
       return { client: v2Owner, markerEvent: presence.markerEvent };
+    }
+    // The phase may already be current while a preceding message prompt is still
+    // actionable (EggLapsePhase begins behind "Come back, <mon>!", for example).
+    // Let the generic prompt driver clear that public UI first. Only reject an
+    // owner contract after the declared semantic surface has actually appeared.
+    if (!hasSemanticSurface(rig, driver.v2SurfaceId, cursors)) {
+      return null;
     }
   }
   if (driver.owner.guestMarker) {

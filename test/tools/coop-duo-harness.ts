@@ -503,14 +503,17 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     loggedInUser.username = ctx.accountIdentity;
   }
   initGlobalScene(ctx.scene);
-  setCoopRuntime(ctx.runtime);
-  installCoopHooksForActive(ctx.runtime);
   Phaser.Math.RND.state(ctx.rndState);
   restoreGhostState(ctx.ghost);
   if (coopHarnessModuleLetIsolation && ctx.moduleLets !== undefined) {
     restoreModuleLets(ctx.moduleLets);
   }
   writeMePins(ctx.mePins ?? IDLE_ME_PINS);
+  // Runtime activation is deliberately LAST: setCoopRuntime flushes continuations
+  // queued by runWhenCoopRuntimeActive. Those callbacks must see this client's
+  // complete browser-local state, especially its ME pin and active replay pointer.
+  setCoopRuntime(ctx.runtime);
+  installCoopHooksForActive(ctx.runtime);
   try {
     return fn();
   } finally {
@@ -520,10 +523,6 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
       ctx.moduleLets = snapshotModuleLets();
     }
     initGlobalScene(prev.scene);
-    if (prev.runtime != null) {
-      setCoopRuntime(prev.runtime);
-      installCoopHooksForActive(prev.runtime);
-    }
     Phaser.Math.RND.state(prev.rndState);
     restoreGhostState(prev.ghost);
     if (coopHarnessModuleLetIsolation) {
@@ -535,6 +534,10 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     }
     activeClientLabel = prevLabel;
     activeClientInboundPump = prevInboundPump;
+    if (prev.runtime != null) {
+      setCoopRuntime(prev.runtime);
+      installCoopHooksForActive(prev.runtime);
+    }
   }
 }
 
@@ -550,24 +553,22 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   }
   // 1. globalScene
   initGlobalScene(ctx.scene);
-  // 2. coop active runtime (also installs the authoritative-guest predicate)
-  setCoopRuntime(ctx.runtime);
-  // 2b. per-client ROLE-GATED process hooks (ghost-pool publisher/suppression always; live-event emitter
-  //     when opted in): re-point the last-write-wins process-globals at THIS runtime's role-gated closures
-  //     (#633 bounded-scope), so a host pump owns the host publisher and a guest pump owns the guest
-  //     suppression/adopt - not whichever runtime happened to wire last.
-  installCoopHooksForActive(ctx.runtime);
-  // 3. process-global RND cursor
+  // 2. process-global RND cursor
   Phaser.Math.RND.state(ctx.rndState);
-  // 4. er-ghost per-run cache
+  // 3. er-ghost per-run cache
   restoreGhostState(ctx.ghost);
-  // 4b. ER module-let substrates (#837): money-streak / overstay anchor / relic lists. Gated on the
+  // 3b. ER module-let substrates (#837): money-streak / overstay anchor / relic lists. Gated on the
   //     opt-in isolation flag (default OFF = shared, pre-#837 behavior); ON = faithful per-client state.
   if (coopHarnessModuleLetIsolation && ctx.moduleLets !== undefined) {
     restoreModuleLets(ctx.moduleLets);
   }
-  // 5. mystery-encounter pins (start / battleCounter / presentation)
+  // 4. mystery-encounter pins (start / battleCounter / presentation)
   writeMePins(ctx.mePins ?? IDLE_ME_PINS);
+  // 5. coop active runtime + role-gated hooks, LAST. setCoopRuntime flushes
+  // runWhenCoopRuntimeActive callbacks synchronously; installing it earlier let a
+  // destination continuation observe the previous client's pins/RNG/module state.
+  setCoopRuntime(ctx.runtime);
+  installCoopHooksForActive(ctx.runtime);
   try {
     return await fn();
   } finally {
@@ -579,10 +580,6 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     }
     ctx.mePins = readMePins();
     initGlobalScene(prev.scene);
-    if (prev.runtime != null) {
-      setCoopRuntime(prev.runtime);
-      installCoopHooksForActive(prev.runtime);
-    }
     Phaser.Math.RND.state(prev.rndState);
     restoreGhostState(prev.ghost);
     if (coopHarnessModuleLetIsolation) {
@@ -594,6 +591,10 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     }
     activeClientLabel = prevLabel;
     activeClientInboundPump = prevInboundPump;
+    if (prev.runtime != null) {
+      setCoopRuntime(prev.runtime);
+      installCoopHooksForActive(prev.runtime);
+    }
   }
 }
 
