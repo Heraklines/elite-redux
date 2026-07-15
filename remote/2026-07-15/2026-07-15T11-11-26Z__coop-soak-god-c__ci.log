@@ -1,0 +1,54 @@
+===== COOP SOAK RESULT =====
+profile: god-c
+verdict: FAIL
+waves_requested: 45
+run: 29410627869 (ci/coop/p33-auto-victory-seal)
+timestamp: 2026-07-15T11-11-26Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20470471 WAVES=45 - replay this run with:  SOAK_SEED=20470471 SOAK_WAVES=45 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] RUN ENDED crossing into wave 31 (seed 20470471): host at terminal phase TitlePhase. Survey stops here.
+[22m[39m[coop-soak] DONE seed=20470471 waves=30/45 resyncHeals=0 assertions=0 findings=0 trainerWaves=6 (fixed=3 random=3) skips={"mysteryEncounterDisabledV1":1} elapsedMs=55882
+[coop-soak] RUN ENDED at wave 31 (seed 20470471): host at terminal phase TitlePhase. Surveyed 30/45 waves under all invariants before the terminal.
+
+----- vitest result tail -----
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > retained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [32m7701[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:280:3[39m
+
+[33m[39m[32m·[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mAssertionError[22m: the god profile is the start-to-finish carrier and may not stop before wave 45: expected { wave: 31, …(1) } to be undefined[39m
+
+[32m- Expected:[39m
+undefined
+
+[31m+ Received:[39m
+{
+  "reason": "host at terminal phase TitlePhase",
+  "wave": 31,
+}
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m228:11[22m[39m
+    [90m226|[39m           result[33m.[39mrunEnded[33m,[39m
+    [90m227|[39m           `the god profile is the start-to-finish carrier and may not …
+    [90m228|[39m         )[33m.[39m[34mtoBeUndefined[39m()[33m;[39m
+    [90m   |[39m           [31m^[39m
+    [90m229|[39m         expect(result.wavesCompleted, "the god profile completed the r…
+    [90m230|[39m       }
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 11:09:56
+[2m   Duration [22m 89.84s[2m (transform 19.64s, setup 23.69s, import 238ms, tests 65.08s, environment 674ms)[22m
+
