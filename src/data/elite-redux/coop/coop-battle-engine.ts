@@ -1662,7 +1662,7 @@ function readTransform(mon: Pokemon): CoopMonTransform | null {
  * Seed, Encore, Taunt, ...) is STILL detected + healed. This mirrors the module's existing exclusion of
  * turn COUNTERS for the same "legitimately transient, not identity" reason (see the file header).
  */
-function readTagTypes(mon: Pokemon): string[] {
+function readChecksumTagTypes(mon: Pokemon): string[] {
   try {
     return sortCoopChecksumTagIds(
       mon.summonData.tags.filter(t => t instanceof SerializableBattlerTag).map(t => t.tagType as unknown as string),
@@ -1670,6 +1670,11 @@ function readTagTypes(mon: Pokemon): string[] {
   } catch {
     return [];
   }
+}
+
+/** Frozen full-snapshot schema adapter; runtime enum identities are strings despite the legacy numeric type. */
+function readTagTypes(mon: Pokemon): number[] {
+  return readChecksumTagTypes(mon) as unknown as number[];
 }
 
 /** Read the arena's tag identities as `[tagType, side]`, sorted (turn counts excluded). */
@@ -1815,7 +1820,7 @@ function readChecksumMon(mon: Pokemon): CoopChecksumMon {
     bossSegments: boss.bossSegments,
     bossSegmentIndex: boss.bossSegmentIndex,
     moves: readMoves(mon),
-    tags: readTagTypes(mon),
+    tags: readChecksumTagTypes(mon),
     // Transform / Imposter copied identity (#836/#837): a host Transform stays invisible to speciesId
     // (species stays the original); hashing the copied speciesForm makes it detectable + healable.
     transformSpeciesId: transform.speciesId,
@@ -3830,10 +3835,10 @@ function applyCoopAuthoritativeBattleStateInternal(
 }
 
 /** Reconcile a live mon's battler tags to exactly the snapshot's tag-type set. */
-function reconcileTags(mon: Pokemon, wantTagTypes: string[]): void {
+function reconcileTags(mon: Pokemon, wantTagTypes: number[]): void {
   try {
     const want = new Set(wantTagTypes);
-    const have = new Set(mon.summonData.tags.map(t => t.tagType as unknown as string));
+    const have = new Set(mon.summonData.tags.map(t => t.tagType as unknown as number));
     // Drop tags the host no longer has.
     for (const have_t of [...have]) {
       if (!want.has(have_t)) {
