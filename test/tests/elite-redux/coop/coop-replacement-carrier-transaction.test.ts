@@ -126,6 +126,58 @@ describe("production replacement carrier transaction", () => {
     initGlobalScene(priorScene);
   });
 
+  it("retains an exact pre-encounter replacement while the new wave has no enemy party yet", async () => {
+    const runtime = startLocalCoopSession({ username: "Host", netcodeMode: "authoritative" });
+    runtime.controller.role = "host";
+    const outbound: CoopMessage[] = [];
+    runtime.partnerTransport?.onMessage(message => outbound.push(message));
+    const preEncounterState: CoopAuthoritativeBattleStateV1 = {
+      ...state(55),
+      wave: 8,
+      turn: 1,
+      enemyParty: [],
+    };
+
+    expect(() =>
+      runtime.battleStream.sendCheckpoint(
+        "replacement",
+        runtime.controller.sessionEpoch,
+        8,
+        1,
+        checkpoint(54),
+        checksum,
+        fullField(),
+        preEncounterState,
+      ),
+    ).not.toThrow();
+    await flushWire();
+
+    expect(
+      outbound.some(
+        message =>
+          message.t === "battleCheckpoint"
+          && message.reason === "replacement"
+          && message.wave === 8
+          && message.turn === 1
+          && message.revision === 55,
+      ),
+      "the exact retained replacement is published before EncounterPhase creates the enemy party",
+    ).toBe(true);
+    expect(() =>
+      runtime.battleStream.emitTurn(
+        runtime.controller.sessionEpoch,
+        8,
+        1,
+        [],
+        checkpoint(56),
+        checksum,
+        "complete-turn-preimage",
+        fullField(),
+        { ...preEncounterState, tick: 57 },
+      ),
+    ).toThrow(/refusing malformed turn commit/);
+  });
+
   it("keeps CommandPhase closed until the complete retransmitted frame applies and checksum-verifies", async () => {
     const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
     runtime.controller.role = "guest";
