@@ -1,0 +1,51 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 45
+run: 29408214386 (ci/coop/p33-auto-victory-seal)
+timestamp: 2026-07-15T10-33-29Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260712 WAVES=45 - replay this run with:  SOAK_SEED=20260712 SOAK_WAVES=45 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+----- Native stack trace -----
+
+ 1: 0xf4db93 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [/opt/hostedtoolcache/node/24.9.0/x64/bin/node]
+ 2: 0x13b24d0 v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [/opt/hostedtoolcache/node/24.9.0/x64/bin/node]
+ 3: 0x13b25bf v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [/opt/hostedtoolcache/node/24.9.0/x64/bin/node]
+ 4: 0x164b0a5  [/opt/hostedtoolcache/node/24.9.0/x64/bin/node]
+ 5: 0x164b0d2  [/opt/hostedtoolcache/node/24.9.0/x64/bin/node]
+ 6: 0x164b3ca v8::internal::Heap::RecomputeLimits(v8::internal::GarbageCollector, v8::base::TimeTicks) [/opt/hostedtoolcache/node/24.9.0/x64/bin/node]
+ 7: 0x165b8ea  [/opt/hostedtoolcache/node/24.9.0/x64/bin/node]
+ 8: 0x165fc90  [/opt/hostedtoolcache/node/24.9.0/x64/bin/node]
+ 9: 0x20f2ac1  [/opt/hostedtoolcache/node/24.9.0/x64/bin/node]
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Unhandled Errors [49m[22m[31m⎯⎯⎯⎯⎯⎯[39m
+[31m[1m
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Unhandled Error [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+[31m[1mError[22m: [vitest-pool]: Worker forks emitted error.[39m
+[90m [2m❯[22m EventEmitter.<anonymous> node_modules/.pnpm/vitest@4.1.5_@types+node@24.12.2_@vitest+coverage-v8@4.1.5_jsdom@29.0.2_msw@2.13.5_@typ_31a77bf69e7f89f1efa11355bef29956/node_modules/vitest/dist/chunks/cli-api.Cjt90eJu.js:[2m3445:22[22m[39m
+[90m [2m❯[22m EventEmitter.emit node:events:[2m508:28[22m[39m
+[90m [2m❯[22m ChildProcess.emitUnexpectedExit node_modules/.pnpm/vitest@4.1.5_@types+node@24.12.2_@vitest+coverage-v8@4.1.5_jsdom@29.0.2_msw@2.13.5_@typ_31a77bf69e7f89f1efa11355bef29956/node_modules/vitest/dist/chunks/cli-api.Cjt90eJu.js:[2m3012:22[22m[39m
+[90m [2m❯[22m ChildProcess.emit node:events:[2m508:28[22m[39m
+[90m [2m❯[22m Process.ChildProcess._handle.onexit node:internal/child_process:[2m294:12[22m[39m
+
+[31m[1mCaused by: Error[22m: Worker exited unexpectedly[39m
+[90m [2m❯[22m ChildProcess.emitUnexpectedExit node_modules/.pnpm/vitest@4.1.5_@types+node@24.12.2_@vitest+coverage-v8@4.1.5_jsdom@29.0.2_msw@2.13.5_@typ_31a77bf69e7f89f1efa11355bef29956/node_modules/vitest/dist/chunks/cli-api.Cjt90eJu.js:[2m3011:33[22m[39m
+[90m [2m❯[22m ChildProcess.emit node:events:[2m508:28[22m[39m
+[90m [2m❯[22m Process.ChildProcess._handle.onexit node:internal/child_process:[2m294:12[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+
+[2m Test Files [22m [90m (1)[39m
+[2m      Tests [22m [90m (2)[39m
+[2m     Errors [22m [1m[31m1 error[39m[22m
+[2m   Start at [22m 10:28:47
+[2m   Duration [22m 270.53s[2m (transform 15.17s, setup 18.51s, import 191ms, tests 0ms, environment 545ms)[22m
+
+[vitest-pool]: Timeout terminating forks worker for test files /home/runner/work/elite-redux/elite-redux/test/tests/elite-redux/coop/coop-soak.test.ts.
