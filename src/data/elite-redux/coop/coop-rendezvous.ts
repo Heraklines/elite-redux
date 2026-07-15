@@ -32,8 +32,8 @@
 // LoopbackTransport, exactly like CoopInteractionRelay / CoopBattleStreamer.
 // =============================================================================
 
-import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { recordCoopCausalEvent } from "#data/elite-redux/coop/coop-causal-trace";
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { beginCoopMachineWait } from "#data/elite-redux/coop/coop-stall-probe";
 import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
