@@ -303,6 +303,12 @@ export interface ClientCtx {
    */
   moduleLets?: CoopModuleLetSnapshot;
   /**
+   * The complete World-Map / biome-transition substrate for this browser process. Unlike the older
+   * money/relic module-let model, this is always isolated: a committed BIOME_PICK permit is one-shot and
+   * letting the host and guest share it lets the first client consume/clear the other client's authority.
+   */
+  biomeState?: CoopBiomeModuleSnapshot;
+  /**
    * The 3 mystery-encounter pins for THIS client (save/restore around the swap; idle off-ME).
    * Optional: ctxs that never reach an ME (the wave/shop spike tests) omit it and the swap treats
    * them as idle; an ME-driving ctx carries the live pins so the host's and guest's never bleed.
@@ -356,6 +362,56 @@ interface CoopModuleLetSnapshot {
   authoritativeTravelClassification: { readonly wave: number; readonly target: BiomeId | null } | null;
 }
 
+interface CoopBiomeModuleSnapshot {
+  /** Full World-Map UI/routing substrate; production clients own independent module instances. */
+  mapState: ErMapSaveData;
+  /** The actual route-decision input, intentionally separate from the persisted map state. */
+  pendingNodes: ErRouteNode[];
+  pendingNodesReady: boolean;
+  /** Deferred Crossroads Leave -> SelectBiome interaction pin, or -1 when idle. */
+  biomeInteractionStart: number;
+  /** Exact committed Switch/NewBiome permit, including this client's independent stage progress. */
+  biomeTailPermit: CoopBiomeTransitionTailPermit | null;
+  authoritativeTravelClassification: { readonly wave: number; readonly target: BiomeId | null } | null;
+  overstayAnchor: number | null;
+  biomeLength: number | null;
+  biomeStartWave: number;
+}
+
+function snapshotBiomeModuleState(): CoopBiomeModuleSnapshot {
+  return {
+    mapState: structuredClone(getErMapSaveData()),
+    pendingNodes: getErPendingNodes().map(node => ({ ...node })),
+    pendingNodesReady: erPendingNodesReady(),
+    biomeInteractionStart: coopBiomeInteractionInProgress() ? coopBiomeInteractionStartValue() : -1,
+    biomeTailPermit: snapshotCoopBiomeTransitionTailPermit(),
+    authoritativeTravelClassification: snapshotAuthoritativeMapTravelClassification(),
+    overstayAnchor: erBiomeOverstayAnchor(),
+    biomeLength: getErBiomeLength(),
+    biomeStartWave: getErBiomeStartWave(),
+  };
+}
+
+function restoreBiomeModuleState(s: CoopBiomeModuleSnapshot): void {
+  restoreErMapState(structuredClone(s.mapState), s.biomeStartWave);
+  if (s.pendingNodesReady) {
+    setErPendingNodes(s.pendingNodes.map(node => ({ ...node })));
+  } else {
+    markErPendingNodesAwaitingAuthority();
+  }
+  setErBiomeOverstayAnchor(s.overstayAnchor);
+  setErBiomeStructureExtent(s.biomeLength, s.biomeStartWave);
+  if (s.biomeInteractionStart >= 0) {
+    setCoopBiomeInteractionStart(s.biomeInteractionStart);
+  } else {
+    clearCoopBiomeInteractionStart();
+  }
+  if (!restoreCoopBiomeTransitionTailPermit(s.biomeTailPermit)) {
+    throw new Error("Invalid isolated co-op biome-tail permit snapshot");
+  }
+  restoreAuthoritativeMapTravelClassification(s.authoritativeTravelClassification);
+}
+
 function snapshotModuleLets(): CoopModuleLetSnapshot {
   return {
     achievementRun: getErAchievementRunState(),
@@ -377,26 +433,17 @@ function restoreModuleLets(s: CoopModuleLetSnapshot): void {
   restoreErAchievementRunState(s.achievementRun);
   restoreErMoneyStreaks(s.moneyStreaks);
   restoreErRelicBattleState(s.relic);
-  // restoreErMapState resets routing + structure; restore the non-persisted pending nodes and the exact
-  // structure/overstay snapshot afterward. This makes a two-engine map transition faithful instead of both
-  // scenes accidentally sharing one process-global graph.
-  restoreErMapState(structuredClone(s.mapState), s.biomeStartWave);
-  if (s.pendingNodesReady) {
-    setErPendingNodes(s.pendingNodes.map(node => ({ ...node })));
-  } else {
-    markErPendingNodesAwaitingAuthority();
-  }
-  setErBiomeOverstayAnchor(s.overstayAnchor);
-  setErBiomeStructureExtent(s.biomeLength, s.biomeStartWave);
-  if (s.biomeInteractionStart >= 0) {
-    setCoopBiomeInteractionStart(s.biomeInteractionStart);
-  } else {
-    clearCoopBiomeInteractionStart();
-  }
-  if (!restoreCoopBiomeTransitionTailPermit(s.biomeTailPermit)) {
-    throw new Error("Invalid isolated co-op biome-tail permit snapshot");
-  }
-  restoreAuthoritativeMapTravelClassification(s.authoritativeTravelClassification);
+  restoreBiomeModuleState({
+    mapState: s.mapState,
+    pendingNodes: s.pendingNodes,
+    pendingNodesReady: s.pendingNodesReady,
+    biomeInteractionStart: s.biomeInteractionStart,
+    biomeTailPermit: s.biomeTailPermit,
+    authoritativeTravelClassification: s.authoritativeTravelClassification,
+    overstayAnchor: s.overstayAnchor,
+    biomeLength: s.biomeLength,
+    biomeStartWave: s.biomeStartWave,
+  });
 }
 
 function snapshotGhostState(): ErGhostRunStateSnapshot {
@@ -462,6 +509,7 @@ function captureLiveCtx(): {
   rndState: string;
   ghost: ErGhostRunStateSnapshot;
   moduleLets: CoopModuleLetSnapshot;
+  biomeState: CoopBiomeModuleSnapshot;
   mePins: MePins;
 } {
   return {
@@ -471,6 +519,7 @@ function captureLiveCtx(): {
     ghost: snapshotGhostState(),
     // Snapshot the module-lets so the prev-restore is faithful when isolation is ON; harmless when OFF.
     moduleLets: snapshotModuleLets(),
+    biomeState: snapshotBiomeModuleState(),
     mePins: readMePins(),
   };
 }
@@ -509,6 +558,9 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   if (coopHarnessModuleLetIsolation && ctx.moduleLets !== undefined) {
     restoreModuleLets(ctx.moduleLets);
   }
+  if (ctx.biomeState !== undefined) {
+    restoreBiomeModuleState(ctx.biomeState);
+  }
   writeMePins(ctx.mePins ?? IDLE_ME_PINS);
   // Runtime activation is deliberately LAST: setCoopRuntime flushes continuations
   // queued by runWhenCoopRuntimeActive. Those callbacks must see this client's
@@ -523,12 +575,16 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     if (coopHarnessModuleLetIsolation) {
       ctx.moduleLets = snapshotModuleLets();
     }
+    if (ctx.biomeState !== undefined) {
+      ctx.biomeState = snapshotBiomeModuleState();
+    }
     initGlobalScene(prev.scene);
     Phaser.Math.RND.state(prev.rndState);
     restoreGhostState(prev.ghost);
     if (coopHarnessModuleLetIsolation) {
       restoreModuleLets(prev.moduleLets);
     }
+    restoreBiomeModuleState(prev.biomeState);
     writeMePins(prev.mePins);
     if (prevAccountIdentity != null && loggedInUser != null) {
       loggedInUser.username = prevAccountIdentity;
@@ -563,6 +619,9 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   if (coopHarnessModuleLetIsolation && ctx.moduleLets !== undefined) {
     restoreModuleLets(ctx.moduleLets);
   }
+  if (ctx.biomeState !== undefined) {
+    restoreBiomeModuleState(ctx.biomeState);
+  }
   // 4. mystery-encounter pins (start / battleCounter / presentation)
   writeMePins(ctx.mePins ?? IDLE_ME_PINS);
   // 5. coop active runtime + role-gated hooks, LAST. setCoopRuntime flushes
@@ -579,6 +638,9 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     if (coopHarnessModuleLetIsolation) {
       ctx.moduleLets = snapshotModuleLets();
     }
+    if (ctx.biomeState !== undefined) {
+      ctx.biomeState = snapshotBiomeModuleState();
+    }
     ctx.mePins = readMePins();
     initGlobalScene(prev.scene);
     Phaser.Math.RND.state(prev.rndState);
@@ -586,6 +648,7 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     if (coopHarnessModuleLetIsolation) {
       restoreModuleLets(prev.moduleLets);
     }
+    restoreBiomeModuleState(prev.biomeState);
     writeMePins(prev.mePins);
     if (prevAccountIdentity != null && loggedInUser != null) {
       loggedInUser.username = prevAccountIdentity;
@@ -1427,6 +1490,10 @@ export async function driveClientPhaseQueueTo(
     matches?: (phase: Phase) => boolean;
     maxPhases?: number;
     perPhaseTimeoutMs?: number;
+    /** Pump the other browser's scheduled inbox while this client's real phase awaits a reciprocal route. */
+    pumpPeer?: () => Promise<void>;
+    /** Drive an explicitly-recognized public prompt while the current phase remains blocked on human input. */
+    drivePublicPhaseInput?: (phase: Phase) => boolean | Promise<boolean>;
   } = {},
 ): Promise<Phase> {
   const matches = options.matches ?? (phase => phase.phaseName === target);
@@ -1450,6 +1517,8 @@ export async function driveClientPhaseQueueTo(
     phase.start();
     const deadline = Date.now() + perPhaseTimeoutMs;
     while (scene.phaseManager.getCurrentPhase() === phase) {
+      await options.drivePublicPhaseInput?.(phase);
+      await options.pumpPeer?.();
       await drainLoopback();
       if (Date.now() >= deadline) {
         const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
@@ -1497,9 +1566,9 @@ export interface DuoRig {
 }
 
 /**
- * A guest command boundary reached through the real queued between-wave transition. The next replay must
- * replace that live command surface through the phase manager, rather than start a detached replay object
- * whose `end()` would shift an unrelated queue.
+ * A guest wave reached through the real queued between-wave transition. Every turn in that same wave must
+ * replace its live command surface through the phase manager, rather than start a detached replay object
+ * whose `end()` would shift an unrelated queue. The exact wave fence naturally expires at the next battle.
  */
 const realGuestCommandBoundaries = new WeakMap<object, { wave: number; turn: number }>();
 
@@ -1548,6 +1617,11 @@ export async function driveDuoGuestTackleThroughPublicUi(
       // Wave 1 opened before buildDuo installed the live runtime. Re-enter that untouched public phase
       // once so it participates in the now-live reciprocal rendezvous.
       rig.hostScene.phaseManager.getCurrentPhase().start();
+      await drainLoopback();
+    } else if (rig.hostScene.phaseManager.getCurrentPhase().phaseName === "CommandPhase") {
+      // A between-wave caller may already have stopped the real host queue on this exact command surface
+      // after materializing both clients. It is already started and waiting at the reciprocal barrier;
+      // asking PhaseInterceptor.to() for the current phase waits for a transition that cannot occur.
       await drainLoopback();
     } else {
       await hostGame.phaseInterceptor.to("CommandPhase");
@@ -1720,6 +1794,7 @@ export async function buildDuo(
     // #837: seed both ctxs from the host's current module-let state (the launch mirror), so each engine
     // starts identical and thereafter keeps its OWN money-streak / overstay / relic state.
     moduleLets: snapshotModuleLets(),
+    biomeState: snapshotBiomeModuleState(),
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: () => runtimePair.flush("host"),
   };
@@ -1737,6 +1812,7 @@ export async function buildDuo(
     rndState: Phaser.Math.RND.state(),
     ghost: emptyGhostSnapshot(),
     moduleLets: structuredClone(hostCtx.moduleLets!),
+    biomeState: structuredClone(hostCtx.biomeState!),
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: () => runtimePair.flush("guest"),
   };
@@ -1780,6 +1856,7 @@ export async function remirrorWave(rig: DuoRig, opts?: { preserveGuestPlayerPart
   ) {
     return;
   }
+  realGuestCommandBoundaries.delete(rig.guestScene);
   await withClient(rig.guestCtx, () => {
     mirrorHostBattleToGuest(rig.hostScene, rig.guestScene, opts);
     const gf = rig.guestScene.getPlayerField();
@@ -1941,7 +2018,7 @@ export async function driveGuestReplayTurn(
     replay = guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
     if (
       realBoundary?.wave === guestScene.currentBattle.waveIndex
-      && realBoundary.turn === turn
+      && guestScene.currentBattle.turn === turn
       && current?.phaseName === "CommandPhase"
     ) {
       // The production guest reaches CoopReplayTurnPhase through TurnStart after public commands. These
@@ -1953,7 +2030,6 @@ export async function driveGuestReplayTurn(
       guestScene.phaseManager.unshiftPhase(replay);
       guestScene.phaseManager.shiftPhase();
       replayStarted = true;
-      realGuestCommandBoundaries.delete(guestScene);
     }
   }
   if (!replayStarted) {
@@ -2097,7 +2173,13 @@ export interface ShopPhaseSeam {
  * real Victory -> BattleEnd -> SelectModifier path and stops before the public reward surface starts.
  * Call inside the destination client's {@linkcode withClient} context.
  */
-export async function reachQueuedRewardShop(scene: BattleScene): Promise<ShopPhaseSeam> {
+export async function reachQueuedRewardShop(
+  scene: BattleScene,
+  options: {
+    pumpPeer?: () => Promise<void>;
+    drivePublicPhaseInput?: (phase: Phase) => boolean | Promise<boolean>;
+  } = {},
+): Promise<ShopPhaseSeam> {
   const current = scene.phaseManager.getCurrentPhase();
   const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
 
@@ -2110,7 +2192,7 @@ export async function reachQueuedRewardShop(scene: BattleScene): Promise<ShopPha
     await drainLoopback();
   }
 
-  return (await driveClientPhaseQueueTo(scene, "SelectModifierPhase")) as unknown as ShopPhaseSeam;
+  return (await driveClientPhaseQueueTo(scene, "SelectModifierPhase", options)) as unknown as ShopPhaseSeam;
 }
 
 /**
@@ -2126,6 +2208,8 @@ export async function driveHostRewardShopOwner(
   opts: {
     takeReward?: boolean;
     reviveSlot?: number;
+    /** The real queued phase already arrived while routing a late retained partner boundary. */
+    alreadyStarted?: boolean;
     /** Start/arrive the other real client at this same reciprocal shop boundary. */
     partnerReady?: () => Promise<void>;
     /** Let the other client materialize the retained terminal before the owner continues. */
@@ -2134,7 +2218,9 @@ export async function driveHostRewardShopOwner(
 ): Promise<number> {
   // start() resolves owner/watcher from the pinned counter, streams the rolled options to the watcher,
   // and opens the owner screen (the prompt handler would drive the UI; here we drive the logic directly).
-  hostPhase.start();
+  if (!opts.alreadyStarted) {
+    hostPhase.start();
+  }
   await opts.partnerReady?.();
   // A guest owner adopts the host-rolled list over transport. Real UI input cannot occur until that
   // asynchronous adoption populates the grid; observe the same readiness boundary here so takeReward
@@ -2440,10 +2526,44 @@ export async function driveRetainedTeachMoveRewardWatch(
  */
 const REWARD_WATCH_MAX_IDLE = 32;
 
+/**
+ * Require a real queued reward phase to release before a caller crosses into its next surface. Mechanical
+ * counter/result completion is necessary but insufficient: SelectModifierPhase ends only after its bounded
+ * MESSAGE transition settles. Call inside the phase owner's ClientCtx. An already-exited phase is a no-op;
+ * detached-fixture compatibility is isolated in driveGuestRewardWatch and earns no queue-exit proof.
+ */
+export async function awaitRewardShopPhaseExit(phase: ShopPhaseSeam): Promise<void> {
+  const phaseManager = globalScene.phaseManager;
+  if (phaseManager.getCurrentPhase() !== (phase as unknown as Phase)) {
+    return;
+  }
+  for (let attempt = 0; attempt < 320; attempt++) {
+    await drainLoopback();
+    if (phaseManager.getCurrentPhase() !== (phase as unknown as Phase)) {
+      return;
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, 10));
+  }
+  const queued = phaseManager.getQueuedPhaseNames?.() ?? [];
+  throw new Error(
+    "reward terminal completed but live SelectModifierPhase did not exit within 320 pumps "
+      + `(interaction=${phase.coopInteractionStart}, queued=[${queued.join(",")}])`,
+  );
+}
+
 export async function driveGuestRewardWatch(
   guestPhase: ShopPhaseSeam,
   opts: { alreadyStarted?: boolean } = {},
 ): Promise<void> {
+  const phaseManager = globalScene.phaseManager;
+  // Production queues one concrete SelectModifierPhase and Phase.end() must actually release it before
+  // the next surface is ready. A counter advance is only the mechanical terminal: the UI transition that
+  // calls super.end() can still be pending. Returning at the counter used to let the shared-process soak
+  // swap globals while that promise was unresolved, leaving the guest on SelectModifierPhase while the
+  // host entered Crossroads/World Map. Keep detached legacy fixtures compatible in one isolated branch;
+  // they deliberately drive a phase that is not installed in the phase manager and therefore have no
+  // meaningful queue-exit boundary to await.
+  const drivesLiveQueuedPhase = phaseManager.getCurrentPhase() === (guestPhase as unknown as Phase);
   // start() (watcher branch) is async-ish: it awaits the owner's options, opens the cosmetic screen,
   // then loops on awaitInteractionChoice. We kick it off, then drain the loopback repeatedly so each
   // buffered/relayed owner pick is delivered + applied until the LEAVE/terminal ADVANCES the interaction.
@@ -2477,13 +2597,32 @@ export async function driveGuestRewardWatch(
     const counter = getCoopRuntime()?.controller.interactionCounter();
     return counter != null && pinned >= 0 && counter > pinned;
   };
+  let mechanicalTerminalReached = false;
   for (let i = 0; i < REWARD_WATCH_MAX_IDLE; i++) {
     await drainLoopback();
     // Completed when EITHER the watcher left (coopWatcher cleared - e.g. a no-relay short-circuit) OR the
     // interaction counter advanced past the pinned one (the owner's terminal was mirrored + applied).
     if (!(guestPhase as unknown as { coopWatcher: boolean }).coopWatcher || advancedPastPinned() || terminalApplied) {
+      mechanicalTerminalReached = true;
+      break;
+    }
+  }
+  if (mechanicalTerminalReached) {
+    if (!drivesLiveQueuedPhase) {
       return;
     }
+    // A host watching a guest-owned retained intent has only consumed the INTENT here. Its current phase
+    // cannot exit until the guest materializes the host RESULT and the exact receipt returns. The caller
+    // must pump that peer causal leg, then use awaitRewardShopPhaseExit on both live phases. This is not a
+    // completed counter-only terminal: the local counter is deliberately still pinned.
+    if (terminalApplied && !advancedPastPinned()) {
+      return;
+    }
+    // Keep this client's complete context installed until the real async MESSAGE transition invokes
+    // super.end() and PhaseManager selects the next queued phase. This is event-driven in browsers; the
+    // bounded timer loop models Phaser's headless transition fallback without mutating the phase/counter.
+    await awaitRewardShopPhaseExit(guestPhase);
+    return;
   }
   // NO-PROGRESS STALL: after REWARD_WATCH_MAX_IDLE drains the watcher neither left NOR advanced the
   // interaction - the owner's terminal never arrived (a relay drop / owner hang / counter-parity mismatch).
@@ -2780,6 +2919,7 @@ export async function buildDuoForMe(
     // #837: seed both ctxs from the host's current module-let state (the launch mirror), so each engine
     // starts identical and thereafter keeps its OWN money-streak / overstay / relic state.
     moduleLets: snapshotModuleLets(),
+    biomeState: snapshotBiomeModuleState(),
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: () => runtimePair.flush("host"),
   };
@@ -2794,6 +2934,7 @@ export async function buildDuoForMe(
     rndState: Phaser.Math.RND.state(),
     ghost: emptyGhostSnapshot(),
     moduleLets: snapshotModuleLets(),
+    biomeState: structuredClone(hostCtx.biomeState!),
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: () => runtimePair.flush("guest"),
   };
@@ -3651,6 +3792,7 @@ export async function buildShowdownDuo(
     rndState: Phaser.Math.RND.state(),
     ghost: snapshotGhostState(),
     moduleLets: snapshotModuleLets(),
+    biomeState: snapshotBiomeModuleState(),
     mePins: { ...IDLE_ME_PINS },
     ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("host") } : {}),
   };
@@ -3665,6 +3807,7 @@ export async function buildShowdownDuo(
     rndState: Phaser.Math.RND.state(),
     ghost: emptyGhostSnapshot(),
     moduleLets: snapshotModuleLets(),
+    biomeState: structuredClone(hostCtx.biomeState!),
     mePins: { ...IDLE_ME_PINS },
     ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("guest") } : {}),
   };

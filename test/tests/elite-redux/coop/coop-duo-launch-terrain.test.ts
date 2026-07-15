@@ -53,18 +53,35 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { coopWaveStartEntryEffectSignature } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  captureCoopAuthoritativeBattleState,
+  captureCoopEnemies,
+  coopWaveStartEntryEffectSignature,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
+import { ErAbilityId } from "#enums/er-ability-id";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import {
+  captureCoopEncounterAuthority,
+  rebroadcastCoopWaveStartAuthorityAfterEntryEffects,
+} from "#phases/encounter-phase";
 import { GameManager } from "#test/framework/game-manager";
-import { buildDuo, type DuoRig, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
+import {
+  buildDuo,
+  type DuoRig,
+  drainLoopback,
+  driveClientPhaseQueueTo,
+  installDuoLogCapture,
+  withClient,
+} from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -134,23 +151,131 @@ describe.skipIf(!RUN)("co-op DUO launch-snapshot: guest adopts the host's on-ent
     // best-effort
   });
 
-  it("treats a post-summon stat-stage mutation as wave-start authority requiring refresh", () => {
+  it("treats every pre-command mechanical mutation as wave-start authority while ignoring publication tick", () => {
     const base = {
       version: 1,
+      tick: 1,
       weather: 0,
       weatherTurnsLeft: 0,
       terrain: 0,
       terrainTurnsLeft: 0,
       arenaTags: [],
-      playerParty: [{ id: 1, formIndex: 0, summonData: { statStages: [0, 0, 0, 0, 0, 0, 0] } }],
-      enemyParty: [{ id: 2, formIndex: 0, summonData: { statStages: [0, 0, 0, 0, 0, 0, 0] } }],
+      playerParty: [
+        {
+          id: 1,
+          hp: 20,
+          status: 0,
+          fainted: false,
+          formIndex: 0,
+          moveset: [{ moveId: 33, ppUsed: 0 }],
+          summonData: { statStages: [0, 0, 0, 0, 0, 0, 0] },
+        },
+      ],
+      enemyParty: [
+        {
+          id: 2,
+          hp: 20,
+          status: 0,
+          fainted: false,
+          formIndex: 0,
+          moveset: [{ moveId: 10, ppUsed: 0 }],
+          summonData: { statStages: [0, 0, 0, 0, 0, 0, 0] },
+        },
+      ],
     } as unknown as CoopAuthoritativeBattleStateV1;
-    const afterEntry = structuredClone(base);
-    const enemySummon = afterEntry.enemyParty[0].summonData as { statStages: number[] };
-    enemySummon.statStages[1] = 1;
 
-    expect(coopWaveStartEntryEffectSignature(afterEntry)).not.toBe(coopWaveStartEntryEffectSignature(base));
+    const mutations: ((state: CoopAuthoritativeBattleStateV1) => void)[] = [
+      state => {
+        state.playerParty[0].hp = 16;
+      },
+      state => {
+        state.playerParty[0].status = 1;
+      },
+      state => {
+        state.playerParty[0].fainted = true;
+      },
+      state => {
+        (state.enemyParty[0].moveset as { ppUsed: number }[])[0].ppUsed = 1;
+      },
+      state => {
+        const summon = state.enemyParty[0].summonData as { statStages: number[] };
+        summon.statStages[1] = 1;
+      },
+    ];
+    for (const mutate of mutations) {
+      const afterEntry = structuredClone(base);
+      mutate(afterEntry);
+      expect(coopWaveStartEntryEffectSignature(afterEntry)).not.toBe(coopWaveStartEntryEffectSignature(base));
+    }
+
+    expect(coopWaveStartEntryEffectSignature({ ...base, tick: 99 })).toBe(coopWaveStartEntryEffectSignature(base));
   });
+
+  it("guest adopts a Cheap Tactics pre-command HP mutation from the refreshed retained carrier", async () => {
+    game.override
+      .enemySpecies(SpeciesId.SKWOVET)
+      .enemyLevel(2)
+      .enemyMoveset(MoveId.SCRATCH)
+      .enemyAbility(ErAbilityId.CHEAP_TACTICS as unknown as AbilityId)
+      .startingLevel(5);
+
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR, SpeciesId.CHARMANDER);
+    const damagedHostHp = game.scene.getPlayerParty().map(mon => mon.hp);
+    expect(
+      damagedHostHp.some((hp, index) => hp < game.scene.getPlayerParty()[index].getMaxHp()),
+      "precondition: Cheap Tactics dealt automatic PostSummon damage before the first command",
+    ).toBe(true);
+
+    const pair = createScheduledCoopPair({ automatic: true });
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    pair.setAutomaticDelivery(false);
+
+    await withClient(rig.guestCtx, () => {
+      for (const mon of rig.guestScene.getPlayerParty()) {
+        mon.hp = mon.getMaxHp();
+      }
+    });
+
+    const staleState = await withClient(rig.hostCtx, () => captureCoopAuthoritativeBattleState(1));
+    expect(staleState).not.toBeNull();
+    for (const raw of staleState!.playerParty) {
+      const stats = raw.stats as number[];
+      raw.hp = stats[0];
+    }
+    const wave = rig.hostScene.currentBattle.waveIndex;
+    await withClient(rig.hostCtx, () => {
+      const battle = rig.hostScene.currentBattle;
+      const encounter = captureCoopEncounterAuthority(battle);
+      rig.hostRuntime.battleStream.sendEnemyParty(
+        wave,
+        captureCoopEnemies(),
+        encounter.mysteryEncounterType,
+        battle.battleType,
+        staleState!,
+        encounter,
+      );
+      rebroadcastCoopWaveStartAuthorityAfterEntryEffects();
+    });
+
+    const refreshed = rig.hostRuntime.battleStream.peekSentEnemyPartyAuthoritativeState(wave);
+    expect(refreshed, "host retained a post-Cheap-Tactics carrier").toBeDefined();
+    expect(refreshed!.playerParty.map(raw => Number(raw.hp))).toEqual(damagedHostHp);
+
+    await withClient(rig.guestCtx, async () => {
+      await drainLoopback();
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+      const command = await driveClientPhaseQueueTo(rig.guestScene, "CommandPhase");
+      command.start();
+      await drainLoopback();
+    });
+    expect(
+      rig.guestScene.getPlayerParty().map(mon => mon.hp),
+      "guest applies the refreshed automatic-move result before opening cmd:1:1",
+    ).toEqual(damagedHostHp);
+
+    logs.flush();
+  }, 300_000);
 
   it("guest's launch-snapshot arena terrain equals the host's (GRASSY), no divergence", async () => {
     // HOST reaches wave-1 / turn-1 command. The enemy's Grassy-Surge innate fired in the encounter's

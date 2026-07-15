@@ -38,6 +38,7 @@ import {
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
+  resolveCoopRetainedWaveContinuationIdentity,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_PICK_CHOICE_KINDS, COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
@@ -121,6 +122,14 @@ interface CoopBiomeContinuationRecovery {
 
 export class SelectBiomePhase extends BattlePhase {
   public readonly phaseName = "SelectBiomePhase";
+  /** Immutable wave that created this biome transition; never re-read from a speculative next Battle. */
+  private coopSourceWave: number | null;
+  /**
+   * Construction-time fallback for non-WAVE map sources (Crossroads, moves, abilities and MEs). A retained
+   * transaction, when present, still wins at start; capturing this now prevents an awaited UI/network seam
+   * from re-addressing the map through a speculative next Battle.
+   */
+  private readonly coopConstructionWave: number;
 
   /**
    * Co-op (#848): the interaction counter to advance ONCE at the terminal, or -1 when this
@@ -159,6 +168,34 @@ export class SelectBiomePhase extends BattlePhase {
   /** Runtime/durability selectors captured before any rendezvous, timer, or Phaser UI callback can resume. */
   private coopBiomeOperationBinding: CoopBiomeOperationBinding | null = null;
 
+  constructor(coopSourceWave: number | null = null) {
+    super();
+    this.coopSourceWave = coopSourceWave;
+    this.coopConstructionWave = coopSourceWave ?? globalScene.currentBattle?.waveIndex ?? -1;
+  }
+
+  /** Capture one durable address before any UI/network await can observe a newer ambient battle. */
+  private requireCoopSourceWave(): number {
+    if (this.coopSourceWave != null) {
+      return this.coopSourceWave;
+    }
+    // Explicit source addresses (VictoryPhase and retained callers) win immediately. Otherwise prefer the
+    // one unresolved retained transaction, but permit a genuinely absent candidate because SelectBiome is
+    // also a public continuation for non-wave operations. The resolver still returns invalid for one
+    // malformed or multiple ambiguous candidates, which must fail closed rather than use this fallback.
+    const identity = resolveCoopRetainedWaveContinuationIdentity(true, true);
+    if (identity.kind === "invalid") {
+      throw new Error(identity.reason);
+    }
+    this.coopSourceWave = identity.kind === "retained" ? identity.address.wave : this.coopConstructionWave;
+    if (!Number.isSafeInteger(this.coopSourceWave) || this.coopSourceWave < 0) {
+      throw new Error(
+        `[coop-op] SelectBiomePhase cannot capture source wave from construction=${this.coopConstructionWave}`,
+      );
+    }
+    return this.coopSourceWave;
+  }
+
   private requireCoopBiomeOperationBinding(): CoopBiomeOperationBinding {
     this.coopBiomeOperationBinding ??= captureCoopBiomeOperationBinding();
     return this.coopBiomeOperationBinding;
@@ -175,6 +212,15 @@ export class SelectBiomePhase extends BattlePhase {
   start() {
     super.start();
 
+    let currentWaveIndex: number;
+    try {
+      currentWaveIndex = this.requireCoopSourceWave();
+    } catch (error) {
+      coopWarn("reward", "SelectBiome could not capture its retained source wave - remaining closed", error);
+      failCoopSharedSession("The shared World Map transition lost its source address.");
+      return;
+    }
+
     const authoritativeGuest = isCoopAuthoritativeGuestGated();
     if (!authoritativeGuest) {
       globalScene.resetSeed();
@@ -182,7 +228,6 @@ export class SelectBiomePhase extends BattlePhase {
 
     const gameMode = globalScene.gameMode;
     const currentBiome = globalScene.arena.biomeId;
-    const currentWaveIndex = globalScene.currentBattle.waveIndex;
     const nextWaveIndex = currentWaveIndex + 1;
 
     // Co-op (#848): a crossroads LEAVE deferred its owner-alternated terminal to this phase (the
@@ -413,7 +458,7 @@ export class SelectBiomePhase extends BattlePhase {
     // owner/watcher picker below with no timeout. (start() already returned for auto-resolve, so this branch
     // is defensive; it runs BEFORE the #858 boundary barrier to keep the auto-resolve path synchronous.)
     if (coopBiomePickerAutoResolvesInTest()) {
-      const biome = this.generateNextBiome(globalScene.currentBattle.waveIndex + 1);
+      const biome = this.generateNextBiome(this.requireCoopSourceWave() + 1);
       coopLog("reward", `biome pick AUTO-RESOLVE (vitest, picker not driven) -> biome=${BiomeId[biome]} (#848)`);
       this.setDeterministicNextBiomeAndEnd(biome);
       return;
@@ -459,7 +504,7 @@ export class SelectBiomePhase extends BattlePhase {
    */
   private async coopAwaitBoundaryBarrier(): Promise<boolean> {
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     if (!this.boundaryStillLive(generation, wave)) {
       return false;
     }
@@ -509,7 +554,7 @@ export class SelectBiomePhase extends BattlePhase {
   private coopBiomePickOwner(revealed: ErRouteNode[], origin: BiomeId, pinned: number): void {
     const mirrorSeq = COOP_BIOME_PICK_SEQ_BASE + pinned;
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     globalScene.ui
       .setModeBoundedWhen(UiMode.ER_MAP, 2_000, () => this.boundaryStillLive(generation, wave), {
         nodes: revealed,
@@ -549,7 +594,7 @@ export class SelectBiomePhase extends BattlePhase {
   private async coopBiomePickWatch(revealed: ErRouteNode[], origin: BiomeId, pinned: number): Promise<void> {
     const mirrorSeq = COOP_BIOME_PICK_SEQ_BASE + pinned;
     const generation = coopSessionGeneration();
-    const boundaryWave = globalScene.currentBattle?.waveIndex ?? -1;
+    const boundaryWave = this.requireCoopSourceWave();
     try {
       const mode = await globalScene.ui.setModeBoundedWhen(
         UiMode.ER_MAP,
@@ -631,7 +676,7 @@ export class SelectBiomePhase extends BattlePhase {
     operationId: string,
     expectedDestination?: BiomeId,
   ): CoopBiomePickPayload | null {
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     const payload = receipt?.payload as CoopBiomePickPayload | undefined;
     if (
       receipt == null
@@ -653,7 +698,7 @@ export class SelectBiomePhase extends BattlePhase {
     pinned: number,
   ): Promise<void> {
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     const address = { sourceWave: wave, interactivePinned: pinned } as const;
     const receipt =
       getCoopBiomeTransitionCommitReceipt(address, this.requireCoopBiomeOperationBinding())
@@ -747,7 +792,7 @@ export class SelectBiomePhase extends BattlePhase {
     committed: boolean,
   ): Promise<void> {
     const generation = coopSessionGeneration();
-    const boundaryWave = globalScene.currentBattle?.waveIndex ?? -1;
+    const boundaryWave = this.requireCoopSourceWave();
     const decision = adoptBiomeWatcherChoice(
       {
         kind: "BIOME_PICK",
@@ -755,10 +800,10 @@ export class SelectBiomePhase extends BattlePhase {
         pinned,
         res: committedRes,
         localRole: role,
-        wave: globalScene.currentBattle?.waveIndex ?? -1,
+        wave: boundaryWave,
         turn: 0,
         sourceBiomeId: globalScene.arena.biomeId,
-        nextWave: (globalScene.currentBattle?.waveIndex ?? -1) + 1,
+        nextWave: boundaryWave + 1,
         allowedRoutes: revealed.map(node => node.biome),
         deterministicDestination: this.coopDeterministicDestination,
         armLocalTail: role === "host",
@@ -808,7 +853,7 @@ export class SelectBiomePhase extends BattlePhase {
     } else {
       // ANTI-HANG (#848): disconnect / stall backstop. Fall back to the SAME deterministic roll both
       // clients compute off the just-reset shared wave seed, so the fallback cannot desync.
-      biome = this.generateNextBiome(globalScene.currentBattle.waveIndex + 1);
+      biome = this.generateNextBiome(boundaryWave + 1);
       coopWarn(
         "reward",
         `biome pick WATCHER: owner pick TIMEOUT/disconnect -> deterministic fallback biome=${BiomeId[biome]} (#848)`,
@@ -846,7 +891,7 @@ export class SelectBiomePhase extends BattlePhase {
   private boundaryStillLive(generation: number, wave: number): boolean {
     return (
       coopSessionGeneration() === generation
-      && globalScene.currentBattle?.waveIndex === wave
+      && this.coopSourceWave === wave
       && globalScene.phaseManager.getCurrentPhase() === this
     );
   }
@@ -910,7 +955,7 @@ export class SelectBiomePhase extends BattlePhase {
         this.awaitAuthoritativeDeterministicBiome();
         return;
       }
-      const sourceWave = globalScene.currentBattle?.waveIndex ?? -1;
+      const sourceWave = this.requireCoopSourceWave();
       const role = this.requireCoopBiomeOperationRole();
       if (role !== controller.role) {
         failCoopSharedSession("The shared World Map transition changed runtime ownership.");
@@ -950,7 +995,7 @@ export class SelectBiomePhase extends BattlePhase {
     }
     this.coopCommitPending = true;
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     const sourceBiome = globalScene.arena.biomeId;
     const address = {
       sourceWave: wave,
@@ -1060,7 +1105,7 @@ export class SelectBiomePhase extends BattlePhase {
 
   private async finishGuestOwnedBiomeAfterCommit(operationId: string, nextBiome: BiomeId): Promise<void> {
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     const receipt = await awaitCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
     if (!this.boundaryStillLive(generation, wave)) {
       return;
@@ -1068,7 +1113,7 @@ export class SelectBiomePhase extends BattlePhase {
     if (this.committedBiomePayload(receipt, operationId, nextBiome) == null) {
       coopWarn(
         "reward",
-        `biome pick OWNER committed identity mismatch id=${operationId} wave=${globalScene.currentBattle?.waveIndex ?? -1} source=${globalScene.arena.biomeId} destination=${nextBiome} - remaining closed`,
+        `biome pick OWNER committed identity mismatch id=${operationId} wave=${wave} source=${globalScene.arena.biomeId} destination=${nextBiome} - remaining closed`,
       );
       this.coopCommitPending = false;
       this.parkBiomeCommitRecovery(() => {
@@ -1088,7 +1133,7 @@ export class SelectBiomePhase extends BattlePhase {
   private parkBiomeCommitRecovery(retry: () => void): void {
     getCoopUiMirror()?.endSession();
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     if (!this.boundaryStillLive(generation, wave)) {
       return;
     }
@@ -1226,7 +1271,7 @@ export class SelectBiomePhase extends BattlePhase {
   private applyNextBiomeAndEnd(nextBiome: BiomeId): boolean {
     try {
       const gameMode = globalScene.gameMode;
-      const currentWaveIndex = globalScene.currentBattle.waveIndex;
+      const currentWaveIndex = this.requireCoopSourceWave();
       const nextWaveIndex = currentWaveIndex + 1;
       // A travel reward is consumed only after authority establishes the destination. Once an authoritative
       // operation lands, clear any local target (even a stale wrong one) so it cannot poison the next picker.
@@ -1239,7 +1284,7 @@ export class SelectBiomePhase extends BattlePhase {
       if (isCoopAuthoritativeGuestGated()) {
         // The renderer owns no between-biome run mutation. The committed BIOME_PICK already armed the exact
         // transition permit; queue only its presentation tail and wait for the next complete host carrier.
-        globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome);
+        globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome, currentWaveIndex);
         if (this.coopAdvancePinned >= 0) {
           const controller = getCoopController();
           advanceCoopInteractionForContinuation(this.coopAdvancePinned);
@@ -1288,7 +1333,7 @@ export class SelectBiomePhase extends BattlePhase {
       // single-node / travel-target / random resolution, or an anti-hang fallback). The watcher applies this
       // biome VERBATIM, so the owner can never travel one-sided-silently and the two clients can never land in
       // different biomes. Idempotent (coopBiomeRelaySent) so the picker pick + this funnel never double-send.
-      globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome);
+      globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome, currentWaveIndex);
       // Co-op (#848): terminate the biome interaction with the single from-pinned advance (idempotent,
       // #837). Fires when this phase participated in an interaction: a chained crossroads-Leave (always)
       // or a multi-node World-Map pick. A purely-deterministic natural transition never ticks the counter.
@@ -1362,6 +1407,7 @@ export class SelectBiomePhase extends BattlePhase {
     // Commit independently of the legacy relay send: a relay exception must not suppress the authoritative
     // operation that can recover it.
     const role = this.requireCoopBiomeOperationRole();
+    const sourceWave = this.requireCoopSourceWave();
     const commit = commitBiomeOwnerIntent(
       {
         kind: "BIOME_PICK",
@@ -1372,13 +1418,13 @@ export class SelectBiomePhase extends BattlePhase {
           sourceBiomeId: globalScene.arena.biomeId,
           biomeId: nextBiome,
           nodeIndex: idx,
-          nextWave: (globalScene.currentBattle?.waveIndex ?? -1) + 1,
+          nextWave: sourceWave + 1,
         },
         localRole: role,
-        wave: globalScene.currentBattle?.waveIndex ?? -1,
+        wave: sourceWave,
         turn: 0,
         boundarySourceBiomeId: globalScene.arena.biomeId,
-        boundaryNextWave: (globalScene.currentBattle?.waveIndex ?? -1) + 1,
+        boundaryNextWave: sourceWave + 1,
         allowedRoutes: this.coopRevealed?.map(node => node.biome) ?? [],
         deterministicDestination: this.coopDeterministicDestination,
         armLocalTail: role === "host",
@@ -1390,18 +1436,14 @@ export class SelectBiomePhase extends BattlePhase {
     }
     if (coopBiomeCommitRequired(role, this.requireCoopBiomeOperationBinding())) {
       const generation = coopSessionGeneration();
-      const wave = globalScene.currentBattle?.waveIndex ?? -1;
       armCoopBiomeIntentResend(
         {
           operationId,
-          wave,
+          wave: sourceWave,
           phaseName: "SelectBiomePhase",
           sessionGeneration: generation,
           resend,
-          isCurrent: () =>
-            coopSessionGeneration() === generation
-            && globalScene.currentBattle?.waveIndex === wave
-            && globalScene.phaseManager.getCurrentPhase() === this,
+          isCurrent: () => this.boundaryStillLive(generation, sourceWave),
         },
         this.requireCoopBiomeOperationBinding(),
       );

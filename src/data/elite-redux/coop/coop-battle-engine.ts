@@ -2636,11 +2636,14 @@ function assertNoDuplicateAuthoritativeIds(parties: Record<string, unknown>[][])
   return true;
 }
 
+type CoopAuthoritativeBattleMaterialV1 = Omit<CoopAuthoritativeBattleStateV1, "tick">;
+
 /**
- * HOST: capture the normal-turn full authoritative state. Per-mon live state is
- * carried by PokemonData.summonData; the field payload is seating only.
+ * Capture the complete mechanical material shared by authoritative-state publication and the
+ * pre-command entry-effect seal. The monotonic transport tick is added only by the public carrier
+ * builder below, so comparing material never mutates publication order.
  */
-export function captureCoopAuthoritativeBattleState(turn: number): CoopAuthoritativeBattleStateV1 | null {
+function captureCoopAuthoritativeBattleMaterial(turn: number): CoopAuthoritativeBattleMaterialV1 | null {
   try {
     const playerParty = globalScene.getPlayerParty().map(pokemonDataForWire);
     const enemyParty = globalScene.getEnemyParty().map(pokemonDataForWire);
@@ -2650,7 +2653,6 @@ export function captureCoopAuthoritativeBattleState(turn: number): CoopAuthorita
     const arena = globalScene.arena;
     return {
       version: 1,
-      tick: coopNextStateTick(),
       wave: globalScene.currentBattle?.waveIndex ?? 0,
       turn,
       double: globalScene.currentBattle?.double === true,
@@ -2691,66 +2693,49 @@ export function captureCoopAuthoritativeBattleState(turn: number): CoopAuthorita
 }
 
 /**
- * Entry-effect SIGNATURE (#920): the minimal projection of authoritative state an on-entry ability chain
+ * HOST: capture the normal-turn full authoritative state. Per-mon live state is
+ * carried by PokemonData.summonData; the field payload is seating only.
+ */
+export function captureCoopAuthoritativeBattleState(turn: number): CoopAuthoritativeBattleStateV1 | null {
+  const material = captureCoopAuthoritativeBattleMaterial(turn);
+  if (material == null) {
+    return null;
+  }
+  const { version, ...rest } = material;
+  return { version, tick: coopNextStateTick(), ...rest };
+}
+
+/**
+ * Entry-effect SIGNATURE (#920): the complete mechanical projection of authoritative state an on-entry chain
  * (PostSummonPhase) can mutate between the PRE-summon wave-start capture and the first CommandPhase -
- * weather + terrain (type AND turn budget), entry-hazard/screen arena tags, entry FORM changes, and both
+ * every carried field, including weather/terrain, arena tags, forms, both parties' PokemonData, and both
  * parties' stat stages. The stage component is essential: PostSummon abilities such as Let’s Roll / Download
  * can boost a host battler before turn 1, while the pure-renderer guest never executes that ability chain.
- * Omitting stages let both clients open the same command surface with different battle math even though the
+ * Omitting any carried field can let both clients open the same command surface with different battle math even though the
  * earlier pre-summon carrier had been applied successfully. The host compares the LIVE post-PostSummon
  * signature against the one it already broadcast in the wave-start
  * enemyPartySync; a difference means an entry effect fired, which is the sole trigger for the single
  * post-summon re-broadcast ({@linkcode rebroadcastCoopWaveStartAuthorityAfterEntryEffects}) so the
- * pure-renderer guest (which never runs summon/PostSummon) adopts terrain/weather/tags/forms BEFORE its
+ * pure-renderer guest (which never runs summon/PostSummon) adopts the complete mechanical state BEFORE its
  * first command instead of at the turn-1 END checkpoint - after it already commanded with stale state.
+ * In particular, scripted PostSummon attacks such as Cheap Tactics mutate HP without changing the old
+ * arena/form/stage subset. The signature therefore uses the same complete material builder as the carrier.
  *
  * Reads live scene when `state` is omitted, else the given carrier. Fully guarded: a read failure returns
  * "" so the caller treats an empty LIVE signature as "cannot tell -> do NOT re-broadcast" (never a spurious
  * re-send). The captured state ALREADY snapshots every one of these fields (weather/terrain/arenaTags +
  * per-mon formIndex + PokemonData.summonData.statStages), so this compares the SAME serialized shapes on
  * both sides.
+ * The monotonic publication tick is excluded because it expresses ordering rather than mechanical state.
  */
 export function coopWaveStartEntryEffectSignature(state?: CoopAuthoritativeBattleStateV1 | null): string {
-  const wireStages = (party: Record<string, unknown>[]): [number, number[]][] =>
-    party.map(raw => {
-      const summonData = raw.summonData;
-      const stages =
-        summonData != null
-        && typeof summonData === "object"
-        && Array.isArray((summonData as { statStages?: unknown }).statStages)
-          ? (summonData as { statStages: unknown[] }).statStages
-          : [];
-      return [Number(raw.id), Array.from({ length: 7 }, (_, index) => Number(stages[index] ?? 0))];
-    });
-  const liveStages = (party: Pokemon[]): [number, number[]][] =>
-    party.map(mon => [
-      Number(mon.id),
-      Array.from({ length: 7 }, (_, index) => Number(mon.getStatStages()[index] ?? 0)),
-    ]);
   try {
     if (state != null) {
-      return JSON.stringify({
-        w: state.weather,
-        wt: state.weatherTurnsLeft,
-        t: state.terrain,
-        tt: state.terrainTurnsLeft,
-        tags: state.arenaTags,
-        forms: state.enemyParty.map(p => [Number(p.id), Number(p.formIndex)]),
-        playerStages: wireStages(state.playerParty),
-        enemyStages: wireStages(state.enemyParty),
-      });
+      const { tick: _publicationOrder, ...material } = state;
+      return canonicalize(material);
     }
-    const arena = globalScene.arena;
-    return JSON.stringify({
-      w: arena.weather?.weatherType ?? 0,
-      wt: arena.weather?.turnsLeft ?? 0,
-      t: arena.terrain?.terrainType ?? 0,
-      tt: arena.terrain?.turnsLeft ?? 0,
-      tags: readArenaTagViews(),
-      forms: globalScene.getEnemyParty().map(p => [Number(p.id), Number(p.formIndex)]),
-      playerStages: liveStages(globalScene.getPlayerParty()),
-      enemyStages: liveStages(globalScene.getEnemyParty()),
-    });
+    const material = captureCoopAuthoritativeBattleMaterial(globalScene.currentBattle?.turn ?? 0);
+    return material == null ? "" : canonicalize(material);
   } catch {
     return "";
   }

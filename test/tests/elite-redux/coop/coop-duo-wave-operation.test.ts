@@ -56,6 +56,8 @@ import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { BattleEndPhase } from "#phases/battle-end-phase";
+import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, type DuoRig, drainLoopback, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
@@ -114,7 +116,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   });
 
   /** Boot the host into a live battle + stand up the duo rig. */
-  async function bootDuo(): Promise<DuoRig> {
+  async function bootDuo(options: { preserveProductionWaveSink?: boolean } = {}): Promise<DuoRig> {
     await game.classicMode.startBattle(SpeciesId.MAGIKARP, SpeciesId.MAGIKARP);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
     expect(rig.hostRuntime.waveOperationBinding.opState).toBe(rig.hostRuntime.opState);
@@ -124,15 +126,18 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(rig.guestRuntime.waveOperationBinding.durability).toBe(rig.guestRuntime.durability);
     expect(Object.isFrozen(rig.guestRuntime.waveOperationBinding)).toBe(true);
     expect(rig.guestRuntime.waveOperationBinding.opState).not.toBe(rig.hostRuntime.waveOperationBinding.opState);
-    // Runtime assembly installs the receiver-bound production sink. Override it only after assembly for
-    // this boundary-seam recording test; production materialization is covered by the runtime/soak suites.
-    registerCoopOperationLiveSink("op:wave", env => {
-      const payload = env.pendingOperation?.payload as CoopWaveAdvancePayload;
-      routed.push(payload);
-      markCoopWaveAdvanceDataApplied(payload.wave, rig.guestRuntime.waveOperationBinding);
-      markCoopWaveAdvanceContinuationReady(payload.wave, rig.guestRuntime.waveOperationBinding);
-      return true;
-    });
+    if (!options.preserveProductionWaveSink) {
+      // Runtime assembly installs the receiver-bound production sink. Override it only after assembly for
+      // boundary-seam recording tests; production materialization is selected explicitly by regressions
+      // that need to execute the real retained-transition bootstrap.
+      registerCoopOperationLiveSink("op:wave", env => {
+        const payload = env.pendingOperation?.payload as CoopWaveAdvancePayload;
+        routed.push(payload);
+        markCoopWaveAdvanceDataApplied(payload.wave, rig.guestRuntime.waveOperationBinding);
+        markCoopWaveAdvanceContinuationReady(payload.wave, rig.guestRuntime.waveOperationBinding);
+        return true;
+      });
+    }
     return rig;
   }
 
@@ -308,6 +313,86 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     logs.flush();
   }, 300_000);
 
+  it("retained ordinary BattleEnd ignores a speculative next-wave Mystery battle and skips local settlement", async () => {
+    const rig = await bootDuo();
+    // Keep DATA unresolved until the real BattleEnd boundary. This mirrors production and ensures the
+    // phase constructor captures the exact wave-11 transaction instead of mutable ambient battle state.
+    registerCoopOperationLiveSink("op:wave", envelope => {
+      routed.push(envelope.pendingOperation?.payload as CoopWaveAdvancePayload);
+      return true;
+    });
+    await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 11 });
+
+    await withClient(rig.guestCtx, () => {
+      const phase = new BattleEndPhase(true);
+      // This fixture deliberately keeps the live sink unresolved so BattleEnd captures the durable
+      // wave-11 identity before ambient state speculates ahead. Mark the already-delivered retained
+      // image applied at that exact identity; otherwise the fixture would ask the guest applier to
+      // rewind an unrelated, manually-mutated wave-12 scene and correctly enter shared recovery.
+      markCoopWaveAdvanceDataApplied(11, rig.guestRuntime.waveOperationBinding);
+      // The next battle has speculated ahead to an ME. The addressed retained source is still wave 11.
+      rig.guestScene.currentBattle.waveIndex = 12;
+      rig.guestScene.currentBattle.battleType = BattleType.MYSTERY_ENCOUNTER;
+      vi.spyOn(rig.guestScene.currentBattle, "isBattleMysteryEncounter").mockReturnValue(true);
+      const addBattleScoreSpy = vi.spyOn(rig.guestScene.currentBattle, "addBattleScore");
+      const clearEnemyHeldItemsSpy = vi.spyOn(rig.guestScene, "clearEnemyHeldItemModifiers");
+      const rawPublisherSpy = vi.spyOn(rig.guestRuntime.battleStream, "sendWaveEndState");
+      const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+      phase.start();
+
+      expect(endSpy, "the exact retained wave-11 image releases BattleEnd").toHaveBeenCalledOnce();
+      expect(addBattleScoreSpy, "the guest does not dual-run victory settlement").not.toHaveBeenCalled();
+      expect(clearEnemyHeldItemsSpy, "the guest does not dual-run shared BattleEnd cleanup").not.toHaveBeenCalled();
+      expect(rawPublisherSpy, "the guest does not fall back to the raw wave-end carrier").not.toHaveBeenCalled();
+    });
+    logs.flush();
+  }, 300_000);
+
+  it("retained ordinary Victory ignores speculative Mystery classification with no encounter payload", async () => {
+    const rig = await bootDuo({ preserveProductionWaveSink: true });
+    // The retained journal's production sink bootstraps only at its addressed source wave. Mirror that exact
+    // pre-delivery boundary first, then let the renderer speculate to wave 12 after the immutable operation
+    // has landed. Starting this fixture at the boot wave (1) would correctly reject a wave-11 transaction.
+    rig.guestScene.currentBattle.waveIndex = 11;
+    await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 11 });
+
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.currentBattle.waveIndex = 12;
+      rig.guestScene.currentBattle.battleType = BattleType.MYSTERY_ENCOUNTER;
+      rig.guestScene.currentBattle.mysteryEncounter = undefined;
+      vi.spyOn(rig.guestScene.currentBattle, "isBattleMysteryEncounter").mockReturnValue(true);
+      const pushNewSpy = vi.spyOn(rig.guestScene.phaseManager, "pushNew");
+
+      // Enter the actual production tail in its real order. The retained materializer first consumes the
+      // operation and sanctions Victory/BattleEnd, then Victory creates the source-addressed BattleEnd.
+      // Constructing BattleEnd before that consume is deliberately rejected by strict tails and would test
+      // an impossible production order rather than the retained DATA-admission seam.
+      rig.guestScene.phaseManager.clearPhaseQueue();
+      expect(
+        () => CoopFinalizeTurnPhase.runPendingWaveAdvanceTail(),
+        "the retained operation must materialize without reading speculative Mystery state",
+      ).not.toThrow();
+      expect(
+        pushNewSpy.mock.calls.find(call => call[0] === "VictoryPhase")?.slice(2),
+        "the retained materializer queues the ordinary wave-11 Victory tail",
+      ).toEqual([false, 11]);
+
+      // PhaseInterceptor disables automatic starts. Shift into the manager-created Victory and start it
+      // exactly once; its normal end() shifts to the sanctioned, source-addressed BattleEnd boundary.
+      rig.guestScene.phaseManager.shiftPhase();
+      const retainedVictory = rig.guestScene.phaseManager.getCurrentPhase();
+      expect(retainedVictory.phaseName).toBe("VictoryPhase");
+      retainedVictory.start();
+      const retainedBoundary = rig.guestScene.phaseManager.getCurrentPhase();
+      expect(retainedBoundary, "the exact production BattleEnd boundary is current").toBeInstanceOf(BattleEndPhase);
+      expect(
+        () => retainedBoundary.start(),
+        "the real retained BattleEnd bootstrap must admit DATA without dereferencing wave-12 Mystery state",
+      ).not.toThrow();
+    });
+    logs.flush();
+  }, 300_000);
+
   it("FINAL VICTORY: retains Victory -> BattleEnd -> GameOver and suppresses the later duplicate terminal echo", async () => {
     const rig = await bootDuo();
     vi.spyOn(rig.hostScene.gameMode, "isWaveFinal").mockReturnValue(true);
@@ -319,6 +404,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(waveOp.coopWaveAdvanceSanctionedTails(payload!)).toEqual([
       "VictoryPhase",
       "BattleEndPhase",
+      "CoopVictorySealPhase",
       "GameOverPhase",
     ]);
 

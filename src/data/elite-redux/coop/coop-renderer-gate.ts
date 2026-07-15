@@ -170,6 +170,7 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "VictoryPhase", // win/capture wave-advance tail the guest builds
   "TrainerVictoryPhase", // trainer-win tail pushed after VictoryPhase on a trainer wave
   "BattleEndPhase", // flee / wave-end tail the guest builds
+  "CoopVictorySealPhase", // proves retained automatic victory DATA before any continuation surface opens
   "NewBattlePhase", // next-wave boundary the guest builds
   "NextEncounterPhase", // next-encounter continuation companion of NewBattlePhase
   "NewBiomeEncounterPhase", // new-biome encounter continuation companion
@@ -194,6 +195,7 @@ export const COOP_WAVE_TAIL_PHASES: ReadonlySet<string> = new Set<string>([
   "VictoryPhase",
   "TrainerVictoryPhase",
   "BattleEndPhase",
+  "CoopVictorySealPhase",
   "NewBattlePhase",
   "NextEncounterPhase",
   "NewBiomeEncounterPhase",

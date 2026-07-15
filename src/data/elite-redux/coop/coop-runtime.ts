@@ -1075,6 +1075,12 @@ let lastWaveEndStateWave = -1;
 const pendingHostWaveTransitions = new Map<number, CoopWaveAdvancePayload>();
 /** Settled host transactions retained by wave, including a terminal victory that supersedes GameOver's echo. */
 const settledHostWaveTransitions = new Map<number, CoopWaveAdvancePayload>();
+/**
+ * One normal victory whose BattleEnd cleanup has completed but whose automatic post-victory children have
+ * not drained yet. Runtime-keying is load-bearing in the two-engine harness: the host and guest coexist in
+ * one process and may alternate the ambient runtime while their independent phase queues advance.
+ */
+const pendingAutomaticVictorySeals = new WeakMap<CoopRuntime, CoopPendingAutomaticVictorySeal>();
 /** Presentation-only data from a raw hint; never sufficient to advance a retained P33 session. */
 const pendingRawWavePresentations = new Map<number, CoopCapturePresentation>();
 /** A retained guest BattleEnd waiting for its exact immutable DATA image to apply. */
@@ -1084,6 +1090,22 @@ let pendingSettledWaveBoundary: {
   released: boolean;
 } | null = null;
 
+/** Immutable phase-owned identity for the automatic normal-victory settlement boundary. */
+export interface CoopAutomaticVictorySealIdentity {
+  readonly runtime: CoopRuntime;
+  readonly binding: CoopWaveAdvanceOperationBinding;
+  readonly wave: number;
+  /** The host captures this at the resolving battle. The guest learns it from retained DATA at admission. */
+  readonly turn: number | null;
+}
+
+interface CoopPendingAutomaticVictorySeal {
+  readonly identity: CoopAutomaticVictorySealIdentity;
+  readonly transition: CoopWaveAdvancePayload;
+  /** BattleEnd may legitimately advance the ambient turn once; freeze that post-battle address for sealing. */
+  readonly settlementTurn: number;
+}
+
 function usesRetainedCoopWaveTransaction(runtime: CoopRuntime | null = active): boolean {
   return (
     runtime != null
@@ -1091,6 +1113,129 @@ function usesRetainedCoopWaveTransaction(runtime: CoopRuntime | null = active): 
     && isCoopCapabilityNegotiated(COOP_CAP_OP_WAVE)
     && isCoopOperationJournalActiveFor(runtime.waveOperationBinding.durability)
   );
+}
+
+/**
+ * Capture the runtime and source address that a later automatic-victory seal phase must still own. The
+ * host turn is available from the resolving battle. A retained guest may already present a speculative
+ * next-wave Battle object when its host-stated VictoryPhase is materialized, so it deliberately defers the
+ * turn read until the exact retained DATA envelope is admitted; mutable ambient state is never substituted.
+ */
+export function captureCoopAutomaticVictorySealIdentity(wave: number): CoopAutomaticVictorySealIdentity | null {
+  const runtime = active;
+  if (runtime == null || !usesRetainedCoopWaveTransaction(runtime)) {
+    return null;
+  }
+  const binding = runtime.waveOperationBinding;
+  let turn: number | null = null;
+  if (runtime.controller.role === "host") {
+    const staged = pendingHostWaveTransitions.get(wave);
+    if (staged?.outcome === "capture") {
+      return null;
+    }
+    const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+    const currentTurn = globalScene.currentBattle?.turn ?? -1;
+    if (staged?.outcome !== "win" || currentWave !== wave || !Number.isSafeInteger(currentTurn) || currentTurn < 0) {
+      failCoopSharedSession(
+        "The automatic victory boundary could not capture its source address "
+          + `(requested ${wave}, ambient ${currentWave}:${currentTurn}, outcome ${staged?.outcome ?? "missing"}).`,
+      );
+      turn = -1;
+    } else {
+      turn = currentTurn;
+    }
+  } else {
+    const transition = getCoopActiveWaveTransition(wave);
+    if (transition?.outcome === "capture") {
+      return null;
+    }
+    if (transition?.outcome !== "win" || transition.wave !== wave) {
+      failCoopSharedSession(`The renderer could not capture the retained normal-victory boundary for wave ${wave}.`);
+    }
+  }
+  return Object.freeze({ runtime, binding, wave, turn });
+}
+
+/** Capture queues VictoryPhase after it already announced CAPTURE; preserve its BattleEnd settlement path. */
+export function isCoopHostCaptureTransitionPending(wave: number): boolean {
+  return active?.controller.role === "host" && pendingHostWaveTransitions.get(wave)?.outcome === "capture";
+}
+
+/**
+ * HOST BattleEnd handoff: defer only a normal retained WIN. Capture and flee retain their established
+ * BattleEnd settlement, while legacy/non-journal sessions continue to publish immediately. Returning true
+ * means BattleEnd must not call the legacy sealer even when validation failed—the shared terminal path is
+ * already armed and publishing a partial image would violate the boundary.
+ */
+export function deferCoopAutomaticVictorySealAtBattleEnd(identity: CoopAutomaticVictorySealIdentity | null): boolean {
+  if (identity == null) {
+    return false;
+  }
+  const runtime = active;
+  if (runtime == null || runtime !== identity.runtime || runtime.waveOperationBinding !== identity.binding) {
+    failCoopSharedSession(`The automatic victory boundary for wave ${identity.wave} lost its owning runtime.`);
+    return true;
+  }
+  if (!usesRetainedCoopWaveTransaction(runtime)) {
+    failCoopSharedSession(`The automatic victory boundary for wave ${identity.wave} lost retained delivery.`);
+    return true;
+  }
+  if (runtime.controller.role === "guest") {
+    const staged = getCoopStagedWaveAdvanceTransaction(identity.wave, identity.binding);
+    const payload = staged?.envelope.pendingOperation?.payload;
+    if (
+      staged == null
+      || staged.dataApplied !== true
+      || !isValidCoopWaveAdvancePayload(payload)
+      || payload.outcome !== "win"
+      || payload.wave !== identity.wave
+    ) {
+      failCoopSharedSession(
+        `The renderer reached BattleEnd before the retained automatic victory state for wave ${identity.wave} `
+          + `(applied ${staged?.dataApplied === true}).`,
+      );
+      return true;
+    }
+    // The complete host image has already been admitted. Skip the legacy/raw BattleEnd publisher and let
+    // the queued CoopVictorySealPhase prove the same staged identity before any continuation surface opens.
+    coopLog("progression", `GUEST automatic victory settlement deferred wave=${identity.wave}`);
+    return true;
+  }
+  if (runtime.controller.role !== "host") {
+    failCoopSharedSession(
+      `An unknown co-op seat attempted to stage the automatic victory boundary for wave ${identity.wave}.`,
+    );
+    return true;
+  }
+  const transition = pendingHostWaveTransitions.get(identity.wave);
+  const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+  const currentTurn = globalScene.currentBattle?.turn ?? -1;
+  if (
+    transition?.outcome !== "win"
+    || transition.wave !== identity.wave
+    || identity.turn == null
+    || identity.turn < 0
+    || currentWave !== identity.wave
+    || !Number.isSafeInteger(currentTurn)
+    || currentTurn !== identity.turn + 1
+  ) {
+    failCoopSharedSession(
+      "The automatic victory boundary did not match BattleEnd "
+        + `(source ${identity.wave}:${identity.turn ?? "unresolved"}, ambient ${currentWave}:${currentTurn}, `
+        + `outcome ${transition?.outcome ?? "missing"}).`,
+    );
+    return true;
+  }
+  if (pendingAutomaticVictorySeals.has(runtime)) {
+    failCoopSharedSession(`A duplicate automatic victory boundary was staged for wave ${identity.wave}.`);
+    return true;
+  }
+  pendingAutomaticVictorySeals.set(runtime, { identity, transition, settlementTurn: currentTurn });
+  coopLog(
+    "progression",
+    `HOST automatic victory settlement deferred wave=${identity.wave} sourceTurn=${identity.turn} settlementTurn=${currentTurn}`,
+  );
+  return true;
 }
 
 function releaseCoopSettledWaveBoundary(wave: number): boolean {
@@ -1178,20 +1323,54 @@ export function awaitCoopSettledWaveAdvanceAtBattleEnd(
   if (runtime == null || binding == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
     return false;
   }
-  // A Mystery battle is the continuation of an already-retained ME terminal transaction. Its BattleEnd
-  // returns through PostMysteryEncounterPhase and must never wait for (or synthesize) a second, colliding
-  // WAVE_ADVANCE transaction for the same pinned wave. The ME surface remains the sole owner of this tail.
-  if (globalScene.currentBattle?.isBattleMysteryEncounter?.()) {
-    return false;
-  }
   const wave = sourceWave;
   if (!Number.isSafeInteger(wave) || wave < 0) {
     failCoopSharedSession("The retained post-battle boundary had no valid source wave.");
     return true;
   }
+  const staged = getCoopStagedWaveAdvanceTransaction(wave, binding);
+  // A real Mystery battle is the continuation of an already-retained ME terminal transaction. Its
+  // BattleEnd returns through PostMysteryEncounterPhase and must never synthesize a colliding WAVE_ADVANCE.
+  // Ambient state is allowed to exempt this tail only when it still describes the exact source wave and
+  // no addressed WAVE_ADVANCE exists. A speculative next-wave Mystery battle cannot steal ownership from
+  // an already-staged ordinary victory (the wave-11 -> speculative ME wave-12 regression).
+  const ambientBattle = globalScene.currentBattle;
+  if (staged == null && ambientBattle?.waveIndex === wave && ambientBattle.isBattleMysteryEncounter?.()) {
+    return false;
+  }
   pendingSettledWaveBoundary = { wave, release, released: false };
   tryApplyCoopSettledWaveData(wave, binding);
   return true;
+}
+
+type CoopPhaseOwnedWaveContinuationSurface = "crossroads";
+
+function phaseOwnedWaveContinuationIsPublic(
+  staged: CoopStagedWaveAdvanceTransaction,
+  surface: CoopPhaseOwnedWaveContinuationSurface,
+): boolean {
+  if (!staged.dataApplied) {
+    return false;
+  }
+  const payload = staged.envelope.pendingOperation?.payload as CoopWaveAdvancePayload;
+  try {
+    switch (surface) {
+      case "crossroads": {
+        // OPTION_SELECT is deliberately absent from the generic registry because many unrelated local and
+        // account-only screens use it. Crossroads owns an explicit attestation after its real picker promise
+        // has committed; accept only that exact phase + mode + active-handler tuple.
+        const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+        return (
+          globalScene.phaseManager?.getCurrentPhase()?.phaseName === "ErCrossroadsPhase"
+          && globalScene.ui.getMode() === UiMode.OPTION_SELECT
+          && globalScene.ui.getHandler()?.active === true
+          && (currentWave === payload.wave || currentWave === payload.nextWave)
+        );
+      }
+    }
+  } catch {
+    return false;
+  }
 }
 
 function retainedWaveContinuationIsPublic(staged: CoopStagedWaveAdvanceTransaction): boolean {
@@ -1229,12 +1408,19 @@ function retainedWaveContinuationIsPublic(staged: CoopStagedWaveAdvanceTransacti
   }
 }
 
-function maybeMarkCoopWaveContinuationReady(wave: number, binding: CoopWaveAdvanceOperationBinding): boolean {
+function maybeMarkCoopWaveContinuationReady(
+  wave: number,
+  binding: CoopWaveAdvanceOperationBinding,
+  phaseOwnedSurface?: CoopPhaseOwnedWaveContinuationSurface,
+): boolean {
   const staged = getCoopStagedWaveAdvanceTransaction(wave, binding);
   if (staged == null) {
     return false;
   }
-  if (!staged.continuationReady && retainedWaveContinuationIsPublic(staged)) {
+  const publicSurface = phaseOwnedSurface == null
+    ? retainedWaveContinuationIsPublic(staged)
+    : phaseOwnedWaveContinuationIsPublic(staged, phaseOwnedSurface);
+  if (!staged.continuationReady && publicSurface) {
     markCoopWaveAdvanceContinuationReady(wave, binding);
     coopLog("progression", `retained WAVE_ADVANCE continuationReady wave=${wave}`);
   }
@@ -1265,11 +1451,14 @@ export type CoopRetainedWaveContinuationIdentity =
  * Resolve the immutable source identity for a retained guest continuation. A caller that is actually
  * opening the post-battle surface must never reinterpret `null` as permission to use mutable scene state:
  * zero candidates means the retained boundary was lost, while multiple candidates mean the continuation
- * is ambiguous. Both are deterministic shared-terminal conditions. Host, solo, lockstep and explicitly
- * non-wave surfaces keep their ambient behavior.
+ * is ambiguous. Both are deterministic shared-terminal conditions by default. A phase that independently
+ * captures an immutable non-wave source may opt into ambient identity only when there are exactly zero
+ * candidates; ambiguity remains invalid. Host, solo, lockstep and explicitly non-wave surfaces keep their
+ * ambient behavior.
  */
 export function resolveCoopRetainedWaveContinuationIdentity(
   requireWaveBoundary: boolean,
+  allowMissingWaveBoundary = false,
 ): CoopRetainedWaveContinuationIdentity {
   const runtime = active;
   if (runtime == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
@@ -1297,6 +1486,14 @@ export function resolveCoopRetainedWaveContinuationIdentity(
       wave: (transaction.envelope.pendingOperation?.payload as CoopWaveAdvancePayload | undefined)?.wave ?? -1,
     }))
     .sort((a, b) => a.wave - b.wave || a.turn - b.turn || a.operationId.localeCompare(b.operationId));
+  // SelectBiomePhase is also entered by Crossroads, moves, abilities and Mystery Events after the previous
+  // WAVE_ADVANCE has already reached continuationReady and released. Those callers capture their ambient
+  // source synchronously at phase construction and may explicitly accept a truly absent wave candidate.
+  // A reward/shop boundary never opts in, and one or more unresolved-but-unaddressable candidates remain
+  // invalid for every caller, so ambiguity can never fall back to mutable scene state.
+  if (allowMissingWaveBoundary && candidates.length === 0) {
+    return { kind: "ambient" };
+  }
   const classification = candidates.length === 0 ? "missing" : candidates.length > 1 ? "ambiguous" : "invalid";
   const reason =
     `[coop-op] retained wave continuation identity ${classification}: candidateCount=${candidates.length} `
@@ -1315,7 +1512,10 @@ export function getCoopRetainedWaveContinuationAddress(): CoopRetainedWaveContin
   return getCoopPendingWaveContinuationBoundary(runtime.waveOperationBinding);
 }
 
-export function notifyCoopWaveContinuationSurfaceReady(sourceWave?: number): boolean {
+export function notifyCoopWaveContinuationSurfaceReady(
+  sourceWave?: number,
+  phaseOwnedSurface?: CoopPhaseOwnedWaveContinuationSurface,
+): boolean {
   const runtime = active;
   if (runtime == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
     return false;
@@ -1324,7 +1524,7 @@ export function notifyCoopWaveContinuationSurfaceReady(sourceWave?: number): boo
   if (!Number.isSafeInteger(wave) || wave < 0) {
     return false;
   }
-  return maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding);
+  return maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding, phaseOwnedSurface);
 }
 
 /**
@@ -4166,6 +4366,104 @@ function normalizeCoopSettledPostBattleState(state: CoopAuthoritativeBattleState
   };
 }
 
+/** Raw carrier retained only for older peers and presentation diagnostics after the durable commit succeeds. */
+function sendCoopWaveEndStateCompatibility(wave: number, state: CoopAuthoritativeBattleStateV1): void {
+  try {
+    coopLog("runtime", `send waveEndState wave=${wave} tick=${state.tick} (host)`);
+    active?.battleStream.sendWaveEndState(wave, state);
+  } catch (e) {
+    coopWarn("runtime", `send raw waveEndState failed after durable seal wave=${wave} (ignored)`, e);
+  }
+}
+
+/**
+ * Execute the explicit post-victory seal after every queued automatic shared mutation drained. The host
+ * commits the one complete image; the guest proves that BattleEnd admitted that exact image before it may
+ * pass this tail into LLM/reward/market/map/new-battle continuation. Missing, duplicate, wrong-runtime and
+ * wrong-address calls all enter the bounded shared terminal path instead of silently advancing one peer.
+ */
+export function sealCoopAutomaticVictoryBoundary(identity: CoopAutomaticVictorySealIdentity): boolean {
+  const runtime = active;
+  if (runtime == null || runtime !== identity.runtime || runtime.waveOperationBinding !== identity.binding) {
+    failCoopSharedSession(`The automatic victory seal for wave ${identity.wave} lost its owning runtime.`);
+    return false;
+  }
+  if (!usesRetainedCoopWaveTransaction(runtime)) {
+    failCoopSharedSession(`The automatic victory seal for wave ${identity.wave} lost retained delivery.`);
+    return false;
+  }
+
+  if (runtime.controller.role === "guest") {
+    const staged = getCoopStagedWaveAdvanceTransaction(identity.wave, identity.binding);
+    const payload = staged?.envelope.pendingOperation?.payload;
+    const retainedTurn = staged?.envelope.authoritativeState.turn;
+    if (
+      staged == null
+      || staged.dataApplied !== true
+      || !isValidCoopWaveAdvancePayload(payload)
+      || payload.outcome !== "win"
+      || payload.wave !== identity.wave
+      || (identity.turn != null && identity.turn !== retainedTurn)
+    ) {
+      failCoopSharedSession(
+        `The renderer reached an incomplete automatic victory seal for wave ${identity.wave} `
+          + `(turn ${retainedTurn ?? "missing"}, applied ${staged?.dataApplied === true}).`,
+      );
+      return false;
+    }
+    coopLog("progression", `GUEST automatic victory settlement admitted wave=${identity.wave} turn=${retainedTurn}`);
+    return true;
+  }
+
+  const pending = pendingAutomaticVictorySeals.get(runtime);
+  if (pending == null) {
+    failCoopSharedSession(`The automatic victory seal for wave ${identity.wave} was missing or already consumed.`);
+    return false;
+  }
+  if (
+    pending.identity !== identity
+    || pending.identity.binding !== identity.binding
+    || pending.identity.wave !== identity.wave
+    || pending.identity.turn !== identity.turn
+    || pending.transition.outcome !== "win"
+  ) {
+    failCoopSharedSession(`The automatic victory seal for wave ${identity.wave} did not match its staged boundary.`);
+    return false;
+  }
+  const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+  const currentTurn = globalScene.currentBattle?.turn ?? -1;
+  if (
+    identity.turn == null
+    || identity.turn < 0
+    || currentWave !== identity.wave
+    || currentTurn !== pending.settlementTurn
+  ) {
+    failCoopSharedSession(
+      `The automatic victory seal address drifted from source ${identity.wave}:${identity.turn ?? "unresolved"} `
+        + `through settlement ${identity.wave}:${pending.settlementTurn} to ${currentWave}:${currentTurn}.`,
+    );
+    return false;
+  }
+
+  const capturedState = captureCoopAuthoritativeBattleState(pending.settlementTurn);
+  if (capturedState == null || capturedState.wave !== identity.wave || capturedState.turn !== pending.settlementTurn) {
+    failCoopSharedSession(`Could not capture the complete automatic victory state for wave ${identity.wave}.`);
+    return false;
+  }
+  const state = normalizeCoopSettledPostBattleState(capturedState);
+  if (commitCoopSettledWaveAdvance(identity.wave, pending.transition, state) == null) {
+    failCoopSharedSession(`Could not retain the complete automatic victory state for wave ${identity.wave}.`);
+    return false;
+  }
+  pendingAutomaticVictorySeals.delete(runtime);
+  sendCoopWaveEndStateCompatibility(identity.wave, state);
+  coopLog(
+    "progression",
+    `HOST automatic victory settlement sealed wave=${identity.wave} sourceTurn=${identity.turn} settlementTurn=${pending.settlementTurn} tick=${state.tick}`,
+  );
+  return true;
+}
+
 export function broadcastCoopWaveEndState(isVictory?: boolean): void {
   if (!globalScene.gameMode.isCoop || active == null || getCoopNetcodeMode() !== "authoritative") {
     return;
@@ -4213,15 +4511,9 @@ export function broadcastCoopWaveEndState(isVictory?: boolean): void {
     }
     return;
   }
-  try {
-    // Compatibility only. A retained peer ignores this raw carrier for correctness, so drop/reorder cannot
-    // make it advance before the complete envelope above.
-    coopLog("runtime", `send waveEndState wave=${wave} tick=${state.tick} (host)`);
-    active.battleStream.sendWaveEndState(wave, state);
-  } catch (e) {
-    // Presentation/legacy compatibility failure after retention cannot invalidate the complete transaction.
-    coopWarn("runtime", `send raw waveEndState failed after durable seal wave=${wave} (ignored)`, e);
-  }
+  // Compatibility only. A retained peer ignores this raw carrier for correctness, so drop/reorder cannot
+  // make it advance before the complete envelope above.
+  sendCoopWaveEndStateCompatibility(wave, state);
 }
 
 // =============================================================================
@@ -5105,6 +5397,7 @@ export function clearCoopRuntime(): void {
   resetCoopMeOperationState();
   // Wave-2f: same teardown for the post-battle wave-advance operation surface (THE KEYSTONE).
   resetCoopWaveAdvanceOperationState(active.waveOperationBinding);
+  pendingAutomaticVictorySeals.delete(active);
   learnMoveForwardInFlight.clear();
   learnMoveBatchForwardInFlight.clear();
   active.localTransport.close();

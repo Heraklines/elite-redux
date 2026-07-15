@@ -38,20 +38,20 @@ import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum, captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { BattlerIndex } from "#enums/battler-index";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
+  awaitRewardShopPhaseExit,
   beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   drainLoopback,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveRewardShopOwnerLeaveViaUi,
@@ -63,6 +63,7 @@ import {
   type ShopPhaseSeam,
   withClient,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -125,21 +126,10 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
     // best-effort
   });
 
-  /** Wire the guest's OWN-slot command answer (the genuine production CoopBattleSync relay). */
-  function wireGuestCommand(rig: DuoRig): void {
-    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.TACKLE,
-      targets: [BattlerIndex.ENEMY_2],
-    }));
-  }
-
-  /** Drive ONE host wave to a win (both player slots FIGHT the frail enemies) under the host ctx. */
+  /** Drive ONE host wave to a win after the guest submitted its own command through public UI. */
   async function hostPlayWave(rig: DuoRig): Promise<void> {
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
       await game.phaseInterceptor.to("TurnEndPhase");
     });
   }
@@ -177,6 +167,16 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
         await withClient(rig.hostCtx, () => drainLoopback());
       }
       await pumpDuoDestinations(rig);
+      await withClient(rig.hostCtx, () => awaitRewardShopPhaseExit(hostShop));
+      await withClient(rig.guestCtx, () => awaitRewardShopPhaseExit(guestShop));
+      expect(
+        rig.hostScene.phaseManager.getCurrentPhase(),
+        "host opened the continuation instead of remaining on a mechanically-complete reward phase",
+      ).not.toBe(hostShop);
+      expect(
+        rig.guestScene.phaseManager.getCurrentPhase(),
+        "guest opened the continuation instead of remaining on a mechanically-complete reward phase",
+      ).not.toBe(guestShop);
       expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counterBefore + 1);
       expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the counter once").toBe(
         counterBefore + 1,
@@ -188,10 +188,16 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
 
   it("seed-pinned mirror: per-wave WAVE-START checksum MATCHES; the ONLY residual is the move-PP bug", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
-    wireGuestCommand(rig);
+    // The directly constructed guest starts at TitlePhase. Align it to the same real TurnInit/Command
+    // queue a second browser would own, then make every packet destination-context scheduled.
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+    });
+    pair.setAutomaticDelivery(false);
 
     const WAVES = 3;
     for (let w = 1; w <= WAVES; w++) {
@@ -210,6 +216,7 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
       );
 
       // Host plays the wave to a win; the guest replays + applies the checkpoint.
+      await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: w === 1 });
       const turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig);
       await withClient(rig.guestCtx, async () => {
@@ -243,6 +250,11 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
       if (w < WAVES) {
         await arriveGuestCommandBoundary(rig, w + 1);
         await withClient(rig.hostCtx, async () => {
+          // Scheduled delivery is intentionally disabled for this public-input journey. Deliver the
+          // guest's exact command arrival while the host's complete process context is installed before
+          // starting the host CommandPhase; otherwise the correct packet remains queued and the phase
+          // waits forever for an arrival the fixture never pumps.
+          await drainLoopback();
           await game.phaseInterceptor.to("CommandPhase");
         });
         expect(rig.hostScene.currentBattle.waveIndex, `wave ${w}: host advanced to wave ${w + 1}`).toBe(w + 1);

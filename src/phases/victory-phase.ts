@@ -4,9 +4,12 @@ import { modifierTypes } from "#data/data-lists";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
   broadcastCoopWaveResolved,
+  captureCoopAutomaticVictorySealIdentity,
+  failCoopSharedSession,
   getCoopActiveWaveTransition,
   getCoopController,
   isCoopAuthoritativeGuest,
+  isCoopHostCaptureTransitionPending,
 } from "#data/elite-redux/coop/coop-runtime";
 import {
   resolveCoopBiomeBoundaryFlag,
@@ -23,7 +26,6 @@ import { BiomeId } from "#enums/biome-id";
 import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { GameModes } from "#enums/game-modes";
 import { ModifierTier } from "#enums/modifier-tier";
-import { UiMode } from "#enums/ui-mode";
 import type { CustomModifierSettings } from "#modifiers/modifier-type";
 import { type ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import { generateModifierType, handleMysteryEncounterVictory } from "#mystery-encounters/encounter-phase-utils";
@@ -55,7 +57,19 @@ export class VictoryPhase extends PokemonPhase {
   start() {
     super.start();
 
-    const isMysteryEncounter = globalScene.currentBattle.isBattleMysteryEncounter();
+    // A retained normal-wave Victory can run after a speculative next Battle has already been installed.
+    // Its immutable WAVE_ADVANCE statement—not that mutable ambient object—owns encounter classification.
+    // Real Mystery-battle victories use the legacy source-null path and may consult their live encounter.
+    const retainedSourceTransition =
+      this.coopSourceWave == null ? null : getCoopActiveWaveTransition(this.coopSourceWave);
+    if (this.coopSourceWave != null && retainedSourceTransition == null) {
+      failCoopSharedSession(`The retained VictoryPhase for wave ${this.coopSourceWave} lost its transition.`);
+      return;
+    }
+    const isMysteryEncounter =
+      this.coopSourceWave == null
+        ? globalScene.currentBattle.isBattleMysteryEncounter()
+        : retainedSourceTransition?.meBoundary === "battle-victory";
 
     // update Pokemon defeated count except for MEs that disable it
     if (!isMysteryEncounter || !globalScene.currentBattle.mysteryEncounter?.preventGameStatsUpdates) {
@@ -98,8 +112,12 @@ export class VictoryPhase extends PokemonPhase {
       return this.end();
     }
 
+    const retainedResolvedVictory =
+      this.coopSourceWave != null
+      && (retainedSourceTransition?.outcome === "win" || retainedSourceTransition?.outcome === "capture");
     if (
-      !globalScene
+      retainedResolvedVictory
+      || !globalScene
         .getEnemyParty()
         .find(p => (globalScene.currentBattle.battleType === BattleType.WILD ? p.isOnField() : !p?.isFainted(true)))
     ) {
@@ -111,6 +129,7 @@ export class VictoryPhase extends PokemonPhase {
       // its own BattleEnd -> rewards -> biome -> NewBattle tail (the order is irrelevant to the
       // guest - it carries the wave number, guarded against a double-advance on the guest side).
       erRecordAchievementWaveWon();
+      const captureKeepsBattleEndSettlement = isCoopHostCaptureTransitionPending(globalScene.currentBattle.waveIndex);
       broadcastCoopWaveResolved("win");
 
       const gameMode = globalScene.gameMode;
@@ -118,7 +137,7 @@ export class VictoryPhase extends PokemonPhase {
         isCoopAuthoritativeGuest() && this.coopSourceWave != null
           ? this.coopSourceWave
           : globalScene.currentBattle.waveIndex;
-      const authoritativeTransition = isCoopAuthoritativeGuest() ? getCoopActiveWaveTransition(currentWaveIndex) : null;
+      const authoritativeTransition = isCoopAuthoritativeGuest() ? retainedSourceTransition : null;
       const tailControl = resolveCoopVictoryTailControl(authoritativeTransition, {
         trainerWin: () => globalScene.currentBattle.battleType === BattleType.TRAINER,
         runContinues: () => gameMode.isEndless || !gameMode.isWaveFinal(currentWaveIndex),
@@ -139,20 +158,23 @@ export class VictoryPhase extends PokemonPhase {
         );
       }
 
-      globalScene.phaseManager.pushNew("BattleEndPhase", true);
+      const automaticVictorySeal =
+        (!isCoopAuthoritativeGuest() && !captureKeepsBattleEndSettlement) || authoritativeTransition?.outcome === "win"
+          ? captureCoopAutomaticVictorySealIdentity(currentWaveIndex)
+          : null;
+      globalScene.phaseManager.pushNew("BattleEndPhase", true, automaticVictorySeal);
       if (isTrainerWin) {
         globalScene.phaseManager.pushNew("TrainerVictoryPhase");
       }
 
-      // LLM Director post-victory hook: queue the LLM-authored postWinText +
-      // victoryEffects narration + victoryRewards BEFORE the vanilla
-      // egg/modifier rewards. Applies only in Director mode and only if the
-      // beat that authored this wave actually emitted a hook.
-      if (gameMode.modeId === GameModes.LLM_DIRECTOR) {
-        applyPostVictoryHook(currentWaveIndex);
-      }
+      // LLM effects are automatic shared mutations and must be inside the retained image. Their narration
+      // and reward chooser are only queued after the explicit seal below, so no public surface can open on
+      // a pre-effect state. The closure is null outside Director mode or when no hook exists.
+      const queuePostVictoryPresentation =
+        gameMode.modeId === GameModes.LLM_DIRECTOR ? preparePostVictoryHook(currentWaveIndex) : null;
 
       if (tailControl.runContinues) {
+        let waveModifierRewardSettings: CustomModifierSettings | undefined;
         if (tailControl.eggLapse) {
           globalScene.phaseManager.pushNew("EggLapsePhase");
         }
@@ -178,14 +200,8 @@ export class VictoryPhase extends PokemonPhase {
           // guaranteedModifierTiers routine. Otherwise the fixed-battle config's
           // reward settings (rival/boss) or undefined (a normal trainer/wild).
           const ghostRewards = buildErGhostRewardSettings();
-          globalScene.phaseManager.pushNew(
-            "SelectModifierPhase",
-            undefined,
-            undefined,
-            ghostRewards ?? gameMode.getFixedBattle(currentWaveIndex)?.customModifierRewardSettings,
-            false,
-            { kind: "wave-boundary" },
-          );
+          waveModifierRewardSettings =
+            ghostRewards ?? gameMode.getFixedBattle(currentWaveIndex)?.customModifierRewardSettings;
         } else if (gameMode.isDaily) {
           globalScene.phaseManager.pushNew("ModifierRewardPhase", modifierTypes.EXP_CHARM);
           if (currentWaveIndex > 10 && !gameMode.isWaveFinal(currentWaveIndex)) {
@@ -248,6 +264,29 @@ export class VictoryPhase extends PokemonPhase {
             `[coop-diag] VictoryTail role=${getCoopController()?.role ?? "none"} wave=${currentWaveIndex} source=${authoritativeTransition == null ? "legacy-local" : "host-stated"} trainer=${isTrainerWin} egg=${tailControl.eggLapse} biomeShop=${fireBiomeShop} biomeChange=${biomeEnding} crossroads=${raiseCrossroads} nextWave=${authoritativeTransition?.nextWave ?? currentWaveIndex + 1}`,
           );
         }
+
+        // The mid-biome x0 heal is an automatic shared mutation. It must drain before the retained victory
+        // image is sealed; previously it ran after the interactive market and therefore could never be part
+        // of the wave's authoritative boundary.
+        if (erRouting && fireBiomeShop && !biomeEnding && !isCoopAuthoritativeGuest()) {
+          globalScene.phaseManager.pushNew("PartyHealPhase", false);
+        }
+
+        if (automaticVictorySeal != null) {
+          globalScene.phaseManager.pushNew("CoopVictorySealPhase", automaticVictorySeal);
+        }
+        queuePostVictoryPresentation?.();
+        if (currentWaveIndex % 10) {
+          globalScene.phaseManager.pushNew(
+            "SelectModifierPhase",
+            undefined,
+            undefined,
+            waveModifierRewardSettings,
+            false,
+            { kind: "wave-boundary" },
+          );
+        }
+
         if (fireBiomeShop) {
           // ER Abyss: the Abyss has no market - its every-10-waves "shop" slot is
           // Giratina's Bargain (a dialogue event, see TheBargainPhase). Everywhere
@@ -267,26 +306,12 @@ export class VictoryPhase extends PokemonPhase {
           }
         }
 
-        // ER (#504): every 10 GLOBAL waves the player also gets a full rest, the
-        // same cadence as the biome shop. Vanilla healed on the biome change
-        // (SelectBiomePhase, which lined up with every 10 waves); with variable
-        // biome length a x0 wave is often MID-biome, so heal here on those mid-biome
-        // x0 waves. Biome-change waves (biomeEnding) still heal via SelectBiomePhase,
-        // so the !biomeEnding guard avoids a double heal. ER routing only (in vanilla
-        // a x0 wave is always the biome change, so nothing changes there).
-        if (erRouting && fireBiomeShop && !biomeEnding && !isCoopAuthoritativeGuest()) {
-          // The authoritative guest receives the host's settled heal in the next complete carrier.
-          // Constructing PartyHealPhase locally is already a forbidden shared mutation even when the
-          // renderer gate catches it and substitutes CoopInertPhase, so prevent the factory call itself.
-          globalScene.phaseManager.pushNew("PartyHealPhase", false);
-        }
-
         if (biomeEnding) {
-          globalScene.phaseManager.pushNew("SelectBiomePhase");
+          globalScene.phaseManager.pushNew("SelectBiomePhase", currentWaveIndex);
         } else if (raiseCrossroads) {
           // ER (#486): not a biome end, but a 5-wave Crossroads tick - raise the
           // "Stay / Move on" choice AFTER the reward and BEFORE the next battle.
-          globalScene.phaseManager.pushNew("ErCrossroadsPhase");
+          globalScene.phaseManager.pushNew("ErCrossroadsPhase", currentWaveIndex);
         }
 
         // ER (#504): warn ONCE, exactly on the wave the player crosses into
@@ -305,12 +330,20 @@ export class VictoryPhase extends PokemonPhase {
 
         globalScene.phaseManager.pushNew("NewBattlePhase");
       } else if (gameMode.isShowdown) {
+        if (automaticVictorySeal != null) {
+          globalScene.phaseManager.pushNew("CoopVictorySealPhase", automaticVictorySeal);
+        }
+        queuePostVictoryPresentation?.();
         // Showdown 1v1 (C3): the opponent's team is swept -> the LOCAL player won the duel. Route
         // to the ephemeral result flow (message + return to title, NO save/score/clear), never the
         // classic GameOver path. C6 emits the showdownResult wire message from the result phase.
         globalScene.currentBattle.battleType = BattleType.CLEAR;
         globalScene.phaseManager.pushNew("ShowdownResultPhase", true, "victory");
       } else {
+        if (automaticVictorySeal != null) {
+          globalScene.phaseManager.pushNew("CoopVictorySealPhase", automaticVictorySeal);
+        }
+        queuePostVictoryPresentation?.();
         globalScene.currentBattle.battleType = BattleType.CLEAR;
         globalScene.score += gameMode.getClearScoreBonus();
         globalScene.updateScoreText();
@@ -358,9 +391,9 @@ export function buildErGhostRewardSettings(): CustomModifierSettings | undefined
 }
 
 /**
- * Consume the LLM Director post-battle hook for `wave` and queue its
- * narration + effects + rewards. Mirrors `grantConsequenceRewards` from
- * llm-director-beat-phase.ts but for the post-victory case.
+ * Consume the LLM Director post-battle hook for `wave`, apply its automatic shared effects immediately,
+ * and return a deferred presentation/reward-chooser enqueue. The caller places that closure after the
+ * retained automatic victory seal, so the effect state is authoritative before either UI can open.
  *
  * Phase ordering (each pushNew appends to the queue):
  *   1. MessagePhase: postWinText + victoryEffects narration (one $-paginated msg)
@@ -368,14 +401,14 @@ export function buildErGhostRewardSettings(): CustomModifierSettings | undefined
  *
  * Defeat-side hook (postLossText, defeatEffects) lives on FaintPhase / GameOverPhase.
  */
-function applyPostVictoryHook(waveIndex: number): void {
+function preparePostVictoryHook(waveIndex: number): (() => void) | null {
   const runtime = getDirectorRuntime();
   if (!runtime) {
-    return;
+    return null;
   }
   const hook = runtime.queue.takePostBattleHook(waveIndex);
   if (!hook) {
-    return;
+    return null;
   }
 
   // 1. Apply effects (mutates state, returns narrative strings) +
@@ -385,20 +418,24 @@ function applyPostVictoryHook(waveIndex: number): void {
     tail.push(hook.postWinText);
   }
   if (hook.victoryEffects && hook.victoryEffects.length > 0) {
-    try {
-      tail.push(...applyEffects(hook.victoryEffects));
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      logEffectApplied(`victory-wave-${waveIndex}`, "victory-effects-batch", false, reason);
+    if (isCoopAuthoritativeGuest()) {
+      coopLog(
+        "progression",
+        `GUEST LLM victory effects SKIP wave=${waveIndex} count=${hook.victoryEffects.length} (retained host state)`,
+      );
+    } else {
+      try {
+        tail.push(...applyEffects(hook.victoryEffects));
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        logEffectApplied(`victory-wave-${waveIndex}`, "victory-effects-batch", false, reason);
+        if (globalScene.gameMode.isCoop) {
+          failCoopSharedSession(`Could not apply the automatic LLM victory effects for wave ${waveIndex}.`);
+        }
+      }
     }
   }
-  if (tail.length > 0) {
-    const combined = paginateAndJoin(tail);
-    if (combined.length > 0) {
-      void globalScene.ui.setMode(UiMode.MESSAGE);
-      globalScene.phaseManager.pushNew("MessagePhase", combined, null, true);
-    }
-  }
+  const combined = tail.length > 0 ? paginateAndJoin(tail) : "";
 
   // 2. LLM-authored victoryRewards: bundle into a single SelectModifierPhase
   // so the player picks ONE from the row. Pokemon-targeted modifiers
@@ -406,9 +443,9 @@ function applyPostVictoryHook(waveIndex: number): void {
   // anyway — and bundling everything into one shop avoids the empty-name +
   // freeze bugs from per-item ModifierRewardPhase. Same dedupe + qty=1 cap
   // as grantConsequenceRewards: the shop is a chooser, not a stockpile.
+  const guaranteed: ModifierTypeOption[] = [];
   if (hook.victoryRewards && hook.victoryRewards.length > 0) {
     const factories = modifierTypes as Record<string, (() => ModifierType) | undefined>;
-    const guaranteed: ModifierTypeOption[] = [];
     const seen = new Set<string>();
     for (const item of hook.victoryRewards) {
       if (seen.has(item.modifierType)) {
@@ -427,6 +464,16 @@ function applyPostVictoryHook(waveIndex: number): void {
       }
       guaranteed.push(new ModifierTypeOption(resolved, 0));
     }
+  }
+
+  console.info(
+    `[llm-director] post-victory-hook applied wave=${waveIndex} postWinTextLen=${hook.postWinText?.length ?? 0} effects=${hook.victoryEffects?.length ?? 0} rewards=${hook.victoryRewards?.length ?? 0}`,
+  );
+
+  return () => {
+    if (combined.length > 0) {
+      globalScene.phaseManager.pushNew("MessagePhase", combined, null, true);
+    }
     if (guaranteed.length > 0) {
       globalScene.phaseManager.pushNew(
         "SelectModifierPhase",
@@ -441,9 +488,5 @@ function applyPostVictoryHook(waveIndex: number): void {
         { kind: "wave-boundary" },
       );
     }
-  }
-
-  console.info(
-    `[llm-director] post-victory-hook applied wave=${waveIndex} postWinTextLen=${hook.postWinText?.length ?? 0} effects=${hook.victoryEffects?.length ?? 0} rewards=${hook.victoryRewards?.length ?? 0}`,
-  );
+  };
 }

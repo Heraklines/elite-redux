@@ -1,13 +1,13 @@
 import { globalScene } from "#app/global-scene";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
-import { coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   adoptCoopBiomeTransitionSwitchPermit,
   getCoopBiomeTransitionTailPermit,
   markCoopBiomeTransitionHistoryRecorded,
   markCoopBiomeTransitionSwitchPrepared,
 } from "#data/elite-redux/coop/coop-renderer-gate";
-import { coopSessionGeneration, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { coopSessionGeneration, failCoopSharedSession, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import {
   type ErRouteNode,
   erBiomeRoutingActive,
@@ -33,7 +33,10 @@ import { getBiomeName } from "#utils/common";
 export class SwitchBiomePhase extends BattlePhase {
   public readonly phaseName = "SwitchBiomePhase";
   private readonly nextBiome: BiomeId;
+  /** Immutable source boundary captured by SelectBiome before speculative NewBattle state can advance. */
+  private readonly coopSourceWave: number | null;
   private coopPermitRecoveryShown = false;
+  private coopPermitRecoveryAttempts = 0;
   private historyRecorded = false;
   private switchPrepared = false;
   private ended = false;
@@ -50,10 +53,12 @@ export class SwitchBiomePhase extends BattlePhase {
   private coopRevealsApplied = false;
   private coopStructureApplied = false;
 
-  constructor(nextBiome: BiomeId) {
+  constructor(nextBiome: BiomeId, coopSourceWave: number | null = null) {
     super();
 
     this.nextBiome = nextBiome;
+    this.coopSourceWave =
+      coopSourceWave != null && Number.isSafeInteger(coopSourceWave) && coopSourceWave >= 0 ? coopSourceWave : null;
   }
 
   start() {
@@ -84,17 +89,24 @@ export class SwitchBiomePhase extends BattlePhase {
     const sourceWave = globalScene.currentBattle?.waveIndex ?? -1;
     const activePermit = authoritativeCoop ? getCoopBiomeTransitionTailPermit() : null;
     const replayingCommittedSwitch = activePermit?.switchAdopted === true;
+    // The next battle can be mirrored before this queued presentation tail starts. Keep the permit addressed
+    // to SelectBiome's immutable completed-wave boundary, but admit only the exact same or immediately-next
+    // ambient battle so an obsolete queued phase cannot spend authority at an unrelated future wave.
+    const permitWave =
+      this.coopSourceWave != null && (sourceWave === this.coopSourceWave || sourceWave === this.coopSourceWave + 1)
+        ? this.coopSourceWave
+        : sourceWave;
     let permit = authoritativeCoop
       ? adoptCoopBiomeTransitionSwitchPermit({
           destinationBiomeId: this.nextBiome,
           sourceBiomeId: sourceBiome,
-          wave: sourceWave,
+          wave: permitWave,
         })
       : null;
     if (authoritativeCoop && permit == null) {
       coopWarn(
         "runtime",
-        `SwitchBiomePhase refused unsanctioned authoritative mutation source=${sourceBiome} destination=${this.nextBiome} wave=${sourceWave}`,
+        `SwitchBiomePhase refused unsanctioned authoritative mutation source=${sourceBiome} destination=${this.nextBiome} ambientWave=${sourceWave} sourceWave=${permitWave}`,
       );
       this.parkForAuthoritativePermit();
       return;
@@ -115,6 +127,7 @@ export class SwitchBiomePhase extends BattlePhase {
 
     if (authoritativeCoop && permit != null) {
       try {
+        this.discardAlreadyMaterializedBattleAdvance(permit, sourceWave);
         this.prepareAuthoritativeTransition(authoritativeGuest, permit, sourceWave);
         this.materializeCoopTransition();
         this.end();
@@ -231,6 +244,35 @@ export class SwitchBiomePhase extends BattlePhase {
         });
       },
     });
+  }
+
+  /**
+   * A retained WAVE_ADVANCE can install the destination battle before this presentation tail runs. The
+   * SelectBiome queue still contains the ordinary NewBattlePhase for the same boundary; executing it would
+   * advance the renderer a second time (source N -> retained N+1 -> local N+2). Remove only that immediate,
+   * exact duplicate. Any different queue shape fails closed so an unrelated future battle cannot be eaten.
+   */
+  private discardAlreadyMaterializedBattleAdvance(
+    permit: NonNullable<ReturnType<typeof getCoopBiomeTransitionTailPermit>>,
+    ambientWave: number,
+  ): void {
+    if (ambientWave !== permit.nextWave) {
+      return;
+    }
+    const queued = globalScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+    const firstNewBattle = queued.indexOf("NewBattlePhase");
+    if (firstNewBattle < 0) {
+      return;
+    }
+    if (firstNewBattle !== 0 || !globalScene.phaseManager.tryRemovePhase("NewBattlePhase")) {
+      throw new Error(
+        `Could not discard exact duplicate NewBattlePhase for retained biome boundary ${permit.wave}->${permit.nextWave}; queue=[${queued.join(",")}]`,
+      );
+    }
+    coopLog(
+      "runtime",
+      `SwitchBiomePhase discarded duplicate NewBattlePhase after retained battle advance wave=${permit.wave}->${permit.nextWave}`,
+    );
   }
 
   private prepareAuthoritativeTransition(
@@ -371,6 +413,13 @@ export class SwitchBiomePhase extends BattlePhase {
   /** Missing authority never advances the queue; reconnect/replay may arm the exact permit, then retry. */
   private parkForAuthoritativePermit(): void {
     if (this.coopPermitRecoveryShown || !this.coopBoundaryStillLive()) {
+      return;
+    }
+    this.coopPermitRecoveryAttempts++;
+    if (this.coopPermitRecoveryAttempts > 2) {
+      failCoopSharedSession(
+        `The shared biome transition to ${this.nextBiome} lost its exact committed permit after bounded recovery.`,
+      );
       return;
     }
     this.coopPermitRecoveryShown = true;
