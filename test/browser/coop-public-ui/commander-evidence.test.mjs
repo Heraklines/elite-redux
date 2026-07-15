@@ -16,6 +16,7 @@ test("Commander observer parser binds the owner, command address, species, and m
     epoch: 73,
     membershipRevision: 4,
     connectionGeneration: 2,
+    observationPhase: "CoopReplayTurnPhase",
     wave: 1,
     turn: 3,
     point: "cmd:1:3",
@@ -36,6 +37,13 @@ test("Commander observer parser binds the owner, command address, species, and m
     () =>
       commanderObservationView(
         `[coop-browser:commander] ${JSON.stringify({ ...observation, stateDigest: "0000000000000000" })}`,
+      ),
+    /invalid Commander observation/u,
+  );
+  assert.throws(
+    () =>
+      commanderObservationView(
+        `[coop-browser:commander] ${JSON.stringify({ ...observation, observationPhase: "MovePhase" })}`,
       ),
     /invalid Commander observation/u,
   );
