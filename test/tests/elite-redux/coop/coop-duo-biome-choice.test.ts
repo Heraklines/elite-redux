@@ -295,8 +295,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     return phase;
   }
 
-  function liveSelectBiome(): SelectBiomePhase {
-    const phase = new SelectBiomePhase();
+  function liveSelectBiome(sourceWave: number | null = null): SelectBiomePhase {
+    const phase = new SelectBiomePhase(sourceWave);
     (phase as unknown as { boundaryStillLive(generation: number, wave: number): boolean }).boundaryStillLive = () =>
       true;
     return phase;
@@ -1099,6 +1099,51 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     expect(guestTracker.mode(), "the natural single-node terminal never opened the ER_MAP picker").not.toBe(
       UiMode.ER_MAP,
     );
+    logs.flush();
+  }, 300_000);
+
+  it("retains the map's source-wave address when the renderer ambient battle has already advanced", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const sourceWave = 15;
+    const destination = BiomeId.VOLCANO;
+    rig.hostScene.currentBattle.waveIndex = sourceWave;
+    rig.guestScene.currentBattle.waveIndex = sourceWave;
+    const hostSwitch = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew");
+    const guestSwitch = vi.spyOn(rig.guestScene.phaseManager, "unshiftNew");
+
+    await withClient(rig.hostCtx, async () => {
+      setErPendingNodes([{ biome: destination, revealed: true }]);
+      liveSelectBiome(sourceWave).start();
+      await drainLoopback();
+    });
+    await withClient(rig.guestCtx, () => drainLoopback());
+    expect(
+      withClientSync(rig.guestCtx, () => getCoopBiomeTransitionCommitReceipt({ sourceWave })?.payload),
+      "the renderer pre-delivered the exact wave-15 map terminal",
+    ).toMatchObject({ biomeId: destination, nextWave: sourceWave + 1 });
+
+    await withClient(rig.guestCtx, async () => {
+      // Reproduce the soak failure exactly: NewBattle already exposed wave 16 before the retained
+      // SelectBiome renderer opened. Its immutable construction address must still consume wave 15.
+      rig.guestScene.currentBattle.waveIndex = sourceWave + 1;
+      setErPendingNodes([{ biome: destination, revealed: true }]);
+      liveSelectBiome(sourceWave).start();
+      for (let attempt = 0; attempt < 80; attempt++) {
+        await drainLoopback();
+        if (guestSwitch.mock.calls.some(call => call[0] === "SwitchBiomePhase")) {
+          return;
+        }
+      }
+      throw new Error("the retained wave-15 map terminal did not release under speculative wave 16");
+    });
+
+    expect(hostSwitch.mock.calls.find(call => call[0] === "SwitchBiomePhase")?.[1]).toBe(destination);
+    expect(guestSwitch.mock.calls.find(call => call[0] === "SwitchBiomePhase")?.[1]).toBe(destination);
+    expect(
+      withClientSync(rig.guestCtx, () => getCoopBiomeTransitionCommitReceipt({ sourceWave: sourceWave + 1 })),
+      "no speculative wave-16 operation was invented",
+    ).toBeUndefined();
     logs.flush();
   }, 300_000);
 });

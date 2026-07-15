@@ -307,7 +307,7 @@ export class VictoryPhase extends PokemonPhase {
         }
 
         if (biomeEnding) {
-          globalScene.phaseManager.pushNew("SelectBiomePhase");
+          globalScene.phaseManager.pushNew("SelectBiomePhase", currentWaveIndex);
         } else if (raiseCrossroads) {
           // ER (#486): not a biome end, but a 5-wave Crossroads tick - raise the
           // "Stay / Move on" choice AFTER the reward and BEFORE the next battle.

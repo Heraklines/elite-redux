@@ -2038,18 +2038,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // so inspecting the queue before advancing is too early. Stop at either structural branch, then arm
         // Dex Nav only after it actually exists. This also guarantees no Dex Nav prompt can leak into an
         // ordinary CommandPhase crossing.
-        // When the guest is already parked on SelectBiome, stop the authority immediately after committing
-        // that exact BIOME_PICK. Production can deliver it while the host renders its SwitchBiome/NewBattle
-        // tail; running the entire host tail first made the shared-process harness restore newer ambient state
-        // before the guest's receipt continuation executed.
-        const boundaries = [
-          "CommandPhase",
-          "ErDexNavPhase",
-          "TheBargainPhase",
-          ...(guestBiomeBoundary == null ? [] : ["SelectBiomePhase"]),
-        ] as const;
         for (;;) {
-          const boundary = await game.phaseInterceptor.toFirst(boundaries);
+          const boundary = await game.phaseInterceptor.toFirst([
+            "CommandPhase",
+            "ErDexNavPhase",
+            "TheBargainPhase",
+          ] as const);
           if (boundary === "ErDexNavPhase") {
             armHostDexNavAutoPicks();
             await game.phaseInterceptor.to("ErDexNavPhase");
@@ -2058,9 +2052,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           if (boundary === "TheBargainPhase") {
             await driveBargainContinuation();
             continue;
-          }
-          if (boundary === "SelectBiomePhase") {
-            await game.phaseInterceptor.to("SelectBiomePhase");
           }
           break;
         }

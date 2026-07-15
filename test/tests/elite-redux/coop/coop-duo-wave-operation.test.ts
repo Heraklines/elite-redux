@@ -53,10 +53,12 @@ import {
   setCoopWaveAdvanceOperationEnabled,
 } from "#data/elite-redux/coop/coop-wave-operation";
 import { BattleType } from "#enums/battle-type";
+import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { BattleEndPhase } from "#phases/battle-end-phase";
+import { VictoryPhase } from "#phases/victory-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, type DuoRig, drainLoopback, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
@@ -340,6 +342,32 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       expect(addBattleScoreSpy, "the guest does not dual-run victory settlement").not.toHaveBeenCalled();
       expect(clearEnemyHeldItemsSpy, "the guest does not dual-run shared BattleEnd cleanup").not.toHaveBeenCalled();
       expect(rawPublisherSpy, "the guest does not fall back to the raw wave-end carrier").not.toHaveBeenCalled();
+    });
+    logs.flush();
+  }, 300_000);
+
+  it("retained ordinary Victory ignores speculative Mystery classification with no encounter payload", async () => {
+    const rig = await bootDuo();
+    registerCoopOperationLiveSink("op:wave", envelope => {
+      routed.push(envelope.pendingOperation?.payload as CoopWaveAdvancePayload);
+      return true;
+    });
+    await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 11 });
+
+    await withClient(rig.guestCtx, () => {
+      markCoopWaveAdvanceDataApplied(11, rig.guestRuntime.waveOperationBinding);
+      rig.guestScene.currentBattle.waveIndex = 12;
+      rig.guestScene.currentBattle.battleType = BattleType.MYSTERY_ENCOUNTER;
+      rig.guestScene.currentBattle.mysteryEncounter = undefined;
+      vi.spyOn(rig.guestScene.currentBattle, "isBattleMysteryEncounter").mockReturnValue(true);
+      const phase = new VictoryPhase(BattlerIndex.ENEMY, false, 11);
+      const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+
+      expect(
+        () => phase.start(),
+        "wave-11 retained ordinary victory must not dereference speculative wave-12 Mystery state",
+      ).not.toThrow();
+      expect(endSpy, "the ordinary retained tail remains executable").toHaveBeenCalledOnce();
     });
     logs.flush();
   }, 300_000);

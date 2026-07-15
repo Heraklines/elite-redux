@@ -1549,6 +1549,11 @@ export async function driveDuoGuestTackleThroughPublicUi(
       // once so it participates in the now-live reciprocal rendezvous.
       rig.hostScene.phaseManager.getCurrentPhase().start();
       await drainLoopback();
+    } else if (rig.hostScene.phaseManager.getCurrentPhase().phaseName === "CommandPhase") {
+      // A between-wave caller may already have stopped the real host queue on this exact command surface
+      // after materializing both clients. It is already started and waiting at the reciprocal barrier;
+      // asking PhaseInterceptor.to() for the current phase waits for a transition that cannot occur.
+      await drainLoopback();
     } else {
       await hostGame.phaseInterceptor.to("CommandPhase");
     }

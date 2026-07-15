@@ -101,6 +101,7 @@ describe.skipIf(!RUN)("CO-OP SOAK catch leg: seeded ball throw -> capture -> dex
       logs,
       profile: "god",
       catchWaves: new Set([CATCH_WAVE]),
+      capturePostWaveState: true,
     });
 
     // eslint-disable-next-line no-console
@@ -137,6 +138,19 @@ describe.skipIf(!RUN)("CO-OP SOAK catch leg: seeded ball throw -> capture -> dex
     expect(result.wavesCompleted, "the run surveyed every requested wave (continued green past the catch)").toBe(
       TOTAL_WAVES,
     );
+    expect(
+      result.postWaveStates.map(state => state.wave),
+      "every boundary was sampled before the next admission",
+    ).toEqual([1, 2, 3, 4, 5]);
+    const catchBoundary = result.postWaveStates.find(state => state.wave === CATCH_WAVE)?.retainedWaveTransaction;
+    expect(catchBoundary?.dataApplied, "wave 3 catch DATA applied before wave 4 could be admitted").toBe(true);
+    expect(
+      catchBoundary?.continuationReady,
+      "wave 3 catch reward surface released its retained continuation before wave 4 could be admitted",
+    ).toBe(true);
+    const wave4Boundary = result.postWaveStates.find(state => state.wave === CATCH_WAVE + 1)?.retainedWaveTransaction;
+    expect(wave4Boundary?.dataApplied, "wave 4 admitted a distinct retained transaction").toBe(true);
+    expect(wave4Boundary?.continuationReady, "wave 4 continuation also released without ambiguity").toBe(true);
 
     logs.flush();
   }, 600_000);
