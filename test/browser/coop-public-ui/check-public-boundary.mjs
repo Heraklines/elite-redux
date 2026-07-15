@@ -49,6 +49,17 @@ for (const file of files) {
 
 const harness = sources.get("public-ui-harness.mjs");
 const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
+if (
+  !harness?.includes("const launchResults = await Promise.allSettled([launchBrowser(), launchBrowser()]);")
+  || !harness.includes("hostBrowser.createBrowserContext()")
+  || !harness.includes("guestBrowser.createBrowserContext()")
+  || !harness.includes("if (launchFailure)")
+  || !harness.includes("Promise.allSettled(this.browsers.map(browser => browser.close()))")
+) {
+  failures.push(
+    "public-ui-harness.mjs: both public players must own independent Chrome processes and contexts with bounded teardown",
+  );
+}
 const evaluateCalls = harness?.match(/page\.evaluate\(/gu)?.length ?? 0;
 if (evaluateCalls !== 1 || !harness?.includes("document.activeElement.blur()")) {
   failures.push(

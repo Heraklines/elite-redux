@@ -1,7 +1,7 @@
 # Co-op two-browser public-UI journeys
 
 This opt-in harness drives two clients built from the exact implementation SHA through the same surfaces a
-player uses. Each seat has its own Chromium `BrowserContext`, cookie jar, local storage, login form, canvas,
+player uses. Each seat has its own Chromium process, `BrowserContext`, cookie jar, local storage, login form, canvas,
 and keyboard. The driver does not import game source, call scene or phase methods, inject relay messages,
 mirror waves, or apply resyncs. `check-public-boundary.mjs` protects that boundary.
 
