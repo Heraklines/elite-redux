@@ -566,8 +566,12 @@ export class BiomeShopPhase extends SelectModifierPhase {
         [...globalScene.getPlayerParty(), ...globalScene.getEnemyParty()].map(mon => [mon.id, mon] as const),
       );
       for (const data of [...rollbackState.playerParty, ...rollbackState.enemyParty]) {
-        const mon = liveById.get(data.id);
-        if (mon != null && data.fusionSpecies === undefined) {
+        const wire = data as { id?: unknown; fusionSpecies?: unknown };
+        if (typeof wire.id !== "number") {
+          return false;
+        }
+        const mon = liveById.get(wire.id);
+        if (mon != null && wire.fusionSpecies === undefined) {
           // applyAuthoritativeMonData maps an absent fusion species to null. Both mean "not fused" to the
           // engine, but only undefined reproduces the captured immutable wire image byte-for-byte.
           (mon as unknown as { fusionSpecies?: unknown }).fusionSpecies = undefined;
