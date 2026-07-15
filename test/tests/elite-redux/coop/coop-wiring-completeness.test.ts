@@ -313,9 +313,9 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       ["owner", source.slice(ownerStart, ownerEnd), "owner"],
       ["watcher", source.slice(watcherStart, watcherEnd), "watcher"],
     ] as const) {
-      const modeOpen = body.indexOf("setModeBoundedWhen(");
-      const supersededGuard = body.indexOf('=== "superseded"');
-      const mirrorOpen = body.indexOf(`beginSession("${mirrorRole}", UiMode.ER_MAP`);
+      const modeOpen = body.search(/setModeBoundedWhen\(\s*UiMode\.ER_MAP/);
+      const supersededGuard = body.search(/===\s*"superseded"/);
+      const mirrorOpen = body.search(new RegExp(`beginSession\\(\\s*"${mirrorRole}"\\s*,\\s*UiMode\\.ER_MAP`));
       const readiness = body.indexOf("notifyCoopWaveContinuationSurfaceReady(");
       expect(modeOpen, `${label} opens ER_MAP through the bounded live-phase seam`).toBeGreaterThanOrEqual(0);
       expect(supersededGuard, `${label} rejects a replaced UI transition`).toBeGreaterThan(modeOpen);
