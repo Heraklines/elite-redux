@@ -82,6 +82,7 @@ class FakeEvidence {
       kind: "browser-surface2",
       observation: {
         surfaceId,
+        coop: true,
         phase,
         phaseInstance,
         uiMode: "MESSAGE",
@@ -199,6 +200,25 @@ test("only ready active local battle narration and EXP instances advance once on
       ["renderer", "battle:message", 1],
     ],
   );
+});
+
+test("pre-command launch advances a readiness-proven SummonPhase prompt without inventing a command address", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const stats = {};
+  const advance = createBattlePromptAdvancer(rig, { authority: 0, renderer: 0 }, stats, "fresh-wave-1-intro", {
+    requireSharedCommandAddress: false,
+  });
+
+  authority.evidence.pushBattleReadiness("battle:message", "SummonPhase", true, 1);
+  assert.equal(await advance(), true);
+  assert.equal(await advance(), false, "one prompt generation must receive exactly one public action");
+  assert.deepEqual(
+    authority.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.equal(stats.battleMessagePrompts, 1);
 });
 
 test("the short public journey advances readiness-proven narration before polling the next outcome", async () => {

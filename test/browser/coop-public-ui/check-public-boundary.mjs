@@ -154,7 +154,8 @@ if (
   || !browserEntry.includes('phase === "MessagePhase"')
   || !browserEntry.includes('surfaceId: "battle:message"')
   || !browserEntry.includes("isAwaitingPromptAction")
-  || !browserEntry.includes("phaseInstance: semanticPhaseInstance")
+  || !browserEntry.includes("phaseInstance: semanticSurfaceInstance")
+  || !browserEntry.includes("getPromptGeneration")
 ) {
   failures.push("coop-browser-entry.ts: EXP prompts must expose complete actionable readiness to the public driver");
 }

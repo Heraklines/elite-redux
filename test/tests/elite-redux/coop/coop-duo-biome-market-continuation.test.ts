@@ -203,12 +203,12 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
 
     await withClient(rig.hostCtx, async () => {
       // Odd interaction => guest owns the market and the host is the watcher,
-      // matching the tester capture. Keep both controllers on the same pin.
+      // matching the tester capture. A peer counter broadcast is only advisory; each controller
+      // crosses its own local terminal, so put both engines on the same pin explicitly.
       rig.hostRuntime.controller.advanceInteraction(0);
-      await drainLoopback();
     });
     await withClient(rig.guestCtx, async () => {
-      await drainLoopback();
+      rig.guestRuntime.controller.advanceInteraction(0);
     });
     expect(rig.hostRuntime.controller.interactionCounter()).toBe(1);
     expect(rig.guestRuntime.controller.interactionCounter()).toBe(1);
@@ -216,6 +216,9 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     await withClient(rig.hostCtx, async () => {
       const phase = liveBiomeShop() as unknown as BiomeShopSeam;
       const option = makeWideLensOption();
+      if (option == null) {
+        throw new Error("Wide Lens must generate a concrete market option");
+      }
       const target = rig.hostScene.getPlayerParty()[1];
       const modifier = option.type.newModifier(target);
       expect(modifier).not.toBeNull();
@@ -414,8 +417,8 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
 
     expect(
       rig.hostRuntime.controller.interactionCounter(),
-      "the owner remains retained until the watcher applies the continuation",
-    ).toBe(counterBefore);
+      "the owner crosses its own local terminal after the human confirms Leave",
+    ).toBe(counterBefore + 1);
     expect(pair.faultsInjected(), "the legacy market buy + leave stream must actually be dropped").toBeGreaterThan(0);
     // The continuation the buy queued is a PINNED BiomeShopPhase (carries coopBiomeStart), not the
     // unpinned plain-SelectModifierPhase orphan (pre-fix this array is empty - the copy had no coopBiomeStart).
@@ -424,8 +427,8 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       counterBefore,
     );
 
-    // WATCHER (guest): adopt the retained stock/result and acknowledge its continuation. Then pump the
-    // authority so it may release the terminal, followed by the watcher once more for the exact counter.
+    // WATCHER (guest): adopt the retained stock/result and acknowledge its continuation. Then pump both
+    // destinations through the retry/ACK transaction until the watcher's own local terminal crosses.
     await withClient(rig.guestCtx, async () => {
       for (let i = 0; i < 32; i++) {
         await drainLoopback();

@@ -431,7 +431,7 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       }
       return inMe
         ? { surfaceId: "mystery-encounter:message", operationClass: "encounter-prompt", ownerModel: "interaction" }
-        : null;
+        : { surfaceId: "battle:message", operationClass: "battle-progress", ownerModel: "local" };
     case "EGG_HATCH_SUMMARY":
       return { surfaceId: "egg:hatch-summary", operationClass: "egg", ownerModel: "local" };
     case "EGG_HATCH_SCENE":
@@ -612,6 +612,7 @@ function observeSemanticSurface(): void {
     // racing repeated Action keys; gameplay surfaces still carry their actual wave/turn.
     const { wave, turn } = semanticBattleAddress(battle);
     const promptReady = (handler as unknown as { isAwaitingPromptAction?: () => boolean }).isAwaitingPromptAction;
+    const readPromptGeneration = (handler as unknown as { getPromptGeneration?: () => number }).getPromptGeneration;
     const awaitingRaw = (handler as unknown as { awaitingActionInput?: unknown }).awaitingActionInput;
     // MessageUiHandler keeps its raw `awaitingActionInput` bit set after an action has consumed
     // `onActionInput`. Its public readiness method proves the complete actionable contract and
@@ -623,11 +624,17 @@ function observeSemanticSurface(): void {
         : typeof awaitingRaw === "boolean"
           ? awaitingRaw
           : null;
+    const promptGeneration =
+      uiMode === "MESSAGE" && typeof readPromptGeneration === "function" ? readPromptGeneration.call(handler) : null;
+    const semanticSurfaceInstance =
+      Number.isSafeInteger(promptGeneration) && (promptGeneration ?? 0) > 0
+        ? (promptGeneration as number)
+        : semanticPhaseInstance;
 
     const probeKey = [
       semantic.surfaceId,
       uiMode,
-      semanticPhaseInstance,
+      semanticSurfaceInstance,
       `${epoch}:${wave}:${turn}`,
       selection.selectedOptionId ?? "",
       ownerSeat ?? "?",
@@ -658,7 +665,7 @@ function observeSemanticSurface(): void {
       optionCount: selection.optionCount,
       ready: { handlerActive: true, awaitingActionInput },
       phase,
-      phaseInstance: semanticPhaseInstance,
+      phaseInstance: semanticSurfaceInstance,
       uiMode,
     };
     const canonical = JSON.stringify(observation);

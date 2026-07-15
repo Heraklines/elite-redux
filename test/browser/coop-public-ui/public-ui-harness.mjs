@@ -915,6 +915,32 @@ export class DuoPublicUiRig {
     this.pairRoleCursors = null;
   }
 
+  async waitForAllLocalCommandsDrivingBattlePrompts(from, purpose) {
+    const clients = Object.values(this.clients);
+    const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
+    const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, purpose, {
+      requireSharedCommandAddress: false,
+    });
+    while (Date.now() < progressBudget.observe()) {
+      if (clients.every(client => findOwnedCommandOrTerminal(client, from[client.label]) != null)) {
+        break;
+      }
+      if (await advanceBattlePrompt()) {
+        continue;
+      }
+      await delay(100);
+    }
+    for (const client of clients) {
+      const event = findOwnedCommandOrTerminal(client, from[client.label]);
+      if (event == null) {
+        throw new Error(`${client.label}: timed out waiting for owned command while ${purpose}`);
+      }
+      if (event.kind !== "browser-surface2" && !LOCAL_COMMAND.test(event.text ?? "")) {
+        throw new Error(`${client.label}: shared session terminated before owned CommandPhase: ${event.text}`);
+      }
+    }
+  }
+
   static async launch(config) {
     const browser = await puppeteer.launch({
       headless: config.headless,
@@ -1336,9 +1362,7 @@ export class DuoPublicUiRig {
         }),
       ),
     );
-    await Promise.all(
-      Object.values(this.clients).map(client => client.waitForLocalCommand(phaseCursors[client.label])),
-    );
+    await this.waitForAllLocalCommandsDrivingBattlePrompts(phaseCursors, "fresh-wave-1-intro");
     const boundary = await this.assertSharedSurface("command", phaseCursors, "fresh-wave-1-command", {
       expectedWave: 1,
     });
@@ -1366,9 +1390,7 @@ export class DuoPublicUiRig {
     await delay(this.config.settleDelayMs);
     await guestClient.press("Space", "guest-accept-resume-offer");
     await this.completePairingBinding();
-    await Promise.all(
-      Object.values(this.clients).map(client => client.waitForLocalCommand(resumeCursors[client.label])),
-    );
+    await this.waitForAllLocalCommandsDrivingBattlePrompts(resumeCursors, "resume-battle-intro");
     const boundary = await this.assertSharedSurface("command", resumeCursors, "resumed-command", {
       allowAddressRepeat: true,
       expectedWave,
@@ -1519,7 +1541,7 @@ export class DuoPublicUiRig {
       await owner.press(key, `leave-reward-screen:${index + 2}/${this.config.keys.rewardLeave.length}`);
     }
     await this.assertRetainedRewardTerminal(terminalCursors, expectedRewardAddress, owner.publicSeat);
-    await Promise.all(values.map(client => client.waitForLocalCommand(commandCursors[client.label])));
+    await this.waitForAllLocalCommandsDrivingBattlePrompts(commandCursors, "next-wave-intro");
     const expectedWave = this.activeBattleWave == null ? null : this.activeBattleWave + 1;
     const boundary = await this.assertSharedSurface("command", commandCursors, "wave-2-command", {
       expectedWave,

@@ -24,7 +24,10 @@ const AUTHORITY_MOVE_EFFECT = /Start Phase MoveEffectPhase/u;
 const RENDERER_MOVE_REPLAY = /Start Phase CoopMoveAnimReplayPhase/u;
 const RENDERER_MOVE_SKIPPED = /present move .* NO-OP end \(user=.* anims=false\)/u;
 const BATTLE_PROMPT_PHASES = new Map([
-  ["battle:message", "MessagePhase"],
+  // Battle narration is rendered by MessageUiHandler from several phase classes (SummonPhase,
+  // ShowTrainerPhase, replay phases, and MessagePhase itself). The semantic surface's prompt
+  // generation is the actionable identity; only EXP needs an exact phase-class restriction.
+  ["battle:message", null],
   ["battle:exp", "ExpPhase"],
 ]);
 const ANIMATION_PROGRESS_ALLOWANCE_MS = 90_000;
@@ -273,12 +276,12 @@ function currentSharedCommandAddress(clients, purpose) {
  * leaving that readiness signal undriven prevents the guest from applying/ACKing the completed turn
  * forever.
  */
-export function createBattlePromptAdvancer(rig, from, stats, purpose) {
+export function createBattlePromptAdvancer(rig, from, stats, purpose, { requireSharedCommandAddress = true } = {}) {
   if (!rig.host) {
     throw new Error(`${purpose}: battle prompt advancement requires the authenticated public host`);
   }
   const clients = Object.values(rig.clients);
-  const expectedAddress = currentSharedCommandAddress(clients, purpose);
+  const expectedAddress = requireSharedCommandAddress ? currentSharedCommandAddress(clients, purpose) : null;
   const cursors = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
   const consumedInstances = new Set();
   return async () => {
@@ -290,13 +293,20 @@ export function createBattlePromptAdvancer(rig, from, stats, purpose) {
         const observation = event.observation;
         const expectedPhase = BATTLE_PROMPT_PHASES.get(observation.surfaceId);
         const observedAddress = `${observation.address?.epoch}:${observation.address?.wave}:${observation.address?.turn}`;
+        const hasLiveBattleAddress =
+          Number.isSafeInteger(observation.address?.epoch)
+          && Number.isSafeInteger(observation.address?.wave)
+          && observation.address.wave > 0
+          && Number.isSafeInteger(observation.address?.turn)
+          && observation.address.turn > 0;
         const instanceKey = `${client.label}:${observation.surfaceId}:${observation.phaseInstance}`;
         return (
-          expectedPhase != null
-          && observedAddress === expectedAddress
-          && observation.phase === expectedPhase
+          BATTLE_PROMPT_PHASES.has(observation.surfaceId)
+          && (expectedAddress == null ? hasLiveBattleAddress : observedAddress === expectedAddress)
+          && (expectedPhase == null || observation.phase === expectedPhase)
           && observation.uiMode === "MESSAGE"
           && observation.ownerModel === "local"
+          && observation.coop === true
           && observation.seatsWithInput?.includes(observation.localSeat)
           && Number.isSafeInteger(observation.phaseInstance)
           && observation.ready?.handlerActive === true
