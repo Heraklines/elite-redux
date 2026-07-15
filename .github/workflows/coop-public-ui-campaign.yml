@@ -149,7 +149,8 @@ jobs:
             test/browser/coop-public-ui/check-campaign-boundary.mjs \
             test/browser/coop-public-ui/environment-seal.mjs \
             test/browser/coop-public-ui/evidence.mjs \
-            test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs
+            test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs \
+            test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
 
       - name: Enforce public-driver boundary (original harness files)
         run: node test/browser/coop-public-ui/check-public-boundary.mjs
@@ -165,6 +166,7 @@ jobs:
           test/browser/coop-public-ui/campaign-exp-phase.test.mjs
           test/browser/coop-public-ui/campaign-render-profile.test.mjs
           test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs
+          test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
 
       # Cache the built bundle keyed on the GAME-SOURCE inputs only (src/public/lockfile/
       # entry/sealer/vite-config/workflow-env) - NOT the harness driver. A harness-only push
@@ -392,3 +394,30 @@ jobs:
           path: dev-logs/coop-public-ui/**
           retention-days: 14
           if-no-files-found: warn
+
+  campaign-required:
+    name: Co-op public UI campaign required
+    if: always()
+    needs:
+      - staging-health
+      - browser-build
+      - solo-nav
+      - campaign
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require healthy staging and every concrete browser profile
+        env:
+          STAGING_HEALTHY: ${{ needs.staging-health.outputs.healthy }}
+          HEALTH_RESULT: ${{ needs.staging-health.result }}
+          BUILD_RESULT: ${{ needs.browser-build.result }}
+          SOLO_RESULT: ${{ needs.solo-nav.result }}
+          CAMPAIGN_RESULT: ${{ needs.campaign.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$HEALTH_RESULT" = "success"
+          test "$STAGING_HEALTHY" = "true"
+          test "$BUILD_RESULT" = "success"
+          test "$SOLO_RESULT" = "success"
+          test "$CAMPAIGN_RESULT" = "success"
+          echo "Campaign closure proven: healthy staging, sealed build, solo navigation, and every matrix profile passed."

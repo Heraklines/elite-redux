@@ -10,6 +10,7 @@
     ".github/coop-task-ownership/p33-browser-process-isolation.json",
     ".github/coop-task-ownership/p33-final-merge-codex.json",
     ".github/coop-task-ownership/p33-terminal-turn-convergence.json",
+    ".github/workflows/coop-public-ui-campaign.yml",
     ".github/workflows/coop-public-ui-journey.yml",
     "scripts/coop-public-ui-contract-check.mjs",
     "src/battle.ts",
@@ -25,6 +26,8 @@
     "test/tests/elite-redux/coop/**",
     "test/tests/test-framework/mock-sprite.test.ts",
     "test/tools/coop-duo-harness.ts",
+    "test/tools/coop-fault-transport.ts",
+    "test/tools/coop-scheduled-transport.ts",
     "test/tools/coop-soak-coverage.ts",
     "test/tools/coop-soak-driver.ts",
     "workers/er-coop-api/src/p33-signaling.ts"

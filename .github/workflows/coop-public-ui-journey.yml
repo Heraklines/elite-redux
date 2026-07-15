@@ -157,6 +157,7 @@ jobs:
             test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs \
             test/browser/coop-public-ui/run-campaign.mjs \
             test/browser/coop-public-ui/run.mjs \
+            test/browser/coop-public-ui/semantic-surface-evidence.test.mjs \
             test/browser/coop-public-ui/terminal-watchdog.mjs \
             test/browser/coop-public-ui/vite.config.mjs
 
@@ -177,6 +178,9 @@ jobs:
 
       - name: Verify strict Wide Lens market contracts
         run: node --test test/browser/coop-public-ui/market-gold-standard.test.mjs
+
+      - name: Verify strict semantic surface evidence contracts
+        run: node --test test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
 
       - name: Build normal application with CI-only read-only observer
         env:

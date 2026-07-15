@@ -373,21 +373,19 @@ function recordBrowserObservations(sink, text) {
   }
 }
 
-/**
- * Parse the read-only v2 semantic surface mirror. Lenient by design: an unrecognized or
- * malformed line returns null and is dropped (v2 drives navigation; it is not a hard proof
- * like v1, whose parser fails closed). Only the fields a driver needs are validated.
- */
-function semanticSurfaceView(text) {
+/** Parse the read-only v2 semantic surface mirror. A claimed v2 line is a strict proof contract. */
+export function semanticSurfaceView(text) {
   if (!text.startsWith(SURFACE2_PREFIX)) {
     return null;
   }
   let value;
   try {
     value = JSON.parse(text.slice(SURFACE2_PREFIX.length));
-  } catch {
-    return null;
+  } catch (error) {
+    throw new Error(`built browser emitted invalid semantic surface JSON: ${String(error)}`);
   }
+  const nullableSeat = seat => seat === null || (Number.isSafeInteger(seat) && seat >= 0);
+  const nullableRevision = revision => revision === null || (Number.isSafeInteger(revision) && revision >= 0);
   if (
     !value
     || typeof value !== "object"
@@ -395,15 +393,51 @@ function semanticSurfaceView(text) {
     || typeof value.surfaceId !== "string"
     || value.surfaceId.length === 0
     || typeof value.operationClass !== "string"
+    || value.operationClass.length === 0
+    || (value.ownerModel !== "interaction" && value.ownerModel !== "local")
+    || typeof value.coop !== "boolean"
     || !value.address
     || typeof value.address !== "object"
     || !Number.isSafeInteger(value.address.epoch)
+    || value.address.epoch < (value.coop ? 1 : 0)
     || !Number.isSafeInteger(value.address.wave)
+    || value.address.wave < 0
     || !Number.isSafeInteger(value.address.turn)
+    || value.address.turn < 0
+    || !nullableSeat(value.localSeat)
+    || !nullableSeat(value.ownerSeat)
+    || !Array.isArray(value.seatsWithInput)
+    || value.seatsWithInput.some(seat => !Number.isSafeInteger(seat) || seat < 0)
+    || new Set(value.seatsWithInput).size !== value.seatsWithInput.length
+    || !nullableRevision(value.membershipRevision)
+    || !nullableRevision(value.connectionGeneration)
+    || (value.localRole !== null && value.localRole !== "host" && value.localRole !== "guest")
+    || !value.ready
+    || typeof value.ready !== "object"
+    || typeof value.ready.handlerActive !== "boolean"
+    || (value.ready.awaitingActionInput !== null && typeof value.ready.awaitingActionInput !== "boolean")
+    || typeof value.phase !== "string"
+    || value.phase.length === 0
+    || typeof value.uiMode !== "string"
+    || value.uiMode.length === 0
+    || !Number.isSafeInteger(value.phaseInstance)
+    || value.phaseInstance <= 0
+    || (value.coop
+      && (value.localSeat === null
+        || value.localRole === null
+        || value.membershipRevision === null
+        || value.connectionGeneration === null))
   ) {
-    return null;
+    throw new Error("built browser emitted an invalid semantic surface observation");
   }
-  return Object.freeze({ ...value, address: Object.freeze({ ...value.address }) });
+  return Object.freeze({
+    ...value,
+    address: Object.freeze({ ...value.address }),
+    seatsWithInput: Object.freeze([...value.seatsWithInput]),
+    ready: Object.freeze({ ...value.ready }),
+    ...(Array.isArray(value.optionIds) ? { optionIds: Object.freeze([...value.optionIds]) } : {}),
+    ...(Array.isArray(value.teamSpeciesIds) ? { teamSpeciesIds: Object.freeze([...value.teamSpeciesIds]) } : {}),
+  });
 }
 
 export class EvidenceSink {
@@ -563,11 +597,19 @@ export class EvidenceSink {
         });
         this.failures.push(invalid);
       }
-      // The v2 semantic mirror is advisory (it drives state-aware navigation, it is not a
-      // hard convergence proof like v1), so a malformed line is ignored, never fatal.
-      const semantic = semanticSurfaceView(text);
-      if (semantic != null) {
-        this.record("browser-surface2", { observation: semantic });
+      try {
+        const semantic = semanticSurfaceView(text);
+        if (semantic != null) {
+          const observed = this.record("browser-surface2", { observation: semantic });
+          if (semantic.surfaceId === "unclassified" || semantic.surfaceId === "observer-fault") {
+            this.failures.push(observed);
+          }
+        }
+      } catch (error) {
+        const invalid = this.record("browser-surface2-invalid", {
+          text: error instanceof Error ? error.message : String(error),
+        });
+        this.failures.push(invalid);
       }
     });
     page.on("pageerror", error => {

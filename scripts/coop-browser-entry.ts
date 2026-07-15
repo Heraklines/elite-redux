@@ -517,6 +517,7 @@ let lastSemanticProbe = "";
 let lastSemanticProbeAt = 0;
 let lastSemanticPhase: object | null = null;
 let semanticPhaseInstance = 0;
+let lastSemanticObserverError = "";
 let lastObservedRenderProfile = "";
 let lastObservedMarket = "";
 let lastObservedCommander = "";
@@ -773,10 +774,6 @@ function observeSemanticSurface(): void {
       return;
     }
     const uiMode = UiMode[ui.getMode()];
-    const semantic = classifySemanticSurface(phase, uiMode);
-    if (semantic == null) {
-      return;
-    }
     // Two adjacent ExpPhase objects can expose the same surface/address and can both become
     // ready between 100 ms observer samples at 10x speed. Object identity is read-only and
     // gives every observed phase instance a monotonic discriminator, preventing the second
@@ -784,6 +781,42 @@ function observeSemanticSurface(): void {
     if (currentPhase !== lastSemanticPhase) {
       lastSemanticPhase = currentPhase;
       semanticPhaseInstance += 1;
+    }
+    const semantic = classifySemanticSurface(phase, uiMode);
+    if (semantic == null) {
+      const membership = runtime?.membership.snapshot();
+      if (runtime == null || membership?.state !== "active") {
+        return;
+      }
+      const { wave, turn } = semanticBattleAddress(battle);
+      const observation = {
+        version: 2,
+        surfaceId: "unclassified",
+        operationClass: "unclassified",
+        ownerModel: "local",
+        coop: true,
+        address: { epoch: runtime.controller.sessionEpoch, wave, turn },
+        membershipRevision: membership.revision,
+        connectionGeneration: membership.connectionGeneration,
+        localSeat: runtime.controller.seat,
+        localRole: runtime.controller.role,
+        ownerSeat: null,
+        seatsWithInput: [runtime.controller.seat],
+        selectedOptionId: null,
+        optionIds: null,
+        optionCount: null,
+        teamSpeciesIds: null,
+        ready: { handlerActive: true, awaitingActionInput: null },
+        phase,
+        phaseInstance: semanticPhaseInstance,
+        uiMode,
+      } as const;
+      const canonical = JSON.stringify(observation);
+      if (canonical !== lastSemanticObservation) {
+        lastSemanticObservation = canonical;
+        console.info(`${SURFACE2_PREFIX}${canonical}`);
+      }
+      return;
     }
 
     let coop = false;
@@ -895,8 +928,13 @@ function observeSemanticSurface(): void {
     }
     lastSemanticObservation = canonical;
     console.info(`${SURFACE2_PREFIX}${canonical}`);
-  } catch {
-    // Scene init/teardown race; gameplay throws are still surfaced by the v1 observer-error path.
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message !== lastSemanticObserverError) {
+      lastSemanticObserverError = message;
+      // Observer failures invalidate the gold oracle. A console error is captured as fatal by EvidenceSink.
+      console.error(`[coop-browser:semantic-observer-error] ${message}`);
+    }
   }
 }
 
