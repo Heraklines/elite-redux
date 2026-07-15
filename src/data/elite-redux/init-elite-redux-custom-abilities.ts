@@ -29,7 +29,13 @@
 // (i18next would otherwise return the missing-key placeholder).
 // =============================================================================
 
-import { type AbAttr, ConditionalCritAbAttr, PostFaintAbAttr, RedirectTypeMoveAbAttr } from "#abilities/ab-attrs";
+import {
+  type AbAttr,
+  ConditionalCritAbAttr,
+  PostDefendContactDamageAbAttr,
+  PostFaintAbAttr,
+  RedirectTypeMoveAbAttr,
+} from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { BadSpliceAbAttr, ER_BAD_SPLICE_ABILITY_ID } from "#data/elite-redux/abilities/bad-splice";
@@ -97,6 +103,17 @@ import { ER_SOULMATE_ABILITY_ID, SoulmateAbAttr } from "#data/elite-redux/abilit
 import { ER_SPORE_BED_ABILITY_ID } from "#data/elite-redux/abilities/spore-bed";
 import { ER_TANGLED_SEED_ABILITY_ID, TangledSeedAbAttr } from "#data/elite-redux/abilities/tangled-seed";
 import {
+  ER_ALLURING_SKULL_ABILITY_ID,
+  ER_FORMLESS_FIST_ABILITY_ID,
+  ER_GRIM_JAB_ABILITY_ID,
+  ER_PRICKLY_ARMOR_ABILITY_ID,
+  ER_SAVAGE_SPEAR_ABILITY_ID,
+  GRIM_JAB_POWER_MULTIPLIER,
+  PRICKLY_ARMOR_CONTACT_DIVISOR,
+  PRICKLY_ARMOR_DAMAGE_REDUCTION,
+  TWICE_HIT_SECOND_STRIKE_MULTIPLIER,
+} from "#data/elite-redux/abilities/type-nativization-abilities";
+import {
   ER_WORLD_IN_PIECES_ABILITY_ID,
   WorldInPiecesRemoveTypeAbAttr,
   WorldInPiecesRestoreAbAttr,
@@ -104,14 +121,20 @@ import {
   WorldInPiecesSummonAbAttr,
 } from "#data/elite-redux/abilities/world-in-pieces";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
+import { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-stat-substitute";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
+import { DamageReductionAbAttr } from "#data/elite-redux/archetypes/damage-reduction-generic";
 import { EntryTrapOnFoeSideAbAttr } from "#data/elite-redux/archetypes/entry-trap-on-foe-side";
+import { HitMultiplierAbAttr, HitMultiplierPowerAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
+import { TypeAbsorbHighestAttackStatBoostAbAttr } from "#data/elite-redux/archetypes/immunity-with-absorb";
 import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
+import { TypeConversionAbAttr, TypeConversionPowerBoostAbAttr } from "#data/elite-redux/archetypes/type-conversion";
 import { ER_ABILITIES, type ErAbilityDraft } from "#data/elite-redux/er-abilities";
 import { ER_ABILITY_ARCHETYPES, type ErArchetypeKind } from "#data/elite-redux/er-ability-archetypes";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { MoveFlags } from "#enums/move-flags";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { failIfRadianceOnFieldCondition } from "#moves/move-condition";
@@ -615,6 +638,53 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_KNIGHTS_HONOR_ABILITY_ID,
     },
+    // Type-nativization (Pass A) bespoke abilities. Each is composed from
+    // existing, tested ER attr primitives in buildCustomAbility below.
+    {
+      draft: {
+        id: ER_SAVAGE_SPEAR_ABILITY_ID,
+        name: "Savage Spear",
+        description: "Horn moves hit twice. 1st hit at 100% power, 2nd hit at 40%.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_SAVAGE_SPEAR_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_GRIM_JAB_ABILITY_ID,
+        name: "Grim Jab",
+        description: "Normal-type Drill moves become Ghost and deal 1.2x damage.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_GRIM_JAB_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_ALLURING_SKULL_ABILITY_ID,
+        name: "Alluring Skull",
+        description: "Draws in Ghost moves, is immune to them, and raises its higher attacking stat.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_ALLURING_SKULL_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_FORMLESS_FIST_ABILITY_ID,
+        name: "Formless Fist",
+        description: "Punching moves hit twice (2nd at 40%) and use its higher attacking stat.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_FORMLESS_FIST_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_PRICKLY_ARMOR_ABILITY_ID,
+        name: "Prickly Armor",
+        description: "Deals 1/6 of an attacker's max HP on contact and takes 10% less damage from attacks.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_PRICKLY_ARMOR_ABILITY_ID,
+    },
   ];
   // Newcomer-patch composite abilities (5933+). Registered as placeholders here
   // (the ability instance + AbilityId reverse-map key + verbatim description);
@@ -966,6 +1036,52 @@ function buildCustomAbility(
     for (const attr of knightsHonorAttrs()) {
       builder.attrs.push(attr);
     }
+  }
+
+  // --- Type-nativization (Pass A) bespokes (composed from ER primitives) ---
+  if (pokerogueId === ER_SAVAGE_SPEAR_ABILITY_ID) {
+    // Horn moves hit twice; the 2nd strike deals 40% power (1st stays 100%).
+    builder.attr(HitMultiplierAbAttr, { extraStrikes: 1, filter: { flag: MoveFlags.HORN_BASED } });
+    builder.attr(HitMultiplierPowerAbAttr, {
+      multiplier: TWICE_HIT_SECOND_STRIKE_MULTIPLIER,
+      extraStrikesOnly: true,
+      filter: { flag: MoveFlags.HORN_BASED },
+    });
+  }
+
+  if (pokerogueId === ER_GRIM_JAB_ABILITY_ID) {
+    // Normal-type Drill moves become Ghost and gain a 1.2x power boost.
+    builder.attr(TypeConversionAbAttr, {
+      source: { kind: "flag", flag: MoveFlags.DRILL_BASED, requireType: PokemonType.NORMAL },
+      newType: PokemonType.GHOST,
+    });
+    builder.attr(TypeConversionPowerBoostAbAttr, {
+      source: { kind: "flag", flag: MoveFlags.DRILL_BASED, requireType: PokemonType.NORMAL },
+      multiplier: GRIM_JAB_POWER_MULTIPLIER,
+    });
+  }
+
+  if (pokerogueId === ER_ALLURING_SKULL_ABILITY_ID) {
+    // Lightning-Rod for Ghost: draw in Ghost moves, be immune, raise higher Atk.
+    builder.attr(RedirectTypeMoveAbAttr, PokemonType.GHOST);
+    builder.attr(TypeAbsorbHighestAttackStatBoostAbAttr, { type: PokemonType.GHOST, stages: 1 });
+  }
+
+  if (pokerogueId === ER_FORMLESS_FIST_ABILITY_ID) {
+    // Raging Boxer (punching moves hit twice, 2nd at 40%) using the higher Atk.
+    builder.attr(HitMultiplierAbAttr, { extraStrikes: 1, filter: { flag: MoveFlags.PUNCHING_MOVE } });
+    builder.attr(HitMultiplierPowerAbAttr, {
+      multiplier: TWICE_HIT_SECOND_STRIKE_MULTIPLIER,
+      extraStrikesOnly: true,
+      filter: { flag: MoveFlags.PUNCHING_MOVE },
+    });
+    builder.attr(AttackStatSubstituteAbAttr, { useHigherOffense: true, flag: MoveFlags.PUNCHING_MOVE });
+  }
+
+  if (pokerogueId === ER_PRICKLY_ARMOR_ABILITY_ID) {
+    // Sharp Edge (1/6 HP to attackers on contact) + a flat 10% damage reduction.
+    builder.attr(PostDefendContactDamageAbAttr, PRICKLY_ARMOR_CONTACT_DIVISOR);
+    builder.attr(DamageReductionAbAttr, { reduction: PRICKLY_ARMOR_DAMAGE_REDUCTION, filter: { kind: "all" } });
   }
 
   const ability = builder.build();
