@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "p33-webrtc-failed-open-ffec",
+  "branch": "ci/coop/p33-webrtc-failed-open-ffec",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "ffec851b40180d7ecc543237636c5e4a8d6a3763",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-webrtc-failed-open-ffec.json",
+    "src/data/elite-redux/coop/coop-webrtc-transport.ts",
+    "test/tests/elite-redux/coop/coop-webrtc-transport.test.ts"
+  ]
+}

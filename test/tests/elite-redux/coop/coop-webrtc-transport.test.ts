@@ -15,6 +15,7 @@ import type { CoopConnectionState, CoopMessage } from "#data/elite-redux/coop/co
 import { COOP_PROTOCOL_VERSION, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import {
   COOP_KEEPALIVE_MS,
+  COOP_PC_DISCONNECTED_GRACE_MS,
   COOP_WIRE_BUFFER_HIGH_BYTES,
   COOP_WIRE_CHUNK_PAYLOAD_CHARS,
   type CoopWireChannel,
@@ -563,7 +564,10 @@ describe("#857 R2 (intermittent flap): the hot-rejoin transport retires the SUPE
   }
   function fakePc(log: string[]): RTCPeerConnection {
     return {
+      connectionState: "connected",
+      iceConnectionState: "connected",
       close: () => log.push("pc.close"),
+      addEventListener: (type: string) => log.push(`pc.on:${type}`),
     } as unknown as RTCPeerConnection;
   }
 
@@ -593,6 +597,160 @@ describe("#857 R2 (intermittent flap): the hot-rejoin transport retires the SUPE
     expect(oldLog).toContain("pc.close");
     // ...and the live pc is untouched (still carrying the session).
     expect(newLog).not.toContain("pc.close");
+  });
+});
+
+describe("peer-connection lifecycle: a failed PC cannot hide behind an open DataChannel", () => {
+  class FakeRtcChannel {
+    readyState: RTCDataChannelState = "open";
+    bufferedAmount = 0;
+    bufferedAmountLowThreshold = 0;
+    closeCount = 0;
+    private readonly listeners = new Map<string, Array<(event: Event) => void>>();
+
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
+      const callback =
+        typeof listener === "function" ? listener : (event: Event) => listener.handleEvent(event);
+      const listeners = this.listeners.get(type) ?? [];
+      listeners.push(callback);
+      this.listeners.set(type, listeners);
+    }
+
+    send(): void {}
+
+    close(): void {
+      this.closeCount++;
+      if (this.readyState === "closed") {
+        return;
+      }
+      this.readyState = "closed";
+      this.fire("close");
+    }
+
+    fire(type: string): void {
+      for (const listener of this.listeners.get(type) ?? []) {
+        listener(new Event(type));
+      }
+    }
+  }
+
+  class FakeRtcPeerConnection {
+    connectionState: RTCPeerConnectionState = "connected";
+    iceConnectionState: RTCIceConnectionState = "connected";
+    closeCount = 0;
+    private readonly listeners = new Map<string, Array<(event: Event) => void>>();
+
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
+      const callback =
+        typeof listener === "function" ? listener : (event: Event) => listener.handleEvent(event);
+      const listeners = this.listeners.get(type) ?? [];
+      listeners.push(callback);
+      this.listeners.set(type, listeners);
+    }
+
+    close(): void {
+      this.closeCount++;
+      if (this.connectionState === "closed") {
+        return;
+      }
+      this.connectionState = "closed";
+      this.fire("connectionstatechange");
+    }
+
+    setConnectionState(state: RTCPeerConnectionState): void {
+      this.connectionState = state;
+      this.fire("connectionstatechange");
+    }
+
+    fire(type: string): void {
+      for (const listener of this.listeners.get(type) ?? []) {
+        listener(new Event(type));
+      }
+    }
+  }
+
+  function makeTransport() {
+    const channel = new FakeRtcChannel();
+    const pc = new FakeRtcPeerConnection();
+    const transport = new WebRtcTransport(
+      "host",
+      wireFromRtcChannel(
+        "host",
+        channel as unknown as RTCDataChannel,
+        pc as unknown as RTCPeerConnection,
+      ),
+    );
+    const states: CoopConnectionState[] = [];
+    transport.onStateChange(state => states.push(state));
+    return { channel, pc, states, transport };
+  }
+
+  it.each(["failed", "closed"] as const)(
+    "treats peer connection %s as immediately terminal even while the DataChannel still says open",
+    terminalState => {
+      const { channel, pc, states, transport } = makeTransport();
+      expect(channel.readyState).toBe("open");
+
+      pc.setConnectionState(terminalState);
+
+      expect(transport.state).toBe("disconnected");
+      expect(states, "lifecycle/rejoin receives exactly one disconnect transition").toEqual(["disconnected"]);
+      expect(transport.disconnectReason()).toBe(`peer connection ${terminalState}`);
+      expect(channel.closeCount, "the stuck-open data channel is retired").toBe(1);
+      expect(pc.closeCount, "the failed peer connection is retired").toBe(1);
+
+      pc.fire("connectionstatechange");
+      channel.fire("close");
+      expect(states, "duplicate carrier callbacks cannot start another rejoin").toEqual(["disconnected"]);
+    },
+  );
+
+  it("debounces a transient disconnected state, cancels on recovery, then fails once after the bounded grace", async () => {
+    vi.useFakeTimers();
+    try {
+      const { channel, pc, states, transport } = makeTransport();
+      pc.setConnectionState("disconnected");
+      await vi.advanceTimersByTimeAsync(COOP_PC_DISCONNECTED_GRACE_MS - 1);
+      expect(transport.state).toBe("connected");
+      expect(channel.readyState).toBe("open");
+
+      pc.setConnectionState("connected");
+      await vi.advanceTimersByTimeAsync(COOP_PC_DISCONNECTED_GRACE_MS + 1);
+      expect(transport.state, "a recovered ICE route keeps the current generation").toBe("connected");
+      expect(states).toEqual([]);
+
+      pc.setConnectionState("disconnected");
+      await vi.advanceTimersByTimeAsync(COOP_PC_DISCONNECTED_GRACE_MS);
+      expect(transport.state).toBe("disconnected");
+      expect(states).toEqual(["disconnected"]);
+      expect(transport.disconnectReason()).toContain("remained disconnected");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("generation-fences obsolete peer-connection callbacks after a replacement", () => {
+    const first = makeTransport();
+    const replacementChannel = new FakeRtcChannel();
+    const replacementPc = new FakeRtcPeerConnection();
+    first.transport.replaceChannel(
+      wireFromRtcChannel(
+        "host",
+        replacementChannel as unknown as RTCDataChannel,
+        replacementPc as unknown as RTCPeerConnection,
+      ),
+    );
+    expect(first.transport.state).toBe("connected");
+
+    first.pc.setConnectionState("failed");
+    expect(first.transport.state, "the superseded PC cannot tear down the replacement").toBe("connected");
+    expect(first.states).toEqual([]);
+    expect(replacementChannel.closeCount).toBe(0);
+
+    replacementPc.setConnectionState("failed");
+    expect(first.transport.state).toBe("disconnected");
+    expect(first.states).toEqual(["disconnected"]);
+    expect(replacementChannel.closeCount).toBe(1);
   });
 });
 
