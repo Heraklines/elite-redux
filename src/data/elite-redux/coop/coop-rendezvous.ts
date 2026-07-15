@@ -147,10 +147,20 @@ export class CoopRendezvous {
   /** point -> when each parked wait began (stall-watchdog age, mirrors the relay). */
   private readonly pendingSince = new Map<string, number>();
   private routeRevision = 0;
-  private latestGuestRoute: { revision: number; point: string; displacedPoint: string } | null = null;
+  private latestGuestRoute: {
+    revision: number;
+    point: string;
+    displacedPoint: string;
+  } | null = null;
   private readonly pendingRouteAcks = new Map<
     number,
-    { finish: () => void; abort: () => void; cancel: () => void; point: string; displacedPoint: string }
+    {
+      finish: () => void;
+      abort: () => void;
+      cancel: () => void;
+      point: string;
+      displacedPoint: string;
+    }
   >();
 
   constructor(transport: CoopTransport, opts: CoopRendezvousOptions = {}) {
@@ -182,7 +192,11 @@ export class CoopRendezvous {
    * bug report's control-plane block: a point in `awaiting` that the partner has NOT arrived at is a
    * one-sided barrier the run is parked on. Pure read; never mutates barrier state.
    */
-  describeArrivals(): { localArrived: string[]; partnerArrived: string[]; awaiting: string[] } {
+  describeArrivals(): {
+    localArrived: string[];
+    partnerArrived: string[];
+    awaiting: string[];
+  } {
     return {
       localArrived: [...this.localArrived],
       partnerArrived: [...this.partnerArrived],
@@ -317,10 +331,13 @@ export class CoopRendezvous {
       stale({ point, timedOut: true });
     }
     this.pendingSince.set(point, Date.now());
-    // A parked barrier await is a MACHINE wait (blocked on the PARTNER's arrival) - register it so the
-    // stall watchdog's asymmetric escalation can bound a dead-partner barrier. The barrier's own
-    // never-continue-unilaterally semantics are unchanged; only the ESCALATION path is added.
-    const endMachineWait = beginCoopMachineWait(`coop-rendezvous:${point}`);
+    // A parked reciprocal barrier is useful MUTUAL-stall evidence, but is not ASYMMETRIC-deadlock proof.
+    // One browser can reach cmd/shop while its healthy peer is still rendering narration/animation or
+    // reading the local path to the same point. Treating that ordinary lead as asymmetric terminated live
+    // wave-1 sessions on slower clients. Disconnect supervision + retransmission still bound a dead peer.
+    const endMachineWait = beginCoopMachineWait(`coop-rendezvous:${point}`, {
+      asymmetricEligible: false,
+    });
     return new Promise<CoopRendezvousResult>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
@@ -503,14 +520,23 @@ export class CoopRendezvous {
       if (this.latestGuestRoute == null || msg.revision >= this.latestGuestRoute.revision) {
         this.latestGuestRoute = msg;
       }
-      this.transport.send({ t: "phaseRouteAck", epoch: msg.epoch, revision: msg.revision });
+      this.transport.send({
+        t: "phaseRouteAck",
+        epoch: msg.epoch,
+        revision: msg.revision,
+      });
       for (const [waitPoint, finish] of [...this.pending.entries()]) {
         if (waitPoint === msg.displacedPoint && waitPoint !== msg.point) {
           coopWarn(
             "rendezvous",
             `guest ROUTED AWAY ${waitPoint} -> host-authoritative ${msg.point} rev=${msg.revision}`,
           );
-          finish({ point: waitPoint, timedOut: false, crossPoint: msg.point, authoritativePoint: msg.point });
+          finish({
+            point: waitPoint,
+            timedOut: false,
+            crossPoint: msg.point,
+            authoritativePoint: msg.point,
+          });
         }
       }
       return;
@@ -659,7 +685,12 @@ export class CoopRendezvous {
         resolve(
           timedOut
             ? { point, timedOut: true }
-            : { point, timedOut: false, crossPoint: displacedPoint, authoritativePoint: point },
+            : {
+                point,
+                timedOut: false,
+                crossPoint: displacedPoint,
+                authoritativePoint: point,
+              },
         );
       };
       const finish = () => settle(false);
@@ -668,7 +699,13 @@ export class CoopRendezvous {
         if (settled) {
           return;
         }
-        this.transport.send({ t: "phaseRoute", epoch, revision, point, displacedPoint });
+        this.transport.send({
+          t: "phaseRoute",
+          epoch,
+          revision,
+          point,
+          displacedPoint,
+        });
         cancel = this.schedule(() => {
           coopWarn(
             "rendezvous",
@@ -677,7 +714,13 @@ export class CoopRendezvous {
           sendAndArm();
         }, retryMs);
       };
-      this.pendingRouteAcks.set(revision, { finish, abort, cancel: () => cancel(), point, displacedPoint });
+      this.pendingRouteAcks.set(revision, {
+        finish,
+        abort,
+        cancel: () => cancel(),
+        point,
+        displacedPoint,
+      });
       sendAndArm();
     });
   }

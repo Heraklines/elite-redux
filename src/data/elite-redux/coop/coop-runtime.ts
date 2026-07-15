@@ -239,6 +239,7 @@ import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import {
   coopMachineWaitLabels,
   createCoopAsymmetricEscalator,
+  oldestCoopAsymmetricMachineWaitMs,
   oldestCoopMachineWaitMs,
 } from "#data/elite-redux/coop/coop-stall-probe";
 import {
@@ -666,7 +667,10 @@ function publishOrStageCoopSnapshotProof(runtime: CoopRuntime, snapshot: CoopFul
   if (typeof timeout === "object" && timeout != null && "unref" in timeout) {
     (timeout as { unref: () => void }).unref();
   }
-  pendingCoopSnapshotProofs.set(runtime, { snapshot, cancelDeadline: () => clearTimeout(timeout) });
+  pendingCoopSnapshotProofs.set(runtime, {
+    snapshot,
+    cancelDeadline: () => clearTimeout(timeout),
+  });
   if (publishPendingCoopSnapshotProof(runtime)) {
     return true;
   }
@@ -1055,7 +1059,10 @@ let lastResolvedWave = -1;
  * `BattleEndPhase` ({@linkcode consumeCoopPendingWaveEndState}) via a single id-based full-state apply -
  * the sole post-battle progression channel (the legacy per-slot exp-delta relay it superseded is gone).
  */
-let pendingWaveEndState: { wave: number; state: CoopAuthoritativeBattleStateV1 } | null = null;
+let pendingWaveEndState: {
+  wave: number;
+  state: CoopAuthoritativeBattleStateV1;
+} | null = null;
 /** The last wave the guest already applied a wave-end authoritative snapshot for. */
 let lastWaveEndStateWave = -1;
 
@@ -1066,7 +1073,11 @@ const settledHostWaveTransitions = new Map<number, CoopWaveAdvancePayload>();
 /** Presentation-only data from a raw hint; never sufficient to advance a retained P33 session. */
 const pendingRawWavePresentations = new Map<number, CoopCapturePresentation>();
 /** A retained guest BattleEnd waiting for its exact immutable DATA image to apply. */
-let pendingSettledWaveBoundary: { wave: number; release: () => void; released: boolean } | null = null;
+let pendingSettledWaveBoundary: {
+  wave: number;
+  release: () => void;
+  released: boolean;
+} | null = null;
 
 function usesRetainedCoopWaveTransaction(runtime: CoopRuntime | null = active): boolean {
   return (
@@ -1734,7 +1745,10 @@ export function coopBroadcastDexSync(): void {
         return;
       }
       try {
-        pending.relay.sendInteractionOutcome(COOP_DEX_SYNC_SEQ, "dexSync", { k: "dexSync", dex: pending.blob });
+        pending.relay.sendInteractionOutcome(COOP_DEX_SYNC_SEQ, "dexSync", {
+          k: "dexSync",
+          dex: pending.blob,
+        });
         coopLog("runtime", "dexSync broadcast (acquisition -> partner account credited)");
       } catch {
         coopWarn("runtime", "dexSync broadcast threw (handled - next ME terminal still converges)");
@@ -1857,6 +1871,7 @@ export function wireCoopStallWatchdog(
         }
       }
       const machineWaitMs = oldestCoopMachineWaitMs();
+      const asymmetricMachineWaitMs = oldestCoopAsymmetricMachineWaitMs();
       const localMs = Math.max(relay.oldestNetworkWaitMs(), battleStream.oldestNetworkWaitMs(), machineWaitMs);
       // #808 HEALTH LINE: one compact self-describing line every ~30s so every log capture
       // carries a session-health timeline for free (zero extra timers).
@@ -1888,7 +1903,7 @@ export function wireCoopStallWatchdog(
         // choosing a move, or reading a modal. Only an explicitly registered MACHINE wait is
         // evidence that this side cannot advance without protocol progress. Feeding the folded
         // `localMs` here made every ordinary one-sided wait look asymmetric after 20 seconds.
-        localMs: machineWaitMs,
+        localMs: asymmetricMachineWaitMs,
         peerBeatMs: peerBeat?.ms ?? null,
         peerBeatAgeMs: peerBeat == null ? null : Date.now() - peerBeat.at,
         transportConnected: transport.state === "connected",
@@ -3210,7 +3225,11 @@ function serializedCommandToReplayKind(command: SerializedCommand): ReplayComman
     default:
       // FIGHT / TERA: cursor is the move slot; the first resolved target (if any).
       return command.targets != null && command.targets.length > 0
-        ? { kind: "move", moveIndex: command.cursor, target: command.targets[0] }
+        ? {
+            kind: "move",
+            moveIndex: command.cursor,
+            target: command.targets[0],
+          }
         : { kind: "move", moveIndex: command.cursor };
   }
 }
@@ -3422,7 +3441,10 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
   }
   // Transport delivery can run while the sender is the ambient harness client. Bind both validation and
   // publication to the receiving runtime so an ACK can never outlive a receipt written into the wrong peer.
-  const binding = { opState: runtime.opState, durability: runtime.durability ?? null };
+  const binding = {
+    opState: runtime.opState,
+    durability: runtime.durability ?? null,
+  };
   const op = envelope.pendingOperation;
   const parsed = op == null ? null : parseCoopOperationId(op.id);
   const plan = preflightCoopBiomeJournalMaterialization(envelope, binding);
@@ -3925,7 +3947,12 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
       ) {
         return false;
       }
-      return materializeCoopMeCommittedTerminal({ operationId: op.id, pinned, step, payload });
+      return materializeCoopMeCommittedTerminal({
+        operationId: op.id,
+        pinned,
+        step,
+        payload,
+      });
     },
   });
   if (receive !== "executed" && receive !== "duplicate") {
@@ -4220,7 +4247,10 @@ export function coopHostStreamMeBattleParty(): void {
     if (enemies[0] != null) {
       enemies[0] = {
         ...enemies[0],
-        data: { ...enemies[0].data, coopArenaBiomeId: globalScene.arena.biomeId },
+        data: {
+          ...enemies[0].data,
+          coopArenaBiomeId: globalScene.arena.biomeId,
+        },
       };
     }
     coopLog("me", `host stream ME-battle party key=${key} enemies=${enemies.length}`);
@@ -4634,10 +4664,14 @@ export function assembleCoopRuntime(
   // Showdown 1v1: the interaction relay disables its #829 seat-map forged-switch check in versus (the
   // guest legitimately relays faint-replacement picks for the host's enemy side). Live predicate so the
   // guest - whose kind flips "coop" -> "versus" only on runConfig receipt - is correct after adoption.
-  const interactionRelay = new CoopInteractionRelay(transport, { isVersus: () => controller.isVersusSession() });
+  const interactionRelay = new CoopInteractionRelay(transport, {
+    isVersus: () => controller.isVersusSession(),
+  });
   const uiMirror = new CoopUiMirror(transport);
   const mePump = new CoopMePump(interactionRelay);
-  const rendezvous = new CoopRendezvous(transport, { getEpoch: () => controller.sessionEpoch });
+  const rendezvous = new CoopRendezvous(transport, {
+    getEpoch: () => controller.sessionEpoch,
+  });
   const membership = new CoopMembershipController(() => controller.role);
   opState = createCoopRuntimeOpState(controller.role);
   // W2b/W2e (§4/§5): the application-level durability engine, flag-gated. Wave-2e plugs the operation
@@ -4674,7 +4708,10 @@ export function assembleCoopRuntime(
           ),
       })
     : undefined;
-  waveOperationBinding = Object.freeze({ opState, durability: durability ?? null });
+  waveOperationBinding = Object.freeze({
+    opState,
+    durability: durability ?? null,
+  });
   // Install the active manager so the migrated surface adapters' commit path journals into it (Wave-2e).
   // null when durability is OFF -> journalCoopCommittedEnvelope is a no-op (pure legacy dual-run).
   setCoopOperationDurability(durability ?? null);
@@ -4696,7 +4733,11 @@ export function assembleCoopRuntime(
     opState,
     waveOperationBinding,
   };
-  sharedTerminalStates.set(runtime, { frozen: false, finalized: false, reason: null });
+  sharedTerminalStates.set(runtime, {
+    frozen: false,
+    finalized: false,
+    reason: null,
+  });
   if (opts.p33 != null) {
     const terminal = createCoopRuntimeSharedTerminal(transport, controller, {
       onPrepare: commit => prepareCoopSharedTerminal(runtime, commit.reason),

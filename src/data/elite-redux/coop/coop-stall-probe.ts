@@ -17,8 +17,9 @@
 // This module adds two engine-free pieces (transport-free, clock-injectable, unit-testable):
 //   1. A REGISTRY where long-lived MACHINE waits register begin/end with a label. A
 //      phase hold or a barrier await registers here; `oldestCoopMachineWaitMs()` folds
-//      into the watchdog's `localMs` so a phase hold counts as a local stall even though
-//      it is not a network wait. `coopMachineWaitLabels()` is the diagnostics snapshot.
+//      all of them into mutual-stall detection, while `oldestCoopAsymmetricMachineWaitMs()`
+//      excludes reciprocal barriers that can legitimately lead a still-rendering peer.
+//      `coopMachineWaitLabels()` is the diagnostics snapshot.
 //   2. An ASYMMETRIC ESCALATOR: a pure state machine the watchdog ticks each interval.
 //      When the local side is stalled >= trigger AND the peer is provably NOT in the
 //      mutual-stall state, it authorizes the existing recovery a bounded number of times
@@ -37,6 +38,17 @@
 interface CoopMachineWait {
   label: string;
   since: number;
+  /** False for reciprocal barriers that may legitimately wait while the peer renders/reads local UI. */
+  asymmetricEligible: boolean;
+}
+
+export interface CoopMachineWaitOptions {
+  /**
+   * Whether a one-sided wait proves a deadlock. Reciprocal rendezvous barriers must pass false: the peer
+   * can still be progressing through narration/animation before reaching the same point. Defaults true
+   * for phase holds whose peer is already beyond the held continuation.
+   */
+  asymmetricEligible?: boolean;
 }
 
 let nextWaitId = 0;
@@ -55,9 +67,13 @@ export function setCoopStallProbeClock(now: (() => number) | null): void {
  * has begun, tagged with `label`. Returns an idempotent end callback; call it exactly when
  * the wait resolves, is superseded, or is disposed. NEVER call this for a human-input wait.
  */
-export function beginCoopMachineWait(label: string): () => void {
+export function beginCoopMachineWait(label: string, options: CoopMachineWaitOptions = {}): () => void {
   const id = nextWaitId++;
-  machineWaits.set(id, { label, since: clock() });
+  machineWaits.set(id, {
+    label,
+    since: clock(),
+    asymmetricEligible: options.asymmetricEligible ?? true,
+  });
   let ended = false;
   return () => {
     if (ended) {
@@ -76,6 +92,25 @@ export function oldestCoopMachineWaitMs(): number {
   let oldest = -1;
   const now = clock();
   for (const wait of machineWaits.values()) {
+    const age = now - wait.since;
+    if (age > oldest) {
+      oldest = age;
+    }
+  }
+  return oldest;
+}
+
+/**
+ * Age of the oldest wait that is itself proof of an asymmetric deadlock. Reciprocal barriers are excluded:
+ * one client may reach `cmd/shop/...` while the other is still legitimately rendering the path to it.
+ */
+export function oldestCoopAsymmetricMachineWaitMs(): number {
+  let oldest = -1;
+  const now = clock();
+  for (const wait of machineWaits.values()) {
+    if (!wait.asymmetricEligible) {
+      continue;
+    }
     const age = now - wait.since;
     if (age > oldest) {
       oldest = age;

@@ -20,6 +20,7 @@ import {
   clearCoopMachineWaits,
   coopMachineWaitLabels,
   createCoopAsymmetricEscalator,
+  oldestCoopAsymmetricMachineWaitMs,
   oldestCoopMachineWaitMs,
   setCoopStallProbeClock,
 } from "#data/elite-redux/coop/coop-stall-probe";
@@ -41,7 +42,27 @@ describe("#P33 coop machine-wait registry", () => {
 
   it("reports -1 when nothing is registered", () => {
     expect(oldestCoopMachineWaitMs()).toBe(-1);
+    expect(oldestCoopAsymmetricMachineWaitMs()).toBe(-1);
     expect(coopMachineWaitLabels()).toEqual([]);
+  });
+
+  it("keeps reciprocal barriers as mutual-stall evidence without manufacturing an asymmetric deadlock", () => {
+    const endBarrier = beginCoopMachineWait("coop-rendezvous:cmd:1:1", {
+      asymmetricEligible: false,
+    });
+    now += TRIGGER + 10_000;
+    expect(oldestCoopMachineWaitMs(), "the barrier still participates in mutual deadlock detection").toBe(30_000);
+    expect(
+      oldestCoopAsymmetricMachineWaitMs(),
+      "a peer still rendering its route to the barrier is healthy, not asymmetric-deadlock proof",
+    ).toBe(-1);
+
+    const endHold = beginCoopMachineWait("coop-resync-hold:t1");
+    now += 5_000;
+    expect(oldestCoopMachineWaitMs()).toBe(35_000);
+    expect(oldestCoopAsymmetricMachineWaitMs()).toBe(5_000);
+    endBarrier();
+    endHold();
   });
 
   it("tracks the age of a registered machine wait and clears it on end", () => {
@@ -101,42 +122,91 @@ describe("#P33 asymmetric stall classification (injected beats)", () => {
   const base = { transportConnected: true, now: 0 };
 
   it("no local stall -> none regardless of the peer", () => {
-    expect(classifyCoopStall({ ...base, localMs: TRIGGER - 1, peerBeatMs: null, peerBeatAgeMs: null })).toBe("none");
+    expect(
+      classifyCoopStall({
+        ...base,
+        localMs: TRIGGER - 1,
+        peerBeatMs: null,
+        peerBeatAgeMs: null,
+      }),
+    ).toBe("none");
   });
 
   it("both stalled with a fresh high peer beat -> mutual (handled by the existing path)", () => {
-    expect(classifyCoopStall({ ...base, localMs: 40_000, peerBeatMs: 30_000, peerBeatAgeMs: 2_000 })).toBe("mutual");
+    expect(
+      classifyCoopStall({
+        ...base,
+        localMs: 40_000,
+        peerBeatMs: 30_000,
+        peerBeatAgeMs: 2_000,
+      }),
+    ).toBe("mutual");
   });
 
   it("peer beat is fresh but LOW (peer progressing / short wait) -> asymmetric", () => {
-    expect(classifyCoopStall({ ...base, localMs: 40_000, peerBeatMs: 1_000, peerBeatAgeMs: 2_000 })).toBe("asymmetric");
+    expect(
+      classifyCoopStall({
+        ...base,
+        localMs: 40_000,
+        peerBeatMs: 1_000,
+        peerBeatAgeMs: 2_000,
+      }),
+    ).toBe("asymmetric");
   });
 
   it("peer has NEVER beaten while connected (advanced or non-reporting hold) -> asymmetric", () => {
-    expect(classifyCoopStall({ ...base, localMs: 40_000, peerBeatMs: null, peerBeatAgeMs: null })).toBe("asymmetric");
+    expect(
+      classifyCoopStall({
+        ...base,
+        localMs: 40_000,
+        peerBeatMs: null,
+        peerBeatAgeMs: null,
+      }),
+    ).toBe("asymmetric");
   });
 
   it("peer beat has gone SILENT past the window while connected -> asymmetric", () => {
-    expect(classifyCoopStall({ ...base, localMs: 40_000, peerBeatMs: 30_000, peerBeatAgeMs: 25_000 })).toBe(
-      "asymmetric",
-    );
+    expect(
+      classifyCoopStall({
+        ...base,
+        localMs: 40_000,
+        peerBeatMs: 30_000,
+        peerBeatAgeMs: 25_000,
+      }),
+    ).toBe("asymmetric");
   });
 
   it("peer silent but transport DISCONNECTED -> none (reconnect/disconnect path owns this)", () => {
     expect(
-      classifyCoopStall({ ...base, transportConnected: false, localMs: 40_000, peerBeatMs: null, peerBeatAgeMs: null }),
+      classifyCoopStall({
+        ...base,
+        transportConnected: false,
+        localMs: 40_000,
+        peerBeatMs: null,
+        peerBeatAgeMs: null,
+      }),
     ).toBe("none");
   });
 
   it("peer beat aging inside the silence window (still plausibly mutually stalled) -> none (wait longer)", () => {
     // fresh window (12.5s) < age (15s) < silence window (20s), high waitingMs: ambiguous, keep waiting.
-    expect(classifyCoopStall({ ...base, localMs: 40_000, peerBeatMs: 30_000, peerBeatAgeMs: 15_000 })).toBe("none");
+    expect(
+      classifyCoopStall({
+        ...base,
+        localMs: 40_000,
+        peerBeatMs: 30_000,
+        peerBeatAgeMs: 15_000,
+      }),
+    ).toBe("none");
   });
 });
 
 describe("#P33 bounded asymmetric escalation", () => {
   it("recovers a bounded number of times (respecting cooldown) then terminates ONCE", () => {
-    const escalator = createCoopAsymmetricEscalator({ maxRecoveryAttempts: 3, recoveryCooldownMs: 30_000 });
+    const escalator = createCoopAsymmetricEscalator({
+      maxRecoveryAttempts: 3,
+      recoveryCooldownMs: 30_000,
+    });
     // A persistent asymmetric stall: peer never beats while connected, local always stalled.
     const asym = (now: number) => ({
       localMs: 40_000,
@@ -165,7 +235,10 @@ describe("#P33 bounded asymmetric escalation", () => {
   });
 
   it("a resolved stall (non-asymmetric tick) re-arms the full recovery budget", () => {
-    const escalator = createCoopAsymmetricEscalator({ maxRecoveryAttempts: 2, recoveryCooldownMs: 30_000 });
+    const escalator = createCoopAsymmetricEscalator({
+      maxRecoveryAttempts: 2,
+      recoveryCooldownMs: 30_000,
+    });
     const asym = (now: number) => ({
       localMs: 40_000,
       peerBeatMs: null,
