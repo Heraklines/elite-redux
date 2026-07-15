@@ -1,0 +1,401 @@
+{
+  "invariant": "no-park",
+  "seed": 20470471,
+  "wave": 16,
+  "detail": "guest retained World Map boundary did not release after host commit (current=SelectBiomePhase, queued=[NewBattlePhase])",
+  "replay": "SOAK_SEED=20470471",
+  "phaseState": {
+    "hostPhase": "SwitchBiomePhase",
+    "guestPhase": "SelectBiomePhase",
+    "hostInteractionCounter": 15,
+    "guestInteractionCounter": 15,
+    "hostWave": 15,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 3623794889,
+        "battlerIndex": -1,
+        "speciesId": 493,
+        "speciesName": "Arceus",
+        "hp": 1180,
+        "maxHp": 1865,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 1
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2513016287,
+        "battlerIndex": -1,
+        "speciesId": 150,
+        "speciesName": "Mewtwo",
+        "hp": 1723,
+        "maxHp": 1725,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 1
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 2555857916,
+        "battlerIndex": -1,
+        "speciesId": 48,
+        "speciesName": "Venonat",
+        "hp": 0,
+        "maxHp": 47,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 324,
+            "ppUsed": 0
+          },
+          {
+            "id": 93,
+            "ppUsed": 0
+          },
+          {
+            "id": 77,
+            "ppUsed": 0
+          },
+          {
+            "id": 33,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 970064726,
+        "battlerIndex": -1,
+        "speciesId": 273,
+        "speciesName": "Seedot",
+        "hp": 0,
+        "maxHp": 41,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 235,
+            "ppUsed": 0
+          },
+          {
+            "id": 74,
+            "ppUsed": 0
+          },
+          {
+            "id": 371,
+            "ppUsed": 0
+          },
+          {
+            "id": 106,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 3623794889,
+        "battlerIndex": 0,
+        "speciesId": 493,
+        "speciesName": "Arceus",
+        "hp": 1180,
+        "maxHp": 1865,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 1
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2513016287,
+        "battlerIndex": 1,
+        "speciesId": 150,
+        "speciesName": "Mewtwo",
+        "hp": 1723,
+        "maxHp": 1725,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 1
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 2555857916,
+        "battlerIndex": 2,
+        "speciesId": 48,
+        "speciesName": "Venonat",
+        "hp": 0,
+        "maxHp": 47,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 324,
+            "ppUsed": 0
+          },
+          {
+            "id": 93,
+            "ppUsed": 0
+          },
+          {
+            "id": 77,
+            "ppUsed": 0
+          },
+          {
+            "id": 33,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 970064726,
+        "battlerIndex": 3,
+        "speciesId": 273,
+        "speciesName": "Seedot",
+        "hp": 0,
+        "maxHp": 41,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 235,
+            "ppUsed": 0
+          },
+          {
+            "id": 74,
+            "ppUsed": 0
+          },
+          {
+            "id": 371,
+            "ppUsed": 0
+          },
+          {
+            "id": 106,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20470471 preseeded=false",
+    "wave 1: host slot move=85 guest slot move=53",
+    "wave 1 turn 1: progress enemyHp=[16:0/14,263:0/14] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 1: reward shop owner=host leave",
+    "wave 2 turn 1: replay guest reciprocally crossed cmd:2:1",
+    "wave 2: host slot move=85 guest slot move=247",
+    "wave 2 turn 1: guest SWITCH -> party[3]",
+    "wave 2 turn 1: progress enemyHp=[831:0/16,283:16/16] playerHp=[890:2065/2065,150:1725/1725]",
+    "wave 2 turn 2: replay guest reciprocally crossed cmd:2:2",
+    "wave 2: reward shop owner=guest leave",
+    "wave 3 turn 1: replay guest reciprocally crossed cmd:3:1",
+    "wave 3: host slot move=53 guest slot move=34",
+    "wave 3 turn 1: progress enemyHp=[29:0/17,263:0/16] playerHp=[890:2065/2065,150:1725/1725]",
+    "wave 3: reward shop owner=host leave",
+    "wave 4 turn 1: replay guest reciprocally crossed cmd:4:1",
+    "wave 4: host slot move=247 guest slot move=85",
+    "wave 4 turn 1: progress enemyHp=[415:0/18,29:0/19] playerHp=[890:2065/2065,150:1725/1725]",
+    "wave 4: reward shop owner=guest take-nonparty",
+    "wave 5 turn 1: replay guest reciprocally crossed cmd:5:1",
+    "wave 5: TRAINER (fixed)",
+    "wave 5: host slot move=53 guest slot move=34",
+    "wave 5 turn 1: progress enemyHp=[504:0/18,399:0/20] playerHp=[890:2065/2065,150:1725/1725]",
+    "wave 5: reward shop owner=host take-nonparty",
+    "wave 6 turn 1: replay guest reciprocally crossed cmd:6:1",
+    "wave 6: host slot move=85 guest slot move=247",
+    "wave 6 turn 1: guest SWITCH -> party[3]",
+    "wave 6 turn 1: progress enemyHp=[824:0/17,43:18/18] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 6 turn 2: replay guest reciprocally crossed cmd:6:2",
+    "wave 6: reward shop owner=guest leave",
+    "wave 7 turn 1: replay guest reciprocally crossed cmd:7:1",
+    "wave 7: host slot move=34 guest slot move=34",
+    "wave 7 turn 1: progress enemyHp=[824:0/19,915:0/24] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 7: reward shop owner=host leave",
+    "wave 8 turn 1: replay guest reciprocally crossed cmd:8:1",
+    "wave 8: TRAINER (fixed)",
+    "wave 8: host slot move=247 guest slot move=85",
+    "wave 8 turn 1: progress enemyHp=[252:0/24,396:0/22] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 8: reward shop owner=guest take-nonparty",
+    "wave 9 turn 1: replay guest reciprocally crossed cmd:9:1",
+    "wave 9: host slot move=85 guest slot move=53",
+    "wave 9 turn 1: guest SWITCH -> party[3]",
+    "wave 9 turn 1: progress enemyHp=[661:0/23,268:26/26] playerHp=[890:2064/2065,150:1725/1725]",
+    "wave 9 turn 2: replay guest reciprocally crossed cmd:9:2",
+    "wave 9: reward shop owner=host leave",
+    "wave 10 turn 1: replay guest reciprocally crossed cmd:10:1",
+    "wave 10: host slot move=85 guest slot move=247",
+    "wave 10 turn 1: guest SWITCH -> party[3]",
+    "wave 10 turn 1: progress enemyHp=[273:0/24,14:19/27] playerHp=[890:2064/2065,384:1714/1715]",
+    "wave 10 turn 2: replay guest reciprocally crossed cmd:10:2",
+    "wave 10: biome market owner=guest leave",
+    "wave 10: drained 1 milestone reward continuation(s)",
+    "wave 11 turn 1: replay guest reciprocally crossed cmd:11:1",
+    "wave 11: host slot move=53 guest slot move=85",
+    "wave 11 turn 1: progress enemyHp=[831:0/29,263:0/26] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 11: reward shop owner=host leave",
+    "wave 12 turn 1: replay guest reciprocally crossed cmd:12:1",
+    "wave 12: host slot move=53 guest slot move=53",
+    "wave 12 turn 1: progress enemyHp=[263:0/30,52:0/28] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 12: reward shop owner=guest leave",
+    "wave 13 turn 1: replay guest reciprocally crossed cmd:13:1",
+    "wave 13 turn 1: host SWITCH -> party[2]",
+    "wave 13: host slot move=34 guest slot move=85",
+    "wave 13 turn 1: guest SWITCH -> party[3]",
+    "wave 13 turn 1: progress enemyHp=[261:32/32,401:32/32] playerHp=[493:1863/1865,150:1723/1725]",
+    "wave 13 turn 2: replay guest reciprocally crossed cmd:13:2",
+    "wave 13: reward shop owner=host take-nonparty",
+    "wave 14 turn 1: replay guest reciprocally crossed cmd:14:1",
+    "wave 14: host slot move=34 guest slot move=85",
+    "wave 14 turn 1: progress enemyHp=[276:0/37,402:0/47] playerHp=[493:1180/1865,150:1723/1725]",
+    "wave 14: reward shop owner=guest leave",
+    "wave 15 turn 1: replay guest reciprocally crossed cmd:15:1",
+    "wave 15: host slot move=53 guest slot move=34",
+    "wave 15 turn 1: progress enemyHp=[48:0/47,273:0/41] playerHp=[493:1180/1865,150:1723/1725]",
+    "wave 15: reward shop owner=host leave",
+    "wave 15: drained 1 milestone reward continuation(s)"
+  ]
+}
