@@ -8,9 +8,12 @@
 //   dev-logs/remote/<YYYY-MM-DD>/<timestamp>__<scenario>__<tester>.log
 //
 // Run: node scripts/pull-dev-logs.mjs        (one shot; only new files download)
+// Downloads use a bounded worker pool and request deadline. Each log is first
+// written to a `.partial` twin and atomically renamed, so an interrupted pull
+// resumes without treating a truncated local file as complete.
 // Authentication is selected, in order, from GH_TOKEN, GITHUB_TOKEN, then the
 // documented github_token.txt file on the current user's Desktop.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -18,6 +21,9 @@ import { pathToFileURL } from "node:url";
 const REPO = "Heraklines/elite-redux";
 const BRANCH = "dev-logs";
 const OUT_ROOT = "dev-logs";
+const DEFAULT_CONCURRENCY = 8;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_PROGRESS_STEPS = 20;
 
 const api = path => `https://api.github.com/repos/${REPO}/${path}`;
 
@@ -101,6 +107,25 @@ function responseHeader(response, name) {
   return response.headers?.get?.(name) ?? null;
 }
 
+function requirePositiveInteger(value, name) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new TypeError(`${name} must be a positive integer; received ${String(value)}`);
+  }
+  return value;
+}
+
+function githubTimeoutError({ stage, credential, timeoutMs }) {
+  const authSource = credential?.source ?? "none";
+  const error = new Error(
+    `GitHub request timed out after ${timeoutMs}ms while ${stage} (credential source: ${authSource}).`,
+  );
+  error.name = "GithubRequestTimeoutError";
+  error.stage = stage;
+  error.authSource = authSource;
+  error.timeoutMs = timeoutMs;
+  return error;
+}
+
 async function responseExcerpt(response, secrets) {
   try {
     const body = await response.text();
@@ -153,53 +178,160 @@ export async function classifyGithubHttpError(response, { stage, credential } = 
   return error;
 }
 
-async function checkedFetch(fetchImpl, url, { headers, credential, stage, allowNotFound = false }) {
+async function fetchGithubResponse(
+  fetchImpl,
+  url,
+  { headers, credential, stage, signal, allowNotFound, readResponse, timeoutError, didTimeOut },
+) {
   let response;
   try {
-    response = await fetchImpl(url, { headers });
+    response = await fetchImpl(url, { headers, signal });
   } catch (error) {
+    if (signal.aborted && didTimeOut()) {
+      throw timeoutError;
+    }
     const detail = error instanceof Error ? error.message : String(error);
     const secrets = credential?.token ? [credential.token] : [];
     throw new Error(`Network failure while ${stage}: ${redactSecrets(detail, secrets)}`);
   }
-  if (response.ok || (allowNotFound && response.status === 404)) {
-    return response;
+  if (!response.ok && !(allowNotFound && response.status === 404)) {
+    throw await classifyGithubHttpError(response, { stage, credential });
   }
-  throw await classifyGithubHttpError(response, { stage, credential });
+  return { status: response.status, body: await readResponse(response) };
+}
+
+async function checkedFetch(
+  fetchImpl,
+  url,
+  { headers, credential, stage, requestTimeoutMs, allowNotFound = false, readResponse = response => response },
+) {
+  const controller = new AbortController();
+  let timedOut = false;
+  let timeoutId;
+  const timeoutError = githubTimeoutError({ stage, credential, timeoutMs: requestTimeoutMs });
+
+  try {
+    return await Promise.race([
+      fetchGithubResponse(fetchImpl, url, {
+        headers,
+        credential,
+        stage,
+        signal: controller.signal,
+        allowNotFound,
+        readResponse,
+        timeoutError,
+        didTimeOut: () => timedOut,
+      }),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+          reject(timeoutError);
+        }, requestTimeoutMs);
+      }),
+    ]);
+  } catch (error) {
+    if (timedOut) {
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function runBounded(items, concurrency, worker, onOrderedOutcome) {
+  const outcomes = new Array(items.length);
+  let cursor = 0;
+  let nextOutcome = 0;
+  let stopReporting = false;
+  let stopScheduling = false;
+
+  const flushOrderedOutcomes = () => {
+    if (stopReporting) {
+      return;
+    }
+    while (nextOutcome < outcomes.length && outcomes[nextOutcome] != null) {
+      const outcome = outcomes[nextOutcome];
+      onOrderedOutcome(outcome, nextOutcome);
+      nextOutcome++;
+      if (!outcome.ok) {
+        stopReporting = true;
+        return;
+      }
+    }
+  };
+
+  const runWorker = async () => {
+    while (!stopScheduling) {
+      const index = cursor++;
+      if (index >= items.length) {
+        return;
+      }
+      try {
+        outcomes[index] = { ok: true, value: await worker(items[index], index) };
+      } catch (error) {
+        outcomes[index] = { ok: false, error };
+        stopScheduling = true;
+      }
+      flushOrderedOutcomes();
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => runWorker()));
+  flushOrderedOutcomes();
+  const failure = outcomes.find(outcome => outcome?.ok === false);
+  if (failure) {
+    throw failure.error;
+  }
 }
 
 export async function pullDevLogs({
   fetchImpl = fetch,
   credential = selectGithubCredential(),
   outRoot = OUT_ROOT,
+  concurrency = DEFAULT_CONCURRENCY,
+  requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+  progressSteps = DEFAULT_PROGRESS_STEPS,
   fileExists = existsSync,
   makeDirectory = path => mkdirSync(path, { recursive: true }),
   writeFile = (path, contents) => writeFileSync(path, contents, "utf8"),
+  renameFile = renameSync,
   log = console.log,
 } = {}) {
+  requirePositiveInteger(concurrency, "concurrency");
+  requirePositiveInteger(requestTimeoutMs, "requestTimeoutMs");
+  requirePositiveInteger(progressSteps, "progressSteps");
   const headers = buildGithubHeaders(credential);
   const refRes = await checkedFetch(fetchImpl, api(`git/ref/heads/${BRANCH}`), {
     headers,
     credential,
     stage: "reading the dev-logs branch reference",
+    requestTimeoutMs,
     allowNotFound: true,
+    readResponse: async response => (response.status === 404 ? null : response.json()),
   });
   if (refRes.status === 404) {
     log("No dev-logs branch yet - no remote logs have been sent.");
     return { downloaded: 0, total: 0, credentialSource: credential?.source ?? "none" };
   }
 
-  const ref = await refRes.json();
+  const ref = refRes.body;
   const treeRes = await checkedFetch(fetchImpl, api(`git/trees/${ref.object.sha}?recursive=1`), {
     headers,
     credential,
     stage: "reading the dev-logs tree",
+    requestTimeoutMs,
+    readResponse: response => response.json(),
   });
-  const tree = await treeRes.json();
-  const logs = tree.tree.filter(
-    entry => entry.type === "blob" && entry.path.startsWith("remote/") && entry.path.endsWith(".log"),
-  );
-  let downloaded = 0;
+  const tree = treeRes.body;
+  if (tree.truncated === true) {
+    throw new Error("GitHub returned a truncated dev-logs tree; refusing to report an incomplete pull.");
+  }
+  const logs = tree.tree
+    .filter(entry => entry.type === "blob" && entry.path.startsWith("remote/") && entry.path.endsWith(".log"))
+    .sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
+  const pending = [];
   for (const entry of logs) {
     const outPath = join(outRoot, entry.path);
     // Skip already-pulled files. A triaged report is marked "done" by renaming it
@@ -209,16 +341,47 @@ export async function pullDevLogs({
     if (fileExists(outPath) || fileExists(donePath)) {
       continue;
     }
-    const raw = await checkedFetch(fetchImpl, `https://raw.githubusercontent.com/${REPO}/${BRANCH}/${entry.path}`, {
-      headers,
-      credential,
-      stage: `downloading ${entry.path}`,
-    });
-    makeDirectory(dirname(outPath));
-    writeFile(outPath, await raw.text());
-    log(`pulled ${outPath}`);
-    downloaded++;
+    pending.push({ entry, outPath });
   }
+
+  if (pending.length === 0) {
+    log(`0 new log(s), ${logs.length} total on the branch.`);
+    return { downloaded: 0, total: logs.length, credentialSource: credential?.source ?? "none" };
+  }
+
+  const effectiveConcurrency = Math.min(concurrency, pending.length);
+  const progressEvery = Math.max(1, Math.ceil(pending.length / progressSteps));
+  log(
+    `${pending.length} new log(s) queued from ${logs.length} total; downloading with concurrency ${effectiveConcurrency}.`,
+  );
+  let downloaded = 0;
+  await runBounded(
+    pending,
+    effectiveConcurrency,
+    async ({ entry, outPath }) => {
+      const raw = await checkedFetch(fetchImpl, `https://raw.githubusercontent.com/${REPO}/${BRANCH}/${entry.path}`, {
+        headers,
+        credential,
+        stage: `downloading ${entry.path}`,
+        requestTimeoutMs,
+        readResponse: response => response.text(),
+      });
+      makeDirectory(dirname(outPath));
+      const partialPath = `${outPath}.partial`;
+      writeFile(partialPath, raw.body);
+      renameFile(partialPath, outPath);
+      return outPath;
+    },
+    outcome => {
+      if (!outcome.ok) {
+        return;
+      }
+      downloaded++;
+      if (downloaded % progressEvery === 0 || downloaded === pending.length) {
+        log(`Progress: ${downloaded}/${pending.length} new log(s) downloaded through ${outcome.value}.`);
+      }
+    },
+  );
   log(`${downloaded} new log(s), ${logs.length} total on the branch.`);
   return { downloaded, total: logs.length, credentialSource: credential?.source ?? "none" };
 }
