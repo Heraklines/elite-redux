@@ -4,6 +4,7 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -39,6 +40,29 @@ const changed = new Set(
 );
 if (changed.size === 0) {
   process.stderr.write(`Co-op static gate resolved zero changed files for ${base}..HEAD; refusing a vacuous pass.\n`);
+  process.exit(1);
+}
+
+// Human staging must exercise the same authenticated stable-seat protocol as the
+// public-browser fidelity lanes. A missing build-time selector silently falls
+// back to the invitation-derived legacy lobby and can swap Pokemon ownership on
+// a reversed reconnect even while every P33-only browser gate remains green.
+const stagingWorkflow = readFileSync(resolve(root, ".github/workflows/deploy-staging.yml"), "utf8").replaceAll(
+  "\r\n",
+  "\n",
+);
+const stagingP33Contract = [
+  /STAGING_COOP_SERVER_URL: https:\/\/er-coop-api-staging\.heraklines\.workers\.dev/u,
+  /VITE_COOP_SERVER_URL=\$\{STAGING_COOP_SERVER_URL\}/u,
+  /VITE_COOP_SIGNALING_PROTOCOL=p33/u,
+  /\/coop\/v3\/health/u,
+  /health\.protocol !== "er-coop-33"/u,
+  /health\.identityConfigured !== true/u,
+];
+if (stagingP33Contract.some(required => !required.test(stagingWorkflow))) {
+  process.stderr.write(
+    "Staging deployment no longer proves and selects the authenticated P33 signaling worker; refusing legacy fallback.\n",
+  );
   process.exit(1);
 }
 
