@@ -1578,6 +1578,26 @@ export interface DuoRig {
 const realGuestCommandBoundaries = new WeakMap<object, { wave: number; turn: number }>();
 
 /**
+ * Record that the guest reached its real queued public CommandPhase for this exact address. The replay
+ * pump then replaces that proven surface through the phase manager instead of starting a detached replay
+ * object whose end() would shift an unrelated tail.
+ */
+export function markRealGuestCommandBoundary(scene: BattleScene, wave: number, turn: number): void {
+  const current = scene.phaseManager.getCurrentPhase();
+  if (
+    current?.phaseName !== "CommandPhase"
+    || scene.currentBattle.waveIndex !== wave
+    || scene.currentBattle.turn !== turn
+  ) {
+    throw new Error(
+      `cannot mark guest command boundary ${wave}:${turn} from `
+        + `${current?.phaseName ?? "none"} ${scene.currentBattle.waveIndex}:${scene.currentBattle.turn}`,
+    );
+  }
+  realGuestCommandBoundaries.set(scene, { wave, turn });
+}
+
+/**
  * Drain retained-operation follow-ups under each destination's complete client context.
  *
  * One pass delivers the result and may enqueue an exact ACK or an authority response in the opposite
@@ -1911,7 +1931,7 @@ export async function arriveGuestCommandBoundary(rig: DuoRig, wave: number, turn
           && rig.guestScene.currentBattle.turn === turn,
       }),
     );
-    realGuestCommandBoundaries.set(rig.guestScene, { wave, turn });
+    markRealGuestCommandBoundary(rig.guestScene, wave, turn);
   }
 
   if (

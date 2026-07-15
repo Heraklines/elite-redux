@@ -228,6 +228,9 @@ export class MockSprite implements MockGameObject {
   }
 
   setName(name: string): this {
+    // Phaser's public GameObject.name changes synchronously with setName(). Keep the wrapper contract
+    // faithful so production code that reads the wrapper (rather than its delegated sprite) sees it.
+    this.name = name;
     this.phaserSprite.setName(name);
     return this;
   }

@@ -186,7 +186,6 @@ export const REVIEWED_UNDRIVABLE_UI_OPERATIONS = [
   [UiMode.PARTY, "op:revival"],
   [UiMode.MODIFIER_SELECT, "op:reward"],
   [UiMode.BIOME_SHOP, "op:reward"],
-  [UiMode.CONFIRM, "op:reward"],
   [UiMode.PARTY, "op:reward"],
   [UiMode.OPTION_SELECT, "op:stormglass"],
 ] as const satisfies readonly (readonly [UiMode, CoopOperationSurfaceClass])[];
@@ -976,6 +975,9 @@ const GUARANTEED_BASE: readonly string[] = [
   // Every continuous run commits wave advancement and reward-shop choices through the operation journal.
   operationKey("op:wave"),
   operationKey("op:reward"),
+  // Every deep run crosses an every-ten-wave market, leaves through its real CONFIRM handler, commits
+  // the retained reward terminal, and proves watcher apply before both market phases can exit.
+  uiOperationKey(UiMode.CONFIRM, "op:reward"),
 ];
 
 /** PROBABILISTIC base: seed/content-dependent surfaces that are probabilistic under EVERY profile. */

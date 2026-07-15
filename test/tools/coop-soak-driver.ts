@@ -148,6 +148,7 @@ import {
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   mirrorHostMeToGuest,
+  markRealGuestCommandBoundary,
   pumpDuoDestinations,
   reachQueuedRewardShop,
   relayGuestMeOptionIndexOnly,
@@ -1996,13 +1997,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     );
   };
 
-  /**
-   * The soak drives the host's real phase queue while the guest is a replay renderer, so the guest does not
-   * naturally execute its own CommandPhase. Materialize both halves of the guest's command rendezvous around
-   * the host crossing: arrive before the host reaches the boundary, then verify the host's reciprocal arrival
-   * afterwards. This is the split arrive/await form of the production reciprocal barrier, not a timeout or a
-   * unilateral continuation.
-   */
+  /** Cross both real queued CommandPhases and require the guest's public command surface before continuing. */
   const crossCommandBoundaryWithReplayGuest = async (
     wave: number,
     turn: number,
@@ -2082,9 +2077,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       let committedBiomeOperationId: string | null = null;
       let hostBiomeProjected = false;
       let guestBiomeBoundary: BiomeBoundarySeam | null = null;
-      const hostHasCommandable = rig.hostScene
-        .getPlayerParty()
-        .some(mon => mon.coopOwner === "host" && !mon.isFainted() && mon.isAllowedInBattle());
       withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.reannounce(point));
       // The early guest arrival is now destination-scheduled; publish it to the host before its command
       // boundary starts waiting. This is delivery, not a manufactured rendezvous or direct state mutation.
@@ -2283,53 +2275,37 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // arrival in both cases.
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase"));
       await pumpDuoDestinations(rig, 2);
-      if (!hostHasCommandable) {
-        actionScript.push(
-          `wave ${wave} turn ${turn}: host half exhausted; guest command proceeds without reciprocal await`,
-        );
-        return;
-      }
-      let guestBiomeCommandBoundary: { tryCoopCheckpointSync(): void } | null = null;
-      if (guestBiomeBoundary != null) {
-        // PhaseInterceptor starts the host's SwitchBiome/NewBiomeEncounter tail while driving it to Command,
-        // but it deliberately disables the guest PhaseManager's automatic start hook. Drain the guest's
-        // actual committed biome tail to the same public command boundary before comparing destinations.
-        // Merely awaiting the command rendezvous here would leave the guest parked on an unstarted
-        // SwitchBiomePhase and misclassify a harness scheduling gap as a production biome desync.
-        const guestCommand = await withClient(rig.guestCtx, () =>
-          driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"),
-        );
-        if (guestCommand.phaseName !== "CommandPhase") {
-          fail(
-            "no-park",
-            transitionSourceWave,
-            `World Map guest tail reached ${guestCommand.phaseName} instead of CommandPhase`,
-          );
-        }
-        // driveClientPhaseQueueTo intentionally stops BEFORE its target starts. Production does not expose
-        // input in that state: CommandPhase.start() first consumes the latest wave-start authority (including
-        // the host-rolled World-Map routes/biome structure), then crosses the reciprocal barrier and opens
-        // input. The soak manually models the barrier below, so invoke that exact production adoption seam
-        // here as well. Otherwise the next loop samples its "wave-start" digest against a guest that is one
-        // private method call earlier than any human-visible command surface and falsely reports erMapState.
-        await withClient(rig.guestCtx, () => {
-          guestBiomeCommandBoundary = guestCommand as unknown as { tryCoopCheckpointSync(): void };
-          guestBiomeCommandBoundary.tryCoopCheckpointSync();
-        });
-      }
-      const guestResult = await withClient(rig.guestCtx, () => rig.guestRuntime.rendezvous.awaitPartner(point));
-      if (guestResult.timedOut || guestResult.crossPoint !== undefined) {
-        fail(
-          "no-park",
-          wave,
-          `replay guest did not reciprocally cross ${point} (timedOut=${guestResult.timedOut} crossPoint=${guestResult.crossPoint ?? "none"})`,
-        );
-      }
-      if (guestBiomeCommandBoundary != null) {
-        // CommandPhase's real continuation funnel consumes again after the reciprocal barrier: a refreshed
-        // carrier may arrive while that barrier is pending. Match that second production seam before the
-        // soak observes the next wave boundary.
-        await withClient(rig.guestCtx, () => guestBiomeCommandBoundary?.tryCoopCheckpointSync());
+      // The old soak manufactured only the guest rendezvous arrival. That let the host proceed but never
+      // opened the guest's production UiMode.COMMAND surface, so retained reward operations could not emit
+      // their exact continuationReady proof and failed closed roughly 60 seconds later. Drive the guest's
+      // real queued CommandPhase for every boundary (ordinary and biome), then require its public handler.
+      const guestCommand = await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, `guest command ${wave}:${turn}`, {
+          matches: phase =>
+            phase.phaseName === "CommandPhase"
+            && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX
+            && rig.guestScene.currentBattle.waveIndex === wave
+            && rig.guestScene.currentBattle.turn === turn,
+        }),
+      );
+      await withClient(rig.guestCtx, async () => {
+        markRealGuestCommandBoundary(rig.guestScene, wave, turn);
+        guestCommand.start();
+        await drainLoopback();
+      });
+      const guestCommandSurface = await waitForPublicModeOrPhaseExit(
+        rig.guestCtx,
+        guestCommand,
+        UiMode.COMMAND,
+        `guest command ${wave}:${turn}`,
+      );
+      const guestHasCommandable = withClientSync(rig.guestCtx, () =>
+        rig.guestScene
+          .getPlayerParty()
+          .some(mon => mon.coopOwner === "guest" && !mon.isFainted() && mon.isAllowedInBattle()),
+      );
+      if (guestHasCommandable && guestCommandSurface !== "opened") {
+        fail("no-park", wave, `guest command ${wave}:${turn} left without a public COMMAND handler`);
       }
       if (guestBiomeBoundary != null && rig.hostScene.arena.biomeId !== rig.guestScene.arena.biomeId) {
         fail(
@@ -2339,7 +2315,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             + `guest=${rig.guestScene.arena.biomeId}`,
         );
       }
-      actionScript.push(`wave ${wave} turn ${turn}: replay guest reciprocally crossed ${point}`);
+      actionScript.push(
+        `wave ${wave} turn ${turn}: replay guest crossed ${point} through real public COMMAND=${guestCommandSurface}`,
+      );
     } finally {
       resetCoopBiomePickerDrivenByTest();
       rig.pair.setDestinationContextDelivery?.(false);

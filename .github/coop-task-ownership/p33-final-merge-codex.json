@@ -19,6 +19,7 @@
     "src/ui/handlers/starter-select-ui-handler.ts",
     "src/ui/ui.ts",
     "test/browser/coop-public-ui/**",
+    "test/mocks/mocks-container/mock-sprite.ts",
     "test/tests/elite-redux/coop/**",
     "test/tools/coop-duo-harness.ts",
     "test/tools/coop-soak-driver.ts",
