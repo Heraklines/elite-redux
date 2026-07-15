@@ -114,8 +114,13 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   /** Start a co-op authoritative double, then flip the LOCAL engine into the GUEST role. */
   const startCoopGuest = async () => {
     const field = await startCoopHost();
-    getCoopRuntime()!.spoof?.dispose();
+    const runtime = getCoopRuntime()!;
+    runtime.spoof?.dispose();
     getCoopController()!.role = "guest";
+    // Protocol 33 keys retained/durable operation cursors by runtime role as well as controller
+    // role. This legacy single-engine fixture changes seats after assembly, so move both
+    // identities together just as the guest-renderer fixture does.
+    (runtime.opState as { localRole: "host" | "guest" | null }).localRole = "guest";
     return field;
   };
 
