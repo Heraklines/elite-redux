@@ -7,6 +7,7 @@
   "allowedFiles": [
     ".github/coop-task-ownership/p33-closure-codex.json",
     ".github/coop-task-ownership/p33-trace-build-id.json",
+    ".github/workflows/coop-focused-branch.yml",
     ".github/workflows/coop-public-ui-journey.yml",
     "biome.jsonc",
     "docs/plans/2026-07-14-showdown-tournament-design.md",
@@ -14,6 +15,7 @@
     "locales/en/settings.json",
     "plugins/vite/build-id-plugin.ts",
     "scripts/coop-browser-entry.ts",
+    "scripts/coop-browser-transport-entry.ts",
     "scripts/gen-editor-data.mjs",
     "scripts/pull-dev-logs.mjs",
     "scripts/run-coop-browser-transport.mjs",
@@ -25,6 +27,7 @@
     "src/data/elite-redux/er-custom-trainers.ts",
     "src/data/elite-redux/er-trainer-runtime-hook.ts",
     "src/data/elite-redux/showdown/**",
+    "src/dev-tools/registry.ts",
     "src/dev-tools/test-suite/index.ts",
     "src/dev-tools/test-suite/scenarios.ts",
     "src/enums/ui-mode.ts",
