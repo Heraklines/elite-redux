@@ -1,0 +1,28 @@
+{
+  "frames": {
+    "0001.png": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 84,
+        "h": 74
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 84,
+        "h": 74
+      },
+      "sourceSize": {
+        "w": 84,
+        "h": 74
+      }
+    }
+  },
+  "meta": {
+    "app": "regitube-test-fixture",
+    "version": "1.0"
+  }
+}

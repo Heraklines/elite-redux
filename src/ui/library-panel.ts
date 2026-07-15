@@ -143,8 +143,37 @@ export class LibraryPanel {
     }
     const H = globalScene.scaledCanvas.height;
     const W = globalScene.scaledCanvas.width;
-    const panelW = 120;
-    const panelH = 68;
+
+    // Layout constants (logical px). The panel sizes itself to its CONTENT — one
+    // line per (title, each recorded move, shared PP) — so it never leaves the big
+    // dead gap the old fixed 120x68 box showed for a partial/empty list.
+    const PAD_X = 4;
+    const PAD_TOP = 3;
+    const PAD_BOT = 4;
+    const ROW_H = 12;
+    const MIN_W = 56;
+    const MAX_W = 150;
+
+    const entries = this.getEntries();
+    // One label per row: title, one per recorded move (cursor row marked "> "), PP.
+    const labels = [
+      "Library",
+      ...entries.map((moveId, index) => `${index === this.cursor ? "> " : "  "}${allMoves[moveId].name}`),
+      `Cast PP: ${getLibraryCastPp(this.holder)}`,
+    ];
+    const texts = labels.map((label, row) => addTextObject(PAD_X, PAD_TOP + row * ROW_H, label, TextStyle.WINDOW));
+
+    // Size the box to the widest rendered line (displayWidth is the logical width —
+    // the text is authored large then scaled down). Fall back to a char estimate in
+    // the headless mock scene where display metrics are unavailable.
+    const measure = (t: Phaser.GameObjects.Text, s: string): number => {
+      const w = t.displayWidth;
+      return typeof w === "number" && Number.isFinite(w) && w > 0 ? w : s.length * 5.5;
+    };
+    const contentW = Math.max(...texts.map((t, i) => measure(t, labels[i])));
+    const panelW = Math.min(MAX_W, Math.max(MIN_W, Math.ceil(contentW) + PAD_X * 2 + 2));
+    const panelH = PAD_TOP + labels.length * ROW_H + PAD_BOT;
+
     const offX = W - panelW - 4;
     const offY = 4;
     const c = globalScene.add.container(offX, -H + offY).setDepth(1000);
@@ -152,17 +181,9 @@ export class LibraryPanel {
     const bg = globalScene.add.rectangle(0, 0, panelW, panelH, 0x1a1a2e, 0.9).setOrigin(0, 0);
     bg.setStrokeStyle(1, 0x8888cc, 1);
     c.add(bg);
-
-    c.add(addTextObject(4, 2, "Library", TextStyle.WINDOW));
-
-    const entries = this.getEntries();
-    entries.forEach((moveId, index) => {
-      const y = 14 + index * 12;
-      const prefix = index === this.cursor ? "> " : "  ";
-      c.add(addTextObject(4, y, `${prefix}${allMoves[moveId].name}`, TextStyle.WINDOW));
-    });
-
-    c.add(addTextObject(4, panelH - 14, `Cast PP: ${getLibraryCastPp(this.holder)}`, TextStyle.WINDOW));
+    for (const t of texts) {
+      c.add(t);
+    }
 
     globalScene.ui.add(c);
     this.container = c;

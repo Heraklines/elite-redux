@@ -5,7 +5,10 @@ import { initPokemonPrevolutions, initPokemonStarters } from "#balance/pokemon-e
 import { initSpecies } from "#balance/pokemon-species";
 import { initChallenges } from "#data/challenge";
 import { initTrainerTypeDialogue } from "#data/dialogue";
+import { wireEliteReduxManualComposites } from "#data/elite-redux/abilities/composite-newcomers";
 import { registerErFinalBossFormChange } from "#data/elite-redux/er-final-boss";
+import { applyNewcomerLearnsetAdditions, injectNewcomerForms } from "#data/elite-redux/er-newcomer-forms";
+import { applyErNewcomerSpeciesLearnsets, injectErNewcomerSpecies } from "#data/elite-redux/er-newcomer-species";
 import {
   initEliteReduxCSourceCorrections,
   remapEliteReduxMoveIdsByName,
@@ -85,6 +88,19 @@ export function initializeGame() {
   console.info(
     `[er-b1b] registered ${customResult.customsAdded} ER-custom species (skipped ${customResult.customsAlreadyPresent} already present + ${customResult.skippedDegenerate} degenerate stubs)`,
   );
+  // Elite Redux: hand-authored newcomer SPECIES (3 evolution-only fakemon +
+  // Regitube + the partner-Eevee family). Registered as ErCustomSpecies with
+  // N-typing + kits + evolution edges + Omniform mappings. Must run AFTER
+  // initEliteReduxSpecies() (base eeveelution kits final -> partner clones exact)
+  // and AFTER initEliteReduxCustomSpecies() (ErCustomSpecies plumbing ready), and
+  // BEFORE initEliteReduxEvolutions() so its prevolutions rebuild picks up the edges.
+  const newcomerSpeciesResult = injectErNewcomerSpecies();
+  if (newcomerSpeciesResult.errors.length > 0) {
+    console.warn("[er-newcomer-species] issues:", newcomerSpeciesResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-newcomer-species] registered ${newcomerSpeciesResult.speciesRegistered} species (skipped ${newcomerSpeciesResult.speciesAlreadyPresent}), ${newcomerSpeciesResult.evolutionEdges} evo edges, ${newcomerSpeciesResult.omniformMappings} Omniform mappings`,
+  );
   // Elite Redux Phase B1c: data-driven mega/primal/origin FORM injection for
   // every ER mega — including ER-custom (Redux) megas, which B1a skips. Must run
   // AFTER initEliteReduxCustomSpecies() so custom bases exist in allSpecies, and
@@ -98,6 +114,17 @@ export function initializeGame() {
   }
   console.info(
     `[er-b1c] injected ${megaFormResult.injected} ER mega forms (skipped ${megaFormResult.skippedExisting} already present)`,
+  );
+  // Elite Redux: hand-authored newcomer-patch fakemon megas/primals. Injected as
+  // real forms (N-type typing + active/innate kits + sprite redirect + stone
+  // form-change edge) onto existing species. Runs AFTER injectAllErMegaForms so a
+  // species' base form may already be seeded; idempotent.
+  const newcomerFormResult = injectNewcomerForms();
+  if (newcomerFormResult.errors.length > 0) {
+    console.warn("[er-newcomer-forms] issues:", newcomerFormResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-newcomer-forms] injected ${newcomerFormResult.injected} forms (skipped ${newcomerFormResult.skippedExisting}), ${newcomerFormResult.edgesRegistered} stone edges`,
   );
   // Elite Redux Phase B2: register ER-custom abilities + moves (ids ≥ 5000).
   // Must run AFTER initAbilities() / initMoves() so the vanilla baselines
@@ -196,6 +223,12 @@ export function initializeGame() {
   console.info(
     `[er-composite-refresh] re-resolved ${compositeRefresh.refreshed} composite abilities against patched parts${compositeRefresh.errors.length > 0 ? ` (${compositeRefresh.errors.length} errors)` : ""}`,
   );
+  // Newcomer-patch manual composites (5933+): fill each composite's attrs from
+  // its constituents NOW that vanilla parts + draft-id composites are final.
+  const manualCompositeResult = wireEliteReduxManualComposites();
+  console.info(
+    `[er-manual-composite] wired ${manualCompositeResult.wired} newcomer composites${manualCompositeResult.emptyConstituents.length > 0 ? ` (${manualCompositeResult.emptyConstituents.length} empty constituents: ${manualCompositeResult.emptyConstituents.map(e => `${e.compositeId}<-${e.constituentId}`).join(", ")})` : ""}`,
+  );
   // Elite Redux Phase B4: populate the ER trainer registry. Must run AFTER
   // initEliteReduxCustomSpecies() and initEliteReduxCustomMoves() so the
   // species/move ids the registry references are guaranteed-resolvable
@@ -250,6 +283,15 @@ export function initializeGame() {
   console.info(
     `[er-b6] patched ${movesetResult.speciesPatched} species' level-up movesets (${movesetResult.movesetEntriesApplied} [level, move] entries; skipped ${movesetResult.speciesSkippedNoMapping} no-mapping + ${movesetResult.speciesSkippedEmpty} empty; dropped ${movesetResult.moveIdsDropped} unmapped move ids)`,
   );
+  // Newcomer-patch learnset additions (e.g. Mega Parasect's Leaf Blade). MUST run
+  // AFTER initEliteReduxMovesets rebuilds the table from the ER dump.
+  const newcomerLearnAdds = applyNewcomerLearnsetAdditions();
+  console.info(`[er-newcomer-forms] applied ${newcomerLearnAdds} learnset additions`);
+  // Newcomer SPECIES learnsets (evolution clones + additions, Regitube, partner
+  // family clones). MUST run AFTER initEliteReduxMovesets rebuilds the table from
+  // the dump so the CLONED pre-evo/base source learnsets are final.
+  const newcomerSpeciesLearn = applyErNewcomerSpeciesLearnsets();
+  console.info(`[er-newcomer-species] wired ${newcomerSpeciesLearn} species learnsets`);
   // Elite Redux Phase B6: wire ER per-species level evolution requirements
   // into pokerogue's `pokemonEvolutions` table (kinds 0/3/4 — LEVEL,
   // LEVEL_MALE, LEVEL_FEMALE). Form changes (kinds 1/2/5 — MEGA, PRIMAL,

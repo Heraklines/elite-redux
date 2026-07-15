@@ -345,4 +345,23 @@ export enum FormChangeItem {
   ZAPDOSITE,
   ZERAORITE,
   ZYGARDITE,
+  // -------------------------------------------------------------------------
+  // Newcomer-patch fakemon mega stones + primal orbs (2026-07). APPENDED at the
+  // end so existing FormChangeItem values never shift (saved data references the
+  // numeric ids). SKARMORITE_Y already exists above. Wired by er-newcomer-forms.ts.
+  // -------------------------------------------------------------------------
+  HYDREIGONITE_X,
+  XERNEASITE,
+  SHUCKLITE_Y,
+  DRAGONINITE_Z,
+  PARASECTITE,
+  ELECTIVIRITE_X,
+  MINUNITE,
+  PLUSLEITE,
+  JUMPLUFFITE,
+  PLANETARY_ORB,
+  EMBRYONIC_ORB,
+  // Mega Skarmory Z (fakemon patch): additive `mega-z` alongside the existing ER
+  // Mega Skarmory Y. Dragonite Z reuses DRAGONINITE_Z above.
+  SKARMORITE_Z,
 }

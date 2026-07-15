@@ -12,9 +12,12 @@
 // aligned when its active ability set includes vanilla Plus or Minus, OR any of
 // the four abilities in this suite (documented DEFAULT).
 //
-//   5. Synchronized Current  — if the holder AND an aligned ally both deal DIRECT
-//      damage to the same target in one turn, that target is paralyzed after both
-//      hits resolve (normal paralysis immunities apply: Electric types, Limber…).
+//   5. Synchronized Current  — (a) if the holder AND an aligned ally both deal
+//      DIRECT damage to the same target in one turn, that target is paralyzed after
+//      both hits resolve (normal paralysis immunities apply). Plus, alignment-
+//      UNRELATED (any ally): (b) if the holder AND its ally both attack in a turn,
+//      each attack gains 25% power; (c) if NEITHER attacks (both status moves),
+//      both restore 1/4 max HP at end of turn.
 //   6. Positive Feedback     — when the holder damages a PARALYZED target, it
 //      consumes the paralysis, the attack gets +25% power, and the target's
 //      HIGHER defensive stat drops one stage after damage.
@@ -24,9 +27,10 @@
 //      HOLDER's own next physical move is primed to become Electric/Fairy dual-
 //      type (self-buff — the maintainer-final reading of the ambiguous "its").
 //   8. Closed Circuit        — if the holder and an ally target the same opponent
-//      in one turn, whichever acts SECOND launches an extra 25 BP Electric/Fairy
-//      special attack at that opponent after both primary moves resolve (uses the
-//      dual-type primitive; DEFAULT special, no secondary effects, cannot crit).
+//      in one turn, BOTH launch an extra 25 BP Electric/Fairy special attack at
+//      that opponent after both primary moves resolve; if the target faints a
+//      remaining extra carries over to another opponent (ErClosedCircuitBurstPhase,
+//      DEFAULT special, no secondary effects, cannot crit).
 //
 // Same-turn coordination (Sync Current, Closed Circuit) is resolved through the
 // shared turn-attack ledger; the second-actor triggers fire from the batch3
@@ -34,13 +38,12 @@
 // innate is inert by design.
 // =============================================================================
 
-import { AbAttr, PostAttackAbAttr, VariableMovePowerAbAttr } from "#abilities/ab-attrs";
+import { AbAttr, PostAttackAbAttr, PostTurnAbAttr, VariableMovePowerAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
-import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
-import { DualTypeMoveAttr } from "#data/moves/move";
+import { allMoves } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
-import { MoveId } from "#enums/move-id";
-import { MoveUseMode } from "#enums/move-use-mode";
+import { Command } from "#enums/command";
+import { MoveCategory } from "#enums/move-category";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -50,9 +53,54 @@ import type {
   PostMoveInteractionAbAttrParams,
   PreAttackModifyPowerAbAttrParams,
 } from "#types/ability-types";
+import { toDmgValue } from "#utils/common";
 import { primeDualTypeMove } from "./dual-type-move";
 import { suppressRandomHeldItem } from "./item-suppression";
 import { allyHitTargetThisTurn } from "./turn-attack-ledger";
+
+/** +25% multiplier when the holder and an ally both attack in one turn. */
+const SYNC_CURRENT_BOTH_ATTACK_MULTIPLIER = 1.25;
+/** Fraction of max HP both restore when neither the holder nor its ally attacks. */
+const SYNC_CURRENT_HEAL_FRACTION = 0.25;
+
+/**
+ * The MoveCategory of `pokemon`'s selected FIGHT command this turn, or
+ * `undefined` when it isn't attacking with a move (switch / ball / run / no
+ * command). Read from `turnCommands` so the boost can be applied PREDICTIVELY as
+ * each attack resolves (before the slower partner has actually acted).
+ */
+function turnCommandCategory(pokemon: Pokemon): MoveCategory | undefined {
+  const cmd = globalScene.currentBattle?.turnCommands?.[pokemon.getBattlerIndex()];
+  if (!cmd || cmd.command !== Command.FIGHT || cmd.move?.move === undefined) {
+    return;
+  }
+  return allMoves[cmd.move.move]?.category;
+}
+
+/** Whether `pokemon`'s selected move this turn is a damaging (non-status) move. */
+function usesDamagingMoveThisTurn(pokemon: Pokemon): boolean {
+  const category = turnCommandCategory(pokemon);
+  return category !== undefined && category !== MoveCategory.STATUS;
+}
+
+/**
+ * Whether `pokemon` actually EXECUTED a status move this turn. Read at turn end
+ * (the neither-attack heal fires from PostTurn, by which point `incrementTurn`
+ * has already cleared `turnCommands`), so it uses the persistent per-turn
+ * `acted` flag + the last move in history (which, given `acted`, is this turn's).
+ */
+function usedStatusMoveThisTurn(pokemon: Pokemon): boolean {
+  if (!pokemon.turnData.acted) {
+    return false;
+  }
+  const last = pokemon.getLastXMoves(1)[0];
+  return last !== undefined && allMoves[last.move]?.category === MoveCategory.STATUS;
+}
+
+/** An active ally of `pokemon`, or `undefined` (inert in singles). */
+function activeAlly(pokemon: Pokemon): Pokemon | undefined {
+  return pokemon.getAllies().find(a => a?.isActive(true));
+}
 
 export const ER_SYNCHRONIZED_CURRENT_ABILITY_ID = 5921;
 export const ER_POSITIVE_FEEDBACK_ABILITY_ID = 5922;
@@ -61,7 +109,6 @@ export const ER_CLOSED_CIRCUIT_ABILITY_ID = 5924;
 
 /** Power boosts / follow-up BP. */
 export const POSITIVE_FEEDBACK_POWER_MULTIPLIER = 1.25;
-export const CLOSED_CIRCUIT_FOLLOWUP_POWER = 25;
 
 /** The suite's abilities, by constructor name, for ability-based alignment detection. */
 const SUITE_ABATTR_NAMES = new Set([
@@ -140,6 +187,49 @@ function syncCurrentPartner(user: Pokemon, target: Pokemon): Pokemon | undefined
   return;
 }
 
+/**
+ * Synchronized Current — BOTH-ATTACK boost (alignment-UNRELATED, any ally).
+ * When the holder and an active ally BOTH use a damaging move this turn, the
+ * holder's attack is boosted 25%. Applied per-attack via the standard
+ * variable-power hook and evaluated from the turn's SELECTED commands, so it
+ * boosts the fast partner's move even before the slow partner has acted. Both
+ * mons boost independently (each carries Synchronized Current), so both attacks
+ * end up boosted. The two attacks need NOT share a target. Inert in singles.
+ */
+export class SynchronizedCurrentBothAttackPowerAbAttr extends VariableMovePowerAbAttr {
+  override canApply({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
+    if (move.category === MoveCategory.STATUS) {
+      return false;
+    }
+    const ally = activeAlly(pokemon);
+    return ally !== undefined && usesDamagingMoveThisTurn(ally);
+  }
+
+  override apply({ power }: PreAttackModifyPowerAbAttrParams): void {
+    power.value *= SYNC_CURRENT_BOTH_ATTACK_MULTIPLIER;
+  }
+}
+
+/**
+ * Synchronized Current — NEITHER-ATTACK heal (alignment-UNRELATED, any ally).
+ * At end of turn, if the holder AND an active ally BOTH used a status move this
+ * turn (i.e. neither attacked), the holder restores 1/4 of its max HP. Both mons
+ * heal independently. Inert in singles.
+ */
+export class SynchronizedCurrentHealAbAttr extends PostTurnAbAttr {
+  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+    const ally = activeAlly(pokemon);
+    return ally !== undefined && usedStatusMoveThisTurn(pokemon) && usedStatusMoveThisTurn(ally);
+  }
+
+  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
+    if (simulated || pokemon.isFullHp()) {
+      return;
+    }
+    pokemon.heal(toDmgValue(pokemon.getMaxHp() * SYNC_CURRENT_HEAL_FRACTION, 1));
+  }
+}
+
 // --- 6. Positive Feedback ----------------------------------------------------
 
 /** +25% power when the holder's move targets a PARALYZED foe. */
@@ -209,18 +299,20 @@ export class ClosedCircuitAbAttr extends AbAttr {
   override apply(_params: AbAttrBaseParams): void {}
 }
 
-/** Per-turn guard so the follow-up fires once per pair per target per turn. */
+/** Per-turn guard so the burst fires once per pair per target per turn. */
 let closedCircuitKey = "";
 
 /**
  * When `user` completes the SECOND move of a Closed-Circuit pair aimed at
- * `target` (its partner already targeted `target` this turn), launch an extra
- * 25 BP Electric/Fairy special attack from `user` at `target`. Fired from the
- * batch3 on-hit dispatcher.
+ * `target` (its partner already targeted `target` this turn), launch the extra
+ * 25 BP Electric/Fairy attacks: BOTH the partner and `user` fire one, after both
+ * primary moves resolve. If the shared target faints (from the primaries or the
+ * first extra), the remaining extra carries over to a living opponent
+ * (`ErClosedCircuitBurstPhase`). Fired from the batch3 on-hit dispatcher.
  */
 export function erClosedCircuitOnHit(user: Pokemon, target: Pokemon): void {
   const partner = closedCircuitPartner(user, target);
-  if (!partner || target.isFainted()) {
+  if (!partner) {
     return;
   }
   const battle = globalScene.currentBattle;
@@ -229,13 +321,8 @@ export function erClosedCircuitOnHit(user: Pokemon, target: Pokemon): void {
     return;
   }
   closedCircuitKey = key;
-  globalScene.phaseManager.unshiftNew(
-    "MovePhase",
-    user,
-    [target.getBattlerIndex()],
-    closedCircuitFollowupMove(),
-    MoveUseMode.INDIRECT,
-  );
+  // Both mons owe an extra attack; partner (first actor) fires first, then user.
+  globalScene.phaseManager.unshiftNew("ErClosedCircuitBurstPhase", [partner, user], target);
 }
 
 /**
@@ -254,16 +341,4 @@ function closedCircuitPartner(user: Pokemon, target: Pokemon): Pokemon | undefin
     }
   }
   return;
-}
-
-/** Build the 25 BP Electric/Fairy special follow-up (Shock Wave clone + Fairy second type). */
-function closedCircuitFollowupMove() {
-  const move = scriptedPokemonMove(MoveId.SHOCK_WAVE, CLOSED_CIRCUIT_FOLLOWUP_POWER);
-  // Attach the Fairy second type onto the scripted clone (own attrs array, never
-  // mutating the registered Shock Wave). Idempotent: skip if already attached.
-  const built = move.getMove();
-  if (!built.attrs.some(a => a instanceof DualTypeMoveAttr)) {
-    (built as unknown as { attrs: unknown[] }).attrs = [...built.attrs, new DualTypeMoveAttr(PokemonType.FAIRY)];
-  }
-  return move;
 }
