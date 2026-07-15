@@ -5,29 +5,29 @@
  */
 
 // =============================================================================
-// Elite Redux — bespoke ability `World in Pieces` (Primal Regigigas).
+// Elite Redux — bespoke ability `World in Pieces`.
 //
-// The holder is innately SEXTUPLE-typed: Normal / Rock / Ice / Steel / Electric
-// / Dragon. Since the Primal Regigigas species does not exist yet, this ability
-// STAMPS the six types onto the holder at summon when it isn't already
-// sextuple-typed (via `summonData.types`, the N-type override path in
-// `getBaseTypes`). This doubles as the test vehicle and will be superseded by
-// species data later (DECISION, documented in the batch report).
+// GENERAL ability (works on ANY holder, whatever its typing): it does NOT stamp
+// a fixed type set. It operates on the holder's ACTUAL types.
 //
 // Behavior (binding):
 //   - The FIRST direct damaging move that hits the holder each turn removes ONE
 //     seeded-random attached NON-Normal type, AFTER that hit's damage resolves
 //     (never retroactive to the removing hit — hooked from PostDefend, which
 //     fires post-damage). Multihit moves remove only one (once per turn). Normal
-//     can never be removed.
-//   - Each MISSING type grants a raw +20% Speed (additive per missing type,
-//     applied to the effective Speed stat via a StatMultiplier).
-//   - Every KO the holder scores RESTORES one seeded-random missing type
-//     (DEFAULT, documented).
+//     can never be removed. If the holder has no removable non-Normal type left,
+//     the strip simply does nothing.
+//   - Each MISSING (removed) type grants a raw +20% Speed (additive per missing
+//     type, applied to the effective Speed stat via a StatMultiplier).
+//   - Every KO the holder scores RESTORES one seeded-random previously-removed
+//     type (DEFAULT, documented).
 //
-// All randomness goes through the seeded `globalScene.randBattleSeedInt` (co-op
-// deterministic). Per-holder state (the full six-type set + the live attached
-// set) is module-level, keyed on the holder.
+// State per holder: `original` (the holder's type list, snapshotted lazily the
+// first time a type is stripped — read straight from `getTypes()`, never a
+// hard-coded set) + `removed` (the set of stripped types). The live types are
+// rebuilt as `original − removed` into `summonData.types`. On (re)summon the
+// state is cleared so a switched-in holder starts whole. All randomness goes
+// through the seeded `globalScene.randBattleSeedInt` (co-op deterministic).
 // =============================================================================
 
 import {
@@ -49,23 +49,14 @@ import type { AbAttrBaseParams } from "#types/ability-types";
 /** Hand-authored ER-custom ability id (both the ER-source id and the pokerogue id). */
 export const ER_WORLD_IN_PIECES_ABILITY_ID = 5917;
 
-/** The holder's innate six types, in canonical display order. Normal is never removable. */
-export const WORLD_IN_PIECES_TYPES: readonly PokemonType[] = [
-  PokemonType.NORMAL,
-  PokemonType.ROCK,
-  PokemonType.ICE,
-  PokemonType.STEEL,
-  PokemonType.ELECTRIC,
-  PokemonType.DRAGON,
-];
-
 /** Raw Speed bonus granted per missing type (additive). */
 export const WORLD_IN_PIECES_SPEED_PER_MISSING = 0.2;
 
-/** Live per-holder state: the full type set and the currently-attached subset. */
+/** Live per-holder state: the original type list and the currently-removed subset. */
 interface WorldInPiecesState {
-  full: readonly PokemonType[];
-  attached: Set<PokemonType>;
+  /** Snapshot of the holder's types, taken lazily the first time a type is stripped. */
+  original: PokemonType[] | undefined;
+  removed: Set<PokemonType>;
 }
 
 const WORLD_IN_PIECES_STATE = new WeakMap<Pokemon, WorldInPiecesState>();
@@ -78,44 +69,48 @@ function turnKey(): string {
   return `${battle?.waveIndex ?? 0}:${battle?.turn ?? 0}`;
 }
 
-/** Rebuild `summonData.types` from the attached set, preserving canonical order. */
-function syncTypes(pokemon: Pokemon, state: WorldInPiecesState): void {
-  pokemon.summonData.types = state.full.filter(t => state.attached.has(t));
-}
-
-/** Number of the holder's six types currently missing. */
-export function worldInPiecesMissingCount(pokemon: Pokemon): number {
-  const state = WORLD_IN_PIECES_STATE.get(pokemon);
+function getState(pokemon: Pokemon): WorldInPiecesState {
+  let state = WORLD_IN_PIECES_STATE.get(pokemon);
   if (!state) {
-    return 0;
+    state = { original: undefined, removed: new Set() };
+    WORLD_IN_PIECES_STATE.set(pokemon, state);
   }
-  return state.full.length - state.attached.size;
+  return state;
 }
 
-/** PostSummon half: stamp the six types when the holder isn't already sextuple-typed. */
+/** Rebuild `summonData.types` from the original set minus the removed subset. */
+function syncTypes(pokemon: Pokemon, state: WorldInPiecesState): void {
+  if (!state.original) {
+    return;
+  }
+  pokemon.summonData.types = state.original.filter(t => !state.removed.has(t));
+}
+
+/** The holder's currently-attached NON-Normal types (candidates for stripping). */
+function removableTypes(pokemon: Pokemon): PokemonType[] {
+  const state = WORLD_IN_PIECES_STATE.get(pokemon);
+  const base = state?.original ?? pokemon.getTypes();
+  const removed = state?.removed;
+  return base.filter(t => t !== PokemonType.NORMAL && !(removed?.has(t) ?? false));
+}
+
+/** Number of the holder's types currently removed. */
+export function worldInPiecesMissingCount(pokemon: Pokemon): number {
+  return WORLD_IN_PIECES_STATE.get(pokemon)?.removed.size ?? 0;
+}
+
+/** PostSummon half: clear state on (re)entry so a switched-in holder starts whole. */
 export class WorldInPiecesSummonAbAttr extends PostSummonAbAttr {
   constructor() {
-    super(true);
+    super(false);
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
     }
-    const existing = WORLD_IN_PIECES_STATE.get(pokemon);
-    if (existing) {
-      // Re-entry (re-summon): restore the full six-type set.
-      existing.attached = new Set(existing.full);
-      syncTypes(pokemon, existing);
-      return;
-    }
-    // Only stamp when not already carrying all six (idempotent for real species data later).
-    const state: WorldInPiecesState = {
-      full: WORLD_IN_PIECES_TYPES,
-      attached: new Set(WORLD_IN_PIECES_TYPES),
-    };
-    WORLD_IN_PIECES_STATE.set(pokemon, state);
-    syncTypes(pokemon, state);
+    WORLD_IN_PIECES_STATE.set(pokemon, { original: undefined, removed: new Set() });
+    WORLD_IN_PIECES_REMOVED_THIS_TURN.delete(pokemon);
   }
 }
 
@@ -132,29 +127,26 @@ export class WorldInPiecesRemoveTypeAbAttr extends PostDefendAbAttr {
     if (WORLD_IN_PIECES_REMOVED_THIS_TURN.get(pokemon) === turnKey()) {
       return false;
     }
-    const state = WORLD_IN_PIECES_STATE.get(pokemon);
-    if (!state) {
-      return false;
-    }
-    // At least one removable (non-Normal, still attached) type.
-    return [...state.attached].some(t => t !== PokemonType.NORMAL);
+    // At least one removable (non-Normal) type currently attached.
+    return removableTypes(pokemon).length > 0;
   }
 
   override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
     if (simulated) {
       return;
     }
-    const state = WORLD_IN_PIECES_STATE.get(pokemon);
-    if (!state) {
-      return;
+    const state = getState(pokemon);
+    // Snapshot the holder's actual types the first time we strip (never a fixed set).
+    if (!state.original) {
+      state.original = [...pokemon.getTypes()];
     }
-    const removable = [...state.attached].filter(t => t !== PokemonType.NORMAL);
+    const removable = state.original.filter(t => t !== PokemonType.NORMAL && !state.removed.has(t));
     if (removable.length === 0) {
       return;
     }
     WORLD_IN_PIECES_REMOVED_THIS_TURN.set(pokemon, turnKey());
     const pick = removable[globalScene.randBattleSeedInt(removable.length)];
-    state.attached.delete(pick);
+    state.removed.add(pick);
     syncTypes(pokemon, state);
     globalScene.phaseManager.queueMessage(
       `${pokemon.getNameToRender()} lost its ${PokemonType[pick].toLowerCase()} form!`,
@@ -178,7 +170,7 @@ export class WorldInPiecesSpeedAbAttr extends StatMultiplierAbAttr {
   }
 }
 
-/** PostVictory half: every KO restores one seeded-random missing type. */
+/** PostVictory half: every KO restores one seeded-random removed type. */
 export class WorldInPiecesRestoreAbAttr extends PostVictoryAbAttr {
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
     return worldInPiecesMissingCount(pokemon) > 0;
@@ -189,15 +181,12 @@ export class WorldInPiecesRestoreAbAttr extends PostVictoryAbAttr {
       return;
     }
     const state = WORLD_IN_PIECES_STATE.get(pokemon);
-    if (!state) {
+    if (!state || state.removed.size === 0) {
       return;
     }
-    const missing = state.full.filter(t => !state.attached.has(t));
-    if (missing.length === 0) {
-      return;
-    }
-    const pick = missing[globalScene.randBattleSeedInt(missing.length)];
-    state.attached.add(pick);
+    const removedList = [...state.removed];
+    const pick = removedList[globalScene.randBattleSeedInt(removedList.length)];
+    state.removed.delete(pick);
     syncTypes(pokemon, state);
     globalScene.phaseManager.queueMessage(
       `${pokemon.getNameToRender()} reclaimed its ${PokemonType[pick].toLowerCase()} form!`,
@@ -205,8 +194,12 @@ export class WorldInPiecesRestoreAbAttr extends PostVictoryAbAttr {
   }
 }
 
-/** Test helper: the holder's live attached types (canonical order), or `undefined`. */
+/** Test helper: the holder's live attached types, or `undefined` if it has none. */
 export function erWorldInPiecesAttached(pokemon: Pokemon): PokemonType[] | undefined {
   const state = WORLD_IN_PIECES_STATE.get(pokemon);
-  return state ? state.full.filter(t => state.attached.has(t)) : undefined;
+  if (state?.original) {
+    return state.original.filter(t => !state.removed.has(t));
+  }
+  const types = pokemon.getTypes();
+  return types.length > 0 ? [...types] : undefined;
 }

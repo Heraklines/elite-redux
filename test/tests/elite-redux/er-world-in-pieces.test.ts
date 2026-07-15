@@ -1,19 +1,33 @@
-import {
-  ER_WORLD_IN_PIECES_ABILITY_ID,
-  erWorldInPiecesAttached,
-  WORLD_IN_PIECES_TYPES,
-} from "#data/elite-redux/abilities/world-in-pieces";
+import { ER_WORLD_IN_PIECES_ABILITY_ID, erWorldInPiecesAttached } from "#data/elite-redux/abilities/world-in-pieces";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
+import type { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 const WORLD_IN_PIECES = ER_WORLD_IN_PIECES_ABILITY_ID as AbilityId;
+
+// The ability is GENERAL (operates on the holder's actual types). This pitch mon
+// happened to be sextuple-typed, so the TEST harness stamps six types onto the
+// holder (not the ability). Normal stays first so it is never the stripped type.
+const SIX_TYPES: readonly PokemonType[] = [
+  PokemonType.NORMAL,
+  PokemonType.ROCK,
+  PokemonType.ICE,
+  PokemonType.STEEL,
+  PokemonType.ELECTRIC,
+  PokemonType.DRAGON,
+];
+
+/** Test-side stamp: give the holder the six types via summonData (harness, not ability). */
+function stampSixTypes(holder: Pokemon): void {
+  holder.summonData.types = [...SIX_TYPES];
+}
 
 describe.skipIf(!RUN)("ER World in Pieces (5917)", () => {
   let phaserGame: Phaser.Game;
@@ -37,14 +51,15 @@ describe.skipIf(!RUN)("ER World in Pieces (5917)", () => {
       .moveset(MoveId.HARDEN);
   });
 
-  it("stamps all six types on entry, and N-type effectiveness multiplies over all of them", async () => {
+  it("operates on the holder's actual types; N-type effectiveness multiplies over all of them", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const holder = game.field.getPlayerPokemon();
     const enemy = game.field.getEnemyPokemon();
+    stampSixTypes(holder);
 
     const types = holder.getTypes();
     expect(types.length).toBe(6);
-    for (const t of WORLD_IN_PIECES_TYPES) {
+    for (const t of SIX_TYPES) {
       expect(types).toContain(t);
     }
 
@@ -56,6 +71,7 @@ describe.skipIf(!RUN)("ER World in Pieces (5917)", () => {
   it("UI substrate: the battle-info panel lays out all six type icons", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const holder = game.field.getPlayerPokemon();
+    stampSixTypes(holder);
     await holder.updateInfo();
 
     // 3 fixed icons (type1/2/3) + 3 lazily-created extras, all visible for 6 types.
@@ -77,6 +93,7 @@ describe.skipIf(!RUN)("ER World in Pieces (5917)", () => {
   it("the first direct hit each turn strips ONE non-Normal type (Normal never removed)", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const holder = game.field.getPlayerPokemon();
+    stampSixTypes(holder);
     expect(erWorldInPiecesAttached(holder)?.length).toBe(6);
 
     game.move.select(MoveId.HARDEN);
@@ -93,6 +110,7 @@ describe.skipIf(!RUN)("ER World in Pieces (5917)", () => {
     game.override.enemyMoveset(MoveId.TWINEEDLE);
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const holder = game.field.getPlayerPokemon();
+    stampSixTypes(holder);
 
     game.move.select(MoveId.HARDEN);
     await game.toEndOfTurn();
@@ -103,6 +121,7 @@ describe.skipIf(!RUN)("ER World in Pieces (5917)", () => {
   it("each missing type grants +20% effective Speed", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const holder = game.field.getPlayerPokemon();
+    stampSixTypes(holder);
     // Full six types → no bonus.
     const speedFull = holder.getEffectiveStat(Stat.SPD);
 
@@ -121,6 +140,7 @@ describe.skipIf(!RUN)("ER World in Pieces (5917)", () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const holder = game.field.getPlayerPokemon();
     const enemy = game.field.getEnemyPokemon();
+    stampSixTypes(holder);
 
     // Turn 1: take a hit → strip one type.
     game.move.select(MoveId.HARDEN);
