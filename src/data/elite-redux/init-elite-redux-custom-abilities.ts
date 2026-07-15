@@ -41,6 +41,7 @@ import {
 import { ChivalryAbAttr, ER_CHIVALRY_ABILITY_ID } from "#data/elite-redux/abilities/chivalry";
 import { CleansingLightAbAttr, ER_CLEANSING_LIGHT_ABILITY_ID } from "#data/elite-redux/abilities/cleansing-light";
 import { CommonRootAbAttr, ER_COMMON_ROOT_ABILITY_ID } from "#data/elite-redux/abilities/common-root";
+import { MANUAL_COMPOSITE_PARTS } from "#data/elite-redux/abilities/composite-newcomers";
 import {
   CrosscutPowerAbAttr,
   CrosscutSecondStrikeAbAttr,
@@ -59,8 +60,10 @@ import {
   OverloadedPowerAbAttr,
   OverloadedPriorityAbAttr,
 } from "#data/elite-redux/abilities/electivire";
+import { ER_GENESIS_SUPERNOVA_ABILITY_ID, GenesisSupernovaAbAttr } from "#data/elite-redux/abilities/genesis-supernova";
 import { ER_HEARTBREAK_ABILITY_ID, HeartbreakAbAttr } from "#data/elite-redux/abilities/heartbreak";
 import { ER_HYDRAPEX_ABILITY_ID, HydrapexAbAttr } from "#data/elite-redux/abilities/hydrapex";
+import { ER_KNIGHTS_HONOR_ABILITY_ID, knightsHonorAttrs } from "#data/elite-redux/abilities/knights-honor";
 import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abilities/last-host";
 import { ER_LIBRARY_ABILITY_ID, LibraryAbAttr } from "#data/elite-redux/abilities/library";
 import { ER_LIFE_PRESERVER_ABILITY_ID, LifePreserverAbAttr } from "#data/elite-redux/abilities/life-preserver";
@@ -589,7 +592,39 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_BAD_SPLICE_ABILITY_ID,
     },
+    // Newcomer-patch bespoke abilities (composites are registered below from
+    // MANUAL_COMPOSITE_PARTS; their attrs are filled by
+    // wireEliteReduxManualComposites in a post-init pass).
+    {
+      draft: {
+        id: ER_GENESIS_SUPERNOVA_ABILITY_ID,
+        name: "Genesis Supernova",
+        description: "This Pokemon's Psychic-type moves summon Psychic Terrain.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_GENESIS_SUPERNOVA_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_KNIGHTS_HONOR_ABILITY_ID,
+        name: "Knight's Honor",
+        description: "Lowering any stats on its side raises Def and Sp. Def.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_KNIGHTS_HONOR_ABILITY_ID,
+    },
   ];
+  // Newcomer-patch composite abilities (5933+). Registered as placeholders here
+  // (the ability instance + AbilityId reverse-map key + verbatim description);
+  // their constituent AbAttrs are attached later by
+  // wireEliteReduxManualComposites (init.ts, after the composite refresh) so
+  // every constituent — ER-custom and rebalance-patched vanilla — is final.
+  for (const def of Object.values(MANUAL_COMPOSITE_PARTS)) {
+    manualDrafts.push({
+      draft: { id: def.id, name: def.name, description: def.description, archetype: "unknown" },
+      pokerogueId: def.id,
+    });
+  }
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
       continue;
@@ -917,6 +952,16 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_BAD_SPLICE_ABILITY_ID) {
     builder.attr(BadSpliceAbAttr);
+  }
+
+  if (pokerogueId === ER_GENESIS_SUPERNOVA_ABILITY_ID) {
+    builder.attr(GenesisSupernovaAbAttr);
+  }
+
+  if (pokerogueId === ER_KNIGHTS_HONOR_ABILITY_ID) {
+    for (const attr of knightsHonorAttrs()) {
+      builder.attrs.push(attr);
+    }
   }
 
   const ability = builder.build();

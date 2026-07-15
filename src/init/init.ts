@@ -5,6 +5,7 @@ import { initPokemonPrevolutions, initPokemonStarters } from "#balance/pokemon-e
 import { initSpecies } from "#balance/pokemon-species";
 import { initChallenges } from "#data/challenge";
 import { initTrainerTypeDialogue } from "#data/dialogue";
+import { wireEliteReduxManualComposites } from "#data/elite-redux/abilities/composite-newcomers";
 import { registerErFinalBossFormChange } from "#data/elite-redux/er-final-boss";
 import {
   initEliteReduxCSourceCorrections,
@@ -195,6 +196,12 @@ export function initializeGame() {
   const compositeRefresh = refreshEliteReduxComposites();
   console.info(
     `[er-composite-refresh] re-resolved ${compositeRefresh.refreshed} composite abilities against patched parts${compositeRefresh.errors.length > 0 ? ` (${compositeRefresh.errors.length} errors)` : ""}`,
+  );
+  // Newcomer-patch manual composites (5933+): fill each composite's attrs from
+  // its constituents NOW that vanilla parts + draft-id composites are final.
+  const manualCompositeResult = wireEliteReduxManualComposites();
+  console.info(
+    `[er-manual-composite] wired ${manualCompositeResult.wired} newcomer composites${manualCompositeResult.emptyConstituents.length > 0 ? ` (${manualCompositeResult.emptyConstituents.length} empty constituents: ${manualCompositeResult.emptyConstituents.map(e => `${e.compositeId}<-${e.constituentId}`).join(", ")})` : ""}`,
   );
   // Elite Redux Phase B4: populate the ER trainer registry. Must run AFTER
   // initEliteReduxCustomSpecies() and initEliteReduxCustomMoves() so the
