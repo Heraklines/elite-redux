@@ -832,6 +832,13 @@ export class UI extends Phaser.GameObjects.Container {
       if (this.mode === mode && !forceTransition) {
         // A newer same-mode winner must still clear an opaque fade left by the superseded attempt.
         this.normalizeTransitionOverlay();
+        // Mode identity alone is not a public surface. A prior clear/teardown can leave the selected
+        // handler inactive; bounded callers must be able to re-open that exact same mode instead of
+        // reporting a false completion that can strand a retained co-op continuation.
+        const handler = this.getHandler();
+        if (!handler.active) {
+          handler.show(args);
+        }
         this.coopAuthoritySurfaceReady(mode);
         resolve();
         return;

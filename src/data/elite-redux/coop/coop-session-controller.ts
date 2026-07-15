@@ -1683,7 +1683,7 @@ export class CoopSessionController {
 
   /** Atomic full-snapshot rollback only; exact restore may move backward and emits no UI/control callback. */
   restoreAuthoritativeInteractionCounterForTransaction(counter: number): void {
-    this.interactionTurn.restore(counter);
+    this.interactionTurn.restoreExactForTransaction(counter);
   }
 
   /** Stage an already-preflighted counter without notifying UI/listeners before atomic commit. */

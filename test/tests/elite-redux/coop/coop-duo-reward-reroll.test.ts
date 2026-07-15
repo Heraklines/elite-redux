@@ -41,6 +41,7 @@ import {
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
@@ -157,9 +158,9 @@ describe.skipIf(!RUN)(
         rig.hostScene.phaseManager.getCurrentPhase(),
       ) as unknown as RerollShopSeam;
       expect(hostShop0.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
-      const guestShop0 = withClientSync(rig.guestCtx, () =>
-        rig.guestScene.phaseManager.create("SelectModifierPhase"),
-      ) as unknown as ShopPhaseSeam;
+      // Follow the same queued Victory -> BattleEnd -> SelectModifier transition as production. A detached
+      // phase never owns the guest's public surface, so the retained transition is correct to reject it.
+      const guestShop0 = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
 
       // ===== OWNER SIDE (host): start round 0, capture its options, REROLL, then start + leave round 1. =====
       let hostOptionIds1: number[] = [];

@@ -645,7 +645,7 @@ export interface CoopFullMonSnapshot {
   /** Each move slot as `[moveId, ppUsed]`, in moveset slot order. */
   moves: [number, number][];
   /** Battler-tag TYPE ids present on the mon (identity only). */
-  tags: number[];
+  tags: string[];
   /**
    * This mon's held-item modifiers as plain ModifierData blobs (#633 RISKY #1/#2/#3). Carried in the
    * resync ONLY (never the per-turn checkpoint - too heavy; the checksum's compact held-item digest

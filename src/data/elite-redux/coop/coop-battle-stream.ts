@@ -3600,17 +3600,6 @@ export class CoopBattleStreamer {
           );
           return;
         }
-        if (!this.acceptsAwaitedTurnAddress(msg)) {
-          // Retained commits may be redelivered after the guest has already crossed the corresponding
-          // boundary. They are valid carriers, but they must not be admitted under a different awaited
-          // address. Keep this distinct from schema validation: `state=1` in the malformed diagnostic only
-          // meant that authoritativeState existed and repeatedly obscured this stale-delivery condition.
-          coopWarn(
-            "stream",
-            `guest DROP unawaited turnResolution e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
-          );
-          return;
-        }
         const res: CoopTurnResolution = {
           epoch: msg.epoch,
           wave: msg.wave,
@@ -3623,6 +3612,35 @@ export class CoopBattleStreamer {
           fullField: msg.fullField,
           authoritativeState: msg.authoritativeState,
         };
+        const exactKey = authorityKey(res);
+        const completedAck = this.ackedTurnCommits.get(exactKey);
+        const admitted = this.seenTurnAuthority.get(exactKey);
+        if (
+          completedAck?.stage === "continuationReady"
+          && admitted != null
+          && admitted.canonical === canonicalize(res)
+        ) {
+          // The final ACK may be lost immediately before the guest crosses into the next wave/turn.
+          // Host retention then redelivers the old immutable carrier after the address has advanced.
+          // Re-ACK the exact completed identity before the live-address gate; never re-admit or re-apply it.
+          coopLog(
+            "replay",
+            `guest RE-ACK completed cross-address turn commit e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
+          );
+          this.transport.send(completedAck.value);
+          return;
+        }
+        if (!this.acceptsAwaitedTurnAddress(res)) {
+          // Retained commits may be redelivered after the guest has already crossed the corresponding
+          // boundary. They are valid carriers, but they must not be admitted under a different awaited
+          // address. Keep this distinct from schema validation: `state=1` in the malformed diagnostic only
+          // meant that authoritativeState existed and repeatedly obscured this stale-delivery condition.
+          coopWarn(
+            "stream",
+            `guest DROP unawaited turnResolution e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
+          );
+          return;
+        }
         const admission = this.classifyAuthority(this.highestSeenTurnAuthority, this.seenTurnAuthority, res);
         if (admission.kind === "conflict") {
           this.beginAuthorityTerminal({
@@ -3751,7 +3769,7 @@ export class CoopBattleStreamer {
         if (this.authorityTerminalStarted) {
           return;
         }
-        if (!hasCompleteAuthorityCompanions(msg) || !this.acceptsCurrentAddress(msg)) {
+        if (!hasCompleteAuthorityCompanions(msg)) {
           coopWarn(
             "checkpoint",
             `guest DROP malformed battleCheckpoint reason=${msg.reason} `
@@ -3771,6 +3789,29 @@ export class CoopBattleStreamer {
           fullField: msg.fullField,
           authoritativeState: msg.authoritativeState,
         };
+        const exactKey = authorityKey(envelope);
+        const completedAck = this.ackedReplacementCommits.get(exactKey);
+        const admitted = this.seenReplacementAuthority.get(exactKey);
+        if (
+          completedAck?.stage === "continuationReady"
+          && admitted != null
+          && admitted.canonical === canonicalize(envelope)
+        ) {
+          coopLog(
+            "checkpoint",
+            `guest RE-ACK completed cross-address replacement e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
+          );
+          this.transport.send(completedAck.value);
+          return;
+        }
+        if (!this.acceptsCurrentAddress(envelope)) {
+          coopWarn(
+            "checkpoint",
+            `guest DROP cross-address battleCheckpoint reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} `
+              + `turn=${msg.turn} rev=${msg.revision}`,
+          );
+          return;
+        }
         const admission = this.classifyAuthority(
           this.highestSeenReplacementAuthority,
           this.seenReplacementAuthority,

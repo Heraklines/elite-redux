@@ -15,6 +15,8 @@ import {
   canonicalize,
   checksumState,
   fnv1a64,
+  sortCoopChecksumArenaTags,
+  sortCoopChecksumTagIds,
 } from "#data/elite-redux/coop/coop-battle-checksum";
 import { describe, expect, it } from "vitest";
 
@@ -86,6 +88,20 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
     it("canonicalize keeps array ORDER (order is meaningful for party/move slots)", () => {
       expect(canonicalize([3, 1, 2])).toBe("[3,1,2]");
       expect(canonicalize([1, 2, 3])).not.toBe(canonicalize([3, 2, 1]));
+    });
+
+    it("string-enum tag sets canonicalize independently of engine insertion order", () => {
+      expect(sortCoopChecksumTagIds(["SEEDED", "ENCORE"])).toEqual(["ENCORE", "SEEDED"]);
+      const host = sortCoopChecksumArenaTags([
+        ["INVERSE_ROOM", 0],
+        ["GRAVITY", 0],
+      ]);
+      const guest = sortCoopChecksumArenaTags([
+        ["GRAVITY", 0],
+        ["INVERSE_ROOM", 0],
+      ]);
+      expect(host).toEqual(guest);
+      expect(checksumState(state({ arenaTags: host }))).toBe(checksumState(state({ arenaTags: guest })));
     });
 
     it("canonicalize normalizes -0, 1.0, and non-finite numbers", () => {
@@ -185,7 +201,7 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
       ).not.toBe(base);
     });
     it("a changed battler tag set", () => {
-      expect(checksumState(state({ field: [mon({ tags: [10] })] }))).not.toBe(base);
+      expect(checksumState(state({ field: [mon({ tags: ["ENCORE"] })] }))).not.toBe(base);
     });
     it("a changed Terastallized flag (#633 GAP 7)", () => {
       expect(checksumState(state({ field: [mon({ isTerastallized: true })] }))).not.toBe(base);
@@ -206,7 +222,7 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
       expect(checksumState(state({ terrain: 2 }))).not.toBe(base);
     });
     it("a changed arena tag set", () => {
-      expect(checksumState(state({ arenaTags: [[1, 0]] }))).not.toBe(base);
+      expect(checksumState(state({ arenaTags: [["GRAVITY", 0]] }))).not.toBe(base);
     });
     it("a changed party order", () => {
       expect(checksumState(state({ party: [4, 1] }))).not.toBe(base);
@@ -288,10 +304,10 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
     });
     it("arena tags hash by [tagType, side] identity only (no turn count in the tuple)", () => {
       // Two-element tuples: identity only. A third element would be a turn counter.
-      const s = state({ arenaTags: [[1, 0]] });
+      const s = state({ arenaTags: [["GRAVITY", 0]] });
       expect(s.arenaTags[0]).toHaveLength(2);
       // Same identity -> same hash regardless of any (excluded) duration.
-      expect(checksumState(s)).toBe(checksumState(state({ arenaTags: [[1, 0]] })));
+      expect(checksumState(s)).toBe(checksumState(state({ arenaTags: [["GRAVITY", 0]] })));
     });
   });
 });

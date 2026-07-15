@@ -548,14 +548,15 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     it("recovers a dropped turn commit, re-ACKs a dropped ACK, and applies observers once", async () => {
       const pair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 0x50333231 });
       const hostRetryTimers: (() => void)[] = [];
+      const current = { epoch: 7, wave: 1, turn: 1 };
       const hostStream = new CoopBattleStreamer(pair.host, {
-        authorityContext: context,
+        authorityContext: () => current,
         schedule: cb => {
           hostRetryTimers.push(cb);
           return () => {};
         },
       });
-      const guestStream = new CoopBattleStreamer(pair.guest, { authorityContext: context });
+      const guestStream = new CoopBattleStreamer(pair.guest, { authorityContext: () => current });
       let appliedDeliveries = 0;
       let pendingReplies = 0;
       guestStream.onTurnCommit(() => appliedDeliveries++);
@@ -581,6 +582,8 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       pair.armNextDrop("turnCommitAck", "guest");
       expect(guestStream.acknowledgeTurnCommit(resolution!, "continuationReady")).toBe(true);
       await flushWire();
+      current.wave = 2;
+      current.turn = 1;
       hostRetryTimers.shift()?.();
       await flushWire();
       expect(appliedDeliveries, "the production host retry was re-ACKed before observer/apply fan-out").toBe(1);
@@ -1580,7 +1583,8 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     it("host retries a replacement after a lost ACK and the guest re-ACKs without reopening it", async () => {
       const pair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 0x50333252 });
       const hostRetryTimers: (() => void)[] = [];
-      const replacementContext = () => ({ epoch: 7, wave: 4, turn: 2 });
+      const current = { epoch: 7, wave: 4, turn: 2 };
+      const replacementContext = () => current;
       const hostStream = new CoopBattleStreamer(pair.host, {
         authorityContext: replacementContext,
         schedule: cb => {
@@ -1612,6 +1616,8 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       pair.armNextDrop("battleCheckpointAck", "guest");
       expect(guestStream.acknowledgeReplacement(envelope, "continuationReady")).toBe(true);
       await flushWire();
+      current.wave = 5;
+      current.turn = 1;
       hostRetryTimers.shift()?.();
       await flushWire();
       expect(opened, "duplicate replacement was re-ACKed before recovery observers/command UI").toBe(1);

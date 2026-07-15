@@ -29,6 +29,20 @@
 //     is hashed. Adding a counter back to the hashed shape re-introduces false desyncs.
 // =============================================================================
 
+/** Canonicalize string-enum battler tag identities independently of engine insertion order. */
+export function sortCoopChecksumTagIds(tags: readonly string[]): string[] {
+  return [...tags].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
+/** Canonicalize string-enum arena tag identities by tag name, then numeric side. */
+export function sortCoopChecksumArenaTags(
+  tags: readonly (readonly [string, number])[],
+): [string, number][] {
+  return tags
+    .map(([tagType, side]) => [tagType, side] as [string, number])
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]));
+}
+
 /** One field mon's full deterministic state for the checksum (NO optionals). */
 export interface CoopChecksumMon {
   /** Battler index (0 host lead, 1 guest lead, 2/3 enemies). */
@@ -82,7 +96,7 @@ export interface CoopChecksumMon {
   /** Each move slot as `[moveId, ppUsed]`, in moveset slot order (NOT sorted). */
   moves: [number, number][];
   /** Sorted ascending list of the battler-tag TYPE ids present (identity only, no counters). */
-  tags: number[];
+  tags: string[];
   /**
    * TRANSFORM / Imposter copied species id (#836/#837); 0 when NOT transformed. Hashing it is INTENDED:
    * a Transform / Imposter copies the target's identity into `summonData` while `species` (hashed by
@@ -110,7 +124,7 @@ export interface CoopChecksumState {
   /** `TerrainType` enum value (0 = none). Turn counter is intentionally excluded. */
   terrain: number;
   /** Arena tag identities as `[tagType, side]`, sorted. Turn counts are excluded. */
-  arenaTags: [number, number][];
+  arenaTags: [string, number][];
   /** Player party `speciesId`s in slot order (order is meaningful - do NOT sort). */
   party: number[];
   /**

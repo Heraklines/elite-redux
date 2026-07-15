@@ -346,11 +346,21 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     });
     expect(retained?.continuationReady, "an inactive watcher cannot attest a public continuation").toBe(false);
 
+    // Reproduce the production wave-20/160 shape: a previous public handler is still active when the
+    // watcher starts. The watcher must explicitly replace it with a real MESSAGE surface before stock.
+    await withClient(rig.guestCtx, async () => {
+      await rig.guestScene.ui.setModeBounded(UiMode.CONFIRM, 2_000, () => {}, () => {});
+      expect(rig.guestScene.ui.getMode()).toBe(UiMode.CONFIRM);
+      expect(rig.guestScene.ui.getHandler().active).toBe(true);
+    });
+
     // Start the real watcher first, then drive the owner's real BIOME_SHOP/CANCEL/CONFIRM handlers.
     await withClient(rig.guestCtx, async () => {
       guestMarket.start();
       await drainLoopback();
     });
+    await waitForMode(rig.guestCtx, UiMode.MESSAGE, "guest market watcher message");
+    expect(rig.guestScene.ui.getHandler().active, "watcher MESSAGE handler is executable").toBe(true);
     await withClient(rig.hostCtx, async () => {
       hostMarket.start();
       await drainLoopback();

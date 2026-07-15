@@ -33,7 +33,7 @@ interface UiSeam {
   };
   fadeOut(): Promise<void>;
   fadeIn(): Promise<void>;
-  getHandler(): { clear(): void; show(args: unknown[]): void };
+  getHandler(): { active: boolean; clear(): void; show(args: unknown[]): void };
 }
 
 type UiHarness = UiSeam & Pick<UI, "getMode" | "setModeBounded" | "setModeBoundedWhen">;
@@ -64,6 +64,7 @@ describe("co-op bounded UI transition seam", () => {
     const ui = Object.create(UI.prototype) as UiHarness;
     const clear = vi.fn();
     const show = vi.fn();
+    const handler = { active: true, clear, show };
     ui.mode = UiMode.STARTER_SELECT;
     ui.modeChain = [];
     ui.modeTransitionGeneration = 0;
@@ -71,9 +72,25 @@ describe("co-op bounded UI transition seam", () => {
     ui.overlay = { setAlpha: vi.fn(), setVisible: vi.fn() };
     ui.fadeOut = () => fade.promise;
     ui.fadeIn = () => Promise.resolve();
-    ui.getHandler = () => ({ clear, show });
+    ui.getHandler = () => handler;
     return { ui, clear, show };
   }
+
+  it("reactivates an inactive handler when a bounded transition targets the current mode", async () => {
+    const fade = deferred();
+    const { ui, clear, show } = makeUi(fade);
+    const handler = ui.getHandler();
+    handler.active = false;
+    show.mockImplementation(() => {
+      handler.active = true;
+    });
+
+    await expect(ui.setModeBounded(UiMode.STARTER_SELECT, 25, { marker: "reopen" })).resolves.toBe("completed");
+    expect(clear).not.toHaveBeenCalled();
+    expect(show).toHaveBeenCalledOnce();
+    expect(show).toHaveBeenCalledWith([{ marker: "reopen" }]);
+    expect(handler.active).toBe(true);
+  });
 
   it("a lost fade times out, force-installs the target exactly once, and its late callback cannot overwrite", async () => {
     const fade = deferred();

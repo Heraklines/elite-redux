@@ -335,9 +335,10 @@ export class BiomeShopPhase extends SelectModifierPhase {
         this.qtys,
       )
       .then(result => {
-        if (result === "completed") {
+        if (result !== "superseded") {
           // A retained wave is not continuation-safe merely because its biome-market phase exists.
           // Release the source transaction only after the real public BIOME_SHOP handler committed.
+          // A bounded timeout force is also a real, active handler and must not be mistaken for failure.
           this.notifyCoopBiomeContinuationSurfaceReady();
           return;
         }
@@ -865,7 +866,12 @@ export class BiomeShopPhase extends SelectModifierPhase {
       this.coopBiomeAuthoritativeStockUnavailable("watcher has no live relay");
       return;
     }
-    globalScene.ui.showText("Your partner is browsing the market...", null, undefined, null, true);
+    // MESSAGE identity is not enough: a prior transition can leave that handler selected but inactive.
+    // Open a bounded real public surface before waiting so the player sees progress and the later retained
+    // continuation can be attested against an executable handler rather than a one-shot assumption.
+    if (!(await this.openCoopBiomeWatcherMessage(generation, wave, pinned))) {
+      return;
+    }
     if (this.coopBiomeOptionOwner) {
       // #832 (audit P1#5): the HOST on a GUEST-owned biome ME is the OPTION owner but the PICK watcher. It
       // runs the real curated subclass, so it ROLLS + STREAMS its own authoritative stock (the guest, a
@@ -891,6 +897,11 @@ export class BiomeShopPhase extends SelectModifierPhase {
       }
       this.shopOptions = rebuilt;
       this.qtys = this.shopOptions.map(() => 99);
+    }
+    // Stock awaits can span another UI transition. Re-open and revalidate the exact watcher surface at
+    // the instant readiness is published; a buffered owner terminal remains safe until the loop below.
+    if (!(await this.openCoopBiomeWatcherMessage(generation, wave, pinned))) {
+      return;
     }
     // The watcher never opens BIOME_SHOP, so its equivalent executable continuation is the fully
     // materialized stock plus the live terminal-consumer loop. Record readiness only after option
@@ -1057,6 +1068,25 @@ export class BiomeShopPhase extends SelectModifierPhase {
     }
     globalScene.ui.clearText();
     this.finishCoopBiomeShopLeave();
+  }
+
+  /** Materialize the watcher-facing MESSAGE handler and prove it still belongs to this exact market. */
+  private async openCoopBiomeWatcherMessage(generation: number, wave: number, pinned: number): Promise<boolean> {
+    const live = (): boolean => this.coopAsyncBoundaryStillLive(generation, wave, pinned);
+    const opened = await globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, live);
+    if (opened === "superseded" || !live()) {
+      return false;
+    }
+    globalScene.ui.showText("Your partner is browsing the market...", null, undefined, null, true);
+    if (!live()) {
+      return false;
+    }
+    const publicSurface = globalScene.ui.getMode() === UiMode.MESSAGE && globalScene.ui.getHandler()?.active === true;
+    if (!publicSurface) {
+      failCoopSharedSession(`Biome market watcher could not open its continuation surface for ${pinned}`);
+      return false;
+    }
+    return true;
   }
 
   /** Publish readiness only while this phase's scene and runtime are installed together. */

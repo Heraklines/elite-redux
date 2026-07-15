@@ -96,7 +96,7 @@ const checksumMon = () => ({
   bossSegments: 0,
   bossSegmentIndex: 0,
   moves: [[33, 0]] as [number, number][],
-  tags: [] as number[],
+  tags: [] as string[],
   transformSpeciesId: 0,
   transformFormIndex: 0,
 });

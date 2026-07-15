@@ -43,6 +43,8 @@ import {
   canonicalize,
   checksumState,
   fnv1a64,
+  sortCoopChecksumArenaTags,
+  sortCoopChecksumTagIds,
 } from "#data/elite-redux/coop/coop-battle-checksum";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
@@ -1660,23 +1662,22 @@ function readTransform(mon: Pokemon): CoopMonTransform | null {
  * Seed, Encore, Taunt, ...) is STILL detected + healed. This mirrors the module's existing exclusion of
  * turn COUNTERS for the same "legitimately transient, not identity" reason (see the file header).
  */
-function readTagTypes(mon: Pokemon): number[] {
+function readTagTypes(mon: Pokemon): string[] {
   try {
-    return mon.summonData.tags
-      .filter(t => t instanceof SerializableBattlerTag)
-      .map(t => t.tagType as unknown as number)
-      .sort((a, b) => a - b);
+    return sortCoopChecksumTagIds(
+      mon.summonData.tags.filter(t => t instanceof SerializableBattlerTag).map(t => t.tagType as unknown as string),
+    );
   } catch {
     return [];
   }
 }
 
 /** Read the arena's tag identities as `[tagType, side]`, sorted (turn counts excluded). */
-function readArenaTags(): [number, number][] {
+function readArenaTags(): [string, number][] {
   try {
-    return globalScene.arena.tags
-      .map(t => [t.tagType as unknown as number, t.side as unknown as number] as [number, number])
-      .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    return sortCoopChecksumArenaTags(
+      globalScene.arena.tags.map(t => [t.tagType as unknown as string, t.side as unknown as number]),
+    );
   } catch {
     return [];
   }
@@ -2362,8 +2363,8 @@ function captureVersusGuestChecksumState(): CoopChecksumState {
     .sort((a, b) => a.bi - b.bi);
   const enemyParty = globalScene.getEnemyParty();
   const arenaTags = readArenaTags()
-    .map(([tagType, side]) => [tagType, swapArenaTagSide(side)] as [number, number])
-    .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    .map(([tagType, side]) => [tagType, swapArenaTagSide(side)] as [string, number]);
+  const canonicalArenaTags = sortCoopChecksumArenaTags(arenaTags);
   const modifiers = (() => {
     try {
       return globalScene
@@ -2381,7 +2382,7 @@ function captureVersusGuestChecksumState(): CoopChecksumState {
     field,
     weather: arena.weather?.weatherType ?? 0,
     terrain: arena.terrain?.terrainType ?? 0,
-    arenaTags,
+    arenaTags: canonicalArenaTags,
     party: enemyParty.map(p => p.species.speciesId),
     partyLevels: enemyParty.map(p => p.level),
     benchHp: readEnemyBenchHpDigest(),
@@ -3829,10 +3830,10 @@ function applyCoopAuthoritativeBattleStateInternal(
 }
 
 /** Reconcile a live mon's battler tags to exactly the snapshot's tag-type set. */
-function reconcileTags(mon: Pokemon, wantTagTypes: number[]): void {
+function reconcileTags(mon: Pokemon, wantTagTypes: string[]): void {
   try {
     const want = new Set(wantTagTypes);
-    const have = new Set(mon.summonData.tags.map(t => t.tagType as unknown as number));
+    const have = new Set(mon.summonData.tags.map(t => t.tagType as unknown as string));
     // Drop tags the host no longer has.
     for (const have_t of [...have]) {
       if (!want.has(have_t)) {

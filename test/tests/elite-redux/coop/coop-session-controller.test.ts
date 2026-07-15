@@ -25,6 +25,19 @@ import { describe, expect, it } from "vitest";
 const flush = () => new Promise<void>(resolve => queueMicrotask(resolve));
 
 describe("co-op session controller (#633, P1)", () => {
+  it("rolls an atomically staged interaction counter back to the exact prior value", () => {
+    const { host } = createLoopbackPair();
+    const controller = new CoopSessionController(host);
+    controller.restoreInteractionCounter(5);
+    expect(controller.interactionCounter()).toBe(5);
+    expect(controller.adoptAuthoritativeInteractionCounterForTransaction(9)).toBe(true);
+    expect(controller.interactionCounter()).toBe(9);
+
+    controller.restoreAuthoritativeInteractionCounterForTransaction(5);
+    expect(controller.interactionCounter(), "transaction rollback may move backward to its exact snapshot").toBe(5);
+    controller.dispose();
+  });
+
   describe("functional compatibility launch barrier", () => {
     it("refuses protocol-33 launch when biome operations or durability do not survive negotiation", async () => {
       clearNegotiatedCoopCapabilities();
