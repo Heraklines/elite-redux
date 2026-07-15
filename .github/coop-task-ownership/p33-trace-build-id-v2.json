@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "taskId": "p33-trace-build-id-v2",
+  "branch": "ci/coop/p33-trace-build-id-v2",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "24ad64eaf932b6ecba85fa67531f18a34bb09937",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-trace-build-id-v2.json",
+    "plugins/vite/build-id-plugin.ts",
+    "src/data/elite-redux/coop/coop-diagnostics.ts",
+    "src/data/elite-redux/coop/coop-report-correlation.ts",
+    "src/utils/build-identity.ts",
+    "test/plugins/build-id-plugin.test.ts",
+    "test/tests/elite-redux/data/er-bug-report.test.ts",
+    "test/tools/coop-diagnostics.test.ts",
+    "test/utils/report-correlation.test.ts"
+  ]
+}

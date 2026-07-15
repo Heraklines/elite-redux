@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { ErBuildIdentityV1 } from "#utils/build-identity";
+import { type ErBuildIdentityV1, normalizeErBuildIdentity } from "#utils/build-identity";
 
 export const COOP_REPORT_CORRELATION_MARKER = "----- CO-OP REPORT CORRELATION (JSON) -----";
 
@@ -22,6 +22,12 @@ export interface CoopReportBindingV1 {
   authoritySeat: number;
 }
 
+/** The authority-replicated membership boundary active when the report was captured. */
+export interface CoopReportMembershipV1 {
+  revision: number;
+  connectionGeneration: number;
+}
+
 /**
  * Machine-readable axes shared by the two reports from one co-op incident. No display names, account ids,
  * pairing bearers or credentials are accepted by this schema.
@@ -33,6 +39,7 @@ export interface CoopReportCorrelationV1 {
   epoch: number;
   seed: string | null;
   binding: CoopReportBindingV1 | null;
+  membership: CoopReportMembershipV1 | null;
   local: CoopReportEndpointV1;
   partner: CoopReportEndpointV1;
   build: ErBuildIdentityV1;
@@ -46,6 +53,8 @@ export interface CoopReportCorrelationInput {
   sessionId?: string | null;
   bindingSource?: "fresh" | "resume" | "showdown" | null;
   authoritySeat?: number | null;
+  membershipRevision?: number | null;
+  membershipConnectionGeneration?: number | null;
   localRole: CoopReportRole;
   localSeat?: number | null;
   partnerRole: CoopReportRole;
@@ -96,10 +105,19 @@ export function createCoopReportCorrelation(input: CoopReportCorrelationInput): 
   const bindingId = opaque(input.bindingId);
   const sessionId = opaque(input.sessionId);
   const authoritySeat = coordinate(input.authoritySeat);
+  const membershipRevision = coordinate(input.membershipRevision);
+  const membershipConnectionGeneration = coordinate(input.membershipConnectionGeneration);
   const binding =
     bindingId != null && sessionId != null && input.bindingSource != null && authoritySeat != null
       ? { bindingId, sessionId, source: input.bindingSource, authoritySeat }
       : null;
+  const membership =
+    membershipRevision != null && membershipConnectionGeneration != null
+      ? { revision: membershipRevision, connectionGeneration: membershipConnectionGeneration }
+      : null;
+  const build: ErBuildIdentityV1 =
+    normalizeErBuildIdentity(input.build)
+    ?? { version: 1, id: "unknown", source: "unknown", sha: null, workflow: null, deployment: null };
   return {
     version: 1,
     pairKey: pairKey({ sessionId, runId, epoch, seed }),
@@ -107,9 +125,10 @@ export function createCoopReportCorrelation(input: CoopReportCorrelationInput): 
     epoch,
     seed,
     binding,
+    membership,
     local: { role: input.localRole, seat: coordinate(input.localSeat) },
     partner: { role: input.partnerRole, seat: coordinate(input.partnerSeat) },
-    build: input.build,
+    build,
   };
 }
 

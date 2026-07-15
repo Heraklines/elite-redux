@@ -127,6 +127,7 @@ describe("co-op control-plane report block (#diagnostics)", () => {
       local: { role: "host", seat: 0 },
       partner: { role: "guest", seat: 1 },
       binding: { bindingId: "p33-binding:pair:1234:seatmap", sessionId: "p33-session:pair:1234" },
+      membership: { revision: 1, connectionGeneration: 1 },
     });
     expect(JSON.stringify(correlation)).not.toMatch(/private-host-account|private-guest-account/u);
   });

@@ -37,7 +37,7 @@ export interface ErBuildIdentityV1 {
 
 export const ER_BUILD_IDENTITY_MARKER = "----- BUILD IDENTITY (JSON) -----";
 
-const SHA_PATTERN = /^[0-9a-f]{7,64}$/u;
+const SHA_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const BUILD_ID_PATTERN = /^[A-Za-z0-9:._-]{1,256}$/u;
 
 function safeText(value: unknown, maxLength = 256): string | null {
@@ -56,12 +56,26 @@ function safeText(value: unknown, maxLength = 256): string | null {
 }
 
 function safeSha(value: unknown): string | null {
-  const sha = safeText(value, 64)?.toLowerCase() ?? null;
+  // Do not sanitize or truncate revision material before validation: malformed bytes must fail closed.
+  const sha = typeof value === "string" ? value.toLowerCase() : null;
   return sha != null && SHA_PATTERN.test(sha) ? sha : null;
 }
 
 function safePositiveInteger(value: unknown): number | null {
   return Number.isSafeInteger(value) && (value as number) > 0 ? (value as number) : null;
+}
+
+function safePublicOrigin(value: unknown): string | null {
+  const text = safeText(value, 512);
+  if (text == null) {
+    return null;
+  }
+  try {
+    const url = new URL(text);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.origin : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeWorkflow(value: unknown): ErBuildWorkflowIdentityV1 | null {
@@ -102,7 +116,7 @@ function normalizeDeployment(value: unknown): ErBuildDeploymentIdentityV1 | null
   return {
     provider: "cloudflare-pages",
     branch: safeText(candidate.branch),
-    url: safeText(candidate.url, 512),
+    url: safePublicOrigin(candidate.url),
   };
 }
 
@@ -129,10 +143,20 @@ export function normalizeErBuildIdentity(value: unknown): ErBuildIdentityV1 | nu
   if ((candidate.workflow != null && workflow == null) || (candidate.deployment != null && deployment == null)) {
     return null;
   }
+  const source = candidate.source as ErBuildIdentityV1["source"];
+  if (
+    ((source === "github" || source === "cloudflare") && sha == null)
+    || (source === "github" && workflow == null)
+    || (source !== "github" && workflow != null)
+    || ((source === "local" || source === "legacy" || source === "unknown")
+      && (sha != null || deployment != null))
+  ) {
+    return null;
+  }
   return {
     version: 1,
     id: candidate.id,
-    source: candidate.source as ErBuildIdentityV1["source"],
+    source,
     sha,
     workflow,
     deployment,

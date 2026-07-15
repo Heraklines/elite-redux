@@ -36,7 +36,7 @@ describe("exact build identity", () => {
     expect(JSON.stringify(first)).not.toContain("must-never-appear");
   });
 
-  it("uses Cloudflare commit/deployment coordinates and strips URL credentials/query material", () => {
+  it("uses Cloudflare commit/deployment coordinates and retains only a public URL origin", () => {
     const identity = resolveBuildIdentity({
       env: {
         CF_PAGES_COMMIT_SHA: CLOUDFLARE_SHA.toUpperCase(),
@@ -51,10 +51,23 @@ describe("exact build identity", () => {
     expect(identity.deployment).toEqual({
       provider: "cloudflare-pages",
       branch: "staging",
-      url: "https://abc.pages.dev/deploy",
+      url: "https://abc.pages.dev",
     });
     expect(JSON.stringify(identity)).not.toMatch(/secret|hidden|token/u);
   });
+
+  it.each(["abcdef0", `${GITHUB_SHA}0`, `${"c".repeat(64)}0`, `${"d".repeat(20)}\n${"d".repeat(20)}`])(
+    "rejects a non-exact source revision %s",
+    malformedSha => {
+      const identity = resolveBuildIdentity({
+        env: { GITHUB_SHA: malformedSha },
+        now: () => 1234,
+        entropy: () => "malformed-sha",
+      });
+
+      expect(identity).toMatchObject({ source: "local", sha: null });
+    },
+  );
 
   it("keeps a unique, safe fallback for local builds", () => {
     const first = resolveBuildIdentity({ env: {}, now: () => 1234, entropy: () => "local-A!" });

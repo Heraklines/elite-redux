@@ -42,6 +42,12 @@ describe("report identity and pairing", () => {
     expect(JSON.parse(block.split("\n")[1])).toEqual(hostBuild);
   });
 
+  it("rejects semantically incomplete or prefix-truncated build identities", () => {
+    expect(normalizeErBuildIdentity({ ...hostBuild, sha: `${hostBuild.sha}0` })).toBeNull();
+    expect(normalizeErBuildIdentity({ ...hostBuild, workflow: null })).toBeNull();
+    expect(normalizeErBuildIdentity({ ...hostBuild, source: "local" })).toBeNull();
+  });
+
   it("pairs swapped host/guest reports even when one peer is on a stale build", () => {
     const shared = {
       runId: "run_01K123456789ABCDEFGHJKMNPQ",
@@ -51,6 +57,8 @@ describe("report identity and pairing", () => {
       sessionId: "p33-session:pair:1700000000000",
       bindingSource: "resume" as const,
       authoritySeat: 0,
+      membershipRevision: 7,
+      membershipConnectionGeneration: 2,
     };
     const host = createCoopReportCorrelation({
       ...shared,
@@ -77,10 +85,48 @@ describe("report identity and pairing", () => {
     expect(guest.pairKey).toBe(host.pairKey);
     expect(guest.local).toEqual(host.partner);
     expect(guest.partner).toEqual(host.local);
+    expect(guest.membership).toEqual({ revision: 7, connectionGeneration: 2 });
     expect(guest.build.id).not.toBe(host.build.id);
     const block = formatCoopReportCorrelation(host);
     expect(block.startsWith(COOP_REPORT_CORRELATION_MARKER)).toBe(true);
     expect(JSON.parse(block.split("\n")[1])).toEqual(host);
     expect(JSON.stringify(host)).not.toMatch(/account|bearer|credential|token/iu);
+  });
+
+  it("fails a partial or malformed membership boundary closed without poisoning report pairing", () => {
+    const correlation = createCoopReportCorrelation({
+      runId: "run-shared",
+      epoch: 99,
+      seed: "seed-shared",
+      membershipRevision: 3,
+      membershipConnectionGeneration: -1,
+      localRole: "host",
+      partnerRole: "guest",
+      build: hostBuild,
+    });
+
+    expect(correlation.membership).toBeNull();
+    expect(correlation.pairKey).toBe("coop-v1|session=-|run=run-shared|epoch=99|seed=seed-shared");
+  });
+
+  it("fails a malformed build payload closed before report serialization", () => {
+    const correlation = createCoopReportCorrelation({
+      runId: "run-shared",
+      epoch: 99,
+      seed: "seed-shared",
+      localRole: "host",
+      partnerRole: "guest",
+      build: { ...hostBuild, id: "secret-token", sha: "not-an-exact-sha" } as ErBuildIdentityV1,
+    });
+
+    expect(correlation.build).toEqual({
+      version: 1,
+      id: "unknown",
+      source: "unknown",
+      sha: null,
+      workflow: null,
+      deployment: null,
+    });
+    expect(JSON.stringify(correlation)).not.toContain("secret-token");
   });
 });
