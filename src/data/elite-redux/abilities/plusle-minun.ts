@@ -83,9 +83,18 @@ function usesDamagingMoveThisTurn(pokemon: Pokemon): boolean {
   return category !== undefined && category !== MoveCategory.STATUS;
 }
 
-/** Whether `pokemon`'s selected move this turn is a status move. */
-function usesStatusMoveThisTurn(pokemon: Pokemon): boolean {
-  return turnCommandCategory(pokemon) === MoveCategory.STATUS;
+/**
+ * Whether `pokemon` actually EXECUTED a status move this turn. Read at turn end
+ * (the neither-attack heal fires from PostTurn, by which point `incrementTurn`
+ * has already cleared `turnCommands`), so it uses the persistent per-turn
+ * `acted` flag + the last move in history (which, given `acted`, is this turn's).
+ */
+function usedStatusMoveThisTurn(pokemon: Pokemon): boolean {
+  if (!pokemon.turnData.acted) {
+    return false;
+  }
+  const last = pokemon.getLastXMoves(1)[0];
+  return last !== undefined && allMoves[last.move]?.category === MoveCategory.STATUS;
 }
 
 /** An active ally of `pokemon`, or `undefined` (inert in singles). */
@@ -210,7 +219,7 @@ export class SynchronizedCurrentBothAttackPowerAbAttr extends VariableMovePowerA
 export class SynchronizedCurrentHealAbAttr extends PostTurnAbAttr {
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
     const ally = activeAlly(pokemon);
-    return ally !== undefined && usesStatusMoveThisTurn(pokemon) && usesStatusMoveThisTurn(ally);
+    return ally !== undefined && usedStatusMoveThisTurn(pokemon) && usedStatusMoveThisTurn(ally);
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
