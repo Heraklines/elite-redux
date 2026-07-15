@@ -182,7 +182,11 @@ export abstract class PokemonSpeciesForm {
   }
 
   isOfType(type: number): boolean {
-    return this.type1 === type || (this.type2 !== null && this.type2 === type);
+    return (
+      this.type1 === type
+      || (this.type2 !== null && this.type2 === type)
+      || (this._extraTypes !== null && this._extraTypes.includes(type))
+    );
   }
 
   /**
@@ -340,6 +344,50 @@ export abstract class PokemonSpeciesForm {
     const mut = this as unknown as { type1: PokemonType; type2: PokemonType | null };
     mut.type1 = type1;
     mut.type2 = type2;
+  }
+
+  /**
+   * ER N-type static model (newcomer-patch fakemon forms). Additional STATIC
+   * types beyond `type1`/`type2` for species/forms that are natively 3+ types
+   * (Mega Parasect = Bug/Grass/Ghost, Primal Regigigas = six types, ...). Kept
+   * as an additive array so `type1`/`type2` stay 100% backward-compatible: every
+   * consumer that reads only the first two types keeps working, and consumers
+   * that want the FULL static typing call {@linkcode getExtraTypes} (or, on a
+   * live Pokemon, {@linkcode Pokemon.getTypes} which folds these in). Null =
+   * legacy 2-type species (the overwhelming majority). This deliberately mirrors
+   * the additive `_passives` triple model above. */
+  protected _extraTypes: readonly PokemonType[] | null = null;
+
+  /**
+   * Install the STATIC extra-type set (types 3..N) for this species form. Pass
+   * an empty array or omit to clear it. Duplicates of `type1`/`type2` and
+   * repeated entries are dropped so `getExtraTypes()` never double-counts.
+   *
+   * @param extraTypes - The additional static types (beyond type1/type2).
+   */
+  setExtraTypes(extraTypes: readonly PokemonType[]): void {
+    const seen = new Set<PokemonType>([this.type1]);
+    if (this.type2 !== null) {
+      seen.add(this.type2);
+    }
+    const cleaned: PokemonType[] = [];
+    for (const t of extraTypes) {
+      if (!seen.has(t)) {
+        seen.add(t);
+        cleaned.push(t);
+      }
+    }
+    this._extraTypes = cleaned.length > 0 ? cleaned : null;
+  }
+
+  /** The STATIC extra types (types 3..N) for this form, or `[]` when 2-type. */
+  getExtraTypes(): readonly PokemonType[] {
+    return this._extraTypes ?? [];
+  }
+
+  /** Whether this form carries a STATIC third-or-later type. */
+  hasExtraTypes(): boolean {
+    return this._extraTypes !== null && this._extraTypes.length > 0;
   }
 
   /**

@@ -2576,6 +2576,22 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
 
+    // ER N-type static model: species/forms that are natively 3+ types (Mega
+    // Parasect = Bug/Grass/Ghost, Primal Regigigas = six types, ...) carry the
+    // extra static types in `speciesForm.getExtraTypes()`. Fold them in on top
+    // of type1/type2 so effectiveness, STAB, immunity checks and the N-type
+    // battle-info renderer (which iterates every getTypes() entry) pick them up
+    // automatically. Skipped when a custom-types override or fusion is present
+    // above only for the first two slots — the extra static types still apply to
+    // the base form's own typing. `getTypes()` wraps this in a Set, so a duplicate
+    // (already type1/type2) is harmless. Only used when NOT overridden by
+    // customPokemonData for the primary types (the extra set has no custom-override
+    // analogue and is intrinsic to the form). */
+    const extraTypes = speciesForm.getExtraTypes();
+    if (extraTypes.length > 0) {
+      return [firstType, secondType ?? PokemonType.UNKNOWN, ...extraTypes];
+    }
+
     return [firstType, secondType ?? PokemonType.UNKNOWN];
   }
 
