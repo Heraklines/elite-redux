@@ -1224,6 +1224,7 @@
     "battleBgm": "battle_kanto_gym",
     "battleType": "single",
     "challenge": "none",
+    "defeatDialogue": "You Got Lucky Punk!  I was'nt at my full power.",
     "difficulties": [
       "youngster",
       "ace",
@@ -1232,6 +1233,7 @@
     ],
     "endless": false,
     "id": 70010,
+    "introDialogue": "I hope you dont get unlucky and recive full hard mode for this battle",
     "maxWave": 160,
     "minWave": 150,
     "name": "Crime Leader",
@@ -1433,6 +1435,7 @@
       }
     ],
     "trainerClass": "GIOVANNI",
+    "victoryDialogue": "Seems like you got full hard mode XD",
     "weight": 100
   }
 }
