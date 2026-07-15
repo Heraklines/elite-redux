@@ -1,0 +1,54 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: 45
+run: 29410627869 (ci/coop/p33-auto-victory-seal)
+timestamp: 2026-07-15T11-11-49Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+
+----- vitest result tail -----
+Original: Timed out in waitUntil![39m
+[36m [2m❯[22m PhaseInterceptor.to test/framework/phase-interceptor.ts:[2m117:13[22m[39m
+    [90m115|[39m       [35mconst[39m stuckPhase [33m=[39m pm[33m.[39m[34mgetCurrentPhase[39m()[33m?.[39mphaseName [33m??[39m [32m"(none)"[39m[33m;[39m
+    [90m116|[39m       [35mconst[39m uiMode [33m=[39m [34mgetEnumStr[39m([33mUiMode[39m[33m,[39m [35mthis[39m[33m.[39mscene[33m.[39mui[33m.[39m[34mgetMode[39m())[33m;[39m
+    [90m117|[39m       [35mthrow[39m [35mnew[39m [33mError[39m(
+    [90m   |[39m             [31m^[39m
+    [90m118|[39m         `PhaseInterceptor.to("${this.target}") did not reach its targe…
+    [90m119|[39m           + `stuck at phase "${stuckPhase}", UI mode ${uiMode}, interc…
+[90m [2m❯[22m crossIntoMeWave test/tools/coop-soak-driver.ts:[2m2707:5[22m[39m
+[90m [2m❯[22m test/tools/coop-soak-driver.ts:[2m3946:15[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m574:12[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m3932:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m94:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:154:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[31m[1mError[22m: PhaseInterceptor.to("MysteryEncounterPhase") did not reach its target (soft-lock / freeze?): stuck at phase "CommandPhase", UI mode MESSAGE (=0), interceptor state "running".
+Original: Timed out in waitUntil![39m
+[36m [2m❯[22m PhaseInterceptor.to test/framework/phase-interceptor.ts:[2m117:13[22m[39m
+    [90m115|[39m       [35mconst[39m stuckPhase [33m=[39m pm[33m.[39m[34mgetCurrentPhase[39m()[33m?.[39mphaseName [33m??[39m [32m"(none)"[39m[33m;[39m
+    [90m116|[39m       [35mconst[39m uiMode [33m=[39m [34mgetEnumStr[39m([33mUiMode[39m[33m,[39m [35mthis[39m[33m.[39mscene[33m.[39mui[33m.[39m[34mgetMode[39m())[33m;[39m
+    [90m117|[39m       [35mthrow[39m [35mnew[39m [33mError[39m(
+    [90m   |[39m             [31m^[39m
+    [90m118|[39m         `PhaseInterceptor.to("${this.target}") did not reach its targe…
+    [90m119|[39m           + `stuck at phase "${stuckPhase}", UI mode ${uiMode}, interc…
+[90m [2m❯[22m crossIntoMeWave test/tools/coop-soak-driver.ts:[2m2707:5[22m[39m
+[90m [2m❯[22m test/tools/coop-soak-driver.ts:[2m3946:15[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m574:12[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m3932:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m172:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 11:09:56
+[2m   Duration [22m 112.03s[2m (transform 29.36s, setup 38.92s, import 387ms, tests 99.34s, environment 1.20s)[22m
+
