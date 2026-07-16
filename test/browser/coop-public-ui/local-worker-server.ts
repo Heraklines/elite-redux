@@ -86,6 +86,11 @@ class SqliteD1Database {
     return new SqliteD1Statement(this.sqlite, sql);
   }
 
+  public async exec(sql: string): Promise<{ count: number; duration: number }> {
+    this.sqlite.exec(sql);
+    return { count: 1, duration: 0 };
+  }
+
   public async batch(statements: SqliteD1Statement[]): Promise<D1ResultLike[]> {
     this.sqlite.exec("BEGIN IMMEDIATE");
     try {
@@ -138,6 +143,24 @@ function listen(port: number, dispatch: (request: Request) => Promise<Response>)
   server.listen(port, "127.0.0.1", () => process.stdout.write(`Local Worker fixture listening at ${origin}\n`));
   return server;
 }
+
+// Cloudflare exposes a default edge cache; Node does not. The save Worker's public title-stats
+// route uses only match/put, so an in-memory response cache preserves its real control flow.
+const responseCache = new Map<string, Response>();
+const defaultCache = {
+  async match(request: RequestInfo | URL): Promise<Response | undefined> {
+    const key = request instanceof Request ? request.url : String(request);
+    return responseCache.get(key)?.clone();
+  },
+  async put(request: RequestInfo | URL, response: Response): Promise<void> {
+    const key = request instanceof Request ? request.url : String(request);
+    responseCache.set(key, response.clone());
+  },
+};
+Object.defineProperty(globalThis, "caches", {
+  configurable: true,
+  value: { default: defaultCache } as unknown as CacheStorage,
+});
 
 const saveDb = database("workers/er-save-api/schema.sql");
 const coopDb = database("workers/er-coop-api/schema.sql");
