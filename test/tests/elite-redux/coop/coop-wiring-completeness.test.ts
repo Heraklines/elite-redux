@@ -218,6 +218,71 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     ).not.toContain("enemies = await streamer.awaitEnemyParty(");
   });
 
+  it("keeps an authoritative guest behind the atomic encounter carrier before Mystery materialization", () => {
+    const root = join(__dirname, "..", "..", "..", "..", "src");
+    const encounterSource = readFileSync(join(root, "phases", "encounter-phase.ts"), "utf8");
+    const battleSceneSource = readFileSync(join(root, "battle-scene.ts"), "utf8");
+
+    const adoptionStart = encounterSource.indexOf("private async runEncounterAfterCoopAdopt(): Promise<void>");
+    const adoptionEnd = encounterSource.indexOf(
+      "protected async prepareCoopAuthoritativeGuestPresentationOnly",
+      adoptionStart,
+    );
+    expect(adoptionStart, "the guest encounter carrier boundary exists").toBeGreaterThanOrEqual(0);
+    expect(adoptionEnd, "the carrier boundary has a bounded source section").toBeGreaterThan(adoptionStart);
+    const adoption = encounterSource.slice(adoptionStart, adoptionEnd);
+    expect(
+      adoption.indexOf("await this.adoptCoopHostEnemyParty("),
+      "the guest awaits the complete host carrier",
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      adoption.indexOf("this.runEncounter()"),
+      "Mystery construction runs only after carrier adoption",
+    ).toBeGreaterThan(adoption.indexOf("await this.adoptCoopHostEnemyParty("));
+
+    const carrierStart = encounterSource.indexOf("private async adoptCoopHostEnemyParty(");
+    const carrierEnd = encounterSource.indexOf("private broadcastCoopEnemyParty", carrierStart);
+    expect(carrierStart, "the atomic carrier apply exists").toBeGreaterThanOrEqual(0);
+    expect(carrierEnd, "the carrier apply has a bounded source section").toBeGreaterThan(carrierStart);
+    const carrier = encounterSource.slice(carrierStart, carrierEnd);
+    expect(
+      carrier.indexOf("const encounter = streamer.consumeEnemyPartyEncounter("),
+      "descriptor is required",
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      carrier.indexOf("applyCoopEncounterAuthority(battle, encounter)"),
+      "descriptor is applied atomically",
+    ).toBeGreaterThan(carrier.indexOf("const encounter = streamer.consumeEnemyPartyEncounter("));
+
+    const pickerStart = battleSceneSource.indexOf("getMysteryEncounter(");
+    const pickerEnd = battleSceneSource.indexOf("// Check for queued encounters first", pickerStart);
+    const picker = battleSceneSource.slice(pickerStart, pickerEnd);
+    expect(picker, "a committed descriptor wins before any live picker").toContain(
+      "encounterType != null && allMysteryEncounters[encounterType] != null",
+    );
+    expect(picker, "a renderer with missing authority fails closed instead of selecting locally").toContain(
+      "refusing local derivation",
+    );
+    expect(picker.indexOf("isCoopAuthoritativeGuest()"), "the guest fence precedes the gauntlet picker").toBeLessThan(
+      picker.indexOf("erGauntletActive()"),
+    );
+  });
+
+  it("purges every reused-key transport buffer at a carried session boundary", () => {
+    const root = join(__dirname, "..", "..", "..", "..", "src");
+    const runtimeSource = readFileSync(join(root, "data", "elite-redux", "coop", "coop-runtime.ts"), "utf8");
+    const gameDataSource = readFileSync(join(root, "system", "game-data.ts"), "utf8");
+    const purgeStart = runtimeSource.indexOf("export function purgeCoopBufferedArrivals(reason: string): void");
+    const purgeEnd = runtimeSource.indexOf("export function isCoopRuntimeActive", purgeStart);
+    expect(purgeStart, "the carried-runtime purge exists").toBeGreaterThanOrEqual(0);
+    expect(purgeEnd, "the purge has a bounded source section").toBeGreaterThan(purgeStart);
+    const purge = runtimeSource.slice(purgeStart, purgeEnd);
+    expect(purge).toContain("active?.interactionRelay.purgeBufferedArrivals(reason)");
+    expect(purge).toContain("active?.rendezvous.purgeBufferedArrivals(reason)");
+    expect(purge).toContain("active?.battleStream.purgeSessionBoundaryState(reason)");
+    expect(gameDataSource).toContain('purgeCoopBufferedArrivals("applyCoopLaunchSession (resume/launch adopt)")');
+  });
+
   it("publishes each complete wave carrier without waiting on a pre-commit interaction generation", () => {
     const encounterSource = readFileSync(
       join(__dirname, "..", "..", "..", "..", "src", "phases", "encounter-phase.ts"),

@@ -6,7 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { getCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopController, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 
@@ -52,7 +52,14 @@ export class CoopPartnerSyncPhase extends Phase {
     } catch {
       /* cosmetic */
     }
-    void controller.awaitPartnerInteraction(getCoopWaveBarrierMs()).then(() => {
+    void controller.awaitPartnerInteraction(getCoopWaveBarrierMs()).then(caughtUp => {
+      if (!caughtUp) {
+        coopWarn(
+          "interaction",
+          `partner-sync gate: counter=${target} recovery exhausted/aborted - phase remains closed for shared terminal`,
+        );
+        return;
+      }
       coopLog("interaction", `partner-sync gate: partner reached counter=${target} -> proceed`);
       this.end();
     });

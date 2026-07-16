@@ -12,6 +12,7 @@
 
 import { setCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
+import { coopMachineWaitLabels } from "#data/elite-redux/coop/coop-stall-probe";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { CoopFlapTransport } from "#test/tools/coop-flap-transport";
@@ -254,6 +255,39 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     const hr = await hostP;
     expect(hr.timedOut).toBe(false);
     expect(hr.point).toBe("cmd:99:9");
+
+    host.dispose();
+  });
+
+  it("incompatible cmd:3:2 wait exhausts finitely into a fatal closed result", async () => {
+    const pair = createLoopbackPair();
+    const manual = makeManualScheduler();
+    const failures: unknown[] = [];
+    const host = new CoopRendezvous(pair.host, {
+      schedule: manual.schedule,
+      maxRecoveryAttempts: 2,
+      onRecoveryExhausted: failure => failures.push(failure),
+    });
+
+    const wait = host.rendezvous("cmd:3:2");
+    expect(coopMachineWaitLabels().some(label => label.startsWith("coop-rendezvous:cmd:3:2@"))).toBe(true);
+
+    manual.fireNext();
+    await flush();
+    manual.fireNext();
+    await flush();
+    let crossed = false;
+    void wait.then(() => {
+      crossed = true;
+    });
+    expect(crossed, "two bounded retransmits never authorize the incompatible command point").toBe(false);
+
+    manual.fireNext();
+    await flush();
+    const result = await wait;
+    expect(result).toEqual({ point: "cmd:3:2", timedOut: true });
+    expect(failures).toEqual([{ point: "cmd:3:2", attempts: 2, kind: "arrival" }]);
+    expect(coopMachineWaitLabels().some(label => label.startsWith("coop-rendezvous:cmd:3:2@"))).toBe(false);
 
     host.dispose();
   });

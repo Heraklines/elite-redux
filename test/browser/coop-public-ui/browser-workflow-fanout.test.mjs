@@ -52,3 +52,35 @@ for (const { file, fanout } of workflows) {
     }
   });
 }
+
+test("journey starter fixtures require both the exact build and exact per-page URL gate", async () => {
+  const [workflow, registry, starterHandler] = await Promise.all([
+    readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
+    readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+  ]);
+
+  assert.match(
+    jobBlock(workflow, "browser-build"),
+    /VITE_COOP_BROWSER_FIXTURE:.*commander-skip.*faint-replacement.*off/u,
+    "the sealed bundle receives one exact fixture identity and defaults closed",
+  );
+  assert.match(
+    registry,
+    /isCoopBrowserCommanderFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "commander-skip"/u,
+  );
+  assert.match(registry, /isCoopBrowserFaintFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "faint-replacement"/u);
+  assert.match(
+    registry,
+    /getCoopBrowserCommanderFixtureStarters\(\)[\s\S]*!isCoopBrowserCommanderFixtureBuild\(\)[\s\S]*get\("coopfixture"\)[\s\S]*"commander"[\s\S]*"dondozo"/u,
+  );
+  assert.match(
+    registry,
+    /getCoopBrowserFaintFixtureStarters\(\)[\s\S]*!isCoopBrowserFaintFixtureBuild\(\)[\s\S]*get\("coopfixture"\)[\s\S]*"faint-owner"[\s\S]*"faint-partner"/u,
+  );
+  assert.match(
+    starterHandler,
+    /getCoopBrowserCommanderFixtureStarters\(\) \?\? getCoopBrowserFaintFixtureStarters\(\)[\s\S]*globalScene\.gameMode\.isCoop[\s\S]*seedTeamFromStarters\(coopBrowserStarters, \{ allowUncaught: true \}\)/u,
+    "only the normal visible co-op starter UI consumes the exact-gated fixture",
+  );
+});

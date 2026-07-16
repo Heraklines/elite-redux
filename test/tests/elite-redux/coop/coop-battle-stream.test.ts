@@ -214,6 +214,26 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(res?.[0]?.data.speciesId).toBe(1);
   });
 
+  it("purges a prior session's wave-keyed battle carriers before reused keys can resolve", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+
+    hostStream.sendEnemyParty(9, [{ fieldIndex: 2, data: { speciesId: 1 } }], -1, 0, emptyAuthoritativeState(9));
+    await flushWire();
+    expect(guestStream.meTypeForWave(9)).toBe(-1);
+    const abandonedWait = guestStream.awaitEnemyParty(10, 10_000);
+
+    guestStream.purgeSessionBoundaryState("new session reuses wave 9");
+
+    expect(guestStream.meTypeForWave(9)).toBeUndefined();
+    expect(guestStream.battleTypeForWave(9)).toBeUndefined();
+    expect(await abandonedWait, "the prior phase cannot steal the new session's wave carrier").toBeNull();
+    expect(await guestStream.awaitEnemyParty(9, 1)).toBeNull();
+    hostStream.sendEnemyParty(10, [{ fieldIndex: 2, data: { speciesId: 4 } }], -1, 0, emptyAuthoritativeState(10));
+    expect((await guestStream.awaitEnemyParty(10))?.[0]?.data.speciesId).toBe(4);
+  });
+
   it("retains the complete new-wave state across encounter peek until command consumes it", async () => {
     const { host, guest } = createLoopbackPair();
     const hostStream = new CoopBattleStreamer(host);

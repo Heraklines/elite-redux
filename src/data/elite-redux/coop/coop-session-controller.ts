@@ -50,6 +50,7 @@ import {
   createFreshCoopSeatMap,
   validateCoopRunSeatMap,
 } from "#data/elite-redux/coop/coop-session-binding";
+import { beginCoopMachineWait } from "#data/elite-redux/coop/coop-stall-probe";
 import type {
   CoopConnectionState,
   CoopMessage,
@@ -231,6 +232,16 @@ export interface CoopSessionOptions {
   requireFunctionalFingerprint?: boolean | undefined;
   /** Authenticated public P33 pairing axes. Absent on legacy/manual/loopback sessions. */
   p33?: CoopP33AuthenticatedContextV1 | undefined;
+  /** Counter replay pulses allowed before the live runtime enters its shared safe terminal. */
+  partnerInteractionRecoveryMaxAttempts?: number | undefined;
+  /** Engine-owned terminal hook for an interaction-counter barrier that cannot converge. */
+  onPartnerInteractionRecoveryExhausted?: ((failure: CoopPartnerInteractionRecoveryFailure) => void) | undefined;
+}
+
+export interface CoopPartnerInteractionRecoveryFailure {
+  need: number;
+  peerSeen: number;
+  attempts: number;
 }
 
 type CoopP33HelloMessage = Extract<CoopMessage, { t: "hello"; pairingId: string }>;
@@ -277,6 +288,10 @@ export class CoopSessionController {
   private readonly onCapabilitiesNegotiated: ((negotiated: ReadonlySet<string>) => void) | undefined;
   private readonly onEpochNegotiated: ((epoch: number) => void) | undefined;
   private readonly requireFunctionalFingerprint: boolean;
+  private readonly partnerInteractionRecoveryMaxAttempts: number;
+  private readonly onPartnerInteractionRecoveryExhausted:
+    | ((failure: CoopPartnerInteractionRecoveryFailure) => void)
+    | undefined;
   /** Authenticated signaling context; its bearer never leaves this browser. */
   private p33Context: CoopP33AuthenticatedContextV1 | null;
   private p33Binding: CoopSessionBindingV1 | null = null;
@@ -489,6 +504,14 @@ export class CoopSessionController {
     this.onCapabilitiesNegotiated = opts.onCapabilitiesNegotiated;
     this.onEpochNegotiated = opts.onEpochNegotiated;
     this.requireFunctionalFingerprint = opts.requireFunctionalFingerprint ?? false;
+    this.partnerInteractionRecoveryMaxAttempts = opts.partnerInteractionRecoveryMaxAttempts ?? 3;
+    if (
+      !Number.isSafeInteger(this.partnerInteractionRecoveryMaxAttempts)
+      || this.partnerInteractionRecoveryMaxAttempts <= 0
+    ) {
+      throw new Error("invalid partner interaction recovery attempt bound");
+    }
+    this.onPartnerInteractionRecoveryExhausted = opts.onPartnerInteractionRecoveryExhausted;
     this.epochCandidate = this.mintEpoch(0);
     this.sessionEpochValue = this.role === "host" ? this.epochCandidate : 0;
     this.runIdValue = this.role === "host" ? mintCoopRunId() : "";
@@ -1464,22 +1487,55 @@ export class CoopSessionController {
 
   /**
    * #788: resolves once the partner's broadcast interaction counter catches up to OURS. A timeout
-   * requests an idempotent counter replay and waits again; it is never permission to cross alone.
+   * requests a bounded number of idempotent counter replays. Exhaustion invokes the runtime's shared
+   * terminal hook and returns false; neither timeout nor exhaustion is permission to cross alone.
    */
   async awaitPartnerInteraction(timeoutMs: number): Promise<boolean> {
     const need = this.interactionTurn.toJSON();
-    while (this.interactionTurn.remoteCounterSeen() < need) {
-      const caughtUp = await this.interactionTurn.awaitRemoteCounter(need, timeoutMs);
-      if (caughtUp) {
-        return true;
+    let attempts = 0;
+    const endMachineWait = beginCoopMachineWait(`coop-partner-interaction:${need}`, {
+      asymmetricEligible: false,
+    });
+    try {
+      while (!this.disposed && this.interactionTurn.remoteCounterSeen() < need) {
+        const caughtUp = await this.interactionTurn.awaitRemoteCounter(need, timeoutMs);
+        if (caughtUp) {
+          return true;
+        }
+        if (attempts >= this.partnerInteractionRecoveryMaxAttempts) {
+          const failure = {
+            need,
+            peerSeen: this.interactionTurn.remoteCounterSeen(),
+            attempts,
+          };
+          coopWarn(
+            "interaction",
+            `partner counter recovery EXHAUSTED local=${need} peerSeen=${failure.peerSeen} attempts=${attempts} `
+              + "- boundary remains closed",
+          );
+          try {
+            this.onPartnerInteractionRecoveryExhausted?.(failure);
+          } catch (error) {
+            coopWarn("interaction", "partner counter terminal hook threw (boundary remains closed)", error);
+          }
+          return false;
+        }
+        attempts++;
+        coopWarn(
+          "interaction",
+          `partner counter replay needed local=${need} peerSeen=${this.interactionTurn.remoteCounterSeen()} `
+            + `attempt=${attempts}/${this.partnerInteractionRecoveryMaxAttempts} - boundary stays closed`,
+        );
+        try {
+          this.transport.send({ t: "requestInteractionCounter", need });
+        } catch (error) {
+          coopWarn("interaction", "partner counter replay send threw (retry remains bounded)", error);
+        }
       }
-      coopWarn(
-        "interaction",
-        `partner counter replay needed local=${need} peerSeen=${this.interactionTurn.remoteCounterSeen()} - boundary stays closed`,
-      );
-      this.transport.send({ t: "requestInteractionCounter", need });
+      return this.interactionTurn.remoteCounterSeen() >= need;
+    } finally {
+      endMachineWait();
     }
-    return true;
   }
 
   get partnerName(): string | null {

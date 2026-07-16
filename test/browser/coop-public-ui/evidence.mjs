@@ -25,7 +25,6 @@ const FATAL_COOP_CONSOLE_RULES = Object.freeze([
     "checksum divergence",
   ],
   [/^\[coop-resync\].*\bUNHEALED\b/iu, "checksum recovery did not heal"],
-  [/^\[coop:heal\]\s/u, "authoritative heal applied"],
   [/^\[coop:durability\].*\boperation delivery RETRY\b/u, "durable operation delivery retry"],
   [
     /^\[coop:durability\].*(?:\brecover cls=.*\battempt=\d+\/\d+|\brecovery request send deferred\b)/u,
@@ -47,7 +46,7 @@ const FATAL_COOP_CONSOLE_RULES = Object.freeze([
     "state resync failed",
   ],
   [
-    /^\[coop:[^\]]+\].*(?:\brecovery (?:EXHAUSTED|exhausted)\b|\bNOT converged\b|\bdid NOT converge\b|\bcould not converge\b|\bcould not recover\b|\bafter bounded recovery\b)/u,
+    /^\[coop:[^\]]+\].*(?:\brecovery exhausted\b|\bNOT converged\b|\bdid NOT converge\b|\bcould not converge\b|\bcould not recover\b|\bafter bounded recovery\b)/iu,
     "co-op recovery exhausted",
   ],
   [/^\[coop:runtime\] shared session (?:terminal requested|stopped safely):/u, "shared session terminated"],

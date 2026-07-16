@@ -3331,6 +3331,71 @@ export class CoopBattleStreamer {
 
   // --- shared -----------------------------------------------------------------
 
+  /**
+   * Cancel old waits and drop every race buffer/retained carrier when this streamer
+   * is deliberately carried across a launch/resume session boundary.
+   *
+   * Turn and replacement commits are fully epoch-addressed, but encounter, launch,
+   * ME-battle, and ghost-pool carriers predate that address and are keyed only by a
+   * wave or interaction key. Leaving one of those frames alive lets a new session
+   * reuse the key and adopt the previous session's data before its real host frame
+   * arrives. Old waiters must be failed too: otherwise a new session's genuine
+   * wave-only carrier can resolve an abandoned phase and be stolen from the new one.
+   * Transport listeners and runtime-level handlers stay installed; this is a session
+   * reset on the same connected runtime, not dispose.
+   */
+  purgeSessionBoundaryState(reason: string): void {
+    const buffered =
+      this.inbox.size
+      + this.liveEvents.size
+      + this.pendingCheckpoints.size
+      + this.appliedOutOfBandCheckpoints.size
+      + this.meBattlePartyInbox.size
+      + this.stateSyncInbox.size
+      + this.enemyPartyStateByWave.size
+      + this.enemyPartyEncounterByWave.size
+      + this.meTypeByWave.size
+      + this.battleTypeByWave.size
+      + Number(this.lastEnemyParty != null)
+      + Number(this.lastLaunchSnapshot != null)
+      + Number(this.lastGhostPool != null);
+    if (buffered > 0) {
+      coopWarn(
+        "stream",
+        `purgeSessionBoundaryState(${reason}) dropping ${buffered} battle-stream arrival(s) (stale-session isolation)`,
+      );
+    } else {
+      coopLog("stream", `purgeSessionBoundaryState(${reason}) nothing buffered`);
+    }
+
+    this.cancelRetainedAuthorityTimers();
+    this.cancelAuthorityGameplayWaiters();
+    this.clearRetainedAuthorityAfterTerminal();
+    this.meBattlePartyInbox.clear();
+    this.stateSyncInbox.clear();
+    this.finalizedMarks.clear();
+    this.lastEnemyParty = null;
+    this.enemyPartyStateByWave.clear();
+    this.enemyPartyEncounterByWave.clear();
+    this.meTypeByWave.clear();
+    this.battleTypeByWave.clear();
+    this.lastLaunchSnapshot = null;
+    this.launchSnapshotAbortWaves.clear();
+    this.consumedLaunchSnapshotWaves.clear();
+    this.lastGhostPool = null;
+
+    // These are host-side replay sources with the same wave-only identities. A
+    // request in the new session must never be answered from the previous one.
+    this.sentMeBattleParties.clear();
+    this.sentEnemyParties.clear();
+    this.lastSentLaunchSnapshot = null;
+    this.lastSentLaunchSnapshotAbort = null;
+    this.lastAuthorityFailure = null;
+    this.ackedAuthorityFailures.clear();
+    this.authorityFailureRevision = 0;
+    this.meMessageHandler = null;
+  }
+
   /** Stop listening and fail any in-flight awaits. */
   dispose(): void {
     this.disposed = true;
@@ -3348,6 +3413,9 @@ export class CoopBattleStreamer {
       finish(null);
     }
     for (const finish of [...this.meBattlePartyWaiters.values()]) {
+      finish(null);
+    }
+    for (const finish of [...this.launchSnapshotWaiters.values()]) {
       finish(null);
     }
     for (const waiter of [...this.stateSyncWaiters.values()]) {
@@ -3377,6 +3445,7 @@ export class CoopBattleStreamer {
     this.seenTurnAuthority.clear();
     this.enemyPartyWaiters.clear();
     this.meBattlePartyWaiters.clear();
+    this.launchSnapshotWaiters.clear();
     this.meBattlePartyInbox.clear();
     this.sentMeBattleParties.clear();
     this.stateSyncWaiters.clear();

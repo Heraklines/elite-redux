@@ -17,6 +17,7 @@ import {
 import { computeErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { CoopSessionController, type CoopSessionSnapshot } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
+import { coopMachineWaitLabels } from "#data/elite-redux/coop/coop-stall-probe";
 import { COOP_PROTOCOL_VERSION, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { describe, expect, it } from "vitest";
@@ -397,6 +398,24 @@ describe("co-op session controller (#633, P1)", () => {
       ).resolves.toBe(true);
       expect(g.partnerInteractionCounterSeen()).toBe(1);
       expect(pair.counters.host.oneShotDropped).toBe(1);
+    });
+
+    it("an incompatible partner counter exhausts finitely and remains closed", async () => {
+      const pair = createLoopbackPair();
+      const failures: unknown[] = [];
+      // No controller is installed on pair.host: every replay request is delivered but can never be answered.
+      const g = new CoopSessionController(pair.guest, {
+        partnerInteractionRecoveryMaxAttempts: 2,
+        onPartnerInteractionRecoveryExhausted: failure => failures.push(failure),
+      });
+      g.advanceInteraction(0);
+
+      const wait = g.awaitPartnerInteraction(1);
+      expect(coopMachineWaitLabels().some(label => label.startsWith("coop-partner-interaction:1@"))).toBe(true);
+      await expect(wait).resolves.toBe(false);
+      expect(failures).toEqual([{ need: 1, peerSeen: 0, attempts: 2 }]);
+      expect(coopMachineWaitLabels().some(label => label.startsWith("coop-partner-interaction:1@"))).toBe(false);
+      g.dispose();
     });
   });
 

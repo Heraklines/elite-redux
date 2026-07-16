@@ -439,8 +439,8 @@ export class ShowdownWagerUiHandler extends UiHandler {
     if (offer != null) {
       return this.lockStakedOffer(offer);
     }
-    // FRIENDLY commit: light our lamp + cross the reciprocal commit barrier. When BOTH have crossed
-    // (or the anti-hang timeout fires), proceed to battle exactly once.
+    // FRIENDLY commit: light our lamp + cross the reciprocal commit barrier. Proceed exactly once only
+    // after BOTH have crossed; bounded recovery exhaustion leaves this boundary closed.
     this.ownLocked = true;
     this.render();
     const rv = this.args?.rendezvous;
@@ -450,7 +450,10 @@ export class ShowdownWagerUiHandler extends UiHandler {
     }
     // Human-deliberation wait: the peer may browse stakes for minutes after we lock (maintainer:
     // the pre-battle pipeline allows >= 10 minutes; the 60s rendezvous default is a pacing class).
-    void rv.rendezvous(SHOWDOWN_WAGER_COMMIT_POINT, getShowdownPickWaitMs()).then(() => {
+    void rv.rendezvous(SHOWDOWN_WAGER_COMMIT_POINT, getShowdownPickWaitMs()).then(result => {
+      if (result.timedOut) {
+        return;
+      }
       this.opponentLocked = true;
       this.render();
       this.proceed(null);

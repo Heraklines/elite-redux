@@ -3424,7 +3424,7 @@ export function getCoopRendezvous(): CoopRendezvous | null {
 }
 
 /**
- * #861 SESSION-BOUNDARY PURGE: drop every BUFFERED relay + rendezvous arrival on the LIVE runtime without
+ * #861 SESSION-BOUNDARY PURGE: drop every BUFFERED relay, rendezvous, and battle-stream arrival on the LIVE runtime without
  * tearing it down, so a prior session/epoch's stale buffered message can never satisfy a NEW epoch's await.
  * Call at every boundary where the SAME runtime is carried across a session/epoch change: a resume boot /
  * launch adopt onto a live runtime ({@linkcode GameData.applyCoopLaunchSession}) and a hot-rejoin
@@ -3434,6 +3434,7 @@ export function getCoopRendezvous(): CoopRendezvous | null {
 export function purgeCoopBufferedArrivals(reason: string): void {
   active?.interactionRelay.purgeBufferedArrivals(reason);
   active?.rendezvous.purgeBufferedArrivals(reason);
+  active?.battleStream.purgeSessionBoundaryState(reason);
 }
 
 /** Whether a co-op session is currently active. */
@@ -5216,6 +5217,7 @@ export function assembleCoopRuntime(
   // It is assigned from controller.role below (not transport.role: P33 authority follows stable seats).
   let opState!: CoopRuntimeOpState;
   let waveOperationBinding: CoopWaveAdvanceOperationBinding;
+  let runtime!: CoopRuntime;
   const controller = new CoopSessionController(transport, {
     username: opts.username,
     version: COOP_PROTOCOL_VERSION,
@@ -5230,6 +5232,21 @@ export function assembleCoopRuntime(
     // in-process engine while the peer's transport is being pumped.
     onEpochNegotiated: epoch =>
       withActiveCoopRuntimeOpState(opState, () => applyCoopOperationEpoch(epoch, waveOperationBinding)),
+    onPartnerInteractionRecoveryExhausted: failure => {
+      const point = readCoopBattlePoint();
+      failCoopRuntimeSharedSession(
+        runtime,
+        `Partner interaction counter recovery exhausted at ${failure.need} `
+          + `(peer ${failure.peerSeen}, ${failure.attempts} attempts).`,
+        {
+          boundary: "surface",
+          reasonCode: "continuation-failed",
+          wave: point.wave,
+          turn: point.turn,
+          boundaryRevision: failure.need,
+        },
+      );
+    },
     p33: opts.p33,
   });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
@@ -5240,7 +5257,6 @@ export function assembleCoopRuntime(
   // in broadcastRunConfig; on the GUEST it is only the pre-runConfig default (the host's
   // value overwrites it on receipt). Default "coop" so co-op stays byte-identical.
   controller.setSessionKind(opts.kind ?? "coop");
-  let runtime: CoopRuntime;
   const battleSync = new CoopBattleSync(transport, {
     onCommandTimeout: (timeout: CoopCommandTimeout) => {
       failCoopRuntimeSharedSession(
@@ -5274,6 +5290,22 @@ export function assembleCoopRuntime(
   const mePump = new CoopMePump(interactionRelay);
   const rendezvous = new CoopRendezvous(transport, {
     getEpoch: () => controller.sessionEpoch,
+    onRecoveryExhausted: failure => {
+      const [, waveValue, turnValue] = failure.point.split(":", 3);
+      const wave = Number(waveValue);
+      const turn = Number(turnValue);
+      failCoopRuntimeSharedSession(
+        runtime,
+        `Rendezvous recovery exhausted at ${failure.point} after ${failure.attempts} attempts `
+          + `(${failure.kind}${failure.displacedPoint == null ? "" : `, displaced ${failure.displacedPoint}`}).`,
+        {
+          boundary: "surface",
+          reasonCode: "continuation-failed",
+          ...(Number.isSafeInteger(wave) && wave >= 0 ? { wave } : {}),
+          ...(Number.isSafeInteger(turn) && turn >= 0 ? { turn } : {}),
+        },
+      );
+    },
   });
   const membership = new CoopMembershipController(() => controller.role);
   opState = createCoopRuntimeOpState(controller.role);

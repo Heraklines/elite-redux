@@ -410,14 +410,18 @@ export class ShowdownSession {
       return;
     }
     // Both valid + both ready. Cross the reciprocal `showdown-ready` barrier before resolving:
-    // neither client enters the battle bootstrap until BOTH have arrived (or the anti-hang
-    // timeout fires - the run then proceeds rather than stranding, per the rendezvous class).
+    // neither client enters the battle bootstrap until BOTH have arrived. Bounded recovery
+    // exhaustion is a closed failure, never permission to enter the battle independently.
     if (this.crossingBarrier) {
       return;
     }
     this.crossingBarrier = true;
     const opponentProfile = this.opponentProfile;
-    void this.rendezvous.rendezvous(SHOWDOWN_READY_RENDEZVOUS_POINT, getShowdownPickWaitMs()).then(() => {
+    void this.rendezvous.rendezvous(SHOWDOWN_READY_RENDEZVOUS_POINT, getShowdownPickWaitMs()).then(result => {
+      if (result.timedOut) {
+        this.finishReject(new ShowdownNegotiationError("timeout", "showdown-ready synchronization recovery exhausted"));
+        return;
+      }
       this.finishResolve({ ownManifest: settle.ownManifest, opponentManifest, opponentTeamHash, opponentProfile });
     });
   }

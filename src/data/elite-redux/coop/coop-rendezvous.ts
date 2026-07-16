@@ -24,9 +24,10 @@
 //     installs its waiter is BUFFERED (remembered in a Set) and consumed on the next await.
 //   - DUPLICATE ARRIVAL: arrivals are set-membership, so a re-sent / re-delivered arrival
 //     for a point already seen is a harmless no-op (idempotent on both ends).
-//   - LOST ARRIVAL / DEAD PARTNER: the timeout retransmits the local arrival and keeps the
-//     boundary CLOSED. It never authorizes unilateral continuation. Transport reconnect handles
-//     a dead channel; a live lost frame heals on the retransmit.
+//   - LOST ARRIVAL / DEAD PARTNER: the timeout retransmits the local arrival a bounded number of
+//     times and keeps the boundary CLOSED. A live lost frame heals on retransmit; exhaustion asks
+//     the owning runtime to enter its deterministic shared safe terminal. It never authorizes
+//     unilateral continuation.
 //
 // Engine-FREE (transport + wire types only) so it is unit-testable headlessly over a
 // LoopbackTransport, exactly like CoopInteractionRelay / CoopBattleStreamer.
@@ -38,6 +39,7 @@ import { beginCoopMachineWait } from "#data/elite-redux/coop/coop-stall-probe";
 import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 const RENDEZVOUS_CAUSAL_POINT_LIMIT = 192;
+const DEFAULT_RENDEZVOUS_RECOVERY_MAX_ATTEMPTS = 3;
 
 /** Stable, bounded token for a point that may originate in a future UI surface. */
 function boundedRendezvousPoint(point: string): string {
@@ -116,7 +118,7 @@ function defaultSchedule(cb: () => void, ms: number): () => void {
 export interface CoopRendezvousResult {
   /** The sync point this result is for. */
   point: string;
-  /** True only when the rendezvous was explicitly torn down/superseded; live timeout never resolves. */
+  /** True when torn down/superseded or bounded live recovery exhausts; callers must remain closed. */
   timedOut: boolean;
   /**
    * Set to the OTHER sync point `Q` when the partner is already on a different branch. This remains a
@@ -135,6 +137,17 @@ export interface CoopRendezvousOptions {
   schedule?: (cb: () => void, ms: number) => () => void;
   /** Negotiated session epoch; route/ACK frames from another epoch are rejected. */
   getEpoch?: () => number;
+  /** Retransmissions allowed before the owning runtime must enter its shared safe terminal. */
+  maxRecoveryAttempts?: number;
+  /** Runtime-owned fail-closed terminal hook; the engine-free rendezvous never imports runtime state. */
+  onRecoveryExhausted?: (failure: CoopRendezvousRecoveryFailure) => void;
+}
+
+export interface CoopRendezvousRecoveryFailure {
+  point: string;
+  attempts: number;
+  kind: "arrival" | "route-ack";
+  displacedPoint?: string;
 }
 
 export interface CoopRendezvousControlSnapshot {
@@ -163,6 +176,8 @@ export class CoopRendezvous {
   private readonly offMessage: () => void;
   private readonly offStateChange: () => void;
   private readonly getEpoch: () => number;
+  private readonly maxRecoveryAttempts: number;
+  private readonly onRecoveryExhausted: ((failure: CoopRendezvousRecoveryFailure) => void) | undefined;
 
   /** Points THIS client has arrived at (idempotent local arrival; suppresses a duplicate send). */
   private readonly localArrived = new Set<string>();
@@ -186,6 +201,7 @@ export class CoopRendezvous {
       cancel: () => void;
       point: string;
       displacedPoint: string;
+      since: number;
     }
   >();
 
@@ -194,6 +210,11 @@ export class CoopRendezvous {
     this.defaultTimeoutMs = opts.timeoutMs ?? getCoopRendezvousWaitMs();
     this.schedule = opts.schedule ?? defaultSchedule;
     this.getEpoch = opts.getEpoch ?? (() => 0);
+    this.maxRecoveryAttempts = opts.maxRecoveryAttempts ?? DEFAULT_RENDEZVOUS_RECOVERY_MAX_ATTEMPTS;
+    if (!Number.isSafeInteger(this.maxRecoveryAttempts) || this.maxRecoveryAttempts <= 0) {
+      throw new Error("invalid rendezvous recovery attempt bound");
+    }
+    this.onRecoveryExhausted = opts.onRecoveryExhausted;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offStateChange = transport.onStateChange(state => {
       if (state === "connected") {
@@ -222,6 +243,26 @@ export class CoopRendezvous {
       result.timedOut ? undefined : `outcome=${result.crossPoint == null ? "exact" : "cross-point"}`,
     );
     return result;
+  }
+
+  private recoveryExhausted(failure: CoopRendezvousRecoveryFailure): void {
+    this.recordCausalStage(
+      "exhausted",
+      failure.point,
+      `kind=${failure.kind} attempts=${failure.attempts}`
+        + (failure.displacedPoint == null ? "" : ` displaced=${failure.displacedPoint}`),
+    );
+    coopWarn(
+      "rendezvous",
+      `RENDEZVOUS RECOVERY EXHAUSTED point=${failure.point} kind=${failure.kind} `
+        + `attempts=${failure.attempts}${failure.displacedPoint == null ? "" : ` displaced=${failure.displacedPoint}`} `
+        + `- boundary remains closed; entering shared safe terminal role=${this.transport.role}`,
+    );
+    try {
+      this.onRecoveryExhausted?.(failure);
+    } catch (error) {
+      coopWarn("rendezvous", `recovery terminal hook threw point=${failure.point} (boundary remains closed)`, error);
+    }
   }
 
   /**
@@ -350,8 +391,9 @@ export class CoopRendezvous {
 
   /**
    * Block until the PARTNER has arrived at `point`. Resolves immediately if the partner's arrival was
-   * already buffered. On timeout, re-send our arrival and continue waiting: a timeout is evidence that
-   * recovery is needed, never permission to cross a shared boundary independently.
+   * already buffered. On timeout, re-send our arrival up to the configured recovery bound. Exhaustion
+   * invokes the runtime terminal hook and returns a closed `timedOut` result; neither outcome grants
+   * permission to cross a shared boundary independently.
    */
   awaitPartner(point: string, timeoutMs = this.defaultTimeoutMs): Promise<CoopRendezvousResult> {
     this.recordCausalStage("wait-open", point);
@@ -406,6 +448,7 @@ export class CoopRendezvous {
     });
     return new Promise<CoopRendezvousResult>(resolve => {
       let settled = false;
+      let recoveryAttempts = 0;
       let cancelTimer: () => void = () => {};
       const finish = (res: CoopRendezvousResult) => {
         if (settled) {
@@ -449,13 +492,24 @@ export class CoopRendezvous {
               finish({ point, timedOut: false });
               return;
             }
+            if (recoveryAttempts >= this.maxRecoveryAttempts) {
+              this.recoveryExhausted({ point, attempts: recoveryAttempts, kind: "arrival" });
+              finish({ point, timedOut: true });
+              return;
+            }
+            recoveryAttempts++;
             coopWarn(
               "rendezvous",
-              `RENDEZVOUS RECOVERY RETRY point=${point} after ${timeoutMs}ms - partner never arrived; `
+              `RENDEZVOUS RECOVERY RETRY point=${point} attempt=${recoveryAttempts}/${this.maxRecoveryAttempts} `
+                + `after ${timeoutMs}ms - partner never arrived; `
                 + `RETRANSMITTING and KEEPING BOUNDARY CLOSED role=${this.transport.role}`,
             );
             // `arrive()` suppresses duplicates by design; recovery intentionally bypasses that suppression.
-            this.transport.send({ t: "rendezvous", point });
+            try {
+              this.transport.send({ t: "rendezvous", point });
+            } catch (error) {
+              coopWarn("rendezvous", `arrival retransmit threw point=${point} (retry remains bounded)`, error);
+            }
             cancelTimer = armRecoveryTimer();
           });
         }, timeoutMs);
@@ -522,6 +576,12 @@ export class CoopRendezvous {
     const now = Date.now();
     for (const since of this.pendingSince.values()) {
       const age = now - since;
+      if (age > oldest) {
+        oldest = age;
+      }
+    }
+    for (const route of this.pendingRouteAcks.values()) {
+      const age = now - route.since;
       if (age > oldest) {
         oldest = age;
       }
@@ -771,13 +831,16 @@ export class CoopRendezvous {
     const epoch = this.getEpoch();
     return new Promise(resolve => {
       let settled = false;
+      let recoveryAttempts = 0;
       let cancel = () => {};
+      const endMachineWait = beginCoopMachineWait(`coop-rendezvous-route:${point}<-${displacedPoint}`);
       const settle = (timedOut: boolean) => {
         if (settled) {
           return;
         }
         settled = true;
         cancel();
+        endMachineWait();
         this.pendingRouteAcks.delete(revision);
         if (!timedOut) {
           coopLog(
@@ -802,17 +865,33 @@ export class CoopRendezvous {
         if (settled) {
           return;
         }
-        this.transport.send({
-          t: "phaseRoute",
-          epoch,
-          revision,
-          point,
-          displacedPoint,
-        });
+        try {
+          this.transport.send({
+            t: "phaseRoute",
+            epoch,
+            revision,
+            point,
+            displacedPoint,
+          });
+        } catch (error) {
+          coopWarn("rendezvous", `host phaseRoute send threw rev=${revision} (retry remains bounded)`, error);
+        }
         cancel = this.schedule(() => {
+          if (recoveryAttempts >= this.maxRecoveryAttempts) {
+            this.recoveryExhausted({
+              point,
+              displacedPoint,
+              attempts: recoveryAttempts,
+              kind: "route-ack",
+            });
+            settle(true);
+            return;
+          }
+          recoveryAttempts++;
           coopWarn(
             "rendezvous",
-            `host phaseRoute RETRY rev=${revision} authoritative=${point} displaced=${displacedPoint}`,
+            `host phaseRoute RETRY rev=${revision} attempt=${recoveryAttempts}/${this.maxRecoveryAttempts} `
+              + `authoritative=${point} displaced=${displacedPoint}`,
           );
           sendAndArm();
         }, retryMs);
@@ -823,6 +902,7 @@ export class CoopRendezvous {
         cancel: () => cancel(),
         point,
         displacedPoint,
+        since: Date.now(),
       });
       sendAndArm();
     });
