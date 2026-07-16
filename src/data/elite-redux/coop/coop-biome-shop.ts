@@ -29,8 +29,8 @@
 
 import { globalScene } from "#app/global-scene";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { COOP_BIOME_STOCK_REROLL } from "#data/elite-redux/coop/coop-interaction-relay";
-import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_BIOME_STOCK_REROLL, parseCoopRewardOptionsKey } from "#data/elite-redux/coop/coop-interaction-relay";
+import { failCoopSharedSession, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 
 /**
  * The `${seq}:${reroll}` reward-options key the host streams an ME-embedded biome market's stock under
@@ -65,7 +65,7 @@ export function hasBufferedCoopBiomeShopStock(interactionCounter: number): boole
  * Otherwise the host opened a vanilla reward screen, so open a SelectModifierPhase (byte-identical to the
  * pre-#832 #821 behavior). Both are pushed by registered phase NAME so this module never imports the phases.
  */
-export function openGuestMeEmbeddedShop(interactionCounter: number): void {
+export function openGuestMeEmbeddedShop(interactionCounter: number, bufferedOptionsKey?: string): void {
   if (hasBufferedCoopBiomeShopStock(interactionCounter)) {
     coopLog(
       "reward",
@@ -77,8 +77,25 @@ export function openGuestMeEmbeddedShop(interactionCounter: number): void {
     globalScene.phaseManager.unshiftNew("BiomeShopPhase");
     return;
   }
+  const optionsAddress = bufferedOptionsKey == null ? null : parseCoopRewardOptionsKey(bufferedOptionsKey);
+  if (
+    bufferedOptionsKey != null
+    && (optionsAddress == null || optionsAddress.seq !== Math.max(0, interactionCounter) || optionsAddress.reroll !== 0)
+  ) {
+    failCoopSharedSession("A Mystery reward handoff carried an invalid ordered surface address.");
+    return;
+  }
   coopLog("reward", "guest ME embedded-shop handoff: reward stock (reroll 0) -> SelectModifierPhase (#821)", {
     counter: interactionCounter,
+    rewardSurface: optionsAddress?.rewardSurface,
   });
-  globalScene.phaseManager.unshiftNew("SelectModifierPhase");
+  globalScene.phaseManager.unshiftNew(
+    "SelectModifierPhase",
+    0,
+    undefined,
+    undefined,
+    false,
+    { kind: "ambient" },
+    optionsAddress?.rewardSurface,
+  );
 }

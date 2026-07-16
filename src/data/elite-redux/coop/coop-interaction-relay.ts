@@ -99,7 +99,8 @@ function rewardOptionsKey(seq: number, reroll: number, rewardSurface?: CoopRewar
   return rewardSurface == null ? `${seq}:${reroll}` : `${seq}:${reroll}:${rewardSurfaceKey(rewardSurface)}`;
 }
 
-function rewardOptionsRequestFromKey(
+/** Decode an internally canonical reward-options inbox key without accepting a malformed surface address. */
+export function parseCoopRewardOptionsKey(
   key: string,
 ): { seq: number; reroll: number; rewardSurface?: CoopRewardSurfaceIdentity } | null {
   const [seqText, rerollText, ordinalText, ...surfaceParts] = key.split(":");
@@ -117,7 +118,8 @@ function rewardOptionsRequestFromKey(
     return null;
   }
   try {
-    return { seq, reroll, rewardSurface: { ordinal, surfaceId: decodeURIComponent(encodedSurfaceId) } };
+    const rewardSurface = { ordinal, surfaceId: decodeURIComponent(encodedSurfaceId) };
+    return isWireRewardSurfaceIdentity(rewardSurface) ? { seq, reroll, rewardSurface } : null;
   } catch {
     return null;
   }
@@ -415,7 +417,7 @@ export class CoopInteractionRelay {
         return;
       }
       for (const key of this.rewardOptionsPending.keys()) {
-        const request = rewardOptionsRequestFromKey(key);
+        const request = parseCoopRewardOptionsKey(key);
         if (request != null) {
           this.transport.send({ t: "requestRewardOptions", ...request });
         }
