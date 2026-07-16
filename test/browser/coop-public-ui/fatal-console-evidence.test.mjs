@@ -31,7 +31,7 @@ const fatalLines = [
   "[coop:runtime] STALL WATCHDOG: asymmetric wait (local=30s peer=0s) -> recovering (cancel orphan waits)",
   "[coop:me] host await guest index missing; retaining selector and requesting durable replay",
   "[coop:resync] await stateSync start seq=8000001",
-  "[coop:resync] guest requestStateSync turn=3 seq=7 START timeout=20000ms",
+  "[coop:resync] guest requestStateSync id=session:7 reason=turn-checksum e=1 wave=2 turn=3 START timeout=20000ms",
   "[coop:resync] turn=3 queueing full snapshot apply (blobLen=300)",
   "[coop:resync] turn=3 no snapshot received (timeout) -> keep current state, re-check next turn",
   "[coop:resync] turn=3 still-diverged host=aaaa guest=bbbb",
@@ -127,12 +127,15 @@ test("EvidenceSink fails on warning-level recovery and an allowlisted checksum e
   );
 });
 
-test("EvidenceSink exempts only the stateSync sequence explicitly introduced by hot rejoin", async () => {
+test("EvidenceSink exempts only a stateSync ticket explicitly marked as hot rejoin", async () => {
   await withSink(async ({ page, sink }) => {
     page.emit("console", consoleMessage("[coop:resync] post-rejoin full resync request seq=9300001", "log"));
     page.emit(
       "console",
-      consoleMessage("[coop:resync] guest requestStateSync turn=9300001 seq=1 START timeout=20000ms", "log"),
+      consoleMessage(
+        "[coop:resync] guest requestStateSync id=session:1 reason=rejoin e=1 wave=3 turn=1 START timeout=20000ms",
+        "log",
+      ),
     );
     page.emit("console", consoleMessage("[coop:durability] resync cls=reward from=2 -> replay 0 entries", "log"));
     assert.equal(sink.failures.length, 0);
@@ -140,12 +143,15 @@ test("EvidenceSink exempts only the stateSync sequence explicitly introduced by 
   });
 });
 
-test("a different stateSync sequence still fails during a hot-rejoin window", async () => {
+test("a non-rejoin stateSync ticket still fails during a hot-rejoin window", async () => {
   await withSink(async ({ page, sink }) => {
     page.emit("console", consoleMessage("[coop:resync] post-rejoin full resync request seq=9300001", "log"));
     page.emit(
       "console",
-      consoleMessage("[coop:resync] guest requestStateSync turn=3 seq=9 START timeout=20000ms", "log"),
+      consoleMessage(
+        "[coop:resync] guest requestStateSync id=session:9 reason=turn-checksum e=1 wave=3 turn=1 START timeout=20000ms",
+        "log",
+      ),
     );
     assert.equal(sink.failures.length, 1);
     assert.equal(sink.failures[0].reason, "state resync attempt");

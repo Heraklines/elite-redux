@@ -2265,58 +2265,81 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
 
     it("a guest requestStateSync round-trips to the host and back as a stateSync blob", async () => {
       const { host, guest } = createLoopbackPair();
-      const hostStream = new CoopBattleStreamer(host);
-      const guestStream = new CoopBattleStreamer(guest);
+      const current = { epoch: 1, wave: 1, turn: 7 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
 
-      // Host answers the guest's resync request with a blob (echoing the seq).
+      // Host answers the guest's exact immutable recovery ticket.
       let sawTurn = -1;
-      hostStream.onStateSyncRequest((turn, seq) => {
-        sawTurn = turn;
-        hostStream.sendStateSync(`blob-for-turn-${turn}`, seq);
+      hostStream.onStateSyncRequest(ticket => {
+        sawTurn = ticket.frontier.turn;
+        hostStream.sendStateSync(`blob-for-turn-${sawTurn}`, ticket, {
+          wave: current.wave,
+          turn: current.turn,
+          stateTick: 1,
+          controlDigest: "digest",
+        });
       });
 
-      const blob = await guestStream.requestStateSync(7);
+      const result = await guestStream.requestStateSync("turn-checksum");
       expect(sawTurn).toBe(7);
-      expect(blob).toBe("blob-for-turn-7");
+      expect(result?.blob).toBe("blob-for-turn-7");
     });
 
-    it("a stale stateSync (older seq) never satisfies the newest resync request", async () => {
+    it("a stale addressed stateSync never satisfies the newest resync request", async () => {
       const { host, guest } = createLoopbackPair();
-      const hostStream = new CoopBattleStreamer(host);
-      const guestStream = new CoopBattleStreamer(guest);
+      const current = { epoch: 1, wave: 1, turn: 2 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
 
       // The host answers the FIRST request late + the SECOND promptly. The first request
       // is superseded by the second (one in flight at a time), so the late seq-1 reply is
       // dropped and only the seq-2 reply satisfies the live await.
       const seqs: number[] = [];
-      hostStream.onStateSyncRequest((_turn, seq) => {
-        seqs.push(seq);
-        if (seq === 2) {
-          hostStream.sendStateSync("fresh", seq);
+      let staleTicket: Parameters<typeof hostStream.sendStateSync>[1] | undefined;
+      hostStream.onStateSyncRequest(ticket => {
+        seqs.push(ticket.seq);
+        if (ticket.seq === 1) {
+          staleTicket = ticket;
+        } else {
+          hostStream.sendStateSync("fresh", ticket, {
+            wave: current.wave,
+            turn: current.turn,
+            stateTick: 2,
+            controlDigest: "digest-2",
+          });
         }
       });
 
-      const first = guestStream.requestStateSync(1); // seq 1 - superseded
-      const second = guestStream.requestStateSync(2); // seq 2 - the live one
+      const first = guestStream.requestStateSync("turn-checksum"); // seq 1 - superseded
+      await new Promise<void>(resolve => queueMicrotask(resolve));
+      const second = guestStream.requestStateSync("stall"); // seq 2 - the live one
       // The stale seq-1 reply, were it to arrive, must not satisfy `second`.
-      hostStream.sendStateSync("stale", 1);
+      hostStream.sendStateSync("stale", staleTicket!, {
+        wave: current.wave,
+        turn: current.turn,
+        stateTick: 1,
+        controlDigest: "digest-1",
+      });
 
       expect(await first).toBeNull();
-      expect(await second).toBe("fresh");
+      expect((await second)?.blob).toBe("fresh");
       expect(seqs).toEqual([1, 2]);
     });
 
     it("a resync that never gets answered times out to null (degraded, never hung)", async () => {
       const { host, guest } = createLoopbackPair();
-      new CoopBattleStreamer(host); // host installs no responder
+      const current = { epoch: 1, wave: 1, turn: 3 };
+      new CoopBattleStreamer(host, { authorityContext: () => current }); // host installs no responder
       const guestStream = new CoopBattleStreamer(guest, {
+        authorityContext: () => current,
         timeoutMs: 1,
         schedule: cb => {
           cb();
           return () => {};
         },
       });
-      expect(await guestStream.requestStateSync(3)).toBeNull();
+      expect(await guestStream.requestStateSync("turn-checksum")).toBeNull();
     });
 
     it("the owner's ME-boundary checksum reaches the watcher's handler (#633 Phase C)", async () => {

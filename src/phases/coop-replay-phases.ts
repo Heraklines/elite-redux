@@ -93,6 +93,7 @@ import type {
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
+  CoopRecoveryAdmissionV1,
 } from "#data/elite-redux/coop/coop-transport";
 import {
   adoptWaveAdvanceWatcherChoice,
@@ -1468,14 +1469,15 @@ export class CoopFinalizeTurnPhase extends Phase {
         + "-> heal-once safety net (stateSync)",
     );
     const resyncGen = coopSessionGeneration(); // #808
-    void streamer.requestStateSync(this.turn).then(blob => {
-      if (blob == null) {
+    void streamer.requestStateSync("turn-checksum").then(result => {
+      if (result == null) {
         coopWarn(
           "resync",
           `turn=${this.turn} no snapshot received (timeout) -> keep current state, re-check next turn`,
         );
         return;
       }
+      const { blob, admission } = result;
       try {
         // #808: a reply landing after session teardown must never queue a phase into the
         // NEXT session's queue (the generation moved on teardown).
@@ -1504,7 +1506,7 @@ export class CoopFinalizeTurnPhase extends Phase {
         if (runtime == null) {
           return;
         }
-        if (!queueCoopAtomicSnapshotApply(runtime, snapshot, `turn=${this.turn} checksum safety-net`)) {
+        if (!queueCoopAtomicSnapshotApply(runtime, snapshot, admission, `turn=${this.turn} checksum safety-net`)) {
           return;
         }
         const interactionController = getCoopController();
@@ -1921,6 +1923,7 @@ export class CoopApplyResyncPhase extends Phase {
     private readonly turn: number,
     private readonly hostChecksum: string,
     private readonly hostObj: unknown,
+    private readonly recoveryAdmission: CoopRecoveryAdmissionV1,
     private readonly onSettled?: ((healed: boolean) => boolean | void) | undefined,
   ) {
     super();
@@ -2269,6 +2272,13 @@ export class CoopApplyResyncPhase extends Phase {
     super.start();
     let rollback: CoopFullBattleSnapshot | null = null;
     try {
+      const streamer = getCoopBattleStreamer();
+      if (streamer == null || !streamer.recoveryAdmissionIsCurrent(this.recoveryAdmission, this.snapshot)) {
+        coopWarn("resync", `turn=${this.turn} DROP snapshot whose immutable recovery ticket is no longer current`);
+        this.settle(false);
+        this.end();
+        return;
+      }
       // #790-class STALE GUARD for resyncs (live faint softlock, 00:47 logs): a resync REQUESTED
       // at turn N can be answered + queued while turn N+1 already finalized. Applying that OLD
       // snapshot then REGRESSES fresh state (the party.1/party.5 transposition warnings) and -
@@ -2402,10 +2412,8 @@ export class CoopApplyResyncPhase extends Phase {
 }
 
 /**
- * A stateSync request is correlated to the turn that detected drift, but the host captures its snapshot when
- * the request ARRIVES. The host may already be on the next turn, making the returned snapshot newer than the
- * request. Judge staleness by that authoritative snapshot turn when available; falling back to the request
- * turn preserves the legacy-host guard.
+ * Protocol 38 admits only an exact recovery frontier. This scalar guard is a final defense behind the full
+ * ticket check above: both older and future turns are invalid for the live battle shell.
  */
 export function coopResyncSnapshotIsStale(
   requestTurn: number,
@@ -2413,7 +2421,7 @@ export function coopResyncSnapshotIsStale(
   liveTurn: number,
 ): boolean {
   const capturedTurn = snapshotTurn ?? requestTurn;
-  return capturedTurn > 0 && liveTurn > capturedTurn;
+  return capturedTurn !== liveTurn;
 }
 
 /** A modern wire state tick is a positive, finite, losslessly representable integer. */

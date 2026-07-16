@@ -260,6 +260,7 @@ import type {
   CoopInteractionOutcome,
   CoopMessage,
   CoopNetcodeMode,
+  CoopRecoveryAdmissionV1,
   CoopRole,
   CoopSerializedEnemy,
   CoopSessionKind,
@@ -489,16 +490,17 @@ function preflightCoopAtomicSnapshot(runtime: CoopRuntime, snapshot: CoopFullBat
 }
 
 function wireCoopResyncResponder(runtime: CoopRuntime): void {
-  runtime.battleStream.onStateSyncRequest((_turn, seq) => {
-    coopLog("resync", `recv requestStateSync turn=${_turn} seq=${seq} role=${runtime.controller.role}`);
+  runtime.battleStream.onStateSyncRequest(ticket => {
+    coopLog("resync", `recv requestStateSync id=${ticket.requestId} role=${runtime.controller.role}`);
     if (runtime.controller.role !== "host") {
-      coopLog("resync", `ignore requestStateSync seq=${seq} (not host, role=${runtime.controller.role})`);
+      coopLog("resync", `ignore requestStateSync id=${ticket.requestId} (not host, role=${runtime.controller.role})`);
       return;
     }
     try {
       const snapshot = captureCoopFullSnapshot();
       if (snapshot == null) {
-        coopWarn("resync", `host has no live snapshot for requestStateSync seq=${seq} -> no reply`);
+        coopWarn("resync", `host has no live snapshot for requestStateSync id=${ticket.requestId}`);
+        runtime.battleStream.sendStateSyncUnavailable(ticket, "unavailable");
         return;
       }
       const stamped = bindCoopSnapshotControl({
@@ -513,15 +515,27 @@ function wireCoopResyncResponder(runtime: CoopRuntime): void {
         runtime.durability != null
         && !runtime.durability.retainSnapshotFrontier(stamped.controlDigest!, stamped.journalHighWater ?? {})
       ) {
-        coopWarn("resync", `host refused unretained stateSync frontier seq=${seq}`);
+        coopWarn("resync", `host refused unretained stateSync frontier id=${ticket.requestId}`);
+        runtime.battleStream.sendStateSyncUnavailable(ticket, "unavailable");
+        return;
+      }
+      const state = stamped.authoritativeState;
+      if (state == null || stamped.controlDigest == null) {
+        runtime.battleStream.sendStateSyncUnavailable(ticket, "unavailable");
         return;
       }
       const blob = compressToBase64(JSON.stringify(stamped));
-      coopLog("resync", `send stateSync seq=${seq} blob=${blob.length}b`);
-      runtime.battleStream.sendStateSync(blob, seq);
+      coopLog("resync", `send stateSync id=${ticket.requestId} blob=${blob.length}b`);
+      runtime.battleStream.sendStateSync(blob, ticket, {
+        wave: state.wave,
+        turn: state.turn,
+        stateTick: state.tick,
+        controlDigest: stamped.controlDigest,
+      });
     } catch (e) {
       /* a resync serialize/send failure must never break the host's turn */
-      coopWarn("resync", `host stateSync send failed seq=${seq}`, e);
+      runtime.battleStream.sendStateSyncUnavailable(ticket, "unavailable");
+      coopWarn("resync", `host stateSync send failed id=${ticket.requestId}`, e);
     }
   });
 }
@@ -797,6 +811,7 @@ export function adoptCoopActiveMysterySnapshot(snapshot: Pick<CoopFullBattleSnap
 function tryApplyCoopActiveMysterySnapshotInline(
   runtime: CoopRuntime,
   snapshot: CoopFullBattleSnapshot,
+  admission: CoopRecoveryAdmissionV1,
   label: string,
   onHealed?: (() => void) | undefined,
 ): boolean | null {
@@ -814,7 +829,10 @@ function tryApplyCoopActiveMysterySnapshotInline(
   ) {
     return null;
   }
-  if (!preflightCoopAtomicSnapshot(runtime, snapshot)) {
+  if (
+    !preflightCoopAtomicSnapshot(runtime, snapshot)
+    || !runtime.battleStream.recoveryAdmissionIsCurrent(admission, snapshot)
+  ) {
     return false;
   }
   const rollback = captureCoopFullSnapshot();
@@ -866,11 +884,15 @@ function tryApplyCoopActiveMysterySnapshotInline(
 export function queueCoopAtomicSnapshotApply(
   runtime: CoopRuntime,
   snapshot: CoopFullBattleSnapshot,
+  admission: CoopRecoveryAdmissionV1,
   label: string,
   onHealed?: (() => void) | undefined,
 ): boolean {
   const snapshotId = `snapshot:e${snapshot.sessionEpoch ?? 0}:tick${snapshot.authoritativeState?.tick ?? snapshot.tick ?? 0}:${snapshot.checksum ?? "missing"}`;
-  if (!preflightCoopAtomicSnapshot(runtime, snapshot)) {
+  if (
+    !preflightCoopAtomicSnapshot(runtime, snapshot)
+    || !runtime.battleStream.recoveryAdmissionIsCurrent(admission, snapshot)
+  ) {
     recordCoopCausalEvent({
       domain: "snapshot",
       stage: "refused",
@@ -889,7 +911,7 @@ export function queueCoopAtomicSnapshotApply(
     );
     return false;
   }
-  const inlineMysteryApply = tryApplyCoopActiveMysterySnapshotInline(runtime, snapshot, label, onHealed);
+  const inlineMysteryApply = tryApplyCoopActiveMysterySnapshotInline(runtime, snapshot, admission, label, onHealed);
   if (inlineMysteryApply != null) {
     return inlineMysteryApply;
   }
@@ -910,6 +932,7 @@ export function queueCoopAtomicSnapshotApply(
     snapshotTurn,
     snapshot.checksum ?? "",
     undefined,
+    admission,
     healed => {
       if (!healed) {
         recordCoopCausalEvent({
@@ -995,7 +1018,17 @@ function sendCoopDurabilitySnapshot(
       coopWarn("resync", `durability snapshot frontier refused cls=${cls} head=${headRevision}`);
       return;
     }
-    runtime.battleStream.sendDurabilitySnapshot(compressToBase64(JSON.stringify(stamped)));
+    const state = stamped.authoritativeState;
+    if (state == null || stamped.controlDigest == null) {
+      coopWarn("resync", `durability snapshot missing modern capture proof cls=${cls} head=${headRevision}`);
+      return;
+    }
+    runtime.battleStream.sendDurabilitySnapshot(compressToBase64(JSON.stringify(stamped)), {
+      wave: state.wave,
+      turn: state.turn,
+      stateTick: state.tick,
+      controlDigest: stamped.controlDigest,
+    });
   } catch (e) {
     coopWarn("resync", `durability snapshot send failed cls=${cls} head=${headRevision}`, e);
   }
@@ -1003,13 +1036,13 @@ function sendCoopDurabilitySnapshot(
 
 /** Guest-side deep-gap application: mutate live state, then ACK exactly the revisions it subsumed. */
 function wireCoopDurabilitySnapshotReceiver(runtime: CoopRuntime): void {
-  runtime.battleStream.onDurabilitySnapshot(blob => {
+  runtime.battleStream.onDurabilitySnapshot(({ blob, admission }) => {
     if (runtime.controller.role !== "guest") {
       return;
     }
     try {
       const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
-      queueCoopAtomicSnapshotApply(runtime, snapshot, `durability deep-gap snapshot blob=${blob.length}b`);
+      queueCoopAtomicSnapshotApply(runtime, snapshot, admission, `durability deep-gap snapshot blob=${blob.length}b`);
     } catch (e) {
       coopWarn("resync", "durability deep-gap snapshot apply failed", e);
     }
@@ -1960,15 +1993,16 @@ function wireCoopMeChecksumCheck(runtime: CoopRuntime, battleStream: CoopBattleS
         );
         coopLog("resync", `await stateSync start seq=${seq}`);
         const gen = coopSessionGeneration(); // #808: die if the session ends before the reply
-        void battleStream.requestStateSync(seq).then(blob => {
+        void battleStream.requestStateSync("mystery-checksum").then(result => {
           if (gen !== coopSessionGeneration()) {
             coopWarn("resync", `stateSync reply seq=${seq} arrived AFTER session teardown -> dropped (#808)`);
             return;
           }
-          if (blob == null) {
+          if (result == null) {
             coopWarn("resync", `await stateSync TIMEOUT/null seq=${seq}`);
             return;
           }
+          const { blob, admission } = result;
           coopLog("resync", `await stateSync resolve seq=${seq} blob=${blob.length}b -> applying`);
           try {
             // #839: this heal fires MID-DIVERT - the stateSync reply resolves while the guest is diverting
@@ -1989,7 +2023,12 @@ function wireCoopMeChecksumCheck(runtime: CoopRuntime, battleStream: CoopBattleS
             // One central preflight enforces epoch, checksum/sentinel, membership, control digest, monotonic
             // interaction counter, and Mystery revision before DATA is touched. Active replay applies inline
             // transactionally; every other phase queues the same atomic apply at a safe boundary.
-            queueCoopAtomicSnapshotApply(liveRuntime, snapshot, `me-entry seq=${seq} comprehensive snapshot`);
+            queueCoopAtomicSnapshotApply(
+              liveRuntime,
+              snapshot,
+              admission,
+              `me-entry seq=${seq} comprehensive snapshot`,
+            );
           } catch (e) {
             /* a malformed resync blob must never crash the ME flow */
             coopWarn("resync", `me-entry seq=${seq} malformed resync blob (ignored)`, e);
@@ -2375,11 +2414,11 @@ export function wireCoopStallWatchdog(
             wave: globalScene.currentBattle?.waveIndex ?? 0,
             turn: globalScene.currentBattle?.turn ?? 0,
           });
-          void battleStream.requestStateSync(seq).then(blob => {
+          void battleStream.requestStateSync("stall").then(result => {
             if (gen !== coopSessionGeneration()) {
               return;
             }
-            if (blob == null) {
+            if (result == null) {
               recordCoopCausalEvent({
                 domain: "snapshot",
                 stage: "timed-out",
@@ -2390,6 +2429,7 @@ export function wireCoopStallWatchdog(
               coopWarn("resync", `stall-recovery stateSync TIMEOUT/null seq=${seq}`);
               return;
             }
+            const { blob, admission } = result;
             try {
               const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
               recordCoopCausalEvent({
@@ -2406,6 +2446,7 @@ export function wireCoopStallWatchdog(
               queueCoopAtomicSnapshotApply(
                 runtime,
                 snapshot,
+                admission,
                 `stall-recovery snapshot seq=${seq} blob=${blob.length}b`,
               );
             } catch {
@@ -2862,11 +2903,11 @@ function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRunti
               wave: globalScene.currentBattle?.waveIndex ?? 0,
               turn: globalScene.currentBattle?.turn ?? 0,
             });
-            void runtime.battleStream.requestStateSync(seq).then(blob => {
+            void runtime.battleStream.requestStateSync("rejoin").then(result => {
               if (gen !== coopSessionGeneration()) {
                 return;
               }
-              if (blob == null) {
+              if (result == null) {
                 recordCoopCausalEvent({
                   domain: "snapshot",
                   stage: "timed-out",
@@ -2877,6 +2918,7 @@ function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRunti
                 coopWarn("resync", `post-rejoin stateSync TIMEOUT/null seq=${seq} (checksum backstop heals next turn)`);
                 return;
               }
+              const { blob, admission } = result;
               try {
                 const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
                 recordCoopCausalEvent({
@@ -2890,7 +2932,12 @@ function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRunti
                   turn: globalScene.currentBattle?.turn ?? 0,
                   detail: `${blob.length}b`,
                 });
-                queueCoopAtomicSnapshotApply(runtime, snapshot, `post-rejoin snapshot seq=${seq} blob=${blob.length}b`);
+                queueCoopAtomicSnapshotApply(
+                  runtime,
+                  snapshot,
+                  admission,
+                  `post-rejoin snapshot seq=${seq} blob=${blob.length}b`,
+                );
               } catch {
                 recordCoopCausalEvent({
                   domain: "snapshot",
@@ -5345,6 +5392,34 @@ export function assembleCoopRuntime(
       wave: globalScene.currentBattle?.waveIndex ?? 0,
       turn: globalScene.currentBattle?.turn ?? 0,
     }),
+    recoveryBinding: () => {
+      if (controller.hasAuthenticatedPairing) {
+        return controller.p33FrameContext();
+      }
+      const runId = controller.runId || `epoch-${controller.sessionEpoch}`;
+      return {
+        sessionId: `legacy-recovery:${runId}`,
+        sessionEpoch: controller.sessionEpoch,
+        seatMapId: `legacy-seat-map:${runId}`,
+        membershipRevision: runtime?.membership?.snapshot().revision ?? 0,
+        fromSeatId: controller.localSeatId,
+        connectionGeneration: transport.connectionGeneration?.() ?? 0,
+      };
+    },
+    validatePeerRecoveryBinding: binding => {
+      if (controller.hasAuthenticatedPairing) {
+        return controller.validateP33PeerFrameContext(binding, binding.membershipRevision);
+      }
+      const runId = controller.runId || `epoch-${controller.sessionEpoch}`;
+      return (
+        binding.sessionId === `legacy-recovery:${runId}`
+        && binding.sessionEpoch === controller.sessionEpoch
+        && binding.seatMapId === `legacy-seat-map:${runId}`
+        && binding.membershipRevision === (runtime?.membership?.snapshot().revision ?? 0)
+        && binding.fromSeatId !== controller.localSeatId
+        && binding.connectionGeneration === (transport.connectionGeneration?.() ?? 0)
+      );
+    },
     onAuthorityTerminal: reason => failCoopSharedSession(reason),
   });
   // Showdown 1v1: the interaction relay disables its #829 seat-map forged-switch check in versus (the

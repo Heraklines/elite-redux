@@ -129,7 +129,7 @@ describe("durability §4.1: message classification (authoritative vs cosmetic vs
       },
       { t: "interactionChoice", seq: 1, kind: "reward", choice: 0 },
       { t: "interactionOutcome", seq: 1, kind: "reward", outcome: { k: "reward" } as never },
-      { t: "stateSync", blob: "b", seq: 1 },
+      { t: "stateSync", ticket: {} as never, captured: {} as never, blob: "b" },
       { t: "launchSnapshot", wave: 1, session: "s" },
       { t: "runConfig", difficulty: "elite", challenges: [] },
       { t: "rosterSync", role: "host", entries: [], ready: true },

@@ -249,8 +249,9 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
 
   it("I3b production carrier: a deep-gap snapshot crosses the live stream and fast-forwards the guest", async () => {
     const pair = createLoopbackPair();
-    const hostStream = new CoopBattleStreamer(pair.host);
-    const guestStream = new CoopBattleStreamer(pair.guest);
+    const current = { epoch: 1, wave: 1, turn: 1 };
+    const hostStream = new CoopBattleStreamer(pair.host, { authorityContext: () => current });
+    const guestStream = new CoopBattleStreamer(pair.guest, { authorityContext: () => current });
     const guestMgr = new CoopDurabilityManager(pair.guest);
     let liveSnapshotHead = 0;
     let hostMgr!: CoopDurabilityManager;
@@ -261,12 +262,17 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
           const marks = { [cls]: head };
           const controlDigest = `deep-gap-${cls}-${head}`;
           expect(hostMgr.retainSnapshotFrontier(controlDigest, marks)).toBe(true);
-          hostStream.sendDurabilitySnapshot(JSON.stringify({ controlDigest, journalHighWater: marks }));
+          hostStream.sendDurabilitySnapshot(JSON.stringify({ controlDigest, journalHighWater: marks }), {
+            wave: current.wave,
+            turn: current.turn,
+            stateTick: head,
+            controlDigest,
+          });
         },
       },
       3,
     );
-    guestStream.onDurabilitySnapshot(blob => {
+    guestStream.onDurabilitySnapshot(({ blob }) => {
       const snapshot = JSON.parse(blob) as { controlDigest: string; journalHighWater: Record<string, number> };
       liveSnapshotHead = snapshot.journalHighWater.wave ?? 0;
       guestMgr.adoptSnapshotMarksForTransaction(snapshot.journalHighWater);

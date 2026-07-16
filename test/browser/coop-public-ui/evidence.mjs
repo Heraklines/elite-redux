@@ -50,10 +50,10 @@ const MARKET_PREFIX = "[coop-browser:market] ";
 const COMMANDER_PREFIX = "[coop-browser:commander] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 const CHECKSUM_SENTINEL = "0000000000000000";
-const POST_REJOIN_RESYNC_REQUEST = /^\[coop:resync\] post-rejoin full resync request seq=(\d+)/u;
-const STATE_SYNC_START = /^\[coop:resync\] guest requestStateSync turn=(\d+) seq=(\d+) START\b/u;
 const COMPATIBLE_PRESENTATION_MISMATCH =
   /^\[coop:checksum\] PRESENTATION MISMATCH sections=[^\n]+ - simulation compatible - /u;
+const STATE_SYNC_START =
+  /^\[coop:resync\] guest requestStateSync id=\S+ reason=([a-z-]+) e=(\d+) wave=(\d+) turn=(\d+) START\b/u;
 const FATAL_COOP_CONSOLE_RULES = Object.freeze([
   [/^\[coop:ASSERT\].*\bCHECKSUM MISMATCH\b/iu, "checksum assertion"],
   [
@@ -871,7 +871,6 @@ export class EvidenceSink {
     this.expectedMissingSystemSaveErrors = expectedMissingSystemSaveErrors;
     this.events = [];
     this.failures = [];
-    this.benignRejoinStateSyncTurns = new Set();
     this.networkState = { account: null, lobby: null, coopRunStatus: null, apiFailure: null };
     this.writeTail = Promise.resolve();
     // Optimization brief R2: batched-write + waiter + telemetry state.
@@ -1277,13 +1276,9 @@ export class EvidenceSink {
         text,
         source,
       });
-      const postRejoinRequest = POST_REJOIN_RESYNC_REQUEST.exec(text);
-      if (postRejoinRequest != null) {
-        this.benignRejoinStateSyncTurns.add(postRejoinRequest[1]);
-      }
       const stateSyncStart = STATE_SYNC_START.exec(text);
       const fatalCoopReason = fatalCoopConsoleReason(text, {
-        benignRejoinStateSync: stateSyncStart != null && this.benignRejoinStateSyncTurns.has(stateSyncStart[1]),
+        benignRejoinStateSync: stateSyncStart?.[1] === "rejoin",
       });
       if (fatalCoopReason != null) {
         const fatal = this.record("coop-fatal-console", {

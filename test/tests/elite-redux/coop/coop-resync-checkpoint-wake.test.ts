@@ -13,6 +13,7 @@ import type {
   CoopBattleCheckpoint,
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
+  CoopRecoveryAdmissionV1,
 } from "#data/elite-redux/coop/coop-transport";
 import { CoopApplyResyncPhase } from "#phases/coop-replay-phases";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -75,6 +76,35 @@ const fullField = (): CoopFullMonSnapshot[] => [
   },
 ];
 
+function recoveryAdmission(epoch: number): CoopRecoveryAdmissionV1 {
+  const guestBinding = {
+    sessionId: `legacy-recovery:e${epoch}`,
+    sessionEpoch: epoch,
+    seatMapId: `legacy-seat-map:e${epoch}`,
+    membershipRevision: 0,
+    fromSeatId: 1,
+    connectionGeneration: 0,
+  };
+  return {
+    ticket: {
+      version: 1,
+      requestId: `test:${epoch}:1`,
+      seq: 1,
+      reason: "turn-checksum",
+      policy: "exact",
+      binding: guestBinding,
+      frontier: { epoch, wave: 4, turn: 2 },
+    },
+    captured: {
+      version: 1,
+      binding: { ...guestBinding, fromSeatId: 0 },
+      frontier: { epoch, wave: 4, turn: 2 },
+      stateTick: 18,
+      controlDigest: "test-digest",
+    },
+  };
+}
+
 describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
   let priorScene: BattleScene;
   let currentPhase: CoopApplyResyncPhase;
@@ -115,7 +145,13 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
       authoritativeState: state(18),
       sessionEpoch: runtime.controller.sessionEpoch,
     } as CoopFullBattleSnapshot;
-    currentPhase = new CoopApplyResyncPhase(snapshot, 1, "old-checksum", undefined);
+    currentPhase = new CoopApplyResyncPhase(
+      snapshot,
+      1,
+      "old-checksum",
+      undefined,
+      recoveryAdmission(runtime.controller.sessionEpoch),
+    );
     const phaseInternals = currentPhase as unknown as {
       armSupersedingCheckpointWake: () => boolean;
       recoveryTickFloor: number;
@@ -201,6 +237,7 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
       1,
       "old-checksum",
       undefined,
+      recoveryAdmission(runtime.controller.sessionEpoch),
     );
     const phaseInternals = currentPhase as unknown as {
       armSupersedingCheckpointWake: () => boolean;
