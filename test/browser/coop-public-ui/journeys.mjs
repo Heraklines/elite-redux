@@ -8,6 +8,8 @@ import { confirmDefaultStarterTeam, selectOptionById, waitForSemanticSurface } f
 const TITLE_PHASE = /Start Phase TitlePhase/u;
 const CHALLENGE_PHASE = /Start Phase SelectChallengePhase/u;
 const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
+const SLOT_ZERO_FORK_QUARANTINE =
+  /resume scan slot=0 load failed \(ignored\) CoopResumeReplicaUnavailableError: (?:equal-revision co-op fork in slot 0|cloud head ancestry conflict for run [0-9a-f-]{36})/u;
 
 function sessionStorageKeys(dom) {
   return dom.storage.map(item => item.key).filter(key => /^sessionData(?:\d*)_/u.test(key));
@@ -410,10 +412,10 @@ async function resumeScanIsolation(rig) {
     ),
   );
   await rig.coldReopenAndPair(rig.config.requesterSeat);
-  await rig.host.evidence.waitFor(/resume scan slot=0 load failed[\s\S]*equal-revision co-op fork in slot 0/u, {
+  await rig.host.evidence.waitFor(SLOT_ZERO_FORK_QUARANTINE, {
     from: rig.host.pageCursor,
     timeoutMs: rig.config.timeoutMs,
-    description: "slot-scoped equal-revision fork quarantine",
+    description: "slot-scoped co-op fork quarantine",
   });
   const localBefore = new Map(
     await Promise.all(
