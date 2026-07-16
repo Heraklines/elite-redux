@@ -300,7 +300,9 @@ jobs:
           COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat || 'guest-seat' }}
           COOP_UI_COMMANDER_OWNER_SEAT: ${{ matrix.commander_owner_seat }}
           COOP_UI_HOST_LOCALE: en
-          COOP_UI_GUEST_LOCALE: de
+          # The retained GameOver oracle isolates terminal ordering from the separately-gated
+          # cross-locale fingerprint contract. All other public journeys keep the EN/DE lane.
+          COOP_UI_GUEST_LOCALE: ${{ inputs.journey == 'game-over' && 'en' || 'de' }}
           COOP_UI_HOST_TITLE_NEW_GAME_KEYS: ${{ inputs.host_title_keys || '[]' }}
           COOP_UI_GUEST_TITLE_NEW_GAME_KEYS: ${{ inputs.guest_title_keys || '[]' }}
           COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'fast' && '70') || (inputs.cadence == 'slow' && '420') || '180' }}
