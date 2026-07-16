@@ -587,6 +587,11 @@ export class CoopSessionController {
     return this.p33Binding == null ? null : structuredClone(this.p33Binding);
   }
 
+  /** Whether this controller was created from Worker-authenticated P33 pairing axes. */
+  get hasAuthenticatedPairing(): boolean {
+    return this.p33Context != null;
+  }
+
   /**
    * Return the exact accepted P33 binding axes. A retained-but-unacknowledged binding is deliberately not
    * authorization: terminal/control traffic may only start after both authenticated seats proved the same

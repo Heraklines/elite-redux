@@ -229,7 +229,12 @@ describe("P33 durable refusal closure", () => {
     const guest = new WebRtcTransport("guest", first.b);
     const received: CoopMessage[] = [];
     guest.onMessage(message => received.push(message));
-    const oversized: CoopMessage = { t: "stateSync", blob: "x".repeat(16 * 1024 * 1024 + 512), seq: 1 };
+    const oversized: CoopMessage = {
+      t: "stateSync",
+      ticket: {} as never,
+      captured: {} as never,
+      blob: "x".repeat(16 * 1024 * 1024 + 512),
+    };
 
     expect(() => host.send(oversized)).not.toThrow();
     expect(first.a.sent).toEqual([]);
@@ -242,7 +247,12 @@ describe("P33 durable refusal closure", () => {
     const replacement = linkedWires();
     guest.replaceChannel(replacement.b);
     host.replaceChannel(replacement.a);
-    const normal: CoopMessage = { t: "stateSync", blob: "y".repeat(40_000), seq: 2 };
+    const normal: CoopMessage = {
+      t: "stateSync",
+      ticket: {} as never,
+      captured: {} as never,
+      blob: "y".repeat(40_000),
+    };
     host.send(normal);
     expect(received).toEqual([normal]);
   });

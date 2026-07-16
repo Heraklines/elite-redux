@@ -25,6 +25,7 @@
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import type { CoopFrameContextV1 } from "#data/elite-redux/coop/coop-session-binding";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopAuthorityAckStage,
@@ -33,10 +34,17 @@ import type {
   CoopCapturePresentation,
   CoopConnectionState,
   CoopEncounterAuthority,
+  CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
   CoopLaunchSnapshotAbortReason,
   CoopMessage,
+  CoopRecoveryAdmissionV1,
+  CoopRecoveryCaptureV1,
+  CoopRecoveryFrontierV1,
+  CoopRecoveryReason,
+  CoopRecoveryTicketV1,
   CoopSerializedEnemy,
+  CoopStateSyncUnavailableReason,
   CoopTransport,
   CoopWaveOutcome,
 } from "#data/elite-redux/coop/coop-transport";
@@ -91,6 +99,10 @@ export interface CoopBattleStreamerOptions {
   now?: () => number;
   /** Production address source used to reject cross-session/wave traffic before buffering it. */
   authorityContext?: () => { epoch: number; wave: number; turn: number };
+  /** Exact local P33 frame binding used by protocol-38 recovery traffic. */
+  recoveryBinding?: () => CoopFrameContextV1 | null;
+  /** Authenticate a recovery frame as the current peer seat and channel generation. */
+  validatePeerRecoveryBinding?: (binding: CoopFrameContextV1) => boolean;
   /** Absolute retention window for an unacknowledged authority commit. */
   authorityRetentionMs?: number;
   /** Maximum simultaneous retained authority commits before shared play terminates fail-closed. */
@@ -395,9 +407,6 @@ const DEFAULT_TIMEOUT_MS = 1_200_000;
  */
 export const COOP_WAVE_NO_ME = -1;
 
-/** Reserved `stateSync.seq` for an unsolicited durability deep-gap snapshot (§4.4). */
-export const COOP_DURABILITY_SNAPSHOT_SEQ = -2_147_000_000;
-
 /**
  * How many past turns of buffered LIVE battle events to retain (#633, animation layer). A handful is
  * plenty: a turn's events are consumed at that turn's boundary, so retention only needs to cover a
@@ -459,16 +468,20 @@ interface PendingTurnWaiter {
 }
 
 interface PendingStateSyncWaiter {
-  seq: number;
-  requestTurn: number;
-  address: CoopTurnAddress | null;
-  finish: (blob: string | null) => void;
+  ticket: CoopRecoveryTicketV1;
+  finish: (result: CoopStateSyncResult | null) => void;
 }
 
-interface BufferedStateSync {
-  seq: number;
-  address: CoopTurnAddress | null;
+export interface CoopStateSyncResult {
   blob: string;
+  admission: CoopRecoveryAdmissionV1;
+}
+
+export interface CoopRecoveryCaptureInput {
+  wave: number;
+  turn: number;
+  stateTick: number;
+  controlDigest: string;
 }
 
 interface LiveTurnBuffer {
@@ -594,8 +607,66 @@ function invalidAuthorityTurnKey(turn: number): string {
   return `invalid:${turn}`;
 }
 
-function stateSyncKey(seq: number, address: CoopTurnAddress | null): string {
-  return address == null ? `legacy:${seq}` : `${pendingTurnKey(address)}:${seq}`;
+function sameRecoveryFrontier(left: CoopRecoveryFrontierV1, right: CoopRecoveryFrontierV1): boolean {
+  return left.epoch === right.epoch && left.wave === right.wave && left.turn === right.turn;
+}
+
+function sameRecoveryBinding(left: CoopFrameContextV1, right: CoopFrameContextV1): boolean {
+  return (
+    left.sessionId === right.sessionId
+    && left.sessionEpoch === right.sessionEpoch
+    && left.seatMapId === right.seatMapId
+    && left.membershipRevision === right.membershipRevision
+    && left.fromSeatId === right.fromSeatId
+    && left.connectionGeneration === right.connectionGeneration
+  );
+}
+
+function validRecoveryBinding(binding: CoopFrameContextV1): boolean {
+  return (
+    typeof binding?.sessionId === "string"
+    && binding.sessionId.length > 0
+    && Number.isSafeInteger(binding.sessionEpoch)
+    && binding.sessionEpoch >= 0
+    && typeof binding.seatMapId === "string"
+    && binding.seatMapId.length > 0
+    && Number.isSafeInteger(binding.membershipRevision)
+    && binding.membershipRevision >= 0
+    && Number.isSafeInteger(binding.fromSeatId)
+    && binding.fromSeatId >= 0
+    && Number.isSafeInteger(binding.connectionGeneration)
+    && binding.connectionGeneration >= 0
+  );
+}
+
+function validRecoveryFrontier(frontier: CoopRecoveryFrontierV1): boolean {
+  return (
+    Number.isSafeInteger(frontier?.epoch)
+    && frontier.epoch >= 0
+    && Number.isSafeInteger(frontier.wave)
+    && frontier.wave >= 0
+    && Number.isSafeInteger(frontier.turn)
+    && frontier.turn >= 0
+  );
+}
+
+function validRecoveryTicket(ticket: CoopRecoveryTicketV1): boolean {
+  return (
+    ticket?.version === 1
+    && typeof ticket.requestId === "string"
+    && ticket.requestId.length > 0
+    && Number.isSafeInteger(ticket.seq)
+    && ticket.seq > 0
+    && (["turn-checksum", "mystery-checksum", "stall", "rejoin", "durability-gap"] as const).includes(ticket.reason)
+    && ticket.policy === "exact"
+    && validRecoveryBinding(ticket.binding)
+    && validRecoveryFrontier(ticket.frontier)
+    && ticket.frontier.epoch === ticket.binding.sessionEpoch
+  );
+}
+
+function recoveryTicketKey(ticket: CoopRecoveryTicketV1): string {
+  return canonicalize(ticket);
 }
 
 function sameTurnAddress(left: CoopTurnAddress, right: CoopTurnAddress): boolean {
@@ -688,12 +759,15 @@ export class CoopBattleStreamer {
   private readonly schedule: (cb: () => void, ms: number) => () => void;
   private readonly now: () => number;
   private readonly authorityContext: (() => { epoch: number; wave: number; turn: number }) | undefined;
+  private readonly recoveryBinding: (() => CoopFrameContextV1 | null) | undefined;
+  private readonly validatePeerRecoveryBinding: ((binding: CoopFrameContextV1) => boolean) | undefined;
   private readonly authorityRetentionMs: number;
   private readonly authorityRetentionLimit: number;
   private readonly onAuthorityTerminal: ((reason: string) => void) | undefined;
   private readonly offMessage: () => void;
   private readonly offStateChange: () => void;
   private disposed = false;
+  private recoveryDisconnected = false;
 
   /** Complete turn address -> resolver for an in-flight {@linkcode awaitTurn}. */
   private readonly pending = new Map<string, PendingTurnWaiter>();
@@ -872,18 +946,18 @@ export class CoopBattleStreamer {
   private ghostPoolHandler: ((pool: GhostTeamSnapshot[]) => void) | null = null;
   /** GUEST: the host's ghost pool that arrived before a handler subscribed (delivered on subscribe). */
   private lastGhostPool: GhostTeamSnapshot[] | null = null;
-  /** HOST: handler answering the guest's `requestStateSync` (#633, TRACK-2 resync). */
-  private stateSyncRequestHandler: ((turn: number, seq: number) => void) | null = null;
+  /** HOST: handler answering one already-authenticated exact recovery ticket. */
+  private stateSyncRequestHandler: ((ticket: CoopRecoveryTicketV1) => void) | null = null;
   /** HOST: handler answering the guest's `requestEnemyParty` re-request (#633/#698 handoff robustness). */
   private enemyPartyRequestHandler: ((wave: number) => void) | null = null;
-  /** GUEST: complete authority address + echoed seq -> one in-flight recovery waiter. */
+  /** GUEST: complete immutable ticket -> one in-flight recovery waiter. */
   private readonly stateSyncWaiters = new Map<string, PendingStateSyncWaiter>();
-  /** GUEST: legacy-only race buffer. Addressed recovery never adopts an unsolicited snapshot. */
-  private readonly stateSyncInbox = new Map<string, BufferedStateSync>();
   /** GUEST: monotonic resync request counter (each desync request bumps it). */
   private stateSyncSeq = 0;
-  /** GUEST: live apply callback for an unsolicited deep-gap durability snapshot. */
-  private durabilitySnapshotHandler: ((blob: string) => void) | null = null;
+  /** HOST: monotonic identity for addressed durability pushes. */
+  private durabilitySnapshotSeq = 0;
+  /** GUEST: live apply callback for an addressed deep-gap durability snapshot. */
+  private durabilitySnapshotHandler: ((result: CoopStateSyncResult) => void) | null = null;
   /** WATCHER: handler for the owner's ME-boundary checksum (#633, TRACK-2 Phase C). */
   private meChecksumHandler: ((seq: number, checksum: string) => void) | null = null;
   /** GUEST: handler for the host's ME narration lines (#633, TRACK-2 Phase C, non-battle ME). */
@@ -940,6 +1014,8 @@ export class CoopBattleStreamer {
     this.schedule = opts.schedule ?? defaultSchedule;
     this.now = opts.now ?? Date.now;
     this.authorityContext = opts.authorityContext;
+    this.recoveryBinding = opts.recoveryBinding;
+    this.validatePeerRecoveryBinding = opts.validatePeerRecoveryBinding;
     this.authorityRetentionMs =
       Number.isFinite(opts.authorityRetentionMs) && (opts.authorityRetentionMs as number) > 0
         ? (opts.authorityRetentionMs as number)
@@ -952,6 +1028,7 @@ export class CoopBattleStreamer {
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offStateChange = transport.onStateChange((state: CoopConnectionState) => {
       if (state !== "connected") {
+        this.recoveryDisconnected = true;
         return;
       }
       if (!this.authorityTerminalStarted) {
@@ -986,17 +1063,15 @@ export class CoopBattleStreamer {
         coopLog("stream", `guest RE-SEND requestMeBattleEnemyParty key=${key} after reconnect`);
         this.transport.send({ t: "requestMeBattleEnemyParty", key });
       }
-      for (const waiter of [...this.stateSyncWaiters.values()]) {
-        if (!this.stateSyncAddressIsCurrent(waiter.address)) {
-          coopWarn("resync", `guest cancel stale stateSync seq=${waiter.seq} after reconnect`);
+      if (this.recoveryDisconnected) {
+        this.recoveryDisconnected = false;
+        for (const waiter of [...this.stateSyncWaiters.values()]) {
+          coopWarn(
+            "resync",
+            `guest cancel stateSync id=${waiter.ticket.requestId} after reconnect; a new generation requires a new ticket`,
+          );
           waiter.finish(null);
-          continue;
         }
-        coopLog(
-          "resync",
-          `guest RE-SEND requestStateSync turn=${waiter.requestTurn} seq=${waiter.seq} after reconnect`,
-        );
-        this.transport.send({ t: "requestStateSync", turn: waiter.requestTurn, seq: waiter.seq });
       }
     });
     coopLog("stream", `streamer CONSTRUCT timeout=${this.timeoutMs}ms onMessage registered`);
@@ -1058,16 +1133,107 @@ export class CoopBattleStreamer {
     );
   }
 
-  private stateSyncAddressIsCurrent(address: CoopTurnAddress | null): boolean {
-    if (address == null) {
-      return this.authorityContext == null;
+  private currentRecoveryBinding(): CoopFrameContextV1 | null {
+    if (this.recoveryBinding != null) {
+      try {
+        const binding = this.recoveryBinding();
+        return binding != null && validRecoveryBinding(binding) ? { ...binding } : null;
+      } catch {
+        return null;
+      }
     }
-    const current = this.currentStateSyncAddress();
-    return current != null && sameTurnAddress(current, address);
+    const frontier = this.currentStateSyncAddress();
+    if (frontier == null) {
+      return null;
+    }
+    return {
+      sessionId: `legacy-recovery:e${frontier.epoch}`,
+      sessionEpoch: frontier.epoch,
+      seatMapId: `legacy-seat-map:e${frontier.epoch}`,
+      membershipRevision: 0,
+      fromSeatId: this.transport.role === "host" ? 0 : 1,
+      connectionGeneration: this.transport.connectionGeneration?.() ?? 0,
+    };
   }
 
-  private stateSyncWaiterForSeq(seq: number): [string, PendingStateSyncWaiter] | undefined {
-    return [...this.stateSyncWaiters].find(([, waiter]) => waiter.seq === seq);
+  private peerRecoveryBindingIsCurrent(binding: CoopFrameContextV1): boolean {
+    if (!validRecoveryBinding(binding)) {
+      return false;
+    }
+    if (this.validatePeerRecoveryBinding != null) {
+      try {
+        return this.validatePeerRecoveryBinding(binding);
+      } catch {
+        return false;
+      }
+    }
+    const local = this.currentRecoveryBinding();
+    return (
+      local != null
+      && binding.sessionId === local.sessionId
+      && binding.sessionEpoch === local.sessionEpoch
+      && binding.seatMapId === local.seatMapId
+      && binding.membershipRevision === local.membershipRevision
+      && binding.fromSeatId !== local.fromSeatId
+      && binding.connectionGeneration === local.connectionGeneration
+    );
+  }
+
+  private localRecoveryTicketIsCurrent(ticket: CoopRecoveryTicketV1): boolean {
+    const binding = this.currentRecoveryBinding();
+    const frontier = this.currentStateSyncAddress();
+    return (
+      validRecoveryTicket(ticket)
+      && binding != null
+      && frontier != null
+      && sameRecoveryBinding(ticket.binding, binding)
+      && sameRecoveryFrontier(ticket.frontier, frontier)
+    );
+  }
+
+  private peerRecoveryTicketIsCurrent(ticket: CoopRecoveryTicketV1): boolean {
+    const frontier = this.currentStateSyncAddress();
+    return (
+      validRecoveryTicket(ticket)
+      && frontier != null
+      && this.peerRecoveryBindingIsCurrent(ticket.binding)
+      && sameRecoveryFrontier(ticket.frontier, frontier)
+    );
+  }
+
+  /** Revalidate immutable receive evidence immediately before a deferred snapshot mutates live state. */
+  recoveryAdmissionIsCurrent(admission: CoopRecoveryAdmissionV1, snapshot?: CoopFullBattleSnapshot): boolean {
+    const { ticket, captured } = admission;
+    if (
+      !validRecoveryTicket(ticket)
+      || captured?.version !== 1
+      || !validRecoveryBinding(captured.binding)
+      || !validRecoveryFrontier(captured.frontier)
+      || !Number.isSafeInteger(captured.stateTick)
+      || captured.stateTick < 0
+      || typeof captured.controlDigest !== "string"
+      || captured.controlDigest.length === 0
+      || !sameRecoveryFrontier(ticket.frontier, captured.frontier)
+      || !this.peerRecoveryBindingIsCurrent(captured.binding)
+    ) {
+      return false;
+    }
+    const addressCurrent =
+      ticket.reason === "durability-gap"
+        ? this.peerRecoveryTicketIsCurrent(ticket) && sameRecoveryBinding(ticket.binding, captured.binding)
+        : this.localRecoveryTicketIsCurrent(ticket);
+    if (!addressCurrent || snapshot == null) {
+      return addressCurrent;
+    }
+    const state = snapshot.authoritativeState;
+    return (
+      snapshot.sessionEpoch === ticket.frontier.epoch
+      && state != null
+      && state.wave === ticket.frontier.wave
+      && state.turn === ticket.frontier.turn
+      && state.tick === captured.stateTick
+      && snapshot.controlDigest === captured.controlDigest
+    );
   }
 
   private acceptsAwaitedTurnAddress(address: CoopTurnAddress): boolean {
@@ -2393,19 +2559,94 @@ export class CoopBattleStreamer {
     return this.now();
   }
 
-  /** HOST: send the authoritative full-state snapshot answering a guest's `requestStateSync`. */
-  sendStateSync(blob: string, seq: number): void {
-    coopLog("resync", `host SEND stateSync seq=${seq} blobLen=${blob.length}`);
-    this.transport.send({ t: "stateSync", blob, seq });
+  private mintRecoveryTicket(reason: CoopRecoveryReason, seq: number): CoopRecoveryTicketV1 | null {
+    const binding = this.currentRecoveryBinding();
+    const frontier = this.currentStateSyncAddress();
+    if (binding == null || frontier == null || binding.sessionEpoch !== frontier.epoch) {
+      return null;
+    }
+    return {
+      version: 1,
+      requestId: `${binding.sessionId}:m${binding.membershipRevision}:s${binding.fromSeatId}:g${binding.connectionGeneration}:r${seq}`,
+      seq,
+      reason,
+      policy: "exact",
+      binding,
+      frontier,
+    };
   }
 
-  /** HOST: push the heavy state snapshot selected when the requested journal gap was evicted. */
-  sendDurabilitySnapshot(blob: string): void {
-    this.sendStateSync(blob, COOP_DURABILITY_SNAPSHOT_SEQ);
+  private captureRecoveryProof(
+    ticket: CoopRecoveryTicketV1,
+    input: CoopRecoveryCaptureInput,
+    localTicket: boolean,
+  ): CoopRecoveryCaptureV1 | null {
+    const binding = this.currentRecoveryBinding();
+    const frontier = this.currentStateSyncAddress();
+    const ticketIsCurrent = localTicket
+      ? this.localRecoveryTicketIsCurrent(ticket)
+      : this.peerRecoveryTicketIsCurrent(ticket);
+    if (
+      !ticketIsCurrent
+      || binding == null
+      || frontier == null
+      || input.wave !== ticket.frontier.wave
+      || input.turn !== ticket.frontier.turn
+      || !Number.isSafeInteger(input.stateTick)
+      || input.stateTick < 0
+      || typeof input.controlDigest !== "string"
+      || input.controlDigest.length === 0
+    ) {
+      return null;
+    }
+    return {
+      version: 1,
+      binding,
+      frontier,
+      stateTick: input.stateTick,
+      controlDigest: input.controlDigest,
+    };
   }
 
-  /** GUEST: install the production live apply callback for deep-gap snapshot pushes. */
-  onDurabilitySnapshot(handler: (blob: string) => void): void {
+  /** HOST: send only the exact snapshot captured for this authenticated request ticket. */
+  sendStateSync(blob: string, ticket: CoopRecoveryTicketV1, input: CoopRecoveryCaptureInput): boolean {
+    const captured = this.captureRecoveryProof(ticket, input, false);
+    if (captured == null) {
+      this.sendStateSyncUnavailable(ticket, "superseded");
+      return false;
+    }
+    coopLog("resync", `host SEND stateSync id=${ticket.requestId} blobLen=${blob.length}`);
+    this.transport.send({ t: "stateSync", ticket, captured, blob });
+    return true;
+  }
+
+  /** HOST: explicitly close a valid request that cannot be captured at its exact frontier. */
+  sendStateSyncUnavailable(ticket: CoopRecoveryTicketV1, reason: CoopStateSyncUnavailableReason): void {
+    if (!validRecoveryTicket(ticket)) {
+      return;
+    }
+    const binding = this.currentRecoveryBinding();
+    const frontier = this.currentStateSyncAddress();
+    const current = binding == null || frontier == null ? null : { binding, frontier };
+    this.transport.send({ t: "stateSyncUnavailable", ticket, reason, current });
+  }
+
+  /** HOST: push a heavy snapshot under its own exact addressed durability ticket. */
+  sendDurabilitySnapshot(blob: string, input: CoopRecoveryCaptureInput): boolean {
+    const ticket = this.mintRecoveryTicket("durability-gap", ++this.durabilitySnapshotSeq);
+    if (ticket == null) {
+      return false;
+    }
+    const captured = this.captureRecoveryProof(ticket, input, true);
+    if (captured == null) {
+      return false;
+    }
+    this.transport.send({ t: "durabilityStateSync", ticket, captured, blob });
+    return true;
+  }
+
+  /** GUEST: install the production live apply callback for addressed deep-gap snapshot pushes. */
+  onDurabilitySnapshot(handler: (result: CoopStateSyncResult) => void): void {
     this.durabilitySnapshotHandler = handler;
   }
 
@@ -2499,12 +2740,8 @@ export class CoopBattleStreamer {
     };
   }
 
-  /**
-   * HOST: subscribe to the guest's resync requests. The handler receives the desynced
-   * `turn` + the request `seq` it must echo on the `stateSync` reply (so the guest can
-   * drop a stale answer). Returns immediately; the host builds + sends the blob.
-   */
-  onStateSyncRequest(handler: (turn: number, seq: number) => void): void {
+  /** HOST: subscribe to already-authenticated exact recovery requests. */
+  onStateSyncRequest(handler: (ticket: CoopRecoveryTicketV1) => void): void {
     coopLog("stream", `host REGISTER onStateSyncRequest handler (was=${this.stateSyncRequestHandler != null})`);
     this.stateSyncRequestHandler = handler;
   }
@@ -3267,19 +3504,12 @@ export class CoopBattleStreamer {
     return promise;
   }
 
-  /**
-   * GUEST: request the host's authoritative full state after a checksum mismatch at
-   * `turn`, then await the answering `stateSync` blob (#633, TRACK-2). Returns the
-   * compressed blob to adopt, or `null` on timeout (the guest then keeps its current
-   * state and re-checks next turn - degraded but never hung). One request is in flight
-   * at a time: a new request supersedes any older waiter (resolves it null), so a
-   * multi-turn divergence can't fan out into overlapping resyncs.
-   */
-  requestStateSync(turn: number): Promise<string | null> {
+  /** GUEST: request one exact authenticated recovery frontier. */
+  requestStateSync(reason: Exclude<CoopRecoveryReason, "durability-gap">): Promise<CoopStateSyncResult | null> {
     // Supersede every older in-flight resync (the newest desync is the one to heal).
     const inFlight = this.stateSyncWaiters.size;
     if (inFlight > 0) {
-      coopWarn("resync", `guest requestStateSync turn=${turn} superseding ${inFlight} older in-flight resync(s)`);
+      coopWarn("resync", `guest requestStateSync reason=${reason} superseding ${inFlight} older request(s)`);
     }
     for (const waiter of [...this.stateSyncWaiters.values()]) {
       waiter.finish(null);
@@ -3290,31 +3520,21 @@ export class CoopBattleStreamer {
     this.stateSyncWaiters.clear();
     this.launchSnapshotWaiters.clear();
     const seq = ++this.stateSyncSeq;
-    // `requestStateSync.turn` predates the authority address and several legacy callers use it as an
-    // interaction/recovery correlation number. Bind the recovery snapshot to the actual current battle
-    // boundary instead of mistaking that legacy request label for the battle turn.
-    const address = this.currentStateSyncAddress();
-    if (this.authorityContext != null && address == null) {
-      coopWarn("resync", `guest requestStateSync turn=${turn} seq=${seq} refused without a valid authority address`);
+    const ticket = this.mintRecoveryTicket(reason, seq);
+    if (ticket == null) {
+      coopWarn("resync", `guest requestStateSync reason=${reason} seq=${seq} refused without exact binding/frontier`);
       return Promise.resolve(null);
     }
-    const key = stateSyncKey(seq, address);
-    // The host may have already answered this exact seq (race) - consume it if so.
-    const buffered = this.stateSyncInbox.get(key);
-    if (buffered !== undefined) {
-      this.stateSyncInbox.delete(key);
-      coopLog(
-        "resync",
-        `guest requestStateSync turn=${turn} seq=${seq} RESOLVE (buffered race) blobLen=${buffered.blob.length}`,
-      );
-      this.transport.send({ t: "requestStateSync", turn, seq });
-      return Promise.resolve(buffered.blob);
-    }
-    coopLog("resync", `guest requestStateSync turn=${turn} seq=${seq} START timeout=${this.timeoutMs}ms`);
-    return new Promise<string | null>(resolve => {
+    const key = recoveryTicketKey(ticket);
+    coopLog(
+      "resync",
+      `guest requestStateSync id=${ticket.requestId} reason=${reason} e=${ticket.frontier.epoch} `
+        + `wave=${ticket.frontier.wave} turn=${ticket.frontier.turn} START timeout=${this.timeoutMs}ms`,
+    );
+    return new Promise<CoopStateSyncResult | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
-      const finish = (blob: string | null) => {
+      const finish = (result: CoopStateSyncResult | null) => {
         if (settled) {
           return;
         }
@@ -3323,16 +3543,16 @@ export class CoopBattleStreamer {
         if (this.stateSyncWaiters.get(key)?.finish === finish) {
           this.stateSyncWaiters.delete(key);
         }
-        if (blob == null) {
-          coopWarn("resync", `guest requestStateSync turn=${turn} seq=${seq} -> null (timeout/superseded)`);
+        if (result == null) {
+          coopWarn("resync", `guest requestStateSync id=${ticket.requestId} -> null (timeout/superseded)`);
         } else {
-          coopLog("resync", `guest requestStateSync turn=${turn} seq=${seq} RESOLVE blobLen=${blob.length}`);
+          coopLog("resync", `guest requestStateSync id=${ticket.requestId} RESOLVE blobLen=${result.blob.length}`);
         }
-        resolve(blob);
+        resolve(result);
       };
-      this.stateSyncWaiters.set(key, { seq, requestTurn: turn, address, finish });
+      this.stateSyncWaiters.set(key, { ticket, finish });
       cancelTimer = this.schedule(() => finish(null), this.timeoutMs);
-      this.transport.send({ t: "requestStateSync", turn, seq });
+      this.transport.send({ t: "requestStateSync", ticket });
     });
   }
 
@@ -3358,7 +3578,6 @@ export class CoopBattleStreamer {
       + this.pendingCheckpoints.size
       + this.appliedOutOfBandCheckpoints.size
       + this.meBattlePartyInbox.size
-      + this.stateSyncInbox.size
       + this.enemyPartyStateByWave.size
       + this.enemyPartyEncounterByWave.size
       + this.meTypeByWave.size
@@ -3379,7 +3598,6 @@ export class CoopBattleStreamer {
     this.cancelAuthorityGameplayWaiters();
     this.clearRetainedAuthorityAfterTerminal();
     this.meBattlePartyInbox.clear();
-    this.stateSyncInbox.clear();
     this.finalizedMarks.clear();
     this.lastEnemyParty = null;
     this.enemyPartyStateByWave.clear();
@@ -3456,7 +3674,6 @@ export class CoopBattleStreamer {
     this.meBattlePartyInbox.clear();
     this.sentMeBattleParties.clear();
     this.stateSyncWaiters.clear();
-    this.stateSyncInbox.clear();
     this.inbox.clear();
     this.liveEvents.clear();
     this.finalizedMarks.clear();
@@ -4269,49 +4486,68 @@ export class CoopBattleStreamer {
         this.enemyPartyRequestHandler?.(msg.wave);
         return;
       }
-      case "requestStateSync":
-        // HOST: the guest detected a desync - hand the request to the host's builder.
-        coopLog("resync", `host RECV requestStateSync turn=${msg.turn} seq=${msg.seq}`);
+      case "requestStateSync": {
+        const ticket = msg.ticket;
+        if (!validRecoveryTicket(ticket)) {
+          coopWarn("resync", "host DROP malformed requestStateSync ticket");
+          return;
+        }
+        if (!this.peerRecoveryBindingIsCurrent(ticket.binding)) {
+          coopWarn("resync", `host REFUSE requestStateSync id=${ticket.requestId} with stale peer binding`);
+          this.sendStateSyncUnavailable(ticket, "superseded");
+          return;
+        }
+        coopLog("resync", `host RECV requestStateSync id=${ticket.requestId} reason=${ticket.reason}`);
+        if (!this.peerRecoveryTicketIsCurrent(ticket)) {
+          this.sendStateSyncUnavailable(ticket, "superseded");
+          return;
+        }
         if (this.stateSyncRequestHandler == null) {
-          coopWarn(
-            "resync",
-            `host RECV requestStateSync turn=${msg.turn} seq=${msg.seq} DROPPED (no handler registered)`,
-          );
+          coopWarn("resync", `host RECV requestStateSync id=${ticket.requestId} unavailable (no handler)`);
+          this.sendStateSyncUnavailable(ticket, "unavailable");
+          return;
         }
-        this.stateSyncRequestHandler?.(msg.turn, msg.seq);
+        this.stateSyncRequestHandler(ticket);
         return;
+      }
       case "stateSync": {
-        if (msg.seq === COOP_DURABILITY_SNAPSHOT_SEQ) {
-          coopLog("resync", `guest RECV durability snapshot blobLen=${msg.blob.length} -> live apply`);
-          this.durabilitySnapshotHandler?.(msg.blob);
+        if (!validRecoveryTicket(msg.ticket)) {
           return;
         }
-        // The legacy reply echoes only `seq`, so the live waiter supplies the immutable authority address.
-        // Never let a delayed old-wave/old-epoch reply apply after the scene moved to a reused numeric turn.
-        const waiterEntry = this.stateSyncWaiterForSeq(msg.seq);
-        if (waiterEntry != null) {
-          const [, waiter] = waiterEntry;
-          if (!this.stateSyncAddressIsCurrent(waiter.address)) {
-            coopWarn(
-              "resync",
-              `guest DROP stale stateSync seq=${msg.seq}; addressed recovery boundary is no longer current`,
-            );
-            waiter.finish(null);
-            return;
-          }
-          coopLog("resync", `guest RECV stateSync seq=${msg.seq} blobLen=${msg.blob.length} -> parked waiter`);
-          waiter.finish(msg.blob);
+        const key = recoveryTicketKey(msg.ticket);
+        const waiter = this.stateSyncWaiters.get(key);
+        if (waiter == null) {
+          coopWarn("resync", `guest DROP unbound stateSync id=${msg.ticket.requestId}`);
           return;
         }
-        if (this.authorityContext != null) {
-          // Production sends the request only after installing its waiter. An unsolicited reply cannot be
-          // authenticated to an epoch/wave/turn because the historical wire frame contains only `seq`.
-          coopWarn("resync", `guest DROP unbound stateSync seq=${msg.seq} (no addressed waiter)`);
+        const admission = { ticket: msg.ticket, captured: msg.captured } satisfies CoopRecoveryAdmissionV1;
+        if (!this.recoveryAdmissionIsCurrent(admission)) {
+          coopWarn("resync", `guest DROP stale/mismatched stateSync id=${msg.ticket.requestId}`);
+          waiter.finish(null);
           return;
         }
-        const key = stateSyncKey(msg.seq, null);
-        coopLog("resync", `guest RECV legacy stateSync seq=${msg.seq} blobLen=${msg.blob.length} -> buffered`);
-        rememberBounded(this.stateSyncInbox, key, { seq: msg.seq, address: null, blob: msg.blob });
+        waiter.finish({ blob: msg.blob, admission });
+        return;
+      }
+      case "stateSyncUnavailable": {
+        if (!validRecoveryTicket(msg.ticket)) {
+          return;
+        }
+        const waiter = this.stateSyncWaiters.get(recoveryTicketKey(msg.ticket));
+        if (waiter != null) {
+          coopWarn("resync", `guest stateSync id=${msg.ticket.requestId} ${msg.reason}`);
+          waiter.finish(null);
+        }
+        return;
+      }
+      case "durabilityStateSync": {
+        const admission = { ticket: msg.ticket, captured: msg.captured } satisfies CoopRecoveryAdmissionV1;
+        if (msg.ticket.reason !== "durability-gap" || !this.recoveryAdmissionIsCurrent(admission)) {
+          coopWarn("resync", "guest DROP stale/mismatched durabilityStateSync");
+          return;
+        }
+        coopLog("resync", `guest RECV durabilityStateSync id=${msg.ticket.requestId} blobLen=${msg.blob.length}`);
+        this.durabilitySnapshotHandler?.({ blob: msg.blob, admission });
         return;
       }
       case "meChecksum":

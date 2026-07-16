@@ -102,7 +102,9 @@ export type CoopRole = "host" | "guest";
 // A protocol-35 renderer cannot preserve multiple surfaces, stable identities, or explicit reroll policy.
 // er-coop-37 adds exact authority-materialized egg reward grants to that closed ordered plan. A
 // protocol-36 renderer would silently credit only the host account, so mixed builds must refuse pairing.
-export const COOP_PROTOCOL_VERSION = "er-coop-37";
+// er-coop-38 replaces the ambient stateSync request/reply with an immutable recovery ticket. Requests,
+// replies, refusals, and durability pushes are bound to the exact session/seat/generation and battle frontier.
+export const COOP_PROTOCOL_VERSION = "er-coop-38";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -799,6 +801,47 @@ export interface CoopFullBattleSnapshot {
   authoritativeState?: CoopAuthoritativeBattleStateV1 | undefined;
 }
 
+/** Why a peer needs a heavy authoritative snapshot. Every reason currently requires an exact frontier. */
+export type CoopRecoveryReason = "turn-checksum" | "mystery-checksum" | "stall" | "rejoin" | "durability-gap";
+
+/** Immutable battle address used by the protocol-38 recovery transaction. */
+export interface CoopRecoveryFrontierV1 {
+  epoch: number;
+  wave: number;
+  turn: number;
+}
+
+/**
+ * Guest-minted request identity (or host-minted durability-push identity). The full frame context prevents
+ * a logical request queued on one authenticated channel generation from being replayed on its successor.
+ */
+export interface CoopRecoveryTicketV1 {
+  version: 1;
+  requestId: string;
+  seq: number;
+  reason: CoopRecoveryReason;
+  policy: "exact";
+  binding: CoopFrameContextV1;
+  frontier: CoopRecoveryFrontierV1;
+}
+
+/** Host capture proof returned beside the exact echoed ticket. */
+export interface CoopRecoveryCaptureV1 {
+  version: 1;
+  binding: CoopFrameContextV1;
+  frontier: CoopRecoveryFrontierV1;
+  stateTick: number;
+  controlDigest: string;
+}
+
+/** Plain admission evidence carried from receive through the deferred safe-boundary apply. */
+export interface CoopRecoveryAdmissionV1 {
+  ticket: CoopRecoveryTicketV1;
+  captured: CoopRecoveryCaptureV1;
+}
+
+export type CoopStateSyncUnavailableReason = "unavailable" | "superseded";
+
 export interface CoopActiveControlSnapshotV1 {
   version: 1;
   phaseName: string;
@@ -1398,19 +1441,29 @@ export type CoopMessage =
   | { t: "interaction"; screen: string; choice: unknown }
   /** Ask the peer to replay its current interaction counter; `need` is diagnostic and monotonic. */
   | { t: "requestInteractionCounter"; need: number }
-  /**
-   * Host -> guest (#633, TRACK-2): the AUTHORITATIVE full battle snapshot, sent to HEAL
-   * a checksum mismatch. `blob` is an lz-string-compressed JSON {@linkcode CoopFullBattleSnapshot}
-   * the guest decompresses + adopts field-by-field (never a session reload mid-battle).
-   * `seq` echoes the `requestStateSync` it answers, so a stale reply is ignored.
-   */
-  | { t: "stateSync"; blob: string; seq: number }
-  /**
-   * Guest -> host (#633, TRACK-2): "my post-turn checksum disagreed with yours at `turn`;
-   * send me the authoritative full state". `seq` is a monotonic guest-side counter so the
-   * host's `stateSync` reply can be matched + a stale one dropped (one request in flight).
-   */
-  | { t: "requestStateSync"; turn: number; seq: number }
+  /** Host -> guest: exact authoritative snapshot answering one immutable recovery ticket. */
+  | {
+      t: "stateSync";
+      ticket: CoopRecoveryTicketV1;
+      captured: CoopRecoveryCaptureV1;
+      blob: string;
+    }
+  /** Guest -> host: request a snapshot only at the ticket's exact authenticated battle frontier. */
+  | { t: "requestStateSync"; ticket: CoopRecoveryTicketV1 }
+  /** Host -> guest: the request was valid but its exact frontier is no longer capturable. */
+  | {
+      t: "stateSyncUnavailable";
+      ticket: CoopRecoveryTicketV1;
+      reason: CoopStateSyncUnavailableReason;
+      current: { binding: CoopFrameContextV1; frontier: CoopRecoveryFrontierV1 } | null;
+    }
+  /** Host -> guest: addressed deep-gap snapshot push. It never bypasses frontier/generation admission. */
+  | {
+      t: "durabilityStateSync";
+      ticket: CoopRecoveryTicketV1;
+      captured: CoopRecoveryCaptureV1;
+      blob: string;
+    }
   /**
    * Host -> guest (#633, LIVE-D): the EXACT enemy party the host generated for this
    * `wave`. The guest adopts these verbatim instead of regenerating (so it never rolls
@@ -1944,9 +1997,13 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "runConfig":
       return `diff=${msg.difficulty} netcode=${msg.netcodeMode ?? "(lockstep)"} kind=${msg.kind ?? "coop"} seed=${msg.seed != null}`;
     case "stateSync":
-      return `seq=${msg.seq} blob=${msg.blob.length}b`;
+      return `id=${msg.ticket.requestId} e=${msg.ticket.frontier.epoch} wave=${msg.ticket.frontier.wave} turn=${msg.ticket.frontier.turn} blob=${msg.blob.length}b`;
     case "requestStateSync":
-      return `turn=${msg.turn} seq=${msg.seq}`;
+      return `id=${msg.ticket.requestId} reason=${msg.ticket.reason} e=${msg.ticket.frontier.epoch} wave=${msg.ticket.frontier.wave} turn=${msg.ticket.frontier.turn}`;
+    case "stateSyncUnavailable":
+      return `id=${msg.ticket.requestId} reason=${msg.reason}`;
+    case "durabilityStateSync":
+      return `id=${msg.ticket.requestId} e=${msg.ticket.frontier.epoch} wave=${msg.ticket.frontier.wave} turn=${msg.ticket.frontier.turn} blob=${msg.blob.length}b`;
     case "enemyPartySync":
       return `wave=${msg.wave} enemies=${msg.enemies.length}${msg.battleType === undefined ? "" : ` battleType=${msg.battleType}`}`;
     case "requestEnemyParty":
