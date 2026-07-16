@@ -27,6 +27,10 @@
 
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { setCoopMeActivePresentation } from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
+  COOP_ME_REWARD_SURFACE_LIMIT,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 // #840: seq bands now live in the single-source-of-truth registry; re-exported below under their
 // historical names so no call site changes (pure re-export, zero behavior change).
 import {
@@ -44,6 +48,7 @@ import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import type {
   CoopInteractionOutcome,
   CoopMessage,
+  CoopRewardSurfaceIdentity,
   CoopSerializedRewardOption,
   CoopTransport,
 } from "#data/elite-redux/coop/coop-transport";
@@ -68,6 +73,55 @@ export const COOP_INTERACTION_LEAVE = -1;
  * (a fixed field seat), so it is the only band the malicious-peer owner check gates on.
  */
 const COOP_FAINT_SWITCH_SLOT_COUNT = 4;
+
+/** Keep legacy reward keys byte-identical when no ordered ME surface address exists. */
+const COOP_REWARD_SURFACE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$/;
+
+function isWireRewardSurfaceIdentity(value: unknown): value is CoopRewardSurfaceIdentity {
+  return (
+    value != null
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && Number.isSafeInteger((value as CoopRewardSurfaceIdentity).ordinal)
+    && (value as CoopRewardSurfaceIdentity).ordinal >= 0
+    && (value as CoopRewardSurfaceIdentity).ordinal < COOP_ME_REWARD_SURFACE_LIMIT
+    && typeof (value as CoopRewardSurfaceIdentity).surfaceId === "string"
+    && (value as CoopRewardSurfaceIdentity).surfaceId.length <= COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH
+    && COOP_REWARD_SURFACE_ID_PATTERN.test((value as CoopRewardSurfaceIdentity).surfaceId)
+  );
+}
+
+function rewardSurfaceKey(rewardSurface?: CoopRewardSurfaceIdentity): string {
+  return rewardSurface == null ? "ambient" : `${rewardSurface.ordinal}:${encodeURIComponent(rewardSurface.surfaceId)}`;
+}
+
+function rewardOptionsKey(seq: number, reroll: number, rewardSurface?: CoopRewardSurfaceIdentity): string {
+  return rewardSurface == null ? `${seq}:${reroll}` : `${seq}:${reroll}:${rewardSurfaceKey(rewardSurface)}`;
+}
+
+function rewardOptionsRequestFromKey(
+  key: string,
+): { seq: number; reroll: number; rewardSurface?: CoopRewardSurfaceIdentity } | null {
+  const [seqText, rerollText, ordinalText, ...surfaceParts] = key.split(":");
+  const seq = Number(seqText);
+  const reroll = Number(rerollText);
+  if (!Number.isSafeInteger(seq) || !Number.isSafeInteger(reroll)) {
+    return null;
+  }
+  if (ordinalText == null) {
+    return { seq, reroll };
+  }
+  const ordinal = Number(ordinalText);
+  const encodedSurfaceId = surfaceParts.join(":");
+  if (!Number.isSafeInteger(ordinal) || ordinal < 0 || encodedSurfaceId.length === 0) {
+    return null;
+  }
+  try {
+    return { seq, reroll, rewardSurface: { ordinal, surfaceId: decodeURIComponent(encodedSurfaceId) } };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Whether `seq` addresses a faint-REPLACEMENT pick (the `COOP_FAINT_SWITCH_SEQ_BASE + fieldIndex` band).
@@ -163,6 +217,8 @@ export interface CoopInteractionChoice {
   kind?: string;
   /** Local-only durable carrier correlation. Never serialized on the legacy interactionChoice wire arm. */
   operationId?: string | undefined;
+  /** Ordered retained Mystery reward surface carried by reward actions. */
+  rewardSurface?: CoopRewardSurfaceIdentity | undefined;
 }
 
 /** Options for {@linkcode CoopInteractionRelay} (timer injection for tests). */
@@ -340,8 +396,10 @@ export class CoopInteractionRelay {
         return;
       }
       for (const key of this.rewardOptionsPending.keys()) {
-        const [seq, reroll] = key.split(":").map(Number);
-        this.transport.send({ t: "requestRewardOptions", seq, reroll });
+        const request = rewardOptionsRequestFromKey(key);
+        if (request != null) {
+          this.transport.send({ t: "requestRewardOptions", ...request });
+        }
       }
     });
   }
@@ -386,7 +444,13 @@ export class CoopInteractionRelay {
   }
 
   /** OWNER: send one pick for interaction `seq` (`kind` is routing/logging only). */
-  sendInteractionChoice(seq: number, kind: string, choice: number, data?: number[]): void {
+  sendInteractionChoice(
+    seq: number,
+    kind: string,
+    choice: number,
+    data?: number[],
+    rewardSurface?: CoopRewardSurfaceIdentity,
+  ): void {
     recordCoopUiRelayCarrier("interactionChoice", `seq=${seq} kind=${kind} choice=${choice}`);
     if (isCoopDebug()) {
       coopLog("relay", `SEND interactionChoice seq=${seq} kind=${kind} ${summarizeChoice({ choice, data })}`);
@@ -397,6 +461,7 @@ export class CoopInteractionRelay {
       kind,
       choice,
       ...(data === undefined ? {} : { data }),
+      ...(rewardSurface == null ? {} : { rewardSurface }),
     });
     // #record-replay: capture this OWNER-sent interaction pick (no-op unless recording on the host).
     recordReplayInteraction({
@@ -421,17 +486,18 @@ export class CoopInteractionRelay {
     choice: number,
     data?: number[],
     operationId?: string | undefined,
+    rewardSurface?: CoopRewardSurfaceIdentity,
   ): void {
     if (!COOP_DURABLE_CHOICE_ECHO_KINDS.has(kind)) {
-      this.deliverInteractionChoice(seq, { choice, data, kind, operationId });
+      this.deliverInteractionChoice(seq, { choice, data, kind, operationId, rewardSurface });
       return;
     }
-    const key = this.choiceCreditKey(seq, kind, choice, data);
+    const key = this.choiceCreditKey(seq, kind, choice, data, rewardSurface);
     if (this.consumeEchoCredit(this.rawChoiceCredits, key)) {
       return;
     }
     this.addEchoCredit(this.committedChoiceCredits, key);
-    this.deliverInteractionChoice(seq, { choice, data, kind, operationId });
+    this.deliverInteractionChoice(seq, { choice, data, kind, operationId, rewardSurface });
   }
 
   /**
@@ -627,8 +693,13 @@ export class CoopInteractionRelay {
   }
 
   /** OWNER: stream the exact reward-option list rolled for `seq` / `reroll` (#633 Fix #2). */
-  sendRewardOptions(seq: number, reroll: number, options: CoopSerializedRewardOption[]): void {
-    const key = `${seq}:${reroll}`;
+  sendRewardOptions(
+    seq: number,
+    reroll: number,
+    options: CoopSerializedRewardOption[],
+    rewardSurface?: CoopRewardSurfaceIdentity,
+  ): void {
+    const key = rewardOptionsKey(seq, reroll, rewardSurface);
     this.sentRewardOptions.set(key, options);
     if (this.sentRewardOptions.size > 64) {
       const oldest = this.sentRewardOptions.keys().next().value;
@@ -642,7 +713,13 @@ export class CoopInteractionRelay {
         `SEND rewardOptions seq=${seq} reroll=${reroll} count=${options.length} ids=[${options.map(o => o.id).join(",")}]`,
       );
     }
-    this.transport.send({ t: "rewardOptions", seq, reroll, options });
+    this.transport.send({
+      t: "rewardOptions",
+      seq,
+      reroll,
+      options,
+      ...(rewardSurface == null ? {} : { rewardSurface }),
+    });
   }
 
   /**
@@ -655,6 +732,7 @@ export class CoopInteractionRelay {
     seq: number,
     reroll: number,
     timeoutMs = this.timeoutMs,
+    rewardSurface?: CoopRewardSurfaceIdentity,
   ): Promise<CoopSerializedRewardOption[] | null> {
     if (this.cancelledSeqs.has(seq)) {
       coopWarn(
@@ -663,7 +741,7 @@ export class CoopInteractionRelay {
       );
       return Promise.resolve(null);
     }
-    const key = `${seq}:${reroll}`;
+    const key = rewardOptionsKey(seq, reroll, rewardSurface);
     const buffered = this.rewardOptionsInbox.get(key);
     if (buffered !== undefined) {
       this.rewardOptionsInbox.delete(key);
@@ -706,7 +784,12 @@ export class CoopInteractionRelay {
       this.rewardOptionsPending.set(key, finish);
       cancelTimer = this.schedule(() => finish(null), timeoutMs);
       coopLog("relay", `SEND requestRewardOptions key=${key} (authoritative replay)`);
-      this.transport.send({ t: "requestRewardOptions", seq, reroll });
+      this.transport.send({
+        t: "requestRewardOptions",
+        seq,
+        reroll,
+        ...(rewardSurface == null ? {} : { rewardSurface }),
+      });
     });
   }
 
@@ -1039,7 +1122,11 @@ export class CoopInteractionRelay {
       return;
     }
     if (msg.t === "rewardOptions") {
-      const key = `${msg.seq}:${msg.reroll}`;
+      if (msg.rewardSurface != null && !isWireRewardSurfaceIdentity(msg.rewardSurface)) {
+        coopWarn("relay", "RECV rewardOptions -> invalid ordered reward surface");
+        return;
+      }
+      const key = rewardOptionsKey(msg.seq, msg.reroll, msg.rewardSurface);
       const waiter = this.rewardOptionsPending.get(key);
       if (waiter) {
         if (isCoopDebug()) {
@@ -1069,7 +1156,11 @@ export class CoopInteractionRelay {
       return;
     }
     if (msg.t === "requestRewardOptions") {
-      const key = `${msg.seq}:${msg.reroll}`;
+      if (msg.rewardSurface != null && !isWireRewardSurfaceIdentity(msg.rewardSurface)) {
+        coopWarn("relay", "RECV requestRewardOptions -> invalid ordered reward surface");
+        return;
+      }
+      const key = rewardOptionsKey(msg.seq, msg.reroll, msg.rewardSurface);
       const options = this.sentRewardOptions.get(key);
       if (options == null) {
         coopWarn("relay", `RECV requestRewardOptions key=${key} -> no authoritative cache`);
@@ -1081,10 +1172,15 @@ export class CoopInteractionRelay {
         seq: msg.seq,
         reroll: msg.reroll,
         options,
+        ...(msg.rewardSurface == null ? {} : { rewardSurface: msg.rewardSurface }),
       });
       return;
     }
     if (msg.t !== "interactionChoice") {
+      return;
+    }
+    if (msg.rewardSurface != null && !isWireRewardSurfaceIdentity(msg.rewardSurface)) {
+      coopWarn("relay", "RECV interactionChoice -> invalid ordered reward surface");
       return;
     }
     // #829 malicious-peer hardening: drop a forged cross-owner faint-replacement switch pick before it
@@ -1102,7 +1198,7 @@ export class CoopInteractionRelay {
       ...(msg.data === undefined ? {} : { data: [...msg.data] }),
     });
     if (COOP_DURABLE_CHOICE_ECHO_KINDS.has(msg.kind)) {
-      const key = this.choiceCreditKey(msg.seq, msg.kind, msg.choice, msg.data);
+      const key = this.choiceCreditKey(msg.seq, msg.kind, msg.choice, msg.data, msg.rewardSurface);
       if (this.consumeEchoCredit(this.committedChoiceCredits, key)) {
         return;
       }
@@ -1113,11 +1209,18 @@ export class CoopInteractionRelay {
       choice: msg.choice,
       data: msg.data,
       kind: msg.kind,
+      rewardSurface: msg.rewardSurface,
     });
   }
 
-  private choiceCreditKey(seq: number, kind: string, choice: number, data: number[] | undefined): string {
-    return `${seq}:${kind}:${choice}:${JSON.stringify(data ?? null)}`;
+  private choiceCreditKey(
+    seq: number,
+    kind: string,
+    choice: number,
+    data: number[] | undefined,
+    rewardSurface?: CoopRewardSurfaceIdentity,
+  ): string {
+    return `${seq}:${kind}:${choice}:${rewardSurfaceKey(rewardSurface)}:${JSON.stringify(data ?? null)}`;
   }
 
   private addEchoCredit(credits: Map<string, number>, key: string): void {

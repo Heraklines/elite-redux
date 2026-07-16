@@ -44,6 +44,7 @@ import {
   COOP_CHECK_OP_UNPAUSE_EVO,
   COOP_CHECK_OP_UNSPLICE,
 } from "#data/elite-redux/coop/coop-shop-check-relay";
+import type { CoopRewardSurfaceIdentity } from "#data/elite-redux/coop/coop-transport";
 import { erBalanceArr, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
@@ -263,6 +264,8 @@ export class SelectModifierPhase extends BattlePhase {
   private readonly coopOwningScene = globalScene;
   /** A retained guest continuation with no single source identity may not open or mutate a reward surface. */
   private readonly coopContinuationIdentityFailure: string | null;
+  /** Stable P36 address of this ordered Mystery reward surface; absent for ordinary reward shops. */
+  private readonly coopRewardSurface: CoopRewardSurfaceIdentity | undefined;
 
   constructor(
     rerollCount = 0,
@@ -270,6 +273,7 @@ export class SelectModifierPhase extends BattlePhase {
     customModifierSettings?: CustomModifierSettings,
     isCopy = false,
     coopContinuation: SelectModifierCoopContinuation = { kind: "ambient" },
+    coopRewardSurface?: CoopRewardSurfaceIdentity,
   ) {
     super();
 
@@ -277,6 +281,7 @@ export class SelectModifierPhase extends BattlePhase {
     this.modifierTiers = modifierTiers;
     this.customModifierSettings = customModifierSettings;
     this.isCopy = isCopy;
+    this.coopRewardSurface = coopRewardSurface;
     const continuationIdentity =
       coopContinuation.kind === "wave-boundary"
         ? resolveCoopRetainedWaveContinuationIdentity(true)
@@ -665,6 +670,7 @@ export class SelectModifierPhase extends BattlePhase {
       undefined,
       false,
       { kind: "inherited", address: this.coopSourceAddress },
+      this.coopRewardSurface,
     );
     globalScene.ui.clearText();
     globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
@@ -1314,6 +1320,7 @@ export class SelectModifierPhase extends BattlePhase {
       },
       true,
       { kind: "inherited", address: this.coopSourceAddress },
+      this.coopRewardSurface,
     );
     // Co-op (#837): the continuation copy MUST inherit the SAME pinned interaction counter this shop
     // opened on. Without it the copy starts at -1 and, if its own terminal ever advances (a backed-out
@@ -1409,6 +1416,7 @@ export class SelectModifierPhase extends BattlePhase {
     const prepared = commitRewardOwnerIntent(
       {
         surface: "reward",
+        rewardSurface: this.coopRewardSurface,
         pinned: this.coopInteractionStart,
         label,
         choice,
@@ -1464,7 +1472,13 @@ export class SelectModifierPhase extends BattlePhase {
         `OWNER send raw seq=${this.coopInteractionStart} kind=${label} choice=${choice} role=${controller.role}`,
       );
     }
-    getCoopInteractionRelay()?.sendInteractionChoice(this.coopInteractionStart, label, choice, wire);
+    getCoopInteractionRelay()?.sendInteractionChoice(
+      this.coopInteractionStart,
+      label,
+      choice,
+      wire,
+      this.coopRewardSurface,
+    );
     if (
       controller.role === "guest"
       && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
@@ -1595,8 +1609,14 @@ export class SelectModifierPhase extends BattlePhase {
           const decision = adoptRewardWatcherChoice(
             {
               surface: "reward",
+              rewardSurface: this.coopRewardSurface,
               pinned: this.coopInteractionStart,
-              action: { choice: action.choice, data: action.data, operationId: action.operationId },
+              action: {
+                choice: action.choice,
+                data: action.data,
+                operationId: action.operationId,
+                rewardSurface: action.rewardSurface,
+              },
               terminal,
               localRole: "guest",
               wave: this.coopRewardWave(),
@@ -1604,6 +1624,10 @@ export class SelectModifierPhase extends BattlePhase {
             },
             this.coopRewardOperationBinding,
           );
+          if (!decision.adopt && decision.reason === "reward-surface-mismatch") {
+            failCoopSharedSession(`Reward result ${operationId} targeted a different ordered surface`);
+            return;
+          }
           if (!decision.adopt || decision.operationId !== operationId || decision.authoritativeProjection !== true) {
             continue;
           }
@@ -1639,7 +1663,12 @@ export class SelectModifierPhase extends BattlePhase {
         "reward",
         `OWNER streams reward options (start=${this.coopInteractionStart} reroll=${this.rerollCount} count=${serialized.length} ids=[${serialized.map(o => o.id).join(",")}])`,
       );
-      getCoopInteractionRelay()?.sendRewardOptions(this.coopInteractionStart, this.rerollCount, serialized);
+      getCoopInteractionRelay()?.sendRewardOptions(
+        this.coopInteractionStart,
+        this.rerollCount,
+        serialized,
+        this.coopRewardSurface,
+      );
     } catch {
       /* a serialize/send failure must never break the owner's reward screen */
     }
@@ -1666,6 +1695,7 @@ export class SelectModifierPhase extends BattlePhase {
         this.coopInteractionStart,
         this.rerollCount,
         COOP_REWARD_WAIT_MS,
+        this.coopRewardSurface,
       );
       if (serialized == null) {
         coopWarn(
@@ -2079,8 +2109,14 @@ export class SelectModifierPhase extends BattlePhase {
       const decision = adoptRewardWatcherChoice(
         {
           surface: "reward",
+          rewardSurface: this.coopRewardSurface,
           pinned: this.coopInteractionStart,
-          action: { choice: action.choice, data: action.data, operationId: action.operationId },
+          action: {
+            choice: action.choice,
+            data: action.data,
+            operationId: action.operationId,
+            rewardSurface: action.rewardSurface,
+          },
           terminal: action.choice === COOP_INTERACTION_LEAVE,
           localRole: controller.role,
           wave: this.coopRewardWave(),
@@ -2089,6 +2125,10 @@ export class SelectModifierPhase extends BattlePhase {
         this.coopRewardOperationBinding,
       );
       if (!decision.adopt) {
+        if (decision.reason === "reward-surface-mismatch") {
+          failCoopSharedSession(`Reward interaction ${seq} targeted a different ordered surface`);
+          return;
+        }
         coopWarn(
           "reward",
           `WATCHER op-gate rejected relayed action (${decision.reason}) seq=${seq} choice=${action.choice} - keep awaiting terminal (Wave-2d)`,
@@ -2195,6 +2235,7 @@ export class SelectModifierPhase extends BattlePhase {
           undefined,
           false,
           { kind: "inherited", address: this.coopSourceAddress },
+          this.coopRewardSurface,
         );
         globalScene.ui.clearText();
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());

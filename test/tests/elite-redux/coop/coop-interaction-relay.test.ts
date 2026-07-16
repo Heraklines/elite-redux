@@ -194,6 +194,51 @@ describe("co-op alternating-interaction relay (#633)", () => {
       expect(await awaited).toBeNull();
     });
 
+    it("does not alias two ordered ME surfaces at the same seq and reroll", async () => {
+      const { host, guest } = createLoopbackPair();
+      const owner = new CoopInteractionRelay(host);
+      const timer: { fire?: () => void } = {};
+      const watcher = new CoopInteractionRelay(guest, {
+        schedule: cb => {
+          timer.fire = cb;
+          return () => {};
+        },
+      });
+      const firstSurface = { surfaceId: "modifier:me:graves:0", ordinal: 0 } as const;
+      const secondSurface = { surfaceId: "modifier:me:graves:1", ordinal: 1 } as const;
+
+      owner.sendRewardOptions(7, 0, options, firstSurface);
+      await new Promise(r => setTimeout(r, 0));
+      const wrongSurface = watcher.awaitRewardOptions(7, 0, 1000, secondSurface);
+      timer.fire?.();
+      expect(await wrongSurface).toBeNull();
+      expect(await watcher.awaitRewardOptions(7, 0, 1000, firstSurface)).toEqual(options);
+    });
+
+    it("drops a malformed ordered surface before it can satisfy an option waiter", async () => {
+      const { host, guest } = createLoopbackPair();
+      const timer: { fire?: () => void } = {};
+      const watcher = new CoopInteractionRelay(guest, {
+        schedule: cb => {
+          timer.fire = cb;
+          return () => {};
+        },
+      });
+      const expectedSurface = { surfaceId: "modifier:me:graves:0", ordinal: 0 } as const;
+      const awaited = watcher.awaitRewardOptions(7, 0, 1000, expectedSurface);
+
+      host.send({
+        t: "rewardOptions",
+        seq: 7,
+        reroll: 0,
+        options,
+        rewardSurface: { surfaceId: "Modifier 0", ordinal: 0 },
+      });
+      await new Promise(r => setTimeout(r, 0));
+      timer.fire?.();
+      expect(await awaited).toBeNull();
+    });
+
     it("times out to null so the caller can fail closed without using a local roll", async () => {
       const { guest } = createLoopbackPair();
       const timer: { fire?: () => void } = {};

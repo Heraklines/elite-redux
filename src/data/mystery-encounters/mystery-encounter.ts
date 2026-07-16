@@ -44,7 +44,13 @@ export interface EncounterStartOfBattleEffect {
 
 /** A standard, locally-rendered reward surface prepared by a Mystery Encounter. */
 export interface MysteryEncounterModifierRewardSurface extends CoopMeModifierRewardSurfaceProjection {
-  readonly settings: CustomModifierSettings | null;
+  readonly ordinal: number;
+  readonly settings: CustomModifierSettings;
+}
+
+/** The only supported way for automatic reward preparation to add another interactive modifier surface. */
+export interface MysteryEncounterRewardPreparationContext {
+  readonly registerModifierSurface: (settings: CustomModifierSettings) => void;
 }
 
 /**

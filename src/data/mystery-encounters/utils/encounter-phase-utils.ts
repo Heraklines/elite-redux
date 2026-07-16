@@ -22,6 +22,7 @@ import {
   setCoopMeActivePresentation,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
+  COOP_ME_REWARD_SURFACE_LIMIT,
   type CoopMeRewardSurfaceProjection,
   makeCoopMeModifierRewardSurfaceProjection,
 } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -72,7 +73,11 @@ import {
 } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import { showEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
-import type { MysteryEncounter, MysteryEncounterRewardPlan } from "#mystery-encounters/mystery-encounter";
+import type {
+  MysteryEncounter,
+  MysteryEncounterRewardPlan,
+  MysteryEncounterRewardPreparationContext,
+} from "#mystery-encounters/mystery-encounter";
 import type { MysteryEncounterOption } from "#mystery-encounters/mystery-encounter-option";
 import type { Variant } from "#sprites/variant";
 import type { PokemonData } from "#system/pokemon-data";
@@ -1282,30 +1287,45 @@ export function selectOptionThenPokemon(
  * Can have shop displayed or skipped
  * @param customShopRewards - adds a shop phase with the specified rewards / reward tiers
  * @param eggRewards
- * @param preRewardsCallback - can execute an arbitrary callback before the new phases if necessary (useful for updating items/party/injecting new phases before {@linkcode MysteryEncounterRewardsPhase})
+ * @param preRewardsCallback - can execute automatic mutations before the new phases. Any additional
+ * interactive modifier surface must use the callback context's explicit registrar.
  */
 export function setEncounterRewards(
   customShopRewards?: CustomModifierSettings,
   eggRewards?: IEggOptions[],
-  preRewardsCallback?: () => void | Promise<void>,
+  preRewardsCallback?: (context: MysteryEncounterRewardPreparationContext) => void | Promise<void>,
 ): void {
   const encounter = globalScene.currentBattle.mysteryEncounter!;
   const surfaces: MysteryEncounterRewardPlan["surfaces"][number][] = [];
   const rewardSurfaceProjections: CoopMeRewardSurfaceProjection[] = [];
-  const rerollMultiplier = customShopRewards?.rerollMultiplier ?? 1;
-  const appendModifierSurface = () => {
+  const appendModifierSurface = (settings: CustomModifierSettings) => {
+    if (surfaces.length >= COOP_ME_REWARD_SURFACE_LIMIT) {
+      throw new Error(`Mystery Encounter reward plan exceeds ${COOP_ME_REWARD_SURFACE_LIMIT} surfaces`);
+    }
+    const ordinal = surfaces.length;
     const projection = makeCoopMeModifierRewardSurfaceProjection(
-      `modifier:me:${encounter.encounterType}:${rewardSurfaceProjections.length}`,
-      rerollMultiplier,
+      `modifier:me:${encounter.encounterType}:${ordinal}`,
+      settings.rerollMultiplier ?? 1,
     );
     rewardSurfaceProjections.push(projection);
-    surfaces.push({ ...projection, settings: customShopRewards ?? null });
+    const surface = { ...projection, ordinal, settings };
+    surfaces.push(surface);
+    return surface;
   };
   if (customShopRewards != null) {
-    appendModifierSurface();
+    appendModifierSurface(customShopRewards);
   }
   let preparationComplete = false;
   let preparationInFlight: Promise<void> | null = null;
+  let registrationOpen = false;
+  const preparationContext: MysteryEncounterRewardPreparationContext = {
+    registerModifierSurface: settings => {
+      if (!registrationOpen) {
+        throw new Error("Mystery Encounter reward surfaces may only be registered during reward preparation");
+      }
+      appendModifierSurface(settings);
+    },
+  };
   const rewardPlan: MysteryEncounterRewardPlan = {
     surfaces,
     rewardSurfaceProjections,
@@ -1316,34 +1336,60 @@ export function setEncounterRewards(
       if (preparationInFlight != null) {
         return preparationInFlight;
       }
-      const queuedBefore = globalScene.phaseManager
+      const queuedModifierSurfaceCount = globalScene.phaseManager
         .getQueuedPhaseNames()
         .filter(phaseName => phaseName === "SelectModifierPhase").length;
+      const surfaceCountBeforePreparation = surfaces.length;
+      const rollbackPreparation = () => {
+        registrationOpen = false;
+        preparationInFlight = null;
+        surfaces.length = surfaceCountBeforePreparation;
+        rewardSurfaceProjections.length = surfaceCountBeforePreparation;
+      };
       const finalizePreparation = () => {
-        const queuedAfter = globalScene.phaseManager
+        registrationOpen = false;
+        const queuedModifierSurfaceCountAfterPreparation = globalScene.phaseManager
           .getQueuedPhaseNames()
           .filter(phaseName => phaseName === "SelectModifierPhase").length;
-        // Temporary count-only bridge for the one current callback-injected case. It deliberately reuses
-        // the helper surface's settings and generated ordinal identity; it does NOT discover independently
-        // injected settings or stable IDs. Replace with explicit typed registration before adding another
-        // callback-injected modifier surface.
-        const injectedSurfaces = Math.max(0, queuedAfter - queuedBefore);
-        for (let index = 0; index < injectedSurfaces; index++) {
-          appendModifierSurface();
+        if (queuedModifierSurfaceCountAfterPreparation !== queuedModifierSurfaceCount) {
+          rollbackPreparation();
+          throw new Error(
+            "Mystery Encounter reward preparation queued an unregistered SelectModifierPhase; use registerModifierSurface",
+          );
         }
         preparationComplete = true;
         preparationInFlight = null;
       };
-      const result = preRewardsCallback?.();
+      registrationOpen = true;
+      let result: void | Promise<void>;
+      try {
+        result = preRewardsCallback?.(preparationContext);
+      } catch (error) {
+        rollbackPreparation();
+        throw error;
+      }
       if (result != null) {
-        preparationInFlight = result.then(finalizePreparation);
+        preparationInFlight = result.then(finalizePreparation, error => {
+          rollbackPreparation();
+          throw error;
+        });
         return preparationInFlight;
       }
       finalizePreparation();
     },
     openRewardSurfaces: () => {
-      if (customShopRewards) {
-        globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, customShopRewards);
+      if (surfaces.length > 0) {
+        for (const surface of surfaces) {
+          globalScene.phaseManager.unshiftNew(
+            "SelectModifierPhase",
+            0,
+            undefined,
+            surface.settings,
+            false,
+            { kind: "ambient" },
+            { surfaceId: surface.surfaceId, ordinal: surface.ordinal },
+          );
+        }
       } else {
         globalScene.phaseManager.removeAllPhasesOfType("MysteryEncounterRewardsPhase");
       }

@@ -475,6 +475,16 @@ export interface CoopSerializedRewardOption {
 }
 
 /**
+ * Stable address of one ordered Mystery Encounter reward surface. The interaction counter still
+ * addresses the live shop session; this address prevents two surfaces reconstructed around the same
+ * retained boundary from sharing option caches or operation ordinals.
+ */
+export interface CoopRewardSurfaceIdentity {
+  readonly surfaceId: string;
+  readonly ordinal: number;
+}
+
+/**
  * One arena tag carried in the per-turn checkpoint (#633 GAP 1). Hazards / screens / tailwind
  * (Stealth Rock, Spikes, Reflect, Light Screen, Tailwind, ...) are set by host MoveEffectPhases
  * the guest never runs, so without carrying them the guest never gains them and the checksum -
@@ -1621,7 +1631,14 @@ export type CoopMessage =
    *  - `choice` the picked option index, or a sentinel (-1 = leave/skip, -2 = reroll)
    *  - `data`   optional extra indices (e.g. party-target slot, ME sub-option)
    */
-  | { t: "interactionChoice"; seq: number; kind: string; choice: number; data?: number[] }
+  | {
+      t: "interactionChoice";
+      seq: number;
+      kind: string;
+      choice: number;
+      data?: number[];
+      rewardSurface?: CoopRewardSurfaceIdentity | undefined;
+    }
   /**
    * Owner -> watcher (#633, TRACK-2 Phase C): the HOST-resolved AUTHORITATIVE outcome of one
    * interaction pick (reward grant / reroll / leave). The watcher ADOPTS this verbatim instead
@@ -1653,9 +1670,20 @@ export type CoopMessage =
    * (party luck would otherwise make the two pools - and the shared RNG cursor - diverge).
    * `reroll` is the reroll round these options belong to (a fresh roll per reroll).
    */
-  | { t: "rewardOptions"; seq: number; reroll: number; options: CoopSerializedRewardOption[] }
+  | {
+      t: "rewardOptions";
+      seq: number;
+      reroll: number;
+      options: CoopSerializedRewardOption[];
+      rewardSurface?: CoopRewardSurfaceIdentity | undefined;
+    }
   /** Watcher -> option owner: replay the exact cached reward/market option payload for this key. */
-  | { t: "requestRewardOptions"; seq: number; reroll: number }
+  | {
+      t: "requestRewardOptions";
+      seq: number;
+      reroll: number;
+      rewardSurface?: CoopRewardSurfaceIdentity | undefined;
+    }
   /**
    * Owner -> watcher (#633): a COSMETIC live-cursor button on a shared interaction
    * screen. The watcher replays `button` into its identical screen so the partner

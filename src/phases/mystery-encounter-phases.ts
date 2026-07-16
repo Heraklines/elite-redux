@@ -1290,10 +1290,16 @@ export class MysteryEncounterRewardsPhase extends Phase {
         globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
         // PhaseTree.addPhase appends and getNextPhase shifts, so unshiftNew is FIFO within this phase's
         // child level. Forward iteration therefore preserves the host-declared surface order.
-        for (const surface of this.authoritativeRewardSurfaces) {
-          globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
-            rerollMultiplier: surface.rerollMultiplier,
-          });
+        for (const [ordinal, surface] of this.authoritativeRewardSurfaces.entries()) {
+          globalScene.phaseManager.unshiftNew(
+            "SelectModifierPhase",
+            0,
+            undefined,
+            { rerollMultiplier: surface.rerollMultiplier },
+            false,
+            { kind: "ambient" },
+            { surfaceId: surface.surfaceId, ordinal },
+          );
         }
         globalScene.phaseManager.pushNew("PostMysteryEncounterPhase");
         this.end();

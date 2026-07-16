@@ -47,6 +47,7 @@ describe("Mystery battle reward preparation boundary", () => {
   it("keeps setEncounterRewards callsites on a typed preparation/surface adapter", () => {
     const encounter = source("src/data/mystery-encounters/mystery-encounter.ts");
     const utilities = source("src/data/mystery-encounters/utils/encounter-phase-utils.ts");
+    const graves = source("src/data/mystery-encounters/encounters/graves-of-the-fallen-encounter.ts");
     const replay = source("src/phases/coop-replay-me-phase.ts");
     const runtime = source("src/data/elite-redux/coop/coop-runtime.ts");
 
@@ -57,7 +58,14 @@ describe("Mystery battle reward preparation boundary", () => {
     expect(encounter).toContain("readonly rewardSurfaceProjections: readonly CoopMeRewardSurfaceProjection[];");
     expect(utilities).toContain("prepareAutomaticEffects: () => {");
     expect(utilities).toContain("encounter.doEncounterRewards = rewardPlan.openRewardSurfaces;");
-    expect(utilities).toContain("const injectedSurfaces = Math.max(0, queuedAfter - queuedBefore);");
+    expect(utilities).toContain("preRewardsCallback?.(preparationContext)");
+    expect(utilities).toContain("registerModifierSurface: settings => {");
+    expect(utilities).not.toContain("injectedSurfaces");
+    expect(utilities).toContain("queuedModifierSurfaceCountAfterPreparation !== queuedModifierSurfaceCount");
+    expect(utilities).toContain("use registerModifierSurface");
+    expect(graves).toContain("({ registerModifierSurface }) => {");
+    expect(graves).toContain("registerModifierSurface(settings);");
+    expect(graves).not.toMatch(/unshiftNew\([\s\S]*?"SelectModifierPhase"/u);
     expect(utilities).toContain('makeCoopMeModifierRewardSurfaceProjection("modifier:heal", -1)');
     expect(replay).toContain('"MysteryEncounterRewardsPhase", false, destination.rewardSurfaces');
     expect(replay).not.toContain("destination.rewardShop");
@@ -83,7 +91,34 @@ describe("Mystery battle reward preparation boundary", () => {
     expect(retainedGuestEnd).toBeGreaterThan(retainedGuestStart);
     expect(phaseTree).toContain("addLevel.push(phase);");
     expect(phaseTree).toContain("return this.levels[this.currentLevel].shift();");
-    expect(retainedGuest).toContain("for (const surface of this.authoritativeRewardSurfaces)");
+    expect(retainedGuest).toContain("for (const [ordinal, surface] of this.authoritativeRewardSurfaces.entries())");
+    expect(retainedGuest).toContain("{ surfaceId: surface.surfaceId, ordinal }");
     expect(retainedGuest).not.toMatch(/authoritativeRewardSurfaces[^\n]*\.(?:reverse|toReversed)\(/u);
+  });
+
+  it("threads one immutable surface identity through option and operation addressing", () => {
+    const phase = source("src/phases/select-modifier-phase.ts");
+    const relay = source("src/data/elite-redux/coop/coop-interaction-relay.ts");
+    const operation = source("src/data/elite-redux/coop/coop-reward-operation.ts");
+    const envelope = source("src/data/elite-redux/coop/coop-operation-envelope.ts");
+    const runtime = source("src/data/elite-redux/coop/coop-runtime.ts");
+
+    expect(phase).toContain("private readonly coopRewardSurface: CoopRewardSurfaceIdentity | undefined;");
+    expect(phase).toContain("rewardSurface: this.coopRewardSurface");
+    expect(phase).toMatch(/sendRewardOptions\([\s\S]*?this\.coopRewardSurface/u);
+    expect(phase).toMatch(/awaitRewardOptions\([\s\S]*?this\.coopRewardSurface/u);
+    expect(phase.match(/this\.coopRewardSurface,/gu)?.length ?? 0).toBeGreaterThanOrEqual(5);
+
+    expect(relay).toContain("rewardOptionsKey(seq, reroll, rewardSurface)");
+    expect(relay).toContain("rewardOptionsKey(msg.seq, msg.reroll, msg.rewardSurface)");
+    expect(relay).toContain("rewardOptionsRequestFromKey(key)");
+    expect(operation).toContain("rewardStreamKey(params.surface, params.pinned, params.rewardSurface)");
+    expect(operation).toContain("coopRewardOperationActionSlot(params.pinned, ordinal, params.rewardSurface)");
+    expect(operation).toContain(
+      "rewardSurfaceKey(existing.rewardSurface) === rewardSurfaceKey(prepared.rewardSurface)",
+    );
+    expect(operation).toContain('return { adopt: false, reason: "reward-surface-mismatch" };');
+    expect(runtime).toMatch(/materializeCommittedInteractionChoice\([\s\S]*?payload\.rewardSurface/u);
+    expect(envelope).toContain("readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;");
   });
 });
