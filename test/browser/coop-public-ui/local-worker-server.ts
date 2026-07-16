@@ -115,12 +115,15 @@ async function nodeRequest(request: IncomingMessage, origin: string): Promise<Re
   for await (const chunk of request) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
-  const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
-  return new Request(new URL(request.url ?? "/", origin), {
-    method: request.method,
+  const method = request.method ?? "GET";
+  const init: RequestInit = {
+    method,
     headers: request.headers as HeadersInit,
-    ...(request.method === "GET" || request.method === "HEAD" ? {} : { body }),
-  });
+  };
+  if (method !== "GET" && method !== "HEAD" && chunks.length > 0) {
+    init.body = Buffer.concat(chunks);
+  }
+  return new Request(new URL(request.url ?? "/", origin), init);
 }
 
 async function writeNodeResponse(response: Response, target: ServerResponse): Promise<void> {
