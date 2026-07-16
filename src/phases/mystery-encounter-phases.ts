@@ -1317,7 +1317,10 @@ export class MysteryEncounterRewardsPhase extends Phase {
           : null;
       const preparation = guestRewardPlan?.prepareAutomaticEffects();
       if (preparation != null) {
-        preparation.then(() => this.openLegacyGuestRewardSurface());
+        preparation.then(
+          () => this.openLegacyGuestRewardSurface(),
+          error => this.handleRewardPreparationFailure(error),
+        );
         return;
       }
       this.openLegacyGuestRewardSurface();
@@ -1377,9 +1380,14 @@ export class MysteryEncounterRewardsPhase extends Phase {
     const rewardPlan =
       encounter.rewardPlan?.openRewardSurfaces === encounter.doEncounterRewards ? encounter.rewardPlan : null;
     if (rewardPlan != null) {
-      const preparation = rewardPlan.prepareAutomaticEffects();
-      if (preparation != null) {
-        await preparation;
+      try {
+        const preparation = rewardPlan.prepareAutomaticEffects();
+        if (preparation != null) {
+          await preparation;
+        }
+      } catch (error) {
+        this.handleRewardPreparationFailure(error);
+        return;
       }
     }
     if (
@@ -1407,6 +1415,16 @@ export class MysteryEncounterRewardsPhase extends Phase {
 
     globalScene.phaseManager.pushNew("PostMysteryEncounterPhase");
     this.end();
+  }
+
+  /** A malformed typed plan is a shared terminal, never an indefinitely parked reward phase. */
+  private handleRewardPreparationFailure(error: unknown): void {
+    coopWarn("me", "Mystery reward preparation rejected its typed surface plan", error);
+    if (globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
+      failCoopSharedSession("Mystery reward preparation produced an invalid shared surface plan.");
+      return;
+    }
+    throw error;
   }
 }
 

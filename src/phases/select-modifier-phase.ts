@@ -15,7 +15,9 @@ import {
   captureCoopRewardOperationBinding,
   commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
+  coopRewardMirrorSeq,
   isCoopRewardRetainedResultMode,
+  isValidCoopRewardSurfaceIdentity,
 } from "#data/elite-redux/coop/coop-reward-operation";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
@@ -304,6 +306,11 @@ export class SelectModifierPhase extends BattlePhase {
     super.start();
 
     if (!this.coopContinuationIdentityIsUsable()) {
+      return false;
+    }
+
+    if (this.coopRewardSurface != null && !isValidCoopRewardSurfaceIdentity(this.coopRewardSurface)) {
+      failCoopSharedSession("A reward picker was constructed with an invalid ordered Mystery surface address");
       return false;
     }
 
@@ -1599,6 +1606,7 @@ export class SelectModifierPhase extends BattlePhase {
             this.coopInteractionStart,
             COOP_REWARD_WAIT_MS,
             COOP_REWARD_CHOICE_KINDS,
+            this.coopRewardSurface ?? null,
           );
           if (action == null) {
             getCoopRuntime()?.durability?.reconnect();
@@ -1992,7 +2000,7 @@ export class SelectModifierPhase extends BattlePhase {
     if (getCoopController() == null || this.coopInteractionStart < 0) {
       return -1;
     }
-    return this.coopInteractionStart * 64 + Math.min(this.rerollCount, 63);
+    return coopRewardMirrorSeq(this.coopInteractionStart, this.rerollCount, this.coopRewardSurface) ?? -1;
   }
 
   /**
@@ -2094,7 +2102,12 @@ export class SelectModifierPhase extends BattlePhase {
     const seq = this.coopInteractionStart;
     this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
     for (;;) {
-      const action = await relay.awaitInteractionChoice(seq, COOP_REWARD_WAIT_MS, COOP_REWARD_CHOICE_KINDS);
+      const action = await relay.awaitInteractionChoice(
+        seq,
+        COOP_REWARD_WAIT_MS,
+        COOP_REWARD_CHOICE_KINDS,
+        this.coopRewardSurface ?? null,
+      );
       if (action == null) {
         coopLog("reward", "WATCHER timed out waiting for partner -> leaving reward screen");
         this.coopEndMirror();

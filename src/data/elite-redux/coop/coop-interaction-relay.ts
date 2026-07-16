@@ -272,12 +272,31 @@ function kindAccepted(kind: string | undefined, expectedKinds: readonly string[]
   return kind !== undefined && expectedKinds.includes(kind);
 }
 
+/**
+ * Ordered Mystery surfaces deliberately share one interaction pin and reward kind. `undefined` opts out
+ * (legacy callers); `null` means the ambient reward stream; an identity requires an exact semantic match.
+ */
+function rewardSurfaceAccepted(
+  rewardSurface: CoopRewardSurfaceIdentity | undefined,
+  expectedRewardSurface: CoopRewardSurfaceIdentity | null | undefined,
+): boolean {
+  if (expectedRewardSurface === undefined) {
+    return true;
+  }
+  if (expectedRewardSurface === null) {
+    return rewardSurface === undefined;
+  }
+  return rewardSurfaceKey(rewardSurface) === rewardSurfaceKey(expectedRewardSurface);
+}
+
 /** #861: an in-flight {@linkcode CoopInteractionRelay.awaitInteractionChoice} waiter + its declared kinds. */
 interface CoopChoiceWaiter {
   /** Resolve the parked await (a matching choice, or null on timeout/supersede). */
   readonly finish: (res: CoopInteractionChoice | null) => void;
   /** The kinds this await legitimately consumes; undefined = validation opted out (accept any). */
   readonly expectedKinds: readonly string[] | undefined;
+  /** Exact ordered Mystery surface, null for ambient, undefined when surface validation is not requested. */
+  readonly expectedRewardSurface: CoopRewardSurfaceIdentity | null | undefined;
 }
 
 /** Compact, log-safe one-line summary of a host-resolved interaction outcome (discriminated by `k`). */
@@ -516,6 +535,7 @@ export class CoopInteractionRelay {
     seq: number,
     timeoutMs = this.timeoutMs,
     expectedKinds?: readonly string[],
+    expectedRewardSurface?: CoopRewardSurfaceIdentity | null,
   ): Promise<CoopInteractionChoice | null> {
     if (this.cancelledSeqs.has(seq)) {
       coopWarn("relay", `AWAIT interactionChoice seq=${seq} -> STICKY-CANCELLED (resync rescue) resolve null`);
@@ -527,7 +547,10 @@ export class CoopInteractionRelay {
       // NON-accepted kind (a stale/cross-family arrival at this reused seq) are LEFT in the queue
       // (re-buffered) and loudly logged - they never resolve this await. Legitimate same-family picks
       // keep strict FIFO order because we take the FIRST accepted one.
-      const matchIdx = queue.findIndex(entry => kindAccepted(entry.kind, expectedKinds));
+      const matchIdx = queue.findIndex(
+        entry =>
+          kindAccepted(entry.kind, expectedKinds) && rewardSurfaceAccepted(entry.rewardSurface, expectedRewardSurface),
+      );
       if (matchIdx >= 0) {
         for (let i = 0; i < matchIdx; i++) {
           coopWarn(
@@ -587,7 +610,7 @@ export class CoopInteractionRelay {
         }
         resolve(res);
       };
-      this.pending.set(seq, { finish, expectedKinds });
+      this.pending.set(seq, { finish, expectedKinds, expectedRewardSurface });
       cancelTimer = this.schedule(() => finish(null), timeoutMs);
     });
   }
@@ -1064,7 +1087,11 @@ export class CoopInteractionRelay {
   /** Route a trusted local/wire choice to an accepting waiter or the per-seq FIFO. */
   private deliverInteractionChoice(seq: number, choice: CoopInteractionChoice): void {
     const waiter = this.pending.get(seq);
-    if (waiter && kindAccepted(choice.kind, waiter.expectedKinds)) {
+    if (
+      waiter
+      && kindAccepted(choice.kind, waiter.expectedKinds)
+      && rewardSurfaceAccepted(choice.rewardSurface, waiter.expectedRewardSurface)
+    ) {
       if (isCoopDebug()) {
         coopLog("relay", `DELIVER interactionChoice seq=${seq} -> waiter ${summarizeChoice(choice)}`);
       }
@@ -1074,8 +1101,8 @@ export class CoopInteractionRelay {
     if (waiter) {
       coopWarn(
         "relay",
-        `DELIVER interactionChoice seq=${seq} kind=${choice.kind ?? "?"} MISMATCH parked waiter `
-          + `(expected [${(waiter.expectedKinds ?? []).join(",")}]) -> BUFFER, waiter stays parked (#861)`,
+        `DELIVER interactionChoice seq=${seq} kind=${choice.kind ?? "?"} surface=${rewardSurfaceKey(choice.rewardSurface)} MISMATCH parked waiter `
+          + `(expected kinds=[${(waiter.expectedKinds ?? []).join(",")}] surface=${waiter.expectedRewardSurface === undefined ? "any" : rewardSurfaceKey(waiter.expectedRewardSurface ?? undefined)}) -> BUFFER, waiter stays parked (#861/P36)`,
       );
     }
     const queue = this.inbox.get(seq) ?? [];
