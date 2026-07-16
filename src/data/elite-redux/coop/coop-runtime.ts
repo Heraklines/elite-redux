@@ -4795,6 +4795,7 @@ export interface CoopMeBattleSettlementPlan {
   readonly continuation: "rewards" | "encounter" | "none";
   readonly trainerVictory: boolean;
   readonly addHeal: boolean;
+  readonly rewardShop: boolean;
   readonly eggLapse: boolean;
 }
 

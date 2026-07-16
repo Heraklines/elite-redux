@@ -308,6 +308,8 @@ export type CoopMeTerminalDestination =
       readonly trainerVictory: boolean;
       /** Whether a reward-less healing shop is requested. Meaningful only for `rewards`. */
       readonly addHeal: boolean;
+      /** Whether the host reward phase opens a SelectModifier surface. */
+      readonly rewardShop: boolean;
       /** Whether EggLapsePhase follows this encounter's reward phase. Meaningful only for `rewards`. */
       readonly eggLapse: boolean;
     };

@@ -172,11 +172,13 @@ export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMe
         || destination.continuation === "none")
       && typeof destination.trainerVictory === "boolean"
       && typeof destination.addHeal === "boolean"
+      && typeof destination.rewardShop === "boolean"
       && typeof destination.eggLapse === "boolean";
     return (
       validShape
       && (!destination.trainerVictory || destination.result === "victory")
-      && ((!destination.addHeal && !destination.eggLapse) || destination.continuation === "rewards")
+      && ((!destination.addHeal && !destination.rewardShop && !destination.eggLapse)
+        || destination.continuation === "rewards")
     );
   }
   return (

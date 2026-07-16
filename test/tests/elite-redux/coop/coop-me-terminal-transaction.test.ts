@@ -88,6 +88,7 @@ function settledPayload(
     continuation?: "rewards" | "encounter" | "none";
     trainerVictory?: boolean;
     addHeal?: boolean;
+    rewardShop?: boolean;
     eggLapse?: boolean;
   } = {},
 ): CoopMeTerminalPayload {
@@ -102,6 +103,7 @@ function settledPayload(
       continuation,
       trainerVictory: options.trainerVictory ?? false,
       addHeal: options.addHeal ?? false,
+      rewardShop: options.rewardShop ?? continuation === "rewards",
       eggLapse: options.eggLapse ?? continuation === "rewards",
     },
   };
@@ -215,12 +217,20 @@ describe("complete retained Mystery terminal transaction", () => {
     expect(isCompleteCoopMeTerminalPayload(leavePayload(12, true))).toBe(true);
     expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 3, disableSwitch: true }))).toBe(true);
     expect(isCompleteCoopMeTerminalPayload(settledPayload(12, { addHeal: true, trainerVictory: true }))).toBe(true);
+    const missingRewardSurface = settledPayload(12);
+    delete (missingRewardSurface.destination as { rewardShop?: boolean }).rewardShop;
+    expect(
+      isCompleteCoopMeTerminalPayload(missingRewardSurface),
+      "the renderer cannot infer whether a settled reward phase opens a shop",
+    ).toBe(false);
     expect(
       isCompleteCoopMeTerminalPayload(settledPayload(12, { result: "failure", trainerVictory: true, eggLapse: false })),
       "a failed battle cannot declare trainer-victory presentation",
     ).toBe(false);
     expect(
-      isCompleteCoopMeTerminalPayload(settledPayload(12, { continuation: "encounter", addHeal: true })),
+      isCompleteCoopMeTerminalPayload(
+        settledPayload(12, { continuation: "encounter", addHeal: true, rewardShop: true }),
+      ),
       "event-continuation settlements cannot smuggle reward-only mutations",
     ).toBe(false);
   });

@@ -1373,7 +1373,7 @@ export class CoopReplayMePhase extends Phase {
       globalScene.phaseManager.pushNew("TrainerVictoryPhase");
     }
     if (destination.continuation === "rewards") {
-      globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", destination.addHeal);
+      globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", destination.addHeal, destination.rewardShop);
       if (destination.eggLapse) {
         globalScene.phaseManager.pushNew("EggLapsePhase");
       }

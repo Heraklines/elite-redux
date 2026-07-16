@@ -1414,6 +1414,7 @@ export function handleMysteryEncounterVictory(addHealPhase = false, doNotContinu
       continuation,
       trainerVictory,
       addHeal: continuation === "rewards" && addHealPhase,
+      rewardShop: continuation === "rewards" && (encounter.doEncounterRewards != null || addHealPhase),
       eggLapse: continuation === "rewards",
     });
     // The retained battle-settled terminal constructs every following guest phase only after its complete
@@ -1460,6 +1461,7 @@ export function handleMysteryEncounterBattleFailed(addHealPhase = false, doNotCo
       continuation,
       trainerVictory: false,
       addHeal: continuation === "rewards" && addHealPhase,
+      rewardShop: continuation === "rewards" && (encounter.doEncounterRewards != null || addHealPhase),
       eggLapse: continuation === "rewards",
     });
     if (isCoopAuthoritativeGuest()) {

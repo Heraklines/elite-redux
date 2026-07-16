@@ -1244,10 +1244,12 @@ export class MysteryEncounterBattlePhase extends Phase {
 export class MysteryEncounterRewardsPhase extends Phase {
   public readonly phaseName = "MysteryEncounterRewardsPhase";
   addHealPhase: boolean;
+  private readonly authoritativeRewardShop: boolean | null;
 
-  constructor(addHealPhase = false) {
+  constructor(addHealPhase = false, authoritativeRewardShop: boolean | null = null) {
     super();
     this.addHealPhase = addHealPhase;
+    this.authoritativeRewardShop = authoritativeRewardShop;
   }
 
   /**
@@ -1264,6 +1266,31 @@ export class MysteryEncounterRewardsPhase extends Phase {
     // (startCoopWatch fills typeOptions from the host's list), so running doEncounterRewards WITHOUT
     // onRewards is safe. The genuinely-interactive engine phases (OptionSelected, Post) stay diverted.
     if (isCoopAuthoritativeGuest()) {
+      if (isCoopMeOperationJournalActive()) {
+        if (this.authoritativeRewardShop == null) {
+          failCoopSharedSession("A retained Mystery reward continuation omitted its shop surface.");
+          return;
+        }
+        coopLog("me", "retained reward continuation: guest opens only the host-stated surface", {
+          counter: coopMeInteractionStartValue(),
+          rewardShop: this.authoritativeRewardShop,
+          addHealPhase: this.addHealPhase,
+        });
+        if (this.authoritativeRewardShop) {
+          globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
+          if (this.addHealPhase) {
+            globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
+              fillRemaining: false,
+              rerollMultiplier: -1,
+            });
+          } else {
+            globalScene.phaseManager.unshiftNew("SelectModifierPhase");
+          }
+        }
+        globalScene.phaseManager.pushNew("PostMysteryEncounterPhase");
+        this.end();
+        return;
+      }
       const guestEncounter = globalScene.currentBattle.mysteryEncounter!;
       coopLog("me", "reward-owner override: guest runs reward shop as WATCHER (host=owner)", {
         counter: coopMeInteractionStartValue(),

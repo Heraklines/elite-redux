@@ -274,7 +274,14 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
     });
     await drainLoopback();
     await withClient(rig.guestCtx, async () => {
-      expect(queued.heldEnd, "the exact held BattleEnd releases once after settlement").toHaveBeenCalledTimes(1);
+      // The loopback can first deliver while the harness has the host scene installed. Production clients
+      // never share a scene, so that delivery is intentionally rejected and the retained op retries once
+      // the guest context is live. Keep this context installed until the real durability retry releases it.
+      await vi.waitFor(
+        () =>
+          expect(queued.heldEnd, "the exact held BattleEnd releases once after settlement").toHaveBeenCalledTimes(1),
+        { timeout: 2_000, interval: 25 },
+      );
       const currentName = rig.guestScene.phaseManager.getCurrentPhase()?.phaseName;
       const rewardQueue = rig.guestScene.phaseManager.getQueuedPhaseNames();
       expect([currentName, ...rewardQueue], "settlement releases into real reward presentation").toContain(
