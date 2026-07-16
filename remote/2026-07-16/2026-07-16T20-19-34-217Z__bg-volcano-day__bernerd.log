@@ -1,0 +1,224 @@
+scenario: BG Volcano · day
+url:      https://elite-redux-staging.pages.dev/
+build:    github:f5e4f298b870a60ef53c7ffc404d73392d1dbef9:run-29527130317.1
+mode:     0  wave:?
+seed:     VHIGx5DrpWqfBFX6gqhnr2Gi
+party:    
+enemy:    
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:f5e4f298b870a60ef53c7ffc404d73392d1dbef9:run-29527130317.1","source":"github","sha":"f5e4f298b870a60ef53c7ffc404d73392d1dbef9","workflow":{"provider":"github-actions","runId":"29527130317","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[19:52:24.850] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:52:25.926] LOG: [ER] build {"version":1,"id":"github:f5e4f298b870a60ef53c7ffc404d73392d1dbef9:run-29527130317.1","source":"github","sha":"f5e4f298b870a60ef53c7ffc404d73392d1dbef9","workflow":{"provider":"github-actions","runId":"29527130317","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[19:52:25.965] LOG: [dev-tools] loaded — 624 scenarios + Send Logs button
+[20:18:20.752] DEBUG: Destroying loading scene
+[20:18:20.753] DEBUG: Destroyed loading scene
+[20:18:20.803] LOG: Seed: Ojtn3ua8BbGJXZZjtKIHs9RV
+[20:18:20.803] LOG: Wave Seed: Ojtn3ua8BbGJXZZjtKIHs9RV 0
+[20:18:22.781] LOG: %cStart Phase LoginPhase color:green;
+[20:18:23.477] LOG: Client Session: K9E9ZpVUMRRn7g2lKCKzX6MMzDEtDVF7
+[20:18:23.922] DEBUG: Using cached system data
+[20:18:23.976] LOG: %cStart Phase TitlePhase color:green;
+[20:18:23.976] LOG: Getting Session Slot id: %d 0
+[20:18:23.989] LOG: use seasonal splash messages true
+[20:18:38.157] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:18:38.992] LOG: Wave Seed: ĬŇőŋĐŒľĕğĿĤħĵķķŇőĨĦĥŐĖįĳ 221
+[20:18:38.995] LOG: %cStart Phase EncounterPhase color:green;
+[20:18:38.999] LOG: Starting species pool tier: UNCOMMON
+[20:18:39.000] LOG: Replaced SKITTY with DELCATTY
+[20:18:39.013] LOG: Pokemon: Wild Delcatty | Species ID: 301 | Level: 60 | Nature: Modest (+SpAtk/-Atk)
+[20:18:39.013] LOG: Stats (IVs): HP: 166 (31), Atk: 128 (11), Def: 90 (13), Spatk: 164 (21), Spdef: 75 (7), Spd: 143 (0)
+[20:18:39.013] LOG: Ability: Pretty Princess | Passive Ability: Prim and Proper 
+[20:18:39.013] LOG: Moveset: ["Uproar (P)","Assist","Last Resort","Wake-Up Slap"]
+[20:18:42.562] LOG: Seed: Hsa6e8N8cMhdMzYW7kpDGHYy
+[20:18:42.562] LOG: Wave Seed: Hsa6e8N8cMhdMzYW7kpDGHYy 0
+[20:18:42.711] WARN: AnimationManager key already exists: prompt
+[20:18:42.711] WARN: AnimationManager key already exists: tera_sparkle
+[20:18:42.711] LOG: Seed: 7mc5uT5rh7Yu0iQxlNQNoDzo
+[20:18:42.711] LOG: Wave Seed: 7mc5uT5rh7Yu0iQxlNQNoDzo 0
+[20:18:44.826] LOG: %cStart Phase LoginPhase color:green;
+[20:18:44.897] ERROR: Couldn't play animation for 'pkmn__301'!
+Is the image for this Pokemon missing?
+ TypeError: Cannot read properties of undefined (reading 'play')
+TypeError: Cannot read properties of undefined (reading 'play')
+    at EnemyPokemon.tryPlaySprite (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241580)
+    at EnemyPokemon.playAnim (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241739)
+    at EnemyPokemon.loadAssets (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:235200)
+    at async Promise.all (index 0)
+[20:18:44.897] WARN: [coop:runtime] discarding stale encounter asset/UI failure after boundary replacement TypeError: Cannot read properties of undefined (reading 'texture')
+TypeError: Cannot read properties of undefined (reading 'texture')
+    at EnemyPokemon.restoreErShinyLabTintSprite (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:242214)
+    at EnemyPokemon.refreshErShinyLabBattleFx (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:242358)
+    at EnemyPokemon.playAnim (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241823)
+    at EnemyPokemon.loadAssets (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:235200)
+    at async Promise.all (index 0)
+[20:18:45.396] LOG: Client Session: K9E9ZpVUMRRn7g2lKCKzX6MMzDEtDVF7
+[20:18:45.774] DEBUG: Using cached system data
+[20:18:45.819] LOG: %cStart Phase TitlePhase color:green;
+[20:18:45.820] LOG: Getting Session Slot id: %d 0
+[20:18:45.824] LOG: use seasonal splash messages true
+[20:18:52.709] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:18:52.736] LOG: Wave Seed: ûıħùĹĘùĶĬûĝĹôĭĕļİĒĕĒĳĈľĳ 196
+[20:18:52.739] LOG: %cStart Phase EncounterPhase color:green;
+[20:18:52.762] LOG: Pokemon: Foe Miraidon | Species ID: 1008 | Level: 60 | Nature: Modest (+SpAtk/-Atk)
+[20:18:52.762] LOG: Stats (IVs): HP: 208 (30), Atk: 109 (30), Def: 117 (31), Spatk: 185 (30), Spdef: 150 (31), Spd: 185 (31)
+[20:18:52.762] LOG: Ability: Surge Surfer | Passive Ability: Hadron Engine 
+[20:18:52.762] LOG: Moveset: ["Frost Breath","Wildbolt Storm","Spacial Rend","Rising Voltage","Searing Shot"]
+[20:18:52.768] LOG: Pokemon: Foe Nihilego | Species ID: 793 | Level: 60 | Nature: Gentle (+SpDef/-Def)
+[20:18:52.768] LOG: Stats (IVs): HP: 218 (7), Atk: 87 (26), Def: 68 (23), Spatk: 176 (19), Spdef: 174 (23), Spd: 127 (7)
+[20:18:52.768] LOG: Ability: Corrosion | Passive Ability: Beast Boost 
+[20:18:52.768] LOG: Moveset: ["Meteor Beam","Drain Brain","Malignant Chain","Venoshock"]
+[20:18:52.772] LOG: Pokemon: Foe Mega Milotic | Species ID: 350 | Level: 60 | Nature: Modest (+SpAtk/-Atk)
+[20:18:52.772] LOG: Stats (IVs): HP: 194 (31), Atk: 86 (31), Def: 105 (31), Spatk: 140 (31), Spdef: 170 (31), Spd: 102 (31)
+[20:18:52.772] LOG: Ability: Pure Love | Passive Ability: Prism Scales 
+[20:18:52.772] LOG: Moveset: ["Scald","Moonblast","Calm Mind","Freeze-Dry"]
+[20:18:52.776] LOG: Pokemon: Foe Parasect | Species ID: 47 | Level: 60 | Nature: Adamant (+Atk/-SpAtk)
+[20:18:52.776] LOG: Stats (IVs): HP: 168 (20), Atk: 131 (3), Def: 110 (8), Spatk: 91 (18), Spdef: 205 (31), Spd: 52 (22)
+[20:18:52.776] LOG: Ability: Self Sufficient | Passive Ability: Parasitic Spores 
+[20:18:52.776] LOG: Moveset: ["Strength Sap","Fertile Fangs","Spore","Astonish"]
+[20:18:52.780] LOG: Pokemon: Foe Torrentula | Species ID: 10081 | Level: 60 | Nature: Sassy (+SpDef/-Spd)
+[20:18:52.780] LOG: Stats (IVs): HP: 193 (22), Atk: 107 (26), Def: 148 (26), Spatk: 99 (26), Spdef: 189 (12), Spd: 69 (17)
+[20:18:52.780] LOG: Ability: Storm Drain | Passive Ability: Water Bubble 
+[20:18:52.780] LOG: Moveset: ["Waterfall","Avalanche","Aqua Jet","Leech Life"]
+[20:18:52.782] LOG: Pokemon: Foe Mega Drednaw | Species ID: 834 | Level: 60 | Nature: Calm (+SpDef/-Atk)
+[20:18:52.782] LOG: Stats (IVs): HP: 189 (25), Atk: 161 (2), Def: 107 (24), Spatk: 79 (8), Spdef: 88 (12), Spd: 98 (21)
+[20:18:52.782] LOG: Ability: Dragon’s Maw | Passive Ability: Long Reach 
+[20:18:52.782] LOG: Moveset: ["Draconic Fangs","Aqua Fang","Deathroll","Shell Smash"]
+[20:18:53.471] WARN: [asset-retry] load error key=cry/350-mega - retry 1/2 with cache-buster
+[20:18:54.747] WARN: [asset-retry] load error key=cry/834-mega - retry 1/2 with cache-buster
+[20:18:54.846] WARN: [asset-retry] load error key=cry/350-mega - retry 2/2 via fastly mirror + cache-buster
+[20:18:55.636] LOG: Seed: U8demkOpeJ2IRK31G8qtEHLM
+[20:18:55.636] LOG: Wave Seed: U8demkOpeJ2IRK31G8qtEHLM 0
+[20:18:55.749] WARN: AnimationManager key already exists: prompt
+[20:18:55.749] WARN: AnimationManager key already exists: tera_sparkle
+[20:18:55.749] LOG: Seed: 5khDKDY3jkrV5yk5uw05xPOD
+[20:18:55.749] LOG: Wave Seed: 5khDKDY3jkrV5yk5uw05xPOD 0
+[20:18:57.938] LOG: %cStart Phase LoginPhase color:green;
+[20:18:58.416] LOG: Client Session: K9E9ZpVUMRRn7g2lKCKzX6MMzDEtDVF7
+[20:18:58.867] DEBUG: Using cached system data
+[20:18:58.917] LOG: %cStart Phase TitlePhase color:green;
+[20:18:58.917] LOG: Getting Session Slot id: %d 0
+[20:18:58.920] LOG: use seasonal splash messages true
+[20:18:58.922] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:19:04.164] WARN: [asset-retry] load error key=cry/834-mega - retry 2/2 via fastly mirror + cache-buster
+[20:19:05.678] ERROR: [asset-retry] PERMANENT load failure key=cry/834-mega url=audio/cry/834-mega.m4a
+[20:19:07.811] ERROR: [asset-retry] PERMANENT load failure key=cry/350-mega url=audio/cry/350-mega.m4a
+[20:19:07.819] ERROR: Couldn't play animation for 'pkmn__er__drednaw_mega'!
+Is the image for this Pokemon missing?
+ TypeError: Cannot read properties of undefined (reading 'play')
+TypeError: Cannot read properties of undefined (reading 'play')
+    at EnemyPokemon.tryPlaySprite (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241580)
+    at EnemyPokemon.playAnim (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241739)
+    at EnemyPokemon.loadAssets (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:235200)
+    at async Promise.all (index 5)
+[20:19:07.820] ERROR: Couldn't play animation for 'pkmn__1008-ultimate-mode'!
+Is the image for this Pokemon missing?
+ TypeError: Cannot read properties of undefined (reading 'play')
+TypeError: Cannot read properties of undefined (reading 'play')
+    at EnemyPokemon.tryPlaySprite (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241580)
+    at EnemyPokemon.playAnim (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241739)
+    at EnemyPokemon.loadAssets (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:235200)
+    at async Promise.all (index 0)
+[20:19:07.820] ERROR: Couldn't play animation for 'pkmn__er__torrentula'!
+Is the image for this Pokemon missing?
+ TypeError: Cannot read properties of undefined (reading 'play')
+TypeError: Cannot read properties of undefined (reading 'play')
+    at EnemyPokemon.tryPlaySprite (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241580)
+    at EnemyPokemon.playAnim (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241739)
+    at EnemyPokemon.loadAssets (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:235200)
+    at async Promise.all (index 4)
+[20:19:07.820] ERROR: Couldn't play animation for 'pkmn__er__milotic_mega_shiny'!
+Is the image for this Pokemon missing?
+ TypeError: Cannot read properties of undefined (reading 'play')
+TypeError: Cannot read properties of undefined (reading 'play')
+    at EnemyPokemon.tryPlaySprite (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241580)
+    at EnemyPokemon.playAnim (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241739)
+    at EnemyPokemon.loadAssets (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:235200)
+    at async Promise.all (index 2)
+[20:19:07.821] ERROR: Couldn't play animation for 'pkmn__47'!
+Is the image for this Pokemon missing?
+ TypeError: Cannot read properties of undefined (reading 'play')
+TypeError: Cannot read properties of undefined (reading 'play')
+    at EnemyPokemon.tryPlaySprite (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241580)
+    at EnemyPokemon.playAnim (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241739)
+    at EnemyPokemon.loadAssets (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:235200)
+    at async Promise.all (index 3)
+[20:19:07.821] ERROR: Couldn't play animation for 'pkmn__793'!
+Is the image for this Pokemon missing?
+ TypeError: Cannot read properties of undefined (reading 'play')
+TypeError: Cannot read properties of undefined (reading 'play')
+    at EnemyPokemon.tryPlaySprite (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241580)
+    at EnemyPokemon.playAnim (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241739)
+    at EnemyPokemon.loadAssets (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:235200)
+    at async Promise.all (index 1)
+[20:19:07.822] LOG: Wave Seed: AwtPWPe?vw~bAwA<A\[P 12
+[20:19:07.822] WARN: [er-ghost] wave 12: trainer wave SKIPPED - challenge read false (ghosts already taken: 1)
+[20:19:07.822] LOG: Starting trainer pool tier: UNCOMMON
+[20:19:07.824] LOG: %cStart Phase EncounterPhase color:green;
+[20:19:07.851] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 5 | Nature: Jolly (+Spd/-SpAtk)
+[20:19:07.851] LOG: Stats (IVs): HP: 17 (31), Atk: 7 (31), Def: 10 (31), Spatk: 7 (31), Spdef: 7 (31), Spd: 11 (31)
+[20:19:07.851] LOG: Ability: Marvel Scale | Passive Ability: Multiscale | Boss Bars: 2
+[20:19:07.851] LOG: Moveset: ["Splash"]
+[20:19:07.855] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 5 | Nature: Timid (+Spd/-Atk)
+[20:19:07.855] LOG: Stats (IVs): HP: 17 (31), Atk: 5 (31), Def: 13 (31), Spatk: 7 (31), Spdef: 7 (31), Spd: 13 (31)
+[20:19:07.855] LOG: Ability: Rattled | Passive Ability: Multiscale | Boss Bars: 2
+[20:19:07.855] LOG: Moveset: ["Gust","Ice Beam","Water Gun","Roost"]
+[20:19:07.860] WARN: Could not load animation file for move '' unknown move id (not in MoveId or ErMoveId)
+[20:19:07.860] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 5 | Nature: Timid (+Spd/-Atk)
+[20:19:07.860] LOG: Stats (IVs): HP: 17 (31), Atk: 6 (31), Def: 11 (31), Spatk: 6 (31), Spdef: 9 (31), Spd: 13 (31)
+[20:19:07.860] LOG: Ability: Rattled | Passive Ability: Multiscale | Boss Bars: 2
+[20:19:07.860] LOG: Moveset: ["Surf","Earth Power","Shock Wave","Future Sight"]
+[20:19:07.861] WARN: [coop:runtime] discarding stale encounter asset/UI failure after boundary replacement TypeError: Cannot read properties of undefined (reading 'texture')
+TypeError: Cannot read properties of undefined (reading 'texture')
+    at EnemyPokemon.restoreErShinyLabTintSprite (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:242214)
+    at EnemyPokemon.refreshErShinyLabBattleFx (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:242358)
+    at EnemyPokemon.playAnim (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:241823)
+    at EnemyPokemon.loadAssets (https://elite-redux-staging.pages.dev/assets/coop-runtime-CKmZfLOs.js:3:235200)
+    at async Promise.all (index 5)
+[20:19:11.676] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[20:19:11.676] LOG: {"id":"BERRY","localeKey":"","iconImage":"liechi_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":3} (enemy)
+[20:19:11.676] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"mystic_water","soundName":"se/restore","tier":2,"moveType":10,"boostPercent":20} (enemy)
+[20:19:11.676] LOG: Battle Seed: F24kshO1f6Cz3wZP
+[20:19:11.679] LOG: Generated AI funcs
+[20:19:11.761] DEBUG: Session data saved to slot 4!
+[20:19:11.762] LOG: Wave Seed: AwtPWPe?vw~bAwA<A\[P 12
+[20:19:11.994] LOG: Dragon Tamer Drake
+[20:19:14.866] LOG: Dialogue saved as seen: dialogue:dragonTamer.encounter.1
+[20:19:14.911] LOG: Dragon Tamer Drake
+[20:19:15.651] LOG: %cStart Phase CommonAnimPhase color:green;
+[20:19:15.652] LOG: %cStart Phase MessagePhase color:green;
+[20:19:15.882] LOG: %cStart Phase SummonPhase color:green;
+[20:19:15.883] LOG: Drake
+[20:19:16.132] LOG: %cStart Phase SummonPhase color:green;
+[20:19:16.415] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:19:16.417] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:19:16.419] LOG: %cStart Phase PostSummonPhase color:green;
+[20:19:16.420] LOG: Ran PSP for: Rayquaza
+[20:19:16.421] LOG: %cStart Phase PostSummonPhase color:green;
+[20:19:16.422] LOG: %cStart Phase PostSummonPhase color:green;
+[20:19:16.430] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:19:16.598] LOG: %cStart Phase MessagePhase color:green;
+[20:19:16.865] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:19:16.900] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:19:17.067] LOG: %cStart Phase MessagePhase color:green;
+[20:19:17.315] LOG: %cStart Phase MessagePhase color:green;
+[20:19:17.548] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:19:17.583] LOG: %cStart Phase PostSummonPhase color:green;
+[20:19:17.583] LOG: Ran PSP for: Magikarp
+[20:19:17.584] LOG: %cStart Phase PostSummonPhase color:green;
+[20:19:17.584] LOG: %cStart Phase PostSummonPhase color:green;
+[20:19:17.585] LOG: %cStart Phase TurnInitPhase color:green;
+[20:19:17.586] LOG: %cStart Phase CommandPhase color:green;
+[20:19:27.587] LOG: [dev-tools] TEST RESULT: FAIL — BG Volcano · day
+[20:19:29.906] LOG: Seed: XhQT6hpadFuiscQuqT59UXee
+[20:19:29.906] LOG: Wave Seed: XhQT6hpadFuiscQuqT59UXee 0
+[20:19:30.040] WARN: AnimationManager key already exists: prompt
+[20:19:30.040] WARN: AnimationManager key already exists: tera_sparkle
+[20:19:30.040] LOG: Seed: VHIGx5DrpWqfBFX6gqhnr2Gi
+[20:19:30.040] LOG: Wave Seed: VHIGx5DrpWqfBFX6gqhnr2Gi 0
+[20:19:32.155] LOG: %cStart Phase LoginPhase color:green;
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"5khDKDY3jkrV5yk5uw05xPOD","gameModeId":0,"difficulty":"youngster","challenges":[],"roster":[{"id":3911688820,"player":true,"species":384,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":100,"exp":1081250,"levelExp":0,"gender":-1,"hp":351,"stats":[351,336,216,336,216,226],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":620,"ppUsed":0,"ppUp":0},{"moveId":245,"ppUsed":0,"ppUp":0},{"moveId":89,"ppUsed":0,"ppUp":0},{"moveId":57,"ppUsed":0,"ppUp":0}],"status":null,"friendship":0,"metLevel":100,"metBiome":-1,"metSpecies":384,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[],"endState":{"waveIndex":0,"money":0,"party":[]},"checkpoint":{"wave":12,"seed":"5khDKDY3jkrV5yk5uw05xPOD","party":[{"id":3911688820,"player":true,"species":384,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":100,"exp":1081250,"levelExp":0,"gender":-1,"hp":351,"stats":[351,336,216,336,216,226],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":620,"ppUsed":0,"ppUp":0},{"moveId":245,"ppUsed":0,"ppUp":0},{"moveId":89,"ppUsed":0,"ppUp":0},{"moveId":57,"ppUsed":0,"ppUp":0}],"status":null,"friendship":0,"metLevel":100,"metBiome":-1,"metSpecies":384,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"}],"money":1000,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":0}}}
