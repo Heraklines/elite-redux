@@ -263,7 +263,11 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     game.scene.phaseManager.unshiftPhase(replay);
     game.scene.phaseManager.shiftPhase();
     replay.start();
-    await new Promise(r => setTimeout(r, 0));
+    // The replay pump is async. A single timer turn is not a causal completion proof and raced the
+    // retained GameOver path on remote runners: the helper observed replay as current, exited, then
+    // the pump shifted into the terminal boundary milliseconds later. Wait for the real phase-tree
+    // transition with a finite budget instead.
+    await vi.waitUntil(() => game.scene.phaseManager.getCurrentPhase() !== replay, { interval: 1, timeout: 5_000 });
     for (let i = 0; i < 32; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();
       if (cur == null || !REPLAY_DRAIN_PHASES.some(name => cur.is(name as Parameters<typeof cur.is>[0]))) {
@@ -271,7 +275,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       }
       const wasFinalize = cur.is("CoopFinalizeTurnPhase");
       cur.start();
-      await new Promise(r => setTimeout(r, 0));
+      await vi.waitUntil(() => game.scene.phaseManager.getCurrentPhase() !== cur, { interval: 1, timeout: 5_000 });
       if (wasFinalize) {
         break;
       }
