@@ -70,6 +70,8 @@ const RUN = process.env.ER_SCENARIO === "1";
 const ME_WAVE = 12;
 /** The ME interaction counter the FIGHT_OR_FLIGHT ME opens on (host owns even -> counter 0). */
 const ME_COUNTER = 0;
+/** Settlement cursor after a legitimate multi-turn spawned battle (handoff itself starts on turn 1). */
+const ME_SETTLEMENT_TURN = 3;
 
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
@@ -198,6 +200,9 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
         expect(e.isFainted(true), `${e.name} adopted the authoritative faint status`).toBe(true);
         expect(e.isOnField(), `${e.name} left the field at the authoritative checkpoint`).toBe(false);
       }
+      // The retained handoff was addressed at turn 1, but a real battle may finish later. This is the
+      // exact C1 race that previously rejected a valid turn-3 BattleEnd before its settlement redelivery.
+      rig.guestScene.currentBattle.turn = ME_SETTLEMENT_TURN;
       expect(
         coopMeHandoffBattleWon(),
         "guest detects the ME battle WON directly (spawned ME battle + all enemies fainted) (#847)",
@@ -249,6 +254,7 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
         expect(enemy.isFainted(true), `${enemy.name} completed the real faint boundary`).toBe(true);
         expect(enemy.isOnField(), `${enemy.name} left the field before Victory`).toBe(false);
       }
+      hostScene.currentBattle.turn = ME_SETTLEMENT_TURN;
       const victory = hostScene.phaseManager.create("VictoryPhase", hostEnemies[0]!.getBattlerIndex());
       expect(hostScene.phaseManager.overridePhase(victory), "host runs the real ME Victory").toBe(true);
       victory.start();
