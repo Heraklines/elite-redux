@@ -3,10 +3,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { BattleScene } from "#app/battle-scene";
+import { globalScene, initGlobalScene } from "#app/global-scene";
 import { Button } from "#enums/buttons";
 import { UiMode } from "#enums/ui-mode";
 import { SaveSlotSelectUiHandler, SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const scene = vi.hoisted(() => {
   const deleteSession = vi.fn<(slot: number) => Promise<boolean>>();
@@ -22,14 +24,6 @@ const scene = vi.hoisted(() => {
   };
   return { deleteSession, reset, setOverlayMode, ui };
 });
-
-vi.mock("#app/global-scene", () => ({
-  globalScene: {
-    gameData: { deleteSession: scene.deleteSession },
-    reset: scene.reset,
-    ui: scene.ui,
-  },
-}));
 
 type HandlerInternals = {
   cursor: number;
@@ -75,10 +69,24 @@ async function confirmDelete(options: { label: string; handler: () => boolean }[
   await vi.waitFor(() => expect(scene.deleteSession).toHaveBeenCalledWith(0));
 }
 
-// This test replaces the process-global scene module, so keep it in the isolated co-op lane.
+// This test replaces the process-global scene binding, so keep it in the isolated co-op lane and restore it.
 describe.skipIf(process.env.ER_SCENARIO !== "1")("co-op save-slot mutation UI", () => {
+  let previousScene: BattleScene | undefined;
+
   beforeEach(() => {
+    previousScene = globalScene;
     vi.clearAllMocks();
+    initGlobalScene({
+      gameData: { deleteSession: scene.deleteSession },
+      reset: scene.reset,
+      ui: scene.ui,
+    } as unknown as BattleScene);
+  });
+
+  afterEach(() => {
+    if (previousScene != null) {
+      initGlobalScene(previousScene);
+    }
   });
 
   it("keeps a manually deleted slot visible and resets when protected cloud deletion fails", async () => {
