@@ -14,7 +14,11 @@
 // existing consumers.
 // =============================================================================
 
-import { type CoopMeTerminalPayload, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  COOP_ME_BATTLE_SETTLED_CHOICE,
+  type CoopMeTerminalPayload,
+  parseCoopOperationId,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type {
   CoopActiveMysteryEncounterSnapshotV1,
@@ -225,7 +229,10 @@ export function isValidCoopActiveMysteryControl(snapshot: unknown): snapshot is 
     || (snapshot.nextPickStep != null && (!isSafeNonNegative(snapshot.nextPickStep) || snapshot.nextPickStep > 999))
     || (snapshot.nextSubPickStep != null
       && (!isSafeNonNegative(snapshot.nextSubPickStep) || snapshot.nextSubPickStep > 999))
-    || (snapshot.terminal !== "pending" && snapshot.terminal !== "leave" && snapshot.terminal !== "battle")
+    || (snapshot.terminal !== "pending"
+      && snapshot.terminal !== "leave"
+      && snapshot.terminal !== "battle"
+      && snapshot.terminal !== "battle-settled")
     || (snapshot.presentation != null && !isValidPresentation(snapshot.presentation))
     || (snapshot.colosseum != null
       && !isValidColosseumControl(snapshot.colosseum, snapshot.interactionCounter as number))
@@ -250,8 +257,12 @@ export function isValidCoopActiveMysteryControl(snapshot: unknown): snapshot is 
     && operation?.owner === 0
     && operation.kind === "ME_TERMINAL"
     && operation.pinnedSeq === expectedAddress
-    && (snapshot.terminal === "battle" ? snapshot.terminalChoice === -1000 : snapshot.terminalChoice === -1)
-    && (snapshot.terminal === "battle" || snapshot.hostTurn == null)
+    && (snapshot.terminal === "battle"
+      ? snapshot.terminalChoice === -1000
+      : snapshot.terminal === "battle-settled"
+        ? snapshot.terminalChoice === COOP_ME_BATTLE_SETTLED_CHOICE
+        : snapshot.terminalChoice === -1)
+    && (snapshot.terminal === "battle" || snapshot.terminal === "battle-settled" || snapshot.hostTurn == null)
   );
 }
 
@@ -316,8 +327,12 @@ export function canRestoreCoopActiveMysteryControl(
       snapshot.hostTurn === coopMeActiveControl.hostTurn && snapshot.handoffWave === coopMeActiveControl.handoffWave
     );
   }
+  const nextStep = snapshot.terminalStep === (coopMeActiveControl.terminalStep ?? -1) + 1;
   return (
-    coopMeActiveControl.terminal === "battle" && snapshot.terminalStep === (coopMeActiveControl.terminalStep ?? -1) + 1
+    nextStep
+    && ((coopMeActiveControl.terminal === "battle" && snapshot.terminal === "battle-settled")
+      || (coopMeActiveControl.terminal === "battle-settled"
+        && (snapshot.terminal === "battle" || snapshot.terminal === "leave")))
   );
 }
 
@@ -490,7 +505,7 @@ export function resolveCoopMeOwnerIntentRebind(
 
 /** Record an exact host terminal before it is put on the 9M carrier. Null/timeout never calls this seam. */
 export function setCoopMeTerminalControl(
-  terminal: "leave" | "battle",
+  terminal: "leave" | "battle" | "battle-settled",
   hostTurn?: number,
   identity?: CoopMeTerminalIdentity,
 ): void {
@@ -512,7 +527,10 @@ export function setCoopMeTerminalControl(
     if (exactDuplicate) {
       return;
     }
-    if (prior.terminal === "leave" || identity.step !== (prior.terminalStep ?? -1) + 1) {
+    const validTransition =
+      (prior.terminal === "battle" && terminal === "battle-settled")
+      || (prior.terminal === "battle-settled" && (terminal === "battle" || terminal === "leave"));
+    if (!validTransition || identity.step !== (prior.terminalStep ?? -1) + 1) {
       return; // leave is final; every new battle/leave after a battle consumes the next exact step
     }
   } else if (identity.step !== 0) {
@@ -587,7 +605,7 @@ function restoreCoopActiveMysteryControlInternal(
   coopMeActiveControl = cloneActiveControl(snapshot);
   if (snapshot.terminal !== "leave") {
     coopMeInteractionStart = snapshot.interactionCounter;
-    coopMeHandoffBattle = snapshot.terminal === "battle";
+    coopMeHandoffBattle = snapshot.terminal === "battle" || snapshot.terminal === "battle-settled";
     coopMeHandoffBattleWave = snapshot.handoffWave ?? -1;
   }
   try {

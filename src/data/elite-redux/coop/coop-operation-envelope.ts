@@ -272,7 +272,11 @@ export type CoopLearnMoveBatchPayload =
  */
 export type CoopMeTerminalKind =
   | "leave" // the ME ended (non-battle): the watcher leaves the encounter + advances the alternation
-  | "battle"; // an option spawned a battle: the watcher finishes WITHOUT leaving (the battle runs host-authoritative)
+  | "battle" // an option spawned a battle: the watcher finishes WITHOUT leaving (the battle runs host-authoritative)
+  | "battle-settled"; // that battle's post-BattleEnd image is retained and its reward tail is executable
+
+/** Durable control sentinel for the ME battle-settled terminal; never carried as a raw input choice. */
+export const COOP_ME_BATTLE_SETTLED_CHOICE = -1001;
 
 /** Exact host-authored continuation opened after the terminal state image has been adopted. */
 export type CoopMeTerminalDestination =
@@ -291,6 +295,21 @@ export type CoopMeTerminalDestination =
       readonly nextWave: number;
       /** Whether `SelectBiomePhase` precedes `NewBattlePhase` at this boundary. */
       readonly selectBiome: boolean;
+    }
+  | {
+      readonly kind: "reward";
+      /** Exact battle turn whose post-BattleEnd image this transaction settles. */
+      readonly hostTurn: number;
+      /** Host-stated battle result; the renderer never infers it from its reconstructed field. */
+      readonly result: "victory" | "failure";
+      /** Exact executable continuation after the settled BattleEnd. */
+      readonly continuation: "rewards" | "encounter" | "none";
+      /** Whether the deterministic trainer-victory presentation precedes the reward phase. */
+      readonly trainerVictory: boolean;
+      /** Whether a reward-less healing shop is requested. Meaningful only for `rewards`. */
+      readonly addHeal: boolean;
+      /** Whether EggLapsePhase follows this encounter's reward phase. Meaningful only for `rewards`. */
+      readonly eggLapse: boolean;
     };
 
 /** ME_PICK intent/outcome: the top-level option index the ME owner selected (#8, guest->host forward). */
@@ -332,6 +351,14 @@ export type CoopMeTerminalPayload =
       readonly outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>;
       /** Exact battle boot, causally bound to the state image above. */
       readonly destination: Extract<CoopMeTerminalDestination, { kind: "battle" }>;
+    }
+  | {
+      /** The spawned battle reached its exact post-BattleEnd reward boundary. */
+      readonly terminal: "battle-settled";
+      /** Comprehensive state after every automatic BattleEnd mutation. */
+      readonly outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>;
+      /** Exact deterministic reward presentation opened from that state. */
+      readonly destination: Extract<CoopMeTerminalDestination, { kind: "reward" }>;
     }
   | {
       /** The encounter reached its true final leave (directly or after a spawned battle). */

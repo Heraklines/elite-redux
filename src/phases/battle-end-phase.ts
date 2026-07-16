@@ -10,10 +10,13 @@ import {
   awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
   type CoopAutomaticVictorySealIdentity,
+  type CoopMeBattleSettlementPlan,
+  commitCoopMeBattleSettlementAtBattleEnd,
   consumeCoopPendingWaveEndState,
   deferCoopAutomaticVictorySealAtBattleEnd,
   failCoopSharedSession,
   getCoopWaveAdvanceRuntimeBinding,
+  holdForCoopMeBattleSettlementAtBattleEnd,
   isCoopAuthoritativeGuest,
   isCoopSettledWaveBoundaryPending,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -134,12 +137,19 @@ export class BattleEndPhase extends BattlePhase {
   private readonly retainedSourceWasTrainer: boolean;
   /** Normal retained wins settle only after every automatic post-victory child has drained. */
   private readonly automaticVictorySeal: CoopAutomaticVictorySealIdentity | null;
+  /** Host-stated ME continuation captured when the battle terminal queues this phase. */
+  private readonly meSettlementPlan: CoopMeBattleSettlementPlan | null;
 
-  constructor(isVictory: boolean, automaticVictorySeal: CoopAutomaticVictorySealIdentity | null = null) {
+  constructor(
+    isVictory: boolean,
+    automaticVictorySeal: CoopAutomaticVictorySealIdentity | null = null,
+    meSettlementPlan: CoopMeBattleSettlementPlan | null = null,
+  ) {
     super();
 
     this.isVictory = isVictory;
     this.automaticVictorySeal = automaticVictorySeal;
+    this.meSettlementPlan = meSettlementPlan;
     this.retainedWaveBinding = getCoopWaveAdvanceRuntimeBinding();
     const retainedBoundary =
       this.retainedWaveBinding == null ? null : getCoopPendingWaveAdvanceBoundary(this.retainedWaveBinding);
@@ -161,11 +171,19 @@ export class BattleEndPhase extends BattlePhase {
     globalScene.phaseManager.removeAllPhasesOfType("BattleEndPhase");
 
     const retainedBinding = this.retainedWaveBinding ?? getCoopWaveAdvanceRuntimeBinding();
+    // ME settlement is owned by the pinned ME terminal stream, not the wave ledger. Check it before the
+    // generic missing-wave-binding failure so an exact retained ME BattleEnd can wait for its own carrier.
+    if (holdForCoopMeBattleSettlementAtBattleEnd()) {
+      return;
+    }
     if (isCoopAuthoritativeGuest() && retainedBinding == null) {
       failCoopSharedSession(`The retained wave ${this.retainedSourceWave} BattleEnd had no owning runtime.`);
       return;
     }
 
+    // An ME battle owns an ordered retained terminal lifecycle, not a once-per-wave WAVE_ADVANCE. The
+    // guest executes none of the shared mutations below: it holds this exact phase until the host's
+    // post-BattleEnd ME_TERMINAL state image applies and releases the stated reward continuation.
     // P33 guest: the host's post-BattleEnd image already contains every mutation below. Hold this phase
     // until that exact retained DATA applies, then release the existing host-stated tail without dual-run.
     if (
@@ -224,11 +242,13 @@ export class BattleEndPhase extends BattlePhase {
     }
 
     globalScene.updateModifiers();
+    const meSettlementRetained =
+      this.meSettlementPlan != null && commitCoopMeBattleSettlementAtBattleEnd(this.meSettlementPlan);
     // Normal retained wins still have automatic TrainerVictory/Money/Modifier/Egg/buff/heal children ahead
     // of their first interactive continuation. Stage that exact phase-owned boundary here and let the
     // explicit CoopVictorySealPhase capture after those children drain. Capture/flee and legacy sessions
     // retain the established BattleEnd settlement timing.
-    if (!deferCoopAutomaticVictorySealAtBattleEnd(this.automaticVictorySeal)) {
+    if (!meSettlementRetained && !deferCoopAutomaticVictorySealAtBattleEnd(this.automaticVictorySeal)) {
       broadcastCoopWaveEndState(this.isVictory);
     }
     // Keep the enemy objects serializable through the settled capture, then tear down presentation exactly

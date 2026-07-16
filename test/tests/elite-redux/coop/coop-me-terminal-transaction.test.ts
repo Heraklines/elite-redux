@@ -81,6 +81,32 @@ function battlePayload(
   };
 }
 
+function settledPayload(
+  wave: number,
+  options: {
+    result?: "victory" | "failure";
+    continuation?: "rewards" | "encounter" | "none";
+    trainerVictory?: boolean;
+    addHeal?: boolean;
+    eggLapse?: boolean;
+  } = {},
+): CoopMeTerminalPayload {
+  const continuation = options.continuation ?? "rewards";
+  return {
+    terminal: "battle-settled",
+    outcome: outcome(wave),
+    destination: {
+      kind: "reward",
+      hostTurn: 3,
+      result: options.result ?? "victory",
+      continuation,
+      trainerVictory: options.trainerVictory ?? false,
+      addHeal: options.addHeal ?? false,
+      eggLapse: options.eggLapse ?? continuation === "rewards",
+    },
+  };
+}
+
 function terminalId(pinned: number, step: number, epoch = 1): string {
   return makeCoopOperationId(epoch, 0, (COOP_ME_TERM_SEQ_BASE + pinned) * 8000 + 4000 + step, "ME_TERMINAL");
 }
@@ -176,7 +202,7 @@ describe("complete retained Mystery terminal transaction", () => {
     }
   });
 
-  it("rejects every old split terminal shape and accepts complete leave/battle destinations", () => {
+  it("rejects every split terminal shape and accepts complete leave/battle/settlement destinations", () => {
     expect(isCompleteCoopMeTerminalPayload({ terminal: "leave" })).toBe(false);
     expect(isCompleteCoopMeTerminalPayload({ terminal: "battle", hostTurn: 3 })).toBe(false);
     expect(
@@ -188,6 +214,15 @@ describe("complete retained Mystery terminal transaction", () => {
     ).toBe(false);
     expect(isCompleteCoopMeTerminalPayload(leavePayload(12, true))).toBe(true);
     expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 3, disableSwitch: true }))).toBe(true);
+    expect(isCompleteCoopMeTerminalPayload(settledPayload(12, { addHeal: true, trainerVictory: true }))).toBe(true);
+    expect(
+      isCompleteCoopMeTerminalPayload(settledPayload(12, { result: "failure", trainerVictory: true, eggLapse: false })),
+      "a failed battle cannot declare trainer-victory presentation",
+    ).toBe(false);
+    expect(
+      isCompleteCoopMeTerminalPayload(settledPayload(12, { continuation: "encounter", addHeal: true })),
+      "event-continuation settlements cannot smuggle reward-only mutations",
+    ).toBe(false);
   });
 
   it("applies DATA once, withholds completion for a late destination receiver, then executes once after reconnect", () => {
@@ -225,14 +260,14 @@ describe("complete retained Mystery terminal transaction", () => {
     expect(destinationAttempts).toBe(2);
   });
 
-  it("rejects reordered post-battle leave, then admits battle step 0 and its exact step 1 leave", () => {
+  it("rejects reordered post-battle operations, then admits battle -> settlement -> leave", () => {
     const receiver = new CoopMeTerminalTransactionReceiver();
     const hooks = { applyMaterial: () => true, executeDestination: () => true };
     const pinned = 11;
 
     expect(
       receiver.receive({ operationId: terminalId(pinned, 1), pinned, step: 1, payload: leavePayload(20, true) }, hooks),
-      "step 1 cannot overtake its battle handoff",
+      "leave cannot overtake either battle handoff or settlement",
     ).toBe("rejected");
     expect(
       receiver.receive(
@@ -246,7 +281,10 @@ describe("complete retained Mystery terminal transaction", () => {
       ),
     ).toBe("executed");
     expect(
-      receiver.receive({ operationId: terminalId(pinned, 1), pinned, step: 1, payload: leavePayload(20, true) }, hooks),
+      receiver.receive({ operationId: terminalId(pinned, 1), pinned, step: 1, payload: settledPayload(20) }, hooks),
+    ).toBe("executed");
+    expect(
+      receiver.receive({ operationId: terminalId(pinned, 2), pinned, step: 2, payload: leavePayload(20, true) }, hooks),
     ).toBe("executed");
   });
 
@@ -267,43 +305,58 @@ describe("complete retained Mystery terminal transaction", () => {
       },
     };
     const round0 = { operationId: terminalId(pinned, 0), pinned, step: 0, payload: battlePayload(20) };
-    const round1 = {
+    const settled0 = {
       operationId: terminalId(pinned, 1),
       pinned,
       step: 1,
+      payload: settledPayload(20, { continuation: "encounter", eggLapse: false }),
+    };
+    const round1 = {
+      operationId: terminalId(pinned, 2),
+      pinned,
+      step: 2,
       payload: battlePayload(20, { encounterMode: 3, disableSwitch: true }),
     };
 
     expect(
       receiver.receive({ operationId: terminalId(pinned, 2), pinned, step: 2, payload: battlePayload(20) }, hooks),
-      "a later round cannot overtake either retained battle step",
+      "a later round cannot overtake its retained battle settlement",
     ).toBe("rejected");
     expect(receiver.receive(round0, hooks)).toBe("executed");
     expect(receiver.receive(round0, hooks), "an old round remains idempotent after execution").toBe("duplicate");
 
     destinationReady = false;
-    expect(receiver.receive(round1, hooks), "round N+1 DATA is retained while its battle surface is late").toBe(
+    expect(receiver.receive(settled0, hooks), "settlement DATA is retained while the held BattleEnd is late").toBe(
       "retry",
     );
     expect(materialApplies).toBe(2);
     destinationReady = true;
-    expect(receiver.receive(round1, hooks), "hot-rejoin retries only round N+1 control").toBe("executed");
-    expect(materialApplies, "the second round state image applied exactly once").toBe(2);
+    expect(receiver.receive(settled0, hooks), "hot-rejoin retries only settlement control").toBe("executed");
+    expect(materialApplies, "the settlement state image applied exactly once").toBe(2);
+    expect(receiver.receive(round1, hooks), "the next battle is admitted only after settlement").toBe("executed");
     expect(receiver.receive(round0, hooks), "a late duplicate from round N never regresses the cursor").toBe(
       "duplicate",
     );
 
     expect(
-      receiver.receive({ operationId: terminalId(pinned, 2), pinned, step: 2, payload: battlePayload(20) }, hooks),
+      receiver.receive(
+        {
+          operationId: terminalId(pinned, 3),
+          pinned,
+          step: 3,
+          payload: settledPayload(20, { continuation: "encounter", eggLapse: false }),
+        },
+        hooks,
+      ),
     ).toBe("executed");
     expect(
-      receiver.receive({ operationId: terminalId(pinned, 3), pinned, step: 3, payload: leavePayload(20, true) }, hooks),
+      receiver.receive({ operationId: terminalId(pinned, 4), pinned, step: 4, payload: leavePayload(20, true) }, hooks),
     ).toBe("executed");
     expect(
-      receiver.receive({ operationId: terminalId(pinned, 4), pinned, step: 4, payload: battlePayload(20) }, hooks),
+      receiver.receive({ operationId: terminalId(pinned, 5), pinned, step: 5, payload: battlePayload(20) }, hooks),
       "the final leave closes the pinned transaction sequence",
     ).toBe("rejected");
-    expect(destinationAttempts).toBe(5);
+    expect(destinationAttempts).toBe(6);
   });
 
   it("rejects same-id payload conflicts and a second terminal for the same pinned stage", () => {

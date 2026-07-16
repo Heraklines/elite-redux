@@ -52,7 +52,7 @@ export type CoopCapabilityKey = string;
 /** The migrated biome-travel operation surface (coop-biome-operation.ts, §2.5 item 1). */
 export const COOP_CAP_OP_BIOME: CoopCapabilityKey = "opSurface.biome";
 /** The migrated mystery-encounter operation surface (coop-me-operation.ts, §2.5 item 2). */
-export const COOP_CAP_OP_ME: CoopCapabilityKey = "opSurface.me";
+export const COOP_CAP_OP_ME: CoopCapabilityKey = "opSurface.me.v2";
 /** The migrated reward-shop operation surface (coop-reward-operation.ts, §2.5 item 3). */
 export const COOP_CAP_OP_REWARD: CoopCapabilityKey = "opSurface.reward";
 /** The migrated post-battle wave-advance operation surface - THE KEYSTONE (coop-wave-operation.ts, §2.5 item 4). */

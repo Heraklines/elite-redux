@@ -226,6 +226,7 @@ type MeShopArm = Promise<{ tag: "shop"; key: string }>;
 
 type CoopMeBattleDestination = Extract<CoopMeTerminalPayload["destination"], { kind: "battle" }>;
 type CoopMeContinueDestination = Extract<CoopMeTerminalPayload["destination"], { kind: "continue" }>;
+type CoopMeRewardDestination = Extract<CoopMeTerminalPayload["destination"], { kind: "reward" }>;
 
 export class CoopReplayMePhase extends Phase {
   public readonly phaseName = "CoopReplayMePhase";
@@ -548,10 +549,11 @@ export class CoopReplayMePhase extends Phase {
   private acceptedTerminal:
     | { kind: "pending" }
     | {
-        kind: "battle-handoff" | "leave";
+        kind: "battle-handoff" | "battle-settled" | "leave";
         operationId: string;
         step: number;
         revision: number;
+        continuation?: CoopMeRewardDestination["continuation"];
       } = {
     kind: "pending",
   };
@@ -1163,23 +1165,48 @@ export class CoopReplayMePhase extends Phase {
       !this.boundaryStillLive()
       || transaction.pinned !== this.interactionCounter
       || (transaction.payload.terminal === "battle") !== (transaction.payload.destination.kind === "battle")
+      || (transaction.payload.terminal === "battle-settled") !== (transaction.payload.destination.kind === "reward")
     ) {
       return false;
+    }
+    if (
+      this.acceptedTerminal.kind !== "pending"
+      && this.acceptedTerminal.operationId === transaction.operationId
+      && this.acceptedTerminal.step === transaction.step
+    ) {
+      return true;
     }
     if (transaction.payload.terminal === "battle") {
       if (this.acceptedTerminal.kind === "pending") {
         return transaction.step === 0;
       }
       return (
-        this.acceptedTerminal.kind === "battle-handoff"
+        this.acceptedTerminal.kind === "battle-settled"
         && ((this.acceptedTerminal.operationId === transaction.operationId
           && this.acceptedTerminal.step === transaction.step)
           || transaction.step === this.acceptedTerminal.step + 1)
       );
     }
+    if (transaction.payload.terminal === "battle-settled") {
+      return (
+        this.acceptedTerminal.kind === "battle-handoff"
+        && (transaction.step === this.acceptedTerminal.step + 1
+          || (this.acceptedTerminal.operationId === transaction.operationId
+            && this.acceptedTerminal.step === transaction.step))
+        && globalScene.phaseManager.getCurrentPhase()?.phaseName === "BattleEndPhase"
+      );
+    }
+    const currentPhaseName = globalScene.phaseManager.getCurrentPhase()?.phaseName;
+    const leaveSurfaceReady =
+      this.acceptedTerminal.kind !== "battle-settled"
+      || (this.acceptedTerminal.continuation === "rewards"
+        ? currentPhaseName === "PostMysteryEncounterPhase"
+        : currentPhaseName === "BattleEndPhase");
     return (
       (this.acceptedTerminal.kind === "pending" && transaction.step === 0)
-      || (this.acceptedTerminal.kind === "battle-handoff" && transaction.step === this.acceptedTerminal.step + 1)
+      || (this.acceptedTerminal.kind === "battle-settled"
+        && transaction.step === this.acceptedTerminal.step + 1
+        && leaveSurfaceReady)
       || (this.acceptedTerminal.kind === "leave"
         && this.acceptedTerminal.operationId === transaction.operationId
         && this.acceptedTerminal.step === transaction.step)
@@ -1191,6 +1218,13 @@ export class CoopReplayMePhase extends Phase {
       return false;
     }
     const { operationId, payload, step } = transaction;
+    if (
+      this.acceptedTerminal.kind !== "pending"
+      && this.acceptedTerminal.operationId === operationId
+      && this.acceptedTerminal.step === step
+    ) {
+      return true;
+    }
     if (this.acceptedTerminal.kind === "leave") {
       return this.acceptedTerminal.operationId === operationId && this.acceptedTerminal.step === step;
     }
@@ -1200,10 +1234,10 @@ export class CoopReplayMePhase extends Phase {
     this.terminalRecoveryAttempt = 0;
     try {
       if (payload.destination.kind === "battle") {
-        const expectedStep = this.acceptedTerminal.kind === "battle-handoff" ? this.acceptedTerminal.step + 1 : 0;
+        const expectedStep = this.acceptedTerminal.kind === "battle-settled" ? this.acceptedTerminal.step + 1 : 0;
         if (step !== expectedStep) {
           return (
-            this.acceptedTerminal.kind === "battle-handoff"
+            this.acceptedTerminal.kind === "battle-settled"
             && this.acceptedTerminal.operationId === operationId
             && this.acceptedTerminal.step === step
           );
@@ -1218,7 +1252,13 @@ export class CoopReplayMePhase extends Phase {
         };
         return true;
       }
-      const expectedStep = this.acceptedTerminal.kind === "battle-handoff" ? this.acceptedTerminal.step + 1 : 0;
+      if (payload.destination.kind === "reward") {
+        if (this.acceptedTerminal.kind !== "battle-handoff" || step !== this.acceptedTerminal.step + 1) {
+          return false;
+        }
+        return this.completeCommittedBattleSettlement(operationId, step, payload.destination);
+      }
+      const expectedStep = this.acceptedTerminal.kind === "battle-settled" ? this.acceptedTerminal.step + 1 : 0;
       if (step !== expectedStep) {
         return false;
       }
@@ -1232,6 +1272,46 @@ export class CoopReplayMePhase extends Phase {
       failCoopSharedSession(`Mystery terminal ${operationId} could not execute coherently`);
       return false;
     }
+  }
+
+  /** Release an exact held BattleEnd only after the retained post-battle image has applied. */
+  private completeCommittedBattleSettlement(
+    operationId: string,
+    step: number,
+    destination: CoopMeRewardDestination,
+  ): boolean {
+    const current = globalScene.phaseManager.getCurrentPhase();
+    if (current?.phaseName !== "BattleEndPhase" || globalScene.currentBattle?.turn !== destination.hostTurn) {
+      return false;
+    }
+    this.acceptedTerminal = {
+      kind: "battle-settled",
+      operationId,
+      step,
+      revision: captureCoopActiveMysteryControl()?.revision ?? 0,
+      continuation: destination.continuation,
+    };
+    if (destination.continuation !== "rewards" && !destination.trainerVictory) {
+      // A host-only doContinue/press-your-luck callback owns the next retained battle/leave step. Keep the
+      // exact BattleEnd parked so an empty queue can never manufacture a phantom command meanwhile.
+      return true;
+    }
+    if (destination.trainerVictory) {
+      globalScene.phaseManager.pushNew("TrainerVictoryPhase");
+    }
+    if (destination.continuation === "rewards") {
+      globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", destination.addHeal);
+      if (destination.eggLapse) {
+        globalScene.phaseManager.pushNew("EggLapsePhase");
+      }
+    } else {
+      // Repeated trainer encounters still show the defeated-trainer interstitial. Re-park behind it on
+      // an ME-owned BattleEnd fence so queue drain cannot infer a phantom turn before the next retained
+      // battle/leave step arrives from the host callback.
+      globalScene.phaseManager.pushNew("BattleEndPhase", destination.result === "victory");
+    }
+    current.end();
+    return true;
   }
 
   /** Project the host's final state directly into its declared continuation, skipping local ME mechanics. */
@@ -1656,7 +1736,12 @@ export class CoopReplayMePhase extends Phase {
    */
   private finishWithoutLeaving(hostTurn?: number, committedDestination?: CoopMeBattleDestination): void {
     if (this.settled) {
-      if (committedDestination != null && (this.settledDetached || this.acceptedTerminal.kind === "battle-handoff")) {
+      if (
+        committedDestination != null
+        && (this.settledDetached
+          || this.acceptedTerminal.kind === "battle-handoff"
+          || this.acceptedTerminal.kind === "battle-settled")
+      ) {
         // A quiz/nested-picker can finish its presentation phase before its option spawns a battle, and a
         // Colosseum CONTINUE produces another complete battle transaction after the prior round. In both
         // cases the retained step supersedes the detached surface and is the next mechanical boundary.

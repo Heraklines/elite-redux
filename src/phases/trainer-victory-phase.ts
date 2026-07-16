@@ -3,6 +3,8 @@ import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { isCoopMeOperationJournalActive } from "#data/elite-redux/coop/coop-me-operation";
+import { captureCoopActiveMysteryControl } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   failCoopSharedSession,
   getCoopActiveWaveTransition,
@@ -47,6 +49,21 @@ function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null 
     return { authoritativeGuest, victory, liveTrainerMatches: true };
   }
 
+  const ambientBattle = globalScene.currentBattle;
+  const meControl = captureCoopActiveMysteryControl();
+  if (
+    isCoopMeOperationJournalActive()
+    && meControl?.terminal === "battle-settled"
+    && ambientBattle?.isBattleMysteryEncounter?.()
+  ) {
+    const victory = snapshotCoopTrainerVictoryBoundary(globalScene, ambientBattle);
+    if (victory == null) {
+      failCoopSharedSession("The retained Mystery settlement declared trainer victory without a trainer boundary.");
+      return null;
+    }
+    return { authoritativeGuest, victory, liveTrainerMatches: true };
+  }
+
   const retainedBinding = getCoopWaveAdvanceRuntimeBinding();
   const retainedBoundary = retainedBinding == null ? null : getCoopPendingWaveContinuationBoundary(retainedBinding);
   const retainedTransition = retainedBoundary == null ? null : getCoopActiveWaveTransition(retainedBoundary.wave);
@@ -67,7 +84,6 @@ function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null 
     return null;
   }
 
-  const ambientBattle = globalScene.currentBattle;
   const liveTrainerMatches =
     ambientBattle?.waveIndex === victory.sourceWave
     && ambientBattle.trainer?.config.trainerType === victory.trainerType;

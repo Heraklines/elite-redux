@@ -201,7 +201,7 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
   const handoff = coopMeHandoffBattleStarted();
   const activeControl = captureCoopActiveMysteryControl();
   const terminalStep = handoff
-    ? activeControl?.interactionCounter === coopMeInteractionStartValue() && activeControl.terminal === "battle"
+    ? activeControl?.interactionCounter === coopMeInteractionStartValue() && activeControl.terminal === "battle-settled"
       ? (activeControl.terminalStep ?? -1) + 1
       : -1
     : 0;
@@ -1359,6 +1359,14 @@ export class PostMysteryEncounterPhase extends Phase {
     // drained - so coopMeInProgress() stays TRUE across leaveDefensive -> the shop -> here, closing
     // the double-advance window. Solo / lockstep / host unaffected.
     if (isCoopAuthoritativeGuest()) {
+      if (isCoopMeOperationJournalActive()) {
+        // P33/v34: the post-reward state and next-wave route belong to the final retained ME_TERMINAL
+        // leave step. Keep the pin and this exact phase live until that DATA+destination transaction
+        // applies; clearing locally would race the final host image and authorize NewBattle from inference.
+        coopLog("me", "authoritative guest: PostMysteryEncounterPhase holds for retained final leave");
+        getCoopRuntime()?.durability?.reconnect();
+        return;
+      }
       coopLog("me", "authoritative guest: PostMysteryEncounterPhase terminal (clearing pin)", {
         counter: coopMeInteractionStartValue(),
       });

@@ -125,7 +125,10 @@ function isSafeNonNegativeInteger(value: unknown): value is number {
  * split `{battle}` control shape here would recreate the raw-party/terminal race this contract removes.
  */
 export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMeTerminalPayload {
-  if (!isPlainObject(value) || (value.terminal !== "leave" && value.terminal !== "battle")) {
+  if (
+    !isPlainObject(value)
+    || (value.terminal !== "leave" && value.terminal !== "battle" && value.terminal !== "battle-settled")
+  ) {
     return false;
   }
   const outcome = value.outcome;
@@ -157,6 +160,23 @@ export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMe
       && isSafeNonNegativeInteger(destination.encounterMode)
       && typeof destination.disableSwitch === "boolean"
       && outcome.authoritativeState.enemyParty.length > 0
+    );
+  }
+  if (value.terminal === "battle-settled") {
+    const validShape =
+      destination.kind === "reward"
+      && isSafeNonNegativeInteger(destination.hostTurn)
+      && (destination.result === "victory" || destination.result === "failure")
+      && (destination.continuation === "rewards"
+        || destination.continuation === "encounter"
+        || destination.continuation === "none")
+      && typeof destination.trainerVictory === "boolean"
+      && typeof destination.addHeal === "boolean"
+      && typeof destination.eggLapse === "boolean";
+    return (
+      validShape
+      && (!destination.trainerVictory || destination.result === "victory")
+      && ((!destination.addHeal && !destination.eggLapse) || destination.continuation === "rewards")
     );
   }
   return (
@@ -198,9 +218,9 @@ interface CoopMeTerminalPinnedState {
 /**
  * Durable ME terminal admission/once gate. DATA and CONTROL have separate progress bits so a late replay
  * phase or hot-rejoin can retry destination execution without reapplying a monotonic state tick. A pinned
- * ME accepts step 0 first, then one monotonically-addressed step after every executed battle. This covers
- * both the ordinary `battle(0) -> leave(1)` path and multi-battle encounters such as Colosseum without a
- * separately timed enemy-party carrier.
+ * ME accepts step 0 first, then the ordered lifecycle `battle -> battle-settled -> (battle | leave)`.
+ * Repeating the settled-to-battle pair supports multi-battle encounters without a separately timed party
+ * or post-BattleEnd carrier.
  */
 export class CoopMeTerminalTransactionReceiver {
   private readonly receipts = new Map<string, CoopMeTerminalReceiptState>();
@@ -236,13 +256,15 @@ export class CoopMeTerminalTransactionReceiver {
     }
     const priorPinned = this.pinned.get(receipt.pinned);
     if (priorReceipt == null) {
-      const expectedStep =
-        priorPinned == null
-          ? 0
-          : priorPinned.terminal === "battle" && priorPinned.executed
-            ? priorPinned.step + 1
-            : null;
-      if (expectedStep == null || receipt.step !== expectedStep) {
+      const validInitial = priorPinned == null && receipt.step === 0 && receipt.payload.terminal !== "battle-settled";
+      const validNext =
+        priorPinned != null
+        && priorPinned.executed
+        && receipt.step === priorPinned.step + 1
+        && ((priorPinned.terminal === "battle" && receipt.payload.terminal === "battle-settled")
+          || (priorPinned.terminal === "battle-settled"
+            && (receipt.payload.terminal === "battle" || receipt.payload.terminal === "leave")));
+      if (!validInitial && !validNext) {
         return "rejected";
       }
     }
@@ -294,15 +316,30 @@ export function coopMeTerminalSanctionedTails(
 ): string[] {
   if (typeof terminal !== "string") {
     const destination = "destination" in terminal ? terminal.destination : terminal;
-    return destination.kind === "battle"
-      ? ["MysteryEncounterBattlePhase", "MysteryEncounterBattleStartCleanupPhase"]
-      : destination.selectBiome
-        ? ["SelectBiomePhase", "NewBattlePhase"]
-        : ["NewBattlePhase"];
+    if (destination.kind === "battle") {
+      return [
+        "MysteryEncounterBattlePhase",
+        "MysteryEncounterBattleStartCleanupPhase",
+        "VictoryPhase",
+        "BattleEndPhase",
+      ];
+    }
+    if (destination.kind === "reward") {
+      return [
+        ...(destination.trainerVictory ? ["TrainerVictoryPhase"] : []),
+        ...(destination.continuation === "rewards"
+          ? ["MysteryEncounterRewardsPhase", "PostMysteryEncounterPhase"]
+          : []),
+        ...(destination.continuation === "rewards" && destination.eggLapse ? ["EggLapsePhase"] : []),
+        ...(destination.continuation !== "rewards" && destination.trainerVictory ? ["BattleEndPhase"] : []),
+      ];
+    }
+    return destination.selectBiome ? ["SelectBiomePhase", "NewBattlePhase"] : ["NewBattlePhase"];
   }
-  return terminal === "battle"
-    ? ["MysteryEncounterBattlePhase", "MysteryEncounterBattleStartCleanupPhase"]
-    : ["MysteryEncounterRewardsPhase", "PostMysteryEncounterPhase"];
+  if (terminal === "battle") {
+    return ["MysteryEncounterBattlePhase", "MysteryEncounterBattleStartCleanupPhase", "VictoryPhase", "BattleEndPhase"];
+  }
+  return terminal === "battle-settled" ? [] : ["MysteryEncounterRewardsPhase", "PostMysteryEncounterPhase"];
 }
 
 /** The typed per-kind payload the owner mints (invariant 2) / the host commits (invariant 4). */
@@ -502,7 +539,7 @@ function armOwnerIntentRetry(operationId: string, resend: () => void): void {
 /**
  * True iff the migrated (envelope-gated) ME path is active; else pure legacy fallback (§5.1). The local
  * rollback flag (`enabled`) is the OUTER gate; the NEGOTIATED capability set is the inner one (#896
- * W2e-R2): if the peer did not advertise "opSurface.me", it is not in the intersection and the surface
+ * W2e-R2): if the peer did not advertise `opSurface.me.v2`, it is not in the intersection and the surface
  * stays OFF on BOTH peers (fail closed). Pre-handshake the capability gate is inert (local flag alone).
  */
 export function isCoopMeOperationEnabled(): boolean {

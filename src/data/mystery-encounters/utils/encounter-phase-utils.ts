@@ -32,6 +32,7 @@ import {
   getCoopInteractionRelay,
   getCoopNetcodeMode,
   getCoopRuntime,
+  isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_SUB_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
@@ -1400,11 +1401,30 @@ export function handleMysteryEncounterVictory(addHealPhase = false, doNotContinu
         encounter.encounterMode === MysteryEncounterMode.TRAINER_BATTLE ? !p?.isFainted(true) : p.isOnField(),
       )
   ) {
-    globalScene.phaseManager.pushNew("BattleEndPhase", true);
-    if (encounter.encounterMode === MysteryEncounterMode.TRAINER_BATTLE) {
+    const queueRewards =
+      globalScene.gameMode.isEndless || !globalScene.gameMode.isWaveFinal(globalScene.currentBattle.waveIndex);
+    const trainerVictory = encounter.encounterMode === MysteryEncounterMode.TRAINER_BATTLE;
+    const continuation = encounter.doContinueEncounter ? "encounter" : queueRewards ? "rewards" : "none";
+    if (globalScene.gameMode.isCoop && continuation === "none") {
+      failCoopSharedSession("A final-wave Mystery battle has no retained GameOver continuation in protocol 34.");
+      return;
+    }
+    globalScene.phaseManager.pushNew("BattleEndPhase", true, null, {
+      result: "victory",
+      continuation,
+      trainerVictory,
+      addHeal: continuation === "rewards" && addHealPhase,
+      eggLapse: continuation === "rewards",
+    });
+    // The retained battle-settled terminal constructs every following guest phase only after its complete
+    // post-BattleEnd DATA image applies. Never pre-queue a locally-derived reward tail on the renderer.
+    if (isCoopAuthoritativeGuest()) {
+      return;
+    }
+    if (trainerVictory) {
       globalScene.phaseManager.pushNew("TrainerVictoryPhase");
     }
-    if (globalScene.gameMode.isEndless || !globalScene.gameMode.isWaveFinal(globalScene.currentBattle.waveIndex)) {
+    if (queueRewards) {
       globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase);
       if (!encounter.doContinueEncounter) {
         // Only lapse eggs once for multi-battle encounters
@@ -1434,7 +1454,17 @@ export function handleMysteryEncounterBattleFailed(addHealPhase = false, doNotCo
     return;
   }
   if (encounter.encounterMode !== MysteryEncounterMode.NO_BATTLE) {
-    globalScene.phaseManager.pushNew("BattleEndPhase", false);
+    const continuation = encounter.doContinueEncounter ? "encounter" : "rewards";
+    globalScene.phaseManager.pushNew("BattleEndPhase", false, null, {
+      result: "failure",
+      continuation,
+      trainerVictory: false,
+      addHeal: continuation === "rewards" && addHealPhase,
+      eggLapse: continuation === "rewards",
+    });
+    if (isCoopAuthoritativeGuest()) {
+      return;
+    }
   }
 
   globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase);

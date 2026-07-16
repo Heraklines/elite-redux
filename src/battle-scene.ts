@@ -4722,11 +4722,16 @@ export class BattleScene extends SceneBase {
    */
   public isMysteryEncounterValidForWave(battleType: BattleType, waveIndex: number): boolean {
     const [lowestMysteryEncounterWave, highestMysteryEncounterWave] = this.gameMode.getMysteryEncounterLegalWaves();
+    // Protocol 34 has no retained ME -> GameOver destination yet. Keep authoritative co-op from opening a
+    // final-wave ME whose battle could settle with an unowned `none` continuation.
+    const hasOwnedCoopContinuation =
+      !this.gameMode.isCoop || this.gameMode.isEndless || !this.gameMode.isWaveFinal(waveIndex);
     return (
       this.gameMode.hasMysteryEncounters
       && battleType === BattleType.WILD
       && !this.gameMode.isBoss(waveIndex)
       && waveIndex % 10 !== 1
+      && hasOwnedCoopContinuation
       && isBetween(waveIndex, lowestMysteryEncounterWave, highestMysteryEncounterWave)
     );
   }

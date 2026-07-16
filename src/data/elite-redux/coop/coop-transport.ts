@@ -94,7 +94,9 @@ export type CoopRole = "host" | "guest";
 // either peer in a local fallback.
 // er-coop-33 is the first compatibility stamp containing BOTH histories. A cached protocol-32 peer is
 // therefore rejected even when it implemented one of the two incompatible protocol-32 branches.
-export const COOP_PROTOCOL_VERSION = "er-coop-33";
+// er-coop-34 adds the ordered retained ME battle settlement terminal and opSurface.me.v2. A protocol-33
+// peer cannot safely infer the post-BattleEnd reward/event tail and is deliberately incompatible.
+export const COOP_PROTOCOL_VERSION = "er-coop-34";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -828,10 +830,10 @@ export interface CoopActiveMysteryEncounterSnapshotV1 {
       }
     | undefined;
   /** `pending` means the exact terminal is not committed yet; the guest must remain in the event. */
-  terminal: "pending" | "leave" | "battle";
+  terminal: "pending" | "leave" | "battle" | "battle-settled";
   /** Exact committed ME_TERMINAL operation. Required for a non-pending terminal. */
   terminalOperationId?: string | undefined;
-  /** ME_TERMINAL step (battle=0, post-battle leave=1; normal leave=0). */
+  /** Ordered ME_TERMINAL step (battle -> battle-settled -> next battle or final leave). */
   terminalStep?: number | undefined;
   /** Exact choice delivered by the journal materializer for this terminal. */
   terminalChoice?: number | undefined;
@@ -1151,10 +1153,10 @@ export type CoopMessage =
       runId?: string;
       checkpointRevision?: number;
     }
-  /** Authenticated public P33 hello. The signaling bearer is intentionally never peer-visible. */
+  /** Authenticated public P33-architecture hello. The signaling bearer is intentionally never peer-visible. */
   | {
       t: "hello";
-      version: "er-coop-33";
+      version: "er-coop-34";
       pairingId: string;
       account: CoopAccountIdentityV1;
       transportRole: CoopTransportRole;

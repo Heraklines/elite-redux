@@ -64,7 +64,7 @@ describe("co-op session controller (#633, P1)", () => {
     });
 
     it("rejects an er-coop-32 peer that contains only one side of the merged protocol-33 contract", async () => {
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-33");
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-34");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",

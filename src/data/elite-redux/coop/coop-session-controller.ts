@@ -814,7 +814,7 @@ export class CoopSessionController {
       const binding = this.p33Binding;
       this.transport.send({
         t: "hello",
-        version: "er-coop-33",
+        version: "er-coop-34",
         pairingId: this.p33Context.pairingId,
         account: { ...this.p33Context.account },
         transportRole: this.p33Context.transportRole,

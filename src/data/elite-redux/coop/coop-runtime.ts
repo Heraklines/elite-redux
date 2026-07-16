@@ -177,7 +177,7 @@ import type {
   CoopStormglassPayload,
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
-import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import { COOP_ME_BATTLE_SETTLED_CHOICE, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import { applyCoopOperationEpoch } from "#data/elite-redux/coop/coop-operation-epoch";
 import {
   coopOperationDurabilityHooks,
@@ -4277,6 +4277,8 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     || pinned >= 100_000
     || !isCompleteCoopMeTerminalPayload(payload)
     || payload.outcome.authoritativeState?.wave !== envelope.wave
+    || (payload.destination.kind === "reward"
+      && payload.destination.hostTurn !== payload.outcome.authoritativeState.turn)
     || (payload.destination.kind === "continue" && payload.destination.nextWave !== envelope.wave + 1)
     || coopMeInteractionStartValue() !== pinned
   ) {
@@ -4300,11 +4302,19 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
       return false;
     },
     executeDestination: () => {
-      const hostTurn = payload.destination.kind === "battle" ? payload.destination.hostTurn : undefined;
+      const hostTurn =
+        payload.destination.kind === "battle" || payload.destination.kind === "reward"
+          ? payload.destination.hostTurn
+          : undefined;
       setCoopMeTerminalControl(payload.terminal, hostTurn, {
         operationId: op.id,
         step,
-        choice: payload.terminal === "battle" ? COOP_ME_BATTLE_HANDOFF : COOP_INTERACTION_LEAVE,
+        choice:
+          payload.terminal === "battle"
+            ? COOP_ME_BATTLE_HANDOFF
+            : payload.terminal === "battle-settled"
+              ? COOP_ME_BATTLE_SETTLED_CHOICE
+              : COOP_INTERACTION_LEAVE,
       });
       const retainedControl = captureCoopActiveMysteryControl();
       if (
@@ -4776,6 +4786,107 @@ export function coopHostStreamMeMessage(text: string): void {
 }
 
 /**
+ * Host-side post-BattleEnd settlement for an ME-spawned battle. The initial battle terminal authorizes
+ * only the battle and its renderer-owned entry into BattleEnd; this next retained step carries every
+ * automatic post-battle mutation and the exact reward presentation. The final leave remains a later step.
+ */
+export interface CoopMeBattleSettlementPlan {
+  readonly result: "victory" | "failure";
+  readonly continuation: "rewards" | "encounter" | "none";
+  readonly trainerVictory: boolean;
+  readonly addHeal: boolean;
+  readonly eggLapse: boolean;
+}
+
+export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettlementPlan): boolean {
+  const runtime = active;
+  const battle = globalScene.currentBattle;
+  if (
+    runtime == null
+    || runtime.controller.role !== "host"
+    || runtime.controller.netcodeMode !== "authoritative"
+    || !isCoopMeOperationEnabled()
+    || !isCoopOperationJournalActive()
+    || battle == null
+    || !battle.isBattleMysteryEncounter?.()
+  ) {
+    return false;
+  }
+  const pinned = coopMeInteractionStartValue();
+  const prior = captureCoopActiveMysteryControl();
+  if (pinned < 0 || prior?.interactionCounter !== pinned || prior.terminal !== "battle") {
+    failCoopSharedSession("Mystery battle settlement had no retained battle handoff");
+    return true;
+  }
+  const step = (prior.terminalStep ?? -1) + 1;
+  const payload = {
+    terminal: "battle-settled",
+    outcome: captureCoopMeOutcome(),
+    destination: {
+      kind: "reward",
+      hostTurn: battle.turn,
+      ...plan,
+    },
+  } satisfies CoopMeTerminalPayload;
+  const operationId = commitMeOwnerIntent({
+    kind: "ME_TERMINAL",
+    seq: COOP_ME_TERM_SEQ_BASE + pinned,
+    pinned,
+    step,
+    payload,
+    localRole: "host",
+    wave: battle.waveIndex,
+    turn: battle.turn,
+  });
+  if (operationId == null) {
+    runtime.durability?.reconnect();
+    failCoopSharedSession("Mystery battle settlement could not be retained");
+    return true;
+  }
+  setCoopMeTerminalControl("battle-settled", battle.turn, {
+    operationId,
+    step,
+    choice: COOP_ME_BATTLE_SETTLED_CHOICE,
+  });
+  coopLog("me", `host retained post-BattleEnd settlement step=${step} id=${operationId}`);
+  return true;
+}
+
+/** Hold the exact guest BattleEnd until the retained post-battle ME settlement is redelivered. */
+export function holdForCoopMeBattleSettlementAtBattleEnd(): boolean {
+  const runtime = active;
+  const battle = globalScene.currentBattle;
+  if (
+    runtime == null
+    || runtime.controller.role !== "guest"
+    || runtime.controller.netcodeMode !== "authoritative"
+    || !isCoopMeOperationEnabled()
+    || !isCoopOperationJournalActive()
+    || battle == null
+    || !battle.isBattleMysteryEncounter?.()
+  ) {
+    return false;
+  }
+  const pinned = coopMeInteractionStartValue();
+  const retained = captureCoopActiveMysteryControl();
+  if (
+    pinned < 0
+    || retained?.interactionCounter !== pinned
+    || (retained.terminal !== "battle" && retained.terminal !== "battle-settled")
+    || retained.hostTurn !== battle.turn
+    || !coopMeHandoffBattleStarted()
+  ) {
+    failCoopSharedSession(
+      `Mystery BattleEnd had no exact retained battle terminal (wave=${battle.waveIndex}, turn=${battle.turn}).`,
+    );
+    return true;
+  }
+  coopLog("me", `guest BattleEnd holds for retained post-battle settlement wave=${battle.waveIndex}`);
+  runtime.durability?.reconnect();
+  return true;
+}
+
+/**
  * OWNER (#633 ME battle handoff): if THIS client owns the in-progress ME and its option just
  * spawned a battle, relay the BATTLE-HANDOFF sentinel so the WATCHER's pump ends WITHOUT leaving
  * the encounter (it then runs the spawned battle host-authoritatively). No-op when we are the
@@ -4816,7 +4927,7 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
     const disableSwitch = options?.disableSwitch ?? false;
     const priorControl = captureCoopActiveMysteryControl();
     const step =
-      priorControl?.interactionCounter === pinned && priorControl.terminal === "battle"
+      priorControl?.interactionCounter === pinned && priorControl.terminal === "battle-settled"
         ? (priorControl.terminalStep ?? -1) + 1
         : priorControl == null || priorControl.terminal === "pending"
           ? 0

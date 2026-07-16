@@ -297,7 +297,7 @@ describe("authenticated P33 browser client", () => {
 
     remote.send({
       t: "hello",
-      version: "er-coop-33",
+      version: "er-coop-34",
       pairingId: "PAIR33",
       account: replica,
       transportRole: "offerer",
@@ -380,7 +380,7 @@ describe("authenticated P33 browser client", () => {
     expect(controller.p33FrameContext()).toBeNull();
     remote.send({
       t: "hello",
-      version: "er-coop-33",
+      version: "er-coop-34",
       pairingId: "PAIR33",
       account: replica,
       transportRole: "offerer",
