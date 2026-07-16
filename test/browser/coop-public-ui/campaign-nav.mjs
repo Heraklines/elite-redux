@@ -89,6 +89,19 @@ export async function waitForSemanticSurface(client, surfaceId, { fromCursor = 0
   return event;
 }
 
+/** Wait for a rendered option surface whose production handler will accept an action now. */
+export async function waitForActionableSemanticSurface(client, surfaceId, { fromCursor = 0, timeoutMs = 15_000 } = {}) {
+  return client.evidence.waitForCondition(
+    sink => {
+      const event = sink.findLastSemanticSurface(fromCursor, surfaceId);
+      return event?.observation.ready?.handlerActive === true && event.observation.ready.inputBlocked === false
+        ? event
+        : null;
+    },
+    { timeoutMs, description: `actionable semantic surface ${surfaceId}` },
+  );
+}
+
 /**
  * Select slot zero on the fresh-account SAVE screen. The registered-account fixture has no saves; this
  * helper waits for the real handler's public loaded+empty projection before issuing the same ACTION a player uses.
@@ -116,6 +129,7 @@ export async function selectFirstEmptySaveSlot(client, { fromCursor = 0, timeout
  * browser cannot reinterpret a later key on the previous screen.
  */
 export async function confirmDefaultStarterTeam(client, { timeoutMs = 15_000 } = {}) {
+  await waitForActionableSemanticSurface(client, "starter-select", { timeoutMs });
   const optionCursor = client.evidence.cursor();
   await client.press("Space", "starter-open-selected-options");
   await waitForSemanticSurface(client, "option-select:SelectStarterPhase", {
@@ -162,6 +176,7 @@ export async function confirmSeededStarterTeam(client, expectedSpecies, { timeou
     expectedSpeciesIds,
     observation: seeded.observation,
   });
+  await waitForActionableSemanticSurface(client, "starter-select", { timeoutMs });
   const confirmCursor = client.evidence.cursor();
   await client.press("Enter", "starter-submit-visible-seeded-team");
   await waitForSemanticSurface(client, "confirm:SelectStarterPhase", {

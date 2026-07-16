@@ -895,6 +895,7 @@ function observeSemanticSurface(): void {
     const promptReady = (handler as unknown as { isAwaitingPromptAction?: () => boolean }).isAwaitingPromptAction;
     const readPromptGeneration = (handler as unknown as { getPromptGeneration?: () => number }).getPromptGeneration;
     const awaitingRaw = (handler as unknown as { awaitingActionInput?: unknown }).awaitingActionInput;
+    const inputBlockedRaw = (handler as unknown as { blockInput?: unknown }).blockInput;
     const readInputBlocked = (handler as unknown as { isInputBlocked?: () => boolean }).isInputBlocked;
     const readSurfaceGeneration = (handler as unknown as { getSurfaceGeneration?: () => number }).getSurfaceGeneration;
     // MessageUiHandler keeps its raw `awaitingActionInput` bit set after an action has consumed
@@ -909,7 +910,12 @@ function observeSemanticSurface(): void {
           : null;
     const promptGeneration =
       uiMode === "MESSAGE" && typeof readPromptGeneration === "function" ? readPromptGeneration.call(handler) : null;
-    const inputBlocked = typeof readInputBlocked === "function" ? readInputBlocked.call(handler) : null;
+    const inputBlocked =
+      typeof readInputBlocked === "function"
+        ? readInputBlocked.call(handler)
+        : typeof inputBlockedRaw === "boolean"
+          ? inputBlockedRaw
+          : null;
     const surfaceGeneration = typeof readSurfaceGeneration === "function" ? readSurfaceGeneration.call(handler) : null;
     const semanticSurfaceInstance =
       Number.isSafeInteger(promptGeneration) && (promptGeneration ?? 0) > 0

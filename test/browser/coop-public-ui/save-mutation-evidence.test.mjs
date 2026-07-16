@@ -42,11 +42,13 @@ test("requires every exact-delete URL commitment field", () => {
 });
 
 test("save journey requires public UI, exact CAS ACK ordering, and a brand-new context", async () => {
-  const [journeys, harness, workflow, saveHandler] = await Promise.all([
+  const [journeys, harness, workflow, saveHandler, campaignNav, browserEntry] = await Promise.all([
     readFile(new URL("journeys.mjs", import.meta.url), "utf8"),
     readFile(new URL("public-ui-harness.mjs", import.meta.url), "utf8"),
     readFile(new URL("../../../.github/workflows/coop-public-ui-journey.yml", import.meta.url), "utf8"),
     readFile(new URL("../../../src/ui/handlers/save-slot-select-ui-handler.ts", import.meta.url), "utf8"),
+    readFile(new URL("campaign-nav.mjs", import.meta.url), "utf8"),
+    readFile(new URL("../../../scripts/coop-browser-entry.ts", import.meta.url), "utf8"),
   ]);
   assert.match(
     journeys,
@@ -66,4 +68,9 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
   assert.match(workflow, /local-worker-vite\.config\.mjs/u);
   assert.match(workflow, /inputs\.journey == 'save-mutations'/u);
   assert.doesNotMatch(saveHandler, /isBeta \|\| isDev \? 300 : 2000/u);
+  assert.match(
+    campaignNav,
+    /confirmDefaultStarterTeam[\s\S]*?waitForActionableSemanticSurface\(client, "starter-select"/u,
+  );
+  assert.match(browserEntry, /inputBlockedRaw[\s\S]*?typeof inputBlockedRaw === "boolean"/u);
 });
