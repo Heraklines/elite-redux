@@ -398,12 +398,13 @@ async function resumeScanIsolation(rig) {
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun();
   for (const client of Object.values(rig.clients)) {
+    const firstRequest = client.evidence.findCoopCasUpdateRequest({ slot: 0, mode: "empty" });
     const firstSave = client.evidence.findResponse("/savedata/session/coop-cas-update", {
       status: 200,
       method: "POST",
     });
-    if (firstSave == null) {
-      throw new Error(`${client.label}: wave-1 command did not create the replica needed by the isolation fixture`);
+    if (firstRequest == null || firstSave == null || firstRequest.index >= firstSave.index) {
+      throw new Error(`${client.label}: wave-1 command did not empty-CAS slot zero for the isolation fixture`);
     }
   }
 
@@ -413,30 +414,55 @@ async function resumeScanIsolation(rig) {
     ),
   );
   await rig.coldReopenAndPair(rig.config.requesterSeat);
-  await rig.host.evidence.waitFor(/resume scan slot=0 load failed/u, {
+  await rig.host.evidence.waitFor(/resume scan slot=0 load failed[\s\S]*equal-revision co-op fork in slot 0/u, {
     from: rig.host.pageCursor,
     timeoutMs: rig.config.timeoutMs,
     description: "slot-scoped equal-revision fork quarantine",
   });
-  const before = await rig.host.checkpoint("resume-conflict-isolated-before-launch");
-  if (!sessionStorageKeys(before).some(key => /^sessionData_/u.test(key))) {
-    throw new Error(`${rig.host.label}: quarantined local slot zero disappeared before the explicit launch decision`);
-  }
+  const localBefore = new Map(
+    await Promise.all(
+      Object.values(rig.clients).map(async client => {
+        const checkpoint = await client.checkpoint("resume-conflict-isolated-before-launch");
+        const sessions = checkpoint.storage.filter(item => /^sessionData(?:\d*)_/u.test(item.key));
+        if (sessions.length !== 1 || !/^[0-9a-f]{64}$/u.test(sessions[0].sha256)) {
+          throw new Error(`${client.label}: expected one exact quarantined local slot before launch`);
+        }
+        return [client.label, sessions[0]];
+      }),
+    ),
+  );
 
-  const freshLaunchCursor = rig.host.evidence.cursor();
+  const clientLaunchCursors = new Map(
+    Object.values(rig.clients).map(client => [client.label, client.evidence.cursor()]),
+  );
   await rig.startFreshRun();
-  const after = await rig.host.checkpoint("resume-conflict-isolated-fresh-command");
-  const keys = sessionStorageKeys(after);
-  if (keys.length < 2) {
-    throw new Error(`${rig.host.label}: fresh run did not preserve the quarantined slot and claim another slot`);
-  }
-  const freshWrite = rig.host.evidence.findResponse("/savedata/session/coop-cas-update", {
-    from: freshLaunchCursor,
-    status: 200,
-    method: "POST",
-  });
-  if (freshWrite == null) {
-    throw new Error(`${rig.host.label}: isolated launch never committed a fresh co-op slot`);
+  const localAfter = await Promise.all(
+    Object.values(rig.clients).map(async client => {
+      const after = await client.checkpoint("resume-conflict-isolated-fresh-command");
+      const sessions = after.storage.filter(item => /^sessionData(?:\d*)_/u.test(item.key));
+      const before = localBefore.get(client.label);
+      const preserved = sessions.find(item => item.key === before?.key);
+      if (sessions.length < 2 || preserved?.sha256 !== before?.sha256) {
+        throw new Error(`${client.label}: fresh run changed or removed the exact quarantined local slot`);
+      }
+      const cursor = clientLaunchCursors.get(client.label);
+      const freshRequest = client.evidence.events
+        .slice(cursor)
+        .find(event => event.kind === "coop-cas-update-request" && event.mode === "empty" && event.slot !== 0);
+      const freshResponse = client.evidence.findResponse("/savedata/session/coop-cas-update", {
+        from: cursor,
+        status: 200,
+        method: "POST",
+      });
+      if (freshRequest == null || freshResponse == null || freshRequest.index >= freshResponse.index) {
+        throw new Error(`${client.label}: isolated launch did not empty-CAS a different fresh slot`);
+      }
+      return { client, sessions, freshRequest, freshResponse };
+    }),
+  );
+  const hostFresh = localAfter.find(proof => proof.client === rig.host);
+  if (hostFresh == null) {
+    throw new Error(`${rig.host.label}: isolated host proof was not captured`);
   }
   const cloudAfter = await Promise.all(
     Object.values(rig.clients).map(async client => [client, await isolatedCloudReplicaStatus(rig, client, 0)]),
@@ -448,8 +474,9 @@ async function resumeScanIsolation(rig) {
   }
   rig.host.evidence.record("resume-scan-isolation-proof", {
     quarantinedSlot: 0,
-    preservedSessionKeys: keys,
-    freshWriteResponseIndex: freshWrite.index,
+    preservedSessionKeys: hostFresh.sessions.map(item => item.key),
+    freshSlot: hostFresh.freshRequest.slot,
+    freshWriteResponseIndex: hostFresh.freshResponse.index,
     quarantinedCloudSha256: cloudAfter.map(([client, status]) => ({ client: client.label, sha256: status.sha256 })),
   });
 }

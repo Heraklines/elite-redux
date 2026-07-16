@@ -142,6 +142,19 @@ function parsedUrl(value) {
   }
 }
 
+export function coopCasUpdateRequestView(value) {
+  const url = value instanceof URL ? value : parsedUrl(value);
+  if (url == null || url.pathname !== "/savedata/session/coop-cas-update") {
+    return null;
+  }
+  const slot = Number(url.searchParams.get("slot"));
+  const mode = url.searchParams.get("coopCasMode");
+  if (!Number.isSafeInteger(slot) || slot < 0 || slot > 4 || (mode !== "empty" && mode !== "existing")) {
+    return null;
+  }
+  return Object.freeze({ slot, mode });
+}
+
 // Diagnostic request/response body capture is scoped to the co-op save + signal workers ONLY
 // (never game assets/CDN/localhost), to keep artifacts sane and never touch unrelated traffic.
 const CAPTURED_API_HOST = /(?:er-save-api|er-coop-api)/u;
@@ -1094,6 +1107,17 @@ export class EvidenceSink {
       );
   }
 
+  findCoopCasUpdateRequest({ from = 0, slot = null, mode = null } = {}) {
+    return this.events
+      .slice(from)
+      .find(
+        event =>
+          event.kind === "coop-cas-update-request"
+          && (slot == null || event.slot === slot)
+          && (mode == null || event.mode === mode),
+      );
+  }
+
   findRenderProfile(moveAnimations, from = 0) {
     return this.events
       .slice(from)
@@ -1386,6 +1410,15 @@ export class EvidenceSink {
           this.record("coop-cas-delete-request", commitment);
         }
       }
+      if (url.pathname === "/savedata/session/coop-cas-update") {
+        const commitment = coopCasUpdateRequestView(url);
+        if (commitment == null) {
+          const invalid = this.record("coop-cas-update-request-invalid", { url: safeUrl(request.url()) });
+          this.failures.push(invalid);
+        } else {
+          this.record("coop-cas-update-request", commitment);
+        }
+      }
       const body = request.postData();
       if (body == null) {
         return;
@@ -1573,26 +1606,39 @@ export class EvidenceSink {
     } else {
       this.record("checkpoint-semantic", { name: step, surfaceKey });
     }
-    const dom = await page.evaluate(() => ({
-      title: document.title,
-      url: location.href,
-      bodyText: document.body.innerText,
-      canvases: [...document.querySelectorAll("canvas")].map(canvas => ({
-        width: canvas.width,
-        height: canvas.height,
-        clientWidth: canvas.clientWidth,
-        clientHeight: canvas.clientHeight,
-      })),
-      inputs: [...document.querySelectorAll("input,textarea")].map(input => ({
-        tag: input.tagName.toLowerCase(),
-        type: input.getAttribute("type"),
-        disabled: input.disabled,
-        visible: input.getClientRects().length > 0,
-      })),
-      storage: Object.keys(localStorage)
-        .sort()
-        .map(key => ({ key, length: localStorage.getItem(key)?.length ?? 0 })),
-    }));
+    const dom = await page.evaluate(async () => {
+      const storage = await Promise.all(
+        Object.keys(localStorage)
+          .sort()
+          .map(async key => {
+            const value = localStorage.getItem(key) ?? "";
+            const sha256 = /^sessionData(?:\d*)_/u.test(key)
+              ? [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
+                  .map(byte => byte.toString(16).padStart(2, "0"))
+                  .join("")
+              : null;
+            return { key, length: value.length, sha256 };
+          }),
+      );
+      return {
+        title: document.title,
+        url: location.href,
+        bodyText: document.body.innerText,
+        canvases: [...document.querySelectorAll("canvas")].map(canvas => ({
+          width: canvas.width,
+          height: canvas.height,
+          clientWidth: canvas.clientWidth,
+          clientHeight: canvas.clientHeight,
+        })),
+        inputs: [...document.querySelectorAll("input,textarea")].map(input => ({
+          tag: input.tagName.toLowerCase(),
+          type: input.getAttribute("type"),
+          disabled: input.disabled,
+          visible: input.getClientRects().length > 0,
+        })),
+        storage,
+      };
+    });
     if (dom.canvases.length === 0 || dom.canvases.some(canvas => canvas.width <= 0 || canvas.height <= 0)) {
       throw new Error(`${this.label}: checkpoint ${step} had no non-zero game canvas`);
     }
