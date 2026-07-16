@@ -589,6 +589,13 @@ export class Arena {
       globalScene.phaseManager.queueMessage(getTerrainClearMessage(oldTerrainType));
     }
 
+    // ER Toxic Terrain: existing Spikes are replaced by Toxic Spikes when the
+    // terrain becomes active (docs/er-custom-mechanics.md — "2 or more layers of
+    // Spikes become 2 layers of Toxic Spikes").
+    if (this.terrain && terrain === TerrainType.TOXIC) {
+      this.erConvertSpikesToToxicSpikes();
+    }
+
     for (const pokemon of inSpeedOrder(ArenaTagSide.BOTH)) {
       pokemon.findAndRemoveTags(
         tag => "terrainTypes" in tag && !(tag.terrainTypes as TerrainType[]).find(t => t === terrain),
@@ -604,6 +611,27 @@ export class Arena {
     }
 
     return true;
+  }
+
+  /**
+   * ER Toxic Terrain rule: when Toxic Terrain becomes active, any layers of
+   * Spikes already on the field are replaced by Toxic Spikes (capped at Toxic
+   * Spikes' 2-layer max). Fires per side that has Spikes.
+   */
+  private erConvertSpikesToToxicSpikes(): void {
+    for (const side of [ArenaTagSide.PLAYER, ArenaTagSide.ENEMY]) {
+      const spikes = this.getTagOnSide(ArenaTagType.SPIKES, side) as { layers: number; sourceId?: number } | undefined;
+      if (!spikes) {
+        continue;
+      }
+      const layers = Math.min(spikes.layers, 2);
+      const sourceId = spikes.sourceId ?? 0;
+      this.removeTagOnSide(ArenaTagType.SPIKES, side, true);
+      // addTag stacks a fresh layer each call (onOverlap increments layers).
+      for (let i = 0; i < layers; i++) {
+        this.addTag(ArenaTagType.TOXIC_SPIKES, 0, undefined, sourceId, side, true);
+      }
+    }
   }
 
   /** Override the terrain to the value set inside {@linkcode Overrides.STARTING_TERRAIN_OVERRIDE}. */

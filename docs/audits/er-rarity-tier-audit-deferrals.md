@@ -1,5 +1,12 @@
 # ER rarity-tier audit — deferred items
 
+> 🔴 **The remaining-dex sweep (all abilities on 10+ species + moves on 37+ mons,
+> 938 items) has its own FIX QUEUE:** `docs/audits/er-remaining-dex-fix-plan.md`
+> — 287 findings (173 numeric dex-vs-c-source conflicts where the **dex wins**, +
+> 114 genuine implementation gaps), with per-row dex-vs-code + suggested fix.
+> Another agent can pick that up directly.
+
+
 Tracking doc for the confirmed-but-not-yet-fixed items surfaced by the
 rarity-tier dex-fidelity audit (tiers 3–7: abilities bucketed by species count,
 moves by mon-count). The vast majority of findings were fixed and committed with
@@ -122,4 +129,35 @@ is audited, or opportunistically.
   Radiance's **ally** in doubles is caught by neither the static-type field
   condition nor the holder-only immunity. Static-Dark and holder-targeted
   runtime-Dark are handled; only runtime-Dark spread/ally-target in doubles slips.
+
+## 7. ✅ RESOLVED by the tier-1 engine sweep (2026-07)
+
+The following prior deferrals were implemented as real engine primitives:
+- **Shallow Grave (629) + Backup Power (899)** (§2): true on-next-summon revive
+  (`PostFaintDeferredReviveAbAttr` + `SummonPhase.onEnd` hook) — the mon now truly
+  faints and revives to 25% at the next send-out.
+- **Evaporate (444)** (§4): ally self-drop immunity in doubles
+  (`UserFieldSelfStatDropImmunityAbAttr` + ally pass in `stat-stage-change-phase`).
+- **Lead Coat (296)** (§5): `WeightMultiplierAbAttr(3)` added.
+- **Ghastly Echo (848)**: the +50% switch-in boost (was §2b) — `ER_EMPOWERED_SWITCH_IN`
+  tag armed on switch-out, consumed at the next send-out.
+
+## 8. Tier-1 engine-sweep NEW residuals (2026-07) — revisit later
+
+- **Fetch (er move 969) — non-Gem generator-built items.** The new `lostItems`
+  ledger retrieves knocked-off / consumed items and shattered Gems, but a held item
+  built by a **generator with pregen args** (other than elemental Gems, which carry
+  `erGemItemType`) can't be faithfully rebuilt from the ledger, so Fetch skips it in
+  favor of the next recoverable lost item. Documented inline in
+  `ErRetrieveConsumedItemAttr`.
+- **Dreamscape (er 859) — the pivot sub-clause.** "Considered asleep → 2× when any
+  active mon is asleep" is done (Comatose now counts as asleep). The remaining
+  clause "attacks hit a **switching-out sleeping foe** for 1× power" is unwired —
+  needs an OnOpponentSwitchOut + target-asleep strike primitive that doesn't exist.
+- **Rom-description slug drift 795–798 (Embody Aspect masks).** Like the 387–392
+  drift (§3): all four Ogerpon mask abilities (795 Speed / 796 Atk / 797 Def / 798
+  SpDef) collapse onto the single `embodyaspect` "Speed" slug in
+  `er-ability-rom-descriptions.ts`, so an audit reading descriptions sees "Speed"
+  for all four. The **code is correct** (real per-mask stat); only the ROM
+  reference text is drifted. No gameplay impact.
 </content>

@@ -1,6 +1,8 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { TurnCommand } from "#app/battle";
 import { globalScene } from "#app/global-scene";
+import { allMoves } from "#data/data-lists";
+import { ConditionalDamageAbAttr } from "#data/elite-redux/archetypes/conditional-damage";
 import { summonCoopPlayerField } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
@@ -10,9 +12,13 @@ import {
   isAuthoritativeBattleSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
+import { erIsSelfSwitchMove } from "#data/moves/move";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
+import { MoveCategory } from "#enums/move-category";
+import { MoveId } from "#enums/move-id";
+import { StatusEffect } from "#enums/status-effect";
 import { SwitchType } from "#enums/switch-type";
 import type { Pokemon } from "#field/pokemon";
 import { BypassSpeedChanceModifier } from "#modifiers/modifier";
@@ -72,6 +78,134 @@ export class TurnStartPhase extends FieldPhase {
       return aIndex < bIndex ? -1 : aIndex > bIndex ? 1 : 0;
     });
     return orderedTargets;
+  }
+
+  /**
+   * ER switch-out interception. Returns the set of {@linkcode BattlerIndex}es whose
+   * queued voluntary switch (`Command.POKEMON`) should be DEFERRED past the move
+   * phases this turn because an opponent is striking them as they leave:
+   * - Pursuit (228): an opponent has a `FIGHT` command with {@linkcode MoveId.PURSUIT}
+   *   targeting the switcher (Pursuit then hits it at x2 — see {@linkcode PursuitPowerAttr}).
+   * - Dreamcatcher (305) / Dreamscape (859): an opponent holding a Dreamcatcher-type
+   *   ability (a `ConditionalDamageAbAttr` with the `any-active-asleep` condition) has a
+   *   queued attacking move targeting the switcher WHILE the switcher is asleep — "attacks
+   *   hit sleeping foes who are switching out ... damaging them before leaving".
+   */
+  private getPursuedSwitchers(): Set<BattlerIndex> {
+    const pursued = new Set<BattlerIndex>();
+    const turnCommands = globalScene.currentBattle.turnCommands;
+
+    for (const switcher of globalScene.getField(true)) {
+      const switcherIndex = switcher.getBattlerIndex();
+      if (turnCommands[switcherIndex]?.command !== Command.POKEMON || turnCommands[switcherIndex]?.skip) {
+        continue;
+      }
+      if (switcher.getOpponents(true).some(opponent => this.isSwitchInterceptedBy(opponent, switcher))) {
+        pursued.add(switcherIndex);
+      }
+    }
+
+    return pursued;
+  }
+
+  /**
+   * @returns whether `opponent`'s queued move this turn intercepts `switcher` as it
+   * switches out — either Pursuit aimed at it, or a Dreamcatcher-type ability holder
+   * attacking it while it is asleep.
+   */
+  private isSwitchInterceptedBy(opponent: Pokemon, switcher: Pokemon): boolean {
+    const command = globalScene.currentBattle.turnCommands[opponent.getBattlerIndex()];
+    if (!command || command.skip || command.command !== Command.FIGHT) {
+      return false;
+    }
+    const queuedMove = command.move;
+    if (!queuedMove) {
+      return false;
+    }
+    // The opponent's move must be aimed at this switcher.
+    const targets = command.targets ?? queuedMove.targets;
+    if (!targets?.includes(switcher.getBattlerIndex())) {
+      return false;
+    }
+    if (queuedMove.move === MoveId.PURSUIT) {
+      return true;
+    }
+    // Dreamcatcher-type rider: sleeping switcher + attacking move + holder has the
+    // "any-active-asleep" conditional-damage attr (Dreamcatcher 305 & Dreamscape 859).
+    return (
+      switcher.status?.effect === StatusEffect.SLEEP
+      && allMoves[queuedMove.move]?.category !== MoveCategory.STATUS
+      && this.hasDreamcatcherSwitchRider(opponent)
+    );
+  }
+
+  /**
+   * @returns whether `pokemon` holds a Dreamcatcher-type ability — one carrying a
+   * `ConditionalDamageAbAttr` with the `any-active-asleep` condition. This is shared by
+   * ER Dreamcatcher (305) and, via its composite Dreamcatcher part, Dreamscape (859).
+   */
+  private hasDreamcatcherSwitchRider(pokemon: Pokemon): boolean {
+    for (const attr of pokemon.getAllActiveAbilityAttrs()) {
+      if (attr instanceof ConditionalDamageAbAttr && attr.getDamageCondition().kind === "any-active-asleep") {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * ER Pursuit (228) vs a self-switching MOVE (U-turn / Volt Switch / Flip Turn /
+   * Parting Shot). Unlike a MENU switch (`Command.POKEMON`, deferred wholesale in
+   * {@linkcode getPursuedSwitchers}), a move-switch's `SwitchSummonPhase` is baked
+   * INTO the foe's own move (queued mid-move via `queueDeferred`), so there is no
+   * turn-start switch command to hold back. Instead we force the Pursuit user's
+   * MovePhase to run FIRST, so Pursuit strikes the foe BEFORE it uses its
+   * self-switch move — preserving the "hit it before it leaves" guarantee even
+   * when the switcher is faster. The x2 is applied by {@linkcode PursuitPowerAttr}
+   * (it reads the still-present self-switch FIGHT command).
+   */
+  private forceMoveSwitchPursuers(): void {
+    const turnCommands = globalScene.currentBattle.turnCommands;
+    for (const switcher of globalScene.getField(true)) {
+      const switcherCmd = turnCommands[switcher.getBattlerIndex()];
+      if (
+        !switcherCmd
+        || switcherCmd.skip
+        || switcherCmd.command !== Command.FIGHT
+        || !erIsSelfSwitchMove(switcherCmd.move?.move)
+      ) {
+        continue;
+      }
+      for (const opponent of switcher.getOpponents(true)) {
+        const oppCmd = turnCommands[opponent.getBattlerIndex()];
+        if (!oppCmd || oppCmd.skip || oppCmd.command !== Command.FIGHT || oppCmd.move?.move !== MoveId.PURSUIT) {
+          continue;
+        }
+        const targets = oppCmd.targets ?? oppCmd.move?.targets;
+        if (targets?.includes(switcher.getBattlerIndex())) {
+          // Strike before the self-switcher acts (and thus before its switch).
+          globalScene.phaseManager.forceMoveNext(mp => mp.pokemon === opponent);
+        }
+      }
+    }
+  }
+
+  /**
+   * Queue the deferred (pursued) switches. `pushNew` places them after the move phases
+   * already pushed this turn, so the interceptor's move (Pursuit / the Dreamcatcher
+   * holder's attack) resolves against the on-field switcher first, then the switch runs.
+   */
+  private queueDeferredSwitches(deferredSwitches: { pokemon: Pokemon; turnCommand: TurnCommand }[]): void {
+    for (const { pokemon, turnCommand } of deferredSwitches) {
+      globalScene.phaseManager.pushNew(
+        "SwitchSummonPhase",
+        turnCommand.args?.[0] ? SwitchType.BATON_PASS : SwitchType.SWITCH,
+        pokemon.getFieldIndex(),
+        turnCommand.cursor!,
+        true,
+        pokemon.isPlayer(),
+      );
+    }
   }
 
   // TODO: Refactor this alongside `CommandPhase.handleCommand` to use SEPARATE METHODS
@@ -148,11 +282,28 @@ export class TurnStartPhase extends FieldPhase {
 
     this.queuePreemptiveCounters(field);
 
+    // ER — switch-out interception (Pursuit 228 / Dreamcatcher 305 / Dreamscape 859):
+    // a foe with a queued voluntary switch that is being "pursued" by an opponent
+    // (Pursuit targeting it, or a Dreamcatcher-type ability holder attacking it while
+    // it sleeps) must have its switch DEFERRED until AFTER the interceptor's move
+    // resolves — so the strike lands on the still-on-field switcher instead of on the
+    // mon it swaps in. Vanilla queues ALL switches (unshifted) before ALL moves, which
+    // is exactly backwards for this case; deferring the specific pursued switch fixes
+    // the order without disturbing normal switching. See `getPursuedSwitchers`.
+    const pursuedSwitchers = this.getPursuedSwitchers();
+    const deferredSwitches: { pokemon: Pokemon; turnCommand: TurnCommand }[] = [];
+
     moveOrder.forEach((o, index) => {
       const pokemon = field[o];
       const turnCommand = globalScene.currentBattle.turnCommands[o];
 
       if (!turnCommand || turnCommand.skip) {
+        return;
+      }
+
+      // Defer a pursued switch: hold it back and re-queue it AFTER the move phases below.
+      if (turnCommand.command === Command.POKEMON && pursuedSwitchers.has(o)) {
+        deferredSwitches.push({ pokemon, turnCommand });
         return;
       }
 
@@ -164,6 +315,13 @@ export class TurnStartPhase extends FieldPhase {
       }
       this.handleTurnCommand(turnCommand, pokemon);
     });
+
+    this.queueDeferredSwitches(deferredSwitches);
+
+    // ER Pursuit (228) vs a self-switching MOVE (U-turn / Volt Switch): reorder
+    // Pursuit to strike the self-switcher BEFORE it acts. Runs after the move
+    // phases are queued so the reorder targets a real, present MovePhase.
+    this.forceMoveSwitchPursuers();
 
     // Queue various effects for the end of the turn.
     phaseManager.pushNew("CheckInterludePhase");

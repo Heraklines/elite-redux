@@ -2,6 +2,12 @@ export enum BattlerTagType {
   RECHARGING = "RECHARGING",
   FLINCHED = "FLINCHED",
   INTERRUPTED = "INTERRUPTED",
+  /**
+   * Elite Redux (move 507 Sky Drop): applied to the TARGET while it is held in
+   * the air across the two-turn Sky Drop. Immobilizes the target (its move is
+   * cancelled while held) until the user slams it back down.
+   */
+  SKY_DROP = "SKY_DROP",
   CONFUSED = "CONFUSED",
   INFATUATED = "INFATUATED",
   SEEDED = "SEEDED",
@@ -98,6 +104,10 @@ export enum BattlerTagType {
   MAGIC_COAT = "MAGIC_COAT",
   SUPREME_OVERLORD = "SUPREME_OVERLORD",
   BYPASS_SPEED = "BYPASS_SPEED",
+  /** Snatch (289): the user is primed to steal the next snatchable self-targeting move. */
+  SNATCH = "SNATCH",
+  /** Me First (382): boosts the copied move's power x1.5 for this turn. */
+  ME_FIRST = "ME_FIRST",
   // ER-specific battler tags. Modelled as battler tags rather than vanilla
   // {@linkcode StatusEffect} entries to avoid mutating pokerogue's primary
   // status enum (which would cascade through save loaders, sprite picks,
@@ -193,4 +203,21 @@ export enum BattlerTagType {
    * on switch-out (ordinary volatile); NOT cured by persistent-status cures.
    */
   ER_COMMANDED = "ER_COMMANDED",
+  /**
+   * Elite Redux Safe Passage (move 979). Applied to the Pokemon sent out after
+   * Safe Passage's user force-switches itself out; the holder takes -35% damage
+   * (read in {@linkcode Pokemon.getAttackDamage}) for the remainder of the turn
+   * it is summoned. Lapses at that turn's end (BattlerTagLapseType.TURN_END,
+   * turnCount 1). Armed + consumed via the per-side pending latch in
+   * `safe-passage.ts`. Not serialized (transient effect).
+   */
+  ER_SAFE_PASSAGE = "ER_SAFE_PASSAGE",
+  /**
+   * Elite Redux Sage Power (ability 352) move-lock. Behaves exactly like
+   * {@linkcode GORILLA_TACTICS} (locks the holder into the first move it uses
+   * for the rest of the battle) but WITHOUT the ×1.5 physical Attack boost
+   * Gorilla Tactics applies in `onAdd` — Sage Power grants only +50% Special
+   * Attack (via a separate StatMultiplier) plus the move lock, per the 2.65 dex.
+   */
+  ER_SAGE_POWER_LOCK = "ER_SAGE_POWER_LOCK",
 }

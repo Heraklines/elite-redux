@@ -56,14 +56,18 @@ import {
   BlockItemTheftAbAttr,
   BlockStatusDamageAbAttr,
   BlockWeatherDamageAttr,
+  BypassBurnDamageReductionAbAttr,
   ChangeMovePriorityAbAttr,
   ConditionalCritAbAttr,
   DefensiveStatSubstituteAbAttr,
+  FlinchStatStageChangeAbAttr,
   FogRestoreDisguiseFormChangeAbAttr,
+  FullBurnDamageImmunityAbAttr,
   FullHpResistTypeAbAttr,
   getWeatherCondition,
   HealFromBerryUseAbAttr,
   IgnoreTypeStatusEffectImmunityAbAttr,
+  MoveImmunityAbAttr,
   MovePowerBoostAbAttr,
   MoveTypeChangeAbAttr,
   MoveTypePowerBoostAbAttr,
@@ -73,10 +77,12 @@ import {
   PostAttackRemoveTargetTypeAbAttr,
   PostAttackStealHeldItemAbAttr,
   PostBiomeChangeWeatherChangeAbAttr,
+  PostDefendApplyArenaTrapTagAbAttr,
   PostDefendApplyBattlerTagAbAttr,
   PostDefendContactApplyTagChanceAbAttr,
   PostDefendPartyStatusHealAbAttr,
   PostDefendStatStageChangeAbAttr,
+  PostIntimidateStatStageChangeAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   PostSummonAbAttr,
   PostSummonFogRestoreDisguiseAbAttr,
@@ -84,11 +90,14 @@ import {
   PostSummonTerrainChangeAbAttr,
   PostSummonWeatherChangeAbAttr,
   PostTurnHurtIfSleepingAbAttr,
+  PostTurnResetStatusAbAttr,
   PostWeatherLapseDamageAbAttr,
   PostWeatherLapseHealAbAttr,
   PreHitResistTypeChangeAbAttr,
+  PreserveBaseStatAbilitiesAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
+  ReduceBurnDamageAbAttr,
   SelfStatDropImmunityAbAttr,
   StabBoostAbAttr,
   StatMultiplierAbAttr,
@@ -102,7 +111,11 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { BerserkOnThresholdAbAttr } from "#data/elite-redux/archetypes/berserk-on-threshold";
-import { ChanceStatusOnAttackAbAttr, ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
+import {
+  ChanceBattlerTagOnAttackAbAttr,
+  ChanceStatusOnAttackAbAttr,
+  ChanceStatusOnHitAbAttr,
+} from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
 import {
@@ -111,7 +124,12 @@ import {
 } from "#data/elite-redux/archetypes/disable-foe-items-on-entry";
 import { DodgeFirstSuperEffectiveAbAttr } from "#data/elite-redux/archetypes/dodge-first-super-effective";
 import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
+import { EntryHazardImmunityAbAttr } from "#data/elite-redux/archetypes/entry-hazard-immunity";
 import { EntryTailwindClearWeatherAbAttr } from "#data/elite-redux/archetypes/entry-tailwind-clear-weather";
+import {
+  FlareBoostSelfBurnOnSummonAbAttr,
+  FlareBoostSelfBurnOnWeatherChangeAbAttr,
+} from "#data/elite-redux/archetypes/flare-boost-fog-self-burn";
 import { HealStatusOnMoveTypeAbAttr } from "#data/elite-redux/archetypes/heal-status-on-move-type";
 import { IgnoreResistancesAbAttr } from "#data/elite-redux/archetypes/offensive-type-chart-override";
 import { PostAttackChangeTargetTypeAbAttr } from "#data/elite-redux/archetypes/post-attack-change-target-type";
@@ -153,7 +171,7 @@ import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { BerryModifier, FieldEffectModifier } from "#modifiers/modifier";
 import type { Move } from "#moves/move";
-import { NumberHolder } from "#utils/common";
+import { NumberHolder, randSeedInt } from "#utils/common";
 import i18next from "i18next";
 
 /**
@@ -162,6 +180,60 @@ import i18next from "i18next";
  * `init-elite-redux-custom-{moves,abilities}.ts`.
  */
 const VANILLA_ID_CUTOFF = 5000;
+
+/**
+ * Dedicated internal move id for FOREWARN's delayed strike. Sits well above both
+ * the vanilla range (≤ ~950) and the ER-custom range (5000–5186), so it can
+ * never collide with a real move. NOT part of the MoveId enum — it is an
+ * ability-internal move constructed at ER init (see {@linkcode registerForewarnFutureSight}).
+ */
+export const FOREWARN_FUTURE_SIGHT_ID = 9500 as MoveId;
+
+/**
+ * ER 2.65 Forewarn: "Casts an 80 BP Future Sight on the opposing Pokemon when
+ * switching in. … The attack cannot miss once initiated and ignores accuracy
+ * checks. This cannot target the same Pokemon twice."
+ *
+ * The delayed hit resolves via `allMoves[sourceMove]` (see `DelayedAttackTag`),
+ * so a per-cast power clone can't reach it — Forewarn needs a DISTINCT registered
+ * move. We shallow-clone the real 120-BP Future Sight (preserving its prototype
+ * and attrs, incl. `DelayedAttackAttr`) into {@linkcode FOREWARN_FUTURE_SIGHT_ID}
+ * with `power = 80` and `accuracy = -1` (bypasses the accuracy check → always
+ * connects). The shared `attrs`/`conditions` are read-only at execution, so the
+ * real Future Sight move is never mutated. The "cannot target the same Pokemon
+ * twice" clause is honored by the DelayedAttack slot guard (`canAddTag` refuses a
+ * second pending strike on an occupied slot). Idempotent.
+ */
+function registerForewarnFutureSight(): void {
+  if (allMoves[FOREWARN_FUTURE_SIGHT_ID]) {
+    return;
+  }
+  const base = allMoves[MoveId.FUTURE_SIGHT];
+  if (!base) {
+    return;
+  }
+  const clone = Object.assign(Object.create(Object.getPrototypeOf(base)), base) as Move;
+  const w = clone as unknown as { id: number; power: number; accuracy: number };
+  w.id = FOREWARN_FUTURE_SIGHT_ID;
+  w.power = 80;
+  w.accuracy = -1;
+  // `Move.localize()` derives its i18n key from `MoveId[this.id]`; id 9500 has no
+  // MoveId enum entry, so the language-reload re-localize pass in battle-scene.ts
+  // would blank the clone's name to ".name" (the same reason ER custom moves
+  // override localize()). Mirror the REAL Future Sight's localized name/effect
+  // instead — set it now and on every re-localize.
+  const relocalize = (): void => {
+    const fs = allMoves[MoveId.FUTURE_SIGHT];
+    const cw = clone as unknown as { name: string; effect: string };
+    cw.name = fs?.name ?? "Future Sight";
+    cw.effect = (fs as unknown as { effect?: string })?.effect ?? cw.name;
+  };
+  relocalize();
+  (clone as unknown as { localize: () => void }).localize = relocalize;
+  // `allMoves` is typed `readonly Move[]`; ER registers by index-write via the
+  // same cast the custom-moves initializer uses.
+  (allMoves as Move[])[FOREWARN_FUTURE_SIGHT_ID] = clone;
+}
 
 /**
  * Per-move target overrides for vanilla moves whose ER dump `target` field is
@@ -586,17 +658,23 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     },
   ],
   // TURBOBLAZE: bypass abilities + add Fire type to self on entry.
+  // ER 2.65 dex: does NOT bypass abilities that modify base stats (Grass Pelt,
+  // Fur Coat, etc.) — PreserveBaseStatAbilitiesAbAttr keeps those active through
+  // the ability-bypass (mirrors Blind Rage 694).
   [
     AbilityId.TURBOBLAZE,
     ab => {
       ab.attrs.push(new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.FIRE }));
+      ab.attrs.push(new PreserveBaseStatAbilitiesAbAttr());
     },
   ],
   // TERAVOLT: bypass abilities + add Electric type to self on entry.
+  // Same base-stat-ability preservation clause as Turboblaze (see above).
   [
     AbilityId.TERAVOLT,
     ab => {
       ab.attrs.push(new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.ELECTRIC }));
+      ab.attrs.push(new PreserveBaseStatAbilitiesAbAttr());
     },
   ],
 
@@ -641,30 +719,90 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // MERCILESS: vanilla always-crits poisoned. ER extends to paralyzed + bleed + sleep.
   [AbilityId.MERCILESS, ab => extendMercilessConditions(ab)],
 
-  // ===== MAJOR — type-conversion baseline boosts (Refrigerate family adds 1.2x typed) =====
-  // ER: Normal→X conversion + "X moves are empowered" — adds typed boost.
+  // ===== MAJOR — type-conversion "-ate" family (two mutually-exclusive branches) =====
+  // ER 2.65 dex: each converts Normal→X and then, IF the user is X-type, its X
+  // moves gain a 10% secondary; OTHERWISE it gains X STAB. The typed damage boost
+  // is gated to NON-X users (the "gains STAB" branch, kept at the prior 1.2x
+  // approximation to avoid a damage regression); the type-user branch adds the
+  // 10% secondary status/tag on X moves.
+  // 174 REFRIGERATE — Ice user: 10% frostbite; else: Ice boost.
   [
     AbilityId.REFRIGERATE,
     ab => {
-      ab.attrs.push(new TypeDamageBoostAbAttr({ type: PokemonType.ICE, multiplier: 1.2 }));
+      ab.attrs.push(
+        new TypeDamageBoostAbAttr({ type: PokemonType.ICE, multiplier: 1.2 }).addCondition(
+          p => !p.isOfType(PokemonType.ICE),
+        ),
+      );
+      ab.attrs.push(
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 10,
+          tags: [BattlerTagType.ER_FROSTBITE],
+          filter: { type: PokemonType.ICE },
+        }).addCondition(p => p.isOfType(PokemonType.ICE)),
+      );
     },
   ],
+  // 182 PIXILATE — Fairy user: 10% infatuate; else: Fairy boost.
   [
     AbilityId.PIXILATE,
     ab => {
-      ab.attrs.push(new TypeDamageBoostAbAttr({ type: PokemonType.FAIRY, multiplier: 1.2 }));
+      ab.attrs.push(
+        new TypeDamageBoostAbAttr({ type: PokemonType.FAIRY, multiplier: 1.2 }).addCondition(
+          p => !p.isOfType(PokemonType.FAIRY),
+        ),
+      );
+      ab.attrs.push(
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 10,
+          tags: [BattlerTagType.INFATUATED],
+          filter: { type: PokemonType.FAIRY },
+        }).addCondition(p => p.isOfType(PokemonType.FAIRY)),
+      );
     },
   ],
+  // 184 AERILATE — dex: "Changes Normal moves to Flying. If the user is
+  // Flying-type its Flying moves are 10% faster, otherwise it gains Flying STAB."
+  // The ER ROM (battle_util.c) implements the "10% faster" clause as a flat 1.1×
+  // DAMAGE modifier on the ate-converted Flying move (identical to every sibling
+  // -ate ability: Refrigerate/Pixilate/Galvanize all `MulModifier(1.1)`), NOT a
+  // speed/priority effect — the dex "faster" wording is garbled flavor, and a
+  // per-move-type speed boost can't reach turn order here (SPD is queried with
+  // MoveId.NONE at ordering time). So:
+  //   • non-Flying user → 1.2× Flying-move boost (approximates the missing STAB).
+  //   • Flying user     → 1.1× Flying-move boost (the ROM's ate bonus), on top of
+  //     the natural 1.5× Flying STAB the engine already grants a Flying user.
   [
     AbilityId.AERILATE,
     ab => {
-      ab.attrs.push(new TypeDamageBoostAbAttr({ type: PokemonType.FLYING, multiplier: 1.2 }));
+      ab.attrs.push(
+        new TypeDamageBoostAbAttr({ type: PokemonType.FLYING, multiplier: 1.2 }).addCondition(
+          p => !p.isOfType(PokemonType.FLYING),
+        ),
+      );
+      ab.attrs.push(
+        new TypeDamageBoostAbAttr({ type: PokemonType.FLYING, multiplier: 1.1 }).addCondition(p =>
+          p.isOfType(PokemonType.FLYING),
+        ),
+      );
     },
   ],
+  // 206 GALVANIZE — Electric user: 10% paralyze; else: Electric boost.
   [
     AbilityId.GALVANIZE,
     ab => {
-      ab.attrs.push(new TypeDamageBoostAbAttr({ type: PokemonType.ELECTRIC, multiplier: 1.2 }));
+      ab.attrs.push(
+        new TypeDamageBoostAbAttr({ type: PokemonType.ELECTRIC, multiplier: 1.2 }).addCondition(
+          p => !p.isOfType(PokemonType.ELECTRIC),
+        ),
+      );
+      ab.attrs.push(
+        new ChanceStatusOnAttackAbAttr({
+          chance: 10,
+          effects: [StatusEffect.PARALYSIS],
+          filter: { type: PokemonType.ELECTRIC },
+        }).addCondition(p => p.isOfType(PokemonType.ELECTRIC)),
+      );
     },
   ],
 
@@ -674,9 +812,10 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [AbilityId.MAGNET_PULL, ab => extendArenaTrapToIgnoreGhost(ab)],
   [AbilityId.ARENA_TRAP, ab => extendArenaTrapToIgnoreGhost(ab)],
 
-  // ===== MAJOR — AROMA_VEIL shrinks protected-tags set =====
-  // ER drops Taunt/Torment/Encore — keep Infatuated, HealBlock, Disabled only.
-  [AbilityId.AROMA_VEIL, ab => narrowAromaVeilTags(ab)],
+  // AROMA_VEIL: ER 2.65 dex mandates protection from infatuation, heal block, AND
+  // the disabling moves "including Disable, Taunt, Encore, and Torment" — the full
+  // vanilla six-tag set. No patcher: the vanilla UserFieldBattlerTagImmunityAbAttr
+  // (INFATUATED/TAUNT/DISABLED/TORMENT/HEAL_BLOCK/ENCORE) already matches the dex.
 
   // ===== MAJOR — DAMP: ER repurposes it from "prevent explosions" to "makes the
   // attacker Water-type on contact" (offense+defense). Code had kept vanilla Damp.
@@ -767,9 +906,18 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // Already at 1.5 by default; no-op. Skipped.
 
   // ===== Round 4: chance-status composite additions =====
-  // 9 STATIC: vanilla 30% contact paralysis → ER adds 10% non-contact PRZ.
-  // No "also on offense" in ER spec for STATIC — keep defend-side only.
-  [AbilityId.STATIC, ab => addNonContactStatusChance(ab, StatusEffect.PARALYSIS, 10)],
+  // 9 STATIC: ER 2.65 dex — "chance to paralyze when attacking OR when hit by a
+  // move: 30% on contact attacks, 10% on non-contact attacks" (bidirectional).
+  // Defense side: vanilla 30% contact PRZ + a 10% non-contact tier. Offense side:
+  // mirror FLAME_BODY — 30% on-contact + 10% non-contact procs against the target.
+  [
+    AbilityId.STATIC,
+    ab => {
+      addNonContactStatusChance(ab, StatusEffect.PARALYSIS, 10);
+      addOffenseContactStatusChance(ab, StatusEffect.PARALYSIS, 30);
+      addOffenseNonContactStatusChance(ab, StatusEffect.PARALYSIS, 10);
+    },
+  ],
   // 49 FLAME_BODY: vanilla 30% contact burn → ER adds 20% non-contact burn.
   // ER spec: "Also works on offense" — add 30% on-attack contact proc too.
   [
@@ -808,6 +956,90 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     AbilityId.POISON_TOUCH,
     ab => {
       addOffenseContactStatusChance(ab, StatusEffect.POISON, 30);
+      // ER 2.65 dex: "30% chance to poison on contact moves, both when attacking
+      // AND being attacked." Vanilla only wires the offense side; add the
+      // defense-side contact proc (contact-only, no non-contact tier).
+      ab.attrs.push(
+        new ChanceStatusOnHitAbAttr({
+          chance: 30,
+          effects: [StatusEffect.POISON],
+          contactRequired: true,
+        }),
+      );
+    },
+  ],
+  // 85 HEATPROOF: ER 2.65 dex — "Immune to burn damage and Attack drops from
+  // burn status." Vanilla only HALVES burn tick (ReduceBurnDamageAbAttr 0.5).
+  // Swap to FULL burn immunity + BypassBurnDamageReductionAbAttr so the burned
+  // holder keeps full physical damage (no burn Attack cut). The Fire-move 0.5x
+  // stays untouched.
+  [
+    AbilityId.HEATPROOF,
+    ab => {
+      // Drop the vanilla 0.5 burn-damage reducer, keep everything else.
+      ab.attrs = ab.attrs.filter(a => !(a instanceof ReduceBurnDamageAbAttr));
+      ab.attrs.push(new FullBurnDamageImmunityAbAttr());
+      ab.attrs.push(new BypassBurnDamageReductionAbAttr());
+    },
+  ],
+  // 19 SHIELD_DUST: ER 2.65 dex — three clauses: (1) block secondary effects of
+  // damaging moves (vanilla IgnoreMoveEffectsAbAttr, already wired), (2) immunity
+  // to ALL entry hazards, (3) immunity to ALL powder moves. Add clauses 2 & 3.
+  [
+    AbilityId.SHIELD_DUST,
+    ab => {
+      ab.attrs.push(
+        new MoveImmunityAbAttr(
+          (pokemon, attacker, move) => pokemon !== attacker && move.hasFlag(MoveFlags.POWDER_MOVE),
+        ),
+      );
+      ab.attrs.push(new EntryHazardImmunityAbAttr());
+    },
+  ],
+  // 155 RATTLED: ER 2.65 dex — "+1 Speed when hit by a Bug/Dark/Ghost move OR when
+  // the user flinches." Base wires the type-hit trigger; vanilla also carries an
+  // off-dex Intimidate reaction. Add the flinch trigger (same attr Steadfast uses).
+  [
+    AbilityId.RATTLED,
+    ab => {
+      ab.attrs.push(new FlinchStatStageChangeAbAttr([Stat.SPD], 1));
+    },
+  ],
+  // 138 FLARE_BOOST: ER 2.65 dex — +50% SpAtk when burned (vanilla) AND "Negates
+  // burn damage. Immediately applies burn to self in fog." The burn-damage block
+  // plus the fog self-ignite (mirrors Toxic Boost's Toxic-Terrain self-poison):
+  // self-burn on switch-in under active fog AND the instant fog is set on-field.
+  [
+    AbilityId.FLARE_BOOST,
+    ab => {
+      ab.attrs.push(new BlockStatusDamageAbAttr(StatusEffect.BURN));
+      ab.attrs.push(new FlareBoostSelfBurnOnSummonAbAttr());
+      ab.attrs.push(new FlareBoostSelfBurnOnWeatherChangeAbAttr());
+    },
+  ],
+  // 61 SHED_SKIN: ER 2.65 dex — "30% chance to cure status at end of turn."
+  // Vanilla uses a 1/3 (~33.3%) gate; retune to an exact 30% roll. Strip the
+  // vanilla-conditioned PostTurnResetStatusAbAttr and re-push with a 30% gate.
+  [
+    AbilityId.SHED_SKIN,
+    ab => {
+      ab.attrs = ab.attrs.filter(a => !(a instanceof PostTurnResetStatusAbAttr));
+      ab.attrs.push(new PostTurnResetStatusAbAttr().addCondition(_pokemon => randSeedInt(100) < 30));
+    },
+  ],
+  // 101 TECHNICIAN: ER 2.65 dex — "Does not boost moves with 60 BP or less if they
+  // POTENTIALLY can have more than 60 BP, such as Revenge or Venoshock." Vanilla
+  // gates on the CURRENT computed power ≤ 60, so an untriggered Revenge/Payback/
+  // Assurance (sitting at base 60) wrongly gets boosted. Replace the condition:
+  // boost only fixed-power moves ≤ 60 — any move carrying a VariablePowerAttr
+  // (whose power can climb above 60) is excluded regardless of its momentary value.
+  [
+    AbilityId.TECHNICIAN,
+    ab => {
+      ab.attrs = ab.attrs.filter(a => a.constructor.name !== "MovePowerBoostAbAttr");
+      ab.attrs.push(
+        new MovePowerBoostAbAttr((_user, _target, move) => move.power <= 60 && !move.hasAttr("VariablePowerAttr"), 1.5),
+      );
     },
   ],
   // 234 PRANKSTER: vanilla status moves +1 priority. ER also adds Dark-immune
@@ -831,11 +1063,12 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // 235 STAKEOUT: vanilla 2x on switch-in. ER ups to 2x always against statused
   // foes (different trigger). Vanilla close enough — keep.
   // 167 FUR_COAT: vanilla 0.5x physical received. Same as ER.
-  // 200 STEELWORKER: ER spec — "Normal moves become Steel. Steel resists
-  // Ghost and Dark." Prior wire halved INCOMING Steel damage (wrong) and
-  // kept the vanilla MoveTypePowerBoost (not in spec). Replace with:
-  //  - MoveTypeChangeAbAttr (Normal → Steel) — Refrigerate-family shape
-  //  - ReceivedTypeDamageMultiplier (Ghost, 0.5) + (Dark, 0.5)
+  // 200 STEELWORKER: ER 2.65 dex — "Normal moves become Steel, and if the user is
+  // Steel-type it RESISTS Ghost and Dark, OTHERWISE it gains Steel STAB." Two
+  // mutually-exclusive branches gated on the holder's own typing:
+  //  - MoveTypeChangeAbAttr (Normal → Steel) — always
+  //  - Steel user: ReceivedTypeDamageMultiplier (Ghost 0.5) + (Dark 0.5)
+  //  - non-Steel user: TypeDamageBoost (Steel 1.5) STAB-equivalent
   //  - Strip the spurious vanilla Steel power-boost
   [
     AbilityId.STEELWORKER,
@@ -844,8 +1077,17 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(
         new MoveTypeChangeAbAttr(PokemonType.STEEL, (_user, _t, move) => !!move && move.type === PokemonType.NORMAL),
       );
-      ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.GHOST, 0.5));
-      ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.DARK, 0.5));
+      ab.attrs.push(
+        new ReceivedTypeDamageMultiplierAbAttr(PokemonType.GHOST, 0.5).addCondition(p => p.isOfType(PokemonType.STEEL)),
+      );
+      ab.attrs.push(
+        new ReceivedTypeDamageMultiplierAbAttr(PokemonType.DARK, 0.5).addCondition(p => p.isOfType(PokemonType.STEEL)),
+      );
+      ab.attrs.push(
+        new TypeDamageBoostAbAttr({ type: PokemonType.STEEL, multiplier: 1.5 }).addCondition(
+          p => !p.isOfType(PokemonType.STEEL),
+        ),
+      );
     },
   ],
   // 263 DRAGONS_MAW: vanilla 1.5x Dragon. ER 1.5x same.
@@ -903,9 +1145,16 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // boost on Normal-type moves AND makes those moves IGNORE the target's
   // resistances (but not immunities) — the IgnoreResistancesAbAttr marker is
   // read by Pokemon.getAttackTypeEffectiveness.
+  // The vanilla ability (init-abilities) already carries an always-true 1.2x
+  // MovePowerBoostAbAttr (every move is Normal post-conversion, so it always
+  // fires). ER's dex value is "10% power boost" (×1.1), NOT ×1.32 — so STRIP the
+  // vanilla 1.2x boost before adding our 1.1x, or the two stack. (constructor.name
+  // === "MovePowerBoostAbAttr" targets exactly the base-class instance; the
+  // MoveTypeChangeAbAttr conversion attr is a different class and is preserved.)
   [
     AbilityId.NORMALIZE,
     ab => {
+      ab.attrs = ab.attrs.filter(attr => attr.constructor.name !== "MovePowerBoostAbAttr");
       ab.attrs.push(new MovePowerBoostAbAttr((_user, _t, move) => move?.type === PokemonType.NORMAL, 1.1));
       ab.attrs.push(new IgnoreResistancesAbAttr());
     },
@@ -949,20 +1198,17 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new ClearOpponentStatBuffsOnSummonAbAttr());
     },
   ],
-  // 53 PICKUP: vanilla "find items post-battle" → ER "Removes all hazards on
-  // entry". Clear the entry hazards on switch-in. (The previous placeholder
-  // pushed a 0-stage ATK self-boost, which did nothing but spam "ATK won't go
-  // higher" on every entry — replaced with the real hazard-clear.)
+  // 53 PICKUP: vanilla "find items post-battle" → ER "Clears all entry hazards
+  // from YOUR side of the field" on switch-in. ownSideOnly=true so it strips only
+  // the holder's own hazards, NOT hazards it set on the opponent (dex: own side).
   [
     AbilityId.PICKUP,
     ab => {
       ab.attrs.push(
-        new PostSummonRemoveArenaTagAbAttr([
-          ArenaTagType.SPIKES,
-          ArenaTagType.TOXIC_SPIKES,
-          ArenaTagType.STEALTH_ROCK,
-          ArenaTagType.STICKY_WEB,
-        ]),
+        new PostSummonRemoveArenaTagAbAttr(
+          [ArenaTagType.SPIKES, ArenaTagType.TOXIC_SPIKES, ArenaTagType.STEALTH_ROCK, ArenaTagType.STICKY_WEB],
+          true,
+        ),
       );
     },
   ],
@@ -1010,14 +1256,52 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   ],
 
   // 242 STALWART: ER spec is "isn't affected by redirection, crits, or ability
-  // suppression". Vanilla pokerogue wires only BlockRedirect (and the builder's
-  // uncopiable/unsuppressable flags cover suppression). Add crit immunity to
-  // match the description.
+  // suppression (Mold Breaker, Gastro Acid, Neutralizing Gas, Mycelium Might)".
+  // Vanilla pokerogue wires only BlockRedirect; the builder does NOT set the
+  // suppression flags (the old comment claimed it did). Add crit immunity AND
+  // mark the ability unsuppressable/uncopiable/unreplaceable so Gastro Acid /
+  // Neutralizing Gas / Trace / Simple Beam can't touch it. Mold-Breaker /
+  // Mycelium-Might immunity is already correct — Stalwart is not `ignorable`, so
+  // arena.ignoreAbilities can't bypass it (pokemon.ts canApplyAbility).
   [
     AbilityId.STALWART,
     ab => {
       if (!ab.attrs.some(a => a instanceof BlockCritAbAttr)) {
         ab.attrs.push(new BlockCritAbAttr());
+      }
+      ab.makeImmutableToAbilityEffects();
+    },
+  ],
+
+  // 402 TOXIC_DEBRIS: ER dex/short_desc = "Sets Toxic Spikes when hit by CONTACT
+  // moves." Vanilla pokerogue triggers on move.category===PHYSICAL (so it wrongly
+  // fires on physical non-contact moves like Earthquake and misses special
+  // contact moves). Swap the predicate to MAKES_CONTACT so it matches the dex and
+  // its siblings Loose Quills (401) / Loose Rocks (405).
+  [
+    AbilityId.TOXIC_DEBRIS,
+    ab => {
+      const idx = ab.attrs.findIndex(a => a instanceof PostDefendApplyArenaTrapTagAbAttr);
+      if (idx !== -1) {
+        ab.attrs[idx] = new PostDefendApplyArenaTrapTagAbAttr(
+          (_target, _user, move) => move.hasFlag(MoveFlags.MAKES_CONTACT),
+          ArenaTagType.TOXIC_SPIKES,
+        );
+      }
+    },
+  ],
+
+  // 553 GUARD_DOG: ER dex adds "or Scare ... raises the stat instead of lowering
+  // it". Vanilla Guard Dog's Intimidate-reaction hardcodes ATK +1, so a Scare
+  // (SpAtk -1, routed through the intimidate reaction) wrongly bumped ATK instead
+  // of SpAtk. Swap to the mirror-incoming variant so the RAISED stat matches the
+  // stat the effect would lower (ATK for Intimidate, SpAtk for Scare/Terrify).
+  [
+    AbilityId.GUARD_DOG,
+    ab => {
+      const idx = ab.attrs.findIndex(a => a instanceof PostIntimidateStatStageChangeAbAttr);
+      if (idx !== -1) {
+        ab.attrs[idx] = new PostIntimidateStatStageChangeAbAttr([Stat.ATK], 1, true, true);
       }
     },
   ],
@@ -1573,6 +1857,10 @@ export function initEliteReduxVanillaRebalance(): VanillaRebalanceResult {
     }
   }
 
+  // Register FOREWARN's dedicated 80-BP always-hit Future Sight variant BEFORE
+  // the ability loop (its entry-effect casts this move id — see patchForewarn).
+  registerForewarnFutureSight();
+
   // === ABILITIES ===
   // Driven by the ABILITY_PATCHERS dispatch table at the top of this file.
   // Each patcher mutates the live Ability's `attrs` array and/or its AbAttrs'
@@ -2056,21 +2344,29 @@ class ErDefeatistStatMultiplierAbAttr extends StatMultiplierAbAttr {
  * pokerogue. Skipping the patch — see audit notes. (Defensive: this function
  * is a no-op.)
  */
-function patchHealerChance(_ability: MutableAbility): void {
-  // No-op: pokerogue's HEALER is already at 30% (`randSeedInt(10) < 3`).
-  // The audit doc treats vanilla as 50%, but the pokerogue source disagrees.
-  // Defer to ROM verification.
+function patchHealerChance(ability: MutableAbility): void {
+  // pokerogue's HEALER is already at 30% (`randSeedInt(10) < 3`) for the ALLY
+  // cure. ER 2.65 dex additionally cures the USER's own status with an
+  // INDEPENDENT 30% check ("cures status for both the user AND their ally.
+  // Makes 2 separate checks for each Pokemon."). Add the self-cure branch with
+  // its own roll — the ally branch stays as the vanilla attr.
+  ability.attrs.push(new PostTurnResetStatusAbAttr(false).addCondition(_pokemon => randSeedInt(10) < 3));
 }
 
 /**
  * Add a "type-X-moves get a +1.2x baseline boost" attr alongside the vanilla
- * low-HP boost. Used by OVERGROW/BLAZE/TORRENT/SWARM. Vanilla:
- *   - `LowHpMoveTypePowerBoostAbAttr` — fires at HP <= 1/3.
- * ER:
- *   - 1.2x ALWAYS, 1.5x at low HP — keep vanilla, add baseline.
+ * low-HP boost. Used by OVERGROW/BLAZE/TORRENT/SWARM.
+ *
+ * ER C-source (battle_util.c) is MUTUALLY EXCLUSIVE: `HP <= 1/3 ? 1.5 : 1.2`.
+ * The vanilla `LowHpMoveTypePowerBoostAbAttr` already supplies the ×1.5 at
+ * HP <= 1/3, so the baseline ×1.2 must be gated to HP > 1/3 — otherwise both
+ * fire below 1/3 HP and stack to 1.2×1.5 = 1.8× (bug). Gating makes the two
+ * boosts exclusive, exactly matching the dex if/else.
  */
 function addBaselineTypeBoost(ability: MutableAbility, type: PokemonType, multiplier: number): void {
-  ability.attrs.push(new MoveTypePowerBoostAbAttr(type, multiplier));
+  ability.attrs.push(
+    new MoveTypePowerBoostAbAttr(type, multiplier).addCondition(pokemon => pokemon.getHpRatio() > 0.33),
+  );
 }
 
 /**
@@ -2218,23 +2514,6 @@ function extendArenaTrapToIgnoreGhost(ability: MutableAbility): void {
 }
 
 /**
- * Narrow AROMA_VEIL's protected tag set. Vanilla protects against
- * INFATUATED + TAUNT + DISABLED + TORMENT + HEAL_BLOCK + ENCORE.
- * ER protects only against INFATUATED + HEAL_BLOCK + DISABLED.
- */
-function narrowAromaVeilTags(ability: MutableAbility): void {
-  for (const attr of ability.attrs) {
-    if (attr instanceof UserFieldBattlerTagImmunityAbAttr) {
-      (attr as unknown as { immuneTagTypes: BattlerTagType[] }).immuneTagTypes = [
-        BattlerTagType.INFATUATED,
-        BattlerTagType.HEAL_BLOCK,
-        BattlerTagType.DISABLED,
-      ];
-    }
-  }
-}
-
-/**
  * Replace DAMP's vanilla `FieldPreventExplosiveMovesAbAttr` (block Explosion/
  * Self-Destruct) with ER's repurposed behavior: when an opponent makes contact
  * with the holder, the attacker's type becomes pure Water
@@ -2306,12 +2585,14 @@ function patchColorChange(ability: MutableAbility): void {
 
 /**
  * Replace FOREWARN's ForewarnAbAttr (reveal-strongest-move) with an
- * EntryEffectAbAttr that scripts Future Sight on entry.
+ * EntryEffectAbAttr that scripts the dedicated 80-BP always-hit Future Sight
+ * variant ({@linkcode FOREWARN_FUTURE_SIGHT_ID}) on entry — NOT the real 120-BP
+ * move. The variant is registered by {@linkcode registerForewarnFutureSight}.
  */
 function patchForewarn(ability: MutableAbility): void {
   for (let i = 0; i < ability.attrs.length; i++) {
     if (ability.attrs[i].constructor.name === "ForewarnAbAttr") {
-      ability.attrs[i] = new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.FUTURE_SIGHT });
+      ability.attrs[i] = new EntryEffectAbAttr({ kind: "scripted-move", move: FOREWARN_FUTURE_SIGHT_ID });
     }
   }
 }
@@ -2449,14 +2730,25 @@ function patchFlowerGift(ability: MutableAbility): void {
 }
 
 /**
- * Patch SOLAR_POWER: ER drops the vanilla in-sun self-damage entirely. Vanilla
- * pokerogue wires both a `PostWeatherLapseDamageAbAttr` (lose 1/8 max HP at the
- * end of every turn in sun) and a `StatMultiplierAbAttr(SPATK, 1.5)`. ER's ROM
- * text ("Boosts the Pokemon's highest attacking stat by 50% during sun.") has
- * no HP cost, so strip only the damage attr and leave the Sp.Atk boost intact.
+ * Patch SOLAR_POWER: ER drops the vanilla in-sun self-damage entirely and boosts
+ * the holder's HIGHEST attacking stat (not just Sp.Atk). Vanilla pokerogue wires
+ * both a `PostWeatherLapseDamageAbAttr` (lose 1/8 max HP each turn in sun) and a
+ * `StatMultiplierAbAttr(SPATK, 1.5)`. ER's ROM text ("Boosts the Pokemon's
+ * highest attacking stat by 50% during sun.") has no HP cost, so strip the damage
+ * attr and swap the SpAtk-only multiplier for the ATK/SpAtk-highest primitive
+ * (mirrors the Big Leaves 374 composite) so a physical attacker also benefits.
  */
 function patchSolarPower(ability: MutableAbility): void {
-  ability.attrs = ability.attrs.filter(a => !(a instanceof PostWeatherLapseDamageAbAttr));
+  ability.attrs = ability.attrs.filter(
+    a => !(a instanceof PostWeatherLapseDamageAbAttr) && !(a instanceof StatMultiplierAbAttr && a.stat === Stat.SPATK),
+  );
+  ability.attrs.push(
+    new SelfHighestStatMultiplierAbAttr({
+      candidates: [Stat.ATK, Stat.SPATK],
+      multiplier: 1.5,
+      weathers: [WeatherType.SUNNY, WeatherType.HARSH_SUN],
+    }),
+  );
 }
 
 /**

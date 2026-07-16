@@ -2083,6 +2083,29 @@ export class GorillaTacticsAbAttr extends ExecutedMoveAbAttr {
   }
 }
 
+/**
+ * Elite Redux Sage Power (ability 352) move-lock. Identical to
+ * {@linkcode GorillaTacticsAbAttr} but adds the {@linkcode BattlerTagType.ER_SAGE_POWER_LOCK}
+ * tag, which locks the holder into its first move WITHOUT Gorilla Tactics'
+ * spurious ×1.5 physical Attack boost. The +50% Special Attack is supplied by a
+ * separate `StatMultiplierAbAttr(SPATK, 1.5)` on the ability.
+ */
+export class SagePowerMoveLockAbAttr extends ExecutedMoveAbAttr {
+  constructor(showAbility = false) {
+    super(showAbility);
+  }
+
+  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+    return !pokemon.getTag(BattlerTagType.ER_SAGE_POWER_LOCK);
+  }
+
+  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
+    if (!simulated) {
+      pokemon.addTag(BattlerTagType.ER_SAGE_POWER_LOCK);
+    }
+  }
+}
+
 /*
 Subclasses that override the `canApply` and `apply` are not allowed to change the type of their parameters.
 This is suggested via the `Closed` type.
@@ -2614,27 +2637,47 @@ export class IntimidateImmunityAbAttr extends CancelInteractionAbAttr {
   }
 }
 
+/**
+ * Params for {@linkcode PostIntimidateStatStageChangeAbAttr}. Carries the stat(s)
+ * and magnitude of the incoming intimidate-family drop so a `mirrorIncoming`
+ * reactor (ER Guard Dog) can raise the SAME stat that was being lowered.
+ */
+export interface PostIntimidateStatStageChangeAbAttrParams extends AbAttrParamsWithCancel {
+  /** The stat(s) the incoming intimidate-family effect is lowering. */
+  readonly incomingStats?: readonly BattleStat[];
+  /** The (negative) stage delta the incoming effect would apply. */
+  readonly incomingStages?: number;
+}
+
 export class PostIntimidateStatStageChangeAbAttr extends AbAttr {
   private readonly stats: readonly BattleStat[];
   private readonly stages: number;
   private readonly overwrites: boolean;
+  private readonly mirrorIncoming: boolean;
 
-  constructor(stats: readonly BattleStat[], stages: number, overwrites?: boolean) {
+  constructor(stats: readonly BattleStat[], stages: number, overwrites?: boolean, mirrorIncoming = false) {
     super(true);
     this.stats = stats;
     this.stages = stages;
     this.overwrites = !!overwrites;
+    this.mirrorIncoming = mirrorIncoming;
   }
 
-  override apply({ pokemon, simulated, cancelled }: AbAttrParamsWithCancel): void {
+  override apply({
+    pokemon,
+    simulated,
+    cancelled,
+    incomingStats,
+    incomingStages,
+  }: PostIntimidateStatStageChangeAbAttrParams): void {
+    // ER Guard Dog (553): "If intimidated OR scared, the corresponding stat is
+    // RAISED instead of lowered." Mirror mode raises whichever stat the incoming
+    // effect targeted (ATK for Intimidate, SpAtk for Scare/Terrify) by the same
+    // magnitude, instead of the hardcoded fallback stat.
+    const stats = this.mirrorIncoming && incomingStats && incomingStats.length > 0 ? incomingStats : this.stats;
+    const stages = this.mirrorIncoming && incomingStages !== undefined ? Math.abs(incomingStages) : this.stages;
     if (!simulated) {
-      globalScene.phaseManager.unshiftNew(
-        "StatStageChangePhase",
-        pokemon.getBattlerIndex(),
-        false,
-        this.stats,
-        this.stages,
-      );
+      globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), false, stats, stages);
     }
     cancelled.value = this.overwrites;
   }
@@ -2679,24 +2722,33 @@ export abstract class PostSummonRemoveEffectAbAttr extends PostSummonAbAttr {}
 export class PostSummonRemoveArenaTagAbAttr extends PostSummonAbAttr {
   /** The arena tags that this attribute should remove. */
   private readonly arenaTags: NonEmptyTuple<ArenaTagType>;
+  /**
+   * When true, only tags on the HOLDER's own side are removed (ER Pickup clears
+   * hazards from YOUR side only). When false (default), tags are stripped from
+   * BOTH sides (vanilla Screen Cleaner behavior).
+   */
+  private readonly ownSideOnly: boolean;
 
   /**
    * @param tagTypes - The arena tags that this attribute should remove
+   * @param ownSideOnly - Restrict removal to the holder's own side (default `false` = both sides)
    */
-  constructor(tagTypes: NonEmptyTuple<ArenaTagType>) {
+  constructor(tagTypes: NonEmptyTuple<ArenaTagType>, ownSideOnly = false) {
     super(true);
     this.arenaTags = tagTypes;
+    this.ownSideOnly = ownSideOnly;
   }
 
   override canApply(_params: AbAttrBaseParams): boolean {
     return globalScene.arena.hasTag(this.arenaTags);
   }
 
-  override apply({ simulated }: AbAttrBaseParams): void {
+  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
     }
-    globalScene.arena.removeTagsOnSide(this.arenaTags, ArenaTagSide.BOTH);
+    const side = this.ownSideOnly ? (pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY) : ArenaTagSide.BOTH;
+    globalScene.arena.removeTagsOnSide(this.arenaTags, side);
   }
 }
 
@@ -2855,7 +2907,15 @@ export class PostSummonStatStageChangeAbAttr extends PostSummonAbAttr {
       }
       const cancelled = new BooleanHolder(false);
       if (this.intimidate) {
-        const params: AbAttrParamsWithCancel = { pokemon: opponent, cancelled, simulated };
+        // Carry the lowered stat(s)/magnitude so ER Guard Dog's mirror reaction
+        // can raise the SAME stat (SpAtk for Scare, ATK for Intimidate).
+        const params: PostIntimidateStatStageChangeAbAttrParams = {
+          pokemon: opponent,
+          cancelled,
+          simulated,
+          incomingStats: this.stats,
+          incomingStages: this.stages,
+        };
         applyAbAttrs("IntimidateImmunityAbAttr", params);
         applyAbAttrs("PostIntimidateStatStageChangeAbAttr", params);
 
@@ -3016,7 +3076,10 @@ export class DownloadAbAttr extends PostSummonAbAttr {
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    if (this.enemyDef < this.enemySpDef) {
+    // ER 2.65 dex: "If Special Defense is higher OR EQUAL, raise Attack." On an
+    // exact Def==SpDef tie the dex raises Attack (vanilla used strict `<`, which
+    // raised Special Attack on a tie).
+    if (this.enemyDef <= this.enemySpDef) {
       this.stats = [Stat.ATK];
     } else {
       this.stats = [Stat.SPATK];
@@ -3627,7 +3690,9 @@ export class ReflectStatStageChangeAbAttr extends PreStatStageChangeAbAttr {
         [stat],
         stages,
         true,
-        false,
+        // ignoreAbilities=true — ER Mirror Armor's reflection bypasses the
+        // attacker's stat-drop immunities (Clear Body / Full Metal Body / Mist).
+        true,
         true,
         null,
         true,
@@ -4110,6 +4175,38 @@ export class CritUseLowerDefensiveStatAbAttr extends AbAttr {
   override apply({ defender, statHolder }: CritUseLowerDefensiveStatAbAttrParams): void {
     if (!defender) {
       return; // no defender resolved (e.g. transient field state) - leave the stat as-is
+    }
+    const def = defender.getEffectiveStat(Stat.DEF);
+    const spDef = defender.getEffectiveStat(Stat.SPDEF);
+    statHolder.value = def <= spDef ? Stat.DEF : Stat.SPDEF;
+  }
+}
+
+/** Params for {@linkcode LowerDefensiveStatVsStatusedFoeAbAttr}. */
+export interface LowerDefensiveStatVsStatusedFoeAbAttrParams extends AbAttrBaseParams {
+  /** The Pokemon being hit (whose Def/SpDef are compared). */
+  readonly defender: Pokemon;
+  /** Holds the `Stat` the damage formula will read as the defender's defensive stat; overwritten in place. */
+  readonly statHolder: NumberHolder;
+}
+
+/**
+ * Elite Redux — Exploit Weakness (284): "When attacking a statused opponent, the
+ * attack targets their LOWER defensive stat." Wired on the ATTACKER, invoked by a
+ * gated `applyAbAttrs` in `Pokemon.getAttackDamage` only when the defender carries
+ * a status. Reads the defender's EFFECTIVE Def/SpDef (stat stages included) and
+ * points the damage formula at whichever is lower — a real defensive-stat swap
+ * (not the old capped power-ratio proxy). Mirrors
+ * {@linkcode CritUseLowerDefensiveStatAbAttr} but gated on status rather than crit.
+ */
+export class LowerDefensiveStatVsStatusedFoeAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply({ defender, statHolder }: LowerDefensiveStatVsStatusedFoeAbAttrParams): void {
+    if (!defender) {
+      return;
     }
     const def = defender.getEffectiveStat(Stat.DEF);
     const spDef = defender.getEffectiveStat(Stat.SPDEF);
@@ -7335,6 +7432,7 @@ export const AbilityAttrs = Object.freeze({
   EnemyMinDamageRollAbAttr,
   DefensiveStatSubstituteAbAttr,
   CritUseLowerDefensiveStatAbAttr,
+  LowerDefensiveStatVsStatusedFoeAbAttr,
   BadDreamsImmunityAbAttr,
   BugPowderImmunityAbAttr,
   IgnoreGenderInfatuationAbAttr,
@@ -7364,6 +7462,7 @@ export const AbilityAttrs = Object.freeze({
   FriskAbAttr,
   FullHpResistTypeAbAttr,
   GorillaTacticsAbAttr,
+  SagePowerMoveLockAbAttr,
   HealFromBerryUseAbAttr,
   IgnoreContactAbAttr,
   IgnoreMoveEffectsAbAttr,

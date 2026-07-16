@@ -31,7 +31,7 @@ import { ArenaTagSide } from "#enums/arena-tag-side";
 import { MoveResult } from "#enums/move-result";
 import { WeatherType } from "#enums/weather-type";
 import { TerrainType } from "#data/terrain";
-import { MoveEffectAttr, type Move } from "#data/moves/move";
+import { MoveEffectAttr, type Move, userActsInSun } from "#data/moves/move";
 import type { Pokemon } from "#field/pokemon";
 
 /** Weather/terrain condition that arms a single-cast Pledge effect. */
@@ -63,18 +63,22 @@ export class ErPledgeWeatherEffectAttr extends MoveEffectAttr {
     super(true);
   }
 
-  private isActive(when: ErPledgeTrigger): boolean {
+  private isActive(when: ErPledgeTrigger, user: Pokemon): boolean {
     if (when === "grassy-terrain") {
       return globalScene.arena.terrain?.terrainType === TerrainType.GRASSY;
+    }
+    // "sun" reads through userActsInSun so a Chloroplast/Solar Flare/Big Leaves
+    // holder (acts-as-if-in-sun) lays the sea-of-fire/rainbow even in neutral
+    // weather — mirroring the Weather Ball / Growth / Synthesis callsites.
+    if (when === "sun") {
+      return userActsInSun(user);
     }
     const weather = globalScene.arena.weather;
     if (!weather || weather.isEffectSuppressed()) {
       return false;
     }
     const wt = weather.weatherType;
-    return when === "sun"
-      ? wt === WeatherType.SUNNY || wt === WeatherType.HARSH_SUN
-      : wt === WeatherType.RAIN || wt === WeatherType.HEAVY_RAIN;
+    return wt === WeatherType.RAIN || wt === WeatherType.HEAVY_RAIN;
   }
 
   override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
@@ -88,7 +92,7 @@ export class ErPledgeWeatherEffectAttr extends MoveEffectAttr {
     }
     let applied = false;
     for (const rule of this.rules) {
-      if (!this.isActive(rule.when)) {
+      if (!this.isActive(rule.when, user)) {
         continue;
       }
       const side = rule.selfSide

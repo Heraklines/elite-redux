@@ -16,7 +16,8 @@ export type MoveRestrictionBattlerTagType =
   | BattlerTagType.ENCORE
   | BattlerTagType.DISABLED
   | BattlerTagType.ER_SILKEN_DECREE
-  | BattlerTagType.GORILLA_TACTICS;
+  | BattlerTagType.GORILLA_TACTICS
+  | BattlerTagType.ER_SAGE_POWER_LOCK;
 
 /**
  * Subset of {@linkcode BattlerTagType}s that are related to trapping effects.

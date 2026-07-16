@@ -188,11 +188,13 @@ export class TypeDamageBoostAbAttr extends MovePowerBoostAbAttr {
    * (e.g. `CompositeAbAttr` introspection).
    *
    * @param hpRatio - The user's `hp / maxHp` at the moment of dispatch.
-   * @returns {@linkcode lowHpMultiplier} when configured and `hpRatio < lowHpThreshold`,
+   * @returns {@linkcode lowHpMultiplier} when configured and `hpRatio <= lowHpThreshold`,
    *   otherwise {@linkcode highHpMultiplier}.
    */
   public resolveMultiplier(hpRatio: number): number {
-    if (this.lowHpMultiplier !== null && hpRatio < this.lowHpThreshold) {
+    // Boundary-INCLUSIVE: ER's low-HP boosts read "at 1/3 HP or lower" (e.g.
+    // Short Circuit 322), so exactly-1/3 HP must trigger the low-HP multiplier.
+    if (this.lowHpMultiplier !== null && hpRatio <= this.lowHpThreshold) {
       return this.lowHpMultiplier;
     }
     return this.highHpMultiplier;

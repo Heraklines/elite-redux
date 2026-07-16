@@ -57,7 +57,24 @@ import { MoveUseMode } from "#enums/move-use-mode";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { BattleStat } from "#enums/stat";
 import type { WeatherType } from "#enums/weather-type";
+import type { Pokemon } from "#field/pokemon";
+import { FieldEffectModifier } from "#modifiers/modifier";
 import type { AbAttrBaseParams } from "#types/ability-types";
+import { NumberHolder } from "#utils/common";
+
+/**
+ * Apply the holder's Terrain/Weather Extender (FieldEffectModifier, +2 turns per
+ * stack) on top of an ER field summoner's fixed base duration. ER field
+ * summoners (the surges) specify their own turn count, which would otherwise
+ * bypass the extender in `arena.trySet{Terrain,Weather}` — this re-applies it so
+ * e.g. Electro Surge's 8-turn Electric Terrain becomes 12 with the item. No-op
+ * without the item (mirrors `erFieldTurnsWithItems` on the rebalance surge path).
+ */
+function extendFieldTurns(pokemon: Pokemon, baseTurns: number): number {
+  const dur = new NumberHolder(baseTurns);
+  globalScene.applyModifier(FieldEffectModifier, pokemon.isPlayer(), pokemon, dur);
+  return dur.value;
+}
 
 /**
  * Discriminated union describing every payload the `entry-effect` archetype
@@ -263,21 +280,24 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
       case "set-weather":
         // `turns` (when > 0) overrides pokerogue's default 5-turn weather so ER
         // weathers keep their own duration (e.g. the new FOG's 8 turns). The
-        // Mystical Rock +2/stack extender still applies on top (see arena.trySetWeather).
+        // fixed override bypasses arena.trySetWeather's own extender hook, so the
+        // Weather Extender (+2/stack) is re-applied here.
         globalScene.arena.trySetWeather(
           this.effect.weather,
           pokemon,
-          this.effect.turns > 0 ? this.effect.turns : undefined,
+          this.effect.turns > 0 ? extendFieldTurns(pokemon, this.effect.turns) : undefined,
         );
         return;
       case "set-terrain":
         // `turns` (when > 0) overrides pokerogue's default 5-turn terrain so ER
-        // terrains keep their own duration (e.g. Toxic Surge's 8 turns).
+        // terrains keep their own duration (e.g. Toxic/Electro Surge's 8 turns).
+        // The fixed override bypasses arena.trySetTerrain's own extender hook, so
+        // the Terrain Extender (+2/stack) is re-applied here (8 → 12).
         globalScene.arena.trySetTerrain(
           this.effect.terrain,
           false,
           pokemon,
-          this.effect.turns > 0 ? this.effect.turns : undefined,
+          this.effect.turns > 0 ? extendFieldTurns(pokemon, this.effect.turns) : undefined,
         );
         return;
       case "set-terrain-random": {
@@ -294,7 +314,12 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
             (m): m is ErSeedModifier => m instanceof ErSeedModifier && choices.includes(ER_SEED_CONFIG[m.kind].terrain),
           );
         const pick = seed ? ER_SEED_CONFIG[seed.kind].terrain : choices[pokemon.randBattleSeedInt(choices.length)];
-        globalScene.arena.trySetTerrain(pick, false, pokemon, this.effect.turns > 0 ? this.effect.turns : undefined);
+        globalScene.arena.trySetTerrain(
+          pick,
+          false,
+          pokemon,
+          this.effect.turns > 0 ? extendFieldTurns(pokemon, this.effect.turns) : undefined,
+        );
         return;
       }
       case "set-hazard": {

@@ -28,8 +28,11 @@ const RUN = process.env.ER_SCENARIO === "1";
 describe.skipIf(!RUN)("ER patched-move descriptions follow the rewritten mechanics", () => {
   it("Dragon Rush: ER stats + mechanics ARE implemented", () => {
     const m = allMoves[MoveId.DRAGON_RUSH];
-    expect(m.power).toBe(95);
-    expect(m.accuracy).toBe(95);
+    // ER 2.65 dex authority (Section A numeric-conflict ruling): power 120 /
+    // accuracy 100. The prior 95/95 was a stale C-source override the maintainer
+    // overruled in favour of `er-moves.ts` (id 407).
+    expect(m.power).toBe(120);
+    expect(m.accuracy).toBe(100);
     const attrNames = m.attrs.map(a => a.constructor.name);
     expect(attrNames).toContain("FlinchAttr"); // 20% flinch
     expect(attrNames).toContain("RecoilAttr"); // 33% recoil

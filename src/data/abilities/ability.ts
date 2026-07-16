@@ -120,6 +120,19 @@ export class Ability {
   public get replaceable(): boolean {
     return !(this.flags & AB_FLAG_UNREPLACEABLE);
   }
+
+  /**
+   * Elite Redux: mark this (already-built) ability immune to suppression, copy,
+   * and replacement — i.e. Gastro Acid / Neutralizing Gas / Trace / Role Play /
+   * Simple Beam / Entrainment cannot touch it. The `AbBuilder` exposes the same
+   * via `unsuppressable()/uncopiable()/unreplaceable()`; this is the post-build
+   * equivalent used by ER's `ABILITY_PATCHERS` (e.g. Stalwart 242).
+   * @returns `this`
+   */
+  public makeImmutableToAbilityEffects(): this {
+    (this as unknown as { flags: number }).flags |= AB_FLAG_UNSUPPRESSABLE | AB_FLAG_UNCOPIABLE | AB_FLAG_UNREPLACEABLE;
+    return this;
+  }
   /**
    * Whether this ability is partially implemented.
    * @remarks

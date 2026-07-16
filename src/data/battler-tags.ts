@@ -616,6 +616,57 @@ export class GorillaTacticsTag extends MoveRestrictionBattlerTag {
 }
 
 /**
+ * Elite Redux Sage Power (ability 352) move-lock tag. Identical to
+ * {@linkcode GorillaTacticsTag} — locks the holder into the first move it uses
+ * for the rest of the battle — but does NOT apply Gorilla Tactics' ×1.5 physical
+ * Attack boost in {@linkcode onAdd}. Sage Power grants only +50% Special Attack
+ * (wired as a separate StatMultiplier on the ability) plus the move lock, per the
+ * ER 2.65 dex.
+ */
+export class SagePowerLockTag extends MoveRestrictionBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_SAGE_POWER_LOCK;
+  /** ID of the move that the user is locked into using. */
+  public readonly moveId: MoveId = MoveId.NONE;
+
+  constructor() {
+    super(BattlerTagType.ER_SAGE_POWER_LOCK, BattlerTagLapseType.CUSTOM, 0);
+  }
+
+  override isMoveRestricted(move: MoveId): boolean {
+    return move !== this.moveId;
+  }
+
+  /** Mirrors {@linkcode GorillaTacticsTag.canAdd}: needs a valid non-Struggle prior move. */
+  override canAdd(pokemon: Pokemon): boolean {
+    const lastSelectedMove = pokemon.getLastNonVirtualMove();
+    return lastSelectedMove != null && lastSelectedMove.move !== MoveId.STRUGGLE;
+  }
+
+  /**
+   * Sets this tag's {@linkcode moveId} — but, unlike Gorilla Tactics, applies NO
+   * Attack boost. Sage Power's only stat effect is the +50% Special Attack wired
+   * on the ability itself.
+   */
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    // Bang is justified as tag is not added if prior move doesn't exist
+    (this as Mutable<SagePowerLockTag>).moveId = pokemon.getLastNonVirtualMove()!.move;
+  }
+
+  public override loadTag(source: BaseBattlerTag & Pick<SagePowerLockTag, "tagType" | "moveId">): void {
+    super.loadTag(source);
+    (this as Mutable<SagePowerLockTag>).moveId = source.moveId;
+  }
+
+  override selectionDeniedText(pokemon: Pokemon): string {
+    return i18next.t("battle:canOnlyUseMove", {
+      moveName: allMoves[this.moveId].name,
+      pokemonName: getPokemonNameWithAffix(pokemon),
+    });
+  }
+}
+
+/**
  * BattlerTag that represents the "recharge" effects of moves like Hyper Beam.
  */
 export class RechargingTag extends SerializableBattlerTag {
@@ -888,6 +939,57 @@ export class InterruptedTag extends BattlerTag {
     const currentPhase = globalScene.phaseManager.getCurrentPhase();
     if (currentPhase.is("MovePhase")) {
       currentPhase.cancel();
+    }
+    return super.lapse(pokemon, lapseType);
+  }
+}
+
+/**
+ * Elite Redux — Sky Drop (move 507). Applied to the TARGET on the charge turn
+ * (when the user takes it into the sky). While held, the target is immobilized:
+ * its move is cancelled at the {@linkcode BattlerTagLapseType.PRE_MOVE} check.
+ * The tag ticks down over two {@linkcode BattlerTagLapseType.TURN_END}s (the
+ * charge turn + the slam turn), so the target regains control once the user
+ * slams it back down. Source-linked to the user, so it is cleared if the user
+ * leaves the field mid-charge (preventing a permanently-immobilized target).
+ * Non-serializable (a mid-charge save mirrors the existing charging-move limit).
+ */
+export class SkyDropHeldTag extends BattlerTag {
+  public override readonly tagType = BattlerTagType.SKY_DROP;
+  constructor(sourceMove: MoveId, sourceId: number) {
+    super(
+      BattlerTagType.SKY_DROP,
+      [BattlerTagLapseType.PRE_MOVE, BattlerTagLapseType.TURN_END],
+      2,
+      sourceMove,
+      sourceId,
+    );
+  }
+
+  override isSourceLinked(): boolean {
+    return true;
+  }
+
+  /**
+   * ER (residual): lifting the target off the field clears its redirection.
+   * A mon that used Follow Me / Rage Powder / Spotlight carries
+   * {@linkcode BattlerTagType.CENTER_OF_ATTENTION}; while it is held in the sky
+   * it can no longer draw moves to itself, so the redirection is removed on lift.
+   */
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    pokemon.removeTag(BattlerTagType.CENTER_OF_ATTENTION);
+  }
+
+  override lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
+    if (lapseType === BattlerTagLapseType.PRE_MOVE) {
+      // Immobilized while held — cancel the target's move this turn, but keep
+      // the tag (it is ticked down only on TURN_END).
+      const currentPhase = globalScene.phaseManager.getCurrentPhase();
+      if (currentPhase.is("MovePhase")) {
+        currentPhase.cancel();
+      }
+      return true;
     }
     return super.lapse(pokemon, lapseType);
   }
@@ -3863,13 +3965,20 @@ export class PowerTrickTag extends SerializableBattlerTag {
   }
 
   /**
-   * Swaps the user's base ATK stat with its base DEF stat.
+   * Swaps the user's base ATK stat with its base DEF stat. ER's Power Trick
+   * (dex: "swaps its Attack and Defense stats AND stat boosts") ALSO exchanges
+   * the ATK and DEF stat STAGES. The swap is symmetric, so calling it again
+   * on removal reverts both the base stats and the stages.
    * @param pokemon - The {@linkcode Pokemon} whose stats will be swapped.
    */
   swapStat(pokemon: Pokemon): void {
     const temp = pokemon.getStat(Stat.ATK, false);
     pokemon.setStat(Stat.ATK, pokemon.getStat(Stat.DEF, false), false);
     pokemon.setStat(Stat.DEF, temp, false);
+    // ER: also swap the ATK/DEF stat stages ("and stat boosts").
+    const tempStage = pokemon.getStatStage(Stat.ATK);
+    pokemon.setStatStage(Stat.ATK, pokemon.getStatStage(Stat.DEF));
+    pokemon.setStatStage(Stat.DEF, tempStage);
   }
 }
 
@@ -4609,6 +4718,71 @@ export class ErCommandedTag extends BattlerTag {
 }
 
 /**
+ * Elite Redux Safe Passage (move 979). The switch-in the move guides onto the
+ * field takes -35% damage (read in {@linkcode Pokemon.getAttackDamage}) for the
+ * remainder of the turn it is summoned. Non-serializable (a transient effect);
+ * armed + applied by the per-side latch in `safe-passage.ts`.
+ *
+ * Lapse: {@linkcode BattlerTagLapseType.TURN_END} with turnCount 1. The switch-in
+ * is summoned MID-TURN (during Safe Passage's resolution), so the shield covers
+ * every remaining hit THIS turn and is stripped at the turn's end (it does not
+ * carry into the next turn). TURN_END never fires mid-move, so — like the
+ * empowered switch-in tag — it is immune to the trailing MoveEndPhase lapse.
+ */
+export class ErSafePassageTag extends BattlerTag {
+  public override readonly tagType = BattlerTagType.ER_SAFE_PASSAGE;
+  constructor() {
+    super(BattlerTagType.ER_SAFE_PASSAGE, BattlerTagLapseType.TURN_END, 1);
+  }
+
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    globalScene.phaseManager.queueMessage(
+      i18next.t("battlerTags:erSafePassageOnAdd", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+        defaultValue: `${getPokemonNameWithAffix(pokemon)} was guided to safety!`,
+      }),
+    );
+  }
+}
+
+/**
+ * Snatch (289): marker placed on the user when it uses Snatch. While present, the
+ * next snatchable self-targeting status move used by ANY other Pokemon this turn is
+ * intercepted (see the snatch check in `move-phase.ts`) and performed by the holder
+ * instead. Non-serializable, single-turn (TURN_END lapse), and additionally consumed
+ * the moment a move is snatched.
+ */
+export class SnatchTag extends BattlerTag {
+  public override readonly tagType = BattlerTagType.SNATCH;
+  constructor() {
+    super(BattlerTagType.SNATCH, BattlerTagLapseType.TURN_END, 1, MoveId.SNATCH);
+  }
+
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    globalScene.phaseManager.queueMessage(
+      i18next.t("battlerTags:snatchOnAdd", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+        defaultValue: `${getPokemonNameWithAffix(pokemon)} waits for a target to make a move!`,
+      }),
+    );
+  }
+}
+
+/**
+ * Me First (382): boosts the copied move's power x1.5 (read in {@linkcode Move.getPower}).
+ * Added to the Me First user immediately before the copied move is called as a
+ * FOLLOW_UP and lapses at TURN_END, so exactly one cast is boosted. Non-serializable.
+ */
+export class MeFirstTag extends BattlerTag {
+  public override readonly tagType = BattlerTagType.ME_FIRST;
+  constructor() {
+    super(BattlerTagType.ME_FIRST, BattlerTagLapseType.TURN_END, 1, MoveId.ME_FIRST);
+  }
+}
+
+/**
  * Retrieves a {@linkcode BattlerTag} based on the provided tag type, turn count, source move, and source ID.
  * @param sourceId - The ID of the pokemon adding the tag
  * @returns The corresponding {@linkcode BattlerTag} object.
@@ -4630,6 +4804,8 @@ export function getBattlerTag(
       return new FlinchedTag(sourceMove);
     case BattlerTagType.INTERRUPTED:
       return new InterruptedTag(sourceMove);
+    case BattlerTagType.SKY_DROP:
+      return new SkyDropHeldTag(sourceMove, sourceId);
     case BattlerTagType.CONFUSED:
       return new ConfusedTag(turnCount, sourceMove);
     case BattlerTagType.INFATUATED:
@@ -4782,6 +4958,8 @@ export function getBattlerTag(
       return new ThroatChoppedTag();
     case BattlerTagType.GORILLA_TACTICS:
       return new GorillaTacticsTag();
+    case BattlerTagType.ER_SAGE_POWER_LOCK:
+      return new SagePowerLockTag();
     case BattlerTagType.UNBURDEN:
       return new UnburdenTag();
     case BattlerTagType.SUBSTITUTE:
@@ -4840,6 +5018,12 @@ export function getBattlerTag(
       return new ErEmpoweredSwitchInTag();
     case BattlerTagType.ER_COMMANDED:
       return new ErCommandedTag(sourceId);
+    case BattlerTagType.ER_SAFE_PASSAGE:
+      return new ErSafePassageTag();
+    case BattlerTagType.SNATCH:
+      return new SnatchTag();
+    case BattlerTagType.ME_FIRST:
+      return new MeFirstTag();
   }
 }
 
@@ -4883,6 +5067,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.SHELL_TRAP]: ShellTrapTag;
   [BattlerTagType.FLINCHED]: FlinchedTag;
   [BattlerTagType.INTERRUPTED]: InterruptedTag;
+  [BattlerTagType.SKY_DROP]: SkyDropHeldTag;
   [BattlerTagType.CONFUSED]: ConfusedTag;
   [BattlerTagType.INFATUATED]: InfatuatedTag;
   [BattlerTagType.SEEDED]: SeedTag;
@@ -4960,6 +5145,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ELECTRIFIED]: ElectrifiedTag;
   [BattlerTagType.THROAT_CHOPPED]: ThroatChoppedTag;
   [BattlerTagType.GORILLA_TACTICS]: GorillaTacticsTag;
+  [BattlerTagType.ER_SAGE_POWER_LOCK]: SagePowerLockTag;
   [BattlerTagType.UNBURDEN]: UnburdenTag;
   [BattlerTagType.SUBSTITUTE]: SubstituteTag;
   [BattlerTagType.AUTOTOMIZED]: AutotomizedTag;
@@ -4989,6 +5175,9 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ER_QUASHED]: ErQuashedTag;
   [BattlerTagType.ER_EMPOWERED_SWITCH_IN]: ErEmpoweredSwitchInTag;
   [BattlerTagType.ER_COMMANDED]: ErCommandedTag;
+  [BattlerTagType.ER_SAFE_PASSAGE]: ErSafePassageTag;
+  [BattlerTagType.SNATCH]: SnatchTag;
+  [BattlerTagType.ME_FIRST]: MeFirstTag;
 };
 
 /**
