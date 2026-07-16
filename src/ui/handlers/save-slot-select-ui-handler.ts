@@ -1,6 +1,5 @@
 import { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
-import { isBeta, isDev } from "#constants/app-constants";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { TextStyle } from "#enums/text-style";
@@ -179,6 +178,8 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
                 handler: () => {
                   globalScene.ui.revertMode();
                   ui.showText(i18next.t("saveSlotSelectUiHandler:deleteData"), null, () => {
+                    // The animated message already requires a separate completed action before this overlay opens.
+                    // A second ConfirmUi delay can strand a visible Yes behind a throttled/paused Phaser clock.
                     ui.setOverlayMode(
                       UiMode.CONFIRM,
                       () => {
@@ -203,7 +204,6 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
                       false,
                       0,
                       19,
-                      isBeta || isDev ? 300 : 2000,
                     );
                   });
                   return true;
@@ -234,6 +234,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
               };
               if (this.sessionSlots[cursor].hasData) {
                 ui.showText(i18next.t("saveSlotSelectUiHandler:overwriteData"), null, () => {
+                  // As above, the prompt boundary supplies the key-bleed guard; the visible confirm must be actionable.
                   ui.setOverlayMode(
                     UiMode.CONFIRM,
                     () => {
@@ -252,7 +253,6 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
                     false,
                     0,
                     19,
-                    isBeta || isDev ? 300 : 2000,
                   );
                 });
               } else if (this.sessionSlots[cursor].hasData === false) {

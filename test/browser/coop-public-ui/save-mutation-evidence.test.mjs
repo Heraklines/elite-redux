@@ -42,10 +42,11 @@ test("requires every exact-delete URL commitment field", () => {
 });
 
 test("save journey requires public UI, exact CAS ACK ordering, and a brand-new context", async () => {
-  const [journeys, harness, workflow] = await Promise.all([
+  const [journeys, harness, workflow, saveHandler] = await Promise.all([
     readFile(new URL("journeys.mjs", import.meta.url), "utf8"),
     readFile(new URL("public-ui-harness.mjs", import.meta.url), "utf8"),
     readFile(new URL("../../../.github/workflows/coop-public-ui-journey.yml", import.meta.url), "utf8"),
+    readFile(new URL("../../../src/ui/handlers/save-slot-select-ui-handler.ts", import.meta.url), "utf8"),
   ]);
   assert.match(
     journeys,
@@ -54,6 +55,8 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
   assert.doesNotMatch(journeys, /async function saveMutations\(rig\) \{\s*await freshThroughWave2\(rig\)/u);
   assert.match(journeys, /targetId: "delete-run"/u);
   assert.match(journeys, /surfaceId: "save-slot",[\s\S]*?targetId: "cursor:0",[\s\S]*?submit: false/u);
+  assert.match(journeys, /waitForReadyYesConfirmation[\s\S]*?ready\.inputBlocked === false/u);
+  assert.doesNotMatch(journeys, /pressUntilExactDeleteRequest|attempt <= 3/u);
   assert.match(journeys, /"\/savedata\/session\/coop-cas-delete"/u);
   assert.match(journeys, /soloWrite\.index <= deleteResponse\.index/u);
   assert.match(journeys, /sessionStorageKeys\(deletedCold\)/u);
@@ -62,4 +65,5 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
   assert.match(workflow, /local-worker-server\.ts/u);
   assert.match(workflow, /local-worker-vite\.config\.mjs/u);
   assert.match(workflow, /inputs\.journey == 'save-mutations'/u);
+  assert.doesNotMatch(saveHandler, /isBeta \|\| isDev \? 300 : 2000/u);
 });

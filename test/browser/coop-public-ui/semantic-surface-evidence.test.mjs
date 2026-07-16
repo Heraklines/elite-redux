@@ -27,9 +27,10 @@ function valid(overrides = {}) {
     optionIds: ["RARE_CANDY"],
     optionCount: 1,
     teamSpeciesIds: null,
-    ready: { handlerActive: true, awaitingActionInput: true },
+    ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
     phase: "SelectModifierPhase",
     phaseInstance: 4,
+    surfaceGeneration: 2,
     uiMode: "MODIFIER_SELECT",
     ...overrides,
   };
@@ -53,6 +54,13 @@ test("semantic evidence rejects every malformed claimed proof", () => {
   );
   assert.throws(
     () => semanticSurfaceView(`${PREFIX}${JSON.stringify(valid({ ready: { handlerActive: "yes" } }))}`),
+    /invalid semantic surface observation/u,
+  );
+  assert.throws(
+    () =>
+      semanticSurfaceView(
+        `${PREFIX}${JSON.stringify(valid({ ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: "no" } }))}`,
+      ),
     /invalid semantic surface observation/u,
   );
   assert.throws(

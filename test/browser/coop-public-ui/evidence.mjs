@@ -440,6 +440,20 @@ function recordBrowserObservations(sink, text) {
 }
 
 /** Parse the read-only v2 semantic surface mirror. A claimed v2 line is a strict proof contract. */
+function validSemanticReadiness(ready) {
+  return (
+    ready
+    && typeof ready === "object"
+    && typeof ready.handlerActive === "boolean"
+    && (ready.awaitingActionInput === null || typeof ready.awaitingActionInput === "boolean")
+    && (ready.inputBlocked === null || typeof ready.inputBlocked === "boolean")
+  );
+}
+
+function nullablePositiveInteger(value) {
+  return value === null || (Number.isSafeInteger(value) && value > 0);
+}
+
 export function semanticSurfaceView(text) {
   if (!text.startsWith(SURFACE2_PREFIX)) {
     return null;
@@ -478,16 +492,14 @@ export function semanticSurfaceView(text) {
     || !nullableRevision(value.membershipRevision)
     || !nullableRevision(value.connectionGeneration)
     || (value.localRole !== null && value.localRole !== "host" && value.localRole !== "guest")
-    || !value.ready
-    || typeof value.ready !== "object"
-    || typeof value.ready.handlerActive !== "boolean"
-    || (value.ready.awaitingActionInput !== null && typeof value.ready.awaitingActionInput !== "boolean")
+    || !validSemanticReadiness(value.ready)
     || typeof value.phase !== "string"
     || value.phase.length === 0
     || typeof value.uiMode !== "string"
     || value.uiMode.length === 0
     || !Number.isSafeInteger(value.phaseInstance)
     || value.phaseInstance <= 0
+    || !nullablePositiveInteger(value.surfaceGeneration)
     || (value.coop
       && (value.localSeat === null
         || value.localRole === null
