@@ -150,6 +150,7 @@ import {
   markRealGuestCommandBoundary,
   materializeMirroredGuestInputTurn,
   mirrorHostMeToGuest,
+  persistInstalledClientMePins,
   pumpDuoDestinations,
   reachQueuedRewardShop,
   relayGuestMeOptionIndexOnly,
@@ -3185,6 +3186,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // parallel; the one-realm harness must do that explicitly for the guest before starting the host's
       // PostME producer. Pumping transport alone while the guest is still on EggLapse correctly leaves the
       // terminal unacknowledged, but can never make that local phase advance.
+      persistInstalledClientMePins(rig.hostCtx);
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase", false));
       await withClient(rig.guestCtx, () =>
         driveClientPhaseQueueTo(rig.guestScene, "PostMysteryEncounterPhase", {

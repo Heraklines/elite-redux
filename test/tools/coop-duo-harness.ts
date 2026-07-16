@@ -525,27 +525,6 @@ function captureLiveCtx(): {
 }
 
 /**
- * Preserve mutations made while a client's scene/runtime is already installed outside a scoped pump.
- * The long-running journey deliberately leaves the host installed between client turns. Production has
- * one module graph per browser, so those live module values ARE the host's current state; overwriting them
- * from an older ClientCtx snapshot when entering withClient would roll that browser back to a prior ME pin,
- * RNG cursor, or transition permit. Nested cross-client pumps do not match and therefore keep using their
- * independently persisted snapshots.
- */
-function refreshClientSnapshotFromInstalledState(ctx: ClientCtx, installed: ReturnType<typeof captureLiveCtx>): void {
-  if (installed.scene !== ctx.scene || installed.runtime !== ctx.runtime) {
-    return;
-  }
-  ctx.rndState = installed.rndState;
-  ctx.ghost = installed.ghost;
-  if (coopHarnessModuleLetIsolation) {
-    ctx.moduleLets = installed.moduleLets;
-  }
-  ctx.biomeState = installed.biomeState;
-  ctx.mePins = installed.mePins;
-}
-
-/**
  * ATOMICALLY install `ctx`'s 4-part process-global context, run `fn`, then restore the
  * previous context. Re-entrant-safe (saves/restores around the body). The RND state is
  * the load-bearing one: the shared Phaser.Math.RND cursor would otherwise bleed between
@@ -565,7 +544,6 @@ let activeClientInboundPump: (() => number) | undefined;
  */
 export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   const prev = captureLiveCtx();
-  refreshClientSnapshotFromInstalledState(ctx, prev);
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
   const prevAccountIdentity = loggedInUser?.username;
@@ -622,7 +600,6 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
 
 export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<T> {
   const prev = captureLiveCtx();
-  refreshClientSnapshotFromInstalledState(ctx, prev);
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
   const prevAccountIdentity = loggedInUser?.username;
@@ -683,6 +660,19 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
       installCoopHooksForActive(prev.runtime);
     }
   }
+}
+
+/**
+ * Save the currently installed client's live Mystery state before a long-running journey crosses into the
+ * other synthetic browser. This is intentionally ME-only and requires an exact scene/runtime match: unlike
+ * production, the one-process journey can mutate the installed host between scoped pumps, while its stored
+ * ClientCtx is updated only on scope exit. Broader ambient-state adoption is unsafe for focused fixtures.
+ */
+export function persistInstalledClientMePins(ctx: ClientCtx): void {
+  if (globalScene !== ctx.scene || getCoopRuntime() !== ctx.runtime) {
+    throw new Error(`cannot persist ${ctx.label} ME pins while a different client is installed`);
+  }
+  ctx.mePins = readMePins();
 }
 
 // ---------------------------------------------------------------------------
