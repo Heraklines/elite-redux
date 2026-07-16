@@ -176,6 +176,11 @@ describe.skipIf(!RUN)("ER newcomer render sweep (non-empty sprite on every surfa
       // Form-level path (summary + battle field).
       "summary/combat front (form)": form.getSpriteAtlasPath(false, formIndex, false, 0, false),
       "combat back (form)": form.getSpriteAtlasPath(false, formIndex, false, 0, true),
+      // Evolution scene: EvolutionPhase.configureSprite plays `pokemon.getSpriteKey(true)`
+      // -> the FORM-level front atlas, the SAME sheet Luvdisc->Discupid drew blank /
+      // Regitube drew scrambled on. A separate gate so a 404/whole-sheet regression on
+      // the evolution surface is named explicitly (runtime frame-pin: er-evolution-render).
+      "evolution scene (evolved form front)": form.getSpriteAtlasPath(false, formIndex, false, 0, false),
     };
 
     const failures: string[] = [];
