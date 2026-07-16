@@ -1297,8 +1297,17 @@ export class PublicUiClient {
       timeoutMs: this.config.timeoutMs,
       description: "TitlePhase before opening co-op",
     });
-    await this.sequence(this.titleNewGameKeys, "title-select-new-game");
-    await this.press("Space", "title-open-new-game");
+    // Continue is inserted above New Game after the first persisted wave. A fixed key
+    // sequence therefore selects a different action after a cold reopen. Drive the same
+    // stable semantic option id that the real title UI exposes, then submit it through the
+    // readiness-aware keyboard navigator.
+    await selectOptionById(this, {
+      surfaceId: "title-menu",
+      targetId: "new-game",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      timeoutMs: this.config.timeoutMs,
+      fromCursor: this.pageCursor,
+    });
     await this.press("ArrowDown", "mode-select-coop-below-classic");
     this.lobbySurfaceCursor = this.evidence.cursor();
     const announceCursor = this.evidence.cursor();
