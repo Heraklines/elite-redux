@@ -1540,6 +1540,90 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     logs.flush();
   }, 300_000);
 
+  it("isolates one divergent legacy slot while a fresh run claims a different verified-empty slot", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const conflictSlot = 4;
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
+    const trackedKeys = [...keys, "er-coop-resume", "er-coop-resume-unavailable"];
+    const tracked = trackedKeys.map(key => [key, localStorage.getItem(key)] as const);
+    const base = JSON.parse(await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene))) as Record<
+      string,
+      unknown
+    >;
+    const localLegacy = JSON.stringify({
+      ...base,
+      waveIndex: 8,
+      timestamp: Number(base.timestamp ?? 1) + 1,
+      money: 12_345,
+      coopRun: undefined,
+      coopControlPlane: undefined,
+    });
+    const cloudLegacy = JSON.stringify({
+      ...base,
+      waveIndex: 9,
+      timestamp: Number(base.timestamp ?? 1) + 2,
+      money: 54_321,
+      coopRun: undefined,
+      coopControlPlane: undefined,
+    });
+
+    try {
+      trackedKeys.forEach(key => localStorage.removeItem(key));
+      localStorage.setItem(keys[conflictSlot], encrypt(localLegacy, false));
+      setBypassLoginForTesting(false);
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request =>
+        request.slot === conflictSlot ? coopCasFound(cloudLegacy) : coopCasMissing(),
+      );
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopRunStatus").mockImplementation(async request => ({
+        ok: true,
+        status: 200,
+        value: { state: "missing", runId: request.coopRunId },
+      }));
+
+      const snapshot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.getCoopResumeLobbySnapshot());
+      expect(snapshot.failures.get(conflictSlot)?.message).toContain(
+        `legacy co-op replicas differ in slot ${conflictSlot}`,
+      );
+      expect(snapshot.sessions.get(0), "other slots remain inspectable").toBeUndefined();
+      expect(decrypt(localStorage.getItem(keys[conflictSlot])!, false), "neither legacy replica is overwritten").toBe(
+        localLegacy,
+      );
+
+      const discovery = await findCoopResumeCandidate(
+        rig.hostRuntime.controller.localName(),
+        rig.hostRuntime.controller.partnerName!,
+        "host",
+        async slot => {
+          const failure = snapshot.failures.get(slot);
+          if (failure != null) {
+            throw failure;
+          }
+          return snapshot.sessions.get(slot);
+        },
+      );
+      expect(discovery, "the lobby gets an explicit quarantined-slot decision instead of throwing").toEqual({
+        kind: "replica-indeterminate",
+        wave: 0,
+      });
+
+      const freshSlot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
+      expect(freshSlot, "fresh launch uses a different local+cloud empty slot").toBe(0);
+      expect(freshSlot).not.toBe(conflictSlot);
+      await withClient(rig.hostCtx, () => rig.hostScene.gameData.cancelPendingFreshCoopSessionSlot());
+
+      await expect(
+        withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionsForCoopResume()),
+        "strict persistence callers still fail closed on the quarantined slot",
+      ).rejects.toThrow(`legacy co-op replicas differ in slot ${conflictSlot}`);
+    } finally {
+      tracked.forEach(([key, value]) => {
+        value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value);
+      });
+    }
+    logs.flush();
+  }, 300_000);
+
   it("never lets a solo cloud replica hide legacy co-op local bytes", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
