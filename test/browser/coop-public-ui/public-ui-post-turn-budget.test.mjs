@@ -270,25 +270,33 @@ test("first-login gender confirm waits for the actionable option picker, not its
   assert.equal(findActionableFirstLoginGenderSurface(evidence, 0), evidence.events[1]);
 });
 
-test("first-login gender readiness is semantic and accepts localized option labels", () => {
-  const evidence = new FakeEvidence("new-account-de");
-  evidence.push({
-    kind: "browser-surface2",
-    observation: {
-      surfaceId: "option-select:SelectGenderPhase",
-      phase: "SelectGenderPhase",
-      phaseInstance: 3,
-      uiMode: "OPTION_SELECT",
-      seatsWithInput: [0],
-      selectedOptionId: "junge",
-      optionIds: ["junge", "m-dchen"],
-      surfaceGeneration: 1,
-      ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: false },
-    },
-  });
+for (const { language, optionIds } of [
+  { language: "German", optionIds: ["junge", "m-dchen"] },
+  { language: "French", optionIds: ["gar-on", "fille"] },
+  // The production observer falls back to stable slot ids when a localized label has no ASCII
+  // characters, covering CJK, Arabic, Cyrillic, and any future script without a Latin slug.
+  { language: "CJK/RTL slot fallback", optionIds: ["slot:0", "slot:1"] },
+]) {
+  test(`first-login gender readiness is semantic for ${language} option ids`, () => {
+    const evidence = new FakeEvidence(`new-account-${language}`);
+    evidence.push({
+      kind: "browser-surface2",
+      observation: {
+        surfaceId: "option-select:SelectGenderPhase",
+        phase: "SelectGenderPhase",
+        phaseInstance: 3,
+        uiMode: "OPTION_SELECT",
+        seatsWithInput: [0],
+        selectedOptionId: optionIds[0],
+        optionIds,
+        surfaceGeneration: 1,
+        ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: false },
+      },
+    });
 
-  assert.equal(findActionableFirstLoginGenderSurface(evidence, 0), evidence.events[0]);
-});
+    assert.equal(findActionableFirstLoginGenderSurface(evidence, 0), evidence.events[0]);
+  });
+}
 
 test("post-turn progress extends the soft deadline but never the immutable hard ceiling", () => {
   let nowMs = 1_000;
