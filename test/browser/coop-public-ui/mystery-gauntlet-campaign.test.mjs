@@ -122,3 +122,11 @@ test("parallel lobby pairing reselects the exact visible username before every r
   assert.match(harness, /requester\.requestPlayer\(acceptorName, \{[\s\S]*purpose: "reissue-request"/u);
   assert.doesNotMatch(harness, /requester\.press\("Space", `lobby-reissue-request-/u);
 });
+
+test("visual checkpoints foreground WebGL and reject trivial captures", async () => {
+  const evidence = await readFile(resolve(root, "test/browser/coop-public-ui/evidence.mjs"), "utf8");
+  assert.match(evidence, /await page\.bringToFront\(\)/u);
+  assert.match(evidence, /requestAnimationFrame\(\(\) => requestAnimationFrame\(resolveFrames\)\)/u);
+  assert.match(evidence, /screenshot\.byteLength < MIN_CHECKPOINT_PNG_BYTES/u);
+  assert.match(evidence, /dom\.canvases\.length === 0/u);
+});
