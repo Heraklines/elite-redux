@@ -22,8 +22,6 @@ const [
   { Command },
   { MoveId },
   { PokemonModifierType },
-  { SettingsDisplayUiHandler },
-  { SettingsUiHandler },
   { StatusEffect },
   { UiMode },
 ] = await Promise.all([
@@ -36,8 +34,6 @@ const [
   import("../src/enums/command"),
   import("../src/enums/move-id"),
   import("../src/modifier/modifier-type"),
-  import("../src/ui/settings/settings-display-ui-handler"),
-  import("../src/ui/settings/settings-ui-handler"),
   import("../src/enums/status-effect"),
   import("../src/enums/ui-mode"),
 ]);
@@ -769,10 +765,11 @@ function semanticBattleAddress(battle: { waveIndex: number; turn: number } | nul
 function observeRenderProfile(): void {
   try {
     const handler = globalScene?.ui?.getHandler();
+    const mode = globalScene?.ui?.getMode();
     const handlerName =
-      handler instanceof SettingsUiHandler
+      mode === UiMode.SETTINGS
         ? "SettingsUiHandler"
-        : handler instanceof SettingsDisplayUiHandler
+        : mode === UiMode.SETTINGS_DISPLAY
           ? "SettingsDisplayUiHandler"
           : null;
     if (!handler?.active || handlerName == null) {

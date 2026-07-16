@@ -278,8 +278,10 @@ if (
 }
 if (
   !browserEntry.includes("[coop-browser:render-profile]")
-  || !browserEntry.includes("handler instanceof SettingsUiHandler")
-  || !browserEntry.includes("handler instanceof SettingsDisplayUiHandler")
+  || !browserEntry.includes("mode === UiMode.SETTINGS")
+  || !browserEntry.includes("mode === UiMode.SETTINGS_DISPLAY")
+  || browserEntry.includes("instanceof SettingsUiHandler")
+  || browserEntry.includes("instanceof SettingsDisplayUiHandler")
   || !browserEntry.includes("moveAnimations: globalScene.moveAnimations")
   || !browserEntry.includes("gameSpeed: globalScene.gameSpeed")
   || !browserEntry.includes('lastObservedRenderProfile = "";')
