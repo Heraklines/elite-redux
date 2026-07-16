@@ -272,11 +272,11 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
         "real BattleEnd released the host toward its ME rewards",
       ).toContain("MysteryEncounterRewardsPhase");
     });
-    await drainLoopback();
     await withClient(rig.guestCtx, async () => {
-      // The loopback can first deliver while the harness has the host scene installed. Production clients
-      // never share a scene, so that delivery is intentionally rejected and the retained op retries once
-      // the guest context is live. Keep this context installed until the real durability retry releases it.
+      // Production clients never share a scene. Pump the retained envelope only after the guest's complete
+      // scene/runtime context is installed; this is the exact scheduler edge two independent browsers get
+      // automatically and avoids relying on durability to repair a single-process harness misdelivery.
+      await drainLoopback();
       await vi.waitFor(
         () =>
           expect(queued.heldEnd, "the exact held BattleEnd releases once after settlement").toHaveBeenCalledTimes(1),

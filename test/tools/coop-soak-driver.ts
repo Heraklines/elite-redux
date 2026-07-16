@@ -2729,7 +2729,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           },
         }),
       );
-      await awaitGuestWaveTransaction(wave, false);
+      // A spawned Mystery battle is not a normal wave terminal: Victory deliberately retains
+      // `ME_TERMINAL battle-settled` instead of `WAVE_ADVANCE`. Reaching the renderer's production-queued
+      // reward shop above proves that exact ME settlement applied and released its held BattleEnd. Requiring
+      // a WAVE_ADVANCE here can only observe a nonexistent/stale transaction and falsely strand the soak.
+      if (!deferAdvanceToMeTerminal) {
+        await awaitGuestWaveTransaction(wave, false);
+      }
       // A terminal turn has TWO authoritative material boundaries: its TurnEnd checkpoint and the retained
       // BattleEnd DATA image. The host may execute automatic PokemonHeal/BattleEnd work while the guest is
       // still rendering the final turn. Compare only after both clients have reached this exact retained
@@ -2761,7 +2767,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // pending MESSAGE transition can resume after a context swap and strand one side before Crossroads.
       await withClient(rig.hostCtx, () => awaitRewardShopPhaseExit(hostShop));
       await withClient(rig.guestCtx, () => awaitRewardShopPhaseExit(guestShop));
-      await awaitGuestWaveTransaction(wave, true);
+      if (!deferAdvanceToMeTerminal) {
+        await awaitGuestWaveTransaction(wave, true);
+      }
       actionScript.push(`wave ${wave}: reward shop owner=${hostOwns ? "host" : "guest"} ${action}`);
 
       const hostAfter = rig.hostRuntime.controller.interactionCounter();
