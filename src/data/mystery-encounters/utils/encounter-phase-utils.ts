@@ -1323,6 +1323,10 @@ export function setEncounterRewards(
         const queuedAfter = globalScene.phaseManager
           .getQueuedPhaseNames()
           .filter(phaseName => phaseName === "SelectModifierPhase").length;
+        // Temporary count-only bridge for the one current callback-injected case. It deliberately reuses
+        // the helper surface's settings and generated ordinal identity; it does NOT discover independently
+        // injected settings or stable IDs. Replace with explicit typed registration before adding another
+        // callback-injected modifier surface.
         const injectedSurfaces = Math.max(0, queuedAfter - queuedBefore);
         for (let index = 0; index < injectedSurfaces; index++) {
           appendModifierSurface();

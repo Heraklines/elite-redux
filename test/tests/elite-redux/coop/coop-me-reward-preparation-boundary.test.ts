@@ -69,4 +69,21 @@ describe("Mystery battle reward preparation boundary", () => {
     expect(settlementPlan).not.toContain("rewardShop");
     expect(settlementPlan).not.toContain("addHeal");
   });
+
+  it("reconstructs declared surfaces in PhaseTree FIFO order", () => {
+    const phaseTree = source("src/phase-tree.ts");
+    const rewardsPhase = source("src/phases/mystery-encounter-phases.ts");
+    const retainedGuestStart = rewardsPhase.indexOf(
+      'coopLog("me", "retained reward continuation: guest opens only the host-stated surfaces"',
+    );
+    const retainedGuestEnd = rewardsPhase.indexOf("      const guestEncounter", retainedGuestStart);
+    const retainedGuest = rewardsPhase.slice(retainedGuestStart, retainedGuestEnd);
+
+    expect(retainedGuestStart).toBeGreaterThanOrEqual(0);
+    expect(retainedGuestEnd).toBeGreaterThan(retainedGuestStart);
+    expect(phaseTree).toContain("addLevel.push(phase);");
+    expect(phaseTree).toContain("return this.levels[this.currentLevel].shift();");
+    expect(retainedGuest).toContain("for (const surface of this.authoritativeRewardSurfaces)");
+    expect(retainedGuest).not.toMatch(/authoritativeRewardSurfaces[^\n]*\.(?:reverse|toReversed)\(/u);
+  });
 });
