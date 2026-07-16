@@ -3864,15 +3864,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     hitSituation(COOP_SOAK_SITUATIONS.catch);
     await withClient(rig.hostCtx, async () => {
       game.doThrowPokeball(CATCH_BALL);
-      // A capture ends the wave BEFORE TurnEndPhase (the AttemptCapturePhase -> BattleEndPhase). Advance and
-      // tolerate the "never reached TurnEndPhase" throw (the battle ended) - the party-length check is truth.
-      await game.phaseInterceptor.to("TurnEndPhase").catch(() => {});
+      // A successful capture prepends AttemptCapture -> Victory, but the TurnEnd subtree that TurnStart
+      // already queued still drains afterward. Drive through its SETTLED commit barrier before switching
+      // process-global context to the guest. Stopping at TurnEndPhase leaves CoopTurnCommitPhase queued and
+      // makes the harness manufacture a replay stall that a continuously-running production host cannot hit.
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
-    // The capture terminal can bypass the host's ordinary TurnEnd interception, but the guest still has the
-    // exact turn-2 resolution buffered behind its open public CommandPhase. Drive that production replay edge
-    // just like every normal turn before asking either renderer to enter the retained reward boundary. Skipping
-    // it left CommandPhase current with TurnStart/CoopFinalize queued, so the host's shop arrival could never be
-    // answered even though the authoritative capture transaction had arrived successfully.
+    // The guest now has the exact settled turn-2 resolution buffered behind its open public CommandPhase.
+    // Drive that production replay edge just like every normal turn before asking either renderer to enter the
+    // retained reward boundary. Skipping it leaves CommandPhase current with TurnStart/CoopFinalize queued, so
+    // the host's shop arrival cannot be answered even though the authoritative capture transaction arrived.
     await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn1 + 1));
     const captured = rig.hostScene.getPlayerParty().length === hostPartyBefore + 1;
     actionScript.push(`wave ${wave}: CATCH throw sp=${rootId} captured=${captured}`);
@@ -3935,9 +3936,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     );
 
     // ===== Reward shop + boundary (the captured wave still awards the wave-win reward pool). =====
-    // AttemptCapture has no guest TurnEnd, so the retained journal wake routes its speculative CommandPhase
-    // into the real Victory -> BattleEnd -> reward tail. Never clear that queue or construct a detached shop:
-    // continuationReady belongs to this exact retained wave transaction.
+    // The renderer guest does not execute AttemptCapture itself; the retained journal wake routes its
+    // speculative CommandPhase into the real Victory -> BattleEnd -> reward tail. Never clear that queue or
+    // construct a detached shop: continuationReady belongs to this exact retained wave transaction.
     await driveRewardShop(wave);
     assertLockstep(wave, "catch-wave-end");
     assertScalarConvergence(wave, "post-shop");
