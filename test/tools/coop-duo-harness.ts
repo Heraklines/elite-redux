@@ -541,6 +541,20 @@ function captureLiveCtx(): {
 export let activeClientLabel: "host" | "guest" | "none" = "none";
 let activeClientInboundPump: (() => number) | undefined;
 
+let meBoundaryGeneration = 0;
+
+function restoreScopedMePins(pins: MePins, capturedBoundaryGeneration: number): void {
+  const boundaryWasInvalidated = capturedBoundaryGeneration !== meBoundaryGeneration;
+  writeMePins(boundaryWasInvalidated ? IDLE_ME_PINS : pins);
+  if (
+    boundaryWasInvalidated
+    && (coopMeInteractionStartValue() !== IDLE_ME_PINS.start
+      || getActiveCoopReplayMePhaseForHarness() !== IDLE_ME_PINS.activeReplay)
+  ) {
+    throw new Error("an invalidated client scope resurrected a stale Mystery boundary during restore");
+  }
+}
+
 /**
  * SYNCHRONOUS sibling of {@linkcode withClient}: install `ctx`'s 4-part process-global context, run a
  * SYNC `fn`, then restore the previous context - all before returning. Use this when the body is purely
@@ -554,6 +568,7 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
   const prevAccountIdentity = loggedInUser?.username;
+  const capturedBoundaryGeneration = meBoundaryGeneration;
   activeClientLabel = ctx.label;
   activeClientInboundPump = ctx.pumpInbound;
   if (ctx.accountIdentity != null && loggedInUser != null) {
@@ -592,7 +607,7 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
       restoreModuleLets(prev.moduleLets);
     }
     restoreBiomeModuleState(prev.biomeState);
-    writeMePins(prev.mePins);
+    restoreScopedMePins(prev.mePins, capturedBoundaryGeneration);
     if (prevAccountIdentity != null && loggedInUser != null) {
       loggedInUser.username = prevAccountIdentity;
     }
@@ -614,6 +629,7 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
   const prevAccountIdentity = loggedInUser?.username;
+  const capturedBoundaryGeneration = meBoundaryGeneration;
   activeClientLabel = ctx.label;
   activeClientInboundPump = ctx.pumpInbound;
   if (ctx.accountIdentity != null && loggedInUser != null) {
@@ -643,7 +659,6 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   try {
     return await fn();
   } finally {
-    // Persist THIS client's mutated RND cursor + ghost cache + module-lets + ME pins into its ctx, restore prev.
     ctx.rndState = Phaser.Math.RND.state();
     ctx.ghost = snapshotGhostState();
     if (coopHarnessModuleLetIsolation) {
@@ -662,7 +677,7 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
       restoreModuleLets(prev.moduleLets);
     }
     restoreBiomeModuleState(prev.biomeState);
-    writeMePins(prev.mePins);
+    restoreScopedMePins(prev.mePins, capturedBoundaryGeneration);
     if (prevAccountIdentity != null && loggedInUser != null) {
       loggedInUser.username = prevAccountIdentity;
     }
@@ -688,6 +703,7 @@ export function persistInstalledClientMePins(ctx: ClientCtx): void {
   // This explicit snapshot is newer than every already-entered async scope. Advance the generation so a
   // late finally from one of those scopes cannot overwrite it with the older replay pointer + pin pair.
   ctx.mePinsSaveGeneration = (ctx.mePinsSaveGeneration ?? 0) + 1;
+  meBoundaryGeneration++;
   ctx.mePins = readMePins();
 }
 
