@@ -24,6 +24,7 @@
 // =============================================================================
 
 import { planErCustomTrainerLaunch, summarizeErCustomTrainer } from "#app/dev-tools/test-suite/custom-trainer-picker";
+import { relevelPreparedGhostParty } from "#app/dev-tools/test-suite/scenarios";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import {
@@ -59,8 +60,10 @@ import {
   setErCustomTrainerSpawnConfigForTesting,
   setErCustomTrainersForTesting,
 } from "#data/elite-redux/er-custom-trainers";
+import type { GhostMember } from "#data/elite-redux/er-ghost-teams";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
+import { getLevelTotalExp } from "#data/exp";
 import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
 import { MoveCategory } from "#enums/move-category";
@@ -214,6 +217,37 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     const keys = resolved.map(t => t.key).sort();
     expect(keys).toEqual(["ACE_RICO", "ENDLESS_T", "GHOST_ONLY", "HARDCORE_ONLY", "HELL_BOSS"]);
     expect(keys).not.toContain("BROKEN");
+  });
+
+  it("keeps re-levelled ghost-team EXP aligned after a KO reward", () => {
+    const mon = globalScene.getPlayerParty()[0];
+    const sourceLevel = 164;
+    const targetLevel = 128;
+    const member: GhostMember = {
+      speciesId: mon.species.speciesId,
+      formIndex: mon.formIndex,
+      abilityIndex: mon.abilityIndex,
+      ivs: [...mon.ivs],
+      nature: mon.nature,
+      level: sourceLevel,
+      gender: mon.gender,
+      shiny: mon.shiny,
+      variant: mon.variant,
+      passive: mon.passive,
+      moves: mon.moveset.map(move => move.moveId),
+    };
+    mon.level = sourceLevel;
+    mon.exp = getLevelTotalExp(sourceLevel, mon.species.growthRate);
+
+    relevelPreparedGhostParty([mon], [member], sourceLevel, targetLevel);
+    expect(mon.level).toBe(targetLevel);
+    expect(mon.exp).toBe(getLevelTotalExp(targetLevel, mon.species.growthRate));
+
+    // Exact gain printed by the submitted Crime Leader capture. Before the
+    // fix, stale level-164 EXP made this single grant hit the wave cap (150).
+    mon.addExp(1_920);
+    expect(mon.level).toBe(targetLevel);
+    expect(mon.exp).toBeLessThan(getLevelTotalExp(targetLevel + 1, mon.species.growthRate));
   });
 
   it("gates by difficulty: hell-only trainer never appears on ace, appears once on hell", () => {

@@ -58,6 +58,7 @@ import {
   setErShinyLabOwnedBit,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
+import { getLevelTotalExp } from "#data/exp";
 import { Gender } from "#data/gender";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
@@ -77,6 +78,7 @@ import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { TimeOfDay } from "#enums/time-of-day";
 import { WeatherType } from "#enums/weather-type";
+import type { PlayerPokemon } from "#field/pokemon";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import { erCommunityItemModifierType, PokemonHeldItemModifierType } from "#modifiers/modifier-type";
@@ -335,6 +337,27 @@ function usableGhostMembers(ghost: GhostTeamSnapshot): GhostMember[] {
 }
 
 /**
+ * Re-level a prepared ghost roster without leaving source-level EXP behind.
+ * Stale EXP makes the first participant that gains EXP race toward the current
+ * wave cap even though its displayed level was lowered for this fight.
+ */
+export function relevelPreparedGhostParty(
+  party: readonly PlayerPokemon[],
+  members: readonly GhostMember[],
+  sourceTopLevel: number,
+  targetTopLevel: number,
+): void {
+  party.forEach((mon, index) => {
+    const sourceLevel = Math.max(1, Math.floor(members[index]?.level ?? sourceTopLevel) || 1);
+    mon.level = Math.max(1, targetTopLevel - (sourceTopLevel - sourceLevel));
+    mon.exp = getLevelTotalExp(mon.level, mon.species.growthRate);
+    mon.calculateStats();
+    mon.hp = mon.getMaxHp();
+    mon.updateInfo();
+  });
+}
+
+/**
  * Build a one-off {@linkcode DevScenario} that force-fields ONE staff-authored
  * custom trainer (er-custom-trainers.json) so the test team can battle-test it
  * from the in-game Dev Scenarios picker. Reuses the round-7 dev force seam
@@ -404,13 +427,7 @@ export function buildErCustomTrainerDevScenario(
     onBattleStart: () => {
       const battle = globalScene.currentBattle;
       const targetTopLevel = Math.max(1, ...(battle?.enemyLevels ?? [battle?.getLevelForWave?.() ?? sourceTopLevel]));
-      globalScene.getPlayerParty().forEach((mon, index) => {
-        const sourceLevel = Math.max(1, Math.floor(members[index]?.level ?? sourceTopLevel) || 1);
-        mon.level = Math.max(1, targetTopLevel - (sourceTopLevel - sourceLevel));
-        mon.calculateStats();
-        mon.hp = mon.getMaxHp();
-        mon.updateInfo();
-      });
+      relevelPreparedGhostParty(globalScene.getPlayerParty(), members, sourceTopLevel, targetTopLevel);
     },
   };
   return { scenario };

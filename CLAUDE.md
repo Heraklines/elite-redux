@@ -705,7 +705,9 @@ ability overrides, BST bypass) - exactly as a real run fields it. The full loop:
    reached that wave within the normal +40 fairness window. It restores stored
    challenge settings when the snapshot carries them, disables the random Mystery
    Encounter roll, and re-levels the player roster against the installed trainer
-   while preserving relative level gaps. Loading has Cancel; failures have Retry +
+   while preserving relative level gaps. Re-leveling MUST reset each member's EXP
+   to the new level as well; otherwise the first KO reconciles stale source-run EXP
+   and can jump a participant straight to the wave cap. Loading has Cancel; failures have Retry +
    Back. **Reset** repeats the exact prepared wave/ghost/challenges without rerolling.
    The one-shot dev force still bypasses challenge exclusivity and clears on install.
    A trainer with no eligible wave or ghost is reported, never replaced by a silent

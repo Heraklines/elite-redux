@@ -33,14 +33,18 @@ import {
 import {
   applyPreparedGhostChallenges,
   buildErCustomTrainerDevScenario,
+  relevelPreparedGhostParty,
   resetDevOverrides,
 } from "#app/dev-tools/test-suite/scenarios";
 import Overrides from "#app/overrides";
 import type { ErCustomTrainerResolved } from "#data/elite-redux/er-custom-trainers";
 import { getErCustomTrainerDevForce, setErCustomTrainerDevForce } from "#data/elite-redux/er-custom-trainers";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
+import { getLevelTotalExp } from "#data/exp";
 import { Challenges } from "#enums/challenges";
 import { GameModes } from "#enums/game-modes";
+import type { PlayerPokemon } from "#field/pokemon";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { describe, expect, it, vi } from "vitest";
 
 /** A stand-in for the MESSAGE UiMode number (the helper is mode-agnostic). */
@@ -226,6 +230,41 @@ describe("Custom Trainers picker - prepared fight selection", () => {
       const setChallengeValue = vi.fn();
       applyPreparedGhostChallenges({ setChallengeValue }, snapshot.challenges ?? []);
       expect(setChallengeValue).toHaveBeenCalledWith(Challenges.INVERSE_BATTLE, 1);
+
+      // Regression: starters are initially constructed at the source run's top
+      // level. Re-leveling only `level` left source-level EXP behind, so the
+      // first participant to gain EXP raced to the current level cap.
+      const bulbasaur = getPokemonSpecies(1);
+      const pikachu = getPokemonSpecies(25);
+      const party = [
+        {
+          level: 20,
+          exp: getLevelTotalExp(20, bulbasaur.growthRate),
+          species: bulbasaur,
+          hp: 1,
+          calculateStats: vi.fn(),
+          getMaxHp: vi.fn(() => 80),
+          updateInfo: vi.fn(),
+        },
+        {
+          level: 20,
+          exp: getLevelTotalExp(20, pikachu.growthRate),
+          species: pikachu,
+          hp: 1,
+          calculateStats: vi.fn(),
+          getMaxHp: vi.fn(() => 70),
+          updateInfo: vi.fn(),
+        },
+      ] as unknown as PlayerPokemon[];
+      relevelPreparedGhostParty(party, snapshot.party, 20, 18);
+      expect(party.map(mon => mon.level)).toEqual([18, 15]);
+      expect(party.map(mon => mon.exp)).toEqual([
+        getLevelTotalExp(18, bulbasaur.growthRate),
+        getLevelTotalExp(15, pikachu.growthRate),
+      ]);
+      expect(party[0].exp).toBeLessThan(getLevelTotalExp(19, bulbasaur.growthRate));
+      expect(party[1].exp).toBeLessThan(getLevelTotalExp(16, pikachu.growthRate));
+      expect(party.map(mon => mon.hp)).toEqual([80, 70]);
     } finally {
       setErCustomTrainerDevForce(null);
       resetDevOverrides();
