@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "taskId": "p33-resume-scan-isolation",
+  "branch": "ci/coop/p33-resume-scan-isolation",
+  "trainRef": "feat/elite-redux-port",
+  "baseSha": "76fb2e27ef67f4e6ce70d1e2ec1cb77db9f52040",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-resume-scan-isolation.json",
+    "src/dev-tools/test-suite/scenarios.ts",
+    "src/phases/title-phase.ts",
+    "src/system/game-data.ts",
+    "test/browser/coop-public-ui/resume-scan-isolation.test.mjs",
+    "test/tests/elite-redux/coop/coop-duo-resume.test.ts"
+  ]
+}
