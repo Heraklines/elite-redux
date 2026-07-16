@@ -47,10 +47,26 @@ describe("Mystery battle reward preparation boundary", () => {
   it("keeps setEncounterRewards callsites on a typed preparation/surface adapter", () => {
     const encounter = source("src/data/mystery-encounters/mystery-encounter.ts");
     const utilities = source("src/data/mystery-encounters/utils/encounter-phase-utils.ts");
+    const replay = source("src/phases/coop-replay-me-phase.ts");
+    const runtime = source("src/data/elite-redux/coop/coop-runtime.ts");
 
     expect(encounter).toContain("export interface MysteryEncounterRewardPlan");
-    expect(encounter).toContain('readonly kind: "modifier";');
-    expect(utilities).toContain("prepareAutomaticEffects: () => preRewardsCallback?.(),");
+    expect(encounter).toContain(
+      "export interface MysteryEncounterModifierRewardSurface extends CoopMeModifierRewardSurfaceProjection",
+    );
+    expect(encounter).toContain("readonly rewardSurfaceProjections: readonly CoopMeRewardSurfaceProjection[];");
+    expect(utilities).toContain("prepareAutomaticEffects: () => {");
     expect(utilities).toContain("encounter.doEncounterRewards = rewardPlan.openRewardSurfaces;");
+    expect(utilities).toContain("const injectedSurfaces = Math.max(0, queuedAfter - queuedBefore);");
+    expect(utilities).toContain('makeCoopMeModifierRewardSurfaceProjection("modifier:heal", -1)');
+    expect(replay).toContain('"MysteryEncounterRewardsPhase", false, destination.rewardSurfaces');
+    expect(replay).not.toContain("destination.rewardShop");
+    expect(replay).not.toContain("destination.addHeal");
+    const settlementPlanStart = runtime.indexOf("export interface CoopMeBattleSettlementPlan");
+    const settlementPlanEnd = runtime.indexOf("\n}\n", settlementPlanStart);
+    const settlementPlan = runtime.slice(settlementPlanStart, settlementPlanEnd);
+    expect(settlementPlan).toContain("readonly rewardSurfaces: readonly CoopMeRewardSurfaceProjection[];");
+    expect(settlementPlan).not.toContain("rewardShop");
+    expect(settlementPlan).not.toContain("addHeal");
   });
 });
