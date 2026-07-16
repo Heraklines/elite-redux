@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "taskId": "p33-gameover-public-ui",
+  "branch": "ci/coop/p33-gameover-public-ui",
+  "trainRef": "ci/coop/p33-closure-integrated",
+  "baseSha": "abb57b17c1c6b5bcad3309cb242359b089c1e816",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-gameover-public-ui.json",
+    ".github/workflows/coop-public-ui-journey.yml",
+    "progress.md",
+    "src/data/elite-redux/coop/coop-webrtc-transport.ts",
+    "src/dev-tools/registry.ts",
+    "src/ui/handlers/starter-select-ui-handler.ts",
+    "test/browser/coop-public-ui/browser-workflow-fanout.test.mjs",
+    "test/browser/coop-public-ui/check-public-boundary.mjs",
+    "test/browser/coop-public-ui/config.mjs",
+    "test/browser/coop-public-ui/game-over-evidence.test.mjs",
+    "test/browser/coop-public-ui/journeys.mjs",
+    "test/browser/coop-public-ui/public-ui-harness.mjs",
+    "test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs"
+  ]
+}

@@ -74,6 +74,7 @@ const COOP_WIRE_MAX_CHUNKS = 2_048;
 const COOP_WIRE_MAX_REASSEMBLED_BYTES = 16 * 1024 * 1024;
 const COOP_LOGICAL_QUEUE_MAX_BYTES = 32 * 1024 * 1024;
 const COOP_LOGICAL_QUEUE_MAX_COUNT = 512;
+const COOP_BROWSER_GAME_OVER_ENVELOPE_DELAY_MS = 4_000;
 /** Bounded whole-transfer replay fence. Transfer ids are unique for one transport session. */
 export const COOP_WIRE_COMPLETED_TRANSFER_RETENTION = 512;
 
@@ -194,6 +195,8 @@ export class WebRtcTransport implements CoopTransport {
   private transportFailureReason: string | undefined;
   /** The current generation has already emitted its one lifecycle disconnect transition. */
   private disconnectedGeneration: number | null = null;
+  /** Exact fixture authority keys already waiting for their one displaced real send. */
+  private readonly delayedGameOverFixtureAuthorities = new Set<string>();
   private readonly inboundChunks = new Map<
     string,
     { readonly total: number; readonly parts: (string | undefined)[]; received: number; bytes: number }
@@ -451,6 +454,51 @@ export class WebRtcTransport implements CoopTransport {
   }
 
   send(msg: CoopMessage): void {
+    const fixtureAuthority = this.gameOverFixtureEnvelopeAuthority(msg);
+    if (fixtureAuthority != null) {
+      if (this.delayedGameOverFixtureAuthorities.has(fixtureAuthority)) {
+        coopLog("webrtc", `fixture COALESCE retained gameOver retry authority=${fixtureAuthority}`);
+        return;
+      }
+      this.delayedGameOverFixtureAuthorities.add(fixtureAuthority);
+      coopLog(
+        "webrtc",
+        `fixture DELAY retained gameOver envelope role=${this.role} authority=${fixtureAuthority} delay=${COOP_BROWSER_GAME_OVER_ENVELOPE_DELAY_MS}ms`,
+      );
+      setTimeout(() => {
+        this.delayedGameOverFixtureAuthorities.delete(fixtureAuthority);
+        this.sendNow(msg);
+      }, COOP_BROWSER_GAME_OVER_ENVELOPE_DELAY_MS);
+      return;
+    }
+    this.sendNow(msg);
+  }
+
+  /**
+   * Exact-build public-browser fault injection for the terminal ordering regression.
+   *
+   * The frame still traverses the normal RTC serialization, durability, receive, journal,
+   * materialization, replay-unpark and ACK paths; only its wall-clock delivery is displaced.
+   * Normal builds fail closed because neither a URL alone nor a build flag alone is sufficient.
+   */
+  private gameOverFixtureEnvelopeAuthority(msg: CoopMessage): string | null {
+    const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+    if (
+      env?.VITE_COOP_BROWSER_FIXTURE !== "game-over"
+      || typeof location === "undefined"
+      || new URLSearchParams(location.search).get("coopfixture") !== "game-over"
+      || msg.t !== "envelope"
+      || msg.envelope.pendingOperation?.kind !== "WAVE_ADVANCE"
+    ) {
+      return null;
+    }
+    const payload = msg.envelope.pendingOperation.payload as { outcome?: unknown } | undefined;
+    return payload?.outcome === "gameOver"
+      ? `${msg.envelope.sessionEpoch}:${msg.envelope.revision}:${msg.envelope.pendingOperation.id}`
+      : null;
+  }
+
+  private sendNow(msg: CoopMessage): void {
     if (this._state !== "connected" || this.wire.readyState !== "open") {
       // W2b durability (§4.3): instead of dropping a DURABLE frame silently (the review-finding-3 hazard),
       // ENQUEUE it and flush FIFO on the next `open`. Cosmetic/internal frames are shed (§4.1). Keepalive
