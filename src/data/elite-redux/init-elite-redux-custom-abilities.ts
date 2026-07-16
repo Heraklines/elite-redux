@@ -98,6 +98,7 @@ import {
   RelativityDefenseReductionAbAttr,
 } from "#data/elite-redux/abilities/relativity";
 import { ER_RENDEZVOUS_ABILITY_ID, RendezvousAbAttr } from "#data/elite-redux/abilities/rendezvous";
+import { ER_SHATTERED_PSYCHE_ABILITY_ID, ShatteredPsycheAbAttr } from "#data/elite-redux/abilities/shattered-psyche";
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
 import { ER_SOULMATE_ABILITY_ID, SoulmateAbAttr } from "#data/elite-redux/abilities/soulmate";
 import { ER_SPORE_BED_ABILITY_ID } from "#data/elite-redux/abilities/spore-bed";
@@ -526,6 +527,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
         archetype: "unknown",
       },
       pokerogueId: ER_NEGATIVE_FEEDBACK_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_SHATTERED_PSYCHE_ABILITY_ID,
+        name: "Shattered Psyche",
+        description:
+          "Once per battle, after commands are chosen, this Pokemon fuses two of its opponents into one entity with their combined HP that takes both of their actions each turn. In a one-on-one battle it pulls a benched foe into the fusion instead. When the fused entity leaves the field, its remaining HP is split back between the two by their shares.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_SHATTERED_PSYCHE_ABILITY_ID,
     },
     {
       draft: {
@@ -986,6 +997,10 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_NEGATIVE_FEEDBACK_ABILITY_ID) {
     builder.attr(NegativeFeedbackAbAttr);
+  }
+
+  if (pokerogueId === ER_SHATTERED_PSYCHE_ABILITY_ID) {
+    builder.attr(ShatteredPsycheAbAttr);
   }
 
   if (pokerogueId === ER_CLOSED_CIRCUIT_ABILITY_ID) {

@@ -26,6 +26,7 @@ import { resetTurnAttackLedger } from "#data/elite-redux/abilities/turn-attack-l
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { StatusEffect } from "#enums/status-effect";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -108,6 +109,59 @@ describe.skipIf(!RUN)("ER Sync Current + Closed Circuit extensions (5921/5924)",
     expect(b.hp).toBeGreaterThan(beforeB);
     expect(a.hp - beforeA).toBeGreaterThanOrEqual(Math.floor(a.getMaxHp() * 0.2));
     expect(b.hp - beforeB).toBeGreaterThanOrEqual(Math.floor(b.getMaxHp() * 0.2));
+  });
+
+  // --- Synchronized Current: heal reaches an ally WITHOUT the ability -------
+  // Live bug (staging 2026-07-16, "sychroniced current healing doesn't work"):
+  // a Mega Minun (Sync Current holder, at FULL HP) stood next to a BASE-form
+  // Plusle (no Sync Current, damaged). Both used status moves (neither attacked),
+  // yet the damaged ally never healed - the effect only ever self-healed the
+  // holder, and a full-HP holder self-heal is a no-op. The ability text is "both
+  // restore 1/4 of their max HP", so the holder must heal the PAIR.
+  it("neither-attack: a damaged ally that lacks the ability is still healed", async () => {
+    game.override.ability(SYNC).enemyMoveset(MoveId.CELEBRATE).moveset([MoveId.TAIL_GLOW, MoveId.HARDEN]);
+    await game.classicMode.startBattle(SpeciesId.MINUN, SpeciesId.PLUSLE);
+    const [holder, ally] = game.scene.getPlayerField();
+    // Strip Sync Current from the ally so ONLY the holder carries it.
+    ally.summonData.ability = AbilityId.BALL_FETCH;
+    holder.hp = holder.getMaxHp(); // full HP -> the holder's own heal is a no-op
+    ally.hp = Math.floor(ally.getMaxHp() / 4);
+    const beforeAlly = ally.hp;
+
+    game.move.select(MoveId.HARDEN, 0); // holder status
+    game.move.select(MoveId.TAIL_GLOW, 1); // ally status
+    await game.toEndOfTurn();
+
+    // The holder heals the whole pair -> the damaged ally is restored ~1/4.
+    expect(ally.hp).toBeGreaterThan(beforeAlly);
+    expect(ally.hp - beforeAlly).toBeGreaterThanOrEqual(Math.floor(ally.getMaxHp() * 0.2));
+  });
+
+  // --- Synchronized Current: "neither attacks" covers not-a-status-move too --
+  // The clause is detected by the ABSENCE of an attack, not the presence of a
+  // clean status move, so an ally that does not attack for ANY reason (here:
+  // fully asleep, so it executes no move) still counts as "did not attack".
+  it("neither-attack: an ally that is asleep (executes no move) still triggers the heal", async () => {
+    game.override.ability(SYNC).enemyMoveset(MoveId.CELEBRATE).moveset([MoveId.HARDEN]);
+    await game.classicMode.startBattle(SpeciesId.PLUSLE, SpeciesId.MINUN);
+    const [a, b] = game.scene.getPlayerField();
+    a.hp = Math.floor(a.getMaxHp() / 2);
+    b.hp = Math.floor(b.getMaxHp() / 2);
+    // Force b into a multi-turn sleep so it does NOT act this turn.
+    b.trySetStatus(StatusEffect.SLEEP, a);
+    if (b.status) {
+      b.status.sleepTurnsRemaining = 3;
+    }
+    const beforeA = a.hp;
+    const beforeB = b.hp;
+
+    game.move.select(MoveId.HARDEN, 0); // a uses a status move
+    game.move.select(MoveId.HARDEN, 1); // b is asleep -> executes nothing
+    await game.toEndOfTurn();
+
+    // Neither mon attacked, so the holder's pair heal restores both.
+    expect(a.hp).toBeGreaterThan(beforeA);
+    expect(b.hp).toBeGreaterThan(beforeB);
   });
 
   // --- Synchronized Current: mixed = no bonus ------------------------------

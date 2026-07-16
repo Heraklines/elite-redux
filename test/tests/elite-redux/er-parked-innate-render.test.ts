@@ -5,20 +5,19 @@
  */
 
 // =============================================================================
-// ER parked-innate graceful render (Primal Mew's Shattered Psyche slot).
+// ER Primal Mew innate triple - fully defined (the parked slot is now filled).
 //
-// Primal Mew's innate triple is [Brain Food, Genesis Supernova, AbilityId.NONE].
-// The trailing NONE is a DESIGN-PARKED slot (the not-yet-defined Shattered Psyche),
-// NOT a bug. The ability screen must OMIT that slot cleanly - never draw a broken /
-// blank PASSIVE row. This locks the contract that:
-//   - the species-static innate list carries exactly one NONE (the parked slot),
-//   - the live-Pokemon getPassiveAbilities() nulls that slot (so the summary loop
-//     skips it), leaving only the two real innates rendered.
+// Primal Mew's innate triple is [Brain Food, Genesis Supernova, Shattered Psyche
+// (5968)]. The trailing slot used to be a design-PARKED AbilityId.NONE; it is now
+// implemented, so the triple carries THREE real innates and NO parked NONE. The
+// summary passive loop still defensively skips a NONE-id passive (it just no
+// longer has one to skip on Primal Mew), so no blank PASSIVE row is ever drawn.
 //
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
 
 import { allAbilities } from "#data/data-lists";
+import { ER_SHATTERED_PSYCHE_ABILITY_ID } from "#data/elite-redux/abilities/shattered-psyche";
 import { AbilityId } from "#enums/ability-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
@@ -27,8 +26,9 @@ import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+const SHATTERED_PSYCHE = ER_SHATTERED_PSYCHE_ABILITY_ID as AbilityId;
 
-describe.skipIf(!RUN)("ER parked-innate graceful render (Primal Mew)", () => {
+describe.skipIf(!RUN)("ER Primal Mew innate triple (Shattered Psyche slot filled)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
 
@@ -41,38 +41,42 @@ describe.skipIf(!RUN)("ER parked-innate graceful render (Primal Mew)", () => {
     game.override.battleStyle("single").startingLevel(50).enemyLevel(50).enemySpecies(SpeciesId.SNORLAX);
   });
 
-  it("the species-static innate triple has exactly one parked NONE slot + two real innates", () => {
+  it("the species-static innate triple is three real innates including Shattered Psyche (no parked NONE)", () => {
     const mew = getPokemonSpecies(SpeciesId.MEW);
     const primalIndex = mew.forms.findIndex(f => f.formKey === "primal");
     expect(primalIndex, "Primal Mew form injected").toBeGreaterThanOrEqual(0);
 
     const innates = mew.getPassiveAbilities(primalIndex);
-    // Exactly one parked slot (NONE) - the design-parked Shattered Psyche.
+    // No parked slot remains - the Shattered Psyche placeholder is implemented.
     const parked = innates.filter(id => id === AbilityId.NONE);
-    expect(parked.length, "one design-parked innate slot").toBe(1);
-    // The two real innates resolve to live abilities (not NONE).
+    expect(parked.length, "no design-parked innate slot remains").toBe(0);
+    // All three innates resolve to live abilities.
     const real = innates.filter(id => id !== AbilityId.NONE);
-    expect(real.length).toBe(2);
+    expect(real.length).toBe(3);
     for (const id of real) {
       expect(allAbilities[id]?.id).toBe(id);
     }
+    // Shattered Psyche (5968) is the filled slot.
+    expect(innates).toContain(SHATTERED_PSYCHE);
   });
 
-  it("the ability screen omits the NONE slot: no rendered passive is AbilityId.NONE", async () => {
+  it("the ability screen renders all three innates, none of which is AbilityId.NONE", async () => {
     await game.classicMode.startBattle(SpeciesId.MEW);
     const mon = game.field.getPlayerPokemon();
-    // Force into the primal form so the parked innate triple is live.
+    // Force into the primal form so the innate triple is live.
     const primalIndex = mon.species.forms.findIndex(f => f.formKey === "primal");
     mon.formIndex = primalIndex;
 
-    // getPassiveAbilities NULLs a NONE slot; the summary passive loop skips null
-    // AND (post-fix) an AbilityId.NONE object, so no blank PASSIVE row is drawn.
+    // The summary passive loop skips null AND an AbilityId.NONE object; with the
+    // slot filled there is no NONE, so all three innates render cleanly.
     const rendered = mon.getPassiveAbilities().filter((a): a is NonNullable<typeof a> => a != null);
     expect(
       rendered.every(a => a.id !== AbilityId.NONE),
       "no NONE passive is rendered",
     ).toBe(true);
-    // The parked slot is omitted, not rendered as a broken row.
-    expect(rendered.length).toBeLessThan(mon.getPassiveAbilities().length);
+    expect(
+      rendered.some(a => a.id === SHATTERED_PSYCHE),
+      "Shattered Psyche innate present",
+    ).toBe(true);
   });
 });
