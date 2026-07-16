@@ -1,4 +1,8 @@
 import { globalScene } from "#app/global-scene";
+import type {
+  CoopMeModifierRewardSurfaceProjection,
+  CoopMeRewardSurfaceProjection,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import type { BattlerIndex } from "#enums/battler-index";
 import type { Challenges } from "#enums/challenges";
 import type { EncounterAnim } from "#enums/encounter-anims";
@@ -39,8 +43,7 @@ export interface EncounterStartOfBattleEffect {
 }
 
 /** A standard, locally-rendered reward surface prepared by a Mystery Encounter. */
-export interface MysteryEncounterModifierRewardSurface {
-  readonly kind: "modifier";
+export interface MysteryEncounterModifierRewardSurface extends CoopMeModifierRewardSurfaceProjection {
   readonly settings: CustomModifierSettings | null;
 }
 
@@ -51,6 +54,8 @@ export interface MysteryEncounterModifierRewardSurface {
  */
 export interface MysteryEncounterRewardPlan {
   readonly surfaces: readonly MysteryEncounterModifierRewardSurface[];
+  /** Wire-safe ordered view retained by the authoritative battle settlement. */
+  readonly rewardSurfaceProjections: readonly CoopMeRewardSurfaceProjection[];
   readonly prepareAutomaticEffects: () => void | Promise<void>;
   readonly openRewardSurfaces: () => boolean;
 }

@@ -27,7 +27,10 @@ import {
   setCoopMeTerminalControl,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
-import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import type {
+  CoopMeRewardSurfaceProjection,
+  CoopMeTerminalPayload,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   type CoopMeBattleSettlementPlan,
   commitCoopMeBattleSettlementAtBattleEnd as commitCoopMeBattleSettlementAfterRewardPreparation,
@@ -1246,18 +1249,18 @@ export class MysteryEncounterBattlePhase extends Phase {
 export class MysteryEncounterRewardsPhase extends Phase {
   public readonly phaseName = "MysteryEncounterRewardsPhase";
   addHealPhase: boolean;
-  private readonly authoritativeRewardShop: boolean | null;
-  /** Compatibility settlement retained after automatic reward preparation on the authoritative host. */
+  private readonly authoritativeRewardSurfaces: readonly CoopMeRewardSurfaceProjection[] | null;
+  /** Settlement retained after automatic reward preparation on the authoritative host. */
   private readonly meSettlementPlan: CoopMeBattleSettlementPlan | null;
 
   constructor(
     addHealPhase = false,
-    authoritativeRewardShop: boolean | null = null,
+    authoritativeRewardSurfaces: readonly CoopMeRewardSurfaceProjection[] | null = null,
     meSettlementPlan: CoopMeBattleSettlementPlan | null = null,
   ) {
     super();
     this.addHealPhase = addHealPhase;
-    this.authoritativeRewardShop = authoritativeRewardShop;
+    this.authoritativeRewardSurfaces = authoritativeRewardSurfaces;
     this.meSettlementPlan = meSettlementPlan;
   }
 
@@ -1276,25 +1279,19 @@ export class MysteryEncounterRewardsPhase extends Phase {
     // onRewards is safe. The genuinely-interactive engine phases (OptionSelected, Post) stay diverted.
     if (isCoopAuthoritativeGuest()) {
       if (isCoopMeOperationJournalActive()) {
-        if (this.authoritativeRewardShop == null) {
-          failCoopSharedSession("A retained Mystery reward continuation omitted its shop surface.");
+        if (this.authoritativeRewardSurfaces == null) {
+          failCoopSharedSession("A retained Mystery reward continuation omitted its ordered surface plan.");
           return;
         }
-        coopLog("me", "retained reward continuation: guest opens only the host-stated surface", {
+        coopLog("me", "retained reward continuation: guest opens only the host-stated surfaces", {
           counter: coopMeInteractionStartValue(),
-          rewardShop: this.authoritativeRewardShop,
-          addHealPhase: this.addHealPhase,
+          rewardSurfaces: this.authoritativeRewardSurfaces.map(surface => surface.surfaceId),
         });
-        if (this.authoritativeRewardShop) {
-          globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
-          if (this.addHealPhase) {
-            globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
-              fillRemaining: false,
-              rerollMultiplier: -1,
-            });
-          } else {
-            globalScene.phaseManager.unshiftNew("SelectModifierPhase");
-          }
+        globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
+        for (const surface of this.authoritativeRewardSurfaces) {
+          globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
+            rerollMultiplier: surface.rerollMultiplier,
+          });
         }
         globalScene.phaseManager.pushNew("PostMysteryEncounterPhase");
         this.end();
@@ -1384,8 +1381,8 @@ export class MysteryEncounterRewardsPhase extends Phase {
       return;
     }
 
-    // This existing P35 settlement shape is a temporary compatibility adapter. Crucially, its DATA image is
-    // now captured after automatic preparation and before any standard modifier picker becomes interactive.
+    // Capture the complete P36 ordered plan after automatic preparation and before any standard modifier
+    // picker becomes interactive.
     if (this.meSettlementPlan != null) {
       commitCoopMeBattleSettlementAfterRewardPreparation(this.meSettlementPlan);
     }

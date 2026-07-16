@@ -168,6 +168,7 @@ import type {
   CoopMeButtonPayload,
   CoopMePickPayload,
   CoopMePresentPayload,
+  CoopMeRewardSurfaceProjection,
   CoopMeSubPayload,
   CoopMeTerminalPayload,
   CoopQuizAnswerPayload,
@@ -4794,8 +4795,7 @@ export interface CoopMeBattleSettlementPlan {
   readonly result: "victory" | "failure";
   readonly continuation: "rewards" | "encounter" | "none";
   readonly trainerVictory: boolean;
-  readonly addHeal: boolean;
-  readonly rewardShop: boolean;
+  readonly rewardSurfaces: readonly CoopMeRewardSurfaceProjection[];
   readonly eggLapse: boolean;
 }
 

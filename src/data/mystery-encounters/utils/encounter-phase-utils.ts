@@ -22,6 +22,10 @@ import {
   setCoopMeActivePresentation,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
+  type CoopMeRewardSurfaceProjection,
+  makeCoopMeModifierRewardSurfaceProjection,
+} from "#data/elite-redux/coop/coop-operation-envelope";
+import {
   coopGuestAwaitMeBattleParty,
   coopGuestShouldAdoptMeBattleParty,
   coopHostStreamMeBattleParty,
@@ -1286,9 +1290,53 @@ export function setEncounterRewards(
   preRewardsCallback?: () => void | Promise<void>,
 ): void {
   const encounter = globalScene.currentBattle.mysteryEncounter!;
+  const surfaces: MysteryEncounterRewardPlan["surfaces"][number][] = [];
+  const rewardSurfaceProjections: CoopMeRewardSurfaceProjection[] = [];
+  const rerollMultiplier = customShopRewards?.rerollMultiplier ?? 1;
+  const appendModifierSurface = () => {
+    const projection = makeCoopMeModifierRewardSurfaceProjection(
+      `modifier:me:${encounter.encounterType}:${rewardSurfaceProjections.length}`,
+      rerollMultiplier,
+    );
+    rewardSurfaceProjections.push(projection);
+    surfaces.push({ ...projection, settings: customShopRewards ?? null });
+  };
+  if (customShopRewards != null) {
+    appendModifierSurface();
+  }
+  let preparationComplete = false;
+  let preparationInFlight: Promise<void> | null = null;
   const rewardPlan: MysteryEncounterRewardPlan = {
-    surfaces: customShopRewards == null ? [] : [{ kind: "modifier", settings: customShopRewards }],
-    prepareAutomaticEffects: () => preRewardsCallback?.(),
+    surfaces,
+    rewardSurfaceProjections,
+    prepareAutomaticEffects: () => {
+      if (preparationComplete) {
+        return;
+      }
+      if (preparationInFlight != null) {
+        return preparationInFlight;
+      }
+      const queuedBefore = globalScene.phaseManager
+        .getQueuedPhaseNames()
+        .filter(phaseName => phaseName === "SelectModifierPhase").length;
+      const finalizePreparation = () => {
+        const queuedAfter = globalScene.phaseManager
+          .getQueuedPhaseNames()
+          .filter(phaseName => phaseName === "SelectModifierPhase").length;
+        const injectedSurfaces = Math.max(0, queuedAfter - queuedBefore);
+        for (let index = 0; index < injectedSurfaces; index++) {
+          appendModifierSurface();
+        }
+        preparationComplete = true;
+        preparationInFlight = null;
+      };
+      const result = preRewardsCallback?.();
+      if (result != null) {
+        preparationInFlight = result.then(finalizePreparation);
+        return preparationInFlight;
+      }
+      finalizePreparation();
+    },
     openRewardSurfaces: () => {
       if (customShopRewards) {
         globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, customShopRewards);
@@ -1307,9 +1355,29 @@ export function setEncounterRewards(
     },
   };
   encounter.rewardPlan = rewardPlan;
-  // Compatibility adapter: existing encounter callsites and the P35 wire contract still observe the
-  // established callback. MysteryEncounterRewardsPhase owns preparation before invoking this surface seam.
+  // Existing encounter callsites still observe the established callback. MysteryEncounterRewardsPhase owns
+  // preparation and freezes the P36 ordered projection before invoking this surface seam.
   encounter.doEncounterRewards = rewardPlan.openRewardSurfaces;
+}
+
+/** Build the exact ordered standard reward projection, or reject an untyped raw callback. */
+function mysteryEncounterRewardSurfaces(
+  encounter: MysteryEncounter,
+  continuation: "rewards" | "encounter" | "none",
+  addHealPhase: boolean,
+): readonly CoopMeRewardSurfaceProjection[] | null {
+  if (continuation !== "rewards") {
+    return [];
+  }
+  const rewardPlan =
+    encounter.rewardPlan?.openRewardSurfaces === encounter.doEncounterRewards ? encounter.rewardPlan : null;
+  if (rewardPlan != null) {
+    return rewardPlan.rewardSurfaceProjections;
+  }
+  if (encounter.doEncounterRewards != null) {
+    return null;
+  }
+  return addHealPhase ? [makeCoopMeModifierRewardSurfaceProjection("modifier:heal", -1)] : [];
 }
 
 /**
@@ -1411,15 +1479,19 @@ export function handleMysteryEncounterVictory(addHealPhase = false, doNotContinu
     const trainerVictory = encounter.encounterMode === MysteryEncounterMode.TRAINER_BATTLE;
     const continuation = encounter.doContinueEncounter ? "encounter" : queueRewards ? "rewards" : "none";
     if (globalScene.gameMode.isCoop && continuation === "none") {
-      failCoopSharedSession("A final-wave Mystery battle has no retained GameOver continuation in protocol 35.");
+      failCoopSharedSession("A final-wave Mystery battle has no retained GameOver continuation in protocol 36.");
+      return;
+    }
+    const rewardSurfaces = mysteryEncounterRewardSurfaces(encounter, continuation, addHealPhase);
+    if (rewardSurfaces == null && globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
+      failCoopSharedSession("A Mystery battle reward callback had no typed reward-surface plan.");
       return;
     }
     const settlementPlan = {
       result: "victory",
       continuation,
       trainerVictory,
-      addHeal: continuation === "rewards" && addHealPhase,
-      rewardShop: continuation === "rewards" && (encounter.doEncounterRewards != null || addHealPhase),
+      rewardSurfaces: rewardSurfaces ?? [],
       eggLapse: continuation === "rewards",
     } as const;
     globalScene.phaseManager.pushNew("BattleEndPhase", true, null, settlementPlan);
@@ -1469,12 +1541,16 @@ export function handleMysteryEncounterBattleFailed(addHealPhase = false, doNotCo
     globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase);
   } else {
     const continuation = encounter.doContinueEncounter ? "encounter" : "rewards";
+    const rewardSurfaces = mysteryEncounterRewardSurfaces(encounter, continuation, addHealPhase);
+    if (rewardSurfaces == null && globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
+      failCoopSharedSession("A failed Mystery battle reward callback had no typed reward-surface plan.");
+      return;
+    }
     const settlementPlan = {
       result: "failure",
       continuation,
       trainerVictory: false,
-      addHeal: continuation === "rewards" && addHealPhase,
-      rewardShop: continuation === "rewards" && (encounter.doEncounterRewards != null || addHealPhase),
+      rewardSurfaces: rewardSurfaces ?? [],
       eggLapse: continuation === "rewards",
     } as const;
     globalScene.phaseManager.pushNew("BattleEndPhase", false, null, settlementPlan);
