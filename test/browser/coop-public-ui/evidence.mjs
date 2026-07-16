@@ -37,6 +37,10 @@ const FATAL_COOP_CONSOLE_RULES = Object.freeze([
     /^\[coop:durability\].*(?:\brecovery EXHAUSTED\b|\bdeferred continuation EXHAUSTED\b|\boperation continuation EXHAUSTED\b|\boperation delivery retries exhausted\b)/u,
     "durability recovery exhausted",
   ],
+  [
+    /^\[coop:relay\].*(?:\bDECLINE reply\b.*\bAI-falls-back\b|\brecv command DECLINE\b.*\bAI fallback\b)/u,
+    "command ownership disagreement",
+  ],
   [/^\[coop:runtime\] STALL WATCHDOG:.*-> recovering\b/u, "stall recovery attempt"],
   [/^\[coop:me\].*requesting durable replay\b/u, "Mystery durability recovery attempt"],
   [/^\[coop:resync\].*(?:\bawait stateSync start\b|\bqueueing full snapshot apply\b)/u, "state resync attempt"],
