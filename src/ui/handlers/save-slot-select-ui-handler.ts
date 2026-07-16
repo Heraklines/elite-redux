@@ -183,7 +183,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
                       UiMode.CONFIRM,
                       () => {
                         globalScene.gameData.deleteSession(cursor).then(response => {
-                          if (response[0] === false) {
+                          if (response === false) {
                             globalScene.reset(true);
                           } else {
                             this.clearSessionSlots();
