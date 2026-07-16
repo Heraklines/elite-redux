@@ -97,6 +97,6 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
   );
   assert.match(
     harness,
-    /semantic\?\.observation\.coop === false[\s\S]*?ownerModel === "local"[\s\S]*?seatsWithInput\?\.includes\(0\)/u,
+    /observation != null[\s\S]*?observation\.coop === false[\s\S]*?ownerModel === "local"[\s\S]*?seatsWithInput\?\.includes\(0\)/u,
   );
 });

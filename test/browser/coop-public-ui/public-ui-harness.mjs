@@ -185,17 +185,16 @@ export function createPublicBattleProgressBudget(
 
 function findOwnedCommandOrTerminal(client, from) {
   const semantic = client.evidence.findLastSemanticSurface(from, "command:command");
+  const observation = semantic?.observation;
   const semanticOwner =
-    semantic?.observation.coop === false
-      ? semantic.observation.ownerModel === "local"
-        && semantic.observation.localSeat == null
-        && semantic.observation.seatsWithInput?.includes(0)
-      : semantic?.observation.localSeat === client.publicSeat
-        && semantic.observation.seatsWithInput?.includes(client.publicSeat);
+    observation != null
+    && (observation.coop === false
+      ? observation.ownerModel === "local" && observation.localSeat == null && observation.seatsWithInput?.includes(0)
+      : observation.localSeat === client.publicSeat && observation.seatsWithInput?.includes(client.publicSeat));
   const ownedSemantic =
-    semantic?.observation.ready?.handlerActive === true
-    && semantic.observation.phase === "CommandPhase"
-    && semantic.observation.uiMode === "COMMAND"
+    observation?.ready?.handlerActive === true
+    && observation.phase === "CommandPhase"
+    && observation.uiMode === "COMMAND"
     && semanticOwner
       ? semantic
       : null;
