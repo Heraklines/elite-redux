@@ -8,7 +8,11 @@ import { initTrainerTypeDialogue } from "#data/dialogue";
 import { wireEliteReduxManualComposites } from "#data/elite-redux/abilities/composite-newcomers";
 import { registerErFinalBossFormChange } from "#data/elite-redux/er-final-boss";
 import { applyNewcomerLearnsetAdditions, injectNewcomerForms } from "#data/elite-redux/er-newcomer-forms";
-import { applyErNewcomerSpeciesLearnsets, injectErNewcomerSpecies } from "#data/elite-redux/er-newcomer-species";
+import {
+  applyErNewcomerSpeciesLearnsets,
+  applyErNewcomerSpeciesTmCompatibility,
+  injectErNewcomerSpecies,
+} from "#data/elite-redux/er-newcomer-species";
 import {
   initEliteReduxCSourceCorrections,
   remapEliteReduxMoveIdsByName,
@@ -374,4 +378,14 @@ export function initializeGame() {
       `[er-pokedex-overrides] applied ${pokedexResult.learnsetsApplied} learnsets + ${pokedexResult.tmSetsApplied} TM sets + ${pokedexResult.abilitiesApplied} ability sets (dropped ${pokedexResult.idsDropped} ids, skipped ${pokedexResult.skippedUnmapped} unmapped${pokedexResult.errors.length > 0 ? `, ${pokedexResult.errors.length} errors` : ""})`,
     );
   }
+
+  // Newcomer SPECIES TM compatibility (a SEPARATE data path from the level-up
+  // learnsets: tmSpecies / speciesTmMoves). Evolution species inherit the pre-evo's
+  // full TM set + type additions; Regitube gets a hand Water set; partner
+  // eeveelutions inherit their base's. Without this the 70000+ band had no TMs.
+  // MUST run LAST — after initEliteReduxPokedexOverrides finalizes the base/pre-evo
+  // TM lists (which the editor TM overrides can extend), so the inherited superset
+  // is complete.
+  const newcomerSpeciesTms = applyErNewcomerSpeciesTmCompatibility();
+  console.info(`[er-newcomer-species] wired ${newcomerSpeciesTms} species TM sets`);
 }

@@ -51,6 +51,8 @@ import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { pokemonEvolutions, SpeciesEvolution } from "#balance/pokemon-evolutions";
 import { speciesStarterCosts } from "#balance/starters";
+import { tmSpecies } from "#balance/tm-species-map";
+import { speciesTmMoves } from "#balance/tms";
 import { allSpecies } from "#data/data-lists";
 import {
   ER_PARTNER_EEVEE_ABILITY_ID,
@@ -571,6 +573,107 @@ export function applyErNewcomerSpeciesLearnsets(): number {
 
   for (const def of ER_PARTNER_FAMILY) {
     table[def.partnerId] = cloneLearnset(def.base);
+    wired++;
+  }
+
+  return wired;
+}
+
+/**
+ * Regitube's TM set. It has no pre-evo to inherit TM compatibility from, so it
+ * gets a hand Water/utility set (mirrors its hand Water level-up learnset). Only
+ * ids that are ACTUAL TM moves get wired (the adder self-filters against the live
+ * TM table), so listing a generous set is safe against roster changes.
+ */
+const REGITUBE_TM_MOVES: readonly MoveId[] = [
+  MoveId.SURF,
+  MoveId.WATERFALL,
+  MoveId.SCALD,
+  MoveId.DIVE,
+  MoveId.ICE_BEAM,
+  MoveId.BLIZZARD,
+  MoveId.RAIN_DANCE,
+  MoveId.BODY_SLAM,
+  MoveId.REST,
+  MoveId.SLEEP_TALK,
+  MoveId.PROTECT,
+  MoveId.SUBSTITUTE,
+  MoveId.FACADE,
+  MoveId.ROUND,
+  MoveId.HYPER_BEAM,
+  MoveId.GIGA_IMPACT,
+];
+
+/**
+ * Wire the newcomer species' TM compatibility. This is a SEPARATE data path from
+ * the level-up learnsets above (`tmSpecies` / `speciesTmMoves`, NOT
+ * `pokemonSpeciesLevelMoves`), and it was originally missed — the 70000+ band had
+ * no TM entries at all, so Tentalect etc. showed an empty TM list and could learn
+ * no TMs (live tester report).
+ *
+ * Derivation (per the newcomer patch): each evolution species inherits its
+ * PRE-EVO's full TM compatibility, plus the type-appropriate coverage moves from
+ * its `learnsetAdditions` that are themselves TMs. Regitube (no pre-evo) gets the
+ * hand set above. Partner eeveelutions inherit their base eeveelution's TM set.
+ * Mega/primal FORMS need no wiring here: `Pokemon.generateCompatibleTms` matches
+ * a plain `tmSpecies` entry against `this.species.speciesId` regardless of form,
+ * so a form inherits its base species' TM compatibility automatically.
+ *
+ * Both live tables are kept in sync: `tmSpecies[move]` (read by the TM-item
+ * compatibility check `generateCompatibleTms`) and `speciesTmMoves[speciesId]`
+ * (read by the Pokedex TM list, AI moveset gen, and Showdown legality). Idempotent.
+ *
+ * Must run AFTER the species are registered (`injectErNewcomerSpecies`). Order
+ * vs. the editor TM overrides (`applyErPokedexOverrides`) is irrelevant: those
+ * only touch species listed in er-tm-learnsets.json, which the 70000+ band is not.
+ */
+export function applyErNewcomerSpeciesTmCompatibility(): number {
+  const tmByMove = tmSpecies as Record<number, (SpeciesId | [SpeciesId | string, string])[]>;
+  const movesBySpecies = speciesTmMoves as Record<number, (MoveId | [unknown, MoveId])[]>;
+  let wired = 0;
+
+  /** Plain (non-form-gated) TM move ids the species carries. */
+  const plainTms = (speciesId: number): MoveId[] =>
+    (movesBySpecies[speciesId] ?? []).map(e => (Array.isArray(e) ? e[1] : e));
+
+  const addTm = (speciesId: number, moveId: number): void => {
+    // Always record in the per-species table (drives Pokedex / AI / Showdown).
+    const moves = (movesBySpecies[speciesId] ??= []);
+    if (!moves.some(e => (Array.isArray(e) ? e[1] : e) === moveId)) {
+      moves.push(moveId as MoveId);
+    }
+    // Mirror into the TM-item table only when this move is an actual TM (some
+    // ER-added per-species entries aren't in the vanilla TM map; those stay
+    // display-only, exactly as they are for the base species).
+    const list = tmByMove[moveId];
+    if (list && !list.some(p => (Array.isArray(p) ? p[0] === speciesId : p === speciesId))) {
+      list.push(speciesId as SpeciesId);
+    }
+  };
+
+  // Inherit the base/pre-evo's full TM set from the authoritative per-species
+  // table (a superset of the TM-item map — includes ER-added display TMs).
+  const inheritFrom = (speciesId: number, baseId: number): void => {
+    for (const moveId of plainTms(baseId)) {
+      addTm(speciesId, moveId);
+    }
+  };
+
+  for (const def of ER_NEWCOMER_EVO_SPECIES) {
+    inheritFrom(def.speciesId, def.evolvesFrom);
+    for (const [, mv] of def.learnsetAdditions) {
+      addTm(def.speciesId, mv);
+    }
+    wired++;
+  }
+
+  for (const mv of REGITUBE_TM_MOVES) {
+    addTm(ER_REGITUBE_SPECIES_ID, mv);
+  }
+  wired++;
+
+  for (const def of ER_PARTNER_FAMILY) {
+    inheritFrom(def.partnerId, def.base);
     wired++;
   }
 
