@@ -1,0 +1,513 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrmqlzdb-8qh0
+mode:     0  wave:?
+seed:     7uzSwU5xBDvvNVyBoXgbFOZ6
+party:    
+enemy:    
+
+----- COMMENT -----
+can't delete co-op run data
+
+----- CONSOLE -----
+[00:24:43.140] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[00:24:43.498] LOG: [ER] build mrmqlzdb-8qh0
+[00:24:43.895] LOG: [dev-tools] loaded — 528 scenarios + Send Logs button
+[00:25:18.744] DEBUG: Destroying loading scene
+[00:25:18.744] DEBUG: Destroyed loading scene
+[00:25:18.819] LOG: Seed: N0lVMOeLjuYXxUUU8WAQKsfo
+[00:25:18.819] LOG: Wave Seed: N0lVMOeLjuYXxUUU8WAQKsfo 0
+[00:25:19.270] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:19.270] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:19.270] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:20.370] LOG: %cStart Phase LoginPhase color:green;
+[00:25:20.931] LOG: Client Session: PHZOWNHz2SRwOzOSeENxh6LqWFlrDBpn
+[00:25:21.516] DEBUG: Using cached system data
+[00:25:21.588] LOG: %cStart Phase TitlePhase color:green;
+[00:25:21.589] LOG: Getting Session Slot id: %d 3
+[00:25:21.604] LOG: use seasonal splash messages true
+[00:25:27.976] LOG: %cStart Phase SelectStarterPhase color:green;
+[00:25:28.148] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.148] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.148] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.197] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.197] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.198] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.235] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.235] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.235] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.272] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.272] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.272] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.309] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.309] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.309] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.343] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.343] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.343] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.382] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.382] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.382] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.415] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.415] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.415] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.449] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.449] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.449] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.483] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.483] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.483] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.516] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.516] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.516] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.548] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.548] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.548] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.584] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.584] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.584] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.620] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.620] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.620] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.653] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.653] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.653] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.686] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.686] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.686] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.714] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.714] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.714] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.750] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.750] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.750] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.785] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.785] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.785] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.819] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.819] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.819] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.853] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:28.853] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:25:28.853] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:25:29.974] LOG: Charmander's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:25:46.740] LOG: Eevee's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:25:51.681] WARN: cry/151 not found
+[00:25:55.109] WARN: [er-atlas] load error for pkmn__151-primal; retrying once with cache-buster (poisoned-cache bypass)
+[00:25:55.255] WARN: [asset-retry] load error key=cry/151-primal - retry 1/2 with cache-buster
+[00:25:55.371] WARN: [asset-retry] load error key=cry/151-primal - retry 2/2 via fastly mirror + cache-buster
+[00:25:56.055] ERROR: [asset-retry] PERMANENT load failure key=cry/151-primal url=audio/cry/151-primal.m4a
+[00:26:09.042] WARN: cry/151 not found
+[00:26:11.944] LOG: Eevee's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:26:56.360] LOG: %cStart Phase TitlePhase color:green;
+[00:26:56.361] LOG: Getting Session Slot id: %d 3
+[00:26:56.381] LOG: use seasonal splash messages true
+[00:27:02.227] LOG: %cStart Phase TitlePhase color:green;
+[00:27:02.228] LOG: Getting Session Slot id: %d 3
+[00:27:02.242] LOG: use seasonal splash messages true
+[00:27:05.269] LOG: %cStart Phase SelectChallengePhase color:green;
+[00:27:18.675] LOG: %cStart Phase SelectStarterPhase color:green;
+[00:27:18.786] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:18.786] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:18.786] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:18.825] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:18.825] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:18.825] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:18.862] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:18.862] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:18.862] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:18.899] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:18.899] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:18.899] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:18.935] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:18.935] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:18.935] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:18.972] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:18.972] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:18.972] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.010] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.010] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.010] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.046] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.046] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.046] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.083] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.083] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.083] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.119] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.119] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.119] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.155] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.155] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.155] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.190] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.190] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.190] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.227] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.228] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.228] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.263] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.263] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.263] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.298] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.299] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.299] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.335] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.335] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.335] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.365] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.365] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.365] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.399] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.399] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.399] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.434] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.434] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.434] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.470] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.470] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.470] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.505] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:19.505] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:27:19.505] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:27:21.069] LOG: Charmander's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:27:22.068] LOG: Charmander's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:27:31.227] LOG: %cSaving starter preferences color: blue
+[00:27:31.726] LOG: %cSaving starter preferences color: blue
+[00:27:34.101] LOG: %cSaving starter preferences color: blue
+[00:27:34.345] LOG: %cSaving starter preferences color: blue
+[00:27:59.466] WARN: cry/311 not found
+[00:28:30.429] WARN: cry/312 not found
+[00:28:39.378] WARN: [asset-retry] load error key=cry/312-mega - retry 1/2 with cache-buster
+[00:28:39.378] WARN: [er-atlas] load error for pkmn__312-mega; retrying once with cache-buster (poisoned-cache bypass)
+[00:28:39.515] WARN: [asset-retry] load error key=cry/312-mega - retry 2/2 via fastly mirror + cache-buster
+[00:28:40.495] ERROR: [asset-retry] PERMANENT load failure key=cry/312-mega url=audio/cry/312-mega.m4a
+[00:29:02.728] WARN: cry/312 not found
+[00:29:07.892] WARN: cry/311 not found
+[00:29:14.571] WARN: [asset-retry] load error key=cry/311-mega - retry 1/2 with cache-buster
+[00:29:14.681] WARN: [asset-retry] load error key=cry/311-mega - retry 2/2 via fastly mirror + cache-buster
+[00:29:15.410] ERROR: [asset-retry] PERMANENT load failure key=cry/311-mega url=audio/cry/311-mega.m4a
+[00:29:15.411] WARN: [er-atlas] load error for pkmn__311-mega; retrying once with cache-buster (poisoned-cache bypass)
+[00:29:24.518] WARN: cry/311 not found
+[00:29:31.721] WARN: cry/312 not found
+[00:29:35.204] LOG: Yanma's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:29:39.041] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:39.041] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:39.041] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:39.357] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:39.357] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:39.357] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:39.544] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:39.544] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:39.544] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:39.707] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:39.707] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:39.707] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:39.874] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:39.874] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:39.874] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:40.040] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:40.040] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:40.040] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:40.210] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:40.211] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:40.211] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:40.410] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:40.410] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:40.410] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:40.522] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:40.522] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:40.522] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:40.756] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:40.756] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:40.756] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:40.961] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:40.961] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:40.961] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:41.141] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:41.141] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:41.141] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:41.316] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:41.316] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:41.316] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:41.871] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:41.871] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:29:41.871] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:29:42.615] LOG: Dracozolt's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:29:42.916] LOG: Sobble's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:29:44.183] LOG: %cSaving starter preferences color: blue
+[00:29:44.476] LOG: %cSaving starter preferences color: blue
+[00:29:44.965] LOG: %cSaving starter preferences color: blue
+[00:29:45.165] LOG: %cSaving starter preferences color: blue
+[00:29:47.852] WARN: cry/632 not found
+[00:29:48.388] LOG: Durant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:29:50.102] LOG: %cSaving starter preferences color: blue
+[00:29:50.328] LOG: %cSaving starter preferences color: blue
+[00:29:50.533] LOG: %cSaving starter preferences color: blue
+[00:29:51.350] LOG: %cSaving starter preferences color: blue
+[00:29:53.290] WARN: cry/816 not found
+[00:29:54.414] LOG: Sobble's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:29:54.716] LOG: Durant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:29:56.215] LOG: %cSaving starter preferences color: blue
+[00:29:56.493] LOG: %cSaving starter preferences color: blue
+[00:29:56.792] LOG: %cSaving starter preferences color: blue
+[00:29:57.349] LOG: %cSaving starter preferences color: blue
+[00:29:59.045] WARN: cry/446 not found
+[00:30:01.018] LOG: Munchlax's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:30:01.398] LOG: Durant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:30:01.714] LOG: Sobble's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:30:03.245] LOG: Dracozolt's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:30:05.639] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:05.639] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:05.639] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:06.254] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:06.254] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:06.254] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:06.853] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:06.853] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:06.853] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:07.286] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:07.286] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:07.286] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:08.825] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:08.825] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:08.825] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:09.054] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:09.055] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:09.055] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:09.290] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:09.290] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:09.290] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:09.506] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:09.506] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:09.506] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:09.706] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:09.706] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:09.706] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:09.896] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:09.896] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:09.896] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:10.514] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:10.514] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:10.514] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:21.599] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:21.599] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:21.599] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:21.948] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:21.948] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:21.948] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:22.172] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:22.172] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:22.172] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:22.359] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:22.359] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:22.359] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:22.549] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:22.549] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:22.549] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:22.716] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:22.716] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:22.716] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:23.350] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:23.350] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:30:23.350] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:30:24.821] LOG: Eevee's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:30:25.364] LOG: Yanma's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:30:30.599] LOG: Yanma's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:30:45.636] LOG: %cSaving starter preferences color: blue
+[00:31:00.484] LOG: %cSaving starter preferences color: blue
+[00:31:00.901] LOG: %cSaving starter preferences color: blue
+[00:31:02.033] LOG: %cSaving starter preferences color: blue
+[00:31:02.600] LOG: %cSaving starter preferences color: blue
+[00:31:06.022] WARN: cry/151 not found
+[00:31:09.568] WARN: cry/151 not found
+[00:31:12.648] WARN: [asset-retry] load error key=cry/151-primal - retry 1/2 with cache-buster
+[00:31:12.782] WARN: [asset-retry] load error key=cry/151-primal - retry 2/2 via fastly mirror + cache-buster
+[00:31:13.362] ERROR: [asset-retry] PERMANENT load failure key=cry/151-primal url=audio/cry/151-primal.m4a
+[00:31:40.322] WARN: cry/151 not found
+[00:31:44.322] LOG: Durant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:31:44.506] LOG: Sobble's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:31:44.748] LOG: Munchlax's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:31:48.888] LOG: Getting Session Slot id: %d 0
+[00:31:48.895] LOG: Getting Session Slot id: %d 1
+[00:31:48.898] LOG: Getting Session Slot id: %d 2
+[00:31:48.900] LOG: Getting Session Slot id: %d 3
+[00:31:48.904] LOG: Getting Session Slot id: %d 4
+[00:31:49.055] LOG: Getting Session Slot id: %d 3
+[00:31:56.274] DEBUG: %cSending a request to delete session in slot %d color: blue 4
+[00:31:56.274] ERROR: Co-op session deletes require compare-and-swap.
+[00:31:56.274] LOG: Seed: 4L878lt0Nnezw8Zipt9c94rB
+[00:31:56.274] LOG: Wave Seed: 4L878lt0Nnezw8Zipt9c94rB 0
+[00:31:56.488] WARN: AnimationManager key already exists: prompt
+[00:31:56.488] WARN: AnimationManager key already exists: tera_sparkle
+[00:31:56.488] LOG: Seed: GETrVuSHQNesB4nAZQQgPdN2
+[00:31:56.489] LOG: Wave Seed: GETrVuSHQNesB4nAZQQgPdN2 0
+[00:31:56.836] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:31:56.836] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:31:56.836] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:31:57.962] LOG: %cStart Phase LoginPhase color:green;
+[00:31:58.408] LOG: Client Session: PHZOWNHz2SRwOzOSeENxh6LqWFlrDBpn
+[00:31:58.698] DEBUG: Using cached system data
+[00:31:58.766] LOG: %cStart Phase TitlePhase color:green;
+[00:31:58.767] LOG: Getting Session Slot id: %d 3
+[00:31:58.773] LOG: use seasonal splash messages true
+[00:32:15.838] LOG: Getting Session Slot id: %d 0
+[00:32:15.842] LOG: Getting Session Slot id: %d 1
+[00:32:15.845] LOG: Getting Session Slot id: %d 2
+[00:32:15.847] LOG: Getting Session Slot id: %d 3
+[00:32:15.851] LOG: Getting Session Slot id: %d 4
+[00:32:18.258] WARN: Attempted to load save slot of -1 through load game menu!
+[00:32:18.265] LOG: use seasonal splash messages true
+[00:32:28.155] LOG: %cStart Phase SelectChallengePhase color:green;
+[00:32:32.677] LOG: %cStart Phase SelectStarterPhase color:green;
+[00:32:32.820] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:32.820] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:32.820] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:32.862] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:32.862] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:32.862] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:32.900] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:32.900] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:32.900] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:32.944] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:32.944] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:32.944] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:32.981] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:32.981] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:32.981] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.018] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.018] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.018] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.054] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.054] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.054] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.092] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.092] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.092] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.129] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.129] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.129] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.166] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.166] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.166] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.202] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.202] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.202] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.238] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.239] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.239] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.275] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.275] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.275] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.312] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.312] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.312] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.351] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.351] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.351] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.388] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.388] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.388] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.419] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.419] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.419] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.456] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.456] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.456] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.493] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.493] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.493] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.530] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.530] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.530] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.567] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:33.567] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:33.567] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:34.287] LOG: Charmander's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:32:37.204] WARN: cry/311 not found
+[00:32:37.209] WARN: cry/312 not found
+[00:32:37.215] WARN: cry/632 not found
+[00:32:37.221] WARN: cry/816 not found
+[00:32:37.228] WARN: cry/446 not found
+[00:32:37.233] WARN: cry/151 not found
+[00:32:39.804] LOG: Durant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:32:40.319] LOG: Sobble's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:32:40.635] LOG: Durant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:32:41.904] LOG: %cSaving starter preferences color: blue
+[00:32:42.165] LOG: %cSaving starter preferences color: blue
+[00:32:42.354] LOG: %cSaving starter preferences color: blue
+[00:32:42.521] LOG: %cSaving starter preferences color: blue
+[00:32:43.303] LOG: Durant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:32:43.777] LOG: %cSaving starter preferences color: blue
+[00:32:44.012] LOG: %cSaving starter preferences color: blue
+[00:32:44.187] LOG: %cSaving starter preferences color: blue
+[00:32:44.387] LOG: %cSaving starter preferences color: blue
+[00:32:45.068] LOG: Sobble's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:32:45.521] LOG: %cSaving starter preferences color: blue
+[00:32:45.768] LOG: %cSaving starter preferences color: blue
+[00:32:45.955] LOG: %cSaving starter preferences color: blue
+[00:32:46.155] LOG: %cSaving starter preferences color: blue
+[00:32:47.115] LOG: Munchlax's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:32:47.313] LOG: Sobble's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:32:47.590] LOG: Durant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:32:48.835] LOG: Durant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:32:49.035] LOG: Sobble's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:32:49.452] LOG: Munchlax's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:32:52.585] LOG: %cSaving starter preferences color: blue
+[00:32:52.613] LOG: Getting Session Slot id: %d 0
+[00:32:52.616] LOG: Getting Session Slot id: %d 1
+[00:32:52.619] LOG: Getting Session Slot id: %d 2
+[00:32:52.621] LOG: Getting Session Slot id: %d 3
+[00:32:52.624] LOG: Getting Session Slot id: %d 4
+[00:32:56.968] DEBUG: %cSending a request to delete session in slot %d color: blue 4
+[00:32:56.968] ERROR: Co-op session deletes require compare-and-swap.
+[00:32:56.969] LOG: Seed: C6blkOJawAUx1HxJtqrm1AY5
+[00:32:56.969] LOG: Wave Seed: C6blkOJawAUx1HxJtqrm1AY5 0
+[00:32:57.180] WARN: AnimationManager key already exists: prompt
+[00:32:57.180] WARN: AnimationManager key already exists: tera_sparkle
+[00:32:57.181] LOG: Seed: 7uzSwU5xBDvvNVyBoXgbFOZ6
+[00:32:57.181] LOG: Wave Seed: 7uzSwU5xBDvvNVyBoXgbFOZ6 0
+[00:32:57.505] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:57.505] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:32:57.505] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:32:58.542] LOG: %cStart Phase LoginPhase color:green;
+[00:32:58.889] LOG: Client Session: PHZOWNHz2SRwOzOSeENxh6LqWFlrDBpn
+[00:32:59.133] DEBUG: Using cached system data
+[00:32:59.202] LOG: %cStart Phase TitlePhase color:green;
+[00:32:59.203] LOG: Getting Session Slot id: %d 3
+[00:32:59.210] LOG: use seasonal splash messages true
+[00:33:02.523] LOG: Getting Session Slot id: %d 0
+[00:33:02.525] LOG: Getting Session Slot id: %d 1
+[00:33:02.527] LOG: Getting Session Slot id: %d 2
+[00:33:02.528] LOG: Getting Session Slot id: %d 3
+[00:33:02.531] LOG: Getting Session Slot id: %d 4
+[00:33:03.260] WARN: Attempted to load save slot of -1 through load game menu!
+[00:33:03.266] LOG: use seasonal splash messages true
+[00:33:09.973] LOG: Getting Session Slot id: %d 0
+[00:33:09.975] LOG: Getting Session Slot id: %d 1
+[00:33:09.977] LOG: Getting Session Slot id: %d 2
+[00:33:09.978] LOG: Getting Session Slot id: %d 3
+[00:33:09.981] LOG: Getting Session Slot id: %d 4
+[00:33:12.396] WARN: Attempted to load save slot of -1 through load game menu!
+[00:33:12.402] LOG: use seasonal splash messages true
+[00:33:52.558] LOG: Getting Session Slot id: %d 0
+[00:33:52.560] LOG: Getting Session Slot id: %d 1
+[00:33:52.562] LOG: Getting Session Slot id: %d 2
+[00:33:52.563] LOG: Getting Session Slot id: %d 3
+[00:33:52.566] LOG: Getting Session Slot id: %d 4
+[00:34:02.293] DEBUG: %cSending a request to delete session in slot %d color: blue 4
+[00:34:02.294] ERROR: Co-op session deletes require compare-and-swap.
+[00:34:02.298] LOG: Getting Session Slot id: %d 0
+[00:34:02.300] LOG: Getting Session Slot id: %d 1
+[00:34:02.302] LOG: Getting Session Slot id: %d 2
+[00:34:02.303] LOG: Getting Session Slot id: %d 3
+[00:34:02.306] LOG: Getting Session Slot id: %d 4
+[00:34:10.162] DEBUG: %cSending a request to delete session in slot %d color: blue 4
+[00:34:10.163] ERROR: Co-op session deletes require compare-and-swap.
+[00:34:10.167] LOG: Getting Session Slot id: %d 0
+[00:34:10.169] LOG: Getting Session Slot id: %d 1
+[00:34:10.171] LOG: Getting Session Slot id: %d 2
+[00:34:10.172] LOG: Getting Session Slot id: %d 3
+[00:34:10.175] LOG: Getting Session Slot id: %d 4
+
+----- REPLAY TRACE (JSON) -----
+(none)
