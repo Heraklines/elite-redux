@@ -161,6 +161,21 @@ function snapshotOriginal(user: Pokemon): void {
 }
 
 /**
+ * The holder's PRE-TRANSFORM (source) species, or `undefined` if it has not
+ * Omniform-transformed this battle. Used by the innate-unlock gate so a
+ * transformed holder reads its innate candy-unlock state from the SOURCE species
+ * (e.g. Partner Eevee) instead of the transform TARGET species (a partner
+ * eeveelution, id 70012+), which the player never candy-unlocked. This carries the
+ * source's unlocked-innate set to every mid-battle form it adapts into (maintainer
+ * directive), and — because the snapshot is captured once per BATTLE and cleared on
+ * `leaveField` — it survives a chain (Eevee -> Jolteon -> Umbreon) and reverts
+ * exactly on switch-out / wave end.
+ */
+export function erOmniformOriginalSpecies(holder: Pokemon): PokemonSpecies | undefined {
+  return OMNIFORM_ORIGINAL.get(holder)?.species;
+}
+
+/**
  * Revert an Omniform holder to its pre-battle species/form + stats. Driven from
  * `Pokemon.leaveField` (switch-out / faint / wave end — the mega-revert
  * precedent). `summonData` (the pinned ability + swapped moveset) is already
