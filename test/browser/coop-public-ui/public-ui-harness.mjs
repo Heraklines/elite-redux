@@ -1001,16 +1001,42 @@ export class PublicUiClient {
     const requestCursor = this.evidence.cursor();
     await this.press("Space", `lobby-${purpose}-${username}`);
     try {
-      await this.evidence.waitFor(/request target=/u, {
-        from: requestCursor,
-        timeoutMs: relayTimeoutMs,
-        description: `request relay for ${username}`,
-      });
+      const outcome = await this.evidence.waitForCondition(
+        sink => {
+          const relayed = sink.find(/request target=/u, requestCursor);
+          if (relayed) {
+            return { kind: "relayed", event: relayed };
+          }
+          const canceled = sink.find(/\[coop:lobby\] cancel/u, requestCursor);
+          if (canceled) {
+            return { kind: "lobby-canceled", event: canceled };
+          }
+          const titleReturn = sink.find(/Start Phase TitlePhase/u, requestCursor);
+          return titleReturn ? { kind: "title-return", event: titleReturn } : null;
+        },
+        {
+          timeoutMs: relayTimeoutMs,
+          description: `request relay for ${username}`,
+        },
+      );
+      if (outcome.kind !== "relayed") {
+        this.evidence.record("lobby-request-terminal", {
+          username,
+          targetId,
+          terminal: outcome.kind,
+          sourceEventIndex: outcome.event.index,
+        });
+        throw new Error(
+          `${this.label}: lobby selection returned to TitlePhase before request relay for ${username} `
+            + `(terminal=${outcome.kind})`,
+        );
+      }
     } catch (error) {
       if (optional && error instanceof Error && /timed out waiting for request relay/u.test(error.message)) {
         // A public key can coincide with the lobby's asynchronous option-list repaint. The
         // self-healing loop will re-select the exact username and try again; only this explicitly
-        // optional TTL refresh may defer. The first request above remains fail-loud.
+        // optional TTL refresh may defer. A lobby cancellation/Title return cannot defer because
+        // the requester has left the lobby and must fail with its exact terminal classification.
         this.evidence.record("lobby-request-deferred", { username, targetId, reason: error.message });
         return false;
       }
