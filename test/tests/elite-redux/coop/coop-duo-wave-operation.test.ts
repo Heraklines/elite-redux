@@ -41,6 +41,7 @@ import {
   broadcastCoopWaveEndState,
   broadcastCoopWaveResolved,
   clearCoopRuntime,
+  coopRetainedGameOverSupersedesReplay,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -485,6 +486,13 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       expect(boundary, "the retained terminal unparks replay into the appended safe boundary").toBeInstanceOf(
         CoopWaveAdvanceBoundaryPhase,
       );
+      expect(
+        coopRetainedGameOverSupersedesReplay(7, 1),
+        "the same-turn replay is terminal-superseded once ordered live events have drained",
+      ).toBe(true);
+      expect(coopRetainedGameOverSupersedesReplay(7, 2), "a queued phantom next turn is also superseded").toBe(true);
+      expect(coopRetainedGameOverSupersedesReplay(6, 1), "a replay from another wave is unrelated").toBe(false);
+      expect(coopRetainedGameOverSupersedesReplay(7, 0), "a replay before the settled turn is unrelated").toBe(false);
       boundary.start();
       const guestTerminal = rig.guestScene.phaseManager.getCurrentPhase();
       expect(guestTerminal, "terminal DATA application exposes the guest GameOver continuation").toBeInstanceOf(
