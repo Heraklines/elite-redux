@@ -951,13 +951,15 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       localStorage.setItem("er-coop-resume", "{}");
       expect(
         await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot()),
-        "tombstone adoption fails closed when lineage cleanup cannot be proven",
-      ).toBe(1);
-      expect(localStorage.getItem(keys[0])).not.toBeNull();
+        "an exact tombstone remains authoritative when a derived resume hint is malformed",
+      ).toBe(0);
+      expect(localStorage.getItem(keys[0])).toBeNull();
+      expect(localStorage.getItem(headKey(0))).toBeNull();
       expect(
         localStorage.getItem("er-coop-deleted-runs"),
-        "failed cleanup rolls back its deletion fence instead of partially suppressing the protected row",
-      ).toBe(deletedEvidenceBeforeFailedCleanup);
+        "the exact deletion fence commits independently of malformed derived resume evidence",
+      ).not.toBe(deletedEvidenceBeforeFailedCleanup);
+      expect(localStorage.getItem("er-coop-resume"), "unknown derived evidence is preserved for diagnosis").toBe("{}");
       await withClient(rig.hostCtx, () => rig.hostScene.gameData.cancelPendingFreshCoopSessionSlot());
       localStorage.removeItem("er-coop-resume");
       expect(
