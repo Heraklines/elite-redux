@@ -65,6 +65,16 @@ function primaryLanguage(locale) {
   return locale.trim().toLowerCase().split("-")[0];
 }
 
+function browserLocale(locale) {
+  if (locale === "en") {
+    return "en-US";
+  }
+  if (locale === "de") {
+    return "de-DE";
+  }
+  return locale;
+}
+
 function parseFunctionalFingerprint(event, label) {
   const match = DATA_FINGERPRINT.exec(event.text ?? "");
   if (match == null) {
@@ -768,6 +778,22 @@ export class PublicUiClient {
     this.publicSeat = null;
     this.page = await this.context.newPage();
     await this.page.setViewport(this.config.viewport);
+    // Chrome-for-Testing on Linux can ignore --lang even though the same flag works on desktop
+    // Chrome. Apply the public browser locale before navigation through Chromium's emulation
+    // domain. This changes navigator/Accept-Language/Intl environment only; it cannot inspect or
+    // mutate game state, storage, Phaser, or the transport.
+    const configuredLocale = browserLocale(this.config.locales[this.label]);
+    const browserSession = await this.page.createCDPSession();
+    try {
+      await browserSession.send("Emulation.setUserAgentOverride", {
+        userAgent: await this.page.browser().userAgent(),
+        acceptLanguage: `${configuredLocale},${primaryLanguage(configuredLocale)};q=0.9`,
+      });
+      await browserSession.send("Emulation.setLocaleOverride", { locale: configuredLocale });
+    } finally {
+      await browserSession.detach();
+    }
+    this.evidence.record("browser-locale-environment", { configuredLocale });
     // The bundle is immutable and digest-verified before launch. Preserve normal browser caching so a
     // cold reopen exercises production cache behavior instead of reloading tens of thousands of assets.
     await this.page.setCacheEnabled(true);

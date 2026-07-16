@@ -56,6 +56,8 @@ if (
   || !harness.includes("hostBrowser.createBrowserContext()")
   || !harness.includes("guestBrowser.createBrowserContext()")
   || !harness.includes("if (launchFailure)")
+  || !harness.includes('browserSession.send("Emulation.setUserAgentOverride"')
+  || !harness.includes('browserSession.send("Emulation.setLocaleOverride"')
   || !harness.includes("Promise.allSettled(this.browsers.map(browser => browser.close()))")
 ) {
   failures.push(
