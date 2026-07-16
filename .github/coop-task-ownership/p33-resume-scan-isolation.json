@@ -14,6 +14,7 @@
     "test/browser/coop-public-ui/evidence.mjs",
     "test/browser/coop-public-ui/journeys.mjs",
     "test/browser/coop-public-ui/local-worker-server.ts",
+    "test/browser/coop-public-ui/public-ui-harness.mjs",
     "test/browser/coop-public-ui/resume-scan-isolation.test.mjs",
     "test/tests/elite-redux/coop/coop-duo-resume.test.ts"
   ]

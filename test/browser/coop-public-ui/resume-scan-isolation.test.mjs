@@ -24,12 +24,13 @@ test("captures only valid co-op CAS slot and mode commitments", () => {
 });
 
 test("lobby quarantines one save-slot failure and releases a fresh run only through verified empty-slot CAS", async () => {
-  const [gameData, title, starter, config, journeys, localWorker, evidence, workflow] = await Promise.all([
+  const [gameData, title, starter, config, journeys, harness, localWorker, evidence, workflow] = await Promise.all([
     readFile(resolve(root, "src/system/game-data.ts"), "utf8"),
     readFile(resolve(root, "src/phases/title-phase.ts"), "utf8"),
     readFile(resolve(root, "src/phases/select-starter-phase.ts"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/journeys.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/local-worker-server.ts"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/evidence.mjs"), "utf8"),
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
@@ -60,6 +61,8 @@ test("lobby quarantines one save-slot failure and releases a fresh run only thro
   assert.match(journeys, /fresh run changed or removed the exact quarantined local slot/u);
   assert.match(journeys, /event\.mode === "empty" && event\.slot !== 0/u);
   assert.match(journeys, /fresh launch mutated quarantined cloud slot zero/u);
+  assert.match(harness, /async enterCoopLobby\(\)[\s\S]*surfaceId: "title-menu"[\s\S]*targetId: "new-game"/u);
+  assert.doesNotMatch(harness, /async enterCoopLobby\(\)[\s\S]{0,700}titleNewGameKeys/u);
   assert.match(localWorker, /\/__coop-fixture\/fork-session/u);
   assert.match(localWorker, /\/__coop-fixture\/session-status/u);
   assert.match(localWorker, /session\.money = originalMoney \+ 1/u);
