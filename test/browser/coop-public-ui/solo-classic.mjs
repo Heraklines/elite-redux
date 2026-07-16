@@ -10,7 +10,12 @@
  * independent of co-op signaling - it is the foundation the co-op journey matrix reuses.
  */
 
-import { confirmDefaultStarterTeam, selectOptionById, waitForSemanticSurface } from "./campaign-nav.mjs";
+import {
+  confirmDefaultStarterTeam,
+  selectFirstEmptySaveSlot,
+  selectOptionById,
+  waitForSemanticSurface,
+} from "./campaign-nav.mjs";
 import { delay } from "./evidence.mjs";
 
 const TITLE_PHASE = /Start Phase TitlePhase/u;
@@ -89,6 +94,10 @@ export async function runSoloClassic(client) {
     surfaceId: "option-select:SelectStarterPhase",
     targetId: "ace",
     navKeys: ["ArrowUp", "ArrowDown"],
+    timeoutMs: client.config.timeoutMs,
+  });
+  await selectFirstEmptySaveSlot(client, {
+    fromCursor: launchCursor,
     timeoutMs: client.config.timeoutMs,
   });
   await waitForSemantic(client, COMMAND_SURFACE, client.config.timeoutMs);

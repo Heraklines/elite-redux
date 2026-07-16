@@ -501,6 +501,27 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       };
     }
   }
+  if (uiMode === "SAVE_SLOT") {
+    const saveHandler = handler as unknown as {
+      scrollCursor?: number;
+      sessionSlots?: Array<{ hasData?: boolean }>;
+    };
+    if (Array.isArray(saveHandler.sessionSlots)) {
+      const optionIds = saveHandler.sessionSlots.map((slot, index) =>
+        slot.hasData === false
+          ? `empty-slot:${index}`
+          : slot.hasData === true
+            ? `occupied-slot:${index}`
+            : `loading-slot:${index}`,
+      );
+      const absoluteIndex = (selectedIndex ?? 0) + (saveHandler.scrollCursor ?? 0);
+      return {
+        selectedOptionId: optionIds[absoluteIndex] ?? `cursor:${absoluteIndex}`,
+        optionIds,
+        optionCount: optionIds.length,
+      };
+    }
+  }
   const optionHandler = handler as unknown as {
     options?: Array<{ label?: unknown }>;
     config?: { options?: Array<{ label?: unknown }> } | null;

@@ -140,6 +140,7 @@ jobs:
             scripts/prepare-coop-browser-artifact.mjs \
             test/browser/coop-public-ui/browser-artifact-prune.test.mjs \
             test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
+            test/browser/coop-public-ui/campaign-nav.mjs \
             test/browser/coop-public-ui/campaign-policy.mjs \
             test/browser/coop-public-ui/campaign.mjs \
             test/browser/coop-public-ui/campaign-exp-phase.test.mjs \
