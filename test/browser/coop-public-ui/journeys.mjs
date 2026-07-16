@@ -90,17 +90,21 @@ async function openTitleOption(client, targetId) {
 }
 
 async function openOccupiedSlotZero(client) {
-  await waitForSemanticSurface(client, "save-slot", {
-    fromCursor: client.pageCursor,
-    timeoutMs: client.config.timeoutMs,
-  });
-  await selectOptionById(client, {
-    surfaceId: "save-slot",
-    targetId: "cursor:0",
-    navKeys: ["ArrowUp", "ArrowDown"],
-    submit: false,
-    timeoutMs: client.config.timeoutMs,
-  });
+  // SaveSlotSelectUiHandler opens on slot zero. Its public semantic identity includes the
+  // loaded state (`occupied-slot:0`), while the phase-level awaitingActionInput flag remains
+  // false because this local handler is not a co-op interaction barrier. Feeding it through the
+  // generic option navigator therefore waits forever for a readiness bit this surface does not
+  // own. Observe the exact loaded slot identity directly before issuing the player's ACTION.
+  await client.evidence.waitForCondition(
+    sink => {
+      const event = sink.findLastSemanticSurface(client.pageCursor, "save-slot");
+      return event?.observation.ready.handlerActive === true
+          && event.observation.selectedOptionId === "occupied-slot:0"
+        ? event
+        : null;
+    },
+    { timeoutMs: client.config.timeoutMs, description: "loaded occupied co-op save slot zero" },
+  );
 }
 
 async function deleteCoopSaveThroughLoadMenu(client) {

@@ -57,7 +57,9 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
   );
   assert.doesNotMatch(journeys, /async function saveMutations\(rig\) \{\s*await freshThroughWave2\(rig\)/u);
   assert.match(journeys, /targetId: "delete-run"/u);
-  assert.match(journeys, /surfaceId: "save-slot",[\s\S]*?targetId: "cursor:0",[\s\S]*?submit: false/u);
+  assert.match(journeys, /findLastSemanticSurface\(client\.pageCursor, "save-slot"\)/u);
+  assert.match(journeys, /event\.observation\.selectedOptionId === "occupied-slot:0"/u);
+  assert.doesNotMatch(journeys, /surfaceId: "save-slot",[\s\S]*?targetId: "cursor:0"/u);
   assert.match(journeys, /waitForReadyYesConfirmation[\s\S]*?ready\.inputBlocked === false/u);
   assert.doesNotMatch(journeys, /pressUntilExactDeleteRequest|attempt <= 3/u);
   assert.match(journeys, /"\/savedata\/session\/coop-cas-delete"/u);

@@ -341,14 +341,22 @@ function assertNoDriverApiFailure(sink, context) {
   }
 }
 
-function isCrossedLobbyRequestFailure(failure) {
-  return failure?.status === 401 && failure.pathname === "/coop/v3/lobby/request";
+function isRetryableLobbyRaceFailure(failure) {
+  if (failure?.status === 401 && failure.pathname === "/coop/v3/lobby/request") {
+    return true;
+  }
+  // The incoming request has a short worker-side TTL. A human can press Accept after the
+  // accept panel became visible but just after that TTL elapsed; the production controller
+  // deliberately treats the resulting 409 as transient and returns to browsing. The browser
+  // oracle must do the same while still requiring a later stable-seat binding by its deadline.
+  return failure?.status === 409
+    && (failure.pathname === "/coop/v3/lobby/request" || failure.pathname === "/coop/v3/lobby/respond");
 }
 
-function clearCrossedLobbyRequestFailures(clients) {
+function clearRetryableLobbyRaceFailures(clients) {
   for (const client of clients) {
     const failure = client.evidence.networkState.apiFailure;
-    if (!isCrossedLobbyRequestFailure(failure)) {
+    if (!isRetryableLobbyRaceFailure(failure)) {
       continue;
     }
     client.evidence.networkState.apiFailure = null;
@@ -1063,9 +1071,19 @@ export class PublicUiClient {
           if (relayed) {
             return { kind: "relayed", event: relayed };
           }
-          const canceled = sink.find(/\[coop:lobby\] cancel/u, requestCursor);
-          if (canceled) {
-            return { kind: "lobby-canceled", event: canceled };
+          // `CoopLobbyController.cancel()` is also the normal cleanup path after a crossed
+          // request has already paired this browser. Treating that log line as a user cancel
+          // made the real-browser oracle fail while the same page was entering
+          // SelectChallengePhase with a valid host binding. Only an actual TitlePhase return is
+          // terminal; post-lobby setup or a stable binding proves the request was superseded by a
+          // successful pairing.
+          const binding = sink.findBinding(requestCursor);
+          if (binding) {
+            return { kind: "paired", event: binding };
+          }
+          const postLobby = sink.find(/Start Phase (?:SelectChallengePhase|SelectStarterPhase)/u, requestCursor);
+          if (postLobby) {
+            return { kind: "paired", event: postLobby };
           }
           const titleReturn = sink.find(/Start Phase TitlePhase/u, requestCursor);
           return titleReturn ? { kind: "title-return", event: titleReturn } : null;
@@ -1075,7 +1093,7 @@ export class PublicUiClient {
           description: `request relay for ${username}`,
         },
       );
-      if (outcome.kind !== "relayed") {
+      if (outcome.kind === "title-return") {
         this.evidence.record("lobby-request-terminal", {
           username,
           targetId,
@@ -1559,7 +1577,7 @@ export class DuoPublicUiRig {
     while (Date.now() < deadline) {
       for (const client of Object.values(this.clients)) {
         const failure = client.evidence.networkState.apiFailure;
-        if (isCrossedLobbyRequestFailure(failure)) {
+        if (isRetryableLobbyRaceFailure(failure)) {
           // Reciprocal requests can cross: one request consumes the lobby credential and creates
           // the match while the other in-flight request receives 401. Do not call that a pass;
           // keep driving until the public stable-seat binding proves the match won the race. If no
@@ -1573,7 +1591,7 @@ export class DuoPublicUiRig {
           client.publicRole = binding.observation.role;
           client.publicSeat = binding.observation.seat;
           if (binding.observation.role === "host") {
-            clearCrossedLobbyRequestFailures(Object.values(this.clients));
+            clearRetryableLobbyRaceFailures(Object.values(this.clients));
             return client;
           }
         }
