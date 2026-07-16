@@ -66,6 +66,7 @@ test("lobby quarantines one save-slot failure and releases a fresh run only thro
   assert.match(localWorker, /createHash\("sha256"\)\.update\(forked\)\.digest\("hex"\)/u);
   assert.match(evidence, /coopCasUpdateRequestView/u);
   assert.match(evidence, /"coop-cas-update-request"/u);
+  assert.match(evidence, /\.\.\.\(coopCas \?\? \{\}\)/u);
   assert.match(evidence, /crypto\.subtle\.digest\("SHA-256"/u);
   assert.match(
     localWorker,
