@@ -48,6 +48,10 @@ test("lobby quarantines one save-slot failure and releases a fresh run only thro
   assert.match(title, /resumeSnapshot\.failures\.get\(slot\)[\s\S]*throw failure/u);
   assert.match(title, /discovery\.kind !== "replica-unavailable"/u);
   assert.match(title, /Press to start a separate co-op run\. Existing saves will not be overwritten\./u);
+  assert.match(
+    title,
+    /stage\.setStatus\("A save conflict was isolated\. Start a separate run\?"\);[\s\S]*await globalScene\.ui\.setMode\(UiMode\.MESSAGE\);[\s\S]*if \(!isCurrentSession\(\)\)[\s\S]*globalScene\.ui\.resetModeChain\(\);[\s\S]*hostStartNew/u,
+  );
   assert.match(title, /hostStartNew/u);
 
   assert.match(starter, /findVerifiedEmptyCoopSessionSlot\(\)/u);
