@@ -837,11 +837,13 @@ export class PublicUiClient {
       fields: ["username", "password", "confirm-password"],
       values: "<redacted>",
     });
+    // Credential entry is setup, not gameplay cadence. CDP still emits public DOM key events,
+    // but an artificial per-character timer dilated 20 ms into minutes on a saturated runner.
     await usernameInput.click({ clickCount: 3 });
-    await this.page.keyboard.type(this.credentials.username, { delay: 20 });
+    await this.page.keyboard.type(this.credentials.username);
     for (const passwordInput of passwordInputs.slice(0, 2)) {
       await passwordInput.click({ clickCount: 3 });
-      await this.page.keyboard.type(this.credentials.password, { delay: 20 });
+      await this.page.keyboard.type(this.credentials.password);
     }
     await this.press("Enter", "submit-registration-form");
     await this.clearDomInputFocus();
@@ -856,10 +858,10 @@ export class PublicUiClient {
     this.evidence.record("fill-login-form", { fields: ["username", "password"], values: "<redacted>" });
     await usernameInput.click({ clickCount: 3 });
     await this.selectAllFocusedText();
-    await this.page.keyboard.type(this.credentials.username, { delay: 20 });
+    await this.page.keyboard.type(this.credentials.username);
     await passwordInput.click({ clickCount: 3 });
     await this.selectAllFocusedText();
-    await this.page.keyboard.type(this.credentials.password, { delay: 20 });
+    await this.page.keyboard.type(this.credentials.password);
     await this.press("Enter", "submit-login-form");
     await this.clearDomInputFocus();
   }
