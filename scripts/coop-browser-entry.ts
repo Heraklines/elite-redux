@@ -350,6 +350,8 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
   const inMe =
     phase.startsWith("MysteryEncounter") || phase === "PostMysteryEncounterPhase" || phase === "CoopReplayMePhase";
   switch (uiMode) {
+    case "LOGIN_OR_REGISTER":
+      return { surfaceId: "auth:login-or-register", operationClass: "authentication", ownerModel: "local" };
     case "TITLE":
       return { surfaceId: "title-menu", operationClass: "navigation", ownerModel: "local" };
     case "COMMAND":
