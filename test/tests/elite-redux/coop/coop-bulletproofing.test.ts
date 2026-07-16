@@ -16,6 +16,8 @@ import {
   isCoopAccountWriteAllowed,
 } from "#data/elite-redux/coop/coop-account-gate";
 import { coopAcceptStateTick, coopNextStateTick, resetCoopStateTicks } from "#data/elite-redux/coop/coop-battle-engine";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 
 describe("#807 A: monotonic state ticks (snapshot sequencing)", () => {
@@ -82,5 +84,10 @@ describe("#807 B: default-deny account-write gate", () => {
     ).toThrow("boom");
     expect(isCoopAccountWriteAllowed()).toBe(false);
     expect(coopGateAccountWrite(true, "after-throw")).toBe(false);
+  });
+
+  it("keeps the local first-unlock achievement egg grant explicitly scoped", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/data/elite-redux/er-achievement-rewards.ts"), "utf8");
+    expect(source).toContain('coopAllowAccountWrite("achievement-egg-reward"');
   });
 });
