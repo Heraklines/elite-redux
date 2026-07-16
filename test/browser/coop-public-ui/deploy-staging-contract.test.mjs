@@ -41,7 +41,7 @@ test("staging browser and signaling deployment are pinned to P33 without product
   assert.match(workflow, /echo "VITE_COOP_SERVER_URL=https:\/\/er-coop-api-staging\.heraklines\.workers\.dev"/u);
   assert.match(workflow, /echo "VITE_COOP_SIGNALING_PROTOCOL=p33"/u);
   assert.match(workflow, /node scripts\/materialize-coop-staging-config\.mjs/u);
-  assert.match(workflow, /command: deploy --config \.tmp\/er-coop-staging\.wrangler\.toml/u);
+  assert.match(workflow, /command: deploy --config workers\/er-coop-api\/wrangler\.generated\.staging\.toml/u);
   assert.match(workflow, /\.sourceSha == \$sha/u);
   assert.doesNotMatch(workflow, /command: deploy --config workers\/er-coop-api\/wrangler\.toml/u);
 });

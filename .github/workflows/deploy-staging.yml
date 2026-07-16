@@ -269,7 +269,7 @@ jobs:
           test "$(jq '[.result[] | select(.name == "er-coop-staging")] | length' "$RUNNER_TEMP/coop-d1.json")" = "1"
           STAGING_COOP_D1_ID="$(jq -r '.result[] | select(.name == "er-coop-staging") | .uuid' "$RUNNER_TEMP/coop-d1.json")"
           node scripts/materialize-coop-staging-config.mjs \
-            "$STAGING_COOP_D1_ID" "$PROMOTED_SHA" .tmp/er-coop-staging.wrangler.toml
+            "$STAGING_COOP_D1_ID" "$PROMOTED_SHA" workers/er-coop-api/wrangler.generated.staging.toml
 
       # Do not mutate either live surface until every fallible build/verification step is green. The Worker
       # goes first so a newly published browser never calls an older save contract. Promotions are queued
@@ -286,7 +286,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config .tmp/er-coop-staging.wrangler.toml
+          command: deploy --config workers/er-coop-api/wrangler.generated.staging.toml
 
       - name: Verify staging P33 signaling contract
         run: |
