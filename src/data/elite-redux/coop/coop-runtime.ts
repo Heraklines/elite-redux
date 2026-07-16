@@ -1055,6 +1055,8 @@ interface CoopPendingWaveAdvance {
 let pendingWaveAdvance: CoopPendingWaveAdvance | null = null;
 /** Engine-phase factory installed by coop-replay-phases without coupling this runtime module to phase classes. */
 let coopWaveAdvanceBoundaryWakeFactory: (() => Phase) | null = null;
+/** Replay-phase abort seam installed without introducing a runtime -> replay-turn-phase import cycle. */
+let coopActiveReplayTurnAborter: ((reason: string, settledTurn: number) => boolean) | null = null;
 /** Complete host statement currently driving the guest's VictoryPhase tail, wave-keyed against stale reuse. */
 let activeGuestWaveTransition: CoopWaveAdvancePayload | null = null;
 /** The last wave the guest already ran the victory tail for (guards a duplicate `waveResolved`). */
@@ -1629,6 +1631,17 @@ export function coopHasPendingWaveAdvance(): boolean {
  */
 export function registerCoopWaveAdvanceBoundaryWakeFactory(factory: (() => Phase) | null): void {
   coopWaveAdvanceBoundaryWakeFactory = factory;
+}
+
+/**
+ * Install the engine-owned aborter for a currently parked authoritative guest replay. A terminal retained
+ * WAVE_ADVANCE can arrive after finalization opened a phantom next turn; waking that exact waiter lets the
+ * already-appended safe-boundary finalizer run instead of sitting behind the parked phase indefinitely.
+ */
+export function registerCoopActiveReplayTurnAborter(
+  aborter: ((reason: string, settledTurn: number) => boolean) | null,
+): void {
+  coopActiveReplayTurnAborter = aborter;
 }
 
 export function consumeCoopPendingWaveAdvance(): {
@@ -3812,17 +3825,28 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
       return false;
     }
     const continuationReady = maybeMarkCoopWaveContinuationReady(payload.wave, binding);
-    if (
-      !continuationReady
-      && coopHasPendingWaveAdvance()
-      && coopWaveAdvanceBoundaryWakeFactory != null
-      && !globalScene.phaseManager?.getQueuedPhaseNames().includes("CoopFinalizeTurnPhase")
-    ) {
+    if (!continuationReady && coopHasPendingWaveAdvance() && coopWaveAdvanceBoundaryWakeFactory != null) {
       // The retained op may land AFTER CoopFinalizeTurnPhase already inspected pendingWaveAdvance. Appending
       // (never unshifting) a tail-only finalizer wake preserves presentation -> checkpoint ordering while ensuring
       // the queue cannot empty into a phantom next turn without consuming the host-stated transition.
-      globalScene.phaseManager.pushPhase(coopWaveAdvanceBoundaryWakeFactory());
-      coopLog("runtime", `wave-advance JOURNAL queued safe-boundary wake wave=${payload.wave}`);
+      const wakeAlreadyQueued = globalScene.phaseManager?.getQueuedPhaseNames().includes("CoopFinalizeTurnPhase");
+      if (!wakeAlreadyQueued) {
+        globalScene.phaseManager.pushPhase(coopWaveAdvanceBoundaryWakeFactory());
+      }
+      // Run 29520815364: gameOver landed after the guest had already opened wave-N turn+1 and parked its
+      // replay waiter. Queue the continuation FIRST, then dissolve that impossible waiter so end() shifts
+      // directly into this boundary and the terminal DATA/continuation proof can complete on both peers.
+      const unparkedReplay =
+        payload.outcome === "gameOver"
+        && (coopActiveReplayTurnAborter?.(
+          `retained gameOver WAVE_ADVANCE wave=${payload.wave} settledTurn=${envelope.turn}`,
+          envelope.turn,
+        )
+          ?? false);
+      coopLog(
+        "runtime",
+        `wave-advance JOURNAL ${wakeAlreadyQueued ? "retained" : "queued"} safe-boundary wake wave=${payload.wave} unparkedReplay=${Number(unparkedReplay)}`,
+      );
     }
     return continuationReady;
   } catch (e) {

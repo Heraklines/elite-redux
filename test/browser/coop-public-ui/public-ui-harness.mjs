@@ -20,6 +20,7 @@ const CHALLENGE_PHASE = /Start Phase SelectChallengePhase/u;
 const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
 const LOCAL_COMMAND = /CommandPhase .*-> LOCAL UI/u;
 const REWARD_PHASE = /Start Phase SelectModifierPhase/u;
+const GAME_OVER_PHASE = /Start Phase GameOverPhase/u;
 const REWARD_OWNER = /OWNER drives reward screen/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
@@ -2314,6 +2315,9 @@ export class DuoPublicUiRig {
       }
 
       const outcome = await this.waitForPostTurnOutcome(outcomeCursors, { expectedCommandAddress });
+      if (outcome.kind === "gameOver") {
+        throw new Error(`Both browsers reached GameOver after turn ${turn}; the reward journey ended terminally`);
+      }
       if (outcome.kind === "reward") {
         await this.assertSharedSurface("reward", outcomeCursors, `turn-${turn}-reward`, {
           expectedWave: this.activeBattleWave,
@@ -2375,6 +2379,11 @@ export class DuoPublicUiRig {
           hardCeilingMs: COMMANDER_BOUNDARY_HARD_CEILING_MS,
         },
       });
+      if (outcome.kind === "gameOver") {
+        throw new Error(
+          `Both browsers reached GameOver after Commander round ${round}; the reward journey ended terminally`,
+        );
+      }
       if (outcome.kind === "reward") {
         await this.assertSharedSurface("reward", outcomeCursors, `commander-turn-${round}-reward`, {
           expectedWave: this.activeBattleWave,
@@ -2521,8 +2530,26 @@ export class DuoPublicUiRig {
       expectedCommandAddress,
     });
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs, progressBudgetOptions);
+    let partialGameOver = [];
     while (Date.now() < progressBudget.observe()) {
       const values = Object.values(this.clients);
+      const gameOvers = values.map(client => client.evidence.find(GAME_OVER_PHASE, from[client.label]));
+      if (gameOvers.every(Boolean)) {
+        for (let i = 0; i < values.length; i++) {
+          values[i].evidence.record("paired-game-over-proof", {
+            eventIndex: gameOvers[i].index,
+            peerEventIndex: gameOvers[(i + 1) % values.length].index,
+          });
+        }
+        return { kind: "gameOver" };
+      }
+      partialGameOver = values.filter((_client, index) => gameOvers[index] != null).map(client => client.label);
+      // Once one peer has entered GameOver, do not misclassify its later terminal log as a generic
+      // post-turn failure. Keep the browsers alive until the partner exposes the same terminal surface.
+      if (partialGameOver.length > 0) {
+        await delay(100);
+        continue;
+      }
       const rewards = values.map(client => client.evidence.find(REWARD_PHASE, from[client.label]));
       if (rewards.every(Boolean)) {
         return { kind: "reward" };
@@ -2560,6 +2587,11 @@ export class DuoPublicUiRig {
         return { kind: "command", client: commandClient };
       }
       await delay(100);
+    }
+    if (partialGameOver.length > 0) {
+      throw new Error(
+        `Timed out waiting for both browsers to reach GameOver; terminal observed only on ${partialGameOver.join(", ")}`,
+      );
     }
     throw new Error("Timed out waiting for public post-turn command, faint, or reward evidence");
   }
@@ -2716,8 +2748,33 @@ export class DuoPublicUiRig {
   }
 
   assertClean() {
+    const failures = [];
     for (const client of Object.values(this.clients)) {
-      client.evidence.assertClean();
+      try {
+        client.evidence.assertClean();
+      } catch (error) {
+        failures.push(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures,
+        `${failures.length} browser evidence failure(s): ${failures.map(error => error.message).join("; ")}`,
+      );
+    }
+  }
+
+  aggregateFailureWithBrowserEvidence(primary) {
+    const failure = primary instanceof Error ? primary : new Error(String(primary));
+    try {
+      this.assertClean();
+      return failure;
+    } catch (error) {
+      const browserFailure = error instanceof Error ? error : new Error(String(error));
+      return new AggregateError(
+        [failure, browserFailure],
+        `${failure.message}; browser evidence: ${browserFailure.message}`,
+      );
     }
   }
 }
