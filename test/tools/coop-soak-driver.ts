@@ -3180,6 +3180,17 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // exactly one alternation step, committed by PostMysteryEncounterPhase after the spawned battle. Drive
       // that true terminal and flush the guest's detached 9M listener before checking the +1 lockstep.
       await driveRewardShop(wave, true);
+      // The retained final leave is executable only when BOTH real clients have drained the declared
+      // post-reward tails and are parked at PostMysteryEncounterPhase. Real browsers progress EggLapse in
+      // parallel; the one-realm harness must do that explicitly for the guest before starting the host's
+      // PostME producer. Pumping transport alone while the guest is still on EggLapse correctly leaves the
+      // terminal unacknowledged, but can never make that local phase advance.
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase", false));
+      await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "PostMysteryEncounterPhase", {
+          pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+        }),
+      );
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
       await withClient(rig.guestCtx, async () => {
         await drainLoopback();
