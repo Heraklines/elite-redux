@@ -2283,7 +2283,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
 
       const result = await guestStream.requestStateSync("turn-checksum");
       expect(sawTurn).toBe(7);
-      expect(result?.blob).toBe("blob-for-turn-7");
+      expect(result).toMatchObject({ kind: "snapshot", blob: "blob-for-turn-7" });
     });
 
     it("a stale addressed stateSync never satisfies the newest resync request", async () => {
@@ -2322,15 +2322,15 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
         controlDigest: "digest-1",
       });
 
-      expect(await first).toBeNull();
-      expect((await second)?.blob).toBe("fresh");
+      expect(await first).toEqual({ kind: "superseded" });
+      expect(await second).toMatchObject({ kind: "snapshot", blob: "fresh" });
       expect(seqs).toEqual([1, 2]);
     });
 
-    it("a resync that never gets answered times out to null (degraded, never hung)", async () => {
-      const { host, guest } = createLoopbackPair();
+    it("a resync that never gets answered resolves with an explicit timeout", async () => {
+      const { guest } = createLoopbackPair();
       const current = { epoch: 1, wave: 1, turn: 3 };
-      new CoopBattleStreamer(host, { authorityContext: () => current }); // host installs no responder
+      // Deliberately install no host streamer/listener, so no explicit unavailable can return.
       const guestStream = new CoopBattleStreamer(guest, {
         authorityContext: () => current,
         timeoutMs: 1,
@@ -2339,7 +2339,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
           return () => {};
         },
       });
-      expect(await guestStream.requestStateSync("turn-checksum")).toBeNull();
+      expect(await guestStream.requestStateSync("turn-checksum")).toEqual({ kind: "timeout" });
     });
 
     it("the owner's ME-boundary checksum reaches the watcher's handler (#633 Phase C)", async () => {

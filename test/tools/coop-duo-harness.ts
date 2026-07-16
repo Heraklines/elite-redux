@@ -78,7 +78,7 @@ import {
   reconcileArenaTags,
   reconcileCoopPlayerModifiers,
 } from "#data/elite-redux/coop/coop-battle-engine";
-import type { CoopStateSyncResult } from "#data/elite-redux/coop/coop-battle-stream";
+import type { CoopStateSyncOutcome } from "#data/elite-redux/coop/coop-battle-stream";
 import {
   clearCoopBiomeInteractionStart,
   coopBiomeInteractionInProgress,
@@ -2234,13 +2234,13 @@ export interface CoopResyncProbe {
  */
 export function installCoopResyncProbe(runtime: CoopRuntime): CoopResyncProbe {
   const streamer = runtime.battleStream as unknown as {
-    requestStateSync: (reason: Exclude<CoopRecoveryReason, "durability-gap">) => Promise<CoopStateSyncResult | null>;
+    requestStateSync: (reason: Exclude<CoopRecoveryReason, "durability-gap">) => Promise<CoopStateSyncOutcome>;
   };
   const original = streamer.requestStateSync.bind(streamer);
   let n = 0;
   streamer.requestStateSync = (
     reason: Exclude<CoopRecoveryReason, "durability-gap">,
-  ): Promise<CoopStateSyncResult | null> => {
+  ): Promise<CoopStateSyncOutcome> => {
     n += 1;
     return original(reason);
   };

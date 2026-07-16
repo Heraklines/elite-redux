@@ -93,8 +93,19 @@ describe("co-op protocol-38 addressed recovery", () => {
     const pending = guestStream.requestStateSync("turn-checksum");
     Object.assign(hostPoint, next);
 
-    await expect(pending).resolves.toBeNull();
+    await expect(pending).resolves.toEqual({ kind: "superseded" });
     expect(captures, "the ambient snapshot builder never runs at a different host frontier").toBe(0);
+    hostStream.dispose();
+    guestStream.dispose();
+  });
+
+  it("resolves an exact-frontier request explicitly unavailable when the host has no snapshot responder", async () => {
+    const pair = createLoopbackPair();
+    const point: Point = { epoch: 9, wave: 3, turn: 2 };
+    const hostStream = new CoopBattleStreamer(pair.host, { authorityContext: () => point });
+    const guestStream = new CoopBattleStreamer(pair.guest, { authorityContext: () => point });
+
+    await expect(guestStream.requestStateSync("rejoin")).resolves.toEqual({ kind: "unavailable" });
     hostStream.dispose();
     guestStream.dispose();
   });
@@ -107,9 +118,13 @@ describe("co-op protocol-38 addressed recovery", () => {
     hostStream.onStateSyncRequest(ticket => hostStream.sendStateSync("exact-boundary", ticket, proof(point)));
 
     const result = await guestStream.requestStateSync("mystery-checksum");
-    expect(result?.blob).toBe("exact-boundary");
-    expect(result?.admission.ticket.frontier).toEqual(point);
-    expect(result?.admission.captured.frontier).toEqual(point);
+    expect(result.kind).toBe("snapshot");
+    if (result.kind !== "snapshot") {
+      throw new Error(`expected snapshot, received ${result.kind}`);
+    }
+    expect(result.blob).toBe("exact-boundary");
+    expect(result.admission.ticket.frontier).toEqual(point);
+    expect(result.admission.captured.frontier).toEqual(point);
     hostStream.dispose();
     guestStream.dispose();
   });
@@ -135,7 +150,7 @@ describe("co-op protocol-38 addressed recovery", () => {
     await flushWire();
     generation++;
     expect(hostStream.sendStateSync("old-generation", retainedTicket!, proof(point))).toBe(false);
-    await expect(pending).resolves.toBeNull();
+    await expect(pending).resolves.toEqual({ kind: "superseded" });
     hostStream.dispose();
     guestStream.dispose();
   });
@@ -155,7 +170,7 @@ describe("co-op protocol-38 addressed recovery", () => {
     wrapped.transition("disconnected");
     wrapped.transition("connected");
 
-    await expect(pending).resolves.toBeNull();
+    await expect(pending).resolves.toEqual({ kind: "reconnect-cancelled" });
     expect(requests.value, "an old-generation logical request is never replayed").toBe(1);
     hostStream.dispose();
     guestStream.dispose();

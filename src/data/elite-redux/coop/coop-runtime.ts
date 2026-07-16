@@ -60,7 +60,11 @@ import {
   reapplyAcceptedCoopAuthoritativeBattleState,
   resetCoopStateTicks,
 } from "#data/elite-redux/coop/coop-battle-engine";
-import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
+import {
+  CoopBattleStreamer,
+  type CoopStateSyncFailure,
+  type CoopStateSyncOutcome,
+} from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync, type CoopCommandTimeout } from "#data/elite-redux/coop/coop-battle-sync";
 import {
   isCoopBiomeOperationEnabled,
@@ -1998,8 +2002,7 @@ function wireCoopMeChecksumCheck(runtime: CoopRuntime, battleStream: CoopBattleS
             coopWarn("resync", `stateSync reply seq=${seq} arrived AFTER session teardown -> dropped (#808)`);
             return;
           }
-          if (result == null) {
-            coopWarn("resync", `await stateSync TIMEOUT/null seq=${seq}`);
+          if (failCoopRecoveryOutcome(runtime, result, `Mystery checksum seq=${seq}`)) {
             return;
           }
           const { blob, admission } = result;
@@ -2023,15 +2026,19 @@ function wireCoopMeChecksumCheck(runtime: CoopRuntime, battleStream: CoopBattleS
             // One central preflight enforces epoch, checksum/sentinel, membership, control digest, monotonic
             // interaction counter, and Mystery revision before DATA is touched. Active replay applies inline
             // transactionally; every other phase queues the same atomic apply at a safe boundary.
-            queueCoopAtomicSnapshotApply(
-              liveRuntime,
-              snapshot,
-              admission,
-              `me-entry seq=${seq} comprehensive snapshot`,
-            );
+            if (
+              !queueCoopAtomicSnapshotApply(
+                liveRuntime,
+                snapshot,
+                admission,
+                `me-entry seq=${seq} comprehensive snapshot`,
+              )
+            ) {
+              failCoopRuntimeSharedSession(liveRuntime, `Mystery checksum seq=${seq} snapshot was not admissible.`);
+            }
           } catch (e) {
-            /* a malformed resync blob must never crash the ME flow */
-            coopWarn("resync", `me-entry seq=${seq} malformed resync blob (ignored)`, e);
+            coopWarn("resync", `me-entry seq=${seq} malformed resync blob`, e);
+            failCoopRuntimeSharedSession(runtime, `Mystery checksum seq=${seq} snapshot could not be decoded.`);
           }
         });
       }),
@@ -2418,15 +2425,15 @@ export function wireCoopStallWatchdog(
             if (gen !== coopSessionGeneration()) {
               return;
             }
-            if (result == null) {
+            if (failCoopRecoveryOutcome(runtime, result, `Stall at wave ${point.wave} turn ${point.turn}`)) {
               recordCoopCausalEvent({
                 domain: "snapshot",
-                stage: "timed-out",
+                stage: "refused",
                 causalId: `${recoveryId}:snapshot:${seq}`,
                 parentId: recoveryId,
                 role: "guest",
+                detail: result.kind,
               });
-              coopWarn("resync", `stall-recovery stateSync TIMEOUT/null seq=${seq}`);
               return;
             }
             const { blob, admission } = result;
@@ -2443,12 +2450,16 @@ export function wireCoopStallWatchdog(
                 turn: readCoopBattlePoint().turn,
                 detail: `${blob.length}b`,
               });
-              queueCoopAtomicSnapshotApply(
-                runtime,
-                snapshot,
-                admission,
-                `stall-recovery snapshot seq=${seq} blob=${blob.length}b`,
-              );
+              if (
+                !queueCoopAtomicSnapshotApply(
+                  runtime,
+                  snapshot,
+                  admission,
+                  `stall-recovery snapshot seq=${seq} blob=${blob.length}b`,
+                )
+              ) {
+                failCoopRuntimeSharedSession(runtime, `Stall recovery snapshot seq=${seq} was not admissible.`);
+              }
             } catch {
               recordCoopCausalEvent({
                 domain: "snapshot",
@@ -2457,7 +2468,7 @@ export function wireCoopStallWatchdog(
                 parentId: recoveryId,
                 role: "guest",
               });
-              coopWarn("resync", `stall-recovery snapshot apply FAILED seq=${seq}`);
+              failCoopRuntimeSharedSession(runtime, `Stall recovery snapshot seq=${seq} could not be decoded.`);
             }
           });
         }
@@ -2729,6 +2740,34 @@ export function failCoopSharedSession(reason: string, failure: CoopSharedSession
   }
 }
 
+/**
+ * Close a recovery request that did not yield an exactly admitted snapshot. This helper is deliberately
+ * side-effectful: callers must return when it reports a failure, and the synchronous shared-terminal
+ * preparation freezes membership, battle commands, retained UI waits, and phase progression before any
+ * released promise continuation can resume mechanics.
+ */
+export function failCoopRecoveryOutcome(
+  runtime: CoopRuntime,
+  outcome: CoopStateSyncOutcome,
+  label: string,
+): outcome is CoopStateSyncFailure {
+  if (outcome.kind === "snapshot") {
+    return false;
+  }
+  const point = readCoopBattlePoint();
+  failCoopRuntimeSharedSession(
+    runtime,
+    `${label} recovery ended with ${outcome.kind} before an exact authoritative snapshot was admitted.`,
+    {
+      boundary: "recovery",
+      reasonCode: "recovery-exhausted",
+      wave: point.wave,
+      turn: point.turn,
+    },
+  );
+  return true;
+}
+
 function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRuntime): void {
   let rejoining = false;
   const terminateSharedSession = (recoveryId: string): void => {
@@ -2907,15 +2946,15 @@ function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRunti
               if (gen !== coopSessionGeneration()) {
                 return;
               }
-              if (result == null) {
+              if (failCoopRecoveryOutcome(runtime, result, "Post-rejoin wave recovery")) {
                 recordCoopCausalEvent({
                   domain: "snapshot",
-                  stage: "timed-out",
+                  stage: "refused",
                   causalId: snapshotId,
                   parentId: recoveryId,
                   role: "guest",
+                  detail: result.kind,
                 });
-                coopWarn("resync", `post-rejoin stateSync TIMEOUT/null seq=${seq} (checksum backstop heals next turn)`);
                 return;
               }
               const { blob, admission } = result;
@@ -2932,12 +2971,16 @@ function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRunti
                   turn: globalScene.currentBattle?.turn ?? 0,
                   detail: `${blob.length}b`,
                 });
-                queueCoopAtomicSnapshotApply(
-                  runtime,
-                  snapshot,
-                  admission,
-                  `post-rejoin snapshot seq=${seq} blob=${blob.length}b`,
-                );
+                if (
+                  !queueCoopAtomicSnapshotApply(
+                    runtime,
+                    snapshot,
+                    admission,
+                    `post-rejoin snapshot seq=${seq} blob=${blob.length}b`,
+                  )
+                ) {
+                  failCoopRuntimeSharedSession(runtime, `Post-rejoin snapshot seq=${seq} was not admissible.`);
+                }
               } catch {
                 recordCoopCausalEvent({
                   domain: "snapshot",
@@ -2946,7 +2989,7 @@ function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRunti
                   parentId: recoveryId,
                   role: "guest",
                 });
-                coopWarn("resync", `post-rejoin snapshot apply FAILED seq=${seq} (checksum backstop heals next turn)`);
+                failCoopRuntimeSharedSession(runtime, `Post-rejoin snapshot seq=${seq} could not be decoded.`);
               }
             });
           }

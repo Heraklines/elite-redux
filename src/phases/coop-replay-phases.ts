@@ -71,6 +71,7 @@ import {
   coopOwnerOfPlayerFieldSlot,
   coopSessionGeneration,
   coopWaveAdvanceSignaledFor,
+  failCoopRecoveryOutcome,
   failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopController,
@@ -1470,11 +1471,11 @@ export class CoopFinalizeTurnPhase extends Phase {
     );
     const resyncGen = coopSessionGeneration(); // #808
     void streamer.requestStateSync("turn-checksum").then(result => {
-      if (result == null) {
-        coopWarn(
-          "resync",
-          `turn=${this.turn} no snapshot received (timeout) -> keep current state, re-check next turn`,
-        );
+      const runtime = getCoopRuntime();
+      if (runtime == null || resyncGen !== coopSessionGeneration()) {
+        return;
+      }
+      if (failCoopRecoveryOutcome(runtime, result, `Turn ${this.turn} checksum`)) {
         return;
       }
       const { blob, admission } = result;
@@ -1502,11 +1503,8 @@ export class CoopFinalizeTurnPhase extends Phase {
         // while a CoopHpDrainReplayPhase animates against it. Route it through a queued one-shot phase
         // so the heavy rebuild lands at a real inter-phase boundary, never mid-drain. The heal-check +
         // UNHEALED diagnostics moved INTO the phase (they must run AFTER the deferred apply).
-        const runtime = getCoopRuntime();
-        if (runtime == null) {
-          return;
-        }
         if (!queueCoopAtomicSnapshotApply(runtime, snapshot, admission, `turn=${this.turn} checksum safety-net`)) {
+          failCoopSharedSession(`Turn ${this.turn} checksum snapshot was not admissible.`);
           return;
         }
         const interactionController = getCoopController();
@@ -1518,8 +1516,7 @@ export class CoopFinalizeTurnPhase extends Phase {
             && (interactionController == null ? true : interactionController.peerAdvancedPastInteraction(seq)),
         );
       } catch {
-        /* a malformed resync blob must never crash the guest's battle */
-        coopWarn("resync", `turn=${this.turn} malformed snapshot blob (handled)`);
+        failCoopSharedSession(`Turn ${this.turn} checksum snapshot could not be decoded.`);
       }
     });
   }
@@ -2276,7 +2273,7 @@ export class CoopApplyResyncPhase extends Phase {
       if (streamer == null || !streamer.recoveryAdmissionIsCurrent(this.recoveryAdmission, this.snapshot)) {
         coopWarn("resync", `turn=${this.turn} DROP snapshot whose immutable recovery ticket is no longer current`);
         this.settle(false);
-        this.end();
+        failCoopSharedSession(`Turn ${this.turn} recovery ticket was superseded before atomic apply.`);
         return;
       }
       // #790-class STALE GUARD for resyncs (live faint softlock, 00:47 logs): a resync REQUESTED
@@ -2294,7 +2291,7 @@ export class CoopApplyResyncPhase extends Phase {
             + "-> DROPPED (newer checkpoint supersedes)",
         );
         this.settle(false);
-        this.end();
+        failCoopSharedSession(`Turn ${this.turn} recovery snapshot no longer matches the live frontier.`);
         return;
       }
       // MINOR-1: if we've already failed to heal THIS divergence twice in a row, skip the heavy
@@ -2310,6 +2307,7 @@ export class CoopApplyResyncPhase extends Phase {
       if (rollback == null) {
         coopWarn("resync", `turn=${this.turn} snapshot refused: no transactional rollback image`);
         this.settle(false);
+        failCoopSharedSession(`Turn ${this.turn} recovery could not capture a rollback image.`);
         return;
       }
       // Pass the isCoopAuthoritativeGuest() gate from here (cycle-free) so the engine's level/exp +
@@ -2326,6 +2324,7 @@ export class CoopApplyResyncPhase extends Phase {
           applyCoopFullSnapshot(rollback, isCoopAuthoritativeGuest(), true);
           this.settle(false);
           coopWarn("resync", `turn=${this.turn} control commit failed; DATA rolled back atomically`);
+          failCoopSharedSession(`Turn ${this.turn} recovery control commit failed after material convergence.`);
           return;
         }
       } else {
@@ -2398,6 +2397,7 @@ export class CoopApplyResyncPhase extends Phase {
         } catch {
           coopWarn("resync", `turn=${this.turn} rollback failed; shared session cannot safely continue`);
           failCoopSharedSession(`turn=${this.turn} atomic DATA rollback failed`);
+          return;
         }
       }
       // Stay fail-closed, but do not become an un-wakeable queue tombstone: a later complete authority
