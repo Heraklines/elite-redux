@@ -960,7 +960,11 @@ function setFirstAtlasFrame(scene: Phaser.Scene, spr: any, key: string): void {
  * built, so the two-pass injector resolves the chrome textures (pbinfo_*, overlay_*,
  * numbers, {biome}_a/_b/_bg) and the pokemon atlases inject inline here.
  */
-export async function renderBattlefield(gs: any, ctx: RenderContext): Promise<FieldElement[]> {
+export async function renderBattlefield(
+  gs: any,
+  ctx: RenderContext,
+  opts: { modifierBars?: boolean } = {},
+): Promise<FieldElement[]> {
   const scene: any = ctx.scene;
   const built: FieldElement[] = [];
   const simulateMissing = process.env.ER_SIMULATE_MISSING === "1";
@@ -1109,6 +1113,31 @@ export async function renderBattlefield(gs: any, ctx: RenderContext): Promise<Fi
       built.push({ kind: isPlayerMon ? "battle-info-player" : "battle-info-enemy" });
     } catch (e) {
       built.push({ kind: "battle-info", error: String(e) });
+    }
+  }
+
+  // --- 3.5 (opt-in): the top-of-screen MODIFIER BARS (held-item icon rows). Fresh
+  // ModifierBar instances against the re-pointed factories, exactly like the fresh
+  // BattleInfo above - so a new held item's icon (holder mini-icon + item sprite)
+  // is verifiable in pixels on BOTH the ally and the enemy bar. Opt-in per recipe:
+  // the pre-existing battle goldens were captured without bars.
+  if (opts.modifierBars) {
+    try {
+      const { ModifierBar, PersistentModifier } = await import("#modifiers/modifier");
+      const barsC = scene.add.container(0, 0).setScale(6);
+      ctx.fieldRoot.add(barsC);
+      for (const player of [true, false]) {
+        const mods = ((player ? gs.modifiers : gs.enemyModifiers) ?? []).filter(
+          (m: any) => m instanceof PersistentModifier,
+        );
+        const bar: any = new ModifierBar(!player);
+        bar.updateModifiers(mods);
+        bar.setVisible(true);
+        barsC.add(bar);
+        built.push({ kind: player ? "modifier-bar-player" : "modifier-bar-enemy", key: `${mods.length} modifiers` });
+      }
+    } catch (e) {
+      built.push({ kind: "modifier-bars", error: String(e) });
     }
   }
 

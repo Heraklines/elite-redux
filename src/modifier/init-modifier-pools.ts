@@ -313,6 +313,9 @@ function initGreatModifierPool() {
     // ER Ability Capsule (#387): GREAT tier per maintainer (2026-06-12);
     // it is a once-per-mon utility, not a Rogue-class power spike.
     new WeightedModifierType(modifierTypes.ER_ABILITY_CAPSULE, 2),
+    // ER Eject Button: GREAT per maintainer (2026-07-16) - a cheap one-shot
+    // pivot tool (the struck holder switches out).
+    new WeightedModifierType(modifierTypes.ER_EJECT_BUTTON, 4),
     new WeightedModifierType(modifierTypes.BASE_STAT_BOOSTER, 3),
     new WeightedModifierType(modifierTypes.TERA_SHARD, (party: Pokemon[]) =>
       party.filter(
@@ -627,6 +630,9 @@ function initUltraModifierPool() {
     // (permanently unlock one innate, or run-unlock two). Rarer than the GREAT-tier
     // normal capsule, so a lower weight.
     new WeightedModifierType(modifierTypes.ER_GREATER_ABILITY_CAPSULE, 2),
+    // ER Expert Belt: ULTRA per maintainer (2026-07-16) - x1.2 super-effective
+    // damage, single stack per mon (getMaxHeldItemCount 1).
+    new WeightedModifierType(modifierTypes.ER_EXPERT_BELT, 3),
   ].map(m => {
     m.setTier(ModifierTier.ULTRA);
     return m;

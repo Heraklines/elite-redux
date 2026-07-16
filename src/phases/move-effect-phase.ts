@@ -24,6 +24,7 @@ import {
 import { erApplyCommunityOnHitItems } from "#data/elite-redux/er-community-items";
 import { erApplyReactiveOnHit } from "#data/elite-redux/er-reactive-items";
 import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
+import { erApplyTacticalSwitchOnHit, erCovertCloakGuards } from "#data/elite-redux/er-tactical-items";
 import { SpeciesFormChangePostMoveTrigger } from "#data/form-change-triggers";
 import type { TypeDamageMultiplier } from "#data/type";
 import { AbilityId } from "#enums/ability-id";
@@ -991,6 +992,10 @@ export class MoveEffectPhase extends PokemonPhase {
       // Moss / Weakness Policy): the struck holder raises a stat once, then it's
       // consumed.
       erApplyReactiveOnHit(target, user.getMoveType(this.move), hitResult, dealsDamage);
+      // ER tactical switch items (Eject Button / Red Card): the surviving struck
+      // holder switches out / drags the attacker out, then the item is consumed.
+      // Last strike of a multi-hit move only.
+      erApplyTacticalSwitchOnHit(user, target, dealsDamage);
     }
   }
 
@@ -1037,7 +1042,8 @@ export class MoveEffectPhase extends PokemonPhase {
 
     if (
       dealsDamage
-      && !target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr")
+      && !target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") // ER Covert Cloak: the held-item flinch (King's Rock class) is an // additional effect inflicted on the holder - the cloak blocks it, like // Shield Dust on the line above.
+      && !erCovertCloakGuards(target)
       && !this.move.hitsSubstitute(user, target)
     ) {
       const flinched = new BooleanHolder(false);

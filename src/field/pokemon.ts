@@ -131,6 +131,7 @@ import {
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { getErShinyLabEarnedTierForPokemon, rollErShinyLabWildSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
 import { applyErAtlasFrameRate } from "#data/elite-redux/er-sprite-anim";
+import { erTryApplyExpertBelt } from "#data/elite-redux/er-tactical-items";
 import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
 import {
   applyErWardStoneBlock,
@@ -5614,6 +5615,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // ER elemental Gems: 1.3x to the attacker's first move of the matching type,
     // then the gem shatters (consumed only on real calcs).
     erTryApplyGem(source, moveType, damage, simulated);
+
+    // ER Expert Belt (held by the attacker): x1.2 on super-effective hits
+    // (effectiveness >= 2, per ER battle_util.c). Passive - never consumed -
+    // so it applies to simulated calcs too, like the recreated Life Orb below.
+    erTryApplyExpertBelt(source, typeMultiplier, damage);
 
     // ER resistance berries (#357): if the DEFENDER holds the berry matching
     // this hit's type, halve the damage BEFORE it lands and consume the berry

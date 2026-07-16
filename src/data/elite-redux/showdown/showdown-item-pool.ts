@@ -69,6 +69,11 @@ export const SHOWDOWN_ITEM_POOL: readonly ShowdownItemKey[] = [
   "ER_SNOWBALL",
   "ER_LUMINOUS_MOSS",
   "ER_WEAKNESS_POLICY",
+  // ER tactical held items (competitive staples).
+  "ER_EXPERT_BELT",
+  "ER_COVERT_CLOAK",
+  "ER_RED_CARD",
+  "ER_EJECT_BUTTON",
   // ER community held items (#387/#392).
   "ER_CHILI_SAMPLE",
   "ER_COPPER_ROD",

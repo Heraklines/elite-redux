@@ -21,6 +21,7 @@ import { erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { ER_ASSAULT_VEST_TYPE, ER_LIFE_ORB_TYPE, ER_ROCKY_HELMET_TYPE } from "#data/elite-redux/er-recreated-items";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { hasErAilment } from "#data/elite-redux/er-status-cure";
+import { erTacticalItemType } from "#data/elite-redux/er-tactical-items";
 import { erSeedItemType } from "#data/elite-redux/er-terrain-seeds";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
@@ -2371,6 +2372,12 @@ const modifierTypeInitObj = Object.freeze({
   ER_SNOWBALL: () => erReactiveItemType("snowball"),
   ER_LUMINOUS_MOSS: () => erReactiveItemType("luminousMoss"),
   ER_WEAKNESS_POLICY: () => erReactiveItemType("weaknessPolicy"),
+
+  // ER tactical held items (Expert Belt / Covert Cloak / Red Card / Eject Button).
+  ER_EXPERT_BELT: () => erTacticalItemType("expertBelt"),
+  ER_COVERT_CLOAK: () => erTacticalItemType("covertCloak"),
+  ER_RED_CARD: () => erTacticalItemType("redCard"),
+  ER_EJECT_BUTTON: () => erTacticalItemType("ejectButton"),
 
   // ER terrain seeds (Great-ball tier).
   ER_ELECTRIC_SEED: () => erSeedItemType("electricSeed"),

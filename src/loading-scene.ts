@@ -62,6 +62,11 @@ export class LoadingScene extends SceneBase {
       .loadImage("er_snowball", "items/er")
       .loadImage("er_luminous_moss", "items/er")
       .loadImage("er_weakness_policy", "items/er")
+      // ER tactical held items (ROM + PokeAPI item sprites, hosted on er-assets).
+      .loadImage("er_expert_belt", "items/er")
+      .loadImage("er_covert_cloak", "items/er")
+      .loadImage("er_red_card", "items/er")
+      .loadImage("er_eject_button", "items/er")
       // ER terrain seeds (PokeAPI item sprites, hosted on er-assets).
       .loadImage("er_electric_seed", "items/er")
       .loadImage("er_grassy_seed", "items/er")

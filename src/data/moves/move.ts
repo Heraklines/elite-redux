@@ -42,6 +42,7 @@ import {
 } from "#data/elite-redux/er-community-items";
 import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { clearErAilments } from "#data/elite-redux/er-status-cure";
+import { erCovertCloakGuards } from "#data/elite-redux/er-tactical-items";
 import { SpeciesFormChangeRevertWeatherFormTrigger } from "#data/form-change-triggers";
 import { getNonVolatileStatusEffects, getStatusEffectHealText, isNonVolatileStatusEffect } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
@@ -1953,6 +1954,13 @@ export class MoveEffectAttr extends MoveAttr {
     }
 
     if (!selfEffect) {
+      // ER Covert Cloak (held by the target): an item Shield Dust - every
+      // additional effect a damaging move would inflict on the holder is
+      // suppressed. Same chokepoint as IgnoreMoveEffectsAbAttr below so
+      // status/stat/flinch secondaries are all covered uniformly.
+      if (move.category !== MoveCategory.STATUS && erCovertCloakGuards(target)) {
+        moveChance.value = 0;
+      }
       applyAbAttrs("IgnoreMoveEffectsAbAttr", { pokemon: target, move, simulated: !showAbility, chance: moveChance });
       // ER Desert Cloak (412): side-wide secondary-effect immunity. Consult the
       // target's WHOLE field (self + allies — getAlliesGenerator walks the side

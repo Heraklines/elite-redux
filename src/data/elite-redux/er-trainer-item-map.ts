@@ -60,6 +60,11 @@ export const ER_ITEM_TO_MODIFIER_KEY: Readonly<Record<number, string>> = {
   241: "WHITE_HERB",
   375: "SOUL_DEW",
   245: "SOOTHE_BELL",
+  // ER tactical held items (er-tactical-items.ts): faithful 1:1 recreations,
+  // so an ER trainer's native Expert Belt / Red Card / Eject Button carries over.
+  314: "ER_EXPERT_BELT",
+  335: "ER_RED_CARD",
+  338: "ER_EJECT_BUTTON",
   // Weather / terrain duration extenders → Mystical Rock.
   295: "MYSTICAL_ROCK", // Icy Rock
   296: "MYSTICAL_ROCK", // Smooth Rock

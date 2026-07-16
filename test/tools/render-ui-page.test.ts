@@ -132,6 +132,12 @@ interface Recipe {
    * the live scene graph, so lingering/fainted-but-shown field objects reproduce.
    */
   field?: boolean;
+  /**
+   * With `field`: also rebuild the top-of-screen MODIFIER BARS (ally + enemy held-item
+   * icon rows) from live modifiers. Opt-in because the older battle goldens were
+   * captured without bars.
+   */
+  modifierBars?: boolean;
   /** Fully custom page: build + show the UI directly into the render scene. */
   render?: (game: GameManager, ctx: RenderContext) => void | Promise<void>;
   /**
@@ -1303,6 +1309,24 @@ const RECIPES: Record<string, Recipe> = {
       return [];
     },
   },
+  // ER tactical held items (er-tactical-items.ts): the four new item icons on BOTH
+  // modifier bars - player holds Expert Belt + Eject Button, enemy holds Covert Cloak
+  // + Red Card. Each icon = holder mini-icon + standalone er-assets item sprite
+  // (er_expert_belt / er_eject_button / er_covert_cloak / er_red_card), the exact
+  // gem/reactive-item item-bar layout. Guards "added an item but its bar icon is
+  // blank/__MISSING" for future item additions too.
+  "battle-tactical-items": {
+    captureActive: true,
+    field: true,
+    modifierBars: true,
+    prepare: async game => {
+      game.override
+        .startingHeldItems([{ name: "ER_EXPERT_BELT" }, { name: "ER_EJECT_BUTTON" }])
+        .enemyHeldItems([{ name: "ER_COVERT_CLOAK" }, { name: "ER_RED_CARD" }]);
+      await game.classicMode.startBattle(SpeciesId.SNORLAX);
+      return [];
+    },
+  },
   // Battlefield in a DOUBLE battle: two mons + stacked HP bars per side. Exercises the
   // slot-offset layout (fieldSpriteOffset / barSlotOffset) of the field renderer.
   "battle-field-doubles": {
@@ -1841,7 +1865,7 @@ describe.skipIf(!RUN)("render-ui-page", () => {
     const run = async () => {
       try {
         if (recipe.field) {
-          await renderBattlefield(game.scene, ctx);
+          await renderBattlefield(game.scene, ctx, { modifierBars: recipe.modifierBars });
           // The in-battle bottom band is the MESSAGE handler's window (the command menu
           // renders ON it in-game). Build it fresh beneath the active handler; a failure
           // here only costs the bar, not the page.
