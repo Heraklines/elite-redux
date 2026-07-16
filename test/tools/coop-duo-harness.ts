@@ -3158,17 +3158,27 @@ export async function driveHostMeRewardShopWithGuestReplay(
   guestScene: MeReplayPumpScene,
 ): Promise<Phase> {
   let replay: Phase | null = null;
+  let guestShop: ShopPhaseSeam | null = null;
   await driveHostRewardShopOwner(hostPhase, {
     takeReward: false,
     partnerReady: async () => {
       replay = await withClient(guestCtx, () => startGuestMeReplay(guestScene));
+      // A browser cannot let the host commit a shop terminal until the guest's real queued shop has
+      // started and announced the reciprocal `shop:<wave>:<counter>` rendezvous. Merely starting the ME
+      // replay leaves that SelectModifierPhase queued: direct host-seam input could then bypass its own
+      // closed UI while the rendezvous recovery correctly remained armed. Start the production phase and
+      // wait for its authoritative option projection before allowing the owner driver to send LEAVE.
+      guestShop = await withClient(guestCtx, () => startGuestMeShopOwner(guestScene as BattleScene));
     },
     partnerSettle: async () => {
-      await withClient(guestCtx, async () => {
-        for (let i = 0; i < 16; i++) {
-          await drainLoopback();
-        }
-      });
+      if (guestShop == null) {
+        throw new Error("host-owned ME reward shop never reached its guest watcher boundary");
+      }
+      const settledGuestShop = guestShop;
+      // Consume the owner's retained terminal through the watcher phase itself. This proves both the
+      // mechanical result and the real phase exit instead of leaving a hidden shop waiter behind while
+      // PostMysteryEncounterPhase advances to the terminal transaction.
+      await withClient(guestCtx, () => driveGuestRewardWatch(settledGuestShop, { alreadyStarted: true }));
     },
   });
   if (replay == null) {
