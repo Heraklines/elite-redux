@@ -3126,10 +3126,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * Advances the alternation counter exactly ONCE (like a shop). Asserts LOCKSTEP at start + end.
    */
   const processMeWave = async (wave: number, type: MysteryEncounterType): Promise<void> => {
-    // crossIntoMeWave leaves the real host browser installed with the freshly-opened encounter. Save that
-    // complete live ME control before the first synthetic guest swap; otherwise hostCtx can still carry a
-    // prior event's pin and restore it much later when the true PostME terminal starts.
-    persistInstalledClientMePins(rig.hostCtx);
     // Mirror the host's CURRENT mystery encounter onto the guest (rebuilds the guest party + sets its ME).
     await withClient(rig.guestCtx, () => mirrorHostMeToGuest(rig.hostScene, rig.guestScene));
     assertLockstep(wave, "me-start");
@@ -3635,8 +3631,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // (the exact footgun coop-duo-mystery IT #4 clears). Drain the queue so the continuous run's next wave is
     // driven cleanly.
     (game.promptHandler as unknown as { prompts: unknown[] }).prompts.length = 0;
-    // #633 FOLLOW-UP (finding (a) - POST-ME COUNTER DESYNC, the HARNESS LEAK): clear the guest's ME
-    // interaction pin here. driveGuestMeReplay / the guest-owned drive above run the guest's ME divert
+    // #633 FOLLOW-UP (finding (a) - POST-ME COUNTER DESYNC, the HARNESS LEAK): persist the true terminal
+    // pin clear for both synthetic browsers here. An overlapping destination-context pump can restore an
+    // older host snapshot after PostMysteryEncounterPhase cleared the live module graph; without this stable
+    // boundary, a later ME can reopen on that stale counter and its exact terminal is correctly rejected.
+    // driveGuestMeReplay / the guest-owned drive above run the guest's ME divert
     // (coopSetMePinForGuest sets coopMeInteractionStart so coopMeInProgress() is TRUE across the whole guest
     // ME, exactly as production) but stop at the CoopReplayMePhase LEAVE terminal - they never drive the
     // guest's PostMysteryEncounterPhase, whose authoritative-guest guard is where production CLEARS the pin
@@ -3644,8 +3643,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // guestCtx.mePins, so the NEXT wave's guest pump reads coopMeInProgress() TRUE and RE-DIVERTS a spurious
     // second ME - the guest never drives that wave's (guest-owned) reward-shop terminal and the host watcher
     // hangs (seed 828633 wave 13: "watcher neither left nor advanced ... owner terminal never arrived").
-    // Mirror the production post-ME boundary clear under the guest ctx (so guestCtx.mePins gets the -1 on
-    // swap-back), exactly as PostMysteryEncounterPhase.start() does for the authoritative guest. Use the ASYNC
+    // Mirror the production post-ME boundary clear under each ctx (so both snapshots get the -1 on swap-back),
+    // exactly as PostMysteryEncounterPhase does. Use the ASYNC
     // withClient (NOT withClientSync): ONLY withClient persists the mutated ME pins back into the ctx on exit
     // (`ctx.mePins = readMePins()`, line ~406); withClientSync deliberately drops them (it restores prev.mePins
     // without saving), so a coopClearMePinForGuest under withClientSync would set the global to -1 but leave
@@ -3654,6 +3653,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // tail with its authoritative NewBattlePhase. Dropping that real tail leaves the old wave as current; when
     // the next queue drive starts the remaining phase, PhaseManager falls through to a phantom CommandPhase
     // on wave W instead of materializing wave W+1 (journey seed 828633, cmd:12:1 while host is at cmd:13:1).
+    await withClient(rig.hostCtx, () => coopClearMePinForGuest());
     await withClient(rig.guestCtx, () => coopClearMePinForGuest());
 
     // The whole ME advanced the alternation counter EXACTLY once (like a shop). Assert LOCKSTEP.
@@ -4422,6 +4422,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             } else {
               await crossIntoMeWave(nextMeType);
             }
+            // Capture the freshly-opened encounter while this exact host scene/runtime is still installed.
+            // withClient restores the ambient client on exit (often the guest after a reward watcher pump),
+            // so deferring this until processMeWave would read the wrong browser-local module graph.
+            persistInstalledClientMePins(rig.hostCtx);
           });
         }
       } catch (e) {

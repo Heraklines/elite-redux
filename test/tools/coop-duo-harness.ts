@@ -315,6 +315,13 @@ export interface ClientCtx {
    */
   mePins?: MePins;
   /**
+   * Monotonic ownership token for asynchronous ME-pin save-back. The one-process harness can have an
+   * older `withClient(ctx)` continuation finish after a newer scope has already persisted this browser's
+   * terminal boundary. Only the latest claimant may write `mePins`, preventing that older continuation
+   * from resurrecting its stale active replay + interaction pin as a seemingly-live Mystery boundary.
+   */
+  mePinsSaveGeneration?: number;
+  /**
    * Optional explicitly scheduled transport inbox for production-transition journeys. The pump is
    * invoked only while this client's complete process-global context is installed, so a network
    * continuation can never resume against the other engine's `globalScene`.
@@ -599,6 +606,10 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
 }
 
 export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<T> {
+  // Async scopes may overlap and finish out of entry order. Claim ME-pin save ownership before installing
+  // this browser; a later scope (or an explicit persistInstalledClientMePins) invalidates this claim.
+  const mePinsSaveGeneration = (ctx.mePinsSaveGeneration ?? 0) + 1;
+  ctx.mePinsSaveGeneration = mePinsSaveGeneration;
   const prev = captureLiveCtx();
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
@@ -641,7 +652,9 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     if (ctx.biomeState !== undefined) {
       ctx.biomeState = snapshotBiomeModuleState();
     }
-    ctx.mePins = readMePins();
+    if (ctx.mePinsSaveGeneration === mePinsSaveGeneration) {
+      ctx.mePins = readMePins();
+    }
     initGlobalScene(prev.scene);
     Phaser.Math.RND.state(prev.rndState);
     restoreGhostState(prev.ghost);
@@ -672,6 +685,9 @@ export function persistInstalledClientMePins(ctx: ClientCtx): void {
   if (globalScene !== ctx.scene || getCoopRuntime() !== ctx.runtime) {
     throw new Error(`cannot persist ${ctx.label} ME pins while a different client is installed`);
   }
+  // This explicit snapshot is newer than every already-entered async scope. Advance the generation so a
+  // late finally from one of those scopes cannot overwrite it with the older replay pointer + pin pair.
+  ctx.mePinsSaveGeneration = (ctx.mePinsSaveGeneration ?? 0) + 1;
   ctx.mePins = readMePins();
 }
 
@@ -3225,6 +3241,23 @@ export async function drainGuestMeReplayToSettle(replay: Phase): Promise<GuestMe
   for (let i = 0; i < 16; i++) {
     await drainLoopback();
     if (meReplaySettled(replay)) {
+      // Journal terminals settle the replay directly, so the losing legacy 8M outcome arm can remain parked
+      // until its long timeout. Retire that exact, now-dead waiter before this client scope exits; otherwise
+      // repeated MEs accumulate detached continuations which can later observe a restored stale boundary.
+      if (isCoopMeOperationJournalActive()) {
+        const relay = getCoopInteractionRelay();
+        if (relay == null) {
+          throw new Error("guest ME replay settled without a live interaction relay");
+        }
+        const seq = (replay as unknown as { seq: number }).seq;
+        relay.cancelWaiters(candidate => candidate === seq);
+        const outcomePending = (relay as unknown as { outcomePending: Map<number, unknown> }).outcomePending;
+        if (outcomePending.has(seq)) {
+          throw new Error(`guest ME replay ${seq} left its outcome waiter armed after settlement`);
+        }
+        // Join the cancellation continuation while the owning guest scene/runtime is still installed.
+        await drainLoopback();
+      }
       return { phase: replay, settled: true };
     }
   }
