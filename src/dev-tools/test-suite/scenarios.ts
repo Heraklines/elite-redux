@@ -13,8 +13,8 @@
  *   - onBattleStart? → optional; runs ONCE on the first turn (mid-combat state
  *                   the Overrides can't express, e.g. pre-boosted stat stages)
  *
- * Selecting a scenario drops you into a configured CLASSIC battle on a throwaway
- * save slot (4) — your real save (slot 0) is untouched.
+ * Selecting a scenario drops you into a configured CLASSIC/CHALLENGE battle on a
+ * throwaway save slot (4) — your real save (slot 0) is untouched.
  *
  * To add one: copy a block. Party via makeStarter(); pre-battle via setOverrides
  * (weather/status/ability/moveset/enemy); mid-combat via onBattleStart +
@@ -41,7 +41,7 @@ import {
   setErCustomTrainerDevForce,
 } from "#data/elite-redux/er-custom-trainers";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
-import { seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
+import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
@@ -53,13 +53,17 @@ import {
 import {
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
   encodeErShinyLabLoadout,
+  normalizeErShinyLabSavedLook,
+  sanitizeErShinyLabPresetName,
   setErShinyLabOwnedBit,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
+import { Gender } from "#data/gender";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
 import { BerryType } from "#enums/berry-type";
 import { BiomeId } from "#enums/biome-id";
+import type { Challenges } from "#enums/challenges";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { ErMoveId } from "#enums/er-move-id";
 import { ErSpeciesId } from "#enums/er-species-id";
@@ -82,7 +86,7 @@ import type { Starter, StarterMoveset } from "#types/save-data";
 import { openErMapOverlay } from "#ui/er-map-ui-handler";
 import { isSlotUnlocked, PASSIVE_SLOTS, unlockSlot } from "#utils/passive-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
-import { planErCustomTrainerLaunch } from "./custom-trainer-picker";
+import { type ErCustomTrainerLaunchPlan, planErCustomTrainerLaunch } from "./custom-trainer-picker";
 
 export interface DevScenario {
   /** Short name for the picker list. */
@@ -91,6 +95,10 @@ export interface DevScenario {
   description: string;
   /** Apply Overrides and return the player party. */
   setup: () => Starter[];
+  /** Run mode to create. Defaults to CLASSIC. */
+  gameMode?: GameModes;
+  /** Optional setup that needs the freshly-created gameMode. */
+  postLaunch?: () => void;
   /** Optional: runs ONCE on the first turn, after both sides are summoned. */
   onBattleStart?: () => void;
   /**
@@ -259,24 +267,71 @@ function setOverrides(partial: Partial<MutableOverrides>): void {
   }
 }
 
-/**
- * Player party fielded when a staff tester picks a custom trainer to battle-test
- * from the Dev Scenarios "Custom Trainers" list. A generic, capable team (2+ mons
- * so double/triple custom trainers have something to face) with explicit movesets
- * per the standing rule. The point is to exercise the TRAINER, not the player.
- */
-function customTrainerTestParty(): Starter[] {
-  return [
-    makeStarter(SpeciesId.GARCHOMP, {
-      moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
-    }),
-    makeStarter(SpeciesId.GRENINJA, {
-      moveset: [MoveId.HYDRO_PUMP, MoveId.ICE_BEAM, MoveId.DARK_PULSE, MoveId.EXTRASENSORY],
-    }),
-    makeStarter(SpeciesId.MAGNEZONE, {
-      moveset: [MoveId.THUNDERBOLT, MoveId.FLASH_CANNON, MoveId.THUNDER_WAVE, MoveId.PROTECT],
-    }),
-  ];
+/** Everything chosen before a custom trainer fight starts. Restart reuses it. */
+export interface PreparedErCustomTrainerFight {
+  plan: ErCustomTrainerLaunchPlan;
+  ghost: GhostTeamSnapshot;
+  candidateCount: number;
+}
+
+/** Apply historical challenge tuples, ignoring ids removed since capture. */
+export function applyPreparedGhostChallenges(
+  gameMode: { setChallengeValue(id: Challenges, value: number): void },
+  challenges: readonly [number, number][],
+): void {
+  for (const [id, value] of challenges) {
+    try {
+      gameMode.setChallengeValue(id as Challenges, value);
+    } catch {
+      // Old/removed challenge ids in historical snapshots are ignored.
+    }
+  }
+}
+
+/** Clamp untrusted snapshot IV data to the legal six-value range. */
+function ghostIvs(member: GhostMember): number[] {
+  if (!Array.isArray(member.ivs) || member.ivs.length !== 6) {
+    return new Array(6).fill(0);
+  }
+  return member.ivs.map(iv => Math.max(0, Math.min(31, Math.floor(iv) || 0)));
+}
+
+/** Convert one stored ghost member into the dev starter handoff shape. */
+function ghostMemberStarter(member: GhostMember): Starter | null {
+  const species = getPokemonSpecies(member.speciesId);
+  if (!species) {
+    return null;
+  }
+  const formIndex =
+    Number.isInteger(member.formIndex) && member.formIndex >= 0 && member.formIndex < (species.forms?.length ?? 0)
+      ? member.formIndex
+      : 0;
+  const moves = Array.isArray(member.moves)
+    ? member.moves.filter(id => Number.isInteger(id) && id > 0).slice(0, 4)
+    : [];
+  const starter: Starter = {
+    speciesId: member.speciesId as SpeciesId,
+    shiny: !!member.shiny,
+    variant: (Number.isInteger(member.variant) ? Math.max(0, Math.min(2, member.variant)) : 0) as Variant,
+    formIndex,
+    female: member.gender === Gender.FEMALE,
+    abilityIndex: Number.isInteger(member.abilityIndex) ? Math.max(0, member.abilityIndex) : 0,
+    passive: !!member.passive,
+    nature: member.nature as Nature,
+    moveset: moves.length > 0 ? (moves as StarterMoveset) : undefined,
+    pokerus: false,
+    ivs: ghostIvs(member),
+  };
+  if (starter.shiny && member.erShinyLab) {
+    starter.erShinyLab = normalizeErShinyLabSavedLook(member.erShinyLab);
+    starter.erShinyLabName = sanitizeErShinyLabPresetName(member.erShinyLabName) || undefined;
+  }
+  return starter;
+}
+
+/** Valid source members, capped at the normal six-mon player party. */
+function usableGhostMembers(ghost: GhostTeamSnapshot): GhostMember[] {
+  return ghost.party.filter(member => !!getPokemonSpecies(member.speciesId)).slice(0, 6);
 }
 
 /**
@@ -299,22 +354,33 @@ function customTrainerTestParty(): Starter[] {
  */
 export function buildErCustomTrainerDevScenario(
   trainer: ErCustomTrainerResolved,
+  prepared: PreparedErCustomTrainerFight,
 ): { scenario: DevScenario } | { error: string } {
-  const mode = getGameMode(GameModes.CLASSIC);
-  const plan = planErCustomTrainerLaunch(trainer, w => mode.isFixedBattle(w));
-  if (!plan.ok) {
-    return { error: plan.reason };
+  const { difficulty, wave } = prepared.plan;
+  const members = usableGhostMembers(prepared.ghost);
+  if (members.length === 0) {
+    return { error: `ghost run ${prepared.ghost.id} has no resolvable party members` };
   }
-  const { difficulty, wave } = plan.plan;
+  const sourceTopLevel = Math.max(1, ...members.map(member => Math.max(1, Math.floor(member.level) || 1)));
+  const challenges = (prepared.ghost.challenges ?? []).filter(
+    tuple => Array.isArray(tuple) && Number.isInteger(tuple[0]) && Number.isFinite(tuple[1]) && tuple[1] !== 0,
+  );
+  const gameMode =
+    prepared.ghost.mode === "challenge" || challenges.length > 0 ? GameModes.CHALLENGE : GameModes.CLASSIC;
+  const challengeText =
+    challenges.length > 0 ? `${challenges.length} stored challenge setting(s)` : "no stored challenges";
   const scenario: DevScenario = {
     label: `Custom: ${trainer.name}`,
     description:
       `CUSTOM TRAINER #${trainer.id} "${trainer.name}"\n`
-      + `Forced spawn on wave ${wave} (difficulty ${difficulty}).\n`
+      + `Random wave ${wave} (difficulty ${difficulty}); player team from ${prepared.ghost.trainerName}\n`
+      + `(run ended at wave ${prepared.ghost.waveReached}, ${members.length} mons, ${challengeText}, `
+      + `${prepared.candidateCount} eligible ghost(s)).\n`
       + "DO: fight it. EXPECT the authored party, sprite + gender, aura, battle\n"
       + "music, intro / victory / defeat lines, weighted slots + slot-fill, RLA /\n"
       + "RLNA move rolls, shiny-lab looks and Insanity ability/innate overrides,\n"
-      + "exactly as a real run fields it.",
+      + "exactly as a real run fields it. Reset repeats this exact wave and team.",
+    gameMode,
     setup: () => {
       resetDevOverrides();
       // Arm the one-shot dev force + pin a difficulty/wave the trainer allows.
@@ -322,9 +388,29 @@ export function buildErCustomTrainerDevScenario(
       setErDifficulty(difficulty);
       setOverrides({
         STARTING_WAVE_OVERRIDE: wave,
-        STARTING_LEVEL_OVERRIDE: 60,
+        // Build safely at the snapshot's top level, then on turn init re-level
+        // against the installed custom trainer while preserving relative gaps.
+        STARTING_LEVEL_OVERRIDE: sourceTopLevel,
+        // A random starting wave can legally roll an ME. The custom trainer
+        // installer intentionally never hijacks MEs, so disable that roll for
+        // this prepared fight or Restart can become an unrelated event.
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 0,
       });
-      return customTrainerTestParty();
+      return members.map(ghostMemberStarter).filter((starter): starter is Starter => starter !== null);
+    },
+    postLaunch: () => {
+      applyPreparedGhostChallenges(globalScene.gameMode, challenges);
+    },
+    onBattleStart: () => {
+      const battle = globalScene.currentBattle;
+      const targetTopLevel = Math.max(1, ...(battle?.enemyLevels ?? [battle?.getLevelForWave?.() ?? sourceTopLevel]));
+      globalScene.getPlayerParty().forEach((mon, index) => {
+        const sourceLevel = Math.max(1, Math.floor(members[index]?.level ?? sourceTopLevel) || 1);
+        mon.level = Math.max(1, targetTopLevel - (sourceTopLevel - sourceLevel));
+        mon.calculateStats();
+        mon.hp = mon.getMaxHp();
+        mon.updateInfo();
+      });
     },
   };
   return { scenario };

@@ -691,20 +691,25 @@ drops into the configured battle with a context banner pinned top-left.
 
 #### How staff test custom trainers
 Title → **🛠 Dev Scenarios** → **👤 Custom Trainers** (top of the list, under the
-Scenario Builder) → pick any staff-authored trainer → drop straight into a forced
-battle against it with the FULL resolved feature set (sprite + gender, aura, battle
-music, intro/victory/defeat lines, weighted-slot + slot-fill rolls, RLA/RLNA moves,
-shiny-lab looks, BST bypass) - exactly as a real run fields it. The full loop:
+Scenario Builder) → pick any staff-authored trainer → **Fight with random ghost
+team** → drop straight into a forced battle against it with the FULL resolved
+feature set (sprite + gender, aura, battle music, intro/victory/defeat lines,
+weighted-slot + slot-fill rolls, RLA/RLNA moves, shiny-lab looks, per-mon Insanity
+ability overrides, BST bypass) - exactly as a real run fields it. The full loop:
 1. Author + **save** the trainer in the balancing editor's Custom Trainers tab -
    that commits the entry into `er-custom-trainers.json`.
 2. A **staging deploy** bakes the updated JSON into the game bundle.
-3. In-game **Dev Scenarios → Custom Trainers → pick** to fight it. The picker
-   force-adjusts the run difficulty + starting wave so the trainer is eligible
-   (skipping boss `%10` + fixed-battle waves the install seam rejects) and the dev
-   force bypasses the challenge-exclusivity gate; a trainer whose whole floor range
-   is boss/fixed waves is reported with a readable message, never a silent wild
-   battle. The force is a one-shot (clears on install), so the rest of the run is
-   normal. Reuses the round-7 dev force seam (`setErCustomTrainerDevForce`).
+3. In-game **Dev Scenarios → Custom Trainers → pick → Fight with random ghost
+   team**. The picker randomly chooses an eligible wave inside the authored range
+   (skipping boss `%10` + fixed-battle waves), then samples a real ghost roster that
+   reached that wave within the normal +40 fairness window. It restores stored
+   challenge settings when the snapshot carries them, disables the random Mystery
+   Encounter roll, and re-levels the player roster against the installed trainer
+   while preserving relative level gaps. Loading has Cancel; failures have Retry +
+   Back. **Reset** repeats the exact prepared wave/ghost/challenges without rerolling.
+   The one-shot dev force still bypasses challenge exclusivity and clears on install.
+   A trainer with no eligible wave or ghost is reported, never replaced by a silent
+   wild battle or the old static three-mon level-60 party.
 4. **Production** only ships the trainer on the MANUAL prod patch - the dev tools
    (incl. this picker) are dead in prod builds.
 

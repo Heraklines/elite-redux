@@ -623,7 +623,11 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
 
     // Force-adjusts difficulty to the trainer's first, and picks wave 31: minWave
     // 30 is a boss wave (%10) so it is skipped; 31 is in range, not boss, not fixed.
-    const hell = planErCustomTrainerLaunch(byKey.get("HELLGUY")!, () => false);
+    const hell = planErCustomTrainerLaunch(
+      byKey.get("HELLGUY")!,
+      () => false,
+      () => 0,
+    );
     expect(hell.ok).toBe(true);
     if (hell.ok) {
       expect(hell.plan.difficulty).toBe("hell");
@@ -639,7 +643,11 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     }
 
     // Injected fixed-battle predicate is honored: wave 31 marked fixed -> slides to 32.
-    const hellFixed = planErCustomTrainerLaunch(byKey.get("HELLGUY")!, w => w === 30 || w === 31);
+    const hellFixed = planErCustomTrainerLaunch(
+      byKey.get("HELLGUY")!,
+      w => w === 30 || w === 31,
+      () => 0,
+    );
     expect(hellFixed.ok).toBe(true);
     if (hellFixed.ok) {
       expect(hellFixed.plan.wave).toBe(32);

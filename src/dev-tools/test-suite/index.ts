@@ -29,10 +29,10 @@
  *   a. Author the trainer in the team-balancing editor and SAVE — that commits the
  *      entry into er-custom-trainers.json.
  *   b. A STAGING deploy bakes the updated JSON into the game bundle.
- *   c. In-game: Title -> Dev Scenarios -> Custom Trainers -> pick the trainer to
- *      fight it. The picker force-adjusts the run difficulty + wave so the trainer
- *      is eligible; a trainer whose floor range is all boss/fixed waves is reported
- *      with a readable message instead of a silent wild battle.
+ *   c. In-game: Title -> Dev Scenarios -> Custom Trainers -> pick the trainer ->
+ *      Fight with random ghost team. The picker randomizes an eligible wave, loads
+ *      a real wave-compatible ghost roster, and restores stored challenges. Empty
+ *      pools/ranges surface Retry/Back instead of a silent unrelated battle.
  *   d. Production only ships the trainer on the MANUAL prod patch (the dev tools,
  *      incl. this picker, are dead in prod builds).
  *
@@ -50,6 +50,7 @@ import {
   setPendingDevShop,
   setPendingDevStarters,
 } from "#app/dev-tools/registry";
+import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { formatCoopControlPlane } from "#data/elite-redux/coop/coop-diagnostics";
 import { DEVLOG_REPLAY_TRACE_MARKER } from "#data/elite-redux/er-bug-report";
@@ -58,13 +59,19 @@ import {
   getErCustomTrainers,
   setErCustomTrainerDevForce,
 } from "#data/elite-redux/er-custom-trainers";
+import { sampleGhostSnapshots } from "#data/elite-redux/er-ghost-teams";
 import { getReplayTrace } from "#data/elite-redux/replay-recorder";
 import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
 import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { openScenarioBuilder } from "./builder";
-import { openDevMenuOverlay, summarizeErCustomTrainer } from "./custom-trainer-picker";
+import {
+  openDevMenuOverlay,
+  pickErCustomTrainerGhost,
+  planErCustomTrainerLaunch,
+  summarizeErCustomTrainer,
+} from "./custom-trainer-picker";
 import {
   buildErCustomTrainerDevScenario,
   buildErCustomTrainerTeamScenario,
@@ -599,7 +606,8 @@ function launchScenario(ctx: DevMenuCtx, scenario: DevScenario): boolean {
     }
     activeScenarioLabel = scenario.label;
     showScenarioBanner(scenario);
-    ctx.startRunWithMode(GameModes.CLASSIC);
+    ctx.startRunWithMode(scenario.gameMode ?? GameModes.CLASSIC);
+    scenario.postLaunch?.();
   } catch (err) {
     // biome-ignore lint/suspicious/noConsole: dev-only diagnostic
     console.error("[dev-tools] scenario launch failed:", err);
@@ -775,10 +783,14 @@ function openCustomTrainerList(ctx: DevMenuCtx): void {
  * fast way into a fight without hand-picking starters).
  */
 function openCustomTrainerActions(ctx: DevMenuCtx, trainer: ErCustomTrainerResolved): void {
+  const range = trainer.endless ? `${trainer.minWave}+` : `${trainer.minWave}-${trainer.maxWave}`;
   const options = [
     {
-      label: `⚔ Fight ${trainer.name}`,
-      handler: () => launchCustomTrainer(ctx, trainer),
+      label: "⚔ Fight with random ghost team",
+      handler: () => {
+        openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => launchCustomTrainer(ctx, trainer));
+        return true;
+      },
     },
     {
       label: "👥 Use as my team",
@@ -795,36 +807,124 @@ function openCustomTrainerActions(ctx: DevMenuCtx, trainer: ErCustomTrainerResol
       },
     },
   ];
-  globalScene.ui.showText(`${trainer.name} #${trainer.id}`, null, () =>
-    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options }),
+  const heading = `${trainer.name} #${trainer.id} | waves ${range} | ${trainer.difficulties.join(", ")}`;
+  globalScene.ui.showText(heading, null, () => globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options }));
+}
+
+/** Only the newest in-flight ghost lookup may change the menu or launch a run. */
+let customTrainerLoadToken = 0;
+const CUSTOM_TRAINER_GHOST_TIMEOUT_MS = 12_000;
+
+async function sampleCustomTrainerGhosts(
+  difficulty: Parameters<typeof sampleGhostSnapshots>[0],
+  wave: number,
+): Promise<Awaited<ReturnType<typeof sampleGhostSnapshots>>> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      sampleGhostSnapshots(difficulty, 20, wave),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error("ghost lookup timed out")), CUSTOM_TRAINER_GHOST_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+/** Loading menu with a real Cancel path; avoids a modeless wait-screen softlock. */
+function showCustomTrainerLoading(
+  ctx: DevMenuCtx,
+  trainer: ErCustomTrainerResolved,
+  wave: number,
+  token: number,
+): void {
+  globalScene.ui.showText(`Finding a real ghost team for wave ${wave}...`, null, () =>
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
+      options: [
+        {
+          label: "Cancel",
+          handler: () => {
+            if (customTrainerLoadToken === token) {
+              customTrainerLoadToken++;
+            }
+            openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerActions(ctx, trainer));
+            return true;
+          },
+        },
+      ],
+    }),
+  );
+}
+
+/** Recoverable lookup/build error with both retry and backward navigation. */
+function showCustomTrainerLaunchError(ctx: DevMenuCtx, trainer: ErCustomTrainerResolved, message: string): void {
+  globalScene.ui.showText(`Can't launch ${trainer.name}: ${message}`, null, () =>
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
+      options: [
+        {
+          label: "Retry (reroll wave + team)",
+          handler: () => {
+            openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => launchCustomTrainer(ctx, trainer));
+            return true;
+          },
+        },
+        {
+          label: "Back",
+          handler: () => {
+            openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerActions(ctx, trainer));
+            return true;
+          },
+        },
+      ],
+    }),
   );
 }
 
 /**
- * Launch a forced battle against `trainer`. When the trainer's own gates leave NO
- * eligible wave (surfaced by `buildErCustomTrainerDevScenario`), show a readable
- * message + a Back entry instead of dropping into a silent wild battle.
+ * Prepare and launch a forced battle against `trainer`: random eligible wave,
+ * real wave-compatible ghost party, and stored challenge settings when present.
  */
-function launchCustomTrainer(ctx: DevMenuCtx, trainer: ErCustomTrainerResolved): boolean {
-  const built = buildErCustomTrainerDevScenario(trainer);
-  if ("error" in built) {
-    globalScene.ui.showText(`Can't launch ${trainer.name}: ${built.error}`, null, () =>
-      globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
-        options: [
-          {
-            label: "Back",
-            handler: () => {
-              openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerList(ctx));
-              return true;
-            },
-          },
-        ],
-      }),
-    );
-    return true;
+function launchCustomTrainer(ctx: DevMenuCtx, trainer: ErCustomTrainerResolved): void {
+  const mode = getGameMode(GameModes.CLASSIC);
+  const plan = planErCustomTrainerLaunch(trainer, wave => mode.isFixedBattle(wave));
+  if (!plan.ok) {
+    showCustomTrainerLaunchError(ctx, trainer, plan.reason);
+    return;
   }
-  activeShareCode = null; // custom-trainer launch: no scenario share code
-  return launchScenario(ctx, built.scenario);
+  const token = ++customTrainerLoadToken;
+  showCustomTrainerLoading(ctx, trainer, plan.plan.wave, token);
+  sampleCustomTrainerGhosts(plan.plan.difficulty, plan.plan.wave)
+    .then(snapshots => {
+      if (customTrainerLoadToken !== token) {
+        return;
+      }
+      const picked = pickErCustomTrainerGhost(snapshots, plan.plan.wave, plan.plan.difficulty);
+      if (!picked) {
+        throw new Error(`no legal ghost run reached wave ${plan.plan.wave} within the +40 fairness window`);
+      }
+      const built = buildErCustomTrainerDevScenario(trainer, {
+        plan: plan.plan,
+        ghost: picked.ghost,
+        candidateCount: picked.candidateCount,
+      });
+      if ("error" in built) {
+        throw new Error(built.error);
+      }
+      activeShareCode = null;
+      if (!launchScenario(ctx, built.scenario)) {
+        throw new Error("the prepared run failed to start; retry to rebuild it");
+      }
+    })
+    .catch(error => {
+      if (customTrainerLoadToken !== token) {
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => showCustomTrainerLaunchError(ctx, trainer, message));
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -853,6 +953,8 @@ registerDevMenu(ctx => {
   scenarioBanner = null;
   activeScenarioLabel = null;
   activeShareCode = null;
+  // Invalidate any ghost lookup whose loading menu was abandoned by a title reset.
+  customTrainerLoadToken++;
   // Clear any armed custom-trainer dev force so a picked-but-not-fought trainer (or
   // one whose battle is over) never leaks into a NORMAL run started from the title.
   // A fought forced trainer already self-clears on install; this covers backing out.

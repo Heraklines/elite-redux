@@ -6,6 +6,8 @@
  */
 
 import type { ErCustomTrainerResolved } from "#data/elite-redux/er-custom-trainers";
+import { ER_GHOST_WAVE_WINDOW } from "#data/elite-redux/er-ghost-constants";
+import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 
 /** How many species names a picker row lists before eliding with a trailing dot. */
@@ -78,6 +80,13 @@ export type ErCustomTrainerLaunchResult = { ok: true; plan: ErCustomTrainerLaunc
 /** Waves past `minWave` scanned for an endless trainer's launch wave (no maxWave). */
 const ENDLESS_SCAN_SPAN = 40;
 
+/** Clamp an injectable random roll to a valid array index. */
+function randomIndex(length: number, random: () => number): number {
+  const roll = random();
+  const normalized = Number.isFinite(roll) ? Math.max(0, Math.min(0.9999999999999999, roll)) : 0;
+  return Math.floor(normalized * length);
+}
+
 /**
  * Plan a forced launch for one custom trainer: pick a run DIFFICULTY the trainer
  * allows (force-adjust) and a starting WAVE inside its floor range that the
@@ -96,6 +105,7 @@ const ENDLESS_SCAN_SPAN = 40;
 export function planErCustomTrainerLaunch(
   trainer: ErCustomTrainerResolved,
   isFixedBattle: (wave: number) => boolean,
+  random: () => number = Math.random,
 ): ErCustomTrainerLaunchResult {
   // Resolved difficulties are validated against the ErDifficulty value set at
   // load time (VALID_DIFFICULTIES in er-custom-trainers), so this narrowing is safe.
@@ -105,11 +115,57 @@ export function planErCustomTrainerLaunch(
   }
   const min = Math.max(1, trainer.minWave);
   const max = trainer.endless ? min + ENDLESS_SCAN_SPAN : Math.max(min, trainer.maxWave);
+  const eligibleWaves: number[] = [];
   for (let wave = min; wave <= max; wave++) {
     if (wave % 10 === 0 || isFixedBattle(wave)) {
       continue;
     }
-    return { ok: true, plan: { difficulty, wave } };
+    eligibleWaves.push(wave);
+  }
+  if (eligibleWaves.length > 0) {
+    return {
+      ok: true,
+      plan: { difficulty, wave: eligibleWaves[randomIndex(eligibleWaves.length, random)] },
+    };
   }
   return { ok: false, reason: `no non-boss / non-fixed wave in range ${min}-${max}` };
+}
+
+/** A ghost snapshot selected for the player side of a prepared custom fight. */
+export interface ErCustomTrainerGhostPick {
+  ghost: GhostTeamSnapshot;
+  /** Number of wave-compatible snapshots in the final random pool. */
+  candidateCount: number;
+}
+
+/**
+ * Pick a real run snapshot suitable for testing a custom trainer on `wave`.
+ *
+ * This mirrors the normal ghost fairness window: the source run must have
+ * reached the target wave, but cannot be more than 40 waves deeper. Prefer the
+ * custom trainer's selected difficulty when that pool is populated; sparse
+ * offline pools may fall back to another difficulty instead of a fake trio.
+ */
+export function pickErCustomTrainerGhost(
+  snapshots: readonly GhostTeamSnapshot[],
+  wave: number,
+  difficulty: ErDifficulty,
+  random: () => number = Math.random,
+): ErCustomTrainerGhostPick | null {
+  const compatible = snapshots.filter(
+    snapshot =>
+      Array.isArray(snapshot.party)
+      && snapshot.party.length > 0
+      && snapshot.waveReached >= wave
+      && snapshot.waveReached <= wave + ER_GHOST_WAVE_WINDOW,
+  );
+  const matchingDifficulty = compatible.filter(snapshot => snapshot.difficulty === difficulty);
+  const pool = matchingDifficulty.length > 0 ? matchingDifficulty : compatible;
+  if (pool.length === 0) {
+    return null;
+  }
+  return {
+    ghost: pool[randomIndex(pool.length, random)],
+    candidateCount: pool.length,
+  };
 }

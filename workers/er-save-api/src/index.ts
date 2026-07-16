@@ -1199,11 +1199,13 @@ type RunSampleRow = {
   username: string | null;
   outcome: string | null;
   difficulty: string | null;
+  mode: string | null;
   wave: number | null;
   created_at: number;
   player_team: string;
   opponent_name: string | null;
   opponent_team: string | null;
+  challenges: string | null;
   presentation?: string | null;
 };
 
@@ -1251,7 +1253,7 @@ async function handleRunSample(
   const MAX_GHOST_SAMPLE_WAVE = 200;
   const NON_GHOST_MODES = "'endless', 'spliced_endless', 'daily'";
   const cols =
-    "id, username, outcome, difficulty, wave, created_at, player_team, opponent_name, opponent_team, presentation";
+    "id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation";
   const maxRow = await env.DB.prepare("SELECT MAX(rowid) AS m FROM runs").first<{ m: number | null }>();
   const maxRowId = maxRow?.m ?? 0;
   const seen = new Set<string>();
@@ -1296,12 +1298,14 @@ async function handleRunSample(
           id: row.id,
           trainerName: row.username ?? "Trainer",
           difficulty: row.difficulty ?? difficulty,
+          mode: row.mode ?? undefined,
           waveReached: row.wave ?? 0,
           isVictory: row.outcome === "victory",
           timestamp: row.created_at,
           party: JSON.parse(row.player_team),
           opponentName: row.opponent_name ?? undefined,
           opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
+          challenges: row.challenges ? JSON.parse(row.challenges) : undefined,
           // ER Ghost Trainer Editor: pass the authored presentation through to the
           // encountering client (which sanitises it before applying). Bad JSON -> omit.
           presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
