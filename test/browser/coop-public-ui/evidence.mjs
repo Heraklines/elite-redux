@@ -52,6 +52,80 @@ const MIN_CHECKPOINT_PNG_BYTES = 4 * 1024;
 const CHECKPOINT_RENDER_SETTLE_MS = 120;
 let checkpointCaptureTail = Promise.resolve();
 
+async function inspectCheckpointPixels(page, screenshot) {
+  const encoded = Buffer.from(screenshot).toString("base64");
+  return page.evaluate(async pngBase64 => {
+    const image = document.createElement("img");
+    image.src = `data:image/png;base64,${pngBase64}`;
+    await image.decode();
+    const width = 180;
+    const height = 112;
+    const sample = document.createElement("canvas");
+    sample.width = width;
+    sample.height = height;
+    const context = sample.getContext("2d", { willReadFrequently: true });
+    if (context == null) {
+      throw new Error("checkpoint PNG inspection could not create a 2D context");
+    }
+    context.drawImage(image, 0, 0, width, height);
+    const pixels = context.getImageData(0, 0, width, height).data;
+    const pixelOffset = (x, y) => (y * width + x) * 4;
+    let nearDarkPixels = 0;
+    const colorBins = new Set();
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const offset = pixelOffset(x, y);
+        const red = pixels[offset];
+        const green = pixels[offset + 1];
+        const blue = pixels[offset + 2];
+        if (Math.max(red, green, blue) < 24) {
+          nearDarkPixels++;
+        }
+        colorBins.add(`${red >> 4}:${green >> 4}:${blue >> 4}`);
+      }
+    }
+    let verticalEdgeColumns = 0;
+    for (let x = 1; x < width; x++) {
+      let strongEdges = 0;
+      for (let y = 0; y < height; y++) {
+        const offset = pixelOffset(x, y);
+        const previous = pixelOffset(x - 1, y);
+        const delta =
+          Math.abs(pixels[offset] - pixels[previous])
+          + Math.abs(pixels[offset + 1] - pixels[previous + 1])
+          + Math.abs(pixels[offset + 2] - pixels[previous + 2]);
+        if (delta > 60) {
+          strongEdges++;
+        }
+      }
+      if (strongEdges / height > 0.5) {
+        verticalEdgeColumns++;
+      }
+    }
+    return {
+      nearDarkRatio: nearDarkPixels / (width * height),
+      colorBinCount: colorBins.size,
+      verticalEdgeColumns,
+    };
+  }, encoded);
+}
+
+export function checkpointPixelIntegrityFailure(pixelIntegrity) {
+  if (pixelIntegrity.colorBinCount < 12) {
+    return "near-empty color palette";
+  }
+  if (pixelIntegrity.nearDarkRatio > 0.98) {
+    return "near-black capture";
+  }
+  if (
+    pixelIntegrity.verticalEdgeColumns > 18
+    || (pixelIntegrity.verticalEdgeColumns > 10 && pixelIntegrity.nearDarkRatio > 0.15)
+  ) {
+    return "vertical-stripe compositor corruption";
+  }
+  return null;
+}
+
 function serializeCheckpointCapture(capture) {
   const pending = checkpointCaptureTail.then(capture, capture);
   // A failed capture must release the queue so the peer can still persist its causal evidence.
@@ -752,10 +826,25 @@ export class EvidenceSink {
         () => new Promise(resolveFrames => requestAnimationFrame(() => requestAnimationFrame(resolveFrames))),
       );
       await delay(CHECKPOINT_RENDER_SETTLE_MS);
-      return page.screenshot({ path: resolve(this.dir, `${step}.png`), fullPage: true });
+      return page.screenshot({
+        path: resolve(this.dir, `${step}.png`),
+        fullPage: false,
+        captureBeyondViewport: false,
+        fromSurface: false,
+      });
     });
     if (screenshot.byteLength < MIN_CHECKPOINT_PNG_BYTES) {
       throw new Error(`${this.label}: checkpoint ${step} produced a trivial ${screenshot.byteLength}-byte PNG`);
+    }
+    const pixelIntegrity = await inspectCheckpointPixels(page, screenshot);
+    this.record("checkpoint-pixel-integrity", { name: step, ...pixelIntegrity });
+    const pixelFailure = checkpointPixelIntegrityFailure(pixelIntegrity);
+    if (pixelFailure != null) {
+      throw new Error(
+        `${this.label}: checkpoint ${step} failed pixel integrity (${pixelFailure}) `
+          + `(bins=${pixelIntegrity.colorBinCount}, dark=${pixelIntegrity.nearDarkRatio.toFixed(3)}, `
+          + `verticalEdges=${pixelIntegrity.verticalEdgeColumns})`,
+      );
     }
     const dom = await page.evaluate(() => ({
       title: document.title,

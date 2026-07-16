@@ -381,6 +381,7 @@ jobs:
           COOP_UI_HEADLESS: "0"
           COOP_UI_VIEWPORT_WIDTH: "1440"
           COOP_UI_VIEWPORT_HEIGHT: "900"
+          LIBGL_ALWAYS_SOFTWARE: "1"
           NODE_OPTIONS: --max-old-space-size=4096
         run: xvfb-run -a -s "-screen 0 1440x900x24" node test/browser/coop-public-ui/run-campaign.mjs
 

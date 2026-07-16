@@ -1341,11 +1341,9 @@ export class DuoPublicUiRig {
           "--disable-background-timer-throttling",
           "--disable-backgrounding-occluded-windows",
           "--disable-renderer-backgrounding",
-          // Xvfb has no hardware GL device on hosted runners. Headful Chromium must use its
-          // bundled software ANGLE backend or Phaser aborts before creating the game canvas.
-          "--use-gl=angle",
-          "--use-angle=swiftshader",
-          "--enable-unsafe-swiftshader",
+          // Avoid Docker's small shared-memory mount and let Xvfb use Mesa's software GL path.
+          "--disable-dev-shm-usage",
+          "--use-gl=desktop",
           `--window-size=${config.viewport.width},${config.viewport.height}`,
         ],
       });

@@ -9,6 +9,7 @@ import { resolve } from "node:path";
 import test from "node:test";
 import { selectOptionById } from "./campaign-nav.mjs";
 import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
+import { checkpointPixelIntegrityFailure } from "./evidence.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 
@@ -145,8 +146,9 @@ test("paired Chromium runs headful at an explicit player-sized viewport", async 
   assert.match(workflow, /COOP_UI_HEADLESS: "0"/u);
   assert.match(workflow, /xvfb-run -a -s "-screen 0 1440x900x24" node/u);
   assert.match(harness, /defaultViewport: config\.viewport/u);
-  assert.match(harness, /"--use-angle=swiftshader"/u);
-  assert.match(harness, /"--enable-unsafe-swiftshader"/u);
+  assert.match(workflow, /LIBGL_ALWAYS_SOFTWARE: "1"/u);
+  assert.match(harness, /"--disable-dev-shm-usage"/u);
+  assert.match(harness, /"--use-gl=desktop"/u);
   assert.match(harness, /`--window-size=\$\{config\.viewport\.width\},\$\{config\.viewport\.height\}`/u);
 });
 
@@ -158,6 +160,32 @@ test("visual checkpoints foreground WebGL and reject trivial captures", async ()
   assert.match(evidence, /dom\.canvases\.length === 0/u);
   assert.match(evidence, /serializeCheckpointCapture\(async \(\) =>/u);
   assert.match(evidence, /checkpointCaptureTail = pending\.catch\(\(\) => \{\}\)/u);
+  assert.match(evidence, /fromSurface: false/u);
+  assert.match(evidence, /verticalEdgeColumns > 18/u);
+  assert.match(evidence, /verticalEdgeColumns > 10 && pixelIntegrity\.nearDarkRatio > 0\.15/u);
+  assert.match(evidence, /checkpoint-pixel-integrity/u);
+});
+
+test("pixel integrity separates observed clean screens from headed compositor corruption", () => {
+  // Sampled from prior clean difficulty/starter/gameplay PNGs: vertical UI borders may span the
+  // viewport, but they are colorful rather than dark compositor columns.
+  for (const clean of [
+    { colorBinCount: 450, nearDarkRatio: 0, verticalEdgeColumns: 12 },
+    { colorBinCount: 562, nearDarkRatio: 0, verticalEdgeColumns: 13 },
+    { colorBinCount: 503, nearDarkRatio: 0, verticalEdgeColumns: 0 },
+    { colorBinCount: 45, nearDarkRatio: 0.79, verticalEdgeColumns: 0 },
+  ]) {
+    assert.equal(checkpointPixelIntegrityFailure(clean), null);
+  }
+
+  // Sampled from the rejected e3abdeea8 headed/Xvfb captures opened during review.
+  for (const corrupt of [
+    { colorBinCount: 112, nearDarkRatio: 0.537, verticalEdgeColumns: 13 },
+    { colorBinCount: 261, nearDarkRatio: 0.473, verticalEdgeColumns: 23 },
+    { colorBinCount: 90, nearDarkRatio: 0.244, verticalEdgeColumns: 23 },
+  ]) {
+    assert.equal(checkpointPixelIntegrityFailure(corrupt), "vertical-stripe compositor corruption");
+  }
 });
 
 test("semantic navigation ignores stale same-surface history before its boundary", async () => {
