@@ -350,6 +350,8 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
   const inMe =
     phase.startsWith("MysteryEncounter") || phase === "PostMysteryEncounterPhase" || phase === "CoopReplayMePhase";
   switch (uiMode) {
+    case "TITLE":
+      return { surfaceId: "title-menu", operationClass: "navigation", ownerModel: "local" };
     case "COMMAND":
     case "FIGHT":
     case "BALL":
@@ -405,6 +407,7 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       }
       return { surfaceId: "summary", operationClass: "info", ownerModel: "local" };
     case "OPTION_SELECT":
+    case "MENU_OPTION_SELECT":
       if (phase === "ErCrossroadsPhase") {
         return { surfaceId: "crossroads", operationClass: "navigation", ownerModel: "interaction" };
       }
@@ -414,7 +417,11 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       if (inMe) {
         return { surfaceId: "mystery-encounter:prompt", operationClass: "encounter-prompt", ownerModel: "interaction" };
       }
-      return { surfaceId: `option-select:${phase}`, operationClass: "confirm", ownerModel: "interaction" };
+      return {
+        surfaceId: `option-select:${phase}`,
+        operationClass: uiMode === "MENU_OPTION_SELECT" ? "save" : "confirm",
+        ownerModel: uiMode === "MENU_OPTION_SELECT" ? "local" : "interaction",
+      };
     case "CONFIRM":
       if (phase === "EggLapsePhase") {
         return { surfaceId: "egg:lapse", operationClass: "egg", ownerModel: "interaction" };

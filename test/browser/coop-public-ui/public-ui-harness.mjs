@@ -550,6 +550,7 @@ export class PublicUiClient {
     // player must be given time to reach TitlePhase instead of being driven through Register a
     // second time while the automatic session restore is still loading.
     this.authenticatedOnce = false;
+    this.forceVisibleLogin = false;
     this.titleNewGameKeys = [
       ...(this.label === "host-seat" ? config.keys.titleNewGame.hostSeat : config.keys.titleNewGame.guestSeat),
     ];
@@ -599,6 +600,21 @@ export class PublicUiClient {
     await this.open();
   }
 
+  async replaceWithEmptyContext() {
+    const browser = this.context.browser();
+    if (browser == null) {
+      throw new Error(`${this.label}: browser disappeared before cold-context replacement`);
+    }
+    this.evidence.record("cold-context-replace", {
+      reason: "brand-new cookie jar and local storage; visible login required",
+    });
+    await this.context.close();
+    this.context = await browser.createBrowserContext();
+    this.authenticatedOnce = true;
+    this.forceVisibleLogin = true;
+    await this.open();
+  }
+
   async loginOrReuseSession() {
     const title = this.evidence.find(TITLE_PHASE, this.pageCursor);
     if (title) {
@@ -617,7 +633,7 @@ export class PublicUiClient {
       return autoTitle;
     }
 
-    if (this.authenticatedOnce) {
+    if (this.authenticatedOnce && !this.forceVisibleLogin) {
       const restoreDeadline = Date.now() + Math.min(this.config.bootTimeoutMs, 15_000);
       while (Date.now() < restoreDeadline) {
         const restoredTitle = this.evidence.find(TITLE_PHASE, this.pageCursor);
@@ -653,6 +669,7 @@ export class PublicUiClient {
     }
     const entered = await this.completePostAuthentication();
     this.authenticatedOnce = true;
+    this.forceVisibleLogin = false;
     if (TITLE_PHASE.test(entered.text ?? "")) {
       await delay(this.config.settleDelayMs);
       return entered;
@@ -911,7 +928,7 @@ export class PublicUiClient {
   }
 
   async checkpoint(name) {
-    await this.evidence.checkpoint(this.page, this.context, `page-${this.pageGeneration}-${name}`);
+    return this.evidence.checkpoint(this.page, this.context, `page-${this.pageGeneration}-${name}`);
   }
 
   async enterCoopLobby() {
@@ -2082,6 +2099,12 @@ export class DuoPublicUiRig {
     await Promise.all(Object.values(this.clients).map(client => client.reopen()));
     await this.loginBoth();
     await this.pair(requesterSeat);
+  }
+
+  async coldReplaceContextsAndLogin() {
+    await this.stopChromeTrace();
+    await Promise.all(Object.values(this.clients).map(client => client.replaceWithEmptyContext()));
+    await this.loginBoth();
   }
 
   async close() {

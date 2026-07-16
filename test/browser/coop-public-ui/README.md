@@ -25,6 +25,7 @@ the same address, digest, and continuation surface. Every battle turn also corre
 | `reverse-resume` | Same, but reverse which player sends the lobby request after reopening | Same as `fresh-wave2`; this is the invitation-direction regression |
 | `faint-replacement` | Pair, Resume, submit battle commands, select a legal replacement through the public picker, observe summon/continued battle | A shared save at a deterministic low-HP boundary |
 | `commander-skip` | Pair, New Run, publicly confirm visible Dondozo/Tatsugiri teams, drive only Dondozo's command UI, prove the hidden Commander skip traverses reciprocal `cmd:<wave>:<turn>`, retain rewards, and reach the next shared Commander command boundary | Dedicated CI bundle only; runs both Commander ownership parities on isolated fresh accounts |
+| `save-mutations` | Create an exact co-op checkpoint, close/reopen both pages, delete one seat's slot through Load Game and overwrite the other through New Game, require exact CAS-delete ACK + tombstone before replacement persistence, then replace both browser contexts and visibly log in again | Ephemeral accounts in in-memory instances of the real save and P33 Worker modules; never staging or production |
 
 `commander-skip` has one explicit setup-fidelity boundary. Fresh isolated accounts cannot reliably select
 account-locked Dondozo/Tatsugiri, so only the dedicated public-browser build
@@ -49,12 +50,22 @@ that timeline when its resource cost is specifically needed; it is not part of a
 reached the wave-2 command surface. If that save was not actually persisted, the next keyboard action takes
 the wrong visible route and the resume journey fails.
 
+`save-mutations` is intentionally stronger than a mocked API journey: the normal application talks to the
+actual Worker modules over HTTP, backed by per-job in-memory D1-compatible SQLite databases. It fails unless
+the public save UI produces `/savedata/session/coop-cas-delete`, receives a successful response, observes the
+exact tombstone status body, removes the local session bytes, and (for overwrite) persists the replacement
+only after that delete ACK. A brand-new `BrowserContext` then repeats visible login and proves deletion is
+absent while the replacement remains loadable. The journey does not manufacture a CAS conflict: a safe
+real-Worker refusal case needs a separate public stale-tab journey, so failure injection is not mislabeled as
+production UI evidence.
+
 ## Run on an isolated machine
 
 Use the opt-in **Co-op Public UI Journey** GitHub workflow for execution. Its primary runner generates a
-unique masked credential pair, then creates both staging accounts through the visible registration form and
-performs every game/lobby action through the visible application. It uploads evidence even when the journey fails. Do not use real
-player accounts; journeys intentionally create or advance isolated staging-API saves. `COOP_UI_API_URL` (or
+unique masked credential pair, then creates both accounts through the visible registration form and
+performs every game/lobby action through the visible application. `save-mutations` uses only its ephemeral
+local Worker databases; the other journeys use isolated staging accounts. It uploads evidence even when the journey fails. Do not use real
+player accounts; ordinary journeys intentionally create or advance isolated staging-API saves. `COOP_UI_API_URL` (or
 the repository's normal `STAGING_SERVER_URL` fallback) and
 `COOP_UI_SIGNAL_URL` are maintainer-owned repository variables; workflow inputs cannot redirect fixture
 creation or credential entry. The optional

@@ -50,7 +50,7 @@ const CAPTURED_API_HOST = /(?:er-save-api|er-coop-api)/u;
 const MAX_BODY_BYTES = 256 * 1024;
 
 function isCapturedApiHost(hostname) {
-  return CAPTURED_API_HOST.test(hostname);
+  return CAPTURED_API_HOST.test(hostname) || hostname === "127.0.0.1" || hostname === "localhost";
 }
 
 // NEVER capture request bodies for the auth routes: /account/register and /account/login carry
@@ -64,6 +64,36 @@ function truncateBody(body) {
     return null;
   }
   return body.length > MAX_BODY_BYTES ? `${body.slice(0, MAX_BODY_BYTES)}…[truncated ${body.length} bytes]` : body;
+}
+
+/** Sanitize and validate the public exact-delete commitment carried in the request URL. */
+export function exactCoopDeleteRequestView(value) {
+  const url = value instanceof URL ? value : parsedUrl(value);
+  if (url?.pathname !== "/savedata/session/coop-cas-delete") {
+    return null;
+  }
+  const rawSlot = url.searchParams.get("slot");
+  const slot = Number(rawSlot);
+  const runId = url.searchParams.get("coopCasRunId");
+  const rawCheckpointRevision = url.searchParams.get("coopCasCheckpointRevision");
+  const checkpointRevision = Number(rawCheckpointRevision);
+  const digest = url.searchParams.get("coopCasDigest");
+  if (
+    rawSlot == null
+    || !Number.isInteger(slot)
+    || slot < 0
+    || slot > 4
+    || runId == null
+    || !/^[A-Za-z0-9_-]{16,128}$/u.test(runId)
+    || rawCheckpointRevision == null
+    || !Number.isSafeInteger(checkpointRevision)
+    || checkpointRevision < 0
+    || digest == null
+    || !/^[0-9a-f]{64}$/u.test(digest)
+  ) {
+    return null;
+  }
+  return { slot, runId, checkpointRevision, digest };
 }
 
 function isExpectedMissingSystemSaveError(type, text, source, registerMode) {
@@ -104,6 +134,42 @@ function lobbyView(body) {
   const request = body.request && typeof body.request.name === "string" ? body.request.name : null;
   const role = body.pairing?.role === "host" || body.pairing?.role === "guest" ? body.pairing.role : null;
   return { players, request, role };
+}
+
+/** Strict public projection of the Worker's account-scoped co-op lineage proof. */
+export function coopRunStatusView(body) {
+  if (
+    !body
+    || typeof body !== "object"
+    || typeof body.runId !== "string"
+    || !/^[A-Za-z0-9_-]{16,128}$/u.test(body.runId)
+  ) {
+    return null;
+  }
+  if (body.state === "missing") {
+    return Object.keys(body).every(key => ["state", "runId"].includes(key))
+      ? { state: "missing", runId: body.runId }
+      : null;
+  }
+  if (
+    !["active", "tombstoned"].includes(body.state)
+    || !Number.isSafeInteger(body.slot)
+    || body.slot < 0
+    || body.slot > 4
+    || !Number.isSafeInteger(body.checkpointRevision)
+    || body.checkpointRevision < 0
+    || typeof body.digest !== "string"
+    || !/^[0-9a-f]{64}$/u.test(body.digest)
+  ) {
+    return null;
+  }
+  return {
+    state: body.state,
+    runId: body.runId,
+    slot: body.slot,
+    checkpointRevision: body.checkpointRevision,
+    digest: body.digest,
+  };
 }
 
 function continuationSurfaceView(text) {
@@ -448,7 +514,7 @@ export class EvidenceSink {
     this.expectedMissingSystemSaveErrors = expectedMissingSystemSaveErrors;
     this.events = [];
     this.failures = [];
-    this.networkState = { account: null, lobby: null, apiFailure: null };
+    this.networkState = { account: null, lobby: null, coopRunStatus: null, apiFailure: null };
     this.writeTail = Promise.resolve();
   }
 
@@ -502,6 +568,18 @@ export class EvidenceSink {
 
   findBinding(from = 0) {
     return this.events.slice(from).find(event => event.kind === "browser-binding");
+  }
+
+  findResponse(pathname, { from = 0, status = null, method = null } = {}) {
+    return this.events
+      .slice(from)
+      .find(
+        event =>
+          event.kind === "response"
+          && event.url.endsWith(pathname)
+          && (status == null || event.status === status)
+          && (method == null || event.method === method),
+      );
   }
 
   findRenderProfile(moveAnimations, from = 0) {
@@ -627,6 +705,15 @@ export class EvidenceSink {
       ) {
         return;
       }
+      if (url.pathname === "/savedata/session/coop-cas-delete") {
+        const commitment = exactCoopDeleteRequestView(url);
+        if (commitment == null) {
+          const invalid = this.record("coop-cas-delete-request-invalid", { url: safeUrl(request.url()) });
+          this.failures.push(invalid);
+        } else {
+          this.record("coop-cas-delete-request", commitment);
+        }
+      }
       const body = request.postData();
       if (body == null) {
         return;
@@ -693,6 +780,7 @@ export class EvidenceSink {
     }
     if (
       url.pathname !== "/account/info"
+      && url.pathname !== "/savedata/session/coop-run-status"
       && !url.pathname.startsWith("/coop/lobby")
       && !url.pathname.startsWith("/coop/v3/lobby")
     ) {
@@ -717,6 +805,14 @@ export class EvidenceSink {
       this.networkState.account = accountView(body);
       if (this.networkState.account) {
         this.record("account-view", this.networkState.account);
+      }
+      return;
+    }
+
+    if (url.pathname === "/savedata/session/coop-run-status") {
+      this.networkState.coopRunStatus = coopRunStatusView(body);
+      if (this.networkState.coopRunStatus) {
+        this.record("coop-run-status-view", this.networkState.coopRunStatus);
       }
       return;
     }
@@ -763,6 +859,7 @@ export class EvidenceSink {
       writeFile(resolve(this.dir, `${step}.cookies.json`), `${JSON.stringify(cookies, null, 2)}\n`),
     ]);
     this.record("checkpoint", { name: step });
+    return dom;
   }
 
   assertClean() {
