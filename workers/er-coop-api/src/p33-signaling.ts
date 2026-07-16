@@ -100,6 +100,12 @@ interface P33TicketCredential {
 const DEFAULT_PRESENCE_WINDOW_MS = 30_000;
 const DEFAULT_REJOIN_GRACE_MS = 2 * 60_000;
 const LOBBY_PRESENCE_MS = 12_000;
+// A presence is deliberately short-lived so crashed browser tabs disappear quickly. A join
+// request is a human decision and must not inherit that heartbeat timeout: under CPU contention
+// the accept panel can spend most of twelve seconds polling, repainting, and releasing input.
+// The requester still has to remain present below, so this longer window does not keep a dead
+// player actionable for longer than LOBBY_PRESENCE_MS.
+const LOBBY_REQUEST_MS = 60_000;
 /**
  * Lobby room namespace (P33 audit #920). A room-less client (production) is placed in this
  * single shared room, so filtering by it returns exactly today's behavior. CI runs pass the
@@ -555,7 +561,7 @@ async function handleLobbyList(request: Request, env: P33SignalingEnv, url: URL,
     .bind(self, now - LOBBY_PRESENCE_MS, room)
     .all<{ presence_id: string; account_id: string; display_name: string; seen_at: number }>();
   let incoming: { id: string; accountId: string; name: string } | null = null;
-  if (row.req_from != null && row.req_at != null && now - row.req_at <= LOBBY_PRESENCE_MS) {
+  if (row.req_from != null && row.req_at != null && now - row.req_at <= LOBBY_REQUEST_MS) {
     const requester = await env.DB.prepare(
       `SELECT presence_id, account_id, display_name FROM coop_lobby_p33
        WHERE presence_id = ? AND paired_code IS NULL AND seen_at >= ?`,

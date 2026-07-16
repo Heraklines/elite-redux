@@ -123,7 +123,10 @@ test("the companion solo lane publicly selects a readiness-proven empty save slo
 });
 
 test("parallel lobby pairing reselects the exact visible username before every request", async () => {
-  const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");
+  const [harness, titlePhase] = await Promise.all([
+    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+    readFile(resolve(root, "src/phases/title-phase.ts"), "utf8"),
+  ]);
   assert.match(harness, /const targetId = semanticOptionId\(`Ask \$\{username\} to play`\)/u);
   assert.match(
     harness,
@@ -162,17 +165,30 @@ test("parallel lobby pairing reselects the exact visible username before every r
   assert.match(harness, /outcome\.kind === "title-return"/u);
   assert.match(harness, /failure\?\.status === 409/u);
   assert.match(harness, /failure\.pathname === "\/coop\/v3\/lobby\/respond"/u);
+  assert.match(harness, /client\.evidence\.networkState\.apiFailure = null/u);
+  assert.match(harness, /proofRequired: "stable-seat-binding"/u);
+  assert.match(harness, /waitFor\(\/respond accept=true from=\/u/u);
+  assert.match(harness, /description: `Accept relay for \$\{requesterName\}`/u);
   assert.match(harness, /requiring a later stable-seat binding/u);
   assert.doesNotMatch(harness, /requester\.press\("Space", `lobby-reissue-request-/u);
   assert.doesNotMatch(harness, /await this\.evidence\.waitFor\(\/request target=\/u/u);
 
-  // The observed staging poll delivered the original request after 6.2s. A refresh must not
-  // starve that live accept panel, but must still beat the worker's approximately 17s TTL.
+  // A submit queued for an expired Accept panel must land on an inert row, never on a newly
+  // reordered player or Cancel action. A fresh navigation/hover explicitly unlocks the new panel.
+  assert.match(titlePhase, /lobbyActionRequiresReselection = true[\s\S]*renderPanel\(\)/u);
+  assert.match(
+    titlePhase,
+    /if \(lobbyActionRequiresReselection\)[\s\S]*label: "Lobby updated - choose again"[\s\S]*handler: \(\) => false/u,
+  );
+  assert.match(titlePhase, /onHover: \(\) => \{\s*lobbyActionRequiresReselection = false/u);
+
+  // The observed staging poll delivered the original request after 6.2s. Keep retries frequent
+  // enough to recover a lost request while leaving the live Accept panel time to be acted on.
   const reissueMs = Number(harness.match(/const LOBBY_REQUEST_REISSUE_MS = ([\d_]+);/u)?.[1].replaceAll("_", ""));
   const optionalRelayMs = Number(
     harness.match(/const OPTIONAL_LOBBY_RELAY_WAIT_MS = ([\d_]+);/u)?.[1].replaceAll("_", ""),
   );
-  assert.ok(reissueMs > 6_200 && reissueMs < 17_000);
+  assert.ok(reissueMs > 6_200 && reissueMs <= 15_000);
   assert.ok(optionalRelayMs > 0 && optionalRelayMs < reissueMs);
 });
 

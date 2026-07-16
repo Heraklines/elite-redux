@@ -204,6 +204,8 @@ export interface CoopLobbyCallbacks {
   onConnected: (runtime: CoopRuntime) => void;
   /** A fatal error (announce/connect failed). */
   onError: (message: string) => void;
+  /** A recoverable lobby race; keep the lobby open and rebuild its actionable panel. */
+  onTransientError?: (message: string) => void;
   /** Lobby v2: someone is asking to join ME - show Accept / Decline. */
   onRequest?: (from: LobbyRequest) => void;
   /** Lobby v2: the incoming request evaporated (requester left / was matched). */
@@ -381,7 +383,8 @@ export class CoopLobbyController {
         return;
       }
       coopWarn("lobby", `request failed (transient): ${msg} -> keep browsing`);
-      this.callbacks.onError(msg);
+      this.outgoingPending = false;
+      this.callbacks.onTransientError?.(msg);
       this.scheduleNextPoll(POLL_INTERVAL_MS);
     }
   }
@@ -421,7 +424,7 @@ export class CoopLobbyController {
         return;
       }
       coopWarn("lobby", `respond failed (transient): ${message(e)} -> keep browsing`);
-      this.callbacks.onError(message(e));
+      this.callbacks.onTransientError?.(message(e));
     }
     this.scheduleNextPoll(POLL_INTERVAL_MS);
   }
@@ -446,7 +449,19 @@ export class CoopLobbyController {
   }
 
   private failClosedP33Credential(error: unknown): boolean {
-    if (this.protocol !== "p33" || !(error instanceof CoopP33HttpError) || ![401, 403, 409].includes(error.status)) {
+    if (this.protocol !== "p33" || !(error instanceof CoopP33HttpError)) {
+      return false;
+    }
+    // 409 means different things on different endpoints. On the authenticated lobby GET it
+    // means this presence/bearer binding was replaced and continuing would be unsafe. On
+    // request/respond it is an ordinary matchmaking race (the row expired, left, or paired)
+    // and must return to browsing. Treating every 409 as credential loss permanently stopped
+    // polling after one late Accept and turned a recoverable race into a real softlock.
+    const credentialFailure =
+      error.status === 401
+      || error.status === 403
+      || (error.status === 409 && error.path.startsWith("/coop/v3/lobby?"));
+    if (!credentialFailure) {
       return false;
     }
     this.stopped = true;

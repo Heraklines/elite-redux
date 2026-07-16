@@ -324,6 +324,43 @@ describe("P33 authenticated signaling Worker", () => {
     expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_runs_p33").get()).toEqual({ count: 1 });
   });
 
+  it("keeps a live human join request actionable beyond the presence heartbeat window", async () => {
+    const alice = await announce(
+      "er-account:11",
+      "Alice",
+      nonce("alice-request-ticket"),
+      nonce("alice-request-client"),
+    );
+    const bob = await announce("er-account:22", "Bob", nonce("bob-request-ticket"), nonce("bob-request-client"));
+    expect(
+      await call("/coop/v3/lobby/request", {
+        body: { self: alice.presenceId, target: bob.presenceId },
+        token: alice.pairingToken,
+      }),
+    ).toMatchObject({ status: 200 });
+
+    // Reproduce the production browser delay: the request itself is older than the 12s
+    // presence window, but the requester is still actively heartbeating. The old worker hid the
+    // Accept row at this point and a queued Space landed on a newly rendered player row instead.
+    vi.setSystemTime(start + 12_001);
+    expect(
+      await call(`/coop/v3/lobby?self=${encodeURIComponent(alice.presenceId)}`, {
+        token: alice.pairingToken,
+      }),
+    ).toMatchObject({ status: 200 });
+    const stillActionable = await call(`/coop/v3/lobby?self=${encodeURIComponent(bob.presenceId)}`, {
+      token: bob.pairingToken,
+    });
+    expect(stillActionable.body.request).toMatchObject({ id: alice.presenceId, name: "Alice" });
+
+    expect(
+      await call("/coop/v3/lobby/respond", {
+        body: { self: bob.presenceId, from: alice.presenceId, accept: true },
+        token: bob.pairingToken,
+      }),
+    ).toMatchObject({ status: 200 });
+  });
+
   it("reclaims a stale account-unique pair when both closed browsers explicitly pair again", async () => {
     const first = await pair();
     // Browser page teardown is not a reliable place for a fetch/beacon. Reproduce the server state

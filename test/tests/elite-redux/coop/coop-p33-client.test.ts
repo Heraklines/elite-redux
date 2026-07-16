@@ -433,4 +433,59 @@ describe("authenticated P33 browser client", () => {
     expect(urls[0]).toContain("/coop/v3/lobby/announce");
     expect(urls.some(url => /\/coop\/lobby(?!\/announce)/u.test(url))).toBe(false);
   });
+
+  it("keeps polling after a stale P33 Accept race instead of treating 409 as credential loss", async () => {
+    vi.useFakeTimers();
+    let polls = 0;
+    const fetcher: typeof fetch = async input => {
+      const url = String(input);
+      if (url.endsWith("/coop/v3/lobby/announce")) {
+        return response({
+          presenceId: credential.presenceId,
+          pairingToken: credential.pairingToken,
+          identity,
+          pairing: null,
+        });
+      }
+      if (url.includes("/coop/v3/lobby?")) {
+        polls++;
+        return response({
+          players: [],
+          pairing: null,
+          request: polls === 1 ? { id: "p33_requester", accountId: peer.accountId, name: peer.displayName } : null,
+          declined: null,
+        });
+      }
+      if (url.endsWith("/coop/v3/lobby/respond")) {
+        return response({ error: "stale lobby response" }, 409);
+      }
+      return response({ ok: true });
+    };
+    const onRequest = vi.fn();
+    const onError = vi.fn();
+    const onTransientError = vi.fn();
+    const controller = new CoopLobbyController(
+      identity.displayName,
+      {
+        onPlayers: vi.fn(),
+        onConnecting: vi.fn(),
+        onConnected: vi.fn(),
+        onError,
+        onTransientError,
+        onRequest,
+      },
+      { protocol: "p33", p33Dependencies: baseDependencies(fetcher) },
+    );
+
+    await controller.start();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(onRequest).toHaveBeenCalledTimes(1);
+    await controller.respond(true);
+    expect(onTransientError).toHaveBeenCalledWith("stale lobby response");
+    expect(onError).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1_600);
+    expect(polls).toBeGreaterThanOrEqual(2);
+    controller.cancel();
+  });
 });

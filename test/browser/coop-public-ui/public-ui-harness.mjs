@@ -1585,6 +1585,15 @@ export class DuoPublicUiRig {
           // keep driving until the public stable-seat binding proves the match won the race. If no
           // binding arrives by the deadline, surface this exact failure below.
           supersededRequestFailure = { client: client.label, ...failure };
+          // The evidence recorder deliberately retains the first failed driver request. Clear
+          // only this classified matchmaking race after copying it above; otherwise the next
+          // semantic lobby waiter calls assertNoDriverApiFailure and aborts before the bounded
+          // self-healing loop can perform the retry it promises.
+          client.evidence.networkState.apiFailure = null;
+          client.evidence.record("driver-api-failure-retry", {
+            ...failure,
+            proofRequired: "stable-seat-binding",
+          });
         } else {
           assertNoDriverApiFailure(client.evidence, "co-op lobby");
         }
@@ -1607,12 +1616,21 @@ export class DuoPublicUiRig {
           // for the live panel's explicit unblocked projection before accepting. If its short TTL
           // expires during that wait, let the requester refresh it and try the next appearance.
           try {
+            const acceptCursor = acceptor.evidence.cursor();
             await selectOptionById(acceptor, {
               surfaceId: "option-select:TitlePhase",
               targetId: semanticOptionId(`Accept ${requesterName}`),
               navKeys: ["ArrowUp", "ArrowDown"],
               timeoutMs: LOBBY_REQUEST_REISSUE_MS,
               fromCursor: roleCursors[acceptor.label],
+            });
+            // Selecting a semantic row is not proof that Phaser consumed the queued key. Require
+            // the public handler-to-relay log before suppressing another attempt; this catches a
+            // repaint/blockInput race without calling controller internals.
+            await acceptor.evidence.waitFor(/respond accept=true from=/u, {
+              from: acceptCursor,
+              timeoutMs: OPTIONAL_LOBBY_RELAY_WAIT_MS,
+              description: `Accept relay for ${requesterName}`,
             });
             acceptedForLiveRequest = true;
           } catch (error) {

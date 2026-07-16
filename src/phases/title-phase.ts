@@ -754,6 +754,10 @@ export class TitlePhase extends Phase {
     // a highlighted row to ACTION. Preserve the highlighted player by identity,
     // never by its transient array index.
     let selectedLobbyOptionId: string | null = null;
+    // When an Accept/Decline takeover disappears, a submit key may already be queued from the
+    // old panel. Make the first row inert until a fresh navigation/hover proves the player has
+    // selected an action from the new generation.
+    let lobbyActionRequiresReselection = false;
     let panelGeneration = 0;
 
     const isCurrentFlow = (): boolean =>
@@ -830,6 +834,12 @@ export class TitlePhase extends Phase {
           },
         );
       } else {
+        if (lobbyActionRequiresReselection) {
+          opts.push({
+            label: "Lobby updated - choose again",
+            handler: () => false,
+          });
+        }
         const selectedPlayerId = selectedLobbyOptionId?.startsWith("player:")
           ? selectedLobbyOptionId.slice("player:".length)
           : null;
@@ -845,12 +855,13 @@ export class TitlePhase extends Phase {
         }
         for (const p of lastPlayers) {
           const optionIndex = opts.length;
-          if (`player:${p.id}` === selectedLobbyOptionId) {
+          if (!lobbyActionRequiresReselection && `player:${p.id}` === selectedLobbyOptionId) {
             initialCursor = optionIndex;
           }
           opts.push({
             label: `Ask ${p.name} to play`,
             onHover: () => {
+              lobbyActionRequiresReselection = false;
               selectedLobbyOptionId = `player:${p.id}`;
             },
             handler: () => {
@@ -865,12 +876,13 @@ export class TitlePhase extends Phase {
             },
           });
         }
-        if (selectedLobbyOptionId === "cpu") {
+        if (!lobbyActionRequiresReselection && selectedLobbyOptionId === "cpu") {
           initialCursor = opts.length;
         }
         opts.push({
           label: "Play vs CPU",
           onHover: () => {
+            lobbyActionRequiresReselection = false;
             selectedLobbyOptionId = "cpu";
           },
           handler: () => {
@@ -882,12 +894,13 @@ export class TitlePhase extends Phase {
           },
         });
       }
-      if (selectedLobbyOptionId === "cancel") {
+      if (!lobbyActionRequiresReselection && selectedLobbyOptionId === "cancel") {
         initialCursor = opts.length;
       }
       opts.push({
         label: i18next.t("menu:cancel"),
         onHover: () => {
+          lobbyActionRequiresReselection = false;
           selectedLobbyOptionId = "cancel";
         },
         handler: () => {
@@ -942,6 +955,7 @@ export class TitlePhase extends Phase {
       },
       // Lobby v2: someone asked to join US - take over the panel with Accept/Decline.
       onRequest: from => {
+        lobbyActionRequiresReselection = false;
         incoming = { id: from.id, name: from.name };
         stage.setSeat(1, { name: from.name, detail: "Wants to join!", dot: "red" });
         stage.setStatus(`${from.name} wants to join your run!`);
@@ -949,6 +963,7 @@ export class TitlePhase extends Phase {
       },
       onRequestGone: () => {
         incoming = null;
+        lobbyActionRequiresReselection = true;
         stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
         stage.setStatus("They withdrew. Looking for other players...");
         renderPanel();
@@ -960,6 +975,14 @@ export class TitlePhase extends Phase {
       onDeclined: name => {
         stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
         stage.setStatus(`${name} declined. Pick another player.`);
+        renderPanel();
+      },
+      onTransientError: message => {
+        incoming = null;
+        lobbyActionRequiresReselection = true;
+        stage.setSeat(1, { name: null, detail: "Lobby changed", dot: "amber" });
+        stage.setStatus(`${message} Choose a player again.`);
+        renderPanel();
       },
       onConnecting: () => {
         stage.setSeat(1, { name: null, detail: "Connecting...", dot: "amber" });
