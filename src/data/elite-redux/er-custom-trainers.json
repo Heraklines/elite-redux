@@ -1482,5 +1482,29 @@
     "trainerClass": "GIOVANNI",
     "victoryDialogue": "Seems like you got full hard mode XD",
     "weight": 100
+  },
+  "TRAINER_70011": {
+    "battleBgm": "battle_bb_elite",
+    "battleType": "double",
+    "challenge": "none",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70011,
+    "maxWave": 175,
+    "minWave": 120,
+    "name": "Dagoza",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "species": 10863
+      }
+    ],
+    "trainerClass": "HEX_MANIAC",
+    "weight": 100
   }
 }
