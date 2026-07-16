@@ -98,7 +98,9 @@ export type CoopRole = "host" | "guest";
 // peer cannot safely infer the post-BattleEnd reward/event tail and is deliberately incompatible.
 // er-coop-35 makes the settled reward surface mandatory. A protocol-34 renderer lacks that field and
 // would otherwise dereference or locally infer encounter reward mechanics after the retained BattleEnd.
-export const COOP_PROTOCOL_VERSION = "er-coop-35";
+// er-coop-36 replaces the ambiguous one-shop/heal booleans with a bounded ordered modifier-surface plan.
+// A protocol-35 renderer cannot preserve multiple surfaces, stable identities, or explicit reroll policy.
+export const COOP_PROTOCOL_VERSION = "er-coop-36";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1158,7 +1160,7 @@ export type CoopMessage =
   /** Authenticated public P33-architecture hello. The signaling bearer is intentionally never peer-visible. */
   | {
       t: "hello";
-      version: "er-coop-35";
+      version: "er-coop-36";
       pairingId: string;
       account: CoopAccountIdentityV1;
       transportRole: CoopTransportRole;

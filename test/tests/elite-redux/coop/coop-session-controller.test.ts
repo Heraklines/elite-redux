@@ -63,15 +63,15 @@ describe("co-op session controller (#633, P1)", () => {
       clearNegotiatedCoopCapabilities();
     });
 
-    it("rejects an er-coop-32 peer that contains only one side of the merged protocol-33 contract", async () => {
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-35");
+    it("rejects an er-coop-35 peer that cannot execute ordered Mystery reward surfaces", async () => {
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-36");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",
         version: COOP_PROTOCOL_VERSION,
       });
       controller.connect();
-      guest.send({ t: "hello", version: "er-coop-32", username: "Cached", role: "guest", epoch: 0 });
+      guest.send({ t: "hello", version: "er-coop-35", username: "Cached", role: "guest", epoch: 0 });
       await flush();
 
       expect(controller.versionMismatch).toBe(true);

@@ -278,6 +278,58 @@ export type CoopMeTerminalKind =
 /** Durable control sentinel for the ME battle-settled terminal; never carried as a raw input choice. */
 export const COOP_ME_BATTLE_SETTLED_CHOICE = -1001;
 
+/** Maximum number of post-battle reward surfaces one retained Mystery transaction may project. */
+export const COOP_ME_REWARD_SURFACE_LIMIT = 16;
+
+/** Maximum canonical wire length of a stable reward-surface identity. */
+export const COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH = 64;
+
+/** Largest reroll-cost multiplier the current modifier UI can execute from an untrusted wire plan. */
+export const COOP_ME_REROLL_MULTIPLIER_MAX = 1_000;
+
+/**
+ * One host-authored modifier picker in the ordered post-battle reward plan. The stable identity binds
+ * retries/reconnects to the same semantic surface; the renderer must not infer either the number of
+ * surfaces or their reroll policy from its local encounter callbacks.
+ */
+export interface CoopMeModifierRewardSurfaceProjection {
+  readonly kind: "modifier";
+  readonly surfaceId: string;
+  /** `-1` disables rerolls; otherwise this is the finite non-negative cost multiplier. */
+  readonly rerollMultiplier: number;
+}
+
+/** Closed projection union. New shared reward UI kinds require a protocol bump and validator arm. */
+export type CoopMeRewardSurfaceProjection = CoopMeModifierRewardSurfaceProjection;
+
+/**
+ * Construct a modifier projection while normalizing the UI's implicit default into explicit wire data.
+ * Validation remains mandatory at the receive boundary; this helper only prevents omission-based drift.
+ */
+export function makeCoopMeModifierRewardSurfaceProjection(
+  surfaceId: string,
+  rerollMultiplier = 1,
+): CoopMeModifierRewardSurfaceProjection {
+  return { kind: "modifier", surfaceId, rerollMultiplier };
+}
+
+/** Complete post-BattleEnd reward destination authored by the authority. */
+export interface CoopMeRewardDestination {
+  readonly kind: "reward";
+  /** Exact battle turn whose post-BattleEnd image this transaction settles. */
+  readonly hostTurn: number;
+  /** Host-stated battle result; the renderer never infers it from its reconstructed field. */
+  readonly result: "victory" | "failure";
+  /** Exact executable continuation after the settled BattleEnd. */
+  readonly continuation: "rewards" | "encounter" | "none";
+  /** Whether the deterministic trainer-victory presentation precedes the reward phase. */
+  readonly trainerVictory: boolean;
+  /** Ordered shared modifier surfaces opened before the post-encounter continuation. */
+  readonly rewardSurfaces: readonly CoopMeRewardSurfaceProjection[];
+  /** Whether EggLapsePhase follows this encounter's reward phase. Meaningful only for `rewards`. */
+  readonly eggLapse: boolean;
+}
+
 /** Exact host-authored continuation opened after the terminal state image has been adopted. */
 export type CoopMeTerminalDestination =
   | {
@@ -296,23 +348,7 @@ export type CoopMeTerminalDestination =
       /** Whether `SelectBiomePhase` precedes `NewBattlePhase` at this boundary. */
       readonly selectBiome: boolean;
     }
-  | {
-      readonly kind: "reward";
-      /** Exact battle turn whose post-BattleEnd image this transaction settles. */
-      readonly hostTurn: number;
-      /** Host-stated battle result; the renderer never infers it from its reconstructed field. */
-      readonly result: "victory" | "failure";
-      /** Exact executable continuation after the settled BattleEnd. */
-      readonly continuation: "rewards" | "encounter" | "none";
-      /** Whether the deterministic trainer-victory presentation precedes the reward phase. */
-      readonly trainerVictory: boolean;
-      /** Whether a reward-less healing shop is requested. Meaningful only for `rewards`. */
-      readonly addHeal: boolean;
-      /** Whether the host reward phase opens a SelectModifier surface. */
-      readonly rewardShop: boolean;
-      /** Whether EggLapsePhase follows this encounter's reward phase. Meaningful only for `rewards`. */
-      readonly eggLapse: boolean;
-    };
+  | CoopMeRewardDestination;
 
 /** ME_PICK intent/outcome: the top-level option index the ME owner selected (#8, guest->host forward). */
 export interface CoopMePickPayload {

@@ -57,10 +57,14 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
 import { setCoopMeOwnerIntentOrdinals } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
+  COOP_ME_REROLL_MULTIPLIER_MAX,
+  COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
+  COOP_ME_REWARD_SURFACE_LIMIT,
   type CoopAuthoritativeEnvelopeV1,
   type CoopMeButtonPayload,
   type CoopMePickPayload,
   type CoopMePresentPayload,
+  type CoopMeRewardSurfaceProjection,
   type CoopMeSubPayload,
   type CoopMeTerminalDestination,
   type CoopMeTerminalKind,
@@ -119,6 +123,44 @@ function isSafeNonNegativeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0;
 }
 
+const COOP_ME_REWARD_SURFACE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$/;
+
+function isCanonicalCoopMeRewardSurfaceId(value: unknown): value is string {
+  return (
+    typeof value === "string"
+    && value.length <= COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH
+    && COOP_ME_REWARD_SURFACE_ID_PATTERN.test(value)
+  );
+}
+
+function isExecutableCoopMeRerollMultiplier(value: unknown): value is number {
+  return (
+    typeof value === "number"
+    && Number.isFinite(value)
+    && (value === -1 || (value >= 0 && value <= COOP_ME_REROLL_MULTIPLIER_MAX))
+  );
+}
+
+function isCompleteCoopMeRewardSurfacePlan(value: unknown): value is CoopMeRewardSurfaceProjection[] {
+  if (!Array.isArray(value) || value.length > COOP_ME_REWARD_SURFACE_LIMIT) {
+    return false;
+  }
+  const surfaceIds = new Set<string>();
+  for (const surface of value) {
+    if (
+      !isPlainObject(surface)
+      || surface.kind !== "modifier"
+      || !isCanonicalCoopMeRewardSurfaceId(surface.surfaceId)
+      || !isExecutableCoopMeRerollMultiplier(surface.rerollMultiplier)
+      || surfaceIds.has(surface.surfaceId)
+    ) {
+      return false;
+    }
+    surfaceIds.add(surface.surfaceId);
+  }
+  return true;
+}
+
 /**
  * Validate the P33 all-in-one terminal transaction before any scene mutation. A modern transaction must
  * carry the id-addressable authoritative state for both leave and battle destinations; accepting the old
@@ -163,23 +205,23 @@ export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMe
     );
   }
   if (value.terminal === "battle-settled") {
-    const validShape =
-      destination.kind === "reward"
-      && isSafeNonNegativeInteger(destination.hostTurn)
-      && (destination.result === "victory" || destination.result === "failure")
-      && (destination.continuation === "rewards"
-        || destination.continuation === "encounter"
-        || destination.continuation === "none")
-      && typeof destination.trainerVictory === "boolean"
-      && typeof destination.addHeal === "boolean"
-      && typeof destination.rewardShop === "boolean"
-      && typeof destination.eggLapse === "boolean";
+    const rewardSurfaces = destination.rewardSurfaces;
+    if (
+      destination.kind !== "reward"
+      || !isSafeNonNegativeInteger(destination.hostTurn)
+      || (destination.result !== "victory" && destination.result !== "failure")
+      || (destination.continuation !== "rewards"
+        && destination.continuation !== "encounter"
+        && destination.continuation !== "none")
+      || typeof destination.trainerVictory !== "boolean"
+      || !isCompleteCoopMeRewardSurfacePlan(rewardSurfaces)
+      || typeof destination.eggLapse !== "boolean"
+    ) {
+      return false;
+    }
     return (
-      validShape
-      && (!destination.trainerVictory || destination.result === "victory")
-      && (destination.addHeal !== true || destination.rewardShop === true)
-      && ((!destination.addHeal && !destination.rewardShop && !destination.eggLapse)
-        || destination.continuation === "rewards")
+      (!destination.trainerVictory || destination.result === "victory")
+      && ((rewardSurfaces.length === 0 && !destination.eggLapse) || destination.continuation === "rewards")
     );
   }
   return (
@@ -328,6 +370,8 @@ export function coopMeTerminalSanctionedTails(
       ];
     }
     if (destination.kind === "reward") {
+      // One retained MysteryEncounterRewardsPhase owns the ordered projection plan. The wire array does
+      // not imply N phase instances; the renderer slice decides how that phase materializes its N pickers.
       return [
         ...(destination.trainerVictory ? ["TrainerVictoryPhase"] : []),
         ...(destination.continuation === "rewards"

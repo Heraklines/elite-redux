@@ -7,6 +7,7 @@
 import {
   CoopMeTerminalTransactionReceiver,
   commitMeOwnerIntent,
+  coopMeTerminalSanctionedTails,
   isCompleteCoopMeTerminalPayload,
   nextCoopMePresentationStep,
   receiveCoopMeTerminalTransaction,
@@ -15,7 +16,14 @@ import {
   setCoopMeOperationEnabled,
   setCoopMePresentationAuthorityStateHooksForTest,
 } from "#data/elite-redux/coop/coop-me-operation";
-import { type CoopMeTerminalPayload, makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  COOP_ME_REROLL_MULTIPLIER_MAX,
+  COOP_ME_REWARD_SURFACE_LIMIT,
+  type CoopMeRewardSurfaceProjection,
+  type CoopMeTerminalPayload,
+  makeCoopMeModifierRewardSurfaceProjection,
+  makeCoopOperationId,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopAuthoritativeBattleStateV1, CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
@@ -87,8 +95,7 @@ function settledPayload(
     result?: "victory" | "failure";
     continuation?: "rewards" | "encounter" | "none";
     trainerVictory?: boolean;
-    addHeal?: boolean;
-    rewardShop?: boolean;
+    rewardSurfaces?: CoopMeRewardSurfaceProjection[];
     eggLapse?: boolean;
   } = {},
 ): CoopMeTerminalPayload {
@@ -102,8 +109,9 @@ function settledPayload(
       result: options.result ?? "victory",
       continuation,
       trainerVictory: options.trainerVictory ?? false,
-      addHeal: options.addHeal ?? false,
-      rewardShop: options.rewardShop ?? continuation === "rewards",
+      rewardSurfaces:
+        options.rewardSurfaces
+        ?? (continuation === "rewards" ? [makeCoopMeModifierRewardSurfaceProjection("modifier:0")] : []),
       eggLapse: options.eggLapse ?? continuation === "rewards",
     },
   };
@@ -216,16 +224,31 @@ describe("complete retained Mystery terminal transaction", () => {
     ).toBe(false);
     expect(isCompleteCoopMeTerminalPayload(leavePayload(12, true))).toBe(true);
     expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 3, disableSwitch: true }))).toBe(true);
-    expect(isCompleteCoopMeTerminalPayload(settledPayload(12, { addHeal: true, trainerVictory: true }))).toBe(true);
-    const missingRewardSurface = settledPayload(12);
-    delete (missingRewardSurface.destination as { rewardShop?: boolean }).rewardShop;
     expect(
-      isCompleteCoopMeTerminalPayload(missingRewardSurface),
-      "the renderer cannot infer whether a settled reward phase opens a shop",
+      isCompleteCoopMeTerminalPayload(
+        settledPayload(12, {
+          rewardSurfaces: [makeCoopMeModifierRewardSurfaceProjection("modifier:heal", -1)],
+          trainerVictory: true,
+        }),
+      ),
+    ).toBe(true);
+    expect(makeCoopMeModifierRewardSurfaceProjection("modifier:default").rerollMultiplier).toBe(1);
+    const missingRewardSurfacePlan = settledPayload(12);
+    delete (missingRewardSurfacePlan.destination as { rewardSurfaces?: unknown }).rewardSurfaces;
+    expect(
+      isCompleteCoopMeTerminalPayload(missingRewardSurfacePlan),
+      "the renderer cannot infer an omitted ordered reward-surface plan",
     ).toBe(false);
     expect(
-      isCompleteCoopMeTerminalPayload(settledPayload(12, { addHeal: true, rewardShop: false })),
-      "a healing-shop request cannot omit the shop surface that executes it",
+      isCompleteCoopMeTerminalPayload(
+        settledPayload(12, {
+          rewardSurfaces: [
+            makeCoopMeModifierRewardSurfaceProjection("modifier:duplicate"),
+            makeCoopMeModifierRewardSurfaceProjection("modifier:duplicate", -1),
+          ],
+        }),
+      ),
+      "stable surface identities must be unique within the ordered plan",
     ).toBe(false);
     expect(
       isCompleteCoopMeTerminalPayload(settledPayload(12, { result: "failure", trainerVictory: true, eggLapse: false })),
@@ -233,10 +256,61 @@ describe("complete retained Mystery terminal transaction", () => {
     ).toBe(false);
     expect(
       isCompleteCoopMeTerminalPayload(
-        settledPayload(12, { continuation: "encounter", addHeal: true, rewardShop: true }),
+        settledPayload(12, {
+          continuation: "encounter",
+          rewardSurfaces: [makeCoopMeModifierRewardSurfaceProjection("modifier:smuggled")],
+        }),
       ),
       "event-continuation settlements cannot smuggle reward-only mutations",
     ).toBe(false);
+  });
+
+  it("rejects unbounded or non-executable modifier reward projections", () => {
+    const validates = (rewardSurfaces: CoopMeRewardSurfaceProjection[]) =>
+      isCompleteCoopMeTerminalPayload(settledPayload(12, { rewardSurfaces }));
+
+    expect(validates([makeCoopMeModifierRewardSurfaceProjection("modifier:0", 0.5)])).toBe(true);
+    expect(
+      validates(
+        Array.from({ length: COOP_ME_REWARD_SURFACE_LIMIT }, (_, index) =>
+          makeCoopMeModifierRewardSurfaceProjection(`modifier:${index}`),
+        ),
+      ),
+    ).toBe(true);
+    expect(validates([makeCoopMeModifierRewardSurfaceProjection("")])).toBe(false);
+    expect(validates([makeCoopMeModifierRewardSurfaceProjection("Modifier 0")])).toBe(false);
+    expect(validates([makeCoopMeModifierRewardSurfaceProjection(`m${"x".repeat(64)}`)])).toBe(false);
+    expect(validates([makeCoopMeModifierRewardSurfaceProjection("modifier:0", -2)])).toBe(false);
+    expect(validates([makeCoopMeModifierRewardSurfaceProjection("modifier:0", Number.NaN)])).toBe(false);
+    expect(validates([makeCoopMeModifierRewardSurfaceProjection("modifier:0", Number.POSITIVE_INFINITY)])).toBe(false);
+    expect(
+      validates([makeCoopMeModifierRewardSurfaceProjection("modifier:0", COOP_ME_REROLL_MULTIPLIER_MAX + 1)]),
+    ).toBe(false);
+    expect(
+      validates([{ kind: "move-tutor", surfaceId: "modifier:0", rerollMultiplier: 1 } as never]),
+      "unknown surface kinds fail closed until their own protocol arm exists",
+    ).toBe(false);
+    expect(
+      validates(
+        Array.from({ length: COOP_ME_REWARD_SURFACE_LIMIT + 1 }, (_, index) =>
+          makeCoopMeModifierRewardSurfaceProjection(`modifier:${index}`),
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it("sanctions one retained reward phase for an ordered multi-surface plan", () => {
+    const payload = settledPayload(12, {
+      rewardSurfaces: [
+        makeCoopMeModifierRewardSurfaceProjection("modifier:graves:0"),
+        makeCoopMeModifierRewardSurfaceProjection("modifier:graves:1", -1),
+      ],
+    });
+    expect(coopMeTerminalSanctionedTails(payload)).toEqual([
+      "MysteryEncounterRewardsPhase",
+      "PostMysteryEncounterPhase",
+      "EggLapsePhase",
+    ]);
   });
 
   it("applies DATA once, withholds completion for a late destination receiver, then executes once after reconnect", () => {
