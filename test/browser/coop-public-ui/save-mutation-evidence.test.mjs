@@ -72,7 +72,7 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
     harness,
     /this\.config\.accountMode === "register" && !this\.authenticatedOnce && account\.lastSessionSlot === -1/u,
   );
-  assert.match(harness, /sink\.events\.slice\(this\.pageCursor\)\.find\(/u);
+  assert.match(harness, /sink\.events\s*\.slice\(this\.pageCursor\)\s*\.find\(/u);
   assert.match(workflow, /local-worker-server\.ts/u);
   assert.match(workflow, /local-worker-vite\.config\.mjs/u);
   assert.match(workflow, /inputs\.journey == 'save-mutations'/u);
