@@ -1681,10 +1681,12 @@ export function coopHasPendingWaveAdvance(): boolean {
  * that makes an otherwise-permanent same-turn replay wait impossible rather than merely slow.
  */
 export function coopRetainedGameOverSupersedesReplay(wave: number, turn: number): boolean {
-  return pendingWaveAdvance?.wave === wave
+  return (
+    pendingWaveAdvance?.wave === wave
     && pendingWaveAdvance.outcome === "gameOver"
     && pendingWaveAdvance.settledTurn != null
-    && turn >= pendingWaveAdvance.settledTurn;
+    && turn >= pendingWaveAdvance.settledTurn
+  );
 }
 
 /**
@@ -1815,8 +1817,7 @@ export function mergeCoopPendingWaveAdvance(
     receivedTransition
     ?? (prev != null && prev.wave === wave && prev.outcome === outcome ? prev.transition : undefined);
   const carriedSettledTurn =
-    settledTurn
-    ?? (prev != null && prev.wave === wave && prev.outcome === outcome ? prev.settledTurn : undefined);
+    settledTurn ?? (prev != null && prev.wave === wave && prev.outcome === outcome ? prev.settledTurn : undefined);
   return {
     wave,
     outcome,
