@@ -36,7 +36,7 @@ export class TurnEndPhase extends FieldPhase {
     // in front of the sentinel, while the sentinel remains in front of the pre-existing
     // Faint/Victory/next-turn tail.
     if (isCoopRecording()) {
-      globalScene.phaseManager.unshiftNew("CoopTurnCommitPhase");
+      globalScene.phaseManager.queueCoopTurnCommitPhase();
     }
 
     globalScene.currentBattle.incrementTurn();

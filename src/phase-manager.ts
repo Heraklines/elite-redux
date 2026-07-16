@@ -677,6 +677,14 @@ export class PhaseManager {
   }
 
   /**
+   * Queue the authoritative co-op commit after the current phase's complete child subtree,
+   * but before its pre-existing faint, victory, or next-turn siblings.
+   */
+  public queueCoopTurnCommitPhase(): void {
+    this.phaseQueue.addBarrier(this.create("CoopTurnCommitPhase"));
+  }
+
+  /**
    * Add a {@linkcode FaintPhase} to the queue.
    * @param args - The arguments to pass to the phase constructor
    *

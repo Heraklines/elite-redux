@@ -11,6 +11,7 @@ export type EntryHazardTagType =
   | ArenaTagType.STEALTH_ROCK
   | ArenaTagType.IMPRISON
   | ArenaTagType.HOT_COALS
+  | ArenaTagType.FOAMY_WEB
   | ArenaTagType.CREEPING_THORNS
   | ArenaTagType.ER_INFESTATION_TRAP;
 
