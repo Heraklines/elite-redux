@@ -525,6 +525,27 @@ function captureLiveCtx(): {
 }
 
 /**
+ * Preserve mutations made while a client's scene/runtime is already installed outside a scoped pump.
+ * The long-running journey deliberately leaves the host installed between client turns. Production has
+ * one module graph per browser, so those live module values ARE the host's current state; overwriting them
+ * from an older ClientCtx snapshot when entering withClient would roll that browser back to a prior ME pin,
+ * RNG cursor, or transition permit. Nested cross-client pumps do not match and therefore keep using their
+ * independently persisted snapshots.
+ */
+function refreshClientSnapshotFromInstalledState(ctx: ClientCtx, installed: ReturnType<typeof captureLiveCtx>): void {
+  if (installed.scene !== ctx.scene || installed.runtime !== ctx.runtime) {
+    return;
+  }
+  ctx.rndState = installed.rndState;
+  ctx.ghost = installed.ghost;
+  if (coopHarnessModuleLetIsolation) {
+    ctx.moduleLets = installed.moduleLets;
+  }
+  ctx.biomeState = installed.biomeState;
+  ctx.mePins = installed.mePins;
+}
+
+/**
  * ATOMICALLY install `ctx`'s 4-part process-global context, run `fn`, then restore the
  * previous context. Re-entrant-safe (saves/restores around the body). The RND state is
  * the load-bearing one: the shared Phaser.Math.RND cursor would otherwise bleed between
@@ -544,6 +565,7 @@ let activeClientInboundPump: (() => number) | undefined;
  */
 export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   const prev = captureLiveCtx();
+  refreshClientSnapshotFromInstalledState(ctx, prev);
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
   const prevAccountIdentity = loggedInUser?.username;
@@ -600,6 +622,7 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
 
 export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<T> {
   const prev = captureLiveCtx();
+  refreshClientSnapshotFromInstalledState(ctx, prev);
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
   const prevAccountIdentity = loggedInUser?.username;
