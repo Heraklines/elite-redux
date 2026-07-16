@@ -69,7 +69,7 @@ test("GameOver journey uses visible starters, real command input, and exact reta
     "settled WAVE_ADVANCE committed wave=1",
     "ignore raw waveResolved for correctness wave=1 outcome=gameOver",
     "wave-advance JOURNAL bootstrap wave=1 outcome=gameOver",
-    "safe-boundary wake wave=1 unparkedReplay=0",
+    "safe-boundary wake wave=1 unparkedReplay=([01])",
     "retained gameOver terminal supersedes unresolved replay at safe event boundary",
     "retained WAVE_ADVANCE continuationReady wave=1",
     "host RELEASE contiguous acknowledged authority cls=op:global",

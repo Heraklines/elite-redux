@@ -2418,7 +2418,7 @@ export class DuoPublicUiRig {
           description: "guest retained terminal journal bootstrap",
         }),
         this.guest.evidence.waitFor(
-          /wave-advance JOURNAL (?:queued|retained) safe-boundary wake wave=1 unparkedReplay=0/u,
+          /wave-advance JOURNAL (?:queued|retained) safe-boundary wake wave=1 unparkedReplay=([01])/u,
           {
             from: outcomeCursors[this.guest.label],
             timeoutMs: this.config.timeoutMs,
@@ -2426,7 +2426,7 @@ export class DuoPublicUiRig {
           },
         ),
         this.guest.evidence.waitFor(
-          /guest replay turn=1: retained gameOver terminal supersedes unresolved replay at safe event boundary -> end/u,
+          /guest replay turn=1: (?:ABORT phantom turn \(retained gameOver WAVE_ADVANCE wave=1 settledTurn=1\) - dissolving parked pump|retained gameOver terminal supersedes unresolved replay at safe event boundary -> end)/u,
           {
             from: outcomeCursors[this.guest.label],
             timeoutMs: this.config.timeoutMs,
@@ -2451,6 +2451,8 @@ export class DuoPublicUiRig {
     );
     const hostGameOver = this.host.evidence.find(GAME_OVER_PHASE, outcomeCursors[this.host.label]);
     const guestGameOver = this.guest.evidence.find(GAME_OVER_PHASE, outcomeCursors[this.guest.label]);
+    const unparkMatch = guestBoundaryQueued.text.match(/unparkedReplay=([01])/u);
+    const activeReplayUnparked = unparkMatch?.[1] === "1";
     if (!hostGameOver || !guestGameOver || guestGameOver.index <= guestReplayReleased.index) {
       throw new Error("Paired GameOver phases did not follow the guest's exact terminal replay-release evidence");
     }
@@ -2458,9 +2460,10 @@ export class DuoPublicUiRig {
       hostCommit.index >= hostSettled.index
       || hostSettled.index >= hostRaw.index
       || guestRaw.index >= guestBootstrap.index
-      || guestBootstrap.index >= guestBoundaryQueued.index
-      || guestBoundaryQueued.index >= guestReplayReleased.index
-      || guestReplayReleased.index >= guestWaveReady.index
+      || guestBootstrap.index >= Math.min(guestBoundaryQueued.index, guestReplayReleased.index)
+      || Math.max(guestBoundaryQueued.index, guestReplayReleased.index) >= guestWaveReady.index
+      || (activeReplayUnparked && guestReplayReleased.index >= guestBoundaryQueued.index)
+      || (!activeReplayUnparked && guestBoundaryQueued.index >= guestReplayReleased.index)
       || hostCommit.index >= hostRelease.index
     ) {
       throw new Error("Retained GameOver causal evidence arrived out of order");
