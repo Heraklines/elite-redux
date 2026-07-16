@@ -11,6 +11,11 @@ name: Deploy Staging
 #   vars.STAGING_SERVER_URL        — save API base, e.g. https://er-save-api-staging.<sub>.workers.dev
 # The Cloudflare account must contain a dedicated `er-coop-staging` D1. The
 # workflow resolves it by exact name and refuses production's D1 id.
+# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID must live only in the protected
+# `staging` environment, with a custom deployment-branch policy allowing only
+# feat/elite-redux-port. Delete repository-level copies: an old workflow revision
+# that does not request the environment can otherwise bypass code-only guards.
+# See docs/staging-promotion-security.md.
 
 run-name: ${{ inputs.operation == 'import_music' && 'Import YouTube BGM' || 'Deploy Staging' }}
 
@@ -55,7 +60,9 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: write
+  deployments: write
 
 concurrency:
   group: ${{ inputs.operation == 'import_music' && 'er-youtube-bgm-import' || 'deploy-staging' }}
@@ -65,13 +72,15 @@ concurrency:
 
 jobs:
   import_music:
-    if: github.repository == 'Heraklines/elite-redux' && inputs.operation == 'import_music'
+    if: github.repository == 'Heraklines/elite-redux' && github.ref == 'refs/heads/feat/elite-redux-port' && inputs.operation == 'import_music'
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    outputs:
+      promoted_sha: ${{ steps.promotion-source.outputs.sha }}
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
 
       - uses: actions/setup-node@v4
@@ -135,24 +144,60 @@ jobs:
             git push origin HEAD:${GITHUB_REF_NAME}
           fi
 
+      - name: Seal imported promotion source
+        id: promotion-source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   deploy:
     needs: import_music
-    if: always() && github.repository == 'Heraklines/elite-redux' && (inputs.operation == 'deploy' || (inputs.operation == 'import_music' && inputs.deploy_staging && needs.import_music.result == 'success'))
+    if: always() && github.repository == 'Heraklines/elite-redux' && github.ref == 'refs/heads/feat/elite-redux-port' && (inputs.operation == 'deploy' || (inputs.operation == 'import_music' && inputs.deploy_staging && needs.import_music.result == 'success'))
     timeout-minutes: 20
     runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://elite-redux-staging.pages.dev/
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.ref }}
+          # Never resolve the mutable branch again when a queued dispatch or rerun starts.
+          ref: ${{ needs.import_music.outputs.promoted_sha || github.sha }}
+          fetch-depth: 0
           # No submodules: the standalone build needs only a handful of small
           # asset-metadata files (the big image/audio dirs ship via jsDelivr).
           # The upstream pokerogue-assets submodule pins a commit that isn't
           # always fetchable, so we vendor those files in deploy/standalone-assets.
 
       - name: Seal exact promotion source
-        run: echo "PROMOTED_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+        env:
+          REQUESTED_PROMOTION_SHA: ${{ needs.import_music.outputs.promoted_sha || github.sha }}
+        run: |
+          node scripts/verify-staging-promotion.mjs seal "$REQUESTED_PROMOTION_SHA"
+          echo "PROMOTED_SHA=$REQUESTED_PROMOTION_SHA" >> "$GITHUB_ENV"
+
+      - name: Verify protected staging environment policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/environments/staging" > "$RUNNER_TEMP/staging-environment.json"
+          jq -e '.deployment_branch_policy.protected_branches == false and .deployment_branch_policy.custom_branch_policies == true' \
+            "$RUNNER_TEMP/staging-environment.json" > /dev/null
+          gh api "repos/${GITHUB_REPOSITORY}/environments/staging/deployment-branch-policies" \
+            > "$RUNNER_TEMP/staging-branch-policies.json"
+          jq -e '[.branch_policies[] | select(.name == "feat/elite-redux-port")] | length == 1' \
+            "$RUNNER_TEMP/staging-branch-policies.json" > /dev/null
 
       - uses: ./.github/actions/setup-deps
+
+      - name: Refuse stale or non-fast-forward promotion
+        run: |
+          git fetch --force --no-tags origin \
+            refs/heads/feat/elite-redux-port:refs/remotes/origin/feat/elite-redux-port
+          curl --fail --silent --show-error \
+            --header 'Cache-Control: no-cache' \
+            "https://elite-redux-staging.pages.dev/version.json?promotion_sha=${PROMOTED_SHA}&run_id=${GITHUB_RUN_ID}" \
+            > "$RUNNER_TEMP/live-staging-version.json"
+          node scripts/verify-staging-promotion.mjs guard \
+            "$PROMOTED_SHA" refs/remotes/origin/feat/elite-redux-port "$RUNNER_TEMP/live-staging-version.json"
 
       - name: Stage standalone asset metadata
         run: |
@@ -242,6 +287,9 @@ jobs:
           # build:standalone now also assembles dist (Cloudflare config copy,
           # sourcemap strip, empty manifest.json, ER_ASSETS_SHA re-pin) via
           # scripts/assemble-cloudflare-dist.mjs - same path production uses.
+          # Reruns preserve the old event GITHUB_SHA, while an import can produce a
+          # newer immutable commit. Stamp the checked-out source, then verify it.
+          export GITHUB_SHA="$PROMOTED_SHA"
           pnpm build:standalone
         env:
           NODE_ENV: production
@@ -253,6 +301,7 @@ jobs:
           done
           echo "=== er-assets pins in dist/_redirects ==="
           grep -o 'er-assets@[0-9a-f]*' dist/_redirects | sort -u
+          node scripts/verify-staging-promotion.mjs dist "$PROMOTED_SHA" dist/version.json
 
       - name: Verify staging promotion contract
         run: node --test test/browser/coop-public-ui/deploy-staging-contract.test.mjs
@@ -270,6 +319,17 @@ jobs:
           STAGING_COOP_D1_ID="$(jq -r '.result[] | select(.name == "er-coop-staging") | .uuid' "$RUNNER_TEMP/coop-d1.json")"
           node scripts/materialize-coop-staging-config.mjs \
             "$STAGING_COOP_D1_ID" "$PROMOTED_SHA" workers/er-coop-api/wrangler.generated.staging.toml
+
+      - name: Revalidate promotion immediately before staging mutation
+        run: |
+          git fetch --force --no-tags origin \
+            refs/heads/feat/elite-redux-port:refs/remotes/origin/feat/elite-redux-port
+          curl --fail --silent --show-error \
+            --header 'Cache-Control: no-cache' \
+            "https://elite-redux-staging.pages.dev/version.json?promotion_sha=${PROMOTED_SHA}&run_id=${GITHUB_RUN_ID}&phase=commit" \
+            > "$RUNNER_TEMP/live-staging-version.json"
+          node scripts/verify-staging-promotion.mjs guard \
+            "$PROMOTED_SHA" refs/remotes/origin/feat/elite-redux-port "$RUNNER_TEMP/live-staging-version.json"
 
       # Do not mutate either live surface until every fallible build/verification step is green. The Worker
       # goes first so a newly published browser never calls an older save contract. Promotions are queued
@@ -313,4 +373,32 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name elite-redux-staging --branch staging --commit-dirty=true
+          command: pages deploy dist --project-name elite-redux-staging --branch staging --commit-hash ${{ needs.import_music.outputs.promoted_sha || github.sha }} --commit-dirty=true
+
+      - name: Verify one live Pages and Worker staging identity
+        run: |
+          for attempt in $(seq 1 24); do
+            PAGE_OK=0
+            WORKER_OK=0
+            curl --fail --silent --show-error \
+              --header 'Cache-Control: no-cache' \
+              "https://elite-redux-staging.pages.dev/version.json?promotion_sha=${PROMOTED_SHA}&attempt=${attempt}" \
+              > "$RUNNER_TEMP/promoted-page-version.json" && PAGE_OK=1
+            curl --fail --silent --show-error \
+              --header 'Cache-Control: no-cache' \
+              "https://er-coop-api-staging.heraklines.workers.dev/coop/v3/health?source_sha=${PROMOTED_SHA}&attempt=${attempt}&phase=pages" \
+              > "$RUNNER_TEMP/promoted-worker-health.json" && WORKER_OK=1
+            if [ "$PAGE_OK" = "1" ] && [ "$WORKER_OK" = "1" ] && \
+              node scripts/verify-staging-promotion.mjs live "$PROMOTED_SHA" \
+                "$RUNNER_TEMP/promoted-page-version.json" "$RUNNER_TEMP/promoted-worker-health.json"; then
+              exit 0
+            fi
+            echo "waiting for one exact staging identity (attempt ${attempt}/24)"
+            sleep 5
+          done
+          echo "Pages identity:" >&2
+          jq '{build, identity}' "$RUNNER_TEMP/promoted-page-version.json" >&2 || true
+          echo "Worker identity:" >&2
+          jq '{ok, protocol, identityConfigured, sourceSha}' "$RUNNER_TEMP/promoted-worker-health.json" >&2 || true
+          echo "staging Pages and co-op Worker did not converge on ${PROMOTED_SHA}" >&2
+          exit 1
