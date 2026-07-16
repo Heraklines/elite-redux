@@ -6,6 +6,7 @@
 
 import { erGauntletPickMeType, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { allMysteryEncounters, initMysteryEncounters } from "#mystery-encounters/mystery-encounters";
 import { type ErGauntletBargainQueue, queueErGauntletBargainTransition } from "#phases/new-battle-phase";
 import { describe, expect, it } from "vitest";
 
@@ -50,8 +51,32 @@ describe("#814 Mystery Gauntlet schedule (pure)", () => {
       wave++;
     }
     expect(erGauntletPickMeType(9, encountered)).toBe(MysteryEncounterType.ER_THE_BARGAIN);
-    // Synthetic LLM encounter never scheduled.
+    // Synthetic/phase-driven encounters never enter the ordinary ME pool.
     expect(seen.has(MysteryEncounterType.LLM_DIRECTED)).toBe(false);
+    expect(seen.has(MysteryEncounterType.ER_THE_BARGAIN)).toBe(false);
+  });
+
+  it("selects only registered ordinary encounters across seeds and waves", () => {
+    initMysteryEncounters();
+    const syntheticTypes = new Set([MysteryEncounterType.LLM_DIRECTED, MysteryEncounterType.ER_THE_BARGAIN]);
+
+    for (let seedIndex = 0; seedIndex < 512; seedIndex++) {
+      const seed = `gauntlet-registry-${seedIndex}`;
+      for (let wave = 2; wave <= 257; wave++) {
+        if (erGauntletWaveKind(wave) !== "me") {
+          continue;
+        }
+        const selected = erGauntletPickMeType(wave, [], seed);
+        expect(
+          syntheticTypes.has(selected),
+          `seed ${seed} wave ${wave} selected synthetic ${MysteryEncounterType[selected]}`,
+        ).toBe(false);
+        expect(
+          allMysteryEncounters[selected],
+          `seed ${seed} wave ${wave} selected unregistered ${MysteryEncounterType[selected]}`,
+        ).toBeDefined();
+      }
+    }
   });
 
   it("pool exhaustion wraps to repeats instead of failing", () => {
