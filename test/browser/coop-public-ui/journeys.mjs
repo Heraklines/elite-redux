@@ -98,8 +98,7 @@ async function openOccupiedSlotZero(client) {
   await client.evidence.waitForCondition(
     sink => {
       const event = sink.findLastSemanticSurface(client.pageCursor, "save-slot");
-      return event?.observation.ready.handlerActive === true
-          && event.observation.selectedOptionId === "occupied-slot:0"
+      return event?.observation.ready.handlerActive === true && event.observation.selectedOptionId === "occupied-slot:0"
         ? event
         : null;
     },

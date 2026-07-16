@@ -349,8 +349,10 @@ function isRetryableLobbyRaceFailure(failure) {
   // accept panel became visible but just after that TTL elapsed; the production controller
   // deliberately treats the resulting 409 as transient and returns to browsing. The browser
   // oracle must do the same while still requiring a later stable-seat binding by its deadline.
-  return failure?.status === 409
-    && (failure.pathname === "/coop/v3/lobby/request" || failure.pathname === "/coop/v3/lobby/respond");
+  return (
+    failure?.status === 409
+    && (failure.pathname === "/coop/v3/lobby/request" || failure.pathname === "/coop/v3/lobby/respond")
+  );
 }
 
 function clearRetryableLobbyRaceFailures(clients) {
