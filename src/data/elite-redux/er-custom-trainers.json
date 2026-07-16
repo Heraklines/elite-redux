@@ -1824,5 +1824,98 @@
     "trainerEffect": "sparkstorm",
     "victoryDialogue": "I swell with optimism, seeing a promising young Trainer like you!",
     "weight": 5
+  },
+  "TRAINER_70013": {
+    "battleType": "double",
+    "challenge": "doubles",
+    "defeatDialogue": "You were only living a pipe dream.",
+    "difficulties": [
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70013,
+    "introDialogue": "We'll be your worst nightmare!",
+    "maxWave": 199,
+    "minWave": 150,
+    "name": "Sisters Baba and Yaga",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "VOLT_SWITCH",
+          "RAZOR_WIND",
+          "OMINOUS_WIND",
+          "ELECTRO_DRIFT"
+        ],
+        "sanityOff": true,
+        "species": 10238
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "MOONBLAST",
+          "MOONGEIST_BEAM",
+          "DARK_PULSE",
+          "QUIVER_DANCE"
+        ],
+        "species": 10663
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "AQUA_BASH",
+          "KNOCK_OFF",
+          "HORN_ATTACK",
+          "PROTECT"
+        ],
+        "species": 10854
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "AQUA_CUTTER",
+          "PIXIE_SLASH",
+          "WATER_SHURIKEN",
+          "PROTECT"
+        ],
+        "species": 10855
+      },
+      {
+        "abilitySlot": 2,
+        "level": null,
+        "moves": [
+          "STAR_CRASH",
+          "SUCKER_PUNCH",
+          "WICKED_BLOW",
+          "RECOVER"
+        ],
+        "species": 10712
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "ASTONISH",
+          "PLAY_ROUGH",
+          "SWORDS_DANCE",
+          "SPECTRAL_THIEF"
+        ],
+        "species": 778
+      }
+    ],
+    "trainerClass": "MYSTERIOUS_SISTERS",
+    "victoryDialogue": "I guess you were OUR worst nightmare...",
+    "weight": 5
   }
 }
