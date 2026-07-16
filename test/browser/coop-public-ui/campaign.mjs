@@ -1184,12 +1184,15 @@ export async function runCampaign(rig) {
   });
 
   await rig.loginBoth();
+  await progress.note("login and fresh-account onboarding complete");
   if (policy.raiseSpeed) {
     await raiseGameSpeed(rig, policy, progress);
   }
   await configureRenderProfile(rig, policy, progress);
   await rig.pair(rig.config.requesterSeat);
+  await progress.note("public lobby pairing complete");
   await rig.startFreshRun();
+  await progress.note("fresh co-op run reached its first shared command surface");
   // Verify the layer-8 passive-digest fix did not disable ER innates (maintainer-directed invariant).
   assertInnatesLive(rig);
   await progress.note("innate-activation invariant checked at wave-1 command surface");

@@ -166,10 +166,14 @@ export async function startSealedPreview(config) {
       if (response.ok) {
         return {
           manifest,
-          close: () =>
-            new Promise((resolveClose, rejectClose) =>
-              server.close(error => (error ? rejectClose(error) : resolveClose())),
-            ),
+          close: () => {
+            // A failed browser can leave keep-alive asset requests open. Stop accepting new
+            // requests and sever those sockets so campaign teardown cannot wait forever.
+            return new Promise((resolveClose, rejectClose) => {
+              server.close(error => (error ? rejectClose(error) : resolveClose()));
+              server.closeAllConnections();
+            });
+          },
         };
       }
     } catch {

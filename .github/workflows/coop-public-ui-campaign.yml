@@ -140,6 +140,8 @@ jobs:
             scripts/prepare-coop-browser-artifact.mjs \
             test/browser/coop-public-ui/browser-artifact-prune.test.mjs \
             test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
+            test/browser/coop-public-ui/campaign-lifecycle.mjs \
+            test/browser/coop-public-ui/campaign-lifecycle.test.mjs \
             test/browser/coop-public-ui/campaign-nav.mjs \
             test/browser/coop-public-ui/campaign-policy.mjs \
             test/browser/coop-public-ui/campaign.mjs \
@@ -151,6 +153,7 @@ jobs:
             test/browser/coop-public-ui/check-campaign-boundary.mjs \
             test/browser/coop-public-ui/environment-seal.mjs \
             test/browser/coop-public-ui/evidence.mjs \
+            test/browser/coop-public-ui/preview-server.mjs \
             test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs \
             test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
 
@@ -165,6 +168,7 @@ jobs:
           node --test
           test/browser/coop-public-ui/browser-artifact-prune.test.mjs
           test/browser/coop-public-ui/browser-workflow-fanout.test.mjs
+          test/browser/coop-public-ui/campaign-lifecycle.test.mjs
           test/browser/coop-public-ui/campaign-exp-phase.test.mjs
           test/browser/coop-public-ui/campaign-render-profile.test.mjs
           test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs
@@ -356,6 +360,11 @@ jobs:
           COOP_UI_DIFFICULTY_OPTION_ID: ${{ matrix.difficulty_option }}
           COOP_UI_REQUIRE_MYSTERY_GAUNTLET: ${{ matrix.require_mystery }}
           COOP_UI_MYSTERY_MIN_SURFACES: "6"
+          # This is the whole lifecycle budget (preview boot + pairing + all waves), not a
+          # refreshable or per-wave wait. It expires early enough to preserve failure evidence.
+          COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: "2700000"
+          COOP_UI_DIAGNOSTIC_TIMEOUT_MS: "20000"
+          COOP_UI_CLEANUP_TIMEOUT_MS: "60000"
           # Loud-fail everywhere by default. `shakedown` (the ONLY mode that permits press-through of
           # an unknown surface) is now reachable ONLY by an explicit dispatch with auto_first=true - a
           # deliberate ordering test. push = loud-fail smoke, schedule = nightly, dispatch = gating.
@@ -382,7 +391,13 @@ jobs:
           COOP_UI_VIEWPORT_WIDTH: "1440"
           COOP_UI_VIEWPORT_HEIGHT: "900"
           NODE_OPTIONS: --max-old-space-size=4096
-        run: xvfb-run -a -s "-screen 0 1440x900x24" node test/browser/coop-public-ui/run-campaign.mjs
+        # GNU timeout is the non-cooperative process-group backstop. The Node deadline above
+        # normally fails first and writes summary.json; SIGINT leaves two minutes for bounded
+        # evidence cleanup before SIGKILL. The normal Node deadline preserves seven upload minutes;
+        # even the forced-kill path retains four minutes before the job deadline.
+        run: >-
+          timeout --signal=INT --kill-after=3m 48m xvfb-run -a -s "-screen 0 1440x900x24" node
+          test/browser/coop-public-ui/run-campaign.mjs
 
       # The environment seal is small, decisive audit evidence - upload it as its own artifact
       # (always, even if the run fails/times out before the evidence uploads below) so audit #920

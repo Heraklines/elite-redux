@@ -14,6 +14,7 @@ import { readFile } from "node:fs/promises";
 
 const files = [
   "campaign-policy.mjs",
+  "campaign-lifecycle.mjs",
   "campaign.mjs",
   "run-campaign.mjs",
   "campaign-nav.mjs",
