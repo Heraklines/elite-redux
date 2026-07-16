@@ -589,6 +589,26 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
   }
 
   /**
+   * Rebuild the move list AND the detail panel (names / types / PP / power /
+   * accuracy) from the acting Pokémon's CURRENT moveset.
+   *
+   * Needed because a mid-turn effect can swap the moveset while the fight menu is
+   * still showing the stale names — specifically ER's `Omniform`, which replaces
+   * the holder's moves when it transforms. `displayMoves` only runs from `show()`,
+   * so without this the open menu keeps the pre-transform list. Safe no-op unless
+   * the menu is currently active (the only state where the cached list is on
+   * screen and a `CommandPhase` is guaranteed current for the accessors below).
+   */
+  refreshMoves(): void {
+    if (!this.active) {
+      return;
+    }
+    this.clearMoves();
+    this.displayMoves();
+    this.setMoveInfo(this.getCursor());
+  }
+
+  /**
    * Returns a specific move's color based on its type effectiveness against opponents
    * If there are multiple opponents, the highest effectiveness' color is returned
    * @returns A color or undefined if the default color should be used
