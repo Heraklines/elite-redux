@@ -43,5 +43,8 @@ test("staging browser and signaling deployment are pinned to P33 without product
   assert.match(workflow, /node scripts\/materialize-coop-staging-config\.mjs/u);
   assert.match(workflow, /command: deploy --config workers\/er-coop-api\/wrangler\.generated\.staging\.toml/u);
   assert.match(workflow, /\.sourceSha == \$sha/u);
+  assert.match(workflow, /for attempt in \$\(seq 1 24\); do/u);
+  assert.match(workflow, /Cache-Control: no-cache/u);
+  assert.match(workflow, /source_sha=\$\{PROMOTED_SHA\}&attempt=\$\{attempt\}/u);
   assert.doesNotMatch(workflow, /command: deploy --config workers\/er-coop-api\/wrangler\.toml/u);
 });

@@ -290,9 +290,10 @@ jobs:
 
       - name: Verify staging P33 signaling contract
         run: |
-          for attempt in 1 2 3 4 5; do
+          for attempt in $(seq 1 24); do
             if curl --fail --silent --show-error \
-              https://er-coop-api-staging.heraklines.workers.dev/coop/v3/health \
+              --header 'Cache-Control: no-cache' \
+              "https://er-coop-api-staging.heraklines.workers.dev/coop/v3/health?source_sha=${PROMOTED_SHA}&attempt=${attempt}" \
               > "$RUNNER_TEMP/coop-health.json"; then
               if jq -e --arg sha "$PROMOTED_SHA" \
                 '.ok == true and .protocol == "er-coop-33" and .identityConfigured == true and .sourceSha == $sha' \
@@ -300,7 +301,8 @@ jobs:
                 exit 0
               fi
             fi
-            sleep $((attempt * 2))
+            echo "waiting for staging P33 Worker source SHA propagation (attempt ${attempt}/24)"
+            sleep 5
           done
           jq '{ok, protocol, identityConfigured, sourceSha}' "$RUNNER_TEMP/coop-health.json" || true
           echo "staging P33 Worker did not attest the promoted source SHA" >&2
