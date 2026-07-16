@@ -682,8 +682,16 @@ export class PublicUiClient {
       await this.openRegistrationForm();
       await this.fillRegistrationForm();
     } else {
-      // LOGIN_OR_REGISTER selects Login by default. This is a real keyboard action against the canvas UI.
-      await this.press("Space", "open-login-form");
+      // LOGIN_OR_REGISTER selects Login by default. FormModalUiHandler accepts SUBMIT, not ACTION,
+      // so the public keyboard equivalent is Enter after the active modal is observably ready.
+      const loginSurface = await waitForSemanticSurface(this, "auth:login-or-register", {
+        fromCursor: this.pageCursor,
+        timeoutMs: this.config.bootTimeoutMs,
+      });
+      if (loginSurface.observation.ready?.handlerActive !== true) {
+        throw new Error(`${this.label}: public login selector was visible but not actionable`);
+      }
+      await this.press("Enter", "open-login-form");
       await this.waitForVisibleInputs({ text: 1, password: 1, purpose: "public login form" });
       await this.fillLoginForm();
     }

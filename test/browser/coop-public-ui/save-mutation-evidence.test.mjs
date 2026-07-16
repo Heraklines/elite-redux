@@ -90,6 +90,11 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
   );
   assert.match(journeys, /confirmDefaultStarterTeam\(client, \{[\s\S]*?fromCursor: starterPhase\.index/u);
   assert.match(browserEntry, /inputBlockedRaw[\s\S]*?typeof inputBlockedRaw === "boolean"/u);
+  assert.match(browserEntry, /case "LOGIN_OR_REGISTER":[\s\S]*?surfaceId: "auth:login-or-register"/u);
+  assert.match(
+    harness,
+    /waitForSemanticSurface\(this, "auth:login-or-register",[\s\S]*?handlerActive !== true[\s\S]*?press\("Enter", "open-login-form"\)/u,
+  );
   assert.match(
     harness,
     /semantic\?\.observation\.coop === false[\s\S]*?ownerModel === "local"[\s\S]*?seatsWithInput\?\.includes\(0\)/u,
