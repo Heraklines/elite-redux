@@ -947,7 +947,18 @@ export class BattleScene extends SceneBase {
       return;
     }
     this.starterColorsLoaded = true;
-    const sc = await cachedFetch("./starter-colors.json").then(res => res.json());
+    let sc: Record<string, [string, string]>;
+    try {
+      sc = await cachedFetch("./starter-colors.json").then(res => res.json());
+    } catch (error) {
+      // Starter colours are presentation metadata, not a boot prerequisite. A slow/CDN-failed
+      // request used to reject BattleScene.preload after the title screen was already interactive,
+      // leaking an uncaught page error into real browsers. Keep the seeded/default colour fallback
+      // and allow a later scene boot to retry instead of poisoning the session as "loaded".
+      this.starterColorsLoaded = false;
+      console.warn("Could not load starter colours; using seeded defaults for this scene", error);
+      return;
+    }
     for (const key of Object.keys(sc)) {
       // Don't clobber Elite Redux's pre-seeded custom-species colors (ids
       // >= 10000). The json only contains vanilla species, so this only

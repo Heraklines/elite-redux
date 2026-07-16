@@ -24,17 +24,19 @@ test("captures only valid co-op CAS slot and mode commitments", () => {
 });
 
 test("lobby quarantines one save-slot failure and releases a fresh run only through verified empty-slot CAS", async () => {
-  const [gameData, title, starter, config, journeys, harness, localWorker, evidence, workflow] = await Promise.all([
-    readFile(resolve(root, "src/system/game-data.ts"), "utf8"),
-    readFile(resolve(root, "src/phases/title-phase.ts"), "utf8"),
-    readFile(resolve(root, "src/phases/select-starter-phase.ts"), "utf8"),
-    readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
-    readFile(resolve(root, "test/browser/coop-public-ui/journeys.mjs"), "utf8"),
-    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
-    readFile(resolve(root, "test/browser/coop-public-ui/local-worker-server.ts"), "utf8"),
-    readFile(resolve(root, "test/browser/coop-public-ui/evidence.mjs"), "utf8"),
-    readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
-  ]);
+  const [gameData, title, battleScene, starter, config, journeys, harness, localWorker, evidence, workflow] =
+    await Promise.all([
+      readFile(resolve(root, "src/system/game-data.ts"), "utf8"),
+      readFile(resolve(root, "src/phases/title-phase.ts"), "utf8"),
+      readFile(resolve(root, "src/battle-scene.ts"), "utf8"),
+      readFile(resolve(root, "src/phases/select-starter-phase.ts"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/journeys.mjs"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/local-worker-server.ts"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/evidence.mjs"), "utf8"),
+      readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
+    ]);
 
   assert.match(gameData, /getCoopResumeLobbySnapshot\(\): Promise<CoopResumeLobbySnapshot>/u);
   assert.match(gameData, /sessions: Map<number, CoopResumeLoadedSession \| undefined>/u);
@@ -52,7 +54,14 @@ test("lobby quarantines one save-slot failure and releases a fresh run only thro
     title,
     /stage\.setStatus\("A save conflict was isolated\. Start a separate run\?"\);[\s\S]*await globalScene\.ui\.setMode\(UiMode\.MESSAGE\);[\s\S]*if \(!isCurrentSession\(\)\)[\s\S]*globalScene\.ui\.resetModeChain\(\);[\s\S]*hostStartNew/u,
   );
+  assert.match(
+    title,
+    /Press to start a separate co-op run\. Existing saves will not be overwritten\.`,\s*\/\/[\s\S]*\s0,\s*hostStartNew/u,
+  );
   assert.match(title, /hostStartNew/u);
+
+  assert.match(battleScene, /Could not load starter colours; using seeded defaults for this scene/u);
+  assert.match(battleScene, /this\.starterColorsLoaded = false;[\s\S]*console\.warn[\s\S]*return;/u);
 
   assert.match(starter, /findVerifiedEmptyCoopSessionSlot\(\)/u);
   assert.match(starter, /confirmPendingFreshCoopSessionSlot\(slot\)/u);

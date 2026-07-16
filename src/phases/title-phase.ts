@@ -1283,7 +1283,11 @@ export class TitlePhase extends Phase {
                 globalScene.ui.resetModeChain();
                 globalScene.ui.showText(
                   `${blockedMessage}\n\nPress to start a separate co-op run. Existing saves will not be overwritten.`,
-                  null,
+                  // The reconciliation scan is asynchronous and can finish while an older lobby message
+                  // still owns a Phaser text timer. Publish this safety-critical confirmation atomically:
+                  // delay=0 installs awaitingActionInput + its exact callback in the same call, so a late
+                  // timer can never leave a visible prompt whose real keyboard input is ignored.
+                  0,
                   hostStartNew,
                   null,
                   true,
