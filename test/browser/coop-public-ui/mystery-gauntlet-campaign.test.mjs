@@ -98,10 +98,16 @@ test("the continuity profile visibly declines Bargain and co-op cannot persist a
 });
 
 test("the companion solo lane publicly selects a readiness-proven empty save slot", async () => {
+  const handler = await readFile(resolve(root, "src/ui/handlers/save-slot-select-ui-handler.ts"), "utf8");
+  const observer = await readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8");
   const navigation = await readFile(resolve(root, "test/browser/coop-public-ui/campaign-nav.mjs"), "utf8");
   const solo = await readFile(resolve(root, "test/browser/coop-public-ui/solo-classic.mjs"), "utf8");
+  assert.match(handler, /getSelectedSlotSemanticSelection\(\)/u);
+  assert.match(handler, /slot\.hasData === undefined[\s\S]*loaded: false[\s\S]*state: "loading"/u);
+  assert.match(observer, /getSelectedSlotSemanticSelection\?\.\(\)/u);
+  assert.match(observer, /selection\?\.loaded \? `\$\{selection\.state\}-slot:\$\{selection\.slotId\}` : null/u);
   assert.match(navigation, /event\?\.observation\.ready\.handlerActive === true/u);
-  assert.match(navigation, /event\.observation\.selectedOptionId === "cursor:0"/u);
+  assert.match(navigation, /event\.observation\.selectedOptionId === "empty-slot:0"/u);
   assert.match(navigation, /await client\.press\("Space", "fresh-save-slot-0"\)/u);
   assert.match(solo, /await selectFirstEmptySaveSlot\(client,/u);
 });

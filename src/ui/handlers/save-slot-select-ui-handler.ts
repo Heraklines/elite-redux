@@ -27,6 +27,14 @@ export enum SaveSlotUiMode {
 
 export type SaveSlotSelectCallback = (cursor: number) => void;
 
+export type SaveSlotSemanticState = "loading" | "empty" | "occupied" | "malformed";
+
+export interface SaveSlotSemanticSelection {
+  readonly slotId: number;
+  readonly loaded: boolean;
+  readonly state: SaveSlotSemanticState;
+}
+
 export class SaveSlotSelectUiHandler extends MessageUiHandler {
   private saveSlotSelectContainer: Phaser.GameObjects.Container;
   private sessionSlotsContainer: Phaser.GameObjects.Container;
@@ -322,6 +330,28 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
     }
 
     return success || error;
+  }
+
+  /**
+   * Read-only public projection of the selected visible slot. Consumers must wait for `loaded`
+   * before issuing an action: SAVE deliberately rejects input while `hasData` is unresolved.
+   */
+  getSelectedSlotSemanticSelection(): SaveSlotSemanticSelection | null {
+    const slot = this.sessionSlots[this.cursor + this.scrollCursor];
+    if (slot == null) {
+      return null;
+    }
+    if (slot.hasData === undefined) {
+      return { slotId: slot.slotId, loaded: false, state: "loading" };
+    }
+    if (slot.malformed) {
+      return { slotId: slot.slotId, loaded: true, state: "malformed" };
+    }
+    return {
+      slotId: slot.slotId,
+      loaded: true,
+      state: slot.hasData ? "occupied" : "empty",
+    };
   }
 
   populateSessionSlots() {

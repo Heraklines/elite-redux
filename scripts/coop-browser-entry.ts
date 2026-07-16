@@ -4,6 +4,7 @@
  */
 
 import type { Pokemon } from "../src/field/pokemon";
+import type { SaveSlotSelectUiHandler } from "../src/ui/handlers/save-slot-select-ui-handler";
 
 // CI-only production-bundle entry. It boots the normal application first, then exposes the narrow transport
 // seam used by the browser checkpoint. This file is included only by vite.coop-browser.config.mjs; no staged
@@ -488,6 +489,15 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
     selectedIndex = handler.getCursor();
   } catch {
     selectedIndex = null;
+  }
+  if (uiMode === "SAVE_SLOT") {
+    const selection = (handler as SaveSlotSelectUiHandler).getSelectedSlotSemanticSelection?.();
+    const selectedOptionId = selection?.loaded ? `${selection.state}-slot:${selection.slotId}` : null;
+    return {
+      selectedOptionId,
+      optionIds: null,
+      optionCount: null,
+    };
   }
   if (uiMode === "MODIFIER_SELECT") {
     const modOptions = (handler as unknown as { options?: Array<{ modifierTypeOption?: { type?: { id?: string } } }> })
