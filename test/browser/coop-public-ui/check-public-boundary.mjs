@@ -50,7 +50,9 @@ for (const file of files) {
 const harness = sources.get("public-ui-harness.mjs");
 const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
 if (
-  !harness?.includes("const launchResults = await Promise.allSettled([launchBrowser(), launchBrowser()]);")
+  !harness?.includes('launchBrowser(config.locales["host-seat"])')
+  || !harness.includes('launchBrowser(config.locales["guest-seat"])')
+  || (harness.match(/launchBrowser\(config\.locales\["(?:host|guest)-seat"\]\)/gu)?.length ?? 0) !== 2
   || !harness.includes("hostBrowser.createBrowserContext()")
   || !harness.includes("guestBrowser.createBrowserContext()")
   || !harness.includes("if (launchFailure)")
