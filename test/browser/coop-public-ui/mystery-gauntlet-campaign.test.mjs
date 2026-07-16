@@ -140,15 +140,14 @@ test("parallel lobby pairing reselects the exact visible username before every r
   assert.ok(optionalRelayMs > 0 && optionalRelayMs < reissueMs);
 });
 
-test("paired Chromium runs headful at an explicit player-sized viewport", async () => {
+test("paired Chromium runs isolated new-headless at a player-sized viewport", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8");
   const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");
-  assert.match(workflow, /COOP_UI_HEADLESS: "0"/u);
-  assert.match(workflow, /xvfb-run -a -s "-screen 0 1440x900x24" node/u);
+  assert.match(workflow, /COOP_UI_HEADLESS: "1"/u);
+  assert.match(workflow, /run: node test\/browser\/coop-public-ui\/run-campaign\.mjs/u);
   assert.match(harness, /defaultViewport: config\.viewport/u);
-  assert.match(workflow, /LIBGL_ALWAYS_SOFTWARE: "1"/u);
   assert.match(harness, /"--disable-dev-shm-usage"/u);
-  assert.match(harness, /"--use-gl=desktop"/u);
+  assert.doesNotMatch(harness, /"--use-gl=desktop"/u);
   assert.match(harness, /`--window-size=\$\{config\.viewport\.width\},\$\{config\.viewport\.height\}`/u);
 });
 

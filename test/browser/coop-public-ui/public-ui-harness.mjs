@@ -1341,9 +1341,9 @@ export class DuoPublicUiRig {
           "--disable-background-timer-throttling",
           "--disable-backgrounding-occluded-windows",
           "--disable-renderer-backgrounding",
-          // Avoid Docker's small shared-memory mount and let Xvfb use Mesa's software GL path.
+          // Avoid Docker's small shared-memory mount while Chrome's native new-headless
+          // compositor provides the isolated software WebGL context.
           "--disable-dev-shm-usage",
-          "--use-gl=desktop",
           `--window-size=${config.viewport.width},${config.viewport.height}`,
         ],
       });

@@ -376,14 +376,13 @@ jobs:
           # + the per-press latency instrumentation are unaffected; only the heavy combined-trace
           # artifact is dropped. Solo-nav keeps it on (one browser, no starvation).
           COOP_UI_CHROME_TRACE: "0"
-          # Gold paired screenshots use a visible Chromium compositor under a virtual display.
-          # Headless WebGL can return a mostly black inactive process even after foregrounding.
-          COOP_UI_HEADLESS: "0"
+          # Probe Chrome's native new-headless compositor with viewport capture and decoded
+          # pixel-integrity checks; each player still owns an independent browser process.
+          COOP_UI_HEADLESS: "1"
           COOP_UI_VIEWPORT_WIDTH: "1440"
           COOP_UI_VIEWPORT_HEIGHT: "900"
-          LIBGL_ALWAYS_SOFTWARE: "1"
           NODE_OPTIONS: --max-old-space-size=4096
-        run: xvfb-run -a -s "-screen 0 1440x900x24" node test/browser/coop-public-ui/run-campaign.mjs
+        run: node test/browser/coop-public-ui/run-campaign.mjs
 
       # The environment seal is small, decisive audit evidence - upload it as its own artifact
       # (always, even if the run fails/times out before the evidence uploads below) so audit #920
