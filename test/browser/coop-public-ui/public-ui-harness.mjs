@@ -206,6 +206,17 @@ function findOwnedCommandOrTerminal(client, from) {
   );
 }
 
+function findAddressedCommandCollectionClosed(client, from, expectedAddress) {
+  return client.evidence.events.slice(from).find(event => {
+    const observation = event.kind === "browser-surface2" ? event.observation : null;
+    return (
+      observation?.operationClass === "battle-progress"
+      && observation.phase !== "CommandPhase"
+      && sameAddress(observation.address, expectedAddress)
+    );
+  });
+}
+
 /**
  * SelectGenderPhase first exposes its preceding MESSAGE projection, then replaces it with the
  * actionable option picker. Do not spend the one public confirm key until that picker proves its
@@ -1570,8 +1581,27 @@ export class DuoPublicUiRig {
       const incoming = acceptor.evidence.networkState.lobby?.request ?? null;
       if (incoming === requesterName) {
         if (!acceptedForLiveRequest) {
-          await acceptor.press("Space", `lobby-accept-${requesterName}`);
-          acceptedForLiveRequest = true;
+          // The lobby publishes the incoming request before its option-panel repaint releases
+          // blockInput. A bare Space here is swallowed by the real handler (the depth campaign
+          // reproduced this for twelve minutes). Navigate to the exact requester identity and wait
+          // for the live panel's explicit unblocked projection before accepting. If its short TTL
+          // expires during that wait, let the requester refresh it and try the next appearance.
+          try {
+            await selectOptionById(acceptor, {
+              surfaceId: "option-select:TitlePhase",
+              targetId: semanticOptionId(`Accept ${requesterName}`),
+              navKeys: ["ArrowUp", "ArrowDown"],
+              timeoutMs: LOBBY_REQUEST_REISSUE_MS,
+              fromCursor: roleCursors[acceptor.label],
+            });
+            acceptedForLiveRequest = true;
+          } catch (error) {
+            acceptor.evidence.record("lobby-accept-deferred", {
+              requesterName,
+              reason: error instanceof Error ? error.message : String(error),
+            });
+            acceptedForLiveRequest = false;
+          }
         }
       } else {
         acceptedForLiveRequest = false;
@@ -2049,6 +2079,9 @@ export class DuoPublicUiRig {
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
     let advanceBattlePrompt = null;
     let promptCommandAddress = null;
+    let submittedCommandAddress = null;
+    let postSubmissionCursors = null;
+    let commandCollectionClosed = null;
 
     while (pending.size > 0 && Date.now() < progressBudget.observe()) {
       let droveCommand = false;
@@ -2066,6 +2099,9 @@ export class DuoPublicUiRig {
         commandEvents[client.label] = event;
         outcomeCursors[client.label] = client.evidence.cursor();
         await client.checkpoint(`${purpose}-${client.label}-command`);
+        const beforeSubmissionCursors = Object.fromEntries(
+          clients.map(value => [value.label, value.evidence.cursor()]),
+        );
         await client.sequence(keys, `${purpose}-${client.label}`);
         pending.delete(client.label);
         const commandAddress = event.observation?.address;
@@ -2079,6 +2115,8 @@ export class DuoPublicUiRig {
           // still be rendering the preceding turn, so its last command observation is not required to match yet.
           // Pin prompt admission to the exact public address that authorized this submission instead.
           promptCommandAddress = `${commandAddress.epoch}:${commandAddress.wave}:${commandAddress.turn}`;
+          submittedCommandAddress = commandAddress;
+          postSubmissionCursors = beforeSubmissionCursors;
           advanceBattlePrompt = null;
         }
         droveCommand = true;
@@ -2087,6 +2125,29 @@ export class DuoPublicUiRig {
       }
       if (droveCommand) {
         continue;
+      }
+      if (submittedCommandAddress != null && postSubmissionCursors != null) {
+        commandCollectionClosed =
+          clients
+            .map(client => ({
+              client,
+              event: findAddressedCommandCollectionClosed(
+                client,
+                postSubmissionCursors[client.label] ?? 0,
+                submittedCommandAddress,
+              ),
+            }))
+            .find(candidate => candidate.event != null) ?? null;
+        if (commandCollectionClosed != null) {
+          // A non-command phase at the exact submitted address is the public state machine's proof
+          // that no reciprocal command owner exists for this round (for example, that battler is
+          // fainted or structurally hidden). Never invent a second owner after collection has closed.
+          for (const label of pending) {
+            outcomeCursors[label] = this.clients[label].evidence.cursor();
+          }
+          pending.clear();
+          break;
+        }
       }
       advanceBattlePrompt ??= createBattlePromptAdvancer(
         this,
@@ -2108,6 +2169,9 @@ export class DuoPublicUiRig {
       client.evidence.record("sequential-command-proof", {
         purpose,
         commandEventIndex: commandEvents[client.label]?.index ?? null,
+        skippedAfterCollectionClosed: commandEvents[client.label] == null && commandCollectionClosed != null,
+        collectionClosedEventIndex: commandCollectionClosed?.event.index ?? null,
+        collectionClosedObservedBy: commandCollectionClosed?.client.label ?? null,
         outcomeCursor: outcomeCursors[client.label],
       });
     }

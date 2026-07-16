@@ -232,13 +232,19 @@ function serializeCheckpointCapture(capture) {
   return pending;
 }
 
-/** Two independent Chromium capture paths; either may recover a headed compositor failure. */
+/**
+ * Two independent Chromium capture paths with bounded retry. A headed SwiftShader/Xvfb readback can
+ * corrupt both paths for the same compositor frame; retrying the same pair after fresh animation frames
+ * distinguishes that transient runner failure from a persistently corrupt render without weakening the
+ * pixel oracle. Healthy captures still return on attempt one.
+ */
 export async function captureCheckpointPngWithFallback(
   page,
   { step, dir, label, record = () => {}, inspect = inspectCheckpointPixels, persist = writeFile, settle = delay },
 ) {
   const failures = [];
-  for (const [attempt, fromSurface] of [false, true].entries()) {
+  const capturePaths = [false, true, false, true, false, true];
+  for (const [attempt, fromSurface] of capturePaths.entries()) {
     let screenshot = null;
     let pixelIntegrity = null;
     try {
@@ -246,7 +252,7 @@ export async function captureCheckpointPngWithFallback(
       await page.evaluate(
         () => new Promise(resolveFrames => requestAnimationFrame(() => requestAnimationFrame(resolveFrames))),
       );
-      await settle(CHECKPOINT_RENDER_SETTLE_MS * (attempt + 1));
+      await settle(Math.min(CHECKPOINT_RENDER_SETTLE_MS * 2 ** attempt, 2_000));
       screenshot = await page.screenshot({
         fullPage: false,
         captureBeyondViewport: false,
@@ -290,7 +296,7 @@ export async function captureCheckpointPngWithFallback(
     }
   }
   throw new Error(
-    `${label}: checkpoint ${step} failed pixel integrity after both capture paths (${failures.join(" | ")})`,
+    `${label}: checkpoint ${step} failed pixel integrity after ${capturePaths.length} capture attempts (${failures.join(" | ")})`,
   );
 }
 

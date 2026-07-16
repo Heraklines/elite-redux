@@ -330,6 +330,59 @@ test("sequential command driver submits the first owner before waiting for the p
   });
 });
 
+test("sequential command driver accepts an exact-address collection close when the partner slot cannot act", async () => {
+  const order = [];
+  const address = { epoch: 73, wave: 1, turn: 2 };
+  const firstEvidence = new FakeEvidence("first");
+  const secondEvidence = new FakeEvidence("second");
+  firstEvidence.push(ownedCommand(0, address));
+  const first = {
+    label: "first",
+    publicSeat: 0,
+    evidence: firstEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("first");
+      firstEvidence.push({
+        kind: "browser-surface2",
+        observation: {
+          operationClass: "battle-progress",
+          surfaceId: "battle:message",
+          phase: "MovePhase",
+          address,
+        },
+      });
+    },
+  };
+  const second = {
+    label: "second",
+    publicSeat: 1,
+    evidence: secondEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("second");
+    },
+  };
+  const rig = {
+    clients: { first, second },
+    config: { timeoutMs: 1_000 },
+  };
+
+  const result = await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
+    rig,
+    { first: 0, second: 0 },
+    ["Space", "Space", "Space"],
+    "turn-2",
+  );
+
+  assert.deepEqual(order, ["first"]);
+  assert.equal(result.commandEvents.second, undefined);
+  const secondProof = secondEvidence.events.at(-1);
+  assert.equal(secondProof.kind, "sequential-command-proof");
+  assert.equal(secondProof.skippedAfterCollectionClosed, true);
+  assert.equal(secondProof.collectionClosedObservedBy, "first");
+});
+
 function marketObservation({ localSeat, ownerSeat, marketOpen, stock, money, quantity }) {
   return {
     version: 1,

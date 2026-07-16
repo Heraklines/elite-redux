@@ -145,6 +145,11 @@ test("parallel lobby pairing reselects the exact visible username before every r
     /requester\.requestPlayer\(acceptor\.credentials\.username, \{[\s\S]*purpose: "initial-request"[\s\S]*optional: true/u,
   );
   assert.match(harness, /let nextReissueAt = Date\.now\(\)/u);
+  assert.match(
+    harness,
+    /incoming === requesterName[\s\S]*selectOptionById\(acceptor, \{[\s\S]*targetId: semanticOptionId\(`Accept \$\{requesterName\}`\)[\s\S]*timeoutMs: LOBBY_REQUEST_REISSUE_MS/u,
+  );
+  assert.doesNotMatch(harness, /acceptor\.press\("Space", `lobby-accept-/u);
   assert.match(harness, /relayTimeoutMs: OPTIONAL_LOBBY_RELAY_WAIT_MS/u);
   assert.match(harness, /optional && error instanceof Error && \/timed out waiting for request relay/u);
   assert.match(harness, /const relayed = sink\.find\(\/request target=\/u, requestCursor\)/u);
@@ -184,8 +189,8 @@ test("visual checkpoints foreground WebGL and reject trivial captures", async ()
   assert.match(evidence, /await page\.bringToFront\(\)/u);
   assert.match(evidence, /requestAnimationFrame\(\(\) => requestAnimationFrame\(resolveFrames\)\)/u);
   assert.match(evidence, /screenshot\.byteLength < MIN_CHECKPOINT_PNG_BYTES/u);
-  assert.match(evidence, /for \(const \[attempt, fromSurface\] of \[false, true\]\.entries\(\)\)/u);
-  assert.match(evidence, /failed pixel integrity after both capture paths/u);
+  assert.match(evidence, /const capturePaths = \[false, true, false, true, false, true\]/u);
+  assert.match(evidence, /failed pixel integrity after \$\{capturePaths\.length\} capture attempts/u);
   assert.match(evidence, /dom\.canvases\.length === 0/u);
   assert.match(evidence, /serializeCheckpointCapture\(\(\) =>[\s\S]*captureCheckpointPngWithFallback/u);
   assert.match(evidence, /checkpointCaptureTail = pending\.catch\(\(\) => \{\}\)/u);
@@ -255,7 +260,7 @@ test("checkpoint capture reports each corrupt path with its own metrics", async 
         persist: async () => {},
       },
     ),
-    /attempt 1 fromSurface=false:[\s\S]*bins=200[\s\S]*attempt 2 fromSurface=true:[\s\S]*bins=201/u,
+    /attempt 1 fromSurface=false:[\s\S]*bins=200[\s\S]*attempt 2 fromSurface=true:[\s\S]*bins=201[\s\S]*attempt 6 fromSurface=true:[\s\S]*bins=205/u,
   );
 });
 
