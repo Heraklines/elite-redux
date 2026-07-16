@@ -1659,5 +1659,170 @@
     "trainerEffect": "smoke",
     "victoryDialogue": "...",
     "weight": 50
+  },
+  "TRAINER_70012": {
+    "battleBgm": "battle_hoenn_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "Wahahahah! Well, I won! How was the battle? Thrilling, right?",
+    "difficulties": [
+      "hell"
+    ],
+    "endless": true,
+    "id": 70012,
+    "introDialogue": "You look like you have a lot of zip! That's a good thing. Wahahahaha!",
+    "maxWave": 199,
+    "minWave": 190,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "DRAGON_FANG"
+          },
+          {
+            "count": 1,
+            "item": "MAGNET"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SPACIAL_REND",
+          "VOLT_SWITCH",
+          "ELECTRO_DRIFT",
+          "OVERHEAT"
+        ],
+        "species": 1008
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "SHELL_BELL"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "THUNDER_PUNCH",
+          "SAPPY_SEED",
+          "METEOR_MASH",
+          "DRAIN_PUNCH"
+        ],
+        "sanityOff": true,
+        "species": 10452
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SALAC_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ER_PSYCHIC_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "LEAF_BLADE",
+          "PSYBLADE",
+          "SHOCKING_EDGE",
+          "BITTER_BLADE"
+        ],
+        "species": 1010
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "ER_GHOST_GEM"
+          },
+          {
+            "count": 1,
+            "item": "ER_ELECTRIC_GEM"
+          },
+          {
+            "count": 1,
+            "item": "ER_FIRE_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "MOONGEIST_BEAM",
+          "ZAP_CANNON",
+          "ARMOR_CANNON",
+          "SHOCK_WAVE"
+        ],
+        "species": 10747
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "MYSTICAL_ROCK"
+          },
+          {
+            "count": 2,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "ELECTRO_SHOT",
+          "FROST_BREATH",
+          "SPLISHY_SPLASH",
+          "AURA_SPHERE"
+        ],
+        "species": 243
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          },
+          {
+            "count": 1,
+            "item": "ER_ELECTRIC_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "KINETIC_BARRAGE",
+          "WEB_SHOT",
+          "VOLT_BOLT",
+          "FROST_BOLT"
+        ],
+        "sanityOff": true,
+        "species": 10762
+      }
+    ],
+    "trainerClass": "WATTSON",
+    "trainerEffect": "sparkstorm",
+    "victoryDialogue": "I swell with optimism, seeing a promising young Trainer like you!",
+    "weight": 5
   }
 }
