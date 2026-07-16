@@ -400,18 +400,36 @@ function seedBaseForm(species: ReturnType<typeof getPokemonSpecies>): void {
   (species.forms as unknown as PokemonForm[]).push(baseForm);
 }
 
-/** Register the mega stone / primal orb form-change edge so the reward pool offers it. */
+/**
+ * Register the mega stone / primal orb form-change edge so the reward pool offers
+ * it AND the Pokedex lists the form.
+ *
+ * The `preFormKey` MUST equal the base species' live default form key, because
+ * both the reward generator (`fc.preFormKey === p.getFormKey()`) and the Pokedex
+ * form list (`f.preFormKey === currentFormKey`) match on it exactly. The old
+ * hardcoded `""` was correct only for FORMLESS bases (their seeded base form key
+ * is ""), but broke any base with NAMED default forms — e.g. Xerneas, whose forms
+ * are "neutral"/"active" and never "", so Xerneasite never spawned and Mega
+ * Xerneas was unreachable in the dex. Register an edge from EACH non-mega base
+ * form key so the mega is offered whatever form the base is currently in.
+ */
 function registerFormChangeEdge(def: NewcomerFormDef, result: InjectNewcomerFormsResult): void {
   if (!pokemonFormChanges[def.baseSpecies]) {
     pokemonFormChanges[def.baseSpecies] = [];
   }
   const list = pokemonFormChanges[def.baseSpecies] as SpeciesFormChange[];
-  const alreadyHasEdge = list.some(fc => fc.preFormKey === "" && fc.formKey === def.formKey);
-  if (alreadyHasEdge) {
-    return;
+  const species = getPokemonSpecies(def.baseSpecies);
+  const baseKeys = (species?.forms ?? [])
+    .map(f => f.formKey ?? "")
+    .filter(k => k !== def.formKey && !/mega|primal/.test(k));
+  const preKeys = baseKeys.length > 0 ? [...new Set(baseKeys)] : [""];
+  for (const preKey of preKeys) {
+    if (list.some(fc => fc.preFormKey === preKey && fc.formKey === def.formKey)) {
+      continue;
+    }
+    list.push(new SpeciesFormChange(def.baseSpecies, preKey, def.formKey, new SpeciesFormChangeItemTrigger(def.item)));
+    result.edgesRegistered++;
   }
-  list.push(new SpeciesFormChange(def.baseSpecies, "", def.formKey, new SpeciesFormChangeItemTrigger(def.item)));
-  result.edgesRegistered++;
 }
 
 /**
