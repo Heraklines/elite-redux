@@ -462,6 +462,10 @@ test("real phase and stream progress extend the outcome wait but never cross its
 
   authority.evidence.pushPhase("Start Phase MoveEffectPhase", new Date(1_080).toISOString(), 80);
   assert.equal(budget.observe(), 1_280);
+  authority.evidence.pushPhase("Start Phase FaintPhase", new Date(1_200).toISOString(), 200);
+  assert.equal(budget.observe(), 1_400, "a later faint phase refreshes the stall deadline");
+  authority.evidence.pushPhase("Start Phase ExpPhase", new Date(1_240).toISOString(), 240);
+  assert.equal(budget.observe(), 1_440, "a later EXP phase refreshes the stall deadline");
   authority.evidence.pushPhase(
     "[coop:turn] host recorder: append turn=1 seq=8 k=hp total=9 live=true",
     new Date(1_250).toISOString(),
@@ -477,12 +481,14 @@ test("real phase and stream progress extend the outcome wait but never cross its
   const records = [...authority.evidence.events, ...renderer.evidence.events].filter(
     event => event.kind === "campaign-animation-budget",
   );
-  assert.equal(records.length, 5);
+  assert.equal(records.length, 7);
   assert.deepEqual(
     records.map(event => [event.phase, event.extensionApplied, event.hardCeilingReached]),
     [
       ["MessagePhase", true, false],
       ["MoveEffectPhase", true, false],
+      ["FaintPhase", true, false],
+      ["ExpPhase", true, false],
       ["authority-stream", true, false],
       ["MoveAnimPhase", false, true],
       ["CoopMoveAnimReplayPhase", true, true],
