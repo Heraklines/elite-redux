@@ -1,0 +1,61 @@
+===== COOP SOAK RESULT =====
+profile: journey
+verdict: FAIL
+waves_requested: 45
+run: 29469348226 (fix/p35-me-harness-lifecycle)
+timestamp: 2026-07-16T03-37-55Z
+
+----- driver lines -----
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+[coop-soak] ME DRIVEN wave 14 (seed 828633): ER_HOT_SPRING [host-owned]
+[coop-soak] ME DRIVEN wave 16 (seed 828633): BERRIES_ABOUND [host-owned]
+[coop-soak] ME DRIVEN wave 18 (seed 828633): ER_PICNIC [host-owned]
+[coop-soak] ME DRIVEN wave 24 (seed 828633): FIELD_TRIP [guest-owned]
+[coop-soak] ME DRIVEN wave 26 (seed 828633): ER_TOWN_RAFFLE [guest-owned]
+[coop-soak] ME DRIVEN wave 28 (seed 828633): ER_FORTUNE_TELLER [guest-owned]
+[coop-soak] ME DRIVEN wave 32 (seed 828633): TELEPORTING_HIJINKS [battle-handoff]
+[coop-soak] ME DRIVEN wave 34 (seed 828633): ER_STILL_WATERS [host-owned]
+[coop-soak] ME DRIVEN wave 36 (seed 828633): WEIRD_DREAM [host-owned]
+[22m[39m[coop-soak] RUN ENDED at wave 39 (seed 828633): host at terminal phase TitlePhase. Survey stops here.
+
+----- vitest result tail -----
+[33m[coop:relay] AWAIT interactionOutcome seq=8000036 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:relay] AWAIT interactionOutcome seq=8000038 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:relay] AWAIT interactionOutcome seq=8000040 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:relay] AWAIT interactionOutcome seq=8000043 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mco-op continuous journey: many mystery events plus biome transitions > plays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m52737[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-journey.test.ts:101:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m > [22mco-op continuous journey: many mystery events plus biome transitions[2m > [22mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[31m[1mAssertionError[22m: the campaign continued after the final forced event: expected 38 to be 45 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 45[39m
+[31m+ 38[39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak-journey.test.ts:[2m119:90[22m[39m
+    [90m117|[39m     })[33m;[39m
+    [90m118|[39m
+    [90m119|[39m     expect(result.wavesCompleted, "the campaign continued after the fi…
+    [90m   |[39m                                                                                          [31m^[39m
+    [90m120|[39m     expect(result.runEnded, "the campaign did not silently terminal/de…
+    [90m121|[39m     expect(result.actionScript, "wave 10 used the odd-seat guest as th…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 03:36:36
+[2m   Duration [22m 78.00s[2m (transform 19.42s, setup 23.65s, import 244ms, tests 53.20s, environment 742ms)[22m
+
