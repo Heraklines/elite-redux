@@ -9,7 +9,7 @@ import { resolve } from "node:path";
 import test from "node:test";
 import { selectOptionById } from "./campaign-nav.mjs";
 import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
-import { checkpointPixelIntegrityFailure } from "./evidence.mjs";
+import { checkpointPixelIntegrityFailure, checkpointRequiresGameplayCoverage } from "./evidence.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 
@@ -146,9 +146,10 @@ test("paired Chromium runs headful at an explicit player-sized viewport", async 
   assert.match(workflow, /COOP_UI_HEADLESS: "0"/u);
   assert.match(workflow, /xvfb-run -a -s "-screen 0 1440x900x24" node/u);
   assert.match(harness, /defaultViewport: config\.viewport/u);
-  assert.match(workflow, /LIBGL_ALWAYS_SOFTWARE: "1"/u);
   assert.match(harness, /"--disable-dev-shm-usage"/u);
-  assert.match(harness, /"--use-gl=desktop"/u);
+  assert.match(harness, /"--use-gl=angle"/u);
+  assert.match(harness, /"--use-angle=swiftshader-webgl"/u);
+  assert.match(harness, /"--enable-unsafe-swiftshader"/u);
   assert.match(harness, /`--window-size=\$\{config\.viewport\.width\},\$\{config\.viewport\.height\}`/u);
 });
 
@@ -163,6 +164,8 @@ test("visual checkpoints foreground WebGL and reject trivial captures", async ()
   assert.match(evidence, /fromSurface: false/u);
   assert.match(evidence, /verticalEdgeColumns > 18/u);
   assert.match(evidence, /verticalEdgeColumns > 10 && pixelIntegrity\.nearDarkRatio > 0\.15/u);
+  assert.match(evidence, /minimumGameplayTileNonDarkRatio < MIN_GAMEPLAY_TILE_NON_DARK_RATIO/u);
+  assert.match(evidence, /minimumGameplayTileColorRatio < MIN_GAMEPLAY_TILE_COLOR_RATIO/u);
   assert.match(evidence, /checkpoint-pixel-integrity/u);
 });
 
@@ -170,22 +173,95 @@ test("pixel integrity separates observed clean screens from headed compositor co
   // Sampled from prior clean difficulty/starter/gameplay PNGs: vertical UI borders may span the
   // viewport, but they are colorful rather than dark compositor columns.
   for (const clean of [
-    { colorBinCount: 450, nearDarkRatio: 0, verticalEdgeColumns: 12 },
-    { colorBinCount: 562, nearDarkRatio: 0, verticalEdgeColumns: 13 },
-    { colorBinCount: 503, nearDarkRatio: 0, verticalEdgeColumns: 0 },
-    { colorBinCount: 45, nearDarkRatio: 0.79, verticalEdgeColumns: 0 },
+    {
+      colorBinCount: 450,
+      nearDarkRatio: 0,
+      verticalEdgeColumns: 12,
+      minimumGameplayTileNonDarkRatio: 0.98,
+      minimumGameplayTileColorRatio: 0.71,
+    },
+    {
+      colorBinCount: 562,
+      nearDarkRatio: 0,
+      verticalEdgeColumns: 13,
+      minimumGameplayTileNonDarkRatio: 0.64,
+      minimumGameplayTileColorRatio: 0.29,
+    },
+    {
+      colorBinCount: 503,
+      nearDarkRatio: 0,
+      verticalEdgeColumns: 0,
+      minimumGameplayTileNonDarkRatio: 1,
+      minimumGameplayTileColorRatio: 0.85,
+    },
+    {
+      colorBinCount: 45,
+      nearDarkRatio: 0.79,
+      verticalEdgeColumns: 0,
+      minimumGameplayTileNonDarkRatio: 0,
+      minimumGameplayTileColorRatio: 0,
+    },
   ]) {
     assert.equal(checkpointPixelIntegrityFailure(clean), null);
   }
 
   // Sampled from the rejected e3abdeea8 headed/Xvfb captures opened during review.
   for (const corrupt of [
-    { colorBinCount: 112, nearDarkRatio: 0.537, verticalEdgeColumns: 13 },
-    { colorBinCount: 261, nearDarkRatio: 0.473, verticalEdgeColumns: 23 },
-    { colorBinCount: 90, nearDarkRatio: 0.244, verticalEdgeColumns: 23 },
+    {
+      colorBinCount: 112,
+      nearDarkRatio: 0.537,
+      verticalEdgeColumns: 13,
+      minimumGameplayTileNonDarkRatio: 0,
+      minimumGameplayTileColorRatio: 0,
+    },
+    {
+      colorBinCount: 261,
+      nearDarkRatio: 0.473,
+      verticalEdgeColumns: 23,
+      minimumGameplayTileNonDarkRatio: 0,
+      minimumGameplayTileColorRatio: 0,
+    },
+    {
+      colorBinCount: 90,
+      nearDarkRatio: 0.244,
+      verticalEdgeColumns: 23,
+      minimumGameplayTileNonDarkRatio: 0,
+      minimumGameplayTileColorRatio: 0,
+    },
   ]) {
     assert.equal(checkpointPixelIntegrityFailure(corrupt), "vertical-stripe compositor corruption");
   }
+});
+
+test("gameplay tile coverage rejects partial WebGL captures without rejecting dark setup screens", () => {
+  // Sampled from the partial guest save-wait capture in run 29473152825. Its global palette and
+  // dark ratio passed the broad integrity checks, but nine of its 6x4 tiles were entirely black.
+  const partialGuest = {
+    colorBinCount: 45,
+    nearDarkRatio: 0.796,
+    verticalEdgeColumns: 0,
+    minimumGameplayTileNonDarkRatio: 0,
+    minimumGameplayTileColorRatio: 0,
+  };
+  assert.equal(checkpointPixelIntegrityFailure(partialGuest, "page-1-wave-2-command"), "partial gameplay capture");
+  assert.equal(checkpointPixelIntegrityFailure(partialGuest, "page-1-campaign-failed"), "partial gameplay capture");
+  assert.equal(checkpointPixelIntegrityFailure(partialGuest, "page-1-paired-and-verifying-save"), null);
+
+  // The exact guest failure PNG from run 29477127389 is full on disk despite looking partial in
+  // one multi-image viewer: every coarse tile contains both visible and chromatic game pixels.
+  const cleanGuestFailure = {
+    colorBinCount: 544,
+    nearDarkRatio: 0,
+    verticalEdgeColumns: 2,
+    minimumGameplayTileNonDarkRatio: 1,
+    minimumGameplayTileColorRatio: 0.855,
+  };
+  assert.equal(checkpointPixelIntegrityFailure(cleanGuestFailure, "page-1-campaign-failed"), null);
+
+  assert.equal(checkpointRequiresGameplayCoverage("page-1-wave-10-mystery-terminal"), true);
+  assert.equal(checkpointRequiresGameplayCoverage("page-1-campaign-failed"), true);
+  assert.equal(checkpointRequiresGameplayCoverage("page-1-title-ready"), false);
+  assert.equal(checkpointRequiresGameplayCoverage("page-1-paired-and-verifying-save"), false);
 });
 
 test("semantic navigation ignores stale same-surface history before its boundary", async () => {

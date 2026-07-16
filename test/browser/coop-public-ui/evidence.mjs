@@ -50,67 +50,104 @@ const CAPTURED_API_HOST = /(?:er-save-api|er-coop-api)/u;
 const MAX_BODY_BYTES = 256 * 1024;
 const MIN_CHECKPOINT_PNG_BYTES = 4 * 1024;
 const CHECKPOINT_RENDER_SETTLE_MS = 120;
+const GAMEPLAY_TILE_COLUMNS = 6;
+const GAMEPLAY_TILE_ROWS = 4;
+const MIN_GAMEPLAY_TILE_NON_DARK_RATIO = 0.08;
+const MIN_GAMEPLAY_TILE_COLOR_RATIO = 0.01;
 let checkpointCaptureTail = Promise.resolve();
 
 async function inspectCheckpointPixels(page, screenshot) {
   const encoded = Buffer.from(screenshot).toString("base64");
-  return page.evaluate(async pngBase64 => {
-    const image = document.createElement("img");
-    image.src = `data:image/png;base64,${pngBase64}`;
-    await image.decode();
-    const width = 180;
-    const height = 112;
-    const sample = document.createElement("canvas");
-    sample.width = width;
-    sample.height = height;
-    const context = sample.getContext("2d", { willReadFrequently: true });
-    if (context == null) {
-      throw new Error("checkpoint PNG inspection could not create a 2D context");
-    }
-    context.drawImage(image, 0, 0, width, height);
-    const pixels = context.getImageData(0, 0, width, height).data;
-    const pixelOffset = (x, y) => (y * width + x) * 4;
-    let nearDarkPixels = 0;
-    const colorBins = new Set();
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const offset = pixelOffset(x, y);
-        const red = pixels[offset];
-        const green = pixels[offset + 1];
-        const blue = pixels[offset + 2];
-        if (Math.max(red, green, blue) < 24) {
-          nearDarkPixels++;
+  return page.evaluate(
+    async ({ pngBase64, tileColumns, tileRows }) => {
+      function summarizePixels(pixelData, canvasWidth, canvasHeight) {
+        const pixelOffset = (x, y) => (y * canvasWidth + x) * 4;
+        let nearDarkPixels = 0;
+        const colorBins = new Set();
+        const gameplayTiles = Array.from({ length: tileColumns * tileRows }, () => ({
+          color: 0,
+          nonDark: 0,
+          pixels: 0,
+        }));
+        for (let y = 0; y < canvasHeight; y++) {
+          for (let x = 0; x < canvasWidth; x++) {
+            const offset = pixelOffset(x, y);
+            const red = pixelData[offset];
+            const green = pixelData[offset + 1];
+            const blue = pixelData[offset + 2];
+            const maximum = Math.max(red, green, blue);
+            const tileColumn = Math.min(tileColumns - 1, Math.floor((x * tileColumns) / canvasWidth));
+            const tileRow = Math.min(tileRows - 1, Math.floor((y * tileRows) / canvasHeight));
+            const tile = gameplayTiles[tileRow * tileColumns + tileColumn];
+            tile.pixels++;
+            if (maximum < 24) {
+              nearDarkPixels++;
+            } else {
+              tile.nonDark++;
+              if (maximum - Math.min(red, green, blue) >= 12) {
+                tile.color++;
+              }
+            }
+            colorBins.add(`${red >> 4}:${green >> 4}:${blue >> 4}`);
+          }
         }
-        colorBins.add(`${red >> 4}:${green >> 4}:${blue >> 4}`);
+        return { colorBins, gameplayTiles, nearDarkPixels, pixelOffset };
       }
-    }
-    let verticalEdgeColumns = 0;
-    for (let x = 1; x < width; x++) {
-      let strongEdges = 0;
-      for (let y = 0; y < height; y++) {
-        const offset = pixelOffset(x, y);
-        const previous = pixelOffset(x - 1, y);
-        const delta =
-          Math.abs(pixels[offset] - pixels[previous])
-          + Math.abs(pixels[offset + 1] - pixels[previous + 1])
-          + Math.abs(pixels[offset + 2] - pixels[previous + 2]);
-        if (delta > 60) {
-          strongEdges++;
+
+      function countVerticalEdgeColumns(pixelData, canvasWidth, canvasHeight, pixelOffset) {
+        let verticalEdgeColumns = 0;
+        for (let x = 1; x < canvasWidth; x++) {
+          let strongEdges = 0;
+          for (let y = 0; y < canvasHeight; y++) {
+            const offset = pixelOffset(x, y);
+            const previous = pixelOffset(x - 1, y);
+            const delta =
+              Math.abs(pixelData[offset] - pixelData[previous])
+              + Math.abs(pixelData[offset + 1] - pixelData[previous + 1])
+              + Math.abs(pixelData[offset + 2] - pixelData[previous + 2]);
+            if (delta > 60) {
+              strongEdges++;
+            }
+          }
+          if (strongEdges / canvasHeight > 0.5) {
+            verticalEdgeColumns++;
+          }
         }
+        return verticalEdgeColumns;
       }
-      if (strongEdges / height > 0.5) {
-        verticalEdgeColumns++;
+
+      const image = document.createElement("img");
+      image.src = `data:image/png;base64,${pngBase64}`;
+      await image.decode();
+      const sampleWidth = 180;
+      const sampleHeight = 112;
+      const sample = document.createElement("canvas");
+      sample.width = sampleWidth;
+      sample.height = sampleHeight;
+      const context = sample.getContext("2d", { willReadFrequently: true });
+      if (context == null) {
+        throw new Error("checkpoint PNG inspection could not create a 2D context");
       }
-    }
-    return {
-      nearDarkRatio: nearDarkPixels / (width * height),
-      colorBinCount: colorBins.size,
-      verticalEdgeColumns,
-    };
-  }, encoded);
+      context.drawImage(image, 0, 0, sampleWidth, sampleHeight);
+      const samplePixels = context.getImageData(0, 0, sampleWidth, sampleHeight).data;
+      const summary = summarizePixels(samplePixels, sampleWidth, sampleHeight);
+      return {
+        nearDarkRatio: summary.nearDarkPixels / (sampleWidth * sampleHeight),
+        colorBinCount: summary.colorBins.size,
+        verticalEdgeColumns: countVerticalEdgeColumns(samplePixels, sampleWidth, sampleHeight, summary.pixelOffset),
+        minimumGameplayTileNonDarkRatio: Math.min(...summary.gameplayTiles.map(tile => tile.nonDark / tile.pixels)),
+        minimumGameplayTileColorRatio: Math.min(...summary.gameplayTiles.map(tile => tile.color / tile.pixels)),
+      };
+    },
+    { pngBase64: encoded, tileColumns: GAMEPLAY_TILE_COLUMNS, tileRows: GAMEPLAY_TILE_ROWS },
+  );
 }
 
-export function checkpointPixelIntegrityFailure(pixelIntegrity) {
+export function checkpointRequiresGameplayCoverage(checkpointName) {
+  return /(?:^|-)wave-\d+(?:-|$)|(?:^|-)campaign-failed$/u.test(checkpointName);
+}
+
+export function checkpointPixelIntegrityFailure(pixelIntegrity, checkpointName = "") {
   if (pixelIntegrity.colorBinCount < 12) {
     return "near-empty color palette";
   }
@@ -122,6 +159,13 @@ export function checkpointPixelIntegrityFailure(pixelIntegrity) {
     || (pixelIntegrity.verticalEdgeColumns > 10 && pixelIntegrity.nearDarkRatio > 0.15)
   ) {
     return "vertical-stripe compositor corruption";
+  }
+  if (
+    checkpointRequiresGameplayCoverage(checkpointName)
+    && (pixelIntegrity.minimumGameplayTileNonDarkRatio < MIN_GAMEPLAY_TILE_NON_DARK_RATIO
+      || pixelIntegrity.minimumGameplayTileColorRatio < MIN_GAMEPLAY_TILE_COLOR_RATIO)
+  ) {
+    return "partial gameplay capture";
   }
   return null;
 }
@@ -838,12 +882,14 @@ export class EvidenceSink {
     }
     const pixelIntegrity = await inspectCheckpointPixels(page, screenshot);
     this.record("checkpoint-pixel-integrity", { name: step, ...pixelIntegrity });
-    const pixelFailure = checkpointPixelIntegrityFailure(pixelIntegrity);
+    const pixelFailure = checkpointPixelIntegrityFailure(pixelIntegrity, step);
     if (pixelFailure != null) {
       throw new Error(
         `${this.label}: checkpoint ${step} failed pixel integrity (${pixelFailure}) `
           + `(bins=${pixelIntegrity.colorBinCount}, dark=${pixelIntegrity.nearDarkRatio.toFixed(3)}, `
-          + `verticalEdges=${pixelIntegrity.verticalEdgeColumns})`,
+          + `verticalEdges=${pixelIntegrity.verticalEdgeColumns}, `
+          + `minTileNonDark=${pixelIntegrity.minimumGameplayTileNonDarkRatio.toFixed(3)}, `
+          + `minTileColor=${pixelIntegrity.minimumGameplayTileColorRatio.toFixed(3)})`,
       );
     }
     const dom = await page.evaluate(() => ({
