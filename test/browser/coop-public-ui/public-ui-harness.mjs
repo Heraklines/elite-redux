@@ -21,6 +21,7 @@ const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
 const LOCAL_COMMAND = /CommandPhase .*-> LOCAL UI/u;
 const REWARD_PHASE = /Start Phase SelectModifierPhase/u;
 const GAME_OVER_PHASE = /Start Phase GameOverPhase/u;
+const POST_GAME_OVER_PHASE = /Start Phase PostGameOverPhase/u;
 const REWARD_OWNER = /OWNER drives reward screen/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
@@ -2490,8 +2491,31 @@ export class DuoPublicUiRig {
     };
     this.host.evidence.record("retained-game-over-race-proof", { ...proof, side: "authority" });
     this.guest.evidence.record("retained-game-over-race-proof", { ...proof, side: "renderer" });
+    this.host.evidence.expectSharedTerminalAfterPairedGameOver(hostGameOver.index);
+    this.guest.evidence.expectSharedTerminalAfterPairedGameOver(guestGameOver.index);
     this.assertNoFatalRecoverySince(outcomeCursors, "retained GameOver terminal");
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("paired-game-over-terminal")));
+    const stableTerminals = await Promise.all(
+      Object.values(this.clients).map(client =>
+        client.evidence.waitFor(POST_GAME_OVER_PHASE, {
+          from: client === this.host ? hostGameOver.index : guestGameOver.index,
+          timeoutMs: this.config.timeoutMs,
+          description: `${client.label} stable post-GameOver visual boundary`,
+        }),
+      ),
+    );
+    for (let index = 0; index < stableTerminals.length; index++) {
+      const client = Object.values(this.clients)[index];
+      client.evidence.record("stable-post-game-over-visual-proof", {
+        gameOverIndex: client === this.host ? hostGameOver.index : guestGameOver.index,
+        postGameOverIndex: stableTerminals[index].index,
+      });
+    }
+    // PostGameOver starts only after GameOver's fade promise completes. One frame lets its stable dark/title
+    // projection paint before the screenshot, so the final artifact is not the transient faint narration.
+    await delay(250);
+    this.assertNoFatalRecoverySince(outcomeCursors, "stable post-GameOver terminal");
+    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("paired-post-game-over-stable")));
     return proof;
   }
 

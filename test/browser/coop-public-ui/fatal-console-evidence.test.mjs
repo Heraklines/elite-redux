@@ -152,3 +152,25 @@ test("a different stateSync sequence still fails during a hot-rejoin window", as
     assert.throws(() => sink.assertClean(), /1 fatal browser event\(s\)/u);
   });
 });
+
+test("only an exact already-rendered paired GameOver may supersede normal shared teardown", async () => {
+  await withSink(async ({ page, sink }) => {
+    assert.throws(() => sink.expectSharedTerminalAfterPairedGameOver(0), /without exact GameOver evidence/u);
+    page.emit("console", consoleMessage("Start Phase GameOverPhase", "log"));
+    const gameOver = sink.events.find(event => /Start Phase GameOverPhase/u.test(event.text ?? ""));
+    sink.expectSharedTerminalAfterPairedGameOver(gameOver.index);
+    page.emit("console", consoleMessage("[coop:runtime] shared session stopped safely: game over", "log"));
+
+    assert.equal(sink.failures.length, 0);
+    assert.equal(sink.events.at(-1).kind, "expected-shared-terminal");
+    assert.doesNotThrow(() => sink.assertClean());
+  });
+});
+
+test("shared teardown remains fatal before the exact GameOver latch is armed", async () => {
+  await withSink(async ({ page, sink }) => {
+    page.emit("console", consoleMessage("[coop:runtime] shared session stopped safely: early teardown", "log"));
+    assert.equal(sink.failures.length, 1);
+    assert.equal(sink.failures[0].reason, "shared session terminated");
+  });
+});

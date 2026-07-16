@@ -102,7 +102,10 @@ export type CoopRole = "host" | "guest";
 // A protocol-35 renderer cannot preserve multiple surfaces, stable identities, or explicit reroll policy.
 // er-coop-37 adds exact authority-materialized egg reward grants to that closed ordered plan. A
 // protocol-36 renderer would silently credit only the host account, so mixed builds must refuse pairing.
-export const COOP_PROTOCOL_VERSION = "er-coop-37";
+// er-coop-38 adds an exact operation-journal admission ACK. A protocol-37 authority cannot distinguish
+// a retained WAVE_ADVANCE that is safely staged behind presentation from an operation that was never
+// delivered, so mixed builds must refuse pairing instead of exhausting delivery retries spuriously.
+export const COOP_PROTOCOL_VERSION = "er-coop-38";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -111,6 +114,13 @@ export const COOP_PROTOCOL_VERSION = "er-coop-37";
  * regressions, and conflicting duplicates instead of silently treating an early ACK as commit release.
  */
 export type CoopAuthorityAckStage = "materialApplied" | "presentationReady" | "continuationReady";
+
+/**
+ * Durable operations have one earlier delivery-only stage. `journalAdmitted` proves the exact canonical
+ * envelope was accepted into the receiver ledger; it is deliberately NOT material or continuation proof.
+ * Turn and replacement commits continue to use {@linkcode CoopAuthorityAckStage} and cannot emit it.
+ */
+export type CoopOperationAckStage = "journalAdmitted" | CoopAuthorityAckStage;
 
 /** Public shared-run surfaces that can prove an authoritative operation reached a usable continuation. */
 export type CoopOperationContinuationSurface = "command" | "sharedInput" | "terminal";
@@ -1172,7 +1182,7 @@ export type CoopMessage =
   /** Authenticated public P33-architecture hello. The signaling bearer is intentionally never peer-visible. */
   | {
       t: "hello";
-      version: "er-coop-37";
+      version: "er-coop-38";
       pairingId: string;
       account: CoopAccountIdentityV1;
       transportRole: CoopTransportRole;
@@ -1792,7 +1802,7 @@ export type CoopMessage =
        * backwards-compatible synthetic durability users. Operation commits are never retired by an ACK
        * without this ordered evidence.
        */
-      stage?: CoopAuthorityAckStage;
+      stage?: CoopOperationAckStage;
       operationId?: string;
       epoch?: number;
       wave?: number;
