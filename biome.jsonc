@@ -66,8 +66,7 @@
       // co-op static gate would reject) every worker-written save. Same generated-data
       // class as the er-*.ts modules above.
       "!!src/data/elite-redux/er-egg-moves.json",
-      "!!src/data/elite-redux/er-custom-trainers.json",
-      "!!src/data/elite-redux/er-custom-trainers-config.json",
+      "!!src/data/elite-redux/er-custom-trainer*.json",
       // Elite Redux: auto-generated SpeciesId companion enum (B1b).
       "!!src/enums/er-species-id.ts",
       // Elite Redux: auto-generated AbilityId/MoveId companion enums (B2).
