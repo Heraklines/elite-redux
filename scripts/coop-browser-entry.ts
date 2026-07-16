@@ -834,9 +834,10 @@ function observeSemanticSurface(): void {
         optionIds: null,
         optionCount: null,
         teamSpeciesIds: null,
-        ready: { handlerActive: true, awaitingActionInput: null },
+        ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
         phase,
         phaseInstance: semanticPhaseInstance,
+        surfaceGeneration: null,
         uiMode,
       } as const;
       const canonical = JSON.stringify(observation);
@@ -894,6 +895,8 @@ function observeSemanticSurface(): void {
     const promptReady = (handler as unknown as { isAwaitingPromptAction?: () => boolean }).isAwaitingPromptAction;
     const readPromptGeneration = (handler as unknown as { getPromptGeneration?: () => number }).getPromptGeneration;
     const awaitingRaw = (handler as unknown as { awaitingActionInput?: unknown }).awaitingActionInput;
+    const readInputBlocked = (handler as unknown as { isInputBlocked?: () => boolean }).isInputBlocked;
+    const readSurfaceGeneration = (handler as unknown as { getSurfaceGeneration?: () => number }).getSurfaceGeneration;
     // MessageUiHandler keeps its raw `awaitingActionInput` bit set after an action has consumed
     // `onActionInput`. Its public readiness method proves the complete actionable contract and
     // therefore prevents a read-only browser observer from publishing a stale ready=true between
@@ -906,6 +909,8 @@ function observeSemanticSurface(): void {
           : null;
     const promptGeneration =
       uiMode === "MESSAGE" && typeof readPromptGeneration === "function" ? readPromptGeneration.call(handler) : null;
+    const inputBlocked = typeof readInputBlocked === "function" ? readInputBlocked.call(handler) : null;
+    const surfaceGeneration = typeof readSurfaceGeneration === "function" ? readSurfaceGeneration.call(handler) : null;
     const semanticSurfaceInstance =
       Number.isSafeInteger(promptGeneration) && (promptGeneration ?? 0) > 0
         ? (promptGeneration as number)
@@ -920,6 +925,8 @@ function observeSemanticSurface(): void {
       teamSpeciesIds?.join(",") ?? "",
       ownerSeat ?? "?",
       awaitingActionInput,
+      inputBlocked,
+      surfaceGeneration,
     ].join("|");
     const now = Date.now();
     if (probeKey === lastSemanticProbe && now - lastSemanticProbeAt < 300) {
@@ -945,9 +952,10 @@ function observeSemanticSurface(): void {
       optionIds: selection.optionIds,
       optionCount: selection.optionCount,
       teamSpeciesIds,
-      ready: { handlerActive: true, awaitingActionInput },
+      ready: { handlerActive: true, awaitingActionInput, inputBlocked },
       phase,
       phaseInstance: semanticSurfaceInstance,
+      surfaceGeneration,
       uiMode,
     };
     const canonical = JSON.stringify(observation);

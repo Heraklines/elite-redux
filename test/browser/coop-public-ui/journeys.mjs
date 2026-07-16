@@ -35,6 +35,30 @@ async function waitForExactDeleteRequest(client, from) {
   );
 }
 
+async function waitForReadyYesConfirmation(client, surfaceId, from) {
+  const ready = await client.evidence.waitForCondition(
+    sink => {
+      const event = sink.findLastSemanticSurface(from, surfaceId);
+      const observation = event?.observation;
+      return observation?.selectedOptionId === "yes"
+        && observation.ready?.handlerActive === true
+        && observation.ready.inputBlocked === false
+        && Number.isSafeInteger(observation.surfaceGeneration)
+        && observation.surfaceGeneration > 0
+        ? event
+        : null;
+    },
+    { timeoutMs: client.config.timeoutMs, description: `actionable Yes confirmation ${surfaceId}` },
+  );
+  client.evidence.record("save-confirm-readiness-proof", {
+    surfaceId,
+    selectedOptionId: ready.observation.selectedOptionId,
+    surfaceGeneration: ready.observation.surfaceGeneration,
+    observationIndex: ready.index,
+  });
+  return ready;
+}
+
 function assertExactDeleteProof(client, request, response, tombstone) {
   if (
     request.index >= response.index
@@ -103,10 +127,7 @@ async function deleteCoopSaveThroughLoadMenu(client) {
     navKeys: ["ArrowUp", "ArrowDown"],
     timeoutMs: client.config.timeoutMs,
   });
-  await waitForSemanticSurface(client, "confirm:TitlePhase", {
-    fromCursor: confirmCursor,
-    timeoutMs: client.config.timeoutMs,
-  });
+  await waitForReadyYesConfirmation(client, "confirm:TitlePhase", confirmCursor);
   await client.checkpoint("delete-confirm-visible");
   const mutationCursor = client.evidence.cursor();
   await client.press("Space", "confirm-exact-coop-delete");
@@ -176,10 +197,7 @@ async function overwriteCoopSaveWithSoloRun(client) {
 
   const confirmCursor = client.evidence.cursor();
   await client.press("Space", "request-overwrite-occupied-coop-slot");
-  await waitForSemanticSurface(client, "confirm:SelectStarterPhase", {
-    fromCursor: confirmCursor,
-    timeoutMs: client.config.timeoutMs,
-  });
+  await waitForReadyYesConfirmation(client, "confirm:SelectStarterPhase", confirmCursor);
   await client.checkpoint("overwrite-confirm-visible");
   const mutationCursor = client.evidence.cursor();
   await client.press("Space", "confirm-overwrite-delete-first");

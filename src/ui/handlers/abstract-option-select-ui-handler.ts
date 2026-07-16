@@ -47,6 +47,9 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
 
   protected blockInput: boolean;
 
+  /** Monotonic identity for each visible option surface opened by this handler instance. */
+  private surfaceGeneration = 0;
+
   protected scrollCursor = 0;
   protected fullCursor = 0;
 
@@ -200,6 +203,7 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
 
     this.config = args[0] as OptionSelectConfig;
     this.blockInput = false;
+    this.surfaceGeneration += 1;
     this.setupOptions();
 
     globalScene.ui.bringToTop(this.optionSelectContainer);
@@ -325,6 +329,16 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
     this.blockInput = false;
     this.optionSelectTextContainer.setAlpha(1);
     this.cursorObj?.setAlpha(1);
+  }
+
+  /** Read-only readiness used by semantic/browser observers; never bypasses the input delay. */
+  isInputBlocked(): boolean {
+    return this.blockInput;
+  }
+
+  /** Distinguishes repeated option/confirmation surfaces within one long-lived game phase. */
+  getSurfaceGeneration(): number {
+    return this.surfaceGeneration;
   }
 
   getOptionsWithScroll(): OptionSelectItem[] {
