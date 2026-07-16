@@ -14,15 +14,25 @@ import {
 } from "./campaign-lifecycle.mjs";
 
 test("campaign lifecycle has a finite outer deadline independent of per-wave waits", () => {
-  const saved = process.env.COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS;
+  const saved = {
+    campaign: process.env.COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS,
+    setup: process.env.COOP_UI_SETUP_HARD_TIMEOUT_MS,
+  };
   delete process.env.COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS;
+  delete process.env.COOP_UI_SETUP_HARD_TIMEOUT_MS;
   try {
     assert.equal(loadCampaignLifecyclePolicy().campaignTimeoutMs, 45 * 60_000);
+    assert.equal(loadCampaignLifecyclePolicy().setupTimeoutMs, 12 * 60_000);
   } finally {
-    if (saved == null) {
+    if (saved.campaign == null) {
       delete process.env.COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS;
     } else {
-      process.env.COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS = saved;
+      process.env.COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS = saved.campaign;
+    }
+    if (saved.setup == null) {
+      delete process.env.COOP_UI_SETUP_HARD_TIMEOUT_MS;
+    } else {
+      process.env.COOP_UI_SETUP_HARD_TIMEOUT_MS = saved.setup;
     }
   }
 });
@@ -67,6 +77,17 @@ test("workflow reserves artifact-upload headroom after both lifecycle backstops"
   );
   assert.match(workflow, /timeout-minutes: 55/u);
   assert.match(workflow, /COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: "2700000"/u);
+  assert.match(workflow, /COOP_UI_SETUP_HARD_TIMEOUT_MS: "720000"/u);
   assert.match(workflow, /timeout --signal=INT --kill-after=3m 48m/u);
   assert.match(workflow, /if: always\(\)[\s\S]*Upload compact campaign diagnosis first/u);
+});
+
+test("campaign setup has a causal first-command deadline and progress marker", async () => {
+  const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
+  assert.match(
+    campaign,
+    /withinDeadline\(setup, lifecycle\.setupTimeoutMs, "public setup through first shared command surface"\)/u,
+  );
+  assert.match(campaign, /setup stage failed before first shared command surface/u);
+  assert.match(campaign, /setup stage completed within immutable deadline/u);
 });

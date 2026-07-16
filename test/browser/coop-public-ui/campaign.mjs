@@ -5,6 +5,7 @@
 
 import { appendFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { loadCampaignLifecyclePolicy, withinDeadline } from "./campaign-lifecycle.mjs";
 import {
   buildDispatchTable,
   GAME_OVER_PHASE,
@@ -1173,6 +1174,7 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
 /** The 30-wave (default) co-op campaign, driven end to end through public UI only. */
 export async function runCampaign(rig) {
   const policy = loadCampaignPolicy();
+  const lifecycle = loadCampaignLifecyclePolicy();
   const progress = new CampaignProgress(rig.config.artifactDir);
   const clients = Object.values(rig.clients);
   await progress.note("campaign start", {
@@ -1181,18 +1183,34 @@ export async function runCampaign(rig) {
     market: policy.market,
     renderProfile: policy.renderProfile,
     mysteryGauntlet: policy.mysteryGauntlet,
+    setupTimeoutMs: lifecycle.setupTimeoutMs,
   });
 
-  await rig.loginBoth();
-  await progress.note("login and fresh-account onboarding complete");
-  if (policy.raiseSpeed) {
-    await raiseGameSpeed(rig, policy, progress);
+  const setup = (async () => {
+    await rig.loginBoth();
+    await progress.note("login and fresh-account onboarding complete");
+    if (policy.raiseSpeed) {
+      await raiseGameSpeed(rig, policy, progress);
+    }
+    await configureRenderProfile(rig, policy, progress);
+    await rig.pair(rig.config.requesterSeat);
+    await progress.note("public lobby pairing complete");
+    await rig.startFreshRun();
+    await progress.note("fresh co-op run reached its first shared command surface");
+  })();
+  try {
+    await withinDeadline(setup, lifecycle.setupTimeoutMs, "public setup through first shared command surface");
+  } catch (error) {
+    await progress.note("setup stage failed before first shared command surface", {
+      setupTimeoutMs: lifecycle.setupTimeoutMs,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    await progress.flush();
+    throw error;
   }
-  await configureRenderProfile(rig, policy, progress);
-  await rig.pair(rig.config.requesterSeat);
-  await progress.note("public lobby pairing complete");
-  await rig.startFreshRun();
-  await progress.note("fresh co-op run reached its first shared command surface");
+  await progress.note("setup stage completed within immutable deadline", {
+    setupTimeoutMs: lifecycle.setupTimeoutMs,
+  });
   // Verify the layer-8 passive-digest fix did not disable ER innates (maintainer-directed invariant).
   assertInnatesLive(rig);
   await progress.note("innate-activation invariant checked at wave-1 command surface");

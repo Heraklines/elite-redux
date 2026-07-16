@@ -111,6 +111,7 @@ try {
     durationMs: finishedAt.getTime() - startedAt.getTime(),
     lifecycle: {
       campaignTimeoutMs: lifecycle.campaignTimeoutMs,
+      setupTimeoutMs: lifecycle.setupTimeoutMs,
       diagnosticTimeoutMs: lifecycle.diagnosticTimeoutMs,
       cleanupTimeoutMs: lifecycle.cleanupTimeoutMs,
       gracefulCleanupCompleted,

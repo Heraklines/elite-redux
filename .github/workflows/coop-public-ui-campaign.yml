@@ -363,6 +363,9 @@ jobs:
           # This is the whole lifecycle budget (preview boot + pairing + all waves), not a
           # refreshable or per-wave wait. It expires early enough to preserve failure evidence.
           COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: "2700000"
+          # Setup through the first shared command must fit the fast-lane contract. A renderer that
+          # takes longer is runner starvation, not useful wave coverage, and fails with a causal marker.
+          COOP_UI_SETUP_HARD_TIMEOUT_MS: "720000"
           COOP_UI_DIAGNOSTIC_TIMEOUT_MS: "20000"
           COOP_UI_CLEANUP_TIMEOUT_MS: "60000"
           # Loud-fail everywhere by default. `shakedown` (the ONLY mode that permits press-through of

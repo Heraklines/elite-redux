@@ -4,6 +4,7 @@
  */
 
 const DEFAULT_CAMPAIGN_TIMEOUT_MS = 45 * 60_000;
+const DEFAULT_SETUP_TIMEOUT_MS = 12 * 60_000;
 const DEFAULT_DIAGNOSTIC_TIMEOUT_MS = 20_000;
 const DEFAULT_CLEANUP_TIMEOUT_MS = 60_000;
 
@@ -20,8 +21,14 @@ function positiveInteger(name, fallback) {
 }
 
 export function loadCampaignLifecyclePolicy() {
+  const campaignTimeoutMs = positiveInteger("COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS", DEFAULT_CAMPAIGN_TIMEOUT_MS);
+  const setupTimeoutMs = positiveInteger("COOP_UI_SETUP_HARD_TIMEOUT_MS", DEFAULT_SETUP_TIMEOUT_MS);
+  if (setupTimeoutMs >= campaignTimeoutMs) {
+    throw new Error("COOP_UI_SETUP_HARD_TIMEOUT_MS must be smaller than COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS");
+  }
   return Object.freeze({
-    campaignTimeoutMs: positiveInteger("COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS", DEFAULT_CAMPAIGN_TIMEOUT_MS),
+    campaignTimeoutMs,
+    setupTimeoutMs,
     diagnosticTimeoutMs: positiveInteger("COOP_UI_DIAGNOSTIC_TIMEOUT_MS", DEFAULT_DIAGNOSTIC_TIMEOUT_MS),
     cleanupTimeoutMs: positiveInteger("COOP_UI_CLEANUP_TIMEOUT_MS", DEFAULT_CLEANUP_TIMEOUT_MS),
   });
