@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
+import { selectOptionById } from "./campaign-nav.mjs";
 import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
@@ -121,6 +122,8 @@ test("parallel lobby pairing reselects the exact visible username before every r
   );
   assert.match(harness, /surface\?\.observation\.optionIds\?\.includes\(targetId\)/u);
   assert.match(harness, /description: `visible lobby option for \$\{username\}`/u);
+  assert.match(harness, /this\.lobbySurfaceCursor = this\.evidence\.cursor\(\)/u);
+  assert.match(harness, /fromCursor: this\.lobbySurfaceCursor/u);
   assert.match(harness, /requester\.requestPlayer\(acceptorName, \{[\s\S]*purpose: "reissue-request"/u);
   assert.doesNotMatch(harness, /requester\.press\("Space", `lobby-reissue-request-/u);
 });
@@ -131,4 +134,50 @@ test("visual checkpoints foreground WebGL and reject trivial captures", async ()
   assert.match(evidence, /requestAnimationFrame\(\(\) => requestAnimationFrame\(resolveFrames\)\)/u);
   assert.match(evidence, /screenshot\.byteLength < MIN_CHECKPOINT_PNG_BYTES/u);
   assert.match(evidence, /dom\.canvases\.length === 0/u);
+  assert.match(evidence, /serializeCheckpointCapture\(async \(\) =>/u);
+  assert.match(evidence, /checkpointCaptureTail = pending\.catch\(\(\) => \{\}\)/u);
+});
+
+test("semantic navigation ignores stale same-surface history before its boundary", async () => {
+  const targetId = "ask-peer-to-play";
+  const events = [
+    {
+      index: 4,
+      observation: {
+        surfaceId: "option-select:TitlePhase",
+        selectedOptionId: "classic",
+        optionIds: ["classic", "co-op", "cancel"],
+      },
+    },
+  ];
+  const client = {
+    label: "guest-seat",
+    evidence: {
+      findLastSemanticSurface(fromCursor, surfaceId) {
+        return events.findLast(event => event.index >= fromCursor && event.observation.surfaceId === surfaceId) ?? null;
+      },
+      record() {},
+    },
+    async press() {
+      throw new Error("target was already selected; navigation input was unexpected");
+    },
+  };
+  setTimeout(() => {
+    events.push({
+      index: 6,
+      observation: {
+        surfaceId: "option-select:TitlePhase",
+        selectedOptionId: targetId,
+        optionIds: [targetId, "cancel"],
+      },
+    });
+  }, 10);
+
+  await selectOptionById(client, {
+    surfaceId: "option-select:TitlePhase",
+    targetId,
+    submit: false,
+    timeoutMs: 250,
+    fromCursor: 5,
+  });
 });

@@ -50,6 +50,14 @@ const CAPTURED_API_HOST = /(?:er-save-api|er-coop-api)/u;
 const MAX_BODY_BYTES = 256 * 1024;
 const MIN_CHECKPOINT_PNG_BYTES = 4 * 1024;
 const CHECKPOINT_RENDER_SETTLE_MS = 120;
+let checkpointCaptureTail = Promise.resolve();
+
+function serializeCheckpointCapture(capture) {
+  const pending = checkpointCaptureTail.then(capture, capture);
+  // A failed capture must release the queue so the peer can still persist its causal evidence.
+  checkpointCaptureTail = pending.catch(() => {});
+  return pending;
+}
 
 function isCapturedApiHost(hostname) {
   return CAPTURED_API_HOST.test(hostname);
@@ -738,12 +746,14 @@ export class EvidenceSink {
     // WebGL canvases in a background Chromium page can capture as mostly black/partial tiles even
     // while the game is healthy. Each player owns an isolated Chrome process, so foreground both
     // independently, allow two real render frames plus a short bounded settle, then capture.
-    await page.bringToFront();
-    await page.evaluate(
-      () => new Promise(resolveFrames => requestAnimationFrame(() => requestAnimationFrame(resolveFrames))),
-    );
-    await delay(CHECKPOINT_RENDER_SETTLE_MS);
-    const screenshot = await page.screenshot({ path: resolve(this.dir, `${step}.png`), fullPage: true });
+    const screenshot = await serializeCheckpointCapture(async () => {
+      await page.bringToFront();
+      await page.evaluate(
+        () => new Promise(resolveFrames => requestAnimationFrame(() => requestAnimationFrame(resolveFrames))),
+      );
+      await delay(CHECKPOINT_RENDER_SETTLE_MS);
+      return page.screenshot({ path: resolve(this.dir, `${step}.png`), fullPage: true });
+    });
     if (screenshot.byteLength < MIN_CHECKPOINT_PNG_BYTES) {
       throw new Error(`${this.label}: checkpoint ${step} produced a trivial ${screenshot.byteLength}-byte PNG`);
     }

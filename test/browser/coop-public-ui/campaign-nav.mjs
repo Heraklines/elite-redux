@@ -190,12 +190,13 @@ export async function selectOptionById(
     submit = true,
     maxSteps = 24,
     timeoutMs = 15_000,
+    fromCursor = 0,
   },
 ) {
   const label = `${surfaceId}->${targetId}`;
   let stalls = 0;
   for (let step = 0; step < maxSteps; step++) {
-    const event = await readSemantic(client, surfaceId, 0, timeoutMs);
+    const event = await readSemantic(client, surfaceId, fromCursor, timeoutMs);
     if (!event) {
       throw new Error(`${client.label}: selectOptionById(${label}) saw no ${surfaceId} semantic surface`);
     }
