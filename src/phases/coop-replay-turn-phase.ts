@@ -122,9 +122,16 @@ export class CoopReplayTurnPhase extends Phase {
     return true;
   }
 
-  /** A retained terminal may dissolve only a speculative turn beyond its settled authority address. */
-  public abortIfPastSettledTurn(settledTurn: number, reason: string): boolean {
-    return this.turn > settledTurn && this.abortPhantom(reason);
+  /**
+   * A retained terminal may always dissolve a speculative later turn. It may dissolve the settled turn
+   * itself only after this pump has drained every ordered live event and installed its authority wait:
+   * GameOver never emits that normal turn-resolution carrier, so this exact wait is otherwise impossible.
+   */
+  public abortIfRetainedTerminalSuperseded(settledTurn: number, reason: string): boolean {
+    return (
+      (this.turn > settledTurn || (this.turn === settledTurn && this.isAwaitingAuthority()))
+      && this.abortPhantom(reason)
+    );
   }
 
   public override end(): void {
@@ -812,5 +819,5 @@ export class CoopReplayTurnPhase extends Phase {
 }
 
 registerCoopActiveReplayTurnAborter(
-  (reason, settledTurn) => activeCoopReplayTurnPhase?.abortIfPastSettledTurn(settledTurn, reason) ?? false,
+  (reason, settledTurn) => activeCoopReplayTurnPhase?.abortIfRetainedTerminalSuperseded(settledTurn, reason) ?? false,
 );

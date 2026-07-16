@@ -452,8 +452,8 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
 
     await withClient(rig.guestCtx, async () => {
       rig.guestScene.currentBattle.waveIndex = 7;
-      rig.guestScene.currentBattle.turn = 2;
-      const replay = new CoopReplayTurnPhase(2);
+      rig.guestScene.currentBattle.turn = 1;
+      const replay = new CoopReplayTurnPhase(1);
       rig.guestScene.phaseManager.clearPhaseQueue();
       rig.guestScene.phaseManager.unshiftPhase(replay);
       rig.guestScene.phaseManager.shiftPhase();
@@ -462,8 +462,8 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       await new Promise(resolve => setTimeout(resolve, 5));
       expect(replay.isAwaitingAuthority(), "the guest has opened the phantom next-turn waiter").toBe(true);
       expect(
-        replay.abortIfPastSettledTurn(2, "same-turn retained terminal must not abort (test)"),
-        "a retained terminal cannot truncate presentation for its own settled turn",
+        replay.abortIfRetainedTerminalSuperseded(2, "a future terminal must not abort an earlier replay (test)"),
+        "a terminal from a later settled turn cannot truncate this replay",
       ).toBe(false);
       expect(replay.isAwaitingAuthority()).toBe(true);
     });
