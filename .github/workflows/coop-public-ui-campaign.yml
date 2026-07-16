@@ -260,7 +260,6 @@ jobs:
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_ACCOUNT_MODE: register
-          COOP_UI_LOBBY_ROOM: campaign-${{ github.run_id }}-${{ matrix.artifact }}-${{ github.run_attempt }}
           COOP_UI_ACTION_DELAY_MS: 70
           COOP_UI_SETTLE_DELAY_MS: 300
           NODE_OPTIONS: --max-old-space-size=4096
@@ -354,6 +353,7 @@ jobs:
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_ACCOUNT_MODE: register
+          COOP_UI_LOBBY_ROOM: campaign-${{ github.run_id }}-${{ matrix.artifact }}-${{ github.run_attempt }}
           # The surface lane keeps real move animations on for a short breadth proof. The depth lane
           # visibly selects Move Animations OFF and spends its runner budget on more waves instead.
           COOP_UI_CAMPAIGN_WAVES: ${{ matrix.waves }}

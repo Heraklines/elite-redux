@@ -13,7 +13,10 @@ test("real-browser lanes assign one public lobby room per isolated pair", () => 
     assert.match(workflow, /VITE_COOP_LOBBY_ROOM_QUERY:\s*1/u);
     assert.match(workflow, /COOP_UI_LOBBY_ROOM:/u);
   }
-  assert.match(campaign, /campaign-\$\{\{ github\.run_id \}\}-\$\{\{ matrix\.artifact \}\}/u);
+  assert.match(
+    campaign,
+    /- name: Drive two isolated built clients[\s\S]*?COOP_UI_LOBBY_ROOM: campaign-\$\{\{ github\.run_id \}\}-\$\{\{ matrix\.artifact \}\}[\s\S]*?run:/u,
+  );
   assert.match(journey, /primary-\$\{\{ github\.run_id \}\}-\$\{\{ matrix\.commander_owner_seat \}\}/u);
   assert.match(journey, /reverse-\$\{\{ github\.run_id \}\}/u);
 });
