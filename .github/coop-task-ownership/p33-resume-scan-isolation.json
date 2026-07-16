@@ -10,6 +10,7 @@
     "src/dev-tools/test-suite/scenarios.ts",
     "src/phases/title-phase.ts",
     "src/system/game-data.ts",
+    "test/browser/coop-public-ui/browser-workflow-fanout.test.mjs",
     "test/browser/coop-public-ui/config.mjs",
     "test/browser/coop-public-ui/evidence.mjs",
     "test/browser/coop-public-ui/journeys.mjs",
