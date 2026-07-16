@@ -278,8 +278,10 @@ if (
 }
 if (
   !browserEntry.includes("[coop-browser:render-profile]")
-  || !browserEntry.includes('handler.constructor?.name !== "SettingsDisplayUiHandler"')
+  || !browserEntry.includes('handlerName !== "SettingsUiHandler"')
+  || !browserEntry.includes('handlerName !== "SettingsDisplayUiHandler"')
   || !browserEntry.includes("moveAnimations: globalScene.moveAnimations")
+  || !browserEntry.includes("gameSpeed: globalScene.gameSpeed")
   || !browserEntry.includes('lastObservedRenderProfile = "";')
 ) {
   failures.push("coop-browser-entry.ts: missing the read-only visible render-profile attestation");
