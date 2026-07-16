@@ -74,6 +74,7 @@ async function openOccupiedSlotZero(client) {
     surfaceId: "save-slot",
     targetId: "cursor:0",
     navKeys: ["ArrowUp", "ArrowDown"],
+    submit: false,
     timeoutMs: client.config.timeoutMs,
   });
 }
