@@ -819,6 +819,7 @@ function observeSemanticSurface(): void {
         return;
       }
       const { wave, turn } = semanticBattleAddress(battle);
+      const stateDigest = battle == null ? null : computeMechanicalDigest().digest;
       const observation = {
         version: 2,
         surfaceId: "unclassified",
@@ -840,6 +841,8 @@ function observeSemanticSurface(): void {
         phase,
         phaseInstance: semanticPhaseInstance,
         surfaceGeneration: null,
+        mysteryEncounterType: battle?.mysteryEncounter?.encounterType ?? null,
+        stateDigest,
         uiMode,
       } as const;
       const canonical = JSON.stringify(observation);
@@ -894,6 +897,7 @@ function observeSemanticSurface(): void {
     // sentinel that lets the public driver wait for their real option surfaces instead of
     // racing repeated Action keys; gameplay surfaces still carry their actual wave/turn.
     const { wave, turn } = semanticBattleAddress(battle);
+    const mysteryEncounterType = battle?.mysteryEncounter?.encounterType ?? null;
     const promptReady = (handler as unknown as { isAwaitingPromptAction?: () => boolean }).isAwaitingPromptAction;
     const readPromptGeneration = (handler as unknown as { getPromptGeneration?: () => number }).getPromptGeneration;
     const awaitingRaw = (handler as unknown as { awaitingActionInput?: unknown }).awaitingActionInput;
@@ -919,6 +923,7 @@ function observeSemanticSurface(): void {
           ? inputBlockedRaw
           : null;
     const surfaceGeneration = typeof readSurfaceGeneration === "function" ? readSurfaceGeneration.call(handler) : null;
+    const stateDigest = coop && battle != null ? computeMechanicalDigest().digest : null;
     const semanticSurfaceInstance =
       Number.isSafeInteger(promptGeneration) && (promptGeneration ?? 0) > 0
         ? (promptGeneration as number)
@@ -935,6 +940,8 @@ function observeSemanticSurface(): void {
       awaitingActionInput,
       inputBlocked,
       surfaceGeneration,
+      mysteryEncounterType,
+      stateDigest,
     ].join("|");
     const now = Date.now();
     if (probeKey === lastSemanticProbe && now - lastSemanticProbeAt < 300) {
@@ -964,6 +971,14 @@ function observeSemanticSurface(): void {
       phase,
       phaseInstance: semanticSurfaceInstance,
       surfaceGeneration,
+      // Stable registry identity, not localized presentation text. This lets two real browsers
+      // prove that an apparently matching Mystery surface is actually the same encounter and
+      // lets the ten-wave gauntlet prove non-repeating event breadth.
+      mysteryEncounterType,
+      // Every co-op UI-to-relay surface carries the same broad mechanical fingerprint used at
+      // battle continuation boundaries. A Mystery/shop/prompt desync can no longer heal before
+      // the next command and disappear from the two-browser evidence.
+      stateDigest,
       uiMode,
     };
     const canonical = JSON.stringify(observation);

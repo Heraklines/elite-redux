@@ -20,6 +20,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import {
   adoptBargainWatcherOutcome,
   commitBargainOwnerOutcome,
@@ -311,7 +312,9 @@ export class TheBargainPhase extends Phase {
         }
         pokeName = mon.getNameToRender();
         globalScene.removePokemonFromPlayerParty(mon, true);
-        new Egg({ sourceType: EggSourceType.EVENT, tier: EggTier.LEGENDARY }).addEggToGameData();
+        coopAllowAccountWrite("bargain-egg-reward", () =>
+          new Egg({ sourceType: EggSourceType.EVENT, tier: EggTier.LEGENDARY }).addEggToGameData(),
+        );
         break;
       }
       case "pride": {

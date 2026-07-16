@@ -237,7 +237,19 @@ test("semantic owner is not driven until the visible handler accepts input", () 
       surfaceId: "reward-shop",
       localSeat: 0,
       ownerSeat: 0,
-      ready: { handlerActive: true, awaitingActionInput: true },
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: true },
+    },
+  });
+  assert.equal(resolveSurfaceOwner(rig, driver, cursors, new Map(), true), null);
+
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "reward-shop",
+      localSeat: 0,
+      ownerSeat: 0,
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
     },
   });
   assert.equal(resolveSurfaceOwner(rig, driver, cursors, new Map(), true)?.client, authority);

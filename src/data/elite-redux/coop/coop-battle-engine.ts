@@ -4473,23 +4473,23 @@ function restoreCoopModuleLetSubstrates(
 ): void {
   try {
     if (Array.isArray(snapshot.erMoneyStreaks)) {
-      coopLog("heal", `erMoneyStreaks host entries=${snapshot.erMoneyStreaks.length} -> restored (#837/#348)`);
+      coopLog("adopt", `erMoneyStreaks host entries=${snapshot.erMoneyStreaks.length} -> restored (#837/#348)`);
       restoreErMoneyStreaks(snapshot.erMoneyStreaks);
     }
     if (snapshot.biomeOverstayAnchor !== undefined) {
-      coopLog("heal", `biomeOverstayAnchor host=${snapshot.biomeOverstayAnchor} -> restored (#837/#504)`);
+      coopLog("adopt", `biomeOverstayAnchor host=${snapshot.biomeOverstayAnchor} -> restored (#837/#504)`);
       setErBiomeOverstayAnchor(snapshot.biomeOverstayAnchor);
     }
     if (snapshot.erBiomeStructure !== undefined) {
       coopLog(
-        "heal",
+        "adopt",
         `erBiomeStructure host length=${snapshot.erBiomeStructure.biomeLength} startWave=${snapshot.erBiomeStructure.biomeStartWave} -> restored (#841 item 5)`,
       );
       setErBiomeStructureExtent(snapshot.erBiomeStructure.biomeLength, snapshot.erBiomeStructure.biomeStartWave);
     }
     if (snapshot.erRelicBattleState !== undefined) {
       coopLog(
-        "heal",
+        "adopt",
         `erRelicBattleState host wave=${(snapshot.erRelicBattleState as ErRelicBattleStateData).wave} -> restored (#837)`,
       );
       restoreErRelicBattleState(snapshot.erRelicBattleState);
@@ -4504,7 +4504,7 @@ function restoreCoopModuleLetSubstrates(
     // no-op; pass the live wave defensively for an older save that omitted it.)
     if (snapshot.erMapState !== undefined) {
       coopLog(
-        "heal",
+        "adopt",
         `erMapState host nodes=${snapshot.erMapState.nodes?.length ?? 0} travelTarget=${snapshot.erMapState.travelTarget ?? "-"} fragments=${snapshot.erMapState.fragments ?? 0} -> restored (#865/#841 item 1)`,
       );
       restoreErMapState(snapshot.erMapState, globalScene.currentBattle?.waveIndex ?? 1);
@@ -4515,7 +4515,7 @@ function restoreCoopModuleLetSubstrates(
     }
     if (Array.isArray(snapshot.erPendingNodes)) {
       coopLog(
-        "heal",
+        "adopt",
         `erPendingNodes host count=${snapshot.erPendingNodes.length} revealed=${snapshot.erPendingNodes.filter(n => n.revealed).length} -> restored (#865)`,
       );
       setErPendingNodes((snapshot.erPendingNodes as ErRouteNode[]).map(n => ({ ...n })));

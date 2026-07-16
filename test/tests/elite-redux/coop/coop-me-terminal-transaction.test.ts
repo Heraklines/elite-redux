@@ -121,6 +121,25 @@ function terminalId(pinned: number, step: number, epoch = 1): string {
   return makeCoopOperationId(epoch, 0, (COOP_ME_TERM_SEQ_BASE + pinned) * 8000 + 4000 + step, "ME_TERMINAL");
 }
 
+function eggReward(overrides: Record<string, unknown> = {}): CoopMeRewardSurfaceProjection {
+  return {
+    kind: "egg",
+    surfaceId: "egg:me:1:0",
+    id: 12345,
+    timestamp: 1_700_000_000_000,
+    sourceType: null,
+    tier: 1,
+    hatchWaves: 25,
+    species: 25,
+    isShiny: false,
+    variantTier: 0,
+    eggMoveIndex: 1,
+    overrideHiddenAbility: false,
+    eggDescriptor: "A promised Egg",
+    ...overrides,
+  } as CoopMeRewardSurfaceProjection;
+}
+
 describe("complete retained Mystery terminal transaction", () => {
   it("keeps host presentation ordinals and commit logs isolated per runtime", () => {
     const runtimeA = createCoopRuntimeOpState("host");
@@ -283,6 +302,20 @@ describe("complete retained Mystery terminal transaction", () => {
     expect(validates([makeCoopMeModifierRewardSurfaceProjection("modifier:0", -2)])).toBe(false);
     expect(validates([makeCoopMeModifierRewardSurfaceProjection("modifier:0", Number.NaN)])).toBe(false);
     expect(validates([makeCoopMeModifierRewardSurfaceProjection("modifier:0", Number.POSITIVE_INFINITY)])).toBe(false);
+    expect(validates([eggReward()])).toBe(true);
+    expect(validates([makeCoopMeModifierRewardSurfaceProjection("modifier:0"), eggReward()])).toBe(true);
+    expect(validates([eggReward({ id: -1 })])).toBe(false);
+    expect(validates([eggReward({ tier: 4 })])).toBe(false);
+    expect(validates([eggReward({ species: 0 })])).toBe(false);
+    expect(validates([eggReward({ species: 1500 })])).toBe(false);
+    expect(validates([eggReward({ species: 999_999 })])).toBe(false);
+    expect(validates([eggReward({ sourceType: 6 })])).toBe(false);
+    expect(validates([eggReward({ isShiny: "yes" })])).toBe(false);
+    expect(validates([eggReward({ variantTier: 3 })])).toBe(false);
+    expect(validates([eggReward({ eggDescriptor: "x".repeat(257) })])).toBe(false);
+    expect(
+      validates([eggReward({ surfaceId: "modifier:0" }), makeCoopMeModifierRewardSurfaceProjection("modifier:0")]),
+    ).toBe(false);
     expect(
       validates([makeCoopMeModifierRewardSurfaceProjection("modifier:0", COOP_ME_REROLL_MULTIPLIER_MAX + 1)]),
     ).toBe(false);

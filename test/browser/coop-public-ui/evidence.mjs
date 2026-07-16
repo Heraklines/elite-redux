@@ -16,6 +16,61 @@ const MARKET_PREFIX = "[coop-browser:market] ";
 const COMMANDER_PREFIX = "[coop-browser:commander] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 const CHECKSUM_SENTINEL = "0000000000000000";
+const POST_REJOIN_RESYNC_REQUEST = /^\[coop:resync\] post-rejoin full resync request seq=(\d+)/u;
+const STATE_SYNC_START = /^\[coop:resync\] guest requestStateSync turn=(\d+) seq=(\d+) START\b/u;
+const FATAL_COOP_CONSOLE_RULES = Object.freeze([
+  [/^\[coop:ASSERT\].*\bCHECKSUM MISMATCH\b/iu, "checksum assertion"],
+  [
+    /^\[coop:checksum\].*(?:\bMISMATCH\b|ASSERTION-DIFF|STRUCTURED APPLY FAILURE|\bNOT converged\b)/u,
+    "checksum divergence",
+  ],
+  [/^\[coop-resync\].*\bUNHEALED\b/iu, "checksum recovery did not heal"],
+  [/^\[coop:heal\]\s/u, "authoritative heal applied"],
+  [/^\[coop:durability\].*\boperation delivery RETRY\b/u, "durable operation delivery retry"],
+  [
+    /^\[coop:durability\].*(?:\brecover cls=.*\battempt=\d+\/\d+|\brecovery request send deferred\b)/u,
+    "durability recovery attempt",
+  ],
+  [
+    /^\[coop:durability\].*(?:-> request tail\b|-> bounded recovery\b|\bapply REJECTED\b|\boutbound queue COLLAPSED\b|\bOVERFLOW:.*-> full snapshot\b)/u,
+    "durability resync requested",
+  ],
+  [
+    /^\[coop:durability\].*(?:\brecovery EXHAUSTED\b|\bdeferred continuation EXHAUSTED\b|\boperation continuation EXHAUSTED\b|\boperation delivery retries exhausted\b)/u,
+    "durability recovery exhausted",
+  ],
+  [/^\[coop:runtime\] STALL WATCHDOG:.*-> recovering\b/u, "stall recovery attempt"],
+  [/^\[coop:me\].*requesting durable replay\b/u, "Mystery durability recovery attempt"],
+  [/^\[coop:resync\].*(?:\bawait stateSync start\b|\bqueueing full snapshot apply\b)/u, "state resync attempt"],
+  [
+    /^\[coop:resync\].*(?:\bstill-diverged\b|\bpersistent divergence\b|\bdid NOT converge\b|\bcould not converge\b|\bno snapshot received \(timeout\)|\bstateSync TIMEOUT\/null\b|\bsnapshot apply FAILED\b|\bmalformed snapshot blob\b|\bsnapshot refused\b|\bcontrol commit failed\b|\brollback failed\b|\bapply\/verify threw\b)/u,
+    "state resync failed",
+  ],
+  [
+    /^\[coop:[^\]]+\].*(?:\brecovery (?:EXHAUSTED|exhausted)\b|\bNOT converged\b|\bdid NOT converge\b|\bcould not converge\b|\bcould not recover\b|\bafter bounded recovery\b)/u,
+    "co-op recovery exhausted",
+  ],
+  [/^\[coop:runtime\] shared session (?:terminal requested|stopped safely):/u, "shared session terminated"],
+]);
+
+/**
+ * Classify console proof that a supposedly clean public-browser run entered divergence or recovery.
+ *
+ * This deliberately does not depend on the console level: production checksum assertions are warnings,
+ * and several durability retries are ordinary logs. A later MATCH/healed line cannot erase the event that
+ * caused recovery, so EvidenceSink retains the first-class fatal observation for assertClean(). The sole
+ * stateful exemption is an explicitly correlated post-rejoin stateSync request; replacing a disconnected
+ * channel and pulling its retained snapshot is part of the hot-rejoin contract, not a spontaneous desync.
+ */
+export function fatalCoopConsoleReason(text, { benignRejoinStateSync = false } = {}) {
+  if (typeof text !== "string") {
+    return null;
+  }
+  if (STATE_SYNC_START.test(text)) {
+    return benignRejoinStateSync ? null : "state resync attempt";
+  }
+  return FATAL_COOP_CONSOLE_RULES.find(([pattern]) => pattern.test(text))?.[1] ?? null;
+}
 
 function cleanSegment(value) {
   return (
@@ -175,6 +230,68 @@ function serializeCheckpointCapture(capture) {
   // A failed capture must release the queue so the peer can still persist its causal evidence.
   checkpointCaptureTail = pending.catch(() => {});
   return pending;
+}
+
+/** Two independent Chromium capture paths; either may recover a headed compositor failure. */
+export async function captureCheckpointPngWithFallback(
+  page,
+  { step, dir, label, record = () => {}, inspect = inspectCheckpointPixels, persist = writeFile, settle = delay },
+) {
+  const failures = [];
+  for (const [attempt, fromSurface] of [false, true].entries()) {
+    let screenshot = null;
+    let pixelIntegrity = null;
+    try {
+      await page.bringToFront();
+      await page.evaluate(
+        () => new Promise(resolveFrames => requestAnimationFrame(() => requestAnimationFrame(resolveFrames))),
+      );
+      await settle(CHECKPOINT_RENDER_SETTLE_MS * (attempt + 1));
+      screenshot = await page.screenshot({
+        fullPage: false,
+        captureBeyondViewport: false,
+        fromSurface,
+      });
+      if (screenshot.byteLength < MIN_CHECKPOINT_PNG_BYTES) {
+        throw new Error(`trivial ${screenshot.byteLength}-byte PNG`);
+      }
+      pixelIntegrity = await inspect(page, screenshot);
+      const pixelFailure = checkpointPixelIntegrityFailure(pixelIntegrity, step);
+      if (pixelFailure != null) {
+        throw new Error(
+          `${pixelFailure}; bins=${pixelIntegrity.colorBinCount}, dark=${pixelIntegrity.nearDarkRatio.toFixed(3)}, `
+            + `verticalEdges=${pixelIntegrity.verticalEdgeColumns}, `
+            + `minTileNonDark=${pixelIntegrity.minimumGameplayTileNonDarkRatio.toFixed(3)}, `
+            + `minTileColor=${pixelIntegrity.minimumGameplayTileColorRatio.toFixed(3)}`,
+        );
+      }
+      record("checkpoint-pixel-attempt", {
+        name: step,
+        attempt: attempt + 1,
+        fromSurface,
+        failure: null,
+        ...pixelIntegrity,
+      });
+      await persist(resolve(dir, `${step}.png`), screenshot);
+      return { pixelIntegrity, attempt: attempt + 1 };
+    } catch (error) {
+      const failure = error instanceof Error ? error.message : String(error);
+      failures.push(`attempt ${attempt + 1} fromSurface=${fromSurface}: ${failure}`);
+      record("checkpoint-pixel-attempt", {
+        name: step,
+        attempt: attempt + 1,
+        fromSurface,
+        failure,
+        ...(pixelIntegrity ?? {}),
+      });
+      if (screenshot != null) {
+        await persist(resolve(dir, `${step}.corrupt-attempt-${attempt + 1}.png`), screenshot);
+      }
+    }
+  }
+  throw new Error(
+    `${label}: checkpoint ${step} failed pixel integrity after both capture paths (${failures.join(" | ")})`,
+  );
 }
 
 function isCapturedApiHost(hostname) {
@@ -598,6 +715,9 @@ export function semanticSurfaceView(text) {
   }
   const nullableSeat = seat => seat === null || (Number.isSafeInteger(seat) && seat >= 0);
   const nullableRevision = revision => revision === null || (Number.isSafeInteger(revision) && revision >= 0);
+  const nullableMysteryEncounterType = type => type === null || (Number.isSafeInteger(type) && type >= 0);
+  const nullableStateDigest = digest =>
+    digest === null || (typeof digest === "string" && /^[0-9a-f]{16}$/iu.test(digest) && digest !== CHECKSUM_SENTINEL);
   if (
     !value
     || typeof value !== "object"
@@ -632,6 +752,9 @@ export function semanticSurfaceView(text) {
     || !Number.isSafeInteger(value.phaseInstance)
     || value.phaseInstance <= 0
     || !nullablePositiveInteger(value.surfaceGeneration)
+    || !nullableMysteryEncounterType(value.mysteryEncounterType)
+    || !nullableStateDigest(value.stateDigest)
+    || (value.coop && value.address.wave > 0 && value.stateDigest === null)
     || (value.coop
       && (value.localSeat === null
         || value.localRole === null
@@ -658,6 +781,7 @@ export class EvidenceSink {
     this.expectedMissingSystemSaveErrors = expectedMissingSystemSaveErrors;
     this.events = [];
     this.failures = [];
+    this.benignRejoinStateSyncTurns = new Set();
     this.networkState = { account: null, lobby: null, coopRunStatus: null, apiFailure: null };
     this.writeTail = Promise.resolve();
   }
@@ -798,6 +922,24 @@ export class EvidenceSink {
         text,
         source,
       });
+      const postRejoinRequest = POST_REJOIN_RESYNC_REQUEST.exec(text);
+      if (postRejoinRequest != null) {
+        this.benignRejoinStateSyncTurns.add(postRejoinRequest[1]);
+      }
+      const stateSyncStart = STATE_SYNC_START.exec(text);
+      const fatalCoopReason = fatalCoopConsoleReason(text, {
+        benignRejoinStateSync: stateSyncStart != null && this.benignRejoinStateSyncTurns.has(stateSyncStart[1]),
+      });
+      if (fatalCoopReason != null) {
+        const fatal = this.record("coop-fatal-console", {
+          level: message.type(),
+          text,
+          source,
+          reason: fatalCoopReason,
+          consoleEventIndex: event.index,
+        });
+        this.failures.push(fatal);
+      }
       const expectedMissingSystemSave = isExpectedMissingSystemSaveError(
         message.type(),
         text,
@@ -808,7 +950,11 @@ export class EvidenceSink {
         // A register-mode flag, not a countdown: a fresh account reads several missing saves
         // (system + session) before its first persist, so all such reads are expected.
         this.record("console-error-expected", { source, reason: "fresh account has no persisted save yet" });
-      } else if (message.type() === "error" && !this.allowedConsoleErrors.some(pattern => pattern.test(text))) {
+      } else if (
+        fatalCoopReason == null
+        && message.type() === "error"
+        && !this.allowedConsoleErrors.some(pattern => pattern.test(text))
+      ) {
         this.failures.push(event);
       }
       try {
@@ -972,33 +1118,18 @@ export class EvidenceSink {
     // WebGL canvases in a background Chromium page can capture as mostly black/partial tiles even
     // while the game is healthy. Each player owns an isolated Chrome process, so foreground both
     // independently, allow two real render frames plus a short bounded settle, then capture.
-    const screenshot = await serializeCheckpointCapture(async () => {
-      await page.bringToFront();
-      await page.evaluate(
-        () => new Promise(resolveFrames => requestAnimationFrame(() => requestAnimationFrame(resolveFrames))),
-      );
-      await delay(CHECKPOINT_RENDER_SETTLE_MS);
-      return page.screenshot({
-        path: resolve(this.dir, `${step}.png`),
-        fullPage: false,
-        captureBeyondViewport: false,
-        fromSurface: false,
-      });
-    });
-    if (screenshot.byteLength < MIN_CHECKPOINT_PNG_BYTES) {
-      throw new Error(`${this.label}: checkpoint ${step} produced a trivial ${screenshot.byteLength}-byte PNG`);
-    }
-    const pixelIntegrity = await inspectCheckpointPixels(page, screenshot);
+    const capture = await serializeCheckpointCapture(() =>
+      captureCheckpointPngWithFallback(page, {
+        step,
+        dir: this.dir,
+        label: this.label,
+        record: (kind, payload) => this.record(kind, payload),
+      }),
+    );
+    const { pixelIntegrity } = capture;
     this.record("checkpoint-pixel-integrity", { name: step, ...pixelIntegrity });
-    const pixelFailure = checkpointPixelIntegrityFailure(pixelIntegrity, step);
-    if (pixelFailure != null) {
-      throw new Error(
-        `${this.label}: checkpoint ${step} failed pixel integrity (${pixelFailure}) `
-          + `(bins=${pixelIntegrity.colorBinCount}, dark=${pixelIntegrity.nearDarkRatio.toFixed(3)}, `
-          + `verticalEdges=${pixelIntegrity.verticalEdgeColumns}, `
-          + `minTileNonDark=${pixelIntegrity.minimumGameplayTileNonDarkRatio.toFixed(3)}, `
-          + `minTileColor=${pixelIntegrity.minimumGameplayTileColorRatio.toFixed(3)})`,
-      );
+    if (capture.attempt > 1) {
+      this.record("checkpoint-pixel-recovered", { name: step, cleanAttempt: capture.attempt });
     }
     const dom = await page.evaluate(() => ({
       title: document.title,

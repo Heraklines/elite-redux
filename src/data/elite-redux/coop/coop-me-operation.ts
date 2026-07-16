@@ -100,6 +100,9 @@ import type {
   CoopInteractionOutcome,
   CoopRole,
 } from "#data/elite-redux/coop/coop-transport";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { EggSourceType } from "#enums/egg-source-types";
+import { VariantTier } from "#enums/variant-tier";
 
 /** First-success latch for the immutable terminal DATA image reused by every journal retry. */
 export class CoopMeTerminalOutcomeLatch {
@@ -123,7 +126,19 @@ function isSafeNonNegativeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0;
 }
 
+function isBoundedNonNegativeInteger(value: unknown, maximum: number): value is number {
+  return isSafeNonNegativeInteger(value) && value <= maximum;
+}
+
 const COOP_ME_REWARD_SURFACE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$/;
+const COOP_ME_EGG_DESCRIPTOR_MAX_LENGTH = 256;
+const REGISTERED_EGG_SPECIES = new Set<number>(Object.values(ER_ID_MAP.species));
+const VALID_EGG_SOURCE_TYPES = new Set<number>(
+  Object.values(EggSourceType).filter((value): value is number => typeof value === "number"),
+);
+const VALID_VARIANT_TIERS = new Set<number>(
+  Object.values(VariantTier).filter((value): value is number => typeof value === "number"),
+);
 
 function isCanonicalCoopMeRewardSurfaceId(value: unknown): value is string {
   return (
@@ -147,13 +162,30 @@ function isCompleteCoopMeRewardSurfacePlan(value: unknown): value is CoopMeRewar
   }
   const surfaceIds = new Set<string>();
   for (const surface of value) {
-    if (
-      !isPlainObject(surface)
-      || surface.kind !== "modifier"
-      || !isCanonicalCoopMeRewardSurfaceId(surface.surfaceId)
-      || !isExecutableCoopMeRerollMultiplier(surface.rerollMultiplier)
-      || surfaceIds.has(surface.surfaceId)
-    ) {
+    if (!isPlainObject(surface) || !isCanonicalCoopMeRewardSurfaceId(surface.surfaceId)) {
+      return false;
+    }
+    const validSurface =
+      surface.kind === "modifier"
+        ? isExecutableCoopMeRerollMultiplier(surface.rerollMultiplier)
+        : surface.kind === "egg"
+          && isSafeNonNegativeInteger(surface.id)
+          && isSafeNonNegativeInteger(surface.timestamp)
+          && (surface.sourceType === null
+            || (isSafeNonNegativeInteger(surface.sourceType) && VALID_EGG_SOURCE_TYPES.has(surface.sourceType)))
+          && isBoundedNonNegativeInteger(surface.tier, 3)
+          && isBoundedNonNegativeInteger(surface.hatchWaves, 1_000_000)
+          && isSafeNonNegativeInteger(surface.species)
+          && REGISTERED_EGG_SPECIES.has(surface.species)
+          && typeof surface.isShiny === "boolean"
+          && isSafeNonNegativeInteger(surface.variantTier)
+          && VALID_VARIANT_TIERS.has(surface.variantTier)
+          && isBoundedNonNegativeInteger(surface.eggMoveIndex, 3)
+          && typeof surface.overrideHiddenAbility === "boolean"
+          && (surface.eggDescriptor === null
+            || (typeof surface.eggDescriptor === "string"
+              && surface.eggDescriptor.length <= COOP_ME_EGG_DESCRIPTOR_MAX_LENGTH));
+    if (!validSurface || surfaceIds.has(surface.surfaceId)) {
       return false;
     }
     surfaceIds.add(surface.surfaceId);

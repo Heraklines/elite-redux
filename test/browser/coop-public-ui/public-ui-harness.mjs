@@ -1007,6 +1007,7 @@ export class PublicUiClient {
     { purpose = "request", timeoutMs = this.config.timeoutMs, relayTimeoutMs = timeoutMs, optional = false } = {},
   ) {
     const targetId = semanticOptionId(`Ask ${username} to play`);
+    let requestCursor = this.evidence.cursor();
     try {
       await this.waitForLobbyPlayer(username, timeoutMs);
       await this.evidence.waitForCondition(
@@ -1019,11 +1020,15 @@ export class PublicUiClient {
       );
       // The worker lobby list is dynamic under a sharded campaign. Select by the exact visible
       // username immediately before every request; an old cursor index may now name another runner.
+      // Submission stays inside the readiness-aware navigator. Splitting selection and Space into
+      // separate operations let a TitlePhase repaint block the key after the correct row was visibly
+      // selected, producing a twelve-minute false softlock in all three real-browser lanes.
+      requestCursor = this.evidence.cursor();
+      this.evidence.record("lobby-request-attempt", { username, targetId, purpose });
       await selectOptionById(this, {
         surfaceId: "option-select:TitlePhase",
         targetId,
         navKeys: ["ArrowUp", "ArrowDown"],
-        submit: false,
         timeoutMs,
         fromCursor: this.lobbySurfaceCursor,
       });
@@ -1040,8 +1045,6 @@ export class PublicUiClient {
       }
       throw error;
     }
-    const requestCursor = this.evidence.cursor();
-    await this.press("Space", `lobby-${purpose}-${username}`);
     try {
       const outcome = await this.evidence.waitForCondition(
         sink => {
@@ -1499,7 +1502,11 @@ export class DuoPublicUiRig {
     );
     // Navigate by the exact public option id and send the first request. The lobby is shared by
     // every remote shard, so a numeric cursor position is never an identity proof.
-    await requester.requestPlayer(acceptor.credentials.username);
+    await requester.requestPlayer(acceptor.credentials.username, {
+      purpose: "initial-request",
+      relayTimeoutMs: OPTIONAL_LOBBY_RELAY_WAIT_MS,
+      optional: true,
+    });
     // The co-op HOST binds from the WebRTC session connect (sessionEpoch>0). The co-op GUEST
     // only binds AFTER the host fires its LAUNCH DECISION ("Press to start co-op" ->
     // sendResumeStartNew / resume offer), which the journey (startFreshRun/resumeRun) drives
@@ -1534,7 +1541,9 @@ export class DuoPublicUiRig {
     const acceptorName = acceptor.credentials.username;
     const deadline = Date.now() + this.config.timeoutMs;
     let acceptedForLiveRequest = false;
-    let nextReissueAt = Date.now() + LOBBY_REQUEST_REISSUE_MS;
+    // The initial public key may land in the tiny repaint window after the semantic read. Enter
+    // the bounded self-healing loop immediately instead of waiting a full request TTL to discover it.
+    let nextReissueAt = Date.now();
     let supersededRequestFailure = null;
     while (Date.now() < deadline) {
       for (const client of Object.values(this.clients)) {

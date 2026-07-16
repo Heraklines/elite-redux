@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { resetErGhostRunState, setCoopGhostPool, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { erGauntletPickMeType, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
+import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { allMysteryEncounters, initMysteryEncounters } from "#mystery-encounters/mystery-encounters";
 import { type ErGauntletBargainQueue, queueErGauntletBargainTransition } from "#phases/new-battle-phase";
@@ -110,6 +112,35 @@ describe("#814 Mystery Gauntlet schedule (pure)", () => {
       const probe = queueProbe();
       expect(queueErGauntletBargainTransition(probe.queue, wave, active)).toBe(false);
       expect(probe.calls).toEqual([]);
+    }
+  });
+
+  it("deterministically skips encounters that are illegal for the host's current run state", () => {
+    const baseline = erGauntletPickMeType(2, [], "eligibility-seed");
+    const substitute = erGauntletPickMeType(2, [], "eligibility-seed", type => type !== baseline);
+    expect(substitute).not.toBe(baseline);
+    expect(() => erGauntletPickMeType(2, [], "eligibility-seed", () => false)).toThrow(/no eligible registered/u);
+  });
+
+  it("always materializes the same scripted wave-7 ghost regardless of external pool timing", () => {
+    setErDifficulty("mystery");
+    try {
+      resetErGhostRunState();
+      expect(takeGhostForWave(6, false)).toBeNull();
+      const first = takeGhostForWave(7, false);
+      expect(first?.id).toBe("mystery-gauntlet-scripted-v1");
+      expect(first?.party).toHaveLength(3);
+      expect(takeGhostForWave(7, false)).toBe(first);
+
+      resetErGhostRunState();
+      expect(takeGhostForWave(7, false)).toEqual(first);
+
+      resetErGhostRunState();
+      setCoopGhostPool([{ ...first!, id: "external-host-only", trainerName: "Fetched Player" }]);
+      expect(takeGhostForWave(7, false)).toEqual(first);
+    } finally {
+      resetErGhostRunState();
+      resetErDifficulty();
     }
   });
 });

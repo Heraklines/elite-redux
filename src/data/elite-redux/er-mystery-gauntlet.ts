@@ -61,8 +61,9 @@ const GAUNTLET_EXCLUDED = new Set<MysteryEncounterType>([
  */
 export function erGauntletPickMeType(
   waveIndex: number,
-  _encountered: readonly MysteryEncounterType[],
+  encountered: readonly MysteryEncounterType[],
   runSeed = "",
+  isEligible: (type: MysteryEncounterType) => boolean = () => true,
 ): MysteryEncounterType {
   if (erGauntletWaveKind(waveIndex) === "bargain") {
     return MysteryEncounterType.ER_THE_BARGAIN;
@@ -74,21 +75,35 @@ export function erGauntletPickMeType(
   for (let i = 0; i < runSeed.length; i++) {
     seedHash = (seedHash * 31 + runSeed.charCodeAt(i)) >>> 0;
   }
-  // #825 (live co-op 'different events at the same wave'): the non-repeat exclusion used the
-  // SAVE-TRACKED encounteredEvents list, which differs per client (each registers only what
-  // its own engine ran) - so host and guest walked DIFFERENT pools and picked different MEs
-  // at the same wave. Derive the seen-set BY CONSTRUCTION instead: recompute what every
-  // earlier gauntlet me-wave must have picked from (wave, seed) alone. Pure + identical on
-  // every client and across reloads, no save-state dependency at all.
-  const seen = new Set<MysteryEncounterType>();
+  // #825: this picker is authority/solo-only. The authority uses its persisted encountered list;
+  // a fresh test jump with no history reconstructs earlier picks from the run seed. Renderers never
+  // call this function: they adopt the retained exact type, so account-local history cannot desync it.
+  const seen = new Set<MysteryEncounterType>(encountered.filter(type => !GAUNTLET_EXCLUDED.has(type)));
+  const eligibility = new Map<MysteryEncounterType, boolean>();
+  const eligible = (type: MysteryEncounterType): boolean => {
+    const cached = eligibility.get(type);
+    if (cached != null) {
+      return cached;
+    }
+    const verdict = isEligible(type);
+    eligibility.set(type, verdict);
+    return verdict;
+  };
   const pickAt = (wave: number): MysteryEncounterType => {
-    const fresh = all.filter(t => !seen.has(t));
-    const pool = fresh.length > 0 ? fresh : all; // pool exhausted -> start repeating
+    const eligiblePool = all.filter(eligible);
+    const fresh = eligiblePool.filter(t => !seen.has(t));
+    const pool = fresh.length > 0 ? fresh : eligiblePool; // pool exhausted -> start repeating
+    if (pool.length === 0) {
+      throw new Error(`Mystery Gauntlet wave ${wave} has no eligible registered encounter`);
+    }
     return pool[(wave + seedHash) % pool.length];
   };
-  for (let w = 2; w < waveIndex; w++) {
-    if (erGauntletWaveKind(w) === "me") {
-      seen.add(pickAt(w));
+  if (seen.size === 0) {
+    for (let w = 2; w < waveIndex; w++) {
+      if (erGauntletWaveKind(w) === "me") {
+        // Reconstruct a deterministic baseline for a fresh dev jump that omitted encounter history.
+        seen.add(pickAt(w));
+      }
     }
   }
   return pickAt(waveIndex);

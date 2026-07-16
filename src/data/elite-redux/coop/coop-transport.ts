@@ -100,7 +100,9 @@ export type CoopRole = "host" | "guest";
 // would otherwise dereference or locally infer encounter reward mechanics after the retained BattleEnd.
 // er-coop-36 replaces the ambiguous one-shop/heal booleans with a bounded ordered modifier-surface plan.
 // A protocol-35 renderer cannot preserve multiple surfaces, stable identities, or explicit reroll policy.
-export const COOP_PROTOCOL_VERSION = "er-coop-36";
+// er-coop-37 adds exact authority-materialized egg reward grants to that closed ordered plan. A
+// protocol-36 renderer would silently credit only the host account, so mixed builds must refuse pairing.
+export const COOP_PROTOCOL_VERSION = "er-coop-37";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1170,7 +1172,7 @@ export type CoopMessage =
   /** Authenticated public P33-architecture hello. The signaling bearer is intentionally never peer-visible. */
   | {
       t: "hello";
-      version: "er-coop-36";
+      version: "er-coop-37";
       pairingId: string;
       account: CoopAccountIdentityV1;
       transportRole: CoopTransportRole;

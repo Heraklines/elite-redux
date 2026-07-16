@@ -7,6 +7,7 @@ import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { modifierTypes } from "#data/data-lists";
 import type { IEggOptions } from "#data/egg";
 import { Egg } from "#data/egg";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
@@ -1298,6 +1299,7 @@ export function setEncounterRewards(
   const encounter = globalScene.currentBattle.mysteryEncounter!;
   const surfaces: MysteryEncounterRewardPlan["surfaces"][number][] = [];
   const rewardSurfaceProjections: CoopMeRewardSurfaceProjection[] = [];
+  const preparedEggs: Egg[] = [];
   const appendModifierSurface = (settings: CustomModifierSettings) => {
     if (surfaces.length >= COOP_ME_REWARD_SURFACE_LIMIT) {
       throw new Error(`Mystery Encounter reward plan exceeds ${COOP_ME_REWARD_SURFACE_LIMIT} surfaces`);
@@ -1340,22 +1342,54 @@ export function setEncounterRewards(
         .getQueuedPhaseNames()
         .filter(phaseName => phaseName === "SelectModifierPhase").length;
       const surfaceCountBeforePreparation = surfaces.length;
+      const projectionCountBeforePreparation = rewardSurfaceProjections.length;
+      const eggCountBeforePreparation = preparedEggs.length;
       const rollbackPreparation = () => {
         registrationOpen = false;
         preparationInFlight = null;
         surfaces.length = surfaceCountBeforePreparation;
-        rewardSurfaceProjections.length = surfaceCountBeforePreparation;
+        rewardSurfaceProjections.length = projectionCountBeforePreparation;
+        preparedEggs.length = eggCountBeforePreparation;
       };
       const finalizePreparation = () => {
-        registrationOpen = false;
-        const queuedModifierSurfaceCountAfterPreparation = globalScene.phaseManager
-          .getQueuedPhaseNames()
-          .filter(phaseName => phaseName === "SelectModifierPhase").length;
-        if (queuedModifierSurfaceCountAfterPreparation !== queuedModifierSurfaceCount) {
+        try {
+          registrationOpen = false;
+          const queuedModifierSurfaceCountAfterPreparation = globalScene.phaseManager
+            .getQueuedPhaseNames()
+            .filter(phaseName => phaseName === "SelectModifierPhase").length;
+          if (queuedModifierSurfaceCountAfterPreparation !== queuedModifierSurfaceCount) {
+            throw new Error(
+              "Mystery Encounter reward preparation queued an unregistered SelectModifierPhase; use registerModifierSurface",
+            );
+          }
+          for (const [eggOrdinal, eggOptions] of (eggRewards ?? []).entries()) {
+            if (rewardSurfaceProjections.length >= COOP_ME_REWARD_SURFACE_LIMIT) {
+              throw new Error(`Mystery Encounter reward plan exceeds ${COOP_ME_REWARD_SURFACE_LIMIT} surfaces`);
+            }
+            if (eggOptions.pulled === true) {
+              throw new Error("Mystery Encounter reward eggs cannot use pulled:true (constructor auto-adds them)");
+            }
+            const egg = new Egg({ ...eggOptions, pulled: false });
+            preparedEggs.push(egg);
+            rewardSurfaceProjections.push({
+              kind: "egg",
+              surfaceId: `egg:me:${encounter.encounterType}:${eggOrdinal}`,
+              id: egg.id,
+              timestamp: egg.timestamp,
+              sourceType: egg.sourceType ?? null,
+              tier: egg.tier,
+              hatchWaves: egg.hatchWaves,
+              species: egg.species,
+              isShiny: egg.isShiny,
+              variantTier: egg.variantTier,
+              eggMoveIndex: egg.eggMoveIndex,
+              overrideHiddenAbility: egg.overrideHiddenAbility,
+              eggDescriptor: eggOptions.eggDescriptor ?? null,
+            });
+          }
+        } catch (error) {
           rollbackPreparation();
-          throw new Error(
-            "Mystery Encounter reward preparation queued an unregistered SelectModifierPhase; use registerModifierSurface",
-          );
+          throw error;
         }
         preparationComplete = true;
         preparationInFlight = null;
@@ -1394,11 +1428,8 @@ export function setEncounterRewards(
         globalScene.phaseManager.removeAllPhasesOfType("MysteryEncounterRewardsPhase");
       }
 
-      if (eggRewards) {
-        eggRewards.forEach(eggOptions => {
-          const egg = new Egg(eggOptions);
-          egg.addEggToGameData();
-        });
+      for (const egg of preparedEggs) {
+        coopAllowAccountWrite("me-egg-reward", () => egg.addEggToGameDataOnce());
       }
 
       return true;

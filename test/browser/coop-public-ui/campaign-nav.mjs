@@ -13,6 +13,14 @@
 
 import { delay } from "./evidence.mjs";
 
+/** Shared readiness contract for every public semantic driver, not only the lobby. */
+export function isActionableSemanticObservation(observation, { requireExplicitUnblocked = false } = {}) {
+  if (observation?.ready?.handlerActive !== true || observation.ready.awaitingActionInput === false) {
+    return false;
+  }
+  return requireExplicitUnblocked ? observation.ready.inputBlocked === false : observation.ready.inputBlocked !== true;
+}
+
 /**
  * Decide the next navigation action from the current semantic observation.
  * Returns one of:
@@ -23,6 +31,13 @@ import { delay } from "./evidence.mjs";
  */
 export function planNavigationStep(observation, targetId) {
   if (observation == null) {
+    return { kind: "wait" };
+  }
+  // A semantic selection is not permission to press yet. Option panels are rebuilt when
+  // dynamic data changes (notably the co-op lobby), and the production handler deliberately
+  // blocks input during that repaint. Treat the mirror's readiness as part of the public UI
+  // state so a real key cannot be swallowed between "selected" and "submit".
+  if (!isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })) {
     return { kind: "wait" };
   }
   if (observation.selectedOptionId === targetId) {
@@ -94,9 +109,7 @@ export async function waitForActionableSemanticSurface(client, surfaceId, { from
   return client.evidence.waitForCondition(
     sink => {
       const event = sink.findLastSemanticSurface(fromCursor, surfaceId);
-      return event?.observation.ready?.handlerActive === true && event.observation.ready.inputBlocked === false
-        ? event
-        : null;
+      return isActionableSemanticObservation(event?.observation, { requireExplicitUnblocked: true }) ? event : null;
     },
     { timeoutMs, description: `actionable semantic surface ${surfaceId}` },
   );
@@ -214,13 +227,20 @@ export async function selectOptionById(
 ) {
   const label = `${surfaceId}->${targetId}`;
   let stalls = 0;
-  for (let step = 0; step < maxSteps; step++) {
-    const event = await readSemantic(client, surfaceId, fromCursor, timeoutMs);
+  let step = 0;
+  const deadline = Date.now() + timeoutMs;
+  while (step < maxSteps && Date.now() < deadline) {
+    const remainingMs = Math.max(1, deadline - Date.now());
+    const event = await readSemantic(client, surfaceId, fromCursor, remainingMs);
     if (!event) {
       throw new Error(`${client.label}: selectOptionById(${label}) saw no ${surfaceId} semantic surface`);
     }
     const observation = event.observation;
     const plan = planNavigationStep(observation, targetId);
+    if (plan.kind === "wait") {
+      await delay(Math.min(80, remainingMs));
+      continue;
+    }
     if (plan.kind === "submit") {
       if (submit) {
         await client.press(submitKey, `nav-submit-${label}`);
@@ -243,7 +263,7 @@ export async function selectOptionById(
     const beforeIndex = event.index;
     const key = chooseNavigationKey(observation, targetId, navKeys, step);
     await client.press(key, `nav-move-${label}-step${step}`);
-    const afterEvent = await waitForNewerSelection(client, surfaceId, beforeIndex, before, timeoutMs);
+    const afterEvent = await waitForNewerSelection(client, surfaceId, beforeIndex, before, remainingMs);
     if (afterEvent == null) {
       stalls += 1;
       client.evidence.record("campaign-nav", { surfaceId, targetId, action: "stall", key, step });
@@ -254,6 +274,10 @@ export async function selectOptionById(
     } else {
       stalls = 0;
     }
+    step += 1;
+  }
+  if (Date.now() >= deadline) {
+    throw new Error(`${client.label}: selectOptionById(${label}) timed out waiting for an actionable target`);
   }
   throw new Error(`${client.label}: selectOptionById(${label}) did not reach the target in ${maxSteps} steps`);
 }

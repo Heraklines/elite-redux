@@ -9,7 +9,11 @@ import { resolve } from "node:path";
 import test from "node:test";
 import { selectOptionById } from "./campaign-nav.mjs";
 import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
-import { checkpointPixelIntegrityFailure, checkpointRequiresGameplayCoverage } from "./evidence.mjs";
+import {
+  captureCheckpointPngWithFallback,
+  checkpointPixelIntegrityFailure,
+  checkpointRequiresGameplayCoverage,
+} from "./evidence.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 
@@ -84,6 +88,10 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /wave-\$\{event\.wave\}-mystery-terminal/u);
   assert.match(campaign, /battleType: observation\.battleType/u);
   assert.match(campaign, /maxBossSegments: observation\.maxBossSegments/u);
+  assert.match(campaign, /observation\.mysteryEncounterType !== first\.mysteryEncounterType/u);
+  assert.match(campaign, /observation\.stateDigest !== first\.stateDigest/u);
+  assert.match(campaign, /duplicateWaves/u);
+  assert.match(campaign, /ordinary encounters were not six distinct registry types/u);
 });
 
 test("the continuity profile visibly declines Bargain and co-op cannot persist a half-open phase", async () => {
@@ -119,13 +127,24 @@ test("parallel lobby pairing reselects the exact visible username before every r
   assert.match(harness, /const targetId = semanticOptionId\(`Ask \$\{username\} to play`\)/u);
   assert.match(
     harness,
-    /selectOptionById\(this, \{[\s\S]*surfaceId: "option-select:TitlePhase"[\s\S]*targetId,[\s\S]*submit: false/u,
+    /requestCursor = this\.evidence\.cursor\(\);[\s\S]*selectOptionById\(this, \{[\s\S]*surfaceId: "option-select:TitlePhase"[\s\S]*targetId,/u,
+  );
+  assert.doesNotMatch(harness, /surfaceId: "option-select:TitlePhase"[\s\S]{0,240}submit: false/u);
+  assert.match(harness, /Splitting selection and Space into[\s\S]*TitlePhase repaint block the key/u);
+  assert.match(
+    await readFile(resolve(root, "test/browser/coop-public-ui/campaign-nav.mjs"), "utf8"),
+    /requireExplicitUnblocked[\s\S]*observation\.ready\.inputBlocked === false/u,
   );
   assert.match(harness, /surface\?\.observation\.optionIds\?\.includes\(targetId\)/u);
   assert.match(harness, /description: `visible lobby option for \$\{username\}`/u);
   assert.match(harness, /this\.lobbySurfaceCursor = this\.evidence\.cursor\(\)/u);
   assert.match(harness, /fromCursor: this\.lobbySurfaceCursor/u);
   assert.match(harness, /requester\.requestPlayer\(acceptorName, \{[\s\S]*purpose: "reissue-request"/u);
+  assert.match(
+    harness,
+    /requester\.requestPlayer\(acceptor\.credentials\.username, \{[\s\S]*purpose: "initial-request"[\s\S]*optional: true/u,
+  );
+  assert.match(harness, /let nextReissueAt = Date\.now\(\)/u);
   assert.match(harness, /relayTimeoutMs: OPTIONAL_LOBBY_RELAY_WAIT_MS/u);
   assert.match(harness, /optional && error instanceof Error && \/timed out waiting for request relay/u);
   assert.match(harness, /const relayed = sink\.find\(\/request target=\/u, requestCursor\)/u);
@@ -165,15 +184,79 @@ test("visual checkpoints foreground WebGL and reject trivial captures", async ()
   assert.match(evidence, /await page\.bringToFront\(\)/u);
   assert.match(evidence, /requestAnimationFrame\(\(\) => requestAnimationFrame\(resolveFrames\)\)/u);
   assert.match(evidence, /screenshot\.byteLength < MIN_CHECKPOINT_PNG_BYTES/u);
+  assert.match(evidence, /for \(const \[attempt, fromSurface\] of \[false, true\]\.entries\(\)\)/u);
+  assert.match(evidence, /failed pixel integrity after both capture paths/u);
   assert.match(evidence, /dom\.canvases\.length === 0/u);
-  assert.match(evidence, /serializeCheckpointCapture\(async \(\) =>/u);
+  assert.match(evidence, /serializeCheckpointCapture\(\(\) =>[\s\S]*captureCheckpointPngWithFallback/u);
   assert.match(evidence, /checkpointCaptureTail = pending\.catch\(\(\) => \{\}\)/u);
-  assert.match(evidence, /fromSurface: false/u);
   assert.match(evidence, /verticalEdgeColumns > 18/u);
   assert.match(evidence, /verticalEdgeColumns > 10 && pixelIntegrity\.nearDarkRatio > 0\.15/u);
   assert.match(evidence, /minimumGameplayTileNonDarkRatio < MIN_GAMEPLAY_TILE_NON_DARK_RATIO/u);
   assert.match(evidence, /minimumGameplayTileColorRatio < MIN_GAMEPLAY_TILE_COLOR_RATIO/u);
   assert.match(evidence, /checkpoint-pixel-integrity/u);
+});
+
+test("checkpoint capture retries an exception through the alternate Chromium path", async () => {
+  const calls = [];
+  const persisted = [];
+  const page = {
+    async bringToFront() {},
+    async evaluate() {},
+    async screenshot(options) {
+      calls.push(options.fromSurface);
+      if (calls.length === 1) {
+        throw new Error("compositor readback failed");
+      }
+      return Buffer.alloc(100_000, 1);
+    },
+  };
+  const result = await captureCheckpointPngWithFallback(page, {
+    step: "retry-proof",
+    dir: "C:/tmp",
+    label: "guest",
+    settle: async () => {},
+    inspect: async () => ({
+      colorBinCount: 500,
+      nearDarkRatio: 0.05,
+      verticalEdgeColumns: 2,
+      minimumGameplayTileNonDarkRatio: 0.95,
+      minimumGameplayTileColorRatio: 0.8,
+    }),
+    persist: async path => persisted.push(path),
+  });
+  assert.deepEqual(calls, [false, true]);
+  assert.equal(result.attempt, 2);
+  assert.deepEqual(persisted, [resolve("C:/tmp", "retry-proof.png")]);
+});
+
+test("checkpoint capture reports each corrupt path with its own metrics", async () => {
+  let inspectCall = 0;
+  await assert.rejects(
+    captureCheckpointPngWithFallback(
+      {
+        async bringToFront() {},
+        async evaluate() {},
+        async screenshot() {
+          return Buffer.alloc(100_000, 1);
+        },
+      },
+      {
+        step: "corrupt-proof",
+        dir: "C:/tmp",
+        label: "host",
+        settle: async () => {},
+        inspect: async () => ({
+          colorBinCount: 200 + inspectCall++,
+          nearDarkRatio: 0.5,
+          verticalEdgeColumns: 30,
+          minimumGameplayTileNonDarkRatio: 0.2,
+          minimumGameplayTileColorRatio: 0.1,
+        }),
+        persist: async () => {},
+      },
+    ),
+    /attempt 1 fromSurface=false:[\s\S]*bins=200[\s\S]*attempt 2 fromSurface=true:[\s\S]*bins=201/u,
+  );
 });
 
 test("pixel integrity separates observed clean screens from headed compositor corruption", () => {
@@ -280,6 +363,7 @@ test("semantic navigation ignores stale same-surface history before its boundary
         surfaceId: "option-select:TitlePhase",
         selectedOptionId: "classic",
         optionIds: ["classic", "co-op", "cancel"],
+        ready: { handlerActive: true, inputBlocked: false },
       },
     },
   ];
@@ -302,6 +386,7 @@ test("semantic navigation ignores stale same-surface history before its boundary
         surfaceId: "option-select:TitlePhase",
         selectedOptionId: targetId,
         optionIds: [targetId, "cancel"],
+        ready: { handlerActive: true, inputBlocked: false },
       },
     });
   }, 10);
@@ -313,4 +398,51 @@ test("semantic navigation ignores stale same-surface history before its boundary
     timeoutMs: 250,
     fromCursor: 5,
   });
+});
+
+test("semantic navigation never submits a selected lobby row while its repaint blocks input", async () => {
+  const targetId = "ask-peer-to-play";
+  const events = [
+    {
+      index: 10,
+      observation: {
+        surfaceId: "option-select:TitlePhase",
+        selectedOptionId: targetId,
+        optionIds: [targetId, "cancel"],
+        surfaceGeneration: 4,
+        ready: { handlerActive: true, inputBlocked: true },
+      },
+    },
+  ];
+  const presses = [];
+  const client = {
+    label: "guest-seat",
+    evidence: {
+      findLastSemanticSurface(fromCursor, surfaceId) {
+        return events.findLast(event => event.index >= fromCursor && event.observation.surfaceId === surfaceId) ?? null;
+      },
+      record() {},
+    },
+    async press(key) {
+      presses.push(key);
+    },
+  };
+  setTimeout(() => {
+    assert.deepEqual(presses, [], "the blocked generation must not receive the submit key");
+    events.push({
+      index: 11,
+      observation: {
+        ...events[0].observation,
+        ready: { handlerActive: true, inputBlocked: false },
+      },
+    });
+  }, 20);
+
+  await selectOptionById(client, {
+    surfaceId: "option-select:TitlePhase",
+    targetId,
+    timeoutMs: 500,
+    fromCursor: 10,
+  });
+  assert.deepEqual(presses, ["Space"]);
 });

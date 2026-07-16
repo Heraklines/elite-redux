@@ -874,7 +874,9 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
   // challenge into constant normal-trainer fallbacks - so under the challenge
   // we top up from the OTHER difficulties' pools too (current first, then the
   // deepest pools), de-duped by id.
-  if (isErGhostChallengeActive()) {
+  // Mystery Gauntlet uses its fixed scripted carrier and must not depend on an external fetch.
+  const immediateGhostPool = isErGhostChallengeActive();
+  if (immediateGhostPool) {
     prefetchStarted = true;
     void (async () => {
       const collected: GhostTeamSnapshot[] = [];
@@ -989,6 +991,33 @@ function pickGhost(candidates: GhostTeamSnapshot[], waveIndex: number): GhostTea
   return pool[h % pool.length];
 }
 
+/** Fixed carrier for the staging-only Mystery schedule; deliberately independent of network/account pools. */
+function mysteryGauntletGhost(): GhostTeamSnapshot {
+  const member = (speciesId: number): GhostMember => ({
+    speciesId,
+    formIndex: 0,
+    abilityIndex: 0,
+    ivs: [20, 20, 20, 20, 20, 20],
+    nature: 0,
+    level: 7,
+    gender: -1,
+    shiny: false,
+    variant: 0,
+    passive: false,
+    moves: [],
+  });
+  return {
+    id: "mystery-gauntlet-scripted-v1",
+    trainerName: "Mystery Challenger",
+    difficulty: "mystery",
+    mode: "classic",
+    waveReached: 7,
+    isVictory: false,
+    timestamp: 0,
+    party: [member(SpeciesId.RATTATA), member(SpeciesId.PIDGEY), member(SpeciesId.CATERPIE)],
+  };
+}
+
 /**
  * The ghost team to field on `waveIndex`, or `null` if none is available yet.
  * Stable within a run: the same wave always yields the same ghost.
@@ -1017,6 +1046,16 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
     console.log(`[er-ghost] wave ${waveIndex}: reusing cached ghost '${existing.trainerName}'`);
     return existing;
+  }
+  if (gauntletGhost) {
+    // This is a deterministic test fixture, not a sampled-player feature. Always use the same
+    // carrier so asymmetric fetch timing cannot make two real browsers cache different trainers.
+    const scripted = mysteryGauntletGhost();
+    usedGhostIds.add(scripted.id);
+    lastGhostUploader = scripted.trainerName ?? "";
+    ghostByWave.set(waveIndex, scripted);
+    console.log(`[er-ghost] wave ${waveIndex}: ghost '${scripted.trainerName}' (scripted gauntlet carrier)`);
+    return scripted;
   }
   const pool = prefetched ?? [];
   // A run that ended at wave W can only be fielded at waves <= W (its team is

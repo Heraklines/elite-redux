@@ -2672,7 +2672,12 @@ export class BattleScene extends SceneBase {
     }
 
     let isBoss: boolean | undefined;
-    if (forceBoss || (species && (species.subLegendary || species.legendary || species.mythical))) {
+    const mysteryGauntletBoss = erGauntletActive() && erGauntletWaveKind(waveIndex) === "boss";
+    if (
+      forceBoss
+      || mysteryGauntletBoss
+      || (species && (species.subLegendary || species.legendary || species.mythical))
+    ) {
       isBoss = true;
     } else {
       // ER (#504): biome NOTORIETY ramps the wild-boss RATE the longer the player
@@ -4756,26 +4761,45 @@ export class BattleScene extends SceneBase {
     } else if (canBypass) {
       encounter = allMysteryEncounters[encounterType ?? -1];
       return encounter;
-    } else if (
-      this.gameMode.isCoop
-      && getCoopController()?.role === "guest"
-      && getCoopBattleStreamer()?.meTypeForWave(this.currentBattle.waveIndex) !== undefined // #862: the verdict can now be the explicit NO-ME sentinel - never adopt that as a type // (reaching here with NO_ME means the wave-type guard raced; fall through to local pick).
-      && getCoopBattleStreamer()?.meTypeForWave(this.currentBattle.waveIndex) !== COOP_WAVE_NO_ME
-    ) {
-      // #825: the host's wave-start sync already told us its rolled ME type - adopt it
-      // verbatim so both screens run the SAME encounter (live 'different events').
-      const adopted = getCoopBattleStreamer()!.meTypeForWave(this.currentBattle.waveIndex)!;
+    } else if (encounterType != null && allMysteryEncounters[encounterType] != null) {
+      // A session/replay/authoritative encounter descriptor is already the exact committed type.
+      // Never re-roll it through the gauntlet schedule on resume.
+      encounter = allMysteryEncounters[encounterType];
+    } else if (isCoopAuthoritativeGuest()) {
+      // A renderer must never derive an encounter from account-local history, party requirements,
+      // pity, or RNG. The retained encounter descriptor normally installs the stream verdict before
+      // EncounterPhase calls here; replay/resume may instead carry the exact type as the argument.
+      // Missing authority is a broken closed boundary, not permission to run the local picker.
+      const streamed = getCoopBattleStreamer()?.meTypeForWave(this.currentBattle.waveIndex);
+      const adopted = streamed !== undefined && streamed !== COOP_WAVE_NO_ME ? streamed : undefined;
+      if (adopted == null || adopted === COOP_WAVE_NO_ME || allMysteryEncounters[adopted] == null) {
+        throw new Error(
+          `Authoritative Mystery encounter type unavailable at wave ${this.currentBattle.waveIndex}; refusing local derivation`,
+        );
+      }
       console.log(
         `[coop:me] wave=${this.currentBattle.waveIndex} ME type ADOPTED from host -> ${MysteryEncounterType[adopted]}`,
       );
       encounter = allMysteryEncounters[adopted] ?? null;
     } else if (erGauntletActive()) {
-      // MYSTERY GAUNTLET (#814): the schedule picks the type. #825: the pick is now
-      // deterministic from (wave, seed) ALONE - identical on host + guest by construction.
+      // MYSTERY GAUNTLET (#814): only the authority/solo engine evaluates live requirements.
       const forced = erGauntletPickMeType(
         this.currentBattle.waveIndex,
         (this.mysteryEncounterSaveData?.encounteredEvents ?? []).map(e => e.type),
         this.seed ?? "",
+        type => {
+          const candidate = allMysteryEncounters[type];
+          if (!candidate) {
+            return false;
+          }
+          if (candidate.disallowedGameModes?.includes(this.gameMode.modeId)) {
+            return false;
+          }
+          if (candidate.disallowedChallenges?.some(challenge => this.gameMode.hasChallenge(challenge))) {
+            return false;
+          }
+          return candidate.meetsRequirements();
+        },
       );
       console.log(`[er-gauntlet] wave=${this.currentBattle.waveIndex} ME type -> ${MysteryEncounterType[forced]}`);
       encounter = allMysteryEncounters[forced] ?? null;

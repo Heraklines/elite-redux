@@ -31,6 +31,8 @@ function valid(overrides = {}) {
     phase: "SelectModifierPhase",
     phaseInstance: 4,
     surfaceGeneration: 2,
+    mysteryEncounterType: 17,
+    stateDigest: "0123456789abcdef",
     uiMode: "MODIFIER_SELECT",
     ...overrides,
   };
@@ -69,6 +71,18 @@ test("semantic evidence rejects every malformed claimed proof", () => {
   );
   assert.throws(
     () => semanticSurfaceView(`${PREFIX}${JSON.stringify(valid({ seatsWithInput: [1, 1] }))}`),
+    /invalid semantic surface observation/u,
+  );
+  assert.throws(
+    () => semanticSurfaceView(`${PREFIX}${JSON.stringify(valid({ mysteryEncounterType: "17" }))}`),
+    /invalid semantic surface observation/u,
+  );
+  assert.throws(
+    () => semanticSurfaceView(`${PREFIX}${JSON.stringify(valid({ stateDigest: "0000000000000000" }))}`),
+    /invalid semantic surface observation/u,
+  );
+  assert.throws(
+    () => semanticSurfaceView(`${PREFIX}${JSON.stringify(valid({ stateDigest: null }))}`),
     /invalid semantic surface observation/u,
   );
 });

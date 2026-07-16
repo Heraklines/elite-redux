@@ -305,8 +305,25 @@ export interface CoopMeModifierRewardSurfaceProjection {
   readonly rerollMultiplier: number;
 }
 
-/** Closed projection union. New shared reward UI kinds require a protocol bump and validator arm. */
-export type CoopMeRewardSurfaceProjection = CoopMeModifierRewardSurfaceProjection;
+/** Exact authority-materialized account egg grant carried beside ordered reward UI surfaces. */
+export interface CoopMeEggRewardSurfaceProjection {
+  readonly kind: "egg";
+  readonly surfaceId: string;
+  readonly id: number;
+  readonly timestamp: number;
+  readonly sourceType: number | null;
+  readonly tier: number;
+  readonly hatchWaves: number;
+  readonly species: number;
+  readonly isShiny: boolean;
+  readonly variantTier: number;
+  readonly eggMoveIndex: number;
+  readonly overrideHiddenAbility: boolean;
+  readonly eggDescriptor: string | null;
+}
+
+/** Closed projection union. New shared reward/account kinds require a protocol bump and validator arm. */
+export type CoopMeRewardSurfaceProjection = CoopMeModifierRewardSurfaceProjection | CoopMeEggRewardSurfaceProjection;
 
 /**
  * Construct a modifier projection while normalizing the UI's implicit default into explicit wire data.

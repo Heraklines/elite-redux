@@ -48,6 +48,7 @@ describe("Mystery battle reward preparation boundary", () => {
     const encounter = source("src/data/mystery-encounters/mystery-encounter.ts");
     const utilities = source("src/data/mystery-encounters/utils/encounter-phase-utils.ts");
     const graves = source("src/data/mystery-encounters/encounters/graves-of-the-fallen-encounter.ts");
+    const rewardsPhase = source("src/phases/mystery-encounter-phases.ts");
     const replay = source("src/phases/coop-replay-me-phase.ts");
     const runtime = source("src/data/elite-redux/coop/coop-runtime.ts");
 
@@ -63,6 +64,14 @@ describe("Mystery battle reward preparation boundary", () => {
     expect(utilities).not.toContain("injectedSurfaces");
     expect(utilities).toContain("queuedModifierSurfaceCountAfterPreparation !== queuedModifierSurfaceCount");
     expect(utilities).toContain("use registerModifierSurface");
+    expect(utilities).toContain("const egg = new Egg(eggOptions);");
+    expect(utilities).toContain('kind: "egg"');
+    expect(utilities).toContain("preparedEggs.push(egg)");
+    expect(utilities).toContain("for (const egg of preparedEggs)");
+    expect(utilities).toContain("eggOptions.pulled === true");
+    expect(utilities).toContain("egg.addEggToGameDataOnce()");
+    expect(rewardsPhase).toContain('coopAllowAccountWrite("me-egg-reward"');
+    expect(rewardsPhase).toContain("new Egg(eggOptions).addEggToGameDataOnce()");
     expect(graves).toContain("({ registerModifierSurface }) => {");
     expect(graves).toContain("registerModifierSurface(settings);");
     expect(graves).not.toMatch(/unshiftNew\([\s\S]*?"SelectModifierPhase"/u);

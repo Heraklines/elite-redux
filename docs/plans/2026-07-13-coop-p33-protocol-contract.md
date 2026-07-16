@@ -1,6 +1,6 @@
-# Co-op protocol 36 contract (P33 authority architecture)
+# Co-op protocol 37 contract (P33 authority architecture)
 
-Status: **frozen for implementation**. Wire version: `er-coop-36`.
+Status: **frozen for implementation**. Wire version: `er-coop-37`.
 
 This contract reconciles the two incompatible protocol-32 development lines and closes the identity model
 that made invitation direction, authority, gameplay ownership, and transport setup all look like one
@@ -121,7 +121,7 @@ pairing record returned by the Worker.
 ```ts
 type CoopHelloV2 = {
   t: "hello";
-  version: "er-coop-36";
+  version: "er-coop-37";
   pairingId: string;
   account: CoopAccountIdentityV1;
   transportRole: CoopTransportRole;
@@ -212,14 +212,16 @@ surface is open with the correct owner seat and operation address. The authority
 every frozen required seat ACKs `continuationReady`. A material-only ACK may suppress redundant reconstruction
 but cannot clear retention or let the authority cross the next shared boundary.
 
-### Retained Mystery battle settlement (protocol 36)
+### Retained Mystery battle settlement (protocol 37)
 
 `opSurface.me.v2` extends each pinned `ME_TERMINAL` stream to the strict ordinal lifecycle
 `battle -> battle-settled -> (battle | leave)`. `battle-settled` carries one comprehensive image through
 BattleEnd proper plus the exact result, host turn, trainer-victory flag, reward/event/none continuation,
-an ordered modifier reward-surface plan, and egg-lapse flag. Each modifier projection carries a unique stable
+an ordered closed reward plan, and egg-lapse flag. Modifier projections carry a unique stable
 canonical ASCII `surfaceId` and an explicit reroll multiplier (`-1` disables rerolls; otherwise finite and
-non-negative). The plan is bounded to 16 surfaces, identifiers to 64 characters, and executable multipliers
+non-negative). Egg projections carry the authority-materialized id, timestamp, registered species, tier,
+hatch state, shiny/variant/move/ability flags, source, and bounded display descriptor; replay application is
+account-write-gated and idempotent by exact egg identity. The plan is bounded to 16 surfaces, identifiers to 64 characters, and executable multipliers
 to at most 1000. An omitted multiplier is normalized to `1` before serialization; an omitted plan, duplicate
 identity, unknown surface kind, invalid multiplier, or reward surface on a non-reward continuation fails
 closed. The renderer holds the exact BattleEnd until this DATA applies. It may then execute only the declared
@@ -231,7 +233,7 @@ Mutations performed later by a host-only `doContinueEncounter` callback are not 
 image; the following retained battle or leave carrier must apply the callback-complete state before opening
 its public continuation.
 
-Protocol 36 continues to disable Mystery encounters on a finite mode's final wave. The current destination
+Protocol 37 continues to disable Mystery encounters on a finite mode's final wave. The current destination
 union has no retained `GameOver` arm, so admitting such an encounter would leave `none` unowned after
 BattleEnd. Adding a typed retained GameOver destination plus renderer proof is a blocking prerequisite before
 that spawn restriction may be removed.

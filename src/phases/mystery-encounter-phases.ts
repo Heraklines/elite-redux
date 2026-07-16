@@ -2,6 +2,8 @@ import { consumeClearMeOverrideAfterFirst } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { getCharVariantFromDialogue } from "#data/dialogue";
+import { Egg, type IEggOptions } from "#data/egg";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -1291,15 +1293,33 @@ export class MysteryEncounterRewardsPhase extends Phase {
         // PhaseTree.addPhase appends and getNextPhase shifts, so unshiftNew is FIFO within this phase's
         // child level. Forward iteration therefore preserves the host-declared surface order.
         for (const [ordinal, surface] of this.authoritativeRewardSurfaces.entries()) {
-          globalScene.phaseManager.unshiftNew(
-            "SelectModifierPhase",
-            0,
-            undefined,
-            { rerollMultiplier: surface.rerollMultiplier },
-            false,
-            { kind: "ambient" },
-            { surfaceId: surface.surfaceId, ordinal },
-          );
+          if (surface.kind === "modifier") {
+            globalScene.phaseManager.unshiftNew(
+              "SelectModifierPhase",
+              0,
+              undefined,
+              { rerollMultiplier: surface.rerollMultiplier },
+              false,
+              { kind: "ambient" },
+              { surfaceId: surface.surfaceId, ordinal },
+            );
+          } else {
+            const eggOptions = {
+              id: surface.id,
+              timestamp: surface.timestamp,
+              pulled: false,
+              sourceType: surface.sourceType ?? undefined,
+              tier: surface.tier,
+              hatchWaves: surface.hatchWaves,
+              species: surface.species,
+              isShiny: surface.isShiny,
+              variantTier: surface.variantTier,
+              eggMoveIndex: surface.eggMoveIndex,
+              overrideHiddenAbility: surface.overrideHiddenAbility,
+              eggDescriptor: surface.eggDescriptor ?? undefined,
+            } as IEggOptions;
+            coopAllowAccountWrite("me-egg-reward", () => new Egg(eggOptions).addEggToGameDataOnce());
+          }
         }
         globalScene.phaseManager.pushNew("PostMysteryEncounterPhase");
         this.end();

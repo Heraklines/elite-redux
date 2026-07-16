@@ -6,6 +6,7 @@
 import { appendFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { loadCampaignLifecyclePolicy, withinDeadline } from "./campaign-lifecycle.mjs";
+import { isActionableSemanticObservation } from "./campaign-nav.mjs";
 import {
   buildDispatchTable,
   GAME_OVER_PHASE,
@@ -681,12 +682,11 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
   if (driver.v2SurfaceId) {
     const semanticOwner = findSemanticOwner(rig, driver.v2SurfaceId, cursors);
     if (semanticOwner) {
-      const readiness = semanticOwner.markerEvent.observation.ready;
       // Phase/owner evidence can precede the real handler by several seconds while narration or
       // transitions finish. Keyboard input in that interval is legitimately discarded. Wait for
       // the observer's addressed actionable projection; this is the same state a human sees before
       // acting and prevents a valid reward from being stranded by an early leave/pick sequence.
-      if (readiness?.handlerActive !== true || readiness.awaitingActionInput === false) {
+      if (!isActionableSemanticObservation(semanticOwner.markerEvent.observation)) {
         return null;
       }
       if (notYetHandled(semanticOwner.client, semanticOwner.markerEvent)) {
@@ -809,10 +809,20 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
   const clients = Object.values(rig.clients);
   const events = await Promise.all(
     clients.map(client =>
-      client.evidence.waitForCondition(sink => sink.findLastSemanticSurface(cursors[client.label] ?? 0, surfaceId), {
-        timeoutMs: rig.config.timeoutMs,
-        description: `paired Mystery ${stage} surface ${surfaceId}`,
-      }),
+      client.evidence.waitForCondition(
+        sink => {
+          const event = sink.findLastSemanticSurface(cursors[client.label] ?? 0, surfaceId);
+          if (event == null || event.observation.ready?.handlerActive !== true) {
+            return null;
+          }
+          const localOwns = event.observation.ownerSeat === event.observation.localSeat;
+          return !localOwns || isActionableSemanticObservation(event.observation) ? event : null;
+        },
+        {
+          timeoutMs: rig.config.timeoutMs,
+          description: `paired actionable Mystery ${stage} surface ${surfaceId}`,
+        },
+      ),
     ),
   );
   const observations = events.map(surfaceEvent => surfaceEvent.observation);
@@ -822,7 +832,13 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
     const sameOptions = JSON.stringify(observation.optionIds ?? null) === JSON.stringify(first.optionIds ?? null);
     if (
       observation.surfaceId !== first.surfaceId
+      || observation.phase !== first.phase
+      || observation.uiMode !== first.uiMode
+      || observation.operationClass !== first.operationClass
       || observation.ownerSeat !== first.ownerSeat
+      || observation.selectedOptionId !== first.selectedOptionId
+      || observation.mysteryEncounterType !== first.mysteryEncounterType
+      || observation.stateDigest !== first.stateDigest
       || !sameAddress
       || !sameOptions
     ) {
@@ -832,9 +848,14 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
   const proof = {
     stage,
     surfaceId,
+    phase: first.phase,
+    uiMode: first.uiMode,
+    selectedOptionId: first.selectedOptionId ?? null,
     address: first.address,
     ownerSeat: first.ownerSeat,
     optionIds: first.optionIds ?? null,
+    mysteryEncounterType: first.mysteryEncounterType ?? null,
+    stateDigest: first.stateDigest ?? null,
   };
   if (stage === "presentation") {
     await finalizePendingMysteryEvent(rig, stats, {
@@ -861,11 +882,18 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
       kind: "mystery",
       wave: first.address.wave,
       ownerSeat: first.ownerSeat,
+      mysteryEncounterType: first.mysteryEncounterType ?? null,
       surfaces: [],
       terminalCursors: fromEach(clients, client => client.evidence.cursor()),
       terminal: null,
     };
     stats.mysteryEvents.push(event);
+  }
+  if (event.mysteryEncounterType !== (first.mysteryEncounterType ?? null)) {
+    throw new Error(
+      `[campaign-mystery] encounter type changed within wave ${first.address.wave}: `
+        + `${event.mysteryEncounterType} -> ${first.mysteryEncounterType ?? null}`,
+    );
   }
   appendMysteryProof(rig, event, proof);
   await Promise.all(clients.map(client => client.checkpoint(`wave-${event.wave}-mystery-${stage}-${surfaceId}`)));
@@ -893,6 +921,8 @@ async function checkpointAsymmetricBargainSurface(rig, cursors, stats, owner) {
   if (
     JSON.stringify(watcherObservation.address) !== JSON.stringify(ownerObservation.address)
     || watcherObservation.ownerSeat !== ownerObservation.ownerSeat
+    || watcherObservation.mysteryEncounterType !== ownerObservation.mysteryEncounterType
+    || watcherObservation.stateDigest !== ownerObservation.stateDigest
     || ownerObservation.ownerSeat !== owner.publicSeat
   ) {
     throw new Error(
@@ -908,6 +938,7 @@ async function checkpointAsymmetricBargainSurface(rig, cursors, stats, owner) {
     kind: "bargain",
     wave: ownerObservation.address.wave,
     ownerSeat: ownerObservation.ownerSeat,
+    mysteryEncounterType: ownerObservation.mysteryEncounterType ?? null,
     surfaces: [],
     terminalCursors: fromEach(Object.values(rig.clients), client => client.evidence.cursor()),
     terminal: null,
@@ -919,12 +950,66 @@ async function checkpointAsymmetricBargainSurface(rig, cursors, stats, owner) {
     address: ownerObservation.address,
     ownerSeat: ownerObservation.ownerSeat,
     optionIds: ownerObservation.optionIds ?? null,
+    mysteryEncounterType: ownerObservation.mysteryEncounterType ?? null,
+    stateDigest: ownerObservation.stateDigest ?? null,
   };
   stats.mysteryEvents.push(event);
   appendMysteryProof(rig, event, proof);
   await Promise.all(
     Object.values(rig.clients).map(client => client.checkpoint(`wave-${event.wave}-mystery-presentation-bargain`)),
   );
+}
+
+/**
+ * Every symmetric registered interface is also a mechanical convergence boundary. This turns the
+ * semantic observer into a generic future-screen contract: adding a driver without matching the
+ * authority address and state digest on both real browsers cannot silently green the campaign.
+ */
+async function checkpointPairedMechanicalSurface(rig, surfaceId, cursors, owner) {
+  const ownerEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(cursors[owner.label] ?? 0, surfaceId);
+      return candidate != null && isActionableSemanticObservation(candidate.observation) ? candidate : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: `actionable owner surface ${surfaceId}` },
+  );
+  const authority = ownerEvent.observation;
+  if (authority.stateDigest == null) {
+    throw new Error(`[campaign-convergence] ${surfaceId} omitted its mechanical state digest`);
+  }
+  const peers = Object.values(rig.clients).filter(client => client !== owner);
+  const peerEvents = await Promise.all(
+    peers.map(peer =>
+      peer.evidence.waitForCondition(
+        sink => {
+          const candidate = sink.findLastSemanticSurface(cursors[peer.label] ?? 0, surfaceId);
+          if (
+            candidate == null
+            || candidate.observation.ready?.handlerActive !== true
+            || JSON.stringify(candidate.observation.address) !== JSON.stringify(authority.address)
+            || candidate.observation.stateDigest !== authority.stateDigest
+          ) {
+            return null;
+          }
+          return candidate;
+        },
+        {
+          timeoutMs: rig.config.timeoutMs,
+          description: `paired address/digest convergence for ${surfaceId} on ${peer.label}`,
+        },
+      ),
+    ),
+  );
+  const proof = {
+    surfaceId,
+    address: authority.address,
+    stateDigest: authority.stateDigest,
+    ownerSeat: authority.ownerSeat,
+    peers: peerEvents.map(event => event.observation.localSeat),
+  };
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-semantic-convergence", proof);
+  }
 }
 
 /** Drive at most one pending between-wave surface. Returns the surface name driven, or null. */
@@ -952,6 +1037,8 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       if (targetReached) {
         return "target-reached";
       }
+    } else if (driver.v2SurfaceId) {
+      await checkpointPairedMechanicalSurface(rig, driver.v2SurfaceId, cursors, client);
     }
     await client.checkpoint(`wave-${stats.wave}-${driver.name}-owner`);
     if (driver.name === "biome-shop" && driver.market?.mode === "target-held") {
@@ -1309,10 +1396,32 @@ export async function runCampaign(rig) {
               && event.surfaces.some(surface => surface.stage === "presentation"),
           ),
       );
-      const unexpected = mysteryCoverage.events.filter(event => !expectedEvents.has(event.wave));
-      if (missing.length > 0 || unexpected.length > 0) {
+      const unexpected = mysteryCoverage.events.filter(
+        event => !expectedEvents.has(event.wave) || expectedEvents.get(event.wave) !== event.kind,
+      );
+      const duplicateWaves = [...new Set(mysteryCoverage.events.map(event => event.wave))].filter(
+        wave => mysteryCoverage.events.filter(event => event.wave === wave).length !== 1,
+      );
+      if (
+        missing.length > 0
+        || unexpected.length > 0
+        || duplicateWaves.length > 0
+        || mysteryCoverage.events.length !== expectedEvents.size
+      ) {
         throw new Error(
-          `[campaign-mystery] exact wave schedule mismatch missing=${JSON.stringify(missing)} unexpected=${JSON.stringify(unexpected.map(event => ({ wave: event.wave, kind: event.kind })))}`,
+          `[campaign-mystery] exact wave schedule mismatch missing=${JSON.stringify(missing)} `
+            + `unexpected=${JSON.stringify(unexpected.map(event => ({ wave: event.wave, kind: event.kind })))} `
+            + `duplicateWaves=${JSON.stringify(duplicateWaves)} total=${mysteryCoverage.events.length}/${expectedEvents.size}`,
+        );
+      }
+      const ordinaryMysteryEvents = mysteryCoverage.events.filter(event => event.kind === "mystery");
+      const ordinaryMysteryTypes = ordinaryMysteryEvents.map(event => event.mysteryEncounterType);
+      if (
+        ordinaryMysteryTypes.some(type => !Number.isSafeInteger(type))
+        || new Set(ordinaryMysteryTypes).size !== ordinaryMysteryEvents.length
+      ) {
+        throw new Error(
+          `[campaign-mystery] ordinary encounters were not six distinct registry types: ${JSON.stringify(ordinaryMysteryTypes)}`,
         );
       }
       const wildOne = mysteryCoverage.battleKinds.find(kind => kind.wave === 1);
