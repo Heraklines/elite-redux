@@ -553,18 +553,14 @@ class SessionSlot extends Phaser.GameObjects.Container {
     return fallbackName;
   }
 
-  async setupWithData(data: SessionSaveData) {
-    const hasName = data?.name;
+  setupWithData(data: SessionSaveData) {
     this.remove(this.loadingLabel, true);
-    if (hasName) {
-      const nameLabel = addTextObject(8, 5, data.name, TextStyle.WINDOW);
-      this.add(nameLabel);
-    } else {
-      const fallbackName = this.decideFallback(data);
-      await globalScene.gameData.renameSession(this.slotId, fallbackName);
-      const nameLabel = addTextObject(8, 5, fallbackName, TextStyle.WINDOW);
-      this.add(nameLabel);
-    }
+    // Save-list rendering must remain read-only. Persisting a generated fallback name here used to
+    // start an unawaited cloud CAS while the slot was already actionable, so an immediate Delete or
+    // Overwrite could race that rename and fail its exact local-byte cleanup after the cloud delete.
+    const displayName = data.name || this.decideFallback(data);
+    const nameLabel = addTextObject(8, 5, displayName, TextStyle.WINDOW);
+    this.add(nameLabel);
 
     const gameModeLabel = addTextObject(
       8,
