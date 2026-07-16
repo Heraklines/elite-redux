@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "taskId": "p38-recovery-closure",
+  "branch": "ci/coop/p38-recovery-closure",
+  "trainRef": "ci/coop/p38-addressed-state-sync",
+  "baseSha": "26da73b8c47050a18bfa14f03a26d0c95c7c02c9",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p38-recovery-closure.json",
+    "src/data/elite-redux/coop/coop-battle-stream.ts",
+    "src/data/elite-redux/coop/coop-durability.ts",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/phases/coop-replay-phases.ts",
+    "test/tests/elite-redux/coop/coop-battle-stream.test.ts",
+    "test/tests/elite-redux/coop/coop-operation-durability-recovery.test.ts",
+    "test/tests/elite-redux/coop/coop-recovery-outcome-terminal.test.ts"
+  ]
+}
