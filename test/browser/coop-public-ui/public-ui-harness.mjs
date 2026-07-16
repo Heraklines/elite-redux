@@ -961,6 +961,14 @@ export class PublicUiClient {
     const targetId = semanticOptionId(`Ask ${username} to play`);
     try {
       await this.waitForLobbyPlayer(username, timeoutMs);
+      await this.evidence.waitForCondition(
+        sink => {
+          assertNoDriverApiFailure(sink, "co-op lobby");
+          const surface = sink.findLastSemanticSurface(this.pageCursor, "option-select:TitlePhase");
+          return surface?.observation.optionIds?.includes(targetId) ? surface : null;
+        },
+        { timeoutMs, description: `visible lobby option for ${username}` },
+      );
       // The worker lobby list is dynamic under a sharded campaign. Select by the exact visible
       // username immediately before every request; an old cursor index may now name another runner.
       await selectOptionById(this, {
@@ -975,6 +983,7 @@ export class PublicUiClient {
         optional
         && error instanceof Error
         && (/timed out waiting for lobby list containing/u.test(error.message)
+          || /timed out waiting for visible lobby option/u.test(error.message)
           || /selectOptionById\(option-select:TitlePhase->.*\) (?:saw no|target not in options)/u.test(error.message))
       ) {
         this.evidence.record("lobby-request-deferred", { username, targetId, reason: error.message });
