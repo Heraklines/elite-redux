@@ -403,6 +403,11 @@ export interface SoakBoundaryDigest {
  */
 export interface SoakPostWaveState {
   wave: number;
+  /** Both engines' battle topology immediately before this wave's first public command is selected. */
+  preCommandTopology: {
+    host: SoakClientPreCommandTopology;
+    guest: SoakClientPreCommandTopology;
+  };
   victoryKind: "wild" | "trainer" | null;
   hostMoney: number;
   guestMoney: number;
@@ -415,6 +420,18 @@ export interface SoakPostWaveState {
   } | null;
   /** Cumulative boundary recoveries at this point; a clean focused transition remains zero throughout. */
   resyncHeals: number;
+}
+
+/** Production-visible battle shape sampled from one engine before the wave's first command. */
+export interface SoakClientPreCommandTopology {
+  doubleBattle: boolean;
+  enemyFieldSize: number;
+  partyOwnersPresent: {
+    host: boolean;
+    guest: boolean;
+  };
+  /** An inactive or absent slot is recorded as null, so the owner tuple also proves both leads are active. */
+  activeSlotOwners: ["host" | "guest" | null, "host" | "guest" | null];
 }
 
 /**
@@ -671,6 +688,28 @@ const MAX_TURNS_PER_WAVE = 60;
 /** Party-slot co-op ownership for the soak: host owns EVEN party slots, guest owns ODD (3-mon-per-player). */
 function coopOwnerForPartySlot(slot: number): "host" | "guest" {
   return slot % 2 === 0 ? "host" : "guest";
+}
+
+/** Capture the topology a player can observe when the public command surface opens. */
+function captureClientPreCommandTopology(scene: BattleScene): SoakClientPreCommandTopology {
+  const field = scene.getPlayerField();
+  const activeOwnerAt = (index: number): "host" | "guest" | null => {
+    const mon = field[index];
+    if (mon == null || !mon.isActive()) {
+      return null;
+    }
+    return mon.coopOwner === "host" || mon.coopOwner === "guest" ? mon.coopOwner : null;
+  };
+  const party = scene.getPlayerParty();
+  return {
+    doubleBattle: scene.currentBattle.double,
+    enemyFieldSize: scene.getEnemyField().length,
+    partyOwnersPresent: {
+      host: party.some(mon => mon.coopOwner === "host"),
+      guest: party.some(mon => mon.coopOwner === "guest"),
+    },
+    activeSlotOwners: [activeOwnerAt(COOP_HOST_FIELD_INDEX), activeOwnerAt(COOP_GUEST_FIELD_INDEX)],
+  };
 }
 
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
@@ -1326,6 +1365,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const skips: Record<string, number> = {};
   const boundaryDigests: SoakBoundaryDigest[] = [];
   const postWaveStates: SoakPostWaveState[] = [];
+  const preCommandTopologies = new Map<number, SoakPostWaveState["preCommandTopology"]>();
   const findings: SoakFinding[] = [];
   let resyncHeals = 0;
   const preHealMismatches: SoakPreHealMismatch[] = [];
@@ -4112,8 +4152,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const staged = getCoopStagedWaveAdvanceTransaction(wave, rig.guestRuntime.waveOperationBinding);
     const victoryKind = (staged?.envelope.pendingOperation?.payload as { victoryKind?: unknown } | undefined)
       ?.victoryKind;
+    const preCommandTopology = preCommandTopologies.get(wave);
+    if (preCommandTopology == null) {
+      throw new Error(`wave ${wave}: missing pre-command topology evidence`);
+    }
     postWaveStates.push({
       wave,
+      preCommandTopology,
       victoryKind: victoryKind === "wild" || victoryKind === "trainer" ? victoryKind : null,
       hostMoney: await withClient(rig.hostCtx, () => rig.hostScene.money),
       guestMoney: await withClient(rig.guestCtx, () => rig.guestScene.money),
@@ -4191,6 +4236,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         await remirrorWave(rig);
         await healGuestFromHost(rig);
       }
+    }
+
+    if (opts.capturePostWaveState) {
+      preCommandTopologies.set(wave, {
+        host: withClientSync(rig.hostCtx, () => captureClientPreCommandTopology(rig.hostScene)),
+        guest: withClientSync(rig.guestCtx, () => captureClientPreCommandTopology(rig.guestScene)),
+      });
     }
 
     // Trainer-wave coverage tally (#846): count TRAINER waves (fixed rival/evil-team vs random rolled) so a

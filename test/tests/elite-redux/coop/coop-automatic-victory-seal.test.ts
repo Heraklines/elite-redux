@@ -87,6 +87,26 @@ describe.skipIf(!RUN)("co-op automatic post-victory retained seal", () => {
     expect(recoverySpy, "the guest never requested full-state recovery").not.toHaveBeenCalled();
     expect(result.postWaveStates.map(state => state.wave)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
+    for (const state of result.postWaveStates) {
+      for (const [client, topology] of [
+        ["host", state.preCommandTopology.host],
+        ["guest", state.preCommandTopology.guest],
+      ] as const) {
+        expect(topology.doubleBattle, `wave ${state.wave}: ${client} retained the co-op double`).toBe(true);
+        expect(topology.enemyFieldSize, `wave ${state.wave}: ${client} rendered an enemy field`).toBeGreaterThan(0);
+        expect(topology.partyOwnersPresent.host, `wave ${state.wave}: ${client} retained the host party half`).toBe(
+          true,
+        );
+        expect(topology.partyOwnersPresent.guest, `wave ${state.wave}: ${client} retained the guest party half`).toBe(
+          true,
+        );
+        expect(
+          topology.activeSlotOwners,
+          `wave ${state.wave}: ${client} retained active host/guest lead seating`,
+        ).toEqual(["host", "guest"]);
+      }
+    }
+
     for (const wave of [5, 8, 10]) {
       const state = result.postWaveStates.find(candidate => candidate.wave === wave);
       expect(state, `wave ${wave}: retained evidence exists`).toBeDefined();
