@@ -48,9 +48,8 @@ const bal = { current: {}, baseline: {} };
 // Factory SET overrides: const → [{moves: [names], abilitySlot}] (absent = shipped sets).
 const trSets = { current: {}, baseline: {} };
 const expandedFactory = new Set(); // species consts with an open set panel
-// Add-a-Mon: live er-custom-mons.json + ability name list for autocomplete.
+// Add-a-Mon: live er-custom-mons.json.
 let MONS_LIVE = {};
-let ABILITY_NAMES = [];
 
 // Custom Trainers: live er-custom-trainers.json + edit state. In the LIVE file
 // each team member's species (and fusion species) is a numeric pokerogue
@@ -58,6 +57,13 @@ let ABILITY_NAMES = [];
 // spById) so the picker matches every other tab, converting back on save.
 let CTR_LIVE = {}; // key → entry (species by numeric id, as stored)
 const ctr = { current: {}, baseline: {} }; // key → entry (species by CONST)
+// Global custom-trainer spawn-density config (sibling er-custom-trainers-config.json):
+// how OFTEN a custom-trainer encounter happens at all, independent of trainer count.
+// { windowSize, windowChancePct }. Saved as its own whitelisted file.
+const ctrConfig = {
+  current: { windowSize: 10, windowChancePct: 25 },
+  baseline: { windowSize: 10, windowChancePct: 25 },
+};
 let ctrSelected = null; // open trainer key, or null
 // Per-member TRANSIENT UI state (NOT saved, NOT part of the dirty diff): which
 // member fieldsets are expanded, and which authored set a member's dropdown
@@ -74,6 +80,12 @@ let BGM_LIST = [];
 const BGM_AUDIO_BASE = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/audio/bgm";
 let bgmPreviewAudio = null; // the single shared HTMLAudioElement
 let bgmPreviewKey = null; // the key currently playing, or null
+
+// Staff-uploaded trainer art catalog + transient upload previews. Catalog entries
+// live in the game data repo; PNG/atlas pairs live in er-assets.
+let TRAINER_SPRITES = [];
+const trainerSpriteByKey = new Map();
+const preparedTrainerSprites = { single: null, m: null, f: null };
 
 // Live egg-move source (er-egg-moves.json, keyed by species CONST → move NAMEs),
 // used by the per-member move-legality helper (levelup ∪ TM ∪ egg).
@@ -105,6 +117,7 @@ let POKEDEX_SPECIES = []; // [{const, name, slug, id, dex}]
 let EVOS = {}; // speciesId → { to: number[], from: number[] }
 const moveById = new Map(); // moveId → rich move
 const abilById = new Map(); // abilityId → rich ability
+const abilIdByNormalizedName = new Map(); // lowercase display name → abilityId
 // Custom Trainers: sprite-bearing trainer classes (from trainer-classes.json),
 // with a NAME→entry lookup for the sprite preview. Falls back to the static
 // TRAINER_CLASS_OPTIONS list if the generated file is missing.
@@ -122,6 +135,9 @@ let TRAINER_FX = [];
 const trainerFxById = new Map(); // aura id → {id, label, accent}
 // Cache of fetched TexturePacker atlas jsons (CDN url → parsed json | null on fail).
 const trainerAtlasCache = new Map();
+// In-flight atlas fetches (CDN url → Promise), so N cards/cells sharing a class
+// fire ONE fetch, not N concurrent ones (caps concurrency on the trainer list).
+const trainerAtlasInflight = new Map();
 // Edit state keyed by species CONST (joined to data via SPECIES[i].id), so the
 // committed override JSON is human-readable and consistent with the other tabs.
 const learn = { current: {}, baseline: {} }; // const → [[level, moveId], ...]
@@ -292,6 +308,10 @@ function dirtyCounts() {
     if (!jsonEq(ctr.current[key], ctr.baseline[key])) {
       ctrN++;
     }
+  }
+  // The global spawn-density config counts toward the Custom Trainers tab dot.
+  if (!jsonEq(ctrConfig.current, ctrConfig.baseline)) {
+    ctrN++;
   }
   return {
     eggN,
@@ -1519,6 +1539,35 @@ const HELD_ITEM_OPTIONS = [
   "MULTI_LENS",
 ];
 
+// Full held-item catalog (editor/data/held-items.json): the complete set of
+// enemy-legal keys the game-side resolveHeldItemKey can field, grouped by
+// category so the held-item picker can offer type boosters, berries and gems
+// (not just the old curated 22). Loaded in init(); falls back to the curated
+// HELD_ITEM_OPTIONS (as "utility") when the generated file is absent so the
+// picker is never empty. The runtime resolver is the source of truth — keys
+// stay free-form, this list is just ergonomics.
+let HELD_ITEMS = HELD_ITEM_OPTIONS.map(key => ({ key, label: prettify(key), category: "utility" }));
+const HELD_CATEGORY_ORDER = ["booster", "berry", "gem", "utility"];
+const HELD_CATEGORY_LABEL = { booster: "type booster", berry: "berry", gem: "gem", utility: "utility" };
+
+/** Held-item picker <option>s, sorted by category (boosters → berries → gems →
+ *  utility) then label, each tagged with its category for at-a-glance grouping. */
+function heldItemsDatalistHtml() {
+  const catRank = k => {
+    const i = HELD_CATEGORY_ORDER.indexOf(k);
+    return i < 0 ? HELD_CATEGORY_ORDER.length : i;
+  };
+  const sorted = [...HELD_ITEMS].sort(
+    (a, b) => catRank(a.category) - catRank(b.category) || (a.label || a.key).localeCompare(b.label || b.key),
+  );
+  return `<datalist id="helditems-list">${sorted
+    .map(
+      h =>
+        `<option value="${esc(h.key)}">${esc(h.label || prettify(h.key))} · ${esc(HELD_CATEGORY_LABEL[h.category] || h.category || "item")}</option>`,
+    )
+    .join("")}</datalist>`;
+}
+
 // BST curve (defaults from er-balance-knobs: er.elite.bstCaps / er.hell.bstCaps,
 // #418/#419). Pairs are [up-to-wave, cap]; past the last wave there is no cap.
 const BST_CAPS = {
@@ -1561,6 +1610,45 @@ const CHALLENGE_OPTIONS = [
   "usagetier",
   "triples",
 ];
+// Challenge VALUE option lists (editor/data/challenge-values.json), keyed by the
+// challenge key above. A challenge present here is "parameterizable": the editor
+// shows a second dropdown of human options mapped to the game's numeric value
+// encoding. Loaded in init(); empty until then (the value dropdown just hides).
+let CHALLENGE_VALUES = {};
+/** Whether a challenge key carries a VALUE parameter (has an option list). */
+function ctrChallengeIsParameterizable(challenge) {
+  return Array.isArray(CHALLENGE_VALUES[challenge]) && CHALLENGE_VALUES[challenge].length > 0;
+}
+/** Normalize an authored challengeValue: a positive integer, else null (unset). */
+function normalizeCtrChallengeValue(value) {
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n >= 1 ? n : null;
+}
+
+// Named challenge PRESETS (editor/data/challenge-presets.json): {name, challenge,
+// challengeValue} configs mined from the achievement catalog (themed mono-type /
+// mono-gen runs). A SEPARATE picker from the main challenge dropdown; picking one
+// just SETS the challenge kind + value fields (one gating mechanism under the
+// hood). Loaded in init(); empty until then (the preset picker hides).
+let CHALLENGE_PRESETS = [];
+/** <optgroup>s for the preset picker, grouped by challenge kind (its label). */
+function ctrPresetOptionsHtml() {
+  const groups = new Map();
+  for (const p of CHALLENGE_PRESETS) {
+    if (!groups.has(p.challenge)) {
+      groups.set(p.challenge, []);
+    }
+    groups.get(p.challenge).push(p);
+  }
+  let html = "";
+  for (const [kind, list] of groups) {
+    const groupLabel = CHALLENGE_LABELS[kind] || kind;
+    html += `<optgroup label="${esc(groupLabel)}">${list
+      .map(p => `<option value="${esc(p.challenge)}:${p.challengeValue}">${esc(p.name)}</option>`)
+      .join("")}</optgroup>`;
+  }
+  return html;
+}
 const CHALLENGE_LABELS = {
   none: "None",
   inverse: "Inverse Battle",
@@ -1615,6 +1703,102 @@ function normalizeCtrSlotChance(value) {
   return normalizeCtrSpawnChance(value);
 }
 
+/**
+ * Resolve a trainer pick WEIGHT with spawnChance back-compat migration (mirrors
+ * resolveErCustomTrainerWeight in er-custom-trainers.ts): a present weight clamps
+ * to an integer >= 1; else a legacy spawnChance migrates (clamped >= 1); else 100.
+ */
+function resolveCtrWeight(weight, spawnChance) {
+  const clampAtLeastOne = v => {
+    if (typeof v !== "number" || !Number.isFinite(v)) {
+      return 1;
+    }
+    const n = Math.floor(v);
+    return n >= 1 ? n : 1;
+  };
+  if (weight !== undefined && weight !== null) {
+    return clampAtLeastOne(weight);
+  }
+  if (spawnChance !== undefined && spawnChance !== null) {
+    return clampAtLeastOne(spawnChance);
+  }
+  return 100;
+}
+
+/** Normalize a spawn WEIGHT to an integer >= 1 (absent/invalid => 100). */
+function normalizeCtrWeight(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 100;
+  }
+  const n = Math.floor(value);
+  return n >= 1 ? n : 1;
+}
+
+/** Normalize the spawn-density window size to an integer 1-100 (invalid => 10). */
+function normalizeCtrWindowSize(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 10;
+  }
+  const n = Math.floor(value);
+  return n >= 1 && n <= 100 ? n : 10;
+}
+
+/** Normalize the spawn-density per-window chance to an integer 0-100 (invalid => 25). */
+function normalizeCtrWindowChance(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 25;
+  }
+  const n = Math.floor(value);
+  return n >= 0 && n <= 100 ? n : 25;
+}
+
+// --- Multi-staff save safety: per-trainer baseline hashing (mirrors the worker's
+// custom-trainers-merge.ts EXACTLY, so a hash computed here matches the worker's).
+// The editor sends hashCtrTrainerEntry(CTR_LIVE[key]) (the LOAD-time repo version,
+// species by id) per modified trainer; the worker compares it against the CURRENT
+// repo version to detect a teammate's concurrent edit (same-trainer conflict).
+
+/** Deterministic, key-sorted JSON string (mirror of worker `stableStringify`). */
+function ctrStableStringify(value) {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "null";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(ctrStableStringify).join(",")}]`;
+  }
+  const keys = Object.keys(value).sort();
+  return `{${keys.map(k => `${JSON.stringify(k)}:${ctrStableStringify(value[k])}`).join(",")}}`;
+}
+
+/** Stable FNV-1a (32-bit) hex hash of a trainer entry (mirror of worker `hashTrainerEntry`). */
+function hashCtrTrainerEntry(entry) {
+  const s = ctrStableStringify(entry);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16);
+}
+
+/**
+ * Per-trainer load-time baseline hashes for a custom-trainers delta: for each
+ * MODIFIED trainer (a non-null delta entry whose key existed in the loaded file
+ * CTR_LIVE), map key -> hash of the LOADED repo entry. New trainers (absent from
+ * CTR_LIVE) and deletions (null) get no baseline, so the worker treats them as a
+ * new-id allocation / delete respectively. This drives the worker's same-trainer
+ * conflict guard.
+ */
+function ctrBuildBaselines(delta) {
+  const baselines = {};
+  for (const [key, value] of Object.entries(delta || {})) {
+    if (value !== null && CTR_LIVE && Object.hasOwn(CTR_LIVE, key)) {
+      baselines[key] = hashCtrTrainerEntry(CTR_LIVE[key]);
+    }
+  }
+  return baselines;
+}
+
 /** Clamp a variant weight to an integer >= 1 (invalid => 1). */
 function clampCtrWeight(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -1636,6 +1820,18 @@ function ctrIsMoveToken(v) {
   return CTR_MOVE_TOKENS.has((v || "").trim().toUpperCase());
 }
 
+/** A move DISPLAY name (e.g. "Ice Beam") -> the enum KEY the editor/game compare in
+ *  ("ICE_BEAM"). Mirror of gen-editor-data's moveNameToEnumKey (and the game's own
+ *  init-elite-redux-custom-moves.ts): uppercase, non-alnum runs -> a single "_",
+ *  trimmed. This is the ONE normalization for both the legal-move pool (moves-rich
+ *  ships DISPLAY names) and every typed move input (so "ice beam" -> "ICE_BEAM"). */
+function moveNameToEnumKey(name) {
+  return String(name || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 /** The member-FIELD keys that make up ONE weighted possibility (excludes slot meta:
  *  slotChance / weighted / variants / cur). */
 const CTR_MEMBER_FIELDS = [
@@ -1644,6 +1840,7 @@ const CTR_MEMBER_FIELDS = [
   "level",
   "moves",
   "abilitySlot",
+  "insanity",
   "fusion",
   "heldItems",
   "shiny",
@@ -1656,6 +1853,36 @@ function ctrNormShiny(s) {
   const o = s && typeof s === "object" ? s : {};
   const str = v => (typeof v === "string" ? v : "");
   return { palette: str(o.palette), surface: str(o.surface), around: str(o.around), name: str(o.name) };
+}
+
+/** Normalize a saved numeric Insanity payload into editor-facing ability names. */
+function ctrNormInsanity(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const abilityName = raw => {
+    if (typeof raw === "string") {
+      return raw;
+    }
+    return Number.isInteger(raw) ? abilById.get(raw)?.name || "" : "";
+  };
+  const rawInnates = Array.isArray(value.innates) ? value.innates : [];
+  return {
+    ability: abilityName(value.ability),
+    innates: [abilityName(rawInnates[0]), abilityName(rawInnates[1]), abilityName(rawInnates[2])],
+  };
+}
+
+/** Resolve a typed ability display name to its authoritative numeric AbilityId. */
+function ctrAbilityId(name) {
+  const normalized = String(name || "")
+    .trim()
+    .toLowerCase();
+  return normalized ? (abilIdByNormalizedName.get(normalized) ?? null) : null;
+}
+
+function ctrAbilityInputBad(name) {
+  return String(name || "").trim() !== "" && ctrAbilityId(name) === null;
 }
 
 /** True when a shiny edit value carries at least one effect (empties = renders normally). */
@@ -1671,6 +1898,8 @@ function blankCtrMemberFields() {
     level: null,
     moves: ["", "", "", ""],
     abilitySlot: 0,
+    // Per-battle ability substitutions. null = Insanity off; blank slots = unchanged.
+    insanity: null,
     fusion: null,
     heldItems: [],
     // Shiny Lab visual effect the mon fields with (empty = none).
@@ -1689,6 +1918,7 @@ function ctrCopyMemberFields(src) {
     level: typeof src.level === "number" ? src.level : null,
     moves: [...(src.moves || []), "", "", "", ""].slice(0, 4),
     abilitySlot: [0, 1, 2].includes(src.abilitySlot) ? src.abilitySlot : 0,
+    insanity: ctrNormInsanity(src.insanity),
     fusion: src.fusion ? { ...src.fusion } : null,
     heldItems: (src.heldItems || []).map(h => ({ item: h.item || "", count: Number.isInteger(h.count) ? h.count : 1 })),
     shiny: ctrNormShiny(src.shiny),
@@ -1780,14 +2010,16 @@ function blankCtrTrainer() {
     id: max + 1,
     name: "",
     trainerClass: "ACE_TRAINER",
+    trainerSprite: "",
     gender: "m",
     battleType: "single",
     difficulties: ["ace", "elite", "hell"],
     minWave: 20,
     maxWave: 80,
     endless: false,
-    spawnChance: 100,
+    weight: 100,
     challenge: "none",
+    challengeValue: null,
     battleBgm: "",
     introDialogue: "",
     victoryDialogue: "",
@@ -1803,16 +2035,20 @@ function ctrLiveToEdit(entry) {
     id: entry.id,
     name: entry.name ?? "",
     trainerClass: entry.trainerClass ?? "ACE_TRAINER",
+    trainerSprite: trainerSpriteByKey.has(entry.trainerSprite) ? entry.trainerSprite : "",
     gender: entry.gender === "f" ? "f" : "m",
     battleType: entry.battleType ?? "single",
     difficulties: Array.isArray(entry.difficulties) ? entry.difficulties.slice() : ["ace", "elite", "hell"],
     minWave: Number.isInteger(entry.minWave) ? entry.minWave : 20,
     maxWave: Number.isInteger(entry.maxWave) ? entry.maxWave : 80,
     endless: entry.endless === true,
-    // Absent/invalid spawnChance normalizes to 100 (guaranteed once per run) -
-    // keeps pre-feature saved entries behaving exactly as before.
-    spawnChance: normalizeCtrSpawnChance(entry.spawnChance),
+    // Pick weight (spawnChance -> weight migration): a saved entry with a legacy
+    // spawnChance and no weight migrates to weight = spawnChance (clamped >= 1);
+    // absent both => 100. New saves always write `weight`.
+    weight: resolveCtrWeight(entry.weight, entry.spawnChance),
     challenge: entry.challenge ?? "none",
+    // Optional challenge VALUE (mono-type/gen/color/... parameter); positive int or null.
+    challengeValue: normalizeCtrChallengeValue(entry.challengeValue),
     // Trimmed bgm key; anything not [a-z0-9_] (or absent) normalizes to "" (none).
     battleBgm: normalizeCtrBattleBgm(entry.battleBgm),
     introDialogue: typeof entry.introDialogue === "string" ? entry.introDialogue.slice(0, 200) : "",
@@ -1833,6 +2069,7 @@ function ctrLiveMemberFieldsToEdit(m) {
     level: typeof m.level === "number" ? m.level : null,
     moves: [...(m.moves || []), "", "", "", ""].slice(0, 4),
     abilitySlot: [0, 1, 2].includes(m.abilitySlot) ? m.abilitySlot : 0,
+    insanity: ctrNormInsanity(m.insanity),
     fusion:
       m.fusion && Number.isInteger(m.fusion.species)
         ? {
@@ -1959,8 +2196,46 @@ function setMovesSummary(set) {
 }
 
 /**
- * Legal move NAMEs for a species CONST = levelup ∪ TM ∪ egg moves, from the data
- * the editor already loaded (learnsets / tm-learnsets / er-egg-moves). Memoized.
+ * Every species CONST in a fielded species' pre-evolution line (self + every
+ * pre-evo down to the root), mirroring the game's collectShowdownFreeMoves walk,
+ * which inherits each pre-evolution's learnset. Uses the editor evolution graph
+ * (EVOS, keyed by numeric species id: { to:[], from:[] }). Falls back to just the
+ * species itself when there is no evo data (e.g. the jsdom smoke harness).
+ */
+function ctrPreEvoLineConsts(speciesConst) {
+  const consts = new Set([speciesConst]);
+  const startId = spByConst.get(speciesConst)?.id;
+  if (startId === undefined) {
+    return consts;
+  }
+  const visited = new Set();
+  const stack = [startId];
+  while (stack.length > 0) {
+    const id = stack.pop();
+    if (visited.has(id)) {
+      continue;
+    }
+    visited.add(id);
+    const c = spById.get(id)?.const;
+    if (c) {
+      consts.add(c);
+    }
+    const from = EVOS[id]?.from;
+    if (Array.isArray(from)) {
+      for (const pid of from) {
+        stack.push(pid);
+      }
+    }
+  }
+  return consts;
+}
+
+/**
+ * Legal move enum-KEYs for a species CONST = levelup ∪ TM ∪ egg moves, ACROSS the
+ * whole pre-evolution line (matching the game's RLA/RLNA free-move pool), from the
+ * data the editor already loaded (learnsets / tm-learnsets / er-egg-moves). The
+ * numeric move ids resolve to DISPLAY names via moves-rich; moveNameToEnumKey maps
+ * those to the enum-key space the inputs + MOVE_SET use. Memoized.
  * An empty set means "no data for this species" (treated as: enforce nothing so a
  * data gap never blocks a save — the illegal check below skips an empty pool).
  */
@@ -1973,23 +2248,55 @@ function legalMovesFor(speciesConst) {
     return cached;
   }
   const out = new Set();
-  for (const [, moveId] of learn.current[speciesConst] || []) {
-    const nm = moveById.get(moveId)?.name;
-    if (nm) {
-      out.add(nm);
+  // learnsets/tm-learnsets ship numeric move ids; moves-rich maps id -> DISPLAY
+  // name, so derive the enum KEY (the space the move inputs + MOVE_SET compare in).
+  // Union across the pre-evolution line so an evolved mon keeps its base's moves.
+  for (const c of ctrPreEvoLineConsts(speciesConst)) {
+    for (const [, moveId] of learn.current[c] || []) {
+      const nm = moveById.get(moveId)?.name;
+      if (nm) {
+        out.add(moveNameToEnumKey(nm));
+      }
     }
-  }
-  for (const moveId of tms.current[speciesConst] || []) {
-    const nm = moveById.get(moveId)?.name;
-    if (nm) {
-      out.add(nm);
+    for (const moveId of tms.current[c] || []) {
+      const nm = moveById.get(moveId)?.name;
+      if (nm) {
+        out.add(moveNameToEnumKey(nm));
+      }
     }
-  }
-  const eggNames = (egg.current[speciesConst] ?? EGG_MOVES_LIVE[speciesConst] ?? []).filter(Boolean);
-  for (const nm of eggNames) {
-    out.add(String(nm).toUpperCase());
+    // Egg moves already ship as enum NAMES (er-egg-moves strips the MoveId. prefix);
+    // normalize through the same transform so a stray-spaced entry still lands right.
+    // The line union folds the root's egg moves into an evolved form (as the game does).
+    const eggNames = (egg.current[c] ?? EGG_MOVES_LIVE[c] ?? []).filter(Boolean);
+    for (const nm of eggNames) {
+      out.add(moveNameToEnumKey(nm));
+    }
   }
   legalMovesCache.set(speciesConst, out);
+  return out;
+}
+
+/** The legal-move pool for a MEMBER: its species' pool UNIONED with its FUSION
+ *  partner's pool when fused (a fusion can legally know moves from both species,
+ *  mirroring the game's fused learnset + the RLA/RLNA install-time union). A
+ *  non-fused member returns exactly legalMovesFor(species) (the cached Set, not
+ *  mutated). */
+function legalMovesForMember(m) {
+  const base = legalMovesFor(m.species);
+  if (!m || !m.fusion || !m.fusion.species) {
+    return base;
+  }
+  const fus = legalMovesFor(m.fusion.species);
+  if (fus.size === 0) {
+    return base;
+  }
+  if (base.size === 0) {
+    return fus;
+  }
+  const out = new Set(base);
+  for (const mv of fus) {
+    out.add(mv);
+  }
   return out;
 }
 
@@ -1999,7 +2306,7 @@ function ctrMoveIllegal(m, move) {
   if (m.sanityOff || !move || ctrIsMoveToken(move)) {
     return false;
   }
-  const legal = legalMovesFor(m.species);
+  const legal = legalMovesForMember(m);
   // An empty pool = no legality data for this species; don't flag (never blocks).
   return legal.size > 0 && !legal.has(move);
 }
@@ -2010,7 +2317,7 @@ function ctrIllegalMoves(m) {
   if (m.sanityOff) {
     return [];
   }
-  const legal = legalMovesFor(m.species);
+  const legal = legalMovesForMember(m);
   if (legal.size === 0) {
     return [];
   }
@@ -2125,7 +2432,89 @@ function ctrSlotControlsHtml(m, i) {
       ${n > 1 ? `<button type="button" class="ctr-var-del" data-idx="${i}" title="Remove this possibility">✕ possibility</button>` : ""}
     </span>`;
   }
-  return `<div class="ctr-slot-ctrls">${slotProb}${weightedToggle}${weightedCtrls}</div>`;
+  return `<div class="ctr-slot-ctrls">${slotProb}${weightedToggle}${weightedCtrls}${ctrCopyControlHtml(i)}</div>`;
+}
+
+/** The per-member "Copy" picker: copies the CURRENTLY-SHOWN possibility either
+ *  into a slot (first empty / new slot) or as a new possibility of a chosen slot
+ *  (weight 100, auto-weighted). A SEPARATE control from the possibility +/✕. */
+function ctrCopyControlHtml(i) {
+  const t = ctrCur();
+  if (!t) {
+    return "";
+  }
+  const slotOpts = t.team
+    .map((s, si) => {
+      const nm = s.species ? spByConst.get(s.species)?.name || s.species : "(empty)";
+      return `<option value="poss:${si}">Slot ${si + 1}: ${esc(nm)}</option>`;
+    })
+    .join("");
+  // A slot target is available when there is an empty slot OR room to append.
+  const canSlot = t.team.length < 6 || t.team.some(s => !s.species);
+  return `<select class="ctr-copy" data-idx="${i}" title="Copy this Pokémon (the currently-shown possibility) elsewhere">
+    <option value="">⧉ Copy…</option>
+    <optgroup label="Copy into a slot">
+      <option value="slot:auto"${canSlot ? "" : " disabled"}>First empty / new slot</option>
+    </optgroup>
+    <optgroup label="Copy as a possibility of">${slotOpts}</optgroup>
+  </select>`;
+}
+
+/** Build a fresh single-possibility SLOT object from cloned member fields. */
+function ctrSlotFromFields(fields) {
+  return {
+    ...ctrCopyMemberFields(fields),
+    slotChance: 100,
+    weighted: false,
+    cur: 0,
+    variants: [{ ...ctrCopyMemberFields(fields), weight: 1 }],
+  };
+}
+
+/** Execute a member Copy command ("slot:auto" | "poss:<idx>") from source slot `srcIdx`. */
+function ctrCopyMember(t, srcIdx, cmd) {
+  const src = t.team[srcIdx];
+  if (!src) {
+    return;
+  }
+  ctrEnsureSlot(src);
+  ctrSyncCurrentVariant(src); // fold live edits into the shown possibility first
+  const fields = ctrCopyMemberFields(src); // deep clone of the SHOWN possibility
+  if (cmd === "slot:auto") {
+    // Least-destructive: fill the first EMPTY slot (species ""), else append a new
+    // slot when there is room. A full, all-filled team can't take a slot copy.
+    const emptyIdx = t.team.findIndex(s => !s.species);
+    if (emptyIdx >= 0) {
+      t.team[emptyIdx] = ctrSlotFromFields(fields);
+      ctrSetSel.set(emptyIdx, -1);
+      ctrOpenMembers.add(emptyIdx);
+      ctrFocusIdx = emptyIdx;
+    } else if (t.team.length < 6) {
+      t.team.push(ctrSlotFromFields(fields));
+      ctrOpenMembers.add(t.team.length - 1);
+      ctrFocusIdx = t.team.length - 1;
+    } else {
+      setStatus("Team is full (6 members) — no empty slot to copy into.");
+    }
+    return;
+  }
+  const poss = cmd.match(/^poss:(\d+)$/);
+  if (poss) {
+    const targetIdx = Number(poss[1]);
+    const target = t.team[targetIdx];
+    if (!target) {
+      return;
+    }
+    ctrEnsureSlot(target);
+    ctrSyncCurrentVariant(target);
+    // Append as a new possibility (weight 100), auto-enabling the weighted slot.
+    target.weighted = true;
+    target.variants.push({ ...ctrCopyMemberFields(fields), weight: 100 });
+    ctrLoadVariant(target, target.variants.length - 1);
+    ctrSetSel.set(targetIdx, -1);
+    ctrOpenMembers.add(targetIdx);
+    ctrFocusIdx = targetIdx;
+  }
 }
 
 /** The <option>s for one shiny-effect category select: "(none)" + the registry. */
@@ -2284,7 +2673,7 @@ function ctrMemberHtml(m, i) {
   const varTag = m.weighted && m.variants.length > 1 ? ` · ${m.cur + 1}/${m.variants.length}` : "";
   const summary = `<span class="ctr-mem-sum" data-idx="${i}" role="button" title="Click to ${open ? "collapse" : "expand"}">
     <span class="ctr-mem-caret">${open ? "▾" : "▸"}</span> Slot ${i + 1}: <b>${esc(spName)}</b>
-    <small>${scale ? "wave-scaled" : `Lv ${m.level}`}${setTag}${varTag}${m.sanityOff ? " · sanity off" : ""}</small></span>`;
+    <small>${scale ? "wave-scaled" : `Lv ${m.level}`}${setTag}${varTag}${m.sanityOff ? " · sanity off" : ""}${m.insanity ? " · INSANITY" : ""}</small></span>`;
   const slotCtrls = ctrSlotControlsHtml(m, i);
   if (!open) {
     return `<fieldset class="ctr-member">
@@ -2296,7 +2685,8 @@ function ctrMemberHtml(m, i) {
   // offers the RLA/RLNA tokens FIRST, then the legal pool when we HAVE data (else
   // the full move set so a data gap never traps the user; matches the save gate).
   const enforce = !m.sanityOff;
-  const legal = enforce ? legalMovesFor(m.species) : null;
+  // Union the fusion partner's legal moves so a fused mon's datalist offers both.
+  const legal = enforce ? legalMovesForMember(m) : null;
   const useLegalList = enforce && legal && legal.size > 0;
   const poolNames = useLegalList ? [...legal].sort() : [...MOVE_SET].sort();
   const tokenOpts = ["RLA", "RLNA"]
@@ -2340,6 +2730,13 @@ function ctrMemberHtml(m, i) {
     )
     .join("");
   const fus = m.fusion;
+  const insanity = ctrNormInsanity(m.insanity);
+  const insanityInput = (label, value, slot) => {
+    const bad = ctrAbilityInputBad(value);
+    const slotAttr = slot === null ? "" : ` data-slot="${slot}"`;
+    const cls = slot === null ? "ctr-insanity-ability" : "ctr-insanity-innate";
+    return `<label>${label} <input class="${cls}" list="abilities-list" data-idx="${i}"${slotAttr} value="${esc(value || "")}" placeholder="unchanged" spellcheck="false"${bad ? ` style="border-color:${ERR}"` : ""} /></label>`;
+  };
   return `<fieldset class="ctr-member open">
     <legend>${summary} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
     ${slotCtrls}
@@ -2348,6 +2745,18 @@ function ctrMemberHtml(m, i) {
     <label>Ability slot <select class="ctr-abil" data-idx="${i}">${ctrAbilOptions(m.species, m.abilitySlot)}</select></label>
     <label title="Uncheck to set an explicit level">Wave-scale level <input type="checkbox" class="ctr-scale" data-idx="${i}"${scale ? " checked" : ""} /></label>
     <label>Level <input type="number" class="ctr-level" data-idx="${i}" value="${scale ? "" : m.level}" min="1" max="200" ${scale ? "disabled" : ""} style="width:64px" /></label>
+    <div class="ctr-insanity${insanity ? " on" : ""}">
+      <label class="ctr-insanity-toggle" title="Override abilities only on this spawned Pokemon for this custom-trainer fight"><input type="checkbox" class="ctr-insanity-on" data-idx="${i}"${insanity ? " checked" : ""} /> Insanity</label>
+      ${
+        insanity
+          ? `<div class="ctr-insanity-fields">
+              ${insanityInput("Active", insanity.ability, null)}
+              ${insanity.innates.map((value, slot) => insanityInput(`Innate ${slot + 1}`, value, slot)).join("")}
+              <span class="hint">Search any game ability. Blank slots keep the Pokemon's normal ability for this fight.</span>
+            </div>`
+          : ""
+      }
+    </div>
     <div class="ctr-moves-head">
       <label>Use set <span>${setDropdown}</span></label>
       <label title="Skip move-legality checks for this member (saved as sanityOff)"><input type="checkbox" class="ctr-sanity" data-idx="${i}"${m.sanityOff ? " checked" : ""} /> Move sanity off</label>
@@ -2380,8 +2789,29 @@ function firstAtlasFrame(atlas) {
   return { crop: fr.frame, sheet: tx.size };
 }
 
-/** Crop one trainer sprite's first frame into `el` via CSS background (scaled 2x). */
-function renderTrainerFrame(file, el) {
+/** Fetch (and cache) a trainer atlas json, sharing ONE in-flight request per url. */
+function fetchTrainerAtlas(url) {
+  if (trainerAtlasCache.has(url)) {
+    return Promise.resolve(trainerAtlasCache.get(url));
+  }
+  if (trainerAtlasInflight.has(url)) {
+    return trainerAtlasInflight.get(url);
+  }
+  const p = fetch(url)
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null)
+    .then(atlas => {
+      trainerAtlasCache.set(url, atlas);
+      trainerAtlasInflight.delete(url);
+      return atlas;
+    });
+  trainerAtlasInflight.set(url, p);
+  return p;
+}
+
+/** Crop one trainer sprite's first frame into `el` via CSS background. Scaled 2x by
+ *  default; pass `{ targetH }` to fit a specific pixel height (e.g. the list card). */
+function renderTrainerFrame(file, el, opts) {
   const url = `${TRAINER_SPRITE_BASE}/${file}.json`;
   const paint = atlas => {
     if (!el.isConnected) {
@@ -2393,8 +2823,8 @@ function renderTrainerFrame(file, el) {
       el.title = "sprite atlas unavailable";
       return;
     }
-    const scale = 2;
     const { crop, sheet } = info;
+    const scale = opts && opts.targetH ? opts.targetH / crop.h : 2;
     el.style.width = `${crop.w * scale}px`;
     el.style.height = `${crop.h * scale}px`;
     el.style.backgroundImage = `url("${TRAINER_SPRITE_BASE}/${file}.png")`;
@@ -2407,18 +2837,16 @@ function renderTrainerFrame(file, el) {
     paint(trainerAtlasCache.get(url));
     return;
   }
-  fetch(url)
-    .then(r => (r.ok ? r.json() : null))
-    .catch(() => null)
-    .then(atlas => {
-      trainerAtlasCache.set(url, atlas);
-      paint(atlas);
-    });
+  fetchTrainerAtlas(url).then(paint);
 }
 
 /** True when the CURRENT trainer's class ships both `_m`/`_f` sprites (hasGenders). */
 function ctrClassHasGenders() {
   const t = ctrCur();
+  const uploaded = t ? trainerSpriteByKey.get(t.trainerSprite || "") : null;
+  if (uploaded) {
+    return uploaded.genders === true;
+  }
   const entry = t ? trainerClassByName.get((t.trainerClass || "").trim().toUpperCase()) : null;
   return !!(entry && entry.genders);
 }
@@ -2443,6 +2871,17 @@ function updateCtrSpritePreview() {
   if (!box) {
     return;
   }
+  const t = ctrCur();
+  const uploaded = t ? trainerSpriteByKey.get(t.trainerSprite || "") : null;
+  if (uploaded) {
+    const file = `${uploaded.spriteKey || uploaded.key}${uploaded.genders ? `_${t.gender === "f" ? "f" : "m"}` : ""}`;
+    const frame = document.createElement("div");
+    frame.className = "ctr-sprite-frame";
+    box.innerHTML = "";
+    box.appendChild(frame);
+    renderTrainerFrame(file, frame);
+    return;
+  }
   const input = document.getElementById("ctr-class");
   const name = input ? input.value.trim().toUpperCase() : "";
   const entry = trainerClassByName.get(name);
@@ -2451,7 +2890,6 @@ function updateCtrSpritePreview() {
     box.innerHTML = '<span class="dyn">no sprite for this class</span>';
     return;
   }
-  const t = ctrCur();
   // Gendered class: field ONLY the selected variant (default "m"); single-sprite
   // class: its lone sprite (gender has no meaning).
   const files = entry.genders ? [`${entry.sprite}_${t && t.gender === "f" ? "f" : "m"}`] : [entry.sprite];
@@ -2616,6 +3054,30 @@ function ctrPreviewPanelHtml(t) {
   </aside>`;
 }
 
+/** The trainer-sprite atlas file for a list card (selected gender variant), or ""
+ *  when the class ships no sprite (unknown class -> neutral placeholder box). */
+function ctrCardSpriteFile(t) {
+  const uploaded = trainerSpriteByKey.get(t.trainerSprite || "");
+  if (uploaded) {
+    return `${uploaded.spriteKey || uploaded.key}${uploaded.genders ? `_${t.gender === "f" ? "f" : "m"}` : ""}`;
+  }
+  const entry = trainerClassByName.get((t.trainerClass || "").trim().toUpperCase());
+  if (!entry) {
+    return "";
+  }
+  return entry.genders ? `${entry.sprite}_${t.gender === "f" ? "f" : "m"}` : entry.sprite;
+}
+
+/** One small team-member icon for a list card: the downscaled front sprite (same
+ *  slug resolution the fusion preview uses). Weighted slot -> the FIRST possibility.
+ *  Empty/unresolvable species -> an empty neutral box (never a broken image). */
+function ctrCardMonIcon(m) {
+  const sp = (Array.isArray(m.variants) && m.variants[0] && m.variants[0].species) || m.species || "";
+  const url = ctrSpeciesSpriteUrl(sp);
+  const img = url ? `<img src="${esc(url)}" alt="" loading="lazy" onerror="this.style.display='none'" />` : "";
+  return `<span class="ctr-card-mon" title="${esc(sp || "empty slot")}">${img}</span>`;
+}
+
 function renderCustomTrainers(root) {
   const keys = Object.keys(ctr.current)
     .filter(k => ctr.current[k])
@@ -2624,8 +3086,14 @@ function renderCustomTrainers(root) {
     .map(k => {
       const t = ctr.current[k];
       const dirty = !jsonEq(ctr.current[k], ctr.baseline[k]);
+      const spriteFile = ctrCardSpriteFile(t);
+      const monIcons = (Array.isArray(t.team) ? t.team : []).map(ctrCardMonIcon).join("");
       return `<button type="button" class="ctr-open${k === ctrSelected ? " on" : ""}${dirty ? " dirty" : ""}" data-ctropen="${esc(k)}">
-        ${esc(t.name || k)} <small style="color:var(--muted)">#${t.id} · ${t.team.length}mon</small>
+        <span class="ctr-card-head">${esc(t.name || k)} <small>#${t.id}</small></span>
+        <span class="ctr-card-body">
+          <span class="ctr-card-sprite"${spriteFile ? ` data-ctrsprite="${esc(spriteFile)}"` : ""}></span>
+          <span class="ctr-card-team">${monIcons}</span>
+        </span>
       </button>`;
     })
     .join("");
@@ -2646,12 +3114,45 @@ function renderCustomTrainers(root) {
     const challSel = CHALLENGE_OPTIONS.map(
       c => `<option value="${c}"${t.challenge === c ? " selected" : ""}>${CHALLENGE_LABELS[c]}</option>`,
     ).join("");
+    // Value dropdown: shown only for a value-bearing challenge (mono-type/gen/
+    // color/...). "(any value)" leaves challengeValue unset (any value qualifies).
+    const challValueSel = ctrChallengeIsParameterizable(t.challenge)
+      ? `<label class="ctr-challvalue-lbl" title="Restrict this trainer to ONE specific value of the chosen challenge (e.g. a specific mono-type). '(any value)' matches any value of that challenge.">Value
+          <select id="ctr-challenge-value">
+            <option value=""${t.challengeValue == null ? " selected" : ""}>(any value)</option>
+            ${CHALLENGE_VALUES[t.challenge]
+              .map(
+                o =>
+                  `<option value="${o.value}"${t.challengeValue === o.value ? " selected" : ""}>${esc(o.label)}</option>`,
+              )
+              .join("")}
+          </select>
+        </label>`
+      : "";
+    // Named-preset picker (SEPARATE from the main dropdown). Picking one just SETS
+    // the challenge kind + value below. Placeholder-only when nothing is chosen.
+    const challPresetSel =
+      CHALLENGE_PRESETS.length > 0
+        ? `<label class="ctr-preset-lbl" title="Named challenge configurations from the achievement catalog (themed mono-type / mono-gen runs). Picking one SETS the Challenge exclusivity + Value fields.">Named preset
+            <select id="ctr-challenge-preset">
+              <option value="">(apply a named preset…)</option>
+              ${ctrPresetOptionsHtml()}
+            </select>
+          </label>`
+        : "";
     const bgmSel = ctrBgmOptions(t.battleBgm || "");
+    const spriteSel = TRAINER_SPRITES.map(
+      sprite =>
+        `<option value="${esc(sprite.key)}"${t.trainerSprite === sprite.key ? " selected" : ""}>${esc(sprite.label || prettify(sprite.key))}</option>`,
+    ).join("");
     form = `<div class="ctr-form">
       <fieldset class="ctr-sec"><legend>Identity</legend>
         <label>Name <input type="text" id="ctr-name" maxlength="24" value="${esc(t.name || "")}" style="width:200px" /></label>
         <label>Id <input type="text" id="ctr-id" value="${t.id}" readonly tabindex="-1" style="width:80px;opacity:.6" /></label>
         <label>Sprite / class <input type="text" id="ctr-class" list="trainerclass-list" value="${esc(t.trainerClass || "")}" style="width:170px" spellcheck="false" /></label>
+        <label title="Optional uploaded appearance. Battle behavior still comes from Sprite / class.">Uploaded art
+          <select id="ctr-sprite"><option value="">(class sprite)</option>${spriteSel}</select>
+        </label>
         <button type="button" id="ctr-browse-class" title="Browse trainer classes by sprite">Browse…</button>
         ${ctrGenderPickerHtml(t)}
         <div class="ctr-bgm-row">
@@ -2665,13 +3166,14 @@ function renderCustomTrainers(root) {
           <label title="Line shown when this trainer's battle starts (up to 200 chars). Players can turn these off with the 'Skip custom trainer intros' setting.">Intro blurb
             <input type="text" id="ctr-intro" maxlength="200" value="${esc(t.introDialogue || "")}" placeholder="Shown at battle start (optional)" style="width:320px" />
           </label>
-          <label title="Line shown when the PLAYER beats this trainer (up to 200 chars). Uses the same dialogue routine ghost trainers use for their victory line.">Victory line
-            <input type="text" id="ctr-victory" maxlength="200" value="${esc(t.victoryDialogue || "")}" placeholder="When the player wins (optional)" style="width:280px" />
+          <label title="Line this trainer says when it BEATS the player (the trainer wins and the player's run ends). Up to 200 chars. Uses the same dialogue routine ghost trainers use.">Line when the trainer WINS
+            <input type="text" id="ctr-defeat" maxlength="200" value="${esc(t.defeatDialogue || "")}" placeholder="Trainer's taunt when it beats you (optional)" style="width:280px" />
           </label>
-          <label title="Line shown when this trainer BEATS the player (up to 200 chars). Uses the same routine ghost trainers use for their defeat line.">Defeat line
-            <input type="text" id="ctr-defeat" maxlength="200" value="${esc(t.defeatDialogue || "")}" placeholder="When the trainer wins (optional)" style="width:280px" />
+          <label title="Line this trainer says when it is DEFEATED (the player wins the battle). Up to 200 chars. Uses the same dialogue routine ghost trainers use.">Line when the trainer is DEFEATED
+            <input type="text" id="ctr-victory" maxlength="200" value="${esc(t.victoryDialogue || "")}" placeholder="Trainer's line when you beat it (optional)" style="width:280px" />
           </label>
         </div>
+        <p class="hint" style="margin:2px 0 0">Heads-up: "wins/defeated" is from the TRAINER's point of view. The DEFEATED line plays when you beat the trainer; the WINS line plays when the trainer beats you.</p>
         <div class="ctr-effect-row">
           <label title="A visual aura rendered around this trainer's sprite in battle, reusing the Ghost Trainer FX aura effects. '(none)' is the plain sprite.">Sprite effect
             <select id="ctr-effect">${ctrEffectOptions(t.trainerEffect || "")}</select>
@@ -2684,10 +3186,12 @@ function renderCustomTrainers(root) {
         <label>Min wave <input type="number" id="ctr-minwave" value="${t.minWave}" min="1" max="5000" style="width:72px" /></label>
         <label>Max wave <input type="number" id="ctr-maxwave" value="${t.maxWave}" min="1" max="5000" ${t.endless ? "disabled" : ""} style="width:72px" /></label>
         <label title="Any floor >= min wave (endless)"><input type="checkbox" id="ctr-endless"${t.endless ? " checked" : ""} /> Endless (any floor ≥ min)</label>
-        <label title="Per-run chance this trainer appears at all. 100 = guaranteed once per run.">Spawn chance % <input type="number" id="ctr-spawnchance" value="${normalizeCtrSpawnChance(t.spawnChance)}" min="1" max="100" style="width:64px" /></label>
+        <label title="Relative odds this trainer is the one fielded when a spawn window fires (weight / total weight among eligible trainers). Higher = more likely. Default 100.">Weight <input type="number" id="ctr-weight" value="${normalizeCtrWeight(t.weight)}" min="1" step="1" style="width:72px" /></label>
         <br /><label>Battle type <select id="ctr-battletype">${battleSel}</select></label>
         <label>Challenge exclusivity <select id="ctr-challenge">${challSel}</select></label>
-        <p class="hint" style="margin:6px 0 0">Spawn chance is ONE roll per run: 100 = guaranteed. If it hits, the trainer appears ONCE at a random floor in its wave range, sliding forward past boss/fixed/mystery waves.</p>
+        ${challValueSel}
+        ${challPresetSel}
+        <p class="hint" style="margin:6px 0 0">Spawning is capped GLOBALLY by the Spawn density panel above (how often ANY custom trainer appears). When a window fires, ONE trainer is picked by weight among the eligible not-yet-used trainers, then it appears once at a wave in its range, sliding forward past boss/fixed/mystery waves. No repeats per run.</p>
       </fieldset>
       <fieldset class="full ctr-sec"><legend>Team (1-6)</legend>
         ${t.team.map((m, i) => ctrMemberHtml(m, i)).join("")}
@@ -2696,15 +3200,23 @@ function renderCustomTrainers(root) {
       ${warnings.length > 0 ? `<div class="ctr-warn">⚠ ${warnings.map(esc).join("<br>⚠ ")}</div>` : ""}
       ${notes.length > 0 ? `<div class="ctr-note">ℹ ${notes.map(esc).join("<br>ℹ ")}</div>` : ""}
       <div class="full" style="display:flex;gap:10px;align-items:center;margin-top:8px">
+        <button type="button" id="ctr-clone" title="Duplicate this trainer as a NEW trainer (fresh id, name + ' (copy)'). The server assigns the real id/key on save.">⧉ Clone trainer</button>
         <button type="button" id="ctr-delete" style="color:var(--err,#c0392b)">🗑 Delete trainer</button>
         <span class="dyn">Changes save with the global “Save”/“Commit & Deploy” buttons.</span>
       </div>
     </div>`;
   }
+  const cfg = ctrConfig.current;
+  const cfgDirty = !jsonEq(ctrConfig.current, ctrConfig.baseline);
   root.innerHTML = `
     <div class="section">
       <h2>Custom Trainers</h2>
       <p class="hint">Staff-authored trainers that spawn in real runs, gated by difficulty, floor range and challenge mode. The team is fielded EXACTLY as authored (the #419 BST cap is bypassed).</p>
+      <fieldset class="ctr-density${cfgDirty ? " dirty" : ""}"><legend>Spawn density${cfgDirty ? " ●" : ""}</legend>
+        <p class="hint" style="margin:0 0 6px">How OFTEN a custom trainer appears at all, INDEPENDENT of how many you author. The run is diced into windows of this many waves; each window has this percent chance to field ONE custom trainer.</p>
+        <label title="Percent chance (0-100) that a given window fields a custom trainer at all. 0 disables custom trainers entirely.">Chance % per window <input type="number" id="ctr-density-chance" value="${normalizeCtrWindowChance(cfg.windowChancePct)}" min="0" max="100" step="1" style="width:72px" /></label>
+        <label title="How many waves make up one spawn window (1-100). Default 10 = at most one custom trainer per 10 waves.">Window size (waves) <input type="number" id="ctr-density-window" value="${normalizeCtrWindowSize(cfg.windowSize)}" min="1" max="100" step="1" style="width:72px" /></label>
+      </fieldset>
       <div class="mon-list">${list || '<span class="dyn">none yet</span>'}<button type="button" id="ctr-new" class="primary">＋ New trainer</button></div>
     </div>
     <div class="section">
@@ -2712,9 +3224,15 @@ function renderCustomTrainers(root) {
         <div class="ctr-layout-main">${form}</div>
         ${panel}
       </div>
-    </div>`;
+    </div>
+    ${heldItemsDatalistHtml()}`;
   // The sprite preview reads the live CDN atlas, so paint it after the DOM exists.
   updateCtrSpritePreview();
+  // Paint each list card's trainer sprite (lazy CDN atlas crop, ~44px tall). The
+  // per-url in-flight cache means many cards sharing a class fire ONE fetch.
+  for (const el of root.querySelectorAll("[data-ctrsprite]")) {
+    renderTrainerFrame(el.dataset.ctrsprite, el, { targetH: 44 });
+  }
 }
 
 // ---- Custom Trainers: input + click handling -------------------------------
@@ -2723,6 +3241,16 @@ function ctrCur() {
 }
 
 function onCustomTrainerInput(el) {
+  // Global spawn-density inputs live ABOVE the trainer list, so they must be
+  // handled with NO trainer selected (before the ctrCur guard below).
+  if (el.id === "ctr-density-chance") {
+    ctrConfig.current.windowChancePct = normalizeCtrWindowChance(Number(el.value));
+    return true;
+  }
+  if (el.id === "ctr-density-window") {
+    ctrConfig.current.windowSize = normalizeCtrWindowSize(Number(el.value));
+    return true;
+  }
   const t = ctrCur();
   if (!t) {
     return false;
@@ -2745,13 +3273,16 @@ function onCustomTrainerInput(el) {
     el.value = t.trainerClass;
     // Live preview without a full re-render (keeps the input cursor).
     updateCtrSpritePreview();
+  } else if (el.id === "ctr-sprite") {
+    t.trainerSprite = trainerSpriteByKey.has(el.value) ? el.value : "";
+    render();
   } else if (el.id === "ctr-minwave") {
     t.minWave = Number(el.value) || 1;
   } else if (el.id === "ctr-maxwave") {
     t.maxWave = Number(el.value) || 1;
-  } else if (el.id === "ctr-spawnchance") {
-    // Clamp to 1-100; a blank/invalid entry normalizes back to 100.
-    t.spawnChance = normalizeCtrSpawnChance(Number(el.value));
+  } else if (el.id === "ctr-weight") {
+    // Pick weight (integer >= 1); a blank/invalid entry normalizes back to 100.
+    t.weight = normalizeCtrWeight(Number(el.value));
   } else if (el.classList.contains("ctr-slotchance") && m) {
     // Slot-fill chance (slots 2-6); clamp 1-100, blank/invalid -> 100.
     m.slotChance = normalizeCtrSlotChance(Number(el.value));
@@ -2768,7 +3299,10 @@ function onCustomTrainerInput(el) {
   } else if (el.classList.contains("ctr-level") && m) {
     m.level = el.value === "" ? null : Number(el.value);
   } else if (el.classList.contains("ctr-move") && m) {
-    const v = el.value.trim().toUpperCase();
+    // Normalize to the enum KEY on EVERY edit (regardless of the sanity toggle):
+    // uppercase + spaces/punctuation -> "_", so a typed "ice beam" becomes
+    // "ICE_BEAM" BEFORE the legality check (a two-word move was always flagged).
+    const v = moveNameToEnumKey(el.value);
     el.value = v;
     m.moves[Number(el.dataset.slot)] = v;
     // A manual move edit flips the member's "Use set" dropdown back to (custom).
@@ -2778,6 +3312,12 @@ function onCustomTrainerInput(el) {
     // error line + dropdown refresh on blur (onCustomTrainerChange -> render).
     const bad = v !== "" && !ctrIsMoveToken(v) && (!MOVE_SET.has(v) || ctrMoveIllegal(m, v));
     el.style.borderColor = bad ? ERR : "";
+  } else if (el.classList.contains("ctr-insanity-ability") && m && m.insanity) {
+    m.insanity.ability = el.value;
+    el.style.borderColor = ctrAbilityInputBad(el.value) ? ERR : "";
+  } else if (el.classList.contains("ctr-insanity-innate") && m && m.insanity) {
+    m.insanity.innates[Number(el.dataset.slot)] = el.value;
+    el.style.borderColor = ctrAbilityInputBad(el.value) ? ERR : "";
   } else if (el.classList.contains("ctr-held-item") && m) {
     const h = m.heldItems[Number(el.dataset.heldidx)];
     if (h) {
@@ -2806,6 +3346,17 @@ function onCustomTrainerInput(el) {
 }
 
 function onCustomTrainerChange(el) {
+  // Global spawn-density inputs (above the list) blur/normalize with no trainer.
+  if (el.id === "ctr-density-chance") {
+    ctrConfig.current.windowChancePct = normalizeCtrWindowChance(Number(el.value));
+    render();
+    return true;
+  }
+  if (el.id === "ctr-density-window") {
+    ctrConfig.current.windowSize = normalizeCtrWindowSize(Number(el.value));
+    render();
+    return true;
+  }
   const t = ctrCur();
   if (!t) {
     return false;
@@ -2822,6 +3373,10 @@ function onCustomTrainerChange(el) {
     t.trainerClass = el.value.trim().toUpperCase();
     render();
     return true;
+  } else if (el.id === "ctr-sprite") {
+    t.trainerSprite = trainerSpriteByKey.has(el.value) ? el.value : "";
+    render();
+    return true;
   } else if (el.classList.contains("ctr-gender-radio")) {
     t.gender = el.value === "f" ? "f" : "m";
     updateCtrSpritePreview();
@@ -2829,6 +3384,32 @@ function onCustomTrainerChange(el) {
     return true;
   } else if (el.id === "ctr-challenge") {
     t.challenge = el.value;
+    // A challengeValue only applies to a value-bearing challenge; drop it when the
+    // new kind can't carry one (or is "none"). Re-render so the value dropdown
+    // appears/disappears for the new kind.
+    if (!ctrChallengeIsParameterizable(t.challenge)) {
+      t.challengeValue = null;
+    }
+    render();
+    return true;
+  } else if (el.id === "ctr-challenge-value") {
+    // "(any value)" -> null (unset); otherwise the chosen numeric value.
+    t.challengeValue = el.value === "" ? null : normalizeCtrChallengeValue(el.value);
+    refreshChrome();
+    return true;
+  } else if (el.id === "ctr-challenge-preset") {
+    // Named preset: SET the challenge kind + value (one gating mechanism). The
+    // encoded value is "<challenge>:<value>". Placeholder ("") is a no-op. The
+    // picker re-renders to a placeholder (the applied fields show below).
+    if (el.value) {
+      const [kind, val] = el.value.split(":");
+      if (CHALLENGE_OPTIONS.includes(kind)) {
+        t.challenge = kind;
+        t.challengeValue = normalizeCtrChallengeValue(val);
+      }
+    }
+    render();
+    return true;
   } else if (el.id === "ctr-effect") {
     // Pick a trainer sprite effect (aura); re-render so the preview swatch updates.
     t.trainerEffect = normalizeCtrTrainerEffect(el.value);
@@ -2842,6 +3423,14 @@ function onCustomTrainerChange(el) {
     return true;
   } else if (el.id === "ctr-endless") {
     t.endless = el.checked;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-copy") && m) {
+    // Copy the shown possibility into a slot / as a new possibility, then reset the
+    // picker to its placeholder on re-render.
+    if (el.value) {
+      ctrCopyMember(t, idx, el.value);
+    }
     render();
     return true;
   } else if (el.classList.contains("ctr-weighted") && m) {
@@ -2890,6 +3479,27 @@ function onCustomTrainerChange(el) {
     return true;
   } else if (el.classList.contains("ctr-sanity") && m) {
     m.sanityOff = el.checked;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-insanity-on") && m) {
+    m.insanity = el.checked ? ctrNormInsanity({}) : null;
+    render();
+    return true;
+  } else if (
+    (el.classList.contains("ctr-insanity-ability") || el.classList.contains("ctr-insanity-innate"))
+    && m
+    && m.insanity
+  ) {
+    // Canonicalize a valid case-insensitive entry to the catalog display name.
+    const id = ctrAbilityId(el.value);
+    if (id !== null) {
+      const name = abilById.get(id)?.name || el.value.trim();
+      if (el.classList.contains("ctr-insanity-ability")) {
+        m.insanity.ability = name;
+      } else {
+        m.insanity.innates[Number(el.dataset.slot)] = name;
+      }
+    }
     render();
     return true;
   } else if (el.classList.contains("ctr-move") && m) {
@@ -2965,6 +3575,30 @@ function onCustomTrainerClick(e) {
     ctrOpenMembers.add(0); // the fresh member starts expanded
     bgmStop();
     render();
+    return true;
+  }
+  if (e.target.closest("#ctr-clone")) {
+    // Clone the SELECTED trainer as a NEW trainer: deep-copy its whole content,
+    // mint a fresh provisional id/key (like #ctr-new) and suffix the name " (copy)".
+    // The server assigns the real id/key on save (the round-7/9 re-key machinery),
+    // so a clone is just a new-trainer entry carrying the copied content.
+    const src = ctrSelected ? ctr.current[ctrSelected] : null;
+    if (src) {
+      const clone = JSON.parse(JSON.stringify(src)); // deep copy (plain edit data)
+      clone.id = blankCtrTrainer().id; // next free provisional id in 70000-79999
+      const suffix = " (copy)";
+      const base = (src.name || "").trim();
+      clone.name = (base + suffix).length <= 24 ? base + suffix : base.slice(0, 24 - suffix.length) + suffix;
+      let key = `TRAINER_${clone.id}`;
+      while (ctr.current[key]) {
+        key += "_2";
+      }
+      ctr.current[key] = clone;
+      ctrSelected = key;
+      ctrResetMemberUiState();
+      bgmStop();
+      render();
+    }
     return true;
   }
   const t = ctrCur();
@@ -3090,6 +3724,373 @@ function onCustomTrainerClick(e) {
   return false;
 }
 
+function assetLicenseBadge(value) {
+  const license = value || "unknown";
+  return `<span class="license ${esc(license)}">${esc(license)}</span>`;
+}
+
+function renderAssets(root) {
+  const tracks = BGM_LIST.map(track => {
+    const title = track.title || prettify(track.key);
+    const detail = [
+      track.artist,
+      track.key,
+      track.splitMethod === "whole" && track.needsManualSplit ? "manual split needed" : "",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+    return `<div class="asset-track">
+      <div><strong>${esc(title)} ${assetLicenseBadge(track.license)}</strong><small>${esc(detail)}</small>${track.sourceUrl ? `<small><a href="${esc(track.sourceUrl)}" target="_blank" rel="noreferrer">Source and attribution</a></small>` : ""}</div>
+      <button type="button" data-asset-bgm="${esc(track.key)}" title="Preview track">Play</button>
+    </div>`;
+  }).join("");
+  root.innerHTML = `<div class="asset-grid">
+    <section class="asset-panel">
+      <h2>Battle music</h2>
+      <div class="asset-form">
+        <label>YouTube videos or playlists<textarea id="asset-media-urls" placeholder="https://www.youtube.com/watch?v=...\nhttps://www.youtube.com/playlist?list=..."></textarea></label>
+        <div class="asset-row">
+          <label>Key prefix <input id="asset-media-prefix" value="battle_custom" maxlength="40" /></label>
+          <label>Staff name <input id="asset-media-author" maxlength="40" /></label>
+        </div>
+        <div class="asset-row">
+          <label><input type="checkbox" id="asset-split" checked /> Split chapters and timestamps</label>
+          <label><input type="checkbox" id="asset-require-cc" /> Require Creative Commons</label>
+          <label><input type="checkbox" id="asset-deploy" checked /> Deploy staging</label>
+        </div>
+        <label><span><input type="checkbox" id="asset-media-rights" /> I confirm we may use and store this audio.</span></label>
+        <div class="asset-row">
+          <button type="button" id="asset-import" class="primary">Queue import</button>
+          <button type="button" id="asset-refresh-jobs">Refresh jobs</button>
+        </div>
+        <div id="asset-jobs" class="asset-jobs"></div>
+      </div>
+      <h2 style="margin-top:18px">Music catalog</h2>
+      <div class="asset-catalog">${tracks || '<span class="dyn">No tracks found.</span>'}</div>
+    </section>
+    <section class="asset-panel">
+      <h2>Trainer sprites</h2>
+      <div class="asset-form">
+        <div class="asset-row">
+          <label>Label <input id="asset-sprite-label" maxlength="80" /></label>
+          <label>Key <input id="asset-sprite-key" maxlength="64" placeholder="trainer_name" /></label>
+        </div>
+        <div class="asset-row">
+          <label>Classification <select id="asset-sprite-kind"><option>rival</option><option>leader</option><option>elite</option><option>villain</option><option selected>other</option></select></label>
+          <label>Tags <input id="asset-sprite-tags" maxlength="180" placeholder="region, theme" /></label>
+          <label><input type="checkbox" id="asset-sprite-gendered" /> M/F pair</label>
+        </div>
+        <div class="asset-row">
+          <label>License <select id="asset-sprite-license"><option value="original">Original</option><option value="cc0">CC0</option><option value="cc-by">CC BY</option><option value="permission">Permission</option><option value="unknown">Unknown</option></select></label>
+          <label>Artist <input id="asset-sprite-author" maxlength="80" /></label>
+        </div>
+        <label>Source URL <input id="asset-sprite-source" type="url" maxlength="500" /></label>
+        <div class="asset-row">
+          <label>Single <input id="asset-file-single" type="file" accept="image/png,image/webp,image/jpeg" /></label>
+          <label>Male <input id="asset-file-m" type="file" accept="image/png,image/webp,image/jpeg" /></label>
+          <label>Female <input id="asset-file-f" type="file" accept="image/png,image/webp,image/jpeg" /></label>
+        </div>
+        <div class="sprite-previews">
+          <div id="asset-preview-a" class="sprite-preview"><span class="dyn">single / male</span></div>
+          <div id="asset-preview-b" class="sprite-preview"><span class="dyn">female</span></div>
+        </div>
+        <label><span><input type="checkbox" id="asset-sprite-rights" /> I confirm we may use and distribute this art.</span></label>
+        <label><span><input type="checkbox" id="asset-sprite-deploy" checked /> Deploy staging after upload.</span></label>
+        <button type="button" id="asset-upload-sprite" class="primary">Process and upload</button>
+      </div>
+      <h2 style="margin-top:18px">Uploaded art</h2>
+      <div class="asset-catalog">${TRAINER_SPRITES.map(sprite => `<div class="asset-track"><div><strong>${esc(sprite.label || sprite.key)} ${assetLicenseBadge(sprite.license)}</strong><small>${esc([sprite.kind, ...(sprite.tags || [])].filter(Boolean).join(" | "))}</small></div><button type="button" data-asset-sprite="${esc(sprite.key)}" title="Open Custom Trainers">Use</button></div>`).join("") || '<span class="dyn">No uploaded trainer art.</span>'}</div>
+    </section>
+  </div>`;
+  paintPreparedTrainerSprites();
+}
+
+function paintPreparedTrainerSprites() {
+  const first = preparedTrainerSprites.single || preparedTrainerSprites.m;
+  const a = document.getElementById("asset-preview-a");
+  const b = document.getElementById("asset-preview-b");
+  if (a && first) {
+    a.innerHTML = `<img src="${first.dataUrl}" alt="Processed trainer sprite" />`;
+  }
+  if (b && preparedTrainerSprites.f) {
+    b.innerHTML = `<img src="${preparedTrainerSprites.f.dataUrl}" alt="Processed female trainer sprite" />`;
+  }
+}
+
+async function processTrainerSprite(file) {
+  const bitmap = await createImageBitmap(file);
+  if (bitmap.width > 2048 || bitmap.height > 2048) {
+    bitmap.close();
+    throw new Error("Sprite dimensions must not exceed 2048x2048");
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const { data } = image;
+  const corners = [0, canvas.width - 1, (canvas.height - 1) * canvas.width, canvas.width * canvas.height - 1];
+  const opaqueCorners = corners.filter(index => data[index * 4 + 3] > 180);
+  const bg = [255, 255, 255];
+  if (opaqueCorners.length > 0) {
+    for (let channel = 0; channel < 3; channel++) {
+      bg[channel] = Math.round(
+        opaqueCorners.reduce((sum, index) => sum + data[index * 4 + channel], 0) / opaqueCorners.length,
+      );
+    }
+  }
+  const seen = new Uint8Array(canvas.width * canvas.height);
+  const queue = [];
+  const matches = index => {
+    const p = index * 4;
+    if (data[p + 3] < 24) {
+      return true;
+    }
+    const dr = data[p] - bg[0];
+    const dg = data[p + 1] - bg[1];
+    const db = data[p + 2] - bg[2];
+    return (
+      dr * dr + dg * dg + db * db <= 42 * 42
+      || (bg.every(v => v > 235) && data[p] > 238 && data[p + 1] > 238 && data[p + 2] > 238)
+    );
+  };
+  const seed = index => {
+    if (!seen[index] && matches(index)) {
+      seen[index] = 1;
+      queue.push(index);
+    }
+  };
+  for (let x = 0; x < canvas.width; x++) {
+    seed(x);
+    seed((canvas.height - 1) * canvas.width + x);
+  }
+  for (let y = 0; y < canvas.height; y++) {
+    seed(y * canvas.width);
+    seed(y * canvas.width + canvas.width - 1);
+  }
+  for (const index of queue) {
+    data[index * 4 + 3] = 0;
+    const x = index % canvas.width;
+    const y = Math.floor(index / canvas.width);
+    if (x > 0) {
+      seed(index - 1);
+    }
+    if (x + 1 < canvas.width) {
+      seed(index + 1);
+    }
+    if (y > 0) {
+      seed(index - canvas.width);
+    }
+    if (y + 1 < canvas.height) {
+      seed(index + canvas.width);
+    }
+  }
+  let minX = canvas.width;
+  let minY = canvas.height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      if (data[(y * canvas.width + x) * 4 + 3] > 0) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+  if (maxX < minX || maxY < minY) {
+    throw new Error("Background removal left no visible sprite pixels");
+  }
+  ctx.putImageData(image, 0, 0);
+  const width = maxX - minX + 1;
+  const height = maxY - minY + 1;
+  const output = document.createElement("canvas");
+  output.width = width;
+  output.height = height;
+  output.getContext("2d").drawImage(canvas, minX, minY, width, height, 0, 0, width, height);
+  const dataUrl = output.toDataURL("image/png");
+  return {
+    dataUrl,
+    pngBase64: dataUrl.split(",")[1],
+    atlas: {
+      frames: {
+        "0001.png": {
+          frame: { x: 0, y: 0, w: width, h: height },
+          rotated: false,
+          trimmed: false,
+          spriteSourceSize: { x: 0, y: 0, w: width, h: height },
+          sourceSize: { w: width, h: height },
+        },
+      },
+      meta: {
+        app: "Elite Redux editor",
+        version: "1.0",
+        image: "sprite.png",
+        format: "RGBA8888",
+        size: { w: width, h: height },
+        scale: "1",
+      },
+    },
+  };
+}
+
+async function onAssetFileChange(input) {
+  const variant = input.id.replace("asset-file-", "");
+  const file = input.files?.[0];
+  if (!file || !(variant in preparedTrainerSprites)) {
+    return;
+  }
+  setStatus(`Processing ${file.name}...`);
+  try {
+    preparedTrainerSprites[variant] = await processTrainerSprite(file);
+    paintPreparedTrainerSprites();
+    setStatus(`${file.name} is cropped and ready.`);
+  } catch (error) {
+    setStatus(`Sprite processing failed: ${error.message || error}`, ERR);
+  }
+}
+
+async function queueMediaImport() {
+  const password = (document.getElementById("password")?.value || "").trim();
+  const urls = (document.getElementById("asset-media-urls")?.value || "")
+    .split(/\r?\n/)
+    .map(value => value.trim())
+    .filter(Boolean);
+  const response = await fetch(`${WORKER_URL}/import-media`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      password,
+      urls,
+      keyPrefix: document.getElementById("asset-media-prefix")?.value.trim(),
+      splitChapters: document.getElementById("asset-split")?.checked,
+      requireCreativeCommons: document.getElementById("asset-require-cc")?.checked,
+      deployStaging: document.getElementById("asset-deploy")?.checked,
+      rightsConfirmed: document.getElementById("asset-media-rights")?.checked,
+      author: document.getElementById("asset-media-author")?.value.trim(),
+    }),
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || `HTTP ${response.status}`);
+  }
+  setStatus("Music import queued. Refresh jobs for runner status.");
+  await refreshMediaJobs();
+}
+
+async function refreshMediaJobs() {
+  const password = (document.getElementById("password")?.value || "").trim();
+  const response = await fetch(`${WORKER_URL}/media-jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || `HTTP ${response.status}`);
+  }
+  const box = document.getElementById("asset-jobs");
+  if (box) {
+    box.innerHTML =
+      (result.runs || [])
+        .map(
+          run =>
+            `<a class="asset-job" href="${esc(run.html_url)}" target="_blank" rel="noreferrer"><span>${esc(new Date(run.created_at).toLocaleString())}</span><b>${esc(run.conclusion || run.status)}</b></a>`,
+        )
+        .join("") || '<span class="dyn">No import jobs yet.</span>';
+  }
+}
+
+async function uploadTrainerSprite() {
+  const gendered = document.getElementById("asset-sprite-gendered")?.checked === true;
+  const files = gendered
+    ? [
+        { variant: "m", ...preparedTrainerSprites.m },
+        { variant: "f", ...preparedTrainerSprites.f },
+      ]
+    : [{ variant: "single", ...preparedTrainerSprites.single }];
+  if (files.some(file => !file.pngBase64)) {
+    throw new Error(
+      gendered ? "Choose and process both male and female files" : "Choose and process a single sprite file",
+    );
+  }
+  const body = {
+    password: (document.getElementById("password")?.value || "").trim(),
+    key: document
+      .getElementById("asset-sprite-key")
+      ?.value.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, ""),
+    label: document.getElementById("asset-sprite-label")?.value.trim(),
+    genders: gendered,
+    kind: document.getElementById("asset-sprite-kind")?.value,
+    tags: (document.getElementById("asset-sprite-tags")?.value || "")
+      .split(",")
+      .map(tag => tag.trim())
+      .filter(Boolean),
+    author: document.getElementById("asset-sprite-author")?.value.trim(),
+    license: document.getElementById("asset-sprite-license")?.value,
+    sourceUrl: document.getElementById("asset-sprite-source")?.value.trim(),
+    rightsConfirmed: document.getElementById("asset-sprite-rights")?.checked,
+    deployStaging: document.getElementById("asset-sprite-deploy")?.checked,
+    files: files.map(file => ({ variant: file.variant, pngBase64: file.pngBase64, atlas: file.atlas })),
+  };
+  const response = await fetch(`${WORKER_URL}/upload-trainer-sprite`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || `HTTP ${response.status}`);
+  }
+  setStatus(`Trainer sprite ${result.key} uploaded. It appears after the editor refreshes.`);
+}
+
+function onAssetsClick(event) {
+  const bgm = event.target.closest("[data-asset-bgm]");
+  if (bgm) {
+    bgmPlay(bgm.dataset.assetBgm);
+    return true;
+  }
+  const use = event.target.closest("[data-asset-sprite]");
+  if (use) {
+    activeTab = "customtrainers";
+    document
+      .querySelectorAll("nav.tabs button")
+      .forEach(button => button.classList.toggle("active", button.dataset.tab === activeTab));
+    render();
+    return true;
+  }
+  const action = async fn => {
+    try {
+      event.target.disabled = true;
+      await fn();
+    } catch (error) {
+      setStatus(error.message || String(error), ERR);
+    } finally {
+      event.target.disabled = false;
+    }
+  };
+  if (event.target.closest("#asset-import")) {
+    void action(queueMediaImport);
+    return true;
+  }
+  if (event.target.closest("#asset-refresh-jobs")) {
+    void action(refreshMediaJobs);
+    return true;
+  }
+  if (event.target.closest("#asset-upload-sprite")) {
+    void action(uploadTrainerSprite);
+    return true;
+  }
+  return false;
+}
+
 function render() {
   const root = $("#content");
   if (activeTab === "eggmoves") {
@@ -3110,6 +4111,8 @@ function render() {
     renderCustomTrainers(root);
   } else if (activeTab === "addmon") {
     renderAddMon(root);
+  } else if (activeTab === "assets") {
+    renderAssets(root);
   } else {
     renderGame(root);
   }
@@ -3371,6 +4374,9 @@ function onPokedexClick(e) {
 
 // Click targets on the Trainers tab (toggle cards, knob resets, filter chips).
 function onClick(e) {
+  if (activeTab === "assets" && onAssetsClick(e)) {
+    return;
+  }
   if (POKEDEX_TABS.has(activeTab) && onPokedexClick(e)) {
     return;
   }
@@ -3867,6 +4873,34 @@ function buildDeltas() {
           memberBad = true;
         }
       }
+      if (m.insanity) {
+        const ins = ctrNormInsanity(m.insanity);
+        const abilityName = ins.ability.trim();
+        const activeId = ctrAbilityId(abilityName);
+        if (abilityName && activeId === null) {
+          bad.push(`${t.name}: unknown Insanity ability "${abilityName}"`);
+          memberBad = true;
+        }
+        const innateIds = ins.innates.map((name, slot) => {
+          const trimmed = name.trim();
+          const abilityId = ctrAbilityId(trimmed);
+          if (trimmed && abilityId === null) {
+            bad.push(`${t.name}: unknown Insanity innate ${slot + 1} "${trimmed}"`);
+            memberBad = true;
+          }
+          return abilityId;
+        });
+        const saved = {};
+        if (activeId !== null) {
+          saved.ability = activeId;
+        }
+        if (innateIds.some(abilityId => abilityId !== null)) {
+          saved.innates = innateIds;
+        }
+        // Keep the empty object when the toggle is on so reopening the editor
+        // preserves that authored state; blank slots remain normal in battle.
+        out.insanity = saved;
+      }
       const held = (m.heldItems || [])
         .filter(h => h && h.item)
         .map(h => ({ item: h.item.trim().toUpperCase(), count: h.count || 1 }));
@@ -3919,19 +4953,28 @@ function buildDeltas() {
     // Serialize gender ONLY when the class has gendered sprites AND "f" is picked
     // (default "m" is omitted so unaffected entries stay byte-clean).
     const classEntry = trainerClassByName.get(t.trainerClass);
-    const genderF = classEntry && classEntry.genders && t.gender === "f";
+    const uploadedSprite = trainerSpriteByKey.get(t.trainerSprite || "");
+    const genderF = (uploadedSprite?.genders || classEntry?.genders) && t.gender === "f";
     ctrDelta[key] = {
       id: t.id,
       name: t.name.trim(),
       trainerClass: t.trainerClass,
+      ...(trainerSpriteByKey.has(t.trainerSprite) ? { trainerSprite: t.trainerSprite } : {}),
       ...(genderF ? { gender: "f" } : {}),
       battleType: t.battleType || "single",
       difficulties: t.difficulties.length > 0 ? t.difficulties : ["ace", "elite", "hell"],
       minWave: t.minWave,
       maxWave: t.maxWave,
       endless: t.endless === true,
-      spawnChance: normalizeCtrSpawnChance(t.spawnChance),
+      // Always write `weight` (never the legacy spawnChance): the game migrates
+      // any old spawnChance on load, but new saves are weight-only.
+      weight: normalizeCtrWeight(t.weight),
       challenge: t.challenge || "none",
+      // challengeValue: serialize ONLY for a value-bearing challenge with a value
+      // set (not "(any value)"). Omitted otherwise (byte-clean; any-value default).
+      ...(ctrChallengeIsParameterizable(t.challenge) && normalizeCtrChallengeValue(t.challengeValue) !== null
+        ? { challengeValue: normalizeCtrChallengeValue(t.challengeValue) }
+        : {}),
       ...(normalizeCtrBattleBgm(t.battleBgm) ? { battleBgm: normalizeCtrBattleBgm(t.battleBgm) } : {}),
       // Intro blurb: trimmed + 200-char cap; omit when empty (byte-clean default).
       ...((t.introDialogue || "").trim() ? { introDialogue: (t.introDialogue || "").trim().slice(0, 200) } : {}),
@@ -3947,6 +4990,16 @@ function buildDeltas() {
   }
   if (Object.keys(ctrDelta).length > 0) {
     deltas["custom-trainers"] = ctrDelta;
+  }
+
+  // Global spawn-density config (its own whitelisted file). Emitted whole (only
+  // two normalized fields) when it differs from the loaded baseline.
+  const cfgOut = {
+    windowSize: normalizeCtrWindowSize(ctrConfig.current.windowSize),
+    windowChancePct: normalizeCtrWindowChance(ctrConfig.current.windowChancePct),
+  };
+  if (!jsonEq(cfgOut, ctrConfig.baseline)) {
+    deltas["custom-trainers-config"] = cfgOut;
   }
 
   return { deltas, bad };
@@ -3994,15 +5047,22 @@ async function commit({ deploy }) {
 
     const author = $("#author").value;
     let lastSha = "";
+    let ctrConflicts = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       // Only the LAST save triggers the (single) deploy.
       const wantDeploy = deploy && i === files.length - 1;
       setStatus(`Saving ${file} (${i + 1}/${files.length})…`);
+      // Custom trainers carry per-trainer baseline hashes so the worker can detect
+      // a teammate's concurrent edit (same-trainer conflict) and server-assign ids.
+      const body = { password, file, delta: deltas[file], author, deploy: wantDeploy };
+      if (file === "custom-trainers") {
+        body.baselines = ctrBuildBaselines(deltas[file]);
+      }
       const res = await fetch(`${WORKER_URL}/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, file, delta: deltas[file], author, deploy: wantDeploy }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
@@ -4014,15 +5074,34 @@ async function commit({ deploy }) {
         setStatus(`Saved ✓ ${lastSha} but deploy failed: ${data.deployError || "unknown"}`, ERR);
         return;
       }
-      markSaved(file);
+      if (file === "custom-trainers") {
+        // Adopt server-assigned ids + keep any conflicted trainers dirty.
+        markCustomTrainersSaved(deltas[file], data);
+        ctrConflicts = Array.isArray(data.conflicts) ? data.conflicts : [];
+      } else {
+        markSaved(file);
+      }
     }
     render();
-    setStatus(
-      deploy
-        ? `Saved ✓ ${lastSha} — deploy triggered, live in a few minutes.`
-        : `Saved ✓ ${lastSha} — click "Commit & Deploy" to apply it to staging.`,
-      "var(--ok)",
-    );
+    if (ctrConflicts.length > 0) {
+      // Partial success: the non-conflicting rest saved, but these trainers were
+      // edited by someone else since load and stay DIRTY (reload to see theirs).
+      const detail = ctrConflicts
+        .slice(0, 3)
+        .map(c => c.error || c.key)
+        .join("; ");
+      setStatus(
+        `Saved ✓ ${lastSha}, but ${ctrConflicts.length} trainer(s) were rejected as conflicts and kept dirty: ${detail}${ctrConflicts.length > 3 ? "…" : ""}`,
+        ERR,
+      );
+    } else {
+      setStatus(
+        deploy
+          ? `Saved ✓ ${lastSha} — deploy triggered, live in a few minutes.`
+          : `Saved ✓ ${lastSha} — click "Commit & Deploy" to apply it to staging.`,
+        "var(--ok)",
+      );
+    }
   } catch (err) {
     setStatus(`Error: ${err}`, ERR);
   } finally {
@@ -4051,16 +5130,78 @@ function markSaved(file) {
     tms.baseline = JSON.parse(JSON.stringify(tms.current));
   } else if (file === "species-abilities") {
     abil.baseline = JSON.parse(JSON.stringify(abil.current));
-  } else if (file === "custom-trainers") {
-    // Drop deleted (null) keys, then snapshot the rest as the new baseline.
-    for (const k of Object.keys(ctr.current)) {
-      if (ctr.current[k] === null) {
-        delete ctr.current[k];
-      }
+  } else if (file === "custom-trainers-config") {
+    ctrConfig.baseline = JSON.parse(JSON.stringify(ctrConfig.current));
+  }
+}
+
+/**
+ * Adopt the worker's custom-trainers save response (Batch A multi-staff safety):
+ *   - apply `idRemap` (server-assigned real ids) to the local edit state so the UI
+ *     reflects the real id without a reload,
+ *   - apply `keyRemap` (a NEW trainer whose provisional key collided with a
+ *     teammate's was re-keyed to TRAINER_<realId> instead of rejected): rename the
+ *     local entry's key so it stays in sync with the committed repo state,
+ *   - for every SAVED (non-conflicted) trainer, advance its baseline AND the
+ *     load-time CTR_LIVE snapshot (so the next save's baseline hash matches the
+ *     new repo state), dropping deleted (null) keys,
+ *   - leave every CONFLICTED trainer untouched: it stays DIRTY so the author can
+ *     reload the teammate's version (or re-save after reconciling).
+ */
+function markCustomTrainersSaved(delta, data) {
+  const idRemap = data && data.idRemap && typeof data.idRemap === "object" ? data.idRemap : {};
+  const keyRemap = data && data.keyRemap && typeof data.keyRemap === "object" ? data.keyRemap : {};
+  const conflicted = new Set((Array.isArray(data && data.conflicts) ? data.conflicts : []).map(c => c.key));
+
+  // Apply server-assigned ids to the live edit state (keyed by the ORIGINAL key,
+  // which is still the local key at this point - re-keying happens next).
+  for (const [key, realId] of Object.entries(idRemap)) {
+    if (ctr.current[key] && typeof realId === "number") {
+      ctr.current[key].id = realId;
     }
-    ctr.baseline = JSON.parse(JSON.stringify(ctr.current));
-    if (ctrSelected && !ctr.current[ctrSelected]) {
-      ctrSelected = null;
+  }
+
+  // Re-key any collided NEW trainer: rename origKey -> newKey in the live edit
+  // state + keep the selection pointed at it. The baseline / CTR_LIVE snapshots are
+  // (re)written under the NEW key by the delta loop below.
+  for (const [origKey, newKey] of Object.entries(keyRemap)) {
+    if (typeof newKey !== "string" || origKey === newKey) {
+      continue;
+    }
+    if (ctr.current[origKey]) {
+      ctr.current[newKey] = ctr.current[origKey];
+      delete ctr.current[origKey];
+    }
+    delete ctr.baseline[origKey];
+    delete CTR_LIVE[origKey];
+    if (ctrSelected === origKey) {
+      ctrSelected = newKey;
+    }
+  }
+
+  for (const [key, value] of Object.entries(delta || {})) {
+    if (conflicted.has(key)) {
+      continue; // rejected by the worker -> keep the local edit DIRTY
+    }
+    if (value === null) {
+      // Deletion committed.
+      delete ctr.current[key];
+      delete ctr.baseline[key];
+      delete CTR_LIVE[key];
+      if (ctrSelected === key) {
+        ctrSelected = null;
+      }
+      continue;
+    }
+    // Saved (created/modified): the committed repo entry is the delta with the
+    // final (possibly remapped) id, under the (possibly remapped) key. Advance
+    // CTR_LIVE (raw, species by id) so a later save hashes the NEW repo state, and
+    // snapshot the baseline as clean.
+    const targetKey = typeof keyRemap[key] === "string" ? keyRemap[key] : key;
+    const finalId = typeof idRemap[key] === "number" ? idRemap[key] : value.id;
+    CTR_LIVE[targetKey] = { ...value, id: finalId };
+    if (ctr.current[targetKey]) {
+      ctr.baseline[targetKey] = JSON.parse(JSON.stringify(ctr.current[targetKey]));
     }
   }
 }
@@ -4080,7 +5221,6 @@ async function init() {
       items,
       trainers,
       knobs,
-      abilities,
       eggLive,
       spLive,
       itemLive,
@@ -4098,17 +5238,21 @@ async function init() {
       allSpeciesData,
       evosData,
       ctrLive,
+      ctrConfigLive,
       trainerClassesData,
       bgmData,
       shinyEffectsData,
       trainerFxData,
+      heldItemsData,
+      challengeValuesData,
+      challengePresetsData,
+      trainerSpritesData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
       fetchJson("./data/items.json", []),
       fetchJson("./data/trainers.json", { frequencyDefaults: { elite: {}, hell: {} }, factorySpecies: [] }),
       fetchJson("./data/balance-knobs.json", []),
-      fetchJson("./data/abilities.json", []),
       // Live override files (resilient: missing on the branch → start empty).
       fetchJson(`${RAW_BASE}/er-egg-moves.json${bust}`, {}),
       fetchJson(`${RAW_BASE}/er-species-tuning.json${bust}`, {}),
@@ -4131,6 +5275,8 @@ async function init() {
       fetchJson("./data/evolutions.json", {}),
       // Live custom-trainers override file (resilient: missing on the branch → empty).
       fetchJson(`${RAW_BASE}/er-custom-trainers.json${bust}`, {}),
+      // Live custom-trainer spawn-density config (resilient: missing → defaults).
+      fetchJson(`${RAW_BASE}/er-custom-trainers-config.json${bust}`, {}),
       // Trainer-class sprite catalog (generated). Fallback → static list below.
       fetchJson("./data/trainer-classes.json", []),
       // Battle-music catalog (generated). Fallback → empty (picker offers "(default)").
@@ -4139,6 +5285,13 @@ async function init() {
       fetchJson("./data/shiny-effects.json", { palette: [], surface: [], around: [] }),
       // Ghost Trainer FX aura catalog (generated). Fallback → empty (picker offers "(none)").
       fetchJson("./data/trainer-fx.json", []),
+      // Held-item catalog (generated). Fallback → the curated HELD_ITEM_OPTIONS below.
+      fetchJson("./data/held-items.json", []),
+      // Challenge VALUE option lists (generated). Fallback → {} (value dropdown hides).
+      fetchJson("./data/challenge-values.json", {}),
+      // Named challenge presets (generated). Fallback → [] (preset picker hides).
+      fetchJson("./data/challenge-presets.json", []),
+      fetchJson(`${RAW_BASE}/er-custom-trainer-sprites.json${bust}`, {}),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -4146,7 +5299,6 @@ async function init() {
     TRAINER_DEFAULTS = trainers.frequencyDefaults;
     FACTORY_SPECIES = trainers.factorySpecies;
     KNOBS = knobs;
-    ABILITY_NAMES = abilities;
     MONS_LIVE = monsLive;
 
     // Seed balance-knob overrides from the live tuning file (only keys that
@@ -4181,6 +5333,7 @@ async function init() {
     }
     for (const a of ABILS_RICH) {
       abilById.set(a.id, a);
+      abilIdByNormalizedName.set(a.name.trim().toLowerCase(), a.id);
     }
     for (const s of POKEDEX_SPECIES) {
       spByConst.set(s.const, s);
@@ -4223,8 +5376,19 @@ async function init() {
     // group alpha-sorted) so the picker surfaces battle tracks up top.
     BGM_LIST = (Array.isArray(bgmData) ? bgmData : [])
       .filter(b => b && typeof b.key === "string")
-      .map(b => ({ key: b.key, battle: b.battle === true }))
+      .map(b => ({ ...b, key: b.key, battle: b.battle === true }))
       .sort((a, b) => (a.battle === b.battle ? a.key.localeCompare(b.key) : a.battle ? -1 : 1));
+
+    trainerSpriteByKey.clear();
+    TRAINER_SPRITES = Object.entries(
+      trainerSpritesData && typeof trainerSpritesData === "object" ? trainerSpritesData : {},
+    )
+      .filter(([key, value]) => /^[a-z0-9_]{2,64}$/.test(key) && value && typeof value === "object")
+      .map(([key, value]) => ({ key, spriteKey: key, ...value }))
+      .sort((a, b) => String(a.label || a.key).localeCompare(String(b.label || b.key)));
+    for (const sprite of TRAINER_SPRITES) {
+      trainerSpriteByKey.set(sprite.key, sprite);
+    }
 
     // Shiny Lab effect registry: build the per-category lists + an id→entry index
     // (with its category) for the per-mon shiny picker and the preview swatch.
@@ -4250,6 +5414,37 @@ async function init() {
       trainerFxById.set(e.id, e);
     }
 
+    // Held-item catalog: the full grouped picker (booster/berry/gem/utility). Fall
+    // back to the curated HELD_ITEM_OPTIONS (as "utility") when the generated file
+    // is absent or malformed, so the picker is never empty.
+    if (Array.isArray(heldItemsData) && heldItemsData.length > 0) {
+      HELD_ITEMS = heldItemsData
+        .filter(h => h && typeof h.key === "string" && h.key.length > 0)
+        .map(h => ({
+          key: h.key,
+          label: typeof h.label === "string" && h.label ? h.label : prettify(h.key),
+          category: typeof h.category === "string" && h.category ? h.category : "utility",
+        }));
+    }
+
+    // Challenge VALUE option lists: the per-kind human options for the value
+    // dropdown. Keep only well-formed {value:number,label:string} arrays.
+    if (challengeValuesData && typeof challengeValuesData === "object") {
+      CHALLENGE_VALUES = {};
+      for (const [kind, opts] of Object.entries(challengeValuesData)) {
+        if (Array.isArray(opts)) {
+          CHALLENGE_VALUES[kind] = opts.filter(o => o && typeof o.value === "number" && typeof o.label === "string");
+        }
+      }
+    }
+
+    // Named challenge presets: keep only well-formed {name,challenge,challengeValue}.
+    if (Array.isArray(challengePresetsData)) {
+      CHALLENGE_PRESETS = challengePresetsData.filter(
+        p => p && typeof p.name === "string" && typeof p.challenge === "string" && typeof p.challengeValue === "number",
+      );
+    }
+
     // Egg-move source + factory-set index for the per-member legality/set helpers.
     EGG_MOVES_LIVE = eggLive && typeof eggLive === "object" ? eggLive : {};
     factoryByConst.clear();
@@ -4269,6 +5464,14 @@ async function init() {
       }
     }
     ctr.baseline = JSON.parse(JSON.stringify(ctr.current));
+
+    // Seed the global spawn-density config (normalized; missing file => defaults).
+    const cfgLive = ctrConfigLive && typeof ctrConfigLive === "object" ? ctrConfigLive : {};
+    ctrConfig.current = {
+      windowSize: normalizeCtrWindowSize(cfgLive.windowSize),
+      windowChancePct: normalizeCtrWindowChance(cfgLive.windowChancePct),
+    };
+    ctrConfig.baseline = JSON.parse(JSON.stringify(ctrConfig.current));
 
     // Seed species tuning: snapshot values overlaid with any live override.
     for (const s of SPECIES) {
@@ -4324,7 +5527,7 @@ async function init() {
     // Ability names for the Add-a-Mon autocomplete.
     const adl = document.createElement("datalist");
     adl.id = "abilities-list";
-    adl.innerHTML = ABILITY_NAMES.map(a => `<option value="${esc(a)}"></option>`).join("");
+    adl.innerHTML = ABILS_RICH.map(a => `<option value="${esc(a.name)}"></option>`).join("");
     document.body.appendChild(adl);
     // Custom Trainers: species picker (full universe), trainer-class + held-item pickers.
     const sdl = document.createElement("datalist");
@@ -4335,10 +5538,9 @@ async function init() {
     tcdl.id = "trainerclass-list";
     tcdl.innerHTML = TRAINER_CLASSES.map(t => `<option value="${t.name}">${prettify(t.name)}</option>`).join("");
     document.body.appendChild(tcdl);
-    const hidl = document.createElement("datalist");
-    hidl.id = "helditems-list";
-    hidl.innerHTML = HELD_ITEM_OPTIONS.map(k => `<option value="${k}">${prettify(k)}</option>`).join("");
-    document.body.appendChild(hidl);
+    // NB: the held-item datalist (#helditems-list) is rendered INSIDE the Custom
+    // Trainers section (heldItemsDatalistHtml) so it reflects the full grouped
+    // HELD_ITEMS catalog loaded above — no global body-level datalist here.
 
     render();
     setStatus(`${SPECIES.length} species, ${ITEMS.length} items loaded.`);
@@ -4360,6 +5562,10 @@ async function init() {
     // `change` fires once per completed edit (blur / pick from list) → one undo step,
     // and on the Trainers tab it refreshes the default/overridden badges.
     content.addEventListener("change", e => {
+      if (activeTab === "assets" && e.target.id?.startsWith("asset-file-")) {
+        void onAssetFileChange(e.target);
+        return;
+      }
       if (activeTab === "customtrainers" && onCustomTrainerChange(e.target)) {
         return;
       }

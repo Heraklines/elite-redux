@@ -24,11 +24,8 @@
 
 import Overrides from "#app/overrides";
 import type { GameModes } from "#enums/game-modes";
-import { MoveId } from "#enums/move-id";
-import { Nature } from "#enums/nature";
-import { SpeciesId } from "#enums/species-id";
 import type { ModifierTypeFunc } from "#types/modifier-types";
-import type { Starter, StarterMoveset } from "#types/save-data";
+import type { Starter } from "#types/save-data";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 
 /** Context handed to dev-menu factories so they can launch runs. */
@@ -82,95 +79,56 @@ export function consumePendingDevStarters(): Starter[] | null {
   return s;
 }
 
-// --- Public-browser Commander starter checkpoint ----------------------------
+let pendingDevStarterLevels: number[] | null = null;
 
-/**
- * Whether this exact bundle was built for the dedicated Commander public-UI journey.
- *
- * This is deliberately separate from the broad staging dev-tools switch. Normal local,
- * staging, and production builds never set this exact value, so a URL parameter alone
- * cannot expose an unavailable starter or alter a player's starter screen.
- */
-export function isCoopBrowserCommanderFixtureBuild(): boolean {
-  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
-  return env?.VITE_COOP_BROWSER_FIXTURE === "commander-skip";
+/** Stage per-slot levels for the next dev party. */
+export function setPendingDevStarterLevels(levels: readonly number[]): void {
+  pendingDevStarterLevels = [...levels];
 }
 
-/** Whether this exact bundle was built for the deterministic faint-replacement browser journey. */
-export function isCoopBrowserFaintFixtureBuild(): boolean {
-  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
-  return env?.VITE_COOP_BROWSER_FIXTURE === "faint-replacement";
+/** Take (and clear) the per-slot levels staged for the next dev party. */
+export function consumePendingDevStarterLevels(): number[] | null {
+  const levels = pendingDevStarterLevels;
+  pendingDevStarterLevels = null;
+  return levels;
 }
 
-/**
- * Return the single starter to pre-populate in the normal co-op starter UI for the
- * Commander browser checkpoint. Both the dedicated build flag and an exact per-client
- * URL value are required. The caller still renders the ordinary starter screen and the
- * browser journey must submit and confirm the visible team with public keyboard input.
- */
-export function getCoopBrowserCommanderFixtureStarters(): Starter[] | null {
-  if (!isCoopBrowserCommanderFixtureBuild() || typeof location === "undefined") {
-    return null;
-  }
-  const fixture = new URLSearchParams(location.search).get("coopfixture");
-  const speciesId = fixture === "commander" ? SpeciesId.TATSUGIRI : fixture === "dondozo" ? SpeciesId.DONDOZO : null;
-  if (speciesId == null) {
-    return null;
-  }
-  const moveset = (
-    speciesId === SpeciesId.DONDOZO ? [MoveId.WATER_SPOUT, MoveId.TACKLE] : [MoveId.TACKLE]
-  ) as StarterMoveset;
-  return [
-    {
-      speciesId,
-      shiny: false,
-      variant: 0,
-      formIndex: 0,
-      abilityIndex: 0,
-      passive: false,
-      nature: Nature.HARDY,
-      moveset,
-      pokerus: false,
-      ivs: new Array(6).fill(31),
-    },
-  ];
+// --- Pending player-party setup (scenario -> SelectStarterPhase) ------------
+// Runs after every staged starter has become a PlayerPokemon, but before the
+// first battle is created. This is early enough for held items and other roster
+// state to be present when the battle UI is first built.
+
+let pendingDevPartySetup: (() => void) | null = null;
+
+/** Stage a callback to run once after the dev party has been constructed. */
+export function setPendingDevPartySetup(setup: () => void): void {
+  pendingDevPartySetup = setup;
 }
 
-/**
- * Materialize the deterministic public faint-replacement precondition in the normal starter UI.
- *
- * The configured owner visibly submits a Magikarp lead with Healing Wish plus a legal reserve.
- * Healing Wish makes the first real public command self-faint without depending on a random wave-1
- * enemy, while the other seat receives a one-mon attacking team. The exact build flag and per-page
- * URL value keep this CI-only fixture unreachable in normal local, staging, and production bundles.
- */
-export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
-  if (!isCoopBrowserFaintFixtureBuild() || typeof location === "undefined") {
-    return null;
-  }
-  const fixture = new URLSearchParams(location.search).get("coopfixture");
-  if (fixture !== "faint-owner" && fixture !== "faint-partner") {
-    return null;
-  }
-  const specs =
-    fixture === "faint-owner"
-      ? [
-          { speciesId: SpeciesId.MAGIKARP, moveset: [MoveId.HEALING_WISH] },
-          { speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] },
-        ]
-      : [{ speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] }];
-  return specs.map(({ speciesId, moveset }) => ({
-    speciesId,
-    shiny: false,
-    variant: 0,
-    formIndex: 0,
-    abilityIndex: 0,
-    passive: false,
-    nature: Nature.HARDY,
-    moveset: moveset as StarterMoveset,
-    pokerus: false,
-    ivs: new Array(6).fill(31),
-  }));
+/** Take (and clear) the staged pre-battle player-party callback. */
+export function consumePendingDevPartySetup(): (() => void) | null {
+  const cb = pendingDevPartySetup;
+  pendingDevPartySetup = null;
+  return cb;
+}
+
+// --- Pending custom-trainer force (scenario -> SelectStarterPhase) ----------
+// Resetting a dev scenario rebuilds the title screen, whose cleanup correctly
+// clears any old force. Keep the next force pending until immediately before
+// newBattle() so that cleanup cannot turn Restart into a random encounter.
+
+let pendingDevCustomTrainerForce: string | null = null;
+
+/** Stage the custom trainer key that the next dev run must force. */
+export function setPendingDevCustomTrainerForce(key: string): void {
+  pendingDevCustomTrainerForce = key;
+}
+
+/** Take (and clear) the custom trainer key staged for the next dev run. */
+export function consumePendingDevCustomTrainerForce(): string | null {
+  const key = pendingDevCustomTrainerForce;
+  pendingDevCustomTrainerForce = null;
+  return key;
 }
 
 // --- One-shot mystery-encounter override (scenario → first ME) ----------------

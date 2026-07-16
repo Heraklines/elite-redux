@@ -25,6 +25,7 @@
 // args); the asset wiring configures itself. See PAGE_RECIPES below.
 // =============================================================================
 
+import { ER_NEWCOMER_FRONT_ICON_SLUGS } from "#data/elite-redux/er-newcomer-species";
 import { UiTheme } from "#enums/ui-theme";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
@@ -389,6 +390,12 @@ function resolveTextureFile(key: string): string | null {
   const erIcon = /^er_icon__(.+)$/.exec(key);
   if (erIcon) {
     const slug = erIcon[1];
+    // Icon-from-front species (e.g. Regitube) load their FRONT atlas under the
+    // icon key at runtime (loading-scene.ts) - mirror that here so the harness
+    // renders the same downscaled front frame the game shows.
+    if (ER_NEWCOMER_FRONT_ICON_SLUGS.has(slug)) {
+      return assetPath(`images/pokemon/elite-redux/${slug}/front.png`);
+    }
     return (
       assetPath(`images/pokemon/elite-redux/${slug}/icon.png`)
       ?? assetPath(`images/pokemon/black/elite-redux/${slug}/icon.png`)
@@ -412,6 +419,17 @@ function addAtlasFrames(tex: Phaser.Textures.Texture, atlas: any): void {
   const entries: [string, any][] = Array.isArray(framesNode)
     ? framesNode.filter((f: any) => f?.filename && f?.frame).map((f: any) => [f.filename, f])
     : Object.entries(framesNode).filter(([, f]: [string, any]) => f?.frame);
+  // Mirror Phaser's JSONHash/JSONArray parsers: copy every non-frames top-level JSON
+  // key onto the texture's customData, so authored metadata (e.g. an `animation`
+  // cadence block for multi-frame ER "GIF" atlases) is readable exactly as in-game.
+  (tex as any).customData ??= {};
+  const cd = (tex as any).customData as Record<string, any>;
+  for (const key of Object.keys(atlas)) {
+    if (key === "frames" || key === "textures") {
+      continue;
+    }
+    cd[key] = atlas[key];
+  }
   for (const [name, f] of entries) {
     const fr = tex.add(name, 0, f.frame.x, f.frame.y, f.frame.w, f.frame.h);
     if (fr && f.trimmed && f.sourceSize && f.spriteSourceSize) {

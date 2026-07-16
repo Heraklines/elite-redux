@@ -41,7 +41,7 @@ import { DexAttr } from "#enums/dex-attr";
 import { EggSourceType } from "#enums/egg-source-types";
 import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
-import { PokemonType } from "#enums/pokemon-type";
+import type { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { TextStyle } from "#enums/text-style";
 import { TimeOfDay } from "#enums/time-of-day";
@@ -76,6 +76,7 @@ import {
   getTextStyleOptions,
   updateCandyCountTextStyle,
 } from "#ui/text";
+import { layoutTypeIconStrip, speciesFormTypes } from "#ui/type-icon-strip";
 import { addWindow } from "#ui/ui-theme";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
 import { BooleanHolder, getLocalizedSpriteKey, padInt } from "#utils/common";
@@ -2971,7 +2972,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
       // Setting type icons and form text
       if (isFormCaught || isFormSeen) {
         const speciesForm = getPokemonSpeciesForm(species.speciesId, formIndex!); // TODO: is the bang correct?
-        this.setTypeIcons(speciesForm.type1, speciesForm.type2);
+        this.setTypeIcons(speciesFormTypes(speciesForm));
         // TODO: change this once forms are refactored
         if (normalForm.includes(species.speciesId) && !formIndex) {
           this.pokemonFormText.setText("");
@@ -2983,7 +2984,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
           this.pokemonFormText.setY(18);
         }
       } else {
-        this.setTypeIcons(null, null);
+        this.setTypeIcons([]);
         this.pokemonFormText.setText("");
         this.pokemonFormText.setVisible(false);
       }
@@ -2992,26 +2993,23 @@ export class PokedexPageUiHandler extends MessageUiHandler {
       this.pokemonNumberText.setColor(getTextColor(TextStyle.SUMMARY));
       this.pokemonNumberText.setShadowColor(getTextColor(TextStyle.SUMMARY, true));
       this.pokemonGenderText.setText("");
-      this.setTypeIcons(null, null);
+      this.setTypeIcons([]);
     }
 
     this.updateInstructions();
   }
 
-  private setTypeIcons(type1: PokemonType | null, type2: PokemonType | null): void {
-    if (type1 === null) {
-      this.type1Icon.setVisible(false);
-    } else {
-      this.type1Icon.setVisible(true);
-      this.type1Icon.setFrame(PokemonType[type1].toLowerCase());
-    }
+  /** Pooled badges for types 3..N (ER N-type substrate). */
+  private extraTypeIcons: Phaser.GameObjects.Sprite[] = [];
 
-    if (type2 === null) {
-      this.type2Icon.setVisible(false);
-    } else {
-      this.type2Icon.setVisible(true);
-      this.type2Icon.setFrame(PokemonType[type2].toLowerCase());
-    }
+  private setTypeIcons(types: readonly PokemonType[]): void {
+    layoutTypeIconStrip(this.starterSelectContainer, this.type1Icon, this.type2Icon, this.extraTypeIcons, types, {
+      x0: 8,
+      y0: 98,
+      baseScale: 0.5,
+      baseStride: 18,
+      maxWidth: 104,
+    });
   }
 
   /**

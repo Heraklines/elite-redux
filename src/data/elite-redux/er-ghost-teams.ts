@@ -31,6 +31,7 @@ import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-myste
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { bypassLogin } from "#constants/app-constants";
+import { ER_GHOST_WAVE_WINDOW } from "#data/elite-redux/er-ghost-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ghostWavesForCurrentRun, isErGhostChallengeActive, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
 import {
@@ -163,7 +164,7 @@ const PREFETCH_LEAD_WAVES = 15;
  * far-deeper team that had to be devolved. A 40-wave band finds a wave-appropriate
  * team far more often.
  */
-export const ER_GHOST_WAVE_WINDOW = 40;
+export { ER_GHOST_WAVE_WINDOW } from "#data/elite-redux/er-ghost-constants";
 
 /**
  * At/after this wave a ghost drawn from a deeper run must NOT be devolved - it is only

@@ -1,11 +1,18 @@
 import { getSessionDataLocalStorageKey } from "#app/account";
-import { consumePendingDevStarters } from "#app/dev-tools/registry";
+import {
+  consumePendingDevCustomTrainerForce,
+  consumePendingDevPartySetup,
+  consumePendingDevStarterLevels,
+  consumePendingDevStarters,
+} from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
 import { allMoves, modifierTypes } from "#data/data-lists";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
+import { isErCustomTrainerDevForceArmed, setErCustomTrainerDevForce } from "#data/elite-redux/er-custom-trainers";
 import { PokemonMove } from "#moves/pokemon-move";
+import { installErCustomTrainerForCurrentWave } from "#phases/er-custom-trainer-install";
 
 /** Throwaway save slot used by dev test-scenarios so they don't clobber slot 0. */
 const DEV_SCENARIO_SLOT = 4;
@@ -96,6 +103,7 @@ export class SelectStarterPhase extends Phase {
     // drop straight into the battle, skipping starter-select. consumePending…
     // returns null in production / on a clean checkout, so this is inert there.
     const devStarters = consumePendingDevStarters();
+    const devStarterLevels = consumePendingDevStarterLevels();
     if (devStarters && devStarters.length > 0) {
       globalScene.sessionSlotId = DEV_SCENARIO_SLOT;
       // The normal starter-select confirm path sets starting money; the dev
@@ -106,7 +114,7 @@ export class SelectStarterPhase extends Phase {
       // Dev scenarios hand-pick movesets for TESTING (e.g. Thunder Wave on a
       // Blastoise) — skip the starter-legality validation that silently
       // rejected them and left scenario mons with NO moves.
-      this.initBattle(devStarters, true);
+      this.initBattle(devStarters, true, undefined, undefined, devStarterLevels ?? undefined);
       return;
     }
 
@@ -611,12 +619,14 @@ export class SelectStarterPhase extends Phase {
    * @param coopOwners - Co-op only (#633, P2): per-launch-mon owner tag, parallel to `starters`.
    *   The merged party is interleaved (host0, guest0, host1, ...), so `coopOwners[i]` is the
    *   owner of `starters[i]`. Omitted / `undefined` for solo and all other modes.
+   * @param startingLevels - Dev scenarios only: optional per-slot construction levels.
    */
   initBattle(
     starters: Starter[],
     ignoreMovesetValidation = false,
     coopOwners?: CoopRole[],
     showdownManifests?: ShowdownMonManifest[],
+    startingLevels?: readonly number[],
   ) {
     const party = globalScene.getPlayerParty();
     const loadPokemonAssets: Promise<void>[] = [];
@@ -656,9 +666,14 @@ export class SelectStarterPhase extends Phase {
       // keeping the turn checksum in parity. Non-showdown paths (showdownMon == null) are unchanged.
       const starterIvs = showdownMon ? [31, 31, 31, 31, 31, 31] : starter.ivs;
       const starterNature = (showdownMon?.nature as Nature | undefined) ?? starter.nature;
+      const stagedLevel = startingLevels?.[i];
+      const starterLevel =
+        stagedLevel != null && Number.isFinite(stagedLevel) && stagedLevel > 0
+          ? Math.floor(stagedLevel)
+          : globalScene.gameMode.getStartingLevel();
       const starterPokemon = globalScene.addPlayerPokemon(
         species,
-        globalScene.gameMode.getStartingLevel(),
+        starterLevel,
         starter.abilityIndex,
         starterFormIndex,
         starterGender,
@@ -769,6 +784,10 @@ export class SelectStarterPhase extends Phase {
     });
     overrideModifiers();
     overrideHeldItems(party[0]);
+    // Dev scenarios can restore per-mon state that the Starter handoff cannot
+    // represent (notably held items). Apply it before newBattle() so the first
+    // battle frame and item bars see the final party state.
+    consumePendingDevPartySetup()?.();
     // Showdown 1v1 (B7 item 6): attach each OWN mon's manifest held item to the PLAYER party -
     // the SAME mapping (buildShowdownHeldItem) the opponent's client fields for you, so both
     // sides field a byte-equal held-item set. MEGA_STONE / unset -> no runtime modifier. The
@@ -804,7 +823,23 @@ export class SelectStarterPhase extends Phase {
       } else {
         globalScene.gameData.gameStats.endlessSessionsPlayed++;
       }
+      // Restart rebuilds the title screen, which clears old custom-trainer
+      // forces. Arm the staged force at the last possible point so Reset always
+      // recreates this trainer battle instead of falling through to a wild wave.
+      const pendingCustomTrainerForce = consumePendingDevCustomTrainerForce();
+      if (pendingCustomTrainerForce) {
+        setErCustomTrainerDevForce(pendingCustomTrainerForce);
+      }
       globalScene.newBattle();
+      // ER (dev-tools only): a staff tester picking a custom trainer from the
+      // in-game Dev Scenarios picker arms a one-shot dev force. The FIRST wave of a
+      // run never runs NewBattlePhase (which normally installs custom trainers), so
+      // install here too when a force is armed - otherwise the forced pick would
+      // drop into a normal wild/trainer battle instead of the chosen trainer. Inert
+      // in prod (the force read is gated to dev tools) and on any un-forced run.
+      if (isErCustomTrainerDevForceArmed()) {
+        installErCustomTrainerForCurrentWave();
+      }
       // ER #439: the biome Map is a DEFAULT item on every run, all difficulties -
       // players can always choose their next biome from the start (daily runs
       // already grant it in TitlePhase; this covers classic/endless/challenge +

@@ -38,6 +38,13 @@ export function getPokemonSpecies(species: SpeciesId | SpeciesId[]): PokemonSpec
  * @returns The national dex number matching the `SpeciesId`
  */
 export function getDexNumber(speciesId: SpeciesId): SpeciesId {
+  // ER-custom species (id >= 10000) are NOT vanilla form-variant ids: `% 2000`
+  // would truncate them into a small (colliding) number - e.g. Regitube 70004 ->
+  // "0004", an ER redux 10500 -> "0500". Show the FULL custom id instead. The
+  // modulo is only meaningful for vanilla form-variant ids (< 10000).
+  if (speciesId >= 10000) {
+    return speciesId;
+  }
   return speciesId % 2000;
 }
 

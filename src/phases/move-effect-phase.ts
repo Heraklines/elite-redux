@@ -5,6 +5,10 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { ConditionalProtectTag } from "#data/arena-tag";
 import { MoveAnim } from "#data/battle-anims";
 import { ProtectedTag, SemiInvulnerableTag, SubstituteTag, TypeBoostTag } from "#data/battler-tags";
+import { erBatch3OnTargetHit } from "#data/elite-redux/abilities/batch3-on-hit";
+import { erBatch4OnTargetHit } from "#data/elite-redux/abilities/batch4-on-hit";
+import { consumeDualTypePrimeOnUse, dualTypePrimeApplies } from "#data/elite-redux/abilities/dual-type-move";
+import { erCapacitorBankConsumeOnElectricUse } from "#data/elite-redux/abilities/electivire";
 import {
   ConditionalAlwaysHitAbAttr,
   erMoveAlwaysHitsForUserType,
@@ -22,6 +26,7 @@ import { erApplyReactiveOnHit } from "#data/elite-redux/er-reactive-items";
 import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
 import { SpeciesFormChangePostMoveTrigger } from "#data/form-change-triggers";
 import type { TypeDamageMultiplier } from "#data/type";
+import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
@@ -113,6 +118,12 @@ export class MoveEffectPhase extends PokemonPhase {
   private firstHit: boolean;
   /** Is this the last strike of a move? */
   private lastHit: boolean;
+  /**
+   * ER Negative Feedback (5923): whether the user was ALREADY dual-type-primed
+   * when this move began. Snapshotted so the move that SETS the prime (in its own
+   * PostAttack) does not also consume it — only a move that started primed does.
+   */
+  private erStartedPrimed = false;
 
   /**
    * @param useMode - The {@linkcode MoveUseMode} corresponding to how this move was used.
@@ -154,6 +165,10 @@ export class MoveEffectPhase extends PokemonPhase {
     }
 
     const move = this.move;
+
+    // ER Negative Feedback (5923): snapshot whether the user began this move
+    // already dual-type-primed, so only a move that STARTED primed consumes it.
+    this.erStartedPrimed = dualTypePrimeApplies(user, move);
 
     /**
      * Does an effect from this move override other effects on this turn?
@@ -234,6 +249,11 @@ export class MoveEffectPhase extends PokemonPhase {
 
     this.firstHit = user.turnData.hitCount === user.turnData.hitsLeft;
     this.lastHit = user.turnData.hitsLeft === 1 || !targets.some(t => t.isActive(true));
+    // ER Capacitor Bank (5925): the holder's Electric moves consume ONE charge
+    // stack per move (guarded to the first strike so a multi-hit move spends one).
+    if (this.firstHit) {
+      erCapacitorBankConsumeOnElectricUse(user, move);
+    }
     erRecordAchievementMoveResolution(user, move, targets, this.hitChecks, this.useMode, this.firstHit);
 
     // Play the animation if the move was successful against any of its targets or it has a POST_TARGET effect (like self destruct)
@@ -688,6 +708,12 @@ export class MoveEffectPhase extends PokemonPhase {
       this.applyOnTargetEffects(user, target, firstTarget, result);
     }
     if (this.lastHit) {
+      // ER Negative Feedback (5923) prime: consume the holder's dual-type prime
+      // once its (physical) move has fully resolved — but ONLY if the move began
+      // primed (not the move that just SET the prime in its own PostAttack).
+      if (this.erStartedPrimed) {
+        consumeDualTypePrimeOnUse(user, this.move);
+      }
       globalScene.triggerPokemonFormChange(user, SpeciesFormChangePostMoveTrigger);
 
       // Multi-hit check for Wimp Out/Emergency Exit
@@ -822,7 +848,12 @@ export class MoveEffectPhase extends PokemonPhase {
 
     // ER recreated held items: Life Orb recoil on the attacker, Rocky Helmet
     // contact damage from the target. Both gated on damage actually dealt.
-    applyErLifeOrbRecoil(user, finalDmg);
+    // ER Sheer Force (125): moves it power-boosts (those with a secondary effect,
+    // move.chance >= 1) do NOT incur Life Orb recoil.
+    const sheerForceSuppressesRecoil = user.hasAbility(AbilityId.SHEER_FORCE) && this.move.chance >= 1;
+    if (!sheerForceSuppressesRecoil) {
+      applyErLifeOrbRecoil(user, finalDmg);
+    }
     applyErRockyHelmet(user, target, this.move, finalDmg);
 
     target.turnData.attacksReceived.unshift({
@@ -927,6 +958,15 @@ export class MoveEffectPhase extends PokemonPhase {
     this.applyHeldItemFlinchCheck(user, target, dealsDamage);
     this.applyOnGetHitAbEffects(user, target, dmgTuple);
     applyAbAttrs("PostAttackAbAttr", { pokemon: user, opponent: target, move: this.move, hitResult, damage });
+
+    // ER Batch 3 same-turn "linked/aligned pair" effects (Rendezvous heal,
+    // Synchronized Current paralysis, Closed Circuit extra hit) + turn-attack
+    // ledger recording. Runs after PostAttack so second-actor triggers see the
+    // first actor's already-recorded hit.
+    if (this.move.is("AttackMove")) {
+      erBatch3OnTargetHit(user, target, this.move, dealsDamage);
+      erBatch4OnTargetHit(user, target, this.move, dealsDamage);
+    }
 
     // We assume only enemy Pokemon are able to have the EnemyAttackStatusEffectChanceModifier from tokens
     if (!user.isPlayer() && this.move.is("AttackMove")) {

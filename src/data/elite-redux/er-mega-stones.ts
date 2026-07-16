@@ -250,6 +250,19 @@ const ER_STONE_DEFS: ReadonlyArray<readonly [string, string]> = [
   ["ZAPDOSITE", "lucarionite"],
   ["ZERAORITE", "lucarionite"],
   ["ZYGARDITE", "lucarionite"],
+  // Newcomer-patch fakemon stones + primal orbs (placeholder icon until art lands).
+  ["HYDREIGONITE_X", "lucarionite"],
+  ["XERNEASITE", "lucarionite"],
+  ["SHUCKLITE_Y", "lucarionite"],
+  ["DRAGONINITE_Z", "lucarionite"],
+  ["PARASECTITE", "lucarionite"],
+  ["ELECTIVIRITE_X", "lucarionite"],
+  ["MINUNITE", "lucarionite"],
+  ["PLUSLEITE", "lucarionite"],
+  ["JUMPLUFFITE", "lucarionite"],
+  ["PLANETARY_ORB", "lucarionite"],
+  ["EMBRYONIC_ORB", "lucarionite"],
+  ["SKARMORITE_Z", "lucarionite"],
 ];
 
 type FcRecord = Record<string, number>;

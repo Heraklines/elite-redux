@@ -62,11 +62,13 @@ import { EndCardPhase } from "#phases/end-card-phase";
 import { EndEvolutionPhase } from "#phases/end-evolution-phase";
 import { EnemyCommandPhase } from "#phases/enemy-command-phase";
 import { ErAbilityCapsulePhase } from "#phases/er-ability-capsule-phase";
+import { ErClosedCircuitBurstPhase } from "#phases/er-closed-circuit-burst-phase";
 import { ErCrossroadsPhase } from "#phases/er-crossroads-phase";
 import { ErDexNavPhase } from "#phases/er-dex-nav-phase";
 import { ErGreaterAbilityCapsulePhase } from "#phases/er-greater-ability-capsule-phase";
 import { ErGreaterAbilityRandomizerPhase } from "#phases/er-greater-ability-randomizer-phase";
 import { ErQuizPhase } from "#phases/er-quiz-phase";
+import { ErShatteredPsycheBonusPhase } from "#phases/er-shattered-psyche-bonus-phase";
 import { ErStormglassPickerPhase } from "#phases/er-stormglass-picker-phase";
 import { EvolutionPhase } from "#phases/evolution-phase";
 import { ExoticShopPhase } from "#phases/exotic-shop-phase";
@@ -183,6 +185,8 @@ const PHASES = Object.freeze({
   ErAbilityCapsulePhase,
   ErGreaterAbilityCapsulePhase,
   ErGreaterAbilityRandomizerPhase,
+  ErClosedCircuitBurstPhase,
+  ErShatteredPsycheBonusPhase,
   ErCrossroadsPhase,
   ErQuizPhase,
   ErStormglassPickerPhase,

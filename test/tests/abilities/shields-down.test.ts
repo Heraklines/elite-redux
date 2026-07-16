@@ -50,11 +50,14 @@ describe("Abilities - Shields Down", () => {
 
     expect(minior.formIndex).toBe(meteorIndex + 7);
 
-    // Use roost to regain 50% HP; should transform back into Meteor Form at turn end
+    // Elite Redux divergence: the Shields Down ROM text states "Cannot revert to
+    // Meteor Form once transformed during battle." So healing back above 50% HP
+    // (Roost) does NOT restore Meteor Form — the Minior stays in Core Form for
+    // the rest of the battle (it only resets to Meteor at the next battle init).
     game.move.use(MoveId.ROOST);
     await game.toNextTurn();
 
-    expect(minior.formIndex).toBe(meteorIndex);
+    expect(minior.formIndex).toBe(meteorIndex + 7);
   });
 
   it("should revert to base form on arena reset, even when fainted", async () => {

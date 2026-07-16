@@ -883,6 +883,12 @@ export abstract class EntryHazardTag extends SerializableArenaTag {
       return false;
     }
 
+    // ER Shield Dust (19): total immunity to ALL entry hazards on switch-in.
+    // Scanned by name (registration-free marker) so any hazard subclass honors it.
+    if (pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "EntryHazardImmunityAbAttr")) {
+      return false;
+    }
+
     if (this.groundedOnly && !pokemon.isGrounded()) {
       return false;
     }
@@ -1446,6 +1452,81 @@ export class InverseRoomTag extends RoomArenaTag {
 }
 
 /**
+ * Elite Redux — `Magic Room` (move 478). While active, the EFFECTS of all held
+ * items on BOTH sides of the field are suppressed for 5 turns. The suppression
+ * itself is enforced at the held-item apply gate
+ * ({@linkcode PokemonHeldItemModifier.shouldApply}, via
+ * {@linkcode isMagicRoomActive}) — this tag is a pure presence marker (no
+ * `apply` effect). Room-style: removed on overlap, so re-casting Magic Room
+ * while it is up ends it. Field-wide.
+ *
+ * The gate scopes suppression to TRANSFERABLE held items (Leftovers, berries,
+ * Choice items, Life Orb, reactive items, …), i.e. the ones with an in-battle
+ * effect. Permanent, non-transferable held items (base-stat vitamins, evo
+ * trackers, Mega Stones / form-change items) are intentionally NOT suppressed —
+ * suppressing base-stat modifiers would mutate a Pokémon's stats mid-battle.
+ * (Documented residual: the dex line "disables Mega Stones too" has no
+ * observable effect here since ER megas are permanent forms, not stone-driven.)
+ */
+export class MagicRoomTag extends RoomArenaTag {
+  public readonly tagType = ArenaTagType.MAGIC_ROOM;
+  constructor(turnCount: number, sourceId?: number) {
+    super(turnCount, MoveId.MAGIC_ROOM, sourceId);
+  }
+
+  protected override get onAddMessageKey(): string {
+    return ""; // no locale message — cosmetic text omitted, the effect is faithful
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+}
+
+/**
+ * True while an ER Magic Room ({@linkcode MagicRoomTag}) is active on the field.
+ * Consulted by the held-item apply gate so a transferable held item's effect is
+ * suppressed for the duration.
+ */
+export function isMagicRoomActive(): boolean {
+  return globalScene.arena.getTag(ArenaTagType.MAGIC_ROOM) instanceof MagicRoomTag;
+}
+
+/**
+ * Elite Redux — `Wonder Room` (move 472). While active, every Pokemon's Attack
+ * and Sp. Atk are swapped field-wide for 5 turns, and their stat stages
+ * ("buffs") are ignored — the swap reads the RAW base stats. The swap itself is
+ * enforced in {@linkcode Pokemon.getEffectiveStat} (via
+ * {@linkcode isWonderRoomActive}) — this tag is a pure presence marker (no
+ * `apply` effect). Room-style: removed on overlap, so re-casting Wonder Room
+ * while it is up ends it. Field-wide.
+ */
+export class WonderRoomTag extends RoomArenaTag {
+  public readonly tagType = ArenaTagType.WONDER_ROOM;
+  constructor(turnCount: number, sourceId?: number) {
+    super(turnCount, MoveId.WONDER_ROOM, sourceId);
+  }
+
+  protected override get onAddMessageKey(): string {
+    return ""; // no locale message — cosmetic text omitted, the effect is faithful
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+}
+
+/**
+ * True while an ER Wonder Room ({@linkcode WonderRoomTag}) is active on the
+ * field. Consulted by {@linkcode Pokemon.getEffectiveStat} so a Pokemon's
+ * Attack and Sp. Atk are swapped (using raw base stats, ignoring stat stages)
+ * for the duration.
+ */
+export function isWonderRoomActive(): boolean {
+  return globalScene.arena.getTag(ArenaTagType.WONDER_ROOM) instanceof WonderRoomTag;
+}
+
+/**
  * Arena Tag class for {@link https://bulbapedia.bulbagarden.net/wiki/Gravity_(move) Gravity}.
  * Grounds all Pokémon on the field, including Flying-types and those with
  * {@linkcode AbilityId.LEVITATE} for the duration of the arena tag, usually 5 turns.
@@ -1978,6 +2059,82 @@ export class PendingHealTag extends SerializableArenaTag {
   }
 }
 
+/**
+ * Elite Redux — reusable one-use entry-trap primitive ({@linkcode
+ * ArenaTagType.ER_INFESTATION_TRAP}). Placed on a side (normally the opposing
+ * side, via an entry ability such as Spore Bed). The NEXT grounded switch-in on
+ * that side has the trap's configured {@linkcode BattlerTagType} applied to it
+ * (Spore Bed → {@linkcode BattlerTagType.INFESTATION} for its ordinary 4-5 turn
+ * duration), after which the trap is spent — subsequent switch-ins are unaffected
+ * and the stale tag is removed at the next turn-end.
+ *
+ * Reusability: the applied effect ({@linkcode appliedTag}) is a serialized field,
+ * so different mons can trap with different battler tags through this one tag/
+ * archetype without minting a new {@linkcode ArenaTagType}.
+ *
+ * One-use is enforced by the {@linkcode consumed} flag rather than by removing the
+ * tag inside {@linkcode activateTrap} — {@linkcode Arena.applyTagsForSide} iterates
+ * `this.tags` directly, so splicing mid-iteration would skip a sibling hazard. The
+ * spent tag is instead reaped by {@linkcode lapse} at the next turn-end (which runs
+ * over a filtered copy, so removal there is safe).
+ */
+export class ErEntryTrapTag extends EntryHazardTag {
+  public override readonly tagType = ArenaTagType.ER_INFESTATION_TRAP;
+  public override get maxLayers() {
+    return 1 as const;
+  }
+
+  /** The battler tag applied to the grounded switch-in. */
+  public readonly appliedTag: BattlerTagType = BattlerTagType.INFESTATION;
+  /** Whether the trap has already caught a switch-in (one-use). */
+  public readonly consumed: boolean = false;
+
+  constructor(sourceId: number | undefined, side: ArenaTagSide) {
+    super(MoveId.NONE, sourceId, side);
+  }
+
+  /** Configure the applied effect (used by the entry archetype at placement time). */
+  public configure(appliedTag: BattlerTagType): void {
+    (this as Mutable<this>).appliedTag = appliedTag;
+  }
+
+  protected override get onAddMessageKey(): string {
+    return "arenaTag:erInfestationTrapOnAdd" + this.i18nSideKey;
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "arenaTag:erInfestationTrapOnRemove" + this.i18nSideKey;
+  }
+
+  override activateTrap(simulated: boolean, pokemon: Pokemon): boolean {
+    if (this.consumed || !pokemon.isAllowedInBattle()) {
+      return false;
+    }
+    if (simulated) {
+      return true;
+    }
+    // Roll the applied tag's ordinary duration through the seeded RNG (co-op safe).
+    // For INFESTATION this mirrors the vanilla 4-5 turn partial-trap window.
+    const duration = pokemon.randBattleSeedIntRange(4, 5);
+    pokemon.addTag(this.appliedTag, duration, MoveId.NONE, this.sourceId);
+    (this as Mutable<this>).consumed = true;
+    return true;
+  }
+
+  override lapse(): boolean {
+    // Keep until spent; once consumed, the next turn-end reaps it.
+    return !this.consumed;
+  }
+
+  public override loadTag(
+    source: BaseArenaTag & Pick<ErEntryTrapTag, "tagType" | "layers" | "appliedTag" | "consumed">,
+  ): void {
+    super.loadTag(source);
+    (this as Mutable<this>).appliedTag = source.appliedTag;
+    (this as Mutable<this>).consumed = source.consumed;
+  }
+}
+
 // TODO: swap `sourceMove` and `sourceId` and make `sourceMove` an optional parameter
 export function getArenaTag(
   tagType: ArenaTagType,
@@ -2017,6 +2174,8 @@ export function getArenaTag(
       return new FoamyWebTag(sourceId, side);
     case ArenaTagType.CREEPING_THORNS:
       return new CreepingThornsTag(sourceId, side);
+    case ArenaTagType.ER_INFESTATION_TRAP:
+      return new ErEntryTrapTag(sourceId, side);
     case ArenaTagType.ER_WEATHER_LOCK:
       return new ErWeatherLockTag(turnCount, sourceId, side);
     case ArenaTagType.STEALTH_ROCK:
@@ -2027,6 +2186,10 @@ export function getArenaTag(
       return new TrickRoomTag(turnCount, sourceId);
     case ArenaTagType.INVERSE_ROOM:
       return new InverseRoomTag(turnCount, sourceMove, sourceId);
+    case ArenaTagType.MAGIC_ROOM:
+      return new MagicRoomTag(turnCount, sourceId);
+    case ArenaTagType.WONDER_ROOM:
+      return new WonderRoomTag(turnCount, sourceId);
     case ArenaTagType.GRAVITY:
       return new GravityTag(turnCount, sourceId);
     case ArenaTagType.REFLECT:
@@ -2091,10 +2254,14 @@ export type ArenaTagTypeMap = {
   [ArenaTagType.HOT_COALS]: HotCoalsTag;
   [ArenaTagType.FOAMY_WEB]: FoamyWebTag;
   [ArenaTagType.CREEPING_THORNS]: CreepingThornsTag;
+  [ArenaTagType.ER_INFESTATION_TRAP]: ErEntryTrapTag;
   [ArenaTagType.ER_WEATHER_LOCK]: ErWeatherLockTag;
   [ArenaTagType.STEALTH_ROCK]: StealthRockTag;
   [ArenaTagType.STICKY_WEB]: StickyWebTag;
   [ArenaTagType.TRICK_ROOM]: TrickRoomTag;
+  [ArenaTagType.INVERSE_ROOM]: InverseRoomTag;
+  [ArenaTagType.MAGIC_ROOM]: MagicRoomTag;
+  [ArenaTagType.WONDER_ROOM]: WonderRoomTag;
   [ArenaTagType.GRAVITY]: GravityTag;
   [ArenaTagType.REFLECT]: ReflectTag;
   [ArenaTagType.LIGHT_SCREEN]: LightScreenTag;

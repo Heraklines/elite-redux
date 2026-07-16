@@ -270,6 +270,14 @@ export class PokemonSummonData {
    */
   public forceAttackerOutUsed = false;
 
+  /**
+   * Whether this Pokemon has already been made {@linkcode BattlerTagType.ER_COMMANDED}
+   * (by ER Puppet Strings) since its current send-out. As part of `summonData` it
+   * resets each switch-in, enforcing the dex's "once per switch-in" rule — a target
+   * cured/expired of Commanded cannot be re-Commanded until it switches out and back in.
+   */
+  public erCommandedUsedThisSwitchIn = false;
+
   // Overrides for transform and company.
   // TODO: Move these into a separate class & add rage fist hit count
   public speciesForm: PokemonSpeciesForm | null = null;

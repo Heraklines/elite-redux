@@ -19,12 +19,13 @@
 //     "minWave": 20,
 //     "maxWave": 60,
 //     "endless": false,                // true => any floor >= minWave (maxWave ignored)
-//     "spawnChance": 100,              // integer 1-100; absent => 100. ONE per-run
-//                                      // roll decides IF the trainer appears this
-//                                      // run; if it does, it spawns EXACTLY ONCE at
-//                                      // a random floor in its window (100 =
-//                                      // guaranteed once per run). See
-//                                      // `rollErCustomTrainerAppearance`.
+//     "weight": 100,                   // integer >= 1; absent => 100. RELATIVE odds
+//                                      // this trainer is the one fielded when a
+//                                      // spawn window fires (weight / totalWeight
+//                                      // among the gate-eligible not-yet-used pool).
+//                                      // Replaces the old per-trainer `spawnChance`:
+//                                      // a saved `spawnChance` with no `weight`
+//                                      // migrates to weight = spawnChance (>= 1).
 //     "challenge": "none",             // none | one of the ErCustomTrainerChallenge
 //                                      // keys (inverse, monocolor, monogen, doubles,
 //                                      // ghost, monotype, maxcost, points, freshstart,
@@ -64,10 +65,26 @@
 //     ]
 //   }
 //
-// Every per-run choice (spawn, wave, weighted-variant pick, slot-fill, RLA/RLNA
-// move) derives ONLY from the run seed (NO Math.random), so a save reload — and a
-// future co-op adoption — reproduce identically. Salts are documented at each
-// helper (custom-trainer-slot / custom-trainer-slotfill / custom-trainer-move).
+// GLOBAL SPAWN DENSITY (er-custom-trainers-config.json — a sibling whitelisted
+// file, NOT a meta key inside this map). The run is diced into fixed windows
+// (default 10 waves); each window rolls ONCE (default 25%) whether ANY custom
+// trainer appears at all, INDEPENDENT of how many trainers are authored. When a
+// window fires, one wave inside it is chosen (seeded, slid forward past
+// boss/fixed/mystery waves) and one trainer is picked by `weight` among the
+// gate-eligible not-yet-used pool. At most one custom trainer per window, no
+// repeats per run. This replaces the old per-trainer once-per-run `spawnChance`
+// (which piled up: N trainers at 100% meant every early wave was a custom battle).
+//
+// Every per-run choice (window fire, wave, trainer pick, weighted-variant pick,
+// slot-fill, RLA/RLNA move) derives ONLY from the run seed (NO Math.random), so a
+// save reload — and a future co-op adoption — reproduce identically. Salts
+// (load-bearing, keep stable):
+//   window fire  : `${seed}:custom-trainer-window:${windowIndex}`
+//   window wave  : `${seed}:custom-trainer-wave:${windowIndex}`
+//   trainer pick : `${seed}:custom-trainer-pick:${windowIndex}`
+//   variant pick : `${seed}:custom-trainer-slot:${key}:${slotIndex}`
+//   slot fill    : `${seed}:custom-trainer-slotfill:${key}:${slotIndex}`
+//   move token   : `${seed}:custom-trainer-move:${key}:${slotIndex}:${moveIndex}`
 //
 // Ids live in the RESERVED 70000-79999 band (above the editor mons at
 // 60000-69999). Every entry is validated at load; an invalid entry is SKIPPED
@@ -82,9 +99,11 @@
 
 import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { globalScene } from "#app/global-scene";
-import { allMoves } from "#data/data-lists";
+import { isDevToolsEnabled } from "#app/dev-tools/registry";
+import { allAbilities, allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
+import { getErCustomTrainerSprite } from "#data/elite-redux/er-custom-trainer-sprites";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   encodeErShinyLabPreset,
@@ -96,19 +115,21 @@ import {
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { isKnownTrainerAuraId } from "#data/elite-redux/er-trainer-fx";
 import { collectShowdownFreeMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
+import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
 import { Gender } from "#data/gender";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
-import type { EnemyPokemon } from "#field/pokemon";
+import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
 import { PokemonMove } from "#moves/pokemon-move";
 import { resolveHeldItemKey } from "#system/llm-director/held-item-resolver";
 import type { HeldModifierConfig } from "#types/held-modifier-config";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import customTrainersJson from "./er-custom-trainers.json";
+import customTrainersConfigJson from "./er-custom-trainers-config.json";
 
 /** Reserved id band for editor-created custom trainers. */
 export const ER_CUSTOM_TRAINER_ID_MIN = 70000;
@@ -120,6 +141,45 @@ export const ER_CUSTOM_TRAINER_ID_MAX = 79999;
  * assigned wave is drawn uniformly across this many floors starting at minWave.
  */
 export const ER_CUSTOM_TRAINER_ENDLESS_WINDOW = 200;
+
+/**
+ * GLOBAL spawn-density config (er-custom-trainers-config.json). Controls how OFTEN
+ * a custom-trainer encounter happens at all, INDEPENDENT of how many trainers are
+ * authored. The run is diced into fixed windows of `windowSize` waves; each window
+ * rolls ONCE (`windowChancePct`) whether ANY custom trainer appears in it.
+ */
+export interface ErCustomTrainerSpawnConfig {
+  /** Waves per spawn window (integer 1-100; default 10). */
+  windowSize: number;
+  /** Percent chance (0-100) a given window fields a custom trainer at all (default 25). */
+  windowChancePct: number;
+}
+
+/** Shipped defaults (used when the config file is missing or a field is invalid). */
+export const ER_CUSTOM_TRAINER_SPAWN_CONFIG_DEFAULT: ErCustomTrainerSpawnConfig = {
+  windowSize: 10,
+  windowChancePct: 25,
+};
+
+/**
+ * Normalize a raw spawn-density config: `windowSize` clamps to an integer 1-100
+ * (invalid/absent => 10); `windowChancePct` clamps to an integer 0-100
+ * (invalid/absent => 25). A garbage file can never break spawning.
+ */
+export function normalizeErCustomTrainerSpawnConfig(raw: unknown): ErCustomTrainerSpawnConfig {
+  const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const clampInt = (value: unknown, min: number, max: number, fallback: number): number => {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      return fallback;
+    }
+    const n = Math.floor(value);
+    return n >= min && n <= max ? n : fallback;
+  };
+  return {
+    windowSize: clampInt(o.windowSize, 1, 100, ER_CUSTOM_TRAINER_SPAWN_CONFIG_DEFAULT.windowSize),
+    windowChancePct: clampInt(o.windowChancePct, 0, 100, ER_CUSTOM_TRAINER_SPAWN_CONFIG_DEFAULT.windowChancePct),
+  };
+}
 
 /** The battle formats a custom trainer can declare. */
 export type ErCustomTrainerBattleType = "single" | "double" | "triple";
@@ -183,6 +243,18 @@ export interface ErCustomTrainerHeldItem {
   count?: number;
 }
 
+/**
+ * Per-battle ability substitutions for one authored team member. Missing slots
+ * keep the species/form's normal ability. These are copied onto the spawned
+ * EnemyPokemon instance and never mutate shared species data.
+ */
+export interface ErCustomTrainerInsanity {
+  /** AbilityId replacing the active ability, or absent to keep the normal active. */
+  ability?: number;
+  /** AbilityIds replacing innate slots 1-3; null/absent entries keep that slot. */
+  innates?: readonly (number | null)[];
+}
+
 /** One authored team member (raw JSON shape — kept loose; it is editor-written). */
 export interface ErCustomTrainerMember {
   /** Pokerogue speciesId (vanilla < 10000, ER-custom >= 10000). */
@@ -199,6 +271,8 @@ export interface ErCustomTrainerMember {
   moves?: readonly string[];
   /** Index into the species' ability list (active ability pick). */
   abilitySlot?: number;
+  /** Optional per-battle active/innate substitutions authored via Insanity mode. */
+  insanity?: ErCustomTrainerInsanity | null;
   fusion?: ErCustomTrainerFusion | null;
   heldItems?: readonly ErCustomTrainerHeldItem[];
   /** Shiny Lab visual effect the mon fields with (see {@linkcode ErCustomTrainerShiny}). */
@@ -243,6 +317,8 @@ export interface ErCustomTrainer {
   name: string;
   /** TrainerType enum NAME (sprite); resolved to a numeric `TrainerType`. */
   trainerClass: string;
+  /** Optional key from er-custom-trainer-sprites.json. Appearance only; class behavior is unchanged. */
+  trainerSprite?: string;
   /**
    * Which gendered sprite the trainer fields, for classes that ship both an `_m`
    * and `_f` sprite (see `hasGenders`). "f" fields the female sprite; "m"/absent
@@ -255,9 +331,31 @@ export interface ErCustomTrainer {
   minWave?: number;
   maxWave?: number;
   endless?: boolean;
-  /** Per-run appearance chance, integer 1-100. Absent/invalid => 100 (guaranteed). */
+  /**
+   * Relative odds this trainer is the one fielded when a spawn window fires
+   * (weight / totalWeight among gate-eligible not-yet-used trainers). Integer
+   * >= 1; absent => 100. REPLACES the old per-trainer `spawnChance`.
+   */
+  weight?: number;
+  /**
+   * DEPRECATED (pre-window-density saves). Per-trainer once-per-run appearance
+   * chance 1-100. Still parsed for back-compat: a saved entry with `spawnChance`
+   * and no `weight` migrates to `weight = spawnChance` (clamped >= 1). New saves
+   * always write `weight` instead.
+   */
   spawnChance?: number;
   challenge?: ErCustomTrainerChallenge;
+  /**
+   * Optional VALUE parameter for a value-bearing `challenge` (mono-type / mono-gen
+   * / mono-color / usage-tier / ...). When set, the trainer's challenge gate
+   * additionally requires the ACTIVE run's challenge value to EQUAL this (using the
+   * game's own value encoding: SINGLE_TYPE = PokemonType index + 1, MONO_COLOR =
+   * ER color index + 1, SINGLE_GENERATION = the gen number with 10 = RDX, etc.).
+   * Absent => any value of that challenge qualifies (the original behavior).
+   * Ignored for `none` and for pure-toggle challenges (value is always 1 there).
+   * Integer >= 1; invalid/absent => unset.
+   */
+  challengeValue?: number;
   /**
    * er-assets `audio/bgm/<key>.mp3` key (filename without `.mp3`) that plays for
    * THIS battle only. Trimmed; empty/absent/invalid => the trainer's default
@@ -321,6 +419,11 @@ export interface ErCustomTrainerMemberResolved {
   /** Ordered move slots incl. RLA/RLNA tokens (resolved via `resolveErCustomTrainerMoveIds`). */
   moveSpecs: readonly ErCustomTrainerMoveSpec[];
   abilitySlot: number;
+  /** Instance-only active/innate substitutions for this custom-trainer battle. */
+  insanity?: {
+    ability: AbilityId | null;
+    innates: readonly [AbilityId | null, AbilityId | null, AbilityId | null];
+  } | null;
   fusion: { speciesId: number; formIndex: number; abilitySlot: number } | null;
   heldItemKeys: readonly { key: string; count: number }[];
   /** Serialized Shiny Lab look this member fields with, or `null` (renders normally). */
@@ -357,6 +460,10 @@ export interface ErCustomTrainerResolved {
   id: number;
   name: string;
   trainerType: number;
+  /** Uploaded sprite atlas key, or "" to use the trainer class sprite. */
+  trainerSpriteKey: string;
+  /** Whether the uploaded sprite uses `_m` and `_f` atlas variants. */
+  trainerSpriteGenders: boolean;
   /** "f" fields the female sprite variant (classes with `hasGenders`); "m" otherwise. */
   gender: "m" | "f";
   /** Whether the encounter should be a double (also true for a pending triple). */
@@ -367,9 +474,15 @@ export interface ErCustomTrainerResolved {
   minWave: number;
   maxWave: number;
   endless: boolean;
-  /** Per-run appearance chance, normalized to an integer 1-100 (100 = guaranteed). */
-  spawnChance: number;
+  /** Relative pick weight when a spawn window fires (integer >= 1; default 100). */
+  weight: number;
   challenge: ErCustomTrainerChallenge;
+  /**
+   * The value the ACTIVE run's challenge must equal for this trainer to pass the
+   * challenge gate, or `null` when unset (any value of that challenge qualifies -
+   * the original behavior). See {@linkcode ErCustomTrainer.challengeValue}.
+   */
+  challengeValue: number | null;
   /** er-assets bgm key to play for this battle only, or "" for the default theme. */
   battleBgm: string;
   /** Normalized intro blurb shown at battle start, or "" for the default class line. */
@@ -413,12 +526,24 @@ const VALID_DIFFICULTIES: ReadonlySet<string> = new Set(["youngster", "ace", "el
 
 let activeTrainers: ErCustomTrainers = customTrainersJson as ErCustomTrainers;
 let resolvedCache: readonly ErCustomTrainerResolved[] | null = null;
+let activeSpawnConfig: ErCustomTrainerSpawnConfig = normalizeErCustomTrainerSpawnConfig(customTrainersConfigJson);
 
 /** Test hook: replace (or with `undefined` restore) the active custom-trainer table. */
 export function setErCustomTrainersForTesting(trainers?: ErCustomTrainers): void {
   activeTrainers = trainers ?? (customTrainersJson as ErCustomTrainers);
   resolvedCache = null;
-  CUSTOM_TRAINER_RUN_ROLLS.clear();
+  USED_CUSTOM_TRAINER_WINDOWS.clear();
+}
+
+/** The active (normalized) global spawn-density config. */
+export function getErCustomTrainerSpawnConfig(): ErCustomTrainerSpawnConfig {
+  return activeSpawnConfig;
+}
+
+/** Test hook: replace (or with `undefined` restore) the active spawn-density config. */
+export function setErCustomTrainerSpawnConfigForTesting(config?: Partial<ErCustomTrainerSpawnConfig>): void {
+  activeSpawnConfig = normalizeErCustomTrainerSpawnConfig(config ?? customTrainersConfigJson);
+  USED_CUSTOM_TRAINER_WINDOWS.clear();
 }
 
 /** Move enum NAME -> pokerogue MoveId, vanilla + ER customs (mirror of er-trainer-tuning.ts). */
@@ -510,6 +635,21 @@ export function normalizeTrainerEffect(value: unknown): string {
 }
 
 /**
+ * Normalize an authored `challengeValue` to a positive integer, or `null` when
+ * absent/invalid (non-number, non-finite, < 1). `null` => unset (the challenge
+ * gate requires only that the challenge is active, any value - original behavior).
+ * The per-challenge maximum is enforced by the run itself (each `Challenge` clamps
+ * its own value); here we only require a positive integer.
+ */
+export function normalizeChallengeValue(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+  const n = Math.floor(value);
+  return n >= 1 ? n : null;
+}
+
+/**
  * Normalize an authored `spawnChance` to an integer in 1-100. Absent or invalid
  * (non-number, non-finite, out of 1-100) => 100, so a saved entry without the
  * field behaves exactly as before (guaranteed to appear once per run).
@@ -528,6 +668,30 @@ function normalizeSpawnChance(value: unknown): number {
  */
 function normalizeSlotChance(value: unknown): number {
   return normalizeSpawnChance(value);
+}
+
+/**
+ * Resolve a trainer's pick `weight` with `spawnChance` back-compat migration:
+ *   - a present `weight` clamps to an integer >= 1 (invalid => 1),
+ *   - else a legacy `spawnChance` migrates to `weight = spawnChance` (clamped >= 1),
+ *   - else (neither present) => 100 (the shipped default weight).
+ * Pure — exported for direct migration testing.
+ */
+export function resolveErCustomTrainerWeight(weight: unknown, spawnChance: unknown): number {
+  const clampAtLeastOne = (value: unknown): number => {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      return 1;
+    }
+    const n = Math.floor(value);
+    return n >= 1 ? n : 1;
+  };
+  if (weight !== undefined) {
+    return clampAtLeastOne(weight);
+  }
+  if (spawnChance !== undefined) {
+    return clampAtLeastOne(spawnChance);
+  }
+  return 100;
 }
 
 /** Clamp an authored variant weight to an integer >= 1 (invalid => 1). */
@@ -614,6 +778,20 @@ function resolveMember(m: ErCustomTrainerMember): ErCustomTrainerMemberResolved 
     .filter(h => h && typeof h.item === "string" && h.item.length > 0)
     .map(h => ({ key: h.item, count: Number.isInteger(h.count) && (h.count as number) > 0 ? (h.count as number) : 1 }));
   const shiny = resolveShinyLook(m.shiny);
+  const rawInsanity = m.insanity && typeof m.insanity === "object" ? m.insanity : null;
+  const resolveAbilityId = (value: unknown): AbilityId | null =>
+    Number.isInteger(value) && (value as number) > AbilityId.NONE ? (value as AbilityId) : null;
+  const rawInnates = Array.isArray(rawInsanity?.innates) ? rawInsanity.innates : [];
+  const insanity = rawInsanity
+    ? {
+        ability: resolveAbilityId(rawInsanity.ability),
+        innates: [
+          resolveAbilityId(rawInnates[0]),
+          resolveAbilityId(rawInnates[1]),
+          resolveAbilityId(rawInnates[2]),
+        ] as const,
+      }
+    : null;
   return {
     speciesId: m.species,
     formIndex: Number.isInteger(m.formIndex) ? (m.formIndex as number) : 0,
@@ -621,6 +799,7 @@ function resolveMember(m: ErCustomTrainerMember): ErCustomTrainerMemberResolved 
     moveIds: ids,
     moveSpecs: specs,
     abilitySlot: clampSlot(m.abilitySlot),
+    insanity,
     fusion,
     heldItemKeys,
     shinyLook: shiny ? shiny.look : null,
@@ -705,13 +884,18 @@ function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResol
     entry.battleType === "double" || entry.battleType === "triple" ? entry.battleType : "single";
   const challenge: ErCustomTrainerChallenge =
     entry.challenge && entry.challenge in CHALLENGE_MAP ? entry.challenge : "none";
+  // A challengeValue only means anything alongside a real challenge; drop it for "none".
+  const challengeValue = challenge === "none" ? null : normalizeChallengeValue(entry.challengeValue);
   const minWave = Number.isInteger(entry.minWave) && (entry.minWave as number) >= 1 ? (entry.minWave as number) : 1;
   const maxWave = Number.isInteger(entry.maxWave) && (entry.maxWave as number) >= minWave ? (entry.maxWave as number) : 200;
+  const trainerSprite = getErCustomTrainerSprite(entry.trainerSprite);
   return {
     key,
     id: entry.id,
     name: entry.name.trim(),
     trainerType,
+    trainerSpriteKey: trainerSprite?.spriteKey ?? "",
+    trainerSpriteGenders: trainerSprite?.genders ?? false,
     gender: entry.gender === "f" ? "f" : "m",
     // A triple falls back to a double until #902 lands triples support.
     isDouble: battleType === "double" || battleType === "triple",
@@ -720,8 +904,9 @@ function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResol
     minWave,
     maxWave,
     endless: entry.endless === true,
-    spawnChance: normalizeSpawnChance(entry.spawnChance),
+    weight: resolveErCustomTrainerWeight(entry.weight, entry.spawnChance),
     challenge,
+    challengeValue,
     battleBgm: normalizeBattleBgm(entry.battleBgm),
     introDialogue: normalizeDialogueLine(entry.introDialogue),
     victoryDialogue: normalizeDialogueLine(entry.victoryDialogue),
@@ -752,40 +937,35 @@ export function getErCustomTrainers(): readonly ErCustomTrainerResolved[] {
 }
 
 // -----------------------------------------------------------------------------
-// Per-run appearance model (once-per-run, seed-deterministic). This REPLACES the
-// old "convert every eligible wave and rotate" behavior: for each trainer we do
-// ONE per-run roll (spawnChance %) to decide IF it appears at all this run, and,
-// if it does, ONE per-run pick of the wave it is assigned to inside its window.
-// The trainer then fires EXACTLY ONCE, at the first non-excluded wave >= its
-// assigned wave (so a boss/fixed/mystery wave slides it forward naturally), and
-// is marked used so it never returns again that run. Both the used set and the
-// roll cache are run-scoped (cleared at run start via resetErCustomTrainerTracking);
-// persistence across save/reload is a documented seam (see game-data.ts
-// erUsedTrainerKeys). Everything derives from the run seed so a save reload — and
-// a future co-op adoption — lands identically (NO Math.random).
+// Window-density appearance model (seed-deterministic). REPLACES the old
+// per-trainer once-per-run `spawnChance` (which piled up: N trainers at 100%
+// meant every early wave was a custom battle). Now a GLOBAL density config dices
+// the run into fixed windows; each window rolls ONCE whether ANY custom trainer
+// appears, then picks WHICH trainer by `weight`. At most one custom trainer per
+// window, no repeats per run. Both the used-key set and the used-window set are
+// run-scoped (cleared at run start via resetErCustomTrainerTracking); everything
+// derives from the run seed so a save reload — and a future co-op adoption —
+// land identically (NO Math.random).
 // -----------------------------------------------------------------------------
 const USED_CUSTOM_TRAINER_KEYS = new Set<string>();
 
-/** The per-run appearance decision for one custom trainer. */
-export interface ErCustomTrainerRunRoll {
-  /** Whether this trainer appears at all this run (the once-per-run chance roll). */
-  appears: boolean;
-  /** The wave the appearance is assigned to (fires at the first non-excluded wave >= this). */
-  assignedWave: number;
-}
+/** Windows (0-based indices) that have already fielded a custom trainer this run. */
+const USED_CUSTOM_TRAINER_WINDOWS = new Set<number>();
 
-/** Per-run cache of the appearance roll, keyed by trainer key (seed-derived, lazy). */
-const CUSTOM_TRAINER_RUN_ROLLS = new Map<string, ErCustomTrainerRunRoll>();
-
-/** Reset per-run custom-trainer state (used set + appearance rolls); call at run start. */
+/** Reset per-run custom-trainer state (used keys + used windows); call at run start. */
 export function resetErCustomTrainerTracking(): void {
   USED_CUSTOM_TRAINER_KEYS.clear();
-  CUSTOM_TRAINER_RUN_ROLLS.clear();
+  USED_CUSTOM_TRAINER_WINDOWS.clear();
 }
 
-/** Mark a custom trainer as fielded this run. */
+/** Mark a custom trainer as fielded this run (no repeats). */
 export function markErCustomTrainerUsed(key: string): void {
   USED_CUSTOM_TRAINER_KEYS.add(key);
+}
+
+/** Mark a spawn window (0-based index) as having fielded its one custom trainer. */
+export function markErCustomTrainerWindowUsed(windowIndex: number): void {
+  USED_CUSTOM_TRAINER_WINDOWS.add(windowIndex);
 }
 
 /** Deterministic FNV-1a hash of a seed string (mirrors runtime-hook selection seeding). */
@@ -798,32 +978,81 @@ function hashSeed(seed: string): number {
   return h >>> 0;
 }
 
+/** The 0-based spawn-window index a 1-based `waveIndex` falls in (waves 1..size => 0). */
+export function erCustomTrainerWindowIndex(waveIndex: number, windowSize: number): number {
+  const size = Math.max(1, Math.floor(windowSize));
+  return Math.floor((Math.max(1, waveIndex) - 1) / size);
+}
+
 /**
- * Deterministic per-run appearance decision for one custom trainer, derived
- * ONLY from the run seed + trainer key (reproducible from the seed; co-op-safe;
- * NO Math.random). Returns whether the trainer appears this run (the chance
- * roll) and, if so, the wave it is assigned to inside its eligible window. Pure
- * — exported for direct unit testing without fragile seed hunting.
- *
- * Formula (salts are load-bearing — keep them stable):
- *   appears      = hashSeed(`${seed}:custom-trainer-roll:${key}`) % 100 < spawnChance
- *   assignedWave = minWave + hashSeed(`${seed}:custom-trainer-wave:${key}`) % window
- *   window       = endless ? ER_CUSTOM_TRAINER_ENDLESS_WINDOW : (maxWave - minWave + 1)
- *
- * At spawnChance = 100 the roll is `x % 100 < 100`, always true, so the trainer
- * is guaranteed to appear exactly once per run at a random floor in its window.
+ * Whether the given spawn window fields a custom trainer AT ALL this run — the
+ * global-density roll, INDEPENDENT of trainer count. Pure + deterministic; NO
+ * Math.random. Salt (load-bearing): `${seed}:custom-trainer-window:${windowIndex}`.
+ *   fires = hashSeed(...) % 100 < windowChancePct
+ * A windowChancePct of 0 never fires; 100 always fires.
  */
-export function rollErCustomTrainerAppearance(
+export function rollErCustomTrainerWindow(
   seed: string,
-  trainer: { key: string; minWave: number; maxWave: number; endless: boolean; spawnChance?: number },
-): ErCustomTrainerRunRoll {
-  const chance = normalizeSpawnChance(trainer.spawnChance);
-  const appears = hashSeed(`${seed}:custom-trainer-roll:${trainer.key}`) % 100 < chance;
-  const window = trainer.endless
-    ? ER_CUSTOM_TRAINER_ENDLESS_WINDOW
-    : Math.max(1, trainer.maxWave - trainer.minWave + 1);
-  const assignedWave = trainer.minWave + (hashSeed(`${seed}:custom-trainer-wave:${trainer.key}`) % window);
-  return { appears, assignedWave };
+  windowIndex: number,
+  config: ErCustomTrainerSpawnConfig,
+): boolean {
+  if (config.windowChancePct <= 0) {
+    return false;
+  }
+  return hashSeed(`${seed}:custom-trainer-window:${windowIndex}`) % 100 < config.windowChancePct;
+}
+
+/**
+ * The wave WITHIN a firing window the custom trainer is anchored to (the first
+ * wave >= this in the window fields it, sliding forward past boss/fixed/mystery
+ * waves exactly like the old DUE semantics). Pure. Salt (load-bearing):
+ * `${seed}:custom-trainer-wave:${windowIndex}`. Returns a 1-based wave number.
+ */
+export function erCustomTrainerWindowWave(seed: string, windowIndex: number, windowSize: number): number {
+  const size = Math.max(1, Math.floor(windowSize));
+  const start = windowIndex * size + 1;
+  return start + (hashSeed(`${seed}:custom-trainer-wave:${windowIndex}`) % size);
+}
+
+/**
+ * Pick ONE trainer index by `weight` among a firing window's gate-eligible pool,
+ * probability weight/totalWeight, seeded by `${seed}:custom-trainer-pick:${windowIndex}`.
+ * Pure + deterministic; NO Math.random. Entries with weight <= 0 are treated as
+ * INELIGIBLE (never picked, excluded from the total). Returns the array index of
+ * the picked entry, or -1 when the pool is empty or every weight is <= 0.
+ */
+export function pickErCustomTrainerByWeight(
+  seed: string,
+  windowIndex: number,
+  pool: readonly { weight: number }[],
+): number {
+  let total = 0;
+  for (const p of pool) {
+    if (p.weight > 0) {
+      total += Math.floor(p.weight);
+    }
+  }
+  if (total <= 0) {
+    return -1;
+  }
+  const r = hashSeed(`${seed}:custom-trainer-pick:${windowIndex}`) % total;
+  let acc = 0;
+  for (let i = 0; i < pool.length; i++) {
+    if (pool[i].weight <= 0) {
+      continue;
+    }
+    acc += Math.floor(pool[i].weight);
+    if (r < acc) {
+      return i;
+    }
+  }
+  // Fall back to the last positive-weight entry (float/rounding guard).
+  for (let i = pool.length - 1; i >= 0; i--) {
+    if (pool[i].weight > 0) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 // -----------------------------------------------------------------------------
@@ -950,6 +1179,35 @@ function legalMovePool(speciesId: number, wantStatus: boolean): readonly number[
 }
 
 /**
+ * The legal-move pool an RLA/RLNA token draws from for a resolved member: the
+ * member's own species pool, UNIONED with its FUSION partner's pool when fused.
+ * A fusion can legally know moves from BOTH species (mirrors how the game builds a
+ * fused mon's learnset), so a fused member's random legal move may come from either
+ * side. Returned SORTED by move id (deterministic walk order). A non-fused member
+ * returns exactly {@linkcode legalMovePool} (byte-identical to the old behavior).
+ */
+function legalMovePoolForMember(member: ErCustomTrainerMemberResolved, wantStatus: boolean): readonly number[] {
+  const base = legalMovePool(member.speciesId, wantStatus);
+  if (!member.fusion) {
+    return base;
+  }
+  const fusion = legalMovePool(member.fusion.speciesId, wantStatus);
+  if (fusion.length === 0) {
+    return base;
+  }
+  if (base.length === 0) {
+    return fusion;
+  }
+  const set = new Set<number>(base);
+  for (const id of fusion) {
+    set.add(id);
+  }
+  const out = [...set];
+  out.sort((a, b) => a - b);
+  return out;
+}
+
+/**
  * Seeded pick of a legal move for one RLA/RLNA token slot: start at
  * `hashSeed(...move...) % pool.length` and walk FORWARD deterministically until a
  * move not already in `used` is found (no duplicates within the moveset). Returns
@@ -999,7 +1257,7 @@ export function resolveErCustomTrainerMoveIds(
       used.add(spec.id);
       return;
     }
-    const pool = legalMovePool(member.speciesId, spec.token === "RLNA");
+    const pool = legalMovePoolForMember(member, spec.token === "RLNA");
     const picked = pickTokenMove(seed, key, slotIndex, moveIndex, pool, used);
     if (picked !== undefined) {
       chosen.push(picked);
@@ -1009,34 +1267,136 @@ export function resolveErCustomTrainerMoveIds(
   return chosen;
 }
 
-/** The per-run appearance roll for `trainer`, computed once from the run seed and cached. */
-function getRunRoll(trainer: ErCustomTrainerResolved): ErCustomTrainerRunRoll {
-  const cached = CUSTOM_TRAINER_RUN_ROLLS.get(trainer.key);
-  if (cached !== undefined) {
-    return cached;
-  }
-  const roll = rollErCustomTrainerAppearance(globalScene.seed ?? "", trainer);
-  CUSTOM_TRAINER_RUN_ROLLS.set(trainer.key, roll);
-  return roll;
-}
-
-function challengeActive(challenge: ErCustomTrainerChallenge): boolean {
+/**
+ * Whether the active run satisfies a trainer's challenge-exclusivity gate:
+ *   - `none` => always true.
+ *   - otherwise the run must have the mapped challenge ACTIVE (value !== 0).
+ *   - AND, when `challengeValue` is set, the run's challenge VALUE must EQUAL it
+ *     (the game's own encoding: SINGLE_TYPE = type+1, MONO_COLOR = color+1,
+ *     SINGLE_GENERATION = gen with 10 = RDX, USAGE_TIER = tier, ...). An unset
+ *     `challengeValue` (null) accepts any value - the original behavior.
+ */
+function challengeActive(challenge: ErCustomTrainerChallenge, challengeValue: number | null = null): boolean {
   if (challenge === "none") {
     return true;
   }
-  return globalScene.gameMode.hasChallenge(CHALLENGE_MAP[challenge]) === true;
+  const id = CHALLENGE_MAP[challenge];
+  if (globalScene.gameMode.hasChallenge(id) !== true) {
+    return false;
+  }
+  if (challengeValue === null) {
+    return true;
+  }
+  const activeValue = globalScene.gameMode.challenges.find(c => c.id === id)?.value ?? 0;
+  return activeValue === challengeValue;
 }
 
 /**
- * Pick a custom trainer that is DUE at `waveIndex`, gated by the active
- * difficulty, the floor range (or endless: any floor >= minWave) and
- * challenge-exclusivity. A trainer is due when its per-run appearance roll came
- * up (spawnChance), it has NOT been fielded yet this run, and `waveIndex` has
- * reached (or passed, via a slide-forward off an excluded wave) its assigned
- * wave — while still inside its window (waveIndex <= maxWave when not endless).
- * If several are due on the same wave, one is chosen by a deterministic
- * wave-seeded pick and the rest stay due for later waves. Returns `null` when
- * none is due. Fires each trainer EXACTLY once per run (the caller marks it used).
+ * Whether a trainer passes the per-wave GATES at `waveIndex`: not already fielded
+ * this run, the active difficulty allows it, `waveIndex` is inside its floor range
+ * (or endless: any floor >= minWave) and its challenge-exclusivity holds. The
+ * shared gate for both the density selector and the dev force path.
+ *
+ * `ignoreChallenge` (dev force only): the staff picker explicitly chooses ONE
+ * trainer to battle-test and pins a matching difficulty + in-range wave, but it
+ * cannot start a challenge run, so the challenge-exclusivity gate is skipped for a
+ * forced pick (the authored party still fields identically). The used-key + floor
+ * gates always apply so a forced pick still fires exactly once, inside its range.
+ */
+function isErCustomTrainerEligible(
+  trainer: ErCustomTrainerResolved,
+  waveIndex: number,
+  difficulty: string,
+  ignoreChallenge = false,
+): boolean {
+  if (USED_CUSTOM_TRAINER_KEYS.has(trainer.key)) {
+    return false;
+  }
+  if (!trainer.difficulties.includes(difficulty)) {
+    return false;
+  }
+  if (waveIndex < trainer.minWave || (!trainer.endless && waveIndex > trainer.maxWave)) {
+    return false;
+  }
+  return ignoreChallenge || challengeActive(trainer.challenge, trainer.challengeValue);
+}
+
+// --- DEV-ONLY force path (staff testing) -------------------------------------
+// Gated by the SAME `isDevToolsEnabled()` seam the dev-tools registry uses (local
+// `start:dev` or a `VITE_DEV_TOOLS=1` staging build) so it is INERT in production
+// — the read is short-circuited before any localStorage access, matching
+// registry.ts. A staff tester forces a NAMED custom trainer to spawn at its first
+// gate-eligible wave, bypassing the density roll, via the localStorage key below
+// (or `setErCustomTrainerDevForce` from a dev scenario). While a force is armed
+// the density path is suppressed, so the tester reliably gets exactly that trainer.
+
+/** localStorage key a staff tester sets to the trainer KEY to force-spawn (dev only). */
+export const ER_DEV_FORCE_CUSTOM_TRAINER_KEY = "er-dev-force-custom-trainer";
+
+let devForcedCustomTrainerKeyOverride: string | null = null;
+
+/**
+ * DEV-ONLY: arm/clear a forced custom-trainer spawn by trainer key (staff testing).
+ * Inert unless dev tools are enabled (checked at read time). Passing null clears it.
+ */
+export function setErCustomTrainerDevForce(key: string | null): void {
+  devForcedCustomTrainerKeyOverride = key && key.trim() ? key.trim().toUpperCase() : null;
+}
+
+/**
+ * DEV-ONLY: clear a forced custom-trainer spawn from BOTH the module override AND
+ * the localStorage key, so a one-shot forced install (see
+ * `installErCustomTrainerForCurrentWave`) leaves the rest of the run fielding
+ * normal (density-driven) battles. Inert/harmless in prod (localStorage guarded).
+ */
+export function clearErCustomTrainerDevForce(): void {
+  devForcedCustomTrainerKeyOverride = null;
+  try {
+    (globalThis as { localStorage?: { removeItem(k: string): void } }).localStorage?.removeItem(
+      ER_DEV_FORCE_CUSTOM_TRAINER_KEY,
+    );
+  } catch {
+    /* storage may be blocked; the module override is already cleared */
+  }
+}
+
+/** The armed dev-force trainer key (module override first, then localStorage), or null in prod. */
+function readDevForcedCustomTrainerKey(): string | null {
+  if (!isDevToolsEnabled()) {
+    return null;
+  }
+  if (devForcedCustomTrainerKeyOverride) {
+    return devForcedCustomTrainerKeyOverride;
+  }
+  try {
+    const ls = (globalThis as { localStorage?: { getItem(k: string): string | null } }).localStorage;
+    const raw = ls?.getItem(ER_DEV_FORCE_CUSTOM_TRAINER_KEY) ?? null;
+    return raw && raw.trim() ? raw.trim().toUpperCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** DEV-ONLY: the currently armed dev-force trainer key (or null: unarmed / prod). */
+export function getErCustomTrainerDevForce(): string | null {
+  return readDevForcedCustomTrainerKey();
+}
+
+/** DEV-ONLY: whether a custom-trainer dev force is armed (staff picked a trainer to fight). */
+export function isErCustomTrainerDevForceArmed(): boolean {
+  return readDevForcedCustomTrainerKey() !== null;
+}
+
+/**
+ * Pick the custom trainer to field at `waveIndex`, under the GLOBAL spawn-density
+ * model: the run is diced into fixed windows; each window rolls ONCE whether ANY
+ * custom trainer appears at all (independent of trainer count), and if it fires,
+ * ONE wave inside the window anchors the appearance (sliding forward past excluded
+ * boss/fixed/mystery waves) and ONE trainer is picked by `weight` among the
+ * gate-eligible not-yet-used pool. At most one custom trainer per window; the
+ * window is consumed on selection so a later wave in the same window fields none.
+ * Returns `null` when nothing is due. Everything derives from the run seed (NO
+ * Math.random). A DEV force override (staff testing) bypasses density entirely.
  */
 export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainerResolved | null {
   const all = getErCustomTrainers();
@@ -1044,28 +1404,53 @@ export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainer
     return null;
   }
   const difficulty = getErDifficulty();
-  const due = all.filter(t => {
-    if (USED_CUSTOM_TRAINER_KEYS.has(t.key)) {
-      return false;
+  const seed = globalScene.seed ?? "";
+
+  // DEV-ONLY: a forced named trainer spawns at its first eligible wave, bypassing
+  // density. While armed (and the trainer exists), density selection is suppressed.
+  const forcedKey = readDevForcedCustomTrainerKey();
+  if (forcedKey) {
+    const forced = all.find(t => t.key === forcedKey);
+    if (forced) {
+      // Force bypasses the challenge-exclusivity gate: the staff picker pins a
+      // matching difficulty + in-range wave but cannot start a challenge run, so a
+      // challenge-gated trainer is still force-fielded (used-key + floor gates hold).
+      return isErCustomTrainerEligible(forced, waveIndex, difficulty, true) ? forced : null;
     }
-    if (!t.difficulties.includes(difficulty)) {
-      return false;
-    }
-    if (waveIndex < t.minWave || (!t.endless && waveIndex > t.maxWave)) {
-      return false;
-    }
-    if (!challengeActive(t.challenge)) {
-      return false;
-    }
-    const roll = getRunRoll(t);
-    return roll.appears && waveIndex >= roll.assignedWave;
-  });
-  if (due.length === 0) {
+    // Unknown key (typo) => fall through to normal density selection.
+  }
+
+  const config = getErCustomTrainerSpawnConfig();
+  const windowIndex = erCustomTrainerWindowIndex(waveIndex, config.windowSize);
+  // At most one custom trainer per window.
+  if (USED_CUSTOM_TRAINER_WINDOWS.has(windowIndex)) {
     return null;
   }
-  const seed = `${globalScene.seed ?? ""}:custom-trainer:${waveIndex}`;
-  const idx = hashSeed(seed) % due.length;
-  return due[idx];
+  // Global-density roll: does this window field a custom trainer at all?
+  if (!rollErCustomTrainerWindow(seed, windowIndex, config)) {
+    return null;
+  }
+  // The anchor wave inside the window; DUE from that wave on (slide forward past
+  // excluded waves, on which the selector is simply never called).
+  const anchorWave = erCustomTrainerWindowWave(seed, windowIndex, config.windowSize);
+  if (waveIndex < anchorWave) {
+    return null;
+  }
+  const pool = all.filter(t => isErCustomTrainerEligible(t, waveIndex, difficulty));
+  if (pool.length === 0) {
+    return null;
+  }
+  const idx = pickErCustomTrainerByWeight(
+    seed,
+    windowIndex,
+    pool.map(t => ({ weight: t.weight })),
+  );
+  if (idx < 0) {
+    return null;
+  }
+  // Consume the window so a later wave in it fields nothing (one per window).
+  markErCustomTrainerWindowUsed(windowIndex);
+  return pool[idx];
 }
 
 // The #419 BST-cap bypass flag lives in a zero-import leaf module so the central
@@ -1077,8 +1462,15 @@ export { isErCustomTrainerBstBypassActive, setErCustomTrainerBstBypass } from "#
 // Enemy construction (the exact-party guarantee).
 // -----------------------------------------------------------------------------
 
-/** Apply an authored fusion onto a freshly built enemy (mirrors generateFusionSpecies). */
-function applyCustomFusion(enemy: EnemyPokemon, fusion: { speciesId: number; formIndex: number; abilitySlot: number }): void {
+/**
+ * Apply an authored fusion onto a built Pokemon (mirrors generateFusionSpecies).
+ * Works for either side: the enemy build path uses it, and the dev "Use as my
+ * team" picker applies it to the player copy of an authored member.
+ */
+export function applyErCustomTrainerFusion(
+  enemy: Pokemon,
+  fusion: { speciesId: number; formIndex: number; abilitySlot: number },
+): void {
   const fusionSpecies = getPokemonSpecies(fusion.speciesId);
   if (!fusionSpecies) {
     return;
@@ -1136,7 +1528,18 @@ export function buildErCustomTrainerMember(
     enemy.customPokemonData.erShinyLabName = member.shinyName || undefined;
   }
   if (member.fusion) {
-    applyCustomFusion(enemy, member.fusion);
+    applyErCustomTrainerFusion(enemy, member.fusion);
+  }
+  // Insanity substitutions use the same per-Pokemon storage as the Ability
+  // Randomizer. Apply after form/fusion setup so slot ownership is correct.
+  // This touches only this EnemyPokemon's CustomPokemonData, never species data.
+  if (member.insanity) {
+    const overrides = [member.insanity.ability, ...member.insanity.innates] as const;
+    overrides.forEach((abilityId, slot) => {
+      if (abilityId != null && allAbilities[abilityId]) {
+        enemy.setAbilityOverrideForSlot(slot, abilityId);
+      }
+    });
   }
   if (moveIds.length > 0) {
     const moves = moveIds.map(id => new PokemonMove(id));
@@ -1180,6 +1583,33 @@ export function applyErCustomTrainerPresentation(trainer: Trainer, resolved: ErC
   if (resolved.trainerEffect) {
     trainer.erGhostAura = resolved.trainerEffect;
   }
+}
+
+/**
+ * Apply the authored custom-trainer name without reversing named NPC titles.
+ * Generic classes keep the engine's normal "class + authored name" behavior.
+ * Named classes (Gym Leaders, Elite Four, Champions, etc.) already own a
+ * canonical personal name, so the authored value is their prefix/title:
+ * `Leader + Sabrina` must render as `Leader Sabrina`, never `Sabrina Leader`.
+ */
+export function applyErCustomTrainerDisplayName(trainer: Trainer, authoredName: string): void {
+  const customName = authoredName.trim();
+  if (!customName) {
+    return;
+  }
+  if (!trainer.config.title) {
+    trainer.name = customName;
+    return;
+  }
+
+  const config = trainer.config;
+  const variant = trainer.variant;
+  trainer.name = config.getTitle(TrainerSlot.TRAINER, variant);
+  trainer.partnerName = config.getTitle(TrainerSlot.TRAINER_PARTNER, variant);
+  trainer.getName = (slot: TrainerSlot = TrainerSlot.NONE, includeTitle = false): string => {
+    const name = config.getTitle(slot, variant);
+    return includeTitle ? `${customName} ${name}`.trim() : name;
+  };
 }
 
 /** Resolve one member's authored held items to `HeldModifierConfig[]` (enemy-legal pool). */

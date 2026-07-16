@@ -133,6 +133,7 @@ import type {
 import { StarterContainer } from "#ui/starter-container";
 import { StatsContainer } from "#ui/stats-container";
 import { addBBCodeTextObject, addTextObject, getTextColor, updateCandyCountTextStyle } from "#ui/text";
+import { layoutTypeIconStrip, speciesFormTypes } from "#ui/type-icon-strip";
 import { addWindow } from "#ui/ui-theme";
 import { applyChallenges, checkStarterValidForChallenge } from "#utils/challenge-utils";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
@@ -492,6 +493,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private pokemonGrowthRateText: Phaser.GameObjects.Text;
   private type1Icon: Phaser.GameObjects.Sprite;
   private type2Icon: Phaser.GameObjects.Sprite;
+  /** Pooled badges for types 3..N (ER N-type substrate). */
+  private extraTypeIcons: Phaser.GameObjects.Sprite[] = [];
   private pokemonLuckLabelText: Phaser.GameObjects.Text;
   private pokemonLuckText: Phaser.GameObjects.Text;
   private pokemonGenderText: Phaser.GameObjects.Text;
@@ -5809,7 +5812,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         }
 
         const speciesForm = getPokemonSpeciesForm(species.speciesId, props.formIndex);
-        this.setTypeIcons(speciesForm.type1, speciesForm.type2);
+        this.setTypeIcons(speciesFormTypes(speciesForm));
 
         this.pokemonSprite.clearTint();
         // ER Black Shinies (#349): PREVIEW the black tier - obsidian-tint the
@@ -5824,8 +5827,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       } else {
         this.pokemonGrowthRateText.setText("");
         this.pokemonGrowthRateLabelText.setVisible(false);
-        this.type1Icon.setVisible(false);
-        this.type2Icon.setVisible(false);
+        this.setTypeIcons([]);
         this.pokemonLuckLabelText.setVisible(false);
         this.pokemonLuckText.setVisible(false);
         this.pokemonShinyIcon.setVisible(false);
@@ -5864,8 +5866,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.shinyLabNameFx?.clear();
       this.pokemonGrowthRateText.setText("");
       this.pokemonGrowthRateLabelText.setVisible(false);
-      this.type1Icon.setVisible(false);
-      this.type2Icon.setVisible(false);
+      this.setTypeIcons([]);
       this.pokemonLuckLabelText.setVisible(false);
       this.pokemonLuckText.setVisible(false);
       this.pokemonShinyIcon.setVisible(false);
@@ -6810,7 +6811,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         const formText = displaySpecies.getFormNameToDisplay(displayFormIndex);
         this.pokemonFormText.setText(formText);
 
-        this.setTypeIcons(speciesForm.type1, speciesForm.type2);
+        this.setTypeIcons(speciesFormTypes(speciesForm));
 
         this.teraIcon.setFrame(PokemonType[this.teraCursor].toLowerCase());
         this.teraIcon.setVisible(!this.statsMode && this.allowTera);
@@ -6822,7 +6823,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         }
         this.pokemonNatureText.setText("");
         this.teraIcon.setVisible(false);
-        this.setTypeIcons(null, null);
+        this.setTypeIcons([]);
       }
     } else {
       this.shinyOverlay.setVisible(false);
@@ -6837,7 +6838,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
       this.pokemonNatureText.setText("");
       this.teraIcon.setVisible(false);
-      this.setTypeIcons(null, null);
+      this.setTypeIcons([]);
     }
 
     if (!this.starterMoveset) {
@@ -6887,17 +6888,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
   }
 
-  setTypeIcons(type1: PokemonType | null, type2: PokemonType | null): void {
-    if (type1 === null) {
-      this.type1Icon.setVisible(false);
-    } else {
-      this.type1Icon.setVisible(true).setFrame(PokemonType[type1].toLowerCase());
-    }
-    if (type2 === null) {
-      this.type2Icon.setVisible(false);
-    } else {
-      this.type2Icon.setVisible(true).setFrame(PokemonType[type2].toLowerCase());
-    }
+  setTypeIcons(types: readonly PokemonType[]): void {
+    layoutTypeIconStrip(this.starterSelectContainer, this.type1Icon, this.type2Icon, this.extraTypeIcons, types, {
+      x0: 8,
+      y0: 98,
+      baseScale: 0.5,
+      baseStride: 18,
+      maxWidth: 104,
+    });
   }
 
   popStarter(index: number): void {

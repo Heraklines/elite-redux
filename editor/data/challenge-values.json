@@ -1,0 +1,288 @@
+{
+  "monotype": [
+    {
+      "value": 1,
+      "label": "Normal"
+    },
+    {
+      "value": 2,
+      "label": "Fighting"
+    },
+    {
+      "value": 3,
+      "label": "Flying"
+    },
+    {
+      "value": 4,
+      "label": "Poison"
+    },
+    {
+      "value": 5,
+      "label": "Ground"
+    },
+    {
+      "value": 6,
+      "label": "Rock"
+    },
+    {
+      "value": 7,
+      "label": "Bug"
+    },
+    {
+      "value": 8,
+      "label": "Ghost"
+    },
+    {
+      "value": 9,
+      "label": "Steel"
+    },
+    {
+      "value": 10,
+      "label": "Fire"
+    },
+    {
+      "value": 11,
+      "label": "Water"
+    },
+    {
+      "value": 12,
+      "label": "Grass"
+    },
+    {
+      "value": 13,
+      "label": "Electric"
+    },
+    {
+      "value": 14,
+      "label": "Psychic"
+    },
+    {
+      "value": 15,
+      "label": "Ice"
+    },
+    {
+      "value": 16,
+      "label": "Dragon"
+    },
+    {
+      "value": 17,
+      "label": "Dark"
+    },
+    {
+      "value": 18,
+      "label": "Fairy"
+    }
+  ],
+  "monogen": [
+    {
+      "value": 1,
+      "label": "Gen 1"
+    },
+    {
+      "value": 2,
+      "label": "Gen 2"
+    },
+    {
+      "value": 3,
+      "label": "Gen 3"
+    },
+    {
+      "value": 4,
+      "label": "Gen 4"
+    },
+    {
+      "value": 5,
+      "label": "Gen 5"
+    },
+    {
+      "value": 6,
+      "label": "Gen 6"
+    },
+    {
+      "value": 7,
+      "label": "Gen 7"
+    },
+    {
+      "value": 8,
+      "label": "Gen 8"
+    },
+    {
+      "value": 9,
+      "label": "Gen 9"
+    },
+    {
+      "value": 10,
+      "label": "RDX (Elite Redux)"
+    }
+  ],
+  "monocolor": [
+    {
+      "value": 1,
+      "label": "Red"
+    },
+    {
+      "value": 2,
+      "label": "Green"
+    },
+    {
+      "value": 3,
+      "label": "Blue"
+    },
+    {
+      "value": 4,
+      "label": "White"
+    },
+    {
+      "value": 5,
+      "label": "Brown"
+    },
+    {
+      "value": 6,
+      "label": "Yellow"
+    },
+    {
+      "value": 7,
+      "label": "Purple"
+    },
+    {
+      "value": 8,
+      "label": "Pink"
+    },
+    {
+      "value": 9,
+      "label": "Gray"
+    },
+    {
+      "value": 10,
+      "label": "Black"
+    }
+  ],
+  "maxcost": [
+    {
+      "value": 1,
+      "label": "Max cost 9"
+    },
+    {
+      "value": 2,
+      "label": "Max cost 8"
+    },
+    {
+      "value": 3,
+      "label": "Max cost 7"
+    },
+    {
+      "value": 4,
+      "label": "Max cost 6"
+    },
+    {
+      "value": 5,
+      "label": "Max cost 5"
+    },
+    {
+      "value": 6,
+      "label": "Max cost 4"
+    },
+    {
+      "value": 7,
+      "label": "Max cost 3"
+    },
+    {
+      "value": 8,
+      "label": "Max cost 2"
+    },
+    {
+      "value": 9,
+      "label": "Max cost 1"
+    }
+  ],
+  "points": [
+    {
+      "value": 1,
+      "label": "9 points"
+    },
+    {
+      "value": 2,
+      "label": "8 points"
+    },
+    {
+      "value": 3,
+      "label": "7 points"
+    },
+    {
+      "value": 4,
+      "label": "6 points"
+    },
+    {
+      "value": 5,
+      "label": "5 points"
+    },
+    {
+      "value": 6,
+      "label": "4 points"
+    },
+    {
+      "value": 7,
+      "label": "3 points"
+    },
+    {
+      "value": 8,
+      "label": "2 points"
+    },
+    {
+      "value": 9,
+      "label": "1 points"
+    }
+  ],
+  "usagetier": [
+    {
+      "value": 1,
+      "label": "UU"
+    },
+    {
+      "value": 2,
+      "label": "RU"
+    },
+    {
+      "value": 3,
+      "label": "PU"
+    },
+    {
+      "value": 4,
+      "label": "NU"
+    }
+  ],
+  "limitedsupport": [
+    {
+      "value": 1,
+      "label": "No healing (shop on)"
+    },
+    {
+      "value": 2,
+      "label": "No shop (healing on)"
+    },
+    {
+      "value": 3,
+      "label": "No support (neither)"
+    }
+  ],
+  "passives": [
+    {
+      "value": 1,
+      "label": "Trainers & final boss only"
+    },
+    {
+      "value": 2,
+      "label": "All Pokemon"
+    }
+  ],
+  "freshstart": [
+    {
+      "value": 1,
+      "label": "Classic"
+    },
+    {
+      "value": 2,
+      "label": "Elite Redux"
+    }
+  ]
+}

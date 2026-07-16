@@ -6,22 +6,136 @@ name: Deploy Staging
 # (the er-editor-api Worker fires a workflow_dispatch after committing).
 #
 # Required GitHub repo config (Settings → Secrets and variables → Actions):
-#   secrets.CLOUDFLARE_API_TOKEN   — token with Pages:Edit and Workers Scripts:Edit on the account
+#   secrets.CLOUDFLARE_API_TOKEN   — token with Pages:Edit on the account
 #   secrets.CLOUDFLARE_ACCOUNT_ID  — Cloudflare account id
 #   vars.STAGING_SERVER_URL        — save API base, e.g. https://er-save-api-staging.<sub>.workers.dev
 
+run-name: ${{ inputs.operation == 'import_music' && 'Import YouTube BGM' || 'Deploy Staging' }}
+
 on:
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Staging operation
+        required: true
+        default: deploy
+        type: choice
+        options:
+          - deploy
+          - import_music
+      source_urls:
+        description: YouTube video or playlist URLs, one per line
+        required: false
+        type: string
+      key_prefix:
+        description: Lowercase asset key prefix
+        required: false
+        default: battle_custom
+        type: string
+      split_chapters:
+        description: Split YouTube chapters and timestamp lists
+        required: false
+        default: true
+        type: boolean
+      require_creative_commons:
+        description: Reject standard or unknown licenses
+        required: false
+        default: false
+        type: boolean
+      deploy_staging:
+        description: Deploy staging after the import
+        required: false
+        default: true
+        type: boolean
+      author:
+        description: Staff attribution for the catalog entry
+        required: false
+        type: string
+
+permissions:
+  contents: write
 
 concurrency:
-  group: deploy-staging
-  # A cancelled run used to leave a newer save Worker serving an older Pages client when cancellation
-  # landed between the two deploy steps. Queue promotions so every started contract pair completes.
+  group: ${{ inputs.operation == 'import_music' && 'er-youtube-bgm-import' || 'deploy-staging' }}
+  # Queue every promotion. Cancelling between Worker and Pages deploys can expose mismatched
+  # save/co-op protocol versions to staging players.
   cancel-in-progress: false
 
 jobs:
+  import_music:
+    if: github.repository == 'Heraklines/elite-redux' && inputs.operation == 'import_music'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install media tools
+        run: |
+          python -m pip install --disable-pip-version-check yt-dlp
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Check asset repository token
+        env:
+          ASSETS_TOKEN: ${{ secrets.ER_ASSETS_TOKEN }}
+        run: |
+          if [ -z "$ASSETS_TOKEN" ]; then
+            echo "ER_ASSETS_TOKEN must grant Contents read/write on Heraklines/er-assets." >&2
+            exit 1
+          fi
+
+      - name: Check out ER assets
+        env:
+          ASSETS_TOKEN: ${{ secrets.ER_ASSETS_TOKEN }}
+        run: git clone --depth 1 "https://x-access-token:${ASSETS_TOKEN}@github.com/Heraklines/er-assets.git" "$RUNNER_TEMP/er-assets"
+
+      - name: Import and normalize tracks
+        env:
+          SOURCE_URLS: ${{ inputs.source_urls }}
+          KEY_PREFIX: ${{ inputs.key_prefix }}
+          SPLIT_CHAPTERS: ${{ inputs.split_chapters }}
+          REQUIRE_CREATIVE_COMMONS: ${{ inputs.require_creative_commons }}
+          IMPORT_AUTHOR: ${{ inputs.author }}
+          ASSETS_DIR: ${{ runner.temp }}/er-assets
+          CATALOG_PATH: editor/data/bgm.json
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: node scripts/import-youtube-bgm.mjs
+
+      - name: Commit audio assets
+        working-directory: ${{ runner.temp }}/er-assets
+        run: |
+          git config user.name "Elite Redux editor"
+          git config user.email "editor@elite-redux.invalid"
+          git add audio/bgm
+          if git diff --cached --quiet; then
+            echo "No new audio assets."
+          else
+            git commit -m "editor: import battle music"
+            git push origin HEAD:main
+          fi
+
+      - name: Commit music catalog
+        run: |
+          git config user.name "Elite Redux editor"
+          git config user.email "editor@elite-redux.invalid"
+          git add editor/data/bgm.json
+          if git diff --cached --quiet; then
+            echo "No catalog changes."
+          else
+            git commit -m "editor: update battle music catalog"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
+
   deploy:
-    if: github.repository == 'Heraklines/elite-redux'
+    needs: import_music
+    if: always() && github.repository == 'Heraklines/elite-redux' && (inputs.operation == 'deploy' || (inputs.operation == 'import_music' && inputs.deploy_staging && needs.import_music.result == 'success'))
     timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
@@ -137,8 +251,8 @@ jobs:
         run: node --test test/browser/coop-public-ui/deploy-staging-contract.test.mjs
 
       # Do not mutate either live surface until every fallible build/verification step is green. The Worker
-      # still goes first so a newly published browser never calls an older save contract; cancel-in-progress
-      # is disabled above so a promotion that reaches this point cannot strand the pair between versions.
+      # goes first so a newly published browser never calls an older save contract. Promotions are queued
+      # above, so a run that reaches this point cannot strand the two halves between protocol versions.
       - name: Deploy cloud-save API (staging)
         uses: cloudflare/wrangler-action@v3
         with:

@@ -1,1 +1,1663 @@
-{}
+{
+  "TRAINER_70001": {
+    "battleBgm": "battle_rival",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "I'll see you later after my training arc!",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite"
+    ],
+    "endless": false,
+    "id": 70001,
+    "introDialogue": "My Rattata is different from regular Rattata. It's like my Rattata is in the top percentage of all Rattata!",
+    "maxWave": 8,
+    "minWave": 1,
+    "name": "Youngster Joey",
+    "team": [
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "ORAN_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "BITE",
+              "QUICK_ATTACK",
+              "RLA",
+              "RLNA"
+            ],
+            "sanityOff": true,
+            "species": 19,
+            "weight": 6
+          },
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "THIEF",
+              "SUPER_FANG",
+              "RLA",
+              "RLNA"
+            ],
+            "sanityOff": true,
+            "species": 2019,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "HYPER_FANG",
+              "POISON_FANG",
+              "ENDURE",
+              "COVET"
+            ],
+            "sanityOff": true,
+            "species": 10646,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "KINGS_ROCK"
+              },
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              },
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "EXTREME_SPEED",
+              "POPULATION_BOMB",
+              "SWORDS_DANCE",
+              "FAKE_OUT"
+            ],
+            "sanityOff": true,
+            "shiny": {
+              "around": "zaps",
+              "name": "Top 0.1%",
+              "palette": "hyperpigment"
+            },
+            "species": 19,
+            "weight": 1
+          }
+        ]
+      }
+    ],
+    "trainerClass": "YOUNGSTER",
+    "victoryDialogue": "Told ya!",
+    "weight": 100
+  },
+  "TRAINER_70002": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70002,
+    "maxWave": 30,
+    "minWave": 15,
+    "name": "Loser",
+    "team": [
+      {
+        "variants": [
+          {
+            "abilitySlot": 2,
+            "level": null,
+            "moves": [
+              "STEALTH_ROCK",
+              "ROCK_SLIDE",
+              "RLA",
+              "RLNA"
+            ],
+            "sanityOff": true,
+            "species": 74,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "WILD_CHARGE",
+              "AUTOTOMIZE",
+              "HARD_PRESS",
+              "RLNA"
+            ],
+            "sanityOff": true,
+            "species": 2074,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 0,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "FLAME_ORB"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "SANDSTORM",
+              "CRUNCH",
+              "PROTECT",
+              "RLA"
+            ],
+            "sanityOff": true,
+            "species": 246,
+            "weight": 3
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              },
+              {
+                "count": 1,
+                "item": "EVIOLITE"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "WRAP",
+              "THUNDER_WAVE",
+              "TAUNT",
+              "EARTHQUAKE"
+            ],
+            "sanityOff": true,
+            "species": 95,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 2,
+            "level": null,
+            "moves": [
+              "DRAGON_DANCE",
+              "COUNTER",
+              "SEISMIC_SLAM",
+              "ROCK_SLIDE"
+            ],
+            "sanityOff": true,
+            "shiny": {
+              "name": "Crystal",
+              "palette": "glassbody",
+              "surface": "glasswarp"
+            },
+            "species": 95,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "slotChance": 50,
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "ACCELEROCK",
+              "SUBSTITUTE",
+              "DIG",
+              "SECRET_POWER"
+            ],
+            "sanityOff": true,
+            "species": 744,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 1,
+              "formIndex": 0,
+              "species": 4
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "BATON"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "FIRE_FANG",
+              "BELLY_DRUM",
+              "JAGGED_FANGS",
+              "RLNA"
+            ],
+            "sanityOff": true,
+            "species": 744,
+            "weight": 1
+          }
+        ]
+      }
+    ],
+    "trainerClass": "BROCK",
+    "weight": 100
+  },
+  "TRAINER_70003": {
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "Whoa, you're tough!",
+    "difficulties": [
+      "hell"
+    ],
+    "endless": false,
+    "id": 70003,
+    "introDialogue": "Some say I'm not ready. Look at me now, I'm Calvin, and I'm a wall before the League! Ready for a real challenge?",
+    "maxWave": 180,
+    "minWave": 180,
+    "name": "Calvin",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "MULTI_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "GROWL",
+          "AURORA_BEAM",
+          "FLASH_FREEZE",
+          "FLIP_TURN"
+        ],
+        "shiny": {
+          "around": "shadowfire"
+        },
+        "species": 10684
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "GIGATON_HAMMER",
+          "BONK",
+          "EARTHQUAKE",
+          "PARTING_SHOT"
+        ],
+        "slotChance": 50,
+        "species": 959
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "SHELL_BELL"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "THROAT_CHOP",
+          "LOVELY_BITE",
+          "IRON_FANGS",
+          "SUCKER_PUNCH"
+        ],
+        "sanityOff": true,
+        "slotChance": 50,
+        "species": 10035
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "BATON"
+          },
+          {
+            "count": 3,
+            "item": "FOCUS_BAND"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "REVIVAL_BLESSING",
+          "SHELL_SMASH",
+          "BATON_PASS",
+          "SPORE"
+        ],
+        "slotChance": 50,
+        "species": 235
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "MIRROR_COAT",
+          "ENCORE",
+          "COUNTER",
+          "SLEEP_TALK"
+        ],
+        "species": 202
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "LAST_RESPECTS",
+          "METAL_CLAW",
+          "FURY_CUTTER",
+          "SHADOW_SNEAK"
+        ],
+        "species": 10518
+      }
+    ],
+    "trainerClass": "YOUNGSTER",
+    "victoryDialogue": "Throughout Heaven and Earth, I alone am the Honored One...",
+    "weight": 20
+  },
+  "TRAINER_70004": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70004,
+    "maxWave": 50,
+    "minWave": 30,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "AQUA_JET",
+          "BRINE",
+          "HYPNOSIS",
+          "CONFUSE_RAY"
+        ],
+        "species": 54
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "TEARFUL_LOOK",
+          "RAIN_DANCE",
+          "SURF",
+          "RLNA"
+        ],
+        "species": 817
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "LIGHT_SCREEN",
+              "PSYBEAM",
+              "RECOVER",
+              "AURORA_BEAM"
+            ],
+            "sanityOff": true,
+            "species": 121,
+            "weight": 13
+          },
+          {
+            "abilitySlot": 0,
+            "fusion": {
+              "abilitySlot": 2,
+              "formIndex": 0,
+              "species": 318
+            },
+            "level": null,
+            "moves": [
+              "RLA",
+              "CRUNCH",
+              "BATON_PASS",
+              "BRINE"
+            ],
+            "sanityOff": true,
+            "shiny": {
+              "around": "shadowaura",
+              "name": "Abyssal",
+              "palette": "obsidian"
+            },
+            "species": 121,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "VISE_GRIP",
+          "AQUA_JET",
+          "FURY_CUTTER",
+          "SWORDS_DANCE"
+        ],
+        "sanityOff": true,
+        "species": 98
+      }
+    ],
+    "trainerClass": "MISTY",
+    "weight": 100
+  },
+  "TRAINER_70005": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "youngsters now days have no respect for their elders!",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70005,
+    "introDialogue": "bla bla bla, back in my days bla bla bla great pokemon war bla bla bla...",
+    "maxWave": 70,
+    "minWave": 50,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "THUNDER_PUNCH",
+          "RLNA",
+          "MACH_PUNCH",
+          "RLNA"
+        ],
+        "species": 125
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "FAKE_OUT",
+              "THUNDER_PUNCH",
+              "SEISMIC_FIST",
+              "ENCORE"
+            ],
+            "species": 26,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 2,
+            "level": null,
+            "moves": [
+              "EXPANDING_FORCE",
+              "LIGHTNING_STRIKE",
+              "RLA",
+              "LIGHT_SCREEN"
+            ],
+            "species": 2026,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "DRAINING_KISS",
+          "THUNDER_FANG",
+          "PURSUIT",
+          "SUBSTITUTE"
+        ],
+        "species": 836
+      }
+    ],
+    "trainerClass": "LT_SURGE",
+    "victoryDialogue": "50 years too early to fight me kid!",
+    "weight": 100
+  },
+  "TRAINER_70006": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70006,
+    "maxWave": 90,
+    "minWave": 70,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ER_POISON_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "TOXIC",
+          "SOIL_DRAIN",
+          "SUNNY_DAY",
+          "VENOM_DRENCH"
+        ],
+        "species": 71
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "GANLON_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SALAC_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SEED_BOMB",
+          "ANCIENT_POWER",
+          "POISON_JAB",
+          "THIEF"
+        ],
+        "species": 465
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 2,
+            "item": "IRON"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SLEEP_POWDER",
+          "SOLAR_BEAM",
+          "LEECH_SEED",
+          "NIGHT_SHADE"
+        ],
+        "species": 45
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "TAILWIND",
+              "CREEPING_THORNS",
+              "ACROBATICS",
+              "SUNNY_DAY"
+            ],
+            "species": 189,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 0,
+              "formIndex": 0,
+              "species": 6101
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "TAILWIND",
+              "MISTY_EXPLOSION",
+              "RLA",
+              "SUNNY_DAY"
+            ],
+            "shiny": {
+              "palette": "solarflare",
+              "surface": "phosphor"
+            },
+            "species": 189,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "CHLOROBLAST",
+          "TRIPLE_AXEL",
+          "SUCKER_PUNCH",
+          "GRASSY_TERRAIN"
+        ],
+        "species": 908
+      }
+    ],
+    "trainerClass": "ERIKA",
+    "weight": 100
+  },
+  "TRAINER_70007": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "double",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70007,
+    "maxWave": 110,
+    "minWave": 95,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "TOXIC",
+          "TOXIC_SPIKES",
+          "SHADOW_SNEAK",
+          "PARTING_SHOT"
+        ],
+        "species": 168
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "IRON"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FLASH",
+          "CONFUSION",
+          "SLEEP_POWDER",
+          "DRAINING_KISS"
+        ],
+        "species": 756
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "TOXIC_PLUNGE",
+          "TOXIC",
+          "SURF",
+          "STOMPING_TANTRUM"
+        ],
+        "slotChance": 30,
+        "species": 10615
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FUMIGATION_BOMB",
+          "INFESTATION",
+          "RLNA",
+          "RLA"
+        ],
+        "species": 2089
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "EXPLOSION",
+          "FLAMETHROWER",
+          "DESTINY_BOND",
+          "ENDURE"
+        ],
+        "species": 110
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          },
+          {
+            "count": 1,
+            "item": "EVIOLITE"
+          },
+          {
+            "count": 2,
+            "item": "IRON"
+          },
+          {
+            "count": 2,
+            "item": "ZINC"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "HYPNOSIS",
+          "NIGHTMARE",
+          "DREAM_EATER",
+          "PROTECT"
+        ],
+        "shiny": {
+          "name": "Nightmare",
+          "palette": "lavender",
+          "surface": "wormhole"
+        },
+        "slotChance": 50,
+        "species": 93
+      }
+    ],
+    "trainerClass": "KOGA",
+    "trainerEffect": "shadowaura",
+    "weight": 100
+  },
+  "TRAINER_70008": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "triple",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70008,
+    "maxWave": 120,
+    "minWave": 110,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "BARRIER",
+          "FAKE_OUT",
+          "CONFUSE_RAY",
+          "FLASH_FREEZE"
+        ],
+        "species": 866
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "FOCUS_BLAST",
+              "PSYCHIC",
+              "HYPNOSIS",
+              "THUNDERBOLT"
+            ],
+            "species": 65,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "FOCUS_BLAST",
+              "PSYCHIC",
+              "HYPNOSIS",
+              "THUNDERBOLT"
+            ],
+            "species": 10099,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "PSYCHIC",
+          "OMINOUS_WIND",
+          "SLEEP_POWDER",
+          "MOONLIGHT"
+        ],
+        "species": 49
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "TOXIC_ORB"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "ASSIST",
+          "DARK_VOID",
+          "FAKE_OUT",
+          "TRICK"
+        ],
+        "shiny": {
+          "palette": "hyperpigment"
+        },
+        "species": 677
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "MIRROR_COAT",
+          "COUNTER",
+          "ENCORE",
+          "SAFEGUARD"
+        ],
+        "species": 202
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "COSMIC_POWER",
+          "HELPING_HAND",
+          "SECRET_POWER",
+          "HIDDEN_POWER"
+        ],
+        "slotChance": 25,
+        "species": 10220
+      }
+    ],
+    "trainerClass": "SABRINA",
+    "weight": 100
+  },
+  "TRAINER_70009": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70009,
+    "maxWave": 135,
+    "minWave": 125,
+    "name": "Leader",
+    "team": [
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "EXTREME_SPEED",
+              "FLAMETHROWER",
+              "SUBSTITUTE",
+              "DOUBLE_KICK"
+            ],
+            "species": 59,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 0,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "LUM_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "SHELL_BELL"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "CLOSE_COMBAT",
+              "TEMPER_FLARE",
+              "CRUNCH",
+              "EXTREME_SPEED"
+            ],
+            "species": 10603,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "BLAZE_KICK",
+              "TAKE_DOWN",
+              "SUNNY_DAY",
+              "MEGA_KICK"
+            ],
+            "species": 78,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 2,
+            "level": null,
+            "moves": [
+              "DAZZLING_GLEAM",
+              "DOUBLE_KICK",
+              "RLA",
+              "RLNA"
+            ],
+            "species": 4078,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "EVIOLITE"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "METRONOME",
+          "RLNA",
+          "SUNNY_DAY",
+          "FLAME_BURST"
+        ],
+        "species": 126
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "ATOMIC_FIRE",
+              "ROCK_POLISH",
+              "RLA",
+              "RLNA"
+            ],
+            "species": 10002,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 0,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              },
+              {
+                "count": 2,
+                "item": "IRON"
+              },
+              {
+                "count": 2,
+                "item": "ZINC"
+              },
+              {
+                "count": 1,
+                "item": "SITRUS_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "METEOR_BEAM",
+              "BURN_UP",
+              "ROCK_POLISH",
+              "RECOVER"
+            ],
+            "sanityOff": true,
+            "shiny": {
+              "surface": "softshade"
+            },
+            "species": 10002,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "WILL_O_WISP",
+              "RLA",
+              "FOUL_PLAY",
+              "FIRE_FANG"
+            ],
+            "species": 229,
+            "weight": 10
+          },
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "NASTY_PLOT",
+              "FIRE_FANG",
+              "CRUNCH",
+              "SUCKER_PUNCH"
+            ],
+            "species": 229,
+            "weight": 10
+          },
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "RLA",
+              "CRUNCH",
+              "ECLIPSE",
+              "SUCKER_PUNCH"
+            ],
+            "species": 10112,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "CHARCOAL"
+          },
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SOLAR_BEAM",
+          "FIRE_BLAST",
+          "EARTH_POWER",
+          "CALM_MIND"
+        ],
+        "shiny": {
+          "palette": "inferno",
+          "surface": "watercolor"
+        },
+        "slotChance": 5,
+        "species": 146
+      }
+    ],
+    "trainerClass": "BLAINE",
+    "weight": 100
+  },
+  "TRAINER_70010": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "You Got Lucky Punk!  I was'nt at my full power.",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70010,
+    "introDialogue": "I hope you dont get unlucky and recive full hard mode for this battle",
+    "maxWave": 160,
+    "minWave": 150,
+    "name": "Crime Leader",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 128
+        },
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "ER_ROCK_GEM"
+          },
+          {
+            "count": 2,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "ROLLOUT",
+          "RAPID_SPIN",
+          "KNOCK_OFF",
+          "BULLDOZE"
+        ],
+        "species": 232
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "SITRUS_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "POISON_JAB",
+              "DRILL_RUN",
+              "PRECIPICE_BLADES",
+              "MEGAHORN"
+            ],
+            "sanityOff": true,
+            "species": 34,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 2,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "LUM_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "ER_POISON_GEM"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "POISON_JAB",
+              "BERSERKER_HORN",
+              "PRECIPICE_BLADES",
+              "POWER_UP_PUNCH"
+            ],
+            "sanityOff": true,
+            "species": 10512,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "STEALTH_ROCK",
+              "VENOSHOCK",
+              "TOXIC_SPIKES",
+              "VENOM_DRENCH"
+            ],
+            "species": 31,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "STEALTH_ROCK",
+              "EARTHQUAKE",
+              "TOXIC_SPIKES",
+              "THUNDERBOLT"
+            ],
+            "species": 10513,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "BODY_PRESS",
+              "GEM_MISSILE",
+              "COIL",
+              "RLNA"
+            ],
+            "species": 10064,
+            "weight": 7
+          },
+          {
+            "abilitySlot": 0,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              },
+              {
+                "count": 1,
+                "item": "HARD_STONE"
+              },
+              {
+                "count": 1,
+                "item": "ER_DRAGON_GEM"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              },
+              {
+                "count": 1,
+                "item": "SITRUS_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "JAGGED_FANGS",
+              "SANDSTORM",
+              "DRAGON_DANCE",
+              "DRACO_METEOR"
+            ],
+            "species": 10631,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "slotChance": 15,
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "TWISTED_SPOON"
+              },
+              {
+                "count": 1,
+                "item": "IRON"
+              },
+              {
+                "count": 1,
+                "item": "CALCIUM"
+              },
+              {
+                "count": 1,
+                "item": "CARBOS"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "PSYSTRIKE",
+              "AURA_SPHERE",
+              "FLAMETHROWER",
+              "RLA"
+            ],
+            "species": 150,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "TWISTED_SPOON"
+              },
+              {
+                "count": 1,
+                "item": "IRON"
+              },
+              {
+                "count": 1,
+                "item": "CALCIUM"
+              },
+              {
+                "count": 1,
+                "item": "CARBOS"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "PSYSTRIKE",
+              "AURA_SPHERE",
+              "MOONBLAST",
+              "RLNA"
+            ],
+            "species": 10107,
+            "weight": 100
+          }
+        ]
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "BLACK_GLASSES"
+          },
+          {
+            "count": 1,
+            "item": "ENIGMA_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ER_STEEL_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BRAVE_BIRD",
+          "STEEL_WING",
+          "BLACK_MAGIC",
+          "MIRROR_MOVE"
+        ],
+        "species": 430
+      }
+    ],
+    "trainerClass": "GIOVANNI",
+    "victoryDialogue": "Seems like you got full hard mode XD",
+    "weight": 100
+  },
+  "TRAINER_70011": {
+    "battleBgm": "battle_bb_elite",
+    "battleType": "double",
+    "challenge": "none",
+    "defeatDialogue": "...",
+    "difficulties": [
+      "elite",
+      "hell"
+    ],
+    "endless": true,
+    "id": 70011,
+    "introDialogue": "...",
+    "maxWave": 180,
+    "minWave": 140,
+    "name": "Dagoza",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "HYPNOSIS",
+          "NIGHTMARE",
+          "DREAM_EATER",
+          "PROTECT"
+        ],
+        "species": 10568
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "SCOPE_LENS"
+          },
+          {
+            "count": 2,
+            "item": "SCOPE_LENS"
+          },
+          {
+            "count": 1,
+            "item": "SHELL_BELL"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          },
+          {
+            "count": 2,
+            "item": "IRON"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "DARK_VOID",
+          "DREAM_EATER",
+          "PROTECT",
+          "MOONLIGHT"
+        ],
+        "shiny": {
+          "palette": "obsidian"
+        },
+        "species": 10769
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "HELPING_HAND",
+          "BLUE_FLARE",
+          "DAZZLING_GLEAM",
+          "CONFUSE_RAY"
+        ],
+        "species": 10654
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "NEVER_MELT_ICE"
+          },
+          {
+            "count": 1,
+            "item": "ER_ICE_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BLIZZARD",
+          "CURSE",
+          "ICE_SPINNER",
+          "RLNA"
+        ],
+        "species": 10533
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "MYSTIC_WATER"
+          },
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          }
+        ],
+        "insanity": {
+          "ability": 5285,
+          "innates": [
+            5045,
+            301,
+            130
+          ]
+        },
+        "level": null,
+        "moves": [
+          "MATCHA_GOTCHA",
+          "SCALD",
+          "BERRY_SMASH",
+          "TORMENT"
+        ],
+        "shiny": {
+          "around": "outline",
+          "name": "Spiked",
+          "palette": "cursed"
+        },
+        "species": 1013
+      },
+      {
+        "abilitySlot": 0,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 10582
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FAIRY_FEATHER"
+          },
+          {
+            "count": 1,
+            "item": "ER_FAIRY_GEM"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FAKE_OUT",
+          "SUCKER_PUNCH",
+          "MOONBLAST",
+          "MISTY_EXPLOSION"
+        ],
+        "species": 683
+      }
+    ],
+    "trainerClass": "HEX_MANIAC",
+    "trainerEffect": "smoke",
+    "victoryDialogue": "...",
+    "weight": 50
+  }
+}

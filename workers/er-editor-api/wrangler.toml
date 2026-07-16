@@ -18,6 +18,7 @@ compatibility_date = "2024-11-01"
 GITHUB_REPO = "Heraklines/elite-redux"
 GITHUB_BRANCH = "feat/elite-redux-port"
 GITHUB_WORKFLOW_FILE = "deploy-staging.yml"
+MEDIA_IMPORT_WORKFLOW_FILE = "deploy-staging.yml"
 ALLOWED_ORIGIN = "*"
 # Sprite repo for the Add-a-Mon upload route (/upload-assets).
 ASSETS_REPO = "Heraklines/er-assets"

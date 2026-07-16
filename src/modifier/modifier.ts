@@ -6,6 +6,7 @@ import { FusionSpeciesFormEvolution, pokemonEvolutions } from "#balance/pokemon-
 import { erIsHeldItemDisabled } from "#data/battler-tags";
 import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
+import { erIsHeldItemSuppressed } from "#data/elite-redux/abilities/item-suppression";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
@@ -707,6 +708,11 @@ export abstract class PokemonHeldItemModifier extends PersistentModifier {
     // suppress THIS item's effect only when it is the locked one. Mega Stones /
     // form-change items are never the locked target ("does not prevent Mega Stones").
     if (erIsHeldItemDisabled(pokemon, this.type?.id)) {
+      return false;
+    }
+    // ER Negative Feedback (5923): a seeded held item is suppressed (no effect,
+    // not removed) until end of the following turn.
+    if (erIsHeldItemSuppressed(pokemon, this.type?.id)) {
       return false;
     }
     return true;

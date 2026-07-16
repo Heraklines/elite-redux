@@ -1286,6 +1286,12 @@ export class BattleScene extends SceneBase {
       .setName(`sprite-${pokemon.name}-icon`)
       .setFrame(pokemon.getIconId(ignoreOverride, useIllusion))
       .setOrigin(0.5, 0);
+    // Per-species icon-scale multiplier (1 for every vanilla species; < 1 for
+    // ER icon-from-front species whose icon is a downscaled front frame).
+    const iconScale = pokemon.getSpeciesForm(ignoreOverride, useIllusion).getIconScale(pokemon.formIndex);
+    if (iconScale !== 1) {
+      icon.setScale(iconScale);
+    }
     // Temporary fix to show pokemon's default icon if variant icon doesn't exist
     if (icon.frame.name !== pokemon.getIconId(ignoreOverride, useIllusion)) {
       console.log(`${pokemon.name}'s variant icon does not exist. Replacing with default.`);
@@ -3054,10 +3060,7 @@ export class BattleScene extends SceneBase {
       return Number.MAX_SAFE_INTEGER;
     }
 
-    const waveIndex = Math.ceil((this.currentBattle?.waveIndex || 1) / 10) * 10;
-    const difficultyWaveIndex = this.gameMode.getWaveForDifficulty(waveIndex);
-    const baseLevel = (1 + difficultyWaveIndex / 2 + Math.pow(difficultyWaveIndex / 25, 2)) * 1.2;
-    return Math.ceil(baseLevel / 2) * 2 + 2;
+    return this.gameMode.getMaxExpLevelForWave(this.currentBattle?.waveIndex || 1);
   }
 
   randomSpecies(

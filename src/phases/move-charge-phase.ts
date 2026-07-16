@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { MoveChargeAnim } from "#data/battle-anims";
+import { erTryQuickeningGrace } from "#data/elite-redux/abilities/quickening-grace";
 import { erRecordAchievementChargeMove } from "#data/elite-redux/er-achievement-tracker";
 import { erTryConsumePowerHerb } from "#data/elite-redux/er-community-items";
 import type { AbilityId } from "#enums/ability-id";
@@ -85,6 +86,14 @@ export class MoveChargePhase extends PokemonPhase {
     // the real charge-resolution point (the same hook Power Herb uses) - the prior
     // PreAttack tag-removal approach never actually skipped the charge.
     if (!instantCharge.value && user?.hasAbility(ErAbilityId.ACCELERATE as unknown as AbilityId)) {
+      instantCharge.value = true;
+    }
+
+    // ER Quickening Grace (5913, Mega Xerneas): once per turn, an ally's ability
+    // lets THIS user's first attacking two-turn charge move fire immediately.
+    // Status charge moves (Geomancy) and recharge moves are excluded inside the
+    // helper / by never reaching this phase.
+    if (!instantCharge.value && erTryQuickeningGrace(user, move)) {
       instantCharge.value = true;
     }
     erRecordAchievementChargeMove(user, move.id, instantCharge.value);

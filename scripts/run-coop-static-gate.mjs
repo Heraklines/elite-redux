@@ -106,10 +106,12 @@ if (typecheck.status !== 0) {
 // Enforce it on every file introduced or changed by this checkpoint; applying it to all
 // historical files would make unrelated legacy style debt block every architecture fix.
 // TypeScript remains stricter above: every co-op diagnostic blocks, changed or not.
-// Markdown and some repository metadata are intentionally ignored by this repository's Biome configuration.
-// Passing an ignored-only checkpoint to `biome check` normally exits non-zero with "No files were processed",
-// even though the non-vacuous diff and full TypeScript ratchet above both ran. Keep ignored-only checkpoints
-// valid while still making every file Biome does process fail closed on diagnostics.
+// Markdown is intentionally ignored by this repository's Biome configuration. Passing a docs-only
+// checkpoint to `biome check` makes Biome exit non-zero with "No files were processed", even though the
+// non-vacuous diff and full TypeScript ratchet above both ran. Restrict this list to formats Biome owns.
+// `--no-errors-on-unmatched` (the flag every package.json biome script already uses) covers the same
+// trap for a checkpoint whose only Biome-owned changes are files the config ignores — e.g. a worker-
+// written `er-custom-trainers*.json` save, which is excluded in biome.jsonc as generated data.
 const biomeFiles = [...changed].filter(file => /\.(?:[cm]?[jt]sx?|jsonc?|ya?ml)$/.test(file));
 if (biomeFiles.length > 0) {
   const biome = run(

@@ -5,6 +5,8 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { PokemonPhase } from "#app/phases/pokemon-phase";
 import { CenterOfAttentionTag, type EncoreTag } from "#data/battler-tags";
+import { erLibraryRecordFoeMove } from "#data/elite-redux/abilities/library";
+import { erOmniformOnMoveStart } from "#data/elite-redux/abilities/omniform";
 import {
   isCoopRecording,
   recordCoopEvent,
@@ -21,18 +23,21 @@ import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { ChallengeType } from "#enums/challenge-type";
 import { CommonAnim } from "#enums/move-anims-common";
+import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import { MoveResult } from "#enums/move-result";
+import { MoveTarget } from "#enums/move-target";
 import { isIgnorePP, isIgnoreStatus, isReflected, isVirtual, MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
+import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { MoveUsedEvent } from "#events/battle-scene";
 import type { Pokemon } from "#field/pokemon";
 import { applyMoveAttrs } from "#moves/apply-attrs";
 import { frenzyMissFunc, getMoveTargets } from "#moves/move-utils";
-import type { PokemonMove } from "#moves/pokemon-move";
+import { PokemonMove } from "#moves/pokemon-move";
 import type { Move, PreUseInterruptAttr } from "#types/move-types";
 import type { TurnMove } from "#types/turn-move";
 import { applyChallenges } from "#utils/challenge-utils";
@@ -218,7 +223,17 @@ export class MovePhase extends PokemonPhase {
       // Struggle's "There are no more moves it can use" message
 
       globalScene.triggerPokemonFormChange(user, SpeciesFormChangePreMoveTrigger);
+      // ER Omniform (5929): adaptive mega-style transform driven by the move's
+      // type, applied BEFORE the move resolves so its stats + speed order are
+      // re-evaluated mid-turn.
+      erOmniformOnMoveStart(user, move);
       // TODO: apply gorilla tactics here instead of in the move effect phase
+    }
+
+    // ER Library (5928): record the FIRST move each opposing Pokemon genuinely
+    // uses into any active opposing Library holder's library (status included).
+    if (!isVirtual(useMode)) {
+      erLibraryRecordFoeMove(user, move);
     }
 
     this.showMoveText();
@@ -234,7 +249,10 @@ export class MovePhase extends PokemonPhase {
       globalScene.currentBattle.lastMove = move.id;
     }
 
-    if (!this.resolveFinalPreMoveCancellationChecks()) {
+    // ER Snatch (289): if this is a snatchable self-targeting move and another Pokemon is
+    // primed with Snatch, that Pokemon steals the move and performs it instead (checkSnatch
+    // queues the theft and returns true), so the original user's move does not execute.
+    if (!this.checkSnatch() && !this.resolveFinalPreMoveCancellationChecks()) {
       this.useMove(charging);
     }
 
@@ -1078,6 +1096,79 @@ export class MovePhase extends PokemonPhase {
   public cancel(): void {
     this.cancelled = true;
     this.moveHistoryEntry.result = MoveResult.FAIL;
+  }
+
+  /**
+   * ER Snatch (289). If the move currently being used is snatchable (a self-targeting
+   * status/heal/stat move used via a normal selection) and another on-field Pokemon is
+   * primed with {@linkcode BattlerTagType.SNATCH}, that Pokemon steals the move: this
+   * move is cancelled and a FOLLOW_UP copy is queued for the snatcher, performed on
+   * itself. The fastest eligible snatcher wins; its Snatch tag is consumed on the steal.
+   *
+   * @returns `true` if the move was snatched (and this phase should end without executing).
+   */
+  private checkSnatch(): boolean {
+    // Only a genuine, first-hand selection of a snatchable move can be stolen — never a
+    // called / reflected / already-snatched cast (guards against infinite snatch loops).
+    if (this.useMode !== MoveUseMode.NORMAL) {
+      return false;
+    }
+    const move = this.move.getMove();
+    if (!MovePhase.isSnatchable(move)) {
+      return false;
+    }
+
+    const user = this.pokemon;
+    // The fastest OTHER on-field Pokemon holding a Snatch tag steals the move.
+    const snatcher = globalScene
+      .getField(true)
+      .filter(p => p !== user && p.getTag(BattlerTagType.SNATCH) != null)
+      .sort((a, b) => b.getEffectiveStat(Stat.SPD) - a.getEffectiveStat(Stat.SPD))[0];
+    if (!snatcher) {
+      return false;
+    }
+
+    snatcher.removeTag(BattlerTagType.SNATCH);
+    globalScene.phaseManager.queueMessage(
+      i18next.t("moveTriggers:snatchedMove", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(snatcher),
+        moveName: move.name,
+        defaultValue: `${getPokemonNameWithAffix(snatcher)} snatched ${getPokemonNameWithAffix(user)}'s move!`,
+      }),
+    );
+
+    // The snatched user's PP has already been spent (usePP ran above); the move now does
+    // nothing for them. Queue the snatcher to perform the move on itself, first.
+    this.cancel();
+    globalScene.phaseManager.unshiftNew(
+      "MovePhase",
+      snatcher,
+      [snatcher.getBattlerIndex()],
+      new PokemonMove(this.move.moveId),
+      MoveUseMode.FOLLOW_UP,
+      MovePhaseTimingModifier.FIRST,
+    );
+    return true;
+  }
+
+  /**
+   * @returns whether `move` is stealable by Snatch — a self-targeting status move
+   * (heals, stat self-boosts, self status/utility). Matches the dex: "Steals the effects
+   * of the foe's healing or status-changing move."
+   */
+  private static isSnatchable(move: Move): boolean {
+    if (move.category !== MoveCategory.STATUS) {
+      return false;
+    }
+    switch (move.moveTarget) {
+      case MoveTarget.USER:
+      case MoveTarget.USER_SIDE:
+      case MoveTarget.USER_OR_NEAR_ALLY:
+      case MoveTarget.USER_AND_ALLIES:
+        return true;
+      default:
+        return false;
+    }
   }
 
   /** @returns An array containing all on-field `Pokemon` targeted by this Phase's invoked move. */

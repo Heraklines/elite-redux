@@ -18,6 +18,7 @@
 import { allAbilities } from "#data/data-lists";
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
 import { ER_ABILITY_ROM_DESCRIPTIONS } from "#data/elite-redux/er-ability-rom-descriptions";
+import { MANUAL_COMPOSITE_PARTS } from "#data/elite-redux/abilities/composite-newcomers";
 import { ER_COMPOSITE_PARTS, type ErCompositePartRef } from "#data/elite-redux/er-composite-parts";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 
@@ -99,6 +100,14 @@ function partPokerogueId(part: ErCompositePartRef): number | undefined {
  * back to the ability's own description.
  */
 export function getErCompositeDetailedDescription(pokerogueAbilityId: number): string | null {
+  // Newcomer-patch manual composites (5933+) live outside the auto-generated
+  // ER_COMPOSITE_PARTS table (they have no ER source draft id). Their constituent
+  // pokerogue ids are in MANUAL_COMPOSITE_PARTS — build the same constituent-detail
+  // block from those.
+  const manual = MANUAL_COMPOSITE_PARTS[pokerogueAbilityId];
+  if (manual) {
+    return buildConstituentDetail(manual.constituents);
+  }
   const erId = erAbilityIdFromPokerogueId(pokerogueAbilityId);
   if (erId === undefined) {
     return null;
@@ -107,10 +116,18 @@ export function getErCompositeDetailedDescription(pokerogueAbilityId: number): s
   if (!entry || entry.parts.length === 0) {
     return null;
   }
+  return buildConstituentDetail(entry.parts.map(partPokerogueId));
+}
+
+/**
+ * Concatenate the detailed (ROM, else short) descriptions of a set of
+ * constituent pokerogue ability ids, labelled by ability name. Shared by the
+ * draft-id and manual composite paths.
+ */
+function buildConstituentDetail(constituentIds: readonly (number | undefined)[]): string | null {
   const blocks: string[] = [];
   const seen = new Set<number>();
-  for (const part of entry.parts) {
-    const pk = partPokerogueId(part);
+  for (const pk of constituentIds) {
     if (pk === undefined || seen.has(pk)) {
       continue;
     }

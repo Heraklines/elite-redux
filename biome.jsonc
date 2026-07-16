@@ -60,6 +60,13 @@
       // Their bodies are large JSON.stringify outputs; biome formatting would
       // dirty the tree on every regen. Linter/formatter rules don't apply here.
       "!!src/data/elite-redux/er-*.ts",
+      // Elite Redux: editor/worker-generated custom-trainer data. The er-editor-api
+      // worker commits these as `JSON.stringify(data, null, 2)` output on every staff
+      // save; Biome's JSON formatter collapses short arrays/objects, so biome would
+      // dirty (and the co-op static gate would reject) every worker-written save. Same
+      // generated-data class as the er-*.ts modules above.
+      "!!src/data/elite-redux/er-custom-trainers.json",
+      "!!src/data/elite-redux/er-custom-trainers-config.json",
       // Elite Redux: auto-generated SpeciesId companion enum (B1b).
       "!!src/enums/er-species-id.ts",
       // Elite Redux: auto-generated AbilityId/MoveId companion enums (B2).

@@ -23,35 +23,55 @@
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
 
+import { planErCustomTrainerLaunch, summarizeErCustomTrainer } from "#app/dev-tools/test-suite/custom-trainer-picker";
+import { applyPreparedGhostHeldItems, translatePreparedGhostLevels } from "#app/dev-tools/test-suite/scenarios";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import {
+  applyErCustomTrainerDisplayName,
   applyErCustomTrainerPresentation,
   buildErCustomTrainerMember,
+  clearErCustomTrainerDevForce,
   type ErCustomTrainerMemberResolved,
+  erCustomTrainerHeldModifierConfigs,
+  erCustomTrainerWindowIndex,
+  erCustomTrainerWindowWave,
+  getErCustomTrainerDevForce,
+  getErCustomTrainerSpawnConfig,
   getErCustomTrainers,
+  isErCustomTrainerDevForceArmed,
   markErCustomTrainerUsed,
   normalizeBattleBgm,
+  normalizeChallengeValue,
   normalizeDialogueLine,
+  normalizeErCustomTrainerSpawnConfig,
   normalizeIntroDialogue,
   normalizeTrainerEffect,
+  pickErCustomTrainerByWeight,
   pickErCustomTrainerVariant,
   resetErCustomTrainerTracking,
   resolveErCustomTrainerMoveIds,
   resolveErCustomTrainerParty,
-  rollErCustomTrainerAppearance,
+  resolveErCustomTrainerWeight,
   rollErCustomTrainerSlotFill,
+  rollErCustomTrainerWindow,
   selectErCustomTrainerForWave,
   setErCustomTrainerBstBypass,
+  setErCustomTrainerDevForce,
+  setErCustomTrainerSpawnConfigForTesting,
   setErCustomTrainersForTesting,
 } from "#data/elite-redux/er-custom-trainers";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
+import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { TrainerSlot } from "#enums/trainer-slot";
+import { TrainerVariant } from "#enums/trainer-variant";
 import type { Trainer } from "#field/trainer";
+import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -144,9 +164,9 @@ const TABLE = {
 /**
  * Play a run from `from` to `to` inclusive: at each wave ask the selector for a
  * DUE trainer and, when one fires, mark it used (exactly what the live caller in
- * new-battle-phase.ts does). Returns every appearance as `{ wave, key }`. Because
- * a trainer's appearance is once-per-run at a seed-assigned wave, sweeping the
- * whole window is the seed-robust way to observe the gates.
+ * new-battle-phase.ts does; the selector itself consumes the spawn window).
+ * Returns every appearance as `{ wave, key }`. Sweeping the whole run is the
+ * seed-robust way to observe the window-density gates.
  */
 function playRun(from: number, to: number): { wave: number; key: string }[] {
   const picks: { wave: number; key: string }[] = [];
@@ -171,8 +191,13 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
   beforeEach(async () => {
     game = new GameManager(phaserGame);
     setErCustomTrainersForTesting(TABLE as never);
+    // Window-density model: force EVERY window to fire (100%) with a 10-wave
+    // window so the gate tests observe selection deterministically. Individual
+    // tests override the config to exercise the density roll itself.
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 100 });
     resetErCustomTrainerTracking();
     setErCustomTrainerBstBypass(false);
+    setErCustomTrainerDevForce(null);
     // NB: do NOT set an enemySpecies/enemyLevel override — either forces every
     // addEnemyPokemon (incl. buildErCustomTrainerMember) to that species/level,
     // masking the exact-party build.
@@ -182,6 +207,8 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
 
   afterEach(() => {
     setErCustomTrainersForTesting(undefined);
+    setErCustomTrainerSpawnConfigForTesting(undefined);
+    setErCustomTrainerDevForce(null);
     resetErCustomTrainerTracking();
     setErCustomTrainerBstBypass(false);
     resetErDifficulty();
@@ -194,26 +221,96 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     expect(keys).not.toContain("BROKEN");
   });
 
+  it("uses the same wave cap for scenario construction and live EXP progression", () => {
+    expect(globalScene.gameMode.getMaxExpLevelForWave(3)).toBe(10);
+    expect(globalScene.gameMode.getMaxExpLevelForWave(153)).toBe(150);
+  });
+
+  it("preserves every sampled ghost member's level gap", () => {
+    const members = [164, 161, 150].map(level => ({ level }));
+    expect(translatePreparedGhostLevels(members, 150)).toEqual([150, 147, 136]);
+  });
+
+  it("renders an authored title before a named trainer class", () => {
+    const namedTrainer = {
+      config: {
+        title: "Gym Leader",
+        getTitle: () => "Sabrina",
+      },
+      variant: TrainerVariant.DEFAULT,
+      name: "",
+      partnerName: "",
+    } as unknown as Trainer;
+
+    applyErCustomTrainerDisplayName(namedTrainer, "Leader");
+
+    expect(namedTrainer.getName(TrainerSlot.NONE, false)).toBe("Sabrina");
+    expect(namedTrainer.getName(TrainerSlot.NONE, true)).toBe("Leader Sabrina");
+  });
+
+  it("keeps generic trainer classes on their normal naming path", () => {
+    const genericTrainer = {
+      config: { title: undefined },
+      name: "",
+    } as unknown as Trainer;
+
+    applyErCustomTrainerDisplayName(genericTrainer, "Calvin");
+
+    expect(genericTrainer.name).toBe("Calvin");
+    expect(Object.hasOwn(genericTrainer, "getName")).toBe(false);
+  });
+
+  it("restores sampled ghost held items with their stack counts", () => {
+    const mon = globalScene.getPlayerParty()[0];
+    const applied = applyPreparedGhostHeldItems(
+      [mon],
+      [
+        {
+          speciesId: mon.species.speciesId,
+          formIndex: mon.formIndex,
+          abilityIndex: mon.abilityIndex,
+          ivs: [...mon.ivs],
+          nature: mon.nature,
+          level: mon.level,
+          gender: mon.gender,
+          shiny: mon.shiny,
+          variant: mon.variant,
+          passive: mon.passive,
+          moves: mon.moveset.map(move => move.moveId),
+          heldItems: [
+            ["LEFTOVERS", 2],
+            ["REMOVED_ITEM", 9],
+          ],
+        },
+      ],
+    );
+
+    const held = globalScene.findModifiers(
+      modifier => modifier instanceof PokemonHeldItemModifier && modifier.pokemonId === mon.id,
+      true,
+    ) as PokemonHeldItemModifier[];
+    expect(applied).toBe(1);
+    expect(held.map(item => [item.type.id, item.stackCount])).toContainEqual(["LEFTOVERS", 2]);
+  });
+
   it("gates by difficulty: hell-only trainer never appears on ace, appears once on hell", () => {
     setErDifficulty("ace");
-    // On ace, HELL_BOSS is hell-only -> never appears anywhere in its window.
+    // On ace, HELL_BOSS is hell-only -> never fielded anywhere.
     expect(playRun(1, 200).some(p => p.key === "HELL_BOSS")).toBe(false);
     resetErCustomTrainerTracking();
     setErDifficulty("hell");
     // On hell it is the only eligible trainer and appears exactly once, inside
-    // its window (50..200).
+    // its floor range (50..200) — every window fires (100%) in this harness.
     const hellPicks = playRun(1, 200).filter(p => p.key === "HELL_BOSS");
     expect(hellPicks.length).toBe(1);
     expect(hellPicks[0].wave).toBeGreaterThanOrEqual(50);
     expect(hellPicks[0].wave).toBeLessThanOrEqual(200);
   });
 
-  it("gates by floor range and endless (assigned wave stays inside the window)", () => {
+  it("gates by floor range and endless (fielded wave stays inside the range)", () => {
     setErDifficulty("ace");
-    // Below ACE_RICO's min (10) and ENDLESS_T's (100), nothing is due yet.
-    expect(selectErCustomTrainerForWave(5)).toBeNull();
-    // Sweep the whole run: ACE_RICO fires once in 10..40, ENDLESS_T once at
-    // some floor >= 100 (endless window). Neither ever appears out of range.
+    // Below ACE_RICO's min (10) and ENDLESS_T's (100), neither is eligible yet.
+    // Window 0 (waves 1-10) can still field ACE_RICO once wave >= 10.
     const byKey = new Map(playRun(1, 320).map(p => [p.key, p.wave]));
     const ace = byKey.get("ACE_RICO");
     expect(ace).toBeDefined();
@@ -221,6 +318,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     expect(ace!).toBeLessThanOrEqual(40);
     const endless = byKey.get("ENDLESS_T");
     expect(endless).toBeDefined();
+    // Endless: any floor >= minWave (100); no upper bound.
     expect(endless!).toBeGreaterThanOrEqual(100);
   });
 
@@ -229,7 +327,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // No challenge active -> ghost-only trainer never appears in a full run.
     expect(playRun(1, 200).some(p => p.key === "GHOST_ONLY")).toBe(false);
     resetErCustomTrainerTracking();
-    // Activate the Ghost challenge -> the ghost-only trainer appears once.
+    // Activate the Ghost challenge -> the ghost-only trainer appears.
     globalScene.gameMode.challenges.push({ id: Challenges.GHOST_TRAINERS, value: 1 } as never);
     try {
       expect(playRun(1, 200).some(p => p.key === "GHOST_ONLY")).toBe(true);
@@ -243,7 +341,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // Without the Hardcore challenge active, the hardcore-only trainer never appears.
     expect(playRun(1, 200).some(p => p.key === "HARDCORE_ONLY")).toBe(false);
     resetErCustomTrainerTracking();
-    // Activate the Hardcore challenge -> the hardcore-only trainer appears once.
+    // Activate the Hardcore challenge -> the hardcore-only trainer appears.
     globalScene.gameMode.challenges.push({ id: Challenges.HARDCORE, value: 1 } as never);
     try {
       expect(playRun(1, 200).some(p => p.key === "HARDCORE_ONLY")).toBe(true);
@@ -252,16 +350,93 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     }
   });
 
+  // ---- WINDOW-DENSITY GATING (the new global model) -------------------------
+  it("window density gates spawning: a NO-roll window fields nothing; a YES window fields exactly one", () => {
+    const ONE = {
+      SOLO: {
+        id: 70010,
+        name: "Solo",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 200,
+        endless: false,
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+    };
+    setErCustomTrainersForTesting(ONE as never);
+    globalScene.seed = "RUNSEED";
+    setErDifficulty("ace");
+
+    // windowChancePct = 0 -> NO window ever fires -> nothing fielded across the run.
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 0 });
+    resetErCustomTrainerTracking();
+    expect(rollErCustomTrainerWindow("RUNSEED", 0, getErCustomTrainerSpawnConfig())).toBe(false);
+    expect(playRun(1, 100).length).toBe(0);
+
+    // windowChancePct = 100 -> EVERY window fires. With a single eligible trainer
+    // and no-repeat, EXACTLY ONE appearance across the whole run.
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 100 });
+    resetErCustomTrainerTracking();
+    expect(rollErCustomTrainerWindow("RUNSEED", 0, getErCustomTrainerSpawnConfig())).toBe(true);
+    const picks = playRun(1, 100);
+    expect(picks.length).toBe(1);
+    expect(picks[0].key).toBe("SOLO");
+
+    // Within the FIRST firing window: at most one appearance, and it lands at the
+    // window's seed-chosen anchor wave (waves 1..10 => window 0).
+    resetErCustomTrainerTracking();
+    const anchor = erCustomTrainerWindowWave("RUNSEED", 0, 10);
+    expect(erCustomTrainerWindowIndex(anchor, 10)).toBe(0);
+    const inWindow = playRun(1, 10);
+    expect(inWindow.length).toBe(1);
+    expect(inWindow[0].wave).toBe(anchor);
+  });
+
+  it("window model slides the appearance forward past an excluded anchor wave", () => {
+    const ONE = {
+      SLIDER: {
+        id: 70012,
+        name: "Slider",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 500,
+        endless: false,
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+    };
+    setErCustomTrainersForTesting(ONE as never);
+    globalScene.seed = "RUNSEED";
+    // A big window so the anchor is comfortably mid-window (never at the boundary).
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 30, windowChancePct: 100 });
+    resetErCustomTrainerTracking();
+    setErDifficulty("ace");
+    const anchor = erCustomTrainerWindowWave("RUNSEED", 0, 30);
+    // Not due before the anchor wave.
+    if (anchor > 1) {
+      expect(selectErCustomTrainerForWave(anchor - 1)).toBeNull();
+    }
+    // Simulate the anchor wave itself being EXCLUDED (boss / fixed / mystery): the
+    // selector is simply never called at `anchor`. The next non-excluded wave in
+    // the SAME window must still field the trainer (slide forward).
+    const next = anchor + 1;
+    expect(erCustomTrainerWindowIndex(next, 30)).toBe(0); // still in window 0
+    expect(selectErCustomTrainerForWave(next)?.key).toBe("SLIDER");
+    // Window consumed: the same window fields nothing again.
+    expect(selectErCustomTrainerForWave(next + 1)).toBeNull();
+  });
+
   it("no-repeat: every eligible trainer fires at most once across a whole run", () => {
     setErDifficulty("ace");
     globalScene.gameMode.challenges.push({ id: Challenges.GHOST_TRAINERS, value: 1 } as never);
     try {
-      const picks = playRun(1, 320);
+      const picks = playRun(1, 400);
       const counts = new Map<string, number>();
       for (const p of picks) {
         counts.set(p.key, (counts.get(p.key) ?? 0) + 1);
       }
-      // At least the ace-eligible pool fired, and NO trainer fired twice.
+      // Some ace-eligible trainers fired, and NO trainer fired twice.
       expect(picks.length).toBeGreaterThan(0);
       for (const [, count] of counts) {
         expect(count).toBe(1);
@@ -271,123 +446,318 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     }
   });
 
-  it("spawnChance absent is treated as 100: assigned a wave and fires exactly once (back-compat)", () => {
-    const ONE = {
-      SOLO: {
-        id: 70010,
-        name: "Solo",
+  it("at most one custom trainer per window (density caps density, not trainer count)", () => {
+    // Two eligible trainers, both spanning the whole run. Every window fires, but
+    // each window fields AT MOST ONE -> no two appearances share a window.
+    const TWO = {
+      A: {
+        id: 70061,
+        name: "Alpha",
         trainerClass: "ACE_TRAINER",
-        battleType: "single",
         difficulties: ["ace"],
-        minWave: 10,
-        maxWave: 30,
-        endless: false,
-        // NB: no spawnChance field — a saved entry from before this feature.
+        minWave: 1,
+        maxWave: 500,
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+      B: {
+        id: 70062,
+        name: "Bravo",
+        trainerClass: "VETERAN",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 500,
+        team: [{ species: SpeciesId.SNORLAX }],
+      },
+    };
+    setErCustomTrainersForTesting(TWO as never);
+    globalScene.seed = "RUNSEED";
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 100 });
+    resetErCustomTrainerTracking();
+    setErDifficulty("ace");
+    const picks = playRun(1, 200);
+    // Both fired (weighted pick spreads across windows), each exactly once...
+    expect(picks.length).toBe(2);
+    // ...and in DIFFERENT windows.
+    const windows = picks.map(p => erCustomTrainerWindowIndex(p.wave, 10));
+    expect(new Set(windows).size).toBe(windows.length);
+  });
+
+  // ---- WEIGHT MIGRATION (spawnChance -> weight) ----------------------------
+  it("migrates spawnChance -> weight (weight wins; absent both -> 100; clamped >= 1)", () => {
+    // Pure resolver.
+    expect(resolveErCustomTrainerWeight(5, 30)).toBe(5); // weight present wins
+    expect(resolveErCustomTrainerWeight(undefined, 30)).toBe(30); // legacy spawnChance migrates
+    expect(resolveErCustomTrainerWeight(undefined, undefined)).toBe(100); // neither -> default 100
+    expect(resolveErCustomTrainerWeight(0, undefined)).toBe(1); // clamp >= 1
+    expect(resolveErCustomTrainerWeight(-4, undefined)).toBe(1);
+    expect(resolveErCustomTrainerWeight(undefined, 0)).toBe(1); // legacy 0 clamps to 1
+    expect(resolveErCustomTrainerWeight(3.9, undefined)).toBe(3); // floored
+
+    const MIG = {
+      LEGACY: {
+        id: 70070,
+        name: "Legacy",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        spawnChance: 40, // pre-feature save, no weight
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+      NEWWEIGHT: {
+        id: 70071,
+        name: "NewWeight",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        weight: 250,
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+      NEITHER: {
+        id: 70072,
+        name: "Neither",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
         team: [{ species: SpeciesId.PIKACHU }],
       },
     };
-    setErCustomTrainersForTesting(ONE as never);
+    setErCustomTrainersForTesting(MIG as never);
+    const byKey = new Map(getErCustomTrainers().map(t => [t.key, t]));
+    expect(byKey.get("LEGACY")!.weight).toBe(40);
+    expect(byKey.get("NEWWEIGHT")!.weight).toBe(250);
+    expect(byKey.get("NEITHER")!.weight).toBe(100);
+  });
+
+  it("spawn-config normalizes: bad fields fall back to the shipped defaults", () => {
+    expect(normalizeErCustomTrainerSpawnConfig(undefined)).toEqual({ windowSize: 10, windowChancePct: 25 });
+    expect(normalizeErCustomTrainerSpawnConfig({ windowSize: 5, windowChancePct: 40 })).toEqual({
+      windowSize: 5,
+      windowChancePct: 40,
+    });
+    // windowSize out of range -> default 10; chance out of range -> default 25.
+    expect(normalizeErCustomTrainerSpawnConfig({ windowSize: 0, windowChancePct: 200 })).toEqual({
+      windowSize: 10,
+      windowChancePct: 25,
+    });
+    expect(normalizeErCustomTrainerSpawnConfig({ windowSize: "x", windowChancePct: null })).toEqual({
+      windowSize: 10,
+      windowChancePct: 25,
+    });
+    // 0% chance is VALID (disables spawning); it must be preserved, not defaulted.
+    expect(normalizeErCustomTrainerSpawnConfig({ windowChancePct: 0 }).windowChancePct).toBe(0);
+  });
+
+  // ---- WEIGHTED TRAINER PICK (pure helper determinism) ---------------------
+  it("weighted trainer pick is deterministic, respects weights, and never picks a zero-weight/empty entry", () => {
+    const pool = [{ weight: 30 }, { weight: 70 }];
+    // Deterministic: same inputs, same output across repeated calls.
+    for (const seed of ["RUNSEED", "ABC", "hello", "", "42"]) {
+      const got = pickErCustomTrainerByWeight(seed, 0, pool);
+      expect(pickErCustomTrainerByWeight(seed, 0, pool)).toBe(got);
+      expect(got).toBeGreaterThanOrEqual(0);
+      expect(got).toBeLessThan(pool.length);
+      // Independently reproduce the cumulative-weight walk for this salt.
+      let h = 0x811c9dc5;
+      const s = `${seed}:custom-trainer-pick:0`;
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+      }
+      const expected = (h >>> 0) % 100 < 30 ? 0 : 1;
+      expect(got).toBe(expected);
+    }
+    // A different window index (salt anchor) can change the pick -> salt is load-bearing.
+    const a = pickErCustomTrainerByWeight("RUNSEED", 0, pool);
+    const b = pickErCustomTrainerByWeight("RUNSEED", 7, pool);
+    expect(pickErCustomTrainerByWeight("RUNSEED", 7, pool)).toBe(b);
+    expect([0, 1]).toContain(a);
+    expect([0, 1]).toContain(b);
+    // Zero-weight entries are NEVER picked (treated as ineligible).
+    for (const seed of ["a", "b", "c", "d", "seed5", "seed6"]) {
+      const idx = pickErCustomTrainerByWeight(seed, 0, [{ weight: 0 }, { weight: 5 }]);
+      expect(idx).toBe(1);
+    }
+    // An all-zero (or empty) pool returns -1 (nothing picked).
+    expect(pickErCustomTrainerByWeight("x", 0, [{ weight: 0 }, { weight: 0 }])).toBe(-1);
+    expect(pickErCustomTrainerByWeight("x", 0, [])).toBe(-1);
+  });
+
+  // ---- DEV FORCE PATH (staff testing) --------------------------------------
+  it("dev force spawns a NAMED trainer at its first eligible wave, bypassing density", () => {
+    const T = {
+      TARGET: {
+        id: 70080,
+        name: "Target",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        minWave: 25,
+        maxWave: 200,
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+    };
+    setErCustomTrainersForTesting(T as never);
+    globalScene.seed = "RUNSEED";
+    // Density OFF -> without the force nothing would ever spawn.
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 0 });
     resetErCustomTrainerTracking();
     setErDifficulty("ace");
-    const resolved = getErCustomTrainers().find(t => t.key === "SOLO")!;
-    expect(resolved.spawnChance).toBe(100);
-    const roll = rollErCustomTrainerAppearance(globalScene.seed ?? "", resolved);
-    expect(roll.appears).toBe(true);
-    expect(roll.assignedWave).toBeGreaterThanOrEqual(10);
-    expect(roll.assignedWave).toBeLessThanOrEqual(30);
-    const picks = playRun(1, 60).filter(p => p.key === "SOLO");
+    // No force: density 0% fields nothing.
+    expect(playRun(1, 100).length).toBe(0);
+    resetErCustomTrainerTracking();
+    // Arm the dev force: the named trainer spawns at its first eligible wave (25),
+    // regardless of density, and only once (no repeat).
+    setErCustomTrainerDevForce("TARGET");
+    expect(selectErCustomTrainerForWave(24)).toBeNull(); // below minWave -> not eligible yet
+    const picks = playRun(1, 100);
     expect(picks.length).toBe(1);
-    expect(picks[0].wave).toBe(roll.assignedWave);
+    expect(picks[0].key).toBe("TARGET");
+    expect(picks[0].wave).toBe(25);
   });
 
-  it("a failing spawnChance roll is never selected on any wave", () => {
-    const ONE = {
-      FLAKY: {
-        id: 70011,
-        name: "Flaky",
-        trainerClass: "ACE_TRAINER",
-        battleType: "single",
+  // ---- ROUND 9: in-game Dev Scenarios "Custom Trainers" picker --------------
+  // The staff picker force-fields ONE named trainer with the full feature set.
+  // WAVE-ELIGIBILITY DECISION (documented): the picker FORCE-ADJUSTS the run
+  // difficulty (to one the trainer allows) and the launch wave (inside its range,
+  // skipping boss %10 + fixed-battle waves the install seam rejects), and the dev
+  // force BYPASSES the challenge-exclusivity gate (the picker can't start a
+  // challenge run, but the authored party still fields identically). Only a
+  // trainer with NO valid difficulty, or whose whole range is boss/fixed waves,
+  // is cleanly REPORTED (a readable message) instead of a silent wild battle.
+  it("dev force bypasses the challenge gate: a challenge-gated trainer is still force-fielded", () => {
+    const GATED = {
+      GHOSTY: {
+        id: 70090,
+        name: "Ghosty",
+        trainerClass: "PSYCHIC",
         difficulties: ["ace"],
-        minWave: 10,
+        minWave: 25,
         maxWave: 200,
-        endless: false,
-        spawnChance: 30,
+        challenge: "ghost", // only spawns naturally under the Ghost challenge
+        team: [{ species: SpeciesId.HAUNTER }],
+      },
+    };
+    setErCustomTrainersForTesting(GATED as never);
+    globalScene.seed = "RUNSEED";
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 0 }); // density off
+    resetErCustomTrainerTracking();
+    setErDifficulty("ace");
+
+    // No challenge active + density off: the trainer never appears on its own.
+    expect(playRun(1, 200).some(p => p.key === "GHOSTY")).toBe(false);
+    resetErCustomTrainerTracking();
+
+    // Force it: it spawns at its first eligible wave (25) EVEN without the Ghost
+    // challenge active, because the dev force bypasses the challenge gate.
+    setErCustomTrainerDevForce("GHOSTY");
+    expect(selectErCustomTrainerForWave(24)).toBeNull(); // below minWave -> still gated by floor
+    const picks = playRun(1, 100);
+    expect(picks.length).toBe(1);
+    expect(picks[0].key).toBe("GHOSTY");
+    expect(picks[0].wave).toBe(25);
+  });
+
+  it("dev force helpers: arm reports armed, and clear (one-shot) disarms both layers", () => {
+    setErCustomTrainerDevForce(null);
+    expect(isErCustomTrainerDevForceArmed()).toBe(false);
+    expect(getErCustomTrainerDevForce()).toBeNull();
+    setErCustomTrainerDevForce("target"); // normalized to upper-case
+    expect(isErCustomTrainerDevForceArmed()).toBe(true);
+    expect(getErCustomTrainerDevForce()).toBe("TARGET");
+    clearErCustomTrainerDevForce();
+    expect(isErCustomTrainerDevForceArmed()).toBe(false);
+    expect(getErCustomTrainerDevForce()).toBeNull();
+  });
+
+  it("planErCustomTrainerLaunch force-adjusts difficulty + skips boss/fixed waves; reports the ungateable", () => {
+    const PLAN = {
+      HELLGUY: {
+        id: 70091,
+        name: "Hell Guy",
+        trainerClass: "VETERAN",
+        difficulties: ["hell", "elite"], // first authored difficulty is picked
+        minWave: 30,
+        maxWave: 60,
+        team: [{ species: SpeciesId.SNORLAX }, { species: SpeciesId.GENGAR }],
+      },
+      BOSSONLY: {
+        id: 70092,
+        name: "Boss Only",
+        trainerClass: "VETERAN",
+        difficulties: ["ace"],
+        minWave: 40, // a single-wave range on a boss wave (40) -> no eligible wave
+        maxWave: 40,
+        team: [{ species: SpeciesId.SNORLAX }],
+      },
+      NODIFF: {
+        id: 70093,
+        name: "No Diff",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["notreal"], // filtered out -> empty difficulties
+        minWave: 5,
+        maxWave: 20,
         team: [{ species: SpeciesId.PIKACHU }],
       },
     };
-    setErCustomTrainersForTesting(ONE as never);
-    globalScene.seed = "RUNSEED";
-    resetErCustomTrainerTracking();
-    setErDifficulty("ace");
-    const resolved = getErCustomTrainers().find(t => t.key === "FLAKY")!;
-    // For seed "RUNSEED" the roll hashes to 47; 47 >= 30 -> does NOT appear.
-    const roll = rollErCustomTrainerAppearance("RUNSEED", resolved);
-    expect(roll.appears).toBe(false);
-    // Control: the SAME trainer/seed at 100% would appear (proves it's the roll,
-    // not some other gate, that suppresses it).
-    expect(rollErCustomTrainerAppearance("RUNSEED", { ...resolved, spawnChance: 100 }).appears).toBe(true);
-    // End-to-end: never returned by the selector across its whole window.
-    expect(playRun(1, 200).some(p => p.key === "FLAKY")).toBe(false);
+    setErCustomTrainersForTesting(PLAN as never);
+    const byKey = new Map(getErCustomTrainers().map(t => [t.key, t]));
+
+    // Force-adjusts difficulty to the trainer's first, and picks wave 31: minWave
+    // 30 is a boss wave (%10) so it is skipped; 31 is in range, not boss, not fixed.
+    const hell = planErCustomTrainerLaunch(
+      byKey.get("HELLGUY")!,
+      () => false,
+      () => 0,
+    );
+    expect(hell.ok).toBe(true);
+    if (hell.ok) {
+      expect(hell.plan.difficulty).toBe("hell");
+      expect(hell.plan.wave).toBe(31);
+      expect(hell.plan.wave % 10).not.toBe(0);
+    }
+
+    // A whole range that is boss/fixed only -> cleanly reported, not launched.
+    const boss = planErCustomTrainerLaunch(byKey.get("BOSSONLY")!, () => false);
+    expect(boss.ok).toBe(false);
+    if (!boss.ok) {
+      expect(boss.reason).toContain("no non-boss");
+    }
+
+    // Injected fixed-battle predicate is honored: wave 31 marked fixed -> slides to 32.
+    const hellFixed = planErCustomTrainerLaunch(
+      byKey.get("HELLGUY")!,
+      w => w === 30 || w === 31,
+      () => 0,
+    );
+    expect(hellFixed.ok).toBe(true);
+    if (hellFixed.ok) {
+      expect(hellFixed.plan.wave).toBe(32);
+    }
+
+    // No valid difficulty authored -> reported.
+    const nodiff = planErCustomTrainerLaunch(byKey.get("NODIFF")!, () => false);
+    expect(nodiff.ok).toBe(false);
+    if (!nodiff.ok) {
+      expect(nodiff.reason).toContain("difficulty");
+    }
   });
 
-  it("DUE / slide-forward: a rolled-in trainer fires at the first wave >= its assigned wave", () => {
-    const ONE = {
-      SLIDER: {
-        id: 70012,
-        name: "Slider",
+  it("summarizeErCustomTrainer renders name, #id and the first team species (no em dash)", () => {
+    const SUM = {
+      SUMMER: {
+        id: 70094,
+        name: "Summer",
         trainerClass: "ACE_TRAINER",
-        battleType: "single",
         difficulties: ["ace"],
-        minWave: 10,
-        maxWave: 200,
-        endless: false,
-        spawnChance: 100,
-        team: [{ species: SpeciesId.PIKACHU }],
+        team: [
+          { species: SpeciesId.PIKACHU },
+          { species: SpeciesId.SNORLAX },
+          { species: SpeciesId.GENGAR },
+          { species: SpeciesId.HAUNTER }, // 4th -> elided
+        ],
       },
     };
-    setErCustomTrainersForTesting(ONE as never);
-    globalScene.seed = "RUNSEED";
-    resetErCustomTrainerTracking();
-    setErDifficulty("ace");
-    const resolved = getErCustomTrainers().find(t => t.key === "SLIDER")!;
-    const roll = rollErCustomTrainerAppearance("RUNSEED", resolved);
-    expect(roll.appears).toBe(true);
-    const w = roll.assignedWave; // 70 for this seed
-    // Not due before its assigned wave.
-    expect(selectErCustomTrainerForWave(w - 1)).toBeNull();
-    // Simulate the assigned wave itself being EXCLUDED (boss / fixed / mystery):
-    // the selector is simply never called at `w`. The next non-excluded wave
-    // must still return the trainer (slide forward).
-    expect(selectErCustomTrainerForWave(w + 1)?.key).toBe("SLIDER");
-  });
-
-  it("once fielded, a trainer is never returned again that run", () => {
-    const ONE = {
-      SLIDER: {
-        id: 70013,
-        name: "Slider",
-        trainerClass: "ACE_TRAINER",
-        battleType: "single",
-        difficulties: ["ace"],
-        minWave: 10,
-        maxWave: 200,
-        endless: false,
-        spawnChance: 100,
-        team: [{ species: SpeciesId.PIKACHU }],
-      },
-    };
-    setErCustomTrainersForTesting(ONE as never);
-    globalScene.seed = "RUNSEED";
-    resetErCustomTrainerTracking();
-    setErDifficulty("ace");
-    const roll = rollErCustomTrainerAppearance("RUNSEED", getErCustomTrainers().find(t => t.key === "SLIDER")!);
-    const w = roll.assignedWave;
-    const pick = selectErCustomTrainerForWave(w);
-    expect(pick?.key).toBe("SLIDER");
-    markErCustomTrainerUsed(pick!.key);
-    // Never again, on the same wave or any later wave in the window.
-    expect(selectErCustomTrainerForWave(w)).toBeNull();
-    expect(selectErCustomTrainerForWave(w + 10)).toBeNull();
+    setErCustomTrainersForTesting(SUM as never);
+    const trainer = getErCustomTrainers().find(t => t.key === "SUMMER")!;
+    const summary = summarizeErCustomTrainer(trainer, id => `S${id}`);
+    expect(summary).toBe(`Summer #70094: S${SpeciesId.PIKACHU}, S${SpeciesId.SNORLAX}, S${SpeciesId.GENGAR}…`);
+    expect(summary).not.toContain("—"); // staff-facing text: no em dash
   });
 
   it("builds the EXACT authored party (species / level / moveset / ability / fusion)", () => {
@@ -403,6 +773,53 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // Fusion constructed on the enemy side.
     expect(enemy!.isFusion()).toBe(true);
     expect(enemy!.fusionSpecies?.speciesId).toBe(SpeciesId.RAYQUAZA);
+  });
+
+  it("applies Insanity abilities only to the spawned enemy instance", () => {
+    setErCustomTrainersForTesting({
+      INSANITY_TEST: {
+        id: 70007,
+        name: "Insanity Test",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [
+          {
+            species: SpeciesId.SNORLAX,
+            abilitySlot: 0,
+            insanity: {
+              ability: AbilityId.DRIZZLE,
+              innates: [AbilityId.STURDY, AbilityId.MOXIE, AbilityId.SPEED_BOOST],
+            },
+          },
+        ],
+      },
+    } as never);
+    const member = getErCustomTrainers()[0].members[0];
+    const enemy = buildErCustomTrainerMember(member, 0, 50, false)!;
+
+    expect(enemy.getAbility().id).toBe(AbilityId.DRIZZLE);
+    expect(
+      enemy
+        .getPassiveAbilities()
+        .slice(0, 3)
+        .map(ability => ability?.id ?? AbilityId.NONE),
+    ).toEqual([AbilityId.STURDY, AbilityId.MOXIE, AbilityId.SPEED_BOOST]);
+
+    // The shared species/form still reports its original kit. A second spawn of
+    // the same resolved member with Insanity removed also gets that normal kit.
+    const speciesActive = enemy.species.getAbility(enemy.abilityIndex);
+    const speciesInnates = enemy.species.getPassiveAbilities(enemy.formIndex);
+    expect(speciesActive).not.toBe(AbilityId.DRIZZLE);
+    expect(speciesInnates).not.toEqual([AbilityId.STURDY, AbilityId.MOXIE, AbilityId.SPEED_BOOST]);
+
+    const normal = buildErCustomTrainerMember({ ...member, insanity: null }, 1, 50, false)!;
+    expect(normal.getAbility().id).toBe(speciesActive);
+    expect(
+      normal
+        .getPassiveAbilities()
+        .slice(0, 3)
+        .map(ability => ability?.id ?? AbilityId.NONE),
+    ).toEqual(speciesInnates);
   });
 
   it("battleBgm normalizes: valid key kept, garbage/absent -> '' (no override)", () => {
@@ -706,6 +1123,158 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // A plain mon stays non-forced (no erShinyLab stamped).
     const plain = buildErCustomTrainerMember(resolved.members[1], 1, 50, false);
     expect(plain!.customPokemonData.erShinyLab).toBeUndefined();
+  });
+
+  // ---- ROUND 10 / FEATURE 3: challenge VALUE gate ---------------------------
+  it("normalizeChallengeValue keeps a positive int, else null", () => {
+    expect(normalizeChallengeValue(10)).toBe(10);
+    expect(normalizeChallengeValue(1)).toBe(1);
+    expect(normalizeChallengeValue(3.9)).toBe(3); // floored
+    expect(normalizeChallengeValue(0)).toBeNull();
+    expect(normalizeChallengeValue(-2)).toBeNull();
+    expect(normalizeChallengeValue(undefined)).toBeNull();
+    expect(normalizeChallengeValue("10")).toBeNull();
+  });
+
+  it("challengeValue resolves; the gate requires the run's challenge VALUE to match when set", () => {
+    const T = {
+      // Mono-Fire (SINGLE_TYPE value 10 = PokemonType.FIRE + 1): only under a Fire run.
+      FIRE_ONLY: {
+        id: 70060,
+        name: "Fire Only",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 200,
+        challenge: "monotype",
+        challengeValue: 10,
+        team: [{ species: SpeciesId.CHARIZARD }],
+      },
+      // Same challenge, no value: any monotype value qualifies (original behavior).
+      ANY_TYPE: {
+        id: 70061,
+        name: "Any Type",
+        trainerClass: "PSYCHIC",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 200,
+        challenge: "monotype",
+        team: [{ species: SpeciesId.ALAKAZAM }],
+      },
+    };
+    setErCustomTrainersForTesting(T as never);
+    const byKey = new Map(getErCustomTrainers().map(t => [t.key, t]));
+    expect(byKey.get("FIRE_ONLY")!.challengeValue).toBe(10);
+    expect(byKey.get("ANY_TYPE")!.challengeValue).toBeNull();
+
+    globalScene.seed = "CHALLSEED";
+    setErDifficulty("ace");
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 100 });
+
+    // No SINGLE_TYPE challenge active: neither trainer's gate passes.
+    resetErCustomTrainerTracking();
+    expect(playRun(1, 200).length).toBe(0);
+
+    // Run is Mono-WATER (value 11): ANY_TYPE (unset value) qualifies; FIRE_ONLY
+    // (needs value 10) does NOT.
+    globalScene.gameMode.setChallengeValue(Challenges.SINGLE_TYPE, 11);
+    resetErCustomTrainerTracking();
+    const waterKeys = new Set(playRun(1, 200).map(p => p.key));
+    expect(waterKeys.has("ANY_TYPE")).toBe(true);
+    expect(waterKeys.has("FIRE_ONLY")).toBe(false);
+
+    // Run is Mono-FIRE (value 10): FIRE_ONLY now qualifies too.
+    globalScene.gameMode.setChallengeValue(Challenges.SINGLE_TYPE, 10);
+    resetErCustomTrainerTracking();
+    const fireKeys = new Set(playRun(1, 200).map(p => p.key));
+    expect(fireKeys.has("FIRE_ONLY")).toBe(true);
+  });
+
+  // ---- ROUND 10 / FEATURE 6: held-item full catalog -------------------------
+  it("held items: a berry, a type booster and an elemental gem all resolve onto the enemy", () => {
+    // The resolver now handles three families: plain keyed items (gems, fixed
+    // items), the ATTACK_TYPE_BOOSTER family (a generic generator specialized by
+    // PokemonType), and the BERRY family (specialized by BerryType). All three
+    // must field on an authored enemy.
+    const member: ErCustomTrainerMemberResolved = {
+      speciesId: SpeciesId.PIKACHU,
+      formIndex: 0,
+      level: 50,
+      moveIds: [],
+      moveSpecs: [],
+      abilitySlot: 0,
+      fusion: null,
+      heldItemKeys: [
+        { key: "SITRUS_BERRY", count: 1 }, // BERRY family (was unresolvable before)
+        { key: "CHARCOAL", count: 1 }, // ATTACK_TYPE_BOOSTER family (Fire booster)
+        { key: "ER_FIRE_GEM", count: 2 }, // plain ER elemental-gem key (already resolved)
+        { key: "LEFTOVERS", count: 1 }, // plain fixed held item (back-compat)
+      ],
+      shinyLook: null,
+      shinyName: "",
+    };
+    const configs = erCustomTrainerHeldModifierConfigs(member);
+    // All four keys resolve to a held-item modifier (newModifier present).
+    expect(configs.length).toBe(4);
+    for (const c of configs) {
+      expect(typeof (c.modifier as { newModifier?: unknown }).newModifier).toBe("function");
+    }
+    // Counts pass through (the gem authored count 2 is preserved).
+    expect(configs[2].stackCount).toBe(2);
+
+    // A bogus key still resolves to nothing (dropped), and an unknown-but-plausible
+    // berry/booster typo does too (never crashes, never a phantom item).
+    const bogus: ErCustomTrainerMemberResolved = { ...member, heldItemKeys: [{ key: "NOT_A_REAL_ITEM", count: 1 }] };
+    expect(erCustomTrainerHeldModifierConfigs(bogus).length).toBe(0);
+  });
+
+  // ---- ROUND 10 / FEATURE 7: fusion move-pool union (RLA/RLNA) --------------
+  it("RLA/RLNA on a FUSED member draws from the UNION of both species' legal pools", () => {
+    // A base member (Pikachu) vs. the SAME member fused with Machamp. Its 4 RLA
+    // slots resolve from a seeded walk of the legal pool; a fused member's pool is
+    // the UNION of both species, so the fused universe is a strict SUPERSET of the
+    // base-only universe (Machamp contributes Fighting moves Pikachu can't learn).
+    const rlaMember = (fusion: ErCustomTrainerMemberResolved["fusion"]): ErCustomTrainerMemberResolved => ({
+      speciesId: SpeciesId.PIKACHU,
+      formIndex: 0,
+      level: 50,
+      moveIds: [],
+      moveSpecs: [
+        { kind: "token", token: "RLA" },
+        { kind: "token", token: "RLA" },
+        { kind: "token", token: "RLA" },
+        { kind: "token", token: "RLA" },
+      ],
+      abilitySlot: 0,
+      fusion,
+      heldItemKeys: [],
+      shinyLook: null,
+      shinyName: "",
+    });
+    const universe = (member: ErCustomTrainerMemberResolved): Set<number> => {
+      const out = new Set<number>();
+      for (let i = 0; i < 120; i++) {
+        for (const id of resolveErCustomTrainerMoveIds(`SEED${i}`, "FUSEKEY", 0, member)) {
+          out.add(id);
+        }
+      }
+      return out;
+    };
+    const baseOnly = universe(rlaMember(null));
+    const fused = universe(rlaMember({ speciesId: SpeciesId.MACHAMP, formIndex: 0, abilitySlot: 0 }));
+
+    // Every base-reachable move is still reachable when fused (union superset)...
+    for (const id of baseOnly) {
+      expect(fused.has(id)).toBe(true);
+    }
+    // ...and the fusion adds moves the base alone never reaches (strict superset).
+    expect(fused.size).toBeGreaterThan(baseOnly.size);
+
+    // Determinism: the same seed + member yields the identical ordered moveset.
+    const fusedMember = rlaMember({ speciesId: SpeciesId.MACHAMP, formIndex: 0, abilitySlot: 0 });
+    expect(resolveErCustomTrainerMoveIds("SEED7", "FUSEKEY", 0, fusedMember)).toEqual(
+      resolveErCustomTrainerMoveIds("SEED7", "FUSEKEY", 0, fusedMember),
+    );
   });
 
   // ---- FEATURE 1: weighted slot variants -----------------------------------

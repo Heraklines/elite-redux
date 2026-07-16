@@ -22,6 +22,21 @@ export enum ArenaTagType {
   TRICK_ROOM = "TRICK_ROOM",
   /** Elite Redux — Inverse Room: reverses type matchups field-wide for a few turns. */
   INVERSE_ROOM = "INVERSE_ROOM",
+  /**
+   * Elite Redux (move 478 Magic Room): suppresses the effects of ALL held items
+   * on BOTH sides of the field for 5 turns (consulted in
+   * {@linkcode PokemonHeldItemModifier.shouldApply}). Room-style: re-using Magic
+   * Room while it is active ends it. Field-wide.
+   */
+  MAGIC_ROOM = "MAGIC_ROOM",
+  /**
+   * Elite Redux (move 472 Wonder Room): for 5 turns, every Pokemon's Attack and
+   * Sp. Atk are swapped field-wide, and their stat stages ("buffs") are ignored
+   * (the swap reads the RAW base stats). Consulted in
+   * {@linkcode Pokemon.getEffectiveStat}. Room-style: re-using Wonder Room while
+   * it is active ends it. Field-wide.
+   */
+  WONDER_ROOM = "WONDER_ROOM",
   GRAVITY = "GRAVITY",
   REFLECT = "REFLECT",
   LIGHT_SCREEN = "LIGHT_SCREEN",
@@ -64,4 +79,14 @@ export enum ArenaTagType {
    * to {@linkcode WeatherType.NONE}. Field-wide.
    */
   ER_WEATHER_LOCK = "ER_WEATHER_LOCK",
+  /**
+   * Elite Redux — one-use entry trap primitive. Placed on a side (typically the
+   * opposing side, via an entry ability like Spore Bed); the NEXT grounded switch-in
+   * on that side has the trap's configured {@linkcode BattlerTagType} applied to it
+   * (Spore Bed uses {@linkcode BattlerTagType.INFESTATION}), then the trap is spent
+   * (removed at the next turn-end). Reusable: the applied effect is a serialized
+   * field on {@linkcode ErEntryTrapTag}, so different mons can trap with different
+   * effects without a new ArenaTagType.
+   */
+  ER_INFESTATION_TRAP = "ER_INFESTATION_TRAP",
 }

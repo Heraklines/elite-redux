@@ -17,30 +17,74 @@
  *      straight into a configured battle (skips starter-select). Add/adjust the
  *      situations in `scenarios.ts`.
  *
+ *   3. A "Custom Trainers" entry (top of the Dev Scenarios list, under the
+ *      Scenario Builder) — pick any staff-authored custom trainer from
+ *      er-custom-trainers.json and drop straight into a forced battle against it,
+ *      with the full resolved feature set (sprite + gender, aura, battle music,
+ *      intro / victory / defeat lines, weighted-slot + slot-fill rolls, RLA / RLNA
+ *      moves, shiny-lab looks, BST bypass). See the "How staff test custom
+ *      trainers" note below.
+ *
+ * HOW STAFF TEST CUSTOM TRAINERS (the full loop):
+ *   a. Author the trainer in the team-balancing editor and SAVE — that commits the
+ *      entry into er-custom-trainers.json.
+ *   b. A STAGING deploy bakes the updated JSON into the game bundle.
+ *   c. In-game: Title -> Dev Scenarios -> Custom Trainers -> pick the trainer ->
+ *      Fight with random ghost team. The picker randomizes an eligible wave, loads
+ *      a real wave-compatible ghost roster, and restores stored challenges. Empty
+ *      pools/ranges surface Retry/Back instead of a silent unrelated battle.
+ *   d. Production only ships the trainer on the MANUAL prod patch (the dev tools,
+ *      incl. this picker, are dead in prod builds).
+ *
  * Edit freely — none of this ships to players.
  */
 
 import {
   consumePendingDevBattleSetup,
+  consumePendingDevCustomTrainerForce,
   consumePendingDevEnemyParty,
+  consumePendingDevPartySetup,
   consumePendingDevShop,
+  consumePendingDevStarterLevels,
   consumePendingDevStarters,
   type DevMenuCtx,
   registerDevMenu,
   setPendingDevBattleSetup,
+  setPendingDevPartySetup,
   setPendingDevShop,
+  setPendingDevStarterLevels,
   setPendingDevStarters,
 } from "#app/dev-tools/registry";
+import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { formatCoopControlPlane, formatLiveCoopReportCorrelation } from "#data/elite-redux/coop/coop-diagnostics";
 import { DEVLOG_REPLAY_TRACE_MARKER } from "#data/elite-redux/er-bug-report";
+import {
+  type ErCustomTrainerResolved,
+  getErCustomTrainers,
+  setErCustomTrainerDevForce,
+} from "#data/elite-redux/er-custom-trainers";
+import { sampleGhostSnapshots } from "#data/elite-redux/er-ghost-teams";
 import { getReplayTrace } from "#data/elite-redux/replay-recorder";
 import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
 import { formatErBuildIdentity, getErBuildIdentity } from "#utils/build-identity";
 import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { openScenarioBuilder } from "./builder";
-import { DEV_SCENARIOS, type DevScenario, resetDevOverrides } from "./scenarios";
+import {
+  openDevMenuOverlay,
+  pickErCustomTrainerGhost,
+  planErCustomTrainerLaunch,
+  summarizeErCustomTrainer,
+} from "./custom-trainer-picker";
+import {
+  buildErCustomTrainerDevScenario,
+  buildErCustomTrainerTeamScenario,
+  DEV_SCENARIOS,
+  type DevScenario,
+  resetDevOverrides,
+} from "./scenarios";
 
 /** er-editor-api Worker — the remote log sink (commits logs to the dev-logs branch). */
 const REMOTE_LOG_URL = "https://er-editor-api.heraklines.workers.dev/devlog";
@@ -313,9 +357,7 @@ function nextUnpassedScenario(after: DevScenario | null): DevScenario | null {
  * before deferring to openScenarioList.
  */
 function openPickerClean(ctx: DevMenuCtx): void {
-  Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE))
-    .then(() => openScenarioList(ctx))
-    .catch(() => {});
+  openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openScenarioList(ctx));
 }
 
 // Passed scenarios are remembered in localStorage (ordered, most-recent LAST) so
@@ -578,6 +620,12 @@ function launchScenario(ctx: DevMenuCtx, scenario: DevScenario): boolean {
   try {
     const starters = scenario.setup();
     setPendingDevStarters(starters);
+    if (scenario.startingLevels) {
+      setPendingDevStarterLevels(scenario.startingLevels);
+    }
+    if (scenario.onPartyReady) {
+      setPendingDevPartySetup(scenario.onPartyReady);
+    }
     if (scenario.onBattleStart) {
       setPendingDevBattleSetup(scenario.onBattleStart);
     }
@@ -588,7 +636,8 @@ function launchScenario(ctx: DevMenuCtx, scenario: DevScenario): boolean {
     }
     activeScenarioLabel = scenario.label;
     showScenarioBanner(scenario);
-    ctx.startRunWithMode(GameModes.CLASSIC);
+    ctx.startRunWithMode(scenario.gameMode ?? GameModes.CLASSIC);
+    scenario.postLaunch?.();
   } catch (err) {
     // biome-ignore lint/suspicious/noConsole: dev-only diagnostic
     console.error("[dev-tools] scenario launch failed:", err);
@@ -636,6 +685,18 @@ function openScenarioList(ctx: DevMenuCtx): void {
           // mode (otherwise: modeless softlock).
           closeMenu: () => openScenarioList(ctx),
         });
+        return true;
+      },
+    },
+    {
+      // Battle-test a staff-authored CUSTOM TRAINER (er-custom-trainers.json):
+      // pick one from the list and drop straight into a forced battle against it
+      // with the full resolved feature set. Sits directly under the builder.
+      label: "\u{1F464} Custom Trainers",
+      handler: () => {
+        // Opened from INSIDE this OPTION_SELECT: collapse to MESSAGE first, else
+        // setOverlayMode(OPTION_SELECT) is a no-op and the list never shows (#937).
+        openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerList(ctx));
         return true;
       },
     },
@@ -690,6 +751,212 @@ function openScenarioList(ctx: DevMenuCtx): void {
   );
 }
 
+/** Max chars for a custom-trainer picker row (a touch wider than a scenario label
+ * to fit the `Name #id: species` summary; still narrow enough to stay on-screen). */
+const MAX_CUSTOM_TRAINER_LABEL = 44;
+
+/** Truncate a long custom-trainer summary so the sub-list window stays on-screen. */
+function clampCustomTrainerLabel(label: string): string {
+  return label.length > MAX_CUSTOM_TRAINER_LABEL ? `${label.slice(0, MAX_CUSTOM_TRAINER_LABEL - 1)}…` : label;
+}
+
+/**
+ * The CUSTOM TRAINERS sub-list (opened from the "Custom Trainers" entry at the top
+ * of the picker, under the Scenario Builder). One row per RESOLVED authored
+ * trainer (name, #id, first species). Picking one opens a small action menu
+ * (Fight / Use as my team). Empty state shows a single "(no custom trainers
+ * authored yet)" line. Same single-OPTION_SELECT + scroll behavior as the list.
+ */
+function openCustomTrainerList(ctx: DevMenuCtx): void {
+  const trainers = getErCustomTrainers();
+  const options: { label: string; handler: () => boolean }[] = [];
+  if (trainers.length === 0) {
+    options.push({
+      label: "(no custom trainers authored yet)",
+      handler: () => {
+        // A no-op selection just re-opens this list; the tester can then go Back.
+        openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerList(ctx));
+        return true;
+      },
+    });
+  } else {
+    for (const trainer of trainers) {
+      const summary = summarizeErCustomTrainer(trainer, id => getPokemonSpecies(id)?.name ?? `#${id}`);
+      options.push({
+        label: clampCustomTrainerLabel(summary),
+        handler: () => {
+          // Nested OPTION_SELECT -> collapse to MESSAGE first (see openDevMenuOverlay).
+          openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerActions(ctx, trainer));
+          return true;
+        },
+      });
+    }
+  }
+  options.push({
+    // Back to the main scenario picker (keeps a live UI mode - no modeless softlock).
+    label: "Back",
+    handler: () => {
+      openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openScenarioList(ctx));
+      return true;
+    },
+  });
+  const header =
+    trainers.length > 0 ? `Select a custom trainer (${trainers.length})` : "No custom trainers authored yet";
+  globalScene.ui.showText(header, null, () =>
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options, maxOptions: 6 }),
+  );
+}
+
+/**
+ * The per-trainer action menu: FIGHT the trainer (forced battle against it) or USE
+ * AS MY TEAM (drop into a normal battle with the authored party as YOUR team - a
+ * fast way into a fight without hand-picking starters).
+ */
+function openCustomTrainerActions(ctx: DevMenuCtx, trainer: ErCustomTrainerResolved): void {
+  const range = trainer.endless ? `${trainer.minWave}+` : `${trainer.minWave}-${trainer.maxWave}`;
+  const options = [
+    {
+      label: "⚔ Fight with random ghost team",
+      handler: () => {
+        openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => launchCustomTrainer(ctx, trainer));
+        return true;
+      },
+    },
+    {
+      label: "👥 Use as my team",
+      handler: () => {
+        activeShareCode = null;
+        return launchScenario(ctx, buildErCustomTrainerTeamScenario(trainer));
+      },
+    },
+    {
+      label: "Back",
+      handler: () => {
+        openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerList(ctx));
+        return true;
+      },
+    },
+  ];
+  const heading = `${trainer.name} #${trainer.id} | waves ${range} | ${trainer.difficulties.join(", ")}`;
+  globalScene.ui.showText(heading, null, () => globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options }));
+}
+
+/** Only the newest in-flight ghost lookup may change the menu or launch a run. */
+let customTrainerLoadToken = 0;
+const CUSTOM_TRAINER_GHOST_TIMEOUT_MS = 12_000;
+
+async function sampleCustomTrainerGhosts(
+  difficulty: Parameters<typeof sampleGhostSnapshots>[0],
+  wave: number,
+): Promise<Awaited<ReturnType<typeof sampleGhostSnapshots>>> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      sampleGhostSnapshots(difficulty, 20, wave),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error("ghost lookup timed out")), CUSTOM_TRAINER_GHOST_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+/** Loading menu with a real Cancel path; avoids a modeless wait-screen softlock. */
+function showCustomTrainerLoading(
+  ctx: DevMenuCtx,
+  trainer: ErCustomTrainerResolved,
+  wave: number,
+  token: number,
+): void {
+  globalScene.ui.showText(`Finding a real ghost team for wave ${wave}...`, null, () =>
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
+      options: [
+        {
+          label: "Cancel",
+          handler: () => {
+            if (customTrainerLoadToken === token) {
+              customTrainerLoadToken++;
+            }
+            openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerActions(ctx, trainer));
+            return true;
+          },
+        },
+      ],
+    }),
+  );
+}
+
+/** Recoverable lookup/build error with both retry and backward navigation. */
+function showCustomTrainerLaunchError(ctx: DevMenuCtx, trainer: ErCustomTrainerResolved, message: string): void {
+  globalScene.ui.showText(`Can't launch ${trainer.name}: ${message}`, null, () =>
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
+      options: [
+        {
+          label: "Retry (reroll wave + team)",
+          handler: () => {
+            openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => launchCustomTrainer(ctx, trainer));
+            return true;
+          },
+        },
+        {
+          label: "Back",
+          handler: () => {
+            openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerActions(ctx, trainer));
+            return true;
+          },
+        },
+      ],
+    }),
+  );
+}
+
+/**
+ * Prepare and launch a forced battle against `trainer`: random eligible wave,
+ * real wave-compatible ghost party, and stored challenge settings when present.
+ */
+function launchCustomTrainer(ctx: DevMenuCtx, trainer: ErCustomTrainerResolved): void {
+  const mode = getGameMode(GameModes.CLASSIC);
+  const plan = planErCustomTrainerLaunch(trainer, wave => mode.isFixedBattle(wave));
+  if (!plan.ok) {
+    showCustomTrainerLaunchError(ctx, trainer, plan.reason);
+    return;
+  }
+  const token = ++customTrainerLoadToken;
+  showCustomTrainerLoading(ctx, trainer, plan.plan.wave, token);
+  sampleCustomTrainerGhosts(plan.plan.difficulty, plan.plan.wave)
+    .then(snapshots => {
+      if (customTrainerLoadToken !== token) {
+        return;
+      }
+      const picked = pickErCustomTrainerGhost(snapshots, plan.plan.wave, plan.plan.difficulty);
+      if (!picked) {
+        throw new Error(`no legal ghost run reached wave ${plan.plan.wave} within the +40 fairness window`);
+      }
+      const built = buildErCustomTrainerDevScenario(trainer, {
+        plan: plan.plan,
+        ghost: picked.ghost,
+        candidateCount: picked.candidateCount,
+      });
+      if ("error" in built) {
+        throw new Error(built.error);
+      }
+      activeShareCode = null;
+      if (!launchScenario(ctx, built.scenario)) {
+        throw new Error("the prepared run failed to start; retry to rebuild it");
+      }
+    })
+    .catch(error => {
+      if (customTrainerLoadToken !== token) {
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => showCustomTrainerLaunchError(ctx, trainer, message));
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Boot: register everything on import.
 // ---------------------------------------------------------------------------
@@ -709,13 +976,22 @@ registerDevMenu(ctx => {
   // "new game dropped me into the old scenario save at Lv50".
   resetDevOverrides();
   consumePendingDevStarters();
+  consumePendingDevStarterLevels();
+  consumePendingDevPartySetup();
   consumePendingDevBattleSetup();
   consumePendingDevShop();
   consumePendingDevEnemyParty();
+  consumePendingDevCustomTrainerForce();
   scenarioBanner?.remove();
   scenarioBanner = null;
   activeScenarioLabel = null;
   activeShareCode = null;
+  // Invalidate any ghost lookup whose loading menu was abandoned by a title reset.
+  customTrainerLoadToken++;
+  // Clear any armed custom-trainer dev force so a picked-but-not-fought trainer (or
+  // one whose battle is over) never leaks into a NORMAL run started from the title.
+  // A fought forced trainer already self-clears on install; this covers backing out.
+  setErCustomTrainerDevForce(null);
   // Fast-iteration handoff: if the banner's Reset / Next / Pick button tore the
   // run down (teardownThen), run the staged action now that we have a FRESH
   // title launch ctx. Deferred so the title menu is fully built first; this is

@@ -66,6 +66,7 @@ const ER_STATUS_BADGES: Record<string, { label: string; color: string }> = {
   bleed: { label: "BLEED", color: "#ff5555" },
   frostbite: { label: "FROST", color: "#8fe0ff" },
   fear: { label: "FEAR", color: "#c98bff" },
+  commanded: { label: "CMND", color: "#ffd166" },
 };
 
 export abstract class BattleInfo extends Phaser.GameObjects.Container {
@@ -129,6 +130,11 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected type1Icon: Phaser.GameObjects.Sprite;
   protected type2Icon: Phaser.GameObjects.Sprite;
   protected type3Icon: Phaser.GameObjects.Sprite;
+  /**
+   * ER N-type substrate: icons for a 4th+ type (some holders are sextuple-typed).
+   * Created lazily so a mon with ≤3 types renders byte-identically to before.
+   */
+  protected extraTypeIcons: Phaser.GameObjects.Sprite[] = [];
   protected expBar: Phaser.GameObjects.Image;
 
   public expMaskRect: Phaser.GameObjects.Graphics;
@@ -550,6 +556,8 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
         frame = "frostbite";
       } else if (pokemon.getTag(BattlerTagType.ER_FEAR)) {
         frame = "fear";
+      } else if (pokemon.getTag(BattlerTagType.ER_COMMANDED)) {
+        frame = "commanded";
       }
     }
 
@@ -638,8 +646,9 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
    * Update the type icons to match the pokemon's types
    */
   setTypes(types: PokemonType[]): void {
+    const key = `pbinfo_${this.player ? "player" : "enemy"}`;
     this.type1Icon
-      .setTexture(`pbinfo_${this.player ? "player" : "enemy"}_type${types.length > 1 ? "1" : ""}`)
+      .setTexture(`${key}_type${types.length > 1 ? "1" : ""}`)
       .setFrame(PokemonType[types[0]].toLowerCase());
     this.type2Icon.setVisible(types.length > 1);
     this.type3Icon.setVisible(types.length > 2);
@@ -648,6 +657,35 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
     }
     if (types.length > 2) {
       this.type3Icon.setFrame(PokemonType[types[2]].toLowerCase());
+    }
+    // ER N-type substrate (maintainer paired-column layout): types 4..N pair into
+    // VERTICAL COLUMNS advancing along the type3->type1 axis, mirroring the game's
+    // own dual-type pair repeated. type1/type2 are column 0 (top/bottom); type3 is
+    // the TOP of column 1, type4 its BOTTOM, type5 the top of column 2, etc. So a
+    // six/seven-type mon shows compact columns beside the name instead of a long
+    // horizontal row crowding the name plate / covering the sprite. Icons pooled
+    // per slot. (1-3 types keep the existing placement - type3Icon at column-1 top.)
+    const colDx = this.type3Icon.x - this.type1Icon.x;
+    const rowTopY = this.type1Icon.y;
+    const rowBottomY = this.type2Icon.y;
+    for (let i = 3; i < types.length; i++) {
+      let icon = this.extraTypeIcons[i - 3];
+      if (!icon) {
+        icon = globalScene.add
+          .sprite(0, 0, `${key}_type`)
+          .setName(`icon_type_${i + 1}`)
+          .setOrigin(0);
+        this.extraTypeIcons[i - 3] = icon;
+        this.add(icon);
+      }
+      const column = Math.floor(i / 2);
+      const row = i % 2;
+      icon.setPosition(this.type1Icon.x + colDx * column, row === 0 ? rowTopY : rowBottomY);
+      icon.setFrame(PokemonType[types[i]].toLowerCase());
+      icon.setVisible(true);
+    }
+    for (let i = Math.max(0, types.length - 3); i < this.extraTypeIcons.length; i++) {
+      this.extraTypeIcons[i].setVisible(false);
     }
   }
 

@@ -155,6 +155,14 @@ export function erTryApplyGem(
   if (damage.value <= 0) {
     return;
   }
+  // Foe item-use suppression (Unnerve 127, As-One 266/267 — anything carrying
+  // PreventItemUseAbAttr): a Pokemon whose opponent suppresses held-item use may
+  // not consume its elemental Gem. Same gate the ER reactive-item consume path
+  // uses (er-reactive-items.ts). Applies to simulated calcs too, so the AI does
+  // not "see" a Gem boost that will not fire.
+  if (source.getOpponents().some(opp => opp.hasAbilityWithAttr("PreventItemUseAbAttr"))) {
+    return;
+  }
   const gem = source
     .getHeldItems()
     .find((m): m is ErGemModifier => m instanceof ErGemModifier && m.gemType === moveType);

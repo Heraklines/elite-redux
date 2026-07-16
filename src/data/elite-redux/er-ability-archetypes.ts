@@ -100,7 +100,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   297: { erAbilityId: 297, archetype: "bespoke", params: null },
   298: { erAbilityId: 298, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"GROUND"}} },
   299: { erAbilityId: 299, archetype: "bespoke", params: null },
-  300: { erAbilityId: 300, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"FIGHTING","multiplier":1.2} },
+  300: { erAbilityId: 300, archetype: "bespoke", params: null }, // Fighting Spirit: Normal→Fighting + conditional Fighting STAB / screen-break (dispatchBespoke, mirrors Tectonize 308 / Qigong 762)
   301: { erAbilityId: 301, archetype: "bespoke", params: null },
   302: { erAbilityId: 302, archetype: "bespoke", params: null },
   303: { erAbilityId: 303, archetype: "bespoke", params: null }, // Fossilized: Rock +20% offense AND halves Rock dmg taken (composite — see dispatchBespoke)
@@ -182,7 +182,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   376: { erAbilityId: 376, archetype: "bespoke", params: null },
   377: { erAbilityId: 377, archetype: "bespoke", params: null },
   378: { erAbilityId: 378, archetype: "bespoke", params: null },
-  379: { erAbilityId: 379, archetype: "type-resist-or-absorb", params: {"type":"ICE","effect":{"kind":"absorb","redirect":true,"statBoost":{"stat":"ATK","stages":1}}} },
+  379: { erAbilityId: 379, archetype: "type-resist-or-absorb", params: {"type":"ICE","effect":{"kind":"absorb","redirect":true,"statBoost":{"highestAttack":true,"stages":1}}} }, // Ice Dew: Ice absorb boosts HIGHEST attacking stat (ATK vs SpAtk), not fixed ATK — mirror Heat Sink 865
   380: { erAbilityId: 380, archetype: "bespoke", params: null },
   381: { erAbilityId: 381, archetype: "bespoke", params: null },
   382: { erAbilityId: 382, archetype: "bespoke", params: null },

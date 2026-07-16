@@ -45,6 +45,7 @@ import { PokedexMonContainer } from "#ui/pokedex-mon-container";
 import { PokemonIconAnimHelper, PokemonIconAnimMode } from "#ui/pokemon-icon-anim-helper";
 import { ScrollBar } from "#ui/scroll-bar";
 import { addTextObject, getTextColor } from "#ui/text";
+import { layoutTypeIconStrip, speciesFormTypes } from "#ui/type-icon-strip";
 import { addWindow } from "#ui/ui-theme";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
 import { BooleanHolder, fixedInt, getLocalizedSpriteKey, padInt, randIntRange } from "#utils/common";
@@ -242,6 +243,8 @@ export class PokedexUiHandler extends MessageUiHandler {
   private pokemonFormText: Phaser.GameObjects.Text;
   private type1Icon: Phaser.GameObjects.Sprite;
   private type2Icon: Phaser.GameObjects.Sprite;
+  /** Pooled badges for types 3..N (ER N-type substrate). */
+  private extraTypeIcons: Phaser.GameObjects.Sprite[] = [];
 
   private starterSelectMessageBox: Phaser.GameObjects.NineSlice;
   private starterSelectMessageBoxContainer: Phaser.GameObjects.Container;
@@ -2291,7 +2294,7 @@ export class PokedexUiHandler extends MessageUiHandler {
         this.startIconAnimation(this.cursor);
 
         const speciesForm = getPokemonSpeciesForm(species.speciesId, 0);
-        this.setTypeIcons(speciesForm.type1, speciesForm.type2);
+        this.setTypeIcons(speciesFormTypes(speciesForm));
 
         this.setSpeciesDetails(species, {});
 
@@ -2421,9 +2424,9 @@ export class PokedexUiHandler extends MessageUiHandler {
 
       if (isFormCaught || isFormSeen || globalScene.dexForDevs) {
         const speciesForm = getPokemonSpeciesForm(species.speciesId, formIndex ?? 0); // TODO: always selecting the first form
-        this.setTypeIcons(speciesForm.type1, speciesForm.type2);
+        this.setTypeIcons(speciesFormTypes(speciesForm));
       } else {
-        this.setTypeIcons(null, null);
+        this.setTypeIcons([]);
       }
 
       if (species?.forms?.filter(f => !f.isUnobtainable).length > 1) {
@@ -2438,23 +2441,18 @@ export class PokedexUiHandler extends MessageUiHandler {
         this.canShowFormTray = false;
       }
     } else {
-      this.setTypeIcons(null, null);
+      this.setTypeIcons([]);
     }
   }
 
-  setTypeIcons(type1: PokemonType | null, type2: PokemonType | null): void {
-    if (type1 === null) {
-      this.type1Icon.setVisible(false);
-    } else {
-      this.type1Icon.setVisible(true);
-      this.type1Icon.setFrame(PokemonType[type1].toLowerCase());
-    }
-    if (type2 === null) {
-      this.type2Icon.setVisible(false);
-    } else {
-      this.type2Icon.setVisible(true);
-      this.type2Icon.setFrame(PokemonType[type2].toLowerCase());
-    }
+  setTypeIcons(types: readonly PokemonType[]): void {
+    layoutTypeIconStrip(this.starterSelectContainer, this.type1Icon, this.type2Icon, this.extraTypeIcons, types, {
+      x0: 10,
+      y0: 158,
+      baseScale: 0.5,
+      baseStride: 18,
+      maxWidth: 104,
+    });
   }
 
   updateStarterValueLabel(starter: PokedexMonContainer): void {

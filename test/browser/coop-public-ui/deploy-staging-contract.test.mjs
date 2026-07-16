@@ -11,7 +11,10 @@ function requiredOffset(fragment) {
 }
 
 test("staging promotes one verified browser/Worker contract without cancellable skew", () => {
-  assert.match(workflow, /^\s*group:\s*deploy-staging\s*$/mu);
+  assert.match(
+    workflow,
+    /^\s*group:\s*\$\{\{ inputs\.operation == 'import_music' && 'er-youtube-bgm-import' \|\| 'deploy-staging' \}\}\s*$/mu,
+  );
   assert.match(workflow, /^\s*cancel-in-progress:\s*false\s*$/mu);
 
   const build = requiredOffset("- name: Build standalone bundle");

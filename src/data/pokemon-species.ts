@@ -12,6 +12,7 @@ import {
   pokemonSpeciesLevelMoves,
 } from "#balance/pokemon-level-moves";
 import { speciesStarterCosts } from "#balance/starters";
+import { applyErAtlasFrameRate } from "#data/elite-redux/er-sprite-anim";
 import type { GrowthRate } from "#data/exp";
 import { Gender } from "#data/gender";
 import { AbilityId } from "#enums/ability-id";
@@ -182,7 +183,11 @@ export abstract class PokemonSpeciesForm {
   }
 
   isOfType(type: number): boolean {
-    return this.type1 === type || (this.type2 !== null && this.type2 === type);
+    return (
+      this.type1 === type
+      || (this.type2 !== null && this.type2 === type)
+      || (this._extraTypes !== null && this._extraTypes.includes(type))
+    );
   }
 
   /**
@@ -340,6 +345,50 @@ export abstract class PokemonSpeciesForm {
     const mut = this as unknown as { type1: PokemonType; type2: PokemonType | null };
     mut.type1 = type1;
     mut.type2 = type2;
+  }
+
+  /**
+   * ER N-type static model (newcomer-patch fakemon forms). Additional STATIC
+   * types beyond `type1`/`type2` for species/forms that are natively 3+ types
+   * (Mega Parasect = Bug/Grass/Ghost, Primal Regigigas = six types, ...). Kept
+   * as an additive array so `type1`/`type2` stay 100% backward-compatible: every
+   * consumer that reads only the first two types keeps working, and consumers
+   * that want the FULL static typing call {@linkcode getExtraTypes} (or, on a
+   * live Pokemon, {@linkcode Pokemon.getTypes} which folds these in). Null =
+   * legacy 2-type species (the overwhelming majority). This deliberately mirrors
+   * the additive `_passives` triple model above. */
+  protected _extraTypes: readonly PokemonType[] | null = null;
+
+  /**
+   * Install the STATIC extra-type set (types 3..N) for this species form. Pass
+   * an empty array or omit to clear it. Duplicates of `type1`/`type2` and
+   * repeated entries are dropped so `getExtraTypes()` never double-counts.
+   *
+   * @param extraTypes - The additional static types (beyond type1/type2).
+   */
+  setExtraTypes(extraTypes: readonly PokemonType[]): void {
+    const seen = new Set<PokemonType>([this.type1]);
+    if (this.type2 !== null) {
+      seen.add(this.type2);
+    }
+    const cleaned: PokemonType[] = [];
+    for (const t of extraTypes) {
+      if (!seen.has(t)) {
+        seen.add(t);
+        cleaned.push(t);
+      }
+    }
+    this._extraTypes = cleaned.length > 0 ? cleaned : null;
+  }
+
+  /** The STATIC extra types (types 3..N) for this form, or `[]` when 2-type. */
+  getExtraTypes(): readonly PokemonType[] {
+    return this._extraTypes ?? [];
+  }
+
+  /** Whether this form carries a STATIC third-or-later type. */
+  hasExtraTypes(): boolean {
+    return this._extraTypes !== null && this._extraTypes.length > 0;
   }
 
   /**
@@ -577,6 +626,16 @@ export abstract class PokemonSpeciesForm {
       return form;
     }
     return;
+  }
+
+  /**
+   * Display-scale MULTIPLIER applied to this species/form's menu icon on top of a
+   * surface's base icon scale. `1` for every vanilla species. ER-custom species
+   * whose icon is derived from the (larger) front sprite override this so the icon
+   * ends up the same on-screen size as a bespoke icon frame.
+   */
+  getIconScale(_formIndex?: number): number {
+    return 1;
   }
 
   getIconAtlasKey(formIndex?: number, shiny?: boolean, variant?: number): string {
@@ -865,6 +924,9 @@ export abstract class PokemonSpeciesForm {
           repeat: -1,
         });
       }
+      // ER: a multi-frame custom atlas may carry its own authored cadence (e.g. a
+      // baked GIF at 116.7 ms/frame); honour it. No-op for vanilla/single-frame.
+      applyErAtlasFrameRate(scene.anims, spriteKey, scene.textures.get(spriteKey)?.customData);
     };
 
     const finalize = async (): Promise<void> => {
@@ -1233,6 +1295,12 @@ export class PokemonSpecies extends PokemonSpeciesForm implements Localizable {
    */
   getFormNameToDisplay(formIndex = 0, append = false): string {
     const formKey = this.forms[formIndex]?.formKey ?? "";
+    // A formless base form (empty formKey) has NO form label. Without this guard a
+    // formless ER custom (e.g. Regitube 70004) falls through to the regional-form
+    // branch below and leaks the raw i18n key "regionalForm." onto the info panel.
+    if (formKey === "") {
+      return "";
+    }
     const formText = toPascalCase(formKey);
     // ER customs (id >= 10000) aren't in the SpeciesId enum, so SpeciesId[id]
     // is undefined and toCamelCase(undefined) crashes (.trim of undefined),

@@ -13,6 +13,12 @@ deploy. Four tabs:
 | 🎛 Game | 62 validated balance knobs (shiny/candy/eggs/money/curves...) | `src/data/elite-redux/er-balance-tuning.json` |
 | ➕ Add a Mon | whole new species: stats, types, abilities, moves, cost - plus a sprite studio that generates tier-2/3 shinies by hue rotation from an uploaded front/back | `src/data/elite-redux/er-custom-mons.json` + sprites committed to `Heraklines/er-assets` |
 
+The **Assets** tab imports YouTube videos or playlists into the battle-music
+catalog and uploads reusable trainer sprites. Music metadata is stored in
+`editor/data/bgm.json`; trainer-sprite metadata is stored in
+`src/data/elite-redux/er-custom-trainer-sprites.json`; binary media is committed
+to `Heraklines/er-assets`.
+
 How it fits together:
 
 ```
@@ -84,6 +90,12 @@ In the GitHub repo → **Settings → Secrets and variables → Actions**:
 - Secret `CLOUDFLARE_ACCOUNT_ID` — your Cloudflare account id
 - Variable `STAGING_SERVER_URL` — the staging save API base
 
+- Secret `ER_ASSETS_TOKEN` - fine-grained PAT with Contents read/write on
+  `Heraklines/er-assets` for the media-import runner
+- Optional secret `YOUTUBE_API_KEY` - improves Creative Commons versus standard
+  YouTube license detection. Imports remain marked `unknown` when neither the
+  API nor page metadata exposes a license.
+
 The workflow lives at `.github/workflows/deploy-staging.yml` and deploys to the
 `elite-redux-staging` Pages project.
 
@@ -124,6 +136,13 @@ the team.
    - **Save** — commits to the branch (applies on the next deploy), or
    - **Commit & Deploy** — commits *and* rebuilds the staging site (live in a
      few minutes). With no pending edits, this just redeploys current.
+
+On the **Assets** tab, playlist videos become separate tracks. Long videos split
+on YouTube chapters or timestamp lists in the description; a mix without either
+remains one track and is marked for manual splitting. Each imported track records
+its source, attribution text, and detected license. Trainer images are converted
+to transparent, tightly cropped PNG atlases before upload, then become selectable
+without changing the trainer's gameplay class.
 
 ## Notes / future
 
