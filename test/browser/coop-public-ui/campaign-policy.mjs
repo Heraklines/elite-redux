@@ -104,7 +104,7 @@ function envKeys(name, fallback) {
 const allowedRewardModes = new Set(["leave", "pick-first"]);
 const allowedMarketModes = new Set(["leave", "target-held"]);
 const allowedModes = new Set(["gating", "shakedown", "nightly"]);
-const allowedRenderProfiles = new Set(["animations-on-surface", "animations-skipped-depth"]);
+const allowedRenderProfiles = new Set(["animations-on-surface", "animations-skipped-depth", "mystery-gauntlet"]);
 
 /** Read every campaign-only knob (base gameplay config still comes from loadConfig). */
 export function loadCampaignPolicy() {
@@ -138,9 +138,21 @@ export function loadCampaignPolicy() {
   if (!/^[A-Z0-9_]+$/u.test(marketTargetId)) {
     throw new Error("COOP_UI_MARKET_TARGET_ID must be a stable uppercase modifier id");
   }
+  const targetWaves = envInteger("COOP_UI_CAMPAIGN_WAVES", 30);
+  const mysteryRequired = envBoolean("COOP_UI_REQUIRE_MYSTERY_GAUNTLET", false);
   return {
     mode,
-    targetWaves: envInteger("COOP_UI_CAMPAIGN_WAVES", 30),
+    targetWaves,
+    // A Mystery option may insert a battle without advancing its game-wave address. Keep actual
+    // wave coverage separate from this finite runaway guard so ten waves are not capped at ten battles.
+    maxBattleLoops: envInteger(
+      "COOP_UI_MAX_BATTLE_LOOPS",
+      mysteryRequired ? Math.max(30, targetWaves * 3) : targetWaves,
+    ),
+    mysteryGauntlet: {
+      required: mysteryRequired,
+      minSurfaces: envInteger("COOP_UI_MYSTERY_MIN_SURFACES", 6),
+    },
     // Press-through of an UNKNOWN interactive surface, mirroring the headless `--auto-first`.
     // Gated to shakedown mode above; a gating/nightly run always loud-fails on the unknown.
     autoFirst: autoFirstRequested && mode === "shakedown",
@@ -215,6 +227,9 @@ export function loadCampaignPolicy() {
       crossroads: envKeys("COOP_UI_CROSSROADS_KEYS", ["Space"]),
       // Mystery encounter: first safe option (top-left of the 2x2 grid), then advance.
       mystery: envKeys("COOP_UI_MYSTERY_KEYS", ["Space"]),
+      // The ten-wave continuity profile proves Bargain ownership + terminal convergence by visibly
+      // declining the offer. Accepting a Sin opens deeper party/ability surfaces covered elsewhere.
+      bargainLeave: envKeys("COOP_UI_BARGAIN_LEAVE_KEYS", ["Backspace"]),
       // Learn-move prompt: decline (keep the current moveset).
       learnMove: envKeys("COOP_UI_LEARN_MOVE_KEYS", ["Backspace"]),
       // Egg hatch: let it run / dismiss the summary.
@@ -284,6 +299,38 @@ export function buildDispatchTable(policy) {
       // Owner derived from the v2 mirror's ownerSeat, never assumed from rig.host; the ME
       // host-owner console marker is the fallback when the v2 mirror is absent.
       v2SurfaceId: "mystery-encounter",
+      owner: { marker: ME_HOST_OWNER },
+      keys: policy.keys.mystery,
+    },
+    {
+      name: "mystery-subprompt",
+      phase: MYSTERY_PHASE,
+      present: MYSTERY_PHASE,
+      v2SurfaceId: "mystery-encounter:prompt",
+      owner: { marker: ME_HOST_OWNER },
+      keys: policy.keys.mystery,
+    },
+    {
+      name: "mystery-quiz",
+      phase: MYSTERY_PHASE,
+      present: MYSTERY_PHASE,
+      v2SurfaceId: "quiz",
+      owner: { marker: ME_HOST_OWNER },
+      keys: policy.keys.mystery,
+    },
+    {
+      name: "mystery-bargain",
+      phase: MYSTERY_PHASE,
+      present: MYSTERY_PHASE,
+      v2SurfaceId: "bargain",
+      owner: { marker: ME_HOST_OWNER },
+      keys: policy.keys.bargainLeave,
+    },
+    {
+      name: "mystery-colosseum",
+      phase: MYSTERY_PHASE,
+      present: MYSTERY_PHASE,
+      v2SurfaceId: "colosseum",
       owner: { marker: ME_HOST_OWNER },
       keys: policy.keys.mystery,
     },

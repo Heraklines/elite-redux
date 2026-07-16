@@ -388,6 +388,9 @@ function comparableSurfaceObservation(observation) {
     uiMode: observation.uiMode,
     uiActive: observation.uiActive,
     stateDigest: observation.stateDigest,
+    battleType: observation.battleType,
+    trainerBoss: observation.trainerBoss,
+    maxBossSegments: observation.maxBossSegments,
   };
 }
 
@@ -1682,18 +1685,42 @@ export class DuoPublicUiRig {
       timeoutMs: this.config.timeoutMs,
     });
     await this.host.checkpoint("difficulty-select-open");
-    const runConfigCursor = this.host.evidence.cursor();
+    const runConfigCursors = Object.fromEntries(
+      Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
+    );
     await selectOptionById(this.host, {
       surfaceId: "option-select:SelectStarterPhase",
-      targetId: "ace",
+      targetId: this.config.difficultyId,
       navKeys: ["ArrowUp", "ArrowDown"],
       timeoutMs: this.config.timeoutMs,
     });
-    await this.host.evidence.waitFor(/\[coop-runconfig\] startRun role=host willBroadcast=true difficulty=/u, {
-      from: runConfigCursor,
-      timeoutMs: this.config.timeoutMs,
-      description: "host authoritative difficulty/runConfig broadcast",
-    });
+    await Promise.all([
+      this.host.evidence.waitFor(
+        new RegExp(
+          `\\[coop-runconfig\\] startRun role=host willBroadcast=true difficulty=${this.config.difficultyId}(?:\\s|$)`,
+          "u",
+        ),
+        {
+          from: runConfigCursors[this.host.label],
+          timeoutMs: this.config.timeoutMs,
+          description: `host authoritative runConfig difficulty=${this.config.difficultyId}`,
+        },
+      ),
+      this.guest.evidence.waitFor(
+        new RegExp(
+          `guest received difficulty=${this.config.difficultyId} netcode=authoritative kind=coop(?:\\s|$)`,
+          "u",
+        ),
+        {
+          from: runConfigCursors[this.guest.label],
+          timeoutMs: this.config.timeoutMs,
+          description: `guest adopted authoritative runConfig difficulty=${this.config.difficultyId}`,
+        },
+      ),
+    ]);
+    await Promise.all(
+      Object.values(this.clients).map(client => client.checkpoint(`difficulty-${this.config.difficultyId}-attested`)),
+    );
     await Promise.all(
       Object.values(this.clients).map(client =>
         client.evidence.waitFor(/local team locked in:/u, {

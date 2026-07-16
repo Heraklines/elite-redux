@@ -142,6 +142,10 @@ function continuationSurfaceView(text) {
     || typeof value.stateDigest !== "string"
     || !/^[0-9a-f]{16}$/iu.test(value.stateDigest)
     || value.stateDigest === CHECKSUM_SENTINEL
+    || !["WILD", "TRAINER", "MYSTERY_ENCOUNTER"].includes(value.battleType)
+    || typeof value.trainerBoss !== "boolean"
+    || !Number.isSafeInteger(value.maxBossSegments)
+    || value.maxBossSegments < 0
   ) {
     throw new Error("built browser emitted an invalid continuation observation");
   }

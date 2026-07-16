@@ -17,6 +17,7 @@ const [
   { canonicalize, fnv1a64 },
   { getCoopRuntime },
   { BattlerTagType },
+  { BattleType },
   { Command },
   { MoveId },
   { PokemonModifierType },
@@ -28,6 +29,7 @@ const [
   import("../src/data/elite-redux/coop/coop-battle-checksum"),
   import("../src/data/elite-redux/coop/coop-runtime"),
   import("../src/enums/battler-tag-type"),
+  import("../src/enums/battle-type"),
   import("../src/enums/command"),
   import("../src/enums/move-id"),
   import("../src/modifier/modifier-type"),
@@ -51,6 +53,9 @@ interface CoopBrowserSurfaceObservationV1 {
   readonly uiMode: string;
   readonly uiActive: true;
   readonly stateDigest: string;
+  readonly battleType: string;
+  readonly trainerBoss: boolean;
+  readonly maxBossSegments: number;
 }
 
 const SURFACE_PREFIX = "[coop-browser:surface] ";
@@ -317,6 +322,9 @@ function observeContinuationSurface(): void {
       uiMode,
       uiActive: true,
       stateDigest,
+      battleType: BattleType[battle.battleType],
+      trainerBoss: battle.trainer?.config.isBoss === true,
+      maxBossSegments: Math.max(0, ...globalScene.getEnemyParty().map(pokemon => pokemon.bossSegments ?? 0)),
     };
     console.info(`${SURFACE_PREFIX}${JSON.stringify(observation)}`);
   } catch (error) {
@@ -348,7 +356,10 @@ interface SemanticSurface {
 /** Map (phase, uiMode) to a stable semantic surfaceId + operation class + ownership model. */
 function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface | null {
   const inMe =
-    phase.startsWith("MysteryEncounter") || phase === "PostMysteryEncounterPhase" || phase === "CoopReplayMePhase";
+    phase.startsWith("MysteryEncounter")
+    || phase === "PostMysteryEncounterPhase"
+    || phase === "CoopReplayMePhase"
+    || phase === "TheBargainPhase";
   switch (uiMode) {
     case "COMMAND":
     case "FIGHT":

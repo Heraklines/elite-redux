@@ -68,6 +68,7 @@ const allowedJourneys = new Set([
 ]);
 const allowedSeats = new Set(["host-seat", "guest-seat"]);
 const allowedAccountModes = new Set(["login", "register"]);
+const allowedDifficulties = new Set(["youngster", "ace", "elite", "hell", "mystery"]);
 const defaultCoopChallengeKeys = [...Array.from({ length: 10 }, () => "ArrowDown"), "ArrowRight", "Space", "Space"];
 
 export function loadConfig() {
@@ -85,6 +86,7 @@ export function loadConfig() {
   const faintOwnerSeat = process.env.COOP_UI_FAINT_OWNER_SEAT?.trim() || "guest-seat";
   const commanderOwnerSeat = process.env.COOP_UI_COMMANDER_OWNER_SEAT?.trim() || "host-seat";
   const accountMode = process.env.COOP_UI_ACCOUNT_MODE?.trim() || "login";
+  const difficultyId = process.env.COOP_UI_DIFFICULTY_ID?.trim() || "ace";
   if (!allowedSeats.has(requesterSeat)) {
     throw new Error(`COOP_UI_REQUESTER_SEAT must be one of ${[...allowedSeats].join(", ")}`);
   }
@@ -96,6 +98,9 @@ export function loadConfig() {
   }
   if (!allowedAccountModes.has(accountMode)) {
     throw new Error(`COOP_UI_ACCOUNT_MODE must be one of ${[...allowedAccountModes].join(", ")}`);
+  }
+  if (!allowedDifficulties.has(difficultyId)) {
+    throw new Error(`COOP_UI_DIFFICULTY_ID must be one of ${[...allowedDifficulties].join(", ")}`);
   }
 
   return {
@@ -155,6 +160,7 @@ export function loadConfig() {
     faintOwnerSeat,
     commanderOwnerSeat,
     accountMode,
+    difficultyId,
     allowedConsoleErrors: (process.env.COOP_UI_ALLOWED_CONSOLE_ERRORS ?? "")
       .split("||")
       .map(value => value.trim())
