@@ -2,7 +2,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { initializeGame } from "#app/init/init";
 import { SceneBase } from "#app/scene-base";
 import { isMobile } from "#app/touch-controls";
-import { ER_NEWCOMER_ICON_SLUGS } from "#data/elite-redux/er-newcomer-species";
+import { ER_NEWCOMER_FRONT_ICON_SLUGS, ER_NEWCOMER_ICON_SLUGS } from "#data/elite-redux/er-newcomer-species";
 import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import { BiomeId } from "#enums/biome-id";
 import { GachaType } from "#enums/gacha-types";
@@ -766,7 +766,11 @@ export class LoadingScene extends SceneBase {
     // title-screen surfaces (save-slot preview, party) render their mini icon
     // instead of an error box (live tester report; same class as #308).
     for (const slug of ER_NEWCOMER_ICON_SLUGS) {
-      this.loadAtlas(`er_icon__${slug}`, `pokemon/elite-redux/${slug}`, "icon");
+      // Icon-from-front species (Regitube) load their FRONT atlas under the icon
+      // key so the icon never depends on a bespoke icon.png (which may lack the
+      // 0001.png frame). The species-level getIconScale downscales it on display.
+      const file = ER_NEWCOMER_FRONT_ICON_SLUGS.has(slug) ? "front" : "icon";
+      this.loadAtlas(`er_icon__${slug}`, `pokemon/elite-redux/${slug}`, file);
     }
   }
 }

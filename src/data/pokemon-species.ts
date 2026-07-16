@@ -628,6 +628,16 @@ export abstract class PokemonSpeciesForm {
     return;
   }
 
+  /**
+   * Display-scale MULTIPLIER applied to this species/form's menu icon on top of a
+   * surface's base icon scale. `1` for every vanilla species. ER-custom species
+   * whose icon is derived from the (larger) front sprite override this so the icon
+   * ends up the same on-screen size as a bespoke icon frame.
+   */
+  getIconScale(_formIndex?: number): number {
+    return 1;
+  }
+
   getIconAtlasKey(formIndex?: number, shiny?: boolean, variant?: number): string {
     const erForm = this.getErRedirectedForm(formIndex);
     if (erForm) {

@@ -225,7 +225,7 @@ function mapGenderRatio(erGender: number): number | null {
  * The display name is stored on the prototype (via the constructor) before
  * the base-class `localize()` call clobbers it; we restore it afterwards.
  */
-class ErCustomSpecies extends PokemonSpecies {
+export class ErCustomSpecies extends PokemonSpecies {
   /** Fallback display name from the ER draft (set pre-construction). */
   private static readonly _draftNames = new Map<number, string>();
   /** Pokerogue speciesId → ER sprite slug (e.g. 10000 → "phantowl"). */
@@ -293,6 +293,39 @@ class ErCustomSpecies extends PokemonSpecies {
   /** Alias a custom species' sprites/icon to a VANILLA base species (no bespoke art). */
   static registerSpriteAlias(id: number, baseSpeciesId: number): void {
     ErCustomSpecies._spriteAliases.set(id, baseSpeciesId);
+  }
+
+  /**
+   * Species whose menu ICON is derived from the (downscaled) FRONT sprite atlas
+   * instead of a bespoke `icon.png`. For a front-only newcomer (Regitube) the
+   * published icon atlas lacks the `0001.png` frame, so the icon key would render
+   * a black/missing box. Maintainer decision: the icon IS the downscaled front
+   * sprite. Mapped value = the display-scale MULTIPLIER applied on top of each
+   * surface's base icon scale (front frames are 2x an icon frame, so 0.5).
+   */
+  private static readonly _iconFromFront = new Map<number, number>();
+
+  /** Derive this species' menu icon from its front sprite (front atlas + `scale` multiplier). */
+  static registerIconFromFront(id: number, scale = 0.5): void {
+    ErCustomSpecies._iconFromFront.set(id, scale);
+  }
+
+  /** Whether this species draws its icon from the front sprite atlas. */
+  static usesIconFromFront(id: number): boolean {
+    return ErCustomSpecies._iconFromFront.has(id);
+  }
+
+  /**
+   * The er-assets atlas path the per-slug icon key (`er_icon__{slug}`) should load
+   * for a custom species: the FRONT sprite atlas for icon-from-front species,
+   * otherwise the bespoke icon atlas. Undefined when not an ER custom / no slug.
+   */
+  static getIconAtlasSourcePath(id: number): string | undefined {
+    const slug = ErCustomSpecies._spriteSlugs.get(id);
+    if (!slug) {
+      return;
+    }
+    return ErCustomSpecies._iconFromFront.has(id) ? `elite-redux/${slug}/front` : `elite-redux/${slug}/icon`;
   }
 
   /** ER sprite slug for a pokerogue species id, or undefined if not an ER custom. */
@@ -394,7 +427,18 @@ class ErCustomSpecies extends PokemonSpecies {
     if (!slug) {
       return super.getIconId(female, formIndex, shiny, variant);
     }
+    // Both the bespoke icon atlas and the front sprite atlas expose "0001.png" as
+    // their first frame, so icon-from-front species resolve here unchanged.
     return "0001.png";
+  }
+
+  /**
+   * Icon-from-front species draw a downscaled FRONT frame as their icon; front
+   * frames are 2x an icon frame, so shrink to match a bespoke icon's on-screen
+   * size. Aliased species and normal slug species keep the default (1).
+   */
+  override getIconScale(_formIndex?: number): number {
+    return ErCustomSpecies._iconFromFront.get(this.speciesId) ?? 1;
   }
 
   /**
@@ -451,10 +495,15 @@ class ErCustomSpecies extends PokemonSpecies {
     }
     const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
     if (slug) {
-      // Preload the icon atlas (key matches getIconAtlasKey output).
+      // Preload the icon atlas (key matches getIconAtlasKey output). Icon-from-front
+      // species (Regitube) load the FRONT atlas under the icon key so the icon
+      // never depends on a bespoke icon.png that may lack the 0001.png frame.
       const iconKey = `er_icon__${slug}`;
       if (!globalScene.textures.exists(iconKey)) {
-        globalScene.loadPokemonAtlas(iconKey, `elite-redux/${slug}/icon`);
+        globalScene.loadPokemonAtlas(
+          iconKey,
+          ErCustomSpecies.getIconAtlasSourcePath(this.speciesId) ?? `elite-redux/${slug}/icon`,
+        );
       }
     }
     // A hand-authored newcomer species may ship its OWN cry asset (Tentalect's

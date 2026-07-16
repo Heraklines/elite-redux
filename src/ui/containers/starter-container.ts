@@ -38,7 +38,9 @@ export class StarterContainer extends Phaser.GameObjects.Container {
       2,
       species.getIconAtlasKey(defaultProps.formIndex, defaultProps.shiny, defaultProps.variant),
     );
-    this.icon.setScale(0.5);
+    // Base grid icon scale 0.5, times the species' per-icon multiplier (1 for
+    // vanilla; < 1 for ER icon-from-front species drawn from a larger front frame).
+    this.icon.setScale(0.5 * species.getIconScale(defaultProps.formIndex));
     this.icon.setOrigin(0, 0);
     this.icon.setFrame(
       species.getIconId(defaultProps.female, defaultProps.formIndex, defaultProps.shiny, defaultProps.variant),

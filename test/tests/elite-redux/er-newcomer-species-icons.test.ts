@@ -24,7 +24,12 @@
 // Gated behind ER_SCENARIO=1 (boots the real init via GameManager).
 // =============================================================================
 
-import { ER_NEWCOMER_ICON_SLUGS, ER_REGITUBE_SPECIES_ID } from "#data/elite-redux/er-newcomer-species";
+import {
+  ER_NEWCOMER_FRONT_ICON_SLUGS,
+  ER_NEWCOMER_ICON_SLUGS,
+  ER_REGITUBE_SPECIES_ID,
+} from "#data/elite-redux/er-newcomer-species";
+import { ErCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
 import type { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -74,6 +79,51 @@ describe.skipIf(!RUN)("ER newcomer species icon resolution (save-slot / party UI
       const sp = getPokemonSpecies(id as SpeciesId);
       const slug = sp.getIconAtlasKey(0, false, 0).slice(ICON_PREFIX.length);
       expect(ER_NEWCOMER_ICON_SLUGS.includes(slug), `${slug} is in the loading-scene preload list`).toBe(true);
+    }
+  });
+
+  // Regitube ships front-only art; its published icon atlas lacks the 0001.png
+  // frame, so the icon key rendered a black/missing box (live tester report). The
+  // maintainer fix derives the icon from the downscaled FRONT sprite.
+  it("Regitube derives its icon from the FRONT sprite atlas at a downscaled scale", () => {
+    // The icon key is unchanged (still er_icon__regitube), but the atlas it loads
+    // is the front sprite atlas, whose 0001.png frame always exists.
+    const source = ErCustomSpecies.getIconAtlasSourcePath(ER_REGITUBE_SPECIES_ID);
+    expect(source, "Regitube icon sources from front atlas").toBe("elite-redux/regitube/front");
+    expect(ErCustomSpecies.usesIconFromFront(ER_REGITUBE_SPECIES_ID)).toBe(true);
+    expect(ER_NEWCOMER_FRONT_ICON_SLUGS.has("regitube")).toBe(true);
+
+    const sp = getPokemonSpecies(ER_REGITUBE_SPECIES_ID as SpeciesId);
+    // Icon key + frame unchanged (frame present in front.json); scale downshifts.
+    expect(sp.getIconAtlasKey(0, false, 0)).toBe("er_icon__regitube");
+    expect(sp.getIconId(false, 0, false, 0)).toBe("0001.png");
+    expect(sp.getIconScale(0)).toBeLessThan(1);
+    expect(sp.getIconScale(0)).toBeGreaterThan(0);
+  });
+
+  it("the other slug newcomers keep a bespoke icon atlas at native scale", () => {
+    for (const id of [70001, 70002, 70003] as const) {
+      const source = ErCustomSpecies.getIconAtlasSourcePath(id);
+      expect(source, `species ${id} keeps bespoke icon`).toMatch(/\/icon$/);
+      expect(ErCustomSpecies.usesIconFromFront(id)).toBe(false);
+      expect(getPokemonSpecies(id as SpeciesId).getIconScale(0)).toBe(1);
+    }
+  });
+
+  // Starter-select handler path (#110/#113 accessor class): the 70000+ band must
+  // resolve a non-empty name + a slug-based sprite atlas + a resolvable icon, so
+  // the grid slot is never a blank (no sprite, no name) cell.
+  it("every 70000-band newcomer resolves name + sprite + icon accessors (no blank slot)", () => {
+    for (const id of SLUG_NEWCOMER_IDS) {
+      const sp = getPokemonSpecies(id as SpeciesId);
+      expect(sp.name?.length ?? 0, `species ${id} has a name`).toBeGreaterThan(0);
+      // The detail-panel/battle sprite atlas resolves to the ER slug (never a
+      // vanilla {id} path that 404s for id >= 10000).
+      const atlas = sp.getSpriteAtlasPath(false, 0, false, 0, false);
+      expect(atlas.startsWith("elite-redux/"), `species ${id} sprite atlas is slug-based`).toBe(true);
+      // Icon accessor resolves to a custom per-slug atlas with a concrete frame.
+      expect(sp.getIconAtlasKey(0, false, 0).startsWith(ICON_PREFIX)).toBe(true);
+      expect(sp.getIconId(false, 0, false, 0)).toBe("0001.png");
     }
   });
 });
