@@ -50,7 +50,8 @@ const COMMANDER_POST_TURN_PROGRESS_ALLOWANCE_MS = 150_000;
 // Self-healing pairing cadence: how often the requester re-issues its ask while unpaired. Kept
 // well under the observed ~17s worker-side request TTL so each re-send REFRESHES the request and
 // keeps the acceptance window open until the accept lands (see driveSelfHealingPairing).
-const LOBBY_REQUEST_REISSUE_MS = 5_000;
+const LOBBY_REQUEST_REISSUE_MS = 10_000;
+const OPTIONAL_LOBBY_RELAY_WAIT_MS = 1_500;
 
 function semanticOptionId(label) {
   return label
@@ -959,7 +960,10 @@ export class PublicUiClient {
     );
   }
 
-  async requestPlayer(username, { purpose = "request", timeoutMs = this.config.timeoutMs, optional = false } = {}) {
+  async requestPlayer(
+    username,
+    { purpose = "request", timeoutMs = this.config.timeoutMs, relayTimeoutMs = timeoutMs, optional = false } = {},
+  ) {
     const targetId = semanticOptionId(`Ask ${username} to play`);
     try {
       await this.waitForLobbyPlayer(username, timeoutMs);
@@ -996,11 +1000,22 @@ export class PublicUiClient {
     }
     const requestCursor = this.evidence.cursor();
     await this.press("Space", `lobby-${purpose}-${username}`);
-    await this.evidence.waitFor(/request target=/u, {
-      from: requestCursor,
-      timeoutMs,
-      description: `request relay for ${username}`,
-    });
+    try {
+      await this.evidence.waitFor(/request target=/u, {
+        from: requestCursor,
+        timeoutMs: relayTimeoutMs,
+        description: `request relay for ${username}`,
+      });
+    } catch (error) {
+      if (optional && error instanceof Error && /timed out waiting for request relay/u.test(error.message)) {
+        // A public key can coincide with the lobby's asynchronous option-list repaint. The
+        // self-healing loop will re-select the exact username and try again; only this explicitly
+        // optional TTL refresh may defer. The first request above remains fail-loud.
+        this.evidence.record("lobby-request-deferred", { username, targetId, reason: error.message });
+        return false;
+      }
+      throw error;
+    }
     return true;
   }
 
@@ -1311,6 +1326,7 @@ export class DuoPublicUiRig {
     const launchBrowser = () =>
       puppeteer.launch({
         headless: config.headless,
+        defaultViewport: config.viewport,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
@@ -1325,6 +1341,7 @@ export class DuoPublicUiRig {
           "--disable-background-timer-throttling",
           "--disable-backgrounding-occluded-windows",
           "--disable-renderer-backgrounding",
+          `--window-size=${config.viewport.width},${config.viewport.height}`,
         ],
       });
     const launchResults = await Promise.allSettled([launchBrowser(), launchBrowser()]);
@@ -1478,6 +1495,7 @@ export class DuoPublicUiRig {
           await requester.requestPlayer(acceptorName, {
             purpose: "reissue-request",
             timeoutMs: LOBBY_REQUEST_REISSUE_MS,
+            relayTimeoutMs: OPTIONAL_LOBBY_RELAY_WAIT_MS,
             optional: true,
           });
           nextReissueAt = Date.now() + LOBBY_REQUEST_REISSUE_MS;
