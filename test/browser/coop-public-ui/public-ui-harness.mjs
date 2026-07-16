@@ -261,16 +261,22 @@ function findAddressedCommandCollectionClosed(client, from, expectedAddress) {
 export function findActionableFirstLoginGenderSurface(evidence, from = 0) {
   const event = evidence.findLastSemanticSurface(from, "option-select:SelectGenderPhase");
   const observation = event?.observation;
+  const optionIds = observation?.optionIds;
   if (
     observation?.phase !== "SelectGenderPhase"
     || !Number.isSafeInteger(observation.phaseInstance)
     || observation.phaseInstance < 2
     || observation.uiMode !== "OPTION_SELECT"
     || observation.ready?.handlerActive !== true
+    || observation.ready.inputBlocked === true
     || !observation.seatsWithInput?.includes(0)
-    || observation.optionIds?.length !== 2
-    || !observation.optionIds.includes("boy")
-    || !observation.optionIds.includes("girl")
+    || !Number.isSafeInteger(observation.surfaceGeneration)
+    || observation.surfaceGeneration < 1
+    || optionIds?.length !== 2
+    || optionIds.some(optionId => typeof optionId !== "string" || optionId.length === 0)
+    || new Set(optionIds).size !== 2
+    || typeof observation.selectedOptionId !== "string"
+    || !optionIds.includes(observation.selectedOptionId)
   ) {
     return null;
   }
