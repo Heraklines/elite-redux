@@ -79,6 +79,44 @@ export function consumePendingDevStarters(): Starter[] | null {
   return s;
 }
 
+// --- Pending player-party setup (scenario -> SelectStarterPhase) ------------
+// Runs after every staged starter has become a PlayerPokemon, but before the
+// first battle is created. This is early enough for held items and other roster
+// state to be present when the battle UI is first built.
+
+let pendingDevPartySetup: (() => void) | null = null;
+
+/** Stage a callback to run once after the dev party has been constructed. */
+export function setPendingDevPartySetup(setup: () => void): void {
+  pendingDevPartySetup = setup;
+}
+
+/** Take (and clear) the staged pre-battle player-party callback. */
+export function consumePendingDevPartySetup(): (() => void) | null {
+  const cb = pendingDevPartySetup;
+  pendingDevPartySetup = null;
+  return cb;
+}
+
+// --- Pending custom-trainer force (scenario -> SelectStarterPhase) ----------
+// Resetting a dev scenario rebuilds the title screen, whose cleanup correctly
+// clears any old force. Keep the next force pending until immediately before
+// newBattle() so that cleanup cannot turn Restart into a random encounter.
+
+let pendingDevCustomTrainerForce: string | null = null;
+
+/** Stage the custom trainer key that the next dev run must force. */
+export function setPendingDevCustomTrainerForce(key: string): void {
+  pendingDevCustomTrainerForce = key;
+}
+
+/** Take (and clear) the custom trainer key staged for the next dev run. */
+export function consumePendingDevCustomTrainerForce(): string | null {
+  const key = pendingDevCustomTrainerForce;
+  pendingDevCustomTrainerForce = null;
+  return key;
+}
+
 // --- One-shot mystery-encounter override (scenario → first ME) ----------------
 // A scenario that forces a Mystery Encounter (via MYSTERY_ENCOUNTER_OVERRIDE +
 // MYSTERY_ENCOUNTER_RATE_OVERRIDE=256) would otherwise re-force the SAME

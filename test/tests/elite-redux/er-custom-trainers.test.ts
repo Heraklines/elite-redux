@@ -24,7 +24,7 @@
 // =============================================================================
 
 import { planErCustomTrainerLaunch, summarizeErCustomTrainer } from "#app/dev-tools/test-suite/custom-trainer-picker";
-import { relevelPreparedGhostParty } from "#app/dev-tools/test-suite/scenarios";
+import { applyPreparedGhostHeldItems } from "#app/dev-tools/test-suite/scenarios";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import {
@@ -60,16 +60,15 @@ import {
   setErCustomTrainerSpawnConfigForTesting,
   setErCustomTrainersForTesting,
 } from "#data/elite-redux/er-custom-trainers";
-import type { GhostMember } from "#data/elite-redux/er-ghost-teams";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
-import { getLevelTotalExp } from "#data/exp";
 import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import type { Trainer } from "#field/trainer";
+import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -219,35 +218,42 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     expect(keys).not.toContain("BROKEN");
   });
 
-  it("keeps re-levelled ghost-team EXP aligned after a KO reward", () => {
+  it("uses the same wave cap for scenario construction and live EXP progression", () => {
+    expect(globalScene.gameMode.getMaxExpLevelForWave(3)).toBe(10);
+    expect(globalScene.gameMode.getMaxExpLevelForWave(153)).toBe(150);
+  });
+
+  it("restores sampled ghost held items with their stack counts", () => {
     const mon = globalScene.getPlayerParty()[0];
-    const sourceLevel = 164;
-    const targetLevel = 128;
-    const member: GhostMember = {
-      speciesId: mon.species.speciesId,
-      formIndex: mon.formIndex,
-      abilityIndex: mon.abilityIndex,
-      ivs: [...mon.ivs],
-      nature: mon.nature,
-      level: sourceLevel,
-      gender: mon.gender,
-      shiny: mon.shiny,
-      variant: mon.variant,
-      passive: mon.passive,
-      moves: mon.moveset.map(move => move.moveId),
-    };
-    mon.level = sourceLevel;
-    mon.exp = getLevelTotalExp(sourceLevel, mon.species.growthRate);
+    const applied = applyPreparedGhostHeldItems(
+      [mon],
+      [
+        {
+          speciesId: mon.species.speciesId,
+          formIndex: mon.formIndex,
+          abilityIndex: mon.abilityIndex,
+          ivs: [...mon.ivs],
+          nature: mon.nature,
+          level: mon.level,
+          gender: mon.gender,
+          shiny: mon.shiny,
+          variant: mon.variant,
+          passive: mon.passive,
+          moves: mon.moveset.map(move => move.moveId),
+          heldItems: [
+            ["LEFTOVERS", 2],
+            ["REMOVED_ITEM", 9],
+          ],
+        },
+      ],
+    );
 
-    relevelPreparedGhostParty([mon], [member], sourceLevel, targetLevel);
-    expect(mon.level).toBe(targetLevel);
-    expect(mon.exp).toBe(getLevelTotalExp(targetLevel, mon.species.growthRate));
-
-    // Exact gain printed by the submitted Crime Leader capture. Before the
-    // fix, stale level-164 EXP made this single grant hit the wave cap (150).
-    mon.addExp(1_920);
-    expect(mon.level).toBe(targetLevel);
-    expect(mon.exp).toBeLessThan(getLevelTotalExp(targetLevel + 1, mon.species.growthRate));
+    const held = globalScene.findModifiers(
+      modifier => modifier instanceof PokemonHeldItemModifier && modifier.pokemonId === mon.id,
+      true,
+    ) as PokemonHeldItemModifier[];
+    expect(applied).toBe(1);
+    expect(held.map(item => [item.type.id, item.stackCount])).toContainEqual(["LEFTOVERS", 2]);
   });
 
   it("gates by difficulty: hell-only trainer never appears on ace, appears once on hell", () => {

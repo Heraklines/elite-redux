@@ -169,6 +169,14 @@ export class GameMode implements GameModeConfig {
     }
   }
 
+  /** Return the normal player EXP cap for a specific wave. */
+  getMaxExpLevelForWave(waveIndex: number): number {
+    const roundedWave = Math.ceil(Math.max(1, waveIndex) / 10) * 10;
+    const difficultyWaveIndex = this.getWaveForDifficulty(roundedWave);
+    const baseLevel = (1 + difficultyWaveIndex / 2 + Math.pow(difficultyWaveIndex / 25, 2)) * 1.2;
+    return Math.ceil(baseLevel / 2) * 2 + 2;
+  }
+
   /**
    * @returns either:
    * - override from overrides.ts

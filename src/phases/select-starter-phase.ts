@@ -1,11 +1,15 @@
 import { getSessionDataLocalStorageKey } from "#app/account";
-import { consumePendingDevStarters } from "#app/dev-tools/registry";
+import {
+  consumePendingDevCustomTrainerForce,
+  consumePendingDevPartySetup,
+  consumePendingDevStarters,
+} from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
 import { allMoves, modifierTypes } from "#data/data-lists";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
-import { isErCustomTrainerDevForceArmed } from "#data/elite-redux/er-custom-trainers";
+import { isErCustomTrainerDevForceArmed, setErCustomTrainerDevForce } from "#data/elite-redux/er-custom-trainers";
 import { PokemonMove } from "#moves/pokemon-move";
 import { installErCustomTrainerForCurrentWave } from "#phases/er-custom-trainer-install";
 
@@ -760,6 +764,10 @@ export class SelectStarterPhase extends Phase {
     });
     overrideModifiers();
     overrideHeldItems(party[0]);
+    // Dev scenarios can restore per-mon state that the Starter handoff cannot
+    // represent (notably held items). Apply it before newBattle() so the first
+    // battle frame and item bars see the final party state.
+    consumePendingDevPartySetup()?.();
     // Showdown 1v1 (B7 item 6): attach each OWN mon's manifest held item to the PLAYER party -
     // the SAME mapping (buildShowdownHeldItem) the opponent's client fields for you, so both
     // sides field a byte-equal held-item set. MEGA_STONE / unset -> no runtime modifier. The
@@ -794,6 +802,13 @@ export class SelectStarterPhase extends Phase {
         globalScene.gameData.gameStats.classicSessionsPlayed++;
       } else {
         globalScene.gameData.gameStats.endlessSessionsPlayed++;
+      }
+      // Restart rebuilds the title screen, which clears old custom-trainer
+      // forces. Arm the staged force at the last possible point so Reset always
+      // recreates this trainer battle instead of falling through to a wild wave.
+      const pendingCustomTrainerForce = consumePendingDevCustomTrainerForce();
+      if (pendingCustomTrainerForce) {
+        setErCustomTrainerDevForce(pendingCustomTrainerForce);
       }
       globalScene.newBattle();
       // ER (dev-tools only): a staff tester picking a custom trainer from the

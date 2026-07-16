@@ -25,6 +25,7 @@
 // ER_SCENARIO.
 // =============================================================================
 
+import { consumePendingDevCustomTrainerForce } from "#app/dev-tools/registry";
 import {
   openDevMenuOverlay,
   pickErCustomTrainerGhost,
@@ -33,18 +34,15 @@ import {
 import {
   applyPreparedGhostChallenges,
   buildErCustomTrainerDevScenario,
-  relevelPreparedGhostParty,
   resetDevOverrides,
 } from "#app/dev-tools/test-suite/scenarios";
+import { getGameMode } from "#app/game-mode";
 import Overrides from "#app/overrides";
 import type { ErCustomTrainerResolved } from "#data/elite-redux/er-custom-trainers";
-import { getErCustomTrainerDevForce, setErCustomTrainerDevForce } from "#data/elite-redux/er-custom-trainers";
+import { setErCustomTrainerDevForce } from "#data/elite-redux/er-custom-trainers";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
-import { getLevelTotalExp } from "#data/exp";
 import { Challenges } from "#enums/challenges";
 import { GameModes } from "#enums/game-modes";
-import type { PlayerPokemon } from "#field/pokemon";
-import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { describe, expect, it, vi } from "vitest";
 
 /** A stand-in for the MESSAGE UiMode number (the helper is mode-agnostic). */
@@ -214,58 +212,33 @@ describe("Custom Trainers picker - prepared fight selection", () => {
       expect(first.map(starter => starter.speciesId)).toEqual([1, 25]);
       expect(first[1].moveset).toEqual([85, 98]);
       expect(Overrides.STARTING_WAVE_OVERRIDE).toBe(21);
+      expect(Overrides.STARTING_LEVEL_OVERRIDE).toBe(getGameMode(GameModes.CHALLENGE).getMaxExpLevelForWave(21));
       expect(Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE).toBe(0);
-      expect(getErCustomTrainerDevForce()).toBe("TESTER");
+      expect(consumePendingDevCustomTrainerForce()).toBe("TESTER");
 
       // Banner Restart invokes setup on this same prepared scenario. It must
-      // re-arm the force and reproduce the exact roster/wave, not reroll.
+      // stage the force again and reproduce the exact roster/wave, not reroll.
+      // The title cleanup can clear the old live force without touching the
+      // just-staged handoff consumed immediately before newBattle().
       setErCustomTrainerDevForce(null);
       const restarted = built.scenario.setup();
       expect(restarted).not.toBe(first);
       expect(restarted).toEqual(first);
       expect(Overrides.STARTING_WAVE_OVERRIDE).toBe(21);
-      expect(getErCustomTrainerDevForce()).toBe("TESTER");
+      setErCustomTrainerDevForce(null);
+      expect(consumePendingDevCustomTrainerForce()).toBe("TESTER");
 
       expect(built.scenario.gameMode).toBe(GameModes.CHALLENGE);
       const setChallengeValue = vi.fn();
       applyPreparedGhostChallenges({ setChallengeValue }, snapshot.challenges ?? []);
       expect(setChallengeValue).toHaveBeenCalledWith(Challenges.INVERSE_BATTLE, 1);
 
-      // Regression: starters are initially constructed at the source run's top
-      // level. Re-leveling only `level` left source-level EXP behind, so the
-      // first participant to gain EXP raced to the current level cap.
-      const bulbasaur = getPokemonSpecies(1);
-      const pikachu = getPokemonSpecies(25);
-      const party = [
-        {
-          level: 20,
-          exp: getLevelTotalExp(20, bulbasaur.growthRate),
-          species: bulbasaur,
-          hp: 1,
-          calculateStats: vi.fn(),
-          getMaxHp: vi.fn(() => 80),
-          updateInfo: vi.fn(),
-        },
-        {
-          level: 20,
-          exp: getLevelTotalExp(20, pikachu.growthRate),
-          species: pikachu,
-          hp: 1,
-          calculateStats: vi.fn(),
-          getMaxHp: vi.fn(() => 70),
-          updateInfo: vi.fn(),
-        },
-      ] as unknown as PlayerPokemon[];
-      relevelPreparedGhostParty(party, snapshot.party, 20, 18);
-      expect(party.map(mon => mon.level)).toEqual([18, 15]);
-      expect(party.map(mon => mon.exp)).toEqual([
-        getLevelTotalExp(18, bulbasaur.growthRate),
-        getLevelTotalExp(15, pikachu.growthRate),
-      ]);
-      expect(party[0].exp).toBeLessThan(getLevelTotalExp(19, bulbasaur.growthRate));
-      expect(party[1].exp).toBeLessThan(getLevelTotalExp(16, pikachu.growthRate));
-      expect(party.map(mon => mon.hp)).toEqual([80, 70]);
+      // The sampled source levels are deliberately not used during launch. All
+      // starters are born at the selected wave's cap, so displayed level, stats
+      // and EXP share one source of truth from the first frame.
+      expect(Overrides.STARTING_LEVEL_OVERRIDE).not.toBe(20);
     } finally {
+      consumePendingDevCustomTrainerForce();
       setErCustomTrainerDevForce(null);
       resetDevOverrides();
     }

@@ -704,11 +704,13 @@ ability overrides, BST bypass) - exactly as a real run fields it. The full loop:
    (skipping boss `%10` + fixed-battle waves), then samples a real ghost roster that
    reached that wave within the normal +40 fairness window. It restores stored
    challenge settings when the snapshot carries them, disables the random Mystery
-   Encounter roll, and re-levels the player roster against the installed trainer
-   while preserving relative level gaps. Re-leveling MUST reset each member's EXP
-   to the new level as well; otherwise the first KO reconciles stale source-run EXP
-   and can jump a participant straight to the wave cap. Loading has Cancel; failures have Retry +
-   Back. **Reset** repeats the exact prepared wave/ghost/challenges without rerolling.
+   Encounter roll, constructs the player roster at that wave's real player level
+   cap, and restores every resolvable per-mon held item from the ghost snapshot
+   before the first battle is created. Do NOT re-level the roster during TurnInit:
+   that leaves the already-built UI and EXP state out of sync. Loading has Cancel;
+   failures have Retry + Back. **Reset** repeats the exact prepared trainer,
+   wave/ghost/challenges without rerolling; its force is staged until immediately
+   before `newBattle()` so title-screen cleanup cannot turn Reset into a wild battle.
    The one-shot dev force still bypasses challenge exclusivity and clears on install.
    A trainer with no eligible wave or ghost is reported, never replaced by a silent
    wild battle or the old static three-mon level-60 party.

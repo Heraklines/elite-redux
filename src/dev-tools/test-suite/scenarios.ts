@@ -23,7 +23,11 @@
 
 import { loggedInUser } from "#app/account";
 import { TerrainType } from "#app/data/terrain";
-import { setClearMeOverrideAfterFirst, setPendingDevEnemyParty } from "#app/dev-tools/registry";
+import {
+  setClearMeOverrideAfterFirst,
+  setPendingDevCustomTrainerForce,
+  setPendingDevEnemyParty,
+} from "#app/dev-tools/registry";
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
@@ -38,7 +42,6 @@ import {
   type ErCustomTrainerResolved,
   erCustomTrainerHeldModifierConfigs,
   resolveErCustomTrainerMoveIds,
-  setErCustomTrainerDevForce,
 } from "#data/elite-redux/er-custom-trainers";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
 import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
@@ -58,7 +61,6 @@ import {
   setErShinyLabOwnedBit,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
-import { getLevelTotalExp } from "#data/exp";
 import { Gender } from "#data/gender";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
@@ -101,6 +103,8 @@ export interface DevScenario {
   gameMode?: GameModes;
   /** Optional setup that needs the freshly-created gameMode. */
   postLaunch?: () => void;
+  /** Optional: runs once after staged starters become the player party. */
+  onPartyReady?: () => void;
   /** Optional: runs ONCE on the first turn, after both sides are summoned. */
   onBattleStart?: () => void;
   /**
@@ -336,25 +340,34 @@ function usableGhostMembers(ghost: GhostTeamSnapshot): GhostMember[] {
   return ghost.party.filter(member => !!getPokemonSpecies(member.speciesId)).slice(0, 6);
 }
 
-/**
- * Re-level a prepared ghost roster without leaving source-level EXP behind.
- * Stale EXP makes the first participant that gains EXP race toward the current
- * wave cap even though its displayed level was lowered for this fight.
- */
-export function relevelPreparedGhostParty(
-  party: readonly PlayerPokemon[],
-  members: readonly GhostMember[],
-  sourceTopLevel: number,
-  targetTopLevel: number,
-): void {
+/** Restore every resolvable held item stored on a sampled ghost roster. */
+export function applyPreparedGhostHeldItems(party: readonly PlayerPokemon[], members: readonly GhostMember[]): number {
+  const registry = modifierTypes as Record<string, ModifierTypeFunc | undefined>;
+  let applied = 0;
   party.forEach((mon, index) => {
-    const sourceLevel = Math.max(1, Math.floor(members[index]?.level ?? sourceTopLevel) || 1);
-    mon.level = Math.max(1, targetTopLevel - (sourceTopLevel - sourceLevel));
-    mon.exp = getLevelTotalExp(mon.level, mon.species.growthRate);
-    mon.calculateStats();
-    mon.hp = mon.getMaxHp();
-    mon.updateInfo();
+    for (const [typeId, rawCount] of members[index]?.heldItems ?? []) {
+      const factory = registry[typeId];
+      if (typeof factory !== "function") {
+        continue;
+      }
+      try {
+        const type = factory();
+        if (!(type instanceof PokemonHeldItemModifierType)) {
+          continue;
+        }
+        const modifier = type.withIdFromFunc(factory).newModifier(mon) as PokemonHeldItemModifier;
+        modifier.pokemonId = mon.id;
+        modifier.stackCount = Math.max(1, Math.floor(Number(rawCount) || 1));
+        globalScene.addModifier(modifier, true, false, false, true);
+        applied++;
+      } catch {
+        // Legacy snapshots can reference removed or generated item variants.
+        // Skip only that entry and keep the rest of the sampled team usable.
+      }
+    }
   });
+  globalScene.updateModifiers(true);
+  return applied;
 }
 
 /**
@@ -384,12 +397,12 @@ export function buildErCustomTrainerDevScenario(
   if (members.length === 0) {
     return { error: `ghost run ${prepared.ghost.id} has no resolvable party members` };
   }
-  const sourceTopLevel = Math.max(1, ...members.map(member => Math.max(1, Math.floor(member.level) || 1)));
   const challenges = (prepared.ghost.challenges ?? []).filter(
     tuple => Array.isArray(tuple) && Number.isInteger(tuple[0]) && Number.isFinite(tuple[1]) && tuple[1] !== 0,
   );
   const gameMode =
     prepared.ghost.mode === "challenge" || challenges.length > 0 ? GameModes.CHALLENGE : GameModes.CLASSIC;
+  const targetLevel = getGameMode(gameMode).getMaxExpLevelForWave(wave);
   const challengeText =
     challenges.length > 0 ? `${challenges.length} stored challenge setting(s)` : "no stored challenges";
   const scenario: DevScenario = {
@@ -402,18 +415,20 @@ export function buildErCustomTrainerDevScenario(
       + "DO: fight it. EXPECT the authored party, sprite + gender, aura, battle\n"
       + "music, intro / victory / defeat lines, weighted slots + slot-fill, RLA /\n"
       + "RLNA move rolls, shiny-lab looks and Insanity ability/innate overrides,\n"
-      + "exactly as a real run fields it. Reset repeats this exact wave and team.",
+      + `at the wave-${wave} player cap (Lv${targetLevel}), with the ghost's held items.\n`
+      + "Reset repeats this exact trainer, wave and team.",
     gameMode,
     setup: () => {
       resetDevOverrides();
-      // Arm the one-shot dev force + pin a difficulty/wave the trainer allows.
-      setErCustomTrainerDevForce(trainer.key);
+      // Keep the force pending until immediately before newBattle(). Title-screen
+      // cleanup during Reset cannot clear it before the trainer is installed.
+      setPendingDevCustomTrainerForce(trainer.key);
       setErDifficulty(difficulty);
       setOverrides({
         STARTING_WAVE_OVERRIDE: wave,
-        // Build safely at the snapshot's top level, then on turn init re-level
-        // against the installed custom trainer while preserving relative gaps.
-        STARTING_LEVEL_OVERRIDE: sourceTopLevel,
+        // Construct the roster at the real player cap from the outset. A late
+        // turn-init rewrite leaves the UI and EXP progression out of sync.
+        STARTING_LEVEL_OVERRIDE: targetLevel,
         // A random starting wave can legally roll an ME. The custom trainer
         // installer intentionally never hijacks MEs, so disable that roll for
         // this prepared fight or Restart can become an unrelated event.
@@ -424,10 +439,8 @@ export function buildErCustomTrainerDevScenario(
     postLaunch: () => {
       applyPreparedGhostChallenges(globalScene.gameMode, challenges);
     },
-    onBattleStart: () => {
-      const battle = globalScene.currentBattle;
-      const targetTopLevel = Math.max(1, ...(battle?.enemyLevels ?? [battle?.getLevelForWave?.() ?? sourceTopLevel]));
-      relevelPreparedGhostParty(globalScene.getPlayerParty(), members, sourceTopLevel, targetTopLevel);
+    onPartyReady: () => {
+      applyPreparedGhostHeldItems(globalScene.getPlayerParty(), members);
     },
   };
   return { scenario };
