@@ -125,7 +125,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
 
@@ -651,7 +651,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.EXPLOSION, 0);
         game.move.select(MoveId.SPLASH, 1);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       const f0 = rig.hostScene.getPlayerField()[0];
       const f1 = rig.hostScene.getPlayerField()[1];

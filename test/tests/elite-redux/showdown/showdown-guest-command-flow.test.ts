@@ -159,7 +159,7 @@ describe.skipIf(!RUN)("Showdown guest command flow - interception + switch round
     );
 
     game.move.select(MoveId.TACKLE);
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
 
     expect(
       game.scene.getEnemyField()[0]?.species.speciesId,

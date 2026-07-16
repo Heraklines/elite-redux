@@ -1865,7 +1865,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
   };
 
-  /** Drive any SwitchPhase UI that occurs before the interceptor can observe TurnEndPhase. */
+  /** Drive any SwitchPhase UI that occurs before the settled authoritative turn commit. */
   const driveHostTurnToEnd = async (turn: number): Promise<void> => {
     const ui = rig.hostScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
     const realSetMode = ui.setMode.bind(ui);
@@ -1900,7 +1900,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       return result;
     };
     try {
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     } finally {
       ui.setMode = realSetMode;
     }
@@ -3829,7 +3829,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // Spread move: omit the target so game.move.select registers the multi-target confirm prompt (which does
       // processInput(ACTION) with no cursor) rather than asserting a target was passed to a spread move.
       game.move.select(spreadMove.moveId, COOP_HOST_FIELD_INDEX);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
       // #845: a HOST-owned mon can faint on the isolation turn (a real enemy hit); arm its replacement picker
       // POST-HOC so the crossing to the throw's CommandPhase drives it instead of stranding at the PARTY UI.
       armHostFaintAutoPick();

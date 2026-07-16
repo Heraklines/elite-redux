@@ -365,7 +365,7 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
     // HOST plays a turn (TACKLE into the guest's lead, no KO); its EnemyCommandPhase consumes the relayed SPLASH.
     await driveScheduledHost(rig, pair, async () => {
       game.move.select(MoveId.TACKLE, 0, BattlerIndex.ENEMY);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
 
     // GUEST replays the host's turn: the authoritative checkpoint conveys the host's SUN.

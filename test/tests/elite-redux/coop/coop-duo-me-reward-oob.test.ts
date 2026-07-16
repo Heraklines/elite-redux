@@ -86,7 +86,7 @@ async function playOneAuthoritativeWave(game: GameManager, rig: DuoRig): Promise
   await withClient(rig.hostCtx, async () => {
     game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
     game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
   });
   await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
 }

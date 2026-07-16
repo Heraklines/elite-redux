@@ -156,7 +156,7 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
 
     // Drive one real turn. The HOST checksum is captured at the post-turn boundary.
     game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX);
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
 
     const hostChecksum = captureCoopChecksum();
     // Capture the host's full authoritative snapshot, then (modeling the guest) apply it

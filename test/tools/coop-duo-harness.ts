@@ -2142,6 +2142,11 @@ export async function driveGuestReplayTurn(
   // phase object changes every iteration anyway). The #847 finishTurnNoStream path still terminates the
   // loop cleanly: on a host stall the pump ends WITHOUT a CoopFinalizeTurnPhase, so the next current phase
   // is a turn-end phase outside this set and the loop returns.
+  // `replay` has already been started above (either explicitly or by the real phase-manager
+  // transition). An async replay phase can remain current across several transport drains; starting
+  // that same object again would create a duplicate same-address authority waiter and make the first
+  // waiter look like a host failure. Start each phase object at most once.
+  let startedPhase: Phase | null = replay;
   let lastPhase: Phase | null = null;
   let stall = 0;
   for (let i = 0; i < 256; i++) {
@@ -2164,7 +2169,10 @@ export async function driveGuestReplayTurn(
     }
     lastPhase = cur;
     const wasFinalize = cur.phaseName === "CoopFinalizeTurnPhase";
-    cur.start();
+    if (cur !== startedPhase) {
+      startedPhase = cur;
+      cur.start();
+    }
     await drainLoopback();
     if (wasFinalize) {
       return;
@@ -3765,7 +3773,7 @@ export async function replayCoopTrace(
           detail: `host slot command kind=${hostCmd?.command.kind ?? "none"} not replayable by the wave-loop drivers (FIGHT only)`,
         });
       }
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
 
     // ===== Guest replays the host's turn + applies the checkpoint (renders the host's outcome). =====

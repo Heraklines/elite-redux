@@ -107,7 +107,7 @@ const trainer = {
   minWave: 17,
   maxWave: 23,
   endless: false,
-} as ErCustomTrainerResolved;
+} as unknown as ErCustomTrainerResolved;
 
 function ghost(
   id: string,

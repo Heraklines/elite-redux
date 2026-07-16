@@ -37,9 +37,9 @@ import { UiMode } from "#enums/ui-mode";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import {
-    buildDuo,
-    type DuoRig,
-    drainLoopback,
+  buildDuo,
+  type DuoRig,
+  drainLoopback,
   driveGuestReplayTurn,
   installDuoLogCapture,
   withClient,
@@ -166,7 +166,7 @@ describe.skipIf(!RUN)(
       await drainLoopback();
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       const hostLead = rig.hostScene.getPlayerField()[COOP_HOST_FIELD_INDEX];
       const guestLead = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];

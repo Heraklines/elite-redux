@@ -31,6 +31,14 @@ export class TurnEndPhase extends FieldPhase {
   start() {
     super.start();
 
+    // Install the immutable commit sentinel before any TurnEnd work can unshift a child phase.
+    // Every delayed mutation queued below (and every grandchild it queues) will therefore run
+    // in front of the sentinel, while the sentinel remains in front of the pre-existing
+    // Faint/Victory/next-turn tail.
+    if (isCoopRecording()) {
+      globalScene.phaseManager.unshiftNew("CoopTurnCommitPhase");
+    }
+
     globalScene.currentBattle.incrementTurn();
     globalScene.eventTarget.dispatchEvent(new TurnEndEvent(globalScene.currentBattle.turn));
     globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
@@ -160,12 +168,6 @@ export class TurnEndPhase extends FieldPhase {
 
     this.erAutoShiftNonAdjacentSurvivors();
 
-    // TurnEnd queues material child phases above (Yawn/orb status, held-item and
-    // terrain healing, post-turn abilities/form changes). Publish only after that
-    // FIFO subtree has fully drained; capturing here produced stale authority.
-    if (isCoopRecording()) {
-      globalScene.phaseManager.unshiftNew("CoopTurnCommitPhase");
-    }
     this.end();
   }
 

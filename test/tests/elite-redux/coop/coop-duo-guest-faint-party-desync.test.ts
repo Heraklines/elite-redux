@@ -153,7 +153,7 @@ describe.skipIf(!RUN)(
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
         game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
 
       // Pull the captured turn-1 resolution payload (the PARKED stale checkpoint - tick N, bi1 fainted).

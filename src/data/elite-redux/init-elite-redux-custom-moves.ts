@@ -41,7 +41,6 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import { ChargeAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { erArmSwitchInBoost } from "#data/elite-redux/empower-switch-in";
 import { ER_FLAG_NAMES_LIST } from "#data/elite-redux/er-flag-mapping";
@@ -94,6 +93,7 @@ import { TerrainType } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { ChargeAnim } from "#enums/move-anims-common";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { MoveTarget } from "#enums/move-target";
@@ -528,6 +528,7 @@ function buildCustomMove(
     id: number;
     name: string;
     description: string;
+    longDescription: string;
     types: readonly number[];
     power: number;
     accuracy: number;

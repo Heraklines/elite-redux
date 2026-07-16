@@ -227,7 +227,7 @@ describe.skipIf(!RUN)(
         for (let i = 0; i < 8; i++) {
           await drainLoopback();
         }
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
 
       // ===== (F) GUEST: replay the turn. The ordinary authoritative checkpoint must carry the mutated

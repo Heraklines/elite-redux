@@ -418,7 +418,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(await awaited).toBeNull();
   });
 
-  it("a second await for the same turn supersedes the stale one (resolves it null)", async () => {
+  it("a second await for the same addressed turn joins the in-flight authority result", async () => {
     const { host, guest } = createLoopbackPair();
     const hostStream = new CoopBattleStreamer(host);
     const guestStream = new CoopBattleStreamer(guest);
@@ -427,8 +427,8 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     const second = guestStream.awaitTurn(1);
     emitCompleteTurn(hostStream, 1, [], emptyCheckpoint(), "deadbeefdeadbeef");
 
-    expect(await first).toBeNull();
-    expect(await second).not.toBeNull();
+    expect(await first).not.toBeNull();
+    expect(await second).toEqual(await first);
   });
 
   it("consumeEnemyParty returns the host's party for the matching wave, then clears it", async () => {

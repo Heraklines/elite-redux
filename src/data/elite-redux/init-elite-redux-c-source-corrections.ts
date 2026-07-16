@@ -565,7 +565,7 @@ export function initEliteReduxCSourceCorrections(): CSourceCorrectionResult {
         continue;
       }
       let bits = 0;
-      for (const idx of (drf as { flags?: number[] }).flags ?? []) {
+      for (const idx of drf.flags) {
         const name = ER_FLAG_NAMES_LIST[idx];
         const mf = name === undefined ? undefined : ER_FLAG_TO_MOVE_FLAG[name];
         if (mf != null) {

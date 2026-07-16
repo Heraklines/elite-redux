@@ -1519,7 +1519,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       const turn = rig.hostScene.currentBattle.turn;
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
       expect(

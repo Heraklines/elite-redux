@@ -496,7 +496,7 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
       const ordinaryTurn = rig.hostScene.currentBattle.turn;
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, ordinaryTurn));
       expect(rig.guestScene.currentBattle.enemyParty.every(enemy => enemy.isFainted())).toBe(true);

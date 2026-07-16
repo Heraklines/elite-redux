@@ -262,10 +262,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const sleeper = field[COOP_GUEST_FIELD_INDEX];
     sleeper.addTag(BattlerTagType.DROWSY, 1);
 
-    let emittedState: ReturnType<typeof completeTurnCarrier>["authoritativeState"] | null = null;
+    const emittedStates: ReturnType<typeof completeTurnCarrier>["authoritativeState"][] = [];
     getCoopRuntime()!.partnerTransport!.onMessage(message => {
       if (message.t === "turnResolution") {
-        emittedState = message.authoritativeState;
+        emittedStates.push(message.authoritativeState);
       }
     });
 
@@ -275,9 +275,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     await new Promise(resolve => setTimeout(resolve, 0));
 
     expect(sleeper.status?.effect, "the host materialized Yawn before the commit sentinel").toBe(StatusEffect.SLEEP);
-    const wireSleeper = emittedState?.playerParty.find(pokemon => pokemon.id === sleeper.id);
-    expect(wireSleeper?.status?.effect, "turnResolution carries the settled sleep status").toBe(StatusEffect.SLEEP);
-    expect(wireSleeper?.status?.sleepTurnsRemaining, "turnResolution carries the authoritative sleep duration").toBe(
+    const wireSleeper = emittedStates.at(-1)?.playerParty.find(pokemon => pokemon.id === sleeper.id);
+    const wireStatus = wireSleeper?.status as { effect?: StatusEffect; sleepTurnsRemaining?: number } | undefined;
+    expect(wireStatus?.effect, "turnResolution carries the settled sleep status").toBe(StatusEffect.SLEEP);
+    expect(wireStatus?.sleepTurnsRemaining, "turnResolution carries the authoritative sleep duration").toBe(
       sleeper.status?.sleepTurnsRemaining,
     );
   });

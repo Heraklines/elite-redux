@@ -154,7 +154,7 @@ describe.skipIf(!RUN)("co-op SOAK asymmetric continuation: host half out, guest 
     // (production's exhausted-partner guard), so no picker strands and the slot stays empty. =====
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.SPLASH, hostFieldIdx);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     expect(hostMon.isFainted(), "the host-owned mon fainted").toBe(true);
     expect(hostOwnedFaintPending(rig), "a host-owned faint is pending").toBe(true);
@@ -254,7 +254,7 @@ describe.skipIf(!RUN)("co-op SOAK asymmetric continuation: host half out, guest 
     // TURN 1: host plays a harmless SPLASH on its own slot; the guest's relayed EARTHQUAKE faints the 1-HP host mon.
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.SPLASH, hostFieldIdx);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     expect(hostMon.isFainted(), "the host-owned mon fainted (host half now exhausted)").toBe(true);
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn0));
@@ -288,7 +288,7 @@ describe.skipIf(!RUN)("co-op SOAK asymmetric continuation: host half out, guest 
         }
         // Drives the survivor's whole turn: its CommandPhase -> partner request -> relay resolve -> TurnEndPhase.
         // The old diagnosis said THIS call would eat the 20-min request timeout; it resolves promptly instead.
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       const turnCalls = spy.mock.calls.slice(before).filter(c => c[1] === turnNo);
       expect(

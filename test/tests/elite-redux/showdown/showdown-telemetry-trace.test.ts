@@ -106,7 +106,7 @@ describe.skipIf(!RUN)("Showdown telemetry replay-trace capture (D5)", () => {
     await startShowdown(game, opponent, relay, [SpeciesId.MILTANK]);
 
     game.move.select(MoveId.TACKLE);
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
 
     // The showdown HOST began recording at EncounterPhase (isShowdown + host).
     const trace = getReplayTrace();

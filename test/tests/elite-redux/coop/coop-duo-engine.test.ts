@@ -233,7 +233,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     await withClient(hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     await drainLoopback();
 

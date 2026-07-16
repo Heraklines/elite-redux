@@ -240,7 +240,7 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
 
   /** Stable per-effect key for the once-per-battle tracker. */
   private onceKey(): string {
-    const e = this.effect as Record<string, unknown>;
+    const e = this.effect as unknown as Record<string, unknown>;
     const disc = e.move ?? e.type ?? e.weather ?? e.stat ?? "";
     return `entry-once:${this.effect.kind}:${String(disc)}`;
   }

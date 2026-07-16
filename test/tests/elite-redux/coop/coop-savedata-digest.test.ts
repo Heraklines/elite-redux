@@ -183,7 +183,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       if (!guestCommandAlreadyCommitted) {
         game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
       }
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
 
@@ -796,7 +796,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TRANSFORM, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
 
     // The host's lead is now transformed (copied identity in summonData, species stays DITTO).

@@ -163,7 +163,7 @@ describe.skipIf(!RUN)(
       // SwitchPhase opens after, with the host's whole half wiped (no legal same-owner bench).
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       const hostLead = rig.hostScene.getPlayerField()[COOP_HOST_FIELD_INDEX];
       expect(hostLead == null || hostLead.isFainted(), "the HOST-owned lead fainted this turn").toBe(true);

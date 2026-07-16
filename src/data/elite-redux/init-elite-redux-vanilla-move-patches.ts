@@ -1728,6 +1728,8 @@ interface MutableMove {
   chance: number;
   name: string;
   nameAppend: string;
+  descriptionOverride?: string;
+  effect: string;
   attrs: MoveAttr[];
   conditions?: unknown[];
   conditionsSeq2?: unknown[];
@@ -1736,6 +1738,7 @@ interface MutableMove {
   chargeAttrs?: MoveAttr[];
   moveTarget: MoveTarget;
   addAttr(attr: MoveAttr): Move;
+  condition(...args: Parameters<Move["condition"]>): Move;
   [MOVE_PATCHED_MARKER]?: true;
 }
 

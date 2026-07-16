@@ -155,7 +155,7 @@ describe.skipIf(!RUN)(
       // SWITCH to GENGAR's bench mate CHARIZARD). The host's SwitchSummonPhase SWAPS party[1] <-> party[3].
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       const hostOrderAfter = order(rig.hostScene);
       expect(hostOrderAfter[COOP_GUEST_FIELD_INDEX], "host swapped CHARIZARD onto the guest's field slot").toBe(
@@ -211,7 +211,7 @@ describe.skipIf(!RUN)(
 
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       const hostOrderAfter = order(rig.hostScene);
 
@@ -255,7 +255,7 @@ describe.skipIf(!RUN)(
       }
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       const hostOrderAfter = order(rig.hostScene);
       expect(hostOrderAfter[COOP_GUEST_FIELD_INDEX], "host swapped CHARIZARD onto the guest's field slot").toBe(
@@ -306,7 +306,7 @@ describe.skipIf(!RUN)(
       // HOST voluntarily switches its own field lead (slot 0, SNORLAX) for its bench LAPRAS (slot 2).
       await withClient(rig.hostCtx, async () => {
         game.doSwitchPokemon(HOST_SWITCH_TO_SLOT);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       const hostOrderAfter = order(rig.hostScene);
       expect(hostOrderAfter[COOP_HOST_FIELD_INDEX], "host swapped LAPRAS onto its own field slot").toBe(
@@ -362,7 +362,7 @@ describe.skipIf(!RUN)(
 
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       const hostOrderAfter = order(rig.hostScene);
       // The host did NOT switch: GENGAR stays on the guest's field slot.
