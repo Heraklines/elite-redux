@@ -2533,44 +2533,53 @@ export class DuoPublicUiRig {
     }
     const revision = Number(commitMatch[1]);
     const operationId = commitMatch[2];
-    const [hostSettled, hostRaw, guestRaw, guestBootstrap, guestUnparked, guestWaveReady] = await Promise.all([
-      this.host.evidence.waitFor(/settled WAVE_ADVANCE committed wave=1 tick=\d+ next=GAME_OVER\/wave1/u, {
-        from: outcomeCursors[this.host.label],
-        timeoutMs: this.config.timeoutMs,
-        description: "host settled terminal DATA",
-      }),
-      this.host.evidence.waitFor(/send waveResolved wave=1 outcome=gameOver/u, {
-        from: outcomeCursors[this.host.label],
-        timeoutMs: this.config.timeoutMs,
-        description: "host raw game-over compatibility hint",
-      }),
-      this.guest.evidence.waitFor(
-        /ignore raw waveResolved for correctness wave=1 outcome=gameOver; awaiting retained transaction/u,
-        {
+    const [hostSettled, hostRaw, guestRaw, guestBootstrap, guestBoundaryQueued, guestReplayReleased, guestWaveReady] =
+      await Promise.all([
+        this.host.evidence.waitFor(/settled WAVE_ADVANCE committed wave=1 tick=\d+ next=GAME_OVER\/wave1/u, {
+          from: outcomeCursors[this.host.label],
+          timeoutMs: this.config.timeoutMs,
+          description: "host settled terminal DATA",
+        }),
+        this.host.evidence.waitFor(/send waveResolved wave=1 outcome=gameOver/u, {
+          from: outcomeCursors[this.host.label],
+          timeoutMs: this.config.timeoutMs,
+          description: "host raw game-over compatibility hint",
+        }),
+        this.guest.evidence.waitFor(
+          /ignore raw waveResolved for correctness wave=1 outcome=gameOver; awaiting retained transaction/u,
+          {
+            from: outcomeCursors[this.guest.label],
+            timeoutMs: this.config.timeoutMs,
+            description: "guest rejects raw game-over correctness",
+          },
+        ),
+        this.guest.evidence.waitFor(/wave-advance JOURNAL bootstrap wave=1 outcome=gameOver \(ACK withheld\)/u, {
           from: outcomeCursors[this.guest.label],
           timeoutMs: this.config.timeoutMs,
-          description: "guest rejects raw game-over correctness",
-        },
-      ),
-      this.guest.evidence.waitFor(/wave-advance JOURNAL bootstrap wave=1 outcome=gameOver \(ACK withheld\)/u, {
-        from: outcomeCursors[this.guest.label],
-        timeoutMs: this.config.timeoutMs,
-        description: "guest retained terminal journal bootstrap",
-      }),
-      this.guest.evidence.waitFor(
-        /wave-advance JOURNAL (?:queued|retained) safe-boundary wake wave=1 unparkedReplay=1/u,
-        {
+          description: "guest retained terminal journal bootstrap",
+        }),
+        this.guest.evidence.waitFor(
+          /wave-advance JOURNAL (?:queued|retained) safe-boundary wake wave=1 unparkedReplay=0/u,
+          {
+            from: outcomeCursors[this.guest.label],
+            timeoutMs: this.config.timeoutMs,
+            description: "guest queued retained terminal behind same-turn presentation",
+          },
+        ),
+        this.guest.evidence.waitFor(
+          /guest replay turn=1: retained gameOver terminal supersedes unresolved replay at safe event boundary -> end/u,
+          {
+            from: outcomeCursors[this.guest.label],
+            timeoutMs: this.config.timeoutMs,
+            description: "guest released same-turn replay after ordered live events drained",
+          },
+        ),
+        this.guest.evidence.waitFor(/retained WAVE_ADVANCE continuationReady wave=1/u, {
           from: outcomeCursors[this.guest.label],
           timeoutMs: this.config.timeoutMs,
-          description: "guest unparked phantom replay for retained terminal",
-        },
-      ),
-      this.guest.evidence.waitFor(/retained WAVE_ADVANCE continuationReady wave=1/u, {
-        from: outcomeCursors[this.guest.label],
-        timeoutMs: this.config.timeoutMs,
-        description: "guest retained terminal continuation proof",
-      }),
-    ]);
+          description: "guest retained terminal continuation proof",
+        }),
+      ]);
 
     await this.assertRetainedContinuation(outcomeCursors, "game-over-terminal");
     const hostRelease = await this.host.evidence.waitFor(
@@ -2583,15 +2592,16 @@ export class DuoPublicUiRig {
     );
     const hostGameOver = this.host.evidence.find(GAME_OVER_PHASE, outcomeCursors[this.host.label]);
     const guestGameOver = this.guest.evidence.find(GAME_OVER_PHASE, outcomeCursors[this.guest.label]);
-    if (!hostGameOver || !guestGameOver || guestGameOver.index <= guestUnparked.index) {
-      throw new Error("Paired GameOver phases did not follow the guest's exact replay-unpark evidence");
+    if (!hostGameOver || !guestGameOver || guestGameOver.index <= guestReplayReleased.index) {
+      throw new Error("Paired GameOver phases did not follow the guest's exact terminal replay-release evidence");
     }
     if (
       hostCommit.index >= hostSettled.index
       || hostSettled.index >= hostRaw.index
       || guestRaw.index >= guestBootstrap.index
-      || guestBootstrap.index >= guestUnparked.index
-      || guestUnparked.index >= guestWaveReady.index
+      || guestBootstrap.index >= guestBoundaryQueued.index
+      || guestBoundaryQueued.index >= guestReplayReleased.index
+      || guestReplayReleased.index >= guestWaveReady.index
       || hostCommit.index >= hostRelease.index
     ) {
       throw new Error("Retained GameOver causal evidence arrived out of order");
@@ -2611,7 +2621,8 @@ export class DuoPublicUiRig {
       guest: {
         rawHintRejectedIndex: guestRaw.index,
         journalBootstrapIndex: guestBootstrap.index,
-        replayUnparkIndex: guestUnparked.index,
+        boundaryQueuedIndex: guestBoundaryQueued.index,
+        replayReleasedIndex: guestReplayReleased.index,
         continuationReadyIndex: guestWaveReady.index,
         gameOverIndex: guestGameOver.index,
       },

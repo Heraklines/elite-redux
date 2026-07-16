@@ -9,7 +9,9 @@
     ".github/workflows/coop-public-ui-journey.yml",
     "progress.md",
     "src/data/elite-redux/coop/coop-webrtc-transport.ts",
+    "src/data/elite-redux/coop/coop-runtime.ts",
     "src/dev-tools/registry.ts",
+    "src/phases/coop-replay-turn-phase.ts",
     "src/ui/handlers/starter-select-ui-handler.ts",
     "test/browser/coop-public-ui/browser-workflow-fanout.test.mjs",
     "test/browser/coop-public-ui/check-public-boundary.mjs",
@@ -17,6 +19,7 @@
     "test/browser/coop-public-ui/game-over-evidence.test.mjs",
     "test/browser/coop-public-ui/journeys.mjs",
     "test/browser/coop-public-ui/public-ui-harness.mjs",
-    "test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs"
+    "test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs",
+    "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts"
   ]
 }

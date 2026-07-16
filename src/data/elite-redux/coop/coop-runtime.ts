@@ -1093,6 +1093,8 @@ function wireCoopEnemyPartyResponder(controller: CoopSessionController, battleSt
 interface CoopPendingWaveAdvance {
   wave: number;
   outcome: CoopWaveOutcome;
+  /** Authority turn whose terminal commit causally follows every live event for this wave. */
+  settledTurn?: number | undefined;
   captureParty?: string[] | undefined;
   capturePresentation?: CoopCapturePresentation | undefined;
   /** The host's complete control statement. Present on current peers and journal recovery. */
@@ -1673,6 +1675,19 @@ export function coopHasPendingWaveAdvance(): boolean {
 }
 
 /**
+ * A retained GameOver commit replaces the turn-resolution frame the host never emits after entering
+ * {@linkcode GameOverPhase}. The renderer may use this only after its ordered live-event buffer is empty:
+ * the envelope is carried by the same ordered channel after those events, so admission is the causal fence
+ * that makes an otherwise-permanent same-turn replay wait impossible rather than merely slow.
+ */
+export function coopRetainedGameOverSupersedesReplay(wave: number, turn: number): boolean {
+  return pendingWaveAdvance?.wave === wave
+    && pendingWaveAdvance.outcome === "gameOver"
+    && pendingWaveAdvance.settledTurn != null
+    && turn >= pendingWaveAdvance.settledTurn;
+}
+
+/**
  * Install the engine-owned safe-boundary wake used when a retained WAVE_ADVANCE arrives after finalization.
  * The factory seam avoids a runtime -> replay-phase import cycle while still appending a real Phase instance.
  */
@@ -1778,6 +1793,7 @@ export function mergeCoopPendingWaveAdvance(
   captureParty: string[] | undefined,
   capturePresentation?: CoopCapturePresentation | undefined,
   transition?: CoopWaveAdvancePayload | undefined,
+  settledTurn?: number | undefined,
 ): CoopPendingWaveAdvance | null {
   if (prev != null && wave < prev.wave) {
     return null; // a stale earlier-wave signal: keep the existing later-wave pending.
@@ -1798,12 +1814,16 @@ export function mergeCoopPendingWaveAdvance(
   const carriedTransition =
     receivedTransition
     ?? (prev != null && prev.wave === wave && prev.outcome === outcome ? prev.transition : undefined);
+  const carriedSettledTurn =
+    settledTurn
+    ?? (prev != null && prev.wave === wave && prev.outcome === outcome ? prev.settledTurn : undefined);
   return {
     wave,
     outcome,
     captureParty: carriedCapture,
     capturePresentation: carriedPresentation,
     ...(carriedTransition === undefined ? {} : { transition: carriedTransition }),
+    ...(carriedSettledTurn === undefined ? {} : { settledTurn: carriedSettledTurn }),
   };
 }
 
@@ -3922,6 +3942,7 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
         undefined,
         pendingRawWavePresentations.get(payload.wave),
         payload,
+        envelope.turn,
       );
       if (merged == null || !markCoopWaveAdvanceBootstrapProjected(payload.wave, binding)) {
         return false;
