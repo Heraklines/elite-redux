@@ -340,6 +340,25 @@ async function releaseExpiredGrace(env: P33SignalingEnv, now: number): Promise<v
   ]);
 }
 
+/**
+ * Reconcile a paired run after both browser processes disappeared. No heartbeat remains to move an
+ * `active` row into grace, so an authenticated fresh announce is the bounded cleanup trigger. Grace
+ * starts when the later peer's presence window actually elapsed, not when this request happened.
+ */
+async function reconcileAbandonedAccountRuns(env: P33SignalingEnv, accountId: string, now: number): Promise<void> {
+  const windowMs = presenceWindow(env);
+  const staleSeenAt = now - windowMs;
+  await env.DB.prepare(
+    `UPDATE coop_runs_p33
+       SET state = 'grace', updated_at = MAX(offerer_seen_at, answerer_seen_at) + ?
+     WHERE state = 'active'
+       AND (offerer_account_id = ? OR answerer_account_id = ?)
+       AND offerer_seen_at < ? AND answerer_seen_at < ?`,
+  )
+    .bind(windowMs, accountId, accountId, staleSeenAt, staleSeenAt)
+    .run();
+}
+
 async function bindTicket(
   env: P33SignalingEnv,
   payload: CoopIdentityTicketV1,
@@ -470,8 +489,9 @@ async function handleAnnounce(request: Request, env: P33SignalingEnv, now: numbe
   if (identity == null) {
     return error(env, "invalid or already rebound co-op identity ticket", 401);
   }
-  await releaseExpiredGrace(env, now);
   const { payload, clientNonce, credential } = identity;
+  await reconcileAbandonedAccountRuns(env, payload.sub, now);
+  await releaseExpiredGrace(env, now);
   const room = normalizeRoom(body.room);
   await env.DB.prepare(
     `DELETE FROM coop_lobby_p33

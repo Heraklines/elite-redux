@@ -515,6 +515,25 @@ describe("P33 authenticated signaling Worker", () => {
     expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_ticket_bindings_p33").get()).toEqual({ count: 0 });
   });
 
+  it("releases a paired presence after both browser processes disappear past presence plus rejoin grace", async () => {
+    env.P33_REJOIN_GRACE_MS = "120000";
+    await pair();
+
+    vi.setSystemTime(start + 30_000 + 120_000 + 1);
+    const alice = await announce(
+      "er-account:11",
+      "Alice",
+      nonce("alice-abandoned-ticket"),
+      nonce("alice-abandoned-client"),
+    );
+    const bob = await announce("er-account:22", "Bob", nonce("bob-abandoned-ticket"), nonce("bob-abandoned-client"));
+
+    expect(alice.pairing).toBeNull();
+    expect(bob.pairing).toBeNull();
+    expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_runs_p33").get()).toEqual({ count: 0 });
+    expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_lobby_p33").get()).toEqual({ count: 2 });
+  });
+
   it("releases lobby membership only through the explicit post-terminal end route", async () => {
     const { alice, bob, code } = await pair();
     expect(await call("/coop/v3/end", { body: { code }, token: bob.pairingToken })).toMatchObject({

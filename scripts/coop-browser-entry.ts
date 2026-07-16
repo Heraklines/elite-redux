@@ -774,6 +774,7 @@ function observeRenderProfile(): void {
     const observation = {
       version: 1,
       moveAnimations: globalScene.moveAnimations,
+      gameSpeed: globalScene.gameSpeed,
       handler: "SettingsDisplayUiHandler",
     } as const;
     const canonical = JSON.stringify(observation);
@@ -800,9 +801,6 @@ function observeSemanticSurface(): void {
       return;
     }
     const handler = ui.getHandler();
-    if (!handler?.active) {
-      return;
-    }
     const uiMode = UiMode[ui.getMode()];
     // Two adjacent ExpPhase objects can expose the same surface/address and can both become
     // ready between 100 ms observer samples at 10x speed. Object identity is read-only and
@@ -811,6 +809,61 @@ function observeSemanticSurface(): void {
     if (currentPhase !== lastSemanticPhase) {
       lastSemanticPhase = currentPhase;
       semanticPhaseInstance += 1;
+    }
+    // A paired controller can exist briefly on TitlePhase before the new session epoch is bound. A title
+    // narration is not battle progress; suppress it instead of emitting an impossible co-op epoch-0 surface.
+    if (phase === "TitlePhase" && uiMode === "MESSAGE") {
+      return;
+    }
+    // When this seat has no locally actionable battler, the real continuation is the exact replay waiter,
+    // not a fabricated command menu. The phase exposes readiness only after awaitTurnOrLiveEvent is installed.
+    const rendererWaitReady = (
+      currentPhase as unknown as { isAwaitingAuthority?: () => boolean }
+    ).isAwaitingAuthority?.();
+    if (rendererWaitReady === true && runtime != null && battle != null) {
+      const membership = runtime.membership.snapshot();
+      if (membership.state !== "active" || runtime.controller.sessionEpoch <= 0) {
+        return;
+      }
+      const { digest: stateDigest } = computeMechanicalDigest();
+      const observation = {
+        version: 2,
+        surfaceId: "command:watcher",
+        operationClass: "command",
+        ownerModel: "local",
+        coop: true,
+        address: {
+          epoch: runtime.controller.sessionEpoch,
+          wave: battle.waveIndex,
+          turn: battle.turn,
+        },
+        membershipRevision: membership.revision,
+        connectionGeneration: membership.connectionGeneration,
+        localSeat: runtime.controller.seat,
+        localRole: runtime.controller.role,
+        ownerSeat: null,
+        seatsWithInput: [],
+        selectedOptionId: null,
+        optionIds: null,
+        optionCount: null,
+        teamSpeciesIds: null,
+        ready: { handlerActive: false, awaitingActionInput: false, inputBlocked: true },
+        phase,
+        phaseInstance: semanticPhaseInstance,
+        surfaceGeneration: null,
+        mysteryEncounterType: battle.mysteryEncounter?.encounterType ?? null,
+        stateDigest,
+        uiMode,
+      } as const;
+      const canonical = JSON.stringify(observation);
+      if (canonical !== lastSemanticObservation) {
+        lastSemanticObservation = canonical;
+        console.info(`${SURFACE2_PREFIX}${canonical}`);
+      }
+      return;
+    }
+    if (!handler?.active) {
+      return;
     }
     const semantic = classifySemanticSurface(phase, uiMode);
     if (semantic == null) {

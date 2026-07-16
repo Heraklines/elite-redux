@@ -358,6 +358,40 @@ test("a registered reward waiting for handler readiness is not classified as an 
   );
 });
 
+test("registered surfaces deduplicate re-emissions by semantic identity, not evidence index", () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const driver = {
+    name: "reward",
+    present: /OWNER drives reward screen/u,
+    v2SurfaceId: "reward-shop",
+    owner: { marker: /OWNER drives reward screen/u },
+  };
+  const address = { epoch: 7, wave: 1, turn: 4 };
+  const pushReward = phaseInstance => {
+    authority.evidence.events.push({
+      index: authority.evidence.events.length,
+      kind: "browser-surface2",
+      observation: {
+        surfaceId: "reward-shop",
+        address,
+        phaseInstance,
+        localSeat: 0,
+        ownerSeat: 0,
+        ready: { handlerActive: true, awaitingActionInput: false },
+      },
+    });
+  };
+  pushReward(11);
+  const handled = new Map([["reward:authority", JSON.stringify(["reward-shop", 7, 1, 4, 11])]]);
+  pushReward(11);
+  assert.equal(findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }, handled), null);
+
+  pushReward(12);
+  assert.equal(findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }, handled), driver);
+});
+
 test("only ready active local battle narration and EXP instances advance once on each public client", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
@@ -412,6 +446,32 @@ test("only ready active local battle narration and EXP instances advance once on
       ["renderer", "battle:message", 1],
     ],
   );
+});
+
+test("between-wave prompt advancement admits a live NextEncounter narration without an old command address", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const stats = { battleMessagePrompts: 0, postBattleExpPrompts: 0 };
+  const from = { authority: 0, renderer: 0 };
+  const advance = createBattlePromptAdvancer(rig, from, stats, "wave-2-between-wave", {
+    requireSharedCommandAddress: false,
+  });
+  authority.evidence.pushBattleReadiness("battle:message", "NextEncounterPhase", true, 41, true, {
+    epoch: 7,
+    wave: 2,
+    turn: 1,
+  });
+  renderer.evidence.pushBattleReadiness("battle:message", "NextEncounterPhase", true, 52, true, {
+    epoch: 7,
+    wave: 2,
+    turn: 1,
+  });
+
+  assert.equal(await advance(), true);
+  assert.equal(await advance(), true);
+  assert.equal(await advance(), false, "each exact phase instance is driven once");
+  assert.equal(stats.battleMessagePrompts, 2);
 });
 
 test("pre-command launch advances a readiness-proven SummonPhase prompt without inventing a command address", async () => {
@@ -478,6 +538,18 @@ test("the short outcome wait names a fully submitted turn as progress", async ()
   assert.deepEqual(await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 50, { stopOnTurnProgress: true }), {
     kind: "turn-progress",
   });
+});
+
+test("the outcome wait drains already-buffered completion evidence at its deadline", async () => {
+  const authority = fakeClient("authority", ["Start Phase SelectModifierPhase"]);
+  const renderer = fakeClient("renderer", ["Start Phase SelectModifierPhase"]);
+  const rig = {
+    host: authority,
+    clients: { authority, renderer },
+    config: { faintOwnerSeat: "renderer" },
+  };
+
+  assert.deepEqual(await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 0), { kind: "reward" });
 });
 
 test("the campaign outcome wait accepts the first owned command frontier without waiting for its peer", async () => {

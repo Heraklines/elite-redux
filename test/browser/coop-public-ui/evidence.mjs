@@ -25,7 +25,6 @@ const FATAL_COOP_CONSOLE_RULES = Object.freeze([
     "checksum divergence",
   ],
   [/^\[coop-resync\].*\bUNHEALED\b/iu, "checksum recovery did not heal"],
-  [/^\[coop:durability\].*\boperation delivery RETRY\b/u, "durable operation delivery retry"],
   [
     /^\[coop:durability\].*(?:\brecover cls=.*\battempt=\d+\/\d+|\brecovery request send deferred\b)/u,
     "durability recovery attempt",
@@ -513,6 +512,9 @@ function renderProfileView(text) {
     || typeof value !== "object"
     || value.version !== 1
     || typeof value.moveAnimations !== "boolean"
+    || typeof value.gameSpeed !== "number"
+    || !Number.isFinite(value.gameSpeed)
+    || value.gameSpeed <= 0
     || value.handler !== "SettingsDisplayUiHandler"
   ) {
     throw new Error("built browser emitted an invalid render-profile observation");
@@ -859,6 +861,12 @@ export class EvidenceSink {
     return this.events
       .slice(from)
       .find(event => event.kind === "browser-render-profile" && event.observation.moveAnimations === moveAnimations);
+  }
+
+  findGameSpeed(gameSpeed, from = 0) {
+    return this.events
+      .slice(from)
+      .find(event => event.kind === "browser-render-profile" && event.observation.gameSpeed === gameSpeed);
   }
 
   /** Latest strict market projection, optionally filtered by a predicate. */

@@ -156,7 +156,7 @@ export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
     fixture === "faint-owner"
       ? [
           { speciesId: SpeciesId.MAGIKARP, moveset: [MoveId.HEALING_WISH] },
-          { speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] },
+          { speciesId: SpeciesId.SEEL, moveset: [MoveId.WATER_SPOUT] },
         ]
       : [{ speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] }];
   return specs.map(({ speciesId, moveset }) => ({

@@ -72,7 +72,12 @@ function ownedCommand(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
   };
 }
 
-function commandFrontierObservation(localSeat, kind, stateDigest = "same-state") {
+function commandFrontierObservation(
+  localSeat,
+  kind,
+  stateDigest = "same-state",
+  address = { epoch: 73, wave: 1, turn: 3 },
+) {
   const owner = kind === "owner";
   return {
     kind: "browser-surface2",
@@ -83,7 +88,7 @@ function commandFrontierObservation(localSeat, kind, stateDigest = "same-state")
       surfaceId: owner ? "command:command" : "battle:message",
       phase: "CommandPhase",
       uiMode: owner ? "COMMAND" : "MESSAGE",
-      address: { epoch: 73, wave: 1, turn: 3 },
+      address,
       membershipRevision: 9,
       connectionGeneration: 2,
       stateDigest,
@@ -104,6 +109,29 @@ test("command frontier accepts one real owner plus the half-wiped partner watche
   assert.equal(match?.address, "73:1:3");
   assert.equal(match?.hostProjection.kind, "watcher");
   assert.equal(match?.guestProjection.kind, "owner");
+});
+
+test("command frontier accepts an exact replay waiter as a non-actionable watcher", () => {
+  const host = { label: "host", publicSeat: 0, evidence: new FakeEvidence("host") };
+  const guest = { label: "guest", publicSeat: 1, evidence: new FakeEvidence("guest") };
+  const address = { epoch: 73, wave: 2, turn: 4 };
+  host.evidence.push(commandFrontierObservation(0, "owner", "same-state", address));
+  guest.evidence.push({
+    kind: "browser-surface2",
+    observation: {
+      ...commandFrontierObservation(1, "watcher", "same-state", address).observation,
+      surfaceId: "command:watcher",
+      operationClass: "command",
+      phase: "CoopReplayTurnPhase",
+      seatsWithInput: [],
+      ready: { handlerActive: false, awaitingActionInput: false, inputBlocked: true },
+    },
+  });
+
+  const match = findSharedCommandFrontierMatch(host, guest, { host: 0, guest: 0 }, null);
+  assert.equal(match?.hostProjection.kind, "owner");
+  assert.equal(match?.guestProjection.kind, "watcher");
+  assert.equal(match?.address, "73:2:4");
 });
 
 test("command frontier rejects owner/watcher digest or generation disagreement", () => {
@@ -461,6 +489,61 @@ test("sequential command driver accepts an exact-address collection close when t
   assert.equal(secondProof.skippedAfterCollectionClosed, true);
   assert.equal(secondProof.collectionClosedObservedBy, "first");
   assert.equal(result.expectedCommandAddress, "73:1:2");
+});
+
+test("exact-address reward closure skips a phantom owner without hiding the one-shot outcome", async () => {
+  const order = [];
+  const address = { epoch: 73, wave: 1, turn: 4 };
+  const firstEvidence = new FakeEvidence("first");
+  const secondEvidence = new FakeEvidence("second");
+  firstEvidence.push(ownedCommand(0, address));
+  const first = {
+    label: "first",
+    publicSeat: 0,
+    evidence: firstEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("first");
+      secondEvidence.push({
+        kind: "browser-surface2",
+        observation: {
+          operationClass: "reward",
+          surfaceId: "reward-shop",
+          phase: "SelectModifierPhase",
+          address,
+        },
+      });
+    },
+  };
+  const second = {
+    label: "second",
+    publicSeat: 1,
+    evidence: secondEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("second");
+    },
+  };
+  const rig = {
+    clients: { first, second },
+    config: { timeoutMs: 1_000 },
+  };
+
+  const result = await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
+    rig,
+    { first: 0, second: 0 },
+    ["Space", "Space", "Space"],
+    "turn-4",
+  );
+
+  assert.deepEqual(order, ["first"]);
+  assert.equal(result.commandEvents.second, undefined);
+  assert.equal(result.outcomeCursors.second, 0, "the reward event remains inside the next outcome scan");
+  const secondProof = secondEvidence.events.at(-1);
+  assert.equal(secondProof.kind, "sequential-command-proof");
+  assert.equal(secondProof.skippedAfterCollectionClosed, true);
+  assert.equal(secondProof.collectionClosedObservedBy, "second");
+  assert.equal(result.expectedCommandAddress, "73:1:4");
 });
 
 function marketObservation({ localSeat, ownerSeat, marketOpen, stock, money, quantity }) {

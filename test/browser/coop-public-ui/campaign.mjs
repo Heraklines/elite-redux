@@ -160,16 +160,25 @@ async function raiseGameSpeed(rig, policy, progress) {
     return;
   }
   for (const client of clients) {
+    const speedCursor = client.evidence.cursor();
     // Drive Title -> Settings -> Game Speed 10x -> back through the real menus. The sequence
     // itself resets the Title cursor to New Game; Settings is an overlay so TitlePhase does
     // not re-log, and a wrong sequence fails loudly at the subsequent pairing (which re-waits
     // Title). A trailing settle lets the last menu transition land before pairing.
     await client.sequence(keys, "raise-game-speed-to-10x");
     await delay(client.config.settleDelayMs);
-    client.evidence.record("campaign-speed", { status: "applied", keys });
+    const attestation = await client.evidence.waitForCondition(sink => sink.findGameSpeed(10, speedCursor), {
+      timeoutMs: client.config.timeoutMs,
+      description: "visible Settings Game Speed=10 attestation",
+    });
+    client.evidence.record("campaign-speed", {
+      status: "attested",
+      gameSpeed: attestation.observation.gameSpeed,
+      keys,
+    });
     await client.checkpoint("speed-raised");
   }
-  await progress.note("speed-raise applied (Game Speed -> 10x via Settings UI)", { keys });
+  await progress.note("speed-raise observer-attested (Game Speed -> 10x via Settings UI)", { keys });
 }
 
 /**
@@ -469,9 +478,6 @@ export async function waitForOutcomeBounded(
   const animationBudget = extendForAnimationProgress ? createAnimationProgressBudget(rig, from, timeoutMs) : null;
   while (true) {
     const deadline = animationBudget?.observe() ?? fixedDeadline;
-    if (Date.now() >= deadline) {
-      break;
-    }
     // A mid-battle wipe / game-over is a real run END, not a driver softlock: classify it
     // distinctly so the campaign still produces clean evidence instead of a generic hang.
     if (
@@ -508,6 +514,11 @@ export async function waitForOutcomeBounded(
     }
     if (advanceBattlePrompt && (await advanceBattlePrompt())) {
       continue;
+    }
+    // Drain evidence once before honoring the deadline. Under severe event-loop dilation the timer callback
+    // can resume after the immutable ceiling even though the commit/reward event was already buffered.
+    if (Date.now() >= deadline) {
+      break;
     }
     await delay(100);
   }
@@ -644,6 +655,28 @@ function hasSemanticSurface(rig, surfaceId, cursors) {
   );
 }
 
+function semanticAppearanceIdentity(event) {
+  const observation = event?.kind === "browser-surface2" ? event.observation : null;
+  if (observation == null) {
+    return null;
+  }
+  return JSON.stringify([
+    observation.surfaceId,
+    observation.address?.epoch,
+    observation.address?.wave,
+    observation.address?.turn,
+    observation.phaseInstance,
+  ]);
+}
+
+function semanticAppearanceIsNew(event, handled) {
+  if (event == null) {
+    return false;
+  }
+  const identity = semanticAppearanceIdentity(event);
+  return identity == null || typeof handled !== "string" ? event.index > (handled ?? -1) : identity !== handled;
+}
+
 /**
  * Return the first registered between-wave surface observed since this wave began.
  *
@@ -659,7 +692,7 @@ export function findRegisteredSurface(rig, dispatch, cursors, handledIndex = new
       if (driver.v2SurfaceId && hasSemanticSurface(rig, driver.v2SurfaceId, cursors)) {
         return Object.values(rig.clients).some(client => {
           const event = client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, driver.v2SurfaceId);
-          return event != null && event.index > (handledIndex.get(`${driver.name}:${client.label}`) ?? -1);
+          return semanticAppearanceIsNew(event, handledIndex.get(`${driver.name}:${client.label}`));
         });
       }
       return Object.values(rig.clients).some(client => {
@@ -680,8 +713,12 @@ export function findRegisteredSurface(rig, dispatch, cursors, handledIndex = new
  */
 export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) {
   const clients = Object.values(rig.clients);
-  const notYetHandled = (client, event) =>
-    event != null && event.index > (handledIndex.get(`${driver.name}:${client.label}`) ?? -1);
+  const notYetHandled = (client, event) => {
+    const handled = handledIndex.get(`${driver.name}:${client.label}`);
+    return event?.kind === "browser-surface2"
+      ? semanticAppearanceIsNew(event, handled)
+      : event != null && event.index > (handled ?? -1);
+  };
 
   // The v2 projection is the actionable public surface and its own ownership contract. Legacy
   // OWNER lines can be emitted while preceding narration is still active, or before a campaign's
@@ -1134,10 +1171,7 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       if (driver.v2SurfaceId) {
         const semantic = c.evidence.findLastSemanticSurface(cursors[c.label], driver.v2SurfaceId);
         if (semantic) {
-          handledIndex.set(
-            `${driver.name}:${c.label}`,
-            Math.max(handledIndex.get(`${driver.name}:${c.label}`) ?? -1, semantic.index),
-          );
+          handledIndex.set(`${driver.name}:${c.label}`, semanticAppearanceIdentity(semantic));
         }
       }
     }
@@ -1211,6 +1245,13 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
   // (surfaceCursors); the next command and terminal are searched from the post-battle
   // cursor so this wave's own commands never read as the next wave.
   const commandCursors = fromEach(clients, client => client.evidence.cursor());
+  const advanceBattlePrompt = createBattlePromptAdvancer(
+    rig,
+    commandCursors,
+    stats,
+    `wave-${waveOrdinal}-between-wave`,
+    { requireSharedCommandAddress: false },
+  );
   const deadline = Date.now() + rig.config.timeoutMs * 3;
   let stallSince = 0;
   let lastPhaseProgress = phaseProgressSignature(clients);
@@ -1261,6 +1302,14 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
     if (drove) {
       stallSince = 0;
       lastRegisteredSurface = drove;
+      lastPhaseProgress = phaseProgressSignature(clients);
+      drivenSurfacePhaseSignature = lastPhaseProgress;
+      continue;
+    }
+
+    if (await advanceBattlePrompt()) {
+      stallSince = 0;
+      lastRegisteredSurface = null;
       lastPhaseProgress = phaseProgressSignature(clients);
       drivenSurfacePhaseSignature = lastPhaseProgress;
       continue;

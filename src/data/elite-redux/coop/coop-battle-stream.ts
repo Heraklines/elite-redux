@@ -499,7 +499,7 @@ interface ReplacementAckIdentity {
   checksum: string;
 }
 
-export type CoopAuthorityContinuationSurface = "command" | "sharedInput" | "terminal";
+export type CoopAuthorityContinuationSurface = "command" | "rendererWait" | "sharedInput" | "terminal";
 
 export type CoopAuthorityContinuationExpectation =
   | { kind: "command"; epoch: number; wave: number; turn: number }
@@ -2257,7 +2257,7 @@ export class CoopBattleStreamer {
       // next address. Both are real, renderer-active public continuation surfaces; the full address—not the
       // early prediction—must decide whether authority retention can be released.
       return (
-        (surface === "command" || surface === "sharedInput")
+        (surface === "command" || surface === "rendererWait" || surface === "sharedInput")
         && ((current.wave === expectation.wave && current.turn === expectation.turn)
           || (this.admittedWaveAdvanceContinuations.has(`${expectation.epoch}:${expectation.wave}`)
             && current.wave === expectation.wave + 1

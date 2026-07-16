@@ -73,6 +73,11 @@ import type { TurnMove } from "#types/turn-move";
 import { canTerastallize } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
+// A healthy peer can spend more than four minutes in autonomous Commander presentation on a constrained
+// browser runner before it is able to reach the same command point. Keep this command-only wait bounded,
+// but beyond the measured seven-minute browser ceiling; shop/route waits retain the tighter default.
+const COMMAND_RENDEZVOUS_RECOVERY_MAX_ATTEMPTS = 7;
+
 export class CommandPhase extends FieldPhase {
   public readonly phaseName = "CommandPhase";
   protected fieldIndex: number;
@@ -904,7 +909,7 @@ export class CommandPhase extends FieldPhase {
       }
       coopLog("rendezvous", `next-command barrier ARRIVE+AWAIT ${point} slot=${this.fieldIndex}`);
       return rendezvous
-        .rendezvous(point, getCoopRendezvousWaitMs())
+        .rendezvous(point, getCoopRendezvousWaitMs(), COMMAND_RENDEZVOUS_RECOVERY_MAX_ATTEMPTS)
         .then(result => {
           if (result.timedOut) {
             coopWarn(

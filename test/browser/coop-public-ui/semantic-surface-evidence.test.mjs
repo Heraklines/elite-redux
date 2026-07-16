@@ -48,6 +48,29 @@ test("semantic evidence ignores unrelated console lines and freezes a valid proo
   assert.ok(Object.isFrozen(parsed.seatsWithInput));
 });
 
+test("semantic evidence accepts an exact non-actionable replay watcher", () => {
+  const parsed = semanticSurfaceView(
+    `${PREFIX}${JSON.stringify(
+      valid({
+        surfaceId: "command:watcher",
+        operationClass: "command",
+        ownerModel: "local",
+        ownerSeat: null,
+        seatsWithInput: [],
+        selectedOptionId: null,
+        optionIds: null,
+        optionCount: null,
+        ready: { handlerActive: false, awaitingActionInput: false, inputBlocked: true },
+        phase: "CoopReplayTurnPhase",
+        surfaceGeneration: null,
+        uiMode: "MESSAGE",
+      }),
+    )}`,
+  );
+  assert.equal(parsed.surfaceId, "command:watcher");
+  assert.deepEqual(parsed.seatsWithInput, []);
+});
+
 test("semantic evidence rejects every malformed claimed proof", () => {
   assert.throws(() => semanticSurfaceView(`${PREFIX}{`), /invalid semantic surface JSON/u);
   assert.throws(

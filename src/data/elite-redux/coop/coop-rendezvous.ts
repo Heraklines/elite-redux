@@ -395,7 +395,14 @@ export class CoopRendezvous {
    * invokes the runtime terminal hook and returns a closed `timedOut` result; neither outcome grants
    * permission to cross a shared boundary independently.
    */
-  awaitPartner(point: string, timeoutMs = this.defaultTimeoutMs): Promise<CoopRendezvousResult> {
+  awaitPartner(
+    point: string,
+    timeoutMs = this.defaultTimeoutMs,
+    maxRecoveryAttempts = this.maxRecoveryAttempts,
+  ): Promise<CoopRendezvousResult> {
+    if (!Number.isSafeInteger(maxRecoveryAttempts) || maxRecoveryAttempts <= 0) {
+      throw new Error("invalid rendezvous per-wait recovery attempt bound");
+    }
     this.recordCausalStage("wait-open", point);
     if (this.partnerArrived.has(point)) {
       if (isCoopDebug()) {
@@ -411,7 +418,7 @@ export class CoopRendezvous {
     const buffered = this.foreignArrival(point);
     if (buffered !== undefined) {
       if (this.transport.role === "host") {
-        return this.publishAuthoritativeRoute(point, buffered, timeoutMs).then(result =>
+        return this.publishAuthoritativeRoute(point, buffered, timeoutMs, maxRecoveryAttempts).then(result =>
           this.recordWaitOutcome(point, result),
         );
       }
@@ -492,7 +499,7 @@ export class CoopRendezvous {
               finish({ point, timedOut: false });
               return;
             }
-            if (recoveryAttempts >= this.maxRecoveryAttempts) {
+            if (recoveryAttempts >= maxRecoveryAttempts) {
               this.recoveryExhausted({ point, attempts: recoveryAttempts, kind: "arrival" });
               finish({ point, timedOut: true });
               return;
@@ -500,7 +507,7 @@ export class CoopRendezvous {
             recoveryAttempts++;
             coopWarn(
               "rendezvous",
-              `RENDEZVOUS RECOVERY RETRY point=${point} attempt=${recoveryAttempts}/${this.maxRecoveryAttempts} `
+              `RENDEZVOUS RECOVERY RETRY point=${point} attempt=${recoveryAttempts}/${maxRecoveryAttempts} `
                 + `after ${timeoutMs}ms - partner never arrived; `
                 + `RETRANSMITTING and KEEPING BOUNDARY CLOSED role=${this.transport.role}`,
             );
@@ -524,9 +531,13 @@ export class CoopRendezvous {
    * the barrier FIRST blocks until the other arrives, the client that reached it SECOND resolves at
    * once (the first's arrival is already buffered). Neither crosses `point` until both have arrived.
    */
-  rendezvous(point: string, timeoutMs = this.defaultTimeoutMs): Promise<CoopRendezvousResult> {
+  rendezvous(
+    point: string,
+    timeoutMs = this.defaultTimeoutMs,
+    maxRecoveryAttempts = this.maxRecoveryAttempts,
+  ): Promise<CoopRendezvousResult> {
     this.arrive(point);
-    return this.awaitPartner(point, timeoutMs);
+    return this.awaitPartner(point, timeoutMs, maxRecoveryAttempts);
   }
 
   /** Whether the partner has already arrived at `point` (a race check without parking a waiter). */
@@ -826,6 +837,7 @@ export class CoopRendezvous {
     point: string,
     displacedPoint: string,
     retryMs: number,
+    maxRecoveryAttempts = this.maxRecoveryAttempts,
   ): Promise<CoopRendezvousResult> {
     const revision = ++this.routeRevision;
     const epoch = this.getEpoch();
@@ -877,7 +889,7 @@ export class CoopRendezvous {
           coopWarn("rendezvous", `host phaseRoute send threw rev=${revision} (retry remains bounded)`, error);
         }
         cancel = this.schedule(() => {
-          if (recoveryAttempts >= this.maxRecoveryAttempts) {
+          if (recoveryAttempts >= maxRecoveryAttempts) {
             this.recoveryExhausted({
               point,
               displacedPoint,
@@ -890,7 +902,7 @@ export class CoopRendezvous {
           recoveryAttempts++;
           coopWarn(
             "rendezvous",
-            `host phaseRoute RETRY rev=${revision} attempt=${recoveryAttempts}/${this.maxRecoveryAttempts} `
+            `host phaseRoute RETRY rev=${revision} attempt=${recoveryAttempts}/${maxRecoveryAttempts} `
               + `authoritative=${point} displaced=${displacedPoint}`,
           );
           sendAndArm();

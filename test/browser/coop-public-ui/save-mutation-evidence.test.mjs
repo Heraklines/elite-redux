@@ -68,6 +68,11 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
   assert.match(journeys, /sessionStorageKeys\(deletedCold\)/u);
   assert.match(harness, /browser\.createBrowserContext\(\)/u);
   assert.match(harness, /brand-new cookie jar and local storage/u);
+  assert.match(
+    harness,
+    /this\.config\.accountMode === "register" && !this\.authenticatedOnce && account\.lastSessionSlot === -1/u,
+  );
+  assert.match(harness, /sink\.events\.slice\(this\.pageCursor\)\.find\(/u);
   assert.match(workflow, /local-worker-server\.ts/u);
   assert.match(workflow, /local-worker-vite\.config\.mjs/u);
   assert.match(workflow, /inputs\.journey == 'save-mutations'/u);

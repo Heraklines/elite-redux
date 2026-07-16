@@ -31,13 +31,16 @@ const POST_TURN_AUTHORITY_PROGRESS = /\[coop:turn\] host recorder: append turn=\
 const POST_TURN_RENDERER_PROGRESS = /\[coop:replay\] guest replay turn=\d+: live increment seq=(\d+)\.\.(\d+)/u;
 const REWARD_RESULT_RETAINED = /reward authoritative RESULT retained rev=(\d+) tick=(\d+) id=([^\s]+)/u;
 const FATAL_COOP_RECOVERY = /Co-op Sync Recovery|recovery request attempt=|recovery EXHAUSTED|could not converge/iu;
-const RENDEZVOUS_RECOVERY_RETRY_POINT = /\[coop:rendezvous\] RENDEZVOUS RECOVERY RETRY point=([^\s]+) after \d+ms/u;
+const RENDEZVOUS_RECOVERY_RETRY_POINT =
+  /\[coop:rendezvous\] RENDEZVOUS RECOVERY RETRY point=([^\s]+)(?: attempt=\d+\/\d+)? after \d+ms/u;
 const TATSUGIRI_SPECIES_ID = 978;
 const DONDOZO_SPECIES_ID = 977;
 const MAGIKARP_SPECIES_ID = 129;
 const BULBASAUR_SPECIES_ID = 1;
+const SEEL_SPECIES_ID = 86;
 const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;
 const POST_TURN_HARD_CEILING_MS = 360_000;
+const COLD_REJOIN_RELEASE_MS = 160_000;
 // Trace-enabled four-core run 29405818635 reached the matching cmd:1:1 observations 0.45s and
 // 1.05s after the ordinary ceiling across the two owner parities, with causal Phaser progress.
 // Keep that measured launch allowance Commander-only; ordinary waits retain the tighter ceiling.
@@ -210,7 +213,7 @@ function findAddressedCommandCollectionClosed(client, from, expectedAddress) {
   return client.evidence.events.slice(from).find(event => {
     const observation = event.kind === "browser-surface2" ? event.observation : null;
     return (
-      observation?.operationClass === "battle-progress"
+      (observation?.operationClass === "battle-progress" || observation?.operationClass === "reward")
       && observation.phase !== "CommandPhase"
       && sameAddress(observation.address, expectedAddress)
     );
@@ -471,6 +474,14 @@ function commandFrontierProjection(client, event) {
   }
   const observation = event.observation;
   const address = observation?.address;
+  const rendererWatcher =
+    observation?.surfaceId === "command:watcher"
+    && observation.operationClass === "command"
+    && observation.phase === "CoopReplayTurnPhase"
+    && observation.seatsWithInput?.length === 0
+    && observation.ready?.handlerActive === false
+    && observation.ready.awaitingActionInput === false
+    && observation.ready.inputBlocked === true;
   if (
     observation?.coop !== true
     || observation.localSeat !== client.publicSeat
@@ -481,7 +492,7 @@ function commandFrontierProjection(client, event) {
     || !Number.isSafeInteger(observation.connectionGeneration)
     || typeof observation.stateDigest !== "string"
     || observation.stateDigest.length === 0
-    || observation.ready?.handlerActive !== true
+    || (observation.ready?.handlerActive !== true && !rendererWatcher)
   ) {
     return null;
   }
@@ -492,11 +503,12 @@ function commandFrontierProjection(client, event) {
     && observation.uiMode === "COMMAND"
     && observation.seatsWithInput?.includes(client.publicSeat);
   const watcher =
-    observation.surfaceId === "battle:message"
-    && observation.operationClass === "battle-progress"
-    && observation.phase === "CommandPhase"
-    && observation.uiMode === "MESSAGE"
-    && observation.ready.awaitingActionInput === true;
+    rendererWatcher
+    || (observation.surfaceId === "battle:message"
+      && observation.operationClass === "battle-progress"
+      && observation.phase === "CommandPhase"
+      && observation.uiMode === "MESSAGE"
+      && observation.ready.awaitingActionInput === true);
   if (!owner && !watcher) {
     return null;
   }
@@ -714,6 +726,7 @@ export class PublicUiClient {
     this.pageCursor = this.evidence.cursor();
     this.evidence.networkState.account = null;
     this.evidence.networkState.lobby = null;
+    this.evidence.networkState.apiFailure = null;
     this.publicRole = null;
     this.publicSeat = null;
     this.page = await this.context.newPage();
@@ -741,6 +754,9 @@ export class PublicUiClient {
 
   async reopen() {
     this.evidence.record("reopen", { reason: "cold browser page using same isolated context" });
+    // Closing a loading page intentionally aborts asset preloads. Detach only this page's error observer
+    // immediately before teardown; errors from the replacement page remain strict.
+    this.page?.removeAllListeners("pageerror");
     await this.page?.close().catch(() => {});
     await this.open();
   }
@@ -753,6 +769,7 @@ export class PublicUiClient {
     this.evidence.record("cold-context-replace", {
       reason: "brand-new cookie jar and local storage; visible login required",
     });
+    this.page?.removeAllListeners("pageerror");
     await this.context.close();
     this.context = await browser.createBrowserContext();
     this.authenticatedOnce = true;
@@ -858,12 +875,14 @@ export class PublicUiClient {
         description: "authenticated public account response",
       },
     );
-    if (this.config.accountMode === "register" && account.lastSessionSlot === -1) {
+    if (this.config.accountMode === "register" && !this.authenticatedOnce && account.lastSessionSlot === -1) {
       await this.evidence.waitForCondition(
         sink =>
-          sink.events.find(
-            event => event.kind === "response" && event.status === 404 && event.url.endsWith("/savedata/system/get"),
-          ),
+          sink.events
+            .slice(this.pageCursor)
+            .find(
+              event => event.kind === "response" && event.status === 404 && event.url.endsWith("/savedata/system/get"),
+            ),
         {
           timeoutMs: this.config.timeoutMs,
           description: "new-account public save lookup",
@@ -2039,7 +2058,7 @@ export class DuoPublicUiRig {
             ? [client.label === this.config.commanderOwnerSeat ? TATSUGIRI_SPECIES_ID : DONDOZO_SPECIES_ID]
             : faintFixture
               ? client.label === this.config.faintOwnerSeat
-                ? [MAGIKARP_SPECIES_ID, BULBASAUR_SPECIES_ID]
+                ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
                 : [BULBASAUR_SPECIES_ID]
               : null;
           const result =
@@ -2342,7 +2361,9 @@ export class DuoPublicUiRig {
           // that no reciprocal command owner exists for this round (for example, that battler is
           // fainted or structurally hidden). Never invent a second owner after collection has closed.
           for (const label of pending) {
-            outcomeCursors[label] = this.clients[label].evidence.cursor();
+            // Preserve the pre-round cursor: a one-shot reward/terminal surface may itself be the exact
+            // collection-close event and must remain visible to the following outcome scan.
+            outcomeCursors[label] = from[label] ?? 0;
           }
           pending.clear();
           break;
@@ -2525,9 +2546,19 @@ export class DuoPublicUiRig {
   }
 
   async coldReopenAndPair(requesterSeat) {
+    const abandonedAt = Date.now();
     await this.stopChromeTrace();
     await Promise.all(Object.values(this.clients).map(client => client.reopen()));
     await this.loginBoth();
+    // The worker releases a crashed pair only after the 30s presence window plus 120s hot-rejoin grace.
+    // Login usually consumes most of this interval; wait only the bounded remainder before a fresh announce.
+    const releaseRemainderMs = abandonedAt + COLD_REJOIN_RELEASE_MS - Date.now();
+    if (releaseRemainderMs > 0) {
+      for (const client of Object.values(this.clients)) {
+        client.evidence.record("cold-rejoin-grace-wait", { remainingMs: releaseRemainderMs });
+      }
+      await delay(releaseRemainderMs);
+    }
     await this.pair(requesterSeat);
   }
 
