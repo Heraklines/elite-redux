@@ -1176,7 +1176,11 @@ export class SummaryUiHandler extends UiHandler {
           const passiveAbilities = this.pokemon.getPassiveAbilities();
           for (let slot = 0; slot < passiveAbilities.length; slot++) {
             const passiveAbility = passiveAbilities[slot];
-            if (!passiveAbility) {
+            // Skip empty slots: a null slot OR an explicit `AbilityId.NONE`
+            // (a design-PARKED innate, e.g. Primal Mew's not-yet-defined Shattered
+            // Psyche). Rendering NONE would draw a broken/blank PASSIVE row. This
+            // mirrors the profile-tab innate guard below.
+            if (!passiveAbility || passiveAbility.id === AbilityId.NONE) {
               continue;
             }
             const container: AbilityContainer = {

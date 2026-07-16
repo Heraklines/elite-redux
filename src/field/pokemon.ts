@@ -5934,6 +5934,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       SpeciesFormKey.MEGA,
       SpeciesFormKey.MEGA_X,
       SpeciesFormKey.MEGA_Y,
+      SpeciesFormKey.MEGA_Z,
       SpeciesFormKey.PRIMAL,
     ] as string[];
     return (
@@ -5947,6 +5948,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       formKey === SpeciesFormKey.MEGA
       || formKey === SpeciesFormKey.MEGA_X
       || formKey === SpeciesFormKey.MEGA_Y
+      || formKey === SpeciesFormKey.MEGA_Z
       || formKey === SpeciesFormKey.PRIMAL
       || formKey === SpeciesFormKey.GIGANTAMAX
       || formKey === SpeciesFormKey.GIGANTAMAX_RAPID

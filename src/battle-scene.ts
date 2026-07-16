@@ -1281,6 +1281,12 @@ export class BattleScene extends SceneBase {
       .setName(`sprite-${pokemon.name}-icon`)
       .setFrame(pokemon.getIconId(ignoreOverride, useIllusion))
       .setOrigin(0.5, 0);
+    // Per-species icon-scale multiplier (1 for every vanilla species; < 1 for
+    // ER icon-from-front species whose icon is a downscaled front frame).
+    const iconScale = pokemon.getSpeciesForm(ignoreOverride, useIllusion).getIconScale(pokemon.formIndex);
+    if (iconScale !== 1) {
+      icon.setScale(iconScale);
+    }
     // Temporary fix to show pokemon's default icon if variant icon doesn't exist
     if (icon.frame.name !== pokemon.getIconId(ignoreOverride, useIllusion)) {
       console.log(`${pokemon.name}'s variant icon does not exist. Replacing with default.`);

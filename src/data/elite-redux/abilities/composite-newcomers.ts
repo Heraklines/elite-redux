@@ -39,6 +39,18 @@
 import type { AbAttr } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
+import {
+  ER_DRAGONFRUIT_ABILITY_ID,
+  ER_FREE_CLIMB_ABILITY_ID,
+  ER_GRIEVOUS_SPEAR_ABILITY_ID,
+  ER_GRIM_JAB_ABILITY_ID,
+  ER_KOMODO_NATIVIZE_ABILITY_ID,
+  ER_OMINOUS_SHROUD_ABILITY_ID,
+  ER_SAVAGE_SPEAR_ABILITY_ID,
+  ER_SPECTACLE_ABILITY_ID,
+  ER_VOLTRON_ABILITY_ID,
+  ER_WATERBORNE_ABILITY_ID,
+} from "#data/elite-redux/abilities/type-nativization-abilities";
 import { AbilityId } from "#enums/ability-id";
 
 // ---------------------------------------------------------------------------
@@ -119,6 +131,14 @@ const SELF_SUFFICIENT = 5045; // base Umbreon innate[0] (ER custom)
 const KEEN_EDGE = 5009; // base Leafeon innate[0] (ER custom)
 const ICE_BODY = 115; // base Glaceon innate[0]
 const PIXILATE = 182; // base Sylveon innate[0]
+
+// Type-nativization (Pass A) composite constituents. ER-custom constituent ids
+// are the LIVE pokerogue ids (ErAbilityId), verified present at authoring time.
+const HYDRATE = 5053; // ER custom (Normal moves become Water, Water empowered)
+const DRACONIZE = 5149; // ER custom (Normal moves become Dragon, Dragon empowered)
+const ENVENOM = 5553; // ER custom (poison-on-attack)
+const FOGGY_EYE = 5666; // ER custom
+const HYPER_AGGRESSIVE = 5096; // ER custom (all moves hit twice, 2nd at 25%)
 
 /**
  * The manual-composite registry, keyed by pokerogue ability id. This is the
@@ -254,6 +274,58 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
     name: "Pixilate",
     description: "Pixilate + Omniform.",
     constituents: [PIXILATE, OMNIFORM],
+  },
+  // -----------------------------------------------------------------------
+  // Type-nativization (Pass A) composite replacements (5955-5962). Each is the
+  // union of its two constituents' attrs, resolved by the same wire pass.
+  // -----------------------------------------------------------------------
+  [ER_WATERBORNE_ABILITY_ID]: {
+    id: ER_WATERBORNE_ABILITY_ID,
+    name: "Waterborne",
+    description: "Hydrate + Adaptability.",
+    constituents: [HYDRATE, AbilityId.ADAPTABILITY],
+  },
+  [ER_DRAGONFRUIT_ABILITY_ID]: {
+    id: ER_DRAGONFRUIT_ABILITY_ID,
+    name: "Dragonfruit",
+    description: "Draconize + Rough Skin.",
+    constituents: [DRACONIZE, AbilityId.ROUGH_SKIN],
+  },
+  [ER_KOMODO_NATIVIZE_ABILITY_ID]: {
+    id: ER_KOMODO_NATIVIZE_ABILITY_ID,
+    name: "Komodo",
+    description: "Draconize + Envenom.",
+    constituents: [DRACONIZE, ENVENOM],
+  },
+  [ER_VOLTRON_ABILITY_ID]: {
+    id: ER_VOLTRON_ABILITY_ID,
+    name: "Voltron",
+    description: "Steely Spirit + Battle Armor.",
+    constituents: [AbilityId.STEELY_SPIRIT, AbilityId.BATTLE_ARMOR],
+  },
+  [ER_GRIEVOUS_SPEAR_ABILITY_ID]: {
+    id: ER_GRIEVOUS_SPEAR_ABILITY_ID,
+    name: "Grievous Spear",
+    description: "Grim Jab + Savage Spear.",
+    constituents: [ER_GRIM_JAB_ABILITY_ID, ER_SAVAGE_SPEAR_ABILITY_ID],
+  },
+  [ER_SPECTACLE_ABILITY_ID]: {
+    id: ER_SPECTACLE_ABILITY_ID,
+    name: "Spectacle",
+    description: "Levitate + Illuminate.",
+    constituents: [AbilityId.LEVITATE, AbilityId.ILLUMINATE],
+  },
+  [ER_OMINOUS_SHROUD_ABILITY_ID]: {
+    id: ER_OMINOUS_SHROUD_ABILITY_ID,
+    name: "Ominous Shroud",
+    description: "Shadow Shield + Foggy Eye.",
+    constituents: [AbilityId.SHADOW_SHIELD, FOGGY_EYE],
+  },
+  [ER_FREE_CLIMB_ABILITY_ID]: {
+    id: ER_FREE_CLIMB_ABILITY_ID,
+    name: "Free Climb",
+    description: "Unburden + Hyper Aggressive.",
+    constituents: [AbilityId.UNBURDEN, HYPER_AGGRESSIVE],
   },
 };
 

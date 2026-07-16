@@ -8,7 +8,12 @@ import { initTrainerTypeDialogue } from "#data/dialogue";
 import { wireEliteReduxManualComposites } from "#data/elite-redux/abilities/composite-newcomers";
 import { registerErFinalBossFormChange } from "#data/elite-redux/er-final-boss";
 import { applyNewcomerLearnsetAdditions, injectNewcomerForms } from "#data/elite-redux/er-newcomer-forms";
-import { applyErNewcomerSpeciesLearnsets, injectErNewcomerSpecies } from "#data/elite-redux/er-newcomer-species";
+import {
+  applyErNewcomerSpeciesLearnsets,
+  applyErNewcomerSpeciesTmCompatibility,
+  injectErNewcomerSpecies,
+} from "#data/elite-redux/er-newcomer-species";
+import { applyErTypeNativization } from "#data/elite-redux/er-type-nativization";
 import {
   initEliteReduxCSourceCorrections,
   remapEliteReduxMoveIdsByName,
@@ -374,4 +379,25 @@ export function initializeGame() {
       `[er-pokedex-overrides] applied ${pokedexResult.learnsetsApplied} learnsets + ${pokedexResult.tmSetsApplied} TM sets + ${pokedexResult.abilitiesApplied} ability sets (dropped ${pokedexResult.idsDropped} ids, skipped ${pokedexResult.skippedUnmapped} unmapped${pokedexResult.errors.length > 0 ? `, ${pokedexResult.errors.length} errors` : ""})`,
     );
   }
+
+  // Newcomer SPECIES TM compatibility (a SEPARATE data path from the level-up
+  // learnsets: tmSpecies / speciesTmMoves). Evolution species inherit the pre-evo's
+  // full TM set + type additions; Regitube gets a hand Water set; partner
+  // eeveelutions inherit their base's. Without this the 70000+ band had no TMs.
+  // MUST run LAST — after initEliteReduxPokedexOverrides finalizes the base/pre-evo
+  // TM lists (which the editor TM overrides can extend), so the inherited superset
+  // is complete.
+  const newcomerSpeciesTms = applyErNewcomerSpeciesTmCompatibility();
+  console.info(`[er-newcomer-species] wired ${newcomerSpeciesTms} species TM sets`);
+
+  // Type-nativization sweep (Pass A): remove every type-grant ability from its
+  // holder, give the granted type NATIVELY (setExtraTypes), and put the per-mon
+  // replacement in the freed slot. Runs LAST so it is authoritative over the
+  // editor ability overrides.
+  const nativization = applyErTypeNativization();
+  console.info(
+    `[er-type-nativization] set ${nativization.extraTypesSet} native types, swapped ${nativization.abilitiesSwapped} abilities`
+      + `${nativization.unresolved.length > 0 ? `; unresolved: ${nativization.unresolved.join(", ")}` : ""}`
+      + `${nativization.notFound.length > 0 ? `; grant-not-found: ${nativization.notFound.join(", ")}` : ""}`,
+  );
 }

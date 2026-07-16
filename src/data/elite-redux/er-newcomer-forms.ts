@@ -29,7 +29,10 @@
 // be constructed yet (they are resolved at battle time from `allAbilities`).
 // =============================================================================
 
-import { installErFormSpriteRedirect } from "#data/elite-redux/er-form-sprite-redirect";
+import {
+  installErFormSpriteRedirect,
+  installErSpeciesFormSpriteDispatch,
+} from "#data/elite-redux/er-form-sprite-redirect";
 import { PokemonForm } from "#data/pokemon-species";
 import { pokemonFormChanges, SpeciesFormChange } from "#data/pokemon-forms";
 import { SpeciesFormChangeItemTrigger } from "#data/pokemon-forms/form-change-triggers";
@@ -257,7 +260,10 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     innates: [AbilityId.PLUS, ab(SYNCHRONIZED_CURRENT), ab(POSITIVE_FEEDBACK)],
     item: FormChangeItem.PLUSLEITE,
   },
-  // #3 Primal Regigigas — Normal/Rock/Ice/Steel/Electric/Dragon (SIX types).
+  // #3 Primal Regigigas — Normal/Rock/Ice/Steel/Electric/Dragon/Water (SEVEN types).
+  // Water is native (Regitube is lore-part of the mon; maintainer directive). This is
+  // the 7-type stress case for the N-type UI (Pass B) and adds a 6th REMOVABLE type to
+  // World in Pieces' pool (every non-Normal type is removable).
   // Active Predator / Stall / Raging Boxer; innates Titan (5934), World in Pieces
   // (5917), Self Repair. Orb Planetary Orb. Reversion form (like other primals):
   // holding the orb triggers the "primal" form, Mega-Bracelet gated in the pool.
@@ -273,6 +279,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
       PokemonType.STEEL,
       PokemonType.ELECTRIC,
       PokemonType.DRAGON,
+      PokemonType.WATER,
     ],
     stats: [140, 170, 145, 70, 145, 100],
     actives: [ab(PREDATOR), AbilityId.STALL, ab(RAGING_BOXER)],
@@ -400,18 +407,36 @@ function seedBaseForm(species: ReturnType<typeof getPokemonSpecies>): void {
   (species.forms as unknown as PokemonForm[]).push(baseForm);
 }
 
-/** Register the mega stone / primal orb form-change edge so the reward pool offers it. */
+/**
+ * Register the mega stone / primal orb form-change edge so the reward pool offers
+ * it AND the Pokedex lists the form.
+ *
+ * The `preFormKey` MUST equal the base species' live default form key, because
+ * both the reward generator (`fc.preFormKey === p.getFormKey()`) and the Pokedex
+ * form list (`f.preFormKey === currentFormKey`) match on it exactly. The old
+ * hardcoded `""` was correct only for FORMLESS bases (their seeded base form key
+ * is ""), but broke any base with NAMED default forms — e.g. Xerneas, whose forms
+ * are "neutral"/"active" and never "", so Xerneasite never spawned and Mega
+ * Xerneas was unreachable in the dex. Register an edge from EACH non-mega base
+ * form key so the mega is offered whatever form the base is currently in.
+ */
 function registerFormChangeEdge(def: NewcomerFormDef, result: InjectNewcomerFormsResult): void {
   if (!pokemonFormChanges[def.baseSpecies]) {
     pokemonFormChanges[def.baseSpecies] = [];
   }
   const list = pokemonFormChanges[def.baseSpecies] as SpeciesFormChange[];
-  const alreadyHasEdge = list.some(fc => fc.preFormKey === "" && fc.formKey === def.formKey);
-  if (alreadyHasEdge) {
-    return;
+  const species = getPokemonSpecies(def.baseSpecies);
+  const baseKeys = (species?.forms ?? [])
+    .map(f => f.formKey ?? "")
+    .filter(k => k !== def.formKey && !/mega|primal/.test(k));
+  const preKeys = baseKeys.length > 0 ? [...new Set(baseKeys)] : [""];
+  for (const preKey of preKeys) {
+    if (list.some(fc => fc.preFormKey === preKey && fc.formKey === def.formKey)) {
+      continue;
+    }
+    list.push(new SpeciesFormChange(def.baseSpecies, preKey, def.formKey, new SpeciesFormChangeItemTrigger(def.item)));
+    result.edgesRegistered++;
   }
-  list.push(new SpeciesFormChange(def.baseSpecies, "", def.formKey, new SpeciesFormChangeItemTrigger(def.item)));
-  result.edgesRegistered++;
 }
 
 /**
@@ -478,6 +503,16 @@ export function injectNewcomerForms(): InjectNewcomerFormsResult {
 
     // #287 sprite/icon redirect to the ER slug (placeholder until art lands).
     installErFormSpriteRedirect(form, def.slug);
+    // #287: also bridge the SPECIES-level sprite path to the redirected form.
+    // The battle path uses `getSpeciesForm(formIndex).getSpriteAtlasPath()` (the
+    // form object, patched above), but the DEX page and other UI surfaces call
+    // the SPECIES-level `species.getSpriteKey(female, formIndex, …)`, which builds
+    // the vanilla `{speciesId}-{formKey}` key and never touches the patched form.
+    // Bases that also carry a vendor mega / redux form get this dispatch installed
+    // by a later init sweep, but bases in NEITHER sweep (e.g. Minun, Plusle) were
+    // left spriteless on the dex — install it here for every newcomer form so all
+    // 12 render regardless of coincidental sweep membership. Idempotent per species.
+    installErSpeciesFormSpriteDispatch(species);
 
     result.injected++;
   }
