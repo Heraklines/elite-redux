@@ -290,7 +290,8 @@ export class CoopLobbyController {
     this.connectFn = options.connect ?? connectCoopWithCode;
     this.connectP33Fn = options.connectP33 ?? connectCoopP33Pairing;
     this.protocol = options.protocol ?? coopLobbyProtocolFromEnv();
-    this.p33Dependencies = options.p33Dependencies ?? { room: coopLobbyRoomFromEnv() };
+    const room = coopLobbyRoomFromEnv();
+    this.p33Dependencies = options.p33Dependencies ?? (room == null ? {} : { room });
   }
 
   /** Announce presence and begin polling. Connects immediately if already paired. */
