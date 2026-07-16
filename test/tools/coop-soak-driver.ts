@@ -3653,8 +3653,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // tail with its authoritative NewBattlePhase. Dropping that real tail leaves the old wave as current; when
     // the next queue drive starts the remaining phase, PhaseManager falls through to a phantom CommandPhase
     // on wave W instead of materializing wave W+1 (journey seed 828633, cmd:12:1 while host is at cmd:13:1).
-    await withClient(rig.hostCtx, () => coopClearMePinForGuest());
-    await withClient(rig.guestCtx, () => coopClearMePinForGuest());
+    await withClient(rig.hostCtx, () => {
+      coopClearMePinForGuest();
+      persistInstalledClientMePins(rig.hostCtx);
+    });
+    await withClient(rig.guestCtx, () => {
+      coopClearMePinForGuest();
+      persistInstalledClientMePins(rig.guestCtx);
+    });
 
     // The whole ME advanced the alternation counter EXACTLY once (like a shop). Assert LOCKSTEP.
     const hostAfter = rig.hostRuntime.controller.interactionCounter();
