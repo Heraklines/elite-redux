@@ -52,6 +52,15 @@ const COMMANDER_POST_TURN_PROGRESS_ALLOWANCE_MS = 150_000;
 // keeps the acceptance window open until the accept lands (see driveSelfHealingPairing).
 const LOBBY_REQUEST_REISSUE_MS = 5_000;
 
+function semanticOptionId(label) {
+  return label
+    .replace(/\[[^\]]*\]/gu, "")
+    .replace(/[^a-zA-Z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .toLowerCase()
+    .slice(0, 40);
+}
+
 function classifyPostTurnProgress(event) {
   if (
     event.kind === "browser-surface2"
@@ -936,7 +945,7 @@ export class PublicUiClient {
     await this.checkpoint("lobby-announced");
   }
 
-  async waitForLobbyPlayer(username) {
+  async waitForLobbyPlayer(username, timeoutMs = this.config.timeoutMs) {
     return this.evidence.waitForCondition(
       sink => {
         assertNoDriverApiFailure(sink, "co-op lobby");
@@ -944,22 +953,43 @@ export class PublicUiClient {
         const index = players.indexOf(username);
         return index >= 0 ? { players, index } : null;
       },
-      { timeoutMs: this.config.timeoutMs, description: `lobby list containing ${username}` },
+      { timeoutMs, description: `lobby list containing ${username}` },
     );
   }
 
-  async requestPlayer(username) {
-    const { index } = await this.waitForLobbyPlayer(username);
-    for (let i = 0; i < index; i++) {
-      await this.press("ArrowDown", `lobby-select-${username}:${i + 1}/${index}`);
+  async requestPlayer(username, { purpose = "request", timeoutMs = this.config.timeoutMs, optional = false } = {}) {
+    const targetId = semanticOptionId(`Ask ${username} to play`);
+    try {
+      await this.waitForLobbyPlayer(username, timeoutMs);
+      // The worker lobby list is dynamic under a sharded campaign. Select by the exact visible
+      // username immediately before every request; an old cursor index may now name another runner.
+      await selectOptionById(this, {
+        surfaceId: "option-select:TitlePhase",
+        targetId,
+        navKeys: ["ArrowUp", "ArrowDown"],
+        submit: false,
+        timeoutMs,
+      });
+    } catch (error) {
+      if (
+        optional
+        && error instanceof Error
+        && (/timed out waiting for lobby list containing/u.test(error.message)
+          || /selectOptionById\(option-select:TitlePhase->.*\) (?:saw no|target not in options)/u.test(error.message))
+      ) {
+        this.evidence.record("lobby-request-deferred", { username, targetId, reason: error.message });
+        return false;
+      }
+      throw error;
     }
     const requestCursor = this.evidence.cursor();
-    await this.press("Space", `lobby-request-${username}`);
+    await this.press("Space", `lobby-${purpose}-${username}`);
     await this.evidence.waitFor(/request target=/u, {
       from: requestCursor,
-      timeoutMs: this.config.timeoutMs,
+      timeoutMs,
       description: `request relay for ${username}`,
     });
+    return true;
   }
 
   async waitForPublicRole(from = this.pageCursor) {
@@ -1363,9 +1393,8 @@ export class DuoPublicUiRig {
     const roleCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
-    // Navigate the requester's cursor onto the acceptor and send the FIRST request. This parks
-    // the OPTION_SELECT cursor on the acceptor's "Ask ... to play" row, so a bare Space re-issues
-    // the same request without re-navigating.
+    // Navigate by the exact public option id and send the first request. The lobby is shared by
+    // every remote shard, so a numeric cursor position is never an identity proof.
     await requester.requestPlayer(acceptor.credentials.username);
     // The co-op HOST binds from the WebRTC session connect (sessionEpoch>0). The co-op GUEST
     // only binds AFTER the host fires its LAUNCH DECISION ("Press to start co-op" ->
@@ -1390,9 +1419,9 @@ export class DuoPublicUiRig {
    *   - ACCEPTOR: the instant an incoming request FROM the requester is visible, press Space
    *     (Accept is option 0 of the take-over panel). Press once per distinct appearance; if it
    *     evaporates and returns, accept again.
-   *   - REQUESTER: whenever no request is in flight, re-press Space to re-issue the ask. `request()`
-   *     re-sends unconditionally (no pending guard), which REFRESHES the worker-side request TTL,
-   *     keeping the acceptance window open until the accept lands.
+   *   - REQUESTER: whenever no request is in flight, re-select the exact acceptor username from the
+   *     current public option list, then re-issue. `request()` refreshes the worker-side TTL. A bare
+   *     Space is forbidden because concurrent shards continuously reorder the lobby rows.
    * Exits when either client observes a role=host binding; throws (same message as before) on the
    * pairing deadline so a genuine never-binds still fails loudly.
    */
@@ -1434,7 +1463,11 @@ export class DuoPublicUiRig {
       } else {
         acceptedForLiveRequest = false;
         if (Date.now() >= nextReissueAt) {
-          await requester.press("Space", `lobby-reissue-request-${acceptorName}`);
+          await requester.requestPlayer(acceptorName, {
+            purpose: "reissue-request",
+            timeoutMs: LOBBY_REQUEST_REISSUE_MS,
+            optional: true,
+          });
           nextReissueAt = Date.now() + LOBBY_REQUEST_REISSUE_MS;
         }
       }
