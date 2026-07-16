@@ -6,6 +6,7 @@ import { Phase } from "#app/phase";
 import type { SpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import { FusionSpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import { erRecordAchievementEvolution } from "#data/elite-redux/er-achievement-tracker";
+import { playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { getTypeRgb } from "#data/type";
 import { LearnMoveSituation } from "#enums/learn-move-situation";
 import { UiMode } from "#enums/ui-mode";
@@ -179,27 +180,11 @@ export class EvolutionPhase extends Phase {
    */
   protected configureSprite(pokemon: Pokemon, sprite: Phaser.GameObjects.Sprite, setPipeline = true): typeof sprite {
     const spriteKey = pokemon.getSpriteKey(true);
-    // ER (#396): if the front anim is missing but its atlas IS loaded (redux
-    // shiny whose finalize was skipped), build the frames here - otherwise
-    // `play` warns "Missing animation" and the EVOLVED sprite silently keeps
-    // showing the pre-evolution.
-    if (!globalScene.anims.exists(spriteKey) && globalScene.textures.exists(spriteKey)) {
-      const originalWarn = console.warn;
-      console.warn = () => {};
-      const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
-        zeroPad: 4,
-        suffix: ".png",
-        start: 1,
-        end: 400,
-      });
-      console.warn = originalWarn;
-      globalScene.anims.create({ key: spriteKey, frames: frameNames, frameRate: 10, repeat: -1 });
-    }
-    try {
-      sprite.play(spriteKey);
-    } catch (err: unknown) {
-      console.error(`Failed to play animation for ${spriteKey}`, err);
-    }
+    // ER (#396 / Discupid evolution scramble): pin the atlas + frame 0001, gap-fill
+    // the anim if the atlas is loaded but its animation was not built, then play.
+    // Without this a bare `play` warns "Missing animation" and the EVOLVED sprite
+    // silently keeps showing the pre-evolution (or draws the raw packed sheet).
+    playErPokemonSpriteAnim(sprite, spriteKey);
 
     if (setPipeline) {
       sprite.setPipeline(globalScene.spritePipeline, {

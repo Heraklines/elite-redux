@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { getPokeballAtlasKey } from "#data/pokeball";
 import { getTypeRgb } from "#data/type";
@@ -1049,7 +1050,9 @@ export class RunInfoUiHandler extends UiHandler {
       const female = pkmn.gender === 1;
       species.loadAssets(female, formIndex, shiny, variant, true).then(() => {
         speciesLoaded.set(id, true);
-        pokemonSprite.play(species.getSpriteKey(female, formIndex, shiny, variant));
+        // Pin frame 0001 + gap-fill the anim so a multi-frame packed ER atlas never
+        // renders as its raw whole-sheet __BASE frame in the Hall of Fame roster.
+        playErPokemonSpriteAnim(pokemonSprite, species.getSpriteKey(female, formIndex, shiny, variant));
         pokemonSprite.setPipelineData("shiny", shiny);
         pokemonSprite.setPipelineData("variant", variant);
         pokemonSprite.setPipelineData("spriteKey", species.getSpriteKey(female, formIndex, shiny, variant));

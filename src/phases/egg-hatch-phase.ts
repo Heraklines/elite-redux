@@ -5,6 +5,7 @@ import type { Egg } from "#data/egg";
 import type { EggHatchData } from "#data/egg-hatch-data";
 import { erRecordEggHatch } from "#data/elite-redux/er-achievement-detection";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
+import { playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { EggTier } from "#enums/egg-type";
 import { UiMode } from "#enums/ui-mode";
 import { EggCountChangedEvent } from "#events/egg";
@@ -362,11 +363,10 @@ export class EggHatchPhase extends Phase {
     }
     this.eggContainer.setVisible(false);
     const spriteKey = this.pokemon.getSpriteKey(true);
-    try {
-      this.pokemonSprite.play(spriteKey);
-    } catch (err: unknown) {
-      console.error(`Failed to play animation for ${spriteKey}`, err);
-    }
+    // Regitube hatch scramble: a multi-frame packed ER atlas draws its raw
+    // whole-sheet __BASE frame here without a frame pin + built anim. The shared
+    // helper pins frame 0001 + gap-fills the anim before playing.
+    playErPokemonSpriteAnim(this.pokemonSprite, spriteKey);
     this.pokemonSprite.setPipelineData("ignoreTimeTint", true);
     this.pokemonSprite.setPipelineData("spriteKey", this.pokemon.getSpriteKey());
     this.pokemonSprite.setPipelineData("shiny", this.pokemon.shiny);

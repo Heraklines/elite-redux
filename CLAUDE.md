@@ -899,13 +899,23 @@ item below has bitten us.
 - 🔴 **MANDATORY RENDER SWEEP (hard requirement, maintainer directive) — every new
   species AND every new form MUST render a REAL, NON-EMPTY sprite on EVERY surface
   it can appear on: (a) SUMMARY, (b) STARTER SELECT, (c) COMBAT front AND back,
-  (d) DEX page.** This is a PIXEL-LEVEL gate, not a key-resolution check: it
-  resolves the atlas path each surface actually uses (species-level for dex/starter
-  — the #287 bug path — and form-level for combat/summary) and decodes the frame
-  from er-assets, failing on a 404/wrong path OR empty art. Add every new mon/form
-  to the parametrized sweep **`test/tests/elite-redux/er-newcomer-render-sweep.test.ts`**
+  (d) DEX page, (e) EVOLUTION SCENE (the evolved form's sprite).** This is a
+  PIXEL-LEVEL gate, not a key-resolution check: it resolves the atlas path each
+  surface actually uses (species-level for dex/starter — the #287 bug path — and
+  form-level for combat/summary/evolution) and decodes the frame from er-assets,
+  failing on a 404/wrong path OR empty art. Add every new mon/form to the
+  parametrized sweep **`test/tests/elite-redux/er-newcomer-render-sweep.test.ts`**
   (`ER_SCENARIO=1`). A newcomer that is not in this sweep, or that fails it, is NOT
   shippable — this test is the pass/fail gate for the READY verdict.
+- 🔴 **The EVOLUTION SCREEN is its own render surface — verify it.** EvolutionPhase
+  renders the EVOLVED mon on a scene that does NOT step the per-species animation and
+  whose multi-frame packed ER atlas defaults to its whole-sheet `__BASE` frame. A bare
+  `play()` there leaves the evolved sprite blank (Luvdisc→Discupid showed nothing) or
+  scrambled (Regitube). All non-battle pokemon-sprite surfaces (evolution scene, egg
+  hatch, egg-summary card, summary, dex, run-info) MUST route their sprite through the
+  shared `playErPokemonSpriteAnim` helper in `er-form-sprite-redirect.ts` (pin frame
+  `0001.png` + gap-fill the anim + play). Runtime gate:
+  **`test/tests/elite-redux/er-evolution-render.test.ts`** (`ER_SCENARIO=1`).
 
 ## Deploy
 

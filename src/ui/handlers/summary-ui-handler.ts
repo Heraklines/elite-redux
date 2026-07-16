@@ -16,7 +16,7 @@ import {
   isErBlackShiny,
   isErGiftCycleAllowed,
 } from "#data/elite-redux/er-black-shinies";
-import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
+import { ensureErSpriteAnim, playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { getErMoveDetailPages, type MoveDetailRow } from "#data/elite-redux/er-move-details";
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
@@ -511,30 +511,12 @@ export class SummaryUiHandler extends UiHandler {
     if (shinyLabSource) {
       this.ensureShinyLabSummarySpriteLoaded(shinyLabSource);
     }
-    // Pin the texture BEFORE attempting the animation: if `play` fails (anim
-    // not built yet), the sprite would otherwise silently keep showing the
-    // PREVIOUS mon's texture (e.g. an ally's black-shiny art on Snorlax's
-    // page). With the texture set, a failed play just means a static frame.
-    if (globalScene.textures.exists(spriteKey)) {
-      this.pokemonSprite.setTexture(spriteKey);
-      // A multi-frame packed atlas defaults to its whole-sheet `__BASE` frame on
-      // setTexture; pin the first real animation frame so it never renders as the
-      // scrambled full sheet (the Regitube menu-scramble class). `play` below
-      // upgrades to the looping animation when it is available; if `play` can't
-      // (anim not built here), the pinned frame stays a clean single-mon frame.
-      if (this.pokemonSprite.texture.has("0001.png")) {
-        this.pokemonSprite.setFrame("0001.png");
-      }
-    }
-    // Gap-fill the per-species animation for ER custom / redirected atlases the
-    // menu surfaces don't lazily build (mirrors the battle field + shiny-lab
-    // paths), so `play` animates instead of falling back to the pinned frame.
-    ensureErSpriteAnim(spriteKey);
-    try {
-      this.pokemonSprite.play(spriteKey);
-    } catch (err: unknown) {
-      console.error(`Failed to play animation for ${spriteKey}`, err);
-    }
+    // Pin the atlas + frame 0001 and gap-fill the animation before playing, so a
+    // multi-frame packed ER atlas never renders as its raw whole-sheet __BASE
+    // frame and a failed play never leaves the PREVIOUS mon's texture (e.g. an
+    // ally's black-shiny art on Snorlax's page). Shared with the evolution / egg
+    // hatch / dex / starter-select surfaces.
+    playErPokemonSpriteAnim(this.pokemonSprite, spriteKey);
     this.pokemonSprite
       .setPipelineData("teraColor", getTypeRgb(this.pokemon.getTeraType()))
       .setPipelineData("isTerastallized", this.pokemon.isTerastallized)

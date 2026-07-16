@@ -160,6 +160,36 @@ export function ensureErSpriteAnim(spriteKey: string): void {
   }
 }
 
+/**
+ * Robustly show `spriteKey` on a pokemon SPRITE across the non-battle surfaces
+ * (evolution scene, egg hatch, egg-summary card, summary, dex, starter select,
+ * run-info). A multi-frame packed ER atlas defaults to its whole-sheet `__BASE`
+ * frame on `setTexture`, and these surfaces do NOT lazily build the per-species
+ * animation the way the battle field does - so a bare `play(key)` either fails
+ * ("Missing animation") leaving the sprite blank / on the previous mon, or draws
+ * the raw packed sheet (the scrambled-sprite class: Regitube on hatch, Discupid
+ * on evolution). This one helper closes it everywhere:
+ *   1. pin the atlas + its first real frame "0001.png" (never the `__BASE` sheet),
+ *   2. gap-fill the animation if the atlas is loaded but the anim was not built,
+ *   3. play the looping animation; a still-missing anim just leaves the clean
+ *      pinned frame, never a scramble.
+ * Safe on a `MockSprite` (headless tests): every op is a no-op there.
+ */
+export function playErPokemonSpriteAnim(sprite: Phaser.GameObjects.Sprite, spriteKey: string): void {
+  if (globalScene.textures.exists(spriteKey)) {
+    sprite.setTexture(spriteKey);
+    if (sprite.texture.has("0001.png")) {
+      sprite.setFrame("0001.png");
+    }
+  }
+  ensureErSpriteAnim(spriteKey);
+  try {
+    sprite.play(spriteKey);
+  } catch (err: unknown) {
+    console.error(`Failed to play animation for ${spriteKey}`, err);
+  }
+}
+
 /** Sprite/icon/asset methods shared by PokemonSpecies and PokemonForm. */
 interface ErSpriteCarrier {
   formIndex?: number;
