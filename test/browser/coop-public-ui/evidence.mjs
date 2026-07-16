@@ -18,6 +18,8 @@ const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 const CHECKSUM_SENTINEL = "0000000000000000";
 const POST_REJOIN_RESYNC_REQUEST = /^\[coop:resync\] post-rejoin full resync request seq=(\d+)/u;
 const STATE_SYNC_START = /^\[coop:resync\] guest requestStateSync turn=(\d+) seq=(\d+) START\b/u;
+const COMPATIBLE_PRESENTATION_MISMATCH =
+  /^\[coop:checksum\] PRESENTATION MISMATCH sections=[^\n]+ - simulation compatible - /u;
 const FATAL_COOP_CONSOLE_RULES = Object.freeze([
   [/^\[coop:ASSERT\].*\bCHECKSUM MISMATCH\b/iu, "checksum assertion"],
   [
@@ -66,6 +68,11 @@ const FATAL_COOP_CONSOLE_RULES = Object.freeze([
  */
 export function fatalCoopConsoleReason(text, { benignRejoinStateSync = false } = {}) {
   if (typeof text !== "string") {
+    return null;
+  }
+  // Localized names are intentionally excluded from the functional pairing fingerprint. Different
+  // presentation hashes are expected for different languages and remain diagnostic-only evidence.
+  if (COMPATIBLE_PRESENTATION_MISMATCH.test(text)) {
     return null;
   }
   if (STATE_SYNC_START.test(text)) {

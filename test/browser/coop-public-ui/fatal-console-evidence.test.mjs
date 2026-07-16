@@ -56,6 +56,7 @@ const benignLines = [
   "[coop:adopt] erMapState host nodes=3 travelTarget=- fragments=0 -> restored (#865/#841 item 1)",
   "[coop:rendezvous] RENDEZVOUS RECOVERY RETRY point=cmd:3:1 after 500ms",
   "[coop:rejoin] Partner reconnected",
+  "[coop:checksum] PRESENTATION MISMATCH sections=movesName,abilitiesName - simulation compatible - movesName local=aaa peer=bbb abilitiesName local=ccc peer=ddd",
 ];
 
 function consoleMessage(text, type = "warn") {
