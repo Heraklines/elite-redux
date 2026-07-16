@@ -554,6 +554,7 @@ export class PublicUiClient {
     this.label = credentials.seat;
     this.page = null;
     this.pageCursor = 0;
+    this.lobbySurfaceCursor = 0;
     this.pageGeneration = 0;
     this.publicRole = null;
     this.publicSeat = null;
@@ -935,6 +936,7 @@ export class PublicUiClient {
     await this.sequence(this.titleNewGameKeys, "title-select-new-game");
     await this.press("Space", "title-open-new-game");
     await this.press("ArrowDown", "mode-select-coop-below-classic");
+    this.lobbySurfaceCursor = this.evidence.cursor();
     const announceCursor = this.evidence.cursor();
     await this.press("Space", "mode-open-coop-lobby");
     await this.evidence.waitFor(/start announce name=/u, {
@@ -964,7 +966,7 @@ export class PublicUiClient {
       await this.evidence.waitForCondition(
         sink => {
           assertNoDriverApiFailure(sink, "co-op lobby");
-          const surface = sink.findLastSemanticSurface(this.pageCursor, "option-select:TitlePhase");
+          const surface = sink.findLastSemanticSurface(this.lobbySurfaceCursor, "option-select:TitlePhase");
           return surface?.observation.optionIds?.includes(targetId) ? surface : null;
         },
         { timeoutMs, description: `visible lobby option for ${username}` },
@@ -977,6 +979,7 @@ export class PublicUiClient {
         navKeys: ["ArrowUp", "ArrowDown"],
         submit: false,
         timeoutMs,
+        fromCursor: this.lobbySurfaceCursor,
       });
     } catch (error) {
       if (
