@@ -74,6 +74,10 @@ export interface CoopCommandTimeout {
   fieldIndex: number;
 }
 
+interface PendingCommandRequest extends CoopPendingCommandSnapshot {
+  finish: (cmd: SerializedCommand | null) => void;
+}
+
 /** Turns a {@linkcode CoopCommandRequest} into the command to send back. */
 export type CoopCommandResponder = (req: CoopCommandRequest) => SerializedCommand;
 
@@ -85,9 +89,9 @@ export interface CoopBattleSyncOptions {
   /** Timer injection (tests). Returns a cancel fn. Defaults to setTimeout/clearTimeout. */
   schedule?: (cb: () => void, ms: number) => () => void;
   /**
-   * Fail-closed production callback for a fully addressed command surface. It runs synchronously before
-   * the retained request resolves `null`, allowing the runtime to enter shared terminal control before a
-   * CommandPhase continuation can mistake that release for permission to choose local AI.
+   * Fail-closed production callback for a fully addressed command surface that times out or is declined.
+   * It runs synchronously before the retained request resolves `null`, allowing the runtime to enter shared
+   * terminal control before a CommandPhase continuation can mistake that release for permission to choose AI.
    */
   onCommandTimeout?: (timeout: CoopCommandTimeout) => void;
 }
@@ -404,18 +408,7 @@ export class CoopBattleSync {
   /** Set before terminal cancellation releases any retained command promise. */
   private terminalFrozen = false;
   /** Full request state retained until resolution so a replaced channel can reissue it verbatim. */
-  private readonly pending = new Map<
-    string,
-    {
-      finish: (cmd: SerializedCommand | null) => void;
-      fieldIndex: number;
-      turn: number;
-      moveSlots: number[];
-      offer?: CoopBattleCommandOffer | undefined;
-      owner?: CoopRole | undefined;
-      address?: CoopCommandAddress | undefined;
-    }
-  >();
+  private readonly pending = new Map<string, PendingCommandRequest>();
   /**
    * Complete command address -> a `command` that arrived with NO pending request yet (#633,
    * LIVE-C). In lockstep the two clients are NOT time-locked: the peer may broadcast
@@ -476,6 +469,31 @@ export class CoopBattleSync {
         this.sendCommandRequest(request);
       }
     });
+  }
+
+  /** Fence a fully addressed command release before its promise continuation can authorize local AI. */
+  private failClosedAddressedRequest(request: PendingCommandRequest, cause: "timeout" | "decline"): boolean {
+    const { owner, address } = request;
+    if (owner == null || address == null) {
+      return false;
+    }
+    // Fence FIRST. Even if an injected callback throws, CommandPhase can never reinterpret the terminal
+    // release as permission to synthesize the absent owner's command locally.
+    this.terminalFrozen = true;
+    try {
+      this.onCommandTimeout?.({
+        epoch: address.epoch,
+        wave: address.wave,
+        turn: request.turn,
+        owner,
+        pokemonId: address.pokemonId,
+        fieldIndex: request.fieldIndex,
+      });
+    } catch (error) {
+      // The terminal fence remains observable and the retained promise must still settle.
+      coopWarn("relay", `command-${cause} terminal callback threw`, error);
+    }
+    return true;
   }
 
   private sendCommandRequest(request: {
@@ -569,15 +587,7 @@ export class CoopBattleSync {
     return new Promise<SerializedCommand | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
-      let request: {
-        finish: (cmd: SerializedCommand | null) => void;
-        fieldIndex: number;
-        turn: number;
-        moveSlots: number[];
-        offer?: CoopBattleCommandOffer | undefined;
-        owner?: CoopRole | undefined;
-        address?: CoopCommandAddress | undefined;
-      };
+      let request: PendingCommandRequest;
       const finish = (cmd: SerializedCommand | null) => {
         if (settled) {
           return;
@@ -608,25 +618,7 @@ export class CoopBattleSync {
           `host requestPartnerCommand TIMEOUT fieldIndex=${fieldIndex} turn=${turn} after=${this.timeoutMs}ms -> fail closed`,
         );
         traceCommand("timed-out", fieldIndex, turn, owner, address);
-        if (owner != null && address != null) {
-          // Fence FIRST. Even if an injected callback throws, the CommandPhase continuation can never
-          // reinterpret this terminal release as an ordinary timeout and choose a local AI command.
-          this.terminalFrozen = true;
-          try {
-            this.onCommandTimeout?.({
-              epoch: address.epoch,
-              wave: address.wave,
-              turn,
-              owner,
-              pokemonId: address.pokemonId,
-              fieldIndex,
-            });
-          } catch (error) {
-            // A terminal callback must not strand the retained promise. The fence above stays observable
-            // even when an injected diagnostic/test callback throws.
-            coopWarn("relay", "command-timeout terminal callback threw", error);
-          }
-        }
+        this.failClosedAddressedRequest(request, "timeout");
         finish(null);
       }, this.timeoutMs);
       if (isCoopDebug()) {
@@ -1057,12 +1049,16 @@ export class CoopBattleSync {
         coopLog("relay", `recv command DUPLICATE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> ignored`);
         return;
       }
-      // #693: an explicit DECLINE resolves the awaiter with null -> the caller's AI
-      // fallback commands the slot. Never treated as a real command.
+      // #693 compatibility: only an UNADDRESSED legacy DECLINE can release to the caller's AI fallback.
+      // A fully addressed decline means the peers disagree about immutable command ownership, so it must
+      // enter the same terminal fence as an addressed timeout before the retained promise resolves.
       if (msg.decline && request != null) {
         traceCommand("declined", msg.fieldIndex, msg.turn, msg.owner, address);
-        this.pending.delete(key);
-        coopLog("relay", `recv command DECLINE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> AI fallback`);
+        const terminal = this.failClosedAddressedRequest(request, "decline");
+        coopLog(
+          "relay",
+          `recv command DECLINE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> ${terminal ? "fail closed" : "legacy AI fallback"}`,
+        );
         request.finish(null);
         return;
       }

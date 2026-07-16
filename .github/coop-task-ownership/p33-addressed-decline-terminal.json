@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "p33-addressed-decline-terminal",
+  "branch": "ci/coop/p33-addressed-decline-terminal",
+  "trainRef": "ci/coop/p33-closure-integrated",
+  "baseSha": "c8d8dda43d34a1ab48358f83d1c082b9c3d52d53",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-addressed-decline-terminal.json",
+    "src/data/elite-redux/coop/coop-battle-sync.ts",
+    "test/tests/elite-redux/coop/coop-battle-sync.test.ts"
+  ]
+}
