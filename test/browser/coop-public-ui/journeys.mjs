@@ -262,14 +262,16 @@ async function commanderSkip(rig) {
 }
 
 async function saveMutations(rig) {
-  await freshThroughWave2(rig);
+  await rig.loginBoth();
+  await rig.pair(rig.config.requesterSeat);
+  await rig.startFreshRun();
   for (const client of Object.values(rig.clients)) {
     const firstSave = client.evidence.findResponse("/savedata/session/coop-cas-update", {
       status: 200,
       method: "POST",
     });
     if (firstSave == null) {
-      throw new Error(`${client.label}: wave-2 setup never produced a successful exact co-op CAS save`);
+      throw new Error(`${client.label}: shared wave-1 command never produced a successful exact co-op CAS save`);
     }
   }
 
