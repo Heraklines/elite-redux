@@ -950,7 +950,14 @@ export class CoopBattleSync {
         //    timeout+AI fallback still bounds the worst case, so this can never hang.
         //  - the slot is provably NOT ours (#693's mutual-misresolve deadlock): DECLINE so
         //    the host's await resolves null and its AI fallback breaks the deadlock.
-        const ours = this.slotOwnershipProbe?.(msg.fieldIndex) ?? true;
+        // A fully addressed request already carries the stable logical owner. That identity must win over
+        // a field-index probe: after a host-side half-wipe/recenter, the guest can still render the old field
+        // layout while the host has compacted the same guest-owned Pokemon to another index. Re-deriving
+        // ownership from that transient index produced a false DECLINE, so the host AI-commanded the guest's
+        // mon before its replay reached the real picker (#851 live wave-1/turn-2 trace). Only legacy requests
+        // without an owner need the best-effort field-layout probe.
+        const ours =
+          msg.owner == null ? (this.slotOwnershipProbe?.(msg.fieldIndex) ?? true) : msg.owner === this.transport.role;
         if (ours) {
           coopLog(
             "relay",

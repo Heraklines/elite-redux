@@ -817,6 +817,48 @@ describe("#812: pre-responder commandRequest buffering (the 'wrong move / didn't
     guestSync.dispose();
   });
 
+  it("uses the addressed owner instead of a stale field-index probe after host recenter", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    // Reproduce the real turn-2 window: host compacted the guest mon to field 0, while the guest's
+    // previous-turn replay still sees field 0 as host-owned. The old probe falsely DECLINED here.
+    guestSync.setSlotOwnershipProbe(() => false);
+    const address = { epoch: 23, wave: 1, pokemonId: 707 };
+
+    const awaited = hostSync.requestPartnerCommand(0, 2, [0, 1, 2, 3], "guest", undefined, address);
+    // Production has no responder. Once replay reaches the real picker, its independent owner-keyed
+    // broadcast may use the guest's still-unreconciled field index and must satisfy the retained await.
+    guestSync.broadcastLocalCommand(
+      1,
+      2,
+      { command: Command.FIGHT, cursor: 0, moveId: 22, targets: [2] },
+      "guest",
+      address,
+    );
+
+    await expect(awaited).resolves.toMatchObject({ moveId: 22, targets: [2] });
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("uses a foreign addressed owner instead of a misleading local field-index probe", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => true);
+
+    await expect(
+      hostSync.requestPartnerCommand(0, 2, [0], "host", undefined, {
+        epoch: 24,
+        wave: 1,
+        pokemonId: 808,
+      }),
+    ).resolves.toBeNull();
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
   it("answers only the newest full-address request when a delayed prior-wave frame arrives before the UI", async () => {
     const { host, guest } = createLoopbackPair();
     const guestSync = new CoopBattleSync(guest);
