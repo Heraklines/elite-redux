@@ -19,6 +19,7 @@ import {
   holdForCoopMeBattleSettlementAtBattleEnd,
   isCoopAuthoritativeGuest,
   isCoopSettledWaveBoundaryPending,
+  shouldDeferCoopMeBattleSettlementUntilRewardPreparation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopAuthorityContinuationSurface } from "#data/elite-redux/coop/coop-ui-registry";
 import {
@@ -247,8 +248,18 @@ export class BattleEndPhase extends BattlePhase {
     }
 
     globalScene.updateModifiers();
-    const meSettlementRetained =
-      this.meSettlementPlan != null && commitCoopMeBattleSettlementAtBattleEnd(this.meSettlementPlan);
+    let meSettlementRetained = false;
+    if (
+      this.meSettlementPlan?.continuation === "rewards"
+      && shouldDeferCoopMeBattleSettlementUntilRewardPreparation()
+    ) {
+      // A standard ME reward plan can still apply automatic party/item mutations before its picker opens.
+      // Keep the guest parked on this exact BattleEnd; MysteryEncounterRewardsPhase captures after that
+      // preparation rather than retaining a stale pre-reward image here.
+      meSettlementRetained = true;
+    } else if (this.meSettlementPlan != null) {
+      meSettlementRetained = commitCoopMeBattleSettlementAtBattleEnd(this.meSettlementPlan);
+    }
     // Normal retained wins still have automatic TrainerVictory/Money/Modifier/Egg/buff/heal children ahead
     // of their first interactive continuation. Stage that exact phase-owned boundary here and let the
     // explicit CoopVictorySealPhase capture after those children drain. Capture/flee and legacy sessions
