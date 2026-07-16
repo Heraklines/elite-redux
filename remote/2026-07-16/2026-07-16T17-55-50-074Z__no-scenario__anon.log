@@ -1,0 +1,39 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:686ef3496be4488a9c9c94d5057a0d974acda9a6:run-29521481459.1
+mode:     0  wave:?
+seed:     pZKV5Z0Bhw8WlWyhNjmIVOY9
+party:    
+enemy:    
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:686ef3496be4488a9c9c94d5057a0d974acda9a6:run-29521481459.1","source":"github","sha":"686ef3496be4488a9c9c94d5057a0d974acda9a6","workflow":{"provider":"github-actions","runId":"29521481459","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"ci/coop/p33-closure-integrated"},"deployment":null}
+
+----- CONSOLE -----
+[17:54:15.081] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[17:54:15.828] LOG: [ER] build {"version":1,"id":"github:686ef3496be4488a9c9c94d5057a0d974acda9a6:run-29521481459.1","source":"github","sha":"686ef3496be4488a9c9c94d5057a0d974acda9a6","workflow":{"provider":"github-actions","runId":"29521481459","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"ci/coop/p33-closure-integrated"},"deployment":null}
+[17:54:16.260] LOG: [dev-tools] loaded — 624 scenarios + Send Logs button
+[17:54:37.018] DEBUG: Destroying loading scene
+[17:54:37.018] DEBUG: Destroyed loading scene
+[17:54:37.106] LOG: Seed: pZKV5Z0Bhw8WlWyhNjmIVOY9
+[17:54:37.107] LOG: Wave Seed: pZKV5Z0Bhw8WlWyhNjmIVOY9 0
+[17:54:47.628] LOG: %cStart Phase LoginPhase color:green;
+[17:54:47.798] LOG: Client Session: WVgy9HJUZ1Dq58qABITjs1CIbxLu1pmu
+[17:54:48.421] DEBUG: Using cached system data
+[17:54:48.537] LOG: %cStart Phase TitlePhase color:green;
+[17:54:48.538] LOG: Getting Session Slot id: %d 4
+[17:54:48.562] LOG: use seasonal splash messages true
+[17:54:55.477] LOG: [coop:lobby] start announce name=Heraklines1 protocol=p33
+[17:54:56.074] WARN: [coop:lobby] start failed: this account already has an active co-op presence
+[17:54:56.078] LOG: [coop:lobby] cancel (id=none connecting=false)
+[17:54:59.323] LOG: %cStart Phase TitlePhase color:green;
+[17:54:59.326] LOG: Getting Session Slot id: %d 4
+[17:54:59.350] LOG: use seasonal splash messages true
+[17:55:04.872] LOG: [coop:lobby] start announce name=Heraklines1 protocol=p33
+[17:55:05.402] WARN: [coop:lobby] start failed: this account already has an active co-op presence
+[17:55:05.406] LOG: [coop:lobby] cancel (id=none connecting=false)
+[17:55:45.791] LOG: %cStart Phase TitlePhase color:green;
+[17:55:45.797] LOG: Getting Session Slot id: %d 4
+[17:55:45.825] LOG: use seasonal splash messages true
+
+----- REPLAY TRACE (JSON) -----
+(none)
