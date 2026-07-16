@@ -27,6 +27,7 @@ import {
   getCoopBattleStreamer,
   getCoopController,
   isCoopAuthoritativeGuest,
+  registerCoopActiveReplayTurnAborter,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 import { swapBattleEvent } from "#data/elite-redux/showdown/showdown-side-swap";
@@ -88,6 +89,8 @@ export class CoopReplayTurnPhase extends Phase {
   private replacementRetryDeadline = 0;
   private authorityFailureUnsubscribe: (() => void) | null = null;
   private ended = false;
+  /** Read-only browser-observer seam: true only after the exact turn waiter has been installed. */
+  private awaitingAuthority = false;
 
   constructor(turn: number, rendered = 0, hpChain?: [number, number][]) {
     super();
@@ -118,8 +121,14 @@ export class CoopReplayTurnPhase extends Phase {
     return true;
   }
 
+  /** A retained terminal may dissolve only a speculative turn beyond its settled authority address. */
+  public abortIfPastSettledTurn(settledTurn: number, reason: string): boolean {
+    return this.turn > settledTurn && this.abortPhantom(reason);
+  }
+
   public override end(): void {
     this.ended = true;
+    this.awaitingAuthority = false;
     this.clearReplacementRetryWake();
     this.authorityFailureUnsubscribe?.();
     this.authorityFailureUnsubscribe = null;
@@ -127,6 +136,11 @@ export class CoopReplayTurnPhase extends Phase {
       activeCoopReplayTurnPhase = null;
     }
     super.end();
+  }
+
+  /** Whether this renderer has installed the exact-address turn/live-event continuation wait. */
+  public isAwaitingAuthority(): boolean {
+    return this.awaitingAuthority && !this.aborted && !this.ended;
   }
 
   public override start(): void {
@@ -197,7 +211,14 @@ export class CoopReplayTurnPhase extends Phase {
           return;
         }
         // 2) Nothing buffered: race the host's resolution against the next live arrival.
-        const raced = await streamer.awaitTurnOrLiveEvent(this.turn, this.rendered);
+        // Install the exact waiter before publishing readiness. A half-wiped/automatic guest has no
+        // command UI to report, but this live replay pump is still the real next-turn continuation.
+        // The dedicated surface cannot release an old/wrong address and never pretends input exists.
+        const authorityWait = streamer.awaitTurnOrLiveEvent(this.turn, this.rendered);
+        this.awaitingAuthority = true;
+        streamer.notifyContinuationSurface("rendererWait");
+        const raced = await authorityWait;
+        this.awaitingAuthority = false;
         // #859: the abort wakes this park by resolving the turn wait null - check the flag
         // BEFORE the stall branch below can misread that null as a host stall.
         if (this.aborted) {
@@ -774,3 +795,7 @@ export class CoopReplayTurnPhase extends Phase {
     coopLog("replay", `guest replay turn=${this.turn}: rendered phases [${breakdown || "none"}]`);
   }
 }
+
+registerCoopActiveReplayTurnAborter(
+  (reason, settledTurn) => activeCoopReplayTurnPhase?.abortIfPastSettledTurn(settledTurn, reason) ?? false,
+);

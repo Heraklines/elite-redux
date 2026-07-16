@@ -178,6 +178,19 @@ describe("P33 authenticated signaling Worker", () => {
     vi.unstubAllGlobals();
   });
 
+  it("attests the exact deployed source SHA through its public health contract", async () => {
+    const sourceSha = "b".repeat(40);
+    env.SOURCE_SHA = sourceSha;
+    const response = await handleP33SignalingRequest(new Request("https://staging.example.test/coop/v3/health"), env);
+    expect(response?.status).toBe(200);
+    await expect(response?.json()).resolves.toEqual({
+      ok: true,
+      protocol: "er-coop-33",
+      identityConfigured: true,
+      sourceSha,
+    });
+  });
+
   async function call(
     path: string,
     options: { method?: "GET" | "POST"; body?: Record<string, unknown>; token?: string } = {},
@@ -209,13 +222,46 @@ describe("P33 authenticated signaling Worker", () => {
     displayName: string,
     ticketNonce: string,
     clientNonce: string,
+    room?: string,
   ): Promise<AnnounceResult> {
     const response = await call("/coop/v3/lobby/announce", {
-      body: { ticket: await ticket(accountId, displayName, ticketNonce), clientNonce },
+      body: {
+        ticket: await ticket(accountId, displayName, ticketNonce),
+        clientNonce,
+        ...(room == null ? {} : { room }),
+      },
     });
     expect(response.status).toBe(200);
     return response.body as unknown as AnnounceResult;
   }
+
+  it("derives lobby isolation from authenticated room membership and rejects cross-room pairing", async () => {
+    const alice = await announce("er-account:11", "Alice", nonce("alice-ticket"), nonce("alice-client"), "room-a");
+    const bob = await announce("er-account:22", "Bob", nonce("bob-ticket"), nonce("bob-client"), "room-b");
+    const carol = await announce("er-account:33", "Carol", nonce("carol-ticket"), nonce("carol-client"), "room-a");
+
+    const aliceLobby = await call(`/coop/v3/lobby?self=${alice.presenceId}&room=room-b`, {
+      token: alice.pairingToken,
+    });
+    expect(aliceLobby.body.players).toEqual([
+      expect.objectContaining({ id: carol.presenceId, accountId: "er-account:33", name: "Carol" }),
+    ]);
+    expect(
+      await call("/coop/v3/lobby/request", {
+        body: { self: alice.presenceId, target: bob.presenceId },
+        token: alice.pairingToken,
+      }),
+    ).toMatchObject({ status: 409 });
+    expect(
+      await call("/coop/v3/lobby/request", {
+        body: { self: alice.presenceId, target: carol.presenceId },
+        token: alice.pairingToken,
+      }),
+    ).toMatchObject({ status: 200 });
+    expect(await call(`/coop/v3/lobby?self=${carol.presenceId}`, { token: carol.pairingToken })).toMatchObject({
+      body: { request: { id: alice.presenceId, name: "Alice" } },
+    });
+  });
 
   async function pair(): Promise<{ alice: AnnounceResult; bob: AnnounceResult; code: string }> {
     const alice = await announce("er-account:11", "Alice", nonce("alice-ticket"), nonce("alice-client"));
@@ -324,6 +370,43 @@ describe("P33 authenticated signaling Worker", () => {
     expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_runs_p33").get()).toEqual({ count: 1 });
   });
 
+  it("keeps a live human join request actionable beyond the presence heartbeat window", async () => {
+    const alice = await announce(
+      "er-account:11",
+      "Alice",
+      nonce("alice-request-ticket"),
+      nonce("alice-request-client"),
+    );
+    const bob = await announce("er-account:22", "Bob", nonce("bob-request-ticket"), nonce("bob-request-client"));
+    expect(
+      await call("/coop/v3/lobby/request", {
+        body: { self: alice.presenceId, target: bob.presenceId },
+        token: alice.pairingToken,
+      }),
+    ).toMatchObject({ status: 200 });
+
+    // Reproduce the production browser delay: the request itself is older than the 12s
+    // presence window, but the requester is still actively heartbeating. The old worker hid the
+    // Accept row at this point and a queued Space landed on a newly rendered player row instead.
+    vi.setSystemTime(start + 12_001);
+    expect(
+      await call(`/coop/v3/lobby?self=${encodeURIComponent(alice.presenceId)}`, {
+        token: alice.pairingToken,
+      }),
+    ).toMatchObject({ status: 200 });
+    const stillActionable = await call(`/coop/v3/lobby?self=${encodeURIComponent(bob.presenceId)}`, {
+      token: bob.pairingToken,
+    });
+    expect(stillActionable.body.request).toMatchObject({ id: alice.presenceId, name: "Alice" });
+
+    expect(
+      await call("/coop/v3/lobby/respond", {
+        body: { self: bob.presenceId, from: alice.presenceId, accept: true },
+        token: bob.pairingToken,
+      }),
+    ).toMatchObject({ status: 200 });
+  });
+
   it("reclaims a stale account-unique pair when both closed browsers explicitly pair again", async () => {
     const first = await pair();
     // Browser page teardown is not a reliable place for a fetch/beacon. Reproduce the server state
@@ -430,6 +513,25 @@ describe("P33 authenticated signaling Worker", () => {
     expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_runs_p33").get()).toEqual({ count: 0 });
     expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_pair_members_p33").get()).toEqual({ count: 0 });
     expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_ticket_bindings_p33").get()).toEqual({ count: 0 });
+  });
+
+  it("releases a paired presence after both browser processes disappear past presence plus rejoin grace", async () => {
+    env.P33_REJOIN_GRACE_MS = "120000";
+    await pair();
+
+    vi.setSystemTime(start + 30_000 + 120_000 + 1);
+    const alice = await announce(
+      "er-account:11",
+      "Alice",
+      nonce("alice-abandoned-ticket"),
+      nonce("alice-abandoned-client"),
+    );
+    const bob = await announce("er-account:22", "Bob", nonce("bob-abandoned-ticket"), nonce("bob-abandoned-client"));
+
+    expect(alice.pairing).toBeNull();
+    expect(bob.pairing).toBeNull();
+    expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_runs_p33").get()).toEqual({ count: 0 });
+    expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_lobby_p33").get()).toEqual({ count: 2 });
   });
 
   it("releases lobby membership only through the explicit post-terminal end route", async () => {

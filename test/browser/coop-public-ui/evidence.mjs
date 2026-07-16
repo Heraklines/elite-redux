@@ -25,7 +25,6 @@ const FATAL_COOP_CONSOLE_RULES = Object.freeze([
     "checksum divergence",
   ],
   [/^\[coop-resync\].*\bUNHEALED\b/iu, "checksum recovery did not heal"],
-  [/^\[coop:durability\].*\boperation delivery RETRY\b/u, "durable operation delivery retry"],
   [
     /^\[coop:durability\].*(?:\brecover cls=.*\battempt=\d+\/\d+|\brecovery request send deferred\b)/u,
     "durability recovery attempt",
@@ -37,6 +36,10 @@ const FATAL_COOP_CONSOLE_RULES = Object.freeze([
   [
     /^\[coop:durability\].*(?:\brecovery EXHAUSTED\b|\bdeferred continuation EXHAUSTED\b|\boperation continuation EXHAUSTED\b|\boperation delivery retries exhausted\b)/u,
     "durability recovery exhausted",
+  ],
+  [
+    /^\[coop:relay\].*(?:\bDECLINE reply\b.*\bAI-falls-back\b|\brecv command DECLINE\b.*\bAI fallback\b)/u,
+    "command ownership disagreement",
   ],
   [/^\[coop:runtime\] STALL WATCHDOG:.*-> recovering\b/u, "stall recovery attempt"],
   [/^\[coop:me\].*requesting durable replay\b/u, "Mystery durability recovery attempt"],
@@ -363,6 +366,21 @@ function isExpectedMissingSystemSaveError(type, text, source, registerMode) {
   return missingSaveRead || missingSessionLog;
 }
 
+/**
+ * i18next deliberately falls back to the bundled English namespace when a selected locale has
+ * not translated that JSON resource. Chromium reports that ordinary fallback probe as a console
+ * error. Keep the 404 response in the evidence, but do not misclassify a successful non-English
+ * fallback as a game failure. English is never exempt: a missing fallback resource is real damage.
+ */
+export function isExpectedLocaleFallbackError(type, text, source) {
+  if (type !== "error" || !/Failed to load resource:.*status of 404/iu.test(text)) {
+    return false;
+  }
+  const path = parsedUrl(source)?.pathname;
+  const locale = typeof path === "string" ? /^\/locales\/([^/]+)\/.+\.json$/u.exec(path)?.[1] : null;
+  return locale != null && locale !== "en";
+}
+
 function accountView(body) {
   const account = Array.isArray(body) ? body[0] : body;
   if (!account || typeof account !== "object") {
@@ -513,7 +531,10 @@ function renderProfileView(text) {
     || typeof value !== "object"
     || value.version !== 1
     || typeof value.moveAnimations !== "boolean"
-    || value.handler !== "SettingsDisplayUiHandler"
+    || typeof value.gameSpeed !== "number"
+    || !Number.isFinite(value.gameSpeed)
+    || value.gameSpeed <= 0
+    || (value.handler !== "SettingsUiHandler" && value.handler !== "SettingsDisplayUiHandler")
   ) {
     throw new Error("built browser emitted an invalid render-profile observation");
   }
@@ -858,7 +879,18 @@ export class EvidenceSink {
   findRenderProfile(moveAnimations, from = 0) {
     return this.events
       .slice(from)
-      .find(event => event.kind === "browser-render-profile" && event.observation.moveAnimations === moveAnimations);
+      .find(
+        event =>
+          event.kind === "browser-render-profile"
+          && event.observation.handler === "SettingsDisplayUiHandler"
+          && event.observation.moveAnimations === moveAnimations,
+      );
+  }
+
+  findGameSpeed(gameSpeed, from = 0) {
+    return this.events
+      .slice(from)
+      .find(event => event.kind === "browser-render-profile" && event.observation.gameSpeed === gameSpeed);
   }
 
   /** Latest strict market projection, optionally filtered by a predicate. */
@@ -951,10 +983,16 @@ export class EvidenceSink {
         source,
         this.expectedMissingSystemSaveErrors,
       );
-      if (expectedMissingSystemSave) {
+      const expectedLocaleFallback = isExpectedLocaleFallbackError(message.type(), text, source);
+      if (expectedMissingSystemSave || expectedLocaleFallback) {
         // A register-mode flag, not a countdown: a fresh account reads several missing saves
         // (system + session) before its first persist, so all such reads are expected.
-        this.record("console-error-expected", { source, reason: "fresh account has no persisted save yet" });
+        this.record("console-error-expected", {
+          source,
+          reason: expectedLocaleFallback
+            ? "selected locale falls back to the bundled English namespace"
+            : "fresh account has no persisted save yet",
+        });
       } else if (
         fatalCoopReason == null
         && message.type() === "error"

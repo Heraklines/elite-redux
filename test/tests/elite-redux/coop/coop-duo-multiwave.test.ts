@@ -148,7 +148,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
   async function hostPlayWave(rig: DuoRig): Promise<void> {
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
 
@@ -369,7 +369,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
     await withClient(rig.hostCtx, () => drainLoopback());

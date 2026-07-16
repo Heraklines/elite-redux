@@ -16,8 +16,8 @@
 //     desync between the host's emit and the guest's await).
 //   - The phase manager's `queueMessage` tap calls `recordCoopMessage(text)` while a
 //     recording is open, capturing each narration line in resolution order.
-//   - The host's TurnEndPhase calls `endCoopRecording()` to take + clear the buffer and
-//     stream it via the battle streamer.
+//   - CoopTurnCommitPhase runs after TurnEndPhase's delayed child mutations, calls
+//     `endCoopRecording()`, and streams the settled carrier via the battle streamer.
 //
 // MVP scope: only `message` events are recorded (narration). Correctness ("same moves,
 // same damage, same mon faints") comes from the streamed CHECKPOINT, not per-move events;

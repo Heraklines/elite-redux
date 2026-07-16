@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "p33-locale-semantic",
+  "branch": "ci/coop/p33-locale-semantic",
+  "trainRef": "ci/coop/p33-closure-integrated",
+  "baseSha": "abb57b17c1c6b5bcad3309cb242359b089c1e816",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-locale-semantic.json",
+    "test/browser/coop-public-ui/public-ui-harness.mjs",
+    "test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs"
+  ]
+}

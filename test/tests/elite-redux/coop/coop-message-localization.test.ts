@@ -207,7 +207,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     const hostFainted = i18next.t("battle:fainted", { pokemonNameWithAffix: getPokemonNameWithAffix(enemy0) });
 
     game.move.select(MoveId.TACKLE, BattlerIndex.PLAYER, enemy0.getBattlerIndex());
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
     await new Promise(r => setTimeout(r, 0));
 
     // The structured events are still recorded (the guest regenerates the lines from them).
@@ -243,7 +243,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     });
 
     game.move.select(MoveId.TACKLE, BattlerIndex.PLAYER, enemy0.getBattlerIndex());
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
     await new Promise(r => setTimeout(r, 0));
 
     const faint = events.find(e => e.k === "faint" && e.bi === enemy0.getBattlerIndex());

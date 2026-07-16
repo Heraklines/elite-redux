@@ -189,7 +189,7 @@ describe.skipIf(!RUN)("co-op DUO field seating: strict same-owner switch/replace
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
       game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
 
     // GUEST renders turn 1: its OWN faint picker opens (CoopGuestFaintSwitchPhase); stub the ONE PARTY open

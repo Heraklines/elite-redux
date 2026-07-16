@@ -331,6 +331,27 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  public-ui-contracts:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Public UI driver and evidence contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Enforce keyboard-and-DOM-only browser boundaries
+        run: |
+          node test/browser/coop-public-ui/check-public-boundary.mjs
+          node test/browser/coop-public-ui/check-campaign-boundary.mjs
+
+      - name: Run every public-UI source and evidence contract
+        run: node --test test/browser/coop-public-ui/*.test.mjs
+
   gate:
     if: github.repository == 'Heraklines/elite-redux'
     needs: plan
@@ -413,30 +434,34 @@ jobs:
   coop-required:
     name: Co-op required aggregate
     if: always()
-    needs: [browser, static, gate, mutation-assurance]
+    needs: [browser, static, public-ui-contracts, gate, mutation-assurance]
     runs-on: ubuntu-latest
     steps:
       - name: Record aggregate status
         env:
           BROWSER_RESULT: ${{ needs.browser.result }}
           STATIC_RESULT: ${{ needs.static.result }}
+          PUBLIC_UI_CONTRACTS_RESULT: ${{ needs.public-ui-contracts.result }}
           GATE_RESULT: ${{ needs.gate.result }}
           MUTATION_RESULT: ${{ needs.mutation-assurance.result }}
         run: >-
           node -e "require('node:fs').writeFileSync('coop-required-status.json',
           JSON.stringify({version:1,sha:process.env.GITHUB_SHA,browser:process.env.BROWSER_RESULT,
-          static:process.env.STATIC_RESULT,gate:process.env.GATE_RESULT,
+          static:process.env.STATIC_RESULT,publicUiContracts:process.env.PUBLIC_UI_CONTRACTS_RESULT,
+          gate:process.env.GATE_RESULT,
           mutation:process.env.MUTATION_RESULT},null,2)+'\n')"
 
       - name: Require every co-op checkpoint job
         env:
           BROWSER_RESULT: ${{ needs.browser.result }}
           STATIC_RESULT: ${{ needs.static.result }}
+          PUBLIC_UI_CONTRACTS_RESULT: ${{ needs.public-ui-contracts.result }}
           GATE_RESULT: ${{ needs.gate.result }}
           MUTATION_RESULT: ${{ needs.mutation-assurance.result }}
         run: |
           test "$BROWSER_RESULT" = success
           test "$STATIC_RESULT" = success
+          test "$PUBLIC_UI_CONTRACTS_RESULT" = success
           test "$GATE_RESULT" = success
           test "$MUTATION_RESULT" = success
 

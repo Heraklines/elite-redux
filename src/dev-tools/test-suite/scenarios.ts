@@ -2850,6 +2850,26 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: different UI languages produce the same gameplay data (#633)",
+    description:
+      "CO-OP P0 fix - verify with TWO REAL clients on staging, one set to English and one to German. The\n"
+      + "lobby previously rejected an otherwise valid pair with 'Could not verify your co-op partner build'\n"
+      + "because boot-time move-id repair walked localized live Move objects, producing different move maps\n"
+      + "and movesets from the same build. The repair now derives ids only from the static MoveId enum and\n"
+      + "bundled English catalog. DO: hard-refresh both clients, choose different UI languages, sign in, and\n"
+      + "pair in a new co-op lobby. EXPECT: fingerprint negotiation succeeds, both players reach starter\n"
+      + "selection, and wave 1 starts normally. CI coverage: er-locale-determinism.test.ts exercises the real\n"
+      + "ER draft ids with translation lookup disabled; the public two-browser cross-locale journey is the\n"
+      + "release oracle.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.EARTHQUAKE, MoveId.CRUNCH] }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: gift-type mystery event no longer desyncs the WAVES (#859)",
     description:
       "CO-OP P0 fix - verify with TWO REAL clients on staging. A NON-battle mystery event (e.g. the\n"

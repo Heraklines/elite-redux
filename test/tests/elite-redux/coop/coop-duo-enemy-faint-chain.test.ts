@@ -131,7 +131,7 @@ describe.skipIf(!RUN)(
       await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, turn);
       await withClient(rig.hostCtx, async () => {
         game.move.select(KO_MOVE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
     }

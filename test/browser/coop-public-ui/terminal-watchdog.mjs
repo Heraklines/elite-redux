@@ -39,6 +39,7 @@ export class TerminalAbortError extends Error {
  */
 export function watchForTerminal(clients, { pollMs = 200 } = {}) {
   const cursors = new Map(clients.map(client => [client.label, 0]));
+  const gameOverBySeat = new Map();
   let stopped = false;
   let timer = null;
   const promise = new Promise((_resolve, reject) => {
@@ -56,9 +57,27 @@ export function watchForTerminal(clients, { pollMs = 200 } = {}) {
           }
           for (const { name, pattern } of TERMINAL_MARKERS) {
             if (pattern.test(text)) {
+              if (name === "game-over") {
+                gameOverBySeat.set(client.label, text);
+                if (gameOverBySeat.size < clients.length) {
+                  continue;
+                }
+              } else if (
+                gameOverBySeat.size > 0
+                && (name === "shared-session-terminal" || name === "shared-session-stopped")
+              ) {
+                // GameOver is a paired terminal: after the first surface opens, keep the rig alive until
+                // every browser has exposed it. Teardown on this peer's later shared-terminal log would
+                // reproduce the terminal-loss race the browser evidence is intended to catch.
+                continue;
+              }
               stopped = true;
-              client.evidence.record("terminal-watchdog", { marker: name, text });
-              reject(new TerminalAbortError(name, text, client.label));
+              const terminalText =
+                name === "game-over"
+                  ? [...gameOverBySeat.entries()].map(([seat, event]) => `${seat}: ${event}`).join(" | ")
+                  : text;
+              client.evidence.record("terminal-watchdog", { marker: name, text: terminalText });
+              reject(new TerminalAbortError(name, terminalText, client.label));
               return;
             }
           }

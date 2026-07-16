@@ -1146,8 +1146,10 @@ function dispatchStatTriggerOnEvent(params: Record<string, unknown>): DispatchRe
   switch (trigger) {
     case "on-ko":
       return ok([new StatTriggerOnKoAbAttr({ stats })]);
-    case "on-hit":
-      return ok([new StatTriggerOnHitAbAttr({ stats, filter: parseOnHitFilter(params.filter) ?? undefined })]);
+    case "on-hit": {
+      const filter = parseOnHitFilter(params.filter);
+      return ok([new StatTriggerOnHitAbAttr(filter == null ? { stats } : { stats, filter })]);
+    }
     case "on-entry":
       return ok([new StatTriggerOnEntryAbAttr({ stats })]);
     case "on-stat-lowered": {
@@ -6607,7 +6609,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // (Merciless-style ConditionalCrit).
       return ok([
         new ConditionalAlwaysHitAbAttr({ superEffective: true }),
-        new ConditionalCritAbAttr((user, target, move) => target.getMoveEffectiveness(user, move) > 1),
+        new ConditionalCritAbAttr(
+          (user, target, move) => target != null && target.getMoveEffectiveness(user, move) > 1,
+        ),
       ]);
     case 374:
       // (No ER ability 374 in audit — sentinel to keep formatting.)

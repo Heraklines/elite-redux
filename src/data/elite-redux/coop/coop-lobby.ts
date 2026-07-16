@@ -204,6 +204,8 @@ export interface CoopLobbyCallbacks {
   onConnected: (runtime: CoopRuntime) => void;
   /** A fatal error (announce/connect failed). */
   onError: (message: string) => void;
+  /** A recoverable lobby race; keep the lobby open and rebuild its actionable panel. */
+  onTransientError?: (message: string) => void;
   /** Lobby v2: someone is asking to join ME - show Accept / Decline. */
   onRequest?: (from: LobbyRequest) => void;
   /** Lobby v2: the incoming request evaporated (requester left / was matched). */
@@ -236,6 +238,21 @@ export interface CoopLobbyOptions {
 export function coopLobbyProtocolFromEnv(): CoopLobbyProtocol {
   const selected = (import.meta.env as unknown as Record<string, string | undefined>).VITE_COOP_SIGNALING_PROTOCOL;
   return selected === "p33" ? "p33" : "legacy";
+}
+
+/**
+ * Optional non-production lobby namespace used by the real-browser matrix.
+ * Production and ordinary staging players omit both build switches and remain in the shared room.
+ */
+export function coopLobbyRoomFromEnv(): string | undefined {
+  const env = import.meta.env as unknown as Record<string, string | undefined>;
+  const configured = env.VITE_COOP_LOBBY_ROOM?.trim();
+  const queryRoom =
+    env.VITE_COOP_LOBBY_ROOM_QUERY === "1" && typeof globalThis.location?.search === "string"
+      ? new URLSearchParams(globalThis.location.search).get("cooproom")?.trim()
+      : undefined;
+  const room = configured || queryRoom;
+  return room != null && room.length <= 64 && /^[A-Za-z0-9_-]+$/u.test(room) ? room : undefined;
 }
 
 const POLL_INTERVAL_MS = 1500;
@@ -273,7 +290,8 @@ export class CoopLobbyController {
     this.connectFn = options.connect ?? connectCoopWithCode;
     this.connectP33Fn = options.connectP33 ?? connectCoopP33Pairing;
     this.protocol = options.protocol ?? coopLobbyProtocolFromEnv();
-    this.p33Dependencies = options.p33Dependencies ?? {};
+    const room = coopLobbyRoomFromEnv();
+    this.p33Dependencies = options.p33Dependencies ?? (room == null ? {} : { room });
   }
 
   /** Announce presence and begin polling. Connects immediately if already paired. */
@@ -381,7 +399,8 @@ export class CoopLobbyController {
         return;
       }
       coopWarn("lobby", `request failed (transient): ${msg} -> keep browsing`);
-      this.callbacks.onError(msg);
+      this.outgoingPending = false;
+      this.callbacks.onTransientError?.(msg);
       this.scheduleNextPoll(POLL_INTERVAL_MS);
     }
   }
@@ -421,7 +440,7 @@ export class CoopLobbyController {
         return;
       }
       coopWarn("lobby", `respond failed (transient): ${message(e)} -> keep browsing`);
-      this.callbacks.onError(message(e));
+      this.callbacks.onTransientError?.(message(e));
     }
     this.scheduleNextPoll(POLL_INTERVAL_MS);
   }
@@ -446,7 +465,19 @@ export class CoopLobbyController {
   }
 
   private failClosedP33Credential(error: unknown): boolean {
-    if (this.protocol !== "p33" || !(error instanceof CoopP33HttpError) || ![401, 403, 409].includes(error.status)) {
+    if (this.protocol !== "p33" || !(error instanceof CoopP33HttpError)) {
+      return false;
+    }
+    // 409 means different things on different endpoints. On the authenticated lobby GET it
+    // means this presence/bearer binding was replaced and continuing would be unsafe. On
+    // request/respond it is an ordinary matchmaking race (the row expired, left, or paired)
+    // and must return to browsing. Treating every 409 as credential loss permanently stopped
+    // polling after one late Accept and turned a recoverable race into a real softlock.
+    const credentialFailure =
+      error.status === 401
+      || error.status === 403
+      || (error.status === 409 && error.path.startsWith("/coop/v3/lobby?"));
+    if (!credentialFailure) {
       return false;
     }
     this.stopped = true;

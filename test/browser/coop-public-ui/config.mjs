@@ -58,6 +58,17 @@ function keySequence(name, fallback) {
   return value;
 }
 
+function optionalIdentifier(name, maxLength) {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    return null;
+  }
+  if (value.length > maxLength || !/^[A-Za-z0-9_-]+$/u.test(value)) {
+    throw new Error(`${name} must contain at most ${maxLength} ASCII letters, digits, underscores, or hyphens`);
+  }
+  return value;
+}
+
 const allowedJourneys = new Set([
   "probe",
   "fresh-wave2",
@@ -71,6 +82,32 @@ const allowedSeats = new Set(["host-seat", "guest-seat"]);
 const allowedAccountModes = new Set(["login", "register"]);
 const allowedDifficulties = new Set(["youngster", "ace", "elite", "hell", "mystery"]);
 const allowedDifficultyOptions = new Set(["youngster", "ace", "elite", "hell", "mystery-test"]);
+const allowedLocales = new Set([
+  "en",
+  "es-ES",
+  "es-419",
+  "fr",
+  "it",
+  "de",
+  "zh-Hans",
+  "zh-Hant",
+  "pt-BR",
+  "ko",
+  "ja",
+  "ca",
+  "eu",
+  "da",
+  "th",
+  "tr",
+  "ro",
+  "ru",
+  "id",
+  "hi",
+  "tl",
+  "nb-NO",
+  "sv",
+  "uk",
+]);
 const defaultCoopChallengeKeys = [...Array.from({ length: 10 }, () => "ArrowDown"), "ArrowRight", "Space", "Space"];
 
 export function loadConfig() {
@@ -90,6 +127,8 @@ export function loadConfig() {
   const accountMode = process.env.COOP_UI_ACCOUNT_MODE?.trim() || "login";
   const difficultyId = process.env.COOP_UI_DIFFICULTY_ID?.trim() || "ace";
   const difficultyOptionId = process.env.COOP_UI_DIFFICULTY_OPTION_ID?.trim() || difficultyId;
+  const hostLocale = process.env.COOP_UI_HOST_LOCALE?.trim() || "en";
+  const guestLocale = process.env.COOP_UI_GUEST_LOCALE?.trim() || "en";
   if (!allowedSeats.has(requesterSeat)) {
     throw new Error(`COOP_UI_REQUESTER_SEAT must be one of ${[...allowedSeats].join(", ")}`);
   }
@@ -108,6 +147,9 @@ export function loadConfig() {
   if (!allowedDifficultyOptions.has(difficultyOptionId)) {
     throw new Error(`COOP_UI_DIFFICULTY_OPTION_ID must be one of ${[...allowedDifficultyOptions].join(", ")}`);
   }
+  if (!allowedLocales.has(hostLocale) || !allowedLocales.has(guestLocale)) {
+    throw new Error(`COOP_UI_HOST_LOCALE and COOP_UI_GUEST_LOCALE must be one of ${[...allowedLocales].join(", ")}`);
+  }
 
   return {
     root: ROOT,
@@ -121,6 +163,7 @@ export function loadConfig() {
     expectedApiOrigin: process.env.COOP_UI_EXPECTED_API_ORIGIN?.trim() || null,
     expectedSignalOrigin: process.env.COOP_UI_EXPECTED_SIGNAL_ORIGIN?.trim() || null,
     entryContract: process.env.COOP_BROWSER_ENTRY_CONTRACT?.trim() || "public-ui-v1",
+    lobbyRoom: optionalIdentifier("COOP_UI_LOBBY_ROOM", 64),
     artifactDir: resolve(ROOT, "dev-logs", "coop-public-ui", runId),
     headless: boolean("COOP_UI_HEADLESS", true),
     chromeTrace: boolean("COOP_UI_CHROME_TRACE", true),
@@ -168,6 +211,10 @@ export function loadConfig() {
     accountMode,
     difficultyId,
     difficultyOptionId,
+    locales: {
+      "host-seat": hostLocale,
+      "guest-seat": guestLocale,
+    },
     allowedConsoleErrors: (process.env.COOP_UI_ALLOWED_CONSOLE_ERRORS ?? "")
       .split("||")
       .map(value => value.trim())

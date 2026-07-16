@@ -9,6 +9,8 @@ name: Deploy Staging
 #   secrets.CLOUDFLARE_API_TOKEN   — token with Pages:Edit on the account
 #   secrets.CLOUDFLARE_ACCOUNT_ID  — Cloudflare account id
 #   vars.STAGING_SERVER_URL        — save API base, e.g. https://er-save-api-staging.<sub>.workers.dev
+# The Cloudflare account must contain a dedicated `er-coop-staging` D1. The
+# workflow resolves it by exact name and refuses production's D1 id.
 
 run-name: ${{ inputs.operation == 'import_music' && 'Import YouTube BGM' || 'Deploy Staging' }}
 
@@ -147,6 +149,9 @@ jobs:
           # The upstream pokerogue-assets submodule pins a commit that isn't
           # always fetchable, so we vendor those files in deploy/standalone-assets.
 
+      - name: Seal exact promotion source
+        run: echo "PROMOTED_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
       - uses: ./.github/actions/setup-deps
 
       - name: Stage standalone asset metadata
@@ -161,6 +166,8 @@ jobs:
           {
             echo "VITE_BYPASS_LOGIN=0"
             echo "VITE_SERVER_URL=${{ vars.STAGING_SERVER_URL }}"
+            echo "VITE_COOP_SERVER_URL=https://er-coop-api-staging.heraklines.workers.dev"
+            echo "VITE_COOP_SIGNALING_PROTOCOL=p33"
             # Showdown battle telemetry (D5): dedicated worker + er-telemetry D1.
             # Without this the client falls back to VITE_SERVER_URL (404 no-op).
             echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry.heraklines.workers.dev"
@@ -250,6 +257,20 @@ jobs:
       - name: Verify staging promotion contract
         run: node --test test/browser/coop-public-ui/deploy-staging-contract.test.mjs
 
+      - name: Resolve isolated co-op D1 and seal staging Worker config
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database?name=er-coop-staging" \
+            > "$RUNNER_TEMP/coop-d1.json"
+          test "$(jq '[.result[] | select(.name == "er-coop-staging")] | length' "$RUNNER_TEMP/coop-d1.json")" = "1"
+          STAGING_COOP_D1_ID="$(jq -r '.result[] | select(.name == "er-coop-staging") | .uuid' "$RUNNER_TEMP/coop-d1.json")"
+          node scripts/materialize-coop-staging-config.mjs \
+            "$STAGING_COOP_D1_ID" "$PROMOTED_SHA" workers/er-coop-api/wrangler.generated.staging.toml
+
       # Do not mutate either live surface until every fallible build/verification step is green. The Worker
       # goes first so a newly published browser never calls an older save contract. Promotions are queued
       # above, so a run that reaches this point cannot strand the two halves between protocol versions.
@@ -259,6 +280,33 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config workers/er-save-api/wrangler.staging.toml
+
+      - name: Deploy co-op signaling API (staging)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config workers/er-coop-api/wrangler.generated.staging.toml
+
+      - name: Verify staging P33 signaling contract
+        run: |
+          for attempt in $(seq 1 24); do
+            if curl --fail --silent --show-error \
+              --header 'Cache-Control: no-cache' \
+              "https://er-coop-api-staging.heraklines.workers.dev/coop/v3/health?source_sha=${PROMOTED_SHA}&attempt=${attempt}" \
+              > "$RUNNER_TEMP/coop-health.json"; then
+              if jq -e --arg sha "$PROMOTED_SHA" \
+                '.ok == true and .protocol == "er-coop-33" and .identityConfigured == true and .sourceSha == $sha' \
+                "$RUNNER_TEMP/coop-health.json" > /dev/null; then
+                exit 0
+              fi
+            fi
+            echo "waiting for staging P33 Worker source SHA propagation (attempt ${attempt}/24)"
+            sleep 5
+          done
+          jq '{ok, protocol, identityConfigured, sourceSha}' "$RUNNER_TEMP/coop-health.json" || true
+          echo "staging P33 Worker did not attest the promoted source SHA" >&2
+          exit 1
 
       - name: Deploy to Cloudflare Pages (staging)
         uses: cloudflare/wrangler-action@v3

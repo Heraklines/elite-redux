@@ -71,6 +71,21 @@ export class PhaseTree {
   }
 
   /**
+   * Install a barrier immediately before the current phase's already-queued siblings.
+   *
+   * Phases subsequently added by the current phase still enter the child level and therefore
+   * drain first (including their descendants). Once that subtree is empty, the barrier runs
+   * before any sibling that was already waiting behind the current phase.
+   */
+  public addBarrier(phase: Phase): void {
+    const siblings = this.levels[this.currentLevel];
+    if (siblings == null) {
+      throw new Error("Attempted to add a phase barrier to a nonexistent PhaseTree level!");
+    }
+    siblings.unshift(phase);
+  }
+
+  /**
    * Add a {@linkcode Phase} after the first occurence of a given `Phase` in the Tree,
    * or to the top of the Tree if no such phase exists.
    * @param phase - The {@linkcode Phase} to be added

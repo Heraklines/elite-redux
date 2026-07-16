@@ -454,6 +454,7 @@ interface CoopTurnAddress {
 interface PendingTurnWaiter {
   turn: number;
   address: CoopTurnAddress | null;
+  promise: Promise<CoopTurnResolution | null>;
   finish: (res: CoopTurnResolution | null) => void;
 }
 
@@ -498,7 +499,7 @@ interface ReplacementAckIdentity {
   checksum: string;
 }
 
-export type CoopAuthorityContinuationSurface = "command" | "sharedInput" | "terminal";
+export type CoopAuthorityContinuationSurface = "command" | "rendererWait" | "sharedInput" | "terminal";
 
 export type CoopAuthorityContinuationExpectation =
   | { kind: "command"; epoch: number; wave: number; turn: number }
@@ -2256,7 +2257,7 @@ export class CoopBattleStreamer {
       // next address. Both are real, renderer-active public continuation surfaces; the full address—not the
       // early prediction—must decide whether authority retention can be released.
       return (
-        (surface === "command" || surface === "sharedInput")
+        (surface === "command" || surface === "rendererWait" || surface === "sharedInput")
         && ((current.wave === expectation.wave && current.turn === expectation.turn)
           || (this.admittedWaveAdvanceContinuations.has(`${expectation.epoch}:${expectation.wave}`)
             && current.wave === expectation.wave + 1
@@ -3211,8 +3212,14 @@ export class CoopBattleStreamer {
     }
     const duplicate = this.pending.get(lookup.key);
     if (duplicate != null) {
-      coopWarn("stream", `guest awaitTurn turn=${turn} superseding duplicate addressed waiter`);
-      duplicate.finish(null);
+      // Same-address consumers are one logical authority wait. Cancelling the first waiter made its
+      // replay phase interpret an internal duplicate pump as missing host authority and terminalize a
+      // healthy session before the delayed host commit arrived. Join the in-flight result instead.
+      coopLog("stream", `guest awaitTurn turn=${turn} JOIN duplicate addressed waiter`);
+      if (lookup.address != null && this.authorityContext != null) {
+        this.requestTurnCommit(lookup.address.epoch, lookup.address.wave, lookup.address.turn);
+      }
+      return duplicate.promise;
     }
     if (lookup.address != null && this.authorityContext != null) {
       this.requestTurnCommit(lookup.address.epoch, lookup.address.wave, lookup.address.turn);
@@ -3229,35 +3236,35 @@ export class CoopBattleStreamer {
     }
     coopLog("replay", `guest awaitTurn turn=${turn} START timeout=${this.timeoutMs}ms`);
     this.pendingSince.set(lookup.key, Date.now());
-    return new Promise<CoopTurnResolution | null>(resolve => {
-      let settled = false;
-      let cancelTimer: () => void = () => {};
-      const finish = (res: CoopTurnResolution | null) => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        cancelTimer();
-        if (this.pending.get(lookup.key)?.finish === finish) {
-          this.pending.delete(lookup.key);
-          this.pendingSince.delete(lookup.key);
-        }
-        if (res == null) {
-          coopWarn("replay", `guest awaitTurn turn=${turn} STALL -> null (timeout/superseded)`);
-        } else {
-          if (this.authorityContext != null) {
-            this.requestTurnCommit(res.epoch, res.wave, res.turn, res.revision);
-          }
-          coopLog(
-            "replay",
-            `guest awaitTurn turn=${turn} RESOLVE events=${res.events.length} checksum=${res.checksum}`,
-          );
-        }
-        resolve(res);
-      };
-      this.pending.set(lookup.key, { turn, address: lookup.address, finish });
-      cancelTimer = this.schedule(() => finish(null), this.timeoutMs);
+    let resolvePromise!: (res: CoopTurnResolution | null) => void;
+    const promise = new Promise<CoopTurnResolution | null>(resolve => {
+      resolvePromise = resolve;
     });
+    let settled = false;
+    let cancelTimer: () => void = () => {};
+    const finish = (res: CoopTurnResolution | null) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cancelTimer();
+      if (this.pending.get(lookup.key)?.finish === finish) {
+        this.pending.delete(lookup.key);
+        this.pendingSince.delete(lookup.key);
+      }
+      if (res == null) {
+        coopWarn("replay", `guest awaitTurn turn=${turn} STALL -> null (timeout/superseded)`);
+      } else {
+        if (this.authorityContext != null) {
+          this.requestTurnCommit(res.epoch, res.wave, res.turn, res.revision);
+        }
+        coopLog("replay", `guest awaitTurn turn=${turn} RESOLVE events=${res.events.length} checksum=${res.checksum}`);
+      }
+      resolvePromise(res);
+    };
+    this.pending.set(lookup.key, { turn, address: lookup.address, promise, finish });
+    cancelTimer = this.schedule(() => finish(null), this.timeoutMs);
+    return promise;
   }
 
   /**

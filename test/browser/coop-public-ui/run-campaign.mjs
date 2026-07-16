@@ -67,6 +67,7 @@ try {
     } catch (diagnosticError) {
       cleanupErrors.push(diagnosticError instanceof Error ? diagnosticError : new Error(String(diagnosticError)));
     }
+    failure = rig.aggregateFailureWithBrowserEvidence(failure);
   }
 } finally {
   for (const [signal, handler] of signalHandlers) {

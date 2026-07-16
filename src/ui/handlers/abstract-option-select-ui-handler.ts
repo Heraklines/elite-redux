@@ -22,6 +22,11 @@ export interface OptionSelectConfig {
 }
 
 export interface OptionSelectItem {
+  /**
+   * Stable, locale-independent identity for automation and accessibility projections.
+   * Presentation text must never be used as an authoritative option identity.
+   */
+  semanticId?: string;
   label: string;
   handler: () => boolean;
   onHover?: () => void;

@@ -167,7 +167,7 @@ describe.skipIf(!RUN)("Showdown versus - two-engine end-to-end proof (C6v2d)", (
     const turn = rig.hostScene.currentBattle.turn;
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
 
     // The guest replays the host's streamed turn (the authoritative state stream applies on the guest).
@@ -254,7 +254,7 @@ describe.skipIf(!RUN)("Showdown versus - two-engine end-to-end proof (C6v2d)", (
       const turn = rig.hostScene.currentBattle.turn;
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);

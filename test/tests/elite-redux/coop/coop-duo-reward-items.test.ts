@@ -95,7 +95,7 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
   async function hostPlayWave(rig: DuoRig): Promise<void> {
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
 

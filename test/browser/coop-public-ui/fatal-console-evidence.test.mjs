@@ -9,7 +9,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { EvidenceSink, fatalCoopConsoleReason } from "./evidence.mjs";
+import { EvidenceSink, fatalCoopConsoleReason, isExpectedLocaleFallbackError } from "./evidence.mjs";
 
 const fatalLines = [
   "[coop:ASSERT] turn=3 CHECKSUM MISMATCH #1 (severity=log): authoritative payload failed",
@@ -17,7 +17,6 @@ const fatalLines = [
   "[coop:checksum] turn=3 ASSERTION-DIFF 2 field(s)",
   "[coop:checksum] turn=3 STRUCTURED APPLY FAILURE (1 section(s)) -> forcing heal-once/resync",
   "[coop-resync] turn=3 UNHEALED party.0.hp host=4 guest=3",
-  "[coop:durability] operation delivery RETRY key=reward:2 attempt=1/8",
   "[coop:durability] recover cls=reward from=1 blocked=3 attempt=1/8 reason=gap",
   "[coop:durability] gap cls=reward got=3 have=1 -> request tail",
   "[coop:rendezvous] RENDEZVOUS RECOVERY EXHAUSTED point=cmd:3:2 kind=arrival attempts=3",
@@ -27,6 +26,8 @@ const fatalLines = [
   "[coop:durability] deferred continuation EXHAUSTED cls=reward from=1 blocked=2 attempts=4 deadlineMs=9000",
   "[coop:durability] operation continuation EXHAUSTED key=reward:2",
   "[coop:durability] recovery EXHAUSTED cls=reward from=1 blocked=3 attempts=8 reason=gap",
+  "[coop:relay] peer recv commandRequest fieldIndex=0 owner=guest turn=2 for a slot that is NOT ours -> DECLINE reply (host AI-falls-back, #693)",
+  "[coop:relay] recv command DECLINE fieldIndex=0 turn=2 -> AI fallback",
   "[coop:runtime] STALL WATCHDOG: asymmetric wait (local=30s peer=0s) -> recovering (cancel orphan waits)",
   "[coop:me] host await guest index missing; retaining selector and requesting durable replay",
   "[coop:resync] await stateSync start seq=8000001",
@@ -46,6 +47,7 @@ const benignLines = [
   "[coop:checksum] guest verify turn=3: MATCH host=guest=aaaa",
   "[coop:durability] apply DEFERRED cls=reward seq=2 -> no ack (boundary pending)",
   "[coop:durability] reconnect resend cls=reward unacked=1",
+  "[coop:durability] operation delivery RETRY key=reward:2 attempt=1/8",
   "[coop:durability] resync cls=reward from=2 -> replay 0 entries",
   "[coop:resync] post-rejoin full resync request seq=9300001",
   "[coop:resync] turn=3 applying full snapshot (suppressResummon=false)",
@@ -88,6 +90,24 @@ test("does not confuse healthy convergence, deferred readiness, reconnect, or re
   for (const line of benignLines) {
     assert.equal(fatalCoopConsoleReason(line), null, line);
   }
+});
+
+test("only non-English locale JSON 404s are classified as expected i18next fallback probes", () => {
+  const error = "Failed to load resource: the server responded with a status of 404 (Not Found)";
+  for (const locale of ["de", "fr", "ja", "zh-Hans", "ar", "ru", "future-locale"]) {
+    assert.equal(isExpectedLocaleFallbackError("error", error, `https://game.test/locales/${locale}/menu.json`), true);
+  }
+  assert.equal(isExpectedLocaleFallbackError("error", error, "https://game.test/locales/en/menu.json"), false);
+  assert.equal(isExpectedLocaleFallbackError("error", error, "https://game.test/assets/missing.json"), false);
+  assert.equal(isExpectedLocaleFallbackError("warning", error, "https://game.test/locales/de/menu.json"), false);
+  assert.equal(
+    isExpectedLocaleFallbackError(
+      "error",
+      "Failed to load resource: status of 500",
+      "https://game.test/locales/de/menu.json",
+    ),
+    false,
+  );
 });
 
 test("EvidenceSink fails on warning-level recovery and an allowlisted checksum error", async () => {

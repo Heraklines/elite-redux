@@ -160,16 +160,25 @@ async function raiseGameSpeed(rig, policy, progress) {
     return;
   }
   for (const client of clients) {
+    const speedCursor = client.evidence.cursor();
     // Drive Title -> Settings -> Game Speed 10x -> back through the real menus. The sequence
     // itself resets the Title cursor to New Game; Settings is an overlay so TitlePhase does
     // not re-log, and a wrong sequence fails loudly at the subsequent pairing (which re-waits
     // Title). A trailing settle lets the last menu transition land before pairing.
     await client.sequence(keys, "raise-game-speed-to-10x");
     await delay(client.config.settleDelayMs);
-    client.evidence.record("campaign-speed", { status: "applied", keys });
+    const attestation = await client.evidence.waitForCondition(sink => sink.findGameSpeed(10, speedCursor), {
+      timeoutMs: client.config.timeoutMs,
+      description: "visible Settings Game Speed=10 attestation",
+    });
+    client.evidence.record("campaign-speed", {
+      status: "attested",
+      gameSpeed: attestation.observation.gameSpeed,
+      keys,
+    });
     await client.checkpoint("speed-raised");
   }
-  await progress.note("speed-raise applied (Game Speed -> 10x via Settings UI)", { keys });
+  await progress.note("speed-raise observer-attested (Game Speed -> 10x via Settings UI)", { keys });
 }
 
 /**
@@ -250,7 +259,7 @@ export function clientsAwaitingTurnProgress(rig, from) {
   return Object.values(rig.clients).filter(client => !client.evidence.find(TURN_PROGRESS, from[client.label] ?? 0));
 }
 
-function findOwnedCommandFrontier(client, from) {
+export function findOwnedCommandFrontier(client, from) {
   const semantic = client.evidence.findLastSemanticSurface(from, "command:command");
   if (
     semantic?.observation.ready?.handlerActive === true
@@ -262,6 +271,11 @@ function findOwnedCommandFrontier(client, from) {
     return semantic;
   }
   return client.evidence.find(LOCAL_COMMAND, from);
+}
+
+/** Every player has reached its own actionable command UI, using semantic evidence first. */
+export function allClientsAtOwnedCommandFrontier(clients, from) {
+  return clients.every(client => findOwnedCommandFrontier(client, from[client.label] ?? 0) != null);
 }
 
 /**
@@ -464,9 +478,6 @@ export async function waitForOutcomeBounded(
   const animationBudget = extendForAnimationProgress ? createAnimationProgressBudget(rig, from, timeoutMs) : null;
   while (true) {
     const deadline = animationBudget?.observe() ?? fixedDeadline;
-    if (Date.now() >= deadline) {
-      break;
-    }
     // A mid-battle wipe / game-over is a real run END, not a driver softlock: classify it
     // distinctly so the campaign still produces clean evidence instead of a generic hang.
     if (
@@ -489,7 +500,7 @@ export async function waitForOutcomeBounded(
         return { kind: "faint", client };
       }
     }
-    if (clients.every(client => client.evidence.find(LOCAL_COMMAND, from[client.label]))) {
+    if (allClientsAtOwnedCommandFrontier(clients, from)) {
       return { kind: "command" };
     }
     if (stopOnOwnedCommandFrontier) {
@@ -503,6 +514,11 @@ export async function waitForOutcomeBounded(
     }
     if (advanceBattlePrompt && (await advanceBattlePrompt())) {
       continue;
+    }
+    // Drain evidence once before honoring the deadline. Under severe event-loop dilation the timer callback
+    // can resume after the immutable ceiling even though the commit/reward event was already buffered.
+    if (Date.now() >= deadline) {
+      break;
     }
     await delay(100);
   }
@@ -518,26 +534,29 @@ export async function waitForOutcomeBounded(
  */
 async function driveBattleWave(rig, policy, stats) {
   const clients = Object.values(rig.clients);
-  let commandCursors = fromEach(clients, client => client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0);
+  let commandCursors = fromEach(clients, client => findOwnedCommandFrontier(client, 0)?.index ?? 0);
   let pendingCommandProof = null;
   const fallbackWindow = Math.min(rig.config.timeoutMs, 15_000);
   for (let turn = 1; turn <= rig.config.maxTurns; turn++) {
     const purpose = `wave-${stats.wave}-turn-${turn}`;
-    const { outcomeCursors } = await rig.driveSequentialCommandRound(
+    const { outcomeCursors, expectedCommandAddress } = await rig.driveSequentialCommandRound(
       commandCursors,
       policy.keys.battle,
       `${purpose}-attack-first`,
     );
     if (pendingCommandProof != null) {
-      await rig.assertSharedSurface("command", pendingCommandProof.cursors, pendingCommandProof.name, {
+      await rig.assertSharedCommandFrontier(pendingCommandProof.cursors, pendingCommandProof.name, {
         expectedWave: rig.activeBattleWave,
+        expectedAddress: expectedCommandAddress,
       });
       await rig.assertRetainedContinuation(pendingCommandProof.cursors, pendingCommandProof.name);
       pendingCommandProof = null;
     }
     stats.turns = turn;
     const from = outcomeCursors;
-    const advanceBattlePrompt = createBattlePromptAdvancer(rig, from, stats, purpose);
+    const advanceBattlePrompt = createBattlePromptAdvancer(rig, from, stats, purpose, {
+      expectedCommandAddress,
+    });
     let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow, {
       stopOnTurnProgress: true,
       stopOnOwnedCommandFrontier: true,
@@ -636,6 +655,28 @@ function hasSemanticSurface(rig, surfaceId, cursors) {
   );
 }
 
+function semanticAppearanceIdentity(event) {
+  const observation = event?.kind === "browser-surface2" ? event.observation : null;
+  if (observation == null) {
+    return null;
+  }
+  return JSON.stringify([
+    observation.surfaceId,
+    observation.address?.epoch,
+    observation.address?.wave,
+    observation.address?.turn,
+    observation.phaseInstance,
+  ]);
+}
+
+function semanticAppearanceIsNew(event, handled) {
+  if (event == null) {
+    return false;
+  }
+  const identity = semanticAppearanceIdentity(event);
+  return identity == null || typeof handled !== "string" ? event.index > (handled ?? -1) : identity !== handled;
+}
+
 /**
  * Return the first registered between-wave surface observed since this wave began.
  *
@@ -651,7 +692,7 @@ export function findRegisteredSurface(rig, dispatch, cursors, handledIndex = new
       if (driver.v2SurfaceId && hasSemanticSurface(rig, driver.v2SurfaceId, cursors)) {
         return Object.values(rig.clients).some(client => {
           const event = client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, driver.v2SurfaceId);
-          return event != null && event.index > (handledIndex.get(`${driver.name}:${client.label}`) ?? -1);
+          return semanticAppearanceIsNew(event, handledIndex.get(`${driver.name}:${client.label}`));
         });
       }
       return Object.values(rig.clients).some(client => {
@@ -672,8 +713,12 @@ export function findRegisteredSurface(rig, dispatch, cursors, handledIndex = new
  */
 export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) {
   const clients = Object.values(rig.clients);
-  const notYetHandled = (client, event) =>
-    event != null && event.index > (handledIndex.get(`${driver.name}:${client.label}`) ?? -1);
+  const notYetHandled = (client, event) => {
+    const handled = handledIndex.get(`${driver.name}:${client.label}`);
+    return event?.kind === "browser-surface2"
+      ? semanticAppearanceIsNew(event, handled)
+      : event != null && event.index > (handled ?? -1);
+  };
 
   // The v2 projection is the actionable public surface and its own ownership contract. Legacy
   // OWNER lines can be emitted while preceding narration is still active, or before a campaign's
@@ -1010,6 +1055,69 @@ async function checkpointPairedMechanicalSurface(rig, surfaceId, cursors, owner)
   for (const client of Object.values(rig.clients)) {
     client.evidence.record("campaign-semantic-convergence", proof);
   }
+  return { authority, ownerEvent, peerEvents };
+}
+
+/**
+ * A leave action is two separate public surfaces, not a timing-based key macro. Open
+ * the confirmation, prove that exact addressed handler is actionable, and only then
+ * submit the remaining key(s). This is load-bearing on throttled remote Chromium.
+ */
+export async function driveConfirmedLeave(rig, driver, owner, authority) {
+  const [openConfirmKey, ...confirmKeys] = driver.keys;
+  if (!openConfirmKey || confirmKeys.length === 0 || !driver.confirmSurfaceId) {
+    throw new Error(`[campaign-readiness] ${driver.name} semantic leave has no open/confirm key split`);
+  }
+  const clients = Object.values(rig.clients);
+  const watcher = clients.find(client => client !== owner);
+  if (watcher == null) {
+    throw new Error(`[campaign-readiness] ${driver.name} semantic leave has no paired watcher`);
+  }
+  const confirmationCursors = fromEach(clients, client => client.evidence.cursor());
+  await owner.press(openConfirmKey, `campaign-${driver.name}-open-confirm`);
+
+  let ownerConfirm;
+  if (driver.confirmSurfaceId === "reward:confirm") {
+    [ownerConfirm] = await Promise.all([
+      owner.waitForOwnedRewardConfirm(confirmationCursors[owner.label], authority.address),
+      watcher.waitForAddressedRewardWatcher(confirmationCursors[watcher.label], owner.publicSeat, authority.address),
+    ]);
+  } else {
+    ownerConfirm = await owner.evidence.waitForCondition(
+      sink => {
+        const candidate = sink.findLastSemanticSurface(confirmationCursors[owner.label], driver.confirmSurfaceId);
+        const observation = candidate?.observation;
+        return observation != null
+          && observation.localSeat === owner.publicSeat
+          && observation.ownerSeat === owner.publicSeat
+          && observation.seatsWithInput?.includes(owner.publicSeat)
+          && observation.selectedOptionId === "yes"
+          && JSON.stringify(observation.address) === JSON.stringify(authority.address)
+          && observation.stateDigest === authority.stateDigest
+          && isActionableSemanticObservation(observation)
+          ? candidate
+          : null;
+      },
+      {
+        timeoutMs: rig.config.timeoutMs,
+        description: `actionable ${driver.confirmSurfaceId} at the exact ${driver.name} address`,
+      },
+    );
+  }
+  const proof = {
+    surface: driver.name,
+    confirmSurfaceId: driver.confirmSurfaceId,
+    address: authority.address,
+    stateDigest: authority.stateDigest,
+    ownerSeat: owner.publicSeat,
+    confirmationEventIndex: ownerConfirm.index,
+  };
+  for (const client of clients) {
+    client.evidence.record("campaign-semantic-confirmation-barrier", proof);
+  }
+  for (const [index, key] of confirmKeys.entries()) {
+    await owner.press(key, `campaign-${driver.name}-confirm:${index + 1}/${confirmKeys.length}`);
+  }
 }
 
 /** Drive at most one pending between-wave surface. Returns the surface name driven, or null. */
@@ -1030,6 +1138,7 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
             : driver.name === "reward" && stats.mysteryEvents.some(event => event.terminal == null)
               ? "reward"
               : null;
+    let mechanicalBoundary = null;
     if (mysteryStage === "bargain") {
       await checkpointAsymmetricBargainSurface(rig, cursors, stats, client);
     } else if (mysteryStage != null && driver.v2SurfaceId) {
@@ -1038,11 +1147,13 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
         return "target-reached";
       }
     } else if (driver.v2SurfaceId) {
-      await checkpointPairedMechanicalSurface(rig, driver.v2SurfaceId, cursors, client);
+      mechanicalBoundary = await checkpointPairedMechanicalSurface(rig, driver.v2SurfaceId, cursors, client);
     }
     await client.checkpoint(`wave-${stats.wave}-${driver.name}-owner`);
     if (driver.name === "biome-shop" && driver.market?.mode === "target-held") {
       stats.market = await driveTargetedMarket(rig, cursors, driver.market);
+    } else if (driver.confirmSurfaceId && mechanicalBoundary != null) {
+      await driveConfirmedLeave(rig, driver, client, mechanicalBoundary.authority);
     } else {
       await client.sequence(driver.keys, `campaign-${driver.name}`);
     }
@@ -1060,10 +1171,7 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       if (driver.v2SurfaceId) {
         const semantic = c.evidence.findLastSemanticSurface(cursors[c.label], driver.v2SurfaceId);
         if (semantic) {
-          handledIndex.set(
-            `${driver.name}:${c.label}`,
-            Math.max(handledIndex.get(`${driver.name}:${c.label}`) ?? -1, semantic.index),
-          );
+          handledIndex.set(`${driver.name}:${c.label}`, semanticAppearanceIdentity(semantic));
         }
       }
     }
@@ -1137,6 +1245,13 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
   // (surfaceCursors); the next command and terminal are searched from the post-battle
   // cursor so this wave's own commands never read as the next wave.
   const commandCursors = fromEach(clients, client => client.evidence.cursor());
+  const advanceBattlePrompt = createBattlePromptAdvancer(
+    rig,
+    commandCursors,
+    stats,
+    `wave-${waveOrdinal}-between-wave`,
+    { requireSharedCommandAddress: false },
+  );
   const deadline = Date.now() + rig.config.timeoutMs * 3;
   let stallSince = 0;
   let lastPhaseProgress = phaseProgressSignature(clients);
@@ -1154,9 +1269,8 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
       return { status: "terminal" };
     }
 
-    if (clients.every(client => client.evidence.find(LOCAL_COMMAND, commandCursors[client.label]))) {
-      await Promise.all(clients.map(client => client.waitForLocalCommand(commandCursors[client.label])));
-      const boundary = await rig.assertSharedSurface("command", commandCursors, `wave-${waveOrdinal}-advance`, {
+    if (clients.some(client => findOwnedCommandFrontier(client, commandCursors[client.label]) != null)) {
+      const boundary = await rig.assertSharedCommandFrontier(commandCursors, `wave-${waveOrdinal}-advance`, {
         allowAddressRepeat: true,
       });
       rig.activeBattleWave = boundary.wave;
@@ -1188,6 +1302,14 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
     if (drove) {
       stallSince = 0;
       lastRegisteredSurface = drove;
+      lastPhaseProgress = phaseProgressSignature(clients);
+      drivenSurfacePhaseSignature = lastPhaseProgress;
+      continue;
+    }
+
+    if (await advanceBattlePrompt()) {
+      stallSince = 0;
+      lastRegisteredSurface = null;
       lastPhaseProgress = phaseProgressSignature(clients);
       drivenSurfacePhaseSignature = lastPhaseProgress;
       continue;

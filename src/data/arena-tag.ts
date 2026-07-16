@@ -1221,7 +1221,7 @@ class HotCoalsTag extends EntryHazardTag {
  * Applies a single-layer trap that lowers the Speed of all grounded Pokémon switching in.
  */
 class StickyWebTag extends EntryHazardTag {
-  public readonly tagType = ArenaTagType.STICKY_WEB;
+  public readonly tagType: EntryHazardTagType = ArenaTagType.STICKY_WEB;
   public override get maxLayers() {
     return 1 as const;
   }

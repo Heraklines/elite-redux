@@ -1779,11 +1779,11 @@ export class AddMoveFlagAbAttr extends AbAttr {
     this.grantedFlags = options.flags;
   }
 
-  override canApply(): boolean {
+  override canApply(_params: AbAttrBaseParams): boolean {
     return false;
   }
 
-  override apply(): void {}
+  override apply(_params: AbAttrBaseParams): void {}
 
   /**
    * Whether `user` has an {@linkcode AddMoveFlagAbAttr} (on its main, passive or
@@ -1796,11 +1796,10 @@ export class AddMoveFlagAbAttr extends AbAttr {
     }
     const attrs = user.getAllActiveAbilityAttrs();
     for (const attr of attrs) {
-      if (attr?.constructor?.name !== "AddMoveFlagAbAttr") {
+      if (!(attr instanceof AddMoveFlagAbAttr)) {
         continue;
       }
-      const a = attr as AddMoveFlagAbAttr;
-      if (a.grantedFlags.includes(flag) && a.filter(user, move)) {
+      if (attr.grantedFlags.includes(flag) && attr.filter(user, move)) {
         return true;
       }
     }

@@ -106,7 +106,7 @@ describe.skipIf(!RUN)("Showdown enemy-command relay - live battle (C6v2b)", () =
     await startShowdown(game, opponent, relay, [SpeciesId.MILTANK]);
 
     game.move.select(MoveId.TACKLE);
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
 
     const enemyLastMove = game.scene.getEnemyPokemon()?.getLastXMoves(1)[0]?.move;
     expect(enemyLastMove).toBe(MoveId.LEER);
@@ -132,7 +132,7 @@ describe.skipIf(!RUN)("Showdown enemy-command relay - live battle (C6v2b)", () =
     await startShowdown(game, opponent, relay, [SpeciesId.MILTANK]);
 
     game.move.select(MoveId.TACKLE);
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
 
     const enemyLastMove = game.scene.getEnemyPokemon()?.getLastXMoves(1)[0]?.move;
     // The host rejected the illegal pick -> AI fallback; the enemy never used the injected SURF.
@@ -149,7 +149,7 @@ describe.skipIf(!RUN)("Showdown enemy-command relay - live battle (C6v2b)", () =
     await startShowdown(game, opponent, null, [SpeciesId.MILTANK]);
 
     game.move.select(MoveId.TACKLE);
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
 
     const enemyLastMove = game.scene.getEnemyPokemon()?.getLastXMoves(1)[0]?.move;
     // The AI would pick an attacking move over LEER, so the relayed move is NOT what executed.

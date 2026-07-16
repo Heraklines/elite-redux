@@ -118,6 +118,7 @@ describe("authoritative operation fault campaign: every registered class", () =>
 
     try {
       let globalRevision = 0;
+      let retainedWave: CoopAuthoritativeEnvelopeV1 | null = null;
       for (const cls of COOP_OPERATION_SURFACES) {
         registerCoopOperationLiveSink(cls, envelope => {
           liveState.set(cls, (envelope.pendingOperation?.payload as { marker: string }).marker);
@@ -132,6 +133,9 @@ describe("authoritative operation fault campaign: every registered class", () =>
 
         // Every surface participates in one dense global commit stream.
         const committedEnvelope = envelopeFor(cls, ++globalRevision);
+        if (cls === "op:wave") {
+          retainedWave = committedEnvelope;
+        }
         expect(coopOperationDurabilityHooks().extractKey?.({ t: "envelope", envelope: committedEnvelope })).toEqual({
           cls: "op:global",
           seq: globalRevision,
@@ -162,7 +166,14 @@ describe("authoritative operation fault campaign: every registered class", () =>
         continuationRetained,
       );
       await flush();
-      expect(host.unackedCount(), "the exact shared continuation releases every generic class").toBe(0);
+      expect(host.unackedCount(), "generic continuations cannot claim the retained WAVE transaction").toBe(1);
+      expect(retainedWave).not.toBeNull();
+      expect(
+        guest.completeRetainedWaveAdvance(retainedWave!, "sharedInput", { epoch: 1, wave: 10, turn: 1 }),
+        "the dedicated DATA-bound wave adapter releases the final retained class",
+      ).toBe(true);
+      await flush();
+      expect(host.unackedCount(), "every class releases only through its own exact continuation proof").toBe(0);
     } finally {
       host.dispose();
       guest.dispose();

@@ -20,24 +20,33 @@ const CHALLENGE_PHASE = /Start Phase SelectChallengePhase/u;
 const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
 const LOCAL_COMMAND = /CommandPhase .*-> LOCAL UI/u;
 const REWARD_PHASE = /Start Phase SelectModifierPhase/u;
+const GAME_OVER_PHASE = /Start Phase GameOverPhase/u;
 const REWARD_OWNER = /OWNER drives reward screen/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) wave=(\d+) turn=(\d+) rev=(\d+)/u;
 const SHARED_SESSION_TERMINAL = /\[coop:runtime\] shared session (?:terminal requested|stopped safely):/u;
 const LAUNCH_SNAPSHOT_ABORT = /launchSnapshotAbort wave=\d+ reason=/u;
+const DATA_FINGERPRINT =
+  /dataFingerprint compute moveMap=([^\s(]+)\((\d+)\) movesData=([^\s(]+)\((\d+)\) movesName=([^\s(]+)\((\d+)\) movesets=([^\s(]+)\((\d+)\) abilitiesData=([^\s(]+)\((\d+)\) abilitiesName=([^\s(]+)\((\d+)\)/u;
+const FUNCTIONAL_FINGERPRINT_MISMATCH = /FUNCTIONAL MISMATCH sections=/u;
+const COMPATIBLE_FINGERPRINT =
+  /MATCH - data tables identical across clients|PRESENTATION MISMATCH sections=.* - simulation compatible -/u;
 const POST_TURN_PHASE_PROGRESS = /Start Phase ([A-Za-z0-9]+Phase)/u;
 const POST_TURN_AUTHORITY_PROGRESS = /\[coop:turn\] host recorder: append turn=\d+ seq=(\d+)/u;
 const POST_TURN_RENDERER_PROGRESS = /\[coop:replay\] guest replay turn=\d+: live increment seq=(\d+)\.\.(\d+)/u;
 const REWARD_RESULT_RETAINED = /reward authoritative RESULT retained rev=(\d+) tick=(\d+) id=([^\s]+)/u;
 const FATAL_COOP_RECOVERY = /Co-op Sync Recovery|recovery request attempt=|recovery EXHAUSTED|could not converge/iu;
-const RENDEZVOUS_RECOVERY_RETRY_POINT = /\[coop:rendezvous\] RENDEZVOUS RECOVERY RETRY point=([^\s]+) after \d+ms/u;
+const RENDEZVOUS_RECOVERY_RETRY_POINT =
+  /\[coop:rendezvous\] RENDEZVOUS RECOVERY RETRY point=([^\s]+)(?: attempt=\d+\/\d+)? after \d+ms/u;
 const TATSUGIRI_SPECIES_ID = 978;
 const DONDOZO_SPECIES_ID = 977;
 const MAGIKARP_SPECIES_ID = 129;
 const BULBASAUR_SPECIES_ID = 1;
+const SEEL_SPECIES_ID = 86;
 const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;
 const POST_TURN_HARD_CEILING_MS = 360_000;
+const COLD_REJOIN_RELEASE_MS = 160_000;
 // Trace-enabled four-core run 29405818635 reached the matching cmd:1:1 observations 0.45s and
 // 1.05s after the ordinary ceiling across the two owner parities, with causal Phaser progress.
 // Keep that measured launch allowance Commander-only; ordinary waits retain the tighter ceiling.
@@ -53,13 +62,31 @@ const COMMANDER_POST_TURN_PROGRESS_ALLOWANCE_MS = 150_000;
 const LOBBY_REQUEST_REISSUE_MS = 10_000;
 const OPTIONAL_LOBBY_RELAY_WAIT_MS = 1_500;
 
-function semanticOptionId(label) {
-  return label
-    .replace(/\[[^\]]*\]/gu, "")
-    .replace(/[^a-zA-Z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "")
-    .toLowerCase()
-    .slice(0, 40);
+function primaryLanguage(locale) {
+  return locale.trim().toLowerCase().split("-")[0];
+}
+
+function browserLocale(locale) {
+  if (locale === "en") {
+    return "en-US";
+  }
+  if (locale === "de") {
+    return "de-DE";
+  }
+  return locale;
+}
+
+function parseFunctionalFingerprint(event, label) {
+  const match = DATA_FINGERPRINT.exec(event.text ?? "");
+  if (match == null) {
+    throw new Error(`${label}: malformed dataFingerprint compute evidence`);
+  }
+  return Object.freeze({
+    moveMap: Object.freeze({ hash: match[1], n: Number(match[2]) }),
+    movesData: Object.freeze({ hash: match[3], n: Number(match[4]) }),
+    movesets: Object.freeze({ hash: match[7], n: Number(match[8]) }),
+    abilitiesData: Object.freeze({ hash: match[9], n: Number(match[10]) }),
+  });
 }
 
 function classifyPostTurnProgress(event) {
@@ -210,7 +237,7 @@ function findAddressedCommandCollectionClosed(client, from, expectedAddress) {
   return client.evidence.events.slice(from).find(event => {
     const observation = event.kind === "browser-surface2" ? event.observation : null;
     return (
-      observation?.operationClass === "battle-progress"
+      (observation?.operationClass === "battle-progress" || observation?.operationClass === "reward")
       && observation.phase !== "CommandPhase"
       && sameAddress(observation.address, expectedAddress)
     );
@@ -225,16 +252,22 @@ function findAddressedCommandCollectionClosed(client, from, expectedAddress) {
 export function findActionableFirstLoginGenderSurface(evidence, from = 0) {
   const event = evidence.findLastSemanticSurface(from, "option-select:SelectGenderPhase");
   const observation = event?.observation;
+  const optionIds = observation?.optionIds;
   if (
     observation?.phase !== "SelectGenderPhase"
     || !Number.isSafeInteger(observation.phaseInstance)
     || observation.phaseInstance < 2
     || observation.uiMode !== "OPTION_SELECT"
     || observation.ready?.handlerActive !== true
+    || observation.ready.inputBlocked === true
     || !observation.seatsWithInput?.includes(0)
-    || observation.optionIds?.length !== 2
-    || !observation.optionIds.includes("boy")
-    || !observation.optionIds.includes("girl")
+    || !Number.isSafeInteger(observation.surfaceGeneration)
+    || observation.surfaceGeneration < 1
+    || optionIds?.length !== 2
+    || optionIds.some(optionId => typeof optionId !== "string" || optionId.length === 0)
+    || new Set(optionIds).size !== 2
+    || typeof observation.selectedOptionId !== "string"
+    || !optionIds.includes(observation.selectedOptionId)
   ) {
     return null;
   }
@@ -252,6 +285,21 @@ function findOwnedReadyReward(client, from) {
     && semantic.observation.seatsWithInput?.includes(client.publicSeat)
     && semantic.observation.ready?.handlerActive === true
     && semantic.observation.ready.awaitingActionInput === true
+    ? semantic
+    : null;
+}
+
+function findOwnedReadyReplacement(client, from) {
+  const semantic = client.evidence.findLastSemanticSurface(from, "party:replacement");
+  return semantic?.observation.operationClass === "replacement"
+    && semantic.observation.ownerModel === "interaction"
+    && semantic.observation.phase === "SwitchPhase"
+    && semantic.observation.uiMode === "PARTY"
+    && semantic.observation.localSeat === client.publicSeat
+    && semantic.observation.ownerSeat === client.publicSeat
+    && semantic.observation.seatsWithInput?.includes(client.publicSeat)
+    && semantic.observation.ready?.handlerActive === true
+    && semantic.observation.ready.inputBlocked !== true
     ? semantic
     : null;
 }
@@ -465,6 +513,117 @@ function findSharedSurfaceMatch(host, guest, surface, cursors, priorAddress, all
   return null;
 }
 
+function commandFrontierProjection(client, event) {
+  if (event?.kind !== "browser-surface2") {
+    return null;
+  }
+  const observation = event.observation;
+  const address = observation?.address;
+  const rendererWatcher =
+    observation?.surfaceId === "command:watcher"
+    && observation.operationClass === "command"
+    && observation.phase === "CoopReplayTurnPhase"
+    && observation.seatsWithInput?.length === 0
+    && observation.ready?.handlerActive === false
+    && observation.ready.awaitingActionInput === false
+    && observation.ready.inputBlocked === true;
+  if (
+    observation?.coop !== true
+    || observation.localSeat !== client.publicSeat
+    || !Number.isSafeInteger(address?.epoch)
+    || !Number.isSafeInteger(address?.wave)
+    || !Number.isSafeInteger(address?.turn)
+    || !Number.isSafeInteger(observation.membershipRevision)
+    || !Number.isSafeInteger(observation.connectionGeneration)
+    || typeof observation.stateDigest !== "string"
+    || observation.stateDigest.length === 0
+    || (observation.ready?.handlerActive !== true && !rendererWatcher)
+  ) {
+    return null;
+  }
+  const owner =
+    observation.surfaceId === "command:command"
+    && observation.operationClass === "command"
+    && observation.phase === "CommandPhase"
+    && observation.uiMode === "COMMAND"
+    && observation.seatsWithInput?.includes(client.publicSeat);
+  const watcher =
+    rendererWatcher
+    || (observation.surfaceId === "battle:message"
+      && observation.operationClass === "battle-progress"
+      && observation.phase === "CommandPhase"
+      && observation.uiMode === "MESSAGE"
+      && observation.ready.awaitingActionInput === true);
+  if (!owner && !watcher) {
+    return null;
+  }
+  return {
+    event,
+    observation,
+    kind: owner ? "owner" : "watcher",
+    address: `${address.epoch}:${address.wave}:${address.turn}`,
+  };
+}
+
+function observedCommandFrontiers(client, from) {
+  return client.evidence.events
+    .slice(from)
+    .map(event => commandFrontierProjection(client, event))
+    .filter(Boolean)
+    .toReversed();
+}
+
+export function findSharedCommandFrontierMatch(
+  host,
+  guest,
+  cursors,
+  priorAddress,
+  { allowAddressRepeat = false, expectedWave = null, expectedAddress = null } = {},
+) {
+  const hostEvents = observedCommandFrontiers(host, cursors[host.label] ?? 0);
+  const guestEvents = observedCommandFrontiers(guest, cursors[guest.label] ?? 0);
+  for (const hostProjection of hostEvents) {
+    const observation = hostProjection.observation;
+    if (
+      (!allowAddressRepeat && priorAddress === hostProjection.address)
+      || (expectedWave != null && observation.address.wave !== expectedWave)
+      || (expectedAddress != null && hostProjection.address !== expectedAddress)
+    ) {
+      continue;
+    }
+    const guestProjection = guestEvents.find(candidate => {
+      const peer = candidate.observation;
+      return (
+        candidate.address === hostProjection.address
+        && peer.membershipRevision === observation.membershipRevision
+        && peer.connectionGeneration === observation.connectionGeneration
+        && peer.stateDigest === observation.stateDigest
+      );
+    });
+    if (guestProjection == null || (hostProjection.kind !== "owner" && guestProjection.kind !== "owner")) {
+      continue;
+    }
+    return {
+      hostProjection,
+      guestProjection,
+      address: hostProjection.address,
+      comparable: {
+        surface: "command",
+        epoch: observation.address.epoch,
+        membershipRevision: observation.membershipRevision,
+        connectionGeneration: observation.connectionGeneration,
+        wave: observation.address.wave,
+        turn: observation.address.turn,
+        phase: "CommandPhase",
+        stateDigest: observation.stateDigest,
+        hostProjection: hostProjection.kind,
+        guestProjection: guestProjection.kind,
+      },
+    };
+  }
+  return null;
+}
+
 const DIGEST_PARTS = /\[coop-browser:digest-parts\] (\{.*\})/u;
 
 /** The latest per-component digest breakdown a client emitted for `address`, or null. */
@@ -612,6 +771,7 @@ export class PublicUiClient {
     this.pageCursor = this.evidence.cursor();
     this.evidence.networkState.account = null;
     this.evidence.networkState.lobby = null;
+    this.evidence.networkState.apiFailure = null;
     this.publicRole = null;
     this.publicSeat = null;
     this.page = await this.context.newPage();
@@ -621,6 +781,9 @@ export class PublicUiClient {
     await this.page.setCacheEnabled(true);
     this.evidence.attach(this.page);
     const entryUrl = new URL(this.config.baseUrl);
+    if (this.config.lobbyRoom != null) {
+      entryUrl.searchParams.set("cooproom", this.config.lobbyRoom);
+    }
     if (this.config.journey === "commander-skip") {
       entryUrl.searchParams.set("coopfixture", this.label === this.config.commanderOwnerSeat ? "commander" : "dondozo");
     } else if (this.config.journey === "faint-replacement") {
@@ -636,6 +799,9 @@ export class PublicUiClient {
 
   async reopen() {
     this.evidence.record("reopen", { reason: "cold browser page using same isolated context" });
+    // Closing a loading page intentionally aborts asset preloads. Detach only this page's error observer
+    // immediately before teardown; errors from the replacement page remain strict.
+    this.page?.removeAllListeners("pageerror");
     await this.page?.close().catch(() => {});
     await this.open();
   }
@@ -648,6 +814,7 @@ export class PublicUiClient {
     this.evidence.record("cold-context-replace", {
       reason: "brand-new cookie jar and local storage; visible login required",
     });
+    this.page?.removeAllListeners("pageerror");
     await this.context.close();
     this.context = await browser.createBrowserContext();
     this.authenticatedOnce = true;
@@ -753,12 +920,14 @@ export class PublicUiClient {
         description: "authenticated public account response",
       },
     );
-    if (this.config.accountMode === "register" && account.lastSessionSlot === -1) {
+    if (this.config.accountMode === "register" && !this.authenticatedOnce && account.lastSessionSlot === -1) {
       await this.evidence.waitForCondition(
         sink =>
-          sink.events.find(
-            event => event.kind === "response" && event.status === 404 && event.url.endsWith("/savedata/system/get"),
-          ),
+          sink.events
+            .slice(this.pageCursor)
+            .find(
+              event => event.kind === "response" && event.status === 404 && event.url.endsWith("/savedata/system/get"),
+            ),
         {
           timeoutMs: this.config.timeoutMs,
           description: "new-account public save lookup",
@@ -903,11 +1072,25 @@ export class PublicUiClient {
    * clear it deterministically here instead of relying on the next game keystroke to do it.
    */
   async clearDomInputFocus() {
-    await this.page.evaluate(() => {
+    const observedLocale = await this.page.evaluate(() => {
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
       }
+      return {
+        navigatorLanguage: navigator.language,
+        persistedLanguage: localStorage.getItem("prLang"),
+      };
     });
+    const expectedLocale = this.config.locales[this.label];
+    if (
+      primaryLanguage(observedLocale.navigatorLanguage) !== primaryLanguage(expectedLocale)
+      || primaryLanguage(observedLocale.persistedLanguage ?? "") !== primaryLanguage(expectedLocale)
+    ) {
+      throw new Error(
+        `${this.label}: browser/app locale mismatch expected=${expectedLocale} navigator=${observedLocale.navigatorLanguage} persisted=${observedLocale.persistedLanguage}`,
+      );
+    }
+    this.evidence.record("browser-locale-proof", { expectedLocale, ...observedLocale });
   }
 
   async visibleInputHandles(selector) {
@@ -1027,7 +1210,7 @@ export class PublicUiClient {
     username,
     { purpose = "request", timeoutMs = this.config.timeoutMs, relayTimeoutMs = timeoutMs, optional = false } = {},
   ) {
-    const targetId = semanticOptionId(`Ask ${username} to play`);
+    const targetId = `ask:${username}`;
     let requestCursor = this.evidence.cursor();
     try {
       await this.waitForLobbyPlayer(username, timeoutMs);
@@ -1232,13 +1415,18 @@ export class DuoPublicUiRig {
   }
 
   async waitForAllLocalCommandsDrivingBattlePrompts(from, purpose) {
-    const clients = Object.values(this.clients);
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
     const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, purpose, {
       requireSharedCommandAddress: false,
     });
     while (Date.now() < progressBudget.observe()) {
-      if (clients.every(client => findOwnedCommandOrTerminal(client, from[client.label]) != null)) {
+      if (
+        this.host
+        && this.guest
+        && findSharedCommandFrontierMatch(this.host, this.guest, from, this.lastSharedSurfaceAddress.get("command"), {
+          allowAddressRepeat: true,
+        }) != null
+      ) {
         break;
       }
       if (await advanceBattlePrompt()) {
@@ -1246,14 +1434,14 @@ export class DuoPublicUiRig {
       }
       await delay(100);
     }
-    for (const client of clients) {
-      const event = findOwnedCommandOrTerminal(client, from[client.label]);
-      if (event == null) {
-        throw new Error(`${client.label}: timed out waiting for owned command while ${purpose}`);
-      }
-      if (event.kind !== "browser-surface2" && !LOCAL_COMMAND.test(event.text ?? "")) {
-        throw new Error(`${client.label}: shared session terminated before owned CommandPhase: ${event.text}`);
-      }
+    if (
+      !this.host
+      || !this.guest
+      || findSharedCommandFrontierMatch(this.host, this.guest, from, this.lastSharedSurfaceAddress.get("command"), {
+        allowAddressRepeat: true,
+      }) == null
+    ) {
+      throw new Error(`${purpose}: timed out waiting for an addressed command owner/watcher frontier`);
     }
   }
 
@@ -1425,7 +1613,7 @@ export class DuoPublicUiRig {
   }
 
   static async launch(config) {
-    const launchBrowser = () =>
+    const launchBrowser = locale =>
       puppeteer.launch({
         headless: config.headless,
         defaultViewport: config.viewport,
@@ -1450,10 +1638,17 @@ export class DuoPublicUiRig {
           "--use-gl=angle",
           "--use-angle=swiftshader-webgl",
           "--enable-unsafe-swiftshader",
+          `--lang=${locale}`,
+          // Chromium documents --accept-lang as the headless switch exposed through
+          // navigator.language; Linux commonly ignores --lang for that API.
+          `--accept-lang=${browserLocale(locale)}`,
           `--window-size=${config.viewport.width},${config.viewport.height}`,
         ],
       });
-    const launchResults = await Promise.allSettled([launchBrowser(), launchBrowser()]);
+    const launchResults = await Promise.allSettled([
+      launchBrowser(config.locales["host-seat"]),
+      launchBrowser(config.locales["guest-seat"]),
+    ]);
     const browsers = launchResults.flatMap(result => (result.status === "fulfilled" ? [result.value] : []));
     const launchFailure = launchResults.find(result => result.status === "rejected");
     if (launchFailure) {
@@ -1546,8 +1741,54 @@ export class DuoPublicUiRig {
     // for a binding that only the launch action produces.
     this.pairRoleCursors = roleCursors;
     await this.driveSelfHealingPairing(requester, acceptor, roleCursors);
+    await this.assertPairingFunctionalFingerprintMatch(roleCursors);
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("paired-awaiting-launch")));
     return { requester, acceptor };
+  }
+
+  /** Prove differently localized production clients built identical simulation tables. */
+  async assertPairingFunctionalFingerprintMatch(roleCursors) {
+    const proofs = await Promise.all(
+      Object.values(this.clients).map(async client => {
+        const from = roleCursors[client.label];
+        const fingerprintEvent = await client.evidence.waitFor(DATA_FINGERPRINT, {
+          from,
+          timeoutMs: this.config.timeoutMs,
+          description: "local ER data fingerprint computation",
+        });
+        const compatibilityEvent = await client.evidence.waitForCondition(
+          sink => {
+            const mismatch = sink.find(FUNCTIONAL_FINGERPRINT_MISMATCH, from);
+            if (mismatch != null) {
+              throw new Error(`${client.label}: ${mismatch.text}`);
+            }
+            return sink.find(COMPATIBLE_FINGERPRINT, from);
+          },
+          {
+            timeoutMs: this.config.timeoutMs,
+            description: "peer functional fingerprint compatibility verdict",
+          },
+        );
+        return {
+          client,
+          fingerprint: parseFunctionalFingerprint(fingerprintEvent, client.label),
+          compatibilityEvent,
+        };
+      }),
+    );
+    const [first, second] = proofs;
+    if (JSON.stringify(first.fingerprint) !== JSON.stringify(second.fingerprint)) {
+      throw new Error(
+        `paired browsers computed different functional fingerprints: ${first.client.label}=${JSON.stringify(first.fingerprint)} ${second.client.label}=${JSON.stringify(second.fingerprint)}`,
+      );
+    }
+    for (const proof of proofs) {
+      proof.client.evidence.record("pairing-functional-fingerprint-proof", {
+        expectedLocale: this.config.locales[proof.client.label],
+        functionalFingerprint: proof.fingerprint,
+        compatibilityEvidenceIndex: proof.compatibilityEvent.index,
+      });
+    }
   }
 
   /**
@@ -1585,6 +1826,15 @@ export class DuoPublicUiRig {
           // keep driving until the public stable-seat binding proves the match won the race. If no
           // binding arrives by the deadline, surface this exact failure below.
           supersededRequestFailure = { client: client.label, ...failure };
+          // The evidence recorder deliberately retains the first failed driver request. Clear
+          // only this classified matchmaking race after copying it above; otherwise the next
+          // semantic lobby waiter calls assertNoDriverApiFailure and aborts before the bounded
+          // self-healing loop can perform the retry it promises.
+          client.evidence.networkState.apiFailure = null;
+          client.evidence.record("driver-api-failure-retry", {
+            ...failure,
+            proofRequired: "stable-seat-binding",
+          });
         } else {
           assertNoDriverApiFailure(client.evidence, "co-op lobby");
         }
@@ -1607,12 +1857,21 @@ export class DuoPublicUiRig {
           // for the live panel's explicit unblocked projection before accepting. If its short TTL
           // expires during that wait, let the requester refresh it and try the next appearance.
           try {
+            const acceptCursor = acceptor.evidence.cursor();
             await selectOptionById(acceptor, {
               surfaceId: "option-select:TitlePhase",
-              targetId: semanticOptionId(`Accept ${requesterName}`),
+              targetId: `accept:${requesterName}`,
               navKeys: ["ArrowUp", "ArrowDown"],
               timeoutMs: LOBBY_REQUEST_REISSUE_MS,
               fromCursor: roleCursors[acceptor.label],
+            });
+            // Selecting a semantic row is not proof that Phaser consumed the queued key. Require
+            // the public handler-to-relay log before suppressing another attempt; this catches a
+            // repaint/blockInput race without calling controller internals.
+            await acceptor.evidence.waitFor(/respond accept=true from=/u, {
+              from: acceptCursor,
+              timeoutMs: OPTIONAL_LOBBY_RELAY_WAIT_MS,
+              description: `Accept relay for ${requesterName}`,
             });
             acceptedForLiveRequest = true;
           } catch (error) {
@@ -1731,6 +1990,56 @@ export class DuoPublicUiRig {
       });
     }
     return sharedComparable;
+  }
+
+  /**
+   * Prove one addressed command frontier without assuming both players have a living
+   * battler. Each browser must publish the same epoch/revision/generation/wave/turn and
+   * mechanical digest. At least one side must own an actionable command UI; a side with
+   * no legal battler is represented by its real CommandPhase partner-waiting message.
+   */
+  async assertSharedCommandFrontier(
+    cursors,
+    proofName,
+    { allowAddressRepeat = false, expectedWave = null, expectedAddress = null } = {},
+  ) {
+    const host = this.host;
+    const guest = this.guest;
+    if (!host || !guest) {
+      throw new Error(`${proofName}: paired host/guest command observations were unavailable`);
+    }
+    const priorAddress = this.lastSharedSurfaceAddress.get("command");
+    const deadline = Date.now() + this.config.timeoutMs;
+    let match = null;
+    while (Date.now() < deadline && match == null) {
+      match = findSharedCommandFrontierMatch(host, guest, cursors, priorAddress, {
+        allowAddressRepeat,
+        expectedWave,
+        expectedAddress,
+      });
+      if (match == null) {
+        await delay(100);
+      }
+    }
+    if (match == null) {
+      const latest = client => observedCommandFrontiers(client, cursors[client.label] ?? 0)[0] ?? null;
+      throw new Error(
+        `${proofName}: clients never converged on one addressed command owner/watcher frontier; `
+          + `host=${JSON.stringify(latest(host)?.observation ?? null)} `
+          + `guest=${JSON.stringify(latest(guest)?.observation ?? null)}`,
+      );
+    }
+    this.lastSharedSurfaceAddress.set("command", match.address);
+    for (const client of Object.values(this.clients)) {
+      const projection = client === host ? match.hostProjection : match.guestProjection;
+      client.evidence.record("shared-command-frontier-proof", {
+        proofName,
+        address: match.address,
+        projection: projection.kind,
+        observation: match.comparable,
+      });
+    }
+    return match.comparable;
   }
 
   async assertRetainedContinuation(cursors, proofName) {
@@ -1861,7 +2170,7 @@ export class DuoPublicUiRig {
             ? [client.label === this.config.commanderOwnerSeat ? TATSUGIRI_SPECIES_ID : DONDOZO_SPECIES_ID]
             : faintFixture
               ? client.label === this.config.faintOwnerSeat
-                ? [MAGIKARP_SPECIES_ID, BULBASAUR_SPECIES_ID]
+                ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
                 : [BULBASAUR_SPECIES_ID]
               : null;
           const result =
@@ -1942,7 +2251,7 @@ export class DuoPublicUiRig {
       this.pendingCommanderBoundary = boundary;
     } else {
       await this.waitForAllLocalCommandsDrivingBattlePrompts(phaseCursors, "fresh-wave-1-intro");
-      const boundary = await this.assertSharedSurface("command", phaseCursors, "fresh-wave-1-command", {
+      const boundary = await this.assertSharedCommandFrontier(phaseCursors, "fresh-wave-1-command", {
         expectedWave: 1,
       });
       this.activeBattleWave = boundary.wave;
@@ -1971,7 +2280,7 @@ export class DuoPublicUiRig {
     await guestClient.press("Space", "guest-accept-resume-offer");
     await this.completePairingBinding();
     await this.waitForAllLocalCommandsDrivingBattlePrompts(resumeCursors, "resume-battle-intro");
-    const boundary = await this.assertSharedSurface("command", resumeCursors, "resumed-command", {
+    const boundary = await this.assertSharedCommandFrontier(resumeCursors, "resumed-command", {
       allowAddressRepeat: true,
       expectedWave,
     });
@@ -1988,20 +2297,24 @@ export class DuoPublicUiRig {
     );
     let pendingCommandProof = null;
     for (let turn = 1; turn <= this.config.maxTurns; turn++) {
-      const { outcomeCursors } = await this.driveSequentialCommandRound(
+      const { outcomeCursors, expectedCommandAddress } = await this.driveSequentialCommandRound(
         commandCursors,
         this.config.keys.battle,
         `turn-${turn}-first-move`,
       );
       if (pendingCommandProof != null) {
-        await this.assertSharedSurface("command", pendingCommandProof.cursors, pendingCommandProof.name, {
+        await this.assertSharedCommandFrontier(pendingCommandProof.cursors, pendingCommandProof.name, {
           expectedWave: this.activeBattleWave,
+          expectedAddress: expectedCommandAddress,
         });
         await this.assertRetainedContinuation(pendingCommandProof.cursors, pendingCommandProof.name);
         pendingCommandProof = null;
       }
 
-      const outcome = await this.waitForPostTurnOutcome(outcomeCursors);
+      const outcome = await this.waitForPostTurnOutcome(outcomeCursors, { expectedCommandAddress });
+      if (outcome.kind === "gameOver") {
+        throw new Error(`Both browsers reached GameOver after turn ${turn}; the reward journey ended terminally`);
+      }
       if (outcome.kind === "reward") {
         await this.assertSharedSurface("reward", outcomeCursors, `turn-${turn}-reward`, {
           expectedWave: this.activeBattleWave,
@@ -2013,7 +2326,7 @@ export class DuoPublicUiRig {
         if (!allowFaint) {
           throw new Error("Unexpected faint picker in the wave-1 journey; use faint-replacement with prepared saves");
         }
-        await this.driveReplacement(outcome.client);
+        await this.driveReplacement(outcome.client, outcomeCursors);
       }
       if (outcome.kind === "command") {
         // Command ownership opens sequentially: submitting the first owner's next-turn command is
@@ -2063,6 +2376,11 @@ export class DuoPublicUiRig {
           hardCeilingMs: COMMANDER_BOUNDARY_HARD_CEILING_MS,
         },
       });
+      if (outcome.kind === "gameOver") {
+        throw new Error(
+          `Both browsers reached GameOver after Commander round ${round}; the reward journey ended terminally`,
+        );
+      }
       if (outcome.kind === "reward") {
         await this.assertSharedSurface("reward", outcomeCursors, `commander-turn-${round}-reward`, {
           expectedWave: this.activeBattleWave,
@@ -2163,7 +2481,9 @@ export class DuoPublicUiRig {
           // that no reciprocal command owner exists for this round (for example, that battler is
           // fainted or structurally hidden). Never invent a second owner after collection has closed.
           for (const label of pending) {
-            outcomeCursors[label] = this.clients[label].evidence.cursor();
+            // Preserve the pre-round cursor: a one-shot reward/terminal surface may itself be the exact
+            // collection-close event and must remain visible to the following outcome scan.
+            outcomeCursors[label] = from[label] ?? 0;
           }
           pending.clear();
           break;
@@ -2195,16 +2515,36 @@ export class DuoPublicUiRig {
         outcomeCursor: outcomeCursors[client.label],
       });
     }
-    return { commandEvents, outcomeCursors };
+    const expectedCommandAddress =
+      submittedCommandAddress == null
+        ? null
+        : `${submittedCommandAddress.epoch}:${submittedCommandAddress.wave}:${submittedCommandAddress.turn}`;
+    return { commandEvents, outcomeCursors, expectedCommandAddress };
   }
 
   async waitForPostTurnOutcome(from, { expectedCommandAddress = null, progressBudgetOptions = {} } = {}) {
-    const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, "public-ui-post-turn", {
-      expectedCommandAddress,
-    });
+    let advanceBattlePrompt = null;
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs, progressBudgetOptions);
+    let partialGameOver = [];
     while (Date.now() < progressBudget.observe()) {
       const values = Object.values(this.clients);
+      const gameOvers = values.map(client => client.evidence.find(GAME_OVER_PHASE, from[client.label]));
+      if (gameOvers.every(Boolean)) {
+        for (let i = 0; i < values.length; i++) {
+          values[i].evidence.record("paired-game-over-proof", {
+            eventIndex: gameOvers[i].index,
+            peerEventIndex: gameOvers[(i + 1) % values.length].index,
+          });
+        }
+        return { kind: "gameOver" };
+      }
+      partialGameOver = values.filter((_client, index) => gameOvers[index] != null).map(client => client.label);
+      // Once one peer has entered GameOver, do not misclassify its later terminal log as a generic
+      // post-turn failure. Keep the browsers alive until the partner exposes the same terminal surface.
+      if (partialGameOver.length > 0) {
+        await delay(100);
+        continue;
+      }
       const rewards = values.map(client => client.evidence.find(REWARD_PHASE, from[client.label]));
       if (rewards.every(Boolean)) {
         return { kind: "reward" };
@@ -2225,6 +2565,9 @@ export class DuoPublicUiRig {
       // before accepting the frontier; returning first strands the renderer and makes the
       // next sequential round observe only one real browser. Structural reward/faint
       // outcomes above retain priority over cosmetic prompt advancement.
+      advanceBattlePrompt ??= createBattlePromptAdvancer(this, from, {}, "public-ui-post-turn", {
+        expectedCommandAddress,
+      });
       if (await advanceBattlePrompt()) {
         continue;
       }
@@ -2243,10 +2586,15 @@ export class DuoPublicUiRig {
       }
       await delay(100);
     }
+    if (partialGameOver.length > 0) {
+      throw new Error(
+        `Timed out waiting for both browsers to reach GameOver; terminal observed only on ${partialGameOver.join(", ")}`,
+      );
+    }
     throw new Error("Timed out waiting for public post-turn command, faint, or reward evidence");
   }
 
-  async driveReplacement(client = null) {
+  async driveReplacement(client = null, from = null) {
     let owner = client;
     if (!owner) {
       owner = this.client(this.config.faintOwnerSeat);
@@ -2254,6 +2602,30 @@ export class DuoPublicUiRig {
         timeoutMs: this.config.timeoutMs,
         description: "configured owner SwitchPhase for faint replacement",
       });
+    }
+    const replacementCursors =
+      from ?? Object.fromEntries(Object.values(this.clients).map(value => [value.label, value.evidence.cursor()]));
+    const advanceBattlePrompt = createBattlePromptAdvancer(this, replacementCursors, {}, "faint-replacement-picker");
+    const deadline = Date.now() + this.config.timeoutMs;
+    let replacementSurface = null;
+    while (Date.now() < deadline) {
+      replacementSurface = findOwnedReadyReplacement(owner, replacementCursors[owner.label]);
+      if (replacementSurface != null) {
+        break;
+      }
+      const terminal =
+        owner.evidence.find(SHARED_SESSION_TERMINAL, replacementCursors[owner.label])
+        ?? owner.evidence.find(LAUNCH_SNAPSHOT_ABORT, replacementCursors[owner.label]);
+      if (terminal != null) {
+        throw new Error(`${owner.label}: shared session terminated before the replacement picker: ${terminal.text}`);
+      }
+      if (await advanceBattlePrompt()) {
+        continue;
+      }
+      await delay(100);
+    }
+    if (replacementSurface == null) {
+      throw new Error(`${owner.label}: timed out waiting for an actionable owned replacement picker`);
     }
     await owner.checkpoint("faint-replacement-picker");
     const replacementCursor = owner.evidence.cursor();
@@ -2328,7 +2700,7 @@ export class DuoPublicUiRig {
       this.assertNoFatalRecoverySince(commandCursors, "retained reward to wave-2 Commander command");
     } else {
       await this.waitForAllLocalCommandsDrivingBattlePrompts(commandCursors, "next-wave-intro");
-      const boundary = await this.assertSharedSurface("command", commandCursors, "wave-2-command", {
+      const boundary = await this.assertSharedCommandFrontier(commandCursors, "wave-2-command", {
         expectedWave,
       });
       this.activeBattleWave = boundary.wave;
@@ -2342,9 +2714,19 @@ export class DuoPublicUiRig {
   }
 
   async coldReopenAndPair(requesterSeat) {
+    const abandonedAt = Date.now();
     await this.stopChromeTrace();
     await Promise.all(Object.values(this.clients).map(client => client.reopen()));
     await this.loginBoth();
+    // The worker releases a crashed pair only after the 30s presence window plus 120s hot-rejoin grace.
+    // Login usually consumes most of this interval; wait only the bounded remainder before a fresh announce.
+    const releaseRemainderMs = abandonedAt + COLD_REJOIN_RELEASE_MS - Date.now();
+    if (releaseRemainderMs > 0) {
+      for (const client of Object.values(this.clients)) {
+        client.evidence.record("cold-rejoin-grace-wait", { remainingMs: releaseRemainderMs });
+      }
+      await delay(releaseRemainderMs);
+    }
     await this.pair(requesterSeat);
   }
 
@@ -2364,8 +2746,33 @@ export class DuoPublicUiRig {
   }
 
   assertClean() {
+    const failures = [];
     for (const client of Object.values(this.clients)) {
-      client.evidence.assertClean();
+      try {
+        client.evidence.assertClean();
+      } catch (error) {
+        failures.push(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures,
+        `${failures.length} browser evidence failure(s): ${failures.map(error => error.message).join("; ")}`,
+      );
+    }
+  }
+
+  aggregateFailureWithBrowserEvidence(primary) {
+    const failure = primary instanceof Error ? primary : new Error(String(primary));
+    try {
+      this.assertClean();
+      return failure;
+    } catch (error) {
+      const browserFailure = error instanceof Error ? error : new Error(String(error));
+      return new AggregateError(
+        [failure, browserFailure],
+        `${failure.message}; browser evidence: ${browserFailure.message}`,
+      );
     }
   }
 }

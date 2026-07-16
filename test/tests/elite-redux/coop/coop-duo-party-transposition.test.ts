@@ -190,7 +190,7 @@ describe.skipIf(!RUN)(
       // TURN 1 on the HOST: the host lead SPLASHes (harmless); the foe's ROCK_SLIDE KOs the 1-HP host lead.
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       expect(rig.hostScene.getPlayerField()[COOP_HOST_FIELD_INDEX]?.isFainted() ?? true, "the host lead fainted").toBe(
         true,

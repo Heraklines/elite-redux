@@ -204,7 +204,7 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     // Drive a REAL turn: the human picks TACKLE for the host slot (single-target,
     // multiple candidates -> goes through target selection); the guest auto-resolves.
     game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX);
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
 
     const hostBroadcasts = sendSpy.mock.calls
       .map(([msg]) => msg)
@@ -314,7 +314,7 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
 
     // The turn drives to completion with a single human selection, proving the
     // partner's CommandPhase auto-submitted (both slots' commands resolved).
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
 
     // A fresh CommandPhase for the NEXT turn opens - the run is healthy, not stuck.
     await game.phaseInterceptor.to("CommandPhase");
@@ -626,7 +626,7 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
         rig.hostScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]?.targets,
         "the host selected the first 1-HP enemy",
       ).toEqual([BattlerIndex.ENEMY]);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
       expect(
         rig.hostScene.currentBattle.enemyParty.every(enemy => enemy.isFainted()),
         "both targets were KO'd",

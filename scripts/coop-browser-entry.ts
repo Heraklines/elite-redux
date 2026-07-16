@@ -402,7 +402,7 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
     case "SAVE_SLOT":
       return { surfaceId: "save-slot", operationClass: "save", ownerModel: "local" };
     case "PARTY":
-      if (phase === "SwitchPhase") {
+      if (phase === "SwitchPhase" || phase === "CoopGuestFaintSwitchPhase") {
         return { surfaceId: "party:replacement", operationClass: "replacement", ownerModel: "interaction" };
       }
       if (phase === "AttemptCapturePhase") {
@@ -472,15 +472,6 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
   }
 }
 
-function normalizeOptionId(label: string): string {
-  return label
-    .replace(/\[[^\]]*\]/gu, "")
-    .replace(/[^a-zA-Z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "")
-    .toLowerCase()
-    .slice(0, 40);
-}
-
 interface SelectionReadout {
   readonly selectedOptionId: string | null;
   readonly optionIds: readonly string[] | null;
@@ -489,8 +480,8 @@ interface SelectionReadout {
 
 /**
  * The visible options + selected id, where the handler exposes them publicly. Reward
- * options carry a stable modifier-type id; option-select menus expose only visible labels
- * (no native stable id - normalized label is the best-observable id, see the gap note).
+ * options carry a stable modifier-type id; option-select menus expose their explicit semantic id.
+ * Options which have not yet declared one remain driveable by ordinal slot, never by translated text.
  */
 function readSelection(handler: { getCursor(): number }, uiMode: string): SelectionReadout {
   let selectedIndex: number | null = null;
@@ -521,13 +512,13 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
     }
   }
   const optionHandler = handler as unknown as {
-    options?: Array<{ label?: unknown }>;
-    config?: { options?: Array<{ label?: unknown }> } | null;
+    options?: Array<{ semanticId?: unknown }>;
+    config?: { options?: Array<{ semanticId?: unknown }> } | null;
   };
   const listOptions = optionHandler.options ?? optionHandler.config?.options;
-  if (Array.isArray(listOptions) && listOptions.length > 0 && typeof listOptions[0]?.label === "string") {
+  if (Array.isArray(listOptions) && listOptions.length > 0) {
     const optionIds = listOptions.map((option, index) =>
-      typeof option?.label === "string" ? normalizeOptionId(option.label) || `slot:${index}` : `slot:${index}`,
+      typeof option?.semanticId === "string" && option.semanticId.length > 0 ? option.semanticId : `slot:${index}`,
     );
     return {
       selectedOptionId: selectedIndex == null ? null : (optionIds[selectedIndex] ?? `cursor:${selectedIndex}`),
@@ -758,14 +749,21 @@ function semanticBattleAddress(battle: { waveIndex: number; turn: number } | nul
 }
 
 /**
- * Attest the real Display-settings value while that visible menu is open. The campaign
- * reaches this handler only through public keys; this probe is read-only and lets an
- * animations-skipped depth result remain visibly distinct from animations-on coverage.
+ * Attest the real settings values while the visible General or Display menu is open. The campaign
+ * reaches these handlers only through public keys; this probe is read-only and proves Game Speed
+ * in General while keeping animations-skipped depth visibly distinct from animations-on coverage.
  */
 function observeRenderProfile(): void {
   try {
     const handler = globalScene?.ui?.getHandler();
-    if (!handler?.active || handler.constructor?.name !== "SettingsDisplayUiHandler") {
+    const mode = globalScene?.ui?.getMode();
+    const handlerName =
+      mode === UiMode.SETTINGS
+        ? "SettingsUiHandler"
+        : mode === UiMode.SETTINGS_DISPLAY
+          ? "SettingsDisplayUiHandler"
+          : null;
+    if (!handler?.active || handlerName == null) {
       // A later Settings visit must emit a fresh attestation even when the saved value
       // did not change (the speed setup opens Settings before the render-profile pass).
       lastObservedRenderProfile = "";
@@ -774,7 +772,8 @@ function observeRenderProfile(): void {
     const observation = {
       version: 1,
       moveAnimations: globalScene.moveAnimations,
-      handler: "SettingsDisplayUiHandler",
+      gameSpeed: globalScene.gameSpeed,
+      handler: handlerName,
     } as const;
     const canonical = JSON.stringify(observation);
     if (canonical === lastObservedRenderProfile) {
@@ -800,9 +799,6 @@ function observeSemanticSurface(): void {
       return;
     }
     const handler = ui.getHandler();
-    if (!handler?.active) {
-      return;
-    }
     const uiMode = UiMode[ui.getMode()];
     // Two adjacent ExpPhase objects can expose the same surface/address and can both become
     // ready between 100 ms observer samples at 10x speed. Object identity is read-only and
@@ -811,6 +807,61 @@ function observeSemanticSurface(): void {
     if (currentPhase !== lastSemanticPhase) {
       lastSemanticPhase = currentPhase;
       semanticPhaseInstance += 1;
+    }
+    // A paired controller can exist briefly on TitlePhase before the new session epoch is bound. A title
+    // narration is not battle progress; suppress it instead of emitting an impossible co-op epoch-0 surface.
+    if (phase === "TitlePhase" && uiMode === "MESSAGE") {
+      return;
+    }
+    // When this seat has no locally actionable battler, the real continuation is the exact replay waiter,
+    // not a fabricated command menu. The phase exposes readiness only after awaitTurnOrLiveEvent is installed.
+    const rendererWaitReady = (
+      currentPhase as unknown as { isAwaitingAuthority?: () => boolean }
+    ).isAwaitingAuthority?.();
+    if (rendererWaitReady === true && runtime != null && battle != null) {
+      const membership = runtime.membership.snapshot();
+      if (membership.state !== "active" || runtime.controller.sessionEpoch <= 0) {
+        return;
+      }
+      const { digest: stateDigest } = computeMechanicalDigest();
+      const observation = {
+        version: 2,
+        surfaceId: "command:watcher",
+        operationClass: "command",
+        ownerModel: "local",
+        coop: true,
+        address: {
+          epoch: runtime.controller.sessionEpoch,
+          wave: battle.waveIndex,
+          turn: battle.turn,
+        },
+        membershipRevision: membership.revision,
+        connectionGeneration: membership.connectionGeneration,
+        localSeat: runtime.controller.seat,
+        localRole: runtime.controller.role,
+        ownerSeat: null,
+        seatsWithInput: [],
+        selectedOptionId: null,
+        optionIds: null,
+        optionCount: null,
+        teamSpeciesIds: null,
+        ready: { handlerActive: false, awaitingActionInput: false, inputBlocked: true },
+        phase,
+        phaseInstance: semanticPhaseInstance,
+        surfaceGeneration: null,
+        mysteryEncounterType: battle.mysteryEncounter?.encounterType ?? null,
+        stateDigest,
+        uiMode,
+      } as const;
+      const canonical = JSON.stringify(observation);
+      if (canonical !== lastSemanticObservation) {
+        lastSemanticObservation = canonical;
+        console.info(`${SURFACE2_PREFIX}${canonical}`);
+      }
+      return;
+    }
+    if (!handler?.active) {
+      return;
     }
     const semantic = classifySemanticSurface(phase, uiMode);
     if (semantic == null) {
@@ -879,8 +930,18 @@ function observeSemanticSurface(): void {
       } catch {
         isLocalOwner = null;
       }
-      ownerSeat =
-        semantic.ownerModel === "interaction" && isLocalOwner != null ? (isLocalOwner ? localSeat : partnerSeat) : null;
+      // A faint replacement is owned by the battler's stable seat, not by the alternating biome
+      // interaction counter. The only browser that opens the real PARTY picker is that local owner;
+      // stamp it explicitly so host SwitchPhase and replica CoopGuestFaintSwitchPhase share one
+      // accurate contract (and so future N-player seats do not inherit a two-seat parity guess).
+      const localReplacementOwner = semantic.operationClass === "replacement" && uiMode === "PARTY";
+      ownerSeat = localReplacementOwner
+        ? localSeat
+        : semantic.ownerModel === "interaction" && isLocalOwner != null
+          ? isLocalOwner
+            ? localSeat
+            : partnerSeat
+          : null;
       // This client's view of who may input: a local surface = this seat drives its own; an
       // interaction surface = only the owner. A driver unions both clients' markers.
       seatsWithInput = semantic.ownerModel === "local" ? [localSeat] : ownerSeat == null ? [] : [ownerSeat];

@@ -217,6 +217,9 @@ export function getTerrainBlockMessage(pokemon: Pokemon, terrainType: TerrainTyp
         pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
         terrainName: getTerrainName(terrainType),
       });
+    case TerrainType.TOXIC:
+      console.warn(`${terrainType} unexpectedly provided as terrain type to getTerrainBlockMessage!`);
+      return "";
     case TerrainType.NONE:
     default:
       terrainType satisfies TerrainType.NONE;

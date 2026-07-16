@@ -51,6 +51,8 @@ interface Env {
   COOP_IDENTITY_SECRET?: string;
   /** Bounded P33 hot-rejoin grace before an abandoned pairing releases both accounts. */
   P33_REJOIN_GRACE_MS?: string;
+  /** Exact Git source deployed by the staging promotion workflow. */
+  SOURCE_SHA?: string;
 }
 
 interface CoopRunRow {

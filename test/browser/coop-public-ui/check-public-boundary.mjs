@@ -50,10 +50,14 @@ for (const file of files) {
 const harness = sources.get("public-ui-harness.mjs");
 const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
 if (
-  !harness?.includes("const launchResults = await Promise.allSettled([launchBrowser(), launchBrowser()]);")
+  !harness?.includes('launchBrowser(config.locales["host-seat"])')
+  || !harness.includes('launchBrowser(config.locales["guest-seat"])')
+  || (harness.match(/launchBrowser\(config\.locales\["(?:host|guest)-seat"\]\)/gu)?.length ?? 0) !== 2
   || !harness.includes("hostBrowser.createBrowserContext()")
   || !harness.includes("guestBrowser.createBrowserContext()")
   || !harness.includes("if (launchFailure)")
+  || !harness.includes("--accept-lang=")
+  || !harness.includes("browserLocale(locale)")
   || !harness.includes("Promise.allSettled(this.browsers.map(browser => browser.close()))")
 ) {
   failures.push(
@@ -278,8 +282,12 @@ if (
 }
 if (
   !browserEntry.includes("[coop-browser:render-profile]")
-  || !browserEntry.includes('handler.constructor?.name !== "SettingsDisplayUiHandler"')
+  || !browserEntry.includes("mode === UiMode.SETTINGS")
+  || !browserEntry.includes("mode === UiMode.SETTINGS_DISPLAY")
+  || browserEntry.includes("instanceof SettingsUiHandler")
+  || browserEntry.includes("instanceof SettingsDisplayUiHandler")
   || !browserEntry.includes("moveAnimations: globalScene.moveAnimations")
+  || !browserEntry.includes("gameSpeed: globalScene.gameSpeed")
   || !browserEntry.includes('lastObservedRenderProfile = "";')
 ) {
   failures.push("coop-browser-entry.ts: missing the read-only visible render-profile attestation");

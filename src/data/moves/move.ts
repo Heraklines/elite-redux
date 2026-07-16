@@ -3374,7 +3374,7 @@ export class MultiHitAttr extends MoveAttr {
       accMultiplier = 1,
     }: { ignoreAcc?: boolean; maxMultiHit?: boolean | undefined; partySize?: number; accMultiplier?: number } = {},
   ): number {
-    let expectedHits: number;
+    let expectedHits = 1;
     switch (this.multiHitType) {
       case MultiHitType.TWO_TO_FIVE:
         expectedHits = maxMultiHit ? 5 : 3.1;
@@ -4471,7 +4471,7 @@ export class ClearWeatherAttr extends MoveEffectAttr {
 export class TerrainChangeAttr extends MoveEffectAttr {
   private readonly terrainType: TerrainType;
   /** Optional explicit duration (ER terrains specify their own, e.g. Toxic Terrain's 8 turns). */
-  private readonly turnsOverride?: number;
+  private readonly turnsOverride: number | undefined;
 
   constructor(terrainType: TerrainType, turnsOverride?: number) {
     super();

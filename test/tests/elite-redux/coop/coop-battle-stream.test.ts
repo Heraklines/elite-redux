@@ -418,7 +418,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(await awaited).toBeNull();
   });
 
-  it("a second await for the same turn supersedes the stale one (resolves it null)", async () => {
+  it("a second await for the same addressed turn joins the in-flight authority result", async () => {
     const { host, guest } = createLoopbackPair();
     const hostStream = new CoopBattleStreamer(host);
     const guestStream = new CoopBattleStreamer(guest);
@@ -427,8 +427,8 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     const second = guestStream.awaitTurn(1);
     emitCompleteTurn(hostStream, 1, [], emptyCheckpoint(), "deadbeefdeadbeef");
 
-    expect(await first).toBeNull();
-    expect(await second).not.toBeNull();
+    expect(await first).not.toBeNull();
+    expect(await second).toEqual(await first);
   });
 
   it("consumeEnemyParty returns the host's party for the matching wave, then clears it", async () => {
@@ -794,6 +794,36 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       await flushWire();
       expect(rawTurnDeliveries).toBe(beforeClearedProbe);
       expect(pendingReplies).toBeGreaterThan(pendingBefore);
+
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
+    it("accepts an exact next-turn renderer waiter when no local command owner exists", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 1, turn: 1 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+
+      const awaited = guestStream.awaitTurn(1);
+      emitCompleteTurn(hostStream, 1, [], emptyCheckpoint(), "deadbeefdeadbeef");
+      const resolution = await awaited;
+      expect(resolution).not.toBeNull();
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "materialApplied")).toBe(true);
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "presentationReady")).toBe(true);
+      expect(
+        guestStream.registerTurnContinuation(resolution!, undefined, {
+          kind: "command",
+          epoch: 7,
+          wave: 1,
+          turn: 2,
+        }),
+      ).toBe(true);
+
+      expect(guestStream.notifyContinuationSurface("rendererWait"), "old-turn replay cannot release").toBe(0);
+      current.turn = 2;
+      expect(guestStream.notifyContinuationSurface("rendererWait"), "installed exact replay waiter releases").toBe(1);
+      expect(guestStream.notifyContinuationSurface("rendererWait"), "renderer readiness is exactly once").toBe(0);
 
       hostStream.dispose();
       guestStream.dispose();

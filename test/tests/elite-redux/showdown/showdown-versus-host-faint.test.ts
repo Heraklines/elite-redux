@@ -237,7 +237,7 @@ describe.skipIf(!RUN)("Showdown versus - HOST-faints replacement ordering (two-e
     // HOST turn N: SPLASH (harmless); the guest's Magikarp TACKLE KOs the host's own Pikachu.
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.SPLASH, 0, BattlerIndex.ENEMY);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     expect(rig.hostScene.getPlayerField()[0]?.isFainted() ?? true, "the HOST's own lead fainted (guest KO'd it)").toBe(
       true,

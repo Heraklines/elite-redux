@@ -31,7 +31,7 @@ observable read-only today. The following are emitted best-effort or omitted; ea
 
 | Gap | Current observable emission | Required production instrumentation |
 | --- | --- | --- |
-| No native stable option identity for `AbstractOptionSelectUiHandler` menus (crossroads, ME prompts, confirms) | The normalized visible `label` is emitted as the option id; `selectedOptionId` is the label at the cursor (else `cursor:<n>`) | A read-only stable option-id per rendered option, independent of localized label text |
+| Some `AbstractOptionSelectUiHandler` call sites have not declared `semanticId` yet | Declared ids are emitted verbatim; undeclared options use stable `slot:<n>` ordinals, never localized labels | Add intrinsic ids when a new automated flow must target a specific dynamic option rather than an ordinal |
 | Per-surface interaction OWNER counter is private to each phase | `ownerSeat` is derived from `isLocalOwnerAtCounter(interactionCounter())` (the LIVE counter) - accurate for a freshly pinned surface, imprecise if the counter advanced after the pin | Each interactive phase exposes the counter it pinned, so owner is read exactly per surface |
 | `seatsWithInput` is this client's local view (own seat for local surfaces, owner seat for interaction surfaces) | Emitted from `ownerModel`; a driver must union both clients' markers to see the full input set | A read-only per-surface "input-enabled seats" set on the shared surface contract |
 | True presentation-ready / animation-idle / sprite-ready state | `ready.handlerActive` + `ready.awaitingActionInput` (where the handler is awaitable) only | A render-idle / presentation-complete marker per surface (same request as the v1 sprite-readiness gap above) |

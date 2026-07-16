@@ -79,6 +79,11 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(harness, /difficulty-\$\{this\.config\.difficultyId\}-attested/u);
   assert.match(campaign, /\[2, "mystery"\][\s\S]*\[6, "mystery"\][\s\S]*\[9, "bargain"\][\s\S]*\[10, "mystery"\]/u);
   assert.match(campaign, /watcherSurfaceId: "mystery-encounter:message"/u);
+  assert.match(campaign, /async function driveConfirmedLeave\(/u);
+  assert.match(campaign, /owner\.waitForOwnedRewardConfirm\(/u);
+  assert.match(campaign, /watcher\.waitForAddressedRewardWatcher\(/u);
+  assert.match(campaign, /campaign-semantic-confirmation-barrier/u);
+  assert.match(campaign, /await driveConfirmedLeave\(rig, driver, client, mechanicalBoundary\.authority\)/u);
   assert.match(campaign, /event\.terminal\.wave === wave \+ 1/u);
   assert.match(campaign, /if \(nextBoundary\.wave <= event\.wave\)/u);
   assert.match(campaign, /mysteryEvents: mysteryCoverage\.events/u);
@@ -123,8 +128,11 @@ test("the companion solo lane publicly selects a readiness-proven empty save slo
 });
 
 test("parallel lobby pairing reselects the exact visible username before every request", async () => {
-  const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");
-  assert.match(harness, /const targetId = semanticOptionId\(`Ask \$\{username\} to play`\)/u);
+  const [harness, titlePhase] = await Promise.all([
+    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+    readFile(resolve(root, "src/phases/title-phase.ts"), "utf8"),
+  ]);
+  assert.match(harness, /const targetId = `ask:\$\{username\}`/u);
   assert.match(
     harness,
     /requestCursor = this\.evidence\.cursor\(\);[\s\S]*selectOptionById\(this, \{[\s\S]*surfaceId: "option-select:TitlePhase"[\s\S]*targetId,/u,
@@ -147,7 +155,7 @@ test("parallel lobby pairing reselects the exact visible username before every r
   assert.match(harness, /let nextReissueAt = Date\.now\(\)/u);
   assert.match(
     harness,
-    /incoming === requesterName[\s\S]*selectOptionById\(acceptor, \{[\s\S]*targetId: semanticOptionId\(`Accept \$\{requesterName\}`\)[\s\S]*timeoutMs: LOBBY_REQUEST_REISSUE_MS/u,
+    /incoming === requesterName[\s\S]*selectOptionById\(acceptor, \{[\s\S]*targetId: `accept:\$\{requesterName\}`[\s\S]*timeoutMs: LOBBY_REQUEST_REISSUE_MS/u,
   );
   assert.doesNotMatch(harness, /acceptor\.press\("Space", `lobby-accept-/u);
   assert.match(harness, /relayTimeoutMs: OPTIONAL_LOBBY_RELAY_WAIT_MS/u);
@@ -162,18 +170,53 @@ test("parallel lobby pairing reselects the exact visible username before every r
   assert.match(harness, /outcome\.kind === "title-return"/u);
   assert.match(harness, /failure\?\.status === 409/u);
   assert.match(harness, /failure\.pathname === "\/coop\/v3\/lobby\/respond"/u);
+  assert.match(harness, /client\.evidence\.networkState\.apiFailure = null/u);
+  assert.match(harness, /proofRequired: "stable-seat-binding"/u);
+  assert.match(harness, /waitFor\(\/respond accept=true from=\/u/u);
+  assert.match(harness, /description: `Accept relay for \$\{requesterName\}`/u);
   assert.match(harness, /requiring a later stable-seat binding/u);
   assert.doesNotMatch(harness, /requester\.press\("Space", `lobby-reissue-request-/u);
   assert.doesNotMatch(harness, /await this\.evidence\.waitFor\(\/request target=\/u/u);
 
-  // The observed staging poll delivered the original request after 6.2s. A refresh must not
-  // starve that live accept panel, but must still beat the worker's approximately 17s TTL.
+  // A submit queued for an expired Accept panel must land on an inert row, never on a newly
+  // reordered player or Cancel action. A fresh navigation/hover explicitly unlocks the new panel.
+  assert.match(titlePhase, /lobbyActionRequiresReselection = true[\s\S]*renderPanel\(\)/u);
+  assert.match(
+    titlePhase,
+    /if \(lobbyActionRequiresReselection\)[\s\S]*label: "Lobby updated - choose again"[\s\S]*handler: \(\) => false/u,
+  );
+  assert.match(titlePhase, /onHover: \(\) => \{\s*lobbyActionRequiresReselection = false/u);
+
+  // The observed staging poll delivered the original request after 6.2s. Keep retries frequent
+  // enough to recover a lost request while leaving the live Accept panel time to be acted on.
   const reissueMs = Number(harness.match(/const LOBBY_REQUEST_REISSUE_MS = ([\d_]+);/u)?.[1].replaceAll("_", ""));
   const optionalRelayMs = Number(
     harness.match(/const OPTIONAL_LOBBY_RELAY_WAIT_MS = ([\d_]+);/u)?.[1].replaceAll("_", ""),
   );
-  assert.ok(reissueMs > 6_200 && reissueMs < 17_000);
+  assert.ok(reissueMs > 6_200 && reissueMs <= 15_000);
   assert.ok(optionalRelayMs > 0 && optionalRelayMs < reissueMs);
+});
+
+test("semantic option identity is independent of every presentation language", async () => {
+  const [observer, optionType, gender, confirm, title, starter] = await Promise.all([
+    readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/abstract-option-select-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/select-gender-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/confirm-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/title-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+  ]);
+
+  assert.match(optionType, /semanticId\?: string/u);
+  assert.match(observer, /option\?\.semanticId === "string"[\s\S]*option\.semanticId[\s\S]*`slot:\$\{index\}`/u);
+  assert.doesNotMatch(observer, /normalizeOptionId|option\.label/u);
+  assert.match(gender, /semanticId: "boy"[\s\S]*semanticId: "girl"/u);
+  assert.match(confirm, /semanticId: "yes"[\s\S]*semanticId: "no"/u);
+  assert.match(title, /semanticId: "new-game"[\s\S]*semanticId: "co-op"/u);
+  assert.match(title, /semanticId: `ask:\$\{p\.name\}`/u);
+  assert.match(title, /semanticId: `accept:\$\{from\.name\}`/u);
+  assert.match(starter, /semanticId: "add-to-party"/u);
+  assert.match(starter, /semanticId: key\.toLowerCase\(\)/u);
 });
 
 test("paired Chromium runs headful at an explicit player-sized viewport", async () => {

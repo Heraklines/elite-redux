@@ -292,6 +292,30 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     host.dispose();
   });
 
+  it("supports a longer command-pacing retry budget without weakening the bounded terminal", async () => {
+    const pair = createLoopbackPair();
+    const manual = makeManualScheduler();
+    const failures: unknown[] = [];
+    const host = new CoopRendezvous(pair.host, {
+      schedule: manual.schedule,
+      maxRecoveryAttempts: 2,
+      onRecoveryExhausted: failure => failures.push(failure),
+    });
+
+    const wait = host.rendezvous("cmd:1:1", 60_000, 7);
+    for (let attempt = 0; attempt < 7; attempt++) {
+      manual.fireNext();
+      await flush();
+      expect(failures, `command pacing remains open after retransmit ${attempt + 1}/7`).toEqual([]);
+    }
+    manual.fireNext();
+    await flush();
+
+    expect(await wait).toEqual({ point: "cmd:1:1", timedOut: true });
+    expect(failures).toEqual([{ point: "cmd:1:1", attempts: 7, kind: "arrival" }]);
+    host.dispose();
+  });
+
   it("#899 queued partner arrival wins when the vitest timeout fires before its delivery microtask", async () => {
     const pair = createLoopbackPair();
     const manual = makeManualScheduler();

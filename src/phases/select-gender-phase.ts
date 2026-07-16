@@ -14,6 +14,7 @@ export class SelectGenderPhase extends Phase {
       globalScene.ui.setMode(UiMode.OPTION_SELECT, {
         options: [
           {
+            semanticId: "boy",
             label: i18next.t("settings:boy"),
             handler: () => {
               globalScene.gameData.gender = PlayerGender.MALE;
@@ -23,6 +24,7 @@ export class SelectGenderPhase extends Phase {
             },
           },
           {
+            semanticId: "girl",
             label: i18next.t("settings:girl"),
             handler: () => {
               globalScene.gameData.gender = PlayerGender.FEMALE;

@@ -805,7 +805,7 @@ describe("#812: pre-responder commandRequest buffering (the 'wrong move / didn't
     guestSync.dispose();
   });
 
-  it("a FOREIGN-slot request (the true #693 mutual-misresolve deadlock) still declines immediately", async () => {
+  it("an unaddressed FOREIGN-slot request retains the legacy immediate decline fallback", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);
     const guestSync = new CoopBattleSync(guest);
@@ -813,6 +813,76 @@ describe("#812: pre-responder commandRequest buffering (the 'wrong move / didn't
 
     const res = await hostSync.requestPartnerCommand(0, 1, [1]);
     expect(res, "declined -> null -> host AI fallback (deadlock broken)").toBeNull();
+    expect(hostSync.isTerminalFrozen()).toBe(false);
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("uses the addressed owner instead of a stale field-index probe after host recenter", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    // Reproduce the real turn-2 window: host compacted the guest mon to field 0, while the guest's
+    // previous-turn replay still sees field 0 as host-owned. The old probe falsely DECLINED here.
+    guestSync.setSlotOwnershipProbe(() => false);
+    const address = { epoch: 23, wave: 1, pokemonId: 707 };
+
+    const awaited = hostSync.requestPartnerCommand(0, 2, [0, 1, 2, 3], "guest", undefined, address);
+    // Production has no responder. Once replay reaches the real picker, its independent owner-keyed
+    // broadcast may use the guest's still-unreconciled field index and must satisfy the retained await.
+    guestSync.broadcastLocalCommand(
+      1,
+      2,
+      { command: Command.FIGHT, cursor: 0, moveId: 22, targets: [2] },
+      "guest",
+      address,
+    );
+
+    await expect(awaited).resolves.toMatchObject({ moveId: 22, targets: [2] });
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("fences an addressed ownership decline before its null continuation can choose AI", async () => {
+    const { host, guest } = createLoopbackPair();
+    const observed: unknown[] = [];
+    let hostSync: CoopBattleSync;
+    hostSync = new CoopBattleSync(host, {
+      onCommandTimeout: timeout => {
+        observed.push({ timeout, frozenInsideCallback: hostSync.isTerminalFrozen() });
+      },
+    });
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => true);
+    let frozenAtContinuation = false;
+
+    const continued = hostSync
+      .requestPartnerCommand(0, 2, [0], "host", undefined, {
+        epoch: 24,
+        wave: 1,
+        pokemonId: 808,
+      })
+      .then(command => {
+        frozenAtContinuation = hostSync.isTerminalFrozen();
+        return command;
+      });
+
+    await expect(continued).resolves.toBeNull();
+    expect(observed).toEqual([
+      {
+        timeout: {
+          epoch: 24,
+          wave: 1,
+          turn: 2,
+          owner: "host",
+          pokemonId: 808,
+          fieldIndex: 0,
+        },
+        frozenInsideCallback: true,
+      },
+    ]);
+    expect(frozenAtContinuation).toBe(true);
+    expect(hostSync.isTerminalFrozen()).toBe(true);
     hostSync.dispose();
     guestSync.dispose();
   });
