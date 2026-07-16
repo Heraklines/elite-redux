@@ -400,8 +400,11 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
     ).toBe(MoveId.WATERFALL);
 
     // HOST resolves turn N+1: its EnemyCommandPhase consumes the buffered guest command, NOT the AI timeout.
+    // Use the deliberately non-lethal fixture move here. THUNDERBOLT is 4x effective against the
+    // replacement Gyarados, so speed-order variance could legitimately open a second replacement picker
+    // before the checkpoint this test is trying to assert, turning the coverage into a false-red lottery.
     await withClient(rig.hostCtx, async () => {
-      game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
+      game.move.select(MoveId.TACKLE, 0, BattlerIndex.ENEMY);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     expect(

@@ -2690,19 +2690,37 @@ export class CoopSessionController {
       }
       case "resumeOffer": {
         // #810: buffer if the UI has not armed its handler yet (offer can beat the arm).
+        // A fresh authenticated P33 replica intentionally has no epoch until the authority commits a
+        // launch boundary. Resume selection happens *before* that commit, so its first authenticated
+        // offer carries the authority's provisional epoch while the replica is still at epoch 0. The
+        // legacy protocol already shares an epoch before this screen and must continue to require an
+        // exact match. Once P33 has any epoch/binding, it also returns to the exact-match rule.
+        const acceptsInitialP33Offer =
+          this.p33Context != null
+          && !this.isAuthority
+          && this.p33PeerHelloAccepted
+          && this.p33Binding == null
+          && !this.p33BindingReady
+          && !this.p33BindingRejected
+          && this.sessionEpochValue === 0
+          && Number.isSafeInteger(msg.epoch)
+          && msg.epoch > 0;
         if (
           this.role !== "guest"
           || !isResumeCommitment(msg.commitment)
           || !this.resumeCommitmentMatchesCurrentSession(msg.commitment)
           || !Number.isSafeInteger(msg.epoch)
           || msg.epoch <= 0
-          || msg.epoch !== this.sessionEpochValue
+          || (msg.epoch !== this.sessionEpochValue && !acceptsInitialP33Offer)
         ) {
           coopWarn(
             "launch",
             `DROP resumeOffer id=${msg.decisionId}: malformed/stale immutable commitment epoch=${msg.epoch} current=${this.sessionEpochValue}`,
           );
           break;
+        }
+        if (acceptsInitialP33Offer) {
+          coopLog("launch", `ACCEPT pre-binding P33 resumeOffer id=${msg.decisionId} epoch=${msg.epoch}`);
         }
         if (this.settledResumeOfferReplies.has(msg.decisionId)) {
           const accept = this.settledResumeOfferReplies.get(msg.decisionId)!;

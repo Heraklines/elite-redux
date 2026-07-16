@@ -24,6 +24,7 @@ import { createFreshCoopP33Context, createFreshCoopSeatMap } from "#data/elite-r
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { COOP_PROTOCOL_VERSION, type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { coopP33GameplayRole } from "#data/elite-redux/coop/coop-webrtc-connect";
+import { GameModes } from "#enums/game-modes";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const identity = {
@@ -412,6 +413,105 @@ describe("authenticated P33 browser client", () => {
     controller.dispose();
     local.close();
     remote.close();
+  });
+
+  it("accepts the authenticated resume offer before the first P33 binding and then binds the committed epoch", async () => {
+    const authority = {
+      version: 1 as const,
+      accountId: "er-account:10",
+      displayName: "Authority",
+      canonicalUsername: "authority",
+    };
+    const replica = {
+      version: 1 as const,
+      accountId: "er-account:20",
+      displayName: "Replica",
+      canonicalUsername: "replica",
+    };
+    // Deliberately reverse invitation direction: transport offerer is the replica, while stable seat 0
+    // remains the gameplay authority. This is the public reverse-resume journey that exposed the race.
+    const authorityContext = createFreshCoopP33Context({
+      pairingId: "REVERSE33",
+      pairingBearer: token,
+      transportRole: "answerer",
+      account: authority,
+      peerAccount: replica,
+      connectionGeneration: 0,
+      peerConnectionGeneration: 0,
+    });
+    const replicaContext = createFreshCoopP33Context({
+      pairingId: "REVERSE33",
+      pairingBearer: token,
+      transportRole: "offerer",
+      account: replica,
+      peerAccount: authority,
+      connectionGeneration: 0,
+      peerConnectionGeneration: 0,
+    });
+    expect(authorityContext).not.toBeNull();
+    expect(replicaContext).not.toBeNull();
+
+    const pair = createLoopbackPair();
+    const host = new CoopSessionController(pair.host, {
+      version: COOP_PROTOCOL_VERSION,
+      p33: authorityContext!,
+      localCapabilities: [],
+    });
+    const guest = new CoopSessionController(pair.guest, {
+      version: COOP_PROTOCOL_VERSION,
+      p33: replicaContext!,
+      localCapabilities: [],
+    });
+    let offeredWave = -1;
+    guest.armResumeOfferHandler(commitment => {
+      offeredWave = commitment.wave;
+    });
+    host.connect();
+    guest.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const provisionalEpoch = host.sessionEpoch;
+    expect(provisionalEpoch).toBeGreaterThan(0);
+    expect(guest.sessionEpoch, "the replica has no boundary epoch before a launch decision").toBe(0);
+    expect(guest.authenticatedBinding).toBeNull();
+
+    const commitment = {
+      version: 1 as const,
+      digest: "0".repeat(64),
+      gameMode: GameModes.COOP,
+      wave: 2,
+      revision: 0,
+      runId: `run-${"b".repeat(20)}`,
+      checkpointRevision: 2,
+      timestamp: 20,
+      participants: ["Authority", "Replica"] as [string, string],
+      seats: { host: "Authority", guest: "Replica" },
+    };
+    const offered = host.offerResume(commitment, 2_000);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(offeredWave, "the epoch-0 authenticated replica received the pre-binding offer").toBe(2);
+
+    const committed = guest.replyResume(true, 2_000);
+    for (let attempt = 0; attempt < 20 && guest.sessionEpoch === 0; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    await expect(offered).resolves.toBe(true);
+    await expect(committed).resolves.toBe(true);
+    expect(host.sessionEpoch).toBeGreaterThan(provisionalEpoch);
+    expect(guest.sessionEpoch).toBe(host.sessionEpoch);
+
+    for (let attempt = 0; attempt < 20 && guest.authenticatedBinding == null; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    expect(guest.authenticatedBinding?.source).toBe("resume");
+    expect(guest.authenticatedBinding?.sessionEpoch).toBe(host.sessionEpoch);
+
+    host.dispose();
+    guest.dispose();
+    pair.host.close();
+    pair.guest.close();
   });
 
   it("never probes or falls back to legacy routes after P33 selection", async () => {
