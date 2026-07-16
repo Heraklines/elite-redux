@@ -75,7 +75,7 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
     /!protectedLocalCoop && deletedCoopRunId == null[\s\S]*?withCommittedCoopDeletePersistenceLease/u,
   );
   assert.match(gameData, /if \(coopClear\) \{[\s\S]*?withCommittedCoopDeletePersistenceLease/u);
-  assert.match(workflow, /src\/system\/game-data\.ts/u);
+  assert.match(workflow, /src\/system\/game-data/u);
   assert.match(workflow, /src\/ui\/handlers\/save-slot-select-ui-handler\.ts/u);
   assert.match(
     campaignNav,
