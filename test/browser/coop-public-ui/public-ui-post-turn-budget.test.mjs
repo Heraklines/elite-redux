@@ -260,12 +260,34 @@ test("first-login gender confirm waits for the actionable option picker, not its
       phaseInstance: 2,
       uiMode: "OPTION_SELECT",
       seatsWithInput: [0],
+      selectedOptionId: "boy",
       optionIds: ["boy", "girl"],
-      ready: { handlerActive: true, awaitingActionInput: null },
+      surfaceGeneration: 1,
+      ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: false },
     },
   });
 
   assert.equal(findActionableFirstLoginGenderSurface(evidence, 0), evidence.events[1]);
+});
+
+test("first-login gender readiness is semantic and accepts localized option labels", () => {
+  const evidence = new FakeEvidence("new-account-de");
+  evidence.push({
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "option-select:SelectGenderPhase",
+      phase: "SelectGenderPhase",
+      phaseInstance: 3,
+      uiMode: "OPTION_SELECT",
+      seatsWithInput: [0],
+      selectedOptionId: "junge",
+      optionIds: ["junge", "m-dchen"],
+      surfaceGeneration: 1,
+      ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: false },
+    },
+  });
+
+  assert.equal(findActionableFirstLoginGenderSurface(evidence, 0), evidence.events[0]);
 });
 
 test("post-turn progress extends the soft deadline but never the immutable hard ceiling", () => {
