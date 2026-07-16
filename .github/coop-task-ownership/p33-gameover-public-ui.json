@@ -25,6 +25,7 @@
     "test/browser/coop-public-ui/journeys.mjs",
     "test/browser/coop-public-ui/public-ui-harness.mjs",
     "test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs",
+    "test/tests/elite-redux/coop/coop-guest-renderer.test.ts",
     "test/tests/elite-redux/coop/coop-p33-client.test.ts",
     "test/tests/elite-redux/coop/coop-session-controller.test.ts",
     "test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts",

@@ -15,6 +15,7 @@ on:
       - "src/ui/handlers/starter-select-ui-handler.ts"
       - "test/browser/coop-public-ui/**"
       - "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts"
+      - "test/tests/elite-redux/coop/coop-guest-renderer.test.ts"
       - "workers/er-save-api/**"
       - "workers/er-coop-api/**"
   workflow_dispatch:
@@ -190,6 +191,7 @@ jobs:
             test/browser/coop-public-ui/terminal-watchdog.mjs \
             test/browser/coop-public-ui/vite.config.mjs \
             test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts \
+            test/tests/elite-redux/coop/coop-guest-renderer.test.ts \
             test/tests/elite-redux/coop/coop-p33-client.test.ts \
             test/tests/elite-redux/coop/coop-session-controller.test.ts \
             test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts
@@ -202,6 +204,7 @@ jobs:
         run: >-
           npx vitest run
           test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts
+          test/tests/elite-redux/coop/coop-guest-renderer.test.ts
           test/tests/elite-redux/coop/coop-p33-client.test.ts
           test/tests/elite-redux/coop/coop-session-controller.test.ts
           test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts
