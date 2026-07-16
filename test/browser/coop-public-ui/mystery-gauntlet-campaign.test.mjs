@@ -133,7 +133,7 @@ test("parallel lobby pairing reselects the exact visible username before every r
   assert.match(harness, /Splitting selection and Space into[\s\S]*TitlePhase repaint block the key/u);
   assert.match(
     await readFile(resolve(root, "test/browser/coop-public-ui/campaign-nav.mjs"), "utf8"),
-    /requireExplicitUnblocked[\s\S]*observation\.ready\.inputBlocked === false/u,
+    /requireExplicitUnblocked[\s\S]*observation\.ready\.inputBlocked != null[\s\S]*observation\.ready\.inputBlocked === false/u,
   );
   assert.match(harness, /surface\?\.observation\.optionIds\?\.includes\(targetId\)/u);
   assert.match(harness, /description: `visible lobby option for \$\{username\}`/u);

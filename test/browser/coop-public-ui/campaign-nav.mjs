@@ -19,11 +19,16 @@ export function isActionableSemanticObservation(observation, { requireExplicitUn
     return false;
   }
   if (requireExplicitUnblocked) {
-    // Input-blocked is the production UI handler's direct answer to "would a key be accepted now?".
-    // Some non-message handlers (notably STARTER_SELECT) legitimately report the enclosing phase's
-    // `awaitingActionInput` as false while the active handler is already accepting input. Once the
-    // handler explicitly says inputBlocked=false, that stronger surface-local fact wins.
-    return observation.ready.inputBlocked === false;
+    // Input-blocked is the production UI handler's strongest answer to "would a key be accepted
+    // now?". Some handlers (notably STARTER_SELECT) expose it while their enclosing phase reports
+    // awaitingActionInput=false, so an explicit false must win. Other always-live handlers (COMMAND
+    // and FIGHT) have no blocking field at all; for those, active + not-explicitly-not-awaiting is
+    // the complete contract. Requiring the optional field to exist made the real wave-1 COMMAND
+    // screen permanently non-actionable in the browser oracle.
+    if (observation.ready.inputBlocked != null) {
+      return observation.ready.inputBlocked === false;
+    }
+    return observation.ready.awaitingActionInput !== false;
   }
   return observation.ready.inputBlocked !== true && observation.ready.awaitingActionInput !== false;
 }

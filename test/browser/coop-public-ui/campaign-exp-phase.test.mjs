@@ -116,6 +116,23 @@ test("an explicitly unblocked handler remains actionable when its enclosing phas
   );
 });
 
+test("an active always-live command handler is actionable without an optional blocking field", () => {
+  const command = {
+    surfaceId: "command:command",
+    selectedOptionId: "cursor:0",
+    ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+  };
+  assert.equal(isActionableSemanticObservation(command, { requireExplicitUnblocked: true }), true);
+  assert.deepEqual(planNavigationStep(command, "cursor:0"), { kind: "submit" });
+
+  const staleMessage = {
+    ...command,
+    surfaceId: "battle:message",
+    ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: null },
+  };
+  assert.equal(isActionableSemanticObservation(staleMessage, { requireExplicitUnblocked: true }), false);
+});
+
 test("owned semantic CommandPhase readiness survives a console-regex miss and enforces UI ownership", async () => {
   const evidence = new FakeEvidence(["[coop:battle] command surface opened for the local player"]);
   const commandSurface = {
