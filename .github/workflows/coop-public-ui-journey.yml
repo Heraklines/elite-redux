@@ -9,8 +9,6 @@ on:
       - "scripts/coop-browser-entry.ts"
       - "scripts/prepare-coop-browser-artifact.mjs"
       - "src/dev-tools/registry.ts"
-      - "src/system/game-data.ts"
-      - "src/ui/handlers/save-slot-select-ui-handler.ts"
       - "src/ui/handlers/starter-select-ui-handler.ts"
       - "test/browser/coop-public-ui/**"
       - "workers/er-save-api/**"
