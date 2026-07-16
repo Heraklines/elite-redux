@@ -296,6 +296,8 @@ async function saveMutations(rig) {
     const firstSave = client.evidence.findResponse("/savedata/session/coop-cas-update", {
       status: 200,
       method: "POST",
+      slot: 0,
+      mode: "empty",
     });
     if (firstSave == null) {
       throw new Error(`${client.label}: shared wave-1 command never produced a successful exact co-op CAS save`);
@@ -449,11 +451,16 @@ async function resumeScanIsolation(rig) {
       const freshRequest = client.evidence.events
         .slice(cursor)
         .find(event => event.kind === "coop-cas-update-request" && event.mode === "empty" && event.slot !== 0);
-      const freshResponse = client.evidence.findResponse("/savedata/session/coop-cas-update", {
-        from: cursor,
-        status: 200,
-        method: "POST",
-      });
+      const freshResponse =
+        freshRequest == null
+          ? null
+          : client.evidence.findResponse("/savedata/session/coop-cas-update", {
+              from: cursor,
+              status: 200,
+              method: "POST",
+              slot: freshRequest.slot,
+              mode: "empty",
+            });
       if (freshRequest == null || freshResponse == null || freshRequest.index >= freshResponse.index) {
         throw new Error(`${client.label}: isolated launch did not empty-CAS a different fresh slot`);
       }

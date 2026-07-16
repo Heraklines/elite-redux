@@ -1095,7 +1095,7 @@ export class EvidenceSink {
     return this.events.slice(from).find(event => event.kind === "browser-binding");
   }
 
-  findResponse(pathname, { from = 0, status = null, method = null } = {}) {
+  findResponse(pathname, { from = 0, status = null, method = null, slot = null, mode = null } = {}) {
     return this.events
       .slice(from)
       .find(
@@ -1103,7 +1103,9 @@ export class EvidenceSink {
           event.kind === "response"
           && event.url.endsWith(pathname)
           && (status == null || event.status === status)
-          && (method == null || event.method === method),
+          && (method == null || event.method === method)
+          && (slot == null || event.slot === slot)
+          && (mode == null || event.mode === mode),
       );
   }
 
@@ -1467,12 +1469,14 @@ export class EvidenceSink {
     page.on("response", response => {
       const status = response.status();
       const method = response.request().method();
-      const url = parsedUrl(response.url());
+      const responseUrl = parsedUrl(response.url());
+      const coopCas =
+        responseUrl?.pathname === "/savedata/session/coop-cas-update" ? coopCasUpdateRequestView(responseUrl) : null;
       // Optimization brief R2: a SUCCESSFUL static GET becomes an aggregate + inventory
       // entry instead of a full per-response event (~45k such events per journey went
       // through one serialized appendFile each). API hosts, non-GETs, and error statuses
       // keep complete individual records below.
-      const isApi = url != null && isCapturedApiHost(url.hostname);
+      const isApi = responseUrl != null && isCapturedApiHost(responseUrl.hostname);
       if (method === "GET" && status < 400 && !isApi) {
         const cls =
           status === 304
@@ -1484,8 +1488,8 @@ export class EvidenceSink {
                 : "network";
         this.staticTraffic.total += 1;
         this.staticTraffic.byClass[cls] += 1;
-        if (url != null) {
-          this.staticTraffic.inventory.add(url.pathname);
+        if (responseUrl != null) {
+          this.staticTraffic.inventory.add(responseUrl.pathname);
         }
       } else {
         this.record("response", {
@@ -1493,6 +1497,7 @@ export class EvidenceSink {
           method,
           url: safeUrl(response.url()),
           fromCache: response.fromCache(),
+          ...(coopCas ?? {}),
         });
       }
       this.capturePublicResponse(response).catch(error => {
@@ -1504,7 +1509,7 @@ export class EvidenceSink {
       // Capture the response BODY for a non-2xx status on the co-op workers only, so the exact
       // error text (e.g. the first-save CAS 409 message) is in the artifact. Bodies carry no
       // credentials on these routes; auth error bodies are advisory, so this is safe.
-      if (url != null && isCapturedApiHost(url.hostname) && (status < 200 || status >= 300)) {
+      if (responseUrl != null && isCapturedApiHost(responseUrl.hostname) && (status < 200 || status >= 300)) {
         response
           .text()
           .then(text => {
