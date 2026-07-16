@@ -1093,6 +1093,15 @@ export class SelectBiomePhase extends BattlePhase {
     if (this.coopCommitPending) {
       return false;
     }
+    // SOLO fast path (P0 hotfix, live 2026-07-16): with no co-op session there is no operation
+    // runtime, and requireCoopBiomeOperationRole() below THROWS from the P33 binding capture
+    // ("no runtime installed for surface=biome"). Every multi-option biome pick funnels through
+    // here, so the throw froze every SOLO endless run at the wave-10 map pick (the picker's
+    // onSelect died uncaught and the phase never ended). Solo needs none of the relay/commit
+    // machinery - apply the biome directly, exactly the pre-P33 behavior.
+    if (!globalScene.gameMode.isCoop || getCoopController() == null) {
+      return this.applyNextBiomeAndEnd(nextBiome);
+    }
     // The owner sends only an intent here. A guest-owned choice must not mutate interest/heal/map/arena or
     // advance the interaction until the host's committed journal envelope returns and arms the exact tail.
     const relay = this.coopRelayOwnerBiome(nextBiome);

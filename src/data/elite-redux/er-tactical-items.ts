@@ -346,7 +346,21 @@ export class ErTacticalItemModifier extends PokemonHeldItemModifier {
 
   override getIcon(forSummary?: boolean): Phaser.GameObjects.Container {
     if (forSummary) {
-      return super.getIcon(forSummary);
+      // Summary/party held-item view. super.getIcon draws `type.iconImage` as a
+      // frame of the "items" ATLAS - our icons are STANDALONE er-assets textures,
+      // so that rendered an invisible blank (live report 2026-07-16: "Floaty
+      // Stone... disappeared from my pokemon hold items"). Draw the standalone
+      // texture directly at the same (0,12) anchor the vanilla summary icon uses.
+      const summary = globalScene.add.container(0, 0);
+      const summaryItem = globalScene.add.sprite(0, 12, ER_TACTICAL_CONFIG[this.kind].icon);
+      summaryItem.setScale(0.5);
+      summaryItem.setOrigin(0, 0.5);
+      summary.add(summaryItem);
+      const summaryStack = this.getIconStackText();
+      if (summaryStack) {
+        summary.add(summaryStack);
+      }
+      return summary;
     }
     // Item-bar layout matching the elemental gems / reactive items: the HOLDER's
     // Pokemon icon on the left, THEN the item's standalone er-assets sprite (it

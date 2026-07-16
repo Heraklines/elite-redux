@@ -114,7 +114,18 @@ export class ErSeedModifier extends PokemonHeldItemModifier {
 
   override getIcon(forSummary?: boolean): Phaser.GameObjects.Container {
     if (forSummary) {
-      return super.getIcon(forSummary);
+      // Standalone er-assets texture - super would render a blank "items"-atlas
+      // frame in the summary/party view (the "item disappeared" report class).
+      const summary = globalScene.add.container(0, 0);
+      const summaryItem = globalScene.add.sprite(0, 12, ER_SEED_CONFIG[this.kind].icon);
+      summaryItem.setScale(0.5);
+      summaryItem.setOrigin(0, 0.5);
+      summary.add(summaryItem);
+      const summaryStack = this.getIconStackText();
+      if (summaryStack) {
+        summary.add(summaryStack);
+      }
+      return summary;
     }
     // Mirror the base held-item item-bar layout so the seed shows WHOSE it is: the
     // holder Pokemon icon on the left, then the seed sprite offset to x=16 (a
