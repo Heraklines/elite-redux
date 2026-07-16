@@ -621,6 +621,9 @@ export class PublicUiClient {
     await this.page.setCacheEnabled(true);
     this.evidence.attach(this.page);
     const entryUrl = new URL(this.config.baseUrl);
+    if (this.config.lobbyRoom != null) {
+      entryUrl.searchParams.set("cooproom", this.config.lobbyRoom);
+    }
     if (this.config.journey === "commander-skip") {
       entryUrl.searchParams.set("coopfixture", this.label === this.config.commanderOwnerSeat ? "commander" : "dondozo");
     } else if (this.config.journey === "faint-replacement") {

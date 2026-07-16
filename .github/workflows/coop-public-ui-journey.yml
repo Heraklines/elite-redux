@@ -198,6 +198,7 @@ jobs:
           COOP_BROWSER_OUT_DIR: dist-coop-public-ui
           VITE_BYPASS_LOGIN: 0
           VITE_BYPASS_TUTORIAL: 0
+          VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
@@ -287,6 +288,7 @@ jobs:
           # `probe` keeps the base journey validator satisfied for the dedicated market route.
           COOP_UI_JOURNEY: ${{ inputs.journey == 'market-wide-lens' && 'probe' || inputs.journey || 'fresh-resume' }}
           COOP_UI_ACCOUNT_MODE: register
+          COOP_UI_LOBBY_ROOM: primary-${{ github.run_id }}-${{ matrix.commander_owner_seat }}-${{ github.run_attempt }}
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
           COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat || 'guest-seat' }}
           COOP_UI_COMMANDER_OWNER_SEAT: ${{ matrix.commander_owner_seat }}
@@ -392,6 +394,7 @@ jobs:
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_JOURNEY: reverse-resume
+          COOP_UI_LOBBY_ROOM: reverse-${{ github.run_id }}-${{ github.run_attempt }}
           COOP_UI_REQUESTER_SEAT: host-seat
           COOP_UI_ACTION_DELAY_MS: 420
           COOP_UI_SETTLE_DELAY_MS: 1300

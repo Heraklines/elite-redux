@@ -240,6 +240,21 @@ export function coopLobbyProtocolFromEnv(): CoopLobbyProtocol {
   return selected === "p33" ? "p33" : "legacy";
 }
 
+/**
+ * Optional non-production lobby namespace used by the real-browser matrix.
+ * Production and ordinary staging players omit both build switches and remain in the shared room.
+ */
+export function coopLobbyRoomFromEnv(): string | undefined {
+  const env = import.meta.env as unknown as Record<string, string | undefined>;
+  const configured = env.VITE_COOP_LOBBY_ROOM?.trim();
+  const queryRoom =
+    env.VITE_COOP_LOBBY_ROOM_QUERY === "1" && typeof globalThis.location?.search === "string"
+      ? new URLSearchParams(globalThis.location.search).get("cooproom")?.trim()
+      : undefined;
+  const room = configured || queryRoom;
+  return room != null && room.length <= 64 && /^[A-Za-z0-9_-]+$/u.test(room) ? room : undefined;
+}
+
 const POLL_INTERVAL_MS = 1500;
 
 function message(e: unknown): string {
@@ -275,7 +290,7 @@ export class CoopLobbyController {
     this.connectFn = options.connect ?? connectCoopWithCode;
     this.connectP33Fn = options.connectP33 ?? connectCoopP33Pairing;
     this.protocol = options.protocol ?? coopLobbyProtocolFromEnv();
-    this.p33Dependencies = options.p33Dependencies ?? {};
+    this.p33Dependencies = options.p33Dependencies ?? { room: coopLobbyRoomFromEnv() };
   }
 
   /** Announce presence and begin polling. Connects immediately if already paired. */

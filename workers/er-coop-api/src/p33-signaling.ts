@@ -41,6 +41,7 @@ export interface P33SignalingEnv {
   ALLOWED_ORIGIN?: string;
   PRESENCE_WINDOW_MS?: string;
   P33_REJOIN_GRACE_MS?: string;
+  SOURCE_SHA?: string;
 }
 
 type P33TransportRole = "offerer" | "answerer";
@@ -548,10 +549,10 @@ async function handleLobbyList(request: Request, env: P33SignalingEnv, url: URL,
   if ((heartbeat.meta.changes ?? 0) !== 1) {
     return error(env, "stale lobby credential", 409);
   }
-  // Room isolation (P33 audit #920): only list players in the SAME room. A room-less caller
-  // resolves to DEFAULT_LOBBY_ROOM and sees only default-room players (production unchanged);
-  // a caller in room A can never see a room-B announcement.
-  const room = normalizeRoom(url.searchParams.get("room"));
+  // Derive the namespace from the authenticated presence, never from caller-controlled query
+  // text. The optional query remains wire-compatible with deployed clients, but cannot be used
+  // to inspect another room or accidentally fall back into the shared production pool.
+  const room = row.room;
   const { results = [] } = await env.DB.prepare(
     `SELECT presence_id, account_id, display_name, seen_at
      FROM coop_lobby_p33
@@ -564,9 +565,9 @@ async function handleLobbyList(request: Request, env: P33SignalingEnv, url: URL,
   if (row.req_from != null && row.req_at != null && now - row.req_at <= LOBBY_REQUEST_MS) {
     const requester = await env.DB.prepare(
       `SELECT presence_id, account_id, display_name FROM coop_lobby_p33
-       WHERE presence_id = ? AND paired_code IS NULL AND seen_at >= ?`,
+       WHERE presence_id = ? AND paired_code IS NULL AND seen_at >= ? AND room = ?`,
     )
-      .bind(row.req_from, now - LOBBY_PRESENCE_MS)
+      .bind(row.req_from, now - LOBBY_PRESENCE_MS, room)
       .first<{ presence_id: string; account_id: string; display_name: string }>();
     if (requester != null) {
       incoming = { id: requester.presence_id, accountId: requester.account_id, name: requester.display_name };
@@ -605,15 +606,16 @@ async function handleLobbyRequest(request: Request, env: P33SignalingEnv, now: n
   }
   const result = await env.DB.prepare(
     `UPDATE coop_lobby_p33 SET req_from = ?, req_at = ?
-     WHERE presence_id = ? AND paired_code IS NULL AND seen_at >= ?
-       AND (req_from IS NULL OR req_from = ?)
-       AND EXISTS (
-         SELECT 1 FROM coop_lobby_p33 AS requester
-         WHERE requester.presence_id = ? AND requester.bearer_hash = ?
-           AND requester.paired_code IS NULL
-       )`,
+      WHERE presence_id = ? AND paired_code IS NULL AND seen_at >= ?
+        AND (req_from IS NULL OR req_from = ?)
+        AND room = ?
+        AND EXISTS (
+          SELECT 1 FROM coop_lobby_p33 AS requester
+          WHERE requester.presence_id = ? AND requester.bearer_hash = ?
+            AND requester.paired_code IS NULL AND requester.room = coop_lobby_p33.room
+        )`,
   )
-    .bind(self, now, target, now - LOBBY_PRESENCE_MS, self, self, requester.bearer_hash)
+    .bind(self, now, target, now - LOBBY_PRESENCE_MS, self, requester.room, self, requester.bearer_hash)
     .run();
   return (result.meta.changes ?? 0) === 1 ? json(env, { ok: true }) : error(env, "player unavailable", 409);
 }
@@ -669,8 +671,9 @@ async function createPairing(
               0, 0, ?, ?, 'active', ?, ?
            FROM coop_lobby_p33 AS offerer JOIN coop_lobby_p33 AS answerer
            WHERE offerer.presence_id = ? AND answerer.presence_id = ?
-             AND offerer.req_from = answerer.presence_id
-             AND offerer.paired_code IS NULL AND answerer.paired_code IS NULL
+              AND offerer.req_from = answerer.presence_id
+              AND offerer.room = answerer.room
+              AND offerer.paired_code IS NULL AND answerer.paired_code IS NULL
              AND offerer.seen_at >= ? AND answerer.seen_at >= ?`,
         ).bind(code, now, now, now, now, offererId, answererId, now - LOBBY_PRESENCE_MS, now - LOBBY_PRESENCE_MS),
         env.DB.prepare(
@@ -1083,6 +1086,7 @@ export async function handleP33SignalingRequest(request: Request, env: P33Signal
       ok: true,
       protocol: "er-coop-33",
       identityConfigured: (env.COOP_IDENTITY_SECRET?.length ?? 0) >= 32,
+      sourceSha: env.SOURCE_SHA ?? null,
     });
   }
   if ((env.COOP_IDENTITY_SECRET?.length ?? 0) < 32) {

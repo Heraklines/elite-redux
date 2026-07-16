@@ -200,6 +200,7 @@ jobs:
           # Staging/dev exposes the fifth Mystery difficulty. This exact immutable bundle therefore
           # exercises the same dev-gated picker and gauntlet schedule testers use on staging.
           VITE_DEV_TOOLS: 1
+          VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_SERVER_URL: ${{ env.COOP_UI_API_ORIGIN }}
@@ -259,6 +260,7 @@ jobs:
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_ACCOUNT_MODE: register
+          COOP_UI_LOBBY_ROOM: campaign-${{ github.run_id }}-${{ matrix.artifact }}-${{ github.run_attempt }}
           COOP_UI_ACTION_DELAY_MS: 70
           COOP_UI_SETTLE_DELAY_MS: 300
           NODE_OPTIONS: --max-old-space-size=4096

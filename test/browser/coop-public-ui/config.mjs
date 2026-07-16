@@ -58,6 +58,17 @@ function keySequence(name, fallback) {
   return value;
 }
 
+function optionalIdentifier(name, maxLength) {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    return null;
+  }
+  if (value.length > maxLength || !/^[A-Za-z0-9_-]+$/u.test(value)) {
+    throw new Error(`${name} must contain at most ${maxLength} ASCII letters, digits, underscores, or hyphens`);
+  }
+  return value;
+}
+
 const allowedJourneys = new Set([
   "probe",
   "fresh-wave2",
@@ -121,6 +132,7 @@ export function loadConfig() {
     expectedApiOrigin: process.env.COOP_UI_EXPECTED_API_ORIGIN?.trim() || null,
     expectedSignalOrigin: process.env.COOP_UI_EXPECTED_SIGNAL_ORIGIN?.trim() || null,
     entryContract: process.env.COOP_BROWSER_ENTRY_CONTRACT?.trim() || "public-ui-v1",
+    lobbyRoom: optionalIdentifier("COOP_UI_LOBBY_ROOM", 64),
     artifactDir: resolve(ROOT, "dev-logs", "coop-public-ui", runId),
     headless: boolean("COOP_UI_HEADLESS", true),
     chromeTrace: boolean("COOP_UI_CHROME_TRACE", true),
