@@ -17,8 +17,10 @@
     "test/tests/elite-redux/coop/coop-battle-stream.test.ts",
     "test/tests/elite-redux/coop/coop-durability.test.ts",
     "test/tests/elite-redux/coop/coop-operation-durability-recovery.test.ts",
+    "test/tests/elite-redux/coop/coop-p33-client.test.ts",
     "test/tests/elite-redux/coop/coop-resync-checkpoint-wake.test.ts",
     "test/tests/elite-redux/coop/coop-resync-snapshot-ordering.test.ts",
+    "test/tests/elite-redux/coop/coop-session-controller.test.ts",
     "test/tests/elite-redux/coop/coop-wire-chunking-adversarial.test.ts",
     "test/tools/coop-duo-harness.ts"
   ]
