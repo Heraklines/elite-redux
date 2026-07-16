@@ -1,1 +1,14 @@
-{}
+{
+  "model_1": {
+    "author": "Kyle Dove",
+    "genders": false,
+    "kind": "other",
+    "label": "Model",
+    "license": "original",
+    "sourceUrl": "https://eeveeexpo.com/resources/942/",
+    "spriteKey": "model_1",
+    "tags": [
+      "galar"
+    ]
+  }
+}
