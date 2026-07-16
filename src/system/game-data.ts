@@ -416,6 +416,13 @@ export class GameData {
   public lastCloudSyncFailed = false;
 
   /**
+   * A confirmed overwrite has already retired the previous cloud row. Its replacement must bypass
+   * the ordinary cloud cadence exactly once, otherwise the preceding save's 20-minute success
+   * cooldown can leave the newly occupied slot local-only after the destructive delete.
+   */
+  private pendingOverwriteCloudSync: { slot: number; accountIdentity: string } | null = null;
+
+  /**
    * ER: set when a localStorage write (system or session save) was rejected -
    * typically QuotaExceededError, the browser's ~5MB cap exceeded by a bloated
    * save (e.g. a very large egg inventory). The save flow no longer throws on this
@@ -4821,9 +4828,10 @@ export class GameData {
    * Delete the session data at the given slot when overwriting a save file
    * For deleting the session of a finished run, use {@linkcode tryClearSession}
    * @param slotId - The slot to clear
+   * @param prepareOverwrite - Whether the next same-slot session save must bypass cloud cadence once
    * @returns A Promise that resolves with whether the session deletion succeeded
    */
-  async deleteSession(slotId: number): Promise<boolean> {
+  async deleteSession(slotId: number, prepareOverwrite = false): Promise<boolean> {
     const accountIdentity = this.currentPersistenceAccount();
     const localKey = this.sessionStorageKeyForAccount(slotId, accountIdentity);
     if (bypassLogin) {
@@ -4889,6 +4897,9 @@ export class GameData {
         return false;
       }
       loggedInUser.lastSessionSlot = -1;
+      if (prepareOverwrite) {
+        this.pendingOverwriteCloudSync = { slot: slotId, accountIdentity };
+      }
       return true;
     }
     if (error.startsWith("session out of date")) {
@@ -5198,7 +5209,14 @@ export class GameData {
       }
     }
 
-    const shouldCloudSync = sync && !bypassLogin && (forceSync || this.shouldAttemptCloudSync());
+    const pendingOverwriteCloudSync = this.pendingOverwriteCloudSync;
+    const overwriteCloudSyncApplies =
+      pendingOverwriteCloudSync != null
+      && !useCachedSession
+      && pendingOverwriteCloudSync.slot === globalScene.sessionSlotId
+      && this.persistenceAccountIsCurrent(pendingOverwriteCloudSync.accountIdentity);
+    const shouldCloudSync =
+      sync && !bypassLogin && (forceSync || overwriteCloudSyncApplies || this.shouldAttemptCloudSync());
 
     if (entryCoopContext != null) {
       entryCoopContext.controller.advanceCheckpointRevision();
@@ -5758,6 +5776,9 @@ export class GameData {
         ? this.updateAllBounded(cloudRequest)
         : Promise.resolve("Save account changed before queued cloud mutation."),
     );
+    if (overwriteCloudSyncApplies && this.pendingOverwriteCloudSync === pendingOverwriteCloudSync) {
+      this.pendingOverwriteCloudSync = null;
+    }
     globalScene.ui.savingIcon.hide();
 
     if (!saveError) {
