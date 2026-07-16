@@ -29,7 +29,7 @@ test("GameOver journey uses visible starters, real command input, and exact reta
   );
   assert.match(
     journeys,
-    /GAME_OVER_SPEED_KEYS[\s\S]*client\.sequence\(GAME_OVER_SPEED_KEYS, "game-over-visible-speed-10x"\)[\s\S]*findGameSpeed\(10, cursor\)/u,
+    /GAME_SPEEDS[\s\S]*surfaceId: "title-menu"[\s\S]*targetId: "settings"[\s\S]*browser-render-profile[\s\S]*findGameSpeed\(10, openCursor\)[\s\S]*targetId: "new-game"/u,
   );
   assert.match(
     journeys,
