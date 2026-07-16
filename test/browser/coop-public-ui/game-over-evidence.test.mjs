@@ -29,15 +29,15 @@ test("GameOver journey uses visible starters, real command input, and exact reta
   );
   assert.match(
     journeys,
-    /GAME_SPEEDS[\s\S]*surfaceId: "title-menu"[\s\S]*targetId: "settings"[\s\S]*browser-render-profile[\s\S]*findGameSpeed\(10, openCursor\)[\s\S]*targetId: "new-game"/u,
-  );
-  assert.match(
-    journeys,
-    /async function gameOver\(rig\)[\s\S]*loginBoth\(\)[\s\S]*raiseGameOverSpeed\(rig\)[\s\S]*pair\(rig\.config\.requesterSeat\)[\s\S]*startFreshRun\(\{ gameOverFixture: true \}\)[\s\S]*driveWaveToGameOver\(\)/u,
+    /async function gameOver\(rig\)[\s\S]*loginBoth\(\)[\s\S]*pair\(rig\.config\.requesterSeat\)[\s\S]*startFreshRun\(\{ gameOverFixture: true \}\)[\s\S]*driveWaveToGameOver\(\)/u,
   );
   assert.match(
     harness,
     /driveWaveToGameOver\(\)[\s\S]*driveSequentialCommandRound\([\s\S]*waitForPostTurnOutcome\([\s\S]*outcome\.kind !== "gameOver"/u,
+  );
+  assert.match(
+    harness,
+    /GAME_OVER_POST_TURN_PROGRESS_ALLOWANCE_MS = 180_000[\s\S]*GAME_OVER_POST_TURN_HARD_CEILING_MS = 900_000[\s\S]*progressAllowanceMs: GAME_OVER_POST_TURN_PROGRESS_ALLOWANCE_MS[\s\S]*hardCeilingMs: GAME_OVER_POST_TURN_HARD_CEILING_MS/u,
   );
   for (const exactEvidence of [
     "settled WAVE_ADVANCE committed wave=1",
