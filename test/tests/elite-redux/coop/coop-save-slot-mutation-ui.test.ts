@@ -30,7 +30,7 @@ type HandlerInternals = {
   scrollCursor: number;
   uiMode: SaveSlotUiMode;
   saveSlotSelectCallback: ((cursor: number) => void) | null;
-  sessionSlots: { hasData: boolean; malformed: boolean }[];
+  sessionSlots: { slotId: number; hasData?: boolean; malformed?: boolean }[];
   clearSessionSlots: ReturnType<typeof vi.fn>;
   populateSessionSlots: ReturnType<typeof vi.fn>;
   setScrollCursor: ReturnType<typeof vi.fn>;
@@ -47,7 +47,7 @@ function configuredHandler(
   internals.scrollCursor = 0;
   internals.uiMode = mode;
   internals.saveSlotSelectCallback = callback;
-  internals.sessionSlots = [{ hasData: true, malformed: false }];
+  internals.sessionSlots = [{ slotId: 0, hasData: true, malformed: false }];
   internals.clearSessionSlots = vi.fn();
   internals.populateSessionSlots = vi.fn();
   internals.setScrollCursor = vi.fn(() => true);
@@ -68,6 +68,30 @@ async function confirmDelete(options: { label: string; handler: () => boolean }[
   confirm();
   await vi.waitFor(() => expect(scene.deleteSession).toHaveBeenCalledWith(0));
 }
+
+describe("save-slot semantic readiness projection", () => {
+  it.each([
+    [{ slotId: 0 }, { slotId: 0, loaded: false, state: "loading" }],
+    [
+      { slotId: 1, hasData: false },
+      { slotId: 1, loaded: true, state: "empty" },
+    ],
+    [
+      { slotId: 2, hasData: true, malformed: false },
+      { slotId: 2, loaded: true, state: "occupied" },
+    ],
+    [
+      { slotId: 3, hasData: true, malformed: true },
+      { slotId: 3, loaded: true, state: "malformed" },
+    ],
+  ] as const)("projects the selected slot without mutating it", (slot, expected) => {
+    const { handler, internals } = configuredHandler(SaveSlotUiMode.SAVE);
+    internals.sessionSlots = [slot];
+
+    expect(handler.getSelectedSlotSemanticSelection()).toEqual(expected);
+    expect(internals.sessionSlots[0]).toEqual(slot);
+  });
+});
 
 // This test replaces the process-global scene binding, so keep it in the isolated co-op lane and restore it.
 describe.skipIf(process.env.ER_SCENARIO !== "1")("co-op save-slot mutation UI", () => {

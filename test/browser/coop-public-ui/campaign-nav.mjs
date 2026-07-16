@@ -91,17 +91,17 @@ export async function waitForSemanticSurface(client, surfaceId, { fromCursor = 0
 
 /**
  * Select slot zero on the fresh-account SAVE screen. The registered-account fixture has no saves; this
- * helper waits for the real handler's public semantic cursor before issuing the same ACTION a player uses.
+ * helper waits for the real handler's public loaded+empty projection before issuing the same ACTION a player uses.
  */
 export async function selectFirstEmptySaveSlot(client, { fromCursor = 0, timeoutMs = 15_000 } = {}) {
   const ready = await client.evidence.waitForCondition(
     sink => {
       const event = sink.findLastSemanticSurface(fromCursor, "save-slot");
-      return event?.observation.ready.handlerActive === true && event.observation.selectedOptionId === "cursor:0"
+      return event?.observation.ready.handlerActive === true && event.observation.selectedOptionId === "empty-slot:0"
         ? event
         : null;
     },
-    { timeoutMs, description: "fresh-account first save slot cursor" },
+    { timeoutMs, description: "fresh-account first loaded empty save slot" },
   );
   client.evidence.record("fresh-save-slot-proof", {
     surfaceId: ready.observation.surfaceId,
