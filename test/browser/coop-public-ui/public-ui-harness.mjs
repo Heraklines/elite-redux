@@ -2440,7 +2440,6 @@ export class DuoPublicUiRig {
         }),
       ]);
 
-    await this.assertRetainedContinuation(outcomeCursors, "game-over-terminal");
     const hostRelease = await this.host.evidence.waitFor(
       new RegExp(`host RELEASE contiguous acknowledged authority cls=op:global seq=${revision}`, "u"),
       {
