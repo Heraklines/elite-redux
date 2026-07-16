@@ -79,6 +79,20 @@ export function consumePendingDevStarters(): Starter[] | null {
   return s;
 }
 
+let pendingDevStarterLevels: number[] | null = null;
+
+/** Stage per-slot levels for the next dev party. */
+export function setPendingDevStarterLevels(levels: readonly number[]): void {
+  pendingDevStarterLevels = [...levels];
+}
+
+/** Take (and clear) the per-slot levels staged for the next dev party. */
+export function consumePendingDevStarterLevels(): number[] | null {
+  const levels = pendingDevStarterLevels;
+  pendingDevStarterLevels = null;
+  return levels;
+}
+
 // --- Pending player-party setup (scenario -> SelectStarterPhase) ------------
 // Runs after every staged starter has become a PlayerPokemon, but before the
 // first battle is created. This is early enough for held items and other roster

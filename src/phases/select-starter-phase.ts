@@ -2,6 +2,7 @@ import { getSessionDataLocalStorageKey } from "#app/account";
 import {
   consumePendingDevCustomTrainerForce,
   consumePendingDevPartySetup,
+  consumePendingDevStarterLevels,
   consumePendingDevStarters,
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
@@ -101,6 +102,7 @@ export class SelectStarterPhase extends Phase {
     // drop straight into the battle, skipping starter-select. consumePending…
     // returns null in production / on a clean checkout, so this is inert there.
     const devStarters = consumePendingDevStarters();
+    const devStarterLevels = consumePendingDevStarterLevels();
     if (devStarters && devStarters.length > 0) {
       globalScene.sessionSlotId = DEV_SCENARIO_SLOT;
       // The normal starter-select confirm path sets starting money; the dev
@@ -111,7 +113,7 @@ export class SelectStarterPhase extends Phase {
       // Dev scenarios hand-pick movesets for TESTING (e.g. Thunder Wave on a
       // Blastoise) — skip the starter-legality validation that silently
       // rejected them and left scenario mons with NO moves.
-      this.initBattle(devStarters, true);
+      this.initBattle(devStarters, true, undefined, undefined, devStarterLevels ?? undefined);
       return;
     }
 
@@ -606,12 +608,14 @@ export class SelectStarterPhase extends Phase {
    * @param coopOwners - Co-op only (#633, P2): per-launch-mon owner tag, parallel to `starters`.
    *   The merged party is interleaved (host0, guest0, host1, ...), so `coopOwners[i]` is the
    *   owner of `starters[i]`. Omitted / `undefined` for solo and all other modes.
+   * @param startingLevels - Dev scenarios only: optional per-slot construction levels.
    */
   initBattle(
     starters: Starter[],
     ignoreMovesetValidation = false,
     coopOwners?: CoopRole[],
     showdownManifests?: ShowdownMonManifest[],
+    startingLevels?: readonly number[],
   ) {
     const party = globalScene.getPlayerParty();
     const loadPokemonAssets: Promise<void>[] = [];
@@ -651,9 +655,14 @@ export class SelectStarterPhase extends Phase {
       // keeping the turn checksum in parity. Non-showdown paths (showdownMon == null) are unchanged.
       const starterIvs = showdownMon ? [31, 31, 31, 31, 31, 31] : starter.ivs;
       const starterNature = (showdownMon?.nature as Nature | undefined) ?? starter.nature;
+      const stagedLevel = startingLevels?.[i];
+      const starterLevel =
+        stagedLevel != null && Number.isFinite(stagedLevel) && stagedLevel > 0
+          ? Math.floor(stagedLevel)
+          : globalScene.gameMode.getStartingLevel();
       const starterPokemon = globalScene.addPlayerPokemon(
         species,
-        globalScene.gameMode.getStartingLevel(),
+        starterLevel,
         starter.abilityIndex,
         starterFormIndex,
         starterGender,

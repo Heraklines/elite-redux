@@ -35,6 +35,7 @@ import {
   applyPreparedGhostChallenges,
   buildErCustomTrainerDevScenario,
   resetDevOverrides,
+  translatePreparedGhostLevels,
 } from "#app/dev-tools/test-suite/scenarios";
 import { getGameMode } from "#app/game-mode";
 import Overrides from "#app/overrides";
@@ -213,6 +214,9 @@ describe("Custom Trainers picker - prepared fight selection", () => {
       expect(first[1].moveset).toEqual([85, 98]);
       expect(Overrides.STARTING_WAVE_OVERRIDE).toBe(21);
       expect(Overrides.STARTING_LEVEL_OVERRIDE).toBe(getGameMode(GameModes.CHALLENGE).getMaxExpLevelForWave(21));
+      const cap = getGameMode(GameModes.CHALLENGE).getMaxExpLevelForWave(21);
+      expect(built.scenario.startingLevels).toEqual([cap, cap - 3]);
+      expect(translatePreparedGhostLevels(snapshot.party, cap)).toEqual([cap, cap - 3]);
       expect(Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE).toBe(0);
       expect(consumePendingDevCustomTrainerForce()).toBe("TESTER");
 
@@ -233,9 +237,8 @@ describe("Custom Trainers picker - prepared fight selection", () => {
       applyPreparedGhostChallenges({ setChallengeValue }, snapshot.challenges ?? []);
       expect(setChallengeValue).toHaveBeenCalledWith(Challenges.INVERSE_BATTLE, 1);
 
-      // The sampled source levels are deliberately not used during launch. All
-      // starters are born at the selected wave's cap, so displayed level, stats
-      // and EXP share one source of truth from the first frame.
+      // Each member is constructed at its translated snapshot level. The top
+      // member reaches the wave cap while the saved three-level gap survives.
       expect(Overrides.STARTING_LEVEL_OVERRIDE).not.toBe(20);
     } finally {
       consumePendingDevCustomTrainerForce();
