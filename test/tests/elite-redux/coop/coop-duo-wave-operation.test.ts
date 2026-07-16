@@ -46,6 +46,7 @@ import {
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import * as waveOp from "#data/elite-redux/coop/coop-wave-operation";
 import {
+  isCoopWaveAdvanceTransactionComplete,
   markCoopWaveAdvanceContinuationReady,
   markCoopWaveAdvanceDataApplied,
   resetCoopWaveAdvanceOperationFlag,
@@ -57,7 +58,9 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { BattleEndPhase } from "#phases/battle-end-phase";
-import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
+import { CoopFinalizeTurnPhase, CoopWaveAdvanceBoundaryPhase } from "#phases/coop-replay-phases";
+import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
+import { GameOverPhase } from "#phases/game-over-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, type DuoRig, drainLoopback, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
@@ -434,6 +437,71 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(waveOp.coopWaveAdvanceSanctionedTails(payload!), "game-over sanctions only GameOverPhase").toEqual([
       "GameOverPhase",
     ]);
+    logs.flush();
+  }, 300_000);
+
+  it("GAME OVER: a retained terminal dissolves a phantom next-turn replay and both peers reach GameOver", async () => {
+    const rig = await bootDuo({ preserveProductionWaveSink: true });
+    const hostTerminal = new GameOverPhase(false);
+    const hostTerminalHandler = vi.spyOn(hostTerminal, "handleGameOver").mockImplementation(() => {});
+    const unackedBefore = rig.hostRuntime.durability?.unackedCount() ?? 0;
+    vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved").mockImplementation(() => {
+      throw new Error("drop raw game-over carrier; retained WAVE_ADVANCE must recover");
+    });
+
+    await withClient(rig.guestCtx, async () => {
+      rig.guestScene.currentBattle.waveIndex = 7;
+      rig.guestScene.currentBattle.turn = 2;
+      const replay = new CoopReplayTurnPhase(2);
+      rig.guestScene.phaseManager.clearPhaseQueue();
+      rig.guestScene.phaseManager.unshiftPhase(replay);
+      rig.guestScene.phaseManager.shiftPhase();
+      expect(rig.guestScene.phaseManager.getCurrentPhase()).toBe(replay);
+      replay.start();
+      await new Promise(resolve => setTimeout(resolve, 5));
+      expect(replay.isAwaitingAuthority(), "the guest has opened the phantom next-turn waiter").toBe(true);
+      expect(
+        replay.abortIfPastSettledTurn(2, "same-turn retained terminal must not abort (test)"),
+        "a retained terminal cannot truncate presentation for its own settled turn",
+      ).toBe(false);
+      expect(replay.isAwaitingAuthority()).toBe(true);
+    });
+
+    await withClient(rig.hostCtx, () => {
+      rig.hostScene.currentBattle.waveIndex = 7;
+      rig.hostScene.currentBattle.turn = 1;
+      hostTerminal.start();
+    });
+    expect(hostTerminalHandler, "the authority opened its real GameOver continuation").toHaveBeenCalledOnce();
+    expect(
+      rig.hostRuntime.durability?.unackedCount(),
+      "host terminal remains retained until the guest opens its terminal",
+    ).toBe(unackedBefore + 1);
+
+    await withClient(rig.guestCtx, async () => {
+      await drainLoopback();
+      await new Promise(resolve => setTimeout(resolve, 10));
+      const boundary = rig.guestScene.phaseManager.getCurrentPhase();
+      expect(boundary, "the retained terminal unparks replay into the appended safe boundary").toBeInstanceOf(
+        CoopWaveAdvanceBoundaryPhase,
+      );
+      boundary.start();
+      const guestTerminal = rig.guestScene.phaseManager.getCurrentPhase();
+      expect(guestTerminal, "terminal DATA application exposes the guest GameOver continuation").toBeInstanceOf(
+        GameOverPhase,
+      );
+      vi.spyOn(guestTerminal as GameOverPhase, "handleGameOver").mockImplementation(() => {});
+      guestTerminal.start();
+      expect(
+        isCoopWaveAdvanceTransactionComplete(7, rig.guestRuntime.waveOperationBinding),
+        "the guest terminal proves DATA applied plus continuation ready",
+      ).toBe(true);
+    });
+
+    await withClient(rig.hostCtx, () => drainLoopback());
+    expect(rig.hostRuntime.durability?.unackedCount(), "the shared terminal proof releases retained authority").toBe(
+      unackedBefore,
+    );
     logs.flush();
   }, 300_000);
 });

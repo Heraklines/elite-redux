@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "taskId": "p33-gameover-replay-unpark",
+  "branch": "ci/coop/p33-gameover-replay-unpark",
+  "trainRef": "ci/coop/p33-closure-integrated",
+  "baseSha": "c8d8dda43d34a1ab48358f83d1c082b9c3d52d53",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-gameover-replay-unpark.json",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/phases/coop-replay-turn-phase.ts",
+    "test/browser/coop-public-ui/campaign-exp-phase.test.mjs",
+    "test/browser/coop-public-ui/public-ui-harness.mjs",
+    "test/browser/coop-public-ui/run-campaign.mjs",
+    "test/browser/coop-public-ui/run.mjs",
+    "test/browser/coop-public-ui/terminal-watchdog.mjs",
+    "test/browser/coop-public-ui/terminal-watchdog.test.mjs",
+    "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts"
+  ]
+}

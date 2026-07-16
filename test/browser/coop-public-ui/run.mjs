@@ -29,6 +29,7 @@ try {
   process.exitCode = 1;
   if (rig) {
     await Promise.all(Object.values(rig.clients).map(client => client.checkpoint("journey-failed").catch(() => {})));
+    failure = rig.aggregateFailureWithBrowserEvidence(failure);
   }
 } finally {
   if (rig) {

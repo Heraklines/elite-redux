@@ -525,6 +525,48 @@ test("the short public journey advances readiness-proven narration before pollin
   );
 });
 
+test("the short post-turn wait keeps both browsers alive until GameOver is paired", async () => {
+  const authority = fakeClient("authority", ["Start Phase GameOverPhase"]);
+  const renderer = fakeClient("renderer", ["Start Phase GameOverPhase"]);
+  const rig = {
+    clients: { authority, renderer },
+    config: { faintOwnerSeat: "renderer", timeoutMs: 1_000 },
+  };
+
+  assert.deepEqual(await DuoPublicUiRig.prototype.waitForPostTurnOutcome.call(rig, { authority: 0, renderer: 0 }), {
+    kind: "gameOver",
+  });
+  assert.equal(authority.evidence.events.at(-1).kind, "paired-game-over-proof");
+  assert.equal(renderer.evidence.events.at(-1).kind, "paired-game-over-proof");
+});
+
+test("browser cleanup evidence is aggregated with the primary journey failure", () => {
+  const rig = Object.assign(Object.create(DuoPublicUiRig.prototype), {
+    clients: {
+      authority: {
+        evidence: {
+          assertClean: () => {
+            throw new Error("authority fatal");
+          },
+        },
+      },
+      renderer: {
+        evidence: {
+          assertClean: () => {
+            throw new Error("renderer fatal");
+          },
+        },
+      },
+    },
+  });
+
+  const failure = rig.aggregateFailureWithBrowserEvidence(new Error("journey timeout"));
+  assert.equal(failure.name, "AggregateError");
+  assert.match(failure.message, /journey timeout/u);
+  assert.match(failure.message, /authority fatal/u);
+  assert.match(failure.message, /renderer fatal/u);
+});
+
 test("the short outcome wait names a fully submitted turn as progress", async () => {
   const authority = fakeClient("authority", ["[coop:turn] host recorder: begin turn=1"]);
   const renderer = fakeClient("renderer", ["Start Phase TurnStartPhase"]);
