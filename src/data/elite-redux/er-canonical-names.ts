@@ -28,14 +28,18 @@
 // thus locale-invariant on their own.
 // =============================================================================
 
+import type { Ability } from "#data/abilities/ability";
 import type { Move } from "#data/moves/move";
 import type { PokemonSpecies } from "#data/pokemon-species";
+import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { toCamelCase } from "#utils/strings";
+import englishAbilities from "../../../locales/en/ability.json";
 import englishMoves from "../../../locales/en/move.json";
 import englishPokemon from "../../../locales/en/pokemon.json";
 
+const ENGLISH_ABILITY_NAMES = englishAbilities as Readonly<Record<string, { name?: string }>>;
 const ENGLISH_MOVE_NAMES = englishMoves as Readonly<Record<string, { name?: string }>>;
 const ENGLISH_POKEMON_NAMES = englishPokemon as Readonly<Record<string, string>>;
 
@@ -48,6 +52,19 @@ const ENGLISH_POKEMON_NAMES = englishPokemon as Readonly<Record<string, string>>
  * reverse-map at init, so a "missing enum key" test would not catch them.)
  */
 const ER_CUSTOM_MOVE_ID_FLOOR = 5000;
+const ER_CUSTOM_ABILITY_ID_FLOOR = 5000;
+
+/** Locale-invariant ability match key for ER data initialization. */
+export function enAbilityName(ability: Ability): string {
+  if (ability.id === AbilityId.NONE) {
+    return "";
+  }
+  if (ability.id >= ER_CUSTOM_ABILITY_ID_FLOOR) {
+    return ability.name;
+  }
+  const enumKey = AbilityId[ability.id];
+  return ENGLISH_ABILITY_NAMES[toCamelCase(enumKey)]?.name ?? enumKey;
+}
 
 /**
  * The English (locale-invariant) display name of a live {@linkcode Move} instance,

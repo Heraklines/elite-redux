@@ -151,6 +151,7 @@ import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-
 import { TypeImmunityHighestAttackStatStageAbAttr } from "#data/elite-redux/archetypes/type-immunity-highest-attack-stat-stage";
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
 import { getErAbilityDescription, getErAbilityRomDescription } from "#data/elite-redux/er-ability-descriptions";
+import { enAbilityName } from "#data/elite-redux/er-canonical-names";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { initEliteReduxVanillaMovePatches } from "#data/elite-redux/init-elite-redux-vanilla-move-patches";
@@ -1908,7 +1909,7 @@ export function initEliteReduxVanillaRebalance(): VanillaRebalanceResult {
       // `ability.description` (battle popups, info panels, Battle Info) is correct.
       // Prefer the expanded ROM text; fall back to the short ER summary.
       const erDescription =
-        getErAbilityRomDescription(mutableAbility.name) ?? getErAbilityDescription(pokerogueId as AbilityId);
+        getErAbilityRomDescription(enAbilityName(mutableAbility)) ?? getErAbilityDescription(pokerogueId as AbilityId);
       if (erDescription) {
         mutableAbility.descriptionOverride = erDescription;
       }

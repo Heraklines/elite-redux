@@ -12,11 +12,13 @@ import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
 import { allSpecies } from "#data/data-lists";
 import { applyErCustomMons } from "#data/elite-redux/init-elite-redux-custom-mons";
+import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import type { SpeciesId } from "#enums/species-id";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
-import { describe, expect, it } from "vitest";
+import i18next from "i18next";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Editor mons live OUTSIDE the static SpeciesId enum (runtime-extended ids).
 const TEST_ID = 60042 as SpeciesId;
@@ -44,6 +46,10 @@ const TEST_MON = {
 };
 
 describe("ER editor custom mons (er-custom-mons.json loader)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("registers a valid mon as a live species with all balance tables wired", () => {
     const result = applyErCustomMons(TEST_MON);
     expect(result.registered).toBe(1);
@@ -73,6 +79,22 @@ describe("ER editor custom mons (er-custom-mons.json loader)", () => {
     expect(again.registered).toBe(0);
     expect(again.alreadyPresent).toBe(1);
     expect(allSpecies.filter(s => s.speciesId === TEST_ID)).toHaveLength(1);
+  });
+
+  it("resolves English ability keys when the runtime English namespace is unavailable", () => {
+    vi.spyOn(i18next, "t").mockReturnValue("__LOCALIZED_NOT_ENGLISH__");
+    const result = applyErCustomMons({
+      SPECIES_EDITOR_LOCALE_PROOF: {
+        ...TEST_MON.SPECIES_EDITOR_TESTCAT,
+        id: 60046,
+        name: "Localeproof",
+        slug: "editor-locale-proof",
+      },
+    });
+    expect(result.registered).toBe(1);
+    const species = getPokemonSpecies(60046 as SpeciesId);
+    expect(species?.ability1).toBe(AbilityId.BLAZE);
+    expect(species?.getPassiveAbilities()[0]).toBe(AbilityId.INTIMIDATE);
   });
 
   it("skips invalid entries (bad id band, bad stats, unknown type) without registering", () => {

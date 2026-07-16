@@ -19,9 +19,11 @@
 // minimal typed stubs suffice - no GameManager / ER init boot.
 // =============================================================================
 
-import { enMoveName, enSpeciesName } from "#data/elite-redux/er-canonical-names";
+import type { Ability } from "#data/abilities/ability";
+import { enAbilityName, enMoveName, enSpeciesName } from "#data/elite-redux/er-canonical-names";
 import type { Move } from "#data/moves/move";
 import type { PokemonSpecies } from "#data/pokemon-species";
+import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import i18next from "i18next";
@@ -36,6 +38,7 @@ function stubUnavailableEnglishCatalog(): ReturnType<typeof vi.spyOn> {
 }
 
 const moveStub = (id: MoveId): Move => ({ id }) as unknown as Move;
+const abilityStub = (id: AbilityId): Ability => ({ id }) as unknown as Ability;
 const speciesStub = (speciesId: SpeciesId): PokemonSpecies => ({ speciesId }) as unknown as PokemonSpecies;
 
 /**
@@ -45,6 +48,7 @@ const speciesStub = (speciesId: SpeciesId): PokemonSpecies => ({ speciesId }) as
  * (already locale-invariant) instead of forcing a non-existent i18n key.
  */
 const customMoveStub = (id: number, name: string): Move => ({ id, name }) as unknown as Move;
+const customAbilityStub = (id: number, name: string): Ability => ({ id, name }) as unknown as Ability;
 const customSpeciesStub = (speciesId: number, name: string): PokemonSpecies =>
   ({ speciesId, name }) as unknown as PokemonSpecies;
 
@@ -68,12 +72,21 @@ describe("ER canonical (locale-invariant) name keys (#633)", () => {
     expect(spyT).toHaveBeenCalledTimes(1);
   });
 
+  it("enAbilityName returns the ENGLISH name without a loaded English namespace", () => {
+    const spyT = stubUnavailableEnglishCatalog();
+    expect(i18next.t("ability:stench.name")).toBe(FAKE_LOCALIZED);
+    expect(enAbilityName(abilityStub(AbilityId.STENCH))).toBe("Stench");
+    expect(enAbilityName(abilityStub(AbilityId.SPEED_BOOST))).toBe("Speed Boost");
+    expect(spyT).toHaveBeenCalledTimes(1);
+  });
+
   it("does not consult i18next even when translation lookup throws", () => {
     const spyT = vi.spyOn(i18next, "t").mockImplementation(() => {
       throw new Error("English namespace unavailable");
     });
     enMoveName(moveStub(MoveId.POUND));
     enSpeciesName(speciesStub(SpeciesId.BULBASAUR));
+    enAbilityName(abilityStub(AbilityId.STENCH));
     expect(spyT).not.toHaveBeenCalled();
   });
 
@@ -98,6 +111,12 @@ describe("ER canonical (locale-invariant) name keys (#633)", () => {
     // 10000+ ids are ER customs with no `pokemon:` i18n key (e.g. "Unown Q").
     expect(enSpeciesName(customSpeciesStub(10859, "Unown Q"))).toBe("Unown Q");
     expect(enSpeciesName(customSpeciesStub(10001, "Phantowl"))).toBe("Phantowl");
+    expect(spyT).not.toHaveBeenCalled();
+  });
+
+  it("ER-CUSTOM ability (id >= 5000): returns the static draft `.name` without i18next", () => {
+    const spyT = stubUnavailableEnglishCatalog();
+    expect(enAbilityName(customAbilityStub(5001, "Aqua Veil"))).toBe("Aqua Veil");
     expect(spyT).not.toHaveBeenCalled();
   });
 
