@@ -65,6 +65,7 @@ const allowedJourneys = new Set([
   "reverse-resume",
   "faint-replacement",
   "commander-skip",
+  "save-mutations",
 ]);
 const allowedSeats = new Set(["host-seat", "guest-seat"]);
 const allowedAccountModes = new Set(["login", "register"]);

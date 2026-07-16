@@ -11,6 +11,8 @@ on:
       - "src/dev-tools/registry.ts"
       - "src/ui/handlers/starter-select-ui-handler.ts"
       - "test/browser/coop-public-ui/**"
+      - "workers/er-save-api/**"
+      - "workers/er-coop-api/**"
   workflow_dispatch:
     inputs:
       journey:
@@ -25,6 +27,7 @@ on:
           - reverse-resume
           - faint-replacement
           - commander-skip
+          - save-mutations
           - market-wide-lens
       requester_seat:
         description: Seat that sends the first lobby invitation
@@ -81,14 +84,15 @@ concurrency:
 
 env:
   COOP_BROWSER_ENTRY_CONTRACT: public-ui-v1
-  # Isolated P33 staging workers, HARDCODED to match the campaign workflow exactly (same
+  # Ordinary journeys use the isolated P33 staging workers, hardcoded to match the campaign workflow (same
   # COOP_IDENTITY_SECRET so the save-API-minted identity tickets validate on the signal worker).
   # Previously the signal origin defaulted to the PROD worker (er-coop-api, no -staging) while the
   # save-API defaulted to staging - a stale/unset repo var split the ticket-issuer from the signal
   # origin, so the staging-minted ticket failed to validate on the prod signal worker and pairing
-  # never completed (the audit's journey-run pairing failure). Both pinned so no var can split them.
-  COOP_UI_SIGNAL_ORIGIN: https://er-coop-api-staging.heraklines.workers.dev
-  COOP_UI_API_ORIGIN: https://er-save-api-staging.heraklines.workers.dev
+  # never completed (the audit's journey-run pairing failure). Both stay paired. `save-mutations`
+  # instead seals localhost origins and starts fresh in-memory instances of the real Worker modules.
+  COOP_UI_SIGNAL_ORIGIN: ${{ inputs.journey == 'save-mutations' && 'http://127.0.0.1:8789' || 'https://er-coop-api-staging.heraklines.workers.dev' }}
+  COOP_UI_API_ORIGIN: ${{ inputs.journey == 'save-mutations' && 'http://127.0.0.1:8788' || 'https://er-save-api-staging.heraklines.workers.dev' }}
 
 jobs:
   browser-build:
@@ -149,6 +153,8 @@ jobs:
             test/browser/coop-public-ui/config.mjs \
             test/browser/coop-public-ui/evidence.mjs \
             test/browser/coop-public-ui/journeys.mjs \
+            test/browser/coop-public-ui/local-worker-server.ts \
+            test/browser/coop-public-ui/local-worker-vite.config.mjs \
             test/browser/coop-public-ui/market-gold-standard.test.mjs \
             test/browser/coop-public-ui/market-journey.mjs \
             test/browser/coop-public-ui/preview-server.mjs \
@@ -157,6 +163,7 @@ jobs:
             test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs \
             test/browser/coop-public-ui/run-campaign.mjs \
             test/browser/coop-public-ui/run.mjs \
+            test/browser/coop-public-ui/save-mutation-evidence.test.mjs \
             test/browser/coop-public-ui/semantic-surface-evidence.test.mjs \
             test/browser/coop-public-ui/terminal-watchdog.mjs \
             test/browser/coop-public-ui/vite.config.mjs
@@ -181,6 +188,9 @@ jobs:
 
       - name: Verify strict semantic surface evidence contracts
         run: node --test test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
+
+      - name: Verify exact save mutation browser evidence contracts
+        run: node --test test/browser/coop-public-ui/save-mutation-evidence.test.mjs
 
       - name: Build normal application with CI-only read-only observer
         env:
@@ -213,7 +223,7 @@ jobs:
     name: ${{ inputs.journey || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / ${{ inputs.journey == 'commander-skip' && matrix.commander_owner_seat || 'primary accounts' }}
     needs: browser-build
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.journey == 'market-wide-lens' && 55 || inputs.journey == 'commander-skip' && 45 || 35 }}
+    timeout-minutes: ${{ inputs.journey == 'market-wide-lens' && 55 || inputs.journey == 'save-mutations' && 50 || inputs.journey == 'commander-skip' && 45 || 35 }}
     strategy:
       fail-fast: false
       matrix:
@@ -235,6 +245,21 @@ jobs:
 
       - name: Install isolated Chrome runtime
         run: pnpm exec puppeteer browsers install chrome
+
+      - name: Start isolated in-memory Worker fixtures for save mutation coverage
+        if: inputs.journey == 'save-mutations'
+        shell: bash
+        run: |
+          pnpm exec vite build --config test/browser/coop-public-ui/local-worker-vite.config.mjs
+          nohup node dist-coop-local-workers/local-worker-server.mjs > local-worker-fixture.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8789/coop/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat local-worker-fixture.log
+          exit 1
 
       - name: Prepare an isolated account pair for visible registration
         run: node test/browser/coop-public-ui/provision-accounts.mjs
@@ -296,6 +321,7 @@ jobs:
             dev-logs/coop-public-ui/**/*.png
             dev-logs/coop-public-ui/**/*.dom.json
             dev-logs/coop-public-ui/**/*.cookies.json
+            local-worker-fixture.log
           compression-level: 9
           retention-days: 14
           if-no-files-found: warn
@@ -310,7 +336,7 @@ jobs:
           if-no-files-found: warn
 
   reverse-journey:
-    if: github.event_name == 'workflow_dispatch' && inputs.fan_out_reverse
+    if: github.event_name == 'workflow_dispatch' && inputs.fan_out_reverse && inputs.journey != 'save-mutations'
     name: reverse-resume / slow / alternate accounts
     needs: browser-build
     runs-on: ubuntu-latest
