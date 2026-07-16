@@ -600,11 +600,6 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
       }
     });
     await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
-    const guestCommand = withClientSync(
-      rig.hostCtx,
-      () => rig.hostScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX],
-    );
-    expect(guestCommand?.targets, "RIGHT + confirm selected the second 1-HP enemy").toEqual([BattlerIndex.ENEMY_2]);
     const turn = rig.hostScene.currentBattle.turn;
     await withClient(rig.hostCtx, async () => {
       expect(rig.hostScene.ui.getMode(), "the host starts on its real command surface").toBe(UiMode.COMMAND);
@@ -620,6 +615,13 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
         "the host selected the first 1-HP enemy",
       ).toEqual([BattlerIndex.ENEMY]);
       await game.phaseInterceptor.to("TurnEndPhase");
+      const consumedGuestCommand = rig.hostScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX];
+      expect(consumedGuestCommand?.command, "the buffered public guest command was consumed as FIGHT").toBe(
+        Command.FIGHT,
+      );
+      expect(consumedGuestCommand?.targets, "RIGHT + confirm remained addressed to the second 1-HP enemy").toEqual([
+        BattlerIndex.ENEMY_2,
+      ]);
       expect(
         rig.hostScene.currentBattle.enemyParty.every(enemy => enemy.isFainted()),
         "both targets were KO'd",
