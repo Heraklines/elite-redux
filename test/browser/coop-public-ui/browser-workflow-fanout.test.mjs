@@ -65,6 +65,16 @@ test("journey bundle resolves one validated asset SHA even when the GitHub API i
   assert.match(build, /grep -Eq '\^\[0-9a-f\]\{40\}\$'/u, "either lookup path must produce an exact commit SHA");
 });
 
+test("exact GameOver gate runs the retained guest-renderer phase-queue regression", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
+  const build = jobBlock(workflow, "browser-build");
+  assert.match(
+    build,
+    /Verify retained GameOver two-engine operation regression[\s\S]*coop-guest-renderer\.test\.ts/u,
+    "the exact browser gate proves both the operation journal and its real guest phase-queue continuation",
+  );
+});
+
 test("journey starter fixtures require both the exact build and exact per-page URL gate", async () => {
   const [workflow, registry, starterHandler] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),

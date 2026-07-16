@@ -255,6 +255,13 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
    */
   const driveReplayTurn = async (turn: number): Promise<void> => {
     const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
+    // Drive the same phase-tree topology production uses. Starting a detached replay object makes
+    // Phase.end() shift whatever unrelated harness phase happens to be current; a retained terminal
+    // wake already appended to the real queue can then remain stranded behind that fixture state.
+    // The test PhaseInterceptor deliberately suppresses automatic starts, so install the replay as
+    // the next phase, select it, and then start it explicitly.
+    game.scene.phaseManager.unshiftPhase(replay);
+    game.scene.phaseManager.shiftPhase();
     replay.start();
     await new Promise(r => setTimeout(r, 0));
     for (let i = 0; i < 32; i++) {
@@ -1145,9 +1152,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   });
 
   // (E) GAME-OVER RENDER (#633 GAP 6): the host's run ended; the guest renderer must show the
-  // game-over screen instead of hanging the lost wave. waveResolved("gameOver") now queues the
-  // guest's GameOverPhase (isVictory=false) - the coop-safe render path (no per-client retry prompt).
-  it('GAME-OVER RENDER (#633 GAP 6): waveResolved("gameOver") makes the guest queue GameOverPhase', async () => {
+  // game-over screen instead of hanging the lost wave. The retained WAVE_ADVANCE transaction (not
+  // the legacy raw cue) queues the guest's GameOverPhase (isVictory=false) at a safe phase boundary -
+  // the coop-safe render path (no per-client retry prompt).
+  it("GAME-OVER RENDER (#633 GAP 6): retained gameOver transaction makes the guest queue GameOverPhase", async () => {
     await startCoopGuest();
     const turn = globalScene.currentBattle.turn;
     const partner = getCoopRuntime()!.partnerTransport!;
@@ -1167,7 +1175,8 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     await new Promise(r => setTimeout(r, 0));
 
     const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
-    // Drive the replay turn + drain the deferred finalize, which consumes the pending gameOver outcome.
+    // Drive the replay through the real phase queue. The retained terminal supersedes the impossible
+    // resolution wait and the already-appended boundary consumes the pending gameOver outcome.
     await driveReplayTurn(turn);
 
     // The guest queued the game-over render (so a lost run shows the screen, not a hang), and NOT a
