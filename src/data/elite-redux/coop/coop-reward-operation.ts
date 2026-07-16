@@ -143,13 +143,23 @@ export function setCoopRewardAuthorityStateHooksForTest(hooks: CoopRewardAuthori
 interface RewardWatcherState {
   ordinal: number;
   ordinalStart: number;
-  ordinalSurfaceKey: string;
-  lastAdoptedStart: number;
   lastLeftStart: number;
 }
 
 function freshWatcherState(): RewardWatcherState {
-  return { ordinal: 0, ordinalStart: -1, ordinalSurfaceKey: "", lastAdoptedStart: -1, lastLeftStart: -1 };
+  return { ordinal: 0, ordinalStart: -1, lastLeftStart: -1 };
+}
+
+/** Cross-stream ordering plus independent same-pin terminal fences for every ordered reward surface. */
+interface RewardWatcherRoleState {
+  /** Highest pin adopted on any reward/market stream. Rejects leftovers from superseded interactions. */
+  lastAdoptedStart: number;
+  /** Ordinal and terminal fence keyed by semantic stream; two P36 surfaces may legitimately share one pin. */
+  readonly streams: Map<string, RewardWatcherState>;
+}
+
+function freshWatcherRoleState(): RewardWatcherRoleState {
+  return { lastAdoptedStart: -1, streams: new Map<string, RewardWatcherState>() };
 }
 
 /** ACTION ORDINAL stride: pin * STRIDE + ordinal must not overflow into the next pin's op-id space. */
@@ -157,6 +167,10 @@ export const COOP_REWARD_ACTION_STRIDE = 100_000;
 
 /** Disjoint action range for the ambient stream and each of the at most 16 P36 Mystery surfaces. */
 export const COOP_REWARD_SURFACE_ACTION_STRIDE = 5_000;
+
+/** Existing cursor mirror reserves six bits for rerolls; P36 adds a disjoint ordered-surface namespace. */
+export const COOP_REWARD_MIRROR_REROLL_STRIDE = 64;
+export const COOP_ME_REWARD_MIRROR_SEQ_BASE = 1_000_000_000;
 
 function rewardSurfaceKey(rewardSurface?: CoopRewardSurfaceIdentity): string {
   return rewardSurface == null ? "ambient" : `${rewardSurface.ordinal}:${rewardSurface.surfaceId}`;
@@ -209,6 +223,39 @@ export function coopRewardOperationActionSlot(
   return Number.isSafeInteger(slot) ? slot : null;
 }
 
+/**
+ * Stable cosmetic cursor address. Ambient rewards retain their historical formula; ordered Mystery
+ * surfaces use a disjoint range so neither another surface at the same pin nor the next ambient pin can
+ * replay buffered buttons into this screen.
+ */
+export function coopRewardMirrorSeq(
+  pinned: number,
+  reroll: number,
+  rewardSurface?: CoopRewardSurfaceIdentity,
+): number | null {
+  if (
+    !Number.isSafeInteger(pinned)
+    || pinned < 0
+    || !Number.isSafeInteger(reroll)
+    || reroll < 0
+    || (rewardSurface != null && !isValidCoopRewardSurfaceIdentity(rewardSurface))
+  ) {
+    return null;
+  }
+  const rerollSlot = Math.min(reroll, COOP_REWARD_MIRROR_REROLL_STRIDE - 1);
+  if (rewardSurface == null) {
+    const seq = pinned * COOP_REWARD_MIRROR_REROLL_STRIDE + rerollSlot;
+    return Number.isSafeInteger(seq) ? seq : null;
+  }
+  const surfacePlanStride = COOP_ME_REWARD_SURFACE_LIMIT * COOP_REWARD_MIRROR_REROLL_STRIDE;
+  const seq =
+    COOP_ME_REWARD_MIRROR_SEQ_BASE
+    + pinned * surfacePlanStride
+    + rewardSurface.ordinal * COOP_REWARD_MIRROR_REROLL_STRIDE
+    + rerollSlot;
+  return Number.isSafeInteger(seq) ? seq : null;
+}
+
 /** Arm one journal-led action before its production sink feeds the real reward/market FIFO. */
 export function armCoopRewardJournalMaterialization(operationId: string, pinned: number): void {
   const s = state();
@@ -225,6 +272,7 @@ interface PreparedRewardIntent {
   readonly wave: number;
   readonly turn: number;
   readonly localRole: CoopRole;
+  readonly watcherRoleState?: RewardWatcherRoleState;
   readonly watcherState?: RewardWatcherState;
   executing: boolean;
   watcherAdvanced: boolean;
@@ -268,7 +316,7 @@ interface RewardOpState {
   /** Complete result state already installed on this receiver, but not necessarily materialized into its UI yet. */
   readonly stateAppliedOperations: Set<string>;
   /** Per-peer watcher state. Dual-engine tests share one JS realm; real peers do not share these cursors either. */
-  readonly watcherStateByRole: Record<CoopRole, RewardWatcherState>;
+  readonly watcherStateByRole: Record<CoopRole, RewardWatcherRoleState>;
   /** The owner's per-interaction monotonic action ordinal (for the committed op-id). Reset when the pin changes. */
   ownerOrdinal: number;
   ownerOrdinalStart: number;
@@ -291,7 +339,7 @@ registerCoopOpSurfaceState(
     journalLeadingStarts: new Set<number>(),
     pendingJournalMaterializations: new Set<string>(),
     stateAppliedOperations: new Set<string>(),
-    watcherStateByRole: { host: freshWatcherState(), guest: freshWatcherState() },
+    watcherStateByRole: { host: freshWatcherRoleState(), guest: freshWatcherRoleState() },
     ownerOrdinal: 0,
     ownerOrdinalStart: -1,
     ownerOrdinalSurfaceKey: "",
@@ -406,8 +454,8 @@ export function resetCoopRewardOperationState(): void {
   s.stateAppliedOperations.clear();
   s.preparedIntents.clear();
   s.committedResultEnvelopes.clear();
-  s.watcherStateByRole.host = freshWatcherState();
-  s.watcherStateByRole.guest = freshWatcherState();
+  s.watcherStateByRole.host = freshWatcherRoleState();
+  s.watcherStateByRole.guest = freshWatcherRoleState();
   s.ownerOrdinal = 0;
   s.ownerOrdinalStart = -1;
   s.ownerOrdinalSurfaceKey = "";
@@ -591,17 +639,22 @@ function nextOwnerOrdinal(s: RewardOpState, pinned: number, rewardSurface?: Coop
 function watcherState(
   s: RewardOpState,
   role: CoopRole,
+  surface: CoopShopSurface,
   pinned: number,
   rewardSurface?: CoopRewardSurfaceIdentity,
-): RewardWatcherState {
-  const ws = s.watcherStateByRole[role];
-  const surfaceKey = rewardSurfaceKey(rewardSurface);
-  if (ws.ordinalStart !== pinned || ws.ordinalSurfaceKey !== surfaceKey) {
-    ws.ordinal = 0;
-    ws.ordinalStart = pinned;
-    ws.ordinalSurfaceKey = surfaceKey;
+): { readonly roleState: RewardWatcherRoleState; readonly streamState: RewardWatcherState } {
+  const roleState = s.watcherStateByRole[role];
+  const streamKey = `${surface}:${rewardSurfaceKey(rewardSurface)}`;
+  let streamState = roleState.streams.get(streamKey);
+  if (streamState == null) {
+    streamState = freshWatcherState();
+    roleState.streams.set(streamKey, streamState);
   }
-  return ws;
+  if (streamState.ordinalStart !== pinned) {
+    streamState.ordinal = 0;
+    streamState.ordinalStart = pinned;
+  }
+  return { roleState, streamState };
 }
 
 // -----------------------------------------------------------------------------
@@ -809,12 +862,12 @@ export function commitRewardAuthoritativeResult(
 }
 
 function advancePreparedWatcher(prepared: PreparedRewardIntent): void {
-  if (prepared.watcherState == null || prepared.watcherAdvanced) {
+  if (prepared.watcherRoleState == null || prepared.watcherState == null || prepared.watcherAdvanced) {
     return;
   }
   prepared.watcherAdvanced = true;
   prepared.watcherState.ordinal += 1;
-  prepared.watcherState.lastAdoptedStart = Math.max(prepared.watcherState.lastAdoptedStart, prepared.pinned);
+  prepared.watcherRoleState.lastAdoptedStart = Math.max(prepared.watcherRoleState.lastAdoptedStart, prepared.pinned);
   if (prepared.terminal) {
     prepared.watcherState.lastLeftStart = Math.max(prepared.watcherState.lastLeftStart, prepared.pinned);
   }
@@ -868,17 +921,23 @@ export function adoptRewardWatcherChoice(
   }
   try {
     const s = state(binding);
-    const ws = watcherState(s, params.localRole, params.pinned, params.rewardSurface);
+    const { roleState, streamState: ws } = watcherState(
+      s,
+      params.localRole,
+      params.surface,
+      params.pinned,
+      params.rewardSurface,
+    );
     // Stale / late rejection (invariant 6, the #861 shape). The pinned interaction counter is monotonic, so:
     //  - a pick STRICTLY BELOW the highest interaction we have adopted at is a leftover from an interaction a
     //    later one already superseded (the cross-interaction stale buffer);
     //  - a pick AT OR BELOW the highest interaction we have LEFT is a late choice for an interaction we
     //    already terminated (the late-after-leave shape).
     // Within a live interaction (pin > both) every action passes, so a legitimate stream of buys is adopted.
-    if (params.pinned < ws.lastAdoptedStart || params.pinned <= ws.lastLeftStart) {
+    if (params.pinned < roleState.lastAdoptedStart || params.pinned <= ws.lastLeftStart) {
       coopWarn(
         "reward",
-        `${params.surface} op WATCHER REJECT stale/late pin=${params.pinned} adoptedStart=${ws.lastAdoptedStart} leftStart=${ws.lastLeftStart} role=${params.localRole} (Wave-2d)`,
+        `${params.surface} op WATCHER REJECT stale/late pin=${params.pinned} adoptedStart=${roleState.lastAdoptedStart} leftStart=${ws.lastLeftStart} stream=${rewardSurfaceKey(params.rewardSurface)} role=${params.localRole} (Wave-2d)`,
       );
       return { adopt: false, reason: "stale-or-late" };
     }
@@ -927,6 +986,7 @@ export function adoptRewardWatcherChoice(
           wave: params.wave,
           turn: params.turn ?? 0,
           localRole: "host",
+          watcherRoleState: roleState,
           watcherState: ws,
           executing: true,
           watcherAdvanced: false,
@@ -967,7 +1027,7 @@ export function adoptRewardWatcherChoice(
         // The authoritative host applies its validated guest-owned action at this safe phase seam.
         // The remote guest remains envelope-gated and merely ACKs/dedupes its already-proposed action.
         ws.ordinal += 1;
-        ws.lastAdoptedStart = Math.max(ws.lastAdoptedStart, params.pinned);
+        roleState.lastAdoptedStart = Math.max(roleState.lastAdoptedStart, params.pinned);
         if (params.terminal) {
           ws.lastLeftStart = Math.max(ws.lastLeftStart, params.pinned);
         }
@@ -988,7 +1048,7 @@ export function adoptRewardWatcherChoice(
     if (guest(binding).hasApplied(opId)) {
       if (params.action.operationId === opId && s.pendingJournalMaterializations.delete(opId)) {
         ws.ordinal += 1;
-        ws.lastAdoptedStart = Math.max(ws.lastAdoptedStart, params.pinned);
+        roleState.lastAdoptedStart = Math.max(roleState.lastAdoptedStart, params.pinned);
         if (params.terminal) {
           ws.lastLeftStart = Math.max(ws.lastLeftStart, params.pinned);
         }
@@ -1026,7 +1086,7 @@ export function adoptRewardWatcherChoice(
 
     // Advance the watcher order + ordinal ONLY on a successful adoption (§8.2: never on the owner's commit).
     ws.ordinal += 1;
-    ws.lastAdoptedStart = Math.max(ws.lastAdoptedStart, params.pinned);
+    roleState.lastAdoptedStart = Math.max(roleState.lastAdoptedStart, params.pinned);
     if (params.terminal) {
       ws.lastLeftStart = Math.max(ws.lastLeftStart, params.pinned);
     }

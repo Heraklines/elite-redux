@@ -332,6 +332,47 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
     logs.flush();
   });
 
+  it("ADVERSARIAL P36: leaving surface A does not reject surface B at the same Mystery pin", () => {
+    installDirectGuestRewardRuntime();
+    const START = 12;
+    const firstSurface = { surfaceId: "modifier:me:graves:0", ordinal: 0 } as const;
+    const secondSurface = { surfaceId: "modifier:me:graves:1", ordinal: 1 } as const;
+
+    const firstLeave = adoptRewardWatcherChoice({
+      surface: "reward",
+      rewardSurface: firstSurface,
+      pinned: START,
+      action: { choice: -1, rewardSurface: firstSurface },
+      terminal: true,
+      localRole: "guest",
+      wave: 11,
+    });
+    expect(firstLeave.adopt, "surface A terminal is adopted").toBe(true);
+
+    const secondAction = adoptRewardWatcherChoice({
+      surface: "reward",
+      rewardSurface: secondSurface,
+      pinned: START,
+      action: { choice: 0, data: [0], rewardSurface: secondSurface },
+      terminal: false,
+      localRole: "guest",
+      wave: 11,
+    });
+    expect(secondAction.adopt, "surface B owns an independent same-pin ordinal and terminal fence").toBe(true);
+
+    const lateFirstAction = adoptRewardWatcherChoice({
+      surface: "reward",
+      rewardSurface: firstSurface,
+      pinned: START,
+      action: { choice: 1, data: [0], rewardSurface: firstSurface },
+      terminal: false,
+      localRole: "guest",
+      wave: 11,
+    });
+    expect(lateFirstAction).toEqual({ adopt: false, reason: "stale-or-late" });
+    logs.flush();
+  });
+
   it("ADVERSARIAL c: a CONTINUATION action on the SAME pinned interaction KEEPS its operation identity (#866)", () => {
     installDirectGuestRewardRuntime();
     const START = 10; // even -> host owns, guest watches

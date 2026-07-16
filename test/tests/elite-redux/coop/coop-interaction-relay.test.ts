@@ -123,6 +123,27 @@ describe("co-op alternating-interaction relay (#633)", () => {
     expect(await awaited).toBeNull();
   });
 
+  it("routes same-pin reward choices only to their exact ordered Mystery surface", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopInteractionRelay(host);
+    const watcher = new CoopInteractionRelay(guest);
+    const firstSurface = { surfaceId: "modifier:me:graves:0", ordinal: 0 } as const;
+    const secondSurface = { surfaceId: "modifier:me:graves:1", ordinal: 1 } as const;
+
+    owner.sendInteractionChoice(12, "reward", COOP_INTERACTION_LEAVE, undefined, firstSurface);
+    owner.sendInteractionChoice(12, "reward", 0, [0], secondSurface);
+    await Promise.resolve();
+
+    expect(
+      await watcher.awaitInteractionChoice(12, 1000, ["reward"], secondSurface),
+      "surface B skips a buffered surface-A terminal even though seq and kind match",
+    ).toMatchObject({ choice: 0, rewardSurface: secondSurface });
+    expect(await watcher.awaitInteractionChoice(12, 1000, ["reward"], firstSurface)).toMatchObject({
+      choice: COOP_INTERACTION_LEAVE,
+      rewardSurface: firstSurface,
+    });
+  });
+
   // Fix #2 (#633): the OWNER host-streams its rolled reward-option list so the WATCHER
   // rebuilds it instead of re-rolling (party luck would diverge the pools + the RNG cursor).
   describe("reward-option streaming (#633 Fix #2)", () => {

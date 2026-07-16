@@ -4,8 +4,11 @@
  */
 
 import {
+  COOP_ME_REWARD_MIRROR_SEQ_BASE,
   COOP_REWARD_ACTION_STRIDE,
+  COOP_REWARD_MIRROR_REROLL_STRIDE,
   COOP_REWARD_SURFACE_ACTION_STRIDE,
+  coopRewardMirrorSeq,
   coopRewardOperationActionSlot,
   isValidCoopRewardSurfaceIdentity,
 } from "#data/elite-redux/coop/coop-reward-operation";
@@ -35,5 +38,17 @@ describe("ordered Mystery reward surface identity", () => {
     expect(isValidCoopRewardSurfaceIdentity({ surfaceId: "modifier:17", ordinal: 16 })).toBe(false);
     expect(coopRewardOperationActionSlot(7, COOP_REWARD_SURFACE_ACTION_STRIDE, first)).toBeNull();
     expect(coopRewardOperationActionSlot(7, 0, { surfaceId: "modifier:17", ordinal: 16 })).toBeNull();
+  });
+
+  it("isolates same-pin cursor streams from other surfaces and the next ambient interaction", () => {
+    const firstSeq = coopRewardMirrorSeq(7, 0, first);
+    const secondSeq = coopRewardMirrorSeq(7, 0, second);
+    const firstReroll = coopRewardMirrorSeq(7, 1, first);
+
+    expect(firstSeq).toBe(COOP_ME_REWARD_MIRROR_SEQ_BASE + 7 * 16 * COOP_REWARD_MIRROR_REROLL_STRIDE);
+    expect(secondSeq).toBe((firstSeq ?? -1) + COOP_REWARD_MIRROR_REROLL_STRIDE);
+    expect(firstReroll).toBe((firstSeq ?? -1) + 1);
+    expect(firstSeq).not.toBe(coopRewardMirrorSeq(8, 0));
+    expect(coopRewardMirrorSeq(7, 0)).toBe(7 * COOP_REWARD_MIRROR_REROLL_STRIDE);
   });
 });
