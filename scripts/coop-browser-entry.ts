@@ -22,6 +22,8 @@ const [
   { Command },
   { MoveId },
   { PokemonModifierType },
+  { SettingsDisplayUiHandler },
+  { SettingsUiHandler },
   { StatusEffect },
   { UiMode },
 ] = await Promise.all([
@@ -34,6 +36,8 @@ const [
   import("../src/enums/command"),
   import("../src/enums/move-id"),
   import("../src/modifier/modifier-type"),
+  import("../src/ui/settings/settings-display-ui-handler"),
+  import("../src/ui/settings/settings-ui-handler"),
   import("../src/enums/status-effect"),
   import("../src/enums/ui-mode"),
 ]);
@@ -765,8 +769,13 @@ function semanticBattleAddress(battle: { waveIndex: number; turn: number } | nul
 function observeRenderProfile(): void {
   try {
     const handler = globalScene?.ui?.getHandler();
-    const handlerName = handler?.constructor?.name;
-    if (!handler?.active || (handlerName !== "SettingsUiHandler" && handlerName !== "SettingsDisplayUiHandler")) {
+    const handlerName =
+      handler instanceof SettingsUiHandler
+        ? "SettingsUiHandler"
+        : handler instanceof SettingsDisplayUiHandler
+          ? "SettingsDisplayUiHandler"
+          : null;
+    if (!handler?.active || handlerName == null) {
       // A later Settings visit must emit a fresh attestation even when the saved value
       // did not change (the speed setup opens Settings before the render-profile pass).
       lastObservedRenderProfile = "";
