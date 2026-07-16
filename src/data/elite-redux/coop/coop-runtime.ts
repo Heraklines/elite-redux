@@ -1436,6 +1436,42 @@ function retainedWaveContinuationIsPublic(staged: CoopStagedWaveAdvanceTransacti
   }
 }
 
+function retainedWaveContinuationAckProof(
+  staged: CoopStagedWaveAdvanceTransaction,
+  phaseOwnedSurface?: CoopPhaseOwnedWaveContinuationSurface,
+): { surface: "command" | "sharedInput" | "terminal"; address: { epoch: number; wave: number; turn: number } } | null {
+  const payload = staged.envelope.pendingOperation?.payload as CoopWaveAdvancePayload;
+  const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+  const currentTurn = globalScene.currentBattle?.turn ?? -1;
+  if (!Number.isSafeInteger(currentWave) || currentWave < 0 || !Number.isSafeInteger(currentTurn) || currentTurn < 0) {
+    return null;
+  }
+  let surface: "command" | "sharedInput" | "terminal" | null = null;
+  if (
+    payload.outcome === "gameOver"
+    || ((payload.outcome === "win" || payload.outcome === "capture") && payload.nextWave === payload.wave)
+  ) {
+    surface = "terminal";
+  } else if (
+    phaseOwnedSurface != null
+    || globalScene.phaseManager?.getCurrentPhase()?.phaseName === "SelectBiomePhase"
+  ) {
+    surface = "sharedInput";
+  } else {
+    try {
+      surface = coopAuthorityContinuationSurface(globalScene.ui.getMode());
+    } catch {
+      return null;
+    }
+  }
+  return surface == null
+    ? null
+    : {
+        surface,
+        address: { epoch: staged.envelope.sessionEpoch, wave: currentWave, turn: currentTurn },
+      };
+}
+
 function maybeMarkCoopWaveContinuationReady(
   wave: number,
   binding: CoopWaveAdvanceOperationBinding,
@@ -1453,7 +1489,14 @@ function maybeMarkCoopWaveContinuationReady(
     markCoopWaveAdvanceContinuationReady(wave, binding);
     coopLog("progression", `retained WAVE_ADVANCE continuationReady wave=${wave}`);
   }
-  return isCoopWaveAdvanceTransactionComplete(wave, binding);
+  const complete = isCoopWaveAdvanceTransactionComplete(wave, binding);
+  if (complete) {
+    const proof = retainedWaveContinuationAckProof(staged, phaseOwnedSurface);
+    if (proof != null) {
+      binding.durability?.completeRetainedWaveAdvance(staged.envelope, proof.surface, proof.address);
+    }
+  }
+  return complete;
 }
 
 /**
@@ -1462,9 +1505,9 @@ function maybeMarkCoopWaveContinuationReady(
  * constructing a phase or receiving an envelope cannot mark the transaction ready. Idempotent and a hard
  * no-op outside the retained authoritative guest path.
  *
- * Reward/shop phases call this after their UI promise commits. WAVE_ADVANCE uses a plain durability ACK
- * after staging (so it is not a generic deferred-operation receipt); without this engine-owned wake, a
- * transaction that correctly waited in BattleEnd could apply DATA yet never record its later public surface.
+ * Reward/shop phases call this after their UI promise commits. WAVE_ADVANCE advances receive ordering at
+ * staging but keeps the host's immutable journal entry retained; this engine-owned wake publishes its exact
+ * DATA-applied + destination-continuation proof so a transaction can neither release early nor wait forever.
  */
 export interface CoopRetainedWaveContinuationAddress {
   readonly wave: number;

@@ -209,7 +209,7 @@ describe("protocol-33 retained operation continuation lifecycle", () => {
     }
   });
 
-  it("parks a later plain wave ACK behind an earlier operation until its continuation is ready", async () => {
+  it("retains a staged wave independently until its DATA-bound destination proof is published", async () => {
     const pair = createLoopbackPair();
     const host = new CoopDurabilityManager(pair.host);
     const guest = new CoopDurabilityManager(pair.guest, {
@@ -244,14 +244,22 @@ describe("protocol-33 retained operation continuation lifecycle", () => {
       await flush();
 
       expect(guest.appliedMarks()).toEqual({ "op:global": 2 });
-      expect(
-        host.unackedCount(),
-        "a later cumulative wave ACK cannot jump the reward's missing continuation proof",
-      ).toBe(2);
+      expect(host.unackedCount(), "cursor admission cannot retire either retained operation").toBe(2);
 
       expect(guest.notifyOperationContinuationSurface("sharedInput", { epoch: 7, wave: 10, turn: 3 })).toBe(1);
       await flush();
-      expect(host.unackedCount(), "the contiguous prefix releases only after both exact proofs exist").toBe(0);
+      expect(host.unackedCount(), "the reward releases, but the staged wave remains retained").toBe(1);
+
+      expect(
+        guest.notifyOperationContinuationSurface("sharedInput", { epoch: 7, wave: 10, turn: 3 }),
+        "a generic source-wave UI cannot release WAVE_ADVANCE",
+      ).toBe(0);
+      expect(
+        guest.completeRetainedWaveAdvance(wave, "sharedInput", { epoch: 7, wave: 10, turn: 3 }),
+        "only the wave adapter's DATA + destination proof releases its transaction",
+      ).toBe(true);
+      await flush();
+      expect(host.unackedCount(), "the contiguous prefix releases after both exact proofs exist").toBe(0);
     } finally {
       host.dispose();
       guest.dispose();

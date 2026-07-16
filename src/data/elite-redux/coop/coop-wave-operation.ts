@@ -1145,12 +1145,13 @@ function applyJournaledWaveEnvelope(
   }
   // Once RECEIVED + STAGED, the staged transaction OWNS this wave's lifecycle: its DATA applies ONLY at the
   // real BattleEnd boundary (BattleEndPhase is the deterministic wake - battle-end-phase.ts - not a retry
-  // timer) and its continuation latch is marked separately (maybeMarkCoopWaveContinuationReady). The journal
-  // cursor must therefore NOT wait on dataApplied/continuationReady: holding it there double-gates the staged
+  // timer) and its continuation latch is marked separately (maybeMarkCoopWaveContinuationReady). The shared
+  // receive cursor must therefore NOT wait on dataApplied/continuationReady: holding it there double-gates the
   // transaction's job onto the SHARED receive cursor and DEADLOCKS the same-boundary reward RESULT
   // (op:global seq+1), which has to apply at the PRE-BattleEnd shop for the guest to reach BattleEnd at all
-  // (soak seed 987654321 wave 1: "owner terminal never arrived"). The WAVE_ADVANCE plain ACK is already
-  // continuation-safe (coop-durability.ts:670-672); layering the UI stages on top is the redundant gate.
+  // (soak seed 987654321 wave 1: "owner terminal never arrived"). Cursor admission and host retention are
+  // deliberately separate: durability advances ordering here but withholds final release until the wave
+  // adapter publishes its exact DATA-applied + destination-continuation proof.
   //
   // A genuinely-absent revision never reaches here - inspectEnvelope above gates on rev == clock+1 - so
   // advancing the cursor is conditional on the op being RECEIVED, never mere absence: global-revision gap
@@ -1195,7 +1196,7 @@ function applyJournaledWaveEnvelope(
     "runtime",
     `wave-advance op JOURNAL cursor-advanced id=${preflight.operationId} rev=${envelope.revision} `
       + `dataApplied=${stagedTxn?.dataApplied === true} continuationReady=${stagedTxn?.continuationReady === true} `
-      + "(DATA applies at BattleEnd; plain ACK is continuation-safe)",
+      + "(DATA applies at BattleEnd; retained ACK awaits DATA + destination continuation)",
   );
   return "applied";
 }

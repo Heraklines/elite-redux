@@ -696,7 +696,7 @@ function isSafeOperationAddressPart(value: unknown, allowZero = true): value is 
   return Number.isSafeInteger(value) && (allowZero ? (value as number) >= 0 : (value as number) > 0);
 }
 
-function operationAuthorityFor(
+function retainedOperationAuthorityFor(
   cls: string,
   seq: number,
   msg: CoopMessage,
@@ -705,12 +705,6 @@ function operationAuthorityFor(
     return null;
   }
   const envelope = msg.envelope;
-  // WAVE_ADVANCE already withholds its durability apply outcome until immutable DATA and its explicit
-  // continuation latch are both ready. Its eventual plain ACK is therefore already continuation-safe;
-  // layering the generic UI stages on top would double-gate the same retained transaction.
-  if (envelope.pendingOperation?.kind === "WAVE_ADVANCE") {
-    return null;
-  }
   if (
     !isSafeOperationAddressPart(envelope.sessionEpoch, false)
     || !isSafeOperationAddressPart(envelope.wave)
@@ -735,6 +729,32 @@ function operationAuthorityFor(
     },
     expectedSurface: envelope.logicalPhase === "GAME_OVER" ? "terminal" : "sharedBoundary",
   };
+}
+
+interface PendingRetainedWaveAck {
+  authority: CoopOperationAuthorityAddress;
+  canonicalEnvelope: string;
+  completed: boolean;
+  ackChain:
+    | readonly [
+        Extract<CoopMessage, { t: "coopAck" }>,
+        Extract<CoopMessage, { t: "coopAck" }>,
+        Extract<CoopMessage, { t: "coopAck" }>,
+      ]
+    | null;
+}
+
+/** Generic operations publish material evidence at apply, then UI stages. WAVE_ADVANCE is completed only
+ * by its dedicated DATA + destination adapter, so receiver-side generic staging must not claim it applied. */
+function operationAuthorityFor(
+  cls: string,
+  seq: number,
+  msg: CoopMessage,
+): { authority: CoopOperationAuthorityAddress; expectedSurface: "sharedBoundary" | "terminal" } | null {
+  if (msg.t === "envelope" && msg.envelope.pendingOperation?.kind === "WAVE_ADVANCE") {
+    return null;
+  }
+  return retainedOperationAuthorityFor(cls, seq, msg);
 }
 
 function operationAuthorityKey(authority: CoopOperationAuthorityAddress): string {
@@ -909,6 +929,8 @@ export class CoopDurabilityManager {
   private readonly pendingOperationContinuations = new Map<string, PendingOperationContinuation>();
   /** Guest: latest canonical stage, retained so duplicate envelopes re-ACK without reapplying. */
   private readonly guestOperationAckEvidence = new Map<string, OperationAckEvidence>();
+  /** Guest: staged WAVE_ADVANCE entries whose receive cursor advanced but whose DATA/control proof is due. */
+  private readonly pendingRetainedWaveAcks = new Map<string, PendingRetainedWaveAck>();
   /** Host: latest accepted exact stage; material/presentation evidence never releases the journal. */
   private readonly hostOperationAckEvidence = new Map<string, OperationAckEvidence>();
   /** Host: later plain cumulative ACKs parked behind an earlier operation that still lacks UI readiness. */
@@ -1025,7 +1047,7 @@ export class CoopDurabilityManager {
       coopWarn("durability", `commit journal retention THREW cls=${cls} seq=${seq}`, e);
       return false;
     }
-    const operation = operationAuthorityFor(cls, seq, msg);
+    const operation = retainedOperationAuthorityFor(cls, seq, msg);
     if (operation != null) {
       this.recordOperationCausalStage(operation.authority, "retained");
     }
@@ -1092,7 +1114,7 @@ export class CoopDurabilityManager {
     if (msg.t === "coopAck") {
       const retained = this.journal.entry(msg.cls, msg.seq);
       const retainedOperation =
-        retained == null ? null : operationAuthorityFor(retained.cls, retained.seq, retained.msg);
+        retained == null ? null : retainedOperationAuthorityFor(retained.cls, retained.seq, retained.msg);
       if (retainedOperation != null || msg.stage != null || msg.operationId != null) {
         // Operation envelopes use exact ordered evidence. A legacy/material-only cumulative ACK can never
         // discard the canonical result before the receiver proves its real continuation surface opened.
@@ -1123,11 +1145,31 @@ export class CoopDurabilityManager {
   /** Receiver: apply an inbound committed op idempotently by `(cls, seq)` (§1.6), then ACK / request tail. */
   private receiveOp(cls: string, seq: number, msg: CoopMessage): void {
     const operation = operationAuthorityFor(cls, seq, msg);
+    const retainedOperation = retainedOperationAuthorityFor(cls, seq, msg);
+    const retainedWaveAuthority =
+      operation == null
+      && retainedOperation != null
+      && msg.t === "envelope"
+      && msg.envelope.pendingOperation?.kind === "WAVE_ADVANCE"
+        ? retainedOperation
+        : null;
     if (this.ledger.isDuplicate(cls, seq)) {
       this.clearDeferred(cls);
       this.clearRecoveryAfterProgress(cls);
       // Already applied (a safe resend, §4.2): re-ACK so the committer stops resending, do NOT re-apply.
-      if (operation == null) {
+      if (retainedWaveAuthority != null) {
+        const key = operationAuthorityKey(retainedWaveAuthority.authority);
+        const pending = this.pendingRetainedWaveAcks.get(key);
+        if (pending?.completed === true && pending.ackChain != null) {
+          for (const ack of pending.ackChain) {
+            try {
+              this.transport.send(ack);
+            } catch (error) {
+              coopWarn("durability", `retained WAVE_ADVANCE ACK-chain resend deferred key=${key}`, error);
+            }
+          }
+        }
+      } else if (operation == null) {
         this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
       } else {
         this.reackDuplicateOperation(operation.authority);
@@ -1190,6 +1232,27 @@ export class CoopDurabilityManager {
     }
     this.ledger.markApplied(cls, seq);
     this.clearRecoveryAfterProgress(cls);
+    if (retainedWaveAuthority != null) {
+      const key = operationAuthorityKey(retainedWaveAuthority.authority);
+      const canonicalEnvelope = JSON.stringify(msg);
+      const prior = this.pendingRetainedWaveAcks.get(key);
+      if (prior != null && prior.canonicalEnvelope !== canonicalEnvelope) {
+        coopWarn("durability", `retained WAVE_ADVANCE canonical conflict key=${key} -> no ACK`);
+        this.requestBoundedRecovery(cls, seq, "apply-rejected", retainedWaveAuthority.authority);
+        return;
+      }
+      this.pendingRetainedWaveAcks.set(key, {
+        authority: retainedWaveAuthority.authority,
+        canonicalEnvelope,
+        completed: false,
+        ackChain: null,
+      });
+      this.pruneCompletedRetainedWaveAcks();
+      // Ordering is applied, so later same-boundary operations may drain. Authority stays silent until the
+      // wave adapter proves the exact embedded DATA and its destination continuation.
+      this.drainDeferredFollowers(cls);
+      return;
+    }
     if (operation == null) {
       this.transport.send({ t: "coopAck", cls, seq });
       this.drainDeferredFollowers(cls);
@@ -1237,6 +1300,100 @@ export class CoopDurabilityManager {
       this.receiveOp(pending.entry.cls, pending.entry.seq, pending.entry.msg);
     }
     return retried;
+  }
+
+  /**
+   * Complete one exact staged WAVE_ADVANCE after its adapter proves immutable DATA application and a real
+   * destination continuation. Receive ordering already advanced at staging; these exact stages affect only
+   * host retention, so later same-boundary operations never deadlock behind the wave transaction.
+   */
+  completeRetainedWaveAdvance(
+    envelope: Extract<CoopMessage, { t: "envelope" }>["envelope"],
+    surface: CoopOperationContinuationSurface,
+    current: CoopOperationContinuationAddress,
+  ): boolean {
+    if (this.disposed || envelope.pendingOperation?.kind !== "WAVE_ADVANCE") {
+      return false;
+    }
+    const msg: Extract<CoopMessage, { t: "envelope" }> = { t: "envelope", envelope };
+    const extracted = this.hooks.extractKey?.(msg) ?? null;
+    if (extracted == null) {
+      return false;
+    }
+    const retained = retainedOperationAuthorityFor(extracted.cls, extracted.seq, msg);
+    if (
+      retained == null
+      || !operationContinuationMatches(retained.expectedSurface, retained.authority, surface, current)
+    ) {
+      return false;
+    }
+    const key = operationAuthorityKey(retained.authority);
+    const pending = this.pendingRetainedWaveAcks.get(key);
+    if (
+      pending == null
+      || pending.canonicalEnvelope !== JSON.stringify(msg)
+      || this.ledger.appliedThrough(extracted.cls) < extracted.seq
+    ) {
+      return false;
+    }
+    if (pending.completed) {
+      const evidence = this.guestOperationAckEvidence.get(key);
+      if (evidence?.stage === "continuationReady") {
+        this.transport.send(evidence.value);
+        return true;
+      }
+      return false;
+    }
+    const material = this.sendOperationAck(retained.authority, "materialApplied");
+    if (material == null) {
+      return false;
+    }
+    const presentation = this.sendOperationAck(retained.authority, "presentationReady", surface, current);
+    if (presentation == null) {
+      return false;
+    }
+    const continuation = this.sendOperationAck(retained.authority, "continuationReady", surface, current);
+    if (continuation == null) {
+      return false;
+    }
+    pending.ackChain = [material, presentation, continuation];
+    pending.completed = true;
+    this.pruneCompletedRetainedWaveAcks();
+    return true;
+  }
+
+  /**
+   * A completed wave proof must survive long enough to answer a lost-final-ACK replay, but it must not grow
+   * for the lifetime of a long run. Keep at most one journal window of completed evidence; an incomplete
+   * entry is never evicted because that would strand its host-side canonical transaction.
+   */
+  private pruneCompletedRetainedWaveAcks(): void {
+    while (this.pendingRetainedWaveAcks.size > this.deferredFollowerLimit) {
+      const oldestCompleted = [...this.pendingRetainedWaveAcks].find(([, pending]) => pending.completed);
+      if (oldestCompleted == null) {
+        return;
+      }
+      const [key] = oldestCompleted;
+      this.pendingRetainedWaveAcks.delete(key);
+      this.guestOperationAckEvidence.delete(key);
+    }
+  }
+
+  private clearRetainedWaveAcks(): void {
+    for (const key of this.pendingRetainedWaveAcks.keys()) {
+      this.guestOperationAckEvidence.delete(key);
+    }
+    this.pendingRetainedWaveAcks.clear();
+  }
+
+  private discardRetainedWaveAcksThrough(marks: Record<string, number>): void {
+    for (const [key, pending] of this.pendingRetainedWaveAcks) {
+      if ((marks[pending.authority.cls] ?? 0) < pending.authority.seq) {
+        continue;
+      }
+      this.pendingRetainedWaveAcks.delete(key);
+      this.guestOperationAckEvidence.delete(key);
+    }
   }
 
   private deferApply(entry: CoopJournalEntry): void {
@@ -1558,7 +1715,7 @@ export class CoopDurabilityManager {
   }
 
   private acceptOperationAck(msg: Extract<CoopMessage, { t: "coopAck" }>, retained: CoopJournalEntry | null): void {
-    const admitted = retained == null ? null : operationAuthorityFor(retained.cls, retained.seq, retained.msg);
+    const admitted = retained == null ? null : retainedOperationAuthorityFor(retained.cls, retained.seq, retained.msg);
     if (admitted == null) {
       if (
         isOperationAckStage(msg.stage)
@@ -1673,9 +1830,8 @@ export class CoopDurabilityManager {
 
   /**
    * Record a normal cumulative ACK without allowing it to jump an earlier retained operation. The shared
-   * `op:global` stream intentionally mixes generic UI operations with transactions such as WAVE_ADVANCE,
-   * whose DATA+continuation latch emits a plain ACK. A later plain ACK proves that later transaction, but
-   * it cannot prove the earlier reward/shop/event surface opened.
+   * `op:global` stream intentionally mixes retained UI operations with ordinary cumulative entries. A later
+   * plain ACK proves only those ordinary entries; it cannot prove an earlier reward/shop/event surface opened.
    */
   private acceptCumulativeAck(cls: string, seq: number): void {
     const highWater = this.journal.highWaterMark(cls);
@@ -1700,7 +1856,7 @@ export class CoopDurabilityManager {
         coopWarn("durability", `retain ACK at journal gap cls=${cls} expected=${through + 1} got=${entry.seq}`);
         break;
       }
-      const admitted = operationAuthorityFor(entry.cls, entry.seq, entry.msg);
+      const admitted = retainedOperationAuthorityFor(entry.cls, entry.seq, entry.msg);
       if (admitted != null) {
         const key = operationAuthorityKey(admitted.authority);
         if (this.hostOperationAckEvidence.get(key)?.stage !== "continuationReady") {
@@ -2119,7 +2275,7 @@ export class CoopDurabilityManager {
     const tail = this.journal.tailFrom(cls, from);
     coopLog("durability", `resync cls=${cls} from=${from} -> replay ${tail.length} entries`);
     for (const e of tail) {
-      const operation = operationAuthorityFor(e.cls, e.seq, e.msg);
+      const operation = retainedOperationAuthorityFor(e.cls, e.seq, e.msg);
       if (operation != null) {
         this.recordOperationCausalStage(operation.authority, "delivery-retry", "reason=tail-request");
       }
@@ -2195,7 +2351,7 @@ export class CoopDurabilityManager {
       if (tail.length > 0) {
         coopLog("durability", `${reason} resend cls=${cls} unacked=${tail.length}`);
         for (const e of tail) {
-          const operation = operationAuthorityFor(e.cls, e.seq, e.msg);
+          const operation = retainedOperationAuthorityFor(e.cls, e.seq, e.msg);
           if (operation != null) {
             this.recordOperationCausalStage(operation.authority, "delivery-retry", `reason=${reason}`);
           }
@@ -2281,6 +2437,9 @@ export class CoopDurabilityManager {
       return false;
     }
     this.committedSnapshotAcks.set(controlDigest, ack);
+    // The committed snapshot proof now owns recovery through these exact frontiers. Retaining an older
+    // incomplete WAVE receipt would leak memory and could answer a stale replay after the snapshot superseded it.
+    this.discardRetainedWaveAcksThrough(normalized);
     while (this.committedSnapshotAcks.size > SNAPSHOT_FRONTIER_RETENTION) {
       const oldest = this.committedSnapshotAcks.keys().next().value as string | undefined;
       if (oldest == null) {
@@ -2309,6 +2468,7 @@ export class CoopDurabilityManager {
     }
     this.operationDeliveryRetries.clear();
     this.pendingCumulativeAcks.clear();
+    this.clearRetainedWaveAcks();
     this.retainedSnapshotFrontiers.clear();
     this.committedSnapshotAcks.clear();
     this.tracedOperationStages.clear();
@@ -2344,6 +2504,7 @@ export class CoopDurabilityManager {
     }
     this.operationDeliveryRetries.clear();
     this.pendingOperationContinuations.clear();
+    this.clearRetainedWaveAcks();
     for (const [key] of this.pendingHostOperationContinuations) {
       this.settleOperationMaterialWaiters(key, false);
     }

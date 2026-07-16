@@ -44,7 +44,7 @@ import {
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
-import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
+import type { CoopAuthoritativeBattleStateV1, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import {
   applyCoopWaveAdvanceEnvelopeForBinding,
@@ -343,7 +343,7 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     // OLD double-gate this returned "deferred" until DATA+continuationReady, holding the shared receive cursor
     // at this wave-advance and DEADLOCKING a same-boundary reward RESULT (op:global seq+1) that has to apply at
     // the pre-BattleEnd shop. The staged transaction ALREADY owns DATA (applied at the real BattleEnd) + the
-    // continuation latch, so the journal cursor must advance at staging; its plain ACK is continuation-safe.
+    // continuation latch, so the journal cursor must advance at staging while host retention remains separate.
     registerCoopOperationLiveSink("op:wave", () => false);
     const pair = createLoopbackPair();
     const hostMgr = new CoopDurabilityManager(pair.host);
@@ -366,7 +366,7 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
       false,
     );
 
-    // DATA applies + continuation latches SEPARATELY (invariant b), in the enforced order, needing no second ACK.
+    // DATA applies + continuation latches SEPARATELY (invariant b), in the enforced order.
     expect(markCoopWaveAdvanceContinuationReady(13), "CONTROL cannot latch before DATA").toBe(false);
     expect(markCoopWaveAdvanceDataApplied(13)).toBe(true);
     expect(markCoopWaveAdvanceContinuationReady(13)).toBe(true);
@@ -484,7 +484,7 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     expect(getCoopStagedWaveAdvanceTransaction(1)?.dataApplied).toBe(true);
   });
 
-  it("advances the cursor + plain-ACKs at staging (no recovery budget consumed, no retry timer), then applies its DATA once at the real BattleEnd wake", async () => {
+  it("advances the cursor at staging but retains authority until BattleEnd DATA and destination readiness", async () => {
     const scheduler = new ManualScheduler();
     const failures: unknown[] = [];
     let battleEndOpen = false;
@@ -525,13 +525,13 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
 
     commitHostWave(14);
     await flush();
-    // The wave-advance is NOT retained/deferred: it advances the shared cursor and plain-ACKs at staging (its
-    // ACK is continuation-safe), so a legitimate Victory->BattleEnd delay consumes ZERO recovery budget and
-    // never sits in the deferred timer - this is exactly what unblocks a same-boundary reward RESULT (seq+1).
+    // The wave-advance is not receive-deferred: it advances the shared cursor, so a legitimate
+    // Victory->BattleEnd delay consumes ZERO recovery budget and cannot block a same-boundary reward RESULT
+    // (seq+1). Host retention is independent and remains until DATA + destination readiness are proven.
     expect(failures, "a non-deferred op consumes no recovery budget").toEqual([]);
     expect(guestMgr.appliedMarks(), "the shared cursor advanced at staging").toEqual({ "op:global": 1 });
-    expect(hostMgr.unackedCount(), "the plain ACK retired the journal entry (continuation-safe)").toBe(0);
-    expect(ackCount, "exactly one plain ACK at staging").toBe(1);
+    expect(hostMgr.unackedCount(), "cursor admission cannot retire the retained wave transaction").toBe(1);
+    expect(ackCount, "staging emits no authority proof before DATA and destination readiness").toBe(0);
     // ...but the wave DATA has NOT applied yet (invariant b: only at the real boundary).
     expect(appliedStateTicks, "DATA did not apply before BattleEnd").toEqual([]);
     expect(getCoopStagedWaveAdvanceTransaction(14)?.dataApplied, "wave DATA still pending pre-boundary").toBe(false);
@@ -539,11 +539,11 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     // Advancing the deferred timer past the old 9.1s window does nothing - the op was never deferred.
     scheduler.advance(9_200);
     await flush();
-    expect(ackCount, "no retry timer fires for a non-deferred op").toBe(1);
+    expect(ackCount, "no receiver recovery timer fires for a non-deferred op").toBe(0);
     expect(failures).toEqual([]);
     hostMgr.reconnect();
     await flush();
-    expect(ackCount, "an exact duplicate resend re-ACKs (anti-spin) but never re-applies").toBeGreaterThanOrEqual(1);
+    expect(ackCount, "a duplicate before completion stays silent and never claims early authority").toBe(0);
 
     // Reaching the real BattleEnd boundary applies the immutable DATA image exactly once; then continuation latches.
     battleEndOpen = true;
@@ -552,6 +552,27 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     expect(getCoopStagedWaveAdvanceTransaction(14)?.dataApplied).toBe(true);
     expect(markCoopWaveAdvanceContinuationReady(14), "continuation latches after DATA").toBe(true);
     expect(isCoopWaveAdvanceTransactionComplete(14)).toBe(true);
+    const completed = getCoopStagedWaveAdvanceTransaction(14)!;
+    expect(
+      guestMgr.completeRetainedWaveAdvance(completed.envelope, "sharedInput", {
+        epoch: completed.envelope.sessionEpoch,
+        wave: 14,
+        turn: completed.envelope.turn,
+      }),
+    ).toBe(true);
+    await flush();
+    expect(hostMgr.unackedCount(), "exact retained-wave continuation proof releases the host journal").toBe(0);
+    expect(ackCount, "completion publishes the three ordered exact authority stages").toBe(3);
+    expect(
+      guestMgr.completeRetainedWaveAdvance(completed.envelope, "sharedInput", {
+        epoch: completed.envelope.sessionEpoch,
+        wave: 14,
+        turn: completed.envelope.turn,
+      }),
+      "a repeated adapter wake idempotently republishes the exact final proof",
+    ).toBe(true);
+    await flush();
+    expect(ackCount, "the completed duplicate republishes only continuationReady").toBe(4);
     expect(
       tryApplyCoopWaveAdvanceDataAtBoundary(14),
       "an already-admitted DATA image is idempotent and cannot call the engine applier twice",
@@ -756,9 +777,10 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
   // ===========================================================================================
   // ANTI-SPIN: a DUPLICATE journal apply still ACKs (never break this invariant).
   // ===========================================================================================
-  it("a re-delivered already-consumed wave-advance ACKs (duplicate), so the committer's resend loop terminates", async () => {
+  it("re-ACKs the exact final proof when its first continuationReady frame is lost", async () => {
     registerCoopOperationLiveSink("op:wave", env => completeWaveEnvelope(env));
-    const sentAcks: string[] = [];
+    const sentAcks: Extract<CoopMessage, { t: "coopAck" }>[] = [];
+    let dropFirstFinalAck = true;
     const pair = createLoopbackPair();
     // Count coopAck frames the guest sends.
     const guestInner = pair.guest;
@@ -770,9 +792,15 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
       get state() {
         return guestInner.state;
       },
-      send: (msg: { t: string }) => {
-        sentAcks.push(msg.t);
-        return guestInner.send(msg as never);
+      send: (msg: CoopMessage) => {
+        if (msg.t === "coopAck") {
+          sentAcks.push(msg);
+          if (msg.stage === "continuationReady" && dropFirstFinalAck) {
+            dropFirstFinalAck = false;
+            return;
+          }
+        }
+        return guestInner.send(msg);
       },
       onMessage: guestInner.onMessage.bind(guestInner),
       onStateChange: guestInner.onStateChange.bind(guestInner),
@@ -784,14 +812,31 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
 
     commitHostWave(40);
     await flush();
-    // Force a re-delivery of the same committed op; the second apply is a duplicate that must STILL ACK.
+    const completed = getCoopStagedWaveAdvanceTransaction(40)!;
+    expect(
+      guestMgr.completeRetainedWaveAdvance(completed.envelope, "sharedInput", {
+        epoch: completed.envelope.sessionEpoch,
+        wave: 40,
+        turn: completed.envelope.turn,
+      }),
+    ).toBe(true);
+    await flush();
+    expect(hostMgr.unackedCount(), "a lost final proof keeps the canonical host transaction retained").toBe(1);
+
+    // Force a re-delivery of the same committed op. The guest must not reapply it, but must republish the
+    // canonical continuationReady evidence so the host's resend loop can terminate.
     hostMgr.reconnect();
     await flush();
 
-    expect(
-      sentAcks.filter(t => t === "coopAck").length,
-      "a duplicate re-delivery still ACKs (anti-spin)",
-    ).toBeGreaterThan(0);
+    expect(sentAcks.map(ack => ack.stage)).toEqual([
+      "materialApplied",
+      "presentationReady",
+      "continuationReady",
+      "materialApplied",
+      "presentationReady",
+      "continuationReady",
+    ]);
+    expect(hostMgr.unackedCount(), "the duplicate final proof releases the retained host transaction").toBe(0);
     expect(sinkWaves(), "but it routes to the live sink only once").toEqual([40]);
     hostMgr.dispose();
     guestMgr.dispose();
