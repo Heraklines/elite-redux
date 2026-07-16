@@ -26,6 +26,11 @@ const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) wave=(\d+) turn=(\d+) rev=(\d+)/u;
 const SHARED_SESSION_TERMINAL = /\[coop:runtime\] shared session (?:terminal requested|stopped safely):/u;
 const LAUNCH_SNAPSHOT_ABORT = /launchSnapshotAbort wave=\d+ reason=/u;
+const DATA_FINGERPRINT =
+  /dataFingerprint compute moveMap=([^\s(]+)\((\d+)\) movesData=([^\s(]+)\((\d+)\) movesName=([^\s(]+)\((\d+)\) movesets=([^\s(]+)\((\d+)\) abilitiesData=([^\s(]+)\((\d+)\) abilitiesName=([^\s(]+)\((\d+)\)/u;
+const FUNCTIONAL_FINGERPRINT_MISMATCH = /FUNCTIONAL MISMATCH sections=/u;
+const COMPATIBLE_FINGERPRINT =
+  /MATCH - data tables identical across clients|PRESENTATION MISMATCH sections=.* - simulation compatible -/u;
 const POST_TURN_PHASE_PROGRESS = /Start Phase ([A-Za-z0-9]+Phase)/u;
 const POST_TURN_AUTHORITY_PROGRESS = /\[coop:turn\] host recorder: append turn=\d+ seq=(\d+)/u;
 const POST_TURN_RENDERER_PROGRESS = /\[coop:replay\] guest replay turn=\d+: live increment seq=(\d+)\.\.(\d+)/u;
@@ -55,6 +60,23 @@ const COMMANDER_POST_TURN_PROGRESS_ALLOWANCE_MS = 150_000;
 // keeps the acceptance window open until the accept lands (see driveSelfHealingPairing).
 const LOBBY_REQUEST_REISSUE_MS = 10_000;
 const OPTIONAL_LOBBY_RELAY_WAIT_MS = 1_500;
+
+function primaryLanguage(locale) {
+  return locale.trim().toLowerCase().split("-")[0];
+}
+
+function parseFunctionalFingerprint(event, label) {
+  const match = DATA_FINGERPRINT.exec(event.text ?? "");
+  if (match == null) {
+    throw new Error(`${label}: malformed dataFingerprint compute evidence`);
+  }
+  return Object.freeze({
+    moveMap: Object.freeze({ hash: match[1], n: Number(match[2]) }),
+    movesData: Object.freeze({ hash: match[3], n: Number(match[4]) }),
+    movesets: Object.freeze({ hash: match[7], n: Number(match[8]) }),
+    abilitiesData: Object.freeze({ hash: match[9], n: Number(match[10]) }),
+  });
+}
 
 function semanticOptionId(label) {
   return label
@@ -1042,11 +1064,25 @@ export class PublicUiClient {
    * clear it deterministically here instead of relying on the next game keystroke to do it.
    */
   async clearDomInputFocus() {
-    await this.page.evaluate(() => {
+    const observedLocale = await this.page.evaluate(() => {
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
       }
+      return {
+        navigatorLanguage: navigator.language,
+        persistedLanguage: localStorage.getItem("prLang"),
+      };
     });
+    const expectedLocale = this.config.locales[this.label];
+    if (
+      primaryLanguage(observedLocale.navigatorLanguage) !== primaryLanguage(expectedLocale)
+      || primaryLanguage(observedLocale.persistedLanguage ?? "") !== primaryLanguage(expectedLocale)
+    ) {
+      throw new Error(
+        `${this.label}: browser/app locale mismatch expected=${expectedLocale} navigator=${observedLocale.navigatorLanguage} persisted=${observedLocale.persistedLanguage}`,
+      );
+    }
+    this.evidence.record("browser-locale-proof", { expectedLocale, ...observedLocale });
   }
 
   async visibleInputHandles(selector) {
@@ -1569,7 +1605,7 @@ export class DuoPublicUiRig {
   }
 
   static async launch(config) {
-    const launchBrowser = () =>
+    const launchBrowser = locale =>
       puppeteer.launch({
         headless: config.headless,
         defaultViewport: config.viewport,
@@ -1594,10 +1630,14 @@ export class DuoPublicUiRig {
           "--use-gl=angle",
           "--use-angle=swiftshader-webgl",
           "--enable-unsafe-swiftshader",
+          `--lang=${locale}`,
           `--window-size=${config.viewport.width},${config.viewport.height}`,
         ],
       });
-    const launchResults = await Promise.allSettled([launchBrowser(), launchBrowser()]);
+    const launchResults = await Promise.allSettled([
+      launchBrowser(config.locales["host-seat"]),
+      launchBrowser(config.locales["guest-seat"]),
+    ]);
     const browsers = launchResults.flatMap(result => (result.status === "fulfilled" ? [result.value] : []));
     const launchFailure = launchResults.find(result => result.status === "rejected");
     if (launchFailure) {
@@ -1690,8 +1730,54 @@ export class DuoPublicUiRig {
     // for a binding that only the launch action produces.
     this.pairRoleCursors = roleCursors;
     await this.driveSelfHealingPairing(requester, acceptor, roleCursors);
+    await this.assertPairingFunctionalFingerprintMatch(roleCursors);
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("paired-awaiting-launch")));
     return { requester, acceptor };
+  }
+
+  /** Prove differently localized production clients built identical simulation tables. */
+  async assertPairingFunctionalFingerprintMatch(roleCursors) {
+    const proofs = await Promise.all(
+      Object.values(this.clients).map(async client => {
+        const from = roleCursors[client.label];
+        const fingerprintEvent = await client.evidence.waitFor(DATA_FINGERPRINT, {
+          from,
+          timeoutMs: this.config.timeoutMs,
+          description: "local ER data fingerprint computation",
+        });
+        const compatibilityEvent = await client.evidence.waitForCondition(
+          sink => {
+            const mismatch = sink.find(FUNCTIONAL_FINGERPRINT_MISMATCH, from);
+            if (mismatch != null) {
+              throw new Error(`${client.label}: ${mismatch.text}`);
+            }
+            return sink.find(COMPATIBLE_FINGERPRINT, from);
+          },
+          {
+            timeoutMs: this.config.timeoutMs,
+            description: "peer functional fingerprint compatibility verdict",
+          },
+        );
+        return {
+          client,
+          fingerprint: parseFunctionalFingerprint(fingerprintEvent, client.label),
+          compatibilityEvent,
+        };
+      }),
+    );
+    const [first, second] = proofs;
+    if (JSON.stringify(first.fingerprint) !== JSON.stringify(second.fingerprint)) {
+      throw new Error(
+        `paired browsers computed different functional fingerprints: ${first.client.label}=${JSON.stringify(first.fingerprint)} ${second.client.label}=${JSON.stringify(second.fingerprint)}`,
+      );
+    }
+    for (const proof of proofs) {
+      proof.client.evidence.record("pairing-functional-fingerprint-proof", {
+        expectedLocale: this.config.locales[proof.client.label],
+        functionalFingerprint: proof.fingerprint,
+        compatibilityEvidenceIndex: proof.compatibilityEvent.index,
+      });
+    }
   }
 
   /**
