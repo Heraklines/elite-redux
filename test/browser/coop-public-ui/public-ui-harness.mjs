@@ -259,6 +259,21 @@ function findOwnedReadyReward(client, from) {
     : null;
 }
 
+function findOwnedReadyReplacement(client, from) {
+  const semantic = client.evidence.findLastSemanticSurface(from, "party:replacement");
+  return semantic?.observation.operationClass === "replacement"
+    && semantic.observation.ownerModel === "interaction"
+    && semantic.observation.phase === "SwitchPhase"
+    && semantic.observation.uiMode === "PARTY"
+    && semantic.observation.localSeat === client.publicSeat
+    && semantic.observation.ownerSeat === client.publicSeat
+    && semantic.observation.seatsWithInput?.includes(client.publicSeat)
+    && semantic.observation.ready?.handlerActive === true
+    && semantic.observation.ready.inputBlocked !== true
+    ? semantic
+    : null;
+}
+
 function sameAddress(left, right) {
   return left?.epoch === right?.epoch && left?.wave === right?.wave && left?.turn === right?.turn;
 }
@@ -2211,7 +2226,7 @@ export class DuoPublicUiRig {
         if (!allowFaint) {
           throw new Error("Unexpected faint picker in the wave-1 journey; use faint-replacement with prepared saves");
         }
-        await this.driveReplacement(outcome.client);
+        await this.driveReplacement(outcome.client, outcomeCursors);
       }
       if (outcome.kind === "command") {
         // Command ownership opens sequentially: submitting the first owner's next-turn command is
@@ -2450,7 +2465,7 @@ export class DuoPublicUiRig {
     throw new Error("Timed out waiting for public post-turn command, faint, or reward evidence");
   }
 
-  async driveReplacement(client = null) {
+  async driveReplacement(client = null, from = null) {
     let owner = client;
     if (!owner) {
       owner = this.client(this.config.faintOwnerSeat);
@@ -2458,6 +2473,30 @@ export class DuoPublicUiRig {
         timeoutMs: this.config.timeoutMs,
         description: "configured owner SwitchPhase for faint replacement",
       });
+    }
+    const replacementCursors =
+      from ?? Object.fromEntries(Object.values(this.clients).map(value => [value.label, value.evidence.cursor()]));
+    const advanceBattlePrompt = createBattlePromptAdvancer(this, replacementCursors, {}, "faint-replacement-picker");
+    const deadline = Date.now() + this.config.timeoutMs;
+    let replacementSurface = null;
+    while (Date.now() < deadline) {
+      replacementSurface = findOwnedReadyReplacement(owner, replacementCursors[owner.label]);
+      if (replacementSurface != null) {
+        break;
+      }
+      const terminal =
+        owner.evidence.find(SHARED_SESSION_TERMINAL, replacementCursors[owner.label])
+        ?? owner.evidence.find(LAUNCH_SNAPSHOT_ABORT, replacementCursors[owner.label]);
+      if (terminal != null) {
+        throw new Error(`${owner.label}: shared session terminated before the replacement picker: ${terminal.text}`);
+      }
+      if (await advanceBattlePrompt()) {
+        continue;
+      }
+      await delay(100);
+    }
+    if (replacementSurface == null) {
+      throw new Error(`${owner.label}: timed out waiting for an actionable owned replacement picker`);
     }
     await owner.checkpoint("faint-replacement-picker");
     const replacementCursor = owner.evidence.cursor();
