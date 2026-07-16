@@ -13,6 +13,7 @@ import {
   applyErNewcomerSpeciesTmCompatibility,
   injectErNewcomerSpecies,
 } from "#data/elite-redux/er-newcomer-species";
+import { applyErTypeNativization } from "#data/elite-redux/er-type-nativization";
 import {
   initEliteReduxCSourceCorrections,
   remapEliteReduxMoveIdsByName,
@@ -388,4 +389,15 @@ export function initializeGame() {
   // is complete.
   const newcomerSpeciesTms = applyErNewcomerSpeciesTmCompatibility();
   console.info(`[er-newcomer-species] wired ${newcomerSpeciesTms} species TM sets`);
+
+  // Type-nativization sweep (Pass A): remove every type-grant ability from its
+  // holder, give the granted type NATIVELY (setExtraTypes), and put the per-mon
+  // replacement in the freed slot. Runs LAST so it is authoritative over the
+  // editor ability overrides.
+  const nativization = applyErTypeNativization();
+  console.info(
+    `[er-type-nativization] set ${nativization.extraTypesSet} native types, swapped ${nativization.abilitiesSwapped} abilities`
+      + `${nativization.unresolved.length > 0 ? `; unresolved: ${nativization.unresolved.join(", ")}` : ""}`
+      + `${nativization.notFound.length > 0 ? `; grant-not-found: ${nativization.notFound.join(", ")}` : ""}`,
+  );
 }
