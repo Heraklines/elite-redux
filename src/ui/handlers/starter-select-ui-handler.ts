@@ -2635,6 +2635,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           ) {
             options = [
               {
+                semanticId: "add-to-party",
                 label: i18next.t("starterSelectUiHandler:addToParty"),
                 handler: () => {
                   ui.setMode(UiMode.STARTER_SELECT);
@@ -2674,6 +2675,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             // if it already exists in your party, it will give you the option to remove from your party
             options = [
               {
+                semanticId: "remove-from-party",
                 label: i18next.t("starterSelectUiHandler:removeFromParty"),
                 handler: () => {
                   this.popStarter(removeIndex);
@@ -7355,6 +7357,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             // before launching. Hovering a mode shows what it does (#368) in
             // the message box under the option list.
             const difficultyOption = (difficulty: ErDifficulty, key: string) => ({
+              semanticId: key.toLowerCase(),
               label: i18next.t(`starterSelectUiHandler:difficulty${key}`),
               onHover: () => {
                 // Show in THIS screen's message box. `ui.showText` would route

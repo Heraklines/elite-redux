@@ -9,7 +9,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { EvidenceSink, fatalCoopConsoleReason } from "./evidence.mjs";
+import { EvidenceSink, fatalCoopConsoleReason, isExpectedLocaleFallbackError } from "./evidence.mjs";
 
 const fatalLines = [
   "[coop:ASSERT] turn=3 CHECKSUM MISMATCH #1 (severity=log): authoritative payload failed",
@@ -90,6 +90,24 @@ test("does not confuse healthy convergence, deferred readiness, reconnect, or re
   for (const line of benignLines) {
     assert.equal(fatalCoopConsoleReason(line), null, line);
   }
+});
+
+test("only non-English locale JSON 404s are classified as expected i18next fallback probes", () => {
+  const error = "Failed to load resource: the server responded with a status of 404 (Not Found)";
+  for (const locale of ["de", "fr", "ja", "zh-Hans", "ar", "ru", "future-locale"]) {
+    assert.equal(isExpectedLocaleFallbackError("error", error, `https://game.test/locales/${locale}/menu.json`), true);
+  }
+  assert.equal(isExpectedLocaleFallbackError("error", error, "https://game.test/locales/en/menu.json"), false);
+  assert.equal(isExpectedLocaleFallbackError("error", error, "https://game.test/assets/missing.json"), false);
+  assert.equal(isExpectedLocaleFallbackError("warning", error, "https://game.test/locales/de/menu.json"), false);
+  assert.equal(
+    isExpectedLocaleFallbackError(
+      "error",
+      "Failed to load resource: status of 500",
+      "https://game.test/locales/de/menu.json",
+    ),
+    false,
+  );
 });
 
 test("EvidenceSink fails on warning-level recovery and an allowlisted checksum error", async () => {

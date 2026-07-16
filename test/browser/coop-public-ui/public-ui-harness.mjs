@@ -89,15 +89,6 @@ function parseFunctionalFingerprint(event, label) {
   });
 }
 
-function semanticOptionId(label) {
-  return label
-    .replace(/\[[^\]]*\]/gu, "")
-    .replace(/[^a-zA-Z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "")
-    .toLowerCase()
-    .slice(0, 40);
-}
-
 function classifyPostTurnProgress(event) {
   if (
     event.kind === "browser-surface2"
@@ -1219,7 +1210,7 @@ export class PublicUiClient {
     username,
     { purpose = "request", timeoutMs = this.config.timeoutMs, relayTimeoutMs = timeoutMs, optional = false } = {},
   ) {
-    const targetId = semanticOptionId(`Ask ${username} to play`);
+    const targetId = `ask:${username}`;
     let requestCursor = this.evidence.cursor();
     try {
       await this.waitForLobbyPlayer(username, timeoutMs);
@@ -1869,7 +1860,7 @@ export class DuoPublicUiRig {
             const acceptCursor = acceptor.evidence.cursor();
             await selectOptionById(acceptor, {
               surfaceId: "option-select:TitlePhase",
-              targetId: semanticOptionId(`Accept ${requesterName}`),
+              targetId: `accept:${requesterName}`,
               navKeys: ["ArrowUp", "ArrowDown"],
               timeoutMs: LOBBY_REQUEST_REISSUE_MS,
               fromCursor: roleCursors[acceptor.label],
@@ -2532,9 +2523,7 @@ export class DuoPublicUiRig {
   }
 
   async waitForPostTurnOutcome(from, { expectedCommandAddress = null, progressBudgetOptions = {} } = {}) {
-    const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, "public-ui-post-turn", {
-      expectedCommandAddress,
-    });
+    let advanceBattlePrompt = null;
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs, progressBudgetOptions);
     let partialGameOver = [];
     while (Date.now() < progressBudget.observe()) {
@@ -2576,6 +2565,9 @@ export class DuoPublicUiRig {
       // before accepting the frontier; returning first strands the renderer and makes the
       // next sequential round observe only one real browser. Structural reward/faint
       // outcomes above retain priority over cosmetic prompt advancement.
+      advanceBattlePrompt ??= createBattlePromptAdvancer(this, from, {}, "public-ui-post-turn", {
+        expectedCommandAddress,
+      });
       if (await advanceBattlePrompt()) {
         continue;
       }

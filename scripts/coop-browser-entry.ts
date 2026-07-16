@@ -472,15 +472,6 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
   }
 }
 
-function normalizeOptionId(label: string): string {
-  return label
-    .replace(/\[[^\]]*\]/gu, "")
-    .replace(/[^a-zA-Z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "")
-    .toLowerCase()
-    .slice(0, 40);
-}
-
 interface SelectionReadout {
   readonly selectedOptionId: string | null;
   readonly optionIds: readonly string[] | null;
@@ -489,8 +480,8 @@ interface SelectionReadout {
 
 /**
  * The visible options + selected id, where the handler exposes them publicly. Reward
- * options carry a stable modifier-type id; option-select menus expose only visible labels
- * (no native stable id - normalized label is the best-observable id, see the gap note).
+ * options carry a stable modifier-type id; option-select menus expose their explicit semantic id.
+ * Options which have not yet declared one remain driveable by ordinal slot, never by translated text.
  */
 function readSelection(handler: { getCursor(): number }, uiMode: string): SelectionReadout {
   let selectedIndex: number | null = null;
@@ -521,13 +512,13 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
     }
   }
   const optionHandler = handler as unknown as {
-    options?: Array<{ label?: unknown }>;
-    config?: { options?: Array<{ label?: unknown }> } | null;
+    options?: Array<{ semanticId?: unknown }>;
+    config?: { options?: Array<{ semanticId?: unknown }> } | null;
   };
   const listOptions = optionHandler.options ?? optionHandler.config?.options;
-  if (Array.isArray(listOptions) && listOptions.length > 0 && typeof listOptions[0]?.label === "string") {
+  if (Array.isArray(listOptions) && listOptions.length > 0) {
     const optionIds = listOptions.map((option, index) =>
-      typeof option?.label === "string" ? normalizeOptionId(option.label) || `slot:${index}` : `slot:${index}`,
+      typeof option?.semanticId === "string" && option.semanticId.length > 0 ? option.semanticId : `slot:${index}`,
     );
     return {
       selectedOptionId: selectedIndex == null ? null : (optionIds[selectedIndex] ?? `cursor:${selectedIndex}`),

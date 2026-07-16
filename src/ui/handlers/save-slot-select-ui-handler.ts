@@ -129,6 +129,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
             case SaveSlotUiMode.LOAD:
               if (!sessionSlot.malformed) {
                 manageDataOptions.push({
+                  semanticId: "load-game",
                   label: i18next.t("menu:loadGame"),
                   handler: () => {
                     globalScene.ui.revertMode();
@@ -139,6 +140,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
                 });
 
                 manageDataOptions.push({
+                  semanticId: "rename-run",
                   label: i18next.t("saveSlotSelectUiHandler:renameRun"),
                   handler: () => {
                     globalScene.ui.revertMode();
@@ -182,6 +184,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
               };
 
               manageDataOptions.push({
+                semanticId: "delete-run",
                 label: i18next.t("saveSlotSelectUiHandler:deleteRun"),
                 handler: () => {
                   globalScene.ui.revertMode();
@@ -220,6 +223,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
               });
 
               manageDataOptions.push({
+                semanticId: "cancel",
                 label: i18next.t("menuUiHandler:cancel"),
                 handler: () => {
                   globalScene.ui.revertMode();

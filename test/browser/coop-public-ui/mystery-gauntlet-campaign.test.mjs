@@ -132,7 +132,7 @@ test("parallel lobby pairing reselects the exact visible username before every r
     readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
     readFile(resolve(root, "src/phases/title-phase.ts"), "utf8"),
   ]);
-  assert.match(harness, /const targetId = semanticOptionId\(`Ask \$\{username\} to play`\)/u);
+  assert.match(harness, /const targetId = `ask:\$\{username\}`/u);
   assert.match(
     harness,
     /requestCursor = this\.evidence\.cursor\(\);[\s\S]*selectOptionById\(this, \{[\s\S]*surfaceId: "option-select:TitlePhase"[\s\S]*targetId,/u,
@@ -155,7 +155,7 @@ test("parallel lobby pairing reselects the exact visible username before every r
   assert.match(harness, /let nextReissueAt = Date\.now\(\)/u);
   assert.match(
     harness,
-    /incoming === requesterName[\s\S]*selectOptionById\(acceptor, \{[\s\S]*targetId: semanticOptionId\(`Accept \$\{requesterName\}`\)[\s\S]*timeoutMs: LOBBY_REQUEST_REISSUE_MS/u,
+    /incoming === requesterName[\s\S]*selectOptionById\(acceptor, \{[\s\S]*targetId: `accept:\$\{requesterName\}`[\s\S]*timeoutMs: LOBBY_REQUEST_REISSUE_MS/u,
   );
   assert.doesNotMatch(harness, /acceptor\.press\("Space", `lobby-accept-/u);
   assert.match(harness, /relayTimeoutMs: OPTIONAL_LOBBY_RELAY_WAIT_MS/u);
@@ -195,6 +195,28 @@ test("parallel lobby pairing reselects the exact visible username before every r
   );
   assert.ok(reissueMs > 6_200 && reissueMs <= 15_000);
   assert.ok(optionalRelayMs > 0 && optionalRelayMs < reissueMs);
+});
+
+test("semantic option identity is independent of every presentation language", async () => {
+  const [observer, optionType, gender, confirm, title, starter] = await Promise.all([
+    readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/abstract-option-select-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/select-gender-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/confirm-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/title-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+  ]);
+
+  assert.match(optionType, /semanticId\?: string/u);
+  assert.match(observer, /option\?\.semanticId === "string"[\s\S]*option\.semanticId[\s\S]*`slot:\$\{index\}`/u);
+  assert.doesNotMatch(observer, /normalizeOptionId|option\.label/u);
+  assert.match(gender, /semanticId: "boy"[\s\S]*semanticId: "girl"/u);
+  assert.match(confirm, /semanticId: "yes"[\s\S]*semanticId: "no"/u);
+  assert.match(title, /semanticId: "new-game"[\s\S]*semanticId: "co-op"/u);
+  assert.match(title, /semanticId: `ask:\$\{p\.name\}`/u);
+  assert.match(title, /semanticId: `accept:\$\{from\.name\}`/u);
+  assert.match(starter, /semanticId: "add-to-party"/u);
+  assert.match(starter, /semanticId: key\.toLowerCase\(\)/u);
 });
 
 test("paired Chromium runs headful at an explicit player-sized viewport", async () => {

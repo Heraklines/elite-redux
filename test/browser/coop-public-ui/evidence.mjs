@@ -366,6 +366,21 @@ function isExpectedMissingSystemSaveError(type, text, source, registerMode) {
   return missingSaveRead || missingSessionLog;
 }
 
+/**
+ * i18next deliberately falls back to the bundled English namespace when a selected locale has
+ * not translated that JSON resource. Chromium reports that ordinary fallback probe as a console
+ * error. Keep the 404 response in the evidence, but do not misclassify a successful non-English
+ * fallback as a game failure. English is never exempt: a missing fallback resource is real damage.
+ */
+export function isExpectedLocaleFallbackError(type, text, source) {
+  if (type !== "error" || !/Failed to load resource:.*status of 404/iu.test(text)) {
+    return false;
+  }
+  const path = parsedUrl(source)?.pathname;
+  const locale = typeof path === "string" ? /^\/locales\/([^/]+)\/.+\.json$/u.exec(path)?.[1] : null;
+  return locale != null && locale !== "en";
+}
+
 function accountView(body) {
   const account = Array.isArray(body) ? body[0] : body;
   if (!account || typeof account !== "object") {
@@ -968,10 +983,16 @@ export class EvidenceSink {
         source,
         this.expectedMissingSystemSaveErrors,
       );
-      if (expectedMissingSystemSave) {
+      const expectedLocaleFallback = isExpectedLocaleFallbackError(message.type(), text, source);
+      if (expectedMissingSystemSave || expectedLocaleFallback) {
         // A register-mode flag, not a countdown: a fresh account reads several missing saves
         // (system + session) before its first persist, so all such reads are expected.
-        this.record("console-error-expected", { source, reason: "fresh account has no persisted save yet" });
+        this.record("console-error-expected", {
+          source,
+          reason: expectedLocaleFallback
+            ? "selected locale falls back to the bundled English namespace"
+            : "fresh account has no persisted save yet",
+        });
       } else if (
         fatalCoopReason == null
         && message.type() === "error"

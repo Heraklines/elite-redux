@@ -151,6 +151,7 @@ export class TitlePhase extends Phase {
     // Add a "continue" menu if the session slot ID is >-1
     if (lastSessionSlot > NO_SAVE_SLOT) {
       options.push({
+        semanticId: "continue",
         label: i18next.t("continue", { ns: "menu" }),
         handler: () => {
           this.loadSaveSlot(lastSessionSlot);
@@ -160,6 +161,7 @@ export class TitlePhase extends Phase {
     }
     options.push(
       {
+        semanticId: "new-game",
         label: i18next.t("menu:newGame"),
         handler: () => {
           const setModeAndEnd = (gameMode: GameModes) => {
@@ -171,6 +173,7 @@ export class TitlePhase extends Phase {
           const { gameData } = globalScene;
           const options: OptionSelectItem[] = [];
           options.push({
+            semanticId: "classic",
             label: GameMode.getModeName(GameModes.CLASSIC),
             handler: () => {
               setModeAndEnd(GameModes.CLASSIC);
@@ -192,6 +195,7 @@ export class TitlePhase extends Phase {
             // A/B toggle are retired - authoritative is the one and only co-op netcode. Same
             // dev/beta/devTools gate.
             options.push({
+              semanticId: "co-op",
               label: GameMode.getModeName(GameModes.COOP),
               handler: () => {
                 this.openCoopLobby(setModeAndEnd, "authoritative");
@@ -221,6 +225,7 @@ export class TitlePhase extends Phase {
             });
           }
           options.push({
+            semanticId: "daily-run",
             label: i18next.t("menu:dailyRun"),
             handler: () => {
               this.initDailyRun();
@@ -327,6 +332,7 @@ export class TitlePhase extends Phase {
           }
           // Cancel button = back to title
           options.push({
+            semanticId: "cancel",
             label: i18next.t("menu:cancel"),
             handler: () => {
               globalScene.phaseManager.toTitleScreen();
@@ -343,6 +349,7 @@ export class TitlePhase extends Phase {
         },
       },
       {
+        semanticId: "load-game",
         label: i18next.t("menu:loadGame"),
         handler: () => {
           globalScene.ui.setOverlayMode(UiMode.SAVE_SLOT, SaveSlotUiMode.LOAD, (slotId: number) => {
@@ -814,6 +821,7 @@ export class TitlePhase extends Phase {
         const from = incoming;
         opts.push(
           {
+            semanticId: `accept:${from.name}`,
             label: `Accept ${from.name}`,
             handler: () => {
               incoming = null;
@@ -822,6 +830,7 @@ export class TitlePhase extends Phase {
             },
           },
           {
+            semanticId: "decline",
             label: "Decline",
             handler: () => {
               incoming = null;
@@ -859,6 +868,7 @@ export class TitlePhase extends Phase {
             initialCursor = optionIndex;
           }
           opts.push({
+            semanticId: `ask:${p.name}`,
             label: `Ask ${p.name} to play`,
             onHover: () => {
               lobbyActionRequiresReselection = false;
@@ -898,6 +908,7 @@ export class TitlePhase extends Phase {
         initialCursor = opts.length;
       }
       opts.push({
+        semanticId: "cancel",
         label: i18next.t("menu:cancel"),
         onHover: () => {
           lobbyActionRequiresReselection = false;
