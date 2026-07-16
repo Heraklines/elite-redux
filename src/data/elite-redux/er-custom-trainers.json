@@ -1488,23 +1488,172 @@
     "battleType": "double",
     "challenge": "none",
     "difficulties": [
-      "ace",
       "elite",
       "hell"
     ],
-    "endless": false,
+    "endless": true,
     "id": 70011,
-    "maxWave": 175,
-    "minWave": 120,
+    "maxWave": 180,
+    "minWave": 140,
     "name": "Dagoza",
     "team": [
       {
         "abilitySlot": 0,
         "level": null,
-        "species": 10863
+        "moves": [
+          "HYPNOSIS",
+          "NIGHTMARE",
+          "DREAM_EATER",
+          "PROTECT"
+        ],
+        "species": 10568
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "SCOPE_LENS"
+          },
+          {
+            "count": 2,
+            "item": "SCOPE_LENS"
+          },
+          {
+            "count": 1,
+            "item": "SHELL_BELL"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          },
+          {
+            "count": 2,
+            "item": "IRON"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "DARK_VOID",
+          "DREAM_EATER",
+          "PROTECT",
+          "MOONLIGHT"
+        ],
+        "shiny": {
+          "palette": "obsidian"
+        },
+        "species": 10769
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "HELPING_HAND",
+          "BLUE_FLARE",
+          "DAZZLING_GLEAM",
+          "CONFUSE_RAY"
+        ],
+        "species": 10654
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "NEVER_MELT_ICE"
+          },
+          {
+            "count": 1,
+            "item": "ER_ICE_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BLIZZARD",
+          "CURSE",
+          "ICE_SPINNER",
+          "RLNA"
+        ],
+        "species": 10533
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "MYSTIC_WATER"
+          },
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          }
+        ],
+        "insanity": {
+          "ability": 5285,
+          "innates": [
+            5045,
+            301,
+            130
+          ]
+        },
+        "level": null,
+        "moves": [
+          "MATCHA_GOTCHA",
+          "SCALD",
+          "BERRY_SMASH",
+          "TORMENT"
+        ],
+        "shiny": {
+          "around": "outline",
+          "name": "Spiked",
+          "palette": "cursed"
+        },
+        "species": 1013
+      },
+      {
+        "abilitySlot": 0,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 10582
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FAIRY_FEATHER"
+          },
+          {
+            "count": 1,
+            "item": "ER_FAIRY_GEM"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FAKE_OUT",
+          "SUCKER_PUNCH",
+          "MOONBLAST",
+          "MISTY_EXPLOSION"
+        ],
+        "species": 683
       }
     ],
     "trainerClass": "HEX_MANIAC",
-    "weight": 100
+    "weight": 50
   }
 }
