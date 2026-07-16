@@ -119,6 +119,8 @@ test("parallel lobby pairing reselects the exact visible username before every r
     harness,
     /selectOptionById\(this, \{[\s\S]*surfaceId: "option-select:TitlePhase"[\s\S]*targetId,[\s\S]*submit: false/u,
   );
+  assert.match(harness, /surface\?\.observation\.optionIds\?\.includes\(targetId\)/u);
+  assert.match(harness, /description: `visible lobby option for \$\{username\}`/u);
   assert.match(harness, /requester\.requestPlayer\(acceptorName, \{[\s\S]*purpose: "reissue-request"/u);
   assert.doesNotMatch(harness, /requester\.press\("Space", `lobby-reissue-request-/u);
 });
