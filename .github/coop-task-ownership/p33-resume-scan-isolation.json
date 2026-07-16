@@ -7,6 +7,7 @@
   "allowedFiles": [
     ".github/coop-task-ownership/p33-resume-scan-isolation.json",
     ".github/workflows/coop-public-ui-journey.yml",
+    "src/battle-scene.ts",
     "src/dev-tools/test-suite/scenarios.ts",
     "src/phases/title-phase.ts",
     "src/system/game-data.ts",
