@@ -1846,6 +1846,10 @@
           {
             "count": 1,
             "item": "SCOPE_LENS"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
           }
         ],
         "level": null,
@@ -1859,18 +1863,38 @@
         "species": 10238
       },
       {
-        "abilitySlot": 1,
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 3,
+            "item": "WIDE_LENS"
+          },
+          {
+            "count": 2,
+            "item": "MYSTICAL_ROCK"
+          }
+        ],
         "level": null,
         "moves": [
-          "MOONBLAST",
-          "MOONGEIST_BEAM",
-          "DARK_PULSE",
-          "QUIVER_DANCE"
+          "OMINOUS_WIND",
+          "EERIE_SPELL",
+          "HURRICANE",
+          "NASTY_PLOT"
         ],
-        "species": 10663
+        "species": 561
       },
       {
         "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "MYSTIC_WATER"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
         "level": null,
         "moves": [
           "AQUA_BASH",
@@ -1882,6 +1906,12 @@
       },
       {
         "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FAIRY_FEATHER"
+          }
+        ],
         "level": null,
         "moves": [
           "AQUA_CUTTER",
@@ -1893,6 +1923,12 @@
       },
       {
         "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "SITRUS_BERRY"
+          }
+        ],
         "level": null,
         "moves": [
           "STAR_CRASH",
@@ -1904,6 +1940,12 @@
       },
       {
         "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          }
+        ],
         "level": null,
         "moves": [
           "ASTONISH",
