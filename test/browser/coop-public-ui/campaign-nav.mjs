@@ -89,12 +89,26 @@ export async function waitForSemanticSurface(client, surfaceId, { fromCursor = 0
   return event;
 }
 
+/** Wait for a rendered option surface whose production handler will accept an action now. */
+export async function waitForActionableSemanticSurface(client, surfaceId, { fromCursor = 0, timeoutMs = 15_000 } = {}) {
+  return client.evidence.waitForCondition(
+    sink => {
+      const event = sink.findLastSemanticSurface(fromCursor, surfaceId);
+      return event?.observation.ready?.handlerActive === true && event.observation.ready.inputBlocked === false
+        ? event
+        : null;
+    },
+    { timeoutMs, description: `actionable semantic surface ${surfaceId}` },
+  );
+}
+
 /**
  * Select the visible starter, add it through its option menu, submit the team, and confirm.
  * Every transition is observed before the next public key is sent, so text animation or a slow
  * browser cannot reinterpret a later key on the previous screen.
  */
 export async function confirmDefaultStarterTeam(client, { timeoutMs = 15_000 } = {}) {
+  await waitForActionableSemanticSurface(client, "starter-select", { timeoutMs });
   const optionCursor = client.evidence.cursor();
   await client.press("Space", "starter-open-selected-options");
   await waitForSemanticSurface(client, "option-select:SelectStarterPhase", {
@@ -141,6 +155,7 @@ export async function confirmSeededStarterTeam(client, expectedSpecies, { timeou
     expectedSpeciesIds,
     observation: seeded.observation,
   });
+  await waitForActionableSemanticSurface(client, "starter-select", { timeoutMs });
   const confirmCursor = client.evidence.cursor();
   await client.press("Enter", "starter-submit-visible-seeded-team");
   await waitForSemanticSurface(client, "confirm:SelectStarterPhase", {
