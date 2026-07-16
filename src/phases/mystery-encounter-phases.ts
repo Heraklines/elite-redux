@@ -29,6 +29,8 @@ import {
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  type CoopMeBattleSettlementPlan,
+  commitCoopMeBattleSettlementAtBattleEnd as commitCoopMeBattleSettlementAfterRewardPreparation,
   coopSessionGeneration,
   failCoopSharedSession,
   getCoopBattleStreamer,
@@ -1245,11 +1247,18 @@ export class MysteryEncounterRewardsPhase extends Phase {
   public readonly phaseName = "MysteryEncounterRewardsPhase";
   addHealPhase: boolean;
   private readonly authoritativeRewardShop: boolean | null;
+  /** Compatibility settlement retained after automatic reward preparation on the authoritative host. */
+  private readonly meSettlementPlan: CoopMeBattleSettlementPlan | null;
 
-  constructor(addHealPhase = false, authoritativeRewardShop: boolean | null = null) {
+  constructor(
+    addHealPhase = false,
+    authoritativeRewardShop: boolean | null = null,
+    meSettlementPlan: CoopMeBattleSettlementPlan | null = null,
+  ) {
     super();
     this.addHealPhase = addHealPhase;
     this.authoritativeRewardShop = authoritativeRewardShop;
+    this.meSettlementPlan = meSettlementPlan;
   }
 
   /**
@@ -1297,17 +1306,16 @@ export class MysteryEncounterRewardsPhase extends Phase {
         hasDoEncounterRewards: !!guestEncounter.doEncounterRewards,
         addHealPhase: this.addHealPhase,
       });
-      if (guestEncounter.doEncounterRewards) {
-        guestEncounter.doEncounterRewards(); // unshifts the SelectModifierPhase the watcher runs
-      } else if (this.addHealPhase) {
-        globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
-        globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
-          fillRemaining: false,
-          rerollMultiplier: -1,
-        });
+      const guestRewardPlan =
+        guestEncounter.rewardPlan?.openRewardSurfaces === guestEncounter.doEncounterRewards
+          ? guestEncounter.rewardPlan
+          : null;
+      const preparation = guestRewardPlan?.prepareAutomaticEffects();
+      if (preparation != null) {
+        preparation.then(() => this.openLegacyGuestRewardSurface());
+        return;
       }
-      globalScene.phaseManager.pushNew("PostMysteryEncounterPhase"); // ends via its guest guard (:765)
-      this.end();
+      this.openLegacyGuestRewardSurface();
       return;
     }
     const encounter = globalScene.currentBattle.mysteryEncounter!;
@@ -1330,14 +1338,56 @@ export class MysteryEncounterRewardsPhase extends Phase {
     }
   }
 
+  /** Preserve the pre-plan legacy guest watcher path after any automatic helper preparation. */
+  private openLegacyGuestRewardSurface(): void {
+    if (globalScene.phaseManager.getCurrentPhase() !== this) {
+      return;
+    }
+    const guestEncounter = globalScene.currentBattle.mysteryEncounter!;
+    if (guestEncounter.doEncounterRewards) {
+      guestEncounter.doEncounterRewards(); // unshifts the SelectModifierPhase the watcher runs
+    } else if (this.addHealPhase) {
+      globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
+      globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
+        fillRemaining: false,
+        rerollMultiplier: -1,
+      });
+    }
+    globalScene.phaseManager.pushNew("PostMysteryEncounterPhase"); // ends via its guest guard (:765)
+    this.end();
+  }
+
   /**
    * Queues encounter EXP and rewards phases, {@linkcode PostMysteryEncounterPhase}, and ends phase
    */
-  doEncounterRewardsAndContinue() {
+  async doEncounterRewardsAndContinue(): Promise<void> {
     const encounter = globalScene.currentBattle.mysteryEncounter!;
 
     if (encounter.doEncounterExp) {
       encounter.doEncounterExp();
+    }
+
+    // Only a plan still paired with its compatibility callback is current. Direct special-surface callbacks
+    // and encounters that clear/replace doEncounterRewards cannot accidentally reuse a stale helper plan.
+    const rewardPlan =
+      encounter.rewardPlan?.openRewardSurfaces === encounter.doEncounterRewards ? encounter.rewardPlan : null;
+    if (rewardPlan != null) {
+      const preparation = rewardPlan.prepareAutomaticEffects();
+      if (preparation != null) {
+        await preparation;
+      }
+    }
+    if (
+      globalScene.currentBattle?.mysteryEncounter !== encounter
+      || globalScene.phaseManager.getCurrentPhase() !== this
+    ) {
+      return;
+    }
+
+    // This existing P35 settlement shape is a temporary compatibility adapter. Crucially, its DATA image is
+    // now captured after automatic preparation and before any standard modifier picker becomes interactive.
+    if (this.meSettlementPlan != null) {
+      commitCoopMeBattleSettlementAfterRewardPreparation(this.meSettlementPlan);
     }
 
     if (encounter.doEncounterRewards) {

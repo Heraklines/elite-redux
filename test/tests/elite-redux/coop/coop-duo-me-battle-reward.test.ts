@@ -243,8 +243,8 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
     );
 
     // Drive the production host wiring rather than invoking the settlement seam: real Victory calls
-    // handleMysteryEncounterVictory, queues BattleEnd with its immutable plan, and real BattleEnd.start
-    // commits the post-BattleEnd image before releasing its own reward tail.
+    // handleMysteryEncounterVictory queues BattleEnd and the reward phase with one immutable plan. BattleEnd
+    // keeps the guest parked; the reward phase commits only after its automatic preparation boundary.
     await withClient(rig.hostCtx, async () => {
       const hostEnemies = hostScene.getEnemyParty();
       for (const enemy of hostEnemies) {
@@ -271,6 +271,9 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
         [hostScene.phaseManager.getCurrentPhase()?.phaseName, ...hostScene.phaseManager.getQueuedPhaseNames()],
         "real BattleEnd released the host toward its ME rewards",
       ).toContain("MysteryEncounterRewardsPhase");
+      const rewards = hostScene.phaseManager.getCurrentPhase();
+      expect(rewards?.phaseName, "host reached the post-prepare settlement owner").toBe("MysteryEncounterRewardsPhase");
+      rewards.start();
     });
     await withClient(rig.guestCtx, async () => {
       // Production clients never share a scene. Pump the retained envelope only after the guest's complete

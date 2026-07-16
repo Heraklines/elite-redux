@@ -4799,6 +4799,26 @@ export interface CoopMeBattleSettlementPlan {
   readonly eggLapse: boolean;
 }
 
+/** Whether the live authoritative ME transaction can move reward settlement out of BattleEnd. */
+export function shouldDeferCoopMeBattleSettlementUntilRewardPreparation(): boolean {
+  const runtime = active;
+  const battle = globalScene.currentBattle;
+  if (
+    runtime == null
+    || runtime.controller.role !== "host"
+    || runtime.controller.netcodeMode !== "authoritative"
+    || !isCoopMeOperationEnabled()
+    || !isCoopOperationJournalActive()
+    || battle == null
+    || !battle.isBattleMysteryEncounter?.()
+  ) {
+    return false;
+  }
+  const pinned = coopMeInteractionStartValue();
+  const prior = captureCoopActiveMysteryControl();
+  return pinned >= 0 && prior?.interactionCounter === pinned && prior.terminal === "battle";
+}
+
 export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettlementPlan): boolean {
   const runtime = active;
   const battle = globalScene.currentBattle;

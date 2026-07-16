@@ -68,7 +68,7 @@ import {
 } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import { showEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
-import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
+import type { MysteryEncounter, MysteryEncounterRewardPlan } from "#mystery-encounters/mystery-encounter";
 import type { MysteryEncounterOption } from "#mystery-encounters/mystery-encounter-option";
 import type { Variant } from "#sprites/variant";
 import type { PokemonData } from "#system/pokemon-data";
@@ -1283,28 +1283,33 @@ export function selectOptionThenPokemon(
 export function setEncounterRewards(
   customShopRewards?: CustomModifierSettings,
   eggRewards?: IEggOptions[],
-  preRewardsCallback?: () => void,
+  preRewardsCallback?: () => void | Promise<void>,
 ): void {
-  globalScene.currentBattle.mysteryEncounter!.doEncounterRewards = () => {
-    if (preRewardsCallback) {
-      preRewardsCallback();
-    }
+  const encounter = globalScene.currentBattle.mysteryEncounter!;
+  const rewardPlan: MysteryEncounterRewardPlan = {
+    surfaces: customShopRewards == null ? [] : [{ kind: "modifier", settings: customShopRewards }],
+    prepareAutomaticEffects: () => preRewardsCallback?.(),
+    openRewardSurfaces: () => {
+      if (customShopRewards) {
+        globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, customShopRewards);
+      } else {
+        globalScene.phaseManager.removeAllPhasesOfType("MysteryEncounterRewardsPhase");
+      }
 
-    if (customShopRewards) {
-      globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, customShopRewards);
-    } else {
-      globalScene.phaseManager.removeAllPhasesOfType("MysteryEncounterRewardsPhase");
-    }
+      if (eggRewards) {
+        eggRewards.forEach(eggOptions => {
+          const egg = new Egg(eggOptions);
+          egg.addEggToGameData();
+        });
+      }
 
-    if (eggRewards) {
-      eggRewards.forEach(eggOptions => {
-        const egg = new Egg(eggOptions);
-        egg.addEggToGameData();
-      });
-    }
-
-    return true;
+      return true;
+    },
   };
+  encounter.rewardPlan = rewardPlan;
+  // Compatibility adapter: existing encounter callsites and the P35 wire contract still observe the
+  // established callback. MysteryEncounterRewardsPhase owns preparation before invoking this surface seam.
+  encounter.doEncounterRewards = rewardPlan.openRewardSurfaces;
 }
 
 /**
@@ -1409,14 +1414,15 @@ export function handleMysteryEncounterVictory(addHealPhase = false, doNotContinu
       failCoopSharedSession("A final-wave Mystery battle has no retained GameOver continuation in protocol 35.");
       return;
     }
-    globalScene.phaseManager.pushNew("BattleEndPhase", true, null, {
+    const settlementPlan = {
       result: "victory",
       continuation,
       trainerVictory,
       addHeal: continuation === "rewards" && addHealPhase,
       rewardShop: continuation === "rewards" && (encounter.doEncounterRewards != null || addHealPhase),
       eggLapse: continuation === "rewards",
-    });
+    } as const;
+    globalScene.phaseManager.pushNew("BattleEndPhase", true, null, settlementPlan);
     // The retained battle-settled terminal constructs every following guest phase only after its complete
     // post-BattleEnd DATA image applies. Never pre-queue a locally-derived reward tail on the renderer.
     if (isCoopAuthoritativeGuest()) {
@@ -1426,7 +1432,12 @@ export function handleMysteryEncounterVictory(addHealPhase = false, doNotContinu
       globalScene.phaseManager.pushNew("TrainerVictoryPhase");
     }
     if (queueRewards) {
-      globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase);
+      globalScene.phaseManager.pushNew(
+        "MysteryEncounterRewardsPhase",
+        addHealPhase,
+        null,
+        continuation === "rewards" ? settlementPlan : null,
+      );
       if (!encounter.doContinueEncounter) {
         // Only lapse eggs once for multi-battle encounters
         globalScene.phaseManager.pushNew("EggLapsePhase");
@@ -1454,22 +1465,29 @@ export function handleMysteryEncounterBattleFailed(addHealPhase = false, doNotCo
   if (encounter.continuousEncounter || doNotContinue) {
     return;
   }
-  if (encounter.encounterMode !== MysteryEncounterMode.NO_BATTLE) {
+  if (encounter.encounterMode === MysteryEncounterMode.NO_BATTLE) {
+    globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase);
+  } else {
     const continuation = encounter.doContinueEncounter ? "encounter" : "rewards";
-    globalScene.phaseManager.pushNew("BattleEndPhase", false, null, {
+    const settlementPlan = {
       result: "failure",
       continuation,
       trainerVictory: false,
       addHeal: continuation === "rewards" && addHealPhase,
       rewardShop: continuation === "rewards" && (encounter.doEncounterRewards != null || addHealPhase),
       eggLapse: continuation === "rewards",
-    });
+    } as const;
+    globalScene.phaseManager.pushNew("BattleEndPhase", false, null, settlementPlan);
     if (isCoopAuthoritativeGuest()) {
       return;
     }
+    globalScene.phaseManager.pushNew(
+      "MysteryEncounterRewardsPhase",
+      addHealPhase,
+      null,
+      continuation === "rewards" ? settlementPlan : null,
+    );
   }
-
-  globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase);
 
   if (!encounter.doContinueEncounter) {
     // Only lapse eggs once for multi-battle encounters
