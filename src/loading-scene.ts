@@ -2,6 +2,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { initializeGame } from "#app/init/init";
 import { SceneBase } from "#app/scene-base";
 import { isMobile } from "#app/touch-controls";
+import { ER_NEWCOMER_ICON_SLUGS } from "#data/elite-redux/er-newcomer-species";
 import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import { BiomeId } from "#enums/biome-id";
 import { GachaType } from "#enums/gacha-types";
@@ -758,6 +759,14 @@ export class LoadingScene extends SceneBase {
         continue;
       }
       this.loadAtlas(`er_icon__${entry.slug}`, `pokemon/elite-redux/${entry.slug}`, "icon");
+    }
+    // Hand-authored newcomer species (70000+ band) are NOT in ER_SPRITE_MANIFEST
+    // (which is auto-generated from the ER dump), so their per-slug icon atlases
+    // would only stream in lazily during a battle. Preload them here too so
+    // title-screen surfaces (save-slot preview, party) render their mini icon
+    // instead of an error box (live tester report; same class as #308).
+    for (const slug of ER_NEWCOMER_ICON_SLUGS) {
+      this.loadAtlas(`er_icon__${slug}`, `pokemon/elite-redux/${slug}`, "icon");
     }
   }
 }

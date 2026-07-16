@@ -229,6 +229,27 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
 ];
 
 /**
+ * Per-slug icon-atlas slugs for the slug-based newcomer species (the three
+ * evolutions above + Regitube). The loading scene preloads each
+ * `er_icon__<slug>` atlas at boot so TITLE-screen surfaces that render a party
+ * mini icon WITHOUT a battle having run first (the save-slot preview, the party
+ * screen reached from the menu, etc.) resolve the texture instead of showing an
+ * error box: these species live in the hand-authored 70000+ band and are NOT in
+ * the auto-generated `ER_SPRITE_MANIFEST` the preloader otherwise iterates, and
+ * `ErCustomSpecies.loadAssets` only lazily loads the atlas during a battle.
+ *
+ * Partner eeveelutions are intentionally omitted: they alias a vanilla base
+ * eeveelution's bundled icon (no per-slug atlas), so the bundled
+ * `pokemon_icons_N` sheet already covers them.
+ */
+export const ER_NEWCOMER_ICON_SLUGS: readonly string[] = [
+  ...ER_NEWCOMER_EVO_SPECIES.map(def => def.slug),
+  // Regitube is registered below with slug "regitube" (kept in sync with its
+  // registerErEditorMon call).
+  "regitube",
+];
+
+/**
  * Regitube — standalone Water "Inflatable Pokemon". Egg-obtainable base-of-line
  * (custom-mons registration shape: starter cost + egg tier). No evolution line.
  *
