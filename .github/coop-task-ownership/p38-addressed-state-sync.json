@@ -18,6 +18,7 @@
     "test/tests/elite-redux/coop/coop-durability.test.ts",
     "test/tests/elite-redux/coop/coop-operation-durability-recovery.test.ts",
     "test/tests/elite-redux/coop/coop-p33-client.test.ts",
+    "test/tests/elite-redux/coop/coop-recovery-outcome-terminal.test.ts",
     "test/tests/elite-redux/coop/coop-resync-checkpoint-wake.test.ts",
     "test/tests/elite-redux/coop/coop-resync-snapshot-ordering.test.ts",
     "test/tests/elite-redux/coop/coop-session-controller.test.ts",

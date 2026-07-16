@@ -469,13 +469,23 @@ interface PendingTurnWaiter {
 
 interface PendingStateSyncWaiter {
   ticket: CoopRecoveryTicketV1;
-  finish: (result: CoopStateSyncResult | null) => void;
+  finish: (outcome: CoopStateSyncOutcome) => void;
 }
 
 export interface CoopStateSyncResult {
+  kind: "snapshot";
   blob: string;
   admission: CoopRecoveryAdmissionV1;
 }
+
+export type CoopStateSyncFailure =
+  | { kind: "superseded" }
+  | { kind: "unavailable" }
+  | { kind: "timeout" }
+  | { kind: "reconnect-cancelled" };
+
+/** Every recovery request resolves finitely and explicitly; null never grants implicit continuation. */
+export type CoopStateSyncOutcome = CoopStateSyncResult | CoopStateSyncFailure;
 
 export interface CoopRecoveryCaptureInput {
   wave: number;
@@ -1070,7 +1080,7 @@ export class CoopBattleStreamer {
             "resync",
             `guest cancel stateSync id=${waiter.ticket.requestId} after reconnect; a new generation requires a new ticket`,
           );
-          waiter.finish(null);
+          waiter.finish({ kind: "reconnect-cancelled" });
         }
       }
     });
@@ -1441,7 +1451,7 @@ export class CoopBattleStreamer {
       finish(null);
     }
     for (const waiter of [...this.stateSyncWaiters.values()]) {
-      waiter.finish(null);
+      waiter.finish({ kind: "superseded" });
     }
     this.pending.clear();
     this.pendingSince.clear();
@@ -3505,14 +3515,14 @@ export class CoopBattleStreamer {
   }
 
   /** GUEST: request one exact authenticated recovery frontier. */
-  requestStateSync(reason: Exclude<CoopRecoveryReason, "durability-gap">): Promise<CoopStateSyncResult | null> {
+  requestStateSync(reason: Exclude<CoopRecoveryReason, "durability-gap">): Promise<CoopStateSyncOutcome> {
     // Supersede every older in-flight resync (the newest desync is the one to heal).
     const inFlight = this.stateSyncWaiters.size;
     if (inFlight > 0) {
       coopWarn("resync", `guest requestStateSync reason=${reason} superseding ${inFlight} older request(s)`);
     }
     for (const waiter of [...this.stateSyncWaiters.values()]) {
-      waiter.finish(null);
+      waiter.finish({ kind: "superseded" });
     }
     for (const finish of [...this.launchSnapshotWaiters.values()]) {
       finish(null);
@@ -3523,7 +3533,7 @@ export class CoopBattleStreamer {
     const ticket = this.mintRecoveryTicket(reason, seq);
     if (ticket == null) {
       coopWarn("resync", `guest requestStateSync reason=${reason} seq=${seq} refused without exact binding/frontier`);
-      return Promise.resolve(null);
+      return Promise.resolve({ kind: "unavailable" });
     }
     const key = recoveryTicketKey(ticket);
     coopLog(
@@ -3531,10 +3541,10 @@ export class CoopBattleStreamer {
       `guest requestStateSync id=${ticket.requestId} reason=${reason} e=${ticket.frontier.epoch} `
         + `wave=${ticket.frontier.wave} turn=${ticket.frontier.turn} START timeout=${this.timeoutMs}ms`,
     );
-    return new Promise<CoopStateSyncResult | null>(resolve => {
+    return new Promise<CoopStateSyncOutcome>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
-      const finish = (result: CoopStateSyncResult | null) => {
+      const finish = (outcome: CoopStateSyncOutcome) => {
         if (settled) {
           return;
         }
@@ -3543,15 +3553,15 @@ export class CoopBattleStreamer {
         if (this.stateSyncWaiters.get(key)?.finish === finish) {
           this.stateSyncWaiters.delete(key);
         }
-        if (result == null) {
-          coopWarn("resync", `guest requestStateSync id=${ticket.requestId} -> null (timeout/superseded)`);
+        if (outcome.kind === "snapshot") {
+          coopLog("resync", `guest requestStateSync id=${ticket.requestId} RESOLVE blobLen=${outcome.blob.length}`);
         } else {
-          coopLog("resync", `guest requestStateSync id=${ticket.requestId} RESOLVE blobLen=${result.blob.length}`);
+          coopWarn("resync", `guest requestStateSync id=${ticket.requestId} -> ${outcome.kind}`);
         }
-        resolve(result);
+        resolve(outcome);
       };
       this.stateSyncWaiters.set(key, { ticket, finish });
-      cancelTimer = this.schedule(() => finish(null), this.timeoutMs);
+      cancelTimer = this.schedule(() => finish({ kind: "timeout" }), this.timeoutMs);
       this.transport.send({ t: "requestStateSync", ticket });
     });
   }
@@ -3644,7 +3654,7 @@ export class CoopBattleStreamer {
       finish(null);
     }
     for (const waiter of [...this.stateSyncWaiters.values()]) {
-      waiter.finish(null);
+      waiter.finish({ kind: "superseded" });
     }
     this.pending.clear();
     this.pendingSince.clear();
@@ -4523,10 +4533,10 @@ export class CoopBattleStreamer {
         const admission = { ticket: msg.ticket, captured: msg.captured } satisfies CoopRecoveryAdmissionV1;
         if (!this.recoveryAdmissionIsCurrent(admission)) {
           coopWarn("resync", `guest DROP stale/mismatched stateSync id=${msg.ticket.requestId}`);
-          waiter.finish(null);
+          waiter.finish({ kind: "superseded" });
           return;
         }
-        waiter.finish({ blob: msg.blob, admission });
+        waiter.finish({ kind: "snapshot", blob: msg.blob, admission });
         return;
       }
       case "stateSyncUnavailable": {
@@ -4536,7 +4546,7 @@ export class CoopBattleStreamer {
         const waiter = this.stateSyncWaiters.get(recoveryTicketKey(msg.ticket));
         if (waiter != null) {
           coopWarn("resync", `guest stateSync id=${msg.ticket.requestId} ${msg.reason}`);
-          waiter.finish(null);
+          waiter.finish({ kind: msg.reason });
         }
         return;
       }
@@ -4547,7 +4557,7 @@ export class CoopBattleStreamer {
           return;
         }
         coopLog("resync", `guest RECV durabilityStateSync id=${msg.ticket.requestId} blobLen=${msg.blob.length}`);
-        this.durabilitySnapshotHandler?.({ blob: msg.blob, admission });
+        this.durabilitySnapshotHandler?.({ kind: "snapshot", blob: msg.blob, admission });
         return;
       }
       case "meChecksum":
