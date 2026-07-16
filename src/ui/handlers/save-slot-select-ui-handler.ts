@@ -142,9 +142,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
                           (sanitizedName: string) => {
                             const name = decodeURIComponent(atob(sanitizedName));
                             globalScene.gameData.renameSession(cursor, name).then(response => {
-                              if (response[0] === false) {
-                                globalScene.reset(true);
-                              } else {
+                              if (response) {
                                 this.clearSessionSlots();
                                 this.cursorObj = null;
                                 this.populateSessionSlots();
@@ -152,6 +150,8 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
                                 this.setCursor(0);
                                 ui.revertMode();
                                 ui.showText("", 0);
+                              } else {
+                                globalScene.reset(true);
                               }
                             });
                           },
