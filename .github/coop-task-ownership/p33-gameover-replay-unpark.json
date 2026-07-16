@@ -9,6 +9,7 @@
     "src/data/elite-redux/coop/coop-runtime.ts",
     "src/phases/coop-replay-turn-phase.ts",
     "test/browser/coop-public-ui/campaign-exp-phase.test.mjs",
+    "test/browser/coop-public-ui/check-public-boundary.mjs",
     "test/browser/coop-public-ui/public-ui-harness.mjs",
     "test/browser/coop-public-ui/run-campaign.mjs",
     "test/browser/coop-public-ui/run.mjs",
