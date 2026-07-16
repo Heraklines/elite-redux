@@ -838,6 +838,55 @@ If the custom asset isn't on er-assets yet, fall back to an EXISTING loaded text
 (as the other ER event intro sprites do) so the screen never shows a missing/green
 texture.
 
+## 🔴 Adding new Pokemon (species or forms) — integration checklist
+
+Distilled from the newcomer-patch bug classes. New content touches MANY data paths
+that the battle path does NOT cover; verify each with a TEST, never assume. Every
+item below has bitten us.
+
+- **Icons resolve on EVERY surface, not just battle.** Battle lazily loads the
+  per-slug `er_icon__<slug>` atlas via `ErCustomSpecies.loadAssets`; title-screen
+  surfaces (save-slot preview, party, starter-select, egg-summary) do NOT. Preload
+  every slug-based custom species icon at boot (`loadEliteReduxCustomIcons` in
+  `loading-scene.ts`, driven by a STATIC list — the loader runs BEFORE
+  `initializeGame`, so a live registry is empty there). All UI paths funnel through
+  `Pokemon.getIconAtlasKey`/`getIconId` → the active species-FORM's override — a
+  species-level override is bypassed when `getSpeciesForm()` returns a FORM lacking
+  it (#308 class). Test the resolved key for each new id.
+- **TM learnsets are a SEPARATE data path** (`tmSpecies` / `speciesTmMoves`) from
+  level-up learnsets (`pokemonSpeciesLevelMoves`). A new species id gets NO TMs
+  unless explicitly wired (this patch's miss). Wire BOTH tables (item-compat vs
+  Pokedex/AI/Showdown). Default: inherit the pre-evo/base's full `speciesTmMoves`
+  superset + type-appropriate additions; standalone mons get a hand set. Mega/primal
+  FORMS inherit the base species' TM compat for free (`generateCompatibleTms` matches
+  a plain `tmSpecies` entry to species id regardless of form). Run the wiring LAST in
+  init, after `initEliteReduxPokedexOverrides` finalizes base TM lists. Test: TM list
+  non-empty AND a pre-evo/base superset.
+- **No-leak is omission-based.** An evolution-only species must NOT get a
+  `speciesStarterCosts` entry or a `speciesEggTiers` entry (that's what keeps it out
+  of the starter grid / egg pool / wild rolls — #232/#352). Egg-obtainable standalones
+  (Regitube) use the custom-mons path and DO get an egg tier. Regression-test both.
+- **Sprite slugs must match the PUBLISHED er-assets dir names EXACTLY** (word-order
+  drift happened this patch). The atlas contract: frames `0001.png..NNNN`, 10fps
+  default, optional cadence block. Verify front + back + shiny atlas keys resolve.
+- **Cry is opt-in.** The base ER-custom load path is sprite-only and queues no cry;
+  `getCryKey` returns a well-formed key that `playSound` tolerates (silent, not a
+  crash). Only wire `cryKey`/`cryFile` when the audio is published. Never let a custom
+  id hit the vanilla `getCryKey`/`getExpandedSpeciesName` (they crash on id ≥ 10000).
+- **N-typing (3rd+ type) is `setExtraTypes`** on the species OR a specific form
+  (per-instance, not keyed by id). `getBaseTypes()` folds the ACTIVE form's extras in,
+  so a mega can add a type the base lacks. Author it as `types: [t1, t2, ...extras]`.
+- **Forms use the form-injection seam, species use `registerErEditorMon`.** A
+  mega/primal/alt form is injected onto its BASE species' `forms[]`
+  (`injectNewcomerForms`), NOT registered as a standalone species. Its abilities are
+  read from `baseSpecies.forms[formKey]` (the Mega ability-override bug class).
+- **Variant/partner CLONES must keep base forms byte-identical.** A partner/alias
+  family that grafts onto a base (e.g. partner-Eevee) must not mutate the base species
+  or its other forms. Regression-test the base kit stays identical.
+- **Verify each surface with a test.** The battle path passing does NOT imply the
+  save/party/starter/egg/Pokedex paths pass — they use different accessors. Add a
+  handler/data-tier test per surface (see `er-newcomer-integration-sweep.test.ts`).
+
 ## Deploy
 
 🔴 **We work and deploy entirely from `feat/elite-redux-port`. NEVER touch `main`.**
