@@ -176,6 +176,11 @@ function rewardSurfaceKey(rewardSurface?: CoopRewardSurfaceIdentity): string {
   return rewardSurface == null ? "ambient" : `${rewardSurface.ordinal}:${rewardSurface.surfaceId}`;
 }
 
+/** Canonical operation stream: durable operation class plus ordered reward-surface identity. */
+function rewardOperationStreamKey(surface: CoopShopSurface, rewardSurface?: CoopRewardSurfaceIdentity): string {
+  return `${kindFor(surface)}:${rewardSurfaceKey(rewardSurface)}`;
+}
+
 const COOP_REWARD_SURFACE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$/;
 
 export function isValidCoopRewardSurfaceIdentity(rewardSurface: unknown): rewardSurface is CoopRewardSurfaceIdentity {
@@ -193,7 +198,7 @@ export function isValidCoopRewardSurfaceIdentity(rewardSurface: unknown): reward
 }
 
 function rewardStreamKey(surface: CoopShopSurface, pinned: number, rewardSurface?: CoopRewardSurfaceIdentity): string {
-  return `${surface}:${pinned}:${rewardSurfaceKey(rewardSurface)}`;
+  return `${pinned}:${rewardOperationStreamKey(surface, rewardSurface)}`;
 }
 
 /**
@@ -317,10 +322,8 @@ interface RewardOpState {
   readonly stateAppliedOperations: Set<string>;
   /** Per-peer watcher state. Dual-engine tests share one JS realm; real peers do not share these cursors either. */
   readonly watcherStateByRole: Record<CoopRole, RewardWatcherRoleState>;
-  /** The owner's per-interaction monotonic action ordinal (for the committed op-id). Reset when the pin changes. */
-  ownerOrdinal: number;
-  ownerOrdinalStart: number;
-  ownerOrdinalSurfaceKey: string;
+  /** Independent monotonic action ordinal for every canonical operation stream at an interaction pin. */
+  readonly ownerOrdinalsByStream: Map<string, number>;
   /** Exact once-only identity retained when a terminal must be retried after commit/journal failure. */
   readonly ownerTerminalOperations: Map<string, { readonly ordinal: number; readonly operationId: string }>;
   /** Proposed peer intents retained separately per local role (the two-engine harness shares one realm). */
@@ -340,9 +343,7 @@ registerCoopOpSurfaceState(
     pendingJournalMaterializations: new Set<string>(),
     stateAppliedOperations: new Set<string>(),
     watcherStateByRole: { host: freshWatcherRoleState(), guest: freshWatcherRoleState() },
-    ownerOrdinal: 0,
-    ownerOrdinalStart: -1,
-    ownerOrdinalSurfaceKey: "",
+    ownerOrdinalsByStream: new Map(),
     ownerTerminalOperations: new Map(),
     preparedIntents: new Map(),
     committedResultEnvelopes: new Map(),
@@ -456,9 +457,7 @@ export function resetCoopRewardOperationState(): void {
   s.committedResultEnvelopes.clear();
   s.watcherStateByRole.host = freshWatcherRoleState();
   s.watcherStateByRole.guest = freshWatcherRoleState();
-  s.ownerOrdinal = 0;
-  s.ownerOrdinalStart = -1;
-  s.ownerOrdinalSurfaceKey = "";
+  s.ownerOrdinalsByStream.clear();
   s.ownerTerminalOperations.clear();
   s.revisionFloor = 0;
 }
@@ -624,15 +623,17 @@ function retainPreparedIntent(s: RewardOpState, prepared: PreparedRewardIntent):
   return true;
 }
 
-/** Next per-interaction owner action ordinal for `pinned` (resets when the pinned interaction changes). */
-function nextOwnerOrdinal(s: RewardOpState, pinned: number, rewardSurface?: CoopRewardSurfaceIdentity): number {
-  const surfaceKey = rewardSurfaceKey(rewardSurface);
-  if (s.ownerOrdinalStart !== pinned || s.ownerOrdinalSurfaceKey !== surfaceKey) {
-    s.ownerOrdinal = 0;
-    s.ownerOrdinalStart = pinned;
-    s.ownerOrdinalSurfaceKey = surfaceKey;
-  }
-  return s.ownerOrdinal++;
+/** Next owner action ordinal in the exact operation-class + reward-surface stream at `pinned`. */
+function nextOwnerOrdinal(
+  s: RewardOpState,
+  pinned: number,
+  surface: CoopShopSurface,
+  rewardSurface?: CoopRewardSurfaceIdentity,
+): number {
+  const streamKey = rewardStreamKey(surface, pinned, rewardSurface);
+  const ordinal = s.ownerOrdinalsByStream.get(streamKey) ?? 0;
+  s.ownerOrdinalsByStream.set(streamKey, ordinal + 1);
+  return ordinal;
 }
 
 /** Peek the watcher's current per-interaction action ordinal for `pinned` (resets when the pin changes). */
@@ -644,7 +645,7 @@ function watcherState(
   rewardSurface?: CoopRewardSurfaceIdentity,
 ): { readonly roleState: RewardWatcherRoleState; readonly streamState: RewardWatcherState } {
   const roleState = s.watcherStateByRole[role];
-  const streamKey = `${surface}:${rewardSurfaceKey(rewardSurface)}`;
+  const streamKey = rewardOperationStreamKey(surface, rewardSurface);
   let streamState = roleState.streams.get(streamKey);
   if (streamState == null) {
     streamState = freshWatcherState();
@@ -703,7 +704,8 @@ export function commitRewardOwnerIntent(
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
     const terminalKey = rewardStreamKey(params.surface, params.pinned, params.rewardSurface);
     const retainedTerminal = params.terminal ? s.ownerTerminalOperations.get(terminalKey) : undefined;
-    const ordinal = retainedTerminal?.ordinal ?? nextOwnerOrdinal(s, params.pinned, params.rewardSurface);
+    const ordinal =
+      retainedTerminal?.ordinal ?? nextOwnerOrdinal(s, params.pinned, params.surface, params.rewardSurface);
     const actionSlot = coopRewardOperationActionSlot(params.pinned, ordinal, params.rewardSurface);
     if (actionSlot == null) {
       return null;

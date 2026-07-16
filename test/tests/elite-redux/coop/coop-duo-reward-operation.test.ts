@@ -36,9 +36,12 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   adoptRewardWatcherChoice,
+  COOP_REWARD_ACTION_STRIDE,
+  commitRewardOwnerIntent,
   isCoopRewardOperationEnabled,
   resetCoopRewardOperationFlag,
   resetCoopRewardOperationState,
@@ -128,6 +131,11 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
   /** Install the one logical guest runtime modeled by the direct watcher-gate adversarial cases. */
   function installDirectGuestRewardRuntime(): void {
     setActiveCoopRuntimeOpState(createCoopRuntimeOpState("guest"));
+    resetCoopRewardOperationState();
+  }
+
+  function installDirectRewardRuntime(role: "host" | "guest"): void {
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState(role));
     resetCoopRewardOperationState();
   }
 
@@ -370,6 +378,71 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
       wave: 11,
     });
     expect(lateFirstAction).toEqual({ adopt: false, reason: "stale-or-late" });
+    logs.flush();
+  });
+
+  it.each([
+    { ownerRole: "host", watcherRole: "guest", pinned: 14, order: ["reward", "market", "reward"] },
+    { ownerRole: "host", watcherRole: "guest", pinned: 14, order: ["market", "reward", "market"] },
+    { ownerRole: "guest", watcherRole: "host", pinned: 15, order: ["reward", "market", "reward"] },
+    { ownerRole: "guest", watcherRole: "host", pinned: 15, order: ["market", "reward", "market"] },
+  ] as const)("ADVERSARIAL stream parity: $ownerRole owner and $watcherRole watcher agree for same-pin $order", ({
+    ownerRole,
+    watcherRole,
+    pinned,
+    order,
+  }) => {
+    installDirectRewardRuntime(ownerRole);
+    const ownerIds = order.map(surface => {
+      const committed = commitRewardOwnerIntent({
+        surface,
+        pinned,
+        label: surface === "reward" ? "reward" : "biomeShop",
+        choice: 0,
+        data: surface === "reward" ? [0] : undefined,
+        terminal: false,
+        localRole: ownerRole,
+        wave: 11,
+      });
+      if (committed == null) {
+        throw new Error(`owner did not mint ${surface} operation`);
+      }
+      return committed.operationId;
+    });
+
+    installDirectRewardRuntime(watcherRole);
+    const watcherIds = order.map(surface => {
+      const adopted = adoptRewardWatcherChoice({
+        surface,
+        pinned,
+        action: {
+          label: surface === "reward" ? "reward" : "biomeShop",
+          choice: 0,
+          data: surface === "reward" ? [0] : undefined,
+        },
+        terminal: false,
+        localRole: watcherRole,
+        wave: 11,
+      });
+      if (!adopted.adopt || adopted.operationId == null) {
+        throw new Error(`watcher did not address ${surface} operation: ${JSON.stringify(adopted)}`);
+      }
+      return adopted.operationId;
+    });
+
+    expect(watcherIds, "owner and watcher derive the same operation ids in the same surface order").toEqual(ownerIds);
+    expect(
+      ownerIds.map(id => parseCoopOperationId(id)?.pinnedSeq),
+      "each operation class has an independent ordinal and returning to the first stream advances without reuse",
+    ).toEqual([
+      pinned * COOP_REWARD_ACTION_STRIDE,
+      pinned * COOP_REWARD_ACTION_STRIDE,
+      pinned * COOP_REWARD_ACTION_STRIDE + 1,
+    ]);
+    expect(
+      ownerIds.map(id => parseCoopOperationId(id)?.kind),
+      "the equal numeric address remains disambiguated by the canonical operation class",
+    ).toEqual(order.map(surface => (surface === "reward" ? "REWARD" : "SHOP_BUY")));
     logs.flush();
   });
 
