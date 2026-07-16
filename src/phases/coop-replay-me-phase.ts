@@ -450,12 +450,12 @@ export class CoopReplayMePhase extends Phase {
           counter: this.interactionCounter,
           key,
         });
-        openGuestMeEmbeddedShop(this.interactionCounter);
+        openGuestMeEmbeddedShop(this.interactionCounter, key);
       }
       return;
     }
     if (!this.settled) {
-      this.settleForWatcherShop(relay);
+      this.settleForWatcherShop(relay, key);
     }
   }
 
@@ -1986,7 +1986,10 @@ export class CoopReplayMePhase extends Phase {
    * options, DRIVES the interactive pick, and relays it for the host to apply). Either way a DETACHED
    * listener on the terminal seq performs the eventual leave + advance (the duties leaveDefensive runs).
    */
-  private settleForWatcherShop(relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>): void {
+  private settleForWatcherShop(
+    relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+    bufferedOptionsKey: string,
+  ): void {
     if (this.settled) {
       return;
     }
@@ -2009,7 +2012,7 @@ export class CoopReplayMePhase extends Phase {
     // shopHandedOff marks the shop opened so the quiz-then-shop hook path never double-opens it.
     this.settledDetached = true;
     this.shopHandedOff = true;
-    openGuestMeEmbeddedShop(this.interactionCounter); // #832: BiomeShopPhase for trader/market MEs, SelectModifierPhase otherwise
+    openGuestMeEmbeddedShop(this.interactionCounter, bufferedOptionsKey); // #832: market vs ordered reward surface
     this.settled = true;
     coopMeHostPresentation = null;
     this.offMeMessage?.();

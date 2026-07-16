@@ -150,15 +150,16 @@ describe("co-op ME-embedded biome market (#832, audit P1#5) - relay round-trip",
 });
 
 describe("co-op ME-embedded biome market (#832, audit P1#5) - guest-open routing + advance suppression", () => {
-  const rec = { unshifted: [] as string[] };
+  const rec = { unshifted: [] as string[], args: [] as unknown[][] };
   let prevGlobalScene: BattleScene;
 
   function makeStubScene(): BattleScene {
     return {
       gameMode: { isCoop: true },
       phaseManager: {
-        unshiftNew(name: string): void {
+        unshiftNew(name: string, ...args: unknown[]): void {
           rec.unshifted.push(name);
+          rec.args.push(args);
         },
         shiftPhase(): void {},
       },
@@ -168,6 +169,7 @@ describe("co-op ME-embedded biome market (#832, audit P1#5) - guest-open routing
   beforeEach(() => {
     prevGlobalScene = globalScene;
     rec.unshifted = [];
+    rec.args = [];
     initGlobalScene(makeStubScene());
   });
 
@@ -215,6 +217,26 @@ describe("co-op ME-embedded biome market (#832, audit P1#5) - guest-open routing
     expect(hasBufferedCoopBiomeShopStock(counter)).toBe(false);
     openGuestMeEmbeddedShop(counter);
     expect(rec.unshifted).toEqual(["SelectModifierPhase"]);
+    hostSide.dispose();
+  });
+
+  it("openGuestMeEmbeddedShop preserves the ordered P36 surface from the buffered live handoff", async () => {
+    const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
+    const controller = getCoopController();
+    controller!.role = "guest";
+    const counter = controller!.interactionCounter();
+    const rewardSurface = { ordinal: 0, surfaceId: "modifier:me:graves:0" } as const;
+    const bufferedKey = `${counter}:0:${rewardSurface.ordinal}:${encodeURIComponent(rewardSurface.surfaceId)}`;
+
+    const hostSide = new CoopInteractionRelay(runtime.partnerTransport!);
+    hostSide.sendRewardOptions(counter, 0, [{ id: "RARE_CANDY", tier: 1, upgradeCount: 0, cost: 0 }], rewardSurface);
+    await flush();
+
+    openGuestMeEmbeddedShop(counter, bufferedKey);
+    expect(rec.unshifted).toEqual(["SelectModifierPhase"]);
+    expect(rec.args[0]?.[5], "the sixth SelectModifierPhase argument is the exact stable surface identity").toEqual(
+      rewardSurface,
+    );
     hostSide.dispose();
   });
 
