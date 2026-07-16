@@ -2,6 +2,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { isCoopMeOperationJournalActive } from "#data/elite-redux/coop/coop-me-operation";
 import {
   broadcastCoopWaveResolved,
   captureCoopAutomaticVictorySealIdentity,
@@ -26,6 +27,7 @@ import { BiomeId } from "#enums/biome-id";
 import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { GameModes } from "#enums/game-modes";
 import { ModifierTier } from "#enums/modifier-tier";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import type { CustomModifierSettings } from "#modifiers/modifier-type";
 import { type ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import { generateModifierType, handleMysteryEncounterVictory } from "#mystery-encounters/encounter-phase-utils";
@@ -71,8 +73,12 @@ export class VictoryPhase extends PokemonPhase {
         ? globalScene.currentBattle.isBattleMysteryEncounter()
         : retainedSourceTransition?.meBoundary === "battle-victory";
 
-    // update Pokemon defeated count except for MEs that disable it
-    if (!isMysteryEncounter || !globalScene.currentBattle.mysteryEncounter?.preventGameStatsUpdates) {
+    // The authoritative renderer may have no live encounter mechanics object. Training Session is the only
+    // encounter that suppresses this statistic, and its host-authored type survives structural adoption.
+    const preventsDefeatedStat =
+      globalScene.currentBattle.mysteryEncounter?.preventGameStatsUpdates
+      ?? globalScene.currentBattle.mysteryEncounterType === MysteryEncounterType.TRAINING_SESSION;
+    if (!isMysteryEncounter || !preventsDefeatedStat) {
       globalScene.gameData.gameStats.pokemonDefeated++;
     }
 
@@ -108,7 +114,19 @@ export class VictoryPhase extends PokemonPhase {
     }
 
     if (isMysteryEncounter) {
-      handleMysteryEncounterVictory(false, this.isExpOnly);
+      if (isCoopAuthoritativeGuest() && isCoopMeOperationJournalActive()) {
+        // The renderer does not own a live MysteryEncounter object: encounter authority deliberately
+        // clears locally-derived mechanics, and the retained battle-settled transaction declares the
+        // exact reward/event continuation later. Its only legal action at a terminal ME victory is to
+        // park an unplanned BattleEnd on that transaction; reading `continuousEncounter` here both
+        // crashed real guests and made the test harness skip the queue entirely. The legacy rollback
+        // path still owns a live encounter and must keep using its original locally-derived tail.
+        if (!this.isExpOnly) {
+          globalScene.phaseManager.pushNew("BattleEndPhase", true);
+        }
+      } else {
+        handleMysteryEncounterVictory(false, this.isExpOnly);
+      }
       return this.end();
     }
 

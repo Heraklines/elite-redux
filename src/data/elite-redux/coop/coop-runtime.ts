@@ -4230,7 +4230,7 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     const retained = captureCoopActiveMysteryControl();
     if (
       retained?.interactionCounter !== pinned
-      || retained.terminal !== "pending"
+      || (retained.terminal !== "pending" && retained.terminal !== "battle-settled")
       || JSON.stringify(retained.presentation) !== JSON.stringify(payload.presentation)
     ) {
       return false;

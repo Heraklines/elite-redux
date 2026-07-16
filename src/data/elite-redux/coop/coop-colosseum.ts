@@ -498,7 +498,10 @@ export class CoopColosseumLoopLeaseRegistry {
 
 /** A detached gauntlet remains resumable across its retained battle-handoff terminal. */
 export function canRebindColosseumGuestLoop(snapshot: CoopActiveMysteryEncounterSnapshotV1): boolean {
-  return (snapshot.terminal === "pending" || snapshot.terminal === "battle") && snapshot.colosseum != null;
+  return (
+    (snapshot.terminal === "pending" || snapshot.terminal === "battle" || snapshot.terminal === "battle-settled")
+    && snapshot.colosseum != null
+  );
 }
 
 /**
@@ -922,17 +925,17 @@ const coopColosseumBattleEndDelegate: CoopMeBattleEndDelegate = ({ interactionCo
 };
 
 /** Re-arm an interrupted between-round loop from the checksum-verified host control statement. */
-function rebindColosseumGuestLoop(snapshot: CoopActiveMysteryEncounterSnapshotV1): void {
+function rebindColosseumGuestLoop(snapshot: CoopActiveMysteryEncounterSnapshotV1): boolean {
   if (!isCoopAuthoritativeGuest() || !canRebindColosseumGuestLoop(snapshot)) {
-    return;
+    return false;
   }
   const relay = getCoopInteractionRelay();
   if (relay == null || coopMeInteractionStartValue() !== snapshot.interactionCounter) {
-    return;
+    return false;
   }
   const colosseum = snapshot.colosseum;
   if (colosseum == null) {
-    return;
+    return false;
   }
   const presentation =
     colosseum.boardRound === colosseum.expectedRound && snapshot.presentation?.subPrompt?.kind === "secondary"
@@ -943,6 +946,7 @@ function rebindColosseumGuestLoop(snapshot: CoopActiveMysteryEncounterSnapshotV1
     presentation,
     decision: colosseum.decision,
   });
+  return true;
 }
 
 // #829 REGISTRATION: install the delegate once at module load. `coop-colosseum` is eagerly imported by

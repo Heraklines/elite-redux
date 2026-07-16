@@ -153,7 +153,7 @@ export type CoopMeBattleEndDelegate = (ctx: {
  * other ME even while registered (the "never leaks into other MEs" guarantee).
  */
 let coopMeBattleEndDelegate: CoopMeBattleEndDelegate | null = null;
-let coopMeSnapshotRebindDelegate: ((snapshot: CoopActiveMysteryEncounterSnapshotV1) => void) | null = null;
+let coopMeSnapshotRebindDelegate: ((snapshot: CoopActiveMysteryEncounterSnapshotV1) => boolean) | null = null;
 
 /** #829: register (d) or clear (null) the between-rounds battle-end delegate. */
 export function setCoopMeBattleEndDelegate(d: CoopMeBattleEndDelegate | null): void {
@@ -162,7 +162,7 @@ export function setCoopMeBattleEndDelegate(d: CoopMeBattleEndDelegate | null): v
 
 /** Register a surface-specific recovery driver without teaching the generic replay phase its rules. */
 export function setCoopMeSnapshotRebindDelegate(
-  delegate: ((snapshot: CoopActiveMysteryEncounterSnapshotV1) => void) | null,
+  delegate: ((snapshot: CoopActiveMysteryEncounterSnapshotV1) => boolean) | null,
 ): void {
   coopMeSnapshotRebindDelegate = delegate;
 }
@@ -228,6 +228,13 @@ type CoopMeBattleDestination = Extract<CoopMeTerminalPayload["destination"], { k
 type CoopMeContinueDestination = Extract<CoopMeTerminalPayload["destination"], { kind: "continue" }>;
 type CoopMeRewardDestination = Extract<CoopMeTerminalPayload["destination"], { kind: "reward" }>;
 
+interface CoopMeBattleSettlementResume {
+  readonly operationId: string;
+  readonly step: number;
+  readonly revision: number;
+  readonly continuation: CoopMeRewardDestination["continuation"];
+}
+
 export class CoopReplayMePhase extends Phase {
   public readonly phaseName = "CoopReplayMePhase";
 
@@ -247,6 +254,8 @@ export class CoopReplayMePhase extends Phase {
   private lastSnapshotPresentationKey: string | null = null;
   /** Once-only guard for the TRUE leave arriving after an ME-spawned battle. */
   private detachedBattleEndCompleted = false;
+  /** A detached surface-specific driver owns the post-battle continuation for this replay. */
+  private battleEndDelegateOwnsContinuation = false;
   /** Initial top-level selector ownership/race is entered once, even if raw + snapshot presentations race. */
   private initialPresentationEntered = false;
   private boundRuntime: ReturnType<typeof getCoopRuntime> = null;
@@ -255,6 +264,8 @@ export class CoopReplayMePhase extends Phase {
   private boundScene: typeof globalScene | null = null;
   /** Once-resolved shop edge, inherited by every outcome-pump re-arm just like the terminal arm. */
   private liveShopArm: MeShopArm | undefined;
+  /** Outcome waiter installed before a queued post-battle successor can be overtaken by its old instance. */
+  private prearmedPresentationOutcome: Promise<CoopInteractionOutcome | null> | undefined;
 
   /** Exact scene/runtime/controller/generation/replay/pin fence for every detached UI continuation. */
   private boundaryStillLive(): boolean {
@@ -272,7 +283,7 @@ export class CoopReplayMePhase extends Phase {
     return globalScene.ui.setModeBoundedWhen(mode, 2_000, () => this.boundaryStillLive(), ...args);
   }
 
-  constructor(interactionCounter: number) {
+  constructor(interactionCounter: number, resumeSettlement?: CoopMeBattleSettlementResume) {
     super();
     this.interactionCounter = interactionCounter;
     this.seq = COOP_ME_PUMP_SEQ_BASE + interactionCounter;
@@ -281,6 +292,21 @@ export class CoopReplayMePhase extends Phase {
     this.boundController = getCoopController();
     this.boundGeneration = coopSessionGeneration();
     this.boundScene = globalScene;
+    if (resumeSettlement != null) {
+      this.acceptedTerminal = {
+        kind: "battle-settled",
+        ...resumeSettlement,
+      };
+    }
+  }
+
+  /**
+   * Supersede the pre-battle replay's waiter before this successor is queued behind any interstitial.
+   * The relay permits one waiter per seq, so installing this arm is the atomic ownership transfer.
+   */
+  public prearmQueuedBattleResume(relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>): void {
+    activeCoopReplayMePhase = this;
+    this.prearmedPresentationOutcome = relay.awaitInteractionOutcome(this.seq, COOP_ME_REPLAY_WAIT_MS);
   }
 
   public override start(): void {
@@ -398,7 +424,9 @@ export class CoopReplayMePhase extends Phase {
       });
       relay.onRewardOptionsBuffered(shopKeyPrefix);
     }
-    this.awaitHostPresentationThenEnter(relay);
+    const prearmedPresentation = this.prearmedPresentationOutcome;
+    this.prearmedPresentationOutcome = undefined;
+    this.awaitHostPresentationThenEnter(relay, prearmedPresentation);
   }
 
   /**
@@ -432,13 +460,16 @@ export class CoopReplayMePhase extends Phase {
   }
 
   /** Await and adopt the exact host selector; a null/malformed result re-requests control, never re-derives. */
-  private awaitHostPresentationThenEnter(relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>): void {
+  private awaitHostPresentationThenEnter(
+    relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+    prearmedPresentation?: Promise<CoopInteractionOutcome | null>,
+  ): void {
     void (async () => {
       coopLog("me", "await host presentation (mePresent)", {
         seq: this.seq,
         timeoutMs: COOP_ME_REPLAY_WAIT_MS,
       });
-      const present = await relay.awaitInteractionOutcome(this.seq, COOP_ME_REPLAY_WAIT_MS);
+      const present = await (prearmedPresentation ?? relay.awaitInteractionOutcome(this.seq, COOP_ME_REPLAY_WAIT_MS));
       if (!this.boundaryStillLive()) {
         return;
       }
@@ -456,8 +487,10 @@ export class CoopReplayMePhase extends Phase {
       const enc = globalScene.currentBattle.mysteryEncounter;
       if (enc != null) {
         enc.dialogueTokens = { ...enc.dialogueTokens, ...present.tokens };
-        coopMeHostPresentation = present;
       }
+      // The authoritative renderer may intentionally have no live MysteryEncounter mechanics object after
+      // a retained battle. The streamed presentation remains the sole UI authority in that state.
+      coopMeHostPresentation = present;
       coopLog("me", "adopted host presentation", {
         seq: this.seq,
         opts: present.meetsReqs.length,
@@ -636,7 +669,7 @@ export class CoopReplayMePhase extends Phase {
       if (
         control == null
         || control.interactionCounter !== this.interactionCounter
-        || control.terminal !== "pending"
+        || (control.terminal !== "pending" && control.terminal !== "battle-settled")
         || control.presentation == null
         || JSON.stringify(control.presentation) !== JSON.stringify(present)
       ) {
@@ -928,8 +961,8 @@ export class CoopReplayMePhase extends Phase {
     const enc = globalScene.currentBattle.mysteryEncounter;
     if (enc != null) {
       enc.dialogueTokens = { ...enc.dialogueTokens, ...present.tokens };
-      coopMeHostPresentation = present;
     }
+    coopMeHostPresentation = present;
     const ownsMe = getCoopController()?.isLocalOwnerAtCounter(this.interactionCounter) ?? false;
     if (ownsMe) {
       // One pick PER ROUND: re-open the pick relay (the #815 single-pick guard is per-round for a repeated
@@ -1180,8 +1213,12 @@ export class CoopReplayMePhase extends Phase {
       if (this.acceptedTerminal.kind === "pending") {
         return transaction.step === 0;
       }
+      const nextBattleSurfaceReady = this.battleEndDelegateOwnsContinuation
+        ? globalScene.phaseManager.getCurrentPhase()?.phaseName === "BattleEndPhase"
+        : globalScene.phaseManager.getCurrentPhase() === this;
       return (
         this.acceptedTerminal.kind === "battle-settled"
+        && nextBattleSurfaceReady
         && ((this.acceptedTerminal.operationId === transaction.operationId
           && this.acceptedTerminal.step === transaction.step)
           || transaction.step === this.acceptedTerminal.step + 1)
@@ -1201,7 +1238,9 @@ export class CoopReplayMePhase extends Phase {
       this.acceptedTerminal.kind !== "battle-settled"
       || (this.acceptedTerminal.continuation === "rewards"
         ? currentPhaseName === "PostMysteryEncounterPhase"
-        : currentPhaseName === "BattleEndPhase");
+        : this.battleEndDelegateOwnsContinuation
+          ? currentPhaseName === "BattleEndPhase"
+          : globalScene.phaseManager.getCurrentPhase() === this);
     return (
       (this.acceptedTerminal.kind === "pending" && transaction.step === 0)
       || (this.acceptedTerminal.kind === "battle-settled"
@@ -1291,9 +1330,43 @@ export class CoopReplayMePhase extends Phase {
       revision: captureCoopActiveMysteryControl()?.revision ?? 0,
       continuation: destination.continuation,
     };
-    if (destination.continuation !== "rewards" && !destination.trainerVictory) {
-      // A host-only doContinue/press-your-luck callback owns the next retained battle/leave step. Keep the
-      // exact BattleEnd parked so an empty queue can never manufacture a phantom command meanwhile.
+    if (destination.continuation === "encounter") {
+      if (this.battleEndDelegateOwnsContinuation) {
+        // The Colosseum's detached board driver already owns the between-round surface and next terminal.
+        // Replacing it with the generic presentation pump would race two consumers on different seqs.
+        return true;
+      }
+      // The host-only doContinue callback now owns a fresh presentation, another battle, or the true leave.
+      // Replace the parked BattleEnd with a new renderer carrying the exact settled lifecycle cursor. A
+      // fresh instance also invalidates every detached promise/listener owned by the pre-battle renderer.
+      globalScene.phaseManager.clearPhaseQueue();
+      const successor = globalScene.phaseManager.create("CoopReplayMePhase", this.interactionCounter, {
+        operationId,
+        step,
+        revision: this.acceptedTerminal.revision,
+        continuation: destination.continuation,
+      });
+      const relay = getCoopInteractionRelay();
+      if (relay == null) {
+        failCoopSharedSession("A retained Mystery continuation had no interaction relay.");
+        return true;
+      }
+      this.disposeRecoveryTimer();
+      this.offMeMessage?.();
+      this.offMeMessage = null;
+      if (relay.onRewardOptionsBuffered != null) {
+        relay.onRewardOptionsBuffered = null;
+      }
+      successor.prearmQueuedBattleResume(relay);
+      if (destination.trainerVictory) {
+        globalScene.phaseManager.pushNew("TrainerVictoryPhase");
+      }
+      globalScene.phaseManager.pushPhase(successor);
+      current.end();
+      return true;
+    }
+    if (destination.continuation === "none") {
+      failCoopSharedSession("A retained Mystery battle settlement had no executable continuation.");
       return true;
     }
     if (destination.trainerVictory) {
@@ -1304,11 +1377,6 @@ export class CoopReplayMePhase extends Phase {
       if (destination.eggLapse) {
         globalScene.phaseManager.pushNew("EggLapsePhase");
       }
-    } else {
-      // Repeated trainer encounters still show the defeated-trainer interstitial. Re-park behind it on
-      // an ME-owned BattleEnd fence so queue drain cannot infer a phantom turn before the next retained
-      // battle/leave step arrives from the host callback.
-      globalScene.phaseManager.pushNew("BattleEndPhase", destination.result === "victory");
     }
     current.end();
     return true;
@@ -1388,6 +1456,11 @@ export class CoopReplayMePhase extends Phase {
       getCoopRuntime()?.durability?.reconnect();
       return;
     }
+    if (snapshot.terminal === "battle-settled") {
+      // The settlement is a lifecycle cursor, not a leave. Its complete journal transaction (including
+      // continuation) must rearm the renderer; a diagnostics-only snapshot cannot invent that destination.
+      return;
+    }
     this.disposeRecoveryTimer();
     this.terminalRecoveryAttempt = 0;
     if (snapshot.terminal === "battle") {
@@ -1465,7 +1538,7 @@ export class CoopReplayMePhase extends Phase {
     if (rebound.retryUncommittedPick) {
       this.pickSent = false;
     }
-    coopMeSnapshotRebindDelegate?.(snapshot);
+    this.battleEndDelegateOwnsContinuation ||= coopMeSnapshotRebindDelegate?.(snapshot) === true;
     if (snapshot.presentation != null) {
       const enc = globalScene.currentBattle?.mysteryEncounter;
       if (enc != null) {
@@ -1476,9 +1549,27 @@ export class CoopReplayMePhase extends Phase {
       }
       coopMeHostPresentation = snapshot.presentation;
     }
-    if (snapshot.terminal !== "pending") {
+    if (
+      snapshot.terminal === "battle-settled"
+      && snapshot.terminalOperationId != null
+      && snapshot.terminalStep != null
+    ) {
+      const sameSettlement =
+        this.acceptedTerminal.kind === "battle-settled"
+        && this.acceptedTerminal.operationId === snapshot.terminalOperationId
+        && this.acceptedTerminal.step === snapshot.terminalStep;
+      // Diagnostics-only recovery control does not contain the settlement DATA or continuation. Only the
+      // complete journal transaction may create this cursor; an exact successor may rebind its presentation.
+      if (!sameSettlement) {
+        getCoopRuntime()?.durability?.reconnect();
+        return;
+      }
+    } else if (snapshot.terminal !== "pending") {
       this.applyVerifiedSnapshotTerminal(snapshot);
       return;
+    }
+    if (this.acceptedTerminal.kind === "battle-settled" && globalScene.phaseManager.getCurrentPhase() !== this) {
+      return; // retain the carrier while a declared interstitial still owns the executable surface
     }
     this.disposeRecoveryTimer();
     this.terminalRecoveryAttempt = 0;
@@ -1790,6 +1881,7 @@ export class CoopReplayMePhase extends Phase {
           seqTerm: this.seqTerm,
           relay: relayRef,
         });
+      this.battleEndDelegateOwnsContinuation ||= delegateOwnsTerminal;
       if (!delegateOwnsTerminal && !isCoopMeOperationJournalActive()) {
         const awaitTrueLeave = (): void => {
           void relayRef
@@ -1847,7 +1939,14 @@ export class CoopReplayMePhase extends Phase {
       }
     } else {
       const battle = globalScene.currentBattle;
-      const encounter = battle?.mysteryEncounter;
+      let encounter = battle?.mysteryEncounter;
+      if (battle != null && encounter == null && battle.mysteryEncounterType != null) {
+        // Encounter authority deliberately clears the guest's mechanics object. Rehydrate only the exact
+        // host-stated type as a presentation shell for MysteryEncounterBattlePhase; journal mode still
+        // bypasses every local option/reward/victory mechanic.
+        encounter = globalScene.getMysteryEncounter(battle.mysteryEncounterType);
+        battle.mysteryEncounter = encounter;
+      }
       if (battle == null || encounter == null) {
         throw new Error("committed Mystery battle has no live encounter");
       }

@@ -171,9 +171,11 @@ export class BattleEndPhase extends BattlePhase {
     globalScene.phaseManager.removeAllPhasesOfType("BattleEndPhase");
 
     const retainedBinding = this.retainedWaveBinding ?? getCoopWaveAdvanceRuntimeBinding();
-    // ME settlement is owned by the pinned ME terminal stream, not the wave ledger. Check it before the
-    // generic missing-wave-binding failure so an exact retained ME BattleEnd can wait for its own carrier.
-    if (holdForCoopMeBattleSettlementAtBattleEnd()) {
+    const retainedWaveBoundary = retainedBinding == null ? null : getCoopPendingWaveAdvanceBoundary(retainedBinding);
+    // A runtime always owns a wave-ledger binding, including during an ME battle. Only an actual staged
+    // WAVE_ADVANCE boundary makes this BattleEnd wave-owned; otherwise the pinned ME terminal stream owns
+    // settlement and the renderer must park here instead of running shared BattleEnd mutations locally.
+    if (retainedWaveBoundary == null && holdForCoopMeBattleSettlementAtBattleEnd()) {
       return;
     }
     if (isCoopAuthoritativeGuest() && retainedBinding == null) {

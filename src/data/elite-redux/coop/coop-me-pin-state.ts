@@ -413,7 +413,7 @@ export function setCoopMeActivePresentation(presentation: CoopMePresentation, re
     return; // an async/late presentation can never regress an already-committed terminal
   }
   const nextControl: CoopActiveMysteryEncounterSnapshotV1 =
-    prior?.terminal === "battle"
+    prior?.terminal === "battle" || prior?.terminal === "battle-settled"
       ? {
           ...prior,
           revision: prior.revision + 1,
@@ -438,7 +438,10 @@ export function setCoopMeActivePresentation(presentation: CoopMePresentation, re
 
 /** Advance host-confirmed guest intent ordinals without allowing a reconnect snapshot to reset them. */
 export function setCoopMeOwnerIntentOrdinals(pinned: number, nextPickStep?: number, nextSubPickStep?: number): void {
-  if (coopMeActiveControl?.interactionCounter !== pinned || coopMeActiveControl.terminal !== "pending") {
+  if (
+    coopMeActiveControl?.interactionCounter !== pinned
+    || (coopMeActiveControl.terminal !== "pending" && coopMeActiveControl.terminal !== "battle-settled")
+  ) {
     return;
   }
   if (
@@ -467,7 +470,9 @@ export function setCoopMeColosseumControl(
 ): boolean {
   if (
     coopMeActiveControl?.interactionCounter !== pinned
-    || (coopMeActiveControl.terminal !== "pending" && coopMeActiveControl.terminal !== "battle")
+    || (coopMeActiveControl.terminal !== "pending"
+      && coopMeActiveControl.terminal !== "battle"
+      && coopMeActiveControl.terminal !== "battle-settled")
     || !isValidColosseumControl(colosseum, pinned)
   ) {
     return false;

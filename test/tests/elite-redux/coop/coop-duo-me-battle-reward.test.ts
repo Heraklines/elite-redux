@@ -205,6 +205,7 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       const victory = rig.guestScene.phaseManager.create("VictoryPhase", enemies[0]!.getBattlerIndex());
       expect(victory.phaseName, "strict renderer gate constructs the sanctioned Victory").toBe("VictoryPhase");
       expect(rig.guestScene.phaseManager.overridePhase(victory), "real Victory starts on the renderer").toBe(true);
+      victory.start();
       const queuedAfterVictory = rig.guestScene.phaseManager.getQueuedPhaseNames();
       expect(queuedAfterVictory, "Victory constructed its real retained BattleEnd").toContain("BattleEndPhase");
       const restored = rig.guestScene.phaseManager.getCurrentPhase();
@@ -212,7 +213,16 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       expect(rig.guestScene.phaseManager.getCurrentPhase()?.phaseName, "guest parks on exact ME BattleEnd").toBe(
         "BattleEndPhase",
       );
-      return { queuedAfterVictory, turnBefore, turnAfter: rig.guestScene.currentBattle.turn };
+      const guestBattleEnd = rig.guestScene.phaseManager.getCurrentPhase();
+      const heldEnd = vi.spyOn(guestBattleEnd, "end");
+      const scoreBeforeHold = rig.guestScene.score;
+      guestBattleEnd.start();
+      expect(heldEnd, "guest BattleEnd does not release before the retained settlement").not.toHaveBeenCalled();
+      expect(rig.guestScene.phaseManager.getCurrentPhase(), "the exact BattleEnd remains current while held").toBe(
+        guestBattleEnd,
+      );
+      expect(rig.guestScene.score, "renderer ran no shared BattleEnd score mutation while held").toBe(scoreBeforeHold);
+      return { heldEnd, queuedAfterVictory, turnBefore, turnAfter: rig.guestScene.currentBattle.turn };
     });
     expect(
       queued.queuedAfterVictory,
@@ -232,10 +242,16 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       }
       const victory = hostScene.phaseManager.create("VictoryPhase", hostEnemies[0]!.getBattlerIndex());
       expect(hostScene.phaseManager.overridePhase(victory), "host runs the real ME Victory").toBe(true);
+      victory.start();
       expect(hostScene.phaseManager.getQueuedPhaseNames(), "Victory wired the planned BattleEnd").toContain(
         "BattleEndPhase",
       );
-      hostScene.phaseManager.getCurrentPhase().end();
+      const restored = hostScene.phaseManager.getCurrentPhase();
+      restored.end();
+      expect(hostScene.phaseManager.getCurrentPhase()?.phaseName, "host reached the exact planned BattleEnd").toBe(
+        "BattleEndPhase",
+      );
+      hostScene.phaseManager.getCurrentPhase().start();
       expect(
         [hostScene.phaseManager.getCurrentPhase()?.phaseName, ...hostScene.phaseManager.getQueuedPhaseNames()],
         "real BattleEnd released the host toward its ME rewards",
@@ -243,6 +259,7 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
     });
     await drainLoopback();
     await withClient(rig.guestCtx, async () => {
+      expect(queued.heldEnd, "the exact held BattleEnd releases once after settlement").toHaveBeenCalledTimes(1);
       const currentName = rig.guestScene.phaseManager.getCurrentPhase()?.phaseName;
       const rewardQueue = rig.guestScene.phaseManager.getQueuedPhaseNames();
       expect([currentName, ...rewardQueue], "settlement releases into real reward presentation").toContain(

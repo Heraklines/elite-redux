@@ -14,11 +14,12 @@ import {
   setCoopMeActivePresentation,
   setCoopMeColosseumControl,
   setCoopMeInteractionStart,
+  setCoopMeOwnerIntentOrdinals,
   setCoopMeTerminalControl,
   setOnMePinCleared,
   setOnMeSnapshotRebind,
 } from "#data/elite-redux/coop/coop-me-pin-state";
-import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import { COOP_ME_BATTLE_SETTLED_CHOICE, makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopActiveMysteryEncounterSnapshotV1 } from "#data/elite-redux/coop/coop-transport";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -68,7 +69,22 @@ describe("co-op Mystery active-control snapshot/rejoin", () => {
     setCoopMeActivePresentation({ ...presentation, labels: ["LATE"] });
     expect(captureCoopActiveMysteryControl()?.terminal, "late UI cannot regress a committed terminal").toBe("battle");
     expect(captureCoopActiveMysteryControl()?.presentation?.labels[0]).toBe("Take it");
-    setCoopMeTerminalControl("leave", undefined, { operationId: terminalOp(41, 1), step: 1, choice: -1 });
+    setCoopMeTerminalControl("battle-settled", 7, {
+      operationId: terminalOp(41, 1),
+      step: 1,
+      choice: COOP_ME_BATTLE_SETTLED_CHOICE,
+    });
+    const resumedPresentation = { ...presentation, labels: ["Continue", "Leave"] };
+    setCoopMeActivePresentation(resumedPresentation);
+    setCoopMeOwnerIntentOrdinals(41, 1, 2);
+    expect(captureCoopActiveMysteryControl()).toMatchObject({
+      terminal: "battle-settled",
+      terminalStep: 1,
+      nextPickStep: 1,
+      nextSubPickStep: 2,
+      presentation: resumedPresentation,
+    });
+    setCoopMeTerminalControl("leave", undefined, { operationId: terminalOp(41, 2), step: 2, choice: -1 });
     setCoopMeTerminalControl("battle", 99, { operationId: terminalOp(41, 0), step: 0, choice: -1000 });
     expect(captureCoopActiveMysteryControl()?.terminal, "an old handoff cannot rewind the true leave").toBe("leave");
   });
@@ -81,17 +97,23 @@ describe("co-op Mystery active-control snapshot/rejoin", () => {
       step: 0,
       choice: -1000,
     });
-    setCoopMeTerminalControl("battle", 9, {
+    setCoopMeTerminalControl("battle-settled", 4, {
       operationId: terminalOp(47, 1),
       step: 1,
+      choice: COOP_ME_BATTLE_SETTLED_CHOICE,
+    });
+    expect(setCoopMeColosseumControl(47, { expectedRound: 2, boardRound: 2 })).toBe(true);
+    setCoopMeTerminalControl("battle", 9, {
+      operationId: terminalOp(47, 2),
+      step: 2,
       choice: -1000,
     });
     expect(captureCoopActiveMysteryControl()).toMatchObject({
       interactionCounter: 47,
       terminal: "battle",
-      terminalStep: 1,
+      terminalStep: 2,
       hostTurn: 9,
-      colosseum: { expectedRound: 1, boardRound: 1 },
+      colosseum: { expectedRound: 2, boardRound: 2 },
     });
 
     const round2 = captureCoopActiveMysteryControl()!;
@@ -99,25 +121,38 @@ describe("co-op Mystery active-control snapshot/rejoin", () => {
       restoreCoopActiveMysteryControl({
         ...round2,
         revision: round2.revision + 1,
+        terminal: "leave",
         terminalOperationId: terminalOp(47, 3),
         terminalStep: 3,
+        terminalChoice: -1,
+        hostTurn: undefined,
       }),
-      "a rejoin snapshot cannot skip an addressed battle step",
+      "the exact next step cannot leave directly after a battle handoff",
     ).toBe(false);
-    const finalLeave: CoopActiveMysteryEncounterSnapshotV1 = {
+    const settledRound2: CoopActiveMysteryEncounterSnapshotV1 = {
       ...round2,
       revision: round2.revision + 1,
+      terminal: "battle-settled",
+      terminalOperationId: terminalOp(47, 3),
+      terminalStep: 3,
+      terminalChoice: COOP_ME_BATTLE_SETTLED_CHOICE,
+      hostTurn: 9,
+    };
+    expect(restoreCoopActiveMysteryControl(settledRound2)).toBe(true);
+    const finalLeave: CoopActiveMysteryEncounterSnapshotV1 = {
+      ...settledRound2,
+      revision: settledRound2.revision + 1,
       terminal: "leave",
-      terminalOperationId: terminalOp(47, 2),
-      terminalStep: 2,
+      terminalOperationId: terminalOp(47, 4),
+      terminalStep: 4,
       terminalChoice: -1,
       hostTurn: undefined,
     };
     expect(restoreCoopActiveMysteryControl(finalLeave)).toBe(true);
-    expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "leave", terminalStep: 2 });
+    expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "leave", terminalStep: 4 });
     setCoopMeTerminalControl("battle", 10, {
-      operationId: terminalOp(47, 3),
-      step: 3,
+      operationId: terminalOp(47, 5),
+      step: 5,
       choice: -1000,
     });
     expect(captureCoopActiveMysteryControl()?.terminal, "final leave remains terminal-final").toBe("leave");
@@ -229,13 +264,34 @@ describe("co-op Mystery active-control snapshot/rejoin", () => {
         ...battle,
         revision: 4,
         terminal: "leave",
-        terminalOperationId: terminalOp(61, 0),
-        terminalStep: 0,
+        terminalOperationId: terminalOp(61, 1),
+        terminalStep: 1,
         terminalChoice: -1,
         hostTurn: undefined,
       }),
-      "a post-battle leave must be the distinct step-1 operation",
+      "the exact step-1 operation must settle the battle before it can leave",
     ).toBe(false);
+    const settled: CoopActiveMysteryEncounterSnapshotV1 = {
+      ...battle,
+      revision: 4,
+      terminal: "battle-settled",
+      terminalOperationId: terminalOp(61, 1),
+      terminalStep: 1,
+      terminalChoice: COOP_ME_BATTLE_SETTLED_CHOICE,
+    };
+    expect(restoreCoopActiveMysteryControl(settled)).toBe(true);
+    expect(
+      restoreCoopActiveMysteryControl({
+        ...settled,
+        revision: 5,
+        terminal: "leave",
+        terminalOperationId: terminalOp(61, 2),
+        terminalStep: 2,
+        terminalChoice: -1,
+        hostTurn: undefined,
+      }),
+      "the next exact operation may leave after the battle settlement",
+    ).toBe(true);
     expect(
       restoreCoopActiveMysteryControl({
         ...pending,
