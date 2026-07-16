@@ -346,6 +346,16 @@ class CoopResumeReplicaUnavailableError extends Error {
   }
 }
 
+/**
+ * One immutable lobby scan. Slot failures stay attached to their slot so discovery can
+ * still inspect every other replica and make a partner-specific decision. Global
+ * account/cloud-scan failures still reject the scan itself.
+ */
+export interface CoopResumeLobbySnapshot {
+  sessions: Map<number, CoopResumeLoadedSession | undefined>;
+  failures: Map<number, Error>;
+}
+
 interface ImportableLocalSessionSave {
   slot: number;
   data: string;
@@ -2152,17 +2162,26 @@ export class GameData {
     return { session: cloud.session!, sessionJson: cloud.raw };
   }
 
-  async getSessionsForCoopResume(): Promise<Map<number, CoopResumeLoadedSession | undefined>> {
+  async getCoopResumeLobbySnapshot(): Promise<CoopResumeLobbySnapshot> {
     const accountIdentity = this.currentPersistenceAccount();
     if (!bypassLogin && accountIdentity == null) {
       throw new CoopResumeReplicaUnavailableError("co-op resume has no authenticated account identity");
     }
-    const result = new Map<number, CoopResumeLoadedSession | undefined>();
+    const sessions = new Map<number, CoopResumeLoadedSession | undefined>();
+    const failures = new Map<number, Error>();
+    const recordSlotFailure = (slot: number, error: unknown): void => {
+      failures.set(
+        slot,
+        error instanceof Error
+          ? error
+          : new CoopResumeReplicaUnavailableError(`slot ${slot} reconciliation failed: ${String(error)}`),
+      );
+    };
     if (bypassLogin) {
       for (let slot = 0; slot < 5; slot++) {
         const raw = localStorage.getItem(this.sessionStorageKeyForAccount(slot, accountIdentity));
         if (raw == null) {
-          result.set(slot, undefined);
+          sessions.set(slot, undefined);
           continue;
         }
         // A malformed / wrong-codec local blob makes decrypt() throw a raw URIError; surface it as an explicit
@@ -2172,21 +2191,47 @@ export class GameData {
         try {
           json = decrypt(raw, bypassLogin);
         } catch (error) {
-          throw new CoopResumeReplicaUnavailableError(`local slot ${slot} is unreadable: ${String(error)}`);
+          recordSlotFailure(
+            slot,
+            new CoopResumeReplicaUnavailableError(`local slot ${slot} is unreadable: ${String(error)}`),
+          );
+          continue;
         }
-        const replica = await this.classifyCoopReplica(slot, json);
-        if (replica.session == null) {
-          throw new CoopResumeReplicaUnavailableError(`local slot ${slot} could not be classified`);
+        try {
+          const replica = await this.classifyCoopReplica(slot, json);
+          if (replica.session == null) {
+            throw new CoopResumeReplicaUnavailableError(`local slot ${slot} could not be classified`);
+          }
+          sessions.set(slot, { session: replica.session, sessionJson: replica.raw });
+        } catch (error) {
+          recordSlotFailure(slot, error);
         }
-        result.set(slot, { session: replica.session, sessionJson: replica.raw });
       }
-      return result;
+      return { sessions, failures };
     }
     const cloud = await this.scanCoopCloudReplicas(accountIdentity!);
     for (let slot = 0; slot < 5; slot++) {
-      result.set(slot, await this.reconcileCoopResumeSlot(slot, accountIdentity!, cloud.get(slot) ?? null));
+      try {
+        sessions.set(slot, await this.reconcileCoopResumeSlot(slot, accountIdentity!, cloud.get(slot) ?? null));
+      } catch (error) {
+        recordSlotFailure(slot, error);
+      }
     }
-    return result;
+    return { sessions, failures };
+  }
+
+  /**
+   * Strict programmatic scan retained for persistence callers and existing tests. The
+   * public lobby uses {@linkcode getCoopResumeLobbySnapshot} so one quarantined slot
+   * cannot erase a valid candidate in another slot or collapse the whole connection.
+   */
+  async getSessionsForCoopResume(): Promise<Map<number, CoopResumeLoadedSession | undefined>> {
+    const snapshot = await this.getCoopResumeLobbySnapshot();
+    const firstFailure = snapshot.failures.values().next().value;
+    if (firstFailure != null) {
+      throw firstFailure;
+    }
+    return snapshot.sessions;
   }
 
   async getSessionForCoopResume(slotId: number): Promise<CoopResumeLoadedSession | undefined> {
