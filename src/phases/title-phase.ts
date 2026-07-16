@@ -1273,7 +1273,14 @@ export class TitlePhase extends Phase {
                 // fences it across the launch, and wins the backend empty-slot CAS before release.
                 // Require an explicit press so an ambiguous/legacy save is never silently ignored.
                 stage.setStatus("A save conflict was isolated. Start a separate run?");
-                globalScene.ui.setMode(UiMode.MESSAGE);
+                // The mode transition is asynchronous. Installing the callback before it settles
+                // lets the late Title -> Message switch replace the handler that owns the prompt,
+                // leaving a visible but permanently inert confirmation.
+                await globalScene.ui.setMode(UiMode.MESSAGE);
+                if (!isCurrentSession()) {
+                  return;
+                }
+                globalScene.ui.resetModeChain();
                 globalScene.ui.showText(
                   `${blockedMessage}\n\nPress to start a separate co-op run. Existing saves will not be overwritten.`,
                   null,
