@@ -89,28 +89,25 @@ export async function waitForSemanticSurface(client, surfaceId, { fromCursor = 0
   return event;
 }
 
-/** Select the first visibly empty save slot; loading/occupied slots are never guessed from cursor position. */
+/**
+ * Select slot zero on the fresh-account SAVE screen. The registered-account fixture has no saves; this
+ * helper waits for the real handler's public semantic cursor before issuing the same ACTION a player uses.
+ */
 export async function selectFirstEmptySaveSlot(client, { fromCursor = 0, timeoutMs = 15_000 } = {}) {
   const ready = await client.evidence.waitForCondition(
     sink => {
       const event = sink.findLastSemanticSurface(fromCursor, "save-slot");
-      return event?.observation.ready.handlerActive === true
-        && event.observation.optionIds?.some(optionId => optionId.startsWith("empty-slot:"))
+      return event?.observation.ready.handlerActive === true && event.observation.selectedOptionId === "cursor:0"
         ? event
         : null;
     },
-    { timeoutMs, description: "visible first empty save slot" },
+    { timeoutMs, description: "fresh-account first save slot cursor" },
   );
-  const targetId = ready.observation.optionIds.find(optionId => optionId.startsWith("empty-slot:"));
-  if (targetId == null) {
-    throw new Error(`${client.label}: save-slot readiness proof had no empty slot`);
-  }
-  return selectOptionById(client, {
-    surfaceId: "save-slot",
-    targetId,
-    navKeys: ["ArrowUp", "ArrowDown"],
-    timeoutMs,
+  client.evidence.record("fresh-save-slot-proof", {
+    surfaceId: ready.observation.surfaceId,
+    selectedOptionId: ready.observation.selectedOptionId,
   });
+  await client.press("Space", "fresh-save-slot-0");
 }
 
 /**

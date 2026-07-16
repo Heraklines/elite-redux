@@ -58,16 +58,17 @@ test("workflow builds the staging-only fifth difficulty and fans a fixed ten-wav
   assert.match(workflow, /VITE_DEV_TOOLS: 1/u);
   assert.match(
     workflow,
-    /profile: mystery-gauntlet\s+artifact: mystery\s+waves: "10"\s+difficulty: mystery\s+require_mystery: "1"/u,
+    /profile: mystery-gauntlet\s+artifact: mystery\s+waves: "10"\s+difficulty: mystery\s+difficulty_option: mystery-test\s+require_mystery: "1"/u,
   );
   assert.match(workflow, /COOP_UI_DIFFICULTY_ID: \$\{\{ matrix\.difficulty \}\}/u);
+  assert.match(workflow, /COOP_UI_DIFFICULTY_OPTION_ID: \$\{\{ matrix\.difficulty_option \}\}/u);
   assert.match(workflow, /COOP_UI_REQUIRE_MYSTERY_GAUNTLET: \$\{\{ matrix\.require_mystery \}\}/u);
 });
 
 test("campaign requires paired runConfig, the exact semantic schedule, and retained terminals", async () => {
   const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");
   const campaign = await readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8");
-  assert.match(harness, /targetId: this\.config\.difficultyId/u);
+  assert.match(harness, /targetId: this\.config\.difficultyOptionId/u);
   assert.match(harness, /guest received difficulty=\$\{this\.config\.difficultyId\}/u);
   assert.match(harness, /difficulty-\$\{this\.config\.difficultyId\}-attested/u);
   assert.match(campaign, /\[2, "mystery"\][\s\S]*\[6, "mystery"\][\s\S]*\[9, "bargain"\][\s\S]*\[10, "mystery"\]/u);
@@ -97,11 +98,10 @@ test("the continuity profile visibly declines Bargain and co-op cannot persist a
 });
 
 test("the companion solo lane publicly selects a readiness-proven empty save slot", async () => {
-  const observer = await readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8");
   const navigation = await readFile(resolve(root, "test/browser/coop-public-ui/campaign-nav.mjs"), "utf8");
   const solo = await readFile(resolve(root, "test/browser/coop-public-ui/solo-classic.mjs"), "utf8");
-  assert.match(observer, /slot\.hasData === false[\s\S]*`empty-slot:\$\{index\}`/u);
   assert.match(navigation, /event\?\.observation\.ready\.handlerActive === true/u);
-  assert.match(navigation, /optionId\.startsWith\("empty-slot:"\)/u);
+  assert.match(navigation, /event\.observation\.selectedOptionId === "cursor:0"/u);
+  assert.match(navigation, /await client\.press\("Space", "fresh-save-slot-0"\)/u);
   assert.match(solo, /await selectFirstEmptySaveSlot\(client,/u);
 });
