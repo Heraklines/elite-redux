@@ -95,6 +95,11 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
     harness,
     /waitForSemanticSurface\(this, "auth:login-or-register",[\s\S]*?handlerActive !== true[\s\S]*?press\("Enter", "open-login-form"\)/u,
   );
+  assert.doesNotMatch(harness, /keyboard\.press\("Control\+A"\)/u);
+  assert.match(
+    harness,
+    /selectAllFocusedText\(\)[\s\S]*?keyboard\.down\("Control"\)[\s\S]*?keyboard\.press\("a"\)[\s\S]*?keyboard\.up\("Control"\)/u,
+  );
   assert.match(
     harness,
     /observation != null[\s\S]*?observation\.coop === false[\s\S]*?ownerModel === "local"[\s\S]*?seatsWithInput\?\.includes\(0\)/u,

@@ -855,13 +855,23 @@ export class PublicUiClient {
     }
     this.evidence.record("fill-login-form", { fields: ["username", "password"], values: "<redacted>" });
     await usernameInput.click({ clickCount: 3 });
-    await this.page.keyboard.press("Control+A");
+    await this.selectAllFocusedText();
     await this.page.keyboard.type(this.credentials.username, { delay: 20 });
     await passwordInput.click({ clickCount: 3 });
-    await this.page.keyboard.press("Control+A");
+    await this.selectAllFocusedText();
     await this.page.keyboard.type(this.credentials.password, { delay: 20 });
     await this.press("Enter", "submit-login-form");
     await this.clearDomInputFocus();
+  }
+
+  /** Send the real select-all keyboard chord; Puppeteer does not accept composite key names. */
+  async selectAllFocusedText() {
+    await this.page.keyboard.down("Control");
+    try {
+      await this.page.keyboard.press("a");
+    } finally {
+      await this.page.keyboard.up("Control");
+    }
   }
 
   /**
