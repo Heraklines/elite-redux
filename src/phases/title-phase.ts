@@ -1238,33 +1238,6 @@ export class TitlePhase extends Phase {
               return;
             }
 
-            // HOST: is there a saved run with EXACTLY this partner (self+partner account pair)?
-            const resumeSnapshot = await globalScene.gameData.getSessionsForCoopResume();
-            const discovery = await findCoopResumeCandidate(
-              controller.localName(),
-              partner,
-              controller.role,
-              async slot => resumeSnapshot.get(slot),
-            );
-            if (!isCurrentSession()) {
-              return;
-            }
-            const blockedMessage = coopResumeBlockMessage(discovery);
-            if (blockedMessage != null && discovery.kind !== "candidate" && discovery.kind !== "no-save") {
-              const acknowledged = await controller.sendResumeBlocked(
-                discovery.kind === "replica-indeterminate" ? "replica-unavailable" : discovery.kind,
-                discovery.wave,
-              );
-              if (!isCurrentSession()) {
-                return;
-              }
-              if (!acknowledged) {
-                console.warn(`[coop-resume] guest did not ACK blocked-save reason=${discovery.kind}`);
-              }
-              terminalFailure(blockedMessage);
-              return;
-            }
-            const marker = discovery.kind === "candidate" ? discovery.candidate : null;
             // Every host non-resume path relays the release so the waiting guest never hangs.
             const hostStartNew = () => {
               if (!isCurrentSession()) {
@@ -1292,6 +1265,55 @@ export class TitlePhase extends Phase {
                   terminalFailure("Could not commit the new co-op run. Reconnect and try again.");
                 });
             };
+
+            // HOST: is there a saved run with EXACTLY this partner (self+partner account pair)?
+            // Keep failures attached to their slots. A corrupt/ambiguous slot must not hide a valid
+            // candidate elsewhere or tear down an otherwise healthy paired transport.
+            const resumeSnapshot = await globalScene.gameData.getCoopResumeLobbySnapshot();
+            const discovery = await findCoopResumeCandidate(
+              controller.localName(),
+              partner,
+              controller.role,
+              async slot => {
+                const failure = resumeSnapshot.failures.get(slot);
+                if (failure != null) {
+                  throw failure;
+                }
+                return resumeSnapshot.sessions.get(slot);
+              },
+            );
+            if (!isCurrentSession()) {
+              return;
+            }
+            const blockedMessage = coopResumeBlockMessage(discovery);
+            if (blockedMessage != null && discovery.kind !== "candidate" && discovery.kind !== "no-save") {
+              if (discovery.kind !== "replica-unavailable") {
+                // A fresh run is safe even when an old slot is quarantined: SelectStarterPhase
+                // independently proves a different slot empty in both local and cloud storage,
+                // fences it across the launch, and wins the backend empty-slot CAS before release.
+                // Require an explicit press so an ambiguous/legacy save is never silently ignored.
+                stage.setStatus("A save conflict was isolated. Start a separate run?");
+                globalScene.ui.setMode(UiMode.MESSAGE);
+                globalScene.ui.showText(
+                  `${blockedMessage}\n\nPress to start a separate co-op run. Existing saves will not be overwritten.`,
+                  null,
+                  hostStartNew,
+                  null,
+                  true,
+                );
+                return;
+              }
+              const acknowledged = await controller.sendResumeBlocked(discovery.kind, discovery.wave);
+              if (!isCurrentSession()) {
+                return;
+              }
+              if (!acknowledged) {
+                console.warn(`[coop-resume] guest did not ACK blocked-save reason=${discovery.kind}`);
+              }
+              terminalFailure(blockedMessage);
+              return;
+            }
+            const marker = discovery.kind === "candidate" ? discovery.candidate : null;
             if (marker == null) {
               // Release the guest only when the host actually presses Start. Sending this before
               // the prompt caused the live split: guest in team select, host still in the lobby.

@@ -3351,6 +3351,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: one conflicting old save no longer blocks every fresh lobby",
+    description:
+      "CO-OP SAVE-DISCOVERY isolation - verify with TWO logged-in clients and an account that has one old\n"
+      + "co-op slot whose browser and cloud copies differ. This is a lobby/save-state regression and cannot\n"
+      + "be created safely by a battle-only scenario.\n"
+      + "\n"
+      + "WHAT WAS BROKEN LIVE: pairing and build verification succeeded, but the host's scan threw\n"
+      + "'legacy co-op replicas differ in slot N'. That one quarantined slot aborted the whole five-slot\n"
+      + "scan, closed WebRTC, and showed 'Could not check co-op saves' even when another slot was empty.\n"
+      + "\n"
+      + "DO: pair the two clients. EXPECT: any valid save in another slot is still offered. If no valid\n"
+      + "resume exists, the host sees the isolated-save warning and may press to start a separate run. The\n"
+      + "guest remains behind the authoritative Resume/New Game barrier until that press. Fresh launch must\n"
+      + "select a DIFFERENT slot proven empty in both browser and cloud storage, recheck it before starter\n"
+      + "materialization, and win backend empty-slot CAS. The conflicting local and cloud bytes must remain\n"
+      + "unchanged. If no verified empty slot exists, both clients fail closed instead of overwriting a save.\n"
+      + "Covered by coop-duo-resume.test.ts and resume-scan-isolation.test.mjs.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: a saved run cannot be loaded solo from Continue",
     description:
       "CO-OP title/load safety - verify with a co-op save but WITHOUT its saved partner connected.\n"
