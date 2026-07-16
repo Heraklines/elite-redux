@@ -24,7 +24,14 @@ import {
 import { erApplyCommunityOnHitItems } from "#data/elite-redux/er-community-items";
 import { erApplyReactiveOnHit } from "#data/elite-redux/er-reactive-items";
 import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
-import { erApplyTacticalSwitchOnHit, erCovertCloakGuards } from "#data/elite-redux/er-tactical-items";
+import {
+  erApplyBlunderPolicyOnMiss,
+  erApplyTacticalSwitchOnHit,
+  erApplyThroatSprayOnUse,
+  erCovertCloakGuards,
+  erPopAirBalloonOnHit,
+  erTransferStickyBarbOnHit,
+} from "#data/elite-redux/er-tactical-items";
 import { SpeciesFormChangePostMoveTrigger } from "#data/form-change-triggers";
 import type { TypeDamageMultiplier } from "#data/type";
 import { AbilityId } from "#enums/ability-id";
@@ -403,6 +410,8 @@ export class MoveEffectPhase extends PokemonPhase {
             i18next.t("battle:attackMissed", { pokemonNameWithAffix: getPokemonNameWithAffix(target) }),
           );
           applyMoveAttrs("MissEffectAttr", user, target, this.move);
+          // ER Blunder Policy: an accuracy miss sharply raises the user's Speed.
+          erApplyBlunderPolicyOnMiss(user);
           break;
         case HitCheckResult.REFLECTED:
           globalScene.phaseManager.unshiftNew("MoveReflectPhase", target, user, this.move);
@@ -983,19 +992,27 @@ export class MoveEffectPhase extends PokemonPhase {
     // Knuckles / Copper Rod proc after a damaging hit, on BOTH sides (the
     // vanilla status-token path above is enemy-only).
     if (dealsDamage && this.move.is("AttackMove")) {
-      erApplyCommunityOnHitItems(
-        user,
-        target,
-        this.move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user, target }),
-      );
+      const makesContact = this.move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user, target });
+      erApplyCommunityOnHitItems(user, target, makesContact);
       // ER reactive held items (Cell Battery / Absorb Bulb / Snowball / Luminous
       // Moss / Weakness Policy): the struck holder raises a stat once, then it's
       // consumed.
       erApplyReactiveOnHit(target, user.getMoveType(this.move), hitResult, dealsDamage);
+      // ER Air Balloon: a struck holder's balloon pops (not a switch, so it can
+      // co-fire with an eject) - checked BEFORE the switch items.
+      erPopAirBalloonOnHit(target, dealsDamage);
+      // ER Sticky Barb: on a contact hit, the barb may latch onto the attacker.
+      erTransferStickyBarbOnHit(user, target, makesContact, dealsDamage);
       // ER tactical switch items (Eject Button / Red Card): the surviving struck
       // holder switches out / drags the attacker out, then the item is consumed.
       // Last strike of a multi-hit move only.
       erApplyTacticalSwitchOnHit(user, target, dealsDamage);
+    }
+
+    // ER Throat Spray: a successful sound-based move raises the user's Sp. Atk
+    // once (fired once per move, on the first resolved target).
+    if (firstTarget) {
+      erApplyThroatSprayOnUse(user, this.move);
     }
   }
 

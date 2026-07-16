@@ -1320,9 +1320,22 @@ const RECIPES: Record<string, Recipe> = {
     field: true,
     modifierBars: true,
     prepare: async game => {
+      // A sample from every icon SOURCE class: ROM 24px (belt/button/boots),
+      // PokeAPI 30px (mental herb), PokeAPI gen9 downscaled 32px (cloak /
+      // booster energy / clear amulet).
       game.override
-        .startingHeldItems([{ name: "ER_EXPERT_BELT" }, { name: "ER_EJECT_BUTTON" }])
-        .enemyHeldItems([{ name: "ER_COVERT_CLOAK" }, { name: "ER_RED_CARD" }]);
+        .startingHeldItems([
+          { name: "ER_EXPERT_BELT" },
+          { name: "ER_EJECT_BUTTON" },
+          { name: "ER_HEAVY_DUTY_BOOTS" },
+          { name: "ER_BOOSTER_ENERGY" },
+        ])
+        .enemyHeldItems([
+          { name: "ER_COVERT_CLOAK" },
+          { name: "ER_RED_CARD" },
+          { name: "ER_MENTAL_HERB" },
+          { name: "ER_CLEAR_AMULET" },
+        ]);
       await game.classicMode.startBattle(SpeciesId.SNORLAX);
       return [];
     },
@@ -1865,7 +1878,7 @@ describe.skipIf(!RUN)("render-ui-page", () => {
     const run = async () => {
       try {
         if (recipe.field) {
-          await renderBattlefield(game.scene, ctx, { modifierBars: recipe.modifierBars });
+          await renderBattlefield(game.scene, ctx, recipe.modifierBars ? { modifierBars: true } : {});
           // The in-battle bottom band is the MESSAGE handler's window (the command menu
           // renders ON it in-game). Build it fresh beneath the active handler; a failure
           // here only costs the bar, not the page.

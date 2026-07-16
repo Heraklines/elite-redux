@@ -190,19 +190,25 @@ describe("ER held-item save persistence", () => {
     expect(erTacticalItemType("ejectButton").id).toBe("ER_EJECT_BUTTON");
   });
 
-  it("round-trips EVERY tactical item through the full load path, preserving kind", () => {
+  it("round-trips EVERY tactical item through the full load path, preserving kind + Booster charge state", () => {
     const kinds = Object.keys(ER_TACTICAL_CONFIG) as ErTacticalKind[];
-    expect(kinds.length).toBe(4);
+    expect(kinds.length).toBe(27);
     for (const [index, kind] of kinds.entries()) {
       const type = erTacticalItemType(kind);
       // The pinned id MUST be a real registry key, or the loader drops the item.
       expect(getModifierTypeFuncById(type.id), `getModifierTypeFuncById(${type.id})`).toBeDefined();
 
-      const original = new ErTacticalItemModifier(type, 900 + index, kind, 1);
+      // Exercise the Booster-Energy charge fields (spent / waveProgress) so they
+      // round-trip through getArgs -> ModifierData -> ctor for every kind.
+      const spent = index % 2 === 1;
+      const waveProgress = index;
+      const original = new ErTacticalItemModifier(type, 900 + index, kind, spent, waveProgress, 1);
       const restored = reload(original) as ErTacticalItemModifier | null;
       expect(restored, kind).toBeInstanceOf(ErTacticalItemModifier);
       expect(restored!.kind, kind).toBe(kind);
       expect(restored!.pokemonId).toBe(900 + index);
+      expect(restored!.spent, kind).toBe(spent);
+      expect(restored!.waveProgress, kind).toBe(waveProgress);
       expect(restored!.matchType(original), kind).toBe(true);
     }
   });

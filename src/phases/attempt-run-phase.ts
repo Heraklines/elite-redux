@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { erTacticalGuaranteedFlee } from "#data/elite-redux/er-tactical-items";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -91,6 +92,11 @@ export class AttemptRunPhase extends FieldPhase {
     // ER biome identity (#439 §3 Group F): Plains "open fields" - fleeing always
     // succeeds (switching is likewise unhindered in the open).
     if (getErBiomeRule(globalScene.arena.biomeId)?.runNeverFails) {
+      return 100;
+    }
+
+    // ER Smoke Ball: the holder always flees a wild battle successfully.
+    if (erTacticalGuaranteedFlee()) {
       return 100;
     }
 

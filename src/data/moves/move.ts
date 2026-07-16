@@ -42,7 +42,11 @@ import {
 } from "#data/elite-redux/er-community-items";
 import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { clearErAilments } from "#data/elite-redux/er-status-cure";
-import { erCovertCloakGuards } from "#data/elite-redux/er-tactical-items";
+import {
+  erCovertCloakGuards,
+  erPunchingGloveStripsContact,
+  erTacticalBlocksPowder,
+} from "#data/elite-redux/er-tactical-items";
 import { SpeciesFormChangeRevertWeatherFormTrigger } from "#data/form-change-triggers";
 import { getNonVolatileStatusEffects, getStatusEffectHealText, isNonVolatileStatusEffect } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
@@ -480,6 +484,11 @@ export abstract class Move implements Localizable {
   isTypeImmune(user: Pokemon, target: Pokemon, type: PokemonType): boolean {
     if (this.moveTarget === MoveTarget.USER) {
       return false;
+    }
+
+    // ER Safety Goggles: the holder is immune to powder moves, whatever its type.
+    if (this.hasFlag(MoveFlags.POWDER_MOVE) && erTacticalBlocksPowder(target)) {
+      return true;
     }
 
     switch (type) {
@@ -947,6 +956,10 @@ export abstract class Move implements Localizable {
     switch (flag) {
       case MoveFlags.MAKES_CONTACT:
         if (user.hasAbilityWithAttr("IgnoreContactAbAttr") || this.hitsSubstitute(user, target)) {
+          return false;
+        }
+        // ER Punching Glove: the holder's punching moves make no contact.
+        if (erPunchingGloveStripsContact(user, this)) {
           return false;
         }
         break;
