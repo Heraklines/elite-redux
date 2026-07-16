@@ -170,15 +170,71 @@ const coopDb = database("workers/er-coop-api/schema.sql");
 const sessionSecret = "public-browser-local-session-secret-at-least-32-bytes";
 const identitySecret = "public-browser-local-identity-secret-at-least-32-bytes";
 
-const saveServer = listen(8788, request =>
-  saveWorker.fetch(request, {
+async function dispatchSaveWorker(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  if (request.method === "POST" && url.pathname === "/__coop-fixture/fork-session") {
+    let body: { username?: unknown; slot?: unknown };
+    try {
+      body = (await request.json()) as { username?: unknown; slot?: unknown };
+    } catch {
+      return Response.json({ error: "invalid fixture request" }, { status: 400 });
+    }
+    const username = typeof body.username === "string" ? body.username.normalize("NFKC").toLowerCase() : "";
+    const slot = body.slot;
+    if (username.length === 0 || !Number.isSafeInteger(slot) || Number(slot) < 0 || Number(slot) > 4) {
+      return Response.json({ error: "invalid fixture target" }, { status: 400 });
+    }
+    const row = saveDb.sqlite
+      .prepare(
+        `SELECT session_saves.data AS data
+         FROM session_saves
+         JOIN users ON users.id = session_saves.user_id
+         WHERE users.username_lower = ? AND session_saves.slot = ?`,
+      )
+      .get(username, Number(slot)) as { data?: unknown } | undefined;
+    if (typeof row?.data !== "string") {
+      return Response.json({ error: "fixture session not found" }, { status: 404 });
+    }
+    let session: Record<string, unknown>;
+    try {
+      session = JSON.parse(row.data) as Record<string, unknown>;
+    } catch {
+      return Response.json({ error: "fixture session is not JSON" }, { status: 409 });
+    }
+    const coopRun = session.coopRun as { checkpointRevision?: unknown; runId?: unknown } | undefined;
+    if (coopRun == null || !Number.isSafeInteger(coopRun.checkpointRevision) || typeof coopRun.runId !== "string") {
+      return Response.json({ error: "fixture session is not a committed co-op checkpoint" }, { status: 409 });
+    }
+    const originalMoney = typeof session.money === "number" && Number.isFinite(session.money) ? session.money : 0;
+    session.money = originalMoney + 1;
+    const forked = JSON.stringify(session);
+    const update = saveDb.sqlite
+      .prepare(
+        `UPDATE session_saves SET data = ?, updated_at = updated_at + 1
+         WHERE user_id = (SELECT id FROM users WHERE username_lower = ?) AND slot = ? AND data = ?`,
+      )
+      .run(forked, username, Number(slot), row.data);
+    if (Number(update.changes) !== 1) {
+      return Response.json({ error: "fixture session changed before fork" }, { status: 409 });
+    }
+    return Response.json({
+      ok: true,
+      slot,
+      runId: coopRun.runId,
+      checkpointRevision: coopRun.checkpointRevision,
+      mutation: "money-plus-one-same-revision",
+    });
+  }
+  return saveWorker.fetch(request, {
     DB: saveDb,
     SESSION_SECRET: sessionSecret,
     COOP_IDENTITY_SECRET: identitySecret,
     COOP_IDENTITY_TTL_MS: "300000",
     ALLOWED_ORIGIN: "*",
-  } as never),
-);
+  } as never);
+}
+
+const saveServer = listen(8788, dispatchSaveWorker);
 const coopServer = listen(8789, request =>
   coopWorker.fetch(request, {
     DB: coopDb,

@@ -33,6 +33,7 @@ on:
           - faint-replacement
           - commander-skip
           - game-over
+          - resume-scan-isolation
           - save-mutations
           - market-wide-lens
       requester_seat:
@@ -95,10 +96,10 @@ env:
   # Previously the signal origin defaulted to the PROD worker (er-coop-api, no -staging) while the
   # save-API defaulted to staging - a stale/unset repo var split the ticket-issuer from the signal
   # origin, so the staging-minted ticket failed to validate on the prod signal worker and pairing
-  # never completed (the audit's journey-run pairing failure). Both stay paired. `save-mutations`
-  # instead seals localhost origins and starts fresh in-memory instances of the real Worker modules.
-  COOP_UI_SIGNAL_ORIGIN: ${{ inputs.journey == 'save-mutations' && 'http://127.0.0.1:8789' || 'https://er-coop-api-staging.heraklines.workers.dev' }}
-  COOP_UI_API_ORIGIN: ${{ inputs.journey == 'save-mutations' && 'http://127.0.0.1:8788' || 'https://er-save-api-staging.heraklines.workers.dev' }}
+  # never completed (the audit's journey-run pairing failure). Both stay paired. Save mutation and
+  # resume-scan isolation journeys instead seal localhost origins and run fresh in-memory real Workers.
+  COOP_UI_SIGNAL_ORIGIN: ${{ (inputs.journey == 'save-mutations' || inputs.journey == 'resume-scan-isolation') && 'http://127.0.0.1:8789' || 'https://er-coop-api-staging.heraklines.workers.dev' }}
+  COOP_UI_API_ORIGIN: ${{ (inputs.journey == 'save-mutations' || inputs.journey == 'resume-scan-isolation') && 'http://127.0.0.1:8788' || 'https://er-save-api-staging.heraklines.workers.dev' }}
 
 jobs:
   browser-build:
@@ -272,7 +273,7 @@ jobs:
     name: ${{ inputs.journey || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / ${{ inputs.journey == 'commander-skip' && matrix.commander_owner_seat || 'primary accounts' }}
     needs: browser-build
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.journey == 'market-wide-lens' && 55 || inputs.journey == 'save-mutations' && 50 || inputs.journey == 'commander-skip' && 45 || 35 }}
+    timeout-minutes: ${{ inputs.journey == 'market-wide-lens' && 55 || (inputs.journey == 'save-mutations' || inputs.journey == 'resume-scan-isolation') && 50 || inputs.journey == 'commander-skip' && 45 || 35 }}
     strategy:
       fail-fast: false
       matrix:
@@ -295,8 +296,8 @@ jobs:
       - name: Install isolated Chrome runtime
         run: pnpm exec puppeteer browsers install chrome
 
-      - name: Start isolated in-memory Worker fixtures for save mutation coverage
-        if: inputs.journey == 'save-mutations'
+      - name: Start isolated in-memory Worker fixtures for persistence coverage
+        if: inputs.journey == 'save-mutations' || inputs.journey == 'resume-scan-isolation'
         shell: bash
         run: |
           pnpm exec vite build --config test/browser/coop-public-ui/local-worker-vite.config.mjs
@@ -401,7 +402,7 @@ jobs:
           if-no-files-found: warn
 
   reverse-journey:
-    if: github.event_name == 'workflow_dispatch' && inputs.fan_out_reverse && inputs.journey != 'save-mutations'
+    if: github.event_name == 'workflow_dispatch' && inputs.fan_out_reverse && inputs.journey != 'save-mutations' && inputs.journey != 'resume-scan-isolation'
     name: reverse-resume / slow / alternate accounts
     needs: browser-build
     runs-on: ubuntu-latest
