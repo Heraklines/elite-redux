@@ -42,10 +42,12 @@ import type { PokemonSpecies, PokemonSpeciesForm } from "#data/pokemon-species";
 import type { AbilityId } from "#enums/ability-id";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 import { PokemonMove } from "#moves/pokemon-move";
 import type { AbAttrBaseParams } from "#types/ability-types";
+import type { FightUiHandler } from "#ui/handlers/fight-ui-handler";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 /** Hand-authored ER-custom ability id (both the ER-source id and the pokerogue id). */
@@ -129,7 +131,7 @@ function resolveSpeciesForm(target: OmniformTarget): PokemonSpeciesForm {
   return species;
 }
 
-/** The holder's pre-transform identity, snapshotted the first time it transforms in a wave. */
+/** The holder's pre-transform identity, snapshotted on its FIRST transform in a battle. */
 interface OmniformOriginal {
   wave: number;
   species: PokemonSpecies;
@@ -138,11 +140,22 @@ interface OmniformOriginal {
 
 const OMNIFORM_ORIGINAL = new WeakMap<Pokemon, OmniformOriginal>();
 
-/** Snapshot the holder's pre-battle species/form once per wave (so revert is exact). */
+/**
+ * Snapshot the holder's pre-battle species/form on its FIRST transform and NOT
+ * again until the entry is cleared on `leaveField` (switch-out / faint / wave end).
+ *
+ * The snapshot MUST be captured once per BATTLE, not once per wave: a chained
+ * transform (Eevee -> Jolteon -> Umbreon) whose links land on different wave
+ * indices would, under a per-wave guard, re-snapshot the INTERMEDIATE form
+ * (Jolteon) as the "original" and revert there instead of all the way back to
+ * Eevee. Guarding purely on presence captures the true pre-battle identity once
+ * and preserves it across the whole chain; `erOmniformRevertOnLeaveField` deletes
+ * the entry when the holder leaves the field, so the next battle re-snapshots
+ * from the reverted base.
+ */
 function snapshotOriginal(user: Pokemon): void {
-  const wave = globalScene.currentBattle?.waveIndex ?? 0;
-  const existing = OMNIFORM_ORIGINAL.get(user);
-  if (!existing || existing.wave !== wave) {
+  if (!OMNIFORM_ORIGINAL.has(user)) {
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
     OMNIFORM_ORIGINAL.set(user, { wave, species: user.species, formIndex: user.formIndex });
   }
 }
@@ -249,6 +262,12 @@ export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
     newMoveset.length = Math.min(newMoveset.length, user.getMaxMoveCount());
   }
   user.summonData.moveset = newMoveset;
+
+  // If the fight menu is currently on screen for this holder, its cached move list
+  // is now stale (old names/types/PP/detail). Force a rebuild from the swapped
+  // moveset. `refreshMoves` self-guards on the menu being active, so a normal
+  // mid-move transform (menu already closed) leaves it a no-op.
+  (globalScene.ui?.handlers?.[UiMode.FIGHT] as FightUiHandler | undefined)?.refreshMoves();
 
   void user.loadAssets(false).then(() => user.updateInfo());
   globalScene.phaseManager.queueMessage(

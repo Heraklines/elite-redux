@@ -87,11 +87,22 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
   it("each mega stone is registered and has a base-form form-change edge (reachability)", () => {
     for (const def of ER_NEWCOMER_FORMS) {
       expect(isErMegaStone(def.item), `${def.formName} stone is an ER mega stone`).toBe(true);
+      const species = getPokemonSpecies(def.baseSpecies);
+      // The live non-mega base form keys the edge's preFormKey must match (both the
+      // Pokedex form list and the reward generator key on preFormKey === current
+      // form key). Hardcoding "" broke Xerneas (base forms neutral/active).
+      const baseKeys = new Set(species.forms.map(f => f.formKey ?? "").filter(k => !/mega|primal/.test(k)));
+      if (baseKeys.size === 0) {
+        baseKeys.add("");
+      }
       const edges = pokemonFormChanges[def.baseSpecies] ?? [];
       const edge = edges.find(
-        fc => fc.preFormKey === "" && fc.formKey === def.formKey && fc.findTrigger(SpeciesFormChangeItemTrigger),
+        fc => baseKeys.has(fc.preFormKey) && fc.formKey === def.formKey && fc.findTrigger(SpeciesFormChangeItemTrigger),
       );
-      expect(edge, `${def.formName} has a base->form item edge`).toBeDefined();
+      expect(
+        edge,
+        `${def.formName} has a live-base-form->form item edge (preFormKey in ${[...baseKeys]})`,
+      ).toBeDefined();
       const trigger = edge?.findTrigger(SpeciesFormChangeItemTrigger) as { item?: number } | undefined;
       expect(trigger?.item).toBe(def.item);
     }

@@ -101,6 +101,51 @@ describe.skipIf(!RUN)("ER Omniform (5929)", () => {
     expect(holder.getStat(Stat.SPD)).toBe(spdBefore);
   });
 
+  it("chained revert restores the ORIGINAL pre-battle form, not an intermediate, across a wave boundary", async () => {
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const holder = game.field.getPlayerPokemon();
+
+    // First transform on the current wave: Eevee -> Vaporeon.
+    erOmniformOnMoveStart(holder, allMoves[MoveId.WATER_GUN]);
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.VAPOREON);
+
+    // Advance the wave index, THEN chain: Vaporeon -> Flareon. The old per-wave
+    // snapshot guard re-captured the INTERMEDIATE form (Vaporeon) here because the
+    // wave changed, so revert landed on Vaporeon instead of Eevee. The snapshot
+    // must be taken once on the FIRST transform per battle and survive the chain.
+    game.scene.currentBattle.waveIndex += 1;
+    erOmniformOnMoveStart(holder, allMoves[MoveId.EMBER]);
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.FLAREON);
+
+    // Revert (leaveField at battle end) must go all the way back to the original.
+    holder.resetSummonData();
+    erOmniformRevertOnLeaveField(holder);
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+  });
+
+  it("swaps the live moveset in place (what the fight menu rebuilds from), keeping the used move in its slot and executing the CURRENT slot on a chain", async () => {
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const holder = game.field.getPlayerPokemon();
+
+    const waterSlot = holder.getMoveset().findIndex(m => m?.moveId === MoveId.WATER_GUN);
+    expect(waterSlot).toBeGreaterThanOrEqual(0);
+
+    // Eevee -> Vaporeon: the used move stays in its slot; the rest are the new
+    // form's moves. `getMoveset()` is exactly what `FightUiHandler.refreshMoves`
+    // reads, so displayed == current after the transform.
+    erOmniformOnMoveStart(holder, allMoves[MoveId.WATER_GUN]);
+    const afterFirst = holder.getMoveset();
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.VAPOREON);
+    expect(afterFirst[waterSlot]?.moveId).toBe(MoveId.WATER_GUN);
+    // The other slots changed away from Eevee's kit (EMBER/TACKLE/SPLASH replaced).
+    expect(afterFirst.some(m => m?.moveId !== MoveId.WATER_GUN)).toBe(true);
+
+    // Chained transform executes on the CURRENT (Vaporeon) form and keeps its move.
+    erOmniformOnMoveStart(holder, allMoves[MoveId.EMBER]);
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.FLAREON);
+    expect(holder.getMoveset().map(m => m?.moveId)).toContain(MoveId.EMBER);
+  });
+
   it("does nothing for an unmapped move type (general: no forced transform)", async () => {
     await game.classicMode.startBattle(SpeciesId.EEVEE);
     const holder = game.field.getPlayerPokemon();

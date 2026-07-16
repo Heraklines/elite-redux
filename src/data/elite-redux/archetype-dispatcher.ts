@@ -7542,10 +7542,14 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       return ok([new SePriorityBonusAbAttr({ priority: 1 })]);
     case 833:
       // Harukaze — "Setting Grassy Terrain sets Tailwind and vice versa."
+      // `side: PLAYER` is HOLDER-RELATIVE (resolved to the holder's own side at
+      // apply time) - NOT the literal player side, and NOT `BOTH` (which is what
+      // the old `side: 0` value actually was: ArenaTagSide.BOTH, leaking Tailwind
+      // to the enemy - #194 both-sides bug).
       return ok([
         new PostSummonStackSetEffectsAbAttr({
           terrain: TerrainType.GRASSY,
-          tags: [{ type: ArenaTagType.TAILWIND, turns: 4, side: 0 /* player; resolved by holder side at runtime */ }],
+          tags: [{ type: ArenaTagType.TAILWIND, turns: 4, side: ArenaTagSide.PLAYER }],
         }),
       ]);
     case 842:

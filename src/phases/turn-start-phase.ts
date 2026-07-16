@@ -3,6 +3,7 @@ import type { TurnCommand } from "#app/battle";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { ConditionalDamageAbAttr } from "#data/elite-redux/archetypes/conditional-damage";
+import { erShatteredPsycheMaybeFuse } from "#data/elite-redux/abilities/shattered-psyche";
 import { summonCoopPlayerField } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
@@ -253,6 +254,13 @@ export class TurnStartPhase extends FieldPhase {
         beginCoopRecording(globalScene.currentBattle.turn);
       }
     }
+
+    // ER Shattered Psyche (5968, Primal Mew's innate): post-command, once per
+    // battle, the holder fuses two of its opponents into one entity. Runs here -
+    // after the guest early-return above, so it is host/solo only by construction
+    // - once turnCommands are fully populated (both CommandPhase and
+    // EnemyCommandPhase have run) but before the move phases are queued.
+    erShatteredPsycheMaybeFuse();
 
     const field = globalScene.getField();
     const moveOrder = this.getCommandOrder();

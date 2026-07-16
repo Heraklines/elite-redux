@@ -44,6 +44,7 @@ import { allMoves } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
 import { Command } from "#enums/command";
 import { MoveCategory } from "#enums/move-category";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -84,17 +85,24 @@ function usesDamagingMoveThisTurn(pokemon: Pokemon): boolean {
 }
 
 /**
- * Whether `pokemon` actually EXECUTED a status move this turn. Read at turn end
- * (the neither-attack heal fires from PostTurn, by which point `incrementTurn`
- * has already cleared `turnCommands`), so it uses the persistent per-turn
- * `acted` flag + the last move in history (which, given `acted`, is this turn's).
+ * Whether `pokemon` ATTACKED this turn, i.e. actually executed a DAMAGING
+ * (non-status) move. Read at turn end (the neither-attack heal fires from
+ * PostTurn, by which point `incrementTurn` has already cleared `turnCommands`),
+ * so it uses the persistent per-turn `acted` flag + the last move in history.
+ *
+ * The heal clause is "if NEITHER attacks" (ability text), so it is detected by
+ * the ABSENCE of an attack, NOT the presence of a clean status move. Every other
+ * way of not attacking - a status move, being fully paralyzed / asleep / frozen /
+ * flinched, a failed move, switching, or issuing no move at all - leaves no
+ * damaging move in history and therefore counts as "did not attack" (the live
+ * divergence: the old positive "used a status move" check missed all of those).
  */
-function usedStatusMoveThisTurn(pokemon: Pokemon): boolean {
+function attackedThisTurn(pokemon: Pokemon): boolean {
   if (!pokemon.turnData.acted) {
     return false;
   }
   const last = pokemon.getLastXMoves(1)[0];
-  return last !== undefined && allMoves[last.move]?.category === MoveCategory.STATUS;
+  return last !== undefined && last.move !== MoveId.NONE && allMoves[last.move]?.category !== MoveCategory.STATUS;
 }
 
 /** An active ally of `pokemon`, or `undefined` (inert in singles). */
@@ -210,23 +218,53 @@ export class SynchronizedCurrentBothAttackPowerAbAttr extends VariableMovePowerA
   }
 }
 
+/** Per-turn guard so each mon of a pair heals at most once (see below). */
+let syncHealTurnKey = "";
+const syncHealedThisTurn = new Set<number>();
+
+/** Restore 1/4 max HP to `mon` once per turn, tracked by the shared guard. */
+function syncCurrentHealOnce(mon: Pokemon): void {
+  if (syncHealedThisTurn.has(mon.id) || mon.isFullHp() || !mon.isActive(true)) {
+    return;
+  }
+  syncHealedThisTurn.add(mon.id);
+  mon.heal(toDmgValue(mon.getMaxHp() * SYNC_CURRENT_HEAL_FRACTION, 1));
+}
+
 /**
  * Synchronized Current — NEITHER-ATTACK heal (alignment-UNRELATED, any ally).
- * At end of turn, if the holder AND an active ally BOTH used a status move this
- * turn (i.e. neither attacked), the holder restores 1/4 of its max HP. Both mons
- * heal independently. Inert in singles.
+ * At end of turn, if NEITHER the holder NOR an active ally attacked this turn,
+ * BOTH the holder AND that ally restore 1/4 of their max HP (ability text: "both
+ * restore 1/4 of their max HP"). The holder heals the PAIR, so the ally benefits
+ * even when it does NOT itself carry Synchronized Current (the live bug: a base-
+ * form ally next to a mega holder, or a full-HP holder, never healed the damaged
+ * ally). A shared per-turn guard heals each mon at most once, so when BOTH allies
+ * carry the ability the pair still heals 1/4 (not 1/2). Inert in singles.
  */
 export class SynchronizedCurrentHealAbAttr extends PostTurnAbAttr {
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
     const ally = activeAlly(pokemon);
-    return ally !== undefined && usedStatusMoveThisTurn(pokemon) && usedStatusMoveThisTurn(ally);
+    return ally !== undefined && !attackedThisTurn(pokemon) && !attackedThisTurn(ally);
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    if (simulated || pokemon.isFullHp()) {
+    if (simulated) {
       return;
     }
-    pokemon.heal(toDmgValue(pokemon.getMaxHp() * SYNC_CURRENT_HEAL_FRACTION, 1));
+    const ally = activeAlly(pokemon);
+    if (!ally) {
+      return;
+    }
+    // Reset the shared guard at the start of each new turn.
+    const battle = globalScene.currentBattle;
+    const key = `${battle?.waveIndex ?? 0}:${battle?.turn ?? 0}`;
+    if (syncHealTurnKey !== key) {
+      syncHealTurnKey = key;
+      syncHealedThisTurn.clear();
+    }
+    // Heal the whole pair, each mon at most once per turn.
+    syncCurrentHealOnce(pokemon);
+    syncCurrentHealOnce(ally);
   }
 }
 

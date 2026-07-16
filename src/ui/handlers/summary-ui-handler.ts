@@ -517,7 +517,19 @@ export class SummaryUiHandler extends UiHandler {
     // page). With the texture set, a failed play just means a static frame.
     if (globalScene.textures.exists(spriteKey)) {
       this.pokemonSprite.setTexture(spriteKey);
+      // A multi-frame packed atlas defaults to its whole-sheet `__BASE` frame on
+      // setTexture; pin the first real animation frame so it never renders as the
+      // scrambled full sheet (the Regitube menu-scramble class). `play` below
+      // upgrades to the looping animation when it is available; if `play` can't
+      // (anim not built here), the pinned frame stays a clean single-mon frame.
+      if (this.pokemonSprite.texture.has("0001.png")) {
+        this.pokemonSprite.setFrame("0001.png");
+      }
     }
+    // Gap-fill the per-species animation for ER custom / redirected atlases the
+    // menu surfaces don't lazily build (mirrors the battle field + shiny-lab
+    // paths), so `play` animates instead of falling back to the pinned frame.
+    ensureErSpriteAnim(spriteKey);
     try {
       this.pokemonSprite.play(spriteKey);
     } catch (err: unknown) {
@@ -1176,7 +1188,11 @@ export class SummaryUiHandler extends UiHandler {
           const passiveAbilities = this.pokemon.getPassiveAbilities();
           for (let slot = 0; slot < passiveAbilities.length; slot++) {
             const passiveAbility = passiveAbilities[slot];
-            if (!passiveAbility) {
+            // Skip empty slots: a null slot OR an explicit `AbilityId.NONE`
+            // (a design-PARKED innate, e.g. Primal Mew's not-yet-defined Shattered
+            // Psyche). Rendering NONE would draw a broken/blank PASSIVE row. This
+            // mirrors the profile-tab innate guard below.
+            if (!passiveAbility || passiveAbility.id === AbilityId.NONE) {
               continue;
             }
             const container: AbilityContainer = {
