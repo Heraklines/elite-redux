@@ -144,6 +144,7 @@ jobs:
             test/browser/coop-public-ui/campaign.mjs \
             test/browser/coop-public-ui/campaign-exp-phase.test.mjs \
             test/browser/coop-public-ui/campaign-render-profile.test.mjs \
+            test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs \
             test/browser/coop-public-ui/solo-classic.mjs \
             test/browser/coop-public-ui/run-campaign.mjs \
             test/browser/coop-public-ui/check-campaign-boundary.mjs \
@@ -165,6 +166,7 @@ jobs:
           test/browser/coop-public-ui/browser-workflow-fanout.test.mjs
           test/browser/coop-public-ui/campaign-exp-phase.test.mjs
           test/browser/coop-public-ui/campaign-render-profile.test.mjs
+          test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs
           test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs
           test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
 
@@ -190,6 +192,9 @@ jobs:
           COOP_BROWSER_OUT_DIR: dist-coop-public-ui
           VITE_BYPASS_LOGIN: 0
           VITE_BYPASS_TUTORIAL: 0
+          # Staging/dev exposes the fifth Mystery difficulty. This exact immutable bundle therefore
+          # exercises the same dev-gated picker and gauntlet schedule testers use on staging.
+          VITE_DEV_TOOLS: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_SERVER_URL: ${{ env.COOP_UI_API_ORIGIN }}
@@ -275,9 +280,18 @@ jobs:
           - profile: animations-on-surface
             artifact: surface
             waves: ${{ inputs.surface_waves || '3' }}
+            difficulty: ace
+            require_mystery: "0"
           - profile: animations-skipped-depth
             artifact: depth
             waves: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
+            difficulty: ace
+            require_mystery: "0"
+          - profile: mystery-gauntlet
+            artifact: mystery
+            waves: "10"
+            difficulty: mystery
+            require_mystery: "1"
     steps:
       - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
@@ -334,6 +348,9 @@ jobs:
           # visibly selects Move Animations OFF and spends its runner budget on more waves instead.
           COOP_UI_CAMPAIGN_WAVES: ${{ matrix.waves }}
           COOP_UI_RENDER_PROFILE: ${{ matrix.profile }}
+          COOP_UI_DIFFICULTY_ID: ${{ matrix.difficulty }}
+          COOP_UI_REQUIRE_MYSTERY_GAUNTLET: ${{ matrix.require_mystery }}
+          COOP_UI_MYSTERY_MIN_SURFACES: "6"
           # Loud-fail everywhere by default. `shakedown` (the ONLY mode that permits press-through of
           # an unknown surface) is now reachable ONLY by an explicit dispatch with auto_first=true - a
           # deliberate ordering test. push = loud-fail smoke, schedule = nightly, dispatch = gating.

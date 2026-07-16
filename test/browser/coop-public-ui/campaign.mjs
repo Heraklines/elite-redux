@@ -24,6 +24,9 @@ const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
 const AUTHORITY_MOVE_EFFECT = /Start Phase MoveEffectPhase/u;
 const RENDERER_MOVE_REPLAY = /Start Phase CoopMoveAnimReplayPhase/u;
 const RENDERER_MOVE_SKIPPED = /present move .* NO-OP end \(user=.* anims=false\)/u;
+const POST_MYSTERY_PHASE = /Start Phase PostMysteryEncounterPhase/u;
+const BARGAIN_OWNER_TERMINAL = /bargain OWNER terminal: outcome blob sent/u;
+const BARGAIN_WATCHER_TERMINAL = /bargain WATCHER: outcome blob received -> converging/u;
 const BATTLE_PROMPT_PHASES = new Map([
   // Battle narration is rendered by MessageUiHandler from several phase classes (SummonPhase,
   // ShowTrainerPhase, replay phases, and MessagePhase itself). The semantic surface's prompt
@@ -735,6 +738,185 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
   return { client: owner, markerEvent: presence.markerEvent };
 }
 
+async function finalizePendingMysteryEvent(rig, stats, nextBoundary) {
+  const event = stats.mysteryEvents.at(-1);
+  if (event == null || event.terminal != null) {
+    return;
+  }
+  // Some Mystery options hand off to a real battle without advancing the wave. The command
+  // surface for that embedded battle is continuation, not the ME terminal. Keep the event open
+  // across the outer battle-loop iteration and close it only when a causally later wave is visible.
+  if (nextBoundary.wave <= event.wave) {
+    return;
+  }
+  const clients = Object.values(rig.clients);
+  if (event.kind === "bargain") {
+    const owner = clients.find(client => client.publicSeat === event.ownerSeat);
+    const watcher = clients.find(client => client !== owner);
+    if (owner == null || watcher == null) {
+      throw new Error(`[campaign-mystery] bargain wave ${event.wave} has no exact owner/watcher pair`);
+    }
+    await Promise.all([
+      owner.evidence.waitFor(BARGAIN_OWNER_TERMINAL, {
+        from: event.terminalCursors[owner.label],
+        timeoutMs: rig.config.timeoutMs,
+        description: `bargain wave ${event.wave} owner retained terminal`,
+      }),
+      watcher.evidence.waitFor(BARGAIN_WATCHER_TERMINAL, {
+        from: event.terminalCursors[watcher.label],
+        timeoutMs: rig.config.timeoutMs,
+        description: `bargain wave ${event.wave} watcher applied terminal`,
+      }),
+    ]);
+  } else {
+    await Promise.all(
+      clients.map(client =>
+        client.evidence.waitFor(POST_MYSTERY_PHASE, {
+          from: event.terminalCursors[client.label],
+          timeoutMs: rig.config.timeoutMs,
+          description: `Mystery wave ${event.wave} paired PostMystery terminal`,
+        }),
+      ),
+    );
+  }
+  event.terminal = nextBoundary;
+  await Promise.all(clients.map(client => client.checkpoint(`wave-${event.wave}-mystery-terminal`)));
+  await Promise.all(
+    clients.map(client =>
+      client.checkpoint(`wave-${event.wave}-mystery-next-${nextBoundary.kind}-${nextBoundary.wave}`),
+    ),
+  );
+}
+
+function appendMysteryProof(rig, event, proof) {
+  event.surfaces.push(proof);
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-mystery-checkpoint", proof);
+  }
+}
+
+async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, stage) {
+  const clients = Object.values(rig.clients);
+  const events = await Promise.all(
+    clients.map(client =>
+      client.evidence.waitForCondition(sink => sink.findLastSemanticSurface(cursors[client.label] ?? 0, surfaceId), {
+        timeoutMs: rig.config.timeoutMs,
+        description: `paired Mystery ${stage} surface ${surfaceId}`,
+      }),
+    ),
+  );
+  const observations = events.map(surfaceEvent => surfaceEvent.observation);
+  const first = observations[0];
+  for (const observation of observations.slice(1)) {
+    const sameAddress = JSON.stringify(observation.address) === JSON.stringify(first.address);
+    const sameOptions = JSON.stringify(observation.optionIds ?? null) === JSON.stringify(first.optionIds ?? null);
+    if (
+      observation.surfaceId !== first.surfaceId
+      || observation.ownerSeat !== first.ownerSeat
+      || !sameAddress
+      || !sameOptions
+    ) {
+      throw new Error(`[campaign-mystery] paired ${stage} surface diverged: ${JSON.stringify(observations)}`);
+    }
+  }
+  const proof = {
+    stage,
+    surfaceId,
+    address: first.address,
+    ownerSeat: first.ownerSeat,
+    optionIds: first.optionIds ?? null,
+  };
+  if (stage === "presentation") {
+    await finalizePendingMysteryEvent(rig, stats, {
+      kind: "mystery-surface",
+      wave: first.address.wave,
+      address: first.address,
+    });
+    if (first.address.wave > stats.targetWave) {
+      stats.targetBoundary = {
+        kind: "mystery-surface",
+        wave: first.address.wave,
+        address: first.address,
+      };
+      await Promise.all(clients.map(client => client.checkpoint(`wave-${first.address.wave}-target-addressed`)));
+      return true;
+    }
+  }
+  let event = stats.mysteryEvents.find(candidate => candidate.wave === first.address.wave);
+  if (event == null) {
+    if (stage !== "presentation") {
+      throw new Error(`[campaign-mystery] ${stage} appeared at wave ${first.address.wave} before a presentation`);
+    }
+    event = {
+      kind: "mystery",
+      wave: first.address.wave,
+      ownerSeat: first.ownerSeat,
+      surfaces: [],
+      terminalCursors: fromEach(clients, client => client.evidence.cursor()),
+      terminal: null,
+    };
+    stats.mysteryEvents.push(event);
+  }
+  appendMysteryProof(rig, event, proof);
+  await Promise.all(clients.map(client => client.checkpoint(`wave-${event.wave}-mystery-${stage}-${surfaceId}`)));
+  return false;
+}
+
+async function checkpointAsymmetricBargainSurface(rig, cursors, stats, owner) {
+  const watcher = Object.values(rig.clients).find(client => client !== owner);
+  if (watcher == null) {
+    throw new Error("[campaign-mystery] bargain has no watcher browser");
+  }
+  const ownerEvent = await owner.evidence.waitForCondition(
+    sink => sink.findLastSemanticSurface(cursors[owner.label] ?? 0, "bargain"),
+    { timeoutMs: rig.config.timeoutMs, description: "owner bargain surface" },
+  );
+  const ownerObservation = ownerEvent.observation;
+  const watcherEvent = await watcher.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(cursors[watcher.label] ?? 0, "mystery-encounter:message");
+      return candidate?.observation.address.wave === ownerObservation.address.wave ? candidate : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "watcher partner-bargaining projection" },
+  );
+  const watcherObservation = watcherEvent.observation;
+  if (
+    JSON.stringify(watcherObservation.address) !== JSON.stringify(ownerObservation.address)
+    || watcherObservation.ownerSeat !== ownerObservation.ownerSeat
+    || ownerObservation.ownerSeat !== owner.publicSeat
+  ) {
+    throw new Error(
+      `[campaign-mystery] asymmetric bargain ownership/address diverged: ${JSON.stringify({ ownerObservation, watcherObservation })}`,
+    );
+  }
+  await finalizePendingMysteryEvent(rig, stats, {
+    kind: "bargain-surface",
+    wave: ownerObservation.address.wave,
+    address: ownerObservation.address,
+  });
+  const event = {
+    kind: "bargain",
+    wave: ownerObservation.address.wave,
+    ownerSeat: ownerObservation.ownerSeat,
+    surfaces: [],
+    terminalCursors: fromEach(Object.values(rig.clients), client => client.evidence.cursor()),
+    terminal: null,
+  };
+  const proof = {
+    stage: "presentation",
+    surfaceId: "bargain",
+    watcherSurfaceId: "mystery-encounter:message",
+    address: ownerObservation.address,
+    ownerSeat: ownerObservation.ownerSeat,
+    optionIds: ownerObservation.optionIds ?? null,
+  };
+  stats.mysteryEvents.push(event);
+  appendMysteryProof(rig, event, proof);
+  await Promise.all(
+    Object.values(rig.clients).map(client => client.checkpoint(`wave-${event.wave}-mystery-presentation-bargain`)),
+  );
+}
+
 /** Drive at most one pending between-wave surface. Returns the surface name driven, or null. */
 async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stats, strict) {
   for (const driver of dispatch) {
@@ -743,6 +925,24 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       continue;
     }
     const { client } = resolved;
+    const mysteryStage =
+      driver.name === "mystery-encounter"
+        ? "presentation"
+        : driver.name === "mystery-bargain"
+          ? "bargain"
+          : driver.name.startsWith("mystery-")
+            ? "subprompt"
+            : driver.name === "reward" && stats.mysteryEvents.some(event => event.terminal == null)
+              ? "reward"
+              : null;
+    if (mysteryStage === "bargain") {
+      await checkpointAsymmetricBargainSurface(rig, cursors, stats, client);
+    } else if (mysteryStage != null && driver.v2SurfaceId) {
+      const targetReached = await checkpointPairedMysterySurface(rig, driver.v2SurfaceId, cursors, stats, mysteryStage);
+      if (targetReached) {
+        return "target-reached";
+      }
+    }
     await client.checkpoint(`wave-${stats.wave}-${driver.name}-owner`);
     if (driver.name === "biome-shop" && driver.market?.mode === "target-held") {
       stats.market = await driveTargetedMarket(rig, cursors, driver.market);
@@ -800,6 +1000,28 @@ function phaseProgressSignature(clients) {
   return clients.map(client => client.evidence.findLast(START_PHASE)?.index ?? -1).join(",");
 }
 
+function currentPairedBattleKind(rig, wave) {
+  const observations = Object.values(rig.clients).map(client => {
+    const event = client.evidence.findLastSurface("command");
+    if (event?.observation.wave !== wave) {
+      throw new Error(`[campaign-mystery] ${client.label} has no current command observation for wave ${wave}`);
+    }
+    return event.observation;
+  });
+  const first = observations[0];
+  const fields = observation => ({
+    battleType: observation.battleType,
+    trainerBoss: observation.trainerBoss,
+    maxBossSegments: observation.maxBossSegments,
+  });
+  if (
+    observations.slice(1).some(observation => JSON.stringify(fields(observation)) !== JSON.stringify(fields(first)))
+  ) {
+    throw new Error(`[campaign-mystery] battle kind diverged at wave ${wave}: ${JSON.stringify(observations)}`);
+  }
+  return { wave, ...fields(first) };
+}
+
 /**
  * Leave the reward shop and drive every between-wave interactive surface (biome shop,
  * crossroads, biome pick, mystery encounters, learn-move, eggs) until both clients reach
@@ -841,6 +1063,12 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
         allowAddressRepeat: true,
       });
       rig.activeBattleWave = boundary.wave;
+      await finalizePendingMysteryEvent(rig, stats, {
+        kind: "command",
+        wave: boundary.wave,
+        address: { epoch: boundary.epoch, wave: boundary.wave, turn: boundary.turn },
+        stateDigest: boundary.stateDigest,
+      });
       if (stats.market != null) {
         stats.market.continuation = {
           status: "command",
@@ -850,12 +1078,16 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
           stateDigest: boundary.stateDigest,
         };
       }
-      return { status: "continue" };
+      return { status: "continue", boundary };
     }
 
     // Loud-fail (strict) unless the explicit shakedown/auto-first ordering opt-in is set: the same
     // gate that permits press-through of an unknown surface also permits the role-default fallback.
     const drove = await driveOnePendingSurface(rig, dispatch, surfaceCursors, handledIndex, stats, !policy.autoFirst);
+    if (drove === "target-reached") {
+      rig.activeBattleWave = stats.targetBoundary.wave;
+      return { status: "continue", boundary: stats.targetBoundary };
+    }
     if (drove) {
       stallSince = 0;
       lastRegisteredSurface = drove;
@@ -939,6 +1171,7 @@ export async function runCampaign(rig) {
     rewardMode: policy.rewardMode,
     market: policy.market,
     renderProfile: policy.renderProfile,
+    mysteryGauntlet: policy.mysteryGauntlet,
   });
 
   await rig.loginBoth();
@@ -953,11 +1186,17 @@ export async function runCampaign(rig) {
   await progress.note("innate-activation invariant checked at wave-1 command surface");
 
   let wavesCleared = 0;
+  let battleLoops = 0;
   let status = "continue";
   const marketCoverage = { visits: [], purchases: [] };
+  const mysteryCoverage = { events: [], battleKinds: [] };
   try {
-    for (let ordinal = 1; ordinal <= policy.targetWaves; ordinal++) {
+    for (let ordinal = 1; ordinal <= policy.maxBattleLoops && wavesCleared < policy.targetWaves; ordinal++) {
+      battleLoops = ordinal;
       const waveNo = rig.activeBattleWave;
+      if (waveNo > policy.targetWaves) {
+        break;
+      }
       const stats = {
         wave: waveNo,
         ordinal,
@@ -967,8 +1206,16 @@ export async function runCampaign(rig) {
         battleMessagePrompts: 0,
         postBattleExpPrompts: 0,
         surfaces: [],
+        // One ME can hand off to a battle at the same wave and finish only after the next outer
+        // battle-loop iteration. The ledger must therefore outlive any individual stats record.
+        mysteryEvents: mysteryCoverage.events,
+        targetWave: policy.targetWaves,
+        targetBoundary: null,
         autoFirst: [],
       };
+      const battleKind = currentPairedBattleKind(rig, waveNo);
+      stats.battleKind = battleKind;
+      mysteryCoverage.battleKinds.push(battleKind);
       const startMs = Date.now();
       // Capture the wave-start cursor BEFORE the battle: the reward shop's OWNER marker is
       // logged when the shop opens (mid-wave), so the between-wave surface search must
@@ -993,7 +1240,9 @@ export async function runCampaign(rig) {
         marketCoverage.purchases.push(...stats.market.purchases);
       }
       status = advanced.status;
-      wavesCleared += 1;
+      if (advanced.boundary != null) {
+        wavesCleared = Math.max(wavesCleared, advanced.boundary.wave - 1);
+      }
       await Promise.all(clients.map(client => client.checkpoint(`wave-${waveNo}-cleared`)));
       await progress.wave({
         ...stats,
@@ -1009,6 +1258,56 @@ export async function runCampaign(rig) {
       await assertRenderProfileExecution(rig, policy, progress);
     }
     assertMarketCoverage(marketCoverage, policy.market);
+    if (policy.mysteryGauntlet.required) {
+      const expectedEvents = new Map([
+        [2, "mystery"],
+        [3, "mystery"],
+        [4, "mystery"],
+        [5, "mystery"],
+        [6, "mystery"],
+        [9, "bargain"],
+        [10, "mystery"],
+      ]);
+      const missing = [...expectedEvents].filter(
+        ([wave, kind]) =>
+          !mysteryCoverage.events.some(
+            event =>
+              event.wave === wave
+              && event.kind === kind
+              && event.terminal != null
+              && event.terminal.wave === wave + 1
+              && event.surfaces.some(surface => surface.stage === "presentation"),
+          ),
+      );
+      const unexpected = mysteryCoverage.events.filter(event => !expectedEvents.has(event.wave));
+      if (missing.length > 0 || unexpected.length > 0) {
+        throw new Error(
+          `[campaign-mystery] exact wave schedule mismatch missing=${JSON.stringify(missing)} unexpected=${JSON.stringify(unexpected.map(event => ({ wave: event.wave, kind: event.kind })))}`,
+        );
+      }
+      const wildOne = mysteryCoverage.battleKinds.find(kind => kind.wave === 1);
+      const ghostSeven = mysteryCoverage.battleKinds.find(kind => kind.wave === 7);
+      const bossEight = mysteryCoverage.battleKinds.find(kind => kind.wave === 8);
+      if (wildOne?.battleType !== "WILD" || ghostSeven?.battleType !== "TRAINER") {
+        throw new Error(`[campaign-mystery] wave 1/7 kind mismatch: ${JSON.stringify({ wildOne, ghostSeven })}`);
+      }
+      if (bossEight?.battleType !== "WILD" || bossEight.maxBossSegments < 2) {
+        throw new Error(
+          `[campaign-mystery] wave 8 was not the scripted segmented wild boss: ${JSON.stringify(bossEight)}`,
+        );
+      }
+      // Only the authority selects the ghost. The renderer adopts the resulting trainer carrier;
+      // requiring it to run the selector would weaken the authoritative architecture.
+      await rig.host.evidence.waitFor(/\[er-ghost\] wave 7: (?:ghost|reusing cached ghost) /u, {
+        timeoutMs: rig.config.timeoutMs,
+        description: "authority selected the Mystery gauntlet wave 7 ghost team",
+      });
+      if (mysteryCoverage.events.length < policy.mysteryGauntlet.minSurfaces) {
+        throw new Error(
+          `[campaign-mystery] observed ${mysteryCoverage.events.length} distinct completed event waves; required ${policy.mysteryGauntlet.minSurfaces}`,
+        );
+      }
+    }
   } finally {
     rig.marketCoverage = marketCoverage;
     await progress.summary({
@@ -1019,7 +1318,10 @@ export async function runCampaign(rig) {
       finalWave: rig.activeBattleWave,
       lastStatus: status,
       replacementCount: rig.replacementCount,
+      battleLoops,
+      maxBattleLoops: policy.maxBattleLoops,
       marketCoverage,
+      mysteryCoverage,
     });
     await progress.flush();
   }
@@ -1036,6 +1338,12 @@ export async function runCampaign(rig) {
     );
   }
   if (wavesCleared < policy.targetWaves) {
+    if (battleLoops >= policy.maxBattleLoops) {
+      throw new Error(
+        `[campaign-loop-budget] exhausted ${policy.maxBattleLoops} battle loops at game wave ${rig.activeBattleWave}; `
+          + `cleared ${wavesCleared}/${policy.targetWaves} addressed waves`,
+      );
+    }
     throw new Error(`Campaign reached ${wavesCleared} cleared waves; target was ${policy.targetWaves}`);
   }
 }
