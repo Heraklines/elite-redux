@@ -128,7 +128,14 @@ test("parallel lobby pairing reselects the exact visible username before every r
   assert.match(harness, /requester\.requestPlayer\(acceptorName, \{[\s\S]*purpose: "reissue-request"/u);
   assert.match(harness, /relayTimeoutMs: OPTIONAL_LOBBY_RELAY_WAIT_MS/u);
   assert.match(harness, /optional && error instanceof Error && \/timed out waiting for request relay/u);
+  assert.match(harness, /const relayed = sink\.find\(\/request target=\/u, requestCursor\)/u);
+  assert.match(harness, /sink\.find\(\/\\\[coop:lobby\\\] cancel\/u, requestCursor\)/u);
+  assert.match(harness, /sink\.find\(\/Start Phase TitlePhase\/u, requestCursor\)/u);
+  assert.match(harness, /this\.evidence\.record\("lobby-request-terminal"/u);
+  assert.match(harness, /lobby selection returned to TitlePhase before request relay/u);
+  assert.match(harness, /outcome\.kind !== "relayed"/u);
   assert.doesNotMatch(harness, /requester\.press\("Space", `lobby-reissue-request-/u);
+  assert.doesNotMatch(harness, /await this\.evidence\.waitFor\(\/request target=\/u/u);
 
   // The observed staging poll delivered the original request after 6.2s. A refresh must not
   // starve that live accept panel, but must still beat the worker's approximately 17s TTL.
