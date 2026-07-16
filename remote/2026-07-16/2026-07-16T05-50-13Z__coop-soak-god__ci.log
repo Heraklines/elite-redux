@@ -1,0 +1,79 @@
+===== COOP SOAK RESULT =====
+profile: god
+verdict: PASS
+waves_requested: 150
+run: 29474755911 (main)
+timestamp: 2026-07-16T05-50-13Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260716 WAVES=150 - replay this run with:  SOAK_SEED=20260716 SOAK_WAVES=150 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=110 guest=0
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=390 guest=110
+[22m[39m[coop-soak] scalar-lag wave 15 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=600 guest=390
+[coop-soak] scalar-lag wave 20 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1910 guest=600
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=2740 guest=1910
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=3660 guest=2740
+[22m[39m[coop-soak] scalar-lag wave 42 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=5330 guest=3660
+[22m[39m[coop-soak] scalar-lag wave 45 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=6830 guest=5330
+[coop-soak] scalar-lag wave 50 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=9900 guest=6830
+[22m[39m[coop-soak] scalar-lag wave 55 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=11830 guest=9900
+[22m[39m[coop-soak] scalar-lag wave 56 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=13660 guest=11830
+[22m[39m[coop-soak] scalar-lag wave 62 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=15140 guest=13660
+[22m[39m[coop-soak] scalar-lag wave 64 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=16670 guest=15140
+[22m[39m[coop-soak] scalar-lag wave 66 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=19030 guest=16670
+[22m[39m[coop-soak] scalar-lag wave 72 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=23100 guest=20800
+[coop-soak] scalar-lag wave 80 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=28030 guest=23100
+[22m[39m[coop-soak] scalar-lag wave 95 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=32350 guest=28030
+[22m[39m[coop-soak] scalar-lag wave 104 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=43040 guest=39160
+[coop-soak] scalar-lag wave 110 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=53170 guest=45880
+[22m[39m[coop-soak] scalar-lag wave 112 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=56240 guest=53170
+[22m[39m[coop-soak] scalar-lag wave 114 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=60920 guest=56240
+[22m[39m[coop-soak] scalar-lag wave 115 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=68790 guest=60920
+[22m[39m[coop-soak] scalar-lag wave 117 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=74220 guest=68790
+[22m[39m[coop-soak] scalar-lag wave 134 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=80070 guest=74220
+[coop-soak] scalar-lag wave 140 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=90230 guest=80070
+[22m[39m[coop-soak] scalar-lag wave 143 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=96250 guest=90230
+[coop-soak] scalar-lag wave 145 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=107150 guest=96250
+[coop-soak] DONE seed=20260716 waves=150/150 resyncHeals=0 assertions=0 findings=0 trainerWaves=27 (fixed=13 random=14) skips={"mysteryEncounterDisabledV1":1} elapsedMs=228130
+
+----- vitest result tail -----
+[33m[coop:relay] AWAIT rewardOptions key=9:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=23:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=53:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=63:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=67:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=77:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=79:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=101:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=107:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=113:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=117:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=121:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=127:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:151:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [33m229204[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:151:3[39m
+
+[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m   Start at [22m 05:46:01
+[2m   Duration [22m 251.51s[2m (transform 17.35s, setup 21.08s, import 190ms, tests 229.58s, environment 535ms)[22m
+
