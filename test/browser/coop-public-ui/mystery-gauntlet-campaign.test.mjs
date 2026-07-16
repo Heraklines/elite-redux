@@ -95,3 +95,13 @@ test("the continuity profile visibly declines Bargain and co-op cannot persist a
   );
   assert.match(encounter, /globalScene\.gameData\s*\.saveAll\(/u);
 });
+
+test("the companion solo lane publicly selects a readiness-proven empty save slot", async () => {
+  const observer = await readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8");
+  const navigation = await readFile(resolve(root, "test/browser/coop-public-ui/campaign-nav.mjs"), "utf8");
+  const solo = await readFile(resolve(root, "test/browser/coop-public-ui/solo-classic.mjs"), "utf8");
+  assert.match(observer, /slot\.hasData === false[\s\S]*`empty-slot:\$\{index\}`/u);
+  assert.match(navigation, /event\?\.observation\.ready\.handlerActive === true/u);
+  assert.match(navigation, /optionId\.startsWith\("empty-slot:"\)/u);
+  assert.match(solo, /await selectFirstEmptySaveSlot\(client,/u);
+});

@@ -89,6 +89,30 @@ export async function waitForSemanticSurface(client, surfaceId, { fromCursor = 0
   return event;
 }
 
+/** Select the first visibly empty save slot; loading/occupied slots are never guessed from cursor position. */
+export async function selectFirstEmptySaveSlot(client, { fromCursor = 0, timeoutMs = 15_000 } = {}) {
+  const ready = await client.evidence.waitForCondition(
+    sink => {
+      const event = sink.findLastSemanticSurface(fromCursor, "save-slot");
+      return event?.observation.ready.handlerActive === true
+        && event.observation.optionIds?.some(optionId => optionId.startsWith("empty-slot:"))
+        ? event
+        : null;
+    },
+    { timeoutMs, description: "visible first empty save slot" },
+  );
+  const targetId = ready.observation.optionIds.find(optionId => optionId.startsWith("empty-slot:"));
+  if (targetId == null) {
+    throw new Error(`${client.label}: save-slot readiness proof had no empty slot`);
+  }
+  return selectOptionById(client, {
+    surfaceId: "save-slot",
+    targetId,
+    navKeys: ["ArrowUp", "ArrowDown"],
+    timeoutMs,
+  });
+}
+
 /**
  * Select the visible starter, add it through its option menu, submit the team, and confirm.
  * Every transition is observed before the next public key is sent, so text animation or a slow
