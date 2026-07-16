@@ -8,6 +8,37 @@ import { confirmDefaultStarterTeam, selectOptionById, waitForSemanticSurface } f
 const TITLE_PHASE = /Start Phase TitlePhase/u;
 const CHALLENGE_PHASE = /Start Phase SelectChallengePhase/u;
 const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
+const GAME_OVER_SPEED_KEYS = [
+  "ArrowDown",
+  "ArrowDown",
+  "ArrowDown",
+  "Space",
+  "ArrowRight",
+  "ArrowRight",
+  "ArrowRight",
+  "ArrowRight",
+  "Backspace",
+  "ArrowUp",
+  "ArrowUp",
+  "ArrowUp",
+];
+
+async function raiseGameOverSpeed(rig) {
+  for (const client of Object.values(rig.clients)) {
+    const cursor = client.evidence.cursor();
+    await client.sequence(GAME_OVER_SPEED_KEYS, "game-over-visible-speed-10x");
+    const attestation = await client.evidence.waitForCondition(sink => sink.findGameSpeed(10, cursor), {
+      timeoutMs: client.config.timeoutMs,
+      description: `${client.label} visible Settings Game Speed=10 attestation`,
+    });
+    client.evidence.record("game-over-speed-proof", {
+      gameSpeed: attestation.observation.gameSpeed,
+      eventIndex: attestation.index,
+      keys: GAME_OVER_SPEED_KEYS,
+    });
+    await client.checkpoint("game-over-speed-10x");
+  }
+}
 
 function sessionStorageKeys(dom) {
   return dom.storage.map(item => item.key).filter(key => /^sessionData(?:\d*)_/u.test(key));
@@ -284,6 +315,7 @@ async function commanderSkip(rig) {
 
 async function gameOver(rig) {
   await rig.loginBoth();
+  await raiseGameOverSpeed(rig);
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun({ gameOverFixture: true });
   await rig.driveWaveToGameOver();
