@@ -79,7 +79,8 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
   assert.match(workflow, /src\/ui\/handlers\/save-slot-select-ui-handler\.ts/u);
   assert.match(
     campaignNav,
-    /confirmDefaultStarterTeam[\s\S]*?waitForActionableSemanticSurface\(client, "starter-select"/u,
+    /confirmDefaultStarterTeam[\s\S]*?fromCursor = client\.pageCursor[\s\S]*?waitForActionableSemanticSurface\(client, "starter-select", \{ fromCursor/u,
   );
+  assert.match(journeys, /confirmDefaultStarterTeam\(client, \{[\s\S]*?fromCursor: starterPhase\.index/u);
   assert.match(browserEntry, /inputBlockedRaw[\s\S]*?typeof inputBlockedRaw === "boolean"/u);
 });
