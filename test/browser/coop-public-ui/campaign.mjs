@@ -17,7 +17,10 @@ import { delay } from "./evidence.mjs";
 import { assertMarketCoverage, driveTargetedMarket } from "./market-journey.mjs";
 
 const START_PHASE = /Start Phase (\w+)/u;
-const ANIMATION_PROGRESS_PHASE = /Start Phase (MoveEffectPhase|MoveAnimPhase|CoopMoveAnimReplayPhase)/u;
+const OUTCOME_PROGRESS_PHASE = /Start Phase ([A-Za-z0-9]+Phase)/u;
+const OUTCOME_PROGRESS_AUTHORITY = /\[coop:turn\] host recorder: append turn=\d+ seq=\d+/u;
+const OUTCOME_PROGRESS_RENDERER = /\[coop:replay\] guest replay turn=\d+: live increment seq=\d+\.\.\d+/u;
+const OUTCOME_PROGRESS_RESOLUTION = /\[coop:replay\] guest (?:RECV turnResolution|awaitTurn turn=\d+ RESOLVE)/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
@@ -399,8 +402,14 @@ export function createAnimationProgressBudget(
     const events = client.evidence.events.slice(scanFrom);
     scanOffsets.set(client.label, client.evidence.events.length);
     for (const event of events) {
-      const match = ANIMATION_PROGRESS_PHASE.exec(event.text ?? "");
-      if (!match) {
+      const text = event.text ?? "";
+      const phase = OUTCOME_PROGRESS_PHASE.exec(text)?.[1] ?? null;
+      const progress =
+        phase
+        ?? (OUTCOME_PROGRESS_AUTHORITY.test(text) ? "authority-stream" : null)
+        ?? (OUTCOME_PROGRESS_RENDERER.test(text) ? "renderer-stream" : null)
+        ?? (OUTCOME_PROGRESS_RESOLUTION.test(text) ? "turn-resolution" : null);
+      if (progress == null) {
         continue;
       }
       const parsedEventAtMs = Date.parse(event.at ?? "");
@@ -408,7 +417,7 @@ export function createAnimationProgressBudget(
       const previousDeadlineMs = deadlineMs;
       deadlineMs = Math.min(hardDeadlineMs, Math.max(deadlineMs, eventAtMs + animationAllowanceMs));
       client.evidence.record("campaign-animation-budget", {
-        phase: match[1],
+        phase: progress,
         phaseEventIndex: event.index,
         phaseObservedAt: event.at ?? null,
         phaseMonotonicMs: event.monotonicMs ?? null,
