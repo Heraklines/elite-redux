@@ -111,3 +111,14 @@ test("the companion solo lane publicly selects a readiness-proven empty save slo
   assert.match(navigation, /await client\.press\("Space", "fresh-save-slot-0"\)/u);
   assert.match(solo, /await selectFirstEmptySaveSlot\(client,/u);
 });
+
+test("parallel lobby pairing reselects the exact visible username before every request", async () => {
+  const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");
+  assert.match(harness, /const targetId = semanticOptionId\(`Ask \$\{username\} to play`\)/u);
+  assert.match(
+    harness,
+    /selectOptionById\(this, \{[\s\S]*surfaceId: "option-select:TitlePhase"[\s\S]*targetId,[\s\S]*submit: false/u,
+  );
+  assert.match(harness, /requester\.requestPlayer\(acceptorName, \{[\s\S]*purpose: "reissue-request"/u);
+  assert.doesNotMatch(harness, /requester\.press\("Space", `lobby-reissue-request-/u);
+});
