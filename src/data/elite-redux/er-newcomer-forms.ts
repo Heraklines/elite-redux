@@ -29,7 +29,10 @@
 // be constructed yet (they are resolved at battle time from `allAbilities`).
 // =============================================================================
 
-import { installErFormSpriteRedirect } from "#data/elite-redux/er-form-sprite-redirect";
+import {
+  installErFormSpriteRedirect,
+  installErSpeciesFormSpriteDispatch,
+} from "#data/elite-redux/er-form-sprite-redirect";
 import { PokemonForm } from "#data/pokemon-species";
 import { pokemonFormChanges, SpeciesFormChange } from "#data/pokemon-forms";
 import { SpeciesFormChangeItemTrigger } from "#data/pokemon-forms/form-change-triggers";
@@ -496,6 +499,16 @@ export function injectNewcomerForms(): InjectNewcomerFormsResult {
 
     // #287 sprite/icon redirect to the ER slug (placeholder until art lands).
     installErFormSpriteRedirect(form, def.slug);
+    // #287: also bridge the SPECIES-level sprite path to the redirected form.
+    // The battle path uses `getSpeciesForm(formIndex).getSpriteAtlasPath()` (the
+    // form object, patched above), but the DEX page and other UI surfaces call
+    // the SPECIES-level `species.getSpriteKey(female, formIndex, …)`, which builds
+    // the vanilla `{speciesId}-{formKey}` key and never touches the patched form.
+    // Bases that also carry a vendor mega / redux form get this dispatch installed
+    // by a later init sweep, but bases in NEITHER sweep (e.g. Minun, Plusle) were
+    // left spriteless on the dex — install it here for every newcomer form so all
+    // 12 render regardless of coincidental sweep membership. Idempotent per species.
+    installErSpeciesFormSpriteDispatch(species);
 
     result.injected++;
   }

@@ -90,4 +90,33 @@ describe.skipIf(!RUN)("ER newcomer forms reachability (dex + reward pool)", () =
     const zForms = ER_NEWCOMER_FORMS.filter(d => d.formKey === "mega-z");
     expect(zForms.length).toBeGreaterThan(0);
   });
+
+  // #287: every newcomer form must render a sprite on the DEX PAGE, which resolves
+  // through the SPECIES-level `species.getSpriteAtlasPath/getSpriteKey(formIndex)`.
+  // Without `installErSpeciesFormSpriteDispatch(species)`, bases in neither the
+  // vendor-mega nor redux sweep (Minun, Plusle) built a vanilla `{id}-mega` path
+  // that 404s -> spriteless. This asserts the species-level path is redirected to
+  // the ER slug for ALL 12 forms.
+  it("every newcomer form resolves its SPECIES-level sprite atlas to the ER slug (dex-page render path)", () => {
+    const broken: string[] = [];
+    for (const def of ER_NEWCOMER_FORMS) {
+      const species = getPokemonSpecies(def.baseSpecies);
+      const formIndex = species.forms.findIndex(f => f.formKey === def.formKey);
+      if (formIndex < 0) {
+        broken.push(`${def.formName}: form ${def.formKey} not injected onto ${species.name}`);
+        continue;
+      }
+      // The dex page calls the SPECIES method (not the FORM method) with the mega
+      // formIndex — this is exactly what was spriteless for Minun/Plusle.
+      const atlas = species.getSpriteAtlasPath(false, formIndex, false, 0, false);
+      const key = species.getSpriteKey(false, formIndex, false, 0, false);
+      if (!atlas.includes(def.slug)) {
+        broken.push(`${def.formName}: species atlas "${atlas}" does not reference slug "${def.slug}"`);
+      }
+      if (!key.includes(def.slug)) {
+        broken.push(`${def.formName}: species sprite key "${key}" does not reference slug "${def.slug}"`);
+      }
+    }
+    expect(broken, broken.join("\n")).toEqual([]);
+  });
 });
