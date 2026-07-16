@@ -216,10 +216,7 @@ async function overwriteCoopSaveWithSoloRun(client) {
       `${client.label}: overwrite persisted replacement at event ${soloWrite.index} before exact delete ACK ${deleteResponse.index}`,
     );
   }
-  await waitForSemanticSurface(client, "command:command", {
-    fromCursor: mutationCursor,
-    timeoutMs: client.config.timeoutMs,
-  });
+  await client.waitForLocalCommand(mutationCursor);
   await client.checkpoint("overwrite-solo-wave1-command");
   client.evidence.record("save-overwrite-proof", {
     deleteResponseIndex: deleteResponse.index,
