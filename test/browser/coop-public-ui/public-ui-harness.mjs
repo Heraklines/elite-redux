@@ -860,6 +860,8 @@ export class PublicUiClient {
         "coopfixture",
         this.label === this.config.faintOwnerSeat ? "faint-owner" : "faint-partner",
       );
+    } else if (this.config.journey === "game-over") {
+      entryUrl.searchParams.set("coopfixture", "game-over");
     }
     this.evidence.record("navigate", { url: entryUrl.origin });
     await this.page.goto(entryUrl, { waitUntil: "domcontentloaded", timeout: this.config.bootTimeoutMs });
@@ -2270,7 +2272,7 @@ export class DuoPublicUiRig {
     return proof;
   }
 
-  async startFreshRun({ commanderFixture = false, faintFixture = false } = {}) {
+  async startFreshRun({ commanderFixture = false, faintFixture = false, gameOverFixture = false } = {}) {
     if (!this.host) {
       throw new Error("startFreshRun requires a paired public host (call pair() first)");
     }
@@ -2313,7 +2315,9 @@ export class DuoPublicUiRig {
               ? client.label === this.config.faintOwnerSeat
                 ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
                 : [BULBASAUR_SPECIES_ID]
-              : null;
+              : gameOverFixture
+                ? [MAGIKARP_SPECIES_ID]
+                : null;
           const result =
             expectedSeededSpecies == null
               ? await confirmDefaultStarterTeam(client, {
@@ -2478,6 +2482,137 @@ export class DuoPublicUiRig {
       commandCursors = outcomeCursors;
     }
     throw new Error(`Battle did not reach rewards in ${this.config.maxTurns} public command rounds`);
+  }
+
+  /**
+   * Drive one real reciprocal command round into the exact retained terminal race.
+   *
+   * The dedicated build seeds each visible starter screen with a lone Memento user and delays
+   * only the retained game-over envelope. This method remains a public driver: it submits the
+   * ordinary command keys, then proves the production logs from RTC receipt through replay unpark,
+   * terminal continuation ACK, host release and both rendered GameOver phases.
+   */
+  async driveWaveToGameOver() {
+    if (!this.host || !this.guest) {
+      throw new Error("driveWaveToGameOver requires a fully bound host and guest");
+    }
+    const commandCursors = Object.fromEntries(
+      Object.values(this.clients).map(client => [client.label, client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0]),
+    );
+    const { outcomeCursors, expectedCommandAddress } = await this.driveSequentialCommandRound(
+      commandCursors,
+      this.config.keys.battle,
+      "game-over-memento-round",
+    );
+    const outcome = await this.waitForPostTurnOutcome(outcomeCursors, { expectedCommandAddress });
+    if (outcome.kind !== "gameOver") {
+      throw new Error(`Memento terminal fixture reached ${outcome.kind} instead of paired GameOver`);
+    }
+
+    const hostCommit = await this.host.evidence.waitFor(
+      /wave-advance op HOST commit wave=1 outcome=gameOver next=GAME_OVER rev=(\d+) id=([^\s]+)/u,
+      {
+        from: outcomeCursors[this.host.label],
+        timeoutMs: this.config.timeoutMs,
+        description: "host retained game-over operation commit",
+      },
+    );
+    const commitMatch = hostCommit.text.match(
+      /wave-advance op HOST commit wave=1 outcome=gameOver next=GAME_OVER rev=(\d+) id=([^\s]+)/u,
+    );
+    if (!commitMatch) {
+      throw new Error("Host game-over commit evidence lost its exact revision or operation id");
+    }
+    const revision = Number(commitMatch[1]);
+    const operationId = commitMatch[2];
+    const [hostSettled, hostRaw, guestRaw, guestBootstrap, guestUnparked, guestWaveReady] = await Promise.all([
+      this.host.evidence.waitFor(/settled WAVE_ADVANCE committed wave=1 tick=\d+ next=GAME_OVER\/wave1/u, {
+        from: outcomeCursors[this.host.label],
+        timeoutMs: this.config.timeoutMs,
+        description: "host settled terminal DATA",
+      }),
+      this.host.evidence.waitFor(/send waveResolved wave=1 outcome=gameOver/u, {
+        from: outcomeCursors[this.host.label],
+        timeoutMs: this.config.timeoutMs,
+        description: "host raw game-over compatibility hint",
+      }),
+      this.guest.evidence.waitFor(
+        /ignore raw waveResolved for correctness wave=1 outcome=gameOver; awaiting retained transaction/u,
+        {
+          from: outcomeCursors[this.guest.label],
+          timeoutMs: this.config.timeoutMs,
+          description: "guest rejects raw game-over correctness",
+        },
+      ),
+      this.guest.evidence.waitFor(/wave-advance JOURNAL bootstrap wave=1 outcome=gameOver \(ACK withheld\)/u, {
+        from: outcomeCursors[this.guest.label],
+        timeoutMs: this.config.timeoutMs,
+        description: "guest retained terminal journal bootstrap",
+      }),
+      this.guest.evidence.waitFor(
+        /wave-advance JOURNAL (?:queued|retained) safe-boundary wake wave=1 unparkedReplay=1/u,
+        {
+          from: outcomeCursors[this.guest.label],
+          timeoutMs: this.config.timeoutMs,
+          description: "guest unparked phantom replay for retained terminal",
+        },
+      ),
+      this.guest.evidence.waitFor(/retained WAVE_ADVANCE continuationReady wave=1/u, {
+        from: outcomeCursors[this.guest.label],
+        timeoutMs: this.config.timeoutMs,
+        description: "guest retained terminal continuation proof",
+      }),
+    ]);
+
+    await this.assertRetainedContinuation(outcomeCursors, "game-over-terminal");
+    const hostRelease = await this.host.evidence.waitFor(
+      new RegExp(`host RELEASE contiguous acknowledged authority cls=op:global seq=${revision}`, "u"),
+      {
+        from: outcomeCursors[this.host.label],
+        timeoutMs: this.config.timeoutMs,
+        description: `host release of exact retained game-over revision ${revision}`,
+      },
+    );
+    const hostGameOver = this.host.evidence.find(GAME_OVER_PHASE, outcomeCursors[this.host.label]);
+    const guestGameOver = this.guest.evidence.find(GAME_OVER_PHASE, outcomeCursors[this.guest.label]);
+    if (!hostGameOver || !guestGameOver || guestGameOver.index <= guestUnparked.index) {
+      throw new Error("Paired GameOver phases did not follow the guest's exact replay-unpark evidence");
+    }
+    if (
+      hostCommit.index >= hostSettled.index
+      || hostSettled.index >= hostRaw.index
+      || guestRaw.index >= guestBootstrap.index
+      || guestBootstrap.index >= guestUnparked.index
+      || guestUnparked.index >= guestWaveReady.index
+      || hostCommit.index >= hostRelease.index
+    ) {
+      throw new Error("Retained GameOver causal evidence arrived out of order");
+    }
+    const proof = {
+      wave: 1,
+      operationId,
+      revision,
+      expectedCommandAddress,
+      host: {
+        settledIndex: hostSettled.index,
+        operationCommitIndex: hostCommit.index,
+        rawHintIndex: hostRaw.index,
+        gameOverIndex: hostGameOver.index,
+        releaseIndex: hostRelease.index,
+      },
+      guest: {
+        rawHintRejectedIndex: guestRaw.index,
+        journalBootstrapIndex: guestBootstrap.index,
+        replayUnparkIndex: guestUnparked.index,
+        continuationReadyIndex: guestWaveReady.index,
+        gameOverIndex: guestGameOver.index,
+      },
+    };
+    this.host.evidence.record("retained-game-over-race-proof", { ...proof, side: "authority" });
+    this.guest.evidence.record("retained-game-over-race-proof", { ...proof, side: "renderer" });
+    this.assertNoFatalRecoverySince(outcomeCursors, "retained GameOver terminal");
+    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("paired-game-over-terminal")));
+    return proof;
   }
 
   /**

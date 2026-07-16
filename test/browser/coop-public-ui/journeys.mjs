@@ -282,6 +282,13 @@ async function commanderSkip(rig) {
   await rig.leaveRewardsAndReachWave2({ commanderFixture: true });
 }
 
+async function gameOver(rig) {
+  await rig.loginBoth();
+  await rig.pair(rig.config.requesterSeat);
+  await rig.startFreshRun({ gameOverFixture: true });
+  await rig.driveWaveToGameOver();
+}
+
 async function saveMutations(rig) {
   await rig.loginBoth();
   await rig.pair(rig.config.requesterSeat);
@@ -355,6 +362,7 @@ const journeys = {
   "reverse-resume": reverseResume,
   "faint-replacement": faintReplacement,
   "commander-skip": commanderSkip,
+  "game-over": gameOver,
   "save-mutations": saveMutations,
 };
 
