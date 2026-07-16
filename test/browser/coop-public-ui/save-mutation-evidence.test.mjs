@@ -42,11 +42,12 @@ test("requires every exact-delete URL commitment field", () => {
 });
 
 test("save journey requires public UI, exact CAS ACK ordering, and a brand-new context", async () => {
-  const [journeys, harness, workflow, saveHandler, campaignNav, browserEntry] = await Promise.all([
+  const [journeys, harness, workflow, saveHandler, gameData, campaignNav, browserEntry] = await Promise.all([
     readFile(new URL("journeys.mjs", import.meta.url), "utf8"),
     readFile(new URL("public-ui-harness.mjs", import.meta.url), "utf8"),
     readFile(new URL("../../../.github/workflows/coop-public-ui-journey.yml", import.meta.url), "utf8"),
     readFile(new URL("../../../src/ui/handlers/save-slot-select-ui-handler.ts", import.meta.url), "utf8"),
+    readFile(new URL("../../../src/system/game-data.ts", import.meta.url), "utf8"),
     readFile(new URL("campaign-nav.mjs", import.meta.url), "utf8"),
     readFile(new URL("../../../scripts/coop-browser-entry.ts", import.meta.url), "utf8"),
   ]);
@@ -68,6 +69,14 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
   assert.match(workflow, /local-worker-vite\.config\.mjs/u);
   assert.match(workflow, /inputs\.journey == 'save-mutations'/u);
   assert.doesNotMatch(saveHandler, /isBeta \|\| isDev \? 300 : 2000/u);
+  assert.match(gameData, /COOP_COMMITTED_DELETE_LOCK_ACQUIRE_TIMEOUT_MS = 30_000/u);
+  assert.match(
+    gameData,
+    /!protectedLocalCoop && deletedCoopRunId == null[\s\S]*?withCommittedCoopDeletePersistenceLease/u,
+  );
+  assert.match(gameData, /if \(coopClear\) \{[\s\S]*?withCommittedCoopDeletePersistenceLease/u);
+  assert.match(workflow, /src\/system\/game-data\.ts/u);
+  assert.match(workflow, /src\/ui\/handlers\/save-slot-select-ui-handler\.ts/u);
   assert.match(
     campaignNav,
     /confirmDefaultStarterTeam[\s\S]*?waitForActionableSemanticSurface\(client, "starter-select"/u,

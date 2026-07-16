@@ -210,6 +210,12 @@ const CLOUD_SYNC_MIN_INTERVAL_MS = 20 * 60 * 1000;
 const CLOUD_SYNC_BACKOFF_BASE_MS = 20 * 60 * 1000;
 const CLOUD_SYNC_BACKOFF_MAX_MS = 6 * 60 * 60 * 1000;
 const COOP_PERSISTENCE_LOCK_ACQUIRE_TIMEOUT_MS = 2_000;
+// Ordinary persistence operations fail closed quickly so a wedged tab cannot stall gameplay. Once an
+// exact backend tombstone has committed, however, returning early leaves the browser advertising stale
+// local bytes even though the authoritative row is already gone. Give that final compare-delete enough
+// time to wait behind a legitimate in-flight checkpoint transaction; it still uses the same account Web
+// Lock and exact local/head guards, so a concurrent tab can never be erased speculatively.
+const COOP_COMMITTED_DELETE_LOCK_ACQUIRE_TIMEOUT_MS = 30_000;
 const COOP_PERSISTENCE_NETWORK_TIMEOUT_MS = 5_000;
 // The GUEST's fresh first-save durability persist chains several SEQUENTIAL real-cloud round-trips
 // (per-slot CAS reads -> run-status guard -> empty-CAS mirror write), each independently bounded by
@@ -3143,6 +3149,7 @@ export class GameData {
     operation: () => Promise<T>,
     requireLocks: boolean,
     accountIdentity = this.currentPersistenceAccount(),
+    lockAcquireTimeoutMs = coopPersistenceClock.lockAcquireTimeoutMs,
   ): Promise<T | null> {
     if (!this.persistenceAccountIsCurrent(accountIdentity)) {
       return null;
@@ -3172,7 +3179,7 @@ export class GameData {
           expired = true;
           abortController.abort("co-op persistence lock acquisition timed out");
           resolve(null);
-        }, coopPersistenceClock.lockAcquireTimeoutMs);
+        }, lockAcquireTimeoutMs);
       });
       let requested: Promise<T | null>;
       try {
@@ -3222,6 +3229,19 @@ export class GameData {
     accountIdentity = this.currentPersistenceAccount(),
   ): Promise<T | null> {
     return this.withSessionPersistenceLease(operation, true, accountIdentity);
+  }
+
+  /** Finish local retirement after the backend has already committed an exact co-op tombstone. */
+  private withCommittedCoopDeletePersistenceLease<T>(
+    operation: () => Promise<T>,
+    accountIdentity: string,
+  ): Promise<T | null> {
+    return this.withSessionPersistenceLease(
+      operation,
+      true,
+      accountIdentity,
+      COOP_COMMITTED_DELETE_LOCK_ACQUIRE_TIMEOUT_MS,
+    );
   }
 
   /** Retire one exact local replica after a typed backend status already proved its run tombstoned. */
@@ -4838,30 +4858,30 @@ export class GameData {
     );
     const error = deletion.error;
     if (!error) {
-      const localDeleted = await this.withSessionPersistenceLease(
-        async () => {
-          if (
-            localStorage.getItem(localKey) !== localBeforeCloud
-            || !this.coopCloudHeadStateMatches(
-              this.readKnownCoopCloudHead(slotId, accountIdentity),
-              lineageHeadBeforeCloud,
-            )
-          ) {
-            return false;
-          }
-          if (
-            deletion.deletedCoopRunId != null
-            && (!recordCoopDeletedRun(accountIdentity, deletion.deletedCoopRunId)
-              || !this.clearKnownCoopCloudHead(slotId, accountIdentity, deletion.deletedCoopRunId))
-          ) {
-            return false;
-          }
-          localStorage.removeItem(localKey);
-          return localStorage.getItem(localKey) == null;
-        },
-        protectedLocalCoop || deletion.deletedCoopRunId != null,
-        accountIdentity,
-      );
+      const deletedCoopRunId = deletion.deletedCoopRunId;
+      const retireLocalReplica = async (): Promise<boolean> => {
+        if (
+          localStorage.getItem(localKey) !== localBeforeCloud
+          || !this.coopCloudHeadStateMatches(
+            this.readKnownCoopCloudHead(slotId, accountIdentity),
+            lineageHeadBeforeCloud,
+          )
+        ) {
+          return false;
+        }
+        if (
+          deletedCoopRunId != null
+          && (!recordCoopDeletedRun(accountIdentity, deletedCoopRunId)
+            || !this.clearKnownCoopCloudHead(slotId, accountIdentity, deletedCoopRunId))
+        ) {
+          return false;
+        }
+        localStorage.removeItem(localKey);
+        return localStorage.getItem(localKey) == null;
+      };
+      const localDeleted = await (!protectedLocalCoop && deletedCoopRunId == null
+        ? this.withSessionPersistenceLease(retireLocalReplica, false, accountIdentity)
+        : this.withCommittedCoopDeletePersistenceLease(retireLocalReplica, accountIdentity));
       if (localDeleted !== true) {
         return false;
       }
@@ -4993,7 +5013,7 @@ export class GameData {
 
     // Cloud exact-delete/clear completed. Compare-delete only the local bytes inspected above.
     if (coopClear) {
-      const localDeleted = await this.withCoopResumePersistenceLease(async () => {
+      const localDeleted = await this.withCommittedCoopDeletePersistenceLease(async () => {
         if (
           localStorage.getItem(localKey) !== localBeforeCloud
           || !this.coopCloudHeadStateMatches(
