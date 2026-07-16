@@ -1,0 +1,232 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:345860f229cb283ab90663c28d0cf7e92c2002c0:run-29499450013.1
+mode:     0  wave:?
+seed:     zeIqOVvupQMQJql4ZTyikfnU
+party:    
+enemy:    
+
+----- COMMENT -----
+deleted the run in the last slot and when returning to replace that slot , it reappeared
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:345860f229cb283ab90663c28d0cf7e92c2002c0:run-29499450013.1","source":"github","sha":"345860f229cb283ab90663c28d0cf7e92c2002c0","workflow":{"provider":"github-actions","runId":"29499450013","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"ci/coop/p33-closure-integrated"},"deployment":null}
+
+----- CONSOLE -----
+[13:33:11.244] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[13:33:11.480] LOG: [ER] build {"version":1,"id":"github:345860f229cb283ab90663c28d0cf7e92c2002c0:run-29499450013.1","source":"github","sha":"345860f229cb283ab90663c28d0cf7e92c2002c0","workflow":{"provider":"github-actions","runId":"29499450013","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"ci/coop/p33-closure-integrated"},"deployment":null}
+[13:33:11.509] LOG: [dev-tools] loaded — 624 scenarios + Send Logs button
+[13:33:35.969] DEBUG: Destroying loading scene
+[13:33:35.969] DEBUG: Destroyed loading scene
+[13:33:36.009] LOG: Seed: EizHmYs98S0f4jisL1vBKDmA
+[13:33:36.009] LOG: Wave Seed: EizHmYs98S0f4jisL1vBKDmA 0
+[13:33:39.240] LOG: %cStart Phase LoginPhase color:green;
+[13:33:39.681] LOG: Client Session: IIGxXGCoQ9B6UOh3gj48XBXQ5TBGvixE
+[13:33:40.194] DEBUG: Using cached system data
+[13:33:40.243] LOG: %cStart Phase TitlePhase color:green;
+[13:33:40.244] LOG: Getting Session Slot id: %d 4
+[13:33:40.252] LOG: use seasonal splash messages true
+[13:33:44.723] LOG: %cStart Phase TitlePhase color:green;
+[13:33:44.724] LOG: Getting Session Slot id: %d 4
+[13:33:44.738] LOG: use seasonal splash messages true
+[13:33:56.474] WARN: cry/70017 not found
+[13:34:05.392] WARN: cry/70016 not found
+[13:34:15.777] WARN: cry/10865 not found
+[13:34:18.142] WARN: cry/10865 not found
+[13:34:25.960] WARN: cry/10880 not found
+[13:34:42.260] WARN: cry/852 not found
+[13:34:44.995] WARN: cry/10854 not found
+[13:34:50.435] WARN: cry/852 not found
+[13:34:54.216] WARN: cry/852 not found
+[13:34:55.861] WARN: cry/10854 not found
+[13:34:58.871] WARN: cry/852 not found
+[13:35:11.345] WARN: cry/10854 not found
+[13:35:28.870] WARN: cry/852 not found
+[13:35:32.002] WARN: cry/852 not found
+[13:35:34.656] WARN: cry/852 not found
+[13:35:35.304] WARN: cry/853 not found
+[13:35:37.207] WARN: cry/852 not found
+[13:35:39.845] WARN: cry/853 not found
+[13:35:45.102] WARN: cry/10855 not found
+[13:36:25.675] WARN: cry/853 not found
+[13:36:26.256] WARN: cry/852 not found
+[13:36:28.182] WARN: cry/853 not found
+[13:36:35.878] WARN: cry/852 not found
+[13:36:39.201] WARN: cry/853 not found
+[13:36:40.314] WARN: cry/853 not found
+[13:36:40.399] WARN: cry/853 not found
+[13:36:42.988] WARN: cry/10855 not found
+[13:36:49.706] WARN: cry/853 not found
+[13:36:50.363] WARN: cry/853 not found
+[13:36:50.870] WARN: cry/852 not found
+[13:36:54.972] WARN: cry/10854 not found
+[13:36:59.570] WARN: cry/852 not found
+[13:36:59.922] WARN: cry/853 not found
+[13:37:06.537] LOG: %cStart Phase SelectChallengePhase color:green;
+[13:37:09.240] LOG: %cStart Phase SelectStarterPhase color:green;
+[13:37:11.494] WARN: cry/692 not found
+[13:37:11.501] WARN: cry/123 not found
+[13:37:13.659] LOG: Getting Session Slot id: %d 0
+[13:37:13.666] LOG: Getting Session Slot id: %d 1
+[13:37:13.673] LOG: Getting Session Slot id: %d 2
+[13:37:13.678] LOG: Getting Session Slot id: %d 3
+[13:37:13.683] LOG: Getting Session Slot id: %d 4
+[13:37:13.718] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:37:13.718] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:37:14.058] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:37:14.058] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:37:16.396] ERROR: Local/cloud checkpoint bytes differ; refusing ambiguous delete.
+[13:37:16.397] LOG: Seed: 6AibnC6dlN34ekB3HrYIKVMS
+[13:37:16.397] LOG: Wave Seed: 6AibnC6dlN34ekB3HrYIKVMS 0
+[13:37:16.551] WARN: AnimationManager key already exists: prompt
+[13:37:16.551] WARN: AnimationManager key already exists: tera_sparkle
+[13:37:16.551] LOG: Seed: nL8qnThZ9nmu8KCQmpYblhYz
+[13:37:16.551] LOG: Wave Seed: nL8qnThZ9nmu8KCQmpYblhYz 0
+[13:37:19.854] LOG: %cStart Phase LoginPhase color:green;
+[13:37:20.465] LOG: Client Session: IIGxXGCoQ9B6UOh3gj48XBXQ5TBGvixE
+[13:37:21.077] DEBUG: Using cached system data
+[13:37:21.121] LOG: %cStart Phase TitlePhase color:green;
+[13:37:21.122] LOG: Getting Session Slot id: %d 4
+[13:37:21.127] LOG: use seasonal splash messages true
+[13:37:25.532] LOG: %cStart Phase SelectChallengePhase color:green;
+[13:37:26.904] LOG: %cStart Phase SelectStarterPhase color:green;
+[13:37:35.072] LOG: %cStart Phase SelectChallengePhase color:green;
+[13:37:35.704] LOG: %cStart Phase TitlePhase color:green;
+[13:37:35.706] LOG: Getting Session Slot id: %d 4
+[13:37:35.720] LOG: use seasonal splash messages true
+[13:37:38.996] LOG: %cStart Phase SelectChallengePhase color:green;
+[13:37:39.853] LOG: %cStart Phase SelectStarterPhase color:green;
+[13:37:50.833] LOG: Getting Session Slot id: %d 0
+[13:37:50.835] LOG: Getting Session Slot id: %d 1
+[13:37:50.837] LOG: Getting Session Slot id: %d 2
+[13:37:50.838] LOG: Getting Session Slot id: %d 3
+[13:37:50.839] LOG: Getting Session Slot id: %d 4
+[13:37:50.851] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:37:50.852] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:37:51.189] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:37:51.189] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:37:55.515] ERROR: Local/cloud checkpoint bytes differ; refusing ambiguous delete.
+[13:37:55.515] LOG: Seed: CVLXDdqCAPzVZytEfy6nJ8IM
+[13:37:55.515] LOG: Wave Seed: CVLXDdqCAPzVZytEfy6nJ8IM 0
+[13:37:55.673] WARN: AnimationManager key already exists: prompt
+[13:37:55.673] WARN: AnimationManager key already exists: tera_sparkle
+[13:37:55.673] LOG: Seed: VUxviGyUjg9kVAT531mQ6B2e
+[13:37:55.673] LOG: Wave Seed: VUxviGyUjg9kVAT531mQ6B2e 0
+[13:37:58.762] LOG: %cStart Phase LoginPhase color:green;
+[13:37:59.191] LOG: Client Session: IIGxXGCoQ9B6UOh3gj48XBXQ5TBGvixE
+[13:37:59.551] DEBUG: Using cached system data
+[13:37:59.601] LOG: %cStart Phase TitlePhase color:green;
+[13:37:59.602] LOG: Getting Session Slot id: %d 4
+[13:37:59.605] LOG: use seasonal splash messages true
+[13:38:01.283] LOG: Getting Session Slot id: %d 0
+[13:38:01.293] LOG: Getting Session Slot id: %d 1
+[13:38:01.299] LOG: Getting Session Slot id: %d 2
+[13:38:01.305] LOG: Getting Session Slot id: %d 3
+[13:38:01.309] LOG: Getting Session Slot id: %d 4
+[13:38:01.334] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:38:01.335] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:38:01.652] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:38:01.652] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:38:07.351] ERROR: Local/cloud checkpoint bytes differ; refusing ambiguous delete.
+[13:38:07.351] LOG: Seed: hw5oZ462lyvWg3kRU5Q04OvN
+[13:38:07.351] LOG: Wave Seed: hw5oZ462lyvWg3kRU5Q04OvN 0
+[13:38:07.490] WARN: AnimationManager key already exists: prompt
+[13:38:07.490] WARN: AnimationManager key already exists: tera_sparkle
+[13:38:07.490] LOG: Seed: YENZe6ioUyT82FQAfAC0ickR
+[13:38:07.490] LOG: Wave Seed: YENZe6ioUyT82FQAfAC0ickR 0
+[13:38:10.722] LOG: %cStart Phase LoginPhase color:green;
+[13:38:11.190] LOG: Client Session: IIGxXGCoQ9B6UOh3gj48XBXQ5TBGvixE
+[13:38:11.551] DEBUG: Using cached system data
+[13:38:11.600] LOG: %cStart Phase TitlePhase color:green;
+[13:38:11.600] LOG: Getting Session Slot id: %d 4
+[13:38:11.603] LOG: use seasonal splash messages true
+[13:38:15.697] LOG: %cStart Phase SelectChallengePhase color:green;
+[13:38:16.438] LOG: %cStart Phase SelectStarterPhase color:green;
+[13:38:20.728] LOG: Getting Session Slot id: %d 0
+[13:38:20.729] LOG: Getting Session Slot id: %d 1
+[13:38:20.731] LOG: Getting Session Slot id: %d 2
+[13:38:20.732] LOG: Getting Session Slot id: %d 3
+[13:38:20.734] LOG: Getting Session Slot id: %d 4
+[13:38:20.746] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:38:20.746] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:38:20.972] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:38:20.972] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-CGrWjOS5.js:3:338460)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CPMmKl-x.js:1050:3816
+[13:38:24.313] ERROR: Local/cloud checkpoint bytes differ; refusing ambiguous delete.
+[13:38:24.313] LOG: Seed: qviscNNERFfMG8TSkGBfwxdq
+[13:38:24.313] LOG: Wave Seed: qviscNNERFfMG8TSkGBfwxdq 0
+[13:38:24.471] WARN: AnimationManager key already exists: prompt
+[13:38:24.471] WARN: AnimationManager key already exists: tera_sparkle
+[13:38:24.471] LOG: Seed: zeIqOVvupQMQJql4ZTyikfnU
+[13:38:24.471] LOG: Wave Seed: zeIqOVvupQMQJql4ZTyikfnU 0
+[13:38:26.590] LOG: %cStart Phase LoginPhase color:green;
+[13:38:27.028] LOG: Client Session: IIGxXGCoQ9B6UOh3gj48XBXQ5TBGvixE
+[13:38:27.383] DEBUG: Using cached system data
+[13:38:27.424] LOG: %cStart Phase TitlePhase color:green;
+[13:38:27.425] LOG: Getting Session Slot id: %d 4
+[13:38:27.428] LOG: use seasonal splash messages true
+
+----- REPLAY TRACE (JSON) -----
+(none)
