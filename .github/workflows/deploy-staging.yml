@@ -15,7 +15,9 @@ on:
 
 concurrency:
   group: deploy-staging
-  cancel-in-progress: true
+  # A cancelled run used to leave a newer save Worker serving an older Pages client when cancellation
+  # landed between the two deploy steps. Queue promotions so every started contract pair completes.
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -32,16 +34,6 @@ jobs:
           # always fetchable, so we vendor those files in deploy/standalone-assets.
 
       - uses: ./.github/actions/setup-deps
-
-      # The save contract must be live before a newly built client can call it. Keep this in the same
-      # exact-SHA promotion job and before Pages so staging can never publish a newer client against an
-      # older save Worker.
-      - name: Deploy cloud-save API (staging)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config workers/er-save-api/wrangler.staging.toml
 
       - name: Stage standalone asset metadata
         run: |
@@ -140,6 +132,19 @@ jobs:
           done
           echo "=== er-assets pins in dist/_redirects ==="
           grep -o 'er-assets@[0-9a-f]*' dist/_redirects | sort -u
+
+      - name: Verify staging promotion contract
+        run: node --test test/browser/coop-public-ui/deploy-staging-contract.test.mjs
+
+      # Do not mutate either live surface until every fallible build/verification step is green. The Worker
+      # still goes first so a newly published browser never calls an older save contract; cancel-in-progress
+      # is disabled above so a promotion that reaches this point cannot strand the pair between versions.
+      - name: Deploy cloud-save API (staging)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config workers/er-save-api/wrangler.staging.toml
 
       - name: Deploy to Cloudflare Pages (staging)
         uses: cloudflare/wrangler-action@v3
