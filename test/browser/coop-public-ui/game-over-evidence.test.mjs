@@ -29,7 +29,11 @@ test("GameOver journey uses visible starters, real command input, and exact reta
   );
   assert.match(
     journeys,
-    /async function gameOver\(rig\)[\s\S]*startFreshRun\(\{ gameOverFixture: true \}\)[\s\S]*driveWaveToGameOver\(\)/u,
+    /GAME_OVER_SPEED_KEYS[\s\S]*client\.sequence\(GAME_OVER_SPEED_KEYS, "game-over-visible-speed-10x"\)[\s\S]*findGameSpeed\(10, cursor\)/u,
+  );
+  assert.match(
+    journeys,
+    /async function gameOver\(rig\)[\s\S]*loginBoth\(\)[\s\S]*raiseGameOverSpeed\(rig\)[\s\S]*pair\(rig\.config\.requesterSeat\)[\s\S]*startFreshRun\(\{ gameOverFixture: true \}\)[\s\S]*driveWaveToGameOver\(\)/u,
   );
   assert.match(
     harness,
