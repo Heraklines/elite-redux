@@ -365,7 +365,10 @@ jobs:
           COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: "2700000"
           # Setup through the first shared command must fit the fast-lane contract. A renderer that
           # takes longer is runner starvation, not useful wave coverage, and fails with a causal marker.
-          COOP_UI_SETUP_HARD_TIMEOUT_MS: "720000"
+          # Two fresh registrations + onboarding + Settings + consent lobby + starter setup use
+          # the public path and reached pairing after 10-11m under full runner fan-out. Preserve a
+          # hard causal bound without turning healthy progress into a deterministic setup false red.
+          COOP_UI_SETUP_HARD_TIMEOUT_MS: "1200000"
           COOP_UI_DIAGNOSTIC_TIMEOUT_MS: "20000"
           COOP_UI_CLEANUP_TIMEOUT_MS: "60000"
           # Loud-fail everywhere by default. `shakedown` (the ONLY mode that permits press-through of

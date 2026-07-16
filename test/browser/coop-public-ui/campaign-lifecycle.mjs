@@ -4,7 +4,13 @@
  */
 
 const DEFAULT_CAMPAIGN_TIMEOUT_MS = 45 * 60_000;
-const DEFAULT_SETUP_TIMEOUT_MS = 12 * 60_000;
+// A fresh two-browser run performs two real registrations, onboarding, Settings navigation,
+// lobby consent, WebRTC verification, challenge/starter selection, and the first shared command.
+// Saturated remote runners repeatedly completed pairing at 10-11 minutes, leaving the old
+// 12-minute cap only seconds for run setup and producing deterministic false reds. Keep this
+// independently bounded below the 45-minute campaign ceiling, but budget the public path that the
+// gate actually promises to execute.
+const DEFAULT_SETUP_TIMEOUT_MS = 20 * 60_000;
 const DEFAULT_DIAGNOSTIC_TIMEOUT_MS = 20_000;
 const DEFAULT_CLEANUP_TIMEOUT_MS = 60_000;
 

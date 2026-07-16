@@ -22,7 +22,7 @@ test("campaign lifecycle has a finite outer deadline independent of per-wave wai
   delete process.env.COOP_UI_SETUP_HARD_TIMEOUT_MS;
   try {
     assert.equal(loadCampaignLifecyclePolicy().campaignTimeoutMs, 45 * 60_000);
-    assert.equal(loadCampaignLifecyclePolicy().setupTimeoutMs, 12 * 60_000);
+    assert.equal(loadCampaignLifecyclePolicy().setupTimeoutMs, 20 * 60_000);
   } finally {
     if (saved.campaign == null) {
       delete process.env.COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS;
@@ -77,7 +77,7 @@ test("workflow reserves artifact-upload headroom after both lifecycle backstops"
   );
   assert.match(workflow, /timeout-minutes: 55/u);
   assert.match(workflow, /COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: "2700000"/u);
-  assert.match(workflow, /COOP_UI_SETUP_HARD_TIMEOUT_MS: "720000"/u);
+  assert.match(workflow, /COOP_UI_SETUP_HARD_TIMEOUT_MS: "1200000"/u);
   assert.match(workflow, /timeout --signal=INT --kill-after=3m 48m/u);
   assert.match(workflow, /if: always\(\)[\s\S]*Upload compact campaign diagnosis first/u);
 });
