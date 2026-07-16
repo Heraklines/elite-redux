@@ -402,7 +402,7 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
     case "SAVE_SLOT":
       return { surfaceId: "save-slot", operationClass: "save", ownerModel: "local" };
     case "PARTY":
-      if (phase === "SwitchPhase") {
+      if (phase === "SwitchPhase" || phase === "CoopGuestFaintSwitchPhase") {
         return { surfaceId: "party:replacement", operationClass: "replacement", ownerModel: "interaction" };
       }
       if (phase === "AttemptCapturePhase") {
@@ -939,8 +939,18 @@ function observeSemanticSurface(): void {
       } catch {
         isLocalOwner = null;
       }
-      ownerSeat =
-        semantic.ownerModel === "interaction" && isLocalOwner != null ? (isLocalOwner ? localSeat : partnerSeat) : null;
+      // A faint replacement is owned by the battler's stable seat, not by the alternating biome
+      // interaction counter. The only browser that opens the real PARTY picker is that local owner;
+      // stamp it explicitly so host SwitchPhase and replica CoopGuestFaintSwitchPhase share one
+      // accurate contract (and so future N-player seats do not inherit a two-seat parity guess).
+      const localReplacementOwner = semantic.operationClass === "replacement" && uiMode === "PARTY";
+      ownerSeat = localReplacementOwner
+        ? localSeat
+        : semantic.ownerModel === "interaction" && isLocalOwner != null
+          ? isLocalOwner
+            ? localSeat
+            : partnerSeat
+          : null;
       // This client's view of who may input: a local surface = this seat drives its own; an
       // interaction surface = only the owner. A driver unions both clients' markers.
       seatsWithInput = semantic.ownerModel === "local" ? [localSeat] : ownerSeat == null ? [] : [ownerSeat];

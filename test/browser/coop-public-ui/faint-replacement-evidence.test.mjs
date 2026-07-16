@@ -13,8 +13,12 @@ test("faint replacement waits for the owned actionable party surface before pres
     readFile(new URL("../../../scripts/coop-browser-entry.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(browserEntry, /phase === "SwitchPhase" && uiMode === "PARTY"/u);
+  assert.match(browserEntry, /phase === "SwitchPhase" \|\| phase === "CoopGuestFaintSwitchPhase"/u);
   assert.match(browserEntry, /surfaceId: "party:replacement"/u);
+  assert.match(
+    browserEntry,
+    /semantic\.operationClass === "replacement" && uiMode === "PARTY"[\s\S]*?ownerSeat = localReplacementOwner/u,
+  );
   assert.match(harness, /findLastSemanticSurface\(from, "party:replacement"\)/u);
   assert.match(harness, /semantic\.observation\.ownerSeat === client\.publicSeat/u);
   assert.match(harness, /semantic\.observation\.seatsWithInput\?\.includes\(client\.publicSeat\)/u);
