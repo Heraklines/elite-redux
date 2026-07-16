@@ -805,7 +805,7 @@ describe("#812: pre-responder commandRequest buffering (the 'wrong move / didn't
     guestSync.dispose();
   });
 
-  it("a FOREIGN-slot request (the true #693 mutual-misresolve deadlock) still declines immediately", async () => {
+  it("an unaddressed FOREIGN-slot request retains the legacy immediate decline fallback", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);
     const guestSync = new CoopBattleSync(guest);
@@ -813,6 +813,7 @@ describe("#812: pre-responder commandRequest buffering (the 'wrong move / didn't
 
     const res = await hostSync.requestPartnerCommand(0, 1, [1]);
     expect(res, "declined -> null -> host AI fallback (deadlock broken)").toBeNull();
+    expect(hostSync.isTerminalFrozen()).toBe(false);
     hostSync.dispose();
     guestSync.dispose();
   });
@@ -842,19 +843,46 @@ describe("#812: pre-responder commandRequest buffering (the 'wrong move / didn't
     guestSync.dispose();
   });
 
-  it("uses a foreign addressed owner instead of a misleading local field-index probe", async () => {
+  it("fences an addressed ownership decline before its null continuation can choose AI", async () => {
     const { host, guest } = createLoopbackPair();
-    const hostSync = new CoopBattleSync(host);
+    const observed: unknown[] = [];
+    let hostSync: CoopBattleSync;
+    hostSync = new CoopBattleSync(host, {
+      onCommandTimeout: timeout => {
+        observed.push({ timeout, frozenInsideCallback: hostSync.isTerminalFrozen() });
+      },
+    });
     const guestSync = new CoopBattleSync(guest);
     guestSync.setSlotOwnershipProbe(() => true);
+    let frozenAtContinuation = false;
 
-    await expect(
-      hostSync.requestPartnerCommand(0, 2, [0], "host", undefined, {
+    const continued = hostSync
+      .requestPartnerCommand(0, 2, [0], "host", undefined, {
         epoch: 24,
         wave: 1,
         pokemonId: 808,
-      }),
-    ).resolves.toBeNull();
+      })
+      .then(command => {
+        frozenAtContinuation = hostSync.isTerminalFrozen();
+        return command;
+      });
+
+    await expect(continued).resolves.toBeNull();
+    expect(observed).toEqual([
+      {
+        timeout: {
+          epoch: 24,
+          wave: 1,
+          turn: 2,
+          owner: "host",
+          pokemonId: 808,
+          fieldIndex: 0,
+        },
+        frozenInsideCallback: true,
+      },
+    ]);
+    expect(frozenAtContinuation).toBe(true);
+    expect(hostSync.isTerminalFrozen()).toBe(true);
     hostSync.dispose();
     guestSync.dispose();
   });
