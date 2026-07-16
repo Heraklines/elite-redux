@@ -21,6 +21,7 @@ test("GameOver journey uses visible starters, real command input, and exact reta
 
   assert.match(workflow, /^\s{10}- game-over$/mu);
   assert.match(workflow, /inputs\.journey == 'game-over' && 'game-over'/u);
+  assert.match(workflow, /COOP_UI_GUEST_LOCALE: \$\{\{ inputs\.journey == 'game-over' && 'en' \|\| 'de' \}\}/u);
   assert.match(registry, /getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*SpeciesId\.MAGIKARP[\s\S]*MoveId\.MEMENTO/u);
   assert.match(
     transport,
