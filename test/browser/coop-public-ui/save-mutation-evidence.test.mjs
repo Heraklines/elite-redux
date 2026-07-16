@@ -47,6 +47,11 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
     readFile(new URL("public-ui-harness.mjs", import.meta.url), "utf8"),
     readFile(new URL("../../../.github/workflows/coop-public-ui-journey.yml", import.meta.url), "utf8"),
   ]);
+  assert.match(
+    journeys,
+    /async function saveMutations\(rig\) \{[\s\S]*?rig\.loginBoth\(\);[\s\S]*?rig\.pair\([\s\S]*?rig\.startFreshRun\(\);/u,
+  );
+  assert.doesNotMatch(journeys, /async function saveMutations\(rig\) \{\s*await freshThroughWave2\(rig\)/u);
   assert.match(journeys, /targetId: "delete-run"/u);
   assert.match(journeys, /surfaceId: "save-slot",[\s\S]*?targetId: "cursor:0",[\s\S]*?submit: false/u);
   assert.match(journeys, /"\/savedata\/session\/coop-cas-delete"/u);
