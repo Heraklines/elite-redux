@@ -1295,6 +1295,12 @@ export class PokemonSpecies extends PokemonSpeciesForm implements Localizable {
    */
   getFormNameToDisplay(formIndex = 0, append = false): string {
     const formKey = this.forms[formIndex]?.formKey ?? "";
+    // A formless base form (empty formKey) has NO form label. Without this guard a
+    // formless ER custom (e.g. Regitube 70004) falls through to the regional-form
+    // branch below and leaks the raw i18n key "regionalForm." onto the info panel.
+    if (formKey === "") {
+      return "";
+    }
     const formText = toPascalCase(formKey);
     // ER customs (id >= 10000) aren't in the SpeciesId enum, so SpeciesId[id]
     // is undefined and toCamelCase(undefined) crashes (.trim of undefined),

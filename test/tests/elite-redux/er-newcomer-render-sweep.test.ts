@@ -65,6 +65,8 @@ interface AtlasAnalysis {
   exists: boolean;
   transparentPct: number;
   dims: string;
+  /** True when the decoded frame is a single mon frame (not the whole packed sheet). */
+  spriteSized: boolean;
 }
 
 /**
@@ -76,7 +78,7 @@ interface AtlasAnalysis {
 async function analyzeAtlas(atlasPath: string): Promise<AtlasAnalysis> {
   const png = join(POKEMON_ROOT, `${atlasPath}.png`);
   if (!existsSync(png)) {
-    return { exists: false, transparentPct: 100, dims: "0x0" };
+    return { exists: false, transparentPct: 100, dims: "0x0", spriteSized: false };
   }
   const img = await loadImage(png);
   let frame = { x: 0, y: 0, w: img.width, h: img.height };
@@ -105,7 +107,12 @@ async function analyzeAtlas(atlasPath: string): Promise<AtlasAnalysis> {
       transparent++;
     }
   }
-  return { exists: true, transparentPct: (transparent / total) * 100, dims: `${frame.w}x${frame.h}` };
+  // A SINGLE mon frame is roughly square (~64x64). A frame whose height dwarfs its
+  // width is the WHOLE packed multi-frame sheet (e.g. regitube front is 64x1536,
+  // 24 frames) - which is exactly what a menu surface draws when it renders the
+  // atlas WITHOUT selecting frame 0001 (the #Regitube scrambled-sprite class).
+  const spriteSized = frame.h <= frame.w * 4;
+  return { exists: true, transparentPct: (transparent / total) * 100, dims: `${frame.w}x${frame.h}`, spriteSized };
 }
 
 /** One roster entry to sweep. */
@@ -179,6 +186,11 @@ describe.skipIf(!RUN)("ER newcomer render sweep (non-empty sprite on every surfa
       } else if (a.transparentPct >= 99) {
         failures.push(
           `${surface}: atlas "${atlasPath}" (${a.dims}) is EMPTY (${a.transparentPct.toFixed(1)}% transparent)`,
+        );
+      } else if (!a.spriteSized) {
+        failures.push(
+          `${surface}: atlas "${atlasPath}" decoded a NON-sprite frame (${a.dims}) - the whole packed sheet, `
+            + "not frame 0001 (the scrambled-sprite class)",
         );
       }
     }

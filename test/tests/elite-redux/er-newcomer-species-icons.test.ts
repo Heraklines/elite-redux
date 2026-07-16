@@ -32,7 +32,7 @@ import {
 import { ErCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
 import type { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
-import { getPokemonSpecies } from "#utils/pokemon-utils";
+import { getDexNumber, getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -107,6 +107,29 @@ describe.skipIf(!RUN)("ER newcomer species icon resolution (save-slot / party UI
       expect(source, `species ${id} keeps bespoke icon`).toMatch(/\/icon$/);
       expect(ErCustomSpecies.usesIconFromFront(id)).toBe(false);
       expect(getPokemonSpecies(id as SpeciesId).getIconScale(0)).toBe(1);
+    }
+  });
+
+  // Info-panel display for the 70000 band (live tester screenshots, Regitube):
+  // the dex number must not truncate the custom id, and a formless custom must not
+  // leak a raw i18n form key.
+  it("the 70000-band dex number shows the FULL custom id (not id % 2000)", () => {
+    // 70004 % 2000 = 4 -> the old "0004" bug. ER customs (>= 10000) show the full id.
+    expect(getDexNumber(70004 as SpeciesId)).toBe(70004);
+    for (const id of SLUG_NEWCOMER_IDS) {
+      expect(getDexNumber(id as SpeciesId), `species ${id} full number`).toBe(id);
+    }
+    // Vanilla ids are unaffected (form-variant modulo still applies below 10000).
+    expect(getDexNumber(25 as SpeciesId)).toBe(25);
+  });
+
+  it("a formless newcomer species shows NO form label (no raw 'regionalForm.' leak)", () => {
+    for (const id of SLUG_NEWCOMER_IDS) {
+      const sp = getPokemonSpecies(id as SpeciesId);
+      const label = sp.getFormNameToDisplay(0);
+      expect(label, `species ${id} form label empty`).toBe("");
+      // Never the leaked raw i18n key.
+      expect(label.includes("regionalForm")).toBe(false);
     }
   });
 
