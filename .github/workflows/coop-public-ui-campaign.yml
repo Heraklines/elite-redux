@@ -282,16 +282,19 @@ jobs:
             artifact: surface
             waves: ${{ inputs.surface_waves || '3' }}
             difficulty: ace
+            difficulty_option: ace
             require_mystery: "0"
           - profile: animations-skipped-depth
             artifact: depth
             waves: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
             difficulty: ace
+            difficulty_option: ace
             require_mystery: "0"
           - profile: mystery-gauntlet
             artifact: mystery
             waves: "10"
             difficulty: mystery
+            difficulty_option: mystery-test
             require_mystery: "1"
     steps:
       - name: Check out exact implementation SHA (harness only)
@@ -350,6 +353,7 @@ jobs:
           COOP_UI_CAMPAIGN_WAVES: ${{ matrix.waves }}
           COOP_UI_RENDER_PROFILE: ${{ matrix.profile }}
           COOP_UI_DIFFICULTY_ID: ${{ matrix.difficulty }}
+          COOP_UI_DIFFICULTY_OPTION_ID: ${{ matrix.difficulty_option }}
           COOP_UI_REQUIRE_MYSTERY_GAUNTLET: ${{ matrix.require_mystery }}
           COOP_UI_MYSTERY_MIN_SURFACES: "6"
           # Loud-fail everywhere by default. `shakedown` (the ONLY mode that permits press-through of

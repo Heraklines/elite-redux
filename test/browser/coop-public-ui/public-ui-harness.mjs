@@ -1690,7 +1690,7 @@ export class DuoPublicUiRig {
     );
     await selectOptionById(this.host, {
       surfaceId: "option-select:SelectStarterPhase",
-      targetId: this.config.difficultyId,
+      targetId: this.config.difficultyOptionId,
       navKeys: ["ArrowUp", "ArrowDown"],
       timeoutMs: this.config.timeoutMs,
     });
