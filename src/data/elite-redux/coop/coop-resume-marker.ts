@@ -719,19 +719,23 @@ export function recordCoopDeletedRun(self: string, runId: string): boolean {
     return false;
   }
   const priorDeletedRuns = localStorage.getItem(COOP_DELETED_RUNS_KEY);
-  const priorMarker = localStorage.getItem(COOP_RESUME_MARKER_KEY);
-  const priorUnavailable = localStorage.getItem(COOP_RESUME_UNAVAILABLE_KEY);
   let writtenDeletedRuns: string | null = null;
   try {
     const retained = readDeletedRuns().filter(entry => !(sameCoopIdentity(entry.self, self) && entry.runId === runId));
     retained.push({ version: 1, self, runId, ts: Date.now() });
     writtenDeletedRuns = JSON.stringify(retained.slice(-64));
     localStorage.setItem(COOP_DELETED_RUNS_KEY, writtenDeletedRuns);
-    if (clearCoopResumeEvidenceIfRun(self, runId) && isCoopRunLocallyDeleted(self, runId)) {
+    if (isCoopRunLocallyDeleted(self, runId)) {
+      // The exact backend tombstone is the authority and this run-id fence is what prevents a stale
+      // local replica from being offered or re-saved. Resume pointers are only derived hints: a
+      // malformed pointer, or a concurrent tab replacing it, must be preserved for diagnosis but
+      // cannot roll back the durable fence for this exact deleted run. Matching well-formed hints are
+      // still removed on a compare-before-delete best-effort basis.
+      clearCoopResumeEvidenceIfRun(self, runId);
       return true;
     }
   } catch {
-    // Roll back below when every touched key still contains this transaction's value.
+    // Roll back the fence below when it still contains this transaction's value.
   }
   try {
     if (writtenDeletedRuns != null && localStorage.getItem(COOP_DELETED_RUNS_KEY) === writtenDeletedRuns) {
@@ -739,14 +743,6 @@ export function recordCoopDeletedRun(self: string, runId: string): boolean {
         localStorage.removeItem(COOP_DELETED_RUNS_KEY);
       } else {
         localStorage.setItem(COOP_DELETED_RUNS_KEY, priorDeletedRuns);
-      }
-    }
-    for (const [key, prior] of [
-      [COOP_RESUME_MARKER_KEY, priorMarker],
-      [COOP_RESUME_UNAVAILABLE_KEY, priorUnavailable],
-    ] as const) {
-      if (prior != null && localStorage.getItem(key) == null) {
-        localStorage.setItem(key, prior);
       }
     }
   } catch {

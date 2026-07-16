@@ -193,10 +193,9 @@ describe("7: stale-but-EQUAL saves resume symmetrically (both clients agree)", (
 });
 
 // -----------------------------------------------------------------------------
-// ATTACK 8: tombstone fail-closed. Malformed lineage -> adoption fails closed.
-// Verify the failure does not crash-loop, and characterize the side effect: a
-// corrupt UNRELATED evidence blob wedges deletion of an otherwise-valid run, so
-// the client keeps a resumable-looking marker and re-offers the run.
+// ATTACK 8: malformed derived resume evidence cannot roll back an exact tombstone fence.
+// The corrupt hint is preserved for diagnosis, but the deleted run stays fenced and
+// can no longer wedge Delete/Overwrite after the Worker has committed its tombstone.
 // -----------------------------------------------------------------------------
 describe("8: fail-closed tombstone lineage adoption", () => {
   it("a successful tombstone deletes the run and fences it out of future discovery", async () => {
@@ -212,27 +211,33 @@ describe("8: fail-closed tombstone lineage adoption", () => {
     expect(discovery.kind, "a tombstoned run is never re-offered").not.toBe("candidate");
   });
 
-  it("FINDING F-8: a MALFORMED unrelated evidence blob makes deletion fail closed - the run stays offerable", async () => {
-    // DESIRED: a corrupt blob for one storage key should not block tombstoning a DIFFERENT valid run. CURRENT:
-    // recordCoopDeletedRun -> clearCoopResumeEvidenceIfRun iterates ALL evidence keys and returns false on any
-    // unparseable/typeless blob (it "cannot prove it belongs to another run"), rolling the whole tombstone back.
-    // The run is therefore NOT marked deleted and its marker survives -> it is re-offered every lobby (fail-closed,
-    // no data loss, but a persistent re-offer / wedged delete until the corrupt blob is cleared).
+  it("a malformed unrelated evidence blob cannot wedge an already-tombstoned run", async () => {
     recordCoopResumeMarker(3, "Alice", "Bob", 40, RUN_A, 6);
     // Poison the resume-marker key with a blob whose self/runId are the WRONG types (not strings).
-    localStorage.setItem("er-coop-resume", JSON.stringify({ self: 123, runId: 456, slot: 3 }));
+    const malformed = JSON.stringify({ self: 123, runId: 456, slot: 3 });
+    localStorage.setItem("er-coop-resume", malformed);
 
     const committed = recordCoopDeletedRun("Alice", RUN_A);
-    expect(committed, "VULNERABILITY: a corrupt unrelated blob wedges the tombstone (fail-closed)").toBe(false);
-    expect(isCoopRunLocallyDeleted("Alice", RUN_A), "the run was NOT durably deleted").toBe(false);
-    // No crash / infinite loop: repeated attempts remain a bounded, deterministic false.
-    expect(recordCoopDeletedRun("Alice", RUN_A)).toBe(false);
+    expect(committed, "the exact run fence commits independently of a derived resume hint").toBe(true);
+    expect(isCoopRunLocallyDeleted("Alice", RUN_A), "the run is durably fenced").toBe(true);
+    expect(localStorage.getItem("er-coop-resume"), "unknown evidence is preserved rather than guessed away").toBe(
+      malformed,
+    );
+    expect(recordCoopDeletedRun("Alice", RUN_A), "a repeated tombstone adoption stays idempotent").toBe(true);
+
+    const save = coopSession({ coopRun: { version: 1, runId: RUN_A, checkpointRevision: 4 } });
+    const discovery = await findCoopResumeCandidate("Alice", "Bob", "host", async slot =>
+      slot === 3 ? loaded(save) : undefined,
+    );
+    expect(discovery.kind, "the stale local replica cannot be re-offered").not.toBe("candidate");
   });
 
-  it("fail-closed deletion never throws on a wholly-unparseable evidence blob", () => {
-    localStorage.setItem("er-coop-resume", "{ this is : not json");
+  it("a wholly-unparseable evidence blob is preserved without blocking the exact run fence", () => {
+    const malformed = "{ this is : not json";
+    localStorage.setItem("er-coop-resume", malformed);
     expect(() => recordCoopDeletedRun("Alice", RUN_A), "a garbage blob is handled, not thrown").not.toThrow();
-    expect(isCoopRunLocallyDeleted("Alice", RUN_A)).toBe(false);
+    expect(isCoopRunLocallyDeleted("Alice", RUN_A)).toBe(true);
+    expect(localStorage.getItem("er-coop-resume")).toBe(malformed);
   });
 });
 
