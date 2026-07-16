@@ -64,7 +64,7 @@ describe("co-op session controller (#633, P1)", () => {
       clearNegotiatedCoopCapabilities();
     });
 
-    it("rejects an er-coop-37 peer that cannot execute addressed state recovery", async () => {
+    it("rejects an er-coop-37 peer without addressed recovery and journal admission", async () => {
       expect(COOP_PROTOCOL_VERSION).toBe("er-coop-38");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {

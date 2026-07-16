@@ -871,6 +871,7 @@ export class EvidenceSink {
     this.expectedMissingSystemSaveErrors = expectedMissingSystemSaveErrors;
     this.events = [];
     this.failures = [];
+    this.expectedSharedTerminalAfterGameOver = null;
     this.networkState = { account: null, lobby: null, coopRunStatus: null, apiFailure: null };
     this.writeTail = Promise.resolve();
     // Optimization brief R2: batched-write + waiter + telemetry state.
@@ -1032,6 +1033,20 @@ export class EvidenceSink {
     } catch {
       /* emergency flush must never throw */
     }
+  }
+
+  /**
+   * Arm the one legitimate shared-session teardown: this same browser has already exposed GameOver and the
+   * duo driver has proven the paired retained terminal. Every earlier or unrelated shared terminal remains
+   * fatal. The exact evidence index prevents a blanket console allowlist.
+   */
+  expectSharedTerminalAfterPairedGameOver(gameOverIndex) {
+    const event = this.events[gameOverIndex];
+    if (!event || !/Start Phase GameOverPhase/u.test(event.text ?? "")) {
+      throw new Error(`${this.label}: cannot arm expected shared terminal without exact GameOver evidence`);
+    }
+    this.expectedSharedTerminalAfterGameOver = gameOverIndex;
+    this.record("expected-shared-terminal-armed", { gameOverIndex });
   }
 
   find(pattern, from = 0) {
@@ -1280,7 +1295,11 @@ export class EvidenceSink {
       const fatalCoopReason = fatalCoopConsoleReason(text, {
         benignRejoinStateSync: stateSyncStart?.[1] === "rejoin",
       });
-      if (fatalCoopReason != null) {
+      const expectedSharedTerminal =
+        fatalCoopReason === "shared session terminated"
+        && this.expectedSharedTerminalAfterGameOver != null
+        && event.index > this.expectedSharedTerminalAfterGameOver;
+      if (fatalCoopReason != null && !expectedSharedTerminal) {
         const fatal = this.record("coop-fatal-console", {
           level: message.type(),
           text,
@@ -1289,6 +1308,13 @@ export class EvidenceSink {
           consoleEventIndex: event.index,
         });
         this.failures.push(fatal);
+      } else if (expectedSharedTerminal) {
+        this.record("expected-shared-terminal", {
+          text,
+          source,
+          consoleEventIndex: event.index,
+          gameOverIndex: this.expectedSharedTerminalAfterGameOver,
+        });
       }
       const expectedMissingSystemSave = isExpectedMissingSystemSaveError(
         message.type(),

@@ -104,6 +104,9 @@ export type CoopRole = "host" | "guest";
 // protocol-36 renderer would silently credit only the host account, so mixed builds must refuse pairing.
 // er-coop-38 replaces the ambient stateSync request/reply with an immutable recovery ticket. Requests,
 // replies, refusals, and durability pushes are bound to the exact session/seat/generation and battle frontier.
+// The same protocol adds an exact operation-journal admission ACK. A protocol-37 authority cannot distinguish
+// a retained WAVE_ADVANCE that is safely staged behind presentation from an operation that was never
+// delivered, so mixed builds must refuse pairing instead of exhausting delivery retries spuriously.
 export const COOP_PROTOCOL_VERSION = "er-coop-38";
 
 /**
@@ -113,6 +116,13 @@ export const COOP_PROTOCOL_VERSION = "er-coop-38";
  * regressions, and conflicting duplicates instead of silently treating an early ACK as commit release.
  */
 export type CoopAuthorityAckStage = "materialApplied" | "presentationReady" | "continuationReady";
+
+/**
+ * Durable operations have one earlier delivery-only stage. `journalAdmitted` proves the exact canonical
+ * envelope was accepted into the receiver ledger; it is deliberately NOT material or continuation proof.
+ * Turn and replacement commits continue to use {@linkcode CoopAuthorityAckStage} and cannot emit it.
+ */
+export type CoopOperationAckStage = "journalAdmitted" | CoopAuthorityAckStage;
 
 /** Public shared-run surfaces that can prove an authoritative operation reached a usable continuation. */
 export type CoopOperationContinuationSurface = "command" | "sharedInput" | "terminal";
@@ -1846,7 +1856,7 @@ export type CoopMessage =
        * backwards-compatible synthetic durability users. Operation commits are never retired by an ACK
        * without this ordered evidence.
        */
-      stage?: CoopAuthorityAckStage;
+      stage?: CoopOperationAckStage;
       operationId?: string;
       epoch?: number;
       wave?: number;

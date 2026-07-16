@@ -74,6 +74,11 @@ test("GameOver journey uses visible starters, real command input, and exact reta
     /assertRetainedContinuation/u,
     "GameOver is released by its WAVE_ADVANCE DATA/continuation proof, not a nonexistent normal turn ACK",
   );
+  assert.match(
+    gameOverDriver,
+    /expectSharedTerminalAfterPairedGameOver[\s\S]*POST_GAME_OVER_PHASE[\s\S]*stable post-GameOver visual boundary[\s\S]*stable-post-game-over-visual-proof[\s\S]*paired-post-game-over-stable/u,
+    "the final screenshot must follow both completed GameOver fades, not the transient faint narration",
+  );
   for (const exactEvidence of [
     "settled WAVE_ADVANCE committed wave=1",
     "ignore raw waveResolved for correctness wave=1 outcome=gameOver",

@@ -509,16 +509,19 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
         ackCount++;
       }
     });
-    const hostMgr = new CoopDurabilityManager(pair.host);
-    const guestMgr = new CoopDurabilityManager(pair.guest, {
-      ...coopOperationDurabilityHooks(),
+    const recoveryTiming = {
       scheduleRecovery: scheduler.schedule,
       recoveryNow: () => scheduler.now,
-      deferredRetryMs: 100,
       recoveryInitialMs: 100,
       recoveryMaxMs: 2_000,
       recoveryMaxAttempts: 8,
       recoveryDeadlineMs: 12_000,
+    };
+    const hostMgr = new CoopDurabilityManager(pair.host, recoveryTiming);
+    const guestMgr = new CoopDurabilityManager(pair.guest, {
+      ...coopOperationDurabilityHooks(),
+      ...recoveryTiming,
+      deferredRetryMs: 100,
       onRecoveryExhausted: failure => failures.push(failure),
     });
     setCoopOperationDurability(hostMgr);
@@ -531,19 +534,30 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     expect(failures, "a non-deferred op consumes no recovery budget").toEqual([]);
     expect(guestMgr.appliedMarks(), "the shared cursor advanced at staging").toEqual({ "op:global": 1 });
     expect(hostMgr.unackedCount(), "cursor admission cannot retire the retained wave transaction").toBe(1);
-    expect(ackCount, "staging emits no authority proof before DATA and destination readiness").toBe(0);
+    expect(ackCount, "staging emits exactly one delivery-only journal admission proof").toBe(1);
+    let materialSettled = false;
+    const materialApplied = hostMgr.waitForOperationMaterialApplied("1:0:WAVE_ADVANCE:14").then(applied => {
+      materialSettled = true;
+      return applied;
+    });
+    await flush();
+    expect(materialSettled, "journal admission is not material application").toBe(false);
     // ...but the wave DATA has NOT applied yet (invariant b: only at the real boundary).
     expect(appliedStateTicks, "DATA did not apply before BattleEnd").toEqual([]);
     expect(getCoopStagedWaveAdvanceTransaction(14)?.dataApplied, "wave DATA still pending pre-boundary").toBe(false);
 
-    // Advancing the deferred timer past the old 9.1s window does nothing - the op was never deferred.
+    // Advance BOTH peers' deterministic recovery clock past the old 9.1s window. Exact admission must
+    // have cancelled host delivery retries without claiming material or continuation readiness.
     scheduler.advance(9_200);
     await flush();
-    expect(ackCount, "no receiver recovery timer fires for a non-deferred op").toBe(0);
+    expect(ackCount, "admission prevents a spurious host retry/exhaustion cycle").toBe(1);
+    expect(materialSettled, "the delivery-only ACK cannot settle a material barrier").toBe(false);
+    expect(hostMgr.unackedCount(), "the host still retains the canonical operation").toBe(1);
     expect(failures).toEqual([]);
     hostMgr.reconnect();
     await flush();
-    expect(ackCount, "a duplicate before completion stays silent and never claims early authority").toBe(0);
+    expect(ackCount, "an incomplete duplicate republishes only exact admission").toBe(2);
+    expect(materialSettled).toBe(false);
 
     // Reaching the real BattleEnd boundary applies the immutable DATA image exactly once; then continuation latches.
     battleEndOpen = true;
@@ -562,7 +576,8 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     ).toBe(true);
     await flush();
     expect(hostMgr.unackedCount(), "exact retained-wave continuation proof releases the host journal").toBe(0);
-    expect(ackCount, "completion publishes the three ordered exact authority stages").toBe(3);
+    expect(await materialApplied, "material resolves only when the DATA-bound chain is published").toBe(true);
+    expect(ackCount, "completion publishes material, presentation, and continuation after admission").toBe(5);
     expect(
       guestMgr.completeRetainedWaveAdvance(completed.envelope, "sharedInput", {
         epoch: completed.envelope.sessionEpoch,
@@ -572,7 +587,7 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
       "a repeated adapter wake idempotently republishes the exact final proof",
     ).toBe(true);
     await flush();
-    expect(ackCount, "the completed duplicate republishes only continuationReady").toBe(4);
+    expect(ackCount, "the completed duplicate republishes only continuationReady").toBe(6);
     expect(
       tryApplyCoopWaveAdvanceDataAtBoundary(14),
       "an already-admitted DATA image is idempotent and cannot call the engine applier twice",
@@ -581,6 +596,191 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     expect(failures).toEqual([]);
     hostMgr.dispose();
     guestMgr.dispose();
+  });
+
+  it("retransmits once when journal admission is lost, then stops before material completion", async () => {
+    const scheduler = new ManualScheduler();
+    restoreBoundaryApplier = registerCoopWaveAdvanceBoundaryDataApplier(() => "applied");
+    registerCoopOperationLiveSink("op:wave", () => false);
+    const pair = createLoopbackPair();
+    let envelopeSends = 0;
+    let admissionSends = 0;
+    let dropFirstAdmission = true;
+    const hostInner = pair.host;
+    const hostWrapped = {
+      ...hostInner,
+      get role() {
+        return hostInner.role;
+      },
+      get state() {
+        return hostInner.state;
+      },
+      send: (msg: CoopMessage) => {
+        if (msg.t === "envelope" && msg.envelope.pendingOperation?.kind === "WAVE_ADVANCE") {
+          envelopeSends++;
+        }
+        return hostInner.send(msg);
+      },
+      onMessage: hostInner.onMessage.bind(hostInner),
+      onStateChange: hostInner.onStateChange.bind(hostInner),
+      close: hostInner.close.bind(hostInner),
+    };
+    const guestInner = pair.guest;
+    const guestWrapped = {
+      ...guestInner,
+      get role() {
+        return guestInner.role;
+      },
+      get state() {
+        return guestInner.state;
+      },
+      send: (msg: CoopMessage) => {
+        if (msg.t === "coopAck" && msg.stage === "journalAdmitted") {
+          admissionSends++;
+          if (dropFirstAdmission) {
+            dropFirstAdmission = false;
+            return;
+          }
+        }
+        return guestInner.send(msg);
+      },
+      onMessage: guestInner.onMessage.bind(guestInner),
+      onStateChange: guestInner.onStateChange.bind(guestInner),
+      close: guestInner.close.bind(guestInner),
+    };
+    const recoveryTiming = {
+      scheduleRecovery: scheduler.schedule,
+      recoveryNow: () => scheduler.now,
+      recoveryInitialMs: 100,
+      recoveryMaxMs: 200,
+      recoveryMaxAttempts: 3,
+      recoveryDeadlineMs: 1_000,
+    };
+    const hostMgr = new CoopDurabilityManager(hostWrapped as never, recoveryTiming);
+    const guestMgr = new CoopDurabilityManager(guestWrapped as never, {
+      ...coopOperationDurabilityHooks(),
+      ...recoveryTiming,
+    });
+    setCoopOperationDurability(hostMgr);
+
+    commitHostWave(15);
+    await flush();
+    expect(envelopeSends, "the canonical operation was sent once initially").toBe(1);
+    expect(admissionSends, "the first exact admission proof was lost").toBe(1);
+    expect(hostMgr.unackedCount()).toBe(1);
+
+    scheduler.advance(100);
+    await flush();
+    expect(envelopeSends, "the host retransmits the exact retained operation once").toBe(2);
+    expect(admissionSends, "the incomplete duplicate republishes exact admission").toBe(2);
+    expect(hostMgr.unackedCount(), "admission still cannot release authority").toBe(1);
+
+    scheduler.advance(5_000);
+    await flush();
+    expect(envelopeSends, "accepted admission cancels every later delivery retry").toBe(2);
+    expect(admissionSends).toBe(2);
+
+    const completed = getCoopStagedWaveAdvanceTransaction(15)!;
+    expect(tryApplyCoopWaveAdvanceDataAtBoundary(15)).toBe("applied");
+    expect(markCoopWaveAdvanceContinuationReady(15)).toBe(true);
+    expect(
+      guestMgr.completeRetainedWaveAdvance(completed.envelope, "sharedInput", {
+        epoch: completed.envelope.sessionEpoch,
+        wave: 15,
+        turn: completed.envelope.turn,
+      }),
+    ).toBe(true);
+    await flush();
+    expect(hostMgr.unackedCount(), "the later DATA-bound continuation chain releases normally").toBe(0);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  it("accepts journal admission only at the exact retained operation address and without continuation fields", async () => {
+    const scheduler = new ManualScheduler();
+    const pair = createLoopbackPair();
+    let envelopeSends = 0;
+    const hostInner = pair.host;
+    const hostWrapped = {
+      ...hostInner,
+      get role() {
+        return hostInner.role;
+      },
+      get state() {
+        return hostInner.state;
+      },
+      send: (msg: CoopMessage) => {
+        if (msg.t === "envelope") {
+          envelopeSends++;
+        }
+        return hostInner.send(msg);
+      },
+      onMessage: hostInner.onMessage.bind(hostInner),
+      onStateChange: hostInner.onStateChange.bind(hostInner),
+      close: hostInner.close.bind(hostInner),
+    };
+    const hostMgr = new CoopDurabilityManager(hostWrapped as never, {
+      scheduleRecovery: scheduler.schedule,
+      recoveryNow: () => scheduler.now,
+      recoveryInitialMs: 100,
+      recoveryMaxMs: 100,
+      recoveryMaxAttempts: 5,
+      recoveryDeadlineMs: 2_000,
+    });
+    const retained = waveEnvelope(16);
+    expect(hostMgr.commit("op:global", retained.revision, { t: "envelope", envelope: retained })).toBe(true);
+    await flush();
+
+    pair.guest.send({
+      t: "coopAck",
+      cls: "op:global",
+      seq: retained.revision,
+      stage: "journalAdmitted",
+      operationId: "wrong-operation",
+      epoch: retained.sessionEpoch,
+      wave: retained.wave,
+      turn: retained.turn,
+    });
+    await flush();
+    scheduler.advance(100);
+    await flush();
+    expect(envelopeSends, "a wrong-address ACK cannot cancel delivery retry").toBe(2);
+
+    pair.guest.send({
+      t: "coopAck",
+      cls: "op:global",
+      seq: retained.revision,
+      stage: "journalAdmitted",
+      operationId: retained.pendingOperation!.id,
+      epoch: retained.sessionEpoch,
+      wave: retained.wave,
+      turn: retained.turn,
+      surface: "sharedInput",
+      continuationEpoch: retained.sessionEpoch,
+      continuationWave: retained.wave,
+      continuationTurn: retained.turn,
+    });
+    await flush();
+    scheduler.advance(100);
+    await flush();
+    expect(envelopeSends, "admission carrying premature continuation evidence is rejected").toBe(3);
+
+    pair.guest.send({
+      t: "coopAck",
+      cls: "op:global",
+      seq: retained.revision,
+      stage: "journalAdmitted",
+      operationId: retained.pendingOperation!.id,
+      epoch: retained.sessionEpoch,
+      wave: retained.wave,
+      turn: retained.turn,
+    });
+    await flush();
+    scheduler.advance(5_000);
+    await flush();
+    expect(envelopeSends, "the exact field-free admission cancels later delivery retries").toBe(3);
+    expect(hostMgr.unackedCount(), "admission cannot release the retained transaction").toBe(1);
+    hostMgr.dispose();
   });
 
   it("routes a continuation that never opens through the peer-coherent terminal supervisor after its own deadline", async () => {
@@ -829,6 +1029,7 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     await flush();
 
     expect(sentAcks.map(ack => ack.stage)).toEqual([
+      "journalAdmitted",
       "materialApplied",
       "presentationReady",
       "continuationReady",

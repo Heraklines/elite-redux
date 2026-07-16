@@ -45,8 +45,8 @@
 import { recordCoopCausalEvent } from "#data/elite-redux/coop/coop-causal-trace";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type {
-  CoopAuthorityAckStage,
   CoopMessage,
+  CoopOperationAckStage,
   CoopOperationContinuationSurface,
   CoopTransport,
 } from "#data/elite-redux/coop/coop-transport";
@@ -635,7 +635,7 @@ interface PendingOperationDeliveryRetry {
 }
 
 interface OperationAckEvidence {
-  stage: CoopAuthorityAckStage;
+  stage: CoopOperationAckStage;
   canonical: string;
   value: Extract<CoopMessage, { t: "coopAck" }>;
 }
@@ -682,14 +682,20 @@ function defaultDurabilitySchedule(callback: () => void, ms: number): () => void
   return () => clearTimeout(timer);
 }
 
-const OPERATION_ACK_STAGE_ORDER: Readonly<Record<CoopAuthorityAckStage, number>> = {
-  materialApplied: 0,
-  presentationReady: 1,
-  continuationReady: 2,
+const OPERATION_ACK_STAGE_ORDER: Readonly<Record<CoopOperationAckStage, number>> = {
+  journalAdmitted: 0,
+  materialApplied: 1,
+  presentationReady: 2,
+  continuationReady: 3,
 };
 
-function isOperationAckStage(value: unknown): value is CoopAuthorityAckStage {
-  return value === "materialApplied" || value === "presentationReady" || value === "continuationReady";
+function isOperationAckStage(value: unknown): value is CoopOperationAckStage {
+  return (
+    value === "journalAdmitted"
+    || value === "materialApplied"
+    || value === "presentationReady"
+    || value === "continuationReady"
+  );
 }
 
 function isSafeOperationAddressPart(value: unknown, allowZero = true): value is number {
@@ -734,6 +740,7 @@ function retainedOperationAuthorityFor(
 interface PendingRetainedWaveAck {
   authority: CoopOperationAuthorityAddress;
   canonicalEnvelope: string;
+  admissionAck: Extract<CoopMessage, { t: "coopAck" }>;
   completed: boolean;
   ackChain:
     | readonly [
@@ -931,7 +938,7 @@ export class CoopDurabilityManager {
   private readonly guestOperationAckEvidence = new Map<string, OperationAckEvidence>();
   /** Guest: staged WAVE_ADVANCE entries whose receive cursor advanced but whose DATA/control proof is due. */
   private readonly pendingRetainedWaveAcks = new Map<string, PendingRetainedWaveAck>();
-  /** Host: latest accepted exact stage; material/presentation evidence never releases the journal. */
+  /** Host: latest exact stage; admission/material/presentation evidence never releases the journal. */
   private readonly hostOperationAckEvidence = new Map<string, OperationAckEvidence>();
   /** Host: later plain cumulative ACKs parked behind an earlier operation that still lacks UI readiness. */
   private readonly pendingCumulativeAcks = new Map<string, number>();
@@ -1168,6 +1175,12 @@ export class CoopDurabilityManager {
               coopWarn("durability", `retained WAVE_ADVANCE ACK-chain resend deferred key=${key}`, error);
             }
           }
+        } else if (pending != null) {
+          try {
+            this.transport.send(pending.admissionAck);
+          } catch (error) {
+            coopWarn("durability", `retained WAVE_ADVANCE admission re-ACK deferred key=${key}`, error);
+          }
         }
       } else if (operation == null) {
         this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
@@ -1241,15 +1254,27 @@ export class CoopDurabilityManager {
         this.requestBoundedRecovery(cls, seq, "apply-rejected", retainedWaveAuthority.authority);
         return;
       }
+      const admissionAck = this.sendOperationAck(retainedWaveAuthority.authority, "journalAdmitted");
+      if (admissionAck == null) {
+        coopWarn("durability", `retained WAVE_ADVANCE admission ACK refused key=${key}`);
+        this.recordOperationCausalStage(
+          retainedWaveAuthority.authority,
+          "material-rejected",
+          "reason=admission-refused",
+        );
+        this.requestBoundedRecovery(cls, seq, "apply-rejected", retainedWaveAuthority.authority);
+        return;
+      }
       this.pendingRetainedWaveAcks.set(key, {
         authority: retainedWaveAuthority.authority,
         canonicalEnvelope,
+        admissionAck,
         completed: false,
         ackChain: null,
       });
       this.pruneCompletedRetainedWaveAcks();
-      // Ordering is applied, so later same-boundary operations may drain. Authority stays silent until the
-      // wave adapter proves the exact embedded DATA and its destination continuation.
+      // Ordering is applied, so later same-boundary operations may drain. journalAdmitted stops redundant
+      // delivery retries only; the authority stays retained until DATA and destination continuation proof.
       this.drainDeferredFollowers(cls);
       return;
     }
@@ -1519,13 +1544,13 @@ export class CoopDurabilityManager {
 
   private sendOperationAck(
     authority: CoopOperationAuthorityAddress,
-    stage: CoopAuthorityAckStage,
+    stage: CoopOperationAckStage,
     surface?: CoopOperationContinuationSurface,
     continuation?: CoopOperationContinuationAddress,
   ): Extract<CoopMessage, { t: "coopAck" }> | null {
     const key = operationAuthorityKey(authority);
     const prior = this.guestOperationAckEvidence.get(key);
-    if (prior == null ? stage !== "materialApplied" : false) {
+    if (prior == null && stage !== "journalAdmitted" && stage !== "materialApplied") {
       return null;
     }
     if (prior != null) {
@@ -1541,9 +1566,8 @@ export class CoopDurabilityManager {
         return null;
       }
     }
-    if (
-      stage === "materialApplied" ? surface != null || continuation != null : surface == null || continuation == null
-    ) {
+    const isPrePresentationStage = stage === "journalAdmitted" || stage === "materialApplied";
+    if (isPrePresentationStage ? surface != null || continuation != null : surface == null || continuation == null) {
       return null;
     }
     if (
@@ -1596,11 +1620,13 @@ export class CoopDurabilityManager {
     }
     this.recordOperationCausalStage(
       authority,
-      stage === "materialApplied"
-        ? "material-applied"
-        : stage === "presentationReady"
-          ? "presentation-ready"
-          : "continuation-ready",
+      stage === "journalAdmitted"
+        ? "journal-admitted"
+        : stage === "materialApplied"
+          ? "material-applied"
+          : stage === "presentationReady"
+            ? "presentation-ready"
+            : "continuation-ready",
       surface == null || continuation == null
         ? "proof=published"
         : `proof=published surface=${surface} at=${continuation.epoch}/${continuation.wave}/${continuation.turn}`,
@@ -1746,14 +1772,14 @@ export class CoopDurabilityManager {
       coopWarn("durability", `DROP malformed/wrong-address operation ACK key=${key}`);
       return;
     }
-    if (msg.stage === "materialApplied") {
+    if (msg.stage === "journalAdmitted" || msg.stage === "materialApplied") {
       if (
         msg.surface != null
         || msg.continuationEpoch != null
         || msg.continuationWave != null
         || msg.continuationTurn != null
       ) {
-        coopWarn("durability", `DROP material operation ACK carrying premature continuation key=${key}`);
+        coopWarn("durability", `DROP pre-presentation operation ACK carrying premature continuation key=${key}`);
         return;
       }
     } else {
@@ -1780,8 +1806,8 @@ export class CoopDurabilityManager {
     }
     const canonical = operationAckCanonical(msg);
     const prior = this.hostOperationAckEvidence.get(key);
-    if (prior == null ? msg.stage !== "materialApplied" : false) {
-      coopWarn("durability", `DROP operation ACK that skipped material stage key=${key} stage=${msg.stage}`);
+    if (prior == null && msg.stage !== "journalAdmitted" && msg.stage !== "materialApplied") {
+      coopWarn("durability", `DROP operation ACK that skipped admission/material stage key=${key} stage=${msg.stage}`);
       return;
     }
     if (prior != null) {
@@ -1809,17 +1835,19 @@ export class CoopDurabilityManager {
     this.hostOperationAckEvidence.set(key, { stage: msg.stage, canonical, value: msg });
     this.recordOperationCausalStage(
       authority,
-      msg.stage === "materialApplied"
-        ? "material-applied"
-        : msg.stage === "presentationReady"
-          ? "presentation-ready"
-          : "continuation-ready",
+      msg.stage === "journalAdmitted"
+        ? "journal-admitted"
+        : msg.stage === "materialApplied"
+          ? "material-applied"
+          : msg.stage === "presentationReady"
+            ? "presentation-ready"
+            : "continuation-ready",
       msg.surface == null
         ? "proof=received"
         : `proof=received surface=${msg.surface} at=${msg.continuationEpoch}/${msg.continuationWave}/${msg.continuationTurn}`,
     );
-    if (msg.stage === "materialApplied" || msg.stage === "continuationReady") {
-      this.cancelOperationDeliveryRetry(key);
+    this.cancelOperationDeliveryRetry(key);
+    if (OPERATION_ACK_STAGE_ORDER[msg.stage] >= OPERATION_ACK_STAGE_ORDER.materialApplied) {
       this.settleOperationMaterialWaiters(key, true);
     }
     if (msg.stage !== "continuationReady") {
@@ -2021,10 +2049,10 @@ export class CoopDurabilityManager {
   }
 
   /**
-   * Retransmit an operation until the peer proves material receipt. Gap recovery cannot recover the final
+   * Retransmit an operation until the peer proves exact journal admission. Gap recovery cannot recover the final
    * lost revision in a class because the receiver has no later follower from which to infer that gap.
-   * Continuation retention remains independent: material receipt stops delivery retries, while the exact
-   * presentation/continuation ACK is still required to release the journal.
+   * Continuation retention remains independent: admission stops delivery retries, material resolves only
+   * material barriers, and the exact presentation/continuation ACK is still required to release the journal.
    */
   private armOperationDeliveryRetry(authority: CoopOperationAuthorityAddress): void {
     const key = operationAuthorityKey(authority);
@@ -2051,7 +2079,7 @@ export class CoopDurabilityManager {
     if (
       this.disposed
       || this.journal.ackedThrough(authority.cls) >= authority.seq
-      || (evidence != null && OPERATION_ACK_STAGE_ORDER[evidence.stage] >= OPERATION_ACK_STAGE_ORDER.materialApplied)
+      || (evidence != null && OPERATION_ACK_STAGE_ORDER[evidence.stage] >= OPERATION_ACK_STAGE_ORDER.journalAdmitted)
     ) {
       this.cancelOperationDeliveryRetry(key);
       return;
