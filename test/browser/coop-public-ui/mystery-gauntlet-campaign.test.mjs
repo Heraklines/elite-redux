@@ -145,7 +145,7 @@ test("paired Chromium runs headful at an explicit player-sized viewport", async 
   assert.match(workflow, /COOP_UI_HEADLESS: "0"/u);
   assert.match(workflow, /xvfb-run -a -s "-screen 0 1440x900x24" node/u);
   assert.match(harness, /defaultViewport: config\.viewport/u);
-  assert.match(harness, /"--use-angle=swiftshader"/u);
+  assert.match(harness, /"--use-angle=swiftshader-webgl"/u);
   assert.match(harness, /"--enable-unsafe-swiftshader"/u);
   assert.match(harness, /`--window-size=\$\{config\.viewport\.width\},\$\{config\.viewport\.height\}`/u);
 });

@@ -1344,7 +1344,7 @@ export class DuoPublicUiRig {
           // Xvfb has no hardware GL device on hosted runners. Headful Chromium must use its
           // bundled software ANGLE backend or Phaser aborts before creating the game canvas.
           "--use-gl=angle",
-          "--use-angle=swiftshader",
+          "--use-angle=swiftshader-webgl",
           "--enable-unsafe-swiftshader",
           `--window-size=${config.viewport.width},${config.viewport.height}`,
         ],
