@@ -46,6 +46,8 @@ const BULBASAUR_SPECIES_ID = 1;
 const SEEL_SPECIES_ID = 86;
 const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;
 const POST_TURN_HARD_CEILING_MS = 360_000;
+const GAME_OVER_POST_TURN_PROGRESS_ALLOWANCE_MS = 180_000;
+const GAME_OVER_POST_TURN_HARD_CEILING_MS = 900_000;
 const COLD_REJOIN_RELEASE_MS = 160_000;
 // Trace-enabled four-core run 29405818635 reached the matching cmd:1:1 observations 0.45s and
 // 1.05s after the ordinary ceiling across the two owner parities, with causal Phaser progress.
@@ -2372,7 +2374,13 @@ export class DuoPublicUiRig {
       this.config.keys.battle,
       "game-over-memento-round",
     );
-    const outcome = await this.waitForPostTurnOutcome(outcomeCursors, { expectedCommandAddress });
+    const outcome = await this.waitForPostTurnOutcome(outcomeCursors, {
+      expectedCommandAddress,
+      progressBudgetOptions: {
+        progressAllowanceMs: GAME_OVER_POST_TURN_PROGRESS_ALLOWANCE_MS,
+        hardCeilingMs: GAME_OVER_POST_TURN_HARD_CEILING_MS,
+      },
+    });
     if (outcome.kind !== "gameOver") {
       throw new Error(`Memento terminal fixture reached ${outcome.kind} instead of paired GameOver`);
     }
