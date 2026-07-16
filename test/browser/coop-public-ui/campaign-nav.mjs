@@ -15,10 +15,17 @@ import { delay } from "./evidence.mjs";
 
 /** Shared readiness contract for every public semantic driver, not only the lobby. */
 export function isActionableSemanticObservation(observation, { requireExplicitUnblocked = false } = {}) {
-  if (observation?.ready?.handlerActive !== true || observation.ready.awaitingActionInput === false) {
+  if (observation?.ready?.handlerActive !== true) {
     return false;
   }
-  return requireExplicitUnblocked ? observation.ready.inputBlocked === false : observation.ready.inputBlocked !== true;
+  if (requireExplicitUnblocked) {
+    // Input-blocked is the production UI handler's direct answer to "would a key be accepted now?".
+    // Some non-message handlers (notably STARTER_SELECT) legitimately report the enclosing phase's
+    // `awaitingActionInput` as false while the active handler is already accepting input. Once the
+    // handler explicitly says inputBlocked=false, that stronger surface-local fact wins.
+    return observation.ready.inputBlocked === false;
+  }
+  return observation.ready.inputBlocked !== true && observation.ready.awaitingActionInput !== false;
 }
 
 /**

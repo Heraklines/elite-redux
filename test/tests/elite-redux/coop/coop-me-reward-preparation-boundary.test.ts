@@ -64,7 +64,7 @@ describe("Mystery battle reward preparation boundary", () => {
     expect(utilities).not.toContain("injectedSurfaces");
     expect(utilities).toContain("queuedModifierSurfaceCountAfterPreparation !== queuedModifierSurfaceCount");
     expect(utilities).toContain("use registerModifierSurface");
-    expect(utilities).toContain("const egg = new Egg(eggOptions);");
+    expect(utilities).toContain("const egg = new Egg({ ...eggOptions, pulled: false });");
     expect(utilities).toContain('kind: "egg"');
     expect(utilities).toContain("preparedEggs.push(egg)");
     expect(utilities).toContain("for (const egg of preparedEggs)");

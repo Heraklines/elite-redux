@@ -14,6 +14,7 @@ import {
   resolveSurfaceOwner,
   waitForOutcomeBounded,
 } from "./campaign.mjs";
+import { isActionableSemanticObservation, planNavigationStep } from "./campaign-nav.mjs";
 import { DuoPublicUiRig, PublicUiClient } from "./public-ui-harness.mjs";
 
 class FakeEvidence {
@@ -97,6 +98,23 @@ class FakeEvidence {
     });
   }
 }
+
+test("an explicitly unblocked handler remains actionable when its enclosing phase is not awaiting narration", () => {
+  const starter = {
+    surfaceId: "starter-select",
+    selectedOptionId: "cursor:0",
+    ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: false },
+  };
+  assert.equal(isActionableSemanticObservation(starter, { requireExplicitUnblocked: true }), true);
+  assert.deepEqual(planNavigationStep(starter, "cursor:0"), { kind: "submit" });
+  assert.equal(
+    isActionableSemanticObservation(
+      { ...starter, ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: true } },
+      { requireExplicitUnblocked: true },
+    ),
+    false,
+  );
+});
 
 test("owned semantic CommandPhase readiness survives a console-regex miss and enforces UI ownership", async () => {
   const evidence = new FakeEvidence(["[coop:battle] command surface opened for the local player"]);
