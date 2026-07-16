@@ -236,6 +236,18 @@ describe("co-op alternating-interaction relay (#633)", () => {
       expect(await watcher.awaitRewardOptions(7, 0, 1000, firstSurface)).toEqual(options);
     });
 
+    it("returns the exact ordered surface key when a reconnect installs its listener after buffering", async () => {
+      const { host, guest } = createLoopbackPair();
+      const owner = new CoopInteractionRelay(host);
+      const watcher = new CoopInteractionRelay(guest);
+      const rewardSurface = { surfaceId: "modifier:me:graves:0", ordinal: 0 } as const;
+
+      owner.sendRewardOptions(7, 0, options, rewardSurface);
+      await new Promise(r => setTimeout(r, 0));
+
+      expect(watcher.bufferedRewardOptionsKeyFor("7:")).toBe("7:0:0:modifier%3Ame%3Agraves%3A0");
+    });
+
     it("drops a malformed ordered surface before it can satisfy an option waiter", async () => {
       const { host, guest } = createLoopbackPair();
       const timer: { fire?: () => void } = {};

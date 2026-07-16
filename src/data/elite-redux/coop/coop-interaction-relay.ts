@@ -890,14 +890,19 @@ export class CoopInteractionRelay {
    */
   public onRewardOptionsBuffered: ((key: string) => void) | null = null;
 
-  /** #821: whether buffered rewardOptions exist for a key prefix (already-arrived race). */
-  hasBufferedRewardOptionsFor(prefix: string): boolean {
+  /** Exact first buffered reward-options address matching a key prefix (already-arrived/reconnect race). */
+  bufferedRewardOptionsKeyFor(prefix: string): string | null {
     for (const k of this.rewardOptionsInbox.keys()) {
       if (String(k).startsWith(prefix)) {
-        return true;
+        return k;
       }
     }
-    return false;
+    return null;
+  }
+
+  /** #821 compatibility predicate for callers that need only buffered presence. */
+  hasBufferedRewardOptionsFor(prefix: string): boolean {
+    return this.bufferedRewardOptionsKeyFor(prefix) != null;
   }
 
   cancelWaiters(shouldCancel: (seq: number) => boolean = () => true): void {

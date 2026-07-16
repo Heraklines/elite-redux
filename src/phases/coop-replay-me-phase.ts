@@ -418,11 +418,13 @@ export class CoopReplayMePhase extends Phase {
     // this admission the guest waits forever on the ME surface while the host is already parked at the
     // reciprocal shop barrier. Treat the retained inbox as an edge-trigger that already happened; the
     // shop opener consumes the same buffered options and still performs every normal authority check.
-    if (relay.hasBufferedRewardOptionsFor(shopKeyPrefix)) {
+    const bufferedShopKey = relay.bufferedRewardOptionsKeyFor(shopKeyPrefix);
+    if (bufferedShopKey != null) {
       coopLog("me", "reward shop handoff was buffered before replay listener; admitting retained edge", {
         counter: this.interactionCounter,
+        key: bufferedShopKey,
       });
-      relay.onRewardOptionsBuffered(shopKeyPrefix);
+      relay.onRewardOptionsBuffered(bufferedShopKey);
     }
     const prearmedPresentation = this.prearmedPresentationOutcome;
     this.prearmedPresentationOutcome = undefined;
