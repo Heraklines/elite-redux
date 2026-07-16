@@ -118,7 +118,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          SHA="$(gh api repos/Heraklines/er-assets/commits/main --jq .sha)"
+          SHA=""
+          for attempt in 1 2 3; do
+            SHA="$(gh api repos/Heraklines/er-assets/commits/main --jq .sha 2>/dev/null || true)"
+            echo "$SHA" | grep -Eq '^[0-9a-f]{40}$' && break
+            echo "er-assets API lookup attempt $attempt failed; retrying exact main ref"
+            sleep "$((attempt * 2))"
+          done
+          if ! echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            SHA="$(git ls-remote https://github.com/Heraklines/er-assets.git refs/heads/main | awk 'NR == 1 { print $1 }')"
+          fi
           echo "$SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "Invalid er-assets SHA: $SHA"; exit 1; }
           echo "COOP_BROWSER_ASSET_SHA=$SHA" >> "$GITHUB_ENV"
           echo "Sealing er-assets pin $SHA into the public-UI bundle"
