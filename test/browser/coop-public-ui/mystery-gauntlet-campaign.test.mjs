@@ -125,7 +125,27 @@ test("parallel lobby pairing reselects the exact visible username before every r
   assert.match(harness, /this\.lobbySurfaceCursor = this\.evidence\.cursor\(\)/u);
   assert.match(harness, /fromCursor: this\.lobbySurfaceCursor/u);
   assert.match(harness, /requester\.requestPlayer\(acceptorName, \{[\s\S]*purpose: "reissue-request"/u);
+  assert.match(harness, /relayTimeoutMs: OPTIONAL_LOBBY_RELAY_WAIT_MS/u);
+  assert.match(harness, /optional && error instanceof Error && \/timed out waiting for request relay/u);
   assert.doesNotMatch(harness, /requester\.press\("Space", `lobby-reissue-request-/u);
+
+  // The observed staging poll delivered the original request after 6.2s. A refresh must not
+  // starve that live accept panel, but must still beat the worker's approximately 17s TTL.
+  const reissueMs = Number(harness.match(/const LOBBY_REQUEST_REISSUE_MS = ([\d_]+);/u)?.[1].replaceAll("_", ""));
+  const optionalRelayMs = Number(
+    harness.match(/const OPTIONAL_LOBBY_RELAY_WAIT_MS = ([\d_]+);/u)?.[1].replaceAll("_", ""),
+  );
+  assert.ok(reissueMs > 6_200 && reissueMs < 17_000);
+  assert.ok(optionalRelayMs > 0 && optionalRelayMs < reissueMs);
+});
+
+test("paired Chromium runs headful at an explicit player-sized viewport", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8");
+  const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");
+  assert.match(workflow, /COOP_UI_HEADLESS: "0"/u);
+  assert.match(workflow, /xvfb-run -a -s "-screen 0 1440x900x24" node/u);
+  assert.match(harness, /defaultViewport: config\.viewport/u);
+  assert.match(harness, /`--window-size=\$\{config\.viewport\.width\},\$\{config\.viewport\.height\}`/u);
 });
 
 test("visual checkpoints foreground WebGL and reject trivial captures", async () => {
