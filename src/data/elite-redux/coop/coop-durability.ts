@@ -645,7 +645,7 @@ export interface CoopDurabilityRecoveryFailure {
   from: number;
   blockedSeq: number;
   attempts: number;
-  reason: "apply-rejected" | "gap" | "deferred-timeout" | "continuation-timeout";
+  reason: "apply-rejected" | "gap" | "deferred-timeout" | "continuation-timeout" | "snapshot-unavailable";
 }
 
 interface PendingDurabilityRecovery extends CoopDurabilityRecoveryFailure {
@@ -870,11 +870,11 @@ export interface CoopDurabilityHooks {
    */
   apply?: (entry: CoopJournalEntry) => CoopApplyOutcome | void;
   /**
-   * Serve a FULL SNAPSHOT at head for a class when a reconnect gap is deeper than the ring (§4.4). Optional;
-   * when absent the manager replays whatever the ring holds (the existing per-surface snapshot heal covers
-   * the deep gap in that case, so this is not required for correctness of the shallow-gap path).
+   * Serve a FULL SNAPSHOT at head for a class when a reconnect gap is deeper than the ring (§4.4).
+   * Return true only after the addressed carrier was accepted for transport. A missing, rejected, or
+   * throwing sender exhausts recovery because the retained partial tail cannot close the evicted gap.
    */
-  sendFullSnapshot?: (cls: string, headRevision: number, controlHighWater: Record<string, number>) => void;
+  sendFullSnapshot?: (cls: string, headRevision: number, controlHighWater: Record<string, number>) => boolean;
   /** Timer/clock seams keep bounded retry deterministic without allowing a synchronous replay recursion. */
   scheduleRecovery?: (callback: () => void, ms: number) => () => void;
   recoveryNow?: () => number;
@@ -2259,6 +2259,40 @@ export class CoopDurabilityManager {
     }
   }
 
+  /** A deep journal gap has no usable tail. If its atomic snapshot cannot be sent, shared play must stop. */
+  private sendRequiredFullSnapshot(cls: string, from: number, head: number): boolean {
+    let sent = false;
+    try {
+      sent = this.hooks.sendFullSnapshot?.(cls, head, this.controlPlaneHighWater()) === true;
+    } catch (error) {
+      coopWarn("durability", `full snapshot sender threw cls=${cls} from=${from} head=${head}`, error);
+    }
+    if (sent) {
+      return true;
+    }
+    if (this.exhaustedRecovery.get(cls) === from) {
+      return false;
+    }
+    this.exhaustedRecovery.set(cls, from);
+    const failure: CoopDurabilityRecoveryFailure = {
+      cls,
+      from,
+      blockedSeq: head,
+      attempts: 1,
+      reason: "snapshot-unavailable",
+    };
+    coopWarn(
+      "durability",
+      `required full snapshot unavailable cls=${cls} from=${from} head=${head} -> shared terminal`,
+    );
+    try {
+      this.hooks.onRecoveryExhausted?.(failure);
+    } catch (error) {
+      coopWarn("durability", `snapshot terminal hook threw cls=${cls} (isolated)`, error);
+    }
+    return false;
+  }
+
   /** Committer: serve a peer's reconnect request - replay the journal tail after `from`, or a full snapshot. */
   private serveResync(cls: string, from: number): void {
     if (this.journal.needsFullSnapshot(cls, from)) {
@@ -2269,7 +2303,7 @@ export class CoopDurabilityManager {
       // fallback when no snapshot hook is wired).
       const head = this.journal.highWaterMark(cls);
       coopLog("durability", `resync cls=${cls} from=${from} DEEPER than ring -> full snapshot at head=${head}`);
-      this.hooks.sendFullSnapshot?.(cls, head, this.controlPlaneHighWater());
+      this.sendRequiredFullSnapshot(cls, from, head);
       return;
     }
     const tail = this.journal.tailFrom(cls, from);
@@ -2344,7 +2378,7 @@ export class CoopDurabilityManager {
           "durability",
           `${reason} cls=${cls} OVERFLOW: ring evicted ops the peer needs (acked=${acked} deeper than ring) -> full snapshot at head=${head}`,
         );
-        this.hooks.sendFullSnapshot?.(cls, head, this.controlPlaneHighWater());
+        this.sendRequiredFullSnapshot(cls, acked, head);
         continue; // the retained tail is unusable (a gap at the evicted ops); the snapshot heals it
       }
       const tail = this.journal.resendTail(cls);

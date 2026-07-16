@@ -93,6 +93,8 @@ export interface CoopCheckpointEnvelope {
 export interface CoopBattleStreamerOptions {
   /** How long the guest waits for a turn's resolution before giving up. Default 60s. */
   timeoutMs?: number;
+  /** Short deadline for an exact state-recovery round trip; never inherit the human-input wait. */
+  recoveryTimeoutMs?: number;
   /** Timer injection (tests). Returns a cancel fn. Defaults to setTimeout/clearTimeout. */
   schedule?: (cb: () => void, ms: number) => () => void;
   /** Clock paired with the injected scheduler so absolute retry deadlines stay deterministic in tests. */
@@ -109,6 +111,8 @@ export interface CoopBattleStreamerOptions {
   authorityRetentionLimit?: number;
   /** Production terminal hook, invoked only after the peer-ACKed fatal contract reaches an outcome. */
   onAuthorityTerminal?: (reason: string) => void;
+  /** Runtime-owned fail-closed hook for a recovery carrier that cannot reach its receiver. */
+  onRecoveryTerminal?: (reason: string) => void;
 }
 
 export type CoopAuthorityFailure = Extract<CoopMessage, { t: "authorityFailure" }>;
@@ -398,6 +402,8 @@ function hasCompleteAuthorityCompanions(
 // slow thinker trips this 60s give-up and the guest desyncs (one player lands in the
 // shop while the other is still choosing). Match the 20min command grace.
 const DEFAULT_TIMEOUT_MS = 1_200_000;
+/** Recovery is machine-to-machine and must fail closed quickly, unlike a human command/shop wait. */
+export const COOP_STATE_SYNC_RECOVERY_TIMEOUT_MS = 12_000;
 
 /**
  * #862: the host's wave-start enemyPartySync states an explicit NEGATIVE ME verdict with this
@@ -766,6 +772,7 @@ function authorityFailureKey(failure: CoopAuthorityFailure): string {
 export class CoopBattleStreamer {
   private readonly transport: CoopTransport;
   private readonly timeoutMs: number;
+  private readonly recoveryTimeoutMs: number;
   private readonly schedule: (cb: () => void, ms: number) => () => void;
   private readonly now: () => number;
   private readonly authorityContext: (() => { epoch: number; wave: number; turn: number }) | undefined;
@@ -774,6 +781,7 @@ export class CoopBattleStreamer {
   private readonly authorityRetentionMs: number;
   private readonly authorityRetentionLimit: number;
   private readonly onAuthorityTerminal: ((reason: string) => void) | undefined;
+  private readonly onRecoveryTerminal: ((reason: string) => void) | undefined;
   private readonly offMessage: () => void;
   private readonly offStateChange: () => void;
   private disposed = false;
@@ -1021,6 +1029,10 @@ export class CoopBattleStreamer {
   constructor(transport: CoopTransport, opts: CoopBattleStreamerOptions = {}) {
     this.transport = transport;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.recoveryTimeoutMs =
+      Number.isSafeInteger(opts.recoveryTimeoutMs) && (opts.recoveryTimeoutMs as number) > 0
+        ? (opts.recoveryTimeoutMs as number)
+        : COOP_STATE_SYNC_RECOVERY_TIMEOUT_MS;
     this.schedule = opts.schedule ?? defaultSchedule;
     this.now = opts.now ?? Date.now;
     this.authorityContext = opts.authorityContext;
@@ -1035,6 +1047,7 @@ export class CoopBattleStreamer {
         ? (opts.authorityRetentionLimit as number)
         : AUTHORITY_COMMIT_RETENTION;
     this.onAuthorityTerminal = opts.onAuthorityTerminal;
+    this.onRecoveryTerminal = opts.onRecoveryTerminal;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offStateChange = transport.onStateChange((state: CoopConnectionState) => {
       if (state !== "connected") {
@@ -1084,7 +1097,10 @@ export class CoopBattleStreamer {
         }
       }
     });
-    coopLog("stream", `streamer CONSTRUCT timeout=${this.timeoutMs}ms onMessage registered`);
+    coopLog(
+      "stream",
+      `streamer CONSTRUCT timeout=${this.timeoutMs}ms recoveryTimeout=${this.recoveryTimeoutMs}ms onMessage registered`,
+    );
   }
 
   private currentAuthorityAddress(turn?: number): { epoch: number; wave: number; turn: number } | null {
@@ -3539,7 +3555,7 @@ export class CoopBattleStreamer {
     coopLog(
       "resync",
       `guest requestStateSync id=${ticket.requestId} reason=${reason} e=${ticket.frontier.epoch} `
-        + `wave=${ticket.frontier.wave} turn=${ticket.frontier.turn} START timeout=${this.timeoutMs}ms`,
+        + `wave=${ticket.frontier.wave} turn=${ticket.frontier.turn} START timeout=${this.recoveryTimeoutMs}ms`,
     );
     return new Promise<CoopStateSyncOutcome>(resolve => {
       let settled = false;
@@ -3561,7 +3577,7 @@ export class CoopBattleStreamer {
         resolve(outcome);
       };
       this.stateSyncWaiters.set(key, { ticket, finish });
-      cancelTimer = this.schedule(() => finish({ kind: "timeout" }), this.timeoutMs);
+      cancelTimer = this.schedule(() => finish({ kind: "timeout" }), this.recoveryTimeoutMs);
       this.transport.send({ t: "requestStateSync", ticket });
     });
   }
@@ -4557,7 +4573,19 @@ export class CoopBattleStreamer {
           return;
         }
         coopLog("resync", `guest RECV durabilityStateSync id=${msg.ticket.requestId} blobLen=${msg.blob.length}`);
-        this.durabilitySnapshotHandler?.({ kind: "snapshot", blob: msg.blob, admission });
+        if (this.durabilitySnapshotHandler == null) {
+          const reason = `Durability recovery ${msg.ticket.requestId} had no installed snapshot receiver.`;
+          coopWarn("resync", reason);
+          this.onRecoveryTerminal?.(reason);
+          return;
+        }
+        try {
+          this.durabilitySnapshotHandler({ kind: "snapshot", blob: msg.blob, admission });
+        } catch (error) {
+          const reason = `Durability recovery ${msg.ticket.requestId} snapshot receiver threw.`;
+          coopWarn("resync", reason, error);
+          this.onRecoveryTerminal?.(reason);
+        }
         return;
       }
       case "meChecksum":

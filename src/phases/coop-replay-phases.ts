@@ -71,7 +71,6 @@ import {
   coopOwnerOfPlayerFieldSlot,
   coopSessionGeneration,
   coopWaveAdvanceSignaledFor,
-  failCoopRecoveryOutcome,
   failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopController,
@@ -85,6 +84,7 @@ import {
   queueCoopMeBattleVictoryTail,
   registerCoopWaveAdvanceBoundaryWakeFactory,
   resolveCoopPendingWaveTransition,
+  runCoopStateRecovery,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
 import { beginCoopMachineWait } from "#data/elite-redux/coop/coop-stall-probe";
@@ -1470,21 +1470,22 @@ export class CoopFinalizeTurnPhase extends Phase {
         + "-> heal-once safety net (stateSync)",
     );
     const resyncGen = coopSessionGeneration(); // #808
-    void streamer.requestStateSync("turn-checksum").then(result => {
-      const runtime = getCoopRuntime();
-      if (runtime == null || resyncGen !== coopSessionGeneration()) {
-        return;
-      }
-      if (failCoopRecoveryOutcome(runtime, result, `Turn ${this.turn} checksum`)) {
-        return;
-      }
-      const { blob, admission } = result;
-      try {
+    const recoveryRuntime = getCoopRuntime();
+    if (recoveryRuntime == null) {
+      failCoopSharedSession(`Turn ${this.turn} checksum recovery had no live runtime.`);
+      return;
+    }
+    void runCoopStateRecovery({
+      runtime: recoveryRuntime,
+      reason: "turn-checksum",
+      label: `Turn ${this.turn} checksum`,
+      isCurrent: () => resyncGen === coopSessionGeneration() && getCoopRuntime() === recoveryRuntime,
+      onSnapshot: ({ blob, admission }) => {
         // #808: a reply landing after session teardown must never queue a phase into the
         // NEXT session's queue (the generation moved on teardown).
         if (resyncGen !== coopSessionGeneration()) {
           coopWarn("resync", `turn=${this.turn} stateSync reply arrived AFTER session teardown -> dropped (#808)`);
-          return;
+          return false;
         }
         const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
         coopLog("resync", `turn=${this.turn} queueing full snapshot apply (blobLen=${blob.length})`);
@@ -1503,9 +1504,10 @@ export class CoopFinalizeTurnPhase extends Phase {
         // while a CoopHpDrainReplayPhase animates against it. Route it through a queued one-shot phase
         // so the heavy rebuild lands at a real inter-phase boundary, never mid-drain. The heal-check +
         // UNHEALED diagnostics moved INTO the phase (they must run AFTER the deferred apply).
-        if (!queueCoopAtomicSnapshotApply(runtime, snapshot, admission, `turn=${this.turn} checksum safety-net`)) {
-          failCoopSharedSession(`Turn ${this.turn} checksum snapshot was not admissible.`);
-          return;
+        if (
+          !queueCoopAtomicSnapshotApply(recoveryRuntime, snapshot, admission, `turn=${this.turn} checksum safety-net`)
+        ) {
+          return false;
         }
         const interactionController = getCoopController();
         // Cancellation occurs only AFTER the atomic envelope passed central preflight. A malformed
@@ -1515,9 +1517,8 @@ export class CoopFinalizeTurnPhase extends Phase {
             !isCoopFaintSwitchSeq(seq)
             && (interactionController == null ? true : interactionController.peerAdvancedPastInteraction(seq)),
         );
-      } catch {
-        failCoopSharedSession(`Turn ${this.turn} checksum snapshot could not be decoded.`);
-      }
+        return true;
+      },
     });
   }
 
@@ -1882,7 +1883,7 @@ function parseCoopCanonical(canonical: string | undefined): unknown {
  * GUEST (#633, BLOCKING-1 - async resync race guard): a one-shot phase that applies a full
  * authoritative resync snapshot at a REAL inter-phase boundary, verifies it healed, then ends. The
  * resync blob arrives via a genuine network round-trip ({@linkcode CoopFinalizeTurnPhase.verifyChecksum}'s
- * `requestStateSync(...).then(...)`), so by the time it resolves the guest is very likely mid-way
+ * centralized `runCoopStateRecovery(...)` request), so by the time it resolves the guest is very likely mid-way
  * through the NEXT turn's replay, pumping `CoopMoveAnimReplayPhase` / `CoopHpDrainReplayPhase` against
  * the live field. The comprehensive snapshot apply re-summons field mons, vacates slots, and rebuilds
  * boss bars ({@linkcode applyCoopFullSnapshot}) - running THAT inline in a bare `.then` could teardown
@@ -1890,7 +1891,7 @@ function parseCoopCanonical(canonical: string | undefined): unknown {
  *
  * Routing the apply through this queued phase lands the heavy re-summon/boss-rebuild at an
  * inter-phase boundary, never interleaved with a half-drained HP bar. The heal-check + UNHEALED
- * diagnostics live here (they must run AFTER the deferred apply, not in the `.then` that enqueues it).
+ * diagnostics live here (they must run AFTER the deferred apply, not in the promise callback that enqueues it).
  *
  * MINOR-1 converge-or-hold: after {@linkcode COOP_RESYNC_RESUMMON_GIVE_UP} consecutive UNHEALED
  * resyncs on the SAME host checksum, the heavy field/boss re-summon is suppressed so a genuinely

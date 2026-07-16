@@ -2333,7 +2333,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       // Deliberately install no host streamer/listener, so no explicit unavailable can return.
       const guestStream = new CoopBattleStreamer(guest, {
         authorityContext: () => current,
-        timeoutMs: 1,
+        recoveryTimeoutMs: 1,
         schedule: cb => {
           cb();
           return () => {};
