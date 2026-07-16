@@ -29,7 +29,7 @@ Assets at C:\Users\Hafida\Downloads\assets (37 files) — animate what has anima
 - Asset: regitube_front.webp ONLY (no back/icon/shiny) — FLAGGED.
 
 ## 3. Primal Regigigas — "Gargantuan Pokemon"
-- Typing: Normal/Rock/Ice/Steel/Electric/Dragon (six types — N-type substrate from B2).
+- Typing: Normal/Rock/Ice/Steel/Electric/Dragon/Water (SEVEN types — N-type substrate from B2). Water is native (Regitube is lore-part of the mon; maintainer directive). This is the N-type UI stress case, and Water is a 6th REMOVABLE type for World in Pieces (every non-Normal type is removable).
 - Stats 140/170/145/70/145/100.
 - Active: Predator / Stall / Raging Boxer. Innates: Titan (NEW composite: Impenetrable + Relic Stone), World in Pieces (5917), Self Repair.
 - Reachable: Regigigas + Planetary Orb (NEW item, primal-reversion style).
