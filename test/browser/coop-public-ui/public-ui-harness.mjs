@@ -778,22 +778,6 @@ export class PublicUiClient {
     this.publicSeat = null;
     this.page = await this.context.newPage();
     await this.page.setViewport(this.config.viewport);
-    // Chrome-for-Testing on Linux can ignore --lang even though the same flag works on desktop
-    // Chrome. Apply the public browser locale before navigation through Chromium's emulation
-    // domain. This changes navigator/Accept-Language/Intl environment only; it cannot inspect or
-    // mutate game state, storage, Phaser, or the transport.
-    const configuredLocale = browserLocale(this.config.locales[this.label]);
-    const browserSession = await this.page.createCDPSession();
-    try {
-      await browserSession.send("Emulation.setUserAgentOverride", {
-        userAgent: await this.page.browser().userAgent(),
-        acceptLanguage: `${configuredLocale},${primaryLanguage(configuredLocale)};q=0.9`,
-      });
-      await browserSession.send("Emulation.setLocaleOverride", { locale: configuredLocale });
-    } finally {
-      await browserSession.detach();
-    }
-    this.evidence.record("browser-locale-environment", { configuredLocale });
     // The bundle is immutable and digest-verified before launch. Preserve normal browser caching so a
     // cold reopen exercises production cache behavior instead of reloading tens of thousands of assets.
     await this.page.setCacheEnabled(true);
@@ -1657,6 +1641,9 @@ export class DuoPublicUiRig {
           "--use-angle=swiftshader-webgl",
           "--enable-unsafe-swiftshader",
           `--lang=${locale}`,
+          // Chromium documents --accept-lang as the headless switch exposed through
+          // navigator.language; Linux commonly ignores --lang for that API.
+          `--accept-lang=${browserLocale(locale)}`,
           `--window-size=${config.viewport.width},${config.viewport.height}`,
         ],
       });
