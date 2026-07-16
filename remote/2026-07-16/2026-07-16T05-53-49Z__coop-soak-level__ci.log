@@ -1,0 +1,63 @@
+===== COOP SOAK RESULT =====
+profile: level
+verdict: PASS
+waves_requested: 55
+run: 29474755911 (main)
+timestamp: 2026-07-16T05-53-49Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260716 WAVES=55 - replay this run with:  SOAK_SEED=20260716 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=110 guest=0
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=670 guest=390
+[22m[39m[coop-soak] scalar-lag wave 15 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1870 guest=1660
+[coop-soak] scalar-lag wave 20 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=3170 guest=1870
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=3990 guest=3170
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=4910 guest=3990
+[22m[39m[coop-soak] scalar-lag wave 42 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=6580 guest=4910
+[22m[39m[coop-soak] scalar-lag wave 45 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=8080 guest=6580
+[coop-soak] scalar-lag wave 50 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=11150 guest=8080
+[22m[39m[coop-soak] RUN ENDED crossing into wave 53 (seed 20260716): host at terminal phase TitlePhase. Survey stops here.
+[22m[39m[coop-soak] DONE seed=20260716 waves=52/55 resyncHeals=0 assertions=0 findings=0 trainerWaves=9 (fixed=4 random=5) skips={"mysteryEncounterDisabledV1":1} elapsedMs=76854
+[coop-soak] RUN ENDED at wave 53 (seed 20260716): host at terminal phase TitlePhase. Surveyed 52/55 waves under all invariants before the terminal.
+
+----- vitest result tail -----
+[coop-soak-coverage]   SKIP uiOperation:PARTY->op:bargain - the soak does not yet prove the complete PARTY owner-input -> op:bargain authority commit -> watcher-apply chain; a synchronous local carrier hit cannot prove the later cross-client commit/adoption for guest-owned input => FOLLOW-UP: add a continuous two-client PARTY journey that carries one causal intent id through op:bargain commit, apply, visual acknowledgement, and state convergence
+[coop-soak-coverage]   SKIP uiOperation:PARTY->op:catchFull - the soak does not yet prove the complete PARTY owner-input -> op:catchFull authority commit -> watcher-apply chain; a synchronous local carrier hit cannot prove the later cross-client commit/adoption for guest-owned input => FOLLOW-UP: add a continuous two-client PARTY journey that carries one causal intent id through op:catchFull commit, apply, visual acknowledgement, and state convergence
+[coop-soak-coverage]   SKIP uiOperation:PARTY->op:faintSwitch - the soak does not yet prove the complete PARTY owner-input -> op:faintSwitch authority commit -> watcher-apply chain; a synchronous local carrier hit cannot prove the later cross-client commit/adoption for guest-owned input => FOLLOW-UP: add a continuous two-client PARTY journey that carries one causal intent id through op:faintSwitch commit, apply, visual acknowledgement, and state convergence
+[coop-soak-coverage]   SKIP uiOperation:PARTY->op:me - the soak does not yet prove the complete PARTY owner-input -> op:me authority commit -> watcher-apply chain; a synchronous local carrier hit cannot prove the later cross-client commit/adoption for guest-owned input => FOLLOW-UP: add a continuous two-client PARTY journey that carries one causal intent id through op:me commit, apply, visual acknowledgement, and state convergence
+[coop-soak-coverage]   SKIP uiOperation:PARTY->op:revival - the soak does not yet prove the complete PARTY owner-input -> op:revival authority commit -> watcher-apply chain; a synchronous local carrier hit cannot prove the later cross-client commit/adoption for guest-owned input => FOLLOW-UP: add a continuous two-client PARTY journey that carries one causal intent id through op:revival commit, apply, visual acknowledgement, and state convergence
+[coop-soak-coverage]   SKIP uiOperation:PARTY->op:reward - the soak does not yet prove the complete PARTY owner-input -> op:reward authority commit -> watcher-apply chain; a synchronous local carrier hit cannot prove the later cross-client commit/adoption for guest-owned input => FOLLOW-UP: add a continuous two-client PARTY journey that carries one causal intent id through op:reward commit, apply, visual acknowledgement, and state convergence
+[coop-soak-coverage]   SKIP uiOperation:SUMMARY->op:learnMove - the soak does not yet prove the complete SUMMARY owner-input -> op:learnMove authority commit -> watcher-apply chain; a synchronous local carrier hit cannot prove the later cross-client commit/adoption for guest-owned input => FOLLOW-UP: add a continuous two-client SUMMARY journey that carries one causal intent id through op:learnMove commit, apply, visual acknowledgement, and state convergence
+[coop-soak-coverage]   SKIP uiRelay:BALL - the soak does not yet prove BALL through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the BALL headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:BIOME_SHOP - the soak does not yet prove BIOME_SHOP through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the BIOME_SHOP headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:COLOSSEUM - the soak does not yet prove COLOSSEUM through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the COLOSSEUM headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:COMMAND - the soak does not yet prove COMMAND through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the COMMAND headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:CONFIRM - the soak does not yet prove CONFIRM through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the CONFIRM headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:ER_BARGAIN - the soak does not yet prove ER_BARGAIN through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the ER_BARGAIN headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:ER_MAP - the soak does not yet prove ER_MAP through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the ER_MAP headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:ER_QUIZ - the soak does not yet prove ER_QUIZ through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the ER_QUIZ headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:FIGHT - the soak does not yet prove FIGHT through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the FIGHT headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:LEARN_MOVE_BATCH - the soak does not yet prove LEARN_MOVE_BATCH through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the LEARN_MOVE_BATCH headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:MODIFIER_SELECT - the soak does not yet prove MODIFIER_SELECT through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the MODIFIER_SELECT headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:MYSTERY_ENCOUNTER - the soak does not yet prove MYSTERY_ENCOUNTER through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the MYSTERY_ENCOUNTER headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:OPTION_SELECT - the soak does not yet prove OPTION_SELECT through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the OPTION_SELECT headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:PARTY - the soak does not yet prove PARTY through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the PARTY headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:SUMMARY - the soak does not yet prove SUMMARY through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the SUMMARY headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage] ===========================================
+[coop-soak-coverage] ENFORCING (profile=level, surveyed 52 >= 30 waves, seed 20260716).
+[coop-soak-coverage] ⚠ PROBABILISTIC cold across the 1 ledger run(s) so far (need 7 to enforce; WARN only): [situation:doublePlayerFaint, situation:enemySwitch, situation:hostHalfExhausted]
+[coop-soak-coverage] ✅ COMPLETENESS BACKSTOP PASSED (seed 20260716).
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:151:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [33m77927[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:151:3[39m
+
+[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m   Start at [22m 05:52:07
+[2m   Duration [22m 102.25s[2m (transform 18.92s, setup 22.83s, import 239ms, tests 78.33s, environment 701ms)[22m
+
