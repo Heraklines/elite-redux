@@ -131,6 +131,18 @@ import {
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { getErShinyLabEarnedTierForPokemon, rollErShinyLabWildSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
 import { applyErAtlasFrameRate } from "#data/elite-redux/er-sprite-anim";
+import {
+  erApplyTacticalDamage,
+  erTacticalAirBalloonUngrounds,
+  erTacticalBlocksBattlerTag,
+  erTacticalBypassesTrap,
+  erTacticalIronBallGrounds,
+  erTacticalProtectsAbility,
+  erTacticalSpeedMultiplier,
+  erTacticalUtilityUmbrella,
+  erTacticalZoomLensMultiplier,
+  erTryApplyExpertBelt,
+} from "#data/elite-redux/er-tactical-items";
 import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
 import {
   applyErWardStoneBlock,
@@ -2057,6 +2069,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         if (this.getTag(BattlerTagType.UNBURDEN) && this.hasAbility(AbilityId.UNBURDEN)) {
           ret *= 2;
         }
+        // ER tactical items: Iron Ball halves Speed, Float Stone raises it 10%.
+        if (!ignoreHeldItems) {
+          ret *= erTacticalSpeedMultiplier(this);
+        }
         break;
       }
     }
@@ -2962,6 +2978,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @param passive - Whether to set the passive ability instead of the non-passive one; default `false`
    */
   public setTempAbility(ability: Ability, passive = false): void {
+    // ER Ability Shield: the holder's ability cannot be changed or replaced.
+    if (erTacticalProtectsAbility(this)) {
+      globalScene.phaseManager.queueMessage(`${this.getNameToRender()}'s Ability Shield protected its Ability!`);
+      return;
+    }
     applyOnLoseAbAttrs({ pokemon: this, passive });
     if (passive) {
       this.summonData.passiveAbility = ability.id;
@@ -3011,6 +3032,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * Suppresses an ability and calls its onlose attributes
    */
   public suppressAbility() {
+    // ER Ability Shield: the holder's ability cannot be suppressed.
+    if (erTacticalProtectsAbility(this)) {
+      globalScene.phaseManager.queueMessage(`${this.getNameToRender()}'s Ability Shield protected its Ability!`);
+      return;
+    }
     applyOnLoseAbAttrs({ pokemon: this, passive: true });
     applyOnLoseAbAttrs({ pokemon: this, passive: false });
     this.summonData.abilitySuppressed = true;
@@ -3485,6 +3511,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   public isGrounded(): boolean {
+    // ER Iron Ball grounds the holder unconditionally (wins over any float);
+    // an unpopped Air Balloon ungrounds it. Iron Ball is checked first.
+    if (erTacticalIronBallGrounds(this)) {
+      return true;
+    }
+    if (erTacticalAirBalloonUngrounds(this)) {
+      return false;
+    }
     return (
       !!this.getTag(GroundedTag)
       || (!this.isOfType(PokemonType.FLYING, true, true)
@@ -3510,6 +3544,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     if (this.isOfType(PokemonType.GHOST)) {
+      return false;
+    }
+
+    // ER Shed Shell / Smoke Ball: the holder can always switch out / flee,
+    // bypassing every trapping effect (ability, move-tag and Fairy Lock).
+    if (erTacticalBypassesTrap(this)) {
       return false;
     }
 
@@ -3754,6 +3794,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     const types = this.getTypes(true, true, false, useIllusion);
     const { arena } = globalScene;
+
+    // ER Air Balloon: a non-popped balloon makes ANY holder immune to Ground moves
+    // (the engine's ground immunity below only covers Flying types + Levitate; the
+    // balloon must grant it directly). Iron Ball wins if both are held (isGrounded
+    // is then true, so this is skipped).
+    if (moveType === PokemonType.GROUND && !this.isGrounded() && erTacticalAirBalloonUngrounds(this)) {
+      return 0;
+    }
 
     // Handle flying v ground type immunity without removing flying type so effective types are still effective
     // Related to https://github.com/pagefaultgames/pokerogue/issues/524
@@ -4936,7 +4984,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       });
     }
 
-    return accuracyMultiplier.value / evasionMultiplier.value;
+    // ER Zoom Lens (held by the attacker): +20% accuracy when the target has
+    // already acted this turn.
+    return (accuracyMultiplier.value / evasionMultiplier.value) * erTacticalZoomLensMultiplier(this, target);
   }
 
   /**
@@ -5267,6 +5317,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       globalScene.arena.getAttackTypeMultiplier(moveType, source.isGrounded()),
     );
     applyMoveAttrs("IgnoreWeatherTypeDebuffAttr", source, this, move, arenaAttackTypeMultiplier);
+    // ER Utility Umbrella (held by the attacker): the holder ignores the sun's /
+    // rain's boost and penalty on its OWN moves (divide the weather component out).
+    erTacticalUtilityUmbrella(source, moveType, arenaAttackTypeMultiplier);
     // Ability-side analogue (ER Catastrophe): let the attacker's ability cancel an
     // adverse weather type debuff for the resolved move type, matching Hydro Steam.
     if (!ignoreSourceAbility) {
@@ -5614,6 +5667,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // ER elemental Gems: 1.3x to the attacker's first move of the matching type,
     // then the gem shatters (consumed only on real calcs).
     erTryApplyGem(source, moveType, damage, simulated);
+
+    // ER Expert Belt (held by the attacker): x1.2 on super-effective hits
+    // (effectiveness >= 2, per ER battle_util.c). Passive - never consumed -
+    // so it applies to simulated calcs too, like the recreated Life Orb below.
+    erTryApplyExpertBelt(source, typeMultiplier, damage);
+
+    // ER tactical boosters (held by the attacker): Punching Glove (+10% punching),
+    // Muscle Band (+10% physical), Wise Glasses (+10% special), Metronome
+    // (+20%/consecutive same-move use). All passive - apply on simulated calcs.
+    erApplyTacticalDamage(source, move, moveCategory, damage);
 
     // ER resistance berries (#357): if the DEFENDER holds the berry matching
     // this hit's type, halve the damage BEFORE it lands and consume the berry
@@ -6093,6 +6156,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       && sourceId !== this.id
       && applyErWardStoneBlock(this, erWardStoneTagLabel(tagType))
     ) {
+      return false;
+    }
+
+    // ER tactical items: Mental Herb cures a mental affliction (consumed), and
+    // Throat Spray blocks Throat Chop while held.
+    if (erTacticalBlocksBattlerTag(this, tagType, sourceId)) {
       return false;
     }
 

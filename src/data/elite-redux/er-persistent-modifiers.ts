@@ -35,6 +35,7 @@ import {
   erResistBerryModifierType,
   erResistBerryTypeId,
 } from "#data/elite-redux/er-resist-berries";
+import { ErTacticalItemModifier } from "#data/elite-redux/er-tactical-items";
 import { ErSeedModifier } from "#data/elite-redux/er-terrain-seeds";
 import {
   ER_WARD_STONE_TIERS,
@@ -50,6 +51,7 @@ const ER_PERSISTENT_MODIFIER_CLASSES: Record<string, new (...args: any[]) => Per
   ErGemModifier,
   ErReactiveItemModifier,
   ErSeedModifier,
+  ErTacticalItemModifier,
   ErLifeOrbModifier,
   ErAssaultVestModifier,
   ErRockyHelmetModifier,

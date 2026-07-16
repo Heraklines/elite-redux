@@ -30,6 +30,7 @@ import {
 } from "#data/elite-redux/coop/coop-wave-operation";
 import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
+import { erAdvanceTacticalRecharges } from "#data/elite-redux/er-tactical-items";
 import { advanceErWardStoneCharges } from "#data/elite-redux/er-ward-stones";
 import { LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
 import { BattlePhase } from "#phases/battle-phase";
@@ -216,6 +217,8 @@ export class BattleEndPhase extends BattlePhase {
       // ER Ward Stones (#358): player-held stones charge up over won waves.
       advanceErWardStoneCharges();
       erAdvanceCommunityItemCharges();
+      // ER Booster Energy: a spent charge recharges after 10 won waves.
+      erAdvanceTacticalRecharges();
     }
 
     // Endless graceful end

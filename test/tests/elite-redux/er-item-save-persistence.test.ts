@@ -35,6 +35,12 @@ import {
   erResistBerryModifierType,
   erResistBerryTypeId,
 } from "#data/elite-redux/er-resist-berries";
+import {
+  ER_TACTICAL_CONFIG,
+  ErTacticalItemModifier,
+  type ErTacticalKind,
+  erTacticalItemType,
+} from "#data/elite-redux/er-tactical-items";
 import { ErSeedModifier, erSeedItemType } from "#data/elite-redux/er-terrain-seeds";
 import {
   ER_WARD_STONE_CONFIG,
@@ -150,6 +156,7 @@ describe("ER held-item save persistence", () => {
     expect(resolveErModifierClass("ErGemModifier")).toBe(ErGemModifier);
     expect(resolveErModifierClass("ErSeedModifier")).toBe(ErSeedModifier);
     expect(resolveErModifierClass("ErReactiveItemModifier")).toBe(ErReactiveItemModifier);
+    expect(resolveErModifierClass("ErTacticalItemModifier")).toBe(ErTacticalItemModifier);
     expect(resolveErModifierClass("ErAssaultVestModifier")).toBe(ErAssaultVestModifier);
     expect(resolveErModifierClass("ErResistBerryModifier")).toBe(ErResistBerryModifier);
     expect(resolveErModifierClass("ErWardStoneModifier")).toBe(ErWardStoneModifier);
@@ -177,6 +184,33 @@ describe("ER held-item save persistence", () => {
     expect(erSeedItemType("grassySeed").id).toBe("ER_GRASSY_SEED");
     expect(erReactiveItemType("cellBattery").id).toBe("ER_CELL_BATTERY");
     expect(erReactiveItemType("weaknessPolicy").id).toBe("ER_WEAKNESS_POLICY");
+    expect(erTacticalItemType("expertBelt").id).toBe("ER_EXPERT_BELT");
+    expect(erTacticalItemType("covertCloak").id).toBe("ER_COVERT_CLOAK");
+    expect(erTacticalItemType("redCard").id).toBe("ER_RED_CARD");
+    expect(erTacticalItemType("ejectButton").id).toBe("ER_EJECT_BUTTON");
+  });
+
+  it("round-trips EVERY tactical item through the full load path, preserving kind + Booster charge state", () => {
+    const kinds = Object.keys(ER_TACTICAL_CONFIG) as ErTacticalKind[];
+    expect(kinds.length).toBe(27);
+    for (const [index, kind] of kinds.entries()) {
+      const type = erTacticalItemType(kind);
+      // The pinned id MUST be a real registry key, or the loader drops the item.
+      expect(getModifierTypeFuncById(type.id), `getModifierTypeFuncById(${type.id})`).toBeDefined();
+
+      // Exercise the Booster-Energy charge fields (spent / waveProgress) so they
+      // round-trip through getArgs -> ModifierData -> ctor for every kind.
+      const spent = index % 2 === 1;
+      const waveProgress = index;
+      const original = new ErTacticalItemModifier(type, 900 + index, kind, spent, waveProgress, 1);
+      const restored = reload(original) as ErTacticalItemModifier | null;
+      expect(restored, kind).toBeInstanceOf(ErTacticalItemModifier);
+      expect(restored!.kind, kind).toBe(kind);
+      expect(restored!.pokemonId).toBe(900 + index);
+      expect(restored!.spent, kind).toBe(spent);
+      expect(restored!.waveProgress, kind).toBe(waveProgress);
+      expect(restored!.matchType(original), kind).toBe(true);
+    }
   });
 
   it("round-trips Assault Vest WITHOUT the StatBooster stats leaking into stackCount", () => {

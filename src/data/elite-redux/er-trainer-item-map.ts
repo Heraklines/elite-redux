@@ -60,6 +60,36 @@ export const ER_ITEM_TO_MODIFIER_KEY: Readonly<Record<number, string>> = {
   241: "WHITE_HERB",
   375: "SOUL_DEW",
   245: "SOOTHE_BELL",
+  // ER tactical held items (er-tactical-items.ts): faithful 1:1 recreations, so
+  // an ER trainer's native item carries over. GROUND-TRUTH id math (2026-07-16):
+  // LAST_MISC_ITEM_INDEX = ITEM_OLD_AMBER = 229, so id = 229 + the offset in
+  // vendor/.../include/constants/items.h. DO NOT "verify" ids against that
+  // file's LINE numbers - they coincidentally equal 250+offset and produced a
+  // wrong base twice (the every-pre-existing-entry cross-check - LEFTOVERS
+  // +44=273, WIDE_LENS +59=288, SOUL_DEW +146=375, BUG_GEM +103=332,
+  // INSECT_PLATE +129=358, ROCKY_HELMET +83=312 - pins the true base at 229).
+  246: "ER_MENTAL_HERB",
+  252: "ER_SMOKE_BALL",
+  289: "ER_ZOOM_LENS",
+  290: "ER_METRONOME_ITEM",
+  291: "ER_MUSCLE_BAND",
+  292: "ER_WISE_GLASSES",
+  293: "ER_EXPERT_BELT",
+  304: "ER_STICKY_BARB",
+  306: "ER_IRON_BALL",
+  308: "ER_SHED_SHELL",
+  311: "ER_FLOAT_STONE",
+  313: "ER_AIR_BALLOON",
+  314: "ER_RED_CARD",
+  317: "ER_EJECT_BUTTON",
+  324: "ER_SAFETY_GOGGLES",
+  325: "ER_ADRENALINE_ORB",
+  350: "ER_THROAT_SPRAY",
+  351: "ER_EJECT_PACK",
+  352: "ER_HEAVY_DUTY_BOOTS",
+  353: "ER_BLUNDER_POLICY",
+  354: "ER_ROOM_SERVICE",
+  355: "ER_UTILITY_UMBRELLA",
   // Weather / terrain duration extenders → Mystical Rock.
   295: "MYSTICAL_ROCK", // Icy Rock
   296: "MYSTICAL_ROCK", // Smooth Rock

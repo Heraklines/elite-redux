@@ -5,6 +5,7 @@ import { fieldPositionForSlot } from "#data/battle-format";
 import { isCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyFieldMedic } from "#data/elite-redux/er-relics";
+import { erApplyStickyBarbTurnEnd } from "#data/elite-redux/er-tactical-items";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
@@ -121,6 +122,10 @@ export class TurnEndPhase extends FieldPhase {
             true,
           );
         }
+
+        // ER Sticky Barb: the holder loses 1/8 max HP at turn end (indirect;
+        // Magic Guard exempt).
+        erApplyStickyBarbTurnEnd(pokemon);
 
         if (!pokemon.isPlayer()) {
           globalScene.applyModifiers(EnemyTurnHealModifier, false, pokemon);

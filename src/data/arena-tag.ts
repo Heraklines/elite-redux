@@ -50,6 +50,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { CommonBattleAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
+import { erApplyRoomServiceOnTrickRoom, erTacticalBlocksHazards } from "#data/elite-redux/er-tactical-items";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -889,6 +890,11 @@ export abstract class EntryHazardTag extends SerializableArenaTag {
       return false;
     }
 
+    // ER Heavy-Duty Boots: the holder is immune to every entry hazard.
+    if (erTacticalBlocksHazards(pokemon)) {
+      return false;
+    }
+
     if (this.groundedOnly && !pokemon.isGrounded()) {
       return false;
     }
@@ -1408,6 +1414,12 @@ export class TrickRoomTag extends RoomArenaTag {
 
   protected override get onAddMessageKey(): string {
     return "arenaTag:trickRoomOnAdd";
+  }
+
+  override onAdd(quiet = false): void {
+    super.onAdd(quiet);
+    // ER Room Service: on-field holders drop Speed by 1 when Trick Room takes hold.
+    erApplyRoomServiceOnTrickRoom();
   }
 
   protected override get onRemoveMessageKey(): string {
