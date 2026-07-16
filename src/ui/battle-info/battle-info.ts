@@ -658,11 +658,16 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
     if (types.length > 2) {
       this.type3Icon.setFrame(PokemonType[types[2]].toLowerCase());
     }
-    // ER N-type substrate: lay out a 4th+ type icon in the row started by
-    // type3Icon (continuing outward on the same stride/axis as type3 vs type1),
-    // so a sextuple-typed mon shows all six. Icons are pooled per-slot.
-    const dx = this.type3Icon.x - this.type1Icon.x;
-    const dy = this.type3Icon.y - this.type1Icon.y;
+    // ER N-type substrate (maintainer paired-column layout): types 4..N pair into
+    // VERTICAL COLUMNS advancing along the type3->type1 axis, mirroring the game's
+    // own dual-type pair repeated. type1/type2 are column 0 (top/bottom); type3 is
+    // the TOP of column 1, type4 its BOTTOM, type5 the top of column 2, etc. So a
+    // six/seven-type mon shows compact columns beside the name instead of a long
+    // horizontal row crowding the name plate / covering the sprite. Icons pooled
+    // per slot. (1-3 types keep the existing placement - type3Icon at column-1 top.)
+    const colDx = this.type3Icon.x - this.type1Icon.x;
+    const rowTopY = this.type1Icon.y;
+    const rowBottomY = this.type2Icon.y;
     for (let i = 3; i < types.length; i++) {
       let icon = this.extraTypeIcons[i - 3];
       if (!icon) {
@@ -673,7 +678,9 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
         this.extraTypeIcons[i - 3] = icon;
         this.add(icon);
       }
-      icon.setPosition(this.type3Icon.x + dx * (i - 2), this.type3Icon.y + dy * (i - 2));
+      const column = Math.floor(i / 2);
+      const row = i % 2;
+      icon.setPosition(this.type1Icon.x + colDx * column, row === 0 ? rowTopY : rowBottomY);
       icon.setFrame(PokemonType[types[i]].toLowerCase());
       icon.setVisible(true);
     }

@@ -35,6 +35,10 @@ import { getLocalizedSpriteKey } from "#utils/common";
 
 /** Native width (px) of a type badge frame in the `types` atlas (32x14). */
 const TYPE_BADGE_WIDTH = 32;
+/** Native height (px) of a type badge frame in the `types` atlas (32x14). */
+const TYPE_BADGE_HEIGHT = 14;
+/** At/above this type count, switch from a single row to paired vertical columns. */
+const PAIRED_THRESHOLD = 4;
 
 /**
  * The full ordered STATIC type list of a species FORM for the preview screens:
@@ -64,8 +68,61 @@ export interface TypeIconStripOptions {
   maxWidth: number;
 }
 
+/** A single placed badge's geometry. */
+export interface TypeIconPlacement {
+  x: number;
+  y: number;
+}
+
+/** The resolved geometry for a strip of `count` type badges. */
+export interface TypeIconStripLayout {
+  scale: number;
+  placements: TypeIconPlacement[];
+}
+
 /**
- * Lay out `types` as a shrink-to-fit horizontal badge strip.
+ * PURE geometry for the N-type badge strip (no sprites) - see
+ * {@linkcode layoutTypeIconStrip} for the surface-facing renderer and the layout
+ * rules. Exposed so the layout can be unit-tested precisely.
+ */
+export function computeTypeIconStripLayout(count: number, opts: TypeIconStripOptions): TypeIconStripLayout {
+  const { x0, y0, baseScale, baseStride, maxWidth } = opts;
+  if (count <= 0) {
+    return { scale: baseScale, placements: [] };
+  }
+  const paired = count >= PAIRED_THRESHOLD;
+  let scale = baseScale;
+  let colStride = baseStride;
+  if (paired) {
+    const cols = Math.ceil(count / 2);
+    const gridWidth = (cols - 1) * baseStride + TYPE_BADGE_WIDTH * scale;
+    if (gridWidth > maxWidth) {
+      scale = baseScale * (maxWidth / gridWidth);
+      colStride = baseStride * (maxWidth / gridWidth);
+    }
+  }
+  const rowStride = TYPE_BADGE_HEIGHT * scale + 1;
+  const placements: TypeIconPlacement[] = [];
+  for (let i = 0; i < count; i++) {
+    const x = paired ? x0 + Math.floor(i / 2) * colStride : x0 + i * colStride;
+    const y = paired ? y0 + (i % 2) * rowStride : y0;
+    placements.push({ x, y });
+  }
+  return { scale, placements };
+}
+
+/**
+ * Lay out `types` as a type-badge strip.
+ *
+ * - 1-3 types: the ORIGINAL single horizontal row (x0 + i*stride) - the common
+ *   case renders byte-identically to the pre-N-type code.
+ * - 4+ types (maintainer layout): VERTICAL PAIRS advancing horizontally. Types
+ *   1-2 stack in column 0, 3-4 in column 1, 5-6 in column 2, a lone 7th in column
+ *   3, and so on (column = floor(i/2), row = i%2). This halves the row length vs a
+ *   flat 6/7-wide strip so the badges stay full, readable size and don't cover the
+ *   sprite / crowd the name - exactly like the game's own dual-type pair, repeated.
+ *   Degrades sanely past that: if the columns would exceed the width budget the
+ *   whole grid shrinks uniformly.
  *
  * @param container - the container the pooled extra badges are added to.
  * @param icon1 - the first fixed badge sprite (already owned by the handler).
@@ -92,27 +149,13 @@ export function layoutTypeIconStrip(
     return;
   }
 
-  const { x0, y0, baseScale, baseStride, maxWidth } = opts;
-  let scale = baseScale;
-  let stride = baseStride;
-  if (n > 2) {
-    const iconWidth = TYPE_BADGE_WIDTH * scale;
-    // Tighten the stride so the last badge's LEFT edge lands within the budget.
-    const fitStride = (maxWidth - iconWidth) / (n - 1);
-    stride = Math.min(baseStride, fitStride);
-    if (stride < iconWidth) {
-      // Even touching overflows: shrink every badge uniformly so all n fit edge
-      // to edge within the budget (graceful degradation past ~7 types).
-      scale = maxWidth / (TYPE_BADGE_WIDTH * n);
-      stride = TYPE_BADGE_WIDTH * scale;
-    }
-  }
+  const { scale, placements } = computeTypeIconStripLayout(n, opts);
 
   const place = (icon: Phaser.GameObjects.Sprite, index: number): void => {
     icon
       .setScale(scale)
       .setOrigin(0, 0)
-      .setPosition(x0 + index * stride, y0)
+      .setPosition(placements[index].x, placements[index].y)
       .setFrame(PokemonType[types[index]].toLowerCase())
       .setVisible(true);
   };
