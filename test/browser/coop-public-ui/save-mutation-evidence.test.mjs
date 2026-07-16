@@ -75,6 +75,12 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
     /!protectedLocalCoop && deletedCoopRunId == null[\s\S]*?withCommittedCoopDeletePersistenceLease/u,
   );
   assert.match(gameData, /if \(coopClear\) \{[\s\S]*?withCommittedCoopDeletePersistenceLease/u);
+  assert.match(saveHandler, /deleteSession\(cursor, true\)/u);
+  assert.match(
+    gameData,
+    /overwriteCloudSyncApplies[\s\S]*?forceSync \|\| overwriteCloudSyncApplies \|\| this\.shouldAttemptCloudSync\(\)/u,
+  );
+  assert.match(gameData, /this\.pendingOverwriteCloudSync === pendingOverwriteCloudSync[\s\S]*?= null/u);
   assert.match(workflow, /src\/system\/game-data/u);
   assert.match(workflow, /src\/ui\/handlers\/save-slot-select-ui-handler\.ts/u);
   assert.match(
