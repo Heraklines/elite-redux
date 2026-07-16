@@ -445,7 +445,7 @@ test("fallback input is sent only to the client whose command never entered the 
   ]);
 });
 
-test("real animation progress extends the outcome wait but never crosses its hard ceiling", () => {
+test("real phase and stream progress extend the outcome wait but never cross its hard ceiling", () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
   const rig = { host: authority, clients: { authority, renderer } };
@@ -458,10 +458,16 @@ test("real animation progress extends the outcome wait but never crosses its har
 
   assert.equal(budget.deadline(), 1_100);
   authority.evidence.pushPhase("Start Phase MessagePhase", new Date(1_050).toISOString(), 50);
-  assert.equal(budget.observe(), 1_100, "ordinary phases must not refresh the animation budget");
+  assert.equal(budget.observe(), 1_250, "a new narration phase is causal queue progress");
 
   authority.evidence.pushPhase("Start Phase MoveEffectPhase", new Date(1_080).toISOString(), 80);
   assert.equal(budget.observe(), 1_280);
+  authority.evidence.pushPhase(
+    "[coop:turn] host recorder: append turn=1 seq=8 k=hp total=9 live=true",
+    new Date(1_250).toISOString(),
+    250,
+  );
+  assert.equal(budget.observe(), 1_450, "new authoritative stream sequence is causal progress");
   nowMs = 1_400;
   renderer.evidence.pushPhase("Start Phase CoopMoveAnimReplayPhase", new Date(1_450).toISOString(), 450);
   assert.equal(budget.observe(), 1_500, "a replay animation refresh is clamped to the immutable hard ceiling");
@@ -471,11 +477,13 @@ test("real animation progress extends the outcome wait but never crosses its har
   const records = [...authority.evidence.events, ...renderer.evidence.events].filter(
     event => event.kind === "campaign-animation-budget",
   );
-  assert.equal(records.length, 3);
+  assert.equal(records.length, 5);
   assert.deepEqual(
     records.map(event => [event.phase, event.extensionApplied, event.hardCeilingReached]),
     [
+      ["MessagePhase", true, false],
       ["MoveEffectPhase", true, false],
+      ["authority-stream", true, false],
       ["MoveAnimPhase", false, true],
       ["CoopMoveAnimReplayPhase", true, true],
     ],
