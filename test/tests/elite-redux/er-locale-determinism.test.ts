@@ -20,7 +20,8 @@
 // =============================================================================
 
 import type { Ability } from "#data/abilities/ability";
-import { enAbilityName, enMoveName, enSpeciesName } from "#data/elite-redux/er-canonical-names";
+import { enAbilityName, enMoveName, enMoveNameForId, enSpeciesName } from "#data/elite-redux/er-canonical-names";
+import { remapEliteReduxMoveIdsInMap } from "#data/elite-redux/init-elite-redux-c-source-corrections";
 import type { Move } from "#data/moves/move";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
@@ -63,6 +64,17 @@ describe("ER canonical (locale-invariant) name keys (#633)", () => {
     expect(enMoveName(moveStub(MoveId.POUND))).toBe("Pound");
     expect(enMoveName(moveStub(MoveId.TACKLE))).toBe("Tackle");
     expect(spyT).toHaveBeenCalledTimes(1);
+  });
+
+  it("enMoveNameForId resolves from static enum/catalog data only", () => {
+    const spyT = vi.spyOn(i18next, "t").mockImplementation(() => {
+      throw new Error("translation state must not participate in static id lookup");
+    });
+    expect(enMoveNameForId(MoveId.KOWTOW_CLEAVE)).toBe("Kowtow Cleave");
+    expect(enMoveNameForId(MoveId.AXE_KICK)).toBe("Axe Kick");
+    expect(enMoveNameForId(MoveId.NONE)).toBe("");
+    expect(enMoveNameForId(5000)).toBe("");
+    expect(spyT).not.toHaveBeenCalled();
   });
 
   it("enSpeciesName returns the ENGLISH name even when the active language is not English", () => {
@@ -127,5 +139,53 @@ describe("ER canonical (locale-invariant) name keys (#633)", () => {
     expect(enMoveName(moveStub(MoveId.POUND))).toBe(localized);
     const localizedSpecies = String(i18next.t("pokemon:bulbasaur"));
     expect(enSpeciesName(speciesStub(SpeciesId.BULBASAUR))).toBe(localizedSpecies);
+  });
+});
+
+describe("ER production move-id remap is locale- and runtime-independent (#633)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("repairs the production ER draft ids identically when translation lookup is unavailable", () => {
+    const makeBrokenMap = (): Record<number, number> => ({
+      868: MoveId.BLOOD_MOON, // ER Kowtow Cleave was scrambled to Blood Moon.
+      894: MoveId.TRAILBLAZE, // ER Axe Kick was scrambled to Trailblaze.
+    });
+
+    vi.spyOn(i18next, "t").mockImplementation(() => {
+      throw new Error("runtime locale unavailable");
+    });
+
+    const first = makeBrokenMap();
+    const firstCount = remapEliteReduxMoveIdsInMap(first);
+
+    vi.restoreAllMocks();
+    vi.spyOn(i18next, "t").mockReturnValue("__GERMAN_RUNTIME_NAME__");
+
+    const second = makeBrokenMap();
+    const secondCount = remapEliteReduxMoveIdsInMap(second);
+
+    expect(firstCount).toBe(2);
+    expect(secondCount).toBe(firstCount);
+    expect(second).toEqual(first);
+    expect(first[868]).toBe(MoveId.KOWTOW_CLEAVE);
+    expect(first[894]).toBe(MoveId.AXE_KICK);
+  });
+
+  it("repairs all 67 entries in a fresh real ER_ID_MAP module, then is idempotent", async () => {
+    vi.resetModules();
+    const [{ ER_ID_MAP: freshIdMap }, { remapEliteReduxMoveIdsByName: freshRemap }] = await Promise.all([
+      import("#data/elite-redux/er-id-map"),
+      import("#data/elite-redux/init-elite-redux-c-source-corrections"),
+    ]);
+    vi.spyOn(i18next, "t").mockImplementation(() => {
+      throw new Error("translation state must not participate in the real remap");
+    });
+
+    expect(freshRemap()).toBe(67);
+    expect(freshIdMap.moves[868]).toBe(MoveId.KOWTOW_CLEAVE);
+    expect(freshIdMap.moves[894]).toBe(MoveId.AXE_KICK);
+    expect(freshRemap()).toBe(0);
   });
 });

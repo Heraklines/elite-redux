@@ -24,13 +24,13 @@
 // =============================================================================
 
 import { allMoves } from "#data/data-lists";
-import { enMoveName } from "#data/elite-redux/er-canonical-names";
+import { enMoveNameForId } from "#data/elite-redux/er-canonical-names";
 import { ER_FLAG_NAMES_LIST, ER_FLAG_TO_MOVE_FLAG } from "#data/elite-redux/er-flag-mapping";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import type { Move } from "#data/moves/move";
 import { MoveFlags } from "#enums/move-flags";
-import type { MoveId } from "#enums/move-id";
+import { MoveId } from "#enums/move-id";
 
 // Embedded snapshot of the C-source-derived move stats — kept inline rather
 // than as a separate JSON import to keep this self-contained. Generated via
@@ -470,11 +470,13 @@ function cheapFnv32Hex(s: string): string {
  *      (e.g. Kowtow Cleave -> Blood Moon, Axe Kick -> Trailblaze) — so the move
  *      silently received another move's rebalance + effects (#151).
  *
- * Both are repaired the same way: `allMoves` is correctly id-indexed, so we
- * resolve each ER move's real id by its display name and repoint the ER id when
- * it currently lands on a different move (or a hole). Only ER moves whose name
- * matches a built pokerogue move are touched; correctly-mapped moves and moves
- * with no name-match (e.g. ER-renamed) are left untouched. Idempotent.
+ * Both are repaired the same way: the static `MoveId` enum and bundled English
+ * catalog define a locale- and boot-order-invariant name-to-id table. We repoint
+ * the ER id when its static English name resolves to a different vanilla id (or
+ * a hole). Correct mappings and ER-renamed moves with no match stay untouched.
+ * Live `Move` objects are deliberately excluded from this lookup: their names
+ * and construction order are mutable initialization state and previously made
+ * this shared map differ between English and German clients. Idempotent.
  *
  * MUST run BEFORE {@linkcode initEliteReduxVanillaRebalance} / move-patches /
  * movesets so every downstream consumer sees the corrected id-map and applies
@@ -492,12 +494,28 @@ export function remapEliteReduxMoveIdsByName(): number {
     `[er-remap] call#${callNo} mapEntries=${Object.keys(movesMap).length}`
       + ` sampleHashBefore=${cheapFnv32Hex(JSON.stringify(movesMap))}`,
   );
+  const remapped = remapEliteReduxMoveIdsInMap(movesMap);
+  if (remapped > 0) {
+    console.info(`[er-csrc] remapped ${remapped} ER moves to their real MoveIds (by name)`);
+  }
+  // Co-op desync diagnostic (#633): fingerprint the map state on EXIT, with the change count,
+  // so we can see whether this call mutated the shared singleton (and how the two clients diverge).
+  console.info(
+    `[er-remap] call#${callNo} changed=${remapped} sampleHashAfter=${cheapFnv32Hex(JSON.stringify(movesMap))}`,
+  );
+  return remapped;
+}
+
+/**
+ * Pure production remap seam. The input map is the only mutable value read;
+ * canonical ids come exclusively from the static enum/catalog snapshot.
+ */
+export function remapEliteReduxMoveIdsInMap(movesMap: Record<number, number>): number {
   const idByName = new Map<string, number>();
-  for (const mv of allMoves) {
-    if (mv !== undefined) {
-      // #633: match on the locale-INVARIANT (forced-English) name so co-op
-      // clients in different languages build the same id-map (mv is a live Move).
-      idByName.set(enMoveName(mv).toLowerCase(), mv.id);
+  for (let moveId = MoveId.NONE + 1; moveId < 5000; moveId++) {
+    const canonicalName = enMoveNameForId(moveId);
+    if (canonicalName) {
+      idByName.set(canonicalName.toLowerCase(), moveId);
     }
   }
   let remapped = 0;
@@ -514,14 +532,6 @@ export function remapEliteReduxMoveIdsByName(): number {
       remapped++;
     }
   }
-  if (remapped > 0) {
-    console.info(`[er-csrc] remapped ${remapped} ER moves to their real MoveIds (by name)`);
-  }
-  // Co-op desync diagnostic (#633): fingerprint the map state on EXIT, with the change count,
-  // so we can see whether this call mutated the shared singleton (and how the two clients diverge).
-  console.info(
-    `[er-remap] call#${callNo} changed=${remapped} sampleHashAfter=${cheapFnv32Hex(JSON.stringify(movesMap))}`,
-  );
   return remapped;
 }
 

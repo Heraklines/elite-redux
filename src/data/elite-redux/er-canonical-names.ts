@@ -43,6 +43,15 @@ const ENGLISH_ABILITY_NAMES = englishAbilities as Readonly<Record<string, { name
 const ENGLISH_MOVE_NAMES = englishMoves as Readonly<Record<string, { name?: string }>>;
 const ENGLISH_POKEMON_NAMES = englishPokemon as Readonly<Record<string, string>>;
 
+/** Snapshot vanilla reverse keys before ER custom-move initialization extends the enum object. */
+const VANILLA_MOVE_ENUM_KEYS: Readonly<Record<number, string>> = Object.freeze(
+  Object.fromEntries(
+    Object.entries(MoveId).flatMap(([key, value]) =>
+      typeof value === "number" && value < 5000 ? [[value, key] as const] : [],
+    ),
+  ),
+);
+
 /**
  * First ER-custom move id. ER-custom moves (>= this) are NOT in pokerogue's
  * `move:` i18n bundle - their live `.name` comes from a STATIC ER draft string
@@ -86,7 +95,25 @@ export function enMoveName(move: Move): string {
   if (move.id >= ER_CUSTOM_MOVE_ID_FLOOR) {
     return move.name;
   }
-  const enumKey = MoveId[move.id];
+  return enMoveNameForId(move.id);
+}
+
+/**
+ * Resolve a vanilla move id through only compile-time enum/catalog data.
+ *
+ * Unlike {@linkcode enMoveName}, this helper never accepts or reads a live
+ * `Move` instance. Data-table initialization that needs to discover a move id
+ * by canonical name must use this seam so boot order, localization, and mutable
+ * runtime entities cannot influence the resulting table.
+ */
+export function enMoveNameForId(moveId: number): string {
+  if (moveId === MoveId.NONE || moveId >= ER_CUSTOM_MOVE_ID_FLOOR) {
+    return "";
+  }
+  const enumKey = VANILLA_MOVE_ENUM_KEYS[moveId];
+  if (typeof enumKey !== "string") {
+    return "";
+  }
   return ENGLISH_MOVE_NAMES[toCamelCase(enumKey)]?.name ?? enumKey;
 }
 
