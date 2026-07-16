@@ -1,0 +1,82 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:f33ac88b239c5cd97e537d4bf79721d6c4ffef1e:run-29526530322.1
+mode:     0  wave:?
+seed:     ilWhgmLhQMAJhl5NKQzccj3L
+party:    
+enemy:    
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:f33ac88b239c5cd97e537d4bf79721d6c4ffef1e:run-29526530322.1","source":"github","sha":"f33ac88b239c5cd97e537d4bf79721d6c4ffef1e","workflow":{"provider":"github-actions","runId":"29526530322","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"ci/coop/staging-f33-restore"},"deployment":null}
+
+----- CONSOLE -----
+[19:09:31.588] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:09:32.569] LOG: [ER] build {"version":1,"id":"github:f33ac88b239c5cd97e537d4bf79721d6c4ffef1e:run-29526530322.1","source":"github","sha":"f33ac88b239c5cd97e537d4bf79721d6c4ffef1e","workflow":{"provider":"github-actions","runId":"29526530322","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"ci/coop/staging-f33-restore"},"deployment":null}
+[19:09:33.149] LOG: [dev-tools] loaded — 624 scenarios + Send Logs button
+[19:10:00.193] DEBUG: Destroying loading scene
+[19:10:00.193] DEBUG: Destroyed loading scene
+[19:10:00.334] LOG: Seed: ilWhgmLhQMAJhl5NKQzccj3L
+[19:10:00.334] LOG: Wave Seed: ilWhgmLhQMAJhl5NKQzccj3L 0
+[19:10:05.481] LOG: %cStart Phase LoginPhase color:green;
+[19:10:05.806] LOG: Client Session: ens55eRDR2qBmYnXV0uEzmOszPtPgyVS
+[19:10:07.270] LOG: %cStart Phase TitlePhase color:green;
+[19:10:07.272] LOG: Getting Session Slot id: %d 1
+[19:10:07.424] LOG: use seasonal splash messages true
+[19:11:56.404] LOG: [coop:lobby] start announce name=test4 protocol=p33
+[19:11:58.127] LOG: [coop:lobby] poll players=0
+[19:11:59.900] LOG: [coop:lobby] poll players=0
+[19:12:01.690] LOG: [coop:lobby] poll players=1
+[19:12:03.497] LOG: [coop:lobby] poll: incoming request from=p33_4COOgA5qOtNOOz4_R68IhekPTGDE_hIz name=Heraklines1
+[19:12:03.509] LOG: [coop:lobby] poll players=1
+[19:12:04.300] LOG: [coop:lobby] respond accept=true from=p33_4COOgA5qOtNOOz4_R68IhekPTGDE_hIz (self=p33_popiE4TRr1aX9m7qFHzT6ngaABczGzXV)
+[19:12:05.180] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[19:12:07.720] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[19:12:07.771] LOG: [coop:launch] data channel OPEN
+[19:12:07.774] LOG: [coop:webrtc] peer connection state role=guest state=connected channel=open
+[19:12:07.774] LOG: [coop:webrtc] ICE connection state role=guest state=connected channel=open
+[19:12:07.776] LOG: [coop:webrtc] ctor role=guest readyState=open state=connected
+[19:12:07.786] LOG: [coop:launch] connectCoopSession role=guest state=connected username=test4 netcode=authoritative
+[19:12:07.834] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[19:12:07.846] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[19:12:07.847] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[19:12:07.848] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[19:12:07.849] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[19:12:07.849] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[19:12:07.850] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[19:12:07.853] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[19:12:07.868] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[19:12:07.869] LOG: [coop:launch] peer session ready role=guest netcode=authoritative -> connecting
+[19:12:07.869] LOG: [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=test4 version=er-coop-37 tiebreak=0.48774469272049814
+[19:12:07.877] LOG: [coop:webrtc] raw tx QUEUE role=guest t=hello bytes=530
+[19:12:08.008] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=d934626e515c046f(1108) movesName=12be97f97ecdc120(1108) movesets=44374aedf908f2ff(1920) abilitiesData=484720164af0dd92(1115) abilitiesName=1581743383868012(1115)
+[19:12:08.125] LOG: [coop:webrtc] raw tx QUEUE role=guest t=dataFingerprint bytes=329
+[19:12:08.131] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.131] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.132] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.132] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.134] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=543 handlers=11
+[19:12:08.142] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[19:12:08.143] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.143] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.143] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.143] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.143] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.143] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.156] LOG: [coop:webrtc] raw rx role=guest t=dataFingerprint bytes=329 handlers=11
+[19:12:08.157] WARN: [coop:checksum] FUNCTIONAL MISMATCH sections=moveMap,movesets - launch remains closed - moveMap local=e9b828360aafb9e2(1032) peer=beac47fd49483418(1032) movesName local=12be97f97ecdc120(1108) peer=c262a065143b9028(1108) movesets local=44374aedf908f2ff(1920) peer=3b61964f350caf7b(1920) abilitiesName local=1581743383868012(1115) peer=0dc202b994a0ebe5(1115)
+[19:12:08.157] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.157] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.157] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.157] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:12:08.158] WARN: [coop-resume] peer compatibility barrier failed; keeping lobby closed (no unilateral start)
+[19:12:08.168] LOG: [coop:lobby] cancel (id=p33_popiE4TRr1aX9m7qFHzT6ngaABczGzXV connecting=true)
+[19:12:08.169] LOG: [coop:launch] clearCoopRuntime role=guest netcode=authoritative gen->1
+[19:12:08.170] LOG: [coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[19:12:08.170] LOG: [coop:relay] dispose() (no in-flight waiters)
+[19:12:08.171] LOG: [coop:pump] end session {"wasOwner":false,"seq":-1,"termSeq":-1}
+[19:12:08.173] LOG: [coop:webrtc] close() role=guest state=connected
+[19:12:08.173] LOG: [coop:webrtc] state role=guest connected -> closed
+[19:12:08.279] LOG: [coop:turn] host recorder: CLEAR (null-out) live emitter (was=true)
+[19:12:08.291] LOG: [coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+----- REPLAY TRACE (JSON) -----
+(none)
