@@ -56,6 +56,24 @@ describe("co-op ER data-table fingerprint (#633, diagnostics)", () => {
       expect(fp.movesData.n).toBe(fp.movesName.n);
       expect(fp.abilitiesData.n).toBe(fp.abilitiesName.n);
     });
+
+    it("boots a fresh real ER move map through all 67 locale-invariant repairs", async () => {
+      // The original #633 regression mocked only the English-name helper, so it stayed green while
+      // the production remap still walked locale-sensitive live Move instances. Reload the actual
+      // generated map + production remap together and prove the complete boot transform here, in the
+      // co-op gate lane that owns the fingerprint compatibility barrier.
+      vi.resetModules();
+      const [idMapModule, correctionModule, moveIdModule] = await Promise.all([
+        import("#data/elite-redux/er-id-map"),
+        import("#data/elite-redux/init-elite-redux-c-source-corrections"),
+        import("#enums/move-id"),
+      ]);
+
+      expect(correctionModule.remapEliteReduxMoveIdsByName()).toBe(67);
+      expect(idMapModule.ER_ID_MAP.moves[868]).toBe(moveIdModule.MoveId.KOWTOW_CLEAVE);
+      expect(idMapModule.ER_ID_MAP.moves[894]).toBe(moveIdModule.MoveId.AXE_KICK);
+      expect(correctionModule.remapEliteReduxMoveIdsByName()).toBe(0);
+    });
   });
 
   describe("diffErDataFingerprint", () => {
