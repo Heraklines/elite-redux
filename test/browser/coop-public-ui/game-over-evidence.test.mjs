@@ -65,6 +65,15 @@ test("GameOver journey uses visible starters, real command input, and exact reta
     harness,
     /GAME_OVER_POST_TURN_PROGRESS_ALLOWANCE_MS = 180_000[\s\S]*GAME_OVER_POST_TURN_HARD_CEILING_MS = 900_000[\s\S]*progressAllowanceMs: GAME_OVER_POST_TURN_PROGRESS_ALLOWANCE_MS[\s\S]*hardCeilingMs: GAME_OVER_POST_TURN_HARD_CEILING_MS/u,
   );
+  const gameOverDriver = harness.slice(
+    harness.indexOf("async driveWaveToGameOver()"),
+    harness.indexOf("async driveCommanderWaveToReward()"),
+  );
+  assert.doesNotMatch(
+    gameOverDriver,
+    /assertRetainedContinuation/u,
+    "GameOver is released by its WAVE_ADVANCE DATA/continuation proof, not a nonexistent normal turn ACK",
+  );
   for (const exactEvidence of [
     "settled WAVE_ADVANCE committed wave=1",
     "ignore raw waveResolved for correctness wave=1 outcome=gameOver",
@@ -78,10 +87,7 @@ test("GameOver journey uses visible starters, real command input, and exact reta
     assert.ok(harness.includes(exactEvidence), `harness retains exact terminal evidence: ${exactEvidence}`);
   }
   assert.doesNotMatch(
-    harness.slice(
-      harness.indexOf("async driveWaveToGameOver()"),
-      harness.indexOf("async driveCommanderWaveToReward()"),
-    ),
+    gameOverDriver,
     /page\.evaluate|globalScene|getCoopRuntime|phaseQueue|RTCPeerConnection|RTCDataChannel/u,
   );
 });
