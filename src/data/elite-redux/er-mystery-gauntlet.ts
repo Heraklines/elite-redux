@@ -48,7 +48,10 @@ export function erGauntletWaveKind(waveIndex: number): ErGauntletWaveKind {
 }
 
 /** Synthetic/phase-driven types that cannot be force-spawned as a plain option ME. */
-const GAUNTLET_EXCLUDED = new Set<MysteryEncounterType>([MysteryEncounterType.LLM_DIRECTED]);
+const GAUNTLET_EXCLUDED = new Set<MysteryEncounterType>([
+  MysteryEncounterType.LLM_DIRECTED,
+  MysteryEncounterType.ER_THE_BARGAIN,
+]);
 
 /**
  * Pick the ME type for a gauntlet "me"/"bargain" wave. Bargain waves always run
