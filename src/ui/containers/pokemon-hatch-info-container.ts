@@ -4,7 +4,7 @@ import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { allMoves } from "#data/data-lists";
 import { getEggTierForSpecies } from "#data/egg";
 import type { EggHatchData } from "#data/egg-hatch-data";
-import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
+import { ensureErSpriteAnim, playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { Gender } from "#data/gender";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
@@ -179,7 +179,9 @@ export class PokemonHatchInfoContainer extends PokemonInfoContainer {
       if (token !== this.displayToken) {
         return;
       }
-      this.currentPokemonSprite.play(spriteKey);
+      // Pin frame 0001 + gap-fill the anim so a multi-frame packed ER atlas never
+      // renders as its raw whole-sheet __BASE frame on the egg-summary card.
+      playErPokemonSpriteAnim(this.currentPokemonSprite, spriteKey);
       this.currentPokemonSprite.setPipelineData("shiny", shiny);
       this.currentPokemonSprite.setPipelineData("variant", variant);
       this.currentPokemonSprite.setPipelineData("spriteKey", spriteKey);
