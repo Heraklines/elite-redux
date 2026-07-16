@@ -3186,9 +3186,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       });
       // The two-engine harness persists the guest module context when the scoped pump returns; only then can
       // the detached promise continuation run against its captured controller. Wait outside the client scope
-      // (bounded) rather than starving that continuation with an inner polling loop.
+      // (bounded), but pump each queued carrier under its destination's complete context just like the two
+      // independent browser event loops. A context-free poll cannot deliver the final retained leave.
       for (let i = 0; i < 16; i++) {
-        await drainLoopback();
+        await withClient(rig.guestCtx, () => drainLoopback());
+        await withClient(rig.hostCtx, () => drainLoopback());
         if (rig.guestRuntime.controller.interactionCounter() === counterBefore + 1) {
           break;
         }

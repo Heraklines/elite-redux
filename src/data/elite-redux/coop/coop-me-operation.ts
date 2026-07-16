@@ -177,7 +177,7 @@ export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMe
     return (
       validShape
       && (!destination.trainerVictory || destination.result === "victory")
-      && (!destination.addHeal || destination.rewardShop)
+      && (destination.addHeal !== true || destination.rewardShop === true)
       && ((!destination.addHeal && !destination.rewardShop && !destination.eggLapse)
         || destination.continuation === "rewards")
     );
