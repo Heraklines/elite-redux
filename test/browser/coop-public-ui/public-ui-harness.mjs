@@ -1341,9 +1341,13 @@ export class DuoPublicUiRig {
           "--disable-background-timer-throttling",
           "--disable-backgrounding-occluded-windows",
           "--disable-renderer-backgrounding",
-          // Avoid Docker's small shared-memory mount and let Xvfb use Mesa's software GL path.
+          // Avoid Docker's small shared-memory mount. Xvfb has no hardware GL device, so use
+          // Chromium's WebGL-only SwiftShader ANGLE backend; the full SwiftShader compositor
+          // produced striped PNGs and Mesa could not create the Phaser WebGL context in CI.
           "--disable-dev-shm-usage",
-          "--use-gl=desktop",
+          "--use-gl=angle",
+          "--use-angle=swiftshader-webgl",
+          "--enable-unsafe-swiftshader",
           `--window-size=${config.viewport.width},${config.viewport.height}`,
         ],
       });
