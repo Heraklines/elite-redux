@@ -1,6 +1,6 @@
-# Co-op protocol 34 contract (P33 authority architecture)
+# Co-op protocol 35 contract (P33 authority architecture)
 
-Status: **frozen for implementation**. Wire version: `er-coop-34`.
+Status: **frozen for implementation**. Wire version: `er-coop-35`.
 
 This contract reconciles the two incompatible protocol-32 development lines and closes the identity model
 that made invitation direction, authority, gameplay ownership, and transport setup all look like one
@@ -121,7 +121,7 @@ pairing record returned by the Worker.
 ```ts
 type CoopHelloV2 = {
   t: "hello";
-  version: "er-coop-34";
+  version: "er-coop-35";
   pairingId: string;
   account: CoopAccountIdentityV1;
   transportRole: CoopTransportRole;
@@ -212,12 +212,13 @@ surface is open with the correct owner seat and operation address. The authority
 every frozen required seat ACKs `continuationReady`. A material-only ACK may suppress redundant reconstruction
 but cannot clear retention or let the authority cross the next shared boundary.
 
-### Retained Mystery battle settlement (protocol 34)
+### Retained Mystery battle settlement (protocol 35)
 
 `opSurface.me.v2` extends each pinned `ME_TERMINAL` stream to the strict ordinal lifecycle
 `battle -> battle-settled -> (battle | leave)`. `battle-settled` carries one comprehensive image through
 BattleEnd proper plus the exact result, host turn, trainer-victory flag, reward/event/none continuation,
-healing-shop flag, and egg-lapse flag. The renderer holds the exact BattleEnd until this DATA applies. It may
+healing flag, exact reward-shop surface flag, and egg-lapse flag. The renderer holds the exact BattleEnd until
+this DATA applies. It may
 then execute only the declared tail; a reward continuation cannot admit final `leave` until
 `PostMysteryEncounterPhase`, while event continuation remains fenced at BattleEnd until the next retained
 battle or leave. Repeated same-wave battles use increasing terminal steps and never reuse WAVE_ADVANCE.
@@ -225,7 +226,7 @@ Mutations performed later by a host-only `doContinueEncounter` callback are not 
 image; the following retained battle or leave carrier must apply the callback-complete state before opening
 its public continuation.
 
-Protocol 34 deliberately disables Mystery encounters on a finite mode's final wave. The current destination
+Protocol 35 deliberately disables Mystery encounters on a finite mode's final wave. The current destination
 union has no retained `GameOver` arm, so admitting such an encounter would leave `none` unowned after
 BattleEnd. Adding a typed retained GameOver destination plus renderer proof is a blocking prerequisite before
 that spawn restriction may be removed.

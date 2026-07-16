@@ -1406,7 +1406,7 @@ export function handleMysteryEncounterVictory(addHealPhase = false, doNotContinu
     const trainerVictory = encounter.encounterMode === MysteryEncounterMode.TRAINER_BATTLE;
     const continuation = encounter.doContinueEncounter ? "encounter" : queueRewards ? "rewards" : "none";
     if (globalScene.gameMode.isCoop && continuation === "none") {
-      failCoopSharedSession("A final-wave Mystery battle has no retained GameOver continuation in protocol 34.");
+      failCoopSharedSession("A final-wave Mystery battle has no retained GameOver continuation in protocol 35.");
       return;
     }
     globalScene.phaseManager.pushNew("BattleEndPhase", true, null, {

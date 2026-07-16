@@ -224,6 +224,10 @@ describe("complete retained Mystery terminal transaction", () => {
       "the renderer cannot infer whether a settled reward phase opens a shop",
     ).toBe(false);
     expect(
+      isCompleteCoopMeTerminalPayload(settledPayload(12, { addHeal: true, rewardShop: false })),
+      "a healing-shop request cannot omit the shop surface that executes it",
+    ).toBe(false);
+    expect(
       isCompleteCoopMeTerminalPayload(settledPayload(12, { result: "failure", trainerVictory: true, eggLapse: false })),
       "a failed battle cannot declare trainer-victory presentation",
     ).toBe(false);

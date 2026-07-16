@@ -61,6 +61,7 @@ import type {
   CoopSessionKind,
   CoopTransport,
 } from "#data/elite-redux/coop/coop-transport";
+import { COOP_PROTOCOL_VERSION } from "#data/elite-redux/coop/coop-transport";
 import { GameModes } from "#enums/game-modes";
 
 export interface CoopResumeCheckpointPersistenceAck {
@@ -814,7 +815,7 @@ export class CoopSessionController {
       const binding = this.p33Binding;
       this.transport.send({
         t: "hello",
-        version: "er-coop-34",
+        version: COOP_PROTOCOL_VERSION,
         pairingId: this.p33Context.pairingId,
         account: { ...this.p33Context.account },
         transportRole: this.p33Context.transportRole,
