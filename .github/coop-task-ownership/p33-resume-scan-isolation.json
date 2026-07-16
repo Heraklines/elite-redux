@@ -11,6 +11,7 @@
     "src/phases/title-phase.ts",
     "src/system/game-data.ts",
     "test/browser/coop-public-ui/config.mjs",
+    "test/browser/coop-public-ui/evidence.mjs",
     "test/browser/coop-public-ui/journeys.mjs",
     "test/browser/coop-public-ui/local-worker-server.ts",
     "test/browser/coop-public-ui/resume-scan-isolation.test.mjs",
