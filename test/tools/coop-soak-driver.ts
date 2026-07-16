@@ -3126,6 +3126,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * Advances the alternation counter exactly ONCE (like a shop). Asserts LOCKSTEP at start + end.
    */
   const processMeWave = async (wave: number, type: MysteryEncounterType): Promise<void> => {
+    // crossIntoMeWave leaves the real host browser installed with the freshly-opened encounter. Save that
+    // complete live ME control before the first synthetic guest swap; otherwise hostCtx can still carry a
+    // prior event's pin and restore it much later when the true PostME terminal starts.
+    persistInstalledClientMePins(rig.hostCtx);
     // Mirror the host's CURRENT mystery encounter onto the guest (rebuilds the guest party + sets its ME).
     await withClient(rig.guestCtx, () => mirrorHostMeToGuest(rig.hostScene, rig.guestScene));
     assertLockstep(wave, "me-start");
@@ -3186,7 +3190,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // parallel; the one-realm harness must do that explicitly for the guest before starting the host's
       // PostME producer. Pumping transport alone while the guest is still on EggLapse correctly leaves the
       // terminal unacknowledged, but can never make that local phase advance.
-      persistInstalledClientMePins(rig.hostCtx);
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase", false));
       await withClient(rig.guestCtx, () =>
         driveClientPhaseQueueTo(rig.guestScene, "PostMysteryEncounterPhase", {
