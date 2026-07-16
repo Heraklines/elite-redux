@@ -8,35 +8,51 @@ import { confirmDefaultStarterTeam, selectOptionById, waitForSemanticSurface } f
 const TITLE_PHASE = /Start Phase TitlePhase/u;
 const CHALLENGE_PHASE = /Start Phase SelectChallengePhase/u;
 const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
-const GAME_OVER_SPEED_KEYS = [
-  "ArrowDown",
-  "ArrowDown",
-  "ArrowDown",
-  "Space",
-  "ArrowRight",
-  "ArrowRight",
-  "ArrowRight",
-  "ArrowRight",
-  "Backspace",
-  "ArrowUp",
-  "ArrowUp",
-  "ArrowUp",
-];
+const GAME_SPEEDS = [2, 3, 4, 5, 7, 10];
 
 async function raiseGameOverSpeed(rig) {
   for (const client of Object.values(rig.clients)) {
-    const cursor = client.evidence.cursor();
-    await client.sequence(GAME_OVER_SPEED_KEYS, "game-over-visible-speed-10x");
-    const attestation = await client.evidence.waitForCondition(sink => sink.findGameSpeed(10, cursor), {
+    const openCursor = client.evidence.cursor();
+    await selectOptionById(client, {
+      surfaceId: "title-menu",
+      targetId: "settings",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      timeoutMs: client.config.timeoutMs,
+    });
+    const initial = await client.evidence.waitForCondition(
+      sink =>
+        sink.events
+          .slice(openCursor)
+          .find(event => event.kind === "browser-render-profile" && GAME_SPEEDS.includes(event.observation?.gameSpeed)),
+      {
+        timeoutMs: client.config.timeoutMs,
+        description: `${client.label} visible Settings game-speed surface`,
+      },
+    );
+    const initialIndex = GAME_SPEEDS.indexOf(initial.observation.gameSpeed);
+    const rightPresses = GAME_SPEEDS.length - 1 - initialIndex;
+    if (rightPresses > 0) {
+      await client.sequence(new Array(rightPresses).fill("ArrowRight"), "game-over-visible-speed-10x");
+    }
+    const attestation = await client.evidence.waitForCondition(sink => sink.findGameSpeed(10, openCursor), {
       timeoutMs: client.config.timeoutMs,
       description: `${client.label} visible Settings Game Speed=10 attestation`,
     });
     client.evidence.record("game-over-speed-proof", {
       gameSpeed: attestation.observation.gameSpeed,
       eventIndex: attestation.index,
-      keys: GAME_OVER_SPEED_KEYS,
+      initialGameSpeed: initial.observation.gameSpeed,
+      rightPresses,
     });
     await client.checkpoint("game-over-speed-10x");
+    await client.press("Backspace", "close-game-over-speed-settings");
+    await selectOptionById(client, {
+      surfaceId: "title-menu",
+      targetId: "new-game",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      submit: false,
+      timeoutMs: client.config.timeoutMs,
+    });
   }
 }
 
