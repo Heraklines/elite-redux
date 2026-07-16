@@ -57,7 +57,10 @@ test("lobby quarantines one save-slot failure and releases a fresh run only thro
   assert.match(config, /"resume-scan-isolation"/u);
   assert.match(journeys, /async function resumeScanIsolation\(rig\)/u);
   assert.match(journeys, /origin\.hostname !== "127\.0\.0\.1" \|\| origin\.port !== "8788"/u);
-  assert.match(journeys, /resume scan slot=0 load failed[\s\S]*equal-revision co-op fork in slot 0/u);
+  assert.match(journeys, /const SLOT_ZERO_FORK_QUARANTINE/u);
+  assert.match(journeys, /equal-revision co-op fork in slot 0/u);
+  assert.match(journeys, /cloud head ancestry conflict for run \[0-9a-f-\]\{36\}/u);
+  assert.match(journeys, /waitFor\(SLOT_ZERO_FORK_QUARANTINE/u);
   assert.match(journeys, /fresh run changed or removed the exact quarantined local slot/u);
   assert.match(journeys, /event\.mode === "empty" && event\.slot !== 0/u);
   assert.match(journeys, /fresh launch mutated quarantined cloud slot zero/u);
