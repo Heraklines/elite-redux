@@ -11,12 +11,9 @@
 // therefore built DIFFERENT id / moveset / ability tables and desynced.
 //
 // The fix is `enMoveName` / `enSpeciesName` in `er-canonical-names.ts`, which
-// re-derive the SAME name key but pin the lookup to English (`{ lng: "en" }`).
-// This test proves the helpers ignore the ACTIVE language: we spy on `i18next.t`
-// so that an UNforced lookup returns a fake "localized" string, while a lookup
-// forced to English returns the real English name. The helpers must always
-// return the English value (so two clients agree regardless of locale), and an
-// English client sees the exact string it always did (zero regression).
+// read the static English catalogs directly. This test deliberately makes every
+// i18next lookup unavailable: the helpers must still return the canonical names
+// without consulting runtime translation state.
 //
 // Engine-free / fast: the helpers only read `move.id` / `species.speciesId`, so
 // minimal typed stubs suffice - no GameManager / ER init boot.
@@ -33,21 +30,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 /** Sentinel returned for any NON-English (unforced) `i18next.t` lookup. */
 const FAKE_LOCALIZED = "__LOCALIZED_NOT_ENGLISH__";
 
-/**
- * Spy on `i18next.t` to emulate a co-op client whose ACTIVE language is NOT
- * English: an unforced lookup yields {@linkcode FAKE_LOCALIZED}, while a lookup
- * forced with `{ lng: "en" }` resolves to the real English name. Returns the
- * captured original `t` so we can produce the genuine English values.
- */
-function stubNonEnglishActiveLanguage(): typeof i18next.t {
-  const realT = i18next.t.bind(i18next);
-  vi.spyOn(i18next, "t").mockImplementation(((key: string, options?: Record<string, unknown>) => {
-    if (options && options.lng === "en") {
-      return realT(key, options);
-    }
-    return FAKE_LOCALIZED;
-  }) as typeof i18next.t);
-  return realT;
+/** Emulate a production client where the English namespace is not loaded. */
+function stubUnavailableEnglishCatalog(): ReturnType<typeof vi.spyOn> {
+  return vi.spyOn(i18next, "t").mockReturnValue(FAKE_LOCALIZED);
 }
 
 const moveStub = (id: MoveId): Move => ({ id }) as unknown as Move;
@@ -69,34 +54,27 @@ describe("ER canonical (locale-invariant) name keys (#633)", () => {
   });
 
   it("enMoveName returns the ENGLISH name even when the active language is not English", () => {
-    const realT = stubNonEnglishActiveLanguage();
-    // Sanity: an unforced lookup (what `move.name` would use) is NOT English here.
+    const spyT = stubUnavailableEnglishCatalog();
     expect(i18next.t("move:pound.name")).toBe(FAKE_LOCALIZED);
-    // The helper forces English, so it agrees across every locale.
-    const expectedEnglish = String(realT("move:pound.name", { lng: "en" }));
-    expect(expectedEnglish).toBe("Pound");
     expect(enMoveName(moveStub(MoveId.POUND))).toBe("Pound");
     expect(enMoveName(moveStub(MoveId.TACKLE))).toBe("Tackle");
+    expect(spyT).toHaveBeenCalledTimes(1);
   });
 
   it("enSpeciesName returns the ENGLISH name even when the active language is not English", () => {
-    const realT = stubNonEnglishActiveLanguage();
+    const spyT = stubUnavailableEnglishCatalog();
     expect(i18next.t("pokemon:bulbasaur")).toBe(FAKE_LOCALIZED);
-    const expectedEnglish = String(realT("pokemon:bulbasaur", { lng: "en" }));
-    expect(expectedEnglish).toBe("Bulbasaur");
     expect(enSpeciesName(speciesStub(SpeciesId.BULBASAUR))).toBe("Bulbasaur");
+    expect(spyT).toHaveBeenCalledTimes(1);
   });
 
-  it('forces `{ lng: "en" }` on every helper lookup (so it never reads the active language)', () => {
-    const spyT = vi.spyOn(i18next, "t");
+  it("does not consult i18next even when translation lookup throws", () => {
+    const spyT = vi.spyOn(i18next, "t").mockImplementation(() => {
+      throw new Error("English namespace unavailable");
+    });
     enMoveName(moveStub(MoveId.POUND));
     enSpeciesName(speciesStub(SpeciesId.BULBASAUR));
-    expect(spyT).toHaveBeenCalledTimes(2);
-    for (const call of spyT.mock.calls) {
-      const options = call[1] as Record<string, unknown> | undefined;
-      expect(options).toBeDefined();
-      expect(options?.lng).toBe("en");
-    }
+    expect(spyT).not.toHaveBeenCalled();
   });
 
   it("enMoveName(MoveId.NONE) returns the empty string (edge case, no i18n lookup)", () => {
@@ -109,16 +87,14 @@ describe("ER canonical (locale-invariant) name keys (#633)", () => {
   it("ER-CUSTOM move (id >= 5000): returns the static draft `.name`, no i18n lookup, locale-independent", () => {
     // Active language is non-English; a custom move has no `move:` i18n entry, so
     // the helper must return its already-English draft name verbatim.
-    stubNonEnglishActiveLanguage();
-    const spyT = vi.spyOn(i18next, "t");
+    const spyT = stubUnavailableEnglishCatalog();
     expect(enMoveName(customMoveStub(5140, "Spine Breaker"))).toBe("Spine Breaker");
     // The custom branch never calls i18next.t (no `{ lng: "en" }` key to resolve).
     expect(spyT).not.toHaveBeenCalled();
   });
 
   it("ER-CUSTOM species (id not in SpeciesId enum): returns the static draft `.name`, locale-independent", () => {
-    stubNonEnglishActiveLanguage();
-    const spyT = vi.spyOn(i18next, "t");
+    const spyT = stubUnavailableEnglishCatalog();
     // 10000+ ids are ER customs with no `pokemon:` i18n key (e.g. "Unown Q").
     expect(enSpeciesName(customSpeciesStub(10859, "Unown Q"))).toBe("Unown Q");
     expect(enSpeciesName(customSpeciesStub(10001, "Phantowl"))).toBe("Phantowl");
