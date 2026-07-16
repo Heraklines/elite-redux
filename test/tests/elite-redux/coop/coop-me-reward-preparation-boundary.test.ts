@@ -111,7 +111,7 @@ describe("Mystery battle reward preparation boundary", () => {
 
     expect(relay).toContain("rewardOptionsKey(seq, reroll, rewardSurface)");
     expect(relay).toContain("rewardOptionsKey(msg.seq, msg.reroll, msg.rewardSurface)");
-    expect(relay).toContain("rewardOptionsRequestFromKey(key)");
+    expect(relay).toContain("parseCoopRewardOptionsKey(key)");
     expect(operation).toContain("rewardStreamKey(params.surface, params.pinned, params.rewardSurface)");
     expect(operation).toContain("coopRewardOperationActionSlot(params.pinned, ordinal, params.rewardSurface)");
     expect(operation).toContain(
