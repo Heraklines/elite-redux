@@ -53,6 +53,18 @@ for (const { file, fanout } of workflows) {
   });
 }
 
+test("journey bundle resolves one validated asset SHA even when the GitHub API is unavailable", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
+  const build = jobBlock(workflow, "browser-build");
+  assert.match(build, /gh api repos\/Heraklines\/er-assets\/commits\/main --jq \.sha/u);
+  assert.match(
+    build,
+    /git ls-remote https:\/\/github\.com\/Heraklines\/er-assets\.git refs\/heads\/main/u,
+    "the immutable public Git ref closes an authenticated API outage",
+  );
+  assert.match(build, /grep -Eq '\^\[0-9a-f\]\{40\}\$'/u, "either lookup path must produce an exact commit SHA");
+});
+
 test("journey starter fixtures require both the exact build and exact per-page URL gate", async () => {
   const [workflow, registry, starterHandler] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
