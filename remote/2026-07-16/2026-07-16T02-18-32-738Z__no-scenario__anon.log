@@ -1,0 +1,2035 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrmuoin9-ie81
+mode:     0  wave:15
+seed:     IBZLsRi8FKYCMqoXKYXAO6Hv
+party:    Skarmory(L16 43hp f0), Mew(L13 37hp f0), Dratini(L10 31hp f0), Hoppip(L10 30hp f0), Paras(L10 32hp f0), Deino(L9 31hp f0)
+enemy:    Geodude(L14), Onix(L14)
+
+----- COMMENT -----
+overlap from fighting the loser brock trainer that was added, more spasificly the hp bar is behind the bar that shows the amount of pokemon you have
+
+----- CONSOLE -----
+[02:09:01.154] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.154] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.154] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.155] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.155] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.158] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.159] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.160] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.160] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.160] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.160] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.160] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.161] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.161] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.161] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.161] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.161] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.161] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.162] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.162] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.164] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.164] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.164] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.164] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.165] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.165] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.165] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.165] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.166] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.166] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.166] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.166] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.166] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.169] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.170] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.170] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.171] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.171] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.171] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.172] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.172] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.172] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.172] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.174] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.174] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.174] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.174] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.175] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.175] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.175] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.176] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.176] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.177] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.177] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.177] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.177] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.177] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.178] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.178] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.178] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.179] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.179] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.179] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.179] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.179] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.180] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.180] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.181] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.181] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.181] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.181] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.181] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.182] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.182] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.182] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.182] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.182] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.183] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.185] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.186] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.192] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.192] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.192] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.192] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.192] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.193] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.193] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.193] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.193] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.193] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.193] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.194] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.194] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.194] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.195] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.195] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.202] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.203] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.203] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.203] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.203] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.203] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.203] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.204] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.204] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.204] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.204] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.204] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.205] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.205] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.205] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.210] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.211] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.211] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.211] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.211] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.211] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.211] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.211] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.212] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.212] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.212] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.212] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.212] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.212] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.213] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.219] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.220] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.221] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.221] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.221] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.222] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.222] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.222] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.222] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.223] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.223] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.223] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.223] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.223] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.224] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.225] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.225] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.226] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.226] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.226] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.226] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.227] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.227] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.227] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.227] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.227] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.228] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.228] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.228] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.228] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.235] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.235] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.235] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.236] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.237] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.237] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.237] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.238] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.238] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.238] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.238] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.238] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.239] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.239] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.239] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.245] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.245] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.245] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.245] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.246] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.246] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.247] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.247] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.247] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.247] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.247] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.247] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.248] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.248] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.248] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.254] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.254] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.254] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.255] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.255] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.255] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.255] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.256] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.256] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.256] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.256] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.256] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.257] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.257] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.262] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.262] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.263] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.264] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.264] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.264] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.264] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.265] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.265] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.265] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.265] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.265] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.266] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.266] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.266] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.271] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.272] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.272] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.272] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.272] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.273] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.273] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.273] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.273] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.274] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.274] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.274] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.275] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.276] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.276] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.277] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.278] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.278] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.278] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.278] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.278] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.279] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.279] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.279] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.280] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.280] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.280] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.281] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.281] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.281] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.286] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.287] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.287] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.287] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.287] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.288] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.288] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.288] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.289] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.289] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.289] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.289] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.289] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.290] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.290] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.295] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.295] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.296] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.296] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.296] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.297] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.297] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.297] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.297] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.298] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.298] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.298] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.298] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.298] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.299] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.304] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.305] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.306] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.306] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.306] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.306] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.306] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.307] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.307] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.307] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.308] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.308] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.308] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.309] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.309] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.314] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.315] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.315] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.315] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.315] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.315] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.316] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.316] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.316] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.316] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.318] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.318] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.318] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.319] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.319] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.324] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.325] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.325] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.325] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.325] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.326] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.326] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.326] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.326] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.326] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.327] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.327] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.327] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.328] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.328] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.328] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.335] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.336] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.336] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.336] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.336] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.337] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.337] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.337] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.337] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.338] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.338] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.338] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.339] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.339] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.339] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.344] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.345] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.345] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.346] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.346] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.346] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.346] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.346] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.347] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.347] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.347] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.347] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.348] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.348] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.348] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.353] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.354] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.354] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.354] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.354] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.354] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.355] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.355] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.355] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.355] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.355] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.356] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.356] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.356] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.356] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.362] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.362] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.362] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.362] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.363] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.363] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.363] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.363] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.363] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.363] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.363] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.363] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.364] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.364] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.364] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.370] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.370] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.370] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.370] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.370] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.370] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.370] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.371] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.371] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.371] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.371] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.371] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.372] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.372] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.372] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.377] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.378] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.378] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.378] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.379] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.379] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.379] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.379] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.380] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.380] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.380] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.380] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.380] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.381] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.381] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.387] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.387] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.387] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.387] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.388] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.388] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.388] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.388] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.388] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.388] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.389] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.389] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.389] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.389] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.389] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.395] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.395] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.395] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.395] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.395] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.395] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.396] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.396] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.396] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.396] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.396] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.397] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.397] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.397] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.397] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.403] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.403] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.403] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.404] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.404] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.404] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.404] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.404] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.404] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.404] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.404] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.405] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.405] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.405] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.405] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.407] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.407] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.407] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.407] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.408] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.408] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.408] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.408] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.408] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.408] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.410] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.410] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.410] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.410] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.411] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.412] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.412] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.413] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.413] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.413] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.413] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.413] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.414] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.414] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.414] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.415] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.415] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.415] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.415] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.415] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.415] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.416] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.416] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.416] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.416] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.419] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.419] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.419] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.420] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.420] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.420] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.420] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.420] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.420] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.420] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.421] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.421] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.421] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.422] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.423] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.423] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.423] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.424] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.424] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.424] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.424] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.425] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.425] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.425] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.426] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.426] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.426] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.427] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.427] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.427] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.427] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.428] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.428] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.428] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.428] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.429] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.429] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.429] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.430] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.430] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.431] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.431] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.431] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.432] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.432] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.432] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.432] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.433] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.436] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.436] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.437] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.437] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.437] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.437] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.438] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.439] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.439] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.439] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.439] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.439] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.440] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.440] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.441] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.441] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.441] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.447] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.447] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.447] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.448] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.448] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.448] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.448] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.448] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.449] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.449] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.449] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.449] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.450] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.452] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.453] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.453] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.453] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.454] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.454] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.454] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.455] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.455] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.456] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.456] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.456] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.456] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.456] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.456] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:01.457] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:09:55.347] WARN: Missing animation: pkmn__er__snorunt_redux
+[02:10:45.688] LOG: %cStart Phase SelectModifierPhase color:green;
+[02:10:45.689] LOG: Wave Seed: VOgY_vESXfPZ~|eXfeN\CU 13
+[02:10:45.696] LOG: 2 0 [3,4,5,6,7,8,9,10,22]
+[02:10:45.697] LOG: {"id":"FULL_HEAL","localeKey":"modifierType:ModifierType.FULL_HEAL","iconImage":"full_heal","soundName":"se/restore","tier":1} 
+[02:10:45.697] LOG: 0 0 [3,4,5]
+[02:10:45.697] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:10:45.698] LOG: 7 3 [3,4,5]
+[02:10:45.698] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[02:10:45.702] LOG: 7 3 [3,4,5]
+[02:10:45.702] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[02:10:45.703] LOG: 0 0 [3,4,5]
+[02:10:45.703] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:10:45.703] LOG: 0 0 [3,4,5]
+[02:10:45.704] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:10:45.704] LOG: 0 0 [3,4,5]
+[02:10:45.704] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:10:45.705] LOG: 0 0 [3,4,5]
+[02:10:45.705] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:10:45.706] LOG: 0 0 [3,4,5]
+[02:10:45.706] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:10:45.706] LOG: 1 0 [3,4,5]
+[02:10:45.706] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[02:10:45.707] LOG: 0 0 [3,4,5]
+[02:10:45.707] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:10:45.708] LOG: 8 3 [3,4,5]
+[02:10:45.708] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[02:10:45.795] WARN: Missing animation: pkmn__1
+[02:10:52.157] LOG: %cStart Phase NewBattlePhase color:green;
+[02:10:52.157] LOG: Wave Seed: WPhZ`wFTYgQ[}fYgfO]DV 14
+[02:10:52.158] LOG: Starting trainer pool tier: COMMON
+[02:10:52.171] LOG: %cStart Phase MessagePhase color:green;
+[02:10:52.575] LOG: %cStart Phase ReturnPhase color:green;
+[02:10:52.757] LOG: %cStart Phase ShowTrainerPhase color:green;
+[02:10:52.938] LOG: %cStart Phase NextEncounterPhase color:green;
+[02:10:52.944] LOG: ER #419: elite BST cap (460 @ w14) - replacing Sandslash (470) with Sandshrew (320)
+[02:10:53.006] LOG: Pokemon: Foe Sandshrew | Species ID: 27 | Level: 14 | Nature: Quirky (-)
+[02:10:53.006] LOG: Stats (IVs): HP: 47 (31), Atk: 27 (31), Def: 27 (31), Spatk: 14 (31), Spdef: 18 (31), Spd: 17 (31)
+[02:10:53.006] LOG: Ability: Sand Veil | Passive Ability: Earthbound 
+[02:10:53.006] LOG: Moveset: ["Hail","Ice Ball (P)","Iron Head","Steamroller"]
+[02:10:53.008] LOG: ER #419: elite BST cap (460 @ w14) - replacing Sunflora (470) with Sunkern (305)
+[02:10:53.074] LOG: Pokemon: Foe Sunkern | Species ID: 191 | Level: 14 | Nature: Bold (+Def/-Atk)
+[02:10:53.074] LOG: Stats (IVs): HP: 42 (31), Atk: 22 (31), Def: 19 (31), Spatk: 24 (31), Spdef: 26 (31), Spd: 14 (31)
+[02:10:53.075] LOG: Ability: Grassy Surge | Passive Ability: Guilt Trip 
+[02:10:53.075] LOG: Moveset: ["Seed Flare","Hidden Power","Synthesis","Mystical Fire"]
+[02:10:57.303] LOG: {"id":"BERRY","localeKey":"","iconImage":"enigma_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":2} (enemy)
+[02:10:57.303] LOG: Battle Seed: fU1gnapqIQyHnGsC
+[02:10:57.304] LOG: Applied HP Up (enemy)
+[02:10:57.305] LOG: Applied HP Up (enemy)
+[02:10:57.306] LOG: Applied HP Up (enemy)
+[02:10:57.308] LOG: Generated AI funcs
+[02:10:58.372] DEBUG: Session data saved to slot 4!
+[02:10:58.372] LOG: Applied HP Up (enemy)
+[02:10:58.373] LOG: Applied HP Up (enemy)
+[02:10:58.376] LOG: Wave Seed: WPhZ`wFTYgQ[}fYgfO]DV 14
+[02:10:58.589] LOG: Twins Ann & Anne
+[02:10:59.792] LOG: Dialogue saved as seen: dialogue:twins.encounter.2
+[02:10:59.875] LOG: Twins Ann & Anne
+[02:11:02.474] LOG: %cStart Phase SummonPhase color:green;
+[02:11:02.475] LOG: Ann
+[02:11:02.673] LOG: Applied HP Up (enemy)
+[02:11:02.675] LOG: Applied HP Up (enemy)
+[02:11:02.740] WARN: cry/27 not found
+[02:11:02.872] LOG: %cStart Phase SummonPhase color:green;
+[02:11:02.873] LOG: Anne
+[02:11:03.155] LOG: Applied HP Up (enemy)
+[02:11:03.156] LOG: Applied HP Up (enemy)
+[02:11:03.190] WARN: cry/191 not found
+[02:11:03.322] LOG: %cStart Phase SummonPhase color:green;
+[02:11:03.639] LOG: Applied HP Up 
+[02:11:03.640] LOG: Applied Zinc 
+[02:11:03.788] LOG: %cStart Phase ShinySparklePhase color:green;
+[02:11:03.905] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[02:11:03.908] LOG: %cStart Phase SummonPhase color:green;
+[02:11:04.224] LOG: Applied HP Up 
+[02:11:04.224] LOG: Applied Zinc 
+[02:11:04.388] LOG: %cStart Phase ShinySparklePhase color:green;
+[02:11:04.522] LOG: %cStart Phase InitEncounterPhase color:green;
+[02:11:04.534] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:04.534] LOG: Ran PSP for: Mew
+[02:11:04.545] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:04.555] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:04.561] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:04.561] LOG: Ran PSP for: Skarmory
+[02:11:04.570] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:04.578] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:04.580] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:04.581] LOG: Ran PSP for: Sandshrew
+[02:11:04.591] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:04.593] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:04.593] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:04.593] LOG: Ran PSP for: Sunkern
+[02:11:04.596] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:04.622] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:11:04.875] LOG: %cStart Phase CommonAnimPhase color:green;
+[02:11:05.421] LOG: %cStart Phase MessagePhase color:green;
+[02:11:05.771] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:11:05.860] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:05.860] LOG: %cStart Phase TurnInitPhase color:green;
+[02:11:05.861] LOG: %cStart Phase CommandPhase color:green;
+[02:11:07.847] LOG: Move: BEAK_BLAST Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Skarmory
+[02:11:07.854] LOG: %cStart Phase SelectTargetPhase color:green;
+[02:11:09.209] LOG: %cStart Phase CommandPhase color:green;
+[02:11:12.528] LOG: Move: ASTRAL_BARRAGE Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Mew
+[02:11:12.533] LOG: %cStart Phase SelectTargetPhase color:green;
+[02:11:12.722] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:11:12.847] LOG: Move Pool: ["Hail","Ice Ball (P)","Iron Head","Steamroller"]
+[02:11:12.848] LOG: Move Scores: [0,4.7368421052631575,5.263157894736842,33.673469387755105]
+[02:11:12.848] LOG: Sorted Move Pool: ["Steamroller","Iron Head","Ice Ball (P)","Hail"]
+[02:11:12.848] LOG: Chosen Move: Steamroller
+[02:11:12.848] LOG: ER AI: experimental brain (sharpness 1)
+[02:11:12.849] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:11:12.855] LOG: Applied X Sp. Def 
+[02:11:12.859] LOG: Applied X Sp. Def 
+[02:11:12.864] LOG: Applied X Sp. Def 
+[02:11:12.872] LOG: Applied X Sp. Def 
+[02:11:12.879] LOG: Applied X Sp. Def 
+[02:11:12.884] LOG: Applied X Sp. Def 
+[02:11:12.953] LOG: Applied X Sp. Def 
+[02:11:12.956] LOG: Applied X Sp. Def 
+[02:11:12.960] LOG: Applied X Sp. Def 
+[02:11:12.961] LOG: Move Pool: ["Seed Flare","Hidden Power","Synthesis","Mystical Fire"]
+[02:11:12.961] LOG: Move Scores: [5.073979591836735,1.776315789473684,-7,2.066326530612245]
+[02:11:12.961] LOG: Sorted Move Pool: ["Seed Flare","Mystical Fire","Hidden Power","Synthesis"]
+[02:11:12.961] LOG: Chosen Move: Seed Flare
+[02:11:12.962] LOG: ER AI: experimental brain (sharpness 1)
+[02:11:12.962] LOG: %cStart Phase TurnStartPhase color:green;
+[02:11:13.006] LOG: %cStart Phase MovePhase color:green;
+[02:11:13.006] LOG: %cUser: Mew
+Move: ASTRAL_BARRAGE
+Use Mode: NORMAL color:orchid
+[02:11:13.024] LOG: %cStart Phase MessagePhase color:green;
+[02:11:13.086] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:11:16.610] LOG: crit stage: +0
+[02:11:16.615] LOG: Move: Astral Barrage | Base damage: 48.08 | Power: 180 | Source attack: 32 | Target defense: 17
+[02:11:16.618] LOG: Move: Astral Barrage | Attack damage: 31
+[02:11:16.622] LOG: crit stage: +0
+[02:11:16.626] LOG: Move: Astral Barrage | Base damage: 34.64 | Power: 180 | Source attack: 32 | Target defense: 24
+[02:11:16.627] LOG: Move: Astral Barrage | Attack damage: 24
+[02:11:16.629] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:11:16.819] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:11:17.047] LOG: %cStart Phase MoveEndPhase color:green;
+[02:11:17.056] LOG: %cStart Phase MovePhase color:green;
+[02:11:17.056] LOG: %cUser: Skarmory
+Move: BEAK_BLAST
+Use Mode: NORMAL color:orchid
+[02:11:17.089] LOG: %cStart Phase MessagePhase color:green;
+[02:11:17.282] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:11:20.780] LOG: crit stage: +0
+[02:11:20.785] LOG: Move: Beak Blast | Base damage: 23.77777777777778 | Power: 100 | Source attack: 35 | Target defense: 27
+[02:11:20.786] LOG: Move: Beak Blast | Attack damage: 61
+[02:11:20.789] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:11:21.011] LOG: %cStart Phase MessagePhase color:green;
+[02:11:21.305] LOG: %cStart Phase FaintPhase color:green;
+[02:11:21.317] WARN: cry/191 not found
+[02:11:21.397] LOG: %cStart Phase MessagePhase color:green;
+[02:11:43.483] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:11:43.742] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:11:43.751] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:11:43.751] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:11:43.906] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:11:44.238] LOG: %cStart Phase MessagePhase color:green;
+[02:11:44.657] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:11:44.664] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:11:44.664] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:11:44.854] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:11:45.191] LOG: %cStart Phase MessagePhase color:green;
+[02:11:45.595] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:11:45.595] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:11:45.680] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:11:45.881] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:11:45.881] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:11:46.055] LOG: %cStart Phase VictoryPhase color:green;
+[02:11:46.057] LOG: %cStart Phase ExpPhase color:green;
+[02:11:46.058] LOG: Applied Super EXP. Charm 
+[02:11:46.058] LOG: Applied EXP. Charm 
+[02:12:05.287] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:12:05.287] LOG: Applied Super EXP. Charm 
+[02:12:05.287] LOG: Applied EXP. Charm 
+[02:12:05.288] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:12:05.288] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:12:05.289] LOG: Applied Super EXP. Charm 
+[02:12:05.289] LOG: Applied EXP. Charm 
+[02:12:05.290] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:12:05.290] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:12:05.290] LOG: Applied Super EXP. Charm 
+[02:12:05.290] LOG: Applied EXP. Charm 
+[02:12:05.291] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:12:05.291] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:12:05.291] LOG: Applied Super EXP. Charm 
+[02:12:05.291] LOG: Applied EXP. Charm 
+[02:12:05.292] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:12:05.292] LOG: %cStart Phase MoveEndPhase color:green;
+[02:12:05.294] LOG: %cStart Phase MovePhase color:green;
+[02:12:05.295] LOG: %cUser: Sandshrew
+Move: STEAMROLLER
+Use Mode: NORMAL color:orchid
+[02:12:05.317] LOG: %cStart Phase MessagePhase color:green;
+[02:12:05.528] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:12:07.114] LOG: crit stage: +0
+[02:12:07.120] LOG: Move: Steamroller | Base damage: 11.2625 | Power: 65 | Source attack: 30 | Target defense: 32
+[02:12:07.122] LOG: Move: Steamroller | Attack damage: 22
+[02:12:07.134] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:12:07.278] LOG: %cStart Phase MessagePhase color:green;
+[02:12:07.604] LOG: %cStart Phase MoveEndPhase color:green;
+[02:12:07.605] LOG: %cStart Phase MovePhase color:green;
+[02:12:07.605] LOG: %cStart Phase MoveEndPhase color:green;
+[02:12:07.606] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:12:07.606] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:12:07.606] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:12:07.607] LOG: %cStart Phase BerryPhase color:green;
+[02:12:07.616] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:12:07.625] LOG: %cStart Phase TurnEndPhase color:green;
+[02:12:07.639] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[02:12:07.639] LOG: %cStart Phase PokemonHealPhase color:green;
+[02:12:08.202] LOG: %cStart Phase MessagePhase color:green;
+[02:12:08.540] LOG: %cStart Phase PokemonHealPhase color:green;
+[02:12:09.068] LOG: %cStart Phase MessagePhase color:green;
+[02:12:09.406] LOG: %cStart Phase TurnInitPhase color:green;
+[02:12:09.407] LOG: %cStart Phase CommandPhase color:green;
+[02:12:28.579] LOG: Move: CEASELESS_EDGE Move targets: {"targets":[2,1],"multiple":false} 
+Player Pokemon: Skarmory
+[02:12:28.586] LOG: %cStart Phase SelectTargetPhase color:green;
+[02:12:29.350] LOG: %cStart Phase CommandPhase color:green;
+[02:12:32.155] LOG: Move: EXPANDING_FORCE Move targets: {"targets":[2,0],"multiple":false} 
+Player Pokemon: Mew
+[02:12:32.159] LOG: %cStart Phase SelectTargetPhase color:green;
+[02:12:33.126] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:12:33.172] LOG: Battle Seed: fU1gnapqIQyHnGsC
+[02:12:33.261] LOG: Move Pool: ["Hail","Ice Ball (P)","Iron Head","Steamroller"]
+[02:12:33.261] LOG: Move Scores: [0,0.1776315789473684,2.984693877551021,0.19736842105263155]
+[02:12:33.261] LOG: Sorted Move Pool: ["Iron Head","Steamroller","Ice Ball (P)","Hail"]
+[02:12:33.261] LOG: Chosen Move: Iron Head
+[02:12:33.261] LOG: ER AI: experimental brain (sharpness 1)
+[02:12:33.261] LOG: %cStart Phase TurnStartPhase color:green;
+[02:12:33.281] LOG: %cStart Phase MovePhase color:green;
+[02:12:33.281] LOG: %cUser: Mew
+Move: EXPANDING_FORCE
+Use Mode: NORMAL color:orchid
+[02:12:33.296] LOG: %cStart Phase MessagePhase color:green;
+[02:12:33.786] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:12:37.421] LOG: crit stage: +0
+[02:12:37.426] LOG: Move: Expanding Force | Base damage: 26.576 | Power: 96 | Source attack: 32 | Target defense: 17
+[02:12:37.427] LOG: Move: Expanding Force | Attack damage: 36
+[02:12:37.429] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:12:37.591] LOG: %cStart Phase FaintPhase color:green;
+[02:12:37.595] WARN: cry/27 not found
+[02:12:37.753] LOG: %cStart Phase MessagePhase color:green;
+[02:12:43.678] LOG: %cStart Phase VictoryPhase color:green;
+[02:12:43.685] LOG: %cStart Phase ExpPhase color:green;
+[02:12:43.685] LOG: Applied Super EXP. Charm 
+[02:12:43.685] LOG: Applied EXP. Charm 
+[02:12:45.172] LOG: %cStart Phase LevelUpPhase color:green;
+[02:13:05.920] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:13:05.920] LOG: Applied Super EXP. Charm 
+[02:13:05.920] LOG: Applied EXP. Charm 
+[02:13:05.921] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:13:05.921] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:13:05.922] LOG: Applied Super EXP. Charm 
+[02:13:05.922] LOG: Applied EXP. Charm 
+[02:13:05.923] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:13:05.923] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:13:05.923] LOG: Applied Super EXP. Charm 
+[02:13:05.923] LOG: Applied EXP. Charm 
+[02:13:05.924] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:13:05.924] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:13:05.924] LOG: Applied Super EXP. Charm 
+[02:13:05.925] LOG: Applied EXP. Charm 
+[02:13:05.925] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:13:05.925] LOG: %cStart Phase MoveEndPhase color:green;
+[02:13:05.927] LOG: %cStart Phase MovePhase color:green;
+[02:13:05.928] LOG: %cUser: Skarmory
+Move: CEASELESS_EDGE
+Use Mode: NORMAL color:orchid
+[02:13:05.932] LOG: %cStart Phase MessagePhase color:green;
+[02:13:06.139] LOG: %cStart Phase MessagePhase color:green;
+[02:13:06.486] LOG: %cStart Phase MoveEndPhase color:green;
+[02:13:06.486] LOG: %cStart Phase MovePhase color:green;
+[02:13:06.486] LOG: %cStart Phase MoveEndPhase color:green;
+[02:13:06.487] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:13:06.487] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:13:06.487] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:13:06.487] LOG: %cStart Phase BerryPhase color:green;
+[02:13:06.489] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:13:06.490] LOG: %cStart Phase TurnEndPhase color:green;
+[02:13:06.495] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[02:13:06.495] LOG: %cStart Phase PokemonHealPhase color:green;
+[02:13:07.056] LOG: %cStart Phase MessagePhase color:green;
+[02:13:07.369] LOG: %cStart Phase BattleEndPhase color:green;
+[02:13:07.370] LOG: Battle Score: 95 (2 Turns x0.84)
+[02:13:07.371] LOG: Total Score: 1065
+[02:13:07.401] LOG: Applied HP Up 
+[02:13:07.401] LOG: Applied Zinc 
+[02:13:07.421] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[02:13:07.425] LOG: Twins Ann & Anne
+[02:13:32.225] LOG: Twins Ann
+[02:13:33.356] LOG: Dialogue saved as seen: dialogue:twins.victory.2
+[02:13:33.356] LOG: %cStart Phase MoneyRewardPhase color:green;
+[02:13:34.068] LOG: %cStart Phase ModifierRewardPhase color:green;
+[02:13:34.793] LOG: %cStart Phase ModifierRewardPhase color:green;
+[02:13:35.534] LOG: %cStart Phase ModifierRewardPhase color:green;
+[02:13:36.553] LOG: %cStart Phase EggLapsePhase color:green;
+[02:14:14.992] LOG: %cStart Phase MessagePhase color:green;
+[02:14:15.707] LOG: %cStart Phase EggSummaryPhase color:green;
+[02:14:15.707] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.712] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.713] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.713] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.713] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.713] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.713] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.713] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.715] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.716] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.717] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.717] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.717] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.717] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.717] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.718] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.718] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.718] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.718] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.718] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.718] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.719] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.719] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.719] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.719] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.720] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.720] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.720] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.720] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.720] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.721] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.721] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.721] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.722] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.722] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.722] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.722] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.722] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.722] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.723] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.723] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.723] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.723] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.723] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.724] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.724] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.724] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.724] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.724] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.724] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.725] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.725] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.725] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.725] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.725] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.726] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.726] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.726] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.726] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.726] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.726] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.727] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.727] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.727] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.727] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.727] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.727] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.728] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.728] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.728] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.728] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.728] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.729] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.729] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.729] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.729] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.730] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.730] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.730] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.730] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.730] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.733] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.733] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.734] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.734] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.734] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.734] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.734] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.735] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.735] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.735] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.735] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.736] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.736] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.736] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.736] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.737] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.737] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.737] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.738] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.738] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.738] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.738] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.739] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.739] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.740] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.743] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.747] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.755] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.756] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.756] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.757] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.757] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.758] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.758] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.759] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.759] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.760] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.760] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.761] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.771] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.772] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.773] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.773] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.773] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.773] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.774] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.774] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.774] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.775] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.775] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.775] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.775] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.775] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.776] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.776] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.776] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.776] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.777] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.777] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.777] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.778] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.778] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.778] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.779] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.779] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.779] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.779] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.779] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.779] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.780] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.780] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.780] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.782] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.783] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.783] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.784] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.784] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.784] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.785] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.785] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.785] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.785] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.786] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.786] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.786] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.787] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.787] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.787] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.788] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.788] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.788] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.788] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.789] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.789] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.789] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.789] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.789] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.790] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.790] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.790] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.791] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.791] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.791] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.791] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.792] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.792] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.793] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.793] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.793] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.793] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.794] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.794] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.794] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.794] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.794] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.795] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.795] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.795] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.796] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.796] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.796] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.797] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.797] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.797] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.798] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.798] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.798] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.799] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.799] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.800] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.800] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.800] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.801] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.801] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.801] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.801] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.801] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.802] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.802] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.802] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.802] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.802] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.803] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.803] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.803] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.803] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.803] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.804] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.805] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.805] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.805] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.806] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.806] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.807] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.807] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.807] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.807] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.807] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.808] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.808] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.808] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.808] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.808] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.808] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.809] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.809] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.809] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.809] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.810] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.810] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.810] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.811] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.811] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.812] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.812] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.812] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.812] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.812] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.812] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.813] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.813] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.813] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.813] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.815] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.816] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.816] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.817] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.818] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.818] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.818] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.819] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.819] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.819] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.819] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.819] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.820] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.820] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.820] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.821] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.821] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.821] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.821] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.821] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.822] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.822] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.822] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.823] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.823] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.824] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.824] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.824] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.824] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.824] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.825] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.825] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.825] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.825] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.826] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.826] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.826] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.826] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.826] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.827] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.827] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.827] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.827] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.828] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.828] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.828] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.829] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.829] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.829] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.829] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.829] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.830] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.830] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.830] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.830] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.831] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.832] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.834] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.835] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.836] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.836] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.836] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.837] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.837] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.837] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.838] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.838] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.838] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.839] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.839] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.839] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.839] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.839] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.839] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.840] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.840] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.840] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.841] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.841] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.841] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.841] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.842] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.842] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.842] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.842] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.843] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.843] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.843] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.844] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.844] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.844] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.844] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.844] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.845] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.845] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.845] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.845] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.846] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.846] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.846] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.846] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.847] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.850] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.851] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.852] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.852] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.852] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.852] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.853] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.853] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.853] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.854] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.854] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.854] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.854] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.854] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.855] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.855] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.855] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.855] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.856] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.856] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.856] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.856] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.857] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.857] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.857] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.858] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.858] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.858] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.859] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.859] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.859] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.859] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.859] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.860] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.860] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.860] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.860] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.861] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.861] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.861] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.862] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.862] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.862] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.862] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.863] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.863] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.868] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.869] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.871] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.871] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.871] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.872] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.872] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.872] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.872] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.872] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.873] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.873] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.873] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.873] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.874] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.874] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.875] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.875] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.875] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.875] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.875] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.876] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.876] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.876] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.876] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.876] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.877] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.877] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.877] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.877] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.878] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.878] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.878] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.878] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.878] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.879] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.879] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.879] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.879] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.879] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.880] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.880] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.880] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.880] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.882] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.883] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.884] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.884] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.884] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.884] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.884] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.885] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.885] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.885] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.886] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.886] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.886] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.886] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.886] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.887] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.887] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.887] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.887] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.888] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.888] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.888] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.888] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.889] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.889] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.889] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.889] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.890] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.890] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.890] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.890] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.890] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.891] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.891] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.891] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.891] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.892] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.892] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.892] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.893] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.893] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.893] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.893] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.894] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.894] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.894] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.895] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.895] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.895] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.896] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.896] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.896] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.896] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.896] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.897] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.897] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.897] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.899] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.900] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.900] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.901] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.901] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.901] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.901] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.902] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.902] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.902] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.902] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.903] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.903] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.903] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.903] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.904] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.904] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.904] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.904] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.905] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.905] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.905] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.905] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.905] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.906] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.906] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.906] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.906] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.907] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.907] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.907] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.908] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.908] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.908] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.908] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.908] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.909] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.909] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.909] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.909] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.910] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.910] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.910] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.910] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.910] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.911] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.911] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.911] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.912] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.912] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.912] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.912] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.912] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.913] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.913] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.913] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.913] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.913] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.914] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.916] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.917] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.918] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.918] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.918] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.918] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.919] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.919] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.919] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.919] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.920] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.920] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.920] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.920] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.921] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.921] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.921] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.921] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.922] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.922] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.922] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.922] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.922] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.923] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.923] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.923] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.923] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.923] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.924] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.924] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.924] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.924] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.925] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.925] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.925] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.925] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.926] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.926] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.926] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.926] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.927] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.927] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.927] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.927] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.928] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.928] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.928] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.928] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.929] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.929] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.929] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.929] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.929] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.930] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.930] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.930] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.934] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.934] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.935] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.935] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.935] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.935] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.935] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.936] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.936] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.936] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.936] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.936] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.937] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.937] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.937] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.937] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.937] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.938] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.938] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.938] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.938] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.939] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.939] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.939] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.940] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.940] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.940] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.941] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.941] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.941] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.941] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.942] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.942] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.942] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.943] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.943] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.943] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.943] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.944] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.944] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.944] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.944] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.945] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.945] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.945] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.945] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.946] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.946] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.946] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.946] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.947] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.947] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.948] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.950] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.950] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.951] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.951] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.951] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.952] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.952] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.952] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.952] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.952] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.952] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.953] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.953] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.953] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.953] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.954] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.954] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.954] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.954] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.955] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.955] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.955] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.955] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.955] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.956] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.956] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.956] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.956] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.957] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.957] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.957] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.957] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.958] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.958] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.958] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.959] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.959] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.959] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.959] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.960] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.960] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.960] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.960] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.960] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.961] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.961] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.961] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.962] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.962] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.962] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.962] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.962] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.963] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.963] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.963] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.963] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.963] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.964] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.966] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.967] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.967] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.967] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.967] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.968] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.968] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.968] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.968] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.969] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.969] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.969] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.970] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.970] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.970] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.971] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.971] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.972] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.972] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.972] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.972] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.973] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.973] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.973] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.974] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.974] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.974] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.974] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.975] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.975] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.976] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.976] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.976] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.976] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.977] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.977] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.977] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.977] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.978] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.978] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.978] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.979] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.979] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.979] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.980] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.980] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.980] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.980] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.983] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.984] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.984] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.985] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.985] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.985] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.985] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.986] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.986] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.986] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.986] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.986] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.987] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.987] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.987] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.988] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.988] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.988] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.988] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.988] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.989] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.989] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.989] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.990] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.990] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.991] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.991] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.992] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.992] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.992] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.993] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.993] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.993] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.994] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.994] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.994] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.994] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.995] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.995] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.995] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.995] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.996] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.996] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.996] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.996] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.997] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.997] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:15.999] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.000] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.001] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.001] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.001] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.002] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.002] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.002] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.003] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.003] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.003] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.003] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.003] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.004] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.004] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.004] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.004] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.004] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.005] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.005] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.005] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.006] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.006] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.006] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.006] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.007] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.007] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.007] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.008] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.008] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.008] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.009] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.009] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.009] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.010] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.010] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.010] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.011] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.011] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.011] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.011] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.012] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.012] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.012] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.012] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.012] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.013] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.013] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.013] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.013] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.014] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.016] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.017] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.017] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.017] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.018] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.018] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.018] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.019] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.019] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.019] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.020] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.020] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.020] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.020] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.021] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.021] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.021] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.021] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.022] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.022] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.022] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.022] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.023] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.023] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.023] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.024] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.024] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.024] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.024] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.024] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.025] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.025] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.025] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.026] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.026] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.026] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.026] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.026] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.027] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.027] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.027] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.027] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.028] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.028] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.029] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.029] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.029] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.029] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.030] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.030] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.030] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.030] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.035] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.035] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.036] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.036] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.036] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.037] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.037] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.037] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.037] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.038] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.038] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.039] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.039] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.039] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.039] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.040] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.040] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.040] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.040] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.041] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.041] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.041] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.042] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.042] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.042] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.042] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.043] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.043] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.043] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.044] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.044] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.044] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.045] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.045] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.046] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.046] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.046] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.047] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.047] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.052] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.052] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.053] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.053] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.053] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.054] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.054] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.055] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.055] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.055] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.055] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.056] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.056] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.056] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.057] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.057] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.057] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.058] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.058] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:14:16.058] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[02:15:10.779] WARN: Missing animation: pkmn__er__spearow_redux
+[02:15:59.407] LOG: %cStart Phase SelectModifierPhase color:green;
+[02:15:59.409] LOG: Wave Seed: WPhZ`wFTYgQ[}fYgfO]DV 14
+[02:15:59.433] LOG: 0 0 [2,3,4,5,6,7,8,9,10,22]
+[02:15:59.433] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[02:15:59.434] LOG: 0 0 [2,3,4,5,6,7,8,9,10,22]
+[02:15:59.434] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[02:15:59.435] LOG: 14 9 [2,3,4,5,6,7,8,9,10,22]
+[02:15:59.435] LOG: GREAT 1
+[02:15:59.435] LOG: 0 0 [2,3,4,5,6,7,8,9,10,22]
+[02:15:59.435] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[02:15:59.436] LOG: 0 0 [2,3,4,5,6,7,8,9,10,22]
+[02:15:59.436] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[02:15:59.436] LOG: 16 9 [2,3,4,5,6,7,8,9,10,22]
+[02:15:59.436] LOG: {"id":"ER_UPGRADED_MAP","localeKey":"","iconImage":"map","iconTint":16765514,"soundName":"se/restore","tier":1} 
+[02:15:59.437] LOG: 8 3 [3,4,5]
+[02:15:59.437] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} 
+[02:15:59.534] WARN: Missing animation: pkmn__4
+[02:16:03.701] LOG: Applied HP Up 
+[02:16:03.701] LOG: Applied Zinc 
+[02:16:03.734] LOG: %cStart Phase NewBattlePhase color:green;
+[02:16:03.735] LOG: Wave Seed: XQi[axGUZhR\~gZhgP^EW 15
+[02:16:03.745] LOG: %cStart Phase NextEncounterPhase color:green;
+[02:16:03.812] LOG: Pokemon: Foe Geodude | Species ID: 74 | Level: 14 | Nature: Naughty (+Atk/-SpDef)
+[02:16:03.812] LOG: Stats (IVs): HP: 35 (4), Atk: 35 (28), Def: 36 (25), Spatk: 16 (22), Spdef: 14 (21), Spd: 13 (24)
+[02:16:03.812] LOG: Ability: Fort Knox | Passive Ability: Let's Roll 
+[02:16:03.812] LOG: Moveset: ["Stealth Rock","Rock Slide","Rollout (P)","Metronome"]
+[02:16:03.885] LOG: Pokemon: Foe Crystal Onix | Species ID: 95 | Level: 14 | Nature: Lonely (+Atk/-Def)
+[02:16:03.886] LOG: Stats (IVs): HP: 42 (5), Atk: 29 (10), Def: 45 (5), Spatk: 16 (24), Spdef: 23 (23), Spd: 25 (9)
+[02:16:03.886] LOG: Ability: Sand Stream | Passive Ability: Sturdy 
+[02:16:03.886] LOG: Moveset: ["Dragon Dance","Counter","Seismic Slam","Rock Slide"]
+[02:16:04.975] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 1/2 with cache-buster
+[02:16:05.109] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 2/2 via fastly mirror + cache-buster
+[02:16:06.261] ERROR: [asset-retry] PERMANENT load failure key=PRAS-Dragon Dance BG url=images/battle_anims/PRAS-Dragon Dance BG.png
+[02:16:06.675] LOG: {"id":"BERRY","localeKey":"","iconImage":"petaya_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":5} (enemy)
+[02:16:06.675] LOG: {"id":"BERRY","localeKey":"","iconImage":"lansat_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":8} (enemy)
+[02:16:06.676] LOG: Battle Seed: GmToLpkf1uGhTjkP
+[02:16:06.677] LOG: Applied Zinc (enemy)
+[02:16:06.678] LOG: Applied Zinc (enemy)
+[02:16:06.690] LOG: Generated AI funcs
+[02:16:07.609] DEBUG: Session data saved to slot 4!
+[02:16:07.611] LOG: Applied Zinc (enemy)
+[02:16:07.619] LOG: Wave Seed: XQi[axGUZhR\~gZhgP^EW 15
+[02:16:07.839] LOG: brock Loser
+[02:16:11.487] LOG: Dialogue saved as seen: dialogue:brock.encounter.2
+[02:16:11.607] LOG: brock Loser
+[02:16:12.726] LOG: %cStart Phase SummonPhase color:green;
+[02:16:12.727] LOG: Loser
+[02:16:13.074] LOG: Applied Zinc (enemy)
+[02:16:13.122] WARN: cry/74 not found
+[02:16:13.288] LOG: %cStart Phase ReturnPhase color:green;
+[02:16:13.439] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[02:16:13.525] LOG: %cStart Phase InitEncounterPhase color:green;
+[02:16:13.526] LOG: %cStart Phase PostSummonPhase color:green;
+[02:16:13.526] LOG: Ran PSP for: Geodude
+[02:16:13.528] LOG: %cStart Phase PostSummonPhase color:green;
+[02:16:13.528] LOG: %cStart Phase PostSummonPhase color:green;
+[02:16:13.531] LOG: %cStart Phase MovePhase color:green;
+[02:16:13.532] LOG: %cUser: Geodude
+Move: DEFENSE_CURL
+Use Mode: FOLLOW_UP color:orchid
+[02:16:13.538] LOG: %cStart Phase MessagePhase color:green;
+[02:16:13.753] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:16:15.088] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:16:15.411] LOG: %cStart Phase MessagePhase color:green;
+[02:16:15.670] LOG: %cStart Phase MoveEndPhase color:green;
+[02:16:15.671] LOG: %cStart Phase TurnInitPhase color:green;
+[02:16:15.671] LOG: %cStart Phase CommandPhase color:green;
+[02:16:26.839] LOG: Move: BODY_PRESS Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Skarmory
+[02:16:26.844] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:16:26.895] LOG: Move Pool: ["Stealth Rock","Rock Slide","Rollout (P)","Metronome"]
+[02:16:26.895] LOG: Move Scores: [-304.72431077694233,-333.671679197995,-340.6892230576441,-354.72431077694233]
+[02:16:26.895] LOG: Sorted Move Pool: ["Stealth Rock","Rock Slide","Rollout (P)","Metronome"]
+[02:16:26.895] LOG: Chosen Move: Stealth Rock
+[02:16:26.895] LOG: ER AI: experimental brain (sharpness 1)
+[02:16:26.895] LOG: %cStart Phase TurnStartPhase color:green;
+[02:16:26.902] LOG: %cStart Phase MovePhase color:green;
+[02:16:26.902] LOG: %cUser: Skarmory
+Move: BODY_PRESS
+Use Mode: NORMAL color:orchid
+[02:16:26.906] LOG: %cStart Phase MessagePhase color:green;
+[02:16:27.037] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:16:28.420] LOG: crit stage: +0
+[02:16:28.423] LOG: Move: Body Press | Base damage: 16.93333333333333 | Power: 80 | Source attack: 60 | Target defense: 54
+[02:16:28.428] LOG: Move: Body Press | Attack damage: 32
+[02:16:28.433] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:16:28.641] LOG: %cStart Phase MessagePhase color:green;
+[02:16:28.935] LOG: %cStart Phase MoveEndPhase color:green;
+[02:16:28.936] LOG: %cStart Phase MovePhase color:green;
+[02:16:28.936] LOG: %cUser: Geodude
+Move: STEALTH_ROCK
+Use Mode: NORMAL color:orchid
+[02:16:28.950] LOG: %cStart Phase MessagePhase color:green;
+[02:16:29.168] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:16:32.662] LOG: %cStart Phase MessagePhase color:green;
+[02:16:33.017] LOG: %cStart Phase MoveEndPhase color:green;
+[02:16:33.017] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:16:33.017] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:16:33.017] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:16:33.018] LOG: %cStart Phase BerryPhase color:green;
+[02:16:33.022] LOG: Applied Petaya Berry (enemy)
+[02:16:33.024] LOG: Applied Zinc (enemy)
+[02:16:33.026] LOG: %cStart Phase CommonAnimPhase color:green;
+[02:16:33.586] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:16:33.808] LOG: %cStart Phase MessagePhase color:green;
+[02:16:34.117] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:16:34.119] LOG: %cStart Phase TurnEndPhase color:green;
+[02:16:34.125] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[02:16:34.125] LOG: %cStart Phase PokemonHealPhase color:green;
+[02:16:34.676] LOG: %cStart Phase MessagePhase color:green;
+[02:16:34.985] LOG: %cStart Phase TurnInitPhase color:green;
+[02:16:34.986] LOG: %cStart Phase CommandPhase color:green;
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"IBZLsRi8FKYCMqoXKYXAO6Hv","gameModeId":0,"difficulty":"youngster","challenges":[],"roster":[{"id":2470238937,"player":true,"species":227,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":9,"exp":877,"levelExp":89,"gender":0,"hp":22,"stats":[57,35,60,19,34,38],"ivs":[31,31,31,31,31,31],"nature":8,"moveset":[{"moveId":690,"ppUsed":5,"ppUp":0},{"moveId":845,"ppUsed":5,"ppUp":1},{"moveId":776,"ppUsed":3,"ppUp":0},{"moveId":355,"ppUsed":0,"ppUp":0}],"status":null,"friendship":77,"metLevel":5,"metBiome":-1,"metSpecies":227,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":8,"isTerastallized":false,"stellarTypesBoosted":[2,16],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[4,5034],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":690,"targets":[2],"result":1,"useMode":1},{"move":845,"targets":[2],"result":1,"useMode":1},{"move":845,"targets":[2],"result":1,"useMode":1},{"move":845,"targets":[2],"result":1,"useMode":1},{"move":845,"targets":[2],"result":1,"useMode":1},{"move":690,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":3,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":758657931,"player":true,"species":151,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":10,"exp":857,"levelExp":0,"gender":-1,"hp":40,"stats":[53,31,35,35,35,39],"ivs":[31,31,31,31,31,31],"nature":10,"moveset":[{"moveId":797,"ppUsed":5,"ppUp":0},{"moveId":226,"ppUsed":0,"ppUp":0},{"moveId":825,"ppUsed":1,"ppUp":0},{"moveId":504,"ppUsed":0,"ppUp":0}],"status":null,"friendship":130,"metLevel":5,"metBiome":-1,"metSpecies":151,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":13,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":825,"targets":[2,3],"result":1,"useMode":1},{"move":797,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3108757474,"player":true,"species":147,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":6,"exp":327,"levelExp":94,"gender":0,"hp":20,"stats":[31,22,17,16,18,18],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":893,"ppUsed":0,"ppUp":0},{"moveId":462,"ppUsed":0,"ppUp":0},{"moveId":34,"ppUsed":3,"ppUp":0},{"moveId":239,"ppUsed":0,"ppUp":0}],"status":null,"friendship":47,"metLevel":5,"metBiome":-1,"metSpecies":147,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3999437276,"player":true,"species":187,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":5,"exp":152,"levelExp":24,"gender":0,"hp":20,"stats":[30,19,16,15,19,22],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":147,"ppUsed":0,"ppUp":0},{"moveId":668,"ppUsed":0,"ppUp":0},{"moveId":738,"ppUsed":0,"ppUp":0},{"moveId":731,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":187,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":11,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":4238690888,"player":true,"species":46,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":6,"exp":240,"levelExp":24,"gender":0,"hp":23,"stats":[32,26,21,16,26,13],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":141,"ppUsed":0,"ppUp":0},{"moveId":738,"ppUsed":0,"ppUp":0},{"moveId":152,"ppUsed":0,"ppUp":0},{"moveId":532,"ppUsed":0,"ppUp":0}],"status":null,"friendship":76,"metLevel":5,"metBiome":-1,"metSpecies":46,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1982649963,"player":true,"species":633,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":159,"levelExp":24,"gender":0,"hp":21,"stats":[31,15,16,19,16,14],"ivs":[31,31,31,31,31,31],"nature":12,"moveset":[{"moveId":5013,"ppUsed":0,"ppUp":0},{"moveId":822,"ppUsed":0,"ppUp":0},{"moveId":840,"ppUsed":0,"ppUp":0},{"moveId":188,"ppUsed":0,"ppUp":0}],"status":null,"friendship":35,"metLevel":5,"metBiome":-1,"metSpecies":633,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":16,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":10,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"interaction","seq":0,"kind":"biome","choice":1},{"type":"command","wave":11,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":11,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":1,"kind":"reward","choice":1},{"type":"command","wave":12,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":12,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":12,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":12,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":12,"turn":5,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":12,"turn":6,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"interaction","seq":2,"kind":"reward","choice":0},{"type":"command","wave":13,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":13,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":3,"kind":"reward","choice":0},{"type":"command","wave":14,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":14,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":14,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":14,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"interaction","seq":4,"kind":"reward","choice":1},{"type":"command","wave":15,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}}],"endState":{"waveIndex":15,"money":2680,"party":[{"species":227,"level":16,"hp":43,"maxHp":57},{"species":151,"level":13,"hp":37,"maxHp":53},{"species":147,"level":10,"hp":31,"maxHp":31},{"species":187,"level":10,"hp":30,"maxHp":30},{"species":46,"level":10,"hp":32,"maxHp":32},{"species":633,"level":9,"hp":31,"maxHp":31}]},"checkpoint":{"wave":10,"seed":"IBZLsRi8FKYCMqoXKYXAO6Hv","party":[{"id":2470238937,"player":true,"species":227,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":9,"exp":877,"levelExp":89,"gender":0,"hp":22,"stats":[57,35,60,19,34,38],"ivs":[31,31,31,31,31,31],"nature":8,"moveset":[{"moveId":690,"ppUsed":5,"ppUp":0},{"moveId":845,"ppUsed":5,"ppUp":1},{"moveId":776,"ppUsed":3,"ppUp":0},{"moveId":355,"ppUsed":0,"ppUp":0}],"status":null,"friendship":77,"metLevel":5,"metBiome":-1,"metSpecies":227,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":8,"isTerastallized":false,"stellarTypesBoosted":[2,16],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[4,5034],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":690,"targets":[2],"result":1,"useMode":1},{"move":845,"targets":[2],"result":1,"useMode":1},{"move":845,"targets":[2],"result":1,"useMode":1},{"move":845,"targets":[2],"result":1,"useMode":1},{"move":845,"targets":[2],"result":1,"useMode":1},{"move":690,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":3,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":758657931,"player":true,"species":151,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":10,"exp":857,"levelExp":0,"gender":-1,"hp":40,"stats":[53,31,35,35,35,39],"ivs":[31,31,31,31,31,31],"nature":10,"moveset":[{"moveId":797,"ppUsed":5,"ppUp":0},{"moveId":226,"ppUsed":0,"ppUp":0},{"moveId":825,"ppUsed":1,"ppUp":0},{"moveId":504,"ppUsed":0,"ppUp":0}],"status":null,"friendship":130,"metLevel":5,"metBiome":-1,"metSpecies":151,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":13,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":825,"targets":[2,3],"result":1,"useMode":1},{"move":797,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3108757474,"player":true,"species":147,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":6,"exp":327,"levelExp":94,"gender":0,"hp":20,"stats":[31,22,17,16,18,18],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":893,"ppUsed":0,"ppUp":0},{"moveId":462,"ppUsed":0,"ppUp":0},{"moveId":34,"ppUsed":3,"ppUp":0},{"moveId":239,"ppUsed":0,"ppUp":0}],"status":null,"friendship":47,"metLevel":5,"metBiome":-1,"metSpecies":147,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3999437276,"player":true,"species":187,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":5,"exp":152,"levelExp":24,"gender":0,"hp":20,"stats":[30,19,16,15,19,22],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":147,"ppUsed":0,"ppUp":0},{"moveId":668,"ppUsed":0,"ppUp":0},{"moveId":738,"ppUsed":0,"ppUp":0},{"moveId":731,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":187,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":11,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":4238690888,"player":true,"species":46,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":6,"exp":240,"levelExp":24,"gender":0,"hp":23,"stats":[32,26,21,16,26,13],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":141,"ppUsed":0,"ppUp":0},{"moveId":738,"ppUsed":0,"ppUp":0},{"moveId":152,"ppUsed":0,"ppUp":0},{"moveId":532,"ppUsed":0,"ppUp":0}],"status":null,"friendship":76,"metLevel":5,"metBiome":-1,"metSpecies":46,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1982649963,"player":true,"species":633,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":159,"levelExp":24,"gender":0,"hp":21,"stats":[31,15,16,19,16,14],"ivs":[31,31,31,31,31,31],"nature":12,"moveset":[{"moveId":5013,"ppUsed":0,"ppUp":0},{"moveId":822,"ppUsed":0,"ppUp":0},{"moveId":840,"ppUsed":0,"ppUp":0},{"moveId":188,"ppUsed":0,"ppUp":0}],"status":null,"friendship":35,"metLevel":5,"metBiome":-1,"metSpecies":633,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":16,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[0],"args":[2470238937,0],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"ER_LUCKY_HEART","args":[1982649963,"luckyHeart",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"SUPER_EXP_CHARM","args":[60],"stackCount":1,"className":"ExpBoosterModifier"},{"player":true,"typeId":"EXP_SHARE","args":[],"stackCount":1,"className":"ExpShareModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[4],"args":[2470238937,4],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[8],"args":[758657931,8],"stackCount":1,"className":"BerryModifier"}],"money":1950,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":0}}}
