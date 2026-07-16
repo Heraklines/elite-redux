@@ -1,0 +1,200 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrmqlzdb-8qh0
+mode:     0  wave:?
+seed:     95WF9CZZWWBMT8MXo3SxX5Xo
+party:    
+enemy:    
+
+----- COMMENT -----
+Sending log
+
+----- CONSOLE -----
+[00:39:21.245] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[00:39:21.588] LOG: [ER] build mrmqlzdb-8qh0
+[00:39:21.624] LOG: [dev-tools] loaded — 528 scenarios + Send Logs button
+[00:39:25.773] DEBUG: Destroying loading scene
+[00:39:25.773] DEBUG: Destroyed loading scene
+[00:39:25.818] LOG: Seed: 95WF9CZZWWBMT8MXo3SxX5Xo
+[00:39:25.818] LOG: Wave Seed: 95WF9CZZWWBMT8MXo3SxX5Xo 0
+[00:39:26.136] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:26.136] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:26.136] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:27.524] LOG: %cStart Phase LoginPhase color:green;
+[00:39:27.923] LOG: Client Session: 0XwpVmlbbXA2QmM5wdSd4uCt7CkkyZrB
+[00:39:28.215] DEBUG: Using cached system data
+[00:39:28.282] LOG: %cStart Phase TitlePhase color:green;
+[00:39:28.284] LOG: Getting Session Slot id: %d 1
+[00:39:28.300] LOG: use seasonal splash messages true
+[00:39:49.341] LOG: %cStart Phase SelectStarterPhase color:green;
+[00:39:49.748] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:49.748] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:49.748] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:49.824] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:49.824] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:49.824] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:49.875] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:49.875] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:49.875] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:49.918] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:49.918] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:49.918] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:49.954] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:49.954] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:49.954] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:49.994] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:49.994] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:49.994] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.028] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.028] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.028] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.059] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.059] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.059] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.090] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.091] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.091] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.123] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.123] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.123] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.153] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.153] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.153] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.181] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.181] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.181] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.209] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.209] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.209] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.238] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.238] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.238] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.268] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.268] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.268] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.299] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.299] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.299] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.324] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.324] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.324] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.350] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.350] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.350] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.379] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.379] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.379] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.407] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.408] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.408] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.442] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:50.442] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:39:50.442] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:39:57.170] WARN: cry/133 not found
+[00:40:22.195] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:40:22.195] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:40:22.195] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:40:28.591] WARN: cry/10700 not found
+[00:41:34.359] WARN: cry/133 not found
+[00:42:01.215] WARN: cry/133 not found
+[00:42:03.802] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:03.802] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:03.802] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:04.394] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:04.394] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:04.394] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:04.782] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:04.782] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:04.782] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:05.310] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:05.310] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:05.310] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:05.770] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:05.770] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:05.770] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:06.511] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:06.511] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:06.511] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:06.694] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:06.694] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:06.694] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:06.824] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:06.824] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:06.824] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:13.461] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:13.461] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:13.461] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:13.516] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:13.516] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:13.516] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:13.546] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:13.546] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:13.546] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:14.869] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:14.869] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:14.869] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:15.153] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:15.153] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:15.153] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:15.643] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:15.643] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:15.643] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:16.077] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:16.077] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:16.077] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:16.194] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:16.194] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:16.194] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:16.482] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:16.482] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:16.482] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:16.902] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:16.902] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:16.902] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:17.017] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:17.017] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:17.017] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:17.347] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:17.347] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:17.347] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:17.441] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:17.441] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:17.441] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:17.900] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:17.900] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:17.900] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:19.222] LOG: Phione's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:42:19.472] LOG: Finneon's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:42:23.128] WARN: cry/21 not found
+[00:42:26.949] WARN: cry/21 not found
+[00:42:44.916] LOG: Finneon's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:42:45.428] LOG: Phione's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:42:55.753] LOG: Finneon's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[00:42:56.641] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:56.641] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:56.641] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:57.103] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:57.103] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:57.103] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:58.237] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:42:58.237] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:42:58.237] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:43:58.555] WARN: cry/163 not found
+[00:44:02.029] WARN: cry/70002 not found
+[00:44:12.870] WARN: cry/163 not found
+[00:44:13.954] WARN: cry/163 not found
+[00:46:52.095] LOG: Regitube's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: false, variant: 0
+[00:46:52.095] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:46:56.085] LOG: Regitube's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: false, variant: 0
+[00:46:56.086] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:46:56.895] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:46:56.895] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:46:56.895] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:46:57.522] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:46:57.522] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:46:57.522] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:46:57.973] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[00:46:57.973] LOG: Regitube's variant icon does not exist. Replacing with default.
+[00:46:57.973] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+
+----- REPLAY TRACE (JSON) -----
+(none)
