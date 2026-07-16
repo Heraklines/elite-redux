@@ -74,7 +74,7 @@ const COOP_WIRE_MAX_CHUNKS = 2_048;
 const COOP_WIRE_MAX_REASSEMBLED_BYTES = 16 * 1024 * 1024;
 const COOP_LOGICAL_QUEUE_MAX_BYTES = 32 * 1024 * 1024;
 const COOP_LOGICAL_QUEUE_MAX_COUNT = 512;
-const COOP_BROWSER_GAME_OVER_ENVELOPE_DELAY_MS = 4_000;
+const COOP_BROWSER_GAME_OVER_ENVELOPE_DELAY_MS = 250;
 /** Bounded whole-transfer replay fence. Transfer ids are unique for one transport session. */
 export const COOP_WIRE_COMPLETED_TRANSFER_RETENTION = 512;
 

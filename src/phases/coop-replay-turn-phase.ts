@@ -23,6 +23,7 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
 import {
   coopLocalOwnedPlayerFieldSlot,
+  coopRetainedGameOverSupersedesReplay,
   coopSessionGeneration,
   getCoopBattleStreamer,
   getCoopController,
@@ -207,6 +208,20 @@ export class CoopReplayTurnPhase extends Phase {
           globalScene.phaseManager.unshiftNew("CoopReplayTurnPhase", this.turn, this.rendered + increment.length, [
             ...this.fromHpByBi.entries(),
           ]);
+          this.end();
+          return;
+        }
+        // GameOver interrupts the host before its normal turn-finalization carrier is emitted. A retained
+        // WAVE_ADVANCE can therefore arrive while this SAME-turn continuation is still queued behind the
+        // final presentation phase. Once every ordered live event has drained, that exact admitted terminal
+        // is the completion fence: waiting for a turnResolution here can never succeed. End into the
+        // already-appended CoopWaveAdvanceBoundaryPhase; do not synthesize a finalize or advance a turn.
+        const wave = globalScene.currentBattle?.waveIndex ?? 0;
+        if (coopRetainedGameOverSupersedesReplay(wave, this.turn)) {
+          coopWarn(
+            "replay",
+            `guest replay turn=${this.turn}: retained gameOver terminal supersedes unresolved replay at safe event boundary -> end`,
+          );
           this.end();
           return;
         }

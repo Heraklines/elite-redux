@@ -11,22 +11,48 @@ import test from "node:test";
 const root = resolve(import.meta.dirname, "../../..");
 
 test("GameOver journey uses visible starters, real command input, and exact retained terminal evidence", async () => {
-  const [workflow, registry, transport, harness, journeys] = await Promise.all([
+  const [workflow, registry, runtime, replay, transport, harness, journeys, duoRegression] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
     readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+    readFile(resolve(root, "src/data/elite-redux/coop/coop-runtime.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/coop-replay-turn-phase.ts"), "utf8"),
     readFile(resolve(root, "src/data/elite-redux/coop/coop-webrtc-transport.ts"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/journeys.mjs"), "utf8"),
+    readFile(resolve(root, "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts"), "utf8"),
   ]);
 
   assert.match(workflow, /^\s{10}- game-over$/mu);
   assert.match(workflow, /inputs\.journey == 'game-over' && 'game-over'/u);
   assert.match(workflow, /COOP_UI_GUEST_LOCALE: \$\{\{ inputs\.journey == 'game-over' && 'en' \|\| 'de' \}\}/u);
+  assert.match(
+    workflow,
+    /Verify retained GameOver two-engine operation regression[\s\S]*coop-duo-wave-operation\.test\.ts/u,
+  );
   assert.match(registry, /getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*SpeciesId\.MAGIKARP[\s\S]*MoveId\.MEMENTO/u);
   assert.match(
     transport,
     /VITE_COOP_BROWSER_FIXTURE !== "game-over"[\s\S]*get\("coopfixture"\) !== "game-over"[\s\S]*pendingOperation\?\.kind !== "WAVE_ADVANCE"[\s\S]*payload\?\.outcome === "gameOver"/u,
   );
+  assert.match(
+    runtime,
+    /coopRetainedGameOverSupersedesReplay\(wave: number, turn: number\)[\s\S]*pendingWaveAdvance\?\.wave === wave[\s\S]*pendingWaveAdvance\.outcome === "gameOver"[\s\S]*turn >= pendingWaveAdvance\.settledTurn/u,
+  );
+  const replayPump = replay.slice(
+    replay.indexOf("private async pump("),
+    replay.indexOf("private handleAuthorityFailure("),
+  );
+  assert.ok(
+    replayPump.indexOf("consumeLiveEventsFrom") < replayPump.indexOf("coopRetainedGameOverSupersedesReplay"),
+    "terminal cannot truncate already-buffered ordered presentation",
+  );
+  assert.ok(
+    replayPump.indexOf("coopRetainedGameOverSupersedesReplay") < replayPump.indexOf("awaitTurnOrLiveEvent"),
+    "terminal releases the impossible resolution wait only at the empty event boundary",
+  );
+  assert.match(duoRegression, /coopRetainedGameOverSupersedesReplay\(7, 1\)[\s\S]*toBe\(true\)/u);
+  assert.match(duoRegression, /coopRetainedGameOverSupersedesReplay\(6, 1\)[\s\S]*toBe\(false\)/u);
+  assert.match(duoRegression, /coopRetainedGameOverSupersedesReplay\(7, 0\)[\s\S]*toBe\(false\)/u);
   assert.match(
     journeys,
     /async function gameOver\(rig\)[\s\S]*loginBoth\(\)[\s\S]*pair\(rig\.config\.requesterSeat\)[\s\S]*startFreshRun\(\{ gameOverFixture: true \}\)[\s\S]*driveWaveToGameOver\(\)/u,
@@ -43,7 +69,8 @@ test("GameOver journey uses visible starters, real command input, and exact reta
     "settled WAVE_ADVANCE committed wave=1",
     "ignore raw waveResolved for correctness wave=1 outcome=gameOver",
     "wave-advance JOURNAL bootstrap wave=1 outcome=gameOver",
-    "safe-boundary wake wave=1 unparkedReplay=1",
+    "safe-boundary wake wave=1 unparkedReplay=0",
+    "retained gameOver terminal supersedes unresolved replay at safe event boundary",
     "retained WAVE_ADVANCE continuationReady wave=1",
     "host RELEASE contiguous acknowledged authority cls=op:global",
     'record("retained-game-over-race-proof"',

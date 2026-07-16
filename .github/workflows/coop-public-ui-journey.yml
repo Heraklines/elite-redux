@@ -128,7 +128,7 @@ jobs:
           status=$?
           set -e
           diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
-          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/coop-webrtc-transport|src/dev-tools/registry|src/system/game-data|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-webrtc-transport|src/dev-tools/registry|src/phases/coop-replay-turn-phase|src/system/game-data|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
           if [ -n "$owned" ]; then
             printf '%s\n' "$owned"
             exit 1
@@ -143,8 +143,10 @@ jobs:
             .github/workflows/coop-public-ui-journey.yml \
             scripts/coop-browser-entry.ts \
             scripts/prepare-coop-browser-artifact.mjs \
+            src/data/elite-redux/coop/coop-runtime.ts \
             src/data/elite-redux/coop/coop-webrtc-transport.ts \
             src/dev-tools/registry.ts \
+            src/phases/coop-replay-turn-phase.ts \
             src/ui/handlers/save-slot-select-ui-handler.ts \
             src/ui/handlers/starter-select-ui-handler.ts \
             test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
@@ -171,7 +173,15 @@ jobs:
             test/browser/coop-public-ui/save-mutation-evidence.test.mjs \
             test/browser/coop-public-ui/semantic-surface-evidence.test.mjs \
             test/browser/coop-public-ui/terminal-watchdog.mjs \
-            test/browser/coop-public-ui/vite.config.mjs
+            test/browser/coop-public-ui/vite.config.mjs \
+            test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts
+
+      - name: Verify retained GameOver two-engine operation regression
+        if: inputs.journey == 'game-over'
+        env:
+          ER_SCENARIO: "1"
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: npx vitest run test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts --reporter=dot
 
       - name: Enforce public-driver boundary
         run: node test/browser/coop-public-ui/check-public-boundary.mjs
