@@ -22,7 +22,11 @@
 // top and is individually flag-gated (§5).
 // =============================================================================
 
-import type { CoopAuthoritativeBattleStateV1, CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopInteractionOutcome,
+  CoopRewardSurfaceIdentity,
+} from "#data/elite-redux/coop/coop-transport";
 
 /** A co-op player seat id (0..N-1). The host/authority is a specific id, conventionally 0. */
 export type CoopPlayerId = number;
@@ -164,6 +168,8 @@ export interface CoopCrossroadsPickPayload {
  * collapses the party-target menu into the single terminal relay this operation carries.
  */
 export interface CoopRewardActionPayload {
+  /** Ordered ME surface address, when this reward action belongs to a retained Mystery reward plan. */
+  readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
   /** The wire `label` the legacy relay sent this action with (reward/shop/skip/reroll/check/transfer/lock). */
   readonly label: string;
   /** The picked option/cursor index, or a sentinel (COOP_INTERACTION_LEAVE = -1 / _REROLL = -2). */

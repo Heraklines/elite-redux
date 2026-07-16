@@ -207,7 +207,9 @@ import {
 import {
   armCoopRewardJournalMaterialization,
   COOP_REWARD_ACTION_STRIDE,
+  COOP_REWARD_SURFACE_ACTION_STRIDE,
   isCoopRewardOperationEnabled,
+  isValidCoopRewardSurfaceIdentity,
   resetCoopRewardOperationState,
   setCoopRewardOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-reward-operation";
@@ -3892,11 +3894,14 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
   }
   if (op.kind === "REWARD") {
     const payload = op.payload as CoopRewardActionPayload;
+    const expectedSurfaceBand = payload.rewardSurface == null ? 0 : payload.rewardSurface.ordinal + 1;
     if (
       typeof payload?.label !== "string"
       || !COOP_REWARD_CHOICE_KINDS.some(kind => kind === payload.label)
       || typeof payload.choice !== "number"
       || typeof payload.terminal !== "boolean"
+      || (payload.rewardSurface !== undefined && !isValidCoopRewardSurfaceIdentity(payload.rewardSurface))
+      || Math.floor(ordinal / COOP_REWARD_SURFACE_ACTION_STRIDE) !== expectedSurfaceBand
       || (payload.data !== undefined && (!Array.isArray(payload.data) || !payload.data.every(Number.isFinite)))
     ) {
       return false;
@@ -3907,6 +3912,7 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
       payload.choice,
       payload.data,
       op.id,
+      payload.rewardSurface,
     );
     armCoopRewardJournalMaterialization(op.id, pinned);
     return true;

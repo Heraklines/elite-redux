@@ -30,6 +30,8 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
 import { COOP_INTERACTION_LEAVE, COOP_INTERACTION_REROLL } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
+  COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
+  COOP_ME_REWARD_SURFACE_LIMIT,
   type CoopAuthoritativeEnvelopeV1,
   type CoopOperationKind,
   type CoopPendingOperation,
@@ -60,7 +62,11 @@ import {
   resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
-import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopRewardSurfaceIdentity,
+  CoopRole,
+} from "#data/elite-redux/coop/coop-transport";
 
 /** The two shop surfaces this adapter serves: the reward screen (#1) and the biome market (#5). */
 export type CoopShopSurface = "reward" | "market";
@@ -73,6 +79,8 @@ export interface CoopRewardRelayAction {
   readonly data?: number[] | undefined;
   /** Present only when the durability live sink supplied this action. */
   readonly operationId?: string | undefined;
+  /** Ordered Mystery reward surface stated by the raw or durable carrier. */
+  readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
 }
 
 /** The watcher's adoption verdict for a relayed reward/market action. */
@@ -135,16 +143,71 @@ export function setCoopRewardAuthorityStateHooksForTest(hooks: CoopRewardAuthori
 interface RewardWatcherState {
   ordinal: number;
   ordinalStart: number;
+  ordinalSurfaceKey: string;
   lastAdoptedStart: number;
   lastLeftStart: number;
 }
 
 function freshWatcherState(): RewardWatcherState {
-  return { ordinal: 0, ordinalStart: -1, lastAdoptedStart: -1, lastLeftStart: -1 };
+  return { ordinal: 0, ordinalStart: -1, ordinalSurfaceKey: "", lastAdoptedStart: -1, lastLeftStart: -1 };
 }
 
 /** ACTION ORDINAL stride: pin * STRIDE + ordinal must not overflow into the next pin's op-id space. */
 export const COOP_REWARD_ACTION_STRIDE = 100_000;
+
+/** Disjoint action range for the ambient stream and each of the at most 16 P36 Mystery surfaces. */
+export const COOP_REWARD_SURFACE_ACTION_STRIDE = 5_000;
+
+function rewardSurfaceKey(rewardSurface?: CoopRewardSurfaceIdentity): string {
+  return rewardSurface == null ? "ambient" : `${rewardSurface.ordinal}:${rewardSurface.surfaceId}`;
+}
+
+const COOP_REWARD_SURFACE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$/;
+
+export function isValidCoopRewardSurfaceIdentity(rewardSurface: unknown): rewardSurface is CoopRewardSurfaceIdentity {
+  return (
+    rewardSurface != null
+    && typeof rewardSurface === "object"
+    && !Array.isArray(rewardSurface)
+    && Number.isSafeInteger((rewardSurface as CoopRewardSurfaceIdentity).ordinal)
+    && (rewardSurface as CoopRewardSurfaceIdentity).ordinal >= 0
+    && (rewardSurface as CoopRewardSurfaceIdentity).ordinal < COOP_ME_REWARD_SURFACE_LIMIT
+    && typeof (rewardSurface as CoopRewardSurfaceIdentity).surfaceId === "string"
+    && (rewardSurface as CoopRewardSurfaceIdentity).surfaceId.length <= COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH
+    && COOP_REWARD_SURFACE_ID_PATTERN.test((rewardSurface as CoopRewardSurfaceIdentity).surfaceId)
+  );
+}
+
+function rewardStreamKey(surface: CoopShopSurface, pinned: number, rewardSurface?: CoopRewardSurfaceIdentity): string {
+  return `${surface}:${pinned}:${rewardSurfaceKey(rewardSurface)}`;
+}
+
+/**
+ * Encode the ordered surface ordinal into the existing numeric operation-id address. The full stable
+ * surfaceId remains in the typed payload, so same-ordinal/different-id proposals conflict instead of aliasing.
+ */
+export function coopRewardOperationActionSlot(
+  pinned: number,
+  actionOrdinal: number,
+  rewardSurface?: CoopRewardSurfaceIdentity,
+): number | null {
+  const surfaceOffset = rewardSurface == null ? 0 : (rewardSurface.ordinal + 1) * COOP_REWARD_SURFACE_ACTION_STRIDE;
+  if (
+    !Number.isSafeInteger(pinned)
+    || pinned < 0
+    || !Number.isSafeInteger(actionOrdinal)
+    || actionOrdinal < 0
+    || actionOrdinal >= COOP_REWARD_SURFACE_ACTION_STRIDE
+    || (rewardSurface != null && !isValidCoopRewardSurfaceIdentity(rewardSurface))
+    || !Number.isSafeInteger(surfaceOffset)
+    || surfaceOffset < 0
+    || surfaceOffset + actionOrdinal >= COOP_REWARD_ACTION_STRIDE
+  ) {
+    return null;
+  }
+  const slot = pinned * COOP_REWARD_ACTION_STRIDE + surfaceOffset + actionOrdinal;
+  return Number.isSafeInteger(slot) ? slot : null;
+}
 
 /** Arm one journal-led action before its production sink feeds the real reward/market FIFO. */
 export function armCoopRewardJournalMaterialization(operationId: string, pinned: number): void {
@@ -156,6 +219,7 @@ export function armCoopRewardJournalMaterialization(operationId: string, pinned:
 interface PreparedRewardIntent {
   readonly intent: CoopPendingOperation;
   readonly surface: CoopShopSurface;
+  readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
   readonly pinned: number;
   readonly terminal: boolean;
   readonly wave: number;
@@ -208,6 +272,7 @@ interface RewardOpState {
   /** The owner's per-interaction monotonic action ordinal (for the committed op-id). Reset when the pin changes. */
   ownerOrdinal: number;
   ownerOrdinalStart: number;
+  ownerOrdinalSurfaceKey: string;
   /** Exact once-only identity retained when a terminal must be retried after commit/journal failure. */
   readonly ownerTerminalOperations: Map<string, { readonly ordinal: number; readonly operationId: string }>;
   /** Proposed peer intents retained separately per local role (the two-engine harness shares one realm). */
@@ -229,6 +294,7 @@ registerCoopOpSurfaceState(
     watcherStateByRole: { host: freshWatcherState(), guest: freshWatcherState() },
     ownerOrdinal: 0,
     ownerOrdinalStart: -1,
+    ownerOrdinalSurfaceKey: "",
     ownerTerminalOperations: new Map(),
     preparedIntents: new Map(),
     committedResultEnvelopes: new Map(),
@@ -344,6 +410,7 @@ export function resetCoopRewardOperationState(): void {
   s.watcherStateByRole.guest = freshWatcherState();
   s.ownerOrdinal = 0;
   s.ownerOrdinalStart = -1;
+  s.ownerOrdinalSurfaceKey = "";
   s.ownerTerminalOperations.clear();
   s.revisionFloor = 0;
 }
@@ -499,6 +566,7 @@ function retainPreparedIntent(s: RewardOpState, prepared: PreparedRewardIntent):
   if (existing != null) {
     return (
       existing.surface === prepared.surface
+      && rewardSurfaceKey(existing.rewardSurface) === rewardSurfaceKey(prepared.rewardSurface)
       && existing.pinned === prepared.pinned
       && existing.terminal === prepared.terminal
       && samePayload(existing.intent.payload, prepared.intent.payload)
@@ -509,20 +577,29 @@ function retainPreparedIntent(s: RewardOpState, prepared: PreparedRewardIntent):
 }
 
 /** Next per-interaction owner action ordinal for `pinned` (resets when the pinned interaction changes). */
-function nextOwnerOrdinal(s: RewardOpState, pinned: number): number {
-  if (s.ownerOrdinalStart !== pinned) {
+function nextOwnerOrdinal(s: RewardOpState, pinned: number, rewardSurface?: CoopRewardSurfaceIdentity): number {
+  const surfaceKey = rewardSurfaceKey(rewardSurface);
+  if (s.ownerOrdinalStart !== pinned || s.ownerOrdinalSurfaceKey !== surfaceKey) {
     s.ownerOrdinal = 0;
     s.ownerOrdinalStart = pinned;
+    s.ownerOrdinalSurfaceKey = surfaceKey;
   }
   return s.ownerOrdinal++;
 }
 
 /** Peek the watcher's current per-interaction action ordinal for `pinned` (resets when the pin changes). */
-function watcherState(s: RewardOpState, role: CoopRole, pinned: number): RewardWatcherState {
+function watcherState(
+  s: RewardOpState,
+  role: CoopRole,
+  pinned: number,
+  rewardSurface?: CoopRewardSurfaceIdentity,
+): RewardWatcherState {
   const ws = s.watcherStateByRole[role];
-  if (ws.ordinalStart !== pinned) {
+  const surfaceKey = rewardSurfaceKey(rewardSurface);
+  if (ws.ordinalStart !== pinned || ws.ordinalSurfaceKey !== surfaceKey) {
     ws.ordinal = 0;
     ws.ordinalStart = pinned;
+    ws.ordinalSurfaceKey = surfaceKey;
   }
   return ws;
 }
@@ -533,6 +610,8 @@ function watcherState(s: RewardOpState, role: CoopRole, pinned: number): RewardW
 
 export interface CoopRewardOwnerCommitParams {
   readonly surface: CoopShopSurface;
+  /** Ordered retained Mystery reward surface; absent for normal-wave rewards and markets. */
+  readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
   /** The pinned interaction counter this shop opened on (coopInteractionStart / coopBiomeStart). */
   readonly pinned: number;
   /** The relayed action's wire label (reward/shop/skip/reroll/check/transfer/lock, or biomeShop). */
@@ -569,21 +648,26 @@ export function commitRewardOwnerIntent(
   try {
     const s = state(binding);
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
-    const terminalKey = `${params.surface}:${params.pinned}`;
+    const terminalKey = rewardStreamKey(params.surface, params.pinned, params.rewardSurface);
     const retainedTerminal = params.terminal ? s.ownerTerminalOperations.get(terminalKey) : undefined;
-    const ordinal = retainedTerminal?.ordinal ?? nextOwnerOrdinal(s, params.pinned);
+    const ordinal = retainedTerminal?.ordinal ?? nextOwnerOrdinal(s, params.pinned, params.rewardSurface);
+    const actionSlot = coopRewardOperationActionSlot(params.pinned, ordinal, params.rewardSurface);
+    if (actionSlot == null) {
+      return null;
+    }
     const opId =
-      retainedTerminal?.operationId
-      ?? makeCoopOperationId(
-        s.epoch,
-        ownerSeat,
-        params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal,
-        kindFor(params.surface),
-      );
+      retainedTerminal?.operationId ?? makeCoopOperationId(s.epoch, ownerSeat, actionSlot, kindFor(params.surface));
     if (params.terminal && retainedTerminal == null) {
       s.ownerTerminalOperations.set(terminalKey, { ordinal, operationId: opId });
     }
-    const payload = buildPayload(params.surface, params.label, params.choice, params.data, params.terminal);
+    const payload = buildPayload(
+      params.surface,
+      params.label,
+      params.choice,
+      params.data,
+      params.terminal,
+      params.rewardSurface,
+    );
     const intent: CoopPendingOperation = {
       id: opId,
       kind: kindFor(params.surface),
@@ -594,6 +678,7 @@ export function commitRewardOwnerIntent(
     const prepared: PreparedRewardIntent = {
       intent,
       surface: params.surface,
+      rewardSurface: params.rewardSurface,
       pinned: params.pinned,
       terminal: params.terminal,
       wave: params.wave,
@@ -741,6 +826,8 @@ function advancePreparedWatcher(prepared: PreparedRewardIntent): void {
 
 export interface CoopRewardWatcherAdoptParams {
   readonly surface: CoopShopSurface;
+  /** Ordered retained Mystery reward surface; absent for normal-wave rewards and markets. */
+  readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
   readonly pinned: number;
   /** The awaited relay action (null = owner timed out / disconnected). */
   readonly action: CoopRewardRelayAction | null;
@@ -753,7 +840,7 @@ export interface CoopRewardWatcherAdoptParams {
 
 /**
  * WATCHER: gate the adoption of one relayed owner action through the operation primitive. When the flag is
- * OFF this is a pass-through (adopt iff the action landed) - pure legacy behavior. When ON:
+ * OFF this skips journal gating but still requires an exact P36 surface address. When ON:
  *   - on the AUTHORITY watching a guest-owned action, VALIDATE + COMMIT the guest's intent (invariant 3);
  *   - REJECT a stale pick from a strictly-earlier interaction (`pin < lastAdoptedStart`, #861) or a late
  *     pick for an interaction already LEFT (`pin <= lastLeftStart`), and de-dupe an exact re-delivery by
@@ -765,12 +852,15 @@ export function adoptRewardWatcherChoice(
   params: CoopRewardWatcherAdoptParams,
   binding?: CoopRewardOperationBinding | null,
 ): CoopRewardAdoptDecision {
-  // Legacy / fallback: adopt iff the action landed, no operation gating.
-  if (!isCoopRewardOperationEnabled()) {
-    return params.action == null ? { adopt: false, reason: "no-relay" } : { adopt: true };
-  }
   if (params.action == null) {
     return { adopt: false, reason: "no-relay" };
+  }
+  if (rewardSurfaceKey(params.action.rewardSurface) !== rewardSurfaceKey(params.rewardSurface)) {
+    return { adopt: false, reason: "reward-surface-mismatch" };
+  }
+  // Legacy / fallback still enforces the P36 surface address; it skips only operation-journal gating.
+  if (!isCoopRewardOperationEnabled()) {
+    return { adopt: true };
   }
   if (params.pinned < 0) {
     // Unpinned interaction (should not happen in a live run): fall through to the legacy apply.
@@ -778,7 +868,7 @@ export function adoptRewardWatcherChoice(
   }
   try {
     const s = state(binding);
-    const ws = watcherState(s, params.localRole, params.pinned);
+    const ws = watcherState(s, params.localRole, params.pinned, params.rewardSurface);
     // Stale / late rejection (invariant 6, the #861 shape). The pinned interaction counter is monotonic, so:
     //  - a pick STRICTLY BELOW the highest interaction we have adopted at is a leftover from an interaction a
     //    later one already superseded (the cross-interaction stale buffer);
@@ -795,18 +885,18 @@ export function adoptRewardWatcherChoice(
 
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
     const ordinal = ws.ordinal;
-    const opId = makeCoopOperationId(
-      s.epoch,
-      ownerSeat,
-      params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal,
-      kindFor(params.surface),
-    );
+    const actionSlot = coopRewardOperationActionSlot(params.pinned, ordinal, params.rewardSurface);
+    if (actionSlot == null) {
+      return { adopt: false, reason: "invalid-surface-action-address" };
+    }
+    const opId = makeCoopOperationId(s.epoch, ownerSeat, actionSlot, kindFor(params.surface));
     const payload = buildPayload(
       params.surface,
       relayedLabel(params.surface, params.action),
       params.action.choice,
       params.action.data,
       params.terminal,
+      params.rewardSurface,
     );
     const intent: CoopPendingOperation = {
       id: opId,
@@ -831,6 +921,7 @@ export function adoptRewardWatcherChoice(
         const prepared: PreparedRewardIntent = {
           intent,
           surface: params.surface,
+          rewardSurface: params.rewardSurface,
           pinned: params.pinned,
           terminal: params.terminal,
           wave: params.wave,
@@ -1023,8 +1114,15 @@ function buildPayload(
   choice: number,
   data: number[] | undefined,
   terminal: boolean,
+  rewardSurface?: CoopRewardSurfaceIdentity,
 ): CoopRewardActionPayload | CoopShopBuyPayload {
   return surface === "reward"
-    ? ({ label, choice, data, terminal } satisfies CoopRewardActionPayload)
+    ? ({
+        label,
+        choice,
+        data,
+        terminal,
+        ...(rewardSurface == null ? {} : { rewardSurface }),
+      } satisfies CoopRewardActionPayload)
     : ({ slot: choice, data, terminal } satisfies CoopShopBuyPayload);
 }

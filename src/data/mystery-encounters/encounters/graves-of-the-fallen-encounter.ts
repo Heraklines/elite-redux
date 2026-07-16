@@ -328,12 +328,12 @@ function setDisturbRewards(grave: GhostTeamSnapshot): void {
     return;
   }
   const settings: CustomModifierSettings = { guaranteedModifierTypeFuncs: funcs, fillRemaining: false };
-  // The first screen comes from `customShopRewards`; the pre-rewards callback queues
-  // the SECOND screen. Both run after the MysteryEncounterRewardsPhase, so the player
+  // The first screen comes from `customShopRewards`; the pre-rewards callback explicitly registers
+  // the SECOND screen. The helper opens the ordered plan after MysteryEncounterRewardsPhase, so the player
   // picks one item from the pool, then a second - DISTURB_REWARD_ITEMS picks total.
-  setEncounterRewards(settings, undefined, () => {
+  setEncounterRewards(settings, undefined, ({ registerModifierSurface }) => {
     for (let i = 1; i < DISTURB_REWARD_ITEMS; i++) {
-      globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, settings);
+      registerModifierSurface(settings);
     }
     queueEncounterMessage(`${namespace}:disturbReward`);
   });
