@@ -253,12 +253,23 @@ jobs:
           pnpm exec vite build --config test/browser/coop-public-ui/local-worker-vite.config.mjs
           nohup node dist-coop-local-workers/local-worker-server.mjs > local-worker-fixture.log 2>&1 &
           for attempt in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:8789/coop/health >/dev/null; then
+            save_status="$(curl --silent --output save-worker-health.txt --write-out '%{http_code}' http://127.0.0.1:8788/game/titlestats || true)"
+            coop_status="$(curl --silent --output coop-worker-health.txt --write-out '%{http_code}' http://127.0.0.1:8789/coop/health || true)"
+            if [[ "$save_status" == "200" && "$coop_status" == "200" ]]; then
               exit 0
+            fi
+            if [[ "$attempt" == "1" || $((attempt % 10)) == "0" ]]; then
+              printf 'worker readiness attempt=%s save=%s coop=%s\n' "$attempt" "$save_status" "$coop_status"
+              cat save-worker-health.txt coop-worker-health.txt 2>/dev/null || true
             fi
             sleep 1
           done
           cat local-worker-fixture.log
+          printf 'save status=%s body=' "$save_status"
+          cat save-worker-health.txt || true
+          printf '\ncoop status=%s body=' "$coop_status"
+          cat coop-worker-health.txt || true
+          printf '\n'
           exit 1
 
       - name: Prepare an isolated account pair for visible registration
