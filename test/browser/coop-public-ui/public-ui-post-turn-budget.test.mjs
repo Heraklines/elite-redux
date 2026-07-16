@@ -5,13 +5,14 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createBattlePromptAdvancer } from "./campaign.mjs";
+import { createBattlePromptAdvancer, driveConfirmedLeave } from "./campaign.mjs";
 import { marketObservationView } from "./evidence.mjs";
 import { assertMarketPurchaseConverged, planMarketGridKeys } from "./market-journey.mjs";
 import {
   createPublicBattleProgressBudget,
   DuoPublicUiRig,
   findActionableFirstLoginGenderSurface,
+  findSharedCommandFrontierMatch,
   PublicUiClient,
 } from "./public-ui-harness.mjs";
 
@@ -70,6 +71,83 @@ function ownedCommand(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
     },
   };
 }
+
+function commandFrontierObservation(localSeat, kind, stateDigest = "same-state") {
+  const owner = kind === "owner";
+  return {
+    kind: "browser-surface2",
+    observation: {
+      version: 2,
+      coop: true,
+      operationClass: owner ? "command" : "battle-progress",
+      surfaceId: owner ? "command:command" : "battle:message",
+      phase: "CommandPhase",
+      uiMode: owner ? "COMMAND" : "MESSAGE",
+      address: { epoch: 73, wave: 1, turn: 3 },
+      membershipRevision: 9,
+      connectionGeneration: 2,
+      stateDigest,
+      localSeat,
+      seatsWithInput: [localSeat],
+      ready: { handlerActive: true, awaitingActionInput: owner ? null : true },
+    },
+  };
+}
+
+test("command frontier accepts one real owner plus the half-wiped partner watcher", () => {
+  const host = { label: "host", publicSeat: 0, evidence: new FakeEvidence("host") };
+  const guest = { label: "guest", publicSeat: 1, evidence: new FakeEvidence("guest") };
+  host.evidence.push(commandFrontierObservation(0, "watcher"));
+  guest.evidence.push(commandFrontierObservation(1, "owner"));
+
+  const match = findSharedCommandFrontierMatch(host, guest, { host: 0, guest: 0 }, null);
+  assert.equal(match?.address, "73:1:3");
+  assert.equal(match?.hostProjection.kind, "watcher");
+  assert.equal(match?.guestProjection.kind, "owner");
+});
+
+test("command frontier rejects owner/watcher digest or generation disagreement", () => {
+  const host = { label: "host", publicSeat: 0, evidence: new FakeEvidence("host") };
+  const guest = { label: "guest", publicSeat: 1, evidence: new FakeEvidence("guest") };
+  host.evidence.push(commandFrontierObservation(0, "watcher", "host-state"));
+  guest.evidence.push(commandFrontierObservation(1, "owner", "guest-state"));
+  assert.equal(findSharedCommandFrontierMatch(host, guest, { host: 0, guest: 0 }, null), null);
+
+  guest.evidence.events[0].observation.stateDigest = "host-state";
+  guest.evidence.events[0].observation.connectionGeneration += 1;
+  assert.equal(findSharedCommandFrontierMatch(host, guest, { host: 0, guest: 0 }, null), null);
+});
+
+test("campaign reward leave cannot send confirm before both semantic confirmation projections exist", async () => {
+  const order = [];
+  const owner = {
+    label: "owner",
+    publicSeat: 0,
+    evidence: new FakeEvidence("owner"),
+    press: async key => order.push(`press:${key}`),
+    waitForOwnedRewardConfirm: async () => {
+      order.push("owner-confirm-ready");
+      return { index: 17 };
+    },
+  };
+  const watcher = {
+    label: "watcher",
+    publicSeat: 1,
+    evidence: new FakeEvidence("watcher"),
+    waitForAddressedRewardWatcher: async () => {
+      order.push("watcher-confirm-ready");
+      return { index: 19 };
+    },
+  };
+  const rig = { clients: { owner, watcher }, config: { timeoutMs: 1_000 } };
+  await driveConfirmedLeave(
+    rig,
+    { name: "reward", keys: ["Backspace", "Space"], confirmSurfaceId: "reward:confirm" },
+    owner,
+    { address: { epoch: 73, wave: 1, turn: 4 }, stateDigest: "settled" },
+  );
+  assert.deepEqual(order, ["press:Backspace", "owner-confirm-ready", "watcher-confirm-ready", "press:Space"]);
+});
 
 function at(ms) {
   return new Date(ms).toISOString();
@@ -328,6 +406,7 @@ test("sequential command driver submits the first owner before waiting for the p
     first: firstEvidence.events.at(-1).index,
     second: secondEvidence.events.at(-1).index,
   });
+  assert.equal(result.expectedCommandAddress, "73:1:2");
 });
 
 test("sequential command driver accepts an exact-address collection close when the partner slot cannot act", async () => {
@@ -381,6 +460,7 @@ test("sequential command driver accepts an exact-address collection close when t
   assert.equal(secondProof.kind, "sequential-command-proof");
   assert.equal(secondProof.skippedAfterCollectionClosed, true);
   assert.equal(secondProof.collectionClosedObservedBy, "first");
+  assert.equal(result.expectedCommandAddress, "73:1:2");
 });
 
 function marketObservation({ localSeat, ownerSeat, marketOpen, stock, money, quantity }) {

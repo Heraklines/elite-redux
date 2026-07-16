@@ -328,7 +328,7 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
 
   it("routes turn and replacement publication through one all-or-nothing authority capture", () => {
     const root = join(__dirname, "..", "..", "..", "..", "src");
-    const turnEnd = readFileSync(join(root, "phases", "turn-end-phase.ts"), "utf8");
+    const turnEnd = readFileSync(join(root, "phases", "coop-turn-commit-phase.ts"), "utf8");
     const replacement = readFileSync(join(root, "phases", "coop-push-replacement-checkpoint-phase.ts"), "utf8");
     for (const [label, source] of [
       ["turnResolution", turnEnd],

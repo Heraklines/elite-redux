@@ -79,6 +79,11 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(harness, /difficulty-\$\{this\.config\.difficultyId\}-attested/u);
   assert.match(campaign, /\[2, "mystery"\][\s\S]*\[6, "mystery"\][\s\S]*\[9, "bargain"\][\s\S]*\[10, "mystery"\]/u);
   assert.match(campaign, /watcherSurfaceId: "mystery-encounter:message"/u);
+  assert.match(campaign, /async function driveConfirmedLeave\(/u);
+  assert.match(campaign, /owner\.waitForOwnedRewardConfirm\(/u);
+  assert.match(campaign, /watcher\.waitForAddressedRewardWatcher\(/u);
+  assert.match(campaign, /campaign-semantic-confirmation-barrier/u);
+  assert.match(campaign, /await driveConfirmedLeave\(rig, driver, client, mechanicalBoundary\.authority\)/u);
   assert.match(campaign, /event\.terminal\.wave === wave \+ 1/u);
   assert.match(campaign, /if \(nextBoundary\.wave <= event\.wave\)/u);
   assert.match(campaign, /mysteryEvents: mysteryCoverage\.events/u);

@@ -41,6 +41,7 @@ import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { BattlerIndex } from "#enums/battler-index";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -233,7 +234,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     // Drive a REAL host turn: the human TACKLEs (single-target -> target select), the guest auto-resolves.
     game.move.select(MoveId.TACKLE, BattlerIndex.PLAYER, enemy0.getBattlerIndex());
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
     // Let the emit (sent on a microtask) land on the partner.
     await new Promise(r => setTimeout(r, 0));
 
@@ -254,6 +255,31 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     // The faint event names the KOd enemy's battler index.
     const faint = events.find(e => e.k === "faint");
     expect(faint?.k === "faint" ? faint.bi : -1).toBe(enemy0.getBattlerIndex());
+  });
+
+  it("(A) commits Yawn sleep only after the delayed TurnEnd status phase has settled", async () => {
+    const field = await startCoopHost();
+    const sleeper = field[COOP_GUEST_FIELD_INDEX];
+    sleeper.addTag(BattlerTagType.DROWSY, 1);
+
+    let emittedState: ReturnType<typeof completeTurnCarrier>["authoritativeState"] | null = null;
+    getCoopRuntime()!.partnerTransport!.onMessage(message => {
+      if (message.t === "turnResolution") {
+        emittedState = message.authoritativeState;
+      }
+    });
+
+    game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
+    game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(sleeper.status?.effect, "the host materialized Yawn before the commit sentinel").toBe(StatusEffect.SLEEP);
+    const wireSleeper = emittedState?.playerParty.find(pokemon => pokemon.id === sleeper.id);
+    expect(wireSleeper?.status?.effect, "turnResolution carries the settled sleep status").toBe(StatusEffect.SLEEP);
+    expect(wireSleeper?.status?.sleepTurnsRemaining, "turnResolution carries the authoritative sleep duration").toBe(
+      sleeper.status?.sleepTurnsRemaining,
+    );
   });
 
   it("(A) a StatStageChangePhase under an open recording records a statStage event with the NEW ABSOLUTE stage", async () => {

@@ -266,6 +266,7 @@ export function buildDispatchTable(policy) {
       v2SurfaceId: "reward-shop",
       owner: { marker: REWARD_OWNER },
       keys: policy.rewardMode === "pick-first" ? policy.keys.rewardPickFirst : policy.keys.rewardLeave,
+      confirmSurfaceId: policy.rewardMode === "pick-first" ? null : "reward:confirm",
     },
     {
       name: "biome-shop",
@@ -275,6 +276,7 @@ export function buildDispatchTable(policy) {
       owner: { marker: BIOME_SHOP_OWNER },
       keys: policy.keys.biomeShopLeave,
       market: policy.market,
+      confirmSurfaceId: policy.market?.mode === "target-held" ? null : "confirm:BiomeShopPhase",
     },
     {
       name: "crossroads",

@@ -465,6 +465,108 @@ function findSharedSurfaceMatch(host, guest, surface, cursors, priorAddress, all
   return null;
 }
 
+function commandFrontierProjection(client, event) {
+  if (event?.kind !== "browser-surface2") {
+    return null;
+  }
+  const observation = event.observation;
+  const address = observation?.address;
+  if (
+    observation?.coop !== true
+    || observation.localSeat !== client.publicSeat
+    || !Number.isSafeInteger(address?.epoch)
+    || !Number.isSafeInteger(address?.wave)
+    || !Number.isSafeInteger(address?.turn)
+    || !Number.isSafeInteger(observation.membershipRevision)
+    || !Number.isSafeInteger(observation.connectionGeneration)
+    || typeof observation.stateDigest !== "string"
+    || observation.stateDigest.length === 0
+    || observation.ready?.handlerActive !== true
+  ) {
+    return null;
+  }
+  const owner =
+    observation.surfaceId === "command:command"
+    && observation.operationClass === "command"
+    && observation.phase === "CommandPhase"
+    && observation.uiMode === "COMMAND"
+    && observation.seatsWithInput?.includes(client.publicSeat);
+  const watcher =
+    observation.surfaceId === "battle:message"
+    && observation.operationClass === "battle-progress"
+    && observation.phase === "CommandPhase"
+    && observation.uiMode === "MESSAGE"
+    && observation.ready.awaitingActionInput === true;
+  if (!owner && !watcher) {
+    return null;
+  }
+  return {
+    event,
+    observation,
+    kind: owner ? "owner" : "watcher",
+    address: `${address.epoch}:${address.wave}:${address.turn}`,
+  };
+}
+
+function observedCommandFrontiers(client, from) {
+  return client.evidence.events
+    .slice(from)
+    .map(event => commandFrontierProjection(client, event))
+    .filter(Boolean)
+    .toReversed();
+}
+
+export function findSharedCommandFrontierMatch(
+  host,
+  guest,
+  cursors,
+  priorAddress,
+  { allowAddressRepeat = false, expectedWave = null, expectedAddress = null } = {},
+) {
+  const hostEvents = observedCommandFrontiers(host, cursors[host.label] ?? 0);
+  const guestEvents = observedCommandFrontiers(guest, cursors[guest.label] ?? 0);
+  for (const hostProjection of hostEvents) {
+    const observation = hostProjection.observation;
+    if (
+      (!allowAddressRepeat && priorAddress === hostProjection.address)
+      || (expectedWave != null && observation.address.wave !== expectedWave)
+      || (expectedAddress != null && hostProjection.address !== expectedAddress)
+    ) {
+      continue;
+    }
+    const guestProjection = guestEvents.find(candidate => {
+      const peer = candidate.observation;
+      return (
+        candidate.address === hostProjection.address
+        && peer.membershipRevision === observation.membershipRevision
+        && peer.connectionGeneration === observation.connectionGeneration
+        && peer.stateDigest === observation.stateDigest
+      );
+    });
+    if (guestProjection == null || (hostProjection.kind !== "owner" && guestProjection.kind !== "owner")) {
+      continue;
+    }
+    return {
+      hostProjection,
+      guestProjection,
+      address: hostProjection.address,
+      comparable: {
+        surface: "command",
+        epoch: observation.address.epoch,
+        membershipRevision: observation.membershipRevision,
+        connectionGeneration: observation.connectionGeneration,
+        wave: observation.address.wave,
+        turn: observation.address.turn,
+        phase: "CommandPhase",
+        stateDigest: observation.stateDigest,
+        hostProjection: hostProjection.kind,
+        guestProjection: guestProjection.kind,
+      },
+    };
+  }
+  return null;
+}
+
 const DIGEST_PARTS = /\[coop-browser:digest-parts\] (\{.*\})/u;
 
 /** The latest per-component digest breakdown a client emitted for `address`, or null. */
@@ -1235,13 +1337,18 @@ export class DuoPublicUiRig {
   }
 
   async waitForAllLocalCommandsDrivingBattlePrompts(from, purpose) {
-    const clients = Object.values(this.clients);
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
     const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, purpose, {
       requireSharedCommandAddress: false,
     });
     while (Date.now() < progressBudget.observe()) {
-      if (clients.every(client => findOwnedCommandOrTerminal(client, from[client.label]) != null)) {
+      if (
+        this.host
+        && this.guest
+        && findSharedCommandFrontierMatch(this.host, this.guest, from, this.lastSharedSurfaceAddress.get("command"), {
+          allowAddressRepeat: true,
+        }) != null
+      ) {
         break;
       }
       if (await advanceBattlePrompt()) {
@@ -1249,14 +1356,14 @@ export class DuoPublicUiRig {
       }
       await delay(100);
     }
-    for (const client of clients) {
-      const event = findOwnedCommandOrTerminal(client, from[client.label]);
-      if (event == null) {
-        throw new Error(`${client.label}: timed out waiting for owned command while ${purpose}`);
-      }
-      if (event.kind !== "browser-surface2" && !LOCAL_COMMAND.test(event.text ?? "")) {
-        throw new Error(`${client.label}: shared session terminated before owned CommandPhase: ${event.text}`);
-      }
+    if (
+      !this.host
+      || !this.guest
+      || findSharedCommandFrontierMatch(this.host, this.guest, from, this.lastSharedSurfaceAddress.get("command"), {
+        allowAddressRepeat: true,
+      }) == null
+    ) {
+      throw new Error(`${purpose}: timed out waiting for an addressed command owner/watcher frontier`);
     }
   }
 
@@ -1754,6 +1861,56 @@ export class DuoPublicUiRig {
     return sharedComparable;
   }
 
+  /**
+   * Prove one addressed command frontier without assuming both players have a living
+   * battler. Each browser must publish the same epoch/revision/generation/wave/turn and
+   * mechanical digest. At least one side must own an actionable command UI; a side with
+   * no legal battler is represented by its real CommandPhase partner-waiting message.
+   */
+  async assertSharedCommandFrontier(
+    cursors,
+    proofName,
+    { allowAddressRepeat = false, expectedWave = null, expectedAddress = null } = {},
+  ) {
+    const host = this.host;
+    const guest = this.guest;
+    if (!host || !guest) {
+      throw new Error(`${proofName}: paired host/guest command observations were unavailable`);
+    }
+    const priorAddress = this.lastSharedSurfaceAddress.get("command");
+    const deadline = Date.now() + this.config.timeoutMs;
+    let match = null;
+    while (Date.now() < deadline && match == null) {
+      match = findSharedCommandFrontierMatch(host, guest, cursors, priorAddress, {
+        allowAddressRepeat,
+        expectedWave,
+        expectedAddress,
+      });
+      if (match == null) {
+        await delay(100);
+      }
+    }
+    if (match == null) {
+      const latest = client => observedCommandFrontiers(client, cursors[client.label] ?? 0)[0] ?? null;
+      throw new Error(
+        `${proofName}: clients never converged on one addressed command owner/watcher frontier; `
+          + `host=${JSON.stringify(latest(host)?.observation ?? null)} `
+          + `guest=${JSON.stringify(latest(guest)?.observation ?? null)}`,
+      );
+    }
+    this.lastSharedSurfaceAddress.set("command", match.address);
+    for (const client of Object.values(this.clients)) {
+      const projection = client === host ? match.hostProjection : match.guestProjection;
+      client.evidence.record("shared-command-frontier-proof", {
+        proofName,
+        address: match.address,
+        projection: projection.kind,
+        observation: match.comparable,
+      });
+    }
+    return match.comparable;
+  }
+
   async assertRetainedContinuation(cursors, proofName) {
     if (!this.host || !this.guest) {
       throw new Error(`${proofName}: retained continuation proof requires a paired host and guest`);
@@ -1963,7 +2120,7 @@ export class DuoPublicUiRig {
       this.pendingCommanderBoundary = boundary;
     } else {
       await this.waitForAllLocalCommandsDrivingBattlePrompts(phaseCursors, "fresh-wave-1-intro");
-      const boundary = await this.assertSharedSurface("command", phaseCursors, "fresh-wave-1-command", {
+      const boundary = await this.assertSharedCommandFrontier(phaseCursors, "fresh-wave-1-command", {
         expectedWave: 1,
       });
       this.activeBattleWave = boundary.wave;
@@ -1992,7 +2149,7 @@ export class DuoPublicUiRig {
     await guestClient.press("Space", "guest-accept-resume-offer");
     await this.completePairingBinding();
     await this.waitForAllLocalCommandsDrivingBattlePrompts(resumeCursors, "resume-battle-intro");
-    const boundary = await this.assertSharedSurface("command", resumeCursors, "resumed-command", {
+    const boundary = await this.assertSharedCommandFrontier(resumeCursors, "resumed-command", {
       allowAddressRepeat: true,
       expectedWave,
     });
@@ -2009,20 +2166,21 @@ export class DuoPublicUiRig {
     );
     let pendingCommandProof = null;
     for (let turn = 1; turn <= this.config.maxTurns; turn++) {
-      const { outcomeCursors } = await this.driveSequentialCommandRound(
+      const { outcomeCursors, expectedCommandAddress } = await this.driveSequentialCommandRound(
         commandCursors,
         this.config.keys.battle,
         `turn-${turn}-first-move`,
       );
       if (pendingCommandProof != null) {
-        await this.assertSharedSurface("command", pendingCommandProof.cursors, pendingCommandProof.name, {
+        await this.assertSharedCommandFrontier(pendingCommandProof.cursors, pendingCommandProof.name, {
           expectedWave: this.activeBattleWave,
+          expectedAddress: expectedCommandAddress,
         });
         await this.assertRetainedContinuation(pendingCommandProof.cursors, pendingCommandProof.name);
         pendingCommandProof = null;
       }
 
-      const outcome = await this.waitForPostTurnOutcome(outcomeCursors);
+      const outcome = await this.waitForPostTurnOutcome(outcomeCursors, { expectedCommandAddress });
       if (outcome.kind === "reward") {
         await this.assertSharedSurface("reward", outcomeCursors, `turn-${turn}-reward`, {
           expectedWave: this.activeBattleWave,
@@ -2216,7 +2374,11 @@ export class DuoPublicUiRig {
         outcomeCursor: outcomeCursors[client.label],
       });
     }
-    return { commandEvents, outcomeCursors };
+    const expectedCommandAddress =
+      submittedCommandAddress == null
+        ? null
+        : `${submittedCommandAddress.epoch}:${submittedCommandAddress.wave}:${submittedCommandAddress.turn}`;
+    return { commandEvents, outcomeCursors, expectedCommandAddress };
   }
 
   async waitForPostTurnOutcome(from, { expectedCommandAddress = null, progressBudgetOptions = {} } = {}) {
@@ -2349,7 +2511,7 @@ export class DuoPublicUiRig {
       this.assertNoFatalRecoverySince(commandCursors, "retained reward to wave-2 Commander command");
     } else {
       await this.waitForAllLocalCommandsDrivingBattlePrompts(commandCursors, "next-wave-intro");
-      const boundary = await this.assertSharedSurface("command", commandCursors, "wave-2-command", {
+      const boundary = await this.assertSharedCommandFrontier(commandCursors, "wave-2-command", {
         expectedWave,
       });
       this.activeBattleWave = boundary.wave;

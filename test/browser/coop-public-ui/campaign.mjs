@@ -528,21 +528,24 @@ async function driveBattleWave(rig, policy, stats) {
   const fallbackWindow = Math.min(rig.config.timeoutMs, 15_000);
   for (let turn = 1; turn <= rig.config.maxTurns; turn++) {
     const purpose = `wave-${stats.wave}-turn-${turn}`;
-    const { outcomeCursors } = await rig.driveSequentialCommandRound(
+    const { outcomeCursors, expectedCommandAddress } = await rig.driveSequentialCommandRound(
       commandCursors,
       policy.keys.battle,
       `${purpose}-attack-first`,
     );
     if (pendingCommandProof != null) {
-      await rig.assertSharedSurface("command", pendingCommandProof.cursors, pendingCommandProof.name, {
+      await rig.assertSharedCommandFrontier(pendingCommandProof.cursors, pendingCommandProof.name, {
         expectedWave: rig.activeBattleWave,
+        expectedAddress: expectedCommandAddress,
       });
       await rig.assertRetainedContinuation(pendingCommandProof.cursors, pendingCommandProof.name);
       pendingCommandProof = null;
     }
     stats.turns = turn;
     const from = outcomeCursors;
-    const advanceBattlePrompt = createBattlePromptAdvancer(rig, from, stats, purpose);
+    const advanceBattlePrompt = createBattlePromptAdvancer(rig, from, stats, purpose, {
+      expectedCommandAddress,
+    });
     let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow, {
       stopOnTurnProgress: true,
       stopOnOwnedCommandFrontier: true,
@@ -1015,6 +1018,69 @@ async function checkpointPairedMechanicalSurface(rig, surfaceId, cursors, owner)
   for (const client of Object.values(rig.clients)) {
     client.evidence.record("campaign-semantic-convergence", proof);
   }
+  return { authority, ownerEvent, peerEvents };
+}
+
+/**
+ * A leave action is two separate public surfaces, not a timing-based key macro. Open
+ * the confirmation, prove that exact addressed handler is actionable, and only then
+ * submit the remaining key(s). This is load-bearing on throttled remote Chromium.
+ */
+export async function driveConfirmedLeave(rig, driver, owner, authority) {
+  const [openConfirmKey, ...confirmKeys] = driver.keys;
+  if (!openConfirmKey || confirmKeys.length === 0 || !driver.confirmSurfaceId) {
+    throw new Error(`[campaign-readiness] ${driver.name} semantic leave has no open/confirm key split`);
+  }
+  const clients = Object.values(rig.clients);
+  const watcher = clients.find(client => client !== owner);
+  if (watcher == null) {
+    throw new Error(`[campaign-readiness] ${driver.name} semantic leave has no paired watcher`);
+  }
+  const confirmationCursors = fromEach(clients, client => client.evidence.cursor());
+  await owner.press(openConfirmKey, `campaign-${driver.name}-open-confirm`);
+
+  let ownerConfirm;
+  if (driver.confirmSurfaceId === "reward:confirm") {
+    [ownerConfirm] = await Promise.all([
+      owner.waitForOwnedRewardConfirm(confirmationCursors[owner.label], authority.address),
+      watcher.waitForAddressedRewardWatcher(confirmationCursors[watcher.label], owner.publicSeat, authority.address),
+    ]);
+  } else {
+    ownerConfirm = await owner.evidence.waitForCondition(
+      sink => {
+        const candidate = sink.findLastSemanticSurface(confirmationCursors[owner.label], driver.confirmSurfaceId);
+        const observation = candidate?.observation;
+        return observation != null
+          && observation.localSeat === owner.publicSeat
+          && observation.ownerSeat === owner.publicSeat
+          && observation.seatsWithInput?.includes(owner.publicSeat)
+          && observation.selectedOptionId === "yes"
+          && JSON.stringify(observation.address) === JSON.stringify(authority.address)
+          && observation.stateDigest === authority.stateDigest
+          && isActionableSemanticObservation(observation)
+          ? candidate
+          : null;
+      },
+      {
+        timeoutMs: rig.config.timeoutMs,
+        description: `actionable ${driver.confirmSurfaceId} at the exact ${driver.name} address`,
+      },
+    );
+  }
+  const proof = {
+    surface: driver.name,
+    confirmSurfaceId: driver.confirmSurfaceId,
+    address: authority.address,
+    stateDigest: authority.stateDigest,
+    ownerSeat: owner.publicSeat,
+    confirmationEventIndex: ownerConfirm.index,
+  };
+  for (const client of clients) {
+    client.evidence.record("campaign-semantic-confirmation-barrier", proof);
+  }
+  for (const [index, key] of confirmKeys.entries()) {
+    await owner.press(key, `campaign-${driver.name}-confirm:${index + 1}/${confirmKeys.length}`);
+  }
 }
 
 /** Drive at most one pending between-wave surface. Returns the surface name driven, or null. */
@@ -1035,6 +1101,7 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
             : driver.name === "reward" && stats.mysteryEvents.some(event => event.terminal == null)
               ? "reward"
               : null;
+    let mechanicalBoundary = null;
     if (mysteryStage === "bargain") {
       await checkpointAsymmetricBargainSurface(rig, cursors, stats, client);
     } else if (mysteryStage != null && driver.v2SurfaceId) {
@@ -1043,11 +1110,13 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
         return "target-reached";
       }
     } else if (driver.v2SurfaceId) {
-      await checkpointPairedMechanicalSurface(rig, driver.v2SurfaceId, cursors, client);
+      mechanicalBoundary = await checkpointPairedMechanicalSurface(rig, driver.v2SurfaceId, cursors, client);
     }
     await client.checkpoint(`wave-${stats.wave}-${driver.name}-owner`);
     if (driver.name === "biome-shop" && driver.market?.mode === "target-held") {
       stats.market = await driveTargetedMarket(rig, cursors, driver.market);
+    } else if (driver.confirmSurfaceId && mechanicalBoundary != null) {
+      await driveConfirmedLeave(rig, driver, client, mechanicalBoundary.authority);
     } else {
       await client.sequence(driver.keys, `campaign-${driver.name}`);
     }
@@ -1159,9 +1228,8 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
       return { status: "terminal" };
     }
 
-    if (allClientsAtOwnedCommandFrontier(clients, commandCursors)) {
-      await Promise.all(clients.map(client => client.waitForLocalCommand(commandCursors[client.label])));
-      const boundary = await rig.assertSharedSurface("command", commandCursors, `wave-${waveOrdinal}-advance`, {
+    if (clients.some(client => findOwnedCommandFrontier(client, commandCursors[client.label]) != null)) {
+      const boundary = await rig.assertSharedCommandFrontier(commandCursors, `wave-${waveOrdinal}-advance`, {
         allowAddressRepeat: true,
       });
       rig.activeBattleWave = boundary.wave;
