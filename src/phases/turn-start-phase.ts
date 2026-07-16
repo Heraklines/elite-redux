@@ -2,8 +2,8 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { TurnCommand } from "#app/battle";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
-import { ConditionalDamageAbAttr } from "#data/elite-redux/archetypes/conditional-damage";
 import { erShatteredPsycheMaybeFuse } from "#data/elite-redux/abilities/shattered-psyche";
+import { ConditionalDamageAbAttr } from "#data/elite-redux/archetypes/conditional-damage";
 import { summonCoopPlayerField } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {

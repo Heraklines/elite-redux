@@ -260,7 +260,12 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   it("(A) commits Yawn sleep only after the delayed TurnEnd status phase has settled", async () => {
     const field = await startCoopHost();
     const sleeper = field[COOP_GUEST_FIELD_INDEX];
-    sleeper.addTag(BattlerTagType.DROWSY, 1);
+    expect(sleeper.addTag(BattlerTagType.DROWSY), "the test installed Yawn's real Drowsy tag").toBe(true);
+    // DrowsyTag deliberately owns its two-turn duration and ignores addTag's generic turnCount.
+    // Put that real tag on its final tick so this one turn proves the delayed status boundary.
+    const drowsy = sleeper.getTag(BattlerTagType.DROWSY);
+    expect(drowsy).toBeDefined();
+    drowsy!.turnCount = 1;
 
     const emittedStates: ReturnType<typeof completeTurnCarrier>["authoritativeState"][] = [];
     getCoopRuntime()!.partnerTransport!.onMessage(message => {

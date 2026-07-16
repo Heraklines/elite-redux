@@ -2142,11 +2142,11 @@ export async function driveGuestReplayTurn(
   // phase object changes every iteration anyway). The #847 finishTurnNoStream path still terminates the
   // loop cleanly: on a host stall the pump ends WITHOUT a CoopFinalizeTurnPhase, so the next current phase
   // is a turn-end phase outside this set and the loop returns.
-  // `replay` has already been started above (either explicitly or by the real phase-manager
-  // transition). An async replay phase can remain current across several transport drains; starting
-  // that same object again would create a duplicate same-address authority waiter and make the first
-  // waiter look like a host failure. Start each phase object at most once.
-  let startedPhase: Phase | null = replay;
+  // A detached/current replay was started explicitly above. The production-boundary branch only
+  // installed it through the test phase manager (whose automatic starter is inert), so it still needs
+  // exactly one start in the loop. An async replay can then remain current across several transport
+  // drains; never start that same object a second time.
+  let startedPhase: Phase | null = replayStarted ? null : replay;
   let lastPhase: Phase | null = null;
   let stall = 0;
   for (let i = 0; i < 256; i++) {
