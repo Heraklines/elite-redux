@@ -750,6 +750,11 @@ export class TitlePhase extends Phase {
     let flowRuntime: CoopRuntime | null = null;
     let flowController: CoopRuntime["controller"] | null = null;
     let flowGeneration: number | null = null;
+    // Lobby polling may reorder the live player list while a human is moving from
+    // a highlighted row to ACTION. Preserve the highlighted player by identity,
+    // never by its transient array index.
+    let selectedLobbyOptionId: string | null = null;
+    let panelGeneration = 0;
 
     const isCurrentFlow = (): boolean =>
       !lobbyTerminated
@@ -797,8 +802,11 @@ export class TitlePhase extends Phase {
     // state change REPLACES the panel rather than stacking a new one. An incoming
     // join request takes over the panel (Accept / Decline) until it is answered.
     const renderPanel = () => {
+      const generation = ++panelGeneration;
       const opts: OptionSelectItem[] = [];
+      let initialCursor = 0;
       if (incoming) {
+        selectedLobbyOptionId = null;
         const from = incoming;
         opts.push(
           {
@@ -822,17 +830,49 @@ export class TitlePhase extends Phase {
           },
         );
       } else {
+        const selectedPlayerId = selectedLobbyOptionId?.startsWith("player:")
+          ? selectedLobbyOptionId.slice("player:".length)
+          : null;
+        const selectedPlayerStillPresent = selectedPlayerId == null || lastPlayers.some(p => p.id === selectedPlayerId);
+        if (!selectedPlayerStillPresent) {
+          opts.push({
+            label: "That player left - choose again",
+            handler: () => false,
+            onHover: () => {
+              selectedLobbyOptionId = null;
+            },
+          });
+        }
         for (const p of lastPlayers) {
+          const optionIndex = opts.length;
+          if (`player:${p.id}` === selectedLobbyOptionId) {
+            initialCursor = optionIndex;
+          }
           opts.push({
             label: `Ask ${p.name} to play`,
+            onHover: () => {
+              selectedLobbyOptionId = `player:${p.id}`;
+            },
             handler: () => {
+              // The player can disappear during the final input frame. Do not let
+              // a stale row request somebody else or fall through to Cancel.
+              if (!lastPlayers.some(player => player.id === p.id)) {
+                renderPanel();
+                return false;
+              }
               void controller?.request(p.id, p.name);
               return true;
             },
           });
         }
+        if (selectedLobbyOptionId === "cpu") {
+          initialCursor = opts.length;
+        }
         opts.push({
           label: "Play vs CPU",
+          onHover: () => {
+            selectedLobbyOptionId = "cpu";
+          },
           handler: () => {
             stage.destroy();
             controller?.cancel();
@@ -842,8 +882,14 @@ export class TitlePhase extends Phase {
           },
         });
       }
+      if (selectedLobbyOptionId === "cancel") {
+        initialCursor = opts.length;
+      }
       opts.push({
         label: i18next.t("menu:cancel"),
+        onHover: () => {
+          selectedLobbyOptionId = "cancel";
+        },
         handler: () => {
           backToTitle();
           return true;
@@ -855,9 +901,23 @@ export class TitlePhase extends Phase {
       // 8px above the screen edge so it sits INSIDE the stage's ACTIONS dock (no overlap
       // with the seat cards), xOffset 2 gives it a right margin, maxOptions bounds a busy
       // lobby to a scrolling list instead of a screen-tall tower.
-      globalScene.ui.showText("", null, () =>
-        globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options: opts, maxOptions: 6, xOffset: 2, yOffset: 40 }),
-      );
+      globalScene.ui.showText("", null, () => {
+        if (generation !== panelGeneration || lobbyTerminated || lobbyCompleted) {
+          return;
+        }
+        globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
+          options: opts,
+          maxOptions: 6,
+          xOffset: 2,
+          yOffset: 40,
+          initialCursor,
+          supportHover: true,
+          // Swallow a key that was already in flight when polling repainted the
+          // menu. This is short enough to be imperceptible but closes the exact
+          // select-then-Cancel race seen by real browsers and humans.
+          delay: 150,
+        });
+      });
     };
 
     controller = new CoopLobbyController(username, {

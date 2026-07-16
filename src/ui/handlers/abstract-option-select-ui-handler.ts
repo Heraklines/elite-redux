@@ -17,6 +17,8 @@ export interface OptionSelectConfig {
   delay?: number;
   noCancel?: boolean;
   supportHover?: boolean;
+  /** Initial cursor in the selectable (non-skipped) option list. */
+  initialCursor?: number;
 }
 
 export interface OptionSelectItem {
@@ -205,7 +207,8 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
     this.optionSelectContainer.setVisible(true);
     this.scrollCursor = 0;
     this.fullCursor = 0;
-    this.setCursor(0);
+    const initialCursor = Math.max(0, Math.min(this.config.initialCursor ?? 0, this.unskippedIndices.length - 1));
+    this.setCursor(initialCursor);
 
     if (this.config.delay) {
       this.blockInput = true;
