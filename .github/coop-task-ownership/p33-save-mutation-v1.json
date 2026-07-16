@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "p33-save-mutation-v1",
+  "branch": "ci/coop/p33-save-mutation-v1",
+  "trainRef": "ci/coop/p33-final-merge-codex",
+  "baseSha": "1e94b2f41448b69585351ee5ed48994b047c3b86",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-save-mutation-v1.json",
+    "src/ui/handlers/save-slot-select-ui-handler.ts",
+    "test/tests/elite-redux/coop/coop-save-slot-mutation-ui.test.ts"
+  ]
+}
