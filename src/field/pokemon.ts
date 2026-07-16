@@ -68,6 +68,7 @@ import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { erLibraryCastIsSpecial, erLibraryDamageMultiplier } from "#data/elite-redux/abilities/library";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
 import { erOmniformRevertOnLeaveField } from "#data/elite-redux/abilities/omniform";
+import { erShatteredPsycheOnLeaveField } from "#data/elite-redux/abilities/shattered-psyche";
 import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
 import { getGraftedTypes } from "#data/elite-redux/abilities/type-graft";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
@@ -7790,6 +7791,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // ER Omniform (5929): revert an adaptive-transform holder to its pre-battle
     // species/form + stats (summonData was already reset above).
     erOmniformRevertOnLeaveField(this);
+    // ER Shattered Psyche (5968): when a fused entity leaves the field, split its
+    // HP back proportionally, restore its own max HP, and clear the blended look.
+    erShatteredPsycheOnLeaveField(this);
     this.switchOutStatus = true;
     globalScene.triggerPokemonFormChange(this, SpeciesFormChangeActiveTrigger, true);
     globalScene.field.remove(this, destroy);

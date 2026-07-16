@@ -92,6 +92,7 @@ const HYDRAPEX = 5931;
 const BAD_SPLICE = 5932;
 const WORLD_IN_PIECES = 5917;
 const GENESIS_SUPERNOVA = 5937;
+const SHATTERED_PSYCHE = 5968;
 // Mega Skarmory Z / Mega Dragonite Z (formKey-collision rows, cleared 2026-07-15).
 const POWER_EDGE = 5362; // ER draft
 const KEEN_EDGE = 5009; // ER custom
@@ -287,8 +288,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     item: FormChangeItem.PLANETARY_ORB,
   },
   // #6 Primal Mew — Psychic. Active Bad Splice (5932); innates Brain Food (5936),
-  // Genesis Supernova (5937), and the PARKED "Shattered Psyche" slot (AbilityId.NONE
-  // placeholder — maintainer to supply the definition). Orb Embryonic Orb.
+  // Genesis Supernova (5937), and Shattered Psyche (5968). Orb Embryonic Orb.
   {
     baseSpecies: SpeciesId.MEW,
     formKey: "primal",
@@ -297,8 +297,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     types: [PokemonType.PSYCHIC],
     stats: [100, 110, 130, 110, 130, 120],
     actives: [ab(BAD_SPLICE), ab(BAD_SPLICE), ab(BAD_SPLICE)],
-    // NONE = parked Shattered Psyche slot (documented TODO; not yet defined).
-    innates: [ab(ER_BRAIN_FOOD_ABILITY_ID), ab(GENESIS_SUPERNOVA), AbilityId.NONE],
+    innates: [ab(ER_BRAIN_FOOD_ABILITY_ID), ab(GENESIS_SUPERNOVA), ab(SHATTERED_PSYCHE)],
     item: FormChangeItem.EMBRYONIC_ORB,
   },
   // #9 Mega Skarmory Z — Steel/Flying/Dragon (N-type). Additive `mega-z` key
