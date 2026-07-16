@@ -62,6 +62,7 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
   assert.doesNotMatch(journeys, /pressUntilExactDeleteRequest|attempt <= 3/u);
   assert.match(journeys, /"\/savedata\/session\/coop-cas-delete"/u);
   assert.match(journeys, /soloWrite\.index <= deleteResponse\.index/u);
+  assert.match(journeys, /client\.waitForLocalCommand\(mutationCursor\)/u);
   assert.match(journeys, /sessionStorageKeys\(deletedCold\)/u);
   assert.match(harness, /browser\.createBrowserContext\(\)/u);
   assert.match(harness, /brand-new cookie jar and local storage/u);
@@ -89,4 +90,8 @@ test("save journey requires public UI, exact CAS ACK ordering, and a brand-new c
   );
   assert.match(journeys, /confirmDefaultStarterTeam\(client, \{[\s\S]*?fromCursor: starterPhase\.index/u);
   assert.match(browserEntry, /inputBlockedRaw[\s\S]*?typeof inputBlockedRaw === "boolean"/u);
+  assert.match(
+    harness,
+    /semantic\?\.observation\.coop === false[\s\S]*?ownerModel === "local"[\s\S]*?seatsWithInput\?\.includes\(0\)/u,
+  );
 });
