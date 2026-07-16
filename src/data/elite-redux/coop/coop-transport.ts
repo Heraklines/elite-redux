@@ -1215,7 +1215,8 @@ export type CoopMessage =
   /** Authenticated public P33-architecture hello. The signaling bearer is intentionally never peer-visible. */
   | {
       t: "hello";
-      version: "er-coop-37";
+      /** Single-source protocol stamp: this arm must advance whenever COOP_PROTOCOL_VERSION advances. */
+      version: typeof COOP_PROTOCOL_VERSION;
       pairingId: string;
       account: CoopAccountIdentityV1;
       transportRole: CoopTransportRole;

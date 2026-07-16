@@ -25,6 +25,8 @@ import { CoopSessionController } from "#data/elite-redux/coop/coop-session-contr
 import { COOP_PROTOCOL_VERSION, type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { coopP33GameplayRole } from "#data/elite-redux/coop/coop-webrtc-connect";
 import { GameModes } from "#enums/game-modes";
+import { readFileSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const identity = {
@@ -94,6 +96,18 @@ afterEach(() => {
 });
 
 describe("authenticated P33 browser client", () => {
+  it("derives the authenticated hello protocol type from the single runtime version constant", () => {
+    const source = readFileSync(resolvePath(process.cwd(), "src/data/elite-redux/coop/coop-transport.ts"), "utf8");
+    const start = source.indexOf("/** Authenticated public P33-architecture hello.");
+    const end = source.indexOf("/** Authority-authored immutable session binding.", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const authenticatedHelloArm = source.slice(start, end);
+
+    expect(authenticatedHelloArm).toContain("version: typeof COOP_PROTOCOL_VERSION;");
+    expect(authenticatedHelloArm).not.toMatch(/version:\s*"er-coop-\d+"/u);
+  });
+
   it("retries a lost announce response with the exact same ticket and random client nonce", async () => {
     const calls: { url: string; init?: RequestInit }[] = [];
     let attempt = 0;
@@ -298,7 +312,7 @@ describe("authenticated P33 browser client", () => {
 
     remote.send({
       t: "hello",
-      version: "er-coop-37",
+      version: COOP_PROTOCOL_VERSION,
       pairingId: "PAIR33",
       account: replica,
       transportRole: "offerer",
@@ -381,7 +395,7 @@ describe("authenticated P33 browser client", () => {
     expect(controller.p33FrameContext()).toBeNull();
     remote.send({
       t: "hello",
-      version: "er-coop-37",
+      version: COOP_PROTOCOL_VERSION,
       pairingId: "PAIR33",
       account: replica,
       transportRole: "offerer",
