@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import {
+  applyErCustomTrainerDisplayName,
   applyErCustomTrainerPresentation,
   buildErCustomTrainerMember,
   clearErCustomTrainerDevForce,
@@ -102,7 +103,7 @@ export function installErCustomTrainerForCurrentWave(): void {
       undefined,
       configOverride,
     );
-    trainer.name = resolved.name;
+    applyErCustomTrainerDisplayName(trainer, resolved.name);
     // Per-trainer BATTLE MUSIC (this battle only). trainerConfigs[type] is a
     // SHARED singleton, so we must NOT mutate config.battleBgm — instead we
     // shadow the INSTANCE getters (exactly how a ghost battle overrides its

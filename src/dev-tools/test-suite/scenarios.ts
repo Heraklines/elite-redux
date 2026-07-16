@@ -99,6 +99,8 @@ export interface DevScenario {
   description: string;
   /** Apply Overrides and return the player party. */
   setup: () => Starter[];
+  /** Optional per-slot levels applied while the staged party is constructed. */
+  startingLevels?: readonly number[];
   /** Run mode to create. Defaults to CLASSIC. */
   gameMode?: GameModes;
   /** Optional setup that needs the freshly-created gameMode. */
@@ -340,6 +342,18 @@ function usableGhostMembers(ghost: GhostTeamSnapshot): GhostMember[] {
   return ghost.party.filter(member => !!getPokemonSpecies(member.speciesId)).slice(0, 6);
 }
 
+/** Scale a ghost roster to a new top level without flattening its saved level gaps. */
+export function translatePreparedGhostLevels(
+  members: readonly Pick<GhostMember, "level">[],
+  targetTopLevel: number,
+): number[] {
+  const sourceTopLevel = Math.max(1, ...members.map(member => Math.max(1, Math.floor(member.level) || 1)));
+  return members.map(member => {
+    const sourceLevel = Math.max(1, Math.floor(member.level) || 1);
+    return Math.max(1, targetTopLevel - (sourceTopLevel - sourceLevel));
+  });
+}
+
 /** Restore every resolvable held item stored on a sampled ghost roster. */
 export function applyPreparedGhostHeldItems(party: readonly PlayerPokemon[], members: readonly GhostMember[]): number {
   const registry = modifierTypes as Record<string, ModifierTypeFunc | undefined>;
@@ -403,6 +417,7 @@ export function buildErCustomTrainerDevScenario(
   const gameMode =
     prepared.ghost.mode === "challenge" || challenges.length > 0 ? GameModes.CHALLENGE : GameModes.CLASSIC;
   const targetLevel = getGameMode(gameMode).getMaxExpLevelForWave(wave);
+  const startingLevels = translatePreparedGhostLevels(members, targetLevel);
   const challengeText =
     challenges.length > 0 ? `${challenges.length} stored challenge setting(s)` : "no stored challenges";
   const scenario: DevScenario = {
@@ -413,11 +428,12 @@ export function buildErCustomTrainerDevScenario(
       + `(run ended at wave ${prepared.ghost.waveReached}, ${members.length} mons, ${challengeText}, `
       + `${prepared.candidateCount} eligible ghost(s)).\n`
       + "DO: fight it. EXPECT the authored party, sprite + gender, aura, battle\n"
-      + "music, intro / victory / defeat lines, weighted slots + slot-fill, RLA /\n"
+      + "music, title/name order, dialogue, weighted slots + slot-fill, RLA /\n"
       + "RLNA move rolls, shiny-lab looks and Insanity ability/innate overrides,\n"
-      + `at the wave-${wave} player cap (Lv${targetLevel}), with the ghost's held items.\n`
+      + `with the ghost's relative levels scaled to a Lv${targetLevel} top, plus held items.\n`
       + "Reset repeats this exact trainer, wave and team.",
     gameMode,
+    startingLevels,
     setup: () => {
       resetDevOverrides();
       // Keep the force pending until immediately before newBattle(). Title-screen

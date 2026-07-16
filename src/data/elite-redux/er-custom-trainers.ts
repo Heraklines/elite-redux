@@ -1585,6 +1585,33 @@ export function applyErCustomTrainerPresentation(trainer: Trainer, resolved: ErC
   }
 }
 
+/**
+ * Apply the authored custom-trainer name without reversing named NPC titles.
+ * Generic classes keep the engine's normal "class + authored name" behavior.
+ * Named classes (Gym Leaders, Elite Four, Champions, etc.) already own a
+ * canonical personal name, so the authored value is their prefix/title:
+ * `Leader + Sabrina` must render as `Leader Sabrina`, never `Sabrina Leader`.
+ */
+export function applyErCustomTrainerDisplayName(trainer: Trainer, authoredName: string): void {
+  const customName = authoredName.trim();
+  if (!customName) {
+    return;
+  }
+  if (!trainer.config.title) {
+    trainer.name = customName;
+    return;
+  }
+
+  const config = trainer.config;
+  const variant = trainer.variant;
+  trainer.name = config.getTitle(TrainerSlot.TRAINER, variant);
+  trainer.partnerName = config.getTitle(TrainerSlot.TRAINER_PARTNER, variant);
+  trainer.getName = (slot: TrainerSlot = TrainerSlot.NONE, includeTitle = false): string => {
+    const name = config.getTitle(slot, variant);
+    return includeTitle ? `${customName} ${name}`.trim() : name;
+  };
+}
+
 /** Resolve one member's authored held items to `HeldModifierConfig[]` (enemy-legal pool). */
 export function erCustomTrainerHeldModifierConfigs(member: ErCustomTrainerMemberResolved): HeldModifierConfig[] {
   const out: HeldModifierConfig[] = [];

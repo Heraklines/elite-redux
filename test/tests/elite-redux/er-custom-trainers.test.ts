@@ -24,10 +24,11 @@
 // =============================================================================
 
 import { planErCustomTrainerLaunch, summarizeErCustomTrainer } from "#app/dev-tools/test-suite/custom-trainer-picker";
-import { applyPreparedGhostHeldItems } from "#app/dev-tools/test-suite/scenarios";
+import { applyPreparedGhostHeldItems, translatePreparedGhostLevels } from "#app/dev-tools/test-suite/scenarios";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import {
+  applyErCustomTrainerDisplayName,
   applyErCustomTrainerPresentation,
   buildErCustomTrainerMember,
   clearErCustomTrainerDevForce,
@@ -67,6 +68,8 @@ import { Challenges } from "#enums/challenges";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { TrainerSlot } from "#enums/trainer-slot";
+import { TrainerVariant } from "#enums/trainer-variant";
 import type { Trainer } from "#field/trainer";
 import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
@@ -221,6 +224,40 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
   it("uses the same wave cap for scenario construction and live EXP progression", () => {
     expect(globalScene.gameMode.getMaxExpLevelForWave(3)).toBe(10);
     expect(globalScene.gameMode.getMaxExpLevelForWave(153)).toBe(150);
+  });
+
+  it("preserves every sampled ghost member's level gap", () => {
+    const members = [164, 161, 150].map(level => ({ level }));
+    expect(translatePreparedGhostLevels(members, 150)).toEqual([150, 147, 136]);
+  });
+
+  it("renders an authored title before a named trainer class", () => {
+    const namedTrainer = {
+      config: {
+        title: "Gym Leader",
+        getTitle: () => "Sabrina",
+      },
+      variant: TrainerVariant.DEFAULT,
+      name: "",
+      partnerName: "",
+    } as unknown as Trainer;
+
+    applyErCustomTrainerDisplayName(namedTrainer, "Leader");
+
+    expect(namedTrainer.getName(TrainerSlot.NONE, false)).toBe("Sabrina");
+    expect(namedTrainer.getName(TrainerSlot.NONE, true)).toBe("Leader Sabrina");
+  });
+
+  it("keeps generic trainer classes on their normal naming path", () => {
+    const genericTrainer = {
+      config: { title: undefined },
+      name: "",
+    } as unknown as Trainer;
+
+    applyErCustomTrainerDisplayName(genericTrainer, "Calvin");
+
+    expect(genericTrainer.name).toBe("Calvin");
+    expect(Object.hasOwn(genericTrainer, "getName")).toBe(false);
   });
 
   it("restores sampled ghost held items with their stack counts", () => {

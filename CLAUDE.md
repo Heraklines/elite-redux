@@ -704,9 +704,10 @@ ability overrides, BST bypass) - exactly as a real run fields it. The full loop:
    (skipping boss `%10` + fixed-battle waves), then samples a real ghost roster that
    reached that wave within the normal +40 fairness window. It restores stored
    challenge settings when the snapshot carries them, disables the random Mystery
-   Encounter roll, constructs the player roster at that wave's real player level
-   cap, and restores every resolvable per-mon held item from the ghost snapshot
-   before the first battle is created. Do NOT re-level the roster during TurnInit:
+   Encounter roll, scales the roster so its highest member reaches that wave's
+   player cap while every saved per-mon level gap is preserved, and restores every
+   resolvable per-mon held item before the first battle is created. Per-slot levels
+   must be passed into `addPlayerPokemon`; do NOT re-level during TurnInit:
    that leaves the already-built UI and EXP state out of sync. Loading has Cancel;
    failures have Retry + Back. **Reset** repeats the exact prepared trainer,
    wave/ghost/challenges without rerolling; its force is staged until immediately

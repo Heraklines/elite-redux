@@ -45,12 +45,14 @@ import {
   consumePendingDevEnemyParty,
   consumePendingDevPartySetup,
   consumePendingDevShop,
+  consumePendingDevStarterLevels,
   consumePendingDevStarters,
   type DevMenuCtx,
   registerDevMenu,
   setPendingDevBattleSetup,
   setPendingDevPartySetup,
   setPendingDevShop,
+  setPendingDevStarterLevels,
   setPendingDevStarters,
 } from "#app/dev-tools/registry";
 import { getGameMode } from "#app/game-mode";
@@ -599,6 +601,9 @@ function launchScenario(ctx: DevMenuCtx, scenario: DevScenario): boolean {
   try {
     const starters = scenario.setup();
     setPendingDevStarters(starters);
+    if (scenario.startingLevels) {
+      setPendingDevStarterLevels(scenario.startingLevels);
+    }
     if (scenario.onPartyReady) {
       setPendingDevPartySetup(scenario.onPartyReady);
     }
@@ -952,6 +957,7 @@ registerDevMenu(ctx => {
   // "new game dropped me into the old scenario save at Lv50".
   resetDevOverrides();
   consumePendingDevStarters();
+  consumePendingDevStarterLevels();
   consumePendingDevPartySetup();
   consumePendingDevBattleSetup();
   consumePendingDevShop();
