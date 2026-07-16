@@ -4869,11 +4869,17 @@ export function holdForCoopMeBattleSettlementAtBattleEnd(): boolean {
   }
   const pinned = coopMeInteractionStartValue();
   const retained = captureCoopActiveMysteryControl();
+  // A battle-handoff records the turn on which the battle started, so a multi-turn battle legitimately
+  // reaches BattleEnd on a later cursor while the settlement operation is still in retriable delivery.
+  // Once battle-settled itself is retained, its post-BattleEnd terminal turn must match exactly.
+  const retainedTurnMatches =
+    retained?.terminal === "battle" || (retained?.terminal === "battle-settled" && retained.hostTurn === battle.turn);
   if (
     pinned < 0
     || retained?.interactionCounter !== pinned
     || (retained.terminal !== "battle" && retained.terminal !== "battle-settled")
-    || retained.hostTurn !== battle.turn
+    || coopMeHandoffBattleWaveValue() !== battle.waveIndex
+    || !retainedTurnMatches
     || !coopMeHandoffBattleStarted()
   ) {
     failCoopSharedSession(

@@ -49,6 +49,7 @@ import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { GameModes } from "#enums/game-modes";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
+import { StatusEffect } from "#enums/status-effect";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuoForMe,
@@ -192,6 +193,10 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       // not locally-chipped), so the guest must now run the ME victory tail instead of a phantom turn.
       for (const e of enemies) {
         e.hp = 0;
+        e.doSetStatus(StatusEffect.FAINT);
+        e.leaveField(true, true, false);
+        expect(e.isFainted(true), `${e.name} adopted the authoritative faint status`).toBe(true);
+        expect(e.isOnField(), `${e.name} left the field at the authoritative checkpoint`).toBe(false);
       }
       expect(
         coopMeHandoffBattleWon(),
@@ -239,6 +244,10 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       const hostEnemies = hostScene.getEnemyParty();
       for (const enemy of hostEnemies) {
         enemy.hp = 0;
+        enemy.doSetStatus(StatusEffect.FAINT);
+        enemy.leaveField(true, true, false);
+        expect(enemy.isFainted(true), `${enemy.name} completed the real faint boundary`).toBe(true);
+        expect(enemy.isOnField(), `${enemy.name} left the field before Victory`).toBe(false);
       }
       const victory = hostScene.phaseManager.create("VictoryPhase", hostEnemies[0]!.getBattlerIndex());
       expect(hostScene.phaseManager.overridePhase(victory), "host runs the real ME Victory").toBe(true);

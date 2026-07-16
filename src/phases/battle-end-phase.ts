@@ -132,6 +132,8 @@ export class BattleEndPhase extends BattlePhase {
    * ledger owner stable across that delay instead of looking it up again only when BattleEnd eventually starts.
    */
   private readonly retainedWaveBinding: CoopWaveAdvanceOperationBinding | null;
+  /** Whether this exact queued phase was born from a staged wave boundary. */
+  private readonly hasRetainedWaveBoundary: boolean;
   /** The battle this queued phase closes, before a speculative tail can replace `currentBattle`. */
   private readonly retainedSourceWave: number;
   private readonly retainedSourceWasTrainer: boolean;
@@ -153,6 +155,7 @@ export class BattleEndPhase extends BattlePhase {
     this.retainedWaveBinding = getCoopWaveAdvanceRuntimeBinding();
     const retainedBoundary =
       this.retainedWaveBinding == null ? null : getCoopPendingWaveAdvanceBoundary(this.retainedWaveBinding);
+    this.hasRetainedWaveBoundary = retainedBoundary != null;
     this.retainedSourceWave = retainedBoundary?.wave ?? globalScene.currentBattle?.waveIndex ?? -1;
     this.retainedSourceWasTrainer =
       retainedBoundary == null
@@ -171,11 +174,11 @@ export class BattleEndPhase extends BattlePhase {
     globalScene.phaseManager.removeAllPhasesOfType("BattleEndPhase");
 
     const retainedBinding = this.retainedWaveBinding ?? getCoopWaveAdvanceRuntimeBinding();
-    const retainedWaveBoundary = retainedBinding == null ? null : getCoopPendingWaveAdvanceBoundary(retainedBinding);
     // A runtime always owns a wave-ledger binding, including during an ME battle. Only an actual staged
-    // WAVE_ADVANCE boundary makes this BattleEnd wave-owned; otherwise the pinned ME terminal stream owns
-    // settlement and the renderer must park here instead of running shared BattleEnd mutations locally.
-    if (retainedWaveBoundary == null && holdForCoopMeBattleSettlementAtBattleEnd()) {
+    // WAVE_ADVANCE boundary at construction makes this BattleEnd wave-owned. The retained DATA can consume
+    // that pending boundary before the queued phase starts, so re-reading ambient state here misclassifies
+    // an ordinary BattleEnd as an ME settlement after a speculative next battle replaces currentBattle.
+    if (!this.hasRetainedWaveBoundary && holdForCoopMeBattleSettlementAtBattleEnd()) {
       return;
     }
     if (isCoopAuthoritativeGuest() && retainedBinding == null) {
