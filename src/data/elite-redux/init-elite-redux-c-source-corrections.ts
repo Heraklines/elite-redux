@@ -450,6 +450,20 @@ export interface CSourceCorrectionResult {
  */
 let erRemapCallCount = 0;
 
+export interface EliteReduxMoveRemapBootEvidence {
+  readonly changed: number;
+  readonly mapEntries: number;
+  readonly hashBefore: string;
+  readonly hashAfter: string;
+}
+
+let erMoveRemapBootEvidence: EliteReduxMoveRemapBootEvidence | null = null;
+
+/** Read-only proof captured from the first real boot remap call. */
+export function getEliteReduxMoveRemapBootEvidence(): EliteReduxMoveRemapBootEvidence | null {
+  return erMoveRemapBootEvidence;
+}
+
 /** Tiny inline FNV-1a 32-bit over a string, hex - a cheap stable fingerprint for the boot log. */
 function cheapFnv32Hex(s: string): string {
   let h = 0x811c9dc5;
@@ -490,19 +504,18 @@ export function remapEliteReduxMoveIdsByName(): number {
   // Co-op desync diagnostic (#633): fingerprint the shared move id-map state on ENTRY so two
   // clients' boot logs can be compared (do they enter the remap with the same map?).
   const callNo = ++erRemapCallCount;
-  console.info(
-    `[er-remap] call#${callNo} mapEntries=${Object.keys(movesMap).length}`
-      + ` sampleHashBefore=${cheapFnv32Hex(JSON.stringify(movesMap))}`,
-  );
+  const mapEntries = Object.keys(movesMap).length;
+  const hashBefore = cheapFnv32Hex(JSON.stringify(movesMap));
+  console.info(`[er-remap] call#${callNo} mapEntries=${mapEntries} sampleHashBefore=${hashBefore}`);
   const remapped = remapEliteReduxMoveIdsInMap(movesMap);
+  const hashAfter = cheapFnv32Hex(JSON.stringify(movesMap));
+  erMoveRemapBootEvidence ??= Object.freeze({ changed: remapped, mapEntries, hashBefore, hashAfter });
   if (remapped > 0) {
     console.info(`[er-csrc] remapped ${remapped} ER moves to their real MoveIds (by name)`);
   }
   // Co-op desync diagnostic (#633): fingerprint the map state on EXIT, with the change count,
   // so we can see whether this call mutated the shared singleton (and how the two clients diverge).
-  console.info(
-    `[er-remap] call#${callNo} changed=${remapped} sampleHashAfter=${cheapFnv32Hex(JSON.stringify(movesMap))}`,
-  );
+  console.info(`[er-remap] call#${callNo} changed=${remapped} sampleHashAfter=${hashAfter}`);
   return remapped;
 }
 

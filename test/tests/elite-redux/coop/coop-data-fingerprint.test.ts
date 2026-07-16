@@ -18,6 +18,12 @@ import {
   logCanonicalDiff,
   logErDataFingerprint,
 } from "#data/elite-redux/coop/coop-data-fingerprint";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import {
+  getEliteReduxMoveRemapBootEvidence,
+  remapEliteReduxMoveIdsByName,
+} from "#data/elite-redux/init-elite-redux-c-source-corrections";
+import { MoveId } from "#enums/move-id";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /** Structured-clone a fingerprint so a hand-mutation can't alias the original. */
@@ -57,22 +63,14 @@ describe("co-op ER data-table fingerprint (#633, diagnostics)", () => {
       expect(fp.abilitiesData.n).toBe(fp.abilitiesName.n);
     });
 
-    it("boots a fresh real ER move map through all 67 locale-invariant repairs", async () => {
+    it("boots the real ER move map through all 67 locale-invariant repairs", () => {
       // The original #633 regression mocked only the English-name helper, so it stayed green while
-      // the production remap still walked locale-sensitive live Move instances. Reload the actual
-      // generated map + production remap together and prove the complete boot transform here, in the
-      // co-op gate lane that owns the fingerprint compatibility barrier.
-      vi.resetModules();
-      const [idMapModule, correctionModule, moveIdModule] = await Promise.all([
-        import("#data/elite-redux/er-id-map"),
-        import("#data/elite-redux/init-elite-redux-c-source-corrections"),
-        import("#enums/move-id"),
-      ]);
-
-      expect(correctionModule.remapEliteReduxMoveIdsByName()).toBe(67);
-      expect(idMapModule.ER_ID_MAP.moves[868]).toBe(moveIdModule.MoveId.KOWTOW_CLEAVE);
-      expect(idMapModule.ER_ID_MAP.moves[894]).toBe(moveIdModule.MoveId.AXE_KICK);
-      expect(correctionModule.remapEliteReduxMoveIdsByName()).toBe(0);
+      // the production remap still walked locale-sensitive live Move instances. Read the evidence
+      // captured by the actual initializeGame boot call; do not reset modules in shared Lane A.
+      expect(getEliteReduxMoveRemapBootEvidence()?.changed).toBe(67);
+      expect(ER_ID_MAP.moves[868]).toBe(MoveId.KOWTOW_CLEAVE);
+      expect(ER_ID_MAP.moves[894]).toBe(MoveId.AXE_KICK);
+      expect(remapEliteReduxMoveIdsByName()).toBe(0);
     });
   });
 
