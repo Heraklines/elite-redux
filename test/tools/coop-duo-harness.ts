@@ -3983,5 +3983,11 @@ export async function buildShowdownDuo(
   guestRuntime.controller.connect();
   await drainLoopback();
 
-  return { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
+  const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
+  // Showdown rigs own the same two independently assembled runtimes as ordinary co-op rigs. Register
+  // them with the shared afterEach teardown too: clearing only the ambient (usually guest) runtime leaves
+  // the host battle stream's retained replacement timer alive, so a prior test can retransmit an old-epoch
+  // checkpoint into the next match and reopen CoopGuestFaintSwitchPhase after the new replacement settled.
+  liveDuoRigs.add(rig);
+  return rig;
 }
