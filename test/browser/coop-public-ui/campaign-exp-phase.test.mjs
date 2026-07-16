@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  allClientsAtOwnedCommandFrontier,
   clientsAwaitingTurnProgress,
   createAnimationProgressBudget,
   createBattlePromptAdvancer,
@@ -166,6 +167,31 @@ test("owned semantic CommandPhase readiness survives a console-regex miss and en
     ),
     /shared session terminated before owned CommandPhase/u,
   );
+});
+
+test("between-wave completion accepts both semantic command frontiers without legacy console lines", () => {
+  const clients = [0, 1].map(seat => {
+    const evidence = new FakeEvidence([`semantic-only-seat-${seat}`]);
+    evidence.events.push({
+      index: evidence.events.length,
+      kind: "browser-surface2",
+      observation: {
+        surfaceId: "command:command",
+        phase: "CommandPhase",
+        uiMode: "COMMAND",
+        localSeat: seat,
+        seatsWithInput: [seat],
+        ready: { handlerActive: true },
+      },
+    });
+    return { label: `seat-${seat}`, publicSeat: seat, evidence };
+  });
+
+  assert.equal(
+    clients.some(client => client.evidence.find(/CommandPhase .*-> LOCAL UI/u)),
+    false,
+  );
+  assert.equal(allClientsAtOwnedCommandFrontier(clients, { "seat-0": 0, "seat-1": 0 }), true);
 });
 
 function fakeClient(label, texts = []) {

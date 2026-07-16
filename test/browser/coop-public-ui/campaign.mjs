@@ -250,7 +250,7 @@ export function clientsAwaitingTurnProgress(rig, from) {
   return Object.values(rig.clients).filter(client => !client.evidence.find(TURN_PROGRESS, from[client.label] ?? 0));
 }
 
-function findOwnedCommandFrontier(client, from) {
+export function findOwnedCommandFrontier(client, from) {
   const semantic = client.evidence.findLastSemanticSurface(from, "command:command");
   if (
     semantic?.observation.ready?.handlerActive === true
@@ -262,6 +262,11 @@ function findOwnedCommandFrontier(client, from) {
     return semantic;
   }
   return client.evidence.find(LOCAL_COMMAND, from);
+}
+
+/** Every player has reached its own actionable command UI, using semantic evidence first. */
+export function allClientsAtOwnedCommandFrontier(clients, from) {
+  return clients.every(client => findOwnedCommandFrontier(client, from[client.label] ?? 0) != null);
 }
 
 /**
@@ -489,7 +494,7 @@ export async function waitForOutcomeBounded(
         return { kind: "faint", client };
       }
     }
-    if (clients.every(client => client.evidence.find(LOCAL_COMMAND, from[client.label]))) {
+    if (allClientsAtOwnedCommandFrontier(clients, from)) {
       return { kind: "command" };
     }
     if (stopOnOwnedCommandFrontier) {
@@ -518,7 +523,7 @@ export async function waitForOutcomeBounded(
  */
 async function driveBattleWave(rig, policy, stats) {
   const clients = Object.values(rig.clients);
-  let commandCursors = fromEach(clients, client => client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0);
+  let commandCursors = fromEach(clients, client => findOwnedCommandFrontier(client, 0)?.index ?? 0);
   let pendingCommandProof = null;
   const fallbackWindow = Math.min(rig.config.timeoutMs, 15_000);
   for (let turn = 1; turn <= rig.config.maxTurns; turn++) {
@@ -1154,7 +1159,7 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
       return { status: "terminal" };
     }
 
-    if (clients.every(client => client.evidence.find(LOCAL_COMMAND, commandCursors[client.label]))) {
+    if (allClientsAtOwnedCommandFrontier(clients, commandCursors)) {
       await Promise.all(clients.map(client => client.waitForLocalCommand(commandCursors[client.label])));
       const boundary = await rig.assertSharedSurface("command", commandCursors, `wave-${waveOrdinal}-advance`, {
         allowAddressRepeat: true,
