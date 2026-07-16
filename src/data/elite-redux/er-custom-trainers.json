@@ -1487,12 +1487,14 @@
     "battleBgm": "battle_bb_elite",
     "battleType": "double",
     "challenge": "none",
+    "defeatDialogue": "...",
     "difficulties": [
       "elite",
       "hell"
     ],
     "endless": true,
     "id": 70011,
+    "introDialogue": "...",
     "maxWave": 180,
     "minWave": 140,
     "name": "Dagoza",
@@ -1654,6 +1656,8 @@
       }
     ],
     "trainerClass": "HEX_MANIAC",
+    "trainerEffect": "smoke",
+    "victoryDialogue": "...",
     "weight": 50
   }
 }
