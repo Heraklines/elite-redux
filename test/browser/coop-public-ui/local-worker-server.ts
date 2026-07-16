@@ -9,6 +9,7 @@
  * while the browser still traverses the normal fetch/auth/GameData code paths.
  */
 
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
@@ -172,7 +173,10 @@ const identitySecret = "public-browser-local-identity-secret-at-least-32-bytes";
 
 async function dispatchSaveWorker(request: Request): Promise<Response> {
   const url = new URL(request.url);
-  if (request.method === "POST" && url.pathname === "/__coop-fixture/fork-session") {
+  if (
+    request.method === "POST"
+    && (url.pathname === "/__coop-fixture/fork-session" || url.pathname === "/__coop-fixture/session-status")
+  ) {
     let body: { username?: unknown; slot?: unknown };
     try {
       body = (await request.json()) as { username?: unknown; slot?: unknown };
@@ -194,6 +198,13 @@ async function dispatchSaveWorker(request: Request): Promise<Response> {
       .get(username, Number(slot)) as { data?: unknown } | undefined;
     if (typeof row?.data !== "string") {
       return Response.json({ error: "fixture session not found" }, { status: 404 });
+    }
+    if (url.pathname === "/__coop-fixture/session-status") {
+      return Response.json({
+        ok: true,
+        slot,
+        sha256: createHash("sha256").update(row.data).digest("hex"),
+      });
     }
     let session: Record<string, unknown>;
     try {
@@ -223,6 +234,7 @@ async function dispatchSaveWorker(request: Request): Promise<Response> {
       runId: coopRun.runId,
       checkpointRevision: coopRun.checkpointRevision,
       mutation: "money-plus-one-same-revision",
+      sha256: createHash("sha256").update(forked).digest("hex"),
     });
   }
   return saveWorker.fetch(request, {

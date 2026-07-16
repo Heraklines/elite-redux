@@ -371,6 +371,26 @@ async function forkIsolatedCloudReplica(rig, client, slot) {
     );
   }
   client.evidence.record("isolated-cloud-replica-fork", result);
+  return result;
+}
+
+async function isolatedCloudReplicaStatus(rig, client, slot) {
+  const origin = new URL(rig.config.expectedApiOrigin ?? "");
+  if (origin.protocol !== "http:" || origin.hostname !== "127.0.0.1" || origin.port !== "8788") {
+    throw new Error(`resume-scan-isolation fixture refuses non-loopback save origin ${origin.href}`);
+  }
+  const response = await fetch(new URL("/__coop-fixture/session-status", origin), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username: client.credentials.username, slot }),
+  });
+  const result = await response.json();
+  if (!response.ok || result?.ok !== true || result.slot !== slot || !/^[0-9a-f]{64}$/u.test(result.sha256)) {
+    throw new Error(
+      `${client.label}: isolated cloud-replica status failed: ${response.status} ${JSON.stringify(result)}`,
+    );
+  }
+  return result;
 }
 
 async function resumeScanIsolation(rig) {
@@ -387,7 +407,11 @@ async function resumeScanIsolation(rig) {
     }
   }
 
-  await Promise.all(Object.values(rig.clients).map(client => forkIsolatedCloudReplica(rig, client, 0)));
+  const forkedCloud = new Map(
+    await Promise.all(
+      Object.values(rig.clients).map(async client => [client.label, await forkIsolatedCloudReplica(rig, client, 0)]),
+    ),
+  );
   await rig.coldReopenAndPair(rig.config.requesterSeat);
   await rig.host.evidence.waitFor(/resume scan slot=0 load failed/u, {
     from: rig.host.pageCursor,
@@ -414,10 +438,19 @@ async function resumeScanIsolation(rig) {
   if (freshWrite == null) {
     throw new Error(`${rig.host.label}: isolated launch never committed a fresh co-op slot`);
   }
+  const cloudAfter = await Promise.all(
+    Object.values(rig.clients).map(async client => [client, await isolatedCloudReplicaStatus(rig, client, 0)]),
+  );
+  for (const [client, status] of cloudAfter) {
+    if (status.sha256 !== forkedCloud.get(client.label)?.sha256) {
+      throw new Error(`${client.label}: fresh launch mutated quarantined cloud slot zero`);
+    }
+  }
   rig.host.evidence.record("resume-scan-isolation-proof", {
     quarantinedSlot: 0,
     preservedSessionKeys: keys,
     freshWriteResponseIndex: freshWrite.index,
+    quarantinedCloudSha256: cloudAfter.map(([client, status]) => ({ client: client.label, sha256: status.sha256 })),
   });
 }
 

@@ -44,8 +44,11 @@ test("lobby quarantines one save-slot failure and releases a fresh run only thro
   assert.match(journeys, /origin\.hostname !== "127\.0\.0\.1" \|\| origin\.port !== "8788"/u);
   assert.match(journeys, /resume scan slot=0 load failed/u);
   assert.match(journeys, /sessionStorageKeys\(after\)[\s\S]*keys\.length < 2/u);
+  assert.match(journeys, /fresh launch mutated quarantined cloud slot zero/u);
   assert.match(localWorker, /\/__coop-fixture\/fork-session/u);
+  assert.match(localWorker, /\/__coop-fixture\/session-status/u);
   assert.match(localWorker, /session\.money = originalMoney \+ 1/u);
+  assert.match(localWorker, /createHash\("sha256"\)\.update\(forked\)\.digest\("hex"\)/u);
   assert.match(
     localWorker,
     /WHERE user_id = \(SELECT id FROM users WHERE username_lower = \?\) AND slot = \? AND data = \?/u,
