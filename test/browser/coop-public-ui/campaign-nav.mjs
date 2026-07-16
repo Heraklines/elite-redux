@@ -128,8 +128,8 @@ export async function selectFirstEmptySaveSlot(client, { fromCursor = 0, timeout
  * Every transition is observed before the next public key is sent, so text animation or a slow
  * browser cannot reinterpret a later key on the previous screen.
  */
-export async function confirmDefaultStarterTeam(client, { timeoutMs = 15_000 } = {}) {
-  await waitForActionableSemanticSurface(client, "starter-select", { timeoutMs });
+export async function confirmDefaultStarterTeam(client, { fromCursor = client.pageCursor, timeoutMs = 15_000 } = {}) {
+  await waitForActionableSemanticSurface(client, "starter-select", { fromCursor, timeoutMs });
   const optionCursor = client.evidence.cursor();
   await client.press("Space", "starter-open-selected-options");
   await waitForSemanticSurface(client, "option-select:SelectStarterPhase", {
@@ -160,11 +160,15 @@ export async function confirmDefaultStarterTeam(client, { timeoutMs = 15_000 } =
  * Submit and confirm a visible party materialized by a build-gated public-browser fixture.
  * The observer is assertion-only: Enter and Space are still the real public starter UI actions.
  */
-export async function confirmSeededStarterTeam(client, expectedSpecies, { timeoutMs = 15_000 } = {}) {
+export async function confirmSeededStarterTeam(
+  client,
+  expectedSpecies,
+  { fromCursor = client.pageCursor, timeoutMs = 15_000 } = {},
+) {
   const expectedSpeciesIds = Array.isArray(expectedSpecies) ? expectedSpecies : [expectedSpecies];
   const seeded = await client.evidence.waitForCondition(
     sink => {
-      const event = sink.findLastSemanticSurface(0, "starter-select");
+      const event = sink.findLastSemanticSurface(fromCursor, "starter-select");
       return JSON.stringify(event?.observation.teamSpeciesIds) === JSON.stringify(expectedSpeciesIds) ? event : null;
     },
     {
@@ -176,7 +180,7 @@ export async function confirmSeededStarterTeam(client, expectedSpecies, { timeou
     expectedSpeciesIds,
     observation: seeded.observation,
   });
-  await waitForActionableSemanticSurface(client, "starter-select", { timeoutMs });
+  await waitForActionableSemanticSurface(client, "starter-select", { fromCursor, timeoutMs });
   const confirmCursor = client.evidence.cursor();
   await client.press("Enter", "starter-submit-visible-seeded-team");
   await waitForSemanticSurface(client, "confirm:SelectStarterPhase", {

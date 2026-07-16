@@ -1782,8 +1782,14 @@ export class DuoPublicUiRig {
               : null;
           const result =
             expectedSeededSpecies == null
-              ? await confirmDefaultStarterTeam(client, { timeoutMs: this.config.timeoutMs })
-              : await confirmSeededStarterTeam(client, expectedSeededSpecies, { timeoutMs: this.config.timeoutMs });
+              ? await confirmDefaultStarterTeam(client, {
+                  fromCursor: phaseCursors[client.label],
+                  timeoutMs: this.config.timeoutMs,
+                })
+              : await confirmSeededStarterTeam(client, expectedSeededSpecies, {
+                  fromCursor: phaseCursors[client.label],
+                  timeoutMs: this.config.timeoutMs,
+                });
           return [client.label, result.launchCursor];
         }),
       ),

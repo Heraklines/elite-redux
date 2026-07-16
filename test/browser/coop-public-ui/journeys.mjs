@@ -176,12 +176,15 @@ async function overwriteCoopSaveWithSoloRun(client) {
   if (CHALLENGE_PHASE.test(entry.text ?? "")) {
     await client.sequence(client.config.keys.challenge, "overwrite-solo-challenge-start");
   }
-  await client.evidence.waitFor(STARTER_PHASE, {
+  const starterPhase = await client.evidence.waitFor(STARTER_PHASE, {
     from: client.pageCursor,
     timeoutMs: client.config.timeoutMs,
     description: "solo starter selection before overwrite",
   });
-  const { launchCursor } = await confirmDefaultStarterTeam(client, { timeoutMs: client.config.timeoutMs });
+  const { launchCursor } = await confirmDefaultStarterTeam(client, {
+    fromCursor: starterPhase.index,
+    timeoutMs: client.config.timeoutMs,
+  });
   await waitForSemanticSurface(client, "option-select:SelectStarterPhase", {
     fromCursor: launchCursor,
     timeoutMs: client.config.timeoutMs,
