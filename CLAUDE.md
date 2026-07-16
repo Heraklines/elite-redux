@@ -886,6 +886,16 @@ item below has bitten us.
 - **Verify each surface with a test.** The battle path passing does NOT imply the
   save/party/starter/egg/Pokedex paths pass — they use different accessors. Add a
   handler/data-tier test per surface (see `er-newcomer-integration-sweep.test.ts`).
+- 🔴 **MANDATORY RENDER SWEEP (hard requirement, maintainer directive) — every new
+  species AND every new form MUST render a REAL, NON-EMPTY sprite on EVERY surface
+  it can appear on: (a) SUMMARY, (b) STARTER SELECT, (c) COMBAT front AND back,
+  (d) DEX page.** This is a PIXEL-LEVEL gate, not a key-resolution check: it
+  resolves the atlas path each surface actually uses (species-level for dex/starter
+  — the #287 bug path — and form-level for combat/summary) and decodes the frame
+  from er-assets, failing on a 404/wrong path OR empty art. Add every new mon/form
+  to the parametrized sweep **`test/tests/elite-redux/er-newcomer-render-sweep.test.ts`**
+  (`ER_SCENARIO=1`). A newcomer that is not in this sweep, or that fails it, is NOT
+  shippable — this test is the pass/fail gate for the READY verdict.
 
 ## Deploy
 
