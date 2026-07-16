@@ -515,7 +515,7 @@ function renderProfileView(text) {
     || typeof value.gameSpeed !== "number"
     || !Number.isFinite(value.gameSpeed)
     || value.gameSpeed <= 0
-    || value.handler !== "SettingsDisplayUiHandler"
+    || (value.handler !== "SettingsUiHandler" && value.handler !== "SettingsDisplayUiHandler")
   ) {
     throw new Error("built browser emitted an invalid render-profile observation");
   }
@@ -860,7 +860,12 @@ export class EvidenceSink {
   findRenderProfile(moveAnimations, from = 0) {
     return this.events
       .slice(from)
-      .find(event => event.kind === "browser-render-profile" && event.observation.moveAnimations === moveAnimations);
+      .find(
+        event =>
+          event.kind === "browser-render-profile"
+          && event.observation.handler === "SettingsDisplayUiHandler"
+          && event.observation.moveAnimations === moveAnimations,
+      );
   }
 
   findGameSpeed(gameSpeed, from = 0) {

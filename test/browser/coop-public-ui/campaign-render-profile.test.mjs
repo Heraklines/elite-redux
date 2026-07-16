@@ -72,6 +72,13 @@ test("browser render-profile markers are validated and indexed as evidence", () 
   assert.equal(sink.findGameSpeed(10)?.observation.gameSpeed, 10);
   assert.equal(sink.findRenderProfile(true), undefined);
 
+  const generalCursor = sink.cursor();
+  emitConsole(
+    '[coop-browser:render-profile] {"version":1,"moveAnimations":true,"gameSpeed":10,"handler":"SettingsUiHandler"}',
+  );
+  assert.equal(sink.findGameSpeed(10, generalCursor)?.observation.handler, "SettingsUiHandler");
+  assert.equal(sink.findRenderProfile(true, generalCursor), undefined);
+
   emitConsole('[coop-browser:render-profile] {"version":1,"moveAnimations":"false","gameSpeed":10}');
   assert.equal(sink.failures.at(-1)?.kind, "browser-surface-invalid");
 });

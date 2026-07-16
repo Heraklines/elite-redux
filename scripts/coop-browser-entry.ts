@@ -758,14 +758,15 @@ function semanticBattleAddress(battle: { waveIndex: number; turn: number } | nul
 }
 
 /**
- * Attest the real Display-settings value while that visible menu is open. The campaign
- * reaches this handler only through public keys; this probe is read-only and lets an
- * animations-skipped depth result remain visibly distinct from animations-on coverage.
+ * Attest the real settings values while the visible General or Display menu is open. The campaign
+ * reaches these handlers only through public keys; this probe is read-only and proves Game Speed
+ * in General while keeping animations-skipped depth visibly distinct from animations-on coverage.
  */
 function observeRenderProfile(): void {
   try {
     const handler = globalScene?.ui?.getHandler();
-    if (!handler?.active || handler.constructor?.name !== "SettingsDisplayUiHandler") {
+    const handlerName = handler?.constructor?.name;
+    if (!handler?.active || (handlerName !== "SettingsUiHandler" && handlerName !== "SettingsDisplayUiHandler")) {
       // A later Settings visit must emit a fresh attestation even when the saved value
       // did not change (the speed setup opens Settings before the render-profile pass).
       lastObservedRenderProfile = "";
@@ -775,7 +776,7 @@ function observeRenderProfile(): void {
       version: 1,
       moveAnimations: globalScene.moveAnimations,
       gameSpeed: globalScene.gameSpeed,
-      handler: "SettingsDisplayUiHandler",
+      handler: handlerName,
     } as const;
     const canonical = JSON.stringify(observation);
     if (canonical === lastObservedRenderProfile) {
