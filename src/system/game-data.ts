@@ -3551,7 +3551,16 @@ export class GameData {
       return { slot: empty, overwrote: null };
     }
     const accountIdentity = this.currentPersistenceAccount();
-    const candidates: { slot: number; unreadable: boolean; timestamp: number; wave: number | null }[] = [];
+    // Divergent/quarantined replicas (readable locally but conflicting with their cloud copy - the
+    // live slot-4 class) are unresumable garbage and must be reclaimed BEFORE any healthy save.
+    // The isolated lobby snapshot already classifies them without aborting on one.
+    let quarantinedSlots = new Set<number>();
+    try {
+      quarantinedSlots = new Set((await this.getCoopResumeLobbySnapshot()).failures.keys());
+    } catch (error) {
+      coopWarn("launch", "reclaim ranking could not classify quarantined slots", error);
+    }
+    const candidates: { slot: number; garbage: boolean; timestamp: number; wave: number | null }[] = [];
     for (let slot = 0; slot < 5; slot++) {
       const raw = localStorage.getItem(this.sessionStorageKeyForAccount(slot, accountIdentity));
       if (raw == null) {
@@ -3564,20 +3573,20 @@ export class GameData {
         const session = this.parseSessionData(decrypt(raw, bypassLogin));
         candidates.push({
           slot,
-          unreadable: false,
+          garbage: quarantinedSlots.has(slot),
           timestamp: session.timestamp ?? 0,
           wave: session.waveIndex ?? null,
         });
       } catch {
-        candidates.push({ slot, unreadable: true, timestamp: 0, wave: null });
+        candidates.push({ slot, garbage: true, timestamp: 0, wave: null });
       }
     }
-    candidates.sort((a, b) => Number(b.unreadable) - Number(a.unreadable) || a.timestamp - b.timestamp);
+    candidates.sort((a, b) => Number(b.garbage) - Number(a.garbage) || a.timestamp - b.timestamp);
     for (const candidate of candidates) {
       coopLog(
         "launch",
         `fresh co-op launch reclaiming least-recent save slot=${candidate.slot} `
-          + `wave=${candidate.wave ?? "?"} unreadable=${candidate.unreadable}`,
+          + `wave=${candidate.wave ?? "?"} garbage=${candidate.garbage}`,
       );
       if (!(await this.deleteSession(candidate.slot))) {
         coopWarn("launch", `least-recent reclamation delete failed slot=${candidate.slot}; trying next candidate`);
@@ -3845,7 +3854,10 @@ export class GameData {
           && (bypassLogin
             || (inspection.cloudCas?.mode === "existing" && inspection.cloudCas.runId === commitment.runId));
 
-        for (let attempt = 0; attempt < 2; attempt++) {
+        // Maintainer directive (2026-07-17): the GUEST's checkpoint copy reclaims a slot like the
+        // host's fresh launch - at most ONCE per persist so a mis-ranked account cannot cascade.
+        let reclaimedForCheckpoint = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
           const marker = readCoopResumeMarker(controller.localName(), partner);
           const markerMatchesRun = marker?.runId === commitment.runId;
           const markerInspection = markerMatchesRun && marker?.slot != null ? await inspectSlot(marker.slot) : null;
@@ -3898,6 +3910,32 @@ export class GameData {
             coopWarn("launch", `guest checkpoint selected empty slot=${selected.slot} inspections=[${summary}]`);
           }
           if (selected == null || !exactRuntimeIsCurrent()) {
+            // Maintainer directive (2026-07-17, live report test4/Heraklines1): a guest whose five
+            // slots are all occupied or unavailable must not NACK the launch checkpoint into a
+            // shared terminal. Reclaim the least valuable slot ONCE - divergent/unreadable replicas
+            // first (they are unresumable), then the OLDEST occupied save that is NOT this run's
+            // slot - through the full cloud-safe delete, then re-run the same inspection.
+            if (exactRuntimeIsCurrent() && !reclaimedForCheckpoint) {
+              reclaimedForCheckpoint = true;
+              const reclaim =
+                allInspections.find(inspection => inspection.kind === "unavailable")
+                ?? allInspections
+                  .filter(
+                    (inspection): inspection is Extract<ResumeSlotInspection, { kind: "occupied" }> =>
+                      inspection.kind === "occupied" && !exactRunSlot(inspection),
+                  )
+                  .sort((a, b) => (a.stored.session.timestamp ?? 0) - (b.stored.session.timestamp ?? 0))[0];
+              if (reclaim != null) {
+                coopWarn(
+                  "launch",
+                  `guest checkpoint has no safe slot; reclaiming least-recent slot=${reclaim.slot} kind=${reclaim.kind}`,
+                );
+                if (await this.deleteSession(reclaim.slot)) {
+                  continue;
+                }
+                coopWarn("launch", `guest checkpoint reclamation delete failed slot=${reclaim.slot}`);
+              }
+            }
             if (exactRuntimeIsCurrent()) {
               recordCoopResumeUnavailableEvidence(
                 controller.localName(),
