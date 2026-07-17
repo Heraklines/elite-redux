@@ -1,0 +1,22 @@
+===== COOP SOAK RESULT =====
+profile: journey
+verdict: FAIL
+waves_requested: 45
+run_mode: calibrated-release
+calibration_id: journey-45-thirteen-event
+target_sha: 4026bf6ca7d4f8095cb9cf7a0008d303b88479d5
+checked_out_sha: 4026bf6ca7d4f8095cb9cf7a0008d303b88479d5
+base_seed: 20260717
+campaign_seed: fixed-in-test (matrix candidate 20260717 not consumed)
+run: 29565689975 (workflow source 4026bf6ca7d4f8095cb9cf7a0008d303b88479d5)
+timestamp: 2026-07-17T08-16-07Z
+
+----- driver lines -----
+(no [coop-soak] lines captured)
+
+----- vitest result tail -----
+[llm-director-log] writing to /home/runner/work/elite-redux/elite-redux/llm-director-trace.jsonl
+[er-dev-log] capture endpoint ready → /home/runner/work/elite-redux/elite-redux/dev-logs (captures/ + results.log preserved)
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.5 [39m[90m/home/runner/work/elite-redux/elite-redux[39m
+
