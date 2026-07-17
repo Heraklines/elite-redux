@@ -448,4 +448,42 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       );
     }
   });
+
+  it("retires late replacement authority only after the retained wave continuation is durably released", () => {
+    const source = readFileSync(
+      join(
+        __dirname,
+        "..",
+        "..",
+        "..",
+        "..",
+        "src",
+        "data",
+        "elite-redux",
+        "coop",
+        "coop-runtime.ts",
+      ),
+      "utf8",
+    );
+    const start = source.indexOf("function maybeMarkCoopWaveContinuationReady(");
+    const end = source.indexOf("export function notifyCoopWaveContinuationSurfaceReady(", start);
+    expect(start, "the retained wave readiness seam exists").toBeGreaterThanOrEqual(0);
+    expect(end, "the retained wave readiness seam has a bounded source section").toBeGreaterThan(start);
+
+    const body = source.slice(start, end);
+    const durableRelease = body.indexOf("completeRetainedWaveAdvance(");
+    const releaseGuard = body.indexOf("if (released)", durableRelease);
+    const replacementRetirement = body.indexOf(
+      "runtime.battleStream.acknowledgeReplacementsSubsumedByOperation(staged.envelope)",
+      releaseGuard,
+    );
+    expect(durableRelease, "the exact WAVE_ADVANCE transaction must release first").toBeGreaterThanOrEqual(0);
+    expect(releaseGuard, "a rejected/duplicate durability proof cannot retire replacement authority").toBeGreaterThan(
+      durableRelease,
+    );
+    expect(
+      replacementRetirement,
+      "the applied WAVE_ADVANCE DATA image retires an older late replacement only after release",
+    ).toBeGreaterThan(releaseGuard);
+  });
 });

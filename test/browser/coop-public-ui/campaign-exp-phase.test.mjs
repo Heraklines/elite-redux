@@ -232,11 +232,57 @@ test("phase presence waits for its declared semantic UI before judging owner evi
     kind: "browser-surface2",
     observation: { surfaceId: "egg:lapse", localSeat: 0, ownerSeat: 1 },
   });
+  assert.equal(
+    resolveSurfaceOwner(rig, driver, cursors, new Map(), true),
+    null,
+    "a watcher may publish the addressed surface before the reciprocal owner projection",
+  );
+  renderer.evidence.events.push({
+    index: renderer.evidence.events.length,
+    kind: "browser-surface2",
+    observation: { surfaceId: "egg:lapse", localSeat: 1, ownerSeat: 0 },
+  });
   assert.throws(
     () => resolveSurfaceOwner(rig, driver, cursors, new Map(), true),
     /never reported an owner/u,
-    "once the semantic surface exists, malformed owner evidence still fails loudly",
+    "once both semantic mirrors exist, malformed owner evidence still fails loudly",
   );
+});
+
+test("a delayed reciprocal semantic owner supersedes the provisional watcher surface", () => {
+  const watcher = fakeClient("watcher");
+  const owner = fakeClient("owner");
+  const rig = { host: watcher, clients: { watcher, owner } };
+  const driver = {
+    name: "mystery-encounter",
+    present: /Start Phase MysteryEncounterPhase/u,
+    v2SurfaceId: "mystery-encounter",
+    owner: { role: "host" },
+  };
+  const cursors = { watcher: 0, owner: 0 };
+  watcher.evidence.events.push({
+    index: watcher.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "mystery-encounter",
+      localSeat: 0,
+      ownerSeat: 1,
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+    },
+  });
+  assert.equal(resolveSurfaceOwner(rig, driver, cursors, new Map(), true), null);
+
+  owner.evidence.events.push({
+    index: owner.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "mystery-encounter",
+      localSeat: 1,
+      ownerSeat: 1,
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+    },
+  });
+  assert.equal(resolveSurfaceOwner(rig, driver, cursors, new Map(), true)?.client, owner);
 });
 
 test("semantic owner remains driveable when its earlier legacy OWNER line is outside the cursor", () => {

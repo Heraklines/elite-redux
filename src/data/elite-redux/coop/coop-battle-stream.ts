@@ -24,7 +24,10 @@
 
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import type {
+  CoopAuthoritativeEnvelopeV1,
+  CoopWaveAdvancePayload,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import type { CoopFrameContextV1 } from "#data/elite-redux/coop/coop-session-binding";
 import type {
   CoopAuthoritativeBattleStateV1,
@@ -740,6 +743,27 @@ function replacementIsCausallyDominatedBy(
     && addressAdvanced
     && authority.revision > retained.revision
     && authority.authoritativeState.tick > retained.authoritativeState.tick
+  );
+}
+
+/**
+ * A completed retained operation belongs to a separate revision namespace from battle-stream authority.
+ * Compare its exact applied DATA image instead: the same session, a non-older battle address, and a strictly
+ * newer state tick prove that the older replacement material is present in the applied state.
+ */
+function replacementIsSubsumedByOperation(
+  retained: CoopCheckpointEnvelope,
+  authority: CoopAuthoritativeEnvelopeV1,
+): boolean {
+  const state = authority.authoritativeState;
+  const addressNotOlder =
+    authority.wave > retained.wave || (authority.wave === retained.wave && authority.turn >= retained.turn);
+  return (
+    authority.sessionEpoch === retained.epoch
+    && authority.wave === state.wave
+    && authority.turn === state.turn
+    && addressNotOlder
+    && state.tick > retained.authoritativeState.tick
   );
 }
 
@@ -2324,6 +2348,59 @@ export class CoopBattleStreamer {
       `guest ACK replacement stage=${stage} e=${envelope.epoch} wave=${envelope.wave} turn=${envelope.turn} rev=${envelope.revision}`,
     );
     return true;
+  }
+
+  /**
+   * Complete older replacement ACK chains from a separately-retained operation's stronger state proof.
+   *
+   * Callers may use this only after the operation's exact authoritative DATA applied and its real public
+   * continuation opened. This closes the live race where a replacement checkpoint arrives after the same
+   * replacement was already incorporated into WAVE_ADVANCE: the late checkpoint cannot safely reopen a
+   * replay phase, but leaving it unacknowledged makes the host retry until terminal failure.
+   */
+  acknowledgeReplacementsSubsumedByOperation(authority: CoopAuthoritativeEnvelopeV1): number {
+    if (this.authorityTerminalStarted || authority.pendingOperation?.kind !== "WAVE_ADVANCE") {
+      return 0;
+    }
+    const candidates = [...this.seenReplacementAuthority.values()]
+      .map(seen => copyAdmittedAuthority(seen))
+      .filter(envelope => replacementIsSubsumedByOperation(envelope, authority))
+      .sort(
+        (left, right) =>
+          left.wave - right.wave
+          || left.turn - right.turn
+          || left.authoritativeState.tick - right.authoritativeState.tick
+          || left.revision - right.revision,
+      );
+    let completed = 0;
+    for (const envelope of candidates) {
+      const key = authorityKey(envelope);
+      const prior = this.ackedReplacementCommits.get(key);
+      const firstStage =
+        prior == null ? 0 : prior.stage === "materialApplied" ? 1 : prior.stage === "presentationReady" ? 2 : 3;
+      const stages: readonly CoopAuthorityAckStage[] = [
+        "materialApplied",
+        "presentationReady",
+        "continuationReady",
+      ];
+      for (let index = firstStage; index < stages.length; index++) {
+        if (!this.acknowledgeReplacement(envelope, stages[index])) {
+          return completed;
+        }
+      }
+      if (firstStage === stages.length && !this.acknowledgeReplacement(envelope, "continuationReady")) {
+        return completed;
+      }
+      this.pendingCheckpoints.delete(bufferedAuthorityKey("replacement", envelope));
+      this.appliedOutOfBandCheckpoints.delete(bufferedAuthorityKey("replacement", envelope));
+      completed++;
+      coopLog(
+        "checkpoint",
+        `guest ACK replacement through newer operation state key=${key} operation=${authority.pendingOperation?.kind ?? "none"} `
+          + `stateTick=${authority.authoritativeState.tick}`,
+      );
+    }
+    return completed;
   }
 
   registerTurnContinuation(

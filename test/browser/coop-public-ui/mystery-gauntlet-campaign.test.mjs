@@ -143,6 +143,25 @@ test("the companion solo lane publicly selects a readiness-proven empty save slo
   assert.match(solo, /await selectFirstEmptySaveSlot\(client,/u);
 });
 
+test("the high-frequency semantic observer caches only its expensive digest on a fixed SLA", async () => {
+  const observer = await readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8");
+  assert.match(observer, /function semanticMechanicalDigest\(key: string\)/u);
+  assert.match(
+    observer,
+    /key === semanticDigestCacheKey && now - semanticDigestCacheAt < 1_000[\s\S]*return semanticDigestCache/u,
+  );
+  assert.match(
+    observer,
+    /semanticMechanicalDigest\(\s*`watcher:\$\{runtime\.controller\.sessionEpoch\}:/u,
+    "the replay-waiter path that previously digested at 10 Hz must use the cache",
+  );
+  assert.doesNotMatch(
+    observer,
+    /rendererWaitReady === true[\s\S]{0,700}computeMechanicalDigest\(\)/u,
+    "a parked replay waiter must not walk the full state on every 100 ms observer poll",
+  );
+});
+
 test("parallel lobby pairing reselects the exact visible username before every request", async () => {
   const [harness, titlePhase] = await Promise.all([
     readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),

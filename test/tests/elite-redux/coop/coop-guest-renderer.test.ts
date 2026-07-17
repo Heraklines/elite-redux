@@ -1663,4 +1663,38 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(rebuiltNonBoss!.bossSegments, "a non-boss remains at canonical zero segments after correction").toBe(0);
     expect(rebuiltNonBoss!.bossSegmentIndex, "a non-boss remains at canonical zero index after correction").toBe(0);
   });
+
+  it("keeps the carrier's exact boss segment index when HP-derived state is one shield behind", async () => {
+    await startCoopGuest();
+    const boss = globalScene.getEnemyField(false)[0];
+    boss.setBoss(true, 2);
+    boss.hp = Math.ceil(boss.getMaxHp() * 0.75);
+    boss.bossSegmentIndex = 0;
+    expect(
+      boss.getBossSegmentIndex(),
+      "fixture reproduces the deep-soak boundary where deriving from HP would restore a broken shield",
+    ).toBe(1);
+
+    const carrier = coopEngine.captureCoopAuthoritativeCarrier(1, "turnResolution");
+    expect(carrier, "the exact turn carrier is complete").not.toBeNull();
+    const captured = carrier!;
+    const fieldBoss = captured.fullField.find(mon => mon.bi === BattlerIndex.ENEMY);
+    const seatBoss = captured.authoritativeState.field.find(
+      seat => seat.side === "enemy" && seat.bi === BattlerIndex.ENEMY,
+    );
+    expect(fieldBoss?.bossSegmentIndex, "rich companion carries the live host index").toBe(0);
+    expect(seatBoss?.bossSegmentIndex, "id-keyed state carries the same live host index").toBe(0);
+
+    boss.bossSegmentIndex = 1;
+    expect(
+      coopEngine.applyCoopAuthoritativeBattleState(captured.authoritativeState, true),
+      "id-keyed authority applies before the rich companion",
+    ).toBe(true);
+    expect(boss.bossSegmentIndex, "id-keyed authority restores the exact host index").toBe(0);
+    coopEngine.applyCoopFieldSnapshot(captured.fullField, true);
+    expect(
+      boss.bossSegmentIndex,
+      "the later rich companion must not overwrite exact authority with an HP-derived index",
+    ).toBe(0);
+  });
 });

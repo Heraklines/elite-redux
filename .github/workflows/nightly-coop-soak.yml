@@ -16,13 +16,15 @@ name: Nightly Co-op Soak
 #            run a DIFFERENT test path (coop-soak-me + coop-soak-asymmetric), not the default
 #            soak, so the ME / asymmetric surfaces get nightly coverage instead of orphaning
 #            behind a manual invocation. This leg NEVER touches the byte-identical default soak.
-# Manually dispatchable on demand with a custom wave count / base seed. The three god runners use
-# stable, widely separated offsets from that base; the me-asym/journey legs hardcode their own content:
+# Manually dispatchable either as the calibrated six-profile release milestone or as an explicitly
+# diagnostic run. The planner freezes ONE checkpoint SHA and ONE base seed before the matrix fans out.
+# The three god runners use stable, widely separated offsets from that base; the me-asym/journey legs
+# hardcode their own content and declare that fixed-input contract in their attestations:
 #
 #   gh workflow run nightly-coop-soak.yml --ref feat/elite-redux-port \
-#       -R Heraklines/elite-redux -f soak_waves=200
+#       -R Heraklines/elite-redux -f run_mode=calibrated-release
 #   gh workflow run nightly-coop-soak.yml --ref feat/elite-redux-port \
-#       -R Heraklines/elite-redux -f soak_waves=50 -f soak_seed=12345
+#       -R Heraklines/elite-redux -f run_mode=diagnostic -f soak_waves=50 -f base_seed=12345
 #
 # Results are PULLABLE like the dev Send-Logs captures: after the soak (pass OR fail) a
 # compact bundle is committed to the `dev-logs` branch under remote/<date>/ as .log files,
@@ -36,12 +38,24 @@ on:
     - cron: "0 3 * * *"
   workflow_dispatch:
     inputs:
-      soak_waves:
-        description: "Optional wave override for every profile (blank = each profile's calibrated default)"
+      run_mode:
+        description: "calibrated-release is release evidence; diagnostic permits overrides but cannot pass the release aggregate"
+        required: true
+        type: choice
+        options:
+          - calibrated-release
+          - diagnostic
+        default: calibrated-release
+      checkpoint_sha:
+        description: "Optional exact 40-character checkpoint SHA (blank = this dispatch ref's immutable event SHA)"
         type: string
         default: ""
-      soak_seed:
-        description: "Optional fixed SOAK_SEED to replay a run (empty = date-derived)"
+      soak_waves:
+        description: "Diagnostic-only override for variable-depth god/level profiles; fixed scenarios ignore it"
+        type: string
+        default: ""
+      base_seed:
+        description: "Optional unsigned matrix base seed; profile offsets apply (fixed scenarios record but do not consume it)"
         type: string
         default: ""
 
@@ -55,12 +69,118 @@ permissions:
   contents: write
 
 jobs:
+  plan:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Freeze co-op soak checkpoint
+    runs-on: ubuntu-latest
+    outputs:
+      target_sha: ${{ steps.plan.outputs.target_sha }}
+      base_seed: ${{ steps.plan.outputs.base_seed }}
+      run_mode: ${{ steps.plan.outputs.run_mode }}
+      calibrated: ${{ steps.plan.outputs.calibrated }}
+      waves_override: ${{ steps.plan.outputs.waves_override }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Resolve one immutable checkpoint and one matrix-wide seed
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_MODE: ${{ github.event.inputs.run_mode }}
+          REQUESTED_CHECKPOINT_SHA: ${{ github.event.inputs.checkpoint_sha }}
+          REQUESTED_BASE_SEED: ${{ github.event.inputs.base_seed }}
+          REQUESTED_SOAK_WAVES: ${{ github.event.inputs.soak_waves }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            run_mode="calibrated-release"
+          else
+            run_mode="${REQUESTED_MODE:-calibrated-release}"
+          fi
+          case "$run_mode" in
+            calibrated-release|diagnostic) ;;
+            *) echo "unsupported run_mode: $run_mode" >&2; exit 1 ;;
+          esac
+          if [ "$run_mode" = "calibrated-release" ] && [ -n "${REQUESTED_SOAK_WAVES:-}" ]; then
+            echo "calibrated-release forbids soak_waves overrides; use run_mode=diagnostic" >&2
+            exit 1
+          fi
+
+          requested_sha="${REQUESTED_CHECKPOINT_SHA:-}"
+          if [ -n "$requested_sha" ]; then
+            candidate="$requested_sha"
+          elif [ "$EVENT_NAME" = "schedule" ]; then
+            candidate="$(git ls-remote origin refs/heads/feat/elite-redux-port | awk 'NR == 1 { print $1 }')"
+          else
+            candidate="$GITHUB_SHA"
+          fi
+          if ! [[ "$candidate" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "checkpoint must resolve to one exact 40-character commit SHA, got: $candidate" >&2
+            exit 1
+          fi
+          git fetch --no-tags --depth=1 origin "$candidate"
+          target_sha="$(git rev-parse 'FETCH_HEAD^{commit}')"
+          if [ "${target_sha,,}" != "${candidate,,}" ]; then
+            echo "fetched checkpoint mismatch: requested=$candidate resolved=$target_sha" >&2
+            exit 1
+          fi
+
+          base_seed="${REQUESTED_BASE_SEED:-$(date -u +%Y%m%d)}"
+          if ! [[ "$base_seed" =~ ^[0-9]+$ ]]; then
+            echo "base_seed must be an unsigned integer, got: $base_seed" >&2
+            exit 1
+          fi
+          if [ "${#base_seed}" -gt 10 ] || { [ "${#base_seed}" -eq 10 ] && [ "$base_seed" \> "4294757536" ]; }; then
+            echo "base_seed must be <= 4294757536 so the largest profile offset stays within uint32" >&2
+            exit 1
+          fi
+          base_seed=$((10#$base_seed))
+
+          calibrated=false
+          if [ "$run_mode" = "calibrated-release" ]; then
+            calibrated=true
+          fi
+          {
+            echo "target_sha=$target_sha"
+            echo "base_seed=$base_seed"
+            echo "run_mode=$run_mode"
+            echo "calibrated=$calibrated"
+            echo "waves_override=${REQUESTED_SOAK_WAVES:-}"
+          } >> "$GITHUB_OUTPUT"
+
+          node -e "require('node:fs').writeFileSync('coop-soak-plan.json', JSON.stringify({
+            schemaVersion: 1,
+            targetSha: process.argv[1],
+            baseSeed: process.argv[2],
+            runMode: process.argv[3],
+            calibrated: process.argv[4] === 'true',
+            wavesOverride: process.argv[5] || null,
+            workflowSourceSha: process.env.GITHUB_SHA,
+            runId: process.env.GITHUB_RUN_ID
+          }, null, 2) + '\n')" \
+            "$target_sha" "$base_seed" "$run_mode" "$calibrated" "${REQUESTED_SOAK_WAVES:-}"
+
+      - name: Upload immutable soak plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-soak-plan-${{ github.run_id }}
+          overwrite: true
+          path: coop-soak-plan.json
+          retention-days: 30
+          if-no-files-found: error
+
   soak:
     if: github.repository == 'Heraklines/elite-redux'
+    needs: plan
     timeout-minutes: 90
     runs-on: ubuntu-latest
     strategy:
-      # Keep BOTH profiles running even if one fails (they cover DIFFERENT strands - see below).
+      # Keep all six profiles running even if one fails (they cover different strands).
       fail-fast: false
       # Independent GitHub runners execute the orthogonal campaigns concurrently. Result publication rebases
       # and retries below, so dev-logs branch contention no longer serializes hours of simulation.
@@ -74,16 +194,28 @@ jobs:
             soak_profile: god
             seed_offset: 0
             waves_default: "200"
+            accepts_wave_override: true
+            accepts_seed: true
+            calibration_id: god-200
+            coverage_ledger: dev-logs/coop-soak/coverage-ledger.json
             test_path: "test/tests/elite-redux/coop/coop-soak.test.ts"
           - profile: god-b
             soak_profile: god
             seed_offset: 104729
             waves_default: "200"
+            accepts_wave_override: true
+            accepts_seed: true
+            calibration_id: god-200
+            coverage_ledger: dev-logs/coop-soak/coverage-ledger.json
             test_path: "test/tests/elite-redux/coop/coop-soak.test.ts"
           - profile: god-c
             soak_profile: god
             seed_offset: 209759
             waves_default: "200"
+            accepts_wave_override: true
+            accepts_seed: true
+            calibration_id: god-200
+            coverage_ledger: dev-logs/coop-soak/coverage-ledger.json
             test_path: "test/tests/elite-redux/coop/coop-soak.test.ts"
           # LEVEL (#832, audit priority #2: the FAINT/WIPE/REVIVE/SWITCH channel - historically the RICHEST
           # desync source, #834/#836/#845-#848). The level-65 party takes real damage and FAINTS reliably
@@ -96,6 +228,10 @@ jobs:
             soak_profile: level
             seed_offset: 0
             waves_default: "55"
+            accepts_wave_override: true
+            accepts_seed: true
+            calibration_id: level-55-faint
+            coverage_ledger: dev-logs/coop-soak/coverage-ledger-level.json
             test_path: "test/tests/elite-redux/coop/coop-soak.test.ts"
           # ME-ASYM (#633 BUILD 1 + #828 BUILD 2). These two tests are gated ER_SCENARIO=1 like every ER
           # engine test but are NOT part of the default soak file, so without this leg they would only ever
@@ -104,15 +240,17 @@ jobs:
           #                                   sync surface: mePresent / meResync / MYSTERY_ENCOUNTER mode).
           #   - coop-soak-asymmetric.test.ts: host-half exhaustion driven as a guest-solo continuation (the
           #                                   partner-plays-on path), NOT a terminal.
-          # Both hardcode their own party profile + wave counts, so SOAK_PROFILE / SOAK_WAVES are inert here
-          # (SOAK_PROFILE=me-asym resolves to the default "god" in resolveSoakProfile, and neither test reads
-          # it - each passes profile:"god" to runCoopSoak explicitly). waves_default is carried only to keep
-          # the shared env block uniform; it changes nothing for these tests. The distinct profile token scopes
-          # this leg's committed result filenames so they never collide with the god / level bundles.
+          # Both hardcode their party profile, seeds, and wave/turn schedules. The explicit "fixed" depth plus
+          # accepts_* flags prevent diagnostic overrides from being reported as consumed. The distinct profile
+          # token scopes this leg's result filenames so they never collide with god / level bundles.
           - profile: me-asym
             soak_profile: god
             seed_offset: 0
-            waves_default: "150"
+            waves_default: "fixed"
+            accepts_wave_override: false
+            accepts_seed: false
+            calibration_id: me-host-guest-plus-asym-six-turn
+            coverage_ledger: ""
             test_path: "test/tests/elite-redux/coop/coop-soak-me.test.ts test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts"
           # JOURNEY: thirteen heterogeneous forced MEs in one continuous production-fidelity run, followed by
           # enough normal waves to cross repeated biome boundaries. Covers nested shops, guest-owned party/move
@@ -122,31 +260,43 @@ jobs:
             soak_profile: god
             seed_offset: 0
             waves_default: "45"
+            accepts_wave_override: false
+            accepts_seed: false
+            calibration_id: journey-45-thirteen-event
+            coverage_ledger: ""
             test_path: "test/tests/elite-redux/coop/coop-soak-journey.test.ts"
     steps:
       - uses: actions/checkout@v6
         with:
-          # The cron fires from the DEFAULT branch (main), which holds only this workflow file -
-          # the game + the soak test live on feat/elite-redux-port, so a scheduled run must check
-          # THAT out. A manual dispatch keeps its explicitly-passed --ref.
-          ref: ${{ github.event_name == 'schedule' && 'feat/elite-redux-port' || github.ref }}
+          # Every runner consumes the planner's immutable checkpoint, never a mutable branch ref.
+          ref: ${{ needs.plan.outputs.target_sha }}
+          fetch-depth: 1
           submodules: recursive
+
+      - name: Verify immutable checkpoint checkout
+        id: checkout
+        env:
+          EXPECTED_SHA: ${{ needs.plan.outputs.target_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$EXPECTED_SHA"
+          git submodule status --recursive > coop-soak-submodules.txt
+          echo "sha=$actual_sha" >> "$GITHUB_OUTPUT"
 
       - uses: ./.github/actions/setup-deps
 
       - name: Derive independent deterministic campaign seed
+        id: seed
         env:
-          REQUESTED_SEED: ${{ github.event.inputs.soak_seed }}
+          BASE_SEED: ${{ needs.plan.outputs.base_seed }}
           SEED_OFFSET: ${{ matrix.seed_offset }}
         run: |
-          base="${REQUESTED_SEED:-$(date -u +%Y%m%d)}"
-          if ! [[ "$base" =~ ^[0-9]+$ ]]; then
-            echo "soak_seed must be an unsigned integer, got: $base" >&2
-            exit 1
-          fi
-          seed=$((10#$base + SEED_OFFSET))
+          seed=$((10#$BASE_SEED + SEED_OFFSET))
           echo "SOAK_SEED=$seed" >> "$GITHUB_ENV"
-          echo "campaign seed: $seed (base=$base offset=$SEED_OFFSET)"
+          echo "seed=$seed" >> "$GITHUB_OUTPUT"
+          echo "campaign seed: $seed (base=$BASE_SEED offset=$SEED_OFFSET)"
 
       - name: Run the co-op soak (${{ matrix.profile }})
         id: soak
@@ -156,16 +306,23 @@ jobs:
           # #832: run each matrix leg under its own SOAK_PROFILE (god = today's deep-wave run; level = the
           # faint-heavy level-85 party). SOAK_PROFILE=god is byte-identical to leaving it unset.
           SOAK_PROFILE: ${{ matrix.soak_profile }}
-          # A manual-dispatch soak_waves (if given) overrides BOTH legs; otherwise each profile's default.
-          REQUESTED_SOAK_WAVES: ${{ github.event.inputs.soak_waves }}
+          # Only variable-depth profiles consume a diagnostic wave override. Fixed ME/asymmetric and journey
+          # scenarios retain their source-defined calibrated schedule and attest that input contract.
+          REQUESTED_SOAK_WAVES: ${{ needs.plan.outputs.waves_override }}
           PROFILE_SOAK_WAVES: ${{ matrix.waves_default }}
+          ACCEPTS_WAVE_OVERRIDE: ${{ matrix.accepts_wave_override }}
           # The long campaigns must exercise the same no-harness-heal path as a live renderer.
           # Specialized ME/journey tests either set their own fidelity or ignore this value.
           SOAK_FIDELITY: "production"
           NODE_OPTIONS: "--max-old-space-size=8192"
         run: |
           mkdir -p dev-logs/coop-soak
-          export SOAK_WAVES="${REQUESTED_SOAK_WAVES:-$PROFILE_SOAK_WAVES}"
+          if [ "$ACCEPTS_WAVE_OVERRIDE" = "true" ]; then
+            export SOAK_WAVES="${REQUESTED_SOAK_WAVES:-$PROFILE_SOAK_WAVES}"
+          else
+            export SOAK_WAVES="$PROFILE_SOAK_WAVES"
+          fi
+          echo "configured_waves=$SOAK_WAVES" >> "$GITHUB_OUTPUT"
           echo "campaign waves: ${SOAK_WAVES} (requested=${REQUESTED_SOAK_WAVES:-none} profile=${PROFILE_SOAK_WAVES})"
           # Tee the run output so the results bundle can carry the seed / verdict / skip counters even
           # on a green run (the driver prints the seed FIRST THING + a DONE line with the skip counters).
@@ -181,6 +338,78 @@ jobs:
           echo "soak vitest exit code: ${soak_exit}"
           echo "exit=${soak_exit}" >> "$GITHUB_OUTPUT"
 
+      - name: Write structured profile attestation
+        if: always()
+        env:
+          PROFILE: ${{ matrix.profile }}
+          TARGET_SHA: ${{ needs.plan.outputs.target_sha }}
+          CHECKED_OUT_SHA: ${{ steps.checkout.outputs.sha }}
+          BASE_SEED: ${{ needs.plan.outputs.base_seed }}
+          CAMPAIGN_SEED: ${{ steps.seed.outputs.seed }}
+          RUN_MODE: ${{ needs.plan.outputs.run_mode }}
+          CALIBRATED: ${{ needs.plan.outputs.calibrated }}
+          CALIBRATION_ID: ${{ matrix.calibration_id }}
+          DEFAULT_WAVES: ${{ matrix.waves_default }}
+          CONFIGURED_WAVES: ${{ steps.soak.outputs.configured_waves }}
+          ACCEPTS_WAVE_OVERRIDE: ${{ matrix.accepts_wave_override }}
+          ACCEPTS_SEED: ${{ matrix.accepts_seed }}
+          COVERAGE_LEDGER: ${{ matrix.coverage_ledger }}
+          TEST_PATHS: ${{ matrix.test_path }}
+          SOAK_EXIT: ${{ steps.soak.outputs.exit }}
+        shell: bash
+        run: |
+          mkdir -p coop-soak-attestation
+          mkdir -p coop-soak-coverage
+          if [ -n "$COVERAGE_LEDGER" ] && [ -f "$COVERAGE_LEDGER" ]; then
+            cp "$COVERAGE_LEDGER" "coop-soak-coverage/${PROFILE}.json"
+          fi
+          node <<'NODE'
+          const fs = require("node:fs");
+          const crypto = require("node:crypto");
+          const soakExit = /^[0-9]+$/u.test(process.env.SOAK_EXIT ?? "")
+            ? Number(process.env.SOAK_EXIT)
+            : null;
+          const coveragePath = `coop-soak-coverage/${process.env.PROFILE}.json`;
+          const coverageBytes = fs.existsSync(coveragePath) ? fs.readFileSync(coveragePath) : null;
+          const attestation = {
+            schemaVersion: 1,
+            profile: process.env.PROFILE,
+            targetSha: process.env.TARGET_SHA,
+            checkedOutSha: process.env.CHECKED_OUT_SHA || null,
+            checkoutVerified:
+              Boolean(process.env.CHECKED_OUT_SHA)
+              && process.env.CHECKED_OUT_SHA === process.env.TARGET_SHA,
+            workflowSourceSha: process.env.GITHUB_SHA,
+            baseSeed: process.env.BASE_SEED,
+            campaignSeed: process.env.CAMPAIGN_SEED || null,
+            seedInputApplied: process.env.ACCEPTS_SEED === "true",
+            runMode: process.env.RUN_MODE,
+            calibrated: process.env.CALIBRATED === "true",
+            calibrationId: process.env.CALIBRATION_ID,
+            defaultWaves: process.env.DEFAULT_WAVES,
+            configuredWaves: process.env.CONFIGURED_WAVES || null,
+            waveOverrideApplied: process.env.ACCEPTS_WAVE_OVERRIDE === "true"
+              && process.env.CONFIGURED_WAVES !== process.env.DEFAULT_WAVES,
+            testPaths: (process.env.TEST_PATHS ?? "").trim().split(/\s+/u).filter(Boolean),
+            coverageLedger: {
+              required: Boolean(process.env.COVERAGE_LEDGER),
+              sourcePath: process.env.COVERAGE_LEDGER || null,
+              present: coverageBytes != null,
+              sha256: coverageBytes == null
+                ? null
+                : crypto.createHash("sha256").update(coverageBytes).digest("hex"),
+            },
+            soakExit: soakExit,
+            passed: soakExit === 0,
+            runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+          };
+          fs.writeFileSync(
+            `coop-soak-attestation/${process.env.PROFILE}.json`,
+            `${JSON.stringify(attestation, null, 2)}\n`,
+          );
+          NODE
+
       - name: Bundle + commit soak results to the dev-logs branch (pullable like Send Logs)
         if: always()
         env:
@@ -188,7 +417,14 @@ jobs:
           SOAK_EXIT: ${{ steps.soak.outputs.exit }}
           # #832: the profile scopes every committed filename so the two matrix legs never collide.
           SOAK_PROFILE: ${{ matrix.profile }}
-          SOAK_WAVES: ${{ github.event.inputs.soak_waves || matrix.waves_default }}
+          SOAK_WAVES: ${{ steps.soak.outputs.configured_waves || matrix.waves_default }}
+          TARGET_SHA: ${{ needs.plan.outputs.target_sha }}
+          CHECKED_OUT_SHA: ${{ steps.checkout.outputs.sha }}
+          BASE_SEED: ${{ needs.plan.outputs.base_seed }}
+          CAMPAIGN_SEED: ${{ steps.seed.outputs.seed }}
+          SEED_INPUT_APPLIED: ${{ matrix.accepts_seed }}
+          RUN_MODE: ${{ needs.plan.outputs.run_mode }}
+          CALIBRATION_ID: ${{ matrix.calibration_id }}
         run: |
           set -euo pipefail
           DATE=$(date -u +%Y-%m-%d)
@@ -203,7 +439,17 @@ jobs:
             echo "profile: ${PROFILE}"
             echo "verdict: ${VERDICT}"
             echo "waves_requested: ${SOAK_WAVES:-150}"
-            echo "run: ${GITHUB_RUN_ID} (${GITHUB_REF_NAME})"
+            echo "run_mode: ${RUN_MODE}"
+            echo "calibration_id: ${CALIBRATION_ID}"
+            echo "target_sha: ${TARGET_SHA}"
+            echo "checked_out_sha: ${CHECKED_OUT_SHA:-missing}"
+            echo "base_seed: ${BASE_SEED}"
+            if [ "$SEED_INPUT_APPLIED" = "true" ]; then
+              echo "campaign_seed: ${CAMPAIGN_SEED}"
+            else
+              echo "campaign_seed: fixed-in-test (matrix candidate ${CAMPAIGN_SEED} not consumed)"
+            fi
+            echo "run: ${GITHUB_RUN_ID} (workflow source ${GITHUB_SHA})"
             echo "timestamp: ${TS}"
             echo
             echo "----- driver lines -----"
@@ -284,6 +530,26 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+      - name: Upload profile attestation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-soak-attestation-${{ matrix.profile }}-${{ github.run_id }}
+          overwrite: true
+          path: coop-soak-attestation/${{ matrix.profile }}.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload required checkpoint coverage ledger
+        if: always() && matrix.coverage_ledger != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-soak-coverage-${{ matrix.profile }}-${{ github.run_id }}
+          overwrite: true
+          path: coop-soak-coverage/${{ matrix.profile }}.json
+          retention-days: 30
+          if-no-files-found: error
+
       - name: Fail the job if the soak failed
         # The empty-check is load-bearing: GitHub's loose comparison coerces a MISSING output ('')
         # to the number 0, so `'' != '0'` alone evaluates FALSE and a crashed soak step would slip
@@ -292,3 +558,301 @@ jobs:
         run: |
           echo "Co-op soak FAILED - see the dev-logs branch (remote/) and the uploaded artifact."
           exit 1
+
+  release-attestation:
+    name: Require six calibrated profiles at one checkpoint
+    if: always() && github.repository == 'Heraklines/elite-redux'
+    needs: [plan, soak]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all profile attestations
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coop-soak-attestation-*-${{ github.run_id }}
+          merge-multiple: true
+          path: coop-soak-attestations
+
+      - name: Download required checkpoint coverage ledgers
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coop-soak-coverage-*-${{ github.run_id }}
+          merge-multiple: true
+          path: coop-soak-coverage
+
+      - name: Verify calibrated six-profile release milestone
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          MATRIX_RESULT: ${{ needs.soak.result }}
+          EXPECTED_SHA: ${{ needs.plan.outputs.target_sha }}
+          EXPECTED_BASE_SEED: ${{ needs.plan.outputs.base_seed }}
+          EXPECTED_RUN_MODE: ${{ needs.plan.outputs.run_mode }}
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const crypto = require("node:crypto");
+          const path = require("node:path");
+          const expected = new Map([
+            ["god-a", {
+              calibrationId: "god-200",
+              configuredWaves: "200",
+              coverageRequired: true,
+              seedOffset: 0,
+              testPaths: ["test/tests/elite-redux/coop/coop-soak.test.ts"],
+            }],
+            ["god-b", {
+              calibrationId: "god-200",
+              configuredWaves: "200",
+              coverageRequired: true,
+              seedOffset: 104729,
+              testPaths: ["test/tests/elite-redux/coop/coop-soak.test.ts"],
+            }],
+            ["god-c", {
+              calibrationId: "god-200",
+              configuredWaves: "200",
+              coverageRequired: true,
+              seedOffset: 209759,
+              testPaths: ["test/tests/elite-redux/coop/coop-soak.test.ts"],
+            }],
+            ["level", {
+              calibrationId: "level-55-faint",
+              configuredWaves: "55",
+              coverageRequired: true,
+              seedOffset: 0,
+              testPaths: ["test/tests/elite-redux/coop/coop-soak.test.ts"],
+            }],
+            ["me-asym", {
+              calibrationId: "me-host-guest-plus-asym-six-turn",
+              configuredWaves: "fixed",
+              coverageRequired: false,
+              seedOffset: 0,
+              testPaths: [
+                "test/tests/elite-redux/coop/coop-soak-me.test.ts",
+                "test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts",
+              ],
+            }],
+            ["journey", {
+              calibrationId: "journey-45-thirteen-event",
+              configuredWaves: "45",
+              coverageRequired: false,
+              seedOffset: 0,
+              testPaths: ["test/tests/elite-redux/coop/coop-soak-journey.test.ts"],
+            }],
+          ]);
+          const requiredCoverage = new Set([
+            "situation:trainerRandom",
+            "situation:weather",
+            "situation:terrain",
+            "situation:enemySwitch",
+            "situation:hostHalfExhausted",
+            "situation:singleFaint",
+            "kind:switch",
+            "operation:op:faintSwitch",
+            "band:faintSwitch",
+            "situation:doublePlayerFaint",
+          ]);
+          const directory = "coop-soak-attestations";
+          const errors = [];
+          if (process.env.PLAN_RESULT !== "success") {
+            errors.push(`planner result was ${process.env.PLAN_RESULT}`);
+          }
+          if (process.env.MATRIX_RESULT !== "success") {
+            errors.push(`matrix result was ${process.env.MATRIX_RESULT}`);
+          }
+          if (process.env.EXPECTED_RUN_MODE !== "calibrated-release") {
+            errors.push(
+              `run_mode=${process.env.EXPECTED_RUN_MODE || "missing"} is diagnostic-only, not release evidence`,
+            );
+          }
+          const files = fs.existsSync(directory)
+            ? fs.readdirSync(directory).filter(file => file.endsWith(".json")).sort()
+            : [];
+          if (files.length !== expected.size) {
+            errors.push(`expected ${expected.size} profile attestations, found ${files.length}`);
+          }
+          const seen = new Set();
+          const byProfile = new Map();
+          const attestations = [];
+          for (const file of files) {
+            let item;
+            try {
+              item = JSON.parse(fs.readFileSync(path.join(directory, file), "utf8"));
+            } catch (error) {
+              errors.push(`${file} is not valid JSON: ${error.message}`);
+              continue;
+            }
+            attestations.push(item);
+            if (!expected.has(item.profile)) {
+              errors.push(`${file} has unexpected profile ${item.profile}`);
+              continue;
+            }
+            if (seen.has(item.profile)) {
+              errors.push(`duplicate profile attestation ${item.profile}`);
+            }
+            seen.add(item.profile);
+            byProfile.set(item.profile, item);
+            const contract = expected.get(item.profile);
+            if (item.calibrationId !== contract.calibrationId) {
+              errors.push(`${item.profile} calibration mismatch: ${item.calibrationId}`);
+            }
+            if (item.configuredWaves !== contract.configuredWaves) {
+              errors.push(
+                `${item.profile} depth mismatch: ${item.configuredWaves} expected ${contract.configuredWaves}`,
+              );
+            }
+            if (JSON.stringify(item.testPaths) !== JSON.stringify(contract.testPaths)) {
+              errors.push(`${item.profile} test-path contract mismatch: ${JSON.stringify(item.testPaths)}`);
+            }
+            const expectedCampaignSeed = String(Number(process.env.EXPECTED_BASE_SEED) + contract.seedOffset);
+            if (item.baseSeed !== process.env.EXPECTED_BASE_SEED) {
+              errors.push(`${item.profile} base seed ${item.baseSeed} did not match the matrix plan`);
+            }
+            if (item.campaignSeed !== expectedCampaignSeed) {
+              errors.push(
+                `${item.profile} campaign seed ${item.campaignSeed} expected ${expectedCampaignSeed}`,
+              );
+            }
+            if (item.targetSha !== process.env.EXPECTED_SHA || item.checkedOutSha !== process.env.EXPECTED_SHA) {
+              errors.push(
+                `${item.profile} SHA mismatch target=${item.targetSha} checkout=${item.checkedOutSha} expected=${process.env.EXPECTED_SHA}`,
+              );
+            }
+            if (item.checkoutVerified !== true) {
+              errors.push(`${item.profile} did not verify its checkout`);
+            }
+            if (item.runMode !== "calibrated-release" || item.calibrated !== true) {
+              errors.push(`${item.profile} is not a calibrated-release attestation`);
+            }
+            if (item.waveOverrideApplied !== false) {
+              errors.push(`${item.profile} applied a wave override`);
+            }
+            if (item.coverageLedger?.required !== contract.coverageRequired) {
+              errors.push(`${item.profile} coverage-ledger requirement does not match its calibration`);
+            }
+            if (item.soakExit !== 0 || item.passed !== true) {
+              errors.push(`${item.profile} soak did not pass (exit=${item.soakExit})`);
+            }
+            if (String(item.runId) !== process.env.GITHUB_RUN_ID) {
+              errors.push(`${item.profile} belongs to run ${item.runId}, expected ${process.env.GITHUB_RUN_ID}`);
+            }
+          }
+          for (const profile of expected.keys()) {
+            if (!seen.has(profile)) {
+              errors.push(`missing profile attestation ${profile}`);
+            }
+          }
+          const coverageDirectory = "coop-soak-coverage";
+          const coverageFiles = fs.existsSync(coverageDirectory)
+            ? fs.readdirSync(coverageDirectory).filter(file => file.endsWith(".json")).sort()
+            : [];
+          const coverageProfiles = [...expected.entries()]
+            .filter(([, contract]) => contract.coverageRequired)
+            .map(([profile]) => profile);
+          if (coverageFiles.length !== coverageProfiles.length) {
+            errors.push(
+              `expected ${coverageProfiles.length} required coverage ledgers, found ${coverageFiles.length}`,
+            );
+          }
+          const coverageUnion = new Set();
+          const coverageEvidence = [];
+          for (const profile of coverageProfiles) {
+            const file = `${profile}.json`;
+            const filePath = path.join(coverageDirectory, file);
+            if (!fs.existsSync(filePath)) {
+              errors.push(`missing required coverage ledger ${file}`);
+              continue;
+            }
+            const bytes = fs.readFileSync(filePath);
+            const digest = crypto.createHash("sha256").update(bytes).digest("hex");
+            const profileAttestation = byProfile.get(profile);
+            if (profileAttestation?.coverageLedger?.present !== true) {
+              errors.push(`${profile} attestation did not record a present coverage ledger`);
+            }
+            if (profileAttestation?.coverageLedger?.sha256 !== digest) {
+              errors.push(`${profile} coverage-ledger digest does not match its attestation`);
+            }
+            let ledger;
+            try {
+              ledger = JSON.parse(bytes.toString("utf8"));
+            } catch (error) {
+              errors.push(`${file} is corrupt JSON: ${error.message}`);
+              continue;
+            }
+            if (!Array.isArray(ledger) || ledger.length === 0) {
+              errors.push(`${file} must contain at least one coverage run`);
+              continue;
+            }
+            const campaignSeed = Number(profileAttestation?.campaignSeed);
+            const currentRuns = ledger.filter(entry =>
+              Number.isFinite(entry?.seed)
+              && entry.seed === campaignSeed
+              && Number.isFinite(entry?.wavesCompleted)
+              && Array.isArray(entry?.surfaces)
+              && entry.surfaces.every(surface => typeof surface === "string")
+            );
+            if (currentRuns.length === 0) {
+              errors.push(`${file} has no valid entry for campaign seed ${profileAttestation?.campaignSeed}`);
+              continue;
+            }
+            const minimumDepth = profile.startsWith("god-") ? 200 : 30;
+            const deepest = Math.max(...currentRuns.map(entry => entry.wavesCompleted));
+            if (deepest < minimumDepth) {
+              errors.push(`${file} surveyed ${deepest} waves; required at least ${minimumDepth}`);
+            }
+            for (const entry of currentRuns) {
+              for (const surface of entry.surfaces) {
+                coverageUnion.add(surface);
+              }
+            }
+            coverageEvidence.push({
+              profile,
+              campaignSeed,
+              deepest,
+              sha256: digest,
+              entries: currentRuns.length,
+            });
+          }
+          const missingCoverage = [...requiredCoverage].filter(surface => !coverageUnion.has(surface)).sort();
+          if (missingCoverage.length > 0) {
+            errors.push(
+              `current-checkpoint probabilistic union missed ${missingCoverage.length} required surface(s): ${missingCoverage.join(", ")}`,
+            );
+          }
+          const status = {
+            schemaVersion: 1,
+            targetSha: process.env.EXPECTED_SHA || null,
+            baseSeed: process.env.EXPECTED_BASE_SEED || null,
+            runMode: process.env.EXPECTED_RUN_MODE || null,
+            planResult: process.env.PLAN_RESULT,
+            matrixResult: process.env.MATRIX_RESULT,
+            expectedProfiles: [...expected.keys()],
+            observedProfiles: [...seen].sort(),
+            attestations,
+            coverageEvidence,
+            coverageUnion: [...coverageUnion].sort(),
+            requiredCoverage: [...requiredCoverage].sort(),
+            passed: errors.length === 0,
+            errors,
+            runId: process.env.GITHUB_RUN_ID,
+          };
+          fs.writeFileSync("coop-soak-release-attestation.json", `${JSON.stringify(status, null, 2)}\n`);
+          if (errors.length > 0) {
+            console.error(errors.map(error => `- ${error}`).join("\n"));
+            process.exit(1);
+          }
+          console.log(
+            `release attestation PASS: six calibrated profiles at ${process.env.EXPECTED_SHA}`,
+          );
+          NODE
+
+      - name: Upload release attestation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-soak-release-attestation-${{ github.run_id }}
+          overwrite: true
+          path: coop-soak-release-attestation.json
+          retention-days: 30
+          if-no-files-found: error

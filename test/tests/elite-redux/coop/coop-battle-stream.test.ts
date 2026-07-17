@@ -9,6 +9,7 @@
 // LoopbackTransport (the same "test via spoofing" path the rest of the suite uses).
 
 import { CoopBattleStreamer, type CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
+import type { CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopBattleCheckpoint,
@@ -1797,6 +1798,94 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.requestReplacementCheckpoint(envelope);
       await flushWire();
       expect(opened, "the successful re-ACK cleared host retention").toBe(1);
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
+    it("retires a late replacement through the completed newer wave transaction", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 4, turn: 2 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+      const replacement = checkpointEnvelope();
+      const ackStages: string[] = [];
+      let opened = 0;
+      host.onMessage(message => {
+        if (message.t === "battleCheckpointAck") {
+          ackStages.push(message.stage);
+        }
+      });
+      guestStream.onCheckpointEnvelope(() => opened++);
+      hostStream.sendCheckpoint(
+        replacement.reason,
+        replacement.epoch,
+        replacement.wave,
+        replacement.turn,
+        replacement.checkpoint,
+        replacement.checksum,
+        replacement.fullField,
+        replacement.authoritativeState,
+      );
+      await flushWire();
+
+      const waveAuthority: CoopAuthoritativeEnvelopeV1 = {
+        version: 1,
+        sessionEpoch: 7,
+        revision: 2,
+        wave: 4,
+        turn: 2,
+        logicalPhase: "WAVE_VICTORY",
+        pendingOperation: {
+          id: "7:0:WAVE_ADVANCE:4",
+          kind: "WAVE_ADVANCE",
+          owner: 0,
+          status: "applied",
+          payload: {},
+        },
+        authoritativeState: emptyAuthoritativeState(4, 2, 21),
+      };
+      expect(
+        guestStream.acknowledgeReplacementsSubsumedByOperation({
+          ...waveAuthority,
+          sessionEpoch: 8,
+        }),
+        "another session cannot retire replacement authority",
+      ).toBe(0);
+      expect(
+        guestStream.acknowledgeReplacementsSubsumedByOperation({
+          ...waveAuthority,
+          authoritativeState: emptyAuthoritativeState(4, 2, replacement.authoritativeState.tick),
+        }),
+        "an equal state tick is not stronger authority",
+      ).toBe(0);
+      expect(
+        guestStream.acknowledgeReplacementsSubsumedByOperation({
+          ...waveAuthority,
+          turn: 1,
+          authoritativeState: emptyAuthoritativeState(4, 1, 21),
+        }),
+        "an older battle address cannot retire a future replacement",
+      ).toBe(0);
+      expect(hostStream.retainedAuthorityDiagnostics().replacementCommits).toBe(1);
+      expect(guestStream.peekCheckpoint()).toEqual(replacement);
+
+      expect(guestStream.acknowledgeReplacementsSubsumedByOperation(waveAuthority)).toBe(1);
+      await flushWire();
+      expect(ackStages).toEqual(["materialApplied", "presentationReady", "continuationReady"]);
+      expect(hostStream.retainedAuthorityDiagnostics().replacementCommits).toBe(0);
+      expect(guestStream.peekCheckpoint(), "the late checkpoint cannot reopen after the newer DATA applied").toBeNull();
+      expect(opened, "causal retirement emits no second apply/presentation wake").toBe(1);
+
+      expect(guestStream.acknowledgeReplacementsSubsumedByOperation(waveAuthority)).toBe(1);
+      await flushWire();
+      expect(ackStages, "a repeated wave proof republishes only final retained evidence").toEqual([
+        "materialApplied",
+        "presentationReady",
+        "continuationReady",
+        "continuationReady",
+      ]);
+      expect(hostStream.retainedAuthorityDiagnostics().terminal).toBe(false);
+      expect(guestStream.retainedAuthorityDiagnostics().terminal).toBe(false);
       hostStream.dispose();
       guestStream.dispose();
     });

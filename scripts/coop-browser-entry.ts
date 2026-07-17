@@ -726,12 +726,33 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
 let lastSemanticObservation = "";
 let lastSemanticProbe = "";
 let lastSemanticProbeAt = 0;
+let semanticDigestCacheKey = "";
+let semanticDigestCacheAt = 0;
+let semanticDigestCache: ReturnType<typeof computeMechanicalDigest> | null = null;
 let lastSemanticPhase: object | null = null;
 let semanticPhaseInstance = 0;
 let lastSemanticObserverError = "";
 let lastObservedRenderProfile = "";
 let lastObservedMarket = "";
 let lastObservedCommander = "";
+
+/**
+ * The semantic observer ticks at 10 Hz so it can notice handler/readiness changes quickly, but the broad
+ * mechanical digest walks both parties, modifiers, arena state, and save substrates. Recomputing that full
+ * projection on every 100 ms poll consumed most of a constrained Chromium runner and reduced the real game
+ * loop below one frame per second. Cache only the digest—not the semantic/readiness reads—for a fixed 1 s
+ * SLA, and invalidate immediately at every phase/surface/address/selection transition supplied by `key`.
+ */
+function semanticMechanicalDigest(key: string): ReturnType<typeof computeMechanicalDigest> {
+  const now = Date.now();
+  if (semanticDigestCache != null && key === semanticDigestCacheKey && now - semanticDigestCacheAt < 1_000) {
+    return semanticDigestCache;
+  }
+  semanticDigestCacheKey = key;
+  semanticDigestCacheAt = now;
+  semanticDigestCache = computeMechanicalDigest();
+  return semanticDigestCache;
+}
 
 interface MarketOptionProjection {
   readonly index: number;
@@ -1013,7 +1034,9 @@ function observeSemanticSurface(): void {
       if (membership.state !== "active" || runtime.controller.sessionEpoch <= 0) {
         return;
       }
-      const { digest: stateDigest } = computeMechanicalDigest();
+      const { digest: stateDigest } = semanticMechanicalDigest(
+        `watcher:${runtime.controller.sessionEpoch}:${battle.waveIndex}:${battle.turn}:${phase}:${semanticPhaseInstance}`,
+      );
       const observation = {
         version: 2,
         surfaceId: "command:watcher",
@@ -1060,7 +1083,12 @@ function observeSemanticSurface(): void {
         return;
       }
       const { wave, turn } = semanticBattleAddress(battle);
-      const stateDigest = battle == null ? null : computeMechanicalDigest().digest;
+      const stateDigest =
+        battle == null
+          ? null
+          : semanticMechanicalDigest(
+              `unclassified:${runtime.controller.sessionEpoch}:${wave}:${turn}:${phase}:${semanticPhaseInstance}:${uiMode}`,
+            ).digest;
       const observation = {
         version: 2,
         surfaceId: "unclassified",
@@ -1194,31 +1222,35 @@ function observeSemanticSurface(): void {
           ? inputBlockedRaw
           : null;
     const surfaceGeneration = typeof readSurfaceGeneration === "function" ? readSurfaceGeneration.call(handler) : null;
-    const stateDigest = coop && battle != null ? computeMechanicalDigest().digest : null;
     const semanticSurfaceInstance =
       Number.isSafeInteger(promptGeneration) && (promptGeneration ?? 0) > 0
         ? (promptGeneration as number)
         : semanticPhaseInstance;
-
-    const probeKey = [
+    const semanticDigestKey = [
       semantic.surfaceId,
       uiMode,
       semanticSurfaceInstance,
       `${epoch}:${wave}:${turn}`,
       selection.selectedOptionId ?? "",
       selection.optionIds?.join(",") ?? "",
-      teamSpeciesIds?.join(",") ?? "",
-      starterGridCandidates == null ? "" : JSON.stringify(starterGridCandidates),
-      partySlots == null ? "" : JSON.stringify(partySlots),
       ownerSeat ?? "?",
       awaitingActionInput,
       inputBlocked,
       surfaceGeneration,
       mysteryEncounterType,
+    ].join("|");
+    const stateDigest =
+      coop && battle != null ? semanticMechanicalDigest(semanticDigestKey).digest : null;
+
+    const probeKey = [
+      semanticDigestKey,
+      teamSpeciesIds?.join(",") ?? "",
+      starterGridCandidates == null ? "" : JSON.stringify(starterGridCandidates),
+      partySlots == null ? "" : JSON.stringify(partySlots),
       stateDigest,
     ].join("|");
     const now = Date.now();
-    if (probeKey === lastSemanticProbe && now - lastSemanticProbeAt < 300) {
+    if (probeKey === lastSemanticProbe && now - lastSemanticProbeAt < 1_000) {
       return;
     }
     lastSemanticProbe = probeKey;

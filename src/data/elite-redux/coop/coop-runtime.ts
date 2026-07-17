@@ -1526,6 +1526,7 @@ function retainedWaveContinuationAckProof(
 function maybeMarkCoopWaveContinuationReady(
   wave: number,
   binding: CoopWaveAdvanceOperationBinding,
+  runtime: CoopRuntime,
   phaseOwnedSurface?: CoopPhaseOwnedWaveContinuationSurface,
 ): boolean {
   const staged = getCoopStagedWaveAdvanceTransaction(wave, binding);
@@ -1544,7 +1545,14 @@ function maybeMarkCoopWaveContinuationReady(
   if (complete) {
     const proof = retainedWaveContinuationAckProof(staged, phaseOwnedSurface);
     if (proof != null) {
-      binding.durability?.completeRetainedWaveAdvance(staged.envelope, proof.surface, proof.address);
+      const released =
+        binding.durability?.completeRetainedWaveAdvance(staged.envelope, proof.surface, proof.address) === true;
+      if (released) {
+        // Replacement and WAVE_ADVANCE are independent retained transports. A replacement checkpoint can
+        // arrive after the guest has already rendered that switch and admitted the later post-battle DATA.
+        // The completed wave proof is then the only safe authority capable of retiring that late checkpoint.
+        runtime.battleStream.acknowledgeReplacementsSubsumedByOperation(staged.envelope);
+      }
     }
   }
   return complete;
@@ -1647,7 +1655,7 @@ export function notifyCoopWaveContinuationSurfaceReady(
   if (!Number.isSafeInteger(wave) || wave < 0) {
     return false;
   }
-  const ready = maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding, phaseOwnedSurface);
+  const ready = maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding, runtime, phaseOwnedSurface);
   if (ready) {
     // Biome-market watchers and other phase-owned continuations deliberately do not open a normal
     // registry-backed UI mode. Their executable public/terminal loop is still the exact continuation
@@ -3998,7 +4006,7 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
     ) {
       return false;
     }
-    const continuationReady = maybeMarkCoopWaveContinuationReady(payload.wave, binding);
+    const continuationReady = maybeMarkCoopWaveContinuationReady(payload.wave, binding, runtime);
     if (!continuationReady && coopHasPendingWaveAdvance() && coopWaveAdvanceBoundaryWakeFactory != null) {
       // The retained op may land AFTER CoopFinalizeTurnPhase already inspected pendingWaveAdvance. Appending
       // (never unshifting) a tail-only finalizer wake preserves presentation -> checkpoint ordering while ensuring
@@ -5685,7 +5693,7 @@ export function assembleCoopRuntime(
     ) {
       const retainedWave = getCoopPendingWaveContinuationBoundary(runtime.waveOperationBinding);
       if (retainedWave != null) {
-        maybeMarkCoopWaveContinuationReady(retainedWave.wave, runtime.waveOperationBinding);
+        maybeMarkCoopWaveContinuationReady(retainedWave.wave, runtime.waveOperationBinding, runtime);
       }
     }
     durability?.retryDeferred("op:global");

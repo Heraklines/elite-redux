@@ -4107,12 +4107,12 @@ function applyFullMon(
       coopWarn("heal", `hp bi=${snap.bi} host=${wantHp} guest=${prevHp} (maxHp=${mon.getMaxHp()}) -> applied`);
     }
     mon.hp = wantHp;
-    // Boss re-assert (#633, A/BLOCKING-2), AFTER hp so the index derives from the correct hp. The host
-    // decrements bossSegmentIndex as shields break, but the guest sets hp by direct assignment (never
-    // via damage()), so its index would freeze and the dividers render wrong + the dimension loops
-    // forever. Re-assert the EXPLICIT host segment COUNT (never the diverged-RNG getEncounterBossSegments
-    // fallback), then DERIVE the index from the now-correct hp via getBossSegmentIndex() so the boss
-    // dimension STOPS diverging each apply instead of looping. Gated authoritative; enemy-only.
+    // Boss re-assert (#633, A/BLOCKING-2), AFTER hp. Re-assert the EXPLICIT host segment count and index
+    // carried by this same immutable authority frame. The live host decrements bossSegmentIndex when a
+    // shield boundary is actually processed; deriving it again from HP can disagree around a just-crossed
+    // boundary (for example host index=0 at HP 160/285 while getBossSegmentIndex() still returns 1). Since
+    // the checksum hashes the host's live index, recomputing it made every retry deterministically fail and
+    // eventually terminated the guest. Older carriers without the index retain the HP-derived fallback.
     if (authoritativeGuest && mon instanceof EnemyPokemon && typeof snap.bossSegments === "number") {
       const want = snap.bossSegments;
       // A freshly reconstructed guest EnemyPokemon (addEnemyPokemon) leaves `bossSegments`
@@ -4128,8 +4128,11 @@ function applyFullMon(
       }
       mon.setBoss(want > 0, want > 0 ? want : undefined);
       if (want > 0) {
-        // Derive the index from hp (self-correcting), not the host's raw index (which can lag a turn).
-        mon.bossSegmentIndex = mon.getBossSegmentIndex();
+        const carriedIndex = snap.bossSegmentIndex;
+        mon.bossSegmentIndex =
+          typeof carriedIndex === "number" && Number.isFinite(carriedIndex)
+            ? Math.max(0, Math.min(want - 1, Math.trunc(carriedIndex)))
+            : mon.getBossSegmentIndex();
         // Re-render the segmented bar UNLESS we're in give-up mode (a persistent divergence shouldn't
         // re-render every turn). initBattleInfo() on an existing bar dispatches to updateBossSegments.
         if (!suppressResummon) {

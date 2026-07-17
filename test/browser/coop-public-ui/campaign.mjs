@@ -1016,16 +1016,28 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
       }
       return null;
     }
-    if (!hasSemanticSurface(rig, driver.v2SurfaceId, cursors)) {
+    const semanticEvents = clients.map(client =>
+      client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, driver.v2SurfaceId),
+    );
+    if (semanticEvents.every(event => event == null)) {
       return null;
     }
-    if (strict) {
+    // Watchers can publish the addressed semantic surface before the owning browser finishes the
+    // preceding narration/phase transition. Treat that one-sided projection as provisional: the Mystery
+    // browser campaign otherwise fails in the few seconds between the watcher's ownerSeat=partner marker
+    // and the partner's own ownerSeat===localSeat mirror. Once every browser has published this surface,
+    // a missing self-owner is genuinely malformed and still fails loudly.
+    if (strict && semanticEvents.every(event => event != null)) {
       throw new Error(
         `[campaign-owner-evidence] surface "${driver.name}" is up but its v2 semantic mirror `
           + `(${driver.v2SurfaceId}) never reported an owner (ownerSeat === localSeat); refusing to `
           + "assume the role default. Fix the surface's marker or run the explicit shakedown opt-in.",
       );
     }
+    // A watcher projection proves only that the surface exists somewhere. Do
+    // not fall through to the legacy role heuristic until the authoritative
+    // owner has projected its own actionable surface.
+    return null;
   }
 
   if (driver.owner.marker) {
