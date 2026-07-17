@@ -170,14 +170,12 @@ export async function selectFirstEmptySaveSlot(client, { fromCursor = 0, timeout
   await client.press("Space", "fresh-save-slot-0");
 }
 
-/** One starter per seat could not survive wave 2 after the enemy-kit rebalance
- *  (run 29551213918 depth: a lone Bulbasaur wiped to a bug double). Two per seat
- *  is the largest fresh-account team the real five-point co-op budget guarantees:
- *  the unlocked pool contains Chikorita at cost 2 plus multiple cost-3 starters.
- *  The merged four-mon party exercises the faint-replacement paths a two-mon
- *  launch cannot reach. */
+/** One starter per seat could not survive wave 2 after the enemy-kit rebalance.
+ * Two per seat is the largest fresh-account team the real five-point co-op budget
+ * guarantees and exercises faint-replacement sync. */
 const MIN_STARTERS_PER_SEAT = 2;
-const RANDOM_TEAM_ATTEMPTS = 6;
+const COOP_STARTER_BUDGET = 5;
+const STARTER_GRID_COLUMNS = 9;
 
 /** The party size the visible starter bar last showed in this evidence sink (observer-read). */
 function visibleTeamSize(sink, fromCursor) {
@@ -192,16 +190,6 @@ function requireRepresentativeStarterTeam(client, fielded) {
         + "the campaign would not represent survivability or faint-replacement sync",
     );
   }
-}
-
-async function waitForStarterSelection(client, selectedOptionId, fromCursor, timeoutMs) {
-  return client.evidence.waitForCondition(
-    sink => {
-      const event = sink.findLastSemanticSurface(fromCursor, "starter-select");
-      return event?.observation.selectedOptionId === selectedOptionId ? event : null;
-    },
-    { timeoutMs, description: `starter selection ${selectedOptionId}` },
-  );
 }
 
 async function waitForVisibleTeamGrowth(client, fromCursor, fielded, timeoutMs) {
@@ -222,72 +210,127 @@ async function waitForVisibleTeamGrowth(client, fromCursor, fielded, timeoutMs) 
     );
 }
 
-/**
- * Remove the lone random pick after it consumed too much of the five-point budget
- * to permit a second starter. Every step is a real public key with a semantic proof:
- * Random -> team slot zero -> Remove from Party -> filter row -> Random.
- */
-async function removeUnaffordableRandomPick(client, timeoutMs) {
-  const teamCursor = client.evidence.cursor();
-  await client.press("ArrowDown", "starter-random-to-team-slot");
-  await waitForStarterSelection(client, "starter-team:0", teamCursor, timeoutMs);
+/** Pick the strongest affordable pair from the observer's read-only visible/caught grid projection. */
+export function chooseAffordableStarterPair(observation, budget = COOP_STARTER_BUDGET) {
+  const candidates = Array.isArray(observation?.starterGridCandidates)
+    ? observation.starterGridCandidates.filter(
+        candidate =>
+          Number.isSafeInteger(candidate?.index)
+          && Number.isSafeInteger(candidate?.speciesId)
+          && typeof candidate?.cost === "number"
+          && candidate.cost > 0,
+      )
+    : [];
+  let best = null;
+  for (let left = 0; left < candidates.length; left++) {
+    for (let right = left + 1; right < candidates.length; right++) {
+      const pair = [candidates[left], candidates[right]];
+      const total = pair[0].cost + pair[1].cost;
+      if (total > budget) {
+        continue;
+      }
+      const score = [total, -Math.max(pair[0].index, pair[1].index)];
+      if (best == null || score[0] > best.score[0] || (score[0] === best.score[0] && score[1] > best.score[1])) {
+        best = { pair, score };
+      }
+    }
+  }
+  return best?.pair ?? null;
+}
 
+async function waitForStarterGridMove(client, fromIndex, selectedOptionId, timeoutMs) {
+  return client.evidence.waitForCondition(
+    sink => {
+      const event = sink.findLastSemanticSurface(0, "starter-select");
+      return event?.index > fromIndex
+        && event.observation.selectedOptionId?.startsWith("starter-grid:")
+        && event.observation.selectedOptionId !== selectedOptionId
+        ? event
+        : null;
+    },
+    { timeoutMs, description: `starter grid moved from ${selectedOptionId}` },
+  );
+}
+
+async function moveStarterGridTo(client, target, timeoutMs) {
+  let event = client.evidence.findLastSemanticSurface(0, "starter-select");
+  if (!event?.observation.selectedOptionId?.startsWith("starter-grid:")) {
+    const enterCursor = client.evidence.cursor();
+    await client.press("ArrowRight", "starter-enter-grid");
+    event = await client.evidence.waitForCondition(
+      sink => {
+        const next = sink.findLastSemanticSurface(enterCursor, "starter-select");
+        return next?.observation.selectedOptionId?.startsWith("starter-grid:") ? next : null;
+      },
+      { timeoutMs, description: "starter grid cursor after entering from side controls" },
+    );
+  }
+
+  for (let step = 0; step < 64; step++) {
+    const current = Number(event.observation.selectedOptionId.slice("starter-grid:".length));
+    if (current === target.index) {
+      return event;
+    }
+    const currentRow = Math.floor(current / STARTER_GRID_COLUMNS);
+    const targetRow = Math.floor(target.index / STARTER_GRID_COLUMNS);
+    const key =
+      currentRow < targetRow
+        ? "ArrowDown"
+        : currentRow > targetRow
+          ? "ArrowUp"
+          : current < target.index
+            ? "ArrowRight"
+            : "ArrowLeft";
+    const beforeIndex = event.index;
+    const beforeId = event.observation.selectedOptionId;
+    await client.press(key, `starter-grid-to-${target.speciesId}:step-${step}`);
+    event = await waitForStarterGridMove(client, beforeIndex, beforeId, timeoutMs);
+  }
+  throw new Error(`${client.label}: starter grid did not reach species ${target.speciesId} at index ${target.index}`);
+}
+
+async function addStarterGridCandidate(client, target, fielded, timeoutMs) {
+  await moveStarterGridTo(client, target, timeoutMs);
   const optionCursor = client.evidence.cursor();
-  await client.press("Space", "starter-open-random-pick-options");
+  await client.press("Space", `starter-open-${target.speciesId}`);
   await waitForSemanticSurface(client, "option-select:SelectStarterPhase", {
     fromCursor: optionCursor,
     timeoutMs,
   });
-  const removeCursor = client.evidence.cursor();
+  const addCursor = client.evidence.cursor();
   await selectOptionById(client, {
     surfaceId: "option-select:SelectStarterPhase",
-    targetId: "remove-from-party",
-    navKeys: ["ArrowUp", "ArrowDown"],
+    targetId: "add-to-party",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    fromCursor: optionCursor,
     timeoutMs,
   });
-  await client.evidence.waitForCondition(sink => (visibleTeamSize(sink, removeCursor) === 0 ? true : null), {
-    timeoutMs,
-    description: "random starter removed from visible team",
-  });
-
-  const randomCursor = client.evidence.cursor();
-  await client.press("ArrowUp", "starter-filter-to-random");
-  await waitForStarterSelection(client, "starter-action:random", randomCursor, timeoutMs);
+  const grownSize = await waitForVisibleTeamGrowth(client, addCursor, fielded, timeoutMs);
+  if (grownSize == null) {
+    throw new Error(`${client.label}: visible team did not accept starter species ${target.speciesId}`);
+  }
+  client.evidence.record("starter-grid-add-proof", { target, fielded: grownSize });
+  return grownSize;
 }
 
 /**
- * Build a representative team using the real Random public control. The production
- * control itself applies unlock, challenge, point-budget, and party-cap rules. Each
- * addition is proven by visible team-bar growth. If a cost-4 pick leaves no affordable
- * second starter, remove it through the public option menu and retry, bounded.
+ * Build a representative team through deterministic public grid navigation. Random selection can
+ * legally choose a cost-4 lead three times in a row and leave no room for a second mon, making a
+ * release gate probabilistic. The observer only reports the visible/caught grid and costs; every
+ * state change remains a real human keyboard action against the production UI.
  */
 export async function confirmDefaultStarterTeam(client, { fromCursor = client.pageCursor, timeoutMs = 15_000 } = {}) {
-  await waitForActionableSemanticSurface(client, "starter-select", { fromCursor, timeoutMs });
-  const randomCursor = client.evidence.cursor();
-  await client.press("ArrowLeft", "starter-grid-to-random");
-  await waitForStarterSelection(client, "starter-action:random", randomCursor, timeoutMs);
+  const starterSurface = await waitForActionableSemanticSurface(client, "starter-select", { fromCursor, timeoutMs });
+  const targets = chooseAffordableStarterPair(starterSurface.observation);
+  if (targets == null) {
+    throw new Error(
+      `${client.label}: visible starter grid exposed no two-mon team within the ${COOP_STARTER_BUDGET}-point budget`,
+    );
+  }
 
-  let fielded = 0;
-  for (let attempt = 1; attempt <= RANDOM_TEAM_ATTEMPTS && fielded < MIN_STARTERS_PER_SEAT; attempt++) {
-    const addCursor = client.evidence.cursor();
-    await client.press("Space", `starter-random-add:attempt-${attempt}`);
-    const grownSize = await waitForVisibleTeamGrowth(client, addCursor, fielded, timeoutMs);
-    if (grownSize != null) {
-      fielded = grownSize;
-      client.evidence.record("starter-random-add-proof", { attempt, fielded });
-      continue;
-    }
-
-    if (fielded !== 1) {
-      throw new Error(`${client.label}: Random public starter control could not field its first unlocked starter`);
-    }
-    client.evidence.record("starter-random-retry", {
-      attempt,
-      fielded,
-      reason: "first random pick left no affordable second starter",
-    });
-    await removeUnaffordableRandomPick(client, timeoutMs);
-    fielded = 0;
+  let fielded = visibleTeamSize(client.evidence, fromCursor);
+  for (const target of targets) {
+    fielded = await addStarterGridCandidate(client, target, fielded, timeoutMs);
   }
   requireRepresentativeStarterTeam(client, fielded);
   client.evidence.record("starter-team-fielded", { fielded, target: MIN_STARTERS_PER_SEAT });

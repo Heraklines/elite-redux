@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
-import { selectOptionById } from "./campaign-nav.mjs";
+import { chooseAffordableStarterPair, selectOptionById } from "./campaign-nav.mjs";
 import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
 import {
   captureCheckpointPngWithFallback,
@@ -237,15 +237,30 @@ test("semantic option identity is independent of every presentation language", a
   assert.match(starter, /semanticId: key\.toLowerCase\(\)/u);
   assert.match(observer, /selectedOptionId: "starter-action:random"/u);
   assert.match(observer, /selectedOptionId: `starter-team:\$\{starterHandler\.starterIconsCursorIndex\}`/u);
-  assert.match(campaignNav, /starter-grid-to-random/u);
-  assert.match(campaignNav, /starter-random-add-proof/u);
-  assert.match(campaignNav, /first random pick left no affordable second starter/u);
-  assert.match(campaignNav, /targetId: "remove-from-party"/u);
+  assert.match(observer, /starterGridCandidates/u);
+  assert.match(campaignNav, /chooseAffordableStarterPair/u);
+  assert.match(campaignNav, /starter-grid-add-proof/u);
+  assert.match(campaignNav, /targetId: "add-to-party"/u);
   assert.match(party, /export enum PartyOption/u);
   assert.match(observer, /partyOptionSemanticId\(/u);
   assert.match(observer, /party-option:\$\{enumName\.toLowerCase\(\)\.replaceAll\("_", "-"\)\}/u);
   assert.match(observer, /partyHandler\.optionsMode === true/u);
   assert.match(observer, /uiMode === "PARTY"\s*\? null/u);
+});
+
+test("representative starter selection is deterministic and stays within the co-op budget", () => {
+  const pair = chooseAffordableStarterPair({
+    starterGridCandidates: [
+      { index: 11, speciesId: 728, cost: 4 },
+      { index: 3, speciesId: 152, cost: 2 },
+      { index: 7, speciesId: 155, cost: 3 },
+      { index: 1, speciesId: 906, cost: 4 },
+    ],
+  });
+  assert.deepEqual(pair, [
+    { index: 3, speciesId: 152, cost: 2 },
+    { index: 7, speciesId: 155, cost: 3 },
+  ]);
 });
 
 test("paired Chromium runs headful at an explicit player-sized viewport", async () => {

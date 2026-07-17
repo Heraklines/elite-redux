@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { PokemonSpecies } from "../src/data/pokemon-species";
 import type { Pokemon } from "../src/field/pokemon";
 import type { SaveSlotSelectUiHandler } from "../src/ui/handlers/save-slot-select-ui-handler";
 
@@ -540,6 +541,32 @@ function partyOptionSemanticId(partyUiMode: number | undefined, option: number, 
   return typeof enumName === "string"
     ? `party-option:${enumName.toLowerCase().replaceAll("_", "-")}`
     : `party-option:slot:${index}`;
+}
+
+function readStarterGridCandidates(handler: unknown) {
+  const containers = (
+    handler as {
+      filteredStarterContainers?: Array<{ cost?: unknown; species?: PokemonSpecies }>;
+    }
+  ).filteredStarterContainers;
+  if (!Array.isArray(containers)) {
+    return null;
+  }
+  return containers
+    .map((container, index) => {
+      const speciesId = container.species?.speciesId;
+      const cost = container.cost;
+      return Number.isSafeInteger(speciesId)
+        && container.species != null
+        && globalScene.gameData.isRootSpeciesUnlocked(container.species)
+        && typeof cost === "number"
+        && Number.isFinite(cost)
+        ? { index, speciesId: speciesId as number, cost }
+        : null;
+    })
+    .filter(candidate => candidate != null)
+    .sort((left, right) => left.cost - right.cost || left.index - right.index)
+    .slice(0, 32);
 }
 
 /**
@@ -1089,6 +1116,7 @@ function observeSemanticSurface(): void {
     }
 
     const selection = readSelection(handler, uiMode);
+    const starterGridCandidates = uiMode === "STARTER_SELECT" ? readStarterGridCandidates(handler) : null;
     const partySlots =
       uiMode === "PARTY"
         ? globalScene.getPlayerParty().map((pokemon, slot) => {
@@ -1158,6 +1186,7 @@ function observeSemanticSurface(): void {
       selection.selectedOptionId ?? "",
       selection.optionIds?.join(",") ?? "",
       teamSpeciesIds?.join(",") ?? "",
+      starterGridCandidates == null ? "" : JSON.stringify(starterGridCandidates),
       partySlots == null ? "" : JSON.stringify(partySlots),
       ownerSeat ?? "?",
       awaitingActionInput,
@@ -1190,6 +1219,7 @@ function observeSemanticSurface(): void {
       optionIds: selection.optionIds,
       optionCount: selection.optionCount,
       teamSpeciesIds,
+      starterGridCandidates,
       partySlots,
       ready: { handlerActive: true, awaitingActionInput, inputBlocked },
       phase,
