@@ -311,6 +311,12 @@ Required, not optional:
 3. **New screen ⇒ new recipe.** If you add a `UiHandler`/screen, add it to `PAGE_RECIPES`
    in the same change so it (and every future change to it) is renderable. A screen with no
    recipe is treated as incomplete.
+4. **Maintainer review copies (MANDATORY, maintainer directive 2026-07-17).** For ANY UI
+   rework/new screen, when the work is FINISHED copy the FINAL harness renders (the PNG of
+   each final state a player would see - not intermediate iterations, not diff artifacts)
+   to `C:\Users\Hafida\Desktop\er-ui-review\` so the maintainer can review them without
+   digging into dev-logs. Name them descriptively (`<screen>-<state>.png`). Final states
+   only; one set per finished feature/fix.
 
 This complements - does not replace - the combat scenario runner (for battle/ability/move
 behavior) and the in-game test-suite scenario (standing rules above). Use whichever fit; for
