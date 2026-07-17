@@ -66,6 +66,12 @@ describe.skipIf(!RUN)("co-op classic finale stage-one normalization", () => {
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, scene => {
       scene.gameMode = getGameMode(GameModes.COOP);
     });
+    const partnerBench = rig.hostScene.getPlayerParty()[1];
+    expect(partnerBench, "the stage-one fixture has a second healthy party member").toBeDefined();
+    if (partnerBench == null) {
+      throw new Error("The stage-one fixture must provide a second healthy party member.");
+    }
+    partnerBench.coopOwner = "guest";
     expect(
       rig.hostScene.getPlayerParty().some(mon => mon.coopOwner === "guest" && !mon.isFainted()),
       "the partner has healthy bench Pokemon, so only exact stage-one geometry may bypass the wait",

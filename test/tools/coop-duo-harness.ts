@@ -1715,36 +1715,41 @@ export async function settleDuoPromise<T>(
     },
   );
 
-  const deadline = Date.now() + timeoutMs;
-  while (!settled && Date.now() < deadline) {
-    await withClient(rig.hostCtx, async () => {
+  // Keep the authority browser installed between pulses. Its Phaser timers and phase-interceptor
+  // continuations remain live while the guest gets short, nested destination turns; after each nested
+  // pulse `withClient` restores this exact host context. Leaving neither browser ambient between flat
+  // host/guest scopes strands delayed enemy summons in the one-process rig even though two real browser
+  // event loops would both remain continuously installed.
+  return await withClient(rig.hostCtx, async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (!settled && Date.now() < deadline) {
       await drainLoopback();
       await new Promise<void>(resolve => setTimeout(resolve, 0));
-    });
-    await withClient(rig.guestCtx, async () => {
-      await drainLoopback();
-      await new Promise<void>(resolve => setTimeout(resolve, 0));
-    });
-    if (!settled) {
-      await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
+      await withClient(rig.guestCtx, async () => {
+        await drainLoopback();
+        await new Promise<void>(resolve => setTimeout(resolve, 0));
+      });
+      if (!settled) {
+        await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
+      }
     }
-  }
 
-  if (!settled) {
-    const hostCurrent = rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "(none)";
-    const guestCurrent = rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "(none)";
-    const hostQueued = rig.hostScene.phaseManager.getQueuedPhaseNames?.() ?? [];
-    const guestQueued = rig.guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
-    throw new Error(
-      `${label} did not settle while both destination contexts were pumped; `
-        + `host=${hostCurrent} queued=[${hostQueued.join(",")}], `
-        + `guest=${guestCurrent} queued=[${guestQueued.join(",")}]`,
-    );
-  }
-  if (rejected) {
-    throw failure;
-  }
-  return await pending;
+    if (!settled) {
+      const hostCurrent = rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "(none)";
+      const guestCurrent = rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "(none)";
+      const hostQueued = rig.hostScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+      const guestQueued = rig.guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+      throw new Error(
+        `${label} did not settle while both destination contexts were pumped; `
+          + `host=${hostCurrent} queued=[${hostQueued.join(",")}], `
+          + `guest=${guestCurrent} queued=[${guestQueued.join(",")}]`,
+      );
+    }
+    if (rejected) {
+      throw failure;
+    }
+    return await pending;
+  });
 }
 
 /**

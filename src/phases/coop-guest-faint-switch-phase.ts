@@ -124,9 +124,11 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       unregisterTerminal();
       // A committed result can arrive after the human selection callback but before the bounded MESSAGE
       // close resolves. Its first materialization correctly defers; wake that exact retained entry now
-      // instead of relying on another host resend after the real UI boundary is already complete.
+      // instead of relying on another host resend after the real UI boundary is already complete. Every
+      // committed operation is sequenced by the durability journal's global class; `op:faintSwitch` is
+      // the semantic adapter name, not a pending durability cursor.
       runWhenCoopRuntimeActive(runtime, () => {
-        runtime.durability?.retryDeferred("op:faintSwitch");
+        runtime.durability?.retryDeferred("op:global");
       });
     };
     const closePicker = (): void => {

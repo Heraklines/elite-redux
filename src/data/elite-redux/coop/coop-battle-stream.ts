@@ -3949,29 +3949,34 @@ export class CoopBattleStreamer {
     switch (msg.t) {
       case "enemyPartySync": {
         const floor = this.enemyPartyAuthorityFloorByWave.get(msg.wave);
-        if (
-          floor != null
-          && (msg.authoritativeState === undefined || msg.authoritativeState.tick <= floor)
-        ) {
+        if (floor != null && (msg.authoritativeState === undefined || msg.authoritativeState.tick <= floor)) {
           coopLog(
             "stream",
             `guest ignored retired enemyParty carrier wave=${msg.wave} tick=${msg.authoritativeState?.tick ?? "-"} floor=${floor}`,
           );
           return;
         }
-        if (msg.authoritativeState !== undefined) {
-          if (msg.authoritativeState.wave === msg.wave) {
+        const admittedAuthoritativeState =
+          msg.authoritativeState?.wave === msg.wave ? msg.authoritativeState : undefined;
+        if (msg.authoritativeState !== undefined && admittedAuthoritativeState === undefined) {
+          coopWarn(
+            "stream",
+            `guest rejected enemyParty state address carrierWave=${msg.wave} stateWave=${msg.authoritativeState.wave}`,
+          );
+        }
+        if (admittedAuthoritativeState !== undefined) {
+          if (admittedAuthoritativeState.wave === msg.wave) {
             const prior = this.enemyPartyStateByWave.get(msg.wave);
-            if (prior == null || msg.authoritativeState.tick > prior.tick) {
-              this.enemyPartyStateByWave.set(msg.wave, msg.authoritativeState);
-            } else if (msg.authoritativeState.tick < prior.tick) {
+            if (prior == null || admittedAuthoritativeState.tick > prior.tick) {
+              this.enemyPartyStateByWave.set(msg.wave, admittedAuthoritativeState);
+            } else if (admittedAuthoritativeState.tick < prior.tick) {
               coopLog(
                 "stream",
-                `guest ignored regressed enemyParty state wave=${msg.wave} tick=${msg.authoritativeState.tick} retained=${prior.tick}`,
+                `guest ignored regressed enemyParty state wave=${msg.wave} tick=${admittedAuthoritativeState.tick} retained=${prior.tick}`,
               );
               return;
-            } else if (canonicalize(prior) !== canonicalize(msg.authoritativeState)) {
-              const current = this.currentAuthorityAddress(msg.authoritativeState.turn);
+            } else if (canonicalize(prior) !== canonicalize(admittedAuthoritativeState)) {
+              const current = this.currentAuthorityAddress(admittedAuthoritativeState.turn);
               const reason = `Enemy-party authority changed at immutable wave/tick ${msg.wave}/${prior.tick}.`;
               if (current == null) {
                 coopWarn("stream", `${reason} No authenticated runtime address remained for the shared terminal.`);
@@ -3981,20 +3986,14 @@ export class CoopBattleStreamer {
                   {
                     epoch: current.epoch,
                     wave: msg.wave,
-                    turn: msg.authoritativeState.turn,
-                    revision: Math.max(1, msg.authoritativeState.tick),
+                    turn: admittedAuthoritativeState.turn,
+                    revision: Math.max(1, admittedAuthoritativeState.tick),
                   },
                   reason,
                 );
               }
               return;
             }
-          } else {
-            coopWarn(
-              "stream",
-              `guest rejected enemyParty state address carrierWave=${msg.wave} stateWave=${msg.authoritativeState.wave}`,
-            );
-            return;
           }
           while (this.enemyPartyStateByWave.size > 4) {
             const oldestWave = Math.min(...this.enemyPartyStateByWave.keys());
@@ -4031,7 +4030,7 @@ export class CoopBattleStreamer {
         this.lastEnemyParty = {
           wave: msg.wave,
           enemies: msg.enemies,
-          ...(msg.authoritativeState === undefined ? {} : { stateTick: msg.authoritativeState.tick }),
+          ...(admittedAuthoritativeState === undefined ? {} : { stateTick: admittedAuthoritativeState.tick }),
         };
         this.enemyPartyHandler?.(msg.wave, msg.enemies);
         return;

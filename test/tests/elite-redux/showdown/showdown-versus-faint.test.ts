@@ -73,8 +73,8 @@ import {
   installDuoLogCapture,
   materializeGuestInputAfterReplacement,
   presentedFieldMon,
-  settleDuoPromise,
   type ShowdownDuoRig,
+  settleDuoPromise,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -703,6 +703,10 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
         }
         expect(pickerCloses, "the retained fallback closed the idle picker through MESSAGE").toBe(1);
         expect(rig.guestScene.phaseManager.getCurrentPhase()?.phaseName).not.toBe("CoopGuestFaintSwitchPhase");
+        // The setup advanced the ambient cursor solely to prove the picker retained its streamed turn-N
+        // address. Once that exact picker has materially closed, remove the synthetic perturbation; the
+        // real turn-N finalizer below is responsible for advancing the renderer to turn N+1 exactly once.
+        rig.guestScene.currentBattle.turn = turn;
       });
       expect(materialAcks.length, "the real picker emitted material proof").toBeGreaterThanOrEqual(1);
       expect(
