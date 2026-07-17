@@ -10,12 +10,13 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   armCoopFaintSwitchIntentResend,
   captureCoopFaintSwitchOperationBinding,
+  markCoopFaintSwitchPickerSettled,
+  registerCoopFaintSwitchPickerTerminal,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   beginCoopFaintSwitchWindow,
   COOP_FAINT_SWITCH_SEQ_BASE,
   endCoopFaintSwitchWindow,
-  getCoopFaintSwitchWaitMs,
   sendCoopFaintSwitchChoice,
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { failCoopSharedSession, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
@@ -32,8 +33,8 @@ import { PartyUiHandler, PartyUiMode } from "#ui/handlers/party-ui-handler";
  * host's out-of-band replacement checkpoint (CoopPushReplacementCheckpointPhase) is what
  * materializes the mon on the guest, keeping the renderer mutation-free.
  *
- * If the player idles past the host's wait ({@linkcode getCoopFaintSwitchWaitMs}), the host
- * auto-picks and the late pick is simply ignored (stale seq) - the run never stalls.
+ * If the player idles past the host's bounded wait, the retained
+ * FAINT_SWITCH terminal closes this picker before the host's authoritative replacement projects.
  */
 export class CoopGuestFaintSwitchPhase extends Phase {
   public readonly phaseName = "CoopGuestFaintSwitchPhase";
@@ -73,6 +74,8 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       return;
     }
     const seq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
+    const sourceWave = scene.currentBattle?.waveIndex ?? 0;
+    const sourceTurn = scene.currentBattle?.turn ?? 0;
     coopLog("replay", `guest own-faint picker OPEN slot=${this.fieldIndex} seq=${seq} (choose your replacement)`);
     // Suppress the stall watchdog while THIS human's replacement picker is open: the guest's replay is
     // parked in a network wait for the host's next turn (which legitimately can't arrive until this pick),
@@ -80,12 +83,42 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     // stateSync. Paired 1:1 with endCoopFaintSwitchWindow on pick (the select callback) or on an open
     // failure (the catch) - exactly one of the two runs.
     beginCoopFaintSwitchWindow();
+    let settled = false;
+    let unregisterTerminal = () => {};
+    unregisterTerminal = registerCoopFaintSwitchPickerTerminal(
+      {
+        wave: sourceWave,
+        turn: sourceTurn,
+        fieldIndex: this.fieldIndex,
+        consume: (payload, operationId) => {
+          if (settled) {
+            return true;
+          }
+          settled = true;
+          endCoopFaintSwitchWindow();
+          coopLog(
+            "replay",
+            `guest own-faint picker CLOSE from committed authority slot=${this.fieldIndex} `
+              + `party[${payload.partySlot}] op=${operationId}`,
+          );
+          void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(() => scene.phaseManager.shiftPhase());
+          return true;
+        },
+      },
+      operationBinding,
+    );
     try {
       scene.ui.setMode(
         UiMode.PARTY,
         PartyUiMode.FAINT_SWITCH,
         this.fieldIndex,
         (slotIndex: number) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          unregisterTerminal();
+          markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.fieldIndex, operationBinding);
           endCoopFaintSwitchWindow();
           const battlerCount = scene.currentBattle?.getBattlerCount() ?? 0;
           const picked = scene.getPlayerParty()[slotIndex];
@@ -130,6 +163,8 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     } catch {
       // A UI failure must never hang the guest's replay; the host auto-picks after its wait.
       endCoopFaintSwitchWindow();
+      unregisterTerminal();
+      markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.fieldIndex, operationBinding);
       coopWarn("replay", `guest own-faint picker slot=${this.fieldIndex} failed to open (handled, host auto-picks)`);
       scene.phaseManager.shiftPhase();
     }

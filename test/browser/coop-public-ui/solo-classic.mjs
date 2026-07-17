@@ -57,16 +57,17 @@ async function assertMirrorReactsToInput(client) {
  * falsely made the navigation probe look complete. Decline every visible initial prompt
  * by semantic option id, then return only from the live command surface.
  */
-async function reachFirstCommand(client, from) {
+export async function reachFirstCommand(client, from) {
   // Animations-on startup can legitimately spend more than the ordinary interaction timeout walking
   // summon/ability/stat narration on a heavily contended browser runner. Run 29556668290 reached the exact
   // healthy wave-1 CommandPhase at 123s, three seconds after the old 120s deadline. Keep this bounded, but
   // give the initial engine setup its own honest budget instead of reporting a real late command as a lock.
   const setupTimeoutMs = Math.max(client.config.timeoutMs, 180_000);
+  let evidenceFloor = from;
   for (let prompts = 0; prompts < 3; prompts++) {
     const surface = await client.evidence.waitForCondition(
       sink => {
-        const latest = sink.findLastSemanticSurface(from);
+        const latest = sink.findLastSemanticSurface(evidenceFloor);
         if (latest?.observation.surfaceId === COMMAND_SURFACE) {
           return latest;
         }
@@ -87,14 +88,21 @@ async function reachFirstCommand(client, from) {
     if (surface.observation.surfaceId === COMMAND_SURFACE) {
       return surface;
     }
-    await selectOptionById(client, {
+    const declined = await selectOptionById(client, {
       surfaceId: CHECK_SWITCH_SURFACE,
       targetId: "no",
       navKeys: ["ArrowUp", "ArrowDown"],
+      fromCursor: evidenceFloor,
       timeoutMs: client.config.timeoutMs,
     });
+    // `press()` can return before the observer publishes the next surface. Retire the exact
+    // prompt instance that authorized this submit; otherwise its still-actionable mirror can
+    // be admitted again and the duplicate Space lands on Command -> Fight -> move selection.
+    // Advancing to the pre-submit sink cursor would be unsafe because a legitimately newer
+    // prompt can arrive while the key is being processed.
+    evidenceFloor = declined.surfaceEventIndex + 1;
   }
-  return waitForSemantic(client, COMMAND_SURFACE, setupTimeoutMs, from);
+  return waitForSemantic(client, COMMAND_SURFACE, setupTimeoutMs, evidenceFloor);
 }
 
 export async function runSoloClassic(client) {

@@ -33,6 +33,7 @@ import {
   buildCheckpoint,
   type CoopArenaView,
   type CoopFieldMonView,
+  isResolvableCoopFormIndex,
   monStateByIndex,
   normalizeMonState,
 } from "#data/elite-redux/coop/coop-battle-checkpoint";
@@ -1031,6 +1032,30 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
       }
       const state = normalizeMonState(raw);
       try {
+        // A battler index is a field coordinate, not a Pokemon identity. Reconciliation can fail to find
+        // a switched-in party member temporarily; the companion full state then rebuilds it. Applying this
+        // row to the stale occupant corrupts the wrong mon (and an out-of-range form starts rejected async
+        // work whose error appears much later). Bind the complete scalar row to species before any mutation.
+        const localSpeciesId = mon.species?.speciesId ?? 0;
+        if (state.speciesId > 0 && localSpeciesId !== state.speciesId) {
+          coopWarn(
+            "checkpoint",
+            `mon bi=${mon.getBattlerIndex()} identity mismatch hostSpecies=${state.speciesId} `
+              + `guestSpecies=${localSpeciesId}; skipped slot scalars pending full-state adoption`,
+          );
+          continue;
+        }
+        if (
+          state.formIndex !== undefined
+          && !isResolvableCoopFormIndex(mon.species?.forms?.length ?? 0, state.formIndex)
+        ) {
+          coopWarn(
+            "checkpoint",
+            `mon bi=${mon.getBattlerIndex()} rejected unresolved formIndex=${state.formIndex} `
+              + `species=${localSpeciesId} forms=${mon.species?.forms?.length ?? 0}; no scalar mutation applied`,
+          );
+          continue;
+        }
         // A reconstructed authoritative mon can enter the logical field before any summon phase creates its
         // sprite/battle-info children. Numeric correction calls updateInfo/loadAssets below, so initialize
         // those presentation nodes first instead of silently abandoning the rest of this mon's checkpoint.
@@ -1086,11 +1111,12 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
               `mon bi=${mon.getBattlerIndex()} formIndex ${mon.formIndex} -> ${state.formIndex} (#809)`,
             );
             mon.formIndex = state.formIndex;
-            try {
-              void mon.loadAssets(false);
-            } catch {
-              /* sprite refresh is cosmetic; state is what must converge */
-            }
+            void mon.loadAssets(false).catch(error => {
+              coopWarn(
+                "checkpoint",
+                `mon bi=${mon.getBattlerIndex()} form presentation refresh failed after valid adoption: ${String(error)}`,
+              );
+            });
           }
           if (state.isTerastallized !== undefined) {
             mon.isTerastallized = state.isTerastallized;
@@ -1129,7 +1155,12 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
               }
             }
           }
-          void mon.updateInfo();
+          void mon.updateInfo().catch(error => {
+            coopWarn(
+              "checkpoint",
+              `mon bi=${mon.getBattlerIndex()} info refresh failed after scalar adoption: ${String(error)}`,
+            );
+          });
         }
       } catch (error) {
         // Checkpoint apply is the hot recovery boundary. A silent partial apply makes a persistent

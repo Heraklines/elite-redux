@@ -9,12 +9,16 @@ import {
   captureCoopFaintSwitchOperationBinding,
   commitFaintSwitchAuthorityIntent,
   coopFaintSwitchOperationAddress,
+  markCoopFaintSwitchPickerSettled,
+  materializeCoopFaintSwitchPickerTerminal,
+  registerCoopFaintSwitchPickerTerminal,
   resetCoopFaintSwitchOperationFlag,
   resetCoopFaintSwitchOperationState,
   resetCoopFaintSwitchRetryMs,
   setCoopFaintSwitchOperationEnabled,
   setCoopFaintSwitchRetryMs,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
+import type { CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { COOP_FAINT_SWITCH_SEQ_BASE, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { setCoopOperationDurability } from "#data/elite-redux/coop/coop-operation-journal";
 import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
@@ -43,6 +47,50 @@ describe("co-op faint-switch operation migration", () => {
   it("addresses repeated same-turn replacements by the authoritative party slot", () => {
     expect(coopFaintSwitchOperationAddress(7, 3, 1, 2)).not.toBe(coopFaintSwitchOperationAddress(7, 3, 1, 3));
     expect(coopFaintSwitchOperationAddress(7, 3, 1, -1)).not.toBe(coopFaintSwitchOperationAddress(7, 3, 1, 2));
+  });
+
+  it("materializes only the exact old-address picker before acknowledging a timeout fallback", () => {
+    const guestState = createCoopRuntimeOpState("guest");
+    setActiveCoopRuntimeOpState(guestState);
+    const binding = captureCoopFaintSwitchOperationBinding("guest");
+    const consumed: string[] = [];
+    registerCoopFaintSwitchPickerTerminal(
+      {
+        wave: 2,
+        turn: 2,
+        fieldIndex: COOP_GUEST_FIELD_INDEX,
+        consume: (payload, operationId) => {
+          consumed.push(`${payload.partySlot}:${operationId}`);
+          return true;
+        },
+      },
+      binding,
+    );
+    const envelope = {
+      sessionEpoch: 1,
+      wave: 2,
+      turn: 2,
+      pendingOperation: {
+        id: "1:1:FAINT_SWITCH:2000214",
+        kind: "FAINT_SWITCH",
+        owner: 1,
+        status: "applied",
+        payload: { fieldIndex: COOP_GUEST_FIELD_INDEX, partySlot: 3, data: [0, 6] },
+      },
+    } as unknown as CoopAuthoritativeEnvelopeV1;
+
+    expect(materializeCoopFaintSwitchPickerTerminal(envelope, binding)).toBe(true);
+    expect(consumed).toEqual(["3:1:1:FAINT_SWITCH:2000214"]);
+    expect(materializeCoopFaintSwitchPickerTerminal(envelope, binding), "exact replay is already settled").toBe(true);
+
+    const later = { ...envelope, turn: 3 } as CoopAuthoritativeEnvelopeV1;
+    expect(
+      materializeCoopFaintSwitchPickerTerminal(later, binding),
+      "a reused field slot at another address cannot consume the old terminal",
+    ).toBe(false);
+
+    markCoopFaintSwitchPickerSettled(2, 3, COOP_GUEST_FIELD_INDEX, binding);
+    expect(materializeCoopFaintSwitchPickerTerminal(later, binding)).toBe(true);
   });
 
   it("keeps host and guest operation state isolated and rejects missing or role-mismatched bindings", () => {

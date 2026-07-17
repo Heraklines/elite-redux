@@ -249,9 +249,9 @@ jobs:
             waves_default: "fixed"
             accepts_wave_override: false
             accepts_seed: false
-            calibration_id: me-host-guest-plus-asym-six-turn
-            coverage_ledger: ""
-            test_path: "test/tests/elite-redux/coop/coop-soak-me.test.ts test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts"
+            calibration_id: me-host-guest-asym-double-faint
+            coverage_ledger: dev-logs/coop-soak/coverage-ledger-me-asym.json
+            test_path: "test/tests/elite-redux/coop/coop-soak-me.test.ts test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts test/tests/elite-redux/coop/coop-duo-double-faint.test.ts"
           # JOURNEY: thirteen heterogeneous forced MEs in one continuous production-fidelity run, followed by
           # enough normal waves to cross repeated biome boundaries. Covers nested shops, guest-owned party/move
           # sub-picks, no-reward terminals, generated rewards, map mutation, a biome-changing ME battle, and
@@ -311,6 +311,8 @@ jobs:
           REQUESTED_SOAK_WAVES: ${{ needs.plan.outputs.waves_override }}
           PROFILE_SOAK_WAVES: ${{ matrix.waves_default }}
           ACCEPTS_WAVE_OVERRIDE: ${{ matrix.accepts_wave_override }}
+          SOAK_MATRIX_PROFILE: ${{ matrix.profile }}
+          CAMPAIGN_SEED: ${{ steps.seed.outputs.seed }}
           # The long campaigns must exercise the same no-harness-heal path as a live renderer.
           # Specialized ME/journey tests either set their own fidelity or ignore this value.
           SOAK_FIDELITY: "production"
@@ -335,6 +337,29 @@ jobs:
             | tee dev-logs/coop-soak/soak-output.txt
           soak_exit=${PIPESTATUS[0]}
           set -e
+          # The fixed me-asym leg contains deterministic, assertion-rich two-engine scenarios rather than
+          # a probabilistic wave collector. Publish its release ledger only after all three files pass.
+          if [ "$soak_exit" = "0" ] && [ "$SOAK_MATRIX_PROFILE" = "me-asym" ]; then
+            node - <<'NODE'
+          const fs = require("node:fs");
+          const path = "dev-logs/coop-soak/coverage-ledger-me-asym.json";
+          fs.writeFileSync(path, `${JSON.stringify([{
+            ts: new Date().toISOString(),
+            seed: Number(process.env.CAMPAIGN_SEED),
+            // Fixed scenario tests do not claim probabilistic campaign depth. Their named surface
+            // assertions are the evidence; zero is the honest wave-depth projection for this profile.
+            wavesCompleted: 0,
+            scenarioCount: 3,
+            surfaces: [
+              "situation:hostHalfExhausted",
+              "situation:doublePlayerFaint",
+              "kind:switch",
+              "operation:op:faintSwitch",
+              "band:faintSwitch",
+            ],
+          }], null, 2)}\n`);
+          NODE
+          fi
           echo "soak vitest exit code: ${soak_exit}"
           echo "exit=${soak_exit}" >> "$GITHUB_OUTPUT"
 
@@ -541,7 +566,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload required checkpoint coverage ledger
-        if: always() && matrix.coverage_ledger != ''
+        if: always() && matrix.coverage_ledger != '' && steps.soak.outputs.exit == '0'
         uses: actions/upload-artifact@v4
         with:
           name: coop-soak-coverage-${{ matrix.profile }}-${{ github.run_id }}
@@ -554,7 +579,7 @@ jobs:
         # The empty-check is load-bearing: GitHub's loose comparison coerces a MISSING output ('')
         # to the number 0, so `'' != '0'` alone evaluates FALSE and a crashed soak step would slip
         # through as success (exactly how run 28708860699 went green on a real NO-PARK strand).
-        if: steps.soak.outputs.exit == '' || steps.soak.outputs.exit != '0'
+        if: always() && (steps.soak.outputs.exit == '' || steps.soak.outputs.exit != '0')
         run: |
           echo "Co-op soak FAILED - see the dev-logs branch (remote/) and the uploaded artifact."
           exit 1
@@ -599,6 +624,7 @@ jobs:
               calibrationId: "god-200",
               configuredWaves: "200",
               coverageRequired: true,
+              minimumDepth: 200,
               seedOffset: 0,
               testPaths: ["test/tests/elite-redux/coop/coop-soak.test.ts"],
             }],
@@ -606,6 +632,7 @@ jobs:
               calibrationId: "god-200",
               configuredWaves: "200",
               coverageRequired: true,
+              minimumDepth: 200,
               seedOffset: 104729,
               testPaths: ["test/tests/elite-redux/coop/coop-soak.test.ts"],
             }],
@@ -613,6 +640,7 @@ jobs:
               calibrationId: "god-200",
               configuredWaves: "200",
               coverageRequired: true,
+              minimumDepth: 200,
               seedOffset: 209759,
               testPaths: ["test/tests/elite-redux/coop/coop-soak.test.ts"],
             }],
@@ -620,23 +648,27 @@ jobs:
               calibrationId: "level-55-faint",
               configuredWaves: "55",
               coverageRequired: true,
+              minimumDepth: 30,
               seedOffset: 0,
               testPaths: ["test/tests/elite-redux/coop/coop-soak.test.ts"],
             }],
             ["me-asym", {
-              calibrationId: "me-host-guest-plus-asym-six-turn",
+              calibrationId: "me-host-guest-asym-double-faint",
               configuredWaves: "fixed",
-              coverageRequired: false,
+              coverageRequired: true,
+              minimumDepth: 0,
               seedOffset: 0,
               testPaths: [
                 "test/tests/elite-redux/coop/coop-soak-me.test.ts",
                 "test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts",
+                "test/tests/elite-redux/coop/coop-duo-double-faint.test.ts",
               ],
             }],
             ["journey", {
               calibrationId: "journey-45-thirteen-event",
               configuredWaves: "45",
               coverageRequired: false,
+              minimumDepth: 0,
               seedOffset: 0,
               testPaths: ["test/tests/elite-redux/coop/coop-soak-journey.test.ts"],
             }],
@@ -796,8 +828,8 @@ jobs:
               errors.push(`${file} has no valid entry for campaign seed ${profileAttestation?.campaignSeed}`);
               continue;
             }
-            const minimumDepth = profile.startsWith("god-") ? 200 : 30;
             const deepest = Math.max(...currentRuns.map(entry => entry.wavesCompleted));
+            const minimumDepth = expected.get(profile)?.minimumDepth ?? Number.POSITIVE_INFINITY;
             if (deepest < minimumDepth) {
               errors.push(`${file} surveyed ${deepest} waves; required at least ${minimumDepth}`);
             }

@@ -260,7 +260,7 @@ export class CoopReplayTurnPhase extends Phase {
           // until we send that command.
           // Peek first. Consumption is the transaction COMMIT and is allowed only after every modern
           // companion applies with zero structured failures and its exact checksum converges.
-          const envelope = streamer.peekCheckpoint();
+          const envelope = streamer.peekCheckpointForTurn(this.turn);
           if (envelope != null) {
             const currentWave = globalScene.currentBattle?.waveIndex ?? 0;
             const checkpointWave = envelope.authoritativeState?.wave;
@@ -287,8 +287,8 @@ export class CoopReplayTurnPhase extends Phase {
                 `guest discard OUT-OF-BAND checkpoint reason=${envelope.reason} wave=${checkpointWave} `
                   + `turn=${envelope.turn} while replaying wave=${currentWave} turn=${this.turn}`,
               );
-              if (streamer.peekCheckpoint() === envelope) {
-                streamer.consumeCheckpoint();
+              if (streamer.peekCheckpointForTurn(this.turn) === envelope) {
+                streamer.consumeCheckpointForTurn(this.turn);
               }
               continue;
             }
@@ -316,7 +316,7 @@ export class CoopReplayTurnPhase extends Phase {
             if (!streamer.acknowledgeReplacement(envelope, "presentationReady")) {
               return;
             }
-            if (streamer.peekCheckpoint() !== envelope) {
+            if (streamer.peekCheckpointForTurn(this.turn) !== envelope) {
               coopWarn(
                 "checkpoint",
                 `guest replacement converged but retained carrier changed before commit turn=${this.turn} -> remain held`,
@@ -324,7 +324,7 @@ export class CoopReplayTurnPhase extends Phase {
               this.parkForReplacementRetry(streamer, envelope);
               return;
             }
-            streamer.consumeCheckpoint();
+            streamer.consumeCheckpointForTurn(this.turn);
             streamer.retainAppliedOutOfBandCheckpoint(envelope);
             // Showdown versus (Task F1): the versus guest owns its ENTIRE player field (a 1v1 -> field
             // slot 0). The co-op seat map used by coopLocalOwnedPlayerFieldSlot() resolves the fixed

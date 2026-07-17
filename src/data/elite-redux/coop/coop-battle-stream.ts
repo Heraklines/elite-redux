@@ -1307,15 +1307,12 @@ export class CoopBattleStreamer {
       return true;
     }
     const current = this.currentAuthorityAddress();
-    if (current == null || current.epoch !== failure.epoch || current.wave !== failure.wave) {
+    if (current == null || current.epoch !== failure.epoch) {
       return false;
-    }
-    if (current.turn === failure.turn) {
-      return true;
     }
     const turnKey = pendingTurnKey(failure);
     const exactKey = authorityKey(failure);
-    return (
+    const hasExactAddressEvidence =
       this.pending.has(turnKey)
       || this.hasRequestedTurnAddress(failure)
       || this.sentTurnCommits.has(exactKey)
@@ -1325,8 +1322,34 @@ export class CoopBattleStreamer {
       || this.ackedTurnCommits.has(exactKey)
       || this.ackedReplacementCommits.has(exactKey)
       || this.seenTurnAuthority.has(exactKey)
-      || this.seenReplacementAuthority.has(exactKey)
-    );
+      || this.seenReplacementAuthority.has(exactKey);
+    // A raw compatibility hint or speculative next battle can advance ambient wave state before a
+    // delayed terminal frame arrives. Exact immutable authority evidence remains the stronger address
+    // proof; accepting it is fail-closed and prevents one peer waiting forever at the successor shell.
+    return hasExactAddressEvidence || (current.wave === failure.wave && current.turn === failure.turn);
+  }
+
+  /**
+   * Replacement authority is captured after TurnEnd increments the host battle turn. The guest can
+   * legitimately still be parked on the just-resolved turn while its owner picker is open, so admit
+   * exactly N+1 only when an exact N turn wait proves that old boundary is still live.
+   */
+  private acceptsCheckpointAddress(envelope: CoopCheckpointEnvelope): boolean {
+    if (this.acceptsCurrentAddress(envelope)) {
+      return true;
+    }
+    const current = this.currentAuthorityAddress();
+    if (
+      current == null
+      || envelope.reason !== "replacement"
+      || envelope.epoch !== current.epoch
+      || envelope.wave !== current.wave
+      || envelope.turn !== current.turn + 1
+    ) {
+      return false;
+    }
+    const currentKey = pendingTurnKey(current);
+    return this.pending.has(currentKey) || this.hasRequestedTurnAddress(current);
   }
 
   private classifyAuthority<T extends { epoch: number; wave: number; turn: number; revision: number }>(
@@ -1941,7 +1964,7 @@ export class CoopBattleStreamer {
     preimage: string,
     fullField: CoopFullMonSnapshot[],
     authoritativeState: CoopAuthoritativeBattleStateV1,
-  ): void {
+  ): boolean {
     const revision = authoritativeState.tick;
     const invalidEventIndex = events.findIndex(event => !isStrictBattleEvent(event));
     if (invalidEventIndex >= 0) {
@@ -1972,9 +1995,31 @@ export class CoopBattleStreamer {
     }
     if (!this.retainAndRetryTurnCommit(commit)) {
       coopWarn("stream", `host WITHHOLD turn commit e=${epoch} wave=${wave} turn=${turn}: authority terminal active`);
-      return;
+      return false;
     }
     this.transport.send(commit);
+    return true;
+  }
+
+  /** Newest checkpoint capable of completing the exact replay-turn park, including its N+1 replacement. */
+  private checkpointEntryForTurn(turn: number): [string, CoopCheckpointEnvelope] | undefined {
+    const waitedAddress = this.currentAuthorityAddress(turn);
+    if (this.authorityContext == null) {
+      return [...this.pendingCheckpoints.entries()].reverse().find(([, envelope]) => envelope.turn === turn);
+    }
+    if (waitedAddress == null) {
+      return;
+    }
+    return [...this.pendingCheckpoints.entries()]
+      .filter(
+        ([, envelope]) =>
+          sameTurnAddress(envelope, waitedAddress)
+          || (envelope.reason === "replacement"
+            && envelope.epoch === waitedAddress.epoch
+            && envelope.wave === waitedAddress.wave
+            && envelope.turn === waitedAddress.turn + 1),
+      )
+      .sort((left, right) => right[1].revision - left[1].revision)[0];
   }
 
   /**
@@ -3301,6 +3346,21 @@ export class CoopBattleStreamer {
     return this.currentCheckpointEntry()?.[1] ?? null;
   }
 
+  /** Inspect the checkpoint that can wake one exact replay turn without broadening the ambient inbox. */
+  peekCheckpointForTurn(turn: number): CoopCheckpointEnvelope | null {
+    return this.checkpointEntryForTurn(turn)?.[1] ?? null;
+  }
+
+  /** Consume only the checkpoint selected for one exact replay-turn boundary. */
+  consumeCheckpointForTurn(turn: number): CoopCheckpointEnvelope | null {
+    const entry = this.checkpointEntryForTurn(turn);
+    if (entry == null) {
+      return null;
+    }
+    discardAuthorityThrough(this.pendingCheckpoints, entry[1]);
+    return entry[1];
+  }
+
   /** Record an out-of-band envelope only after its numeric/full state applied successfully. */
   retainAppliedOutOfBandCheckpoint(checkpoint: CoopCheckpointEnvelope): void {
     const key = bufferedAuthorityKey("replacement", checkpoint);
@@ -3431,7 +3491,7 @@ export class CoopBattleStreamer {
     // delivery race to a newer final turn. Both carriers share the monotonic authoritative-state tick,
     // so consume the newest revision instead of assuming one carrier class is always newer.
     const waitedAddress = this.currentAuthorityAddress(turn);
-    const checkpoint = this.peekCheckpoint();
+    const checkpoint = this.peekCheckpointForTurn(turn);
     const bufferedTurn = this.bufferedTurnEntry(turn)?.[1];
     if (
       checkpoint != null
@@ -4207,7 +4267,7 @@ export class CoopBattleStreamer {
           this.transport.send(completedAck.value);
           return;
         }
-        if (!this.acceptsCurrentAddress(envelope)) {
+        if (!this.acceptsCheckpointAddress(envelope)) {
           coopWarn(
             "checkpoint",
             `guest DROP cross-address battleCheckpoint reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} `

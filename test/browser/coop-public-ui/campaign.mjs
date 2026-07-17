@@ -1404,7 +1404,7 @@ async function checkpointRewardPartyTarget(rig, cursors, owner) {
 async function driveRewardPartyTarget(rig, driver, owner, boundary) {
   const targetSlot = driver.partySlot ?? 0;
   let event = boundary.ownerEvent;
-  const selectedCursor = () => /^cursor:(\d+)$/u.exec(event.observation.selectedOptionId ?? "");
+  const selectedCursor = () => /^party-slot:(\d+)$/u.exec(event.observation.selectedOptionId ?? "");
   const match = selectedCursor();
   if (match == null) {
     throw new Error(`[campaign-reward-target] ${owner.label} exposed no stable party cursor before target selection`);
@@ -1418,7 +1418,7 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
     event = await owner.evidence.waitForCondition(
       sink => {
         const candidate = sink.findLastSemanticSurface(priorIndex + 1, "party:reward-target");
-        return candidate?.observation.selectedOptionId === `cursor:${nextCursor}` ? candidate : null;
+        return candidate?.observation.selectedOptionId === `party-slot:${nextCursor}` ? candidate : null;
       },
       { timeoutMs: rig.config.timeoutMs, description: `reward party cursor ${targetSlot}` },
     );

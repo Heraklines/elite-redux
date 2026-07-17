@@ -111,6 +111,7 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import { CoopDurabilityManager, isCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import {
   isCoopFaintSwitchOperationEnabled,
+  materializeCoopFaintSwitchPickerTerminal,
   resetCoopFaintSwitchOperationState,
   setCoopFaintSwitchOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
@@ -280,7 +281,7 @@ import {
   createLoopbackPair,
   type SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
-import { setCoopLiveEmitter } from "#data/elite-redux/coop/coop-turn-recorder";
+import { isCoopRecording, setCoopLiveEmitter } from "#data/elite-redux/coop/coop-turn-recorder";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { coopAuthorityContinuationSurface } from "#data/elite-redux/coop/coop-ui-registry";
 import { resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
@@ -1130,6 +1131,20 @@ let lastWaveEndStateWave = -1;
 const pendingHostWaveTransitions = new Map<number, CoopWaveAdvancePayload>();
 /** Settled host transactions retained by wave, including a terminal victory that supersedes GameOver's echo. */
 const settledHostWaveTransitions = new Map<number, CoopWaveAdvancePayload>();
+/**
+ * A normal victory observed while its material battle turn is still recording. The transition is staged
+ * immediately so BattleEnd can freeze its identity, but its raw compatibility hint cannot leave the host
+ * until the immutable turn commit has been accepted for retention.
+ */
+const deferredHostWaveResolved = new Map<
+  number,
+  {
+    outcome: CoopWaveOutcome;
+    captureParty?: string[] | undefined;
+    presentation?: CoopCapturePresentation | undefined;
+    transition: CoopWaveAdvancePayload;
+  }
+>();
 /**
  * One normal victory whose BattleEnd cleanup has completed but whose automatic post-victory children have
  * not drained yet. Runtime-keying is load-bearing in the two-engine harness: the host and guest coexist in
@@ -3929,11 +3944,32 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
   if (outcome === "gameOver") {
     commitCoopSettledWaveAdvance(wave, transition);
   }
+  const captureParty = outcome === "capture" ? captureCoopCaptureParty() : undefined;
+  if (outcome === "win" && isCoopRecording()) {
+    deferredHostWaveResolved.set(wave, { outcome, captureParty, presentation, transition });
+    coopLog(
+      "runtime",
+      `defer raw waveResolved wave=${wave} outcome=${outcome} until its material turnResolution is retained`,
+    );
+    return;
+  }
+  sendCoopWaveResolvedCompatibility(wave, outcome, captureParty, presentation, transition);
+}
+
+function sendCoopWaveResolvedCompatibility(
+  wave: number,
+  outcome: CoopWaveOutcome,
+  captureParty: string[] | undefined,
+  presentation: CoopCapturePresentation | undefined,
+  transition: CoopWaveAdvancePayload,
+): void {
+  if (active == null || active.controller.role !== "host") {
+    return;
+  }
   try {
     // Co-op (#633 B1/B2/B3): a CAPTURE grows/edits the host's party (the caught mon, and a party-full
     // release) that the guest's pure-renderer tail never reproduces. Carry the full post-catch party
     // so the guest can reconcile its bench + credit the catch. Other outcomes carry nothing (no-op).
-    const captureParty = outcome === "capture" ? captureCoopCaptureParty() : undefined;
     coopLog(
       "runtime",
       `send waveResolved wave=${wave} outcome=${outcome}${captureParty == null ? "" : ` captureParty=${captureParty.length}`}${presentation == null ? "" : ` cap=sp${presentation.speciesId}`} (host)`,
@@ -3943,6 +3979,38 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
     /* a wave-resolved send failure must never break the host's post-battle flow */
     coopWarn("runtime", `send waveResolved failed wave=${wave} outcome=${outcome}`, e);
   }
+}
+
+/**
+ * Publish a staged normal-victory compatibility hint only after the exact final material turn has entered
+ * immutable retention. If turn sealing fails, this is never called: both peers remain at the failing turn
+ * address and the retained authorityFailure can terminate them symmetrically.
+ */
+export function flushCoopWaveResolvedAfterTurnCommit(wave: number): boolean {
+  const deferred = deferredHostWaveResolved.get(wave);
+  if (deferred == null) {
+    return true;
+  }
+  const staged = pendingHostWaveTransitions.get(wave);
+  if (
+    active == null
+    || active.controller.role !== "host"
+    || staged == null
+    || staged !== deferred.transition
+    || staged.outcome !== deferred.outcome
+  ) {
+    failCoopSharedSession(`The deferred waveResolved compatibility hint for wave ${wave} lost its turn boundary.`);
+    return false;
+  }
+  deferredHostWaveResolved.delete(wave);
+  sendCoopWaveResolvedCompatibility(
+    wave,
+    deferred.outcome,
+    deferred.captureParty,
+    deferred.presentation,
+    deferred.transition,
+  );
+  return true;
 }
 
 /**
@@ -4303,17 +4371,19 @@ function materializeCoopFaintSwitchFromOp(runtime: CoopRuntime, envelope: CoopAu
   ) {
     return false;
   }
-  // Guest-owned picks were already materialized by the local picker. Host-owned replacements are fed into
-  // the same committed-choice FIFO used by the replacement phase, with the operation id for dedupe.
-  if (operation.owner === 0) {
-    runtime.interactionRelay.materializeCommittedInteractionChoice(
-      COOP_FAINT_SWITCH_SEQ_BASE + payload.fieldIndex,
-      "switch",
-      payload.partySlot,
-      [...payload.data],
-      operation.id,
-    );
+  if (operation.owner === 1) {
+    // This synchronous consumer is the material boundary: a timeout fallback cannot ACK until the
+    // exact old-address guest picker has been settled and its late callback disabled.
+    return materializeCoopFaintSwitchPickerTerminal(envelope);
   }
+  // Host-owned replacements are fed into the existing committed-choice watcher.
+  runtime.interactionRelay.materializeCommittedInteractionChoice(
+    COOP_FAINT_SWITCH_SEQ_BASE + payload.fieldIndex,
+    "switch",
+    payload.partySlot,
+    [...payload.data],
+    operation.id,
+  );
   return true;
 }
 
@@ -5454,6 +5524,7 @@ export function assembleCoopRuntime(
   // here would erase whichever peer the two-engine harness most recently installed, not the runtime below.
   pendingHostWaveTransitions.clear();
   settledHostWaveTransitions.clear();
+  deferredHostWaveResolved.clear();
   pendingRawWavePresentations.clear();
   pendingSettledWaveBoundary = null;
   // #896 W2e-R2: a fresh assembly is a genuine RE-PAIR (new control plane), so drop any prior session's
@@ -5938,6 +6009,7 @@ export function clearCoopRuntime(): void {
   lastWaveEndStateWave = -1;
   pendingHostWaveTransitions.clear();
   settledHostWaveTransitions.clear();
+  deferredHostWaveResolved.clear();
   pendingRawWavePresentations.clear();
   pendingSettledWaveBoundary = null;
   // Reset the ME battle handoff counter so a subsequent run starts clean (#633).

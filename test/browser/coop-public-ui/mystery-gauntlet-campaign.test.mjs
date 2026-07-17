@@ -14,6 +14,7 @@ import {
   checkpointPixelIntegrityFailure,
   checkpointRequiresGameplayCoverage,
 } from "./evidence.mjs";
+import { reachFirstCommand } from "./solo-classic.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 
@@ -97,6 +98,11 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /async function checkpointRewardPartyTarget\(/u);
   assert.match(campaign, /watcherSurfaceId: "reward-shop"/u);
   assert.match(campaign, /async function driveRewardPartyTarget\(/u);
+  assert.match(
+    campaign,
+    /selectedCursor = \(\) => \/\^party-slot:\(\\d\+\)\$\/u[\s\S]*selectedOptionId === `party-slot:\$\{nextCursor\}`/u,
+  );
+  assert.doesNotMatch(campaign, /\^cursor:\(\\d\+\)\$/u);
   assert.match(campaign, /selected\.startsWith\("party-option:"\)/u);
   assert.match(campaign, /campaign-reward-target-action/u);
   assert.match(campaign, /await driveConfirmedLeave\(rig, driver, client, mechanicalBoundary\.authority\)/u);
@@ -141,6 +147,89 @@ test("the companion solo lane publicly selects a readiness-proven empty save slo
   assert.match(navigation, /event\.observation\.selectedOptionId === "empty-slot:0"/u);
   assert.match(navigation, /await client\.press\("Space", "fresh-save-slot-0"\)/u);
   assert.match(solo, /await selectFirstEmptySaveSlot\(client,/u);
+});
+
+function soloCommandProgressClient(promptCount) {
+  const events = [
+    {
+      index: 0,
+      kind: "browser-surface2",
+      observation: {
+        surfaceId: "check-switch",
+        optionIds: ["yes", "no"],
+        selectedOptionId: "no",
+        ready: { handlerActive: true, inputBlocked: false },
+      },
+    },
+  ];
+  const presses = [];
+  const evidence = {
+    events,
+    findLastSemanticSurface(fromCursor = 0, surfaceId = null) {
+      return events
+        .filter(
+          event =>
+            event.index >= fromCursor
+            && event.kind === "browser-surface2"
+            && (surfaceId == null || event.observation.surfaceId === surfaceId),
+        )
+        .at(-1);
+    },
+    async waitForCondition(predicate, { timeoutMs = 500, description = "condition" } = {}) {
+      const deadline = Date.now() + Math.min(timeoutMs, 500);
+      while (Date.now() < deadline) {
+        const result = predicate(this);
+        if (result) {
+          return result;
+        }
+        await new Promise(resolveDelay => setTimeout(resolveDelay, 2));
+      }
+      throw new Error(`timed out waiting for ${description}`);
+    },
+    record() {},
+  };
+  return {
+    label: "solo-seat",
+    config: { timeoutMs: 500 },
+    evidence,
+    presses,
+    async press(key, purpose) {
+      presses.push({ key, purpose });
+      const submittedPrompts = presses.filter(entry => entry.purpose === "nav-submit-check-switch->no").length;
+      setTimeout(() => {
+        const observation =
+          submittedPrompts < promptCount
+            ? {
+                surfaceId: "check-switch",
+                optionIds: ["yes", "no"],
+                selectedOptionId: "no",
+                ready: { handlerActive: true, inputBlocked: false },
+              }
+            : {
+                surfaceId: "command:command",
+                ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+              };
+        events.push({ index: events.length, kind: "browser-surface2", observation });
+      }, 10);
+    },
+  };
+}
+
+test("solo command setup retires a lingering switch prompt after exactly one submit", async () => {
+  const client = soloCommandProgressClient(1);
+  const command = await reachFirstCommand(client, 0);
+  assert.equal(command.observation.surfaceId, "command:command");
+  assert.deepEqual(client.presses, [{ key: "Space", purpose: "nav-submit-check-switch->no" }]);
+});
+
+test("solo command setup submits each distinct switch prompt exactly once", async () => {
+  const client = soloCommandProgressClient(2);
+  const command = await reachFirstCommand(client, 0);
+  assert.equal(command.observation.surfaceId, "command:command");
+  assert.deepEqual(client.presses, [
+    { key: "Space", purpose: "nav-submit-check-switch->no" },
+    { key: "Space", purpose: "nav-submit-check-switch->no" },
+  ]);
 });
 
 test("the high-frequency semantic observer caches only its expensive digest on a fixed SLA", async () => {

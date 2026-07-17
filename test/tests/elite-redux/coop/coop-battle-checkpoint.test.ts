@@ -12,6 +12,7 @@ import {
   buildCheckpoint,
   type CoopArenaView,
   type CoopFieldMonView,
+  isResolvableCoopFormIndex,
   monStateByIndex,
   normalizeMonState,
   serializeArenaTag,
@@ -59,6 +60,20 @@ describe("co-op battle checkpoint pure core (#633, LIVE-D)", () => {
     const changed = serializeMonState(mon({ formIndex: 1, abilityId: 42 }));
     expect(changed.formIndex).toBe(1);
     expect(changed.abilityId).toBe(42);
+  });
+
+  it("sanitizes malformed wire forms and defines the species form domain", () => {
+    expect(serializeMonState(mon({ formIndex: -1 })).formIndex).toBeUndefined();
+    expect(serializeMonState(mon({ formIndex: 1.5 })).formIndex).toBeUndefined();
+    expect(serializeMonState(mon({ formIndex: Number.NaN })).formIndex).toBeUndefined();
+
+    expect(isResolvableCoopFormIndex(0, 0), "formless species use their base object at index zero").toBe(true);
+    expect(isResolvableCoopFormIndex(0, 1)).toBe(false);
+    expect(isResolvableCoopFormIndex(2, 0)).toBe(true);
+    expect(isResolvableCoopFormIndex(2, 1)).toBe(true);
+    expect(isResolvableCoopFormIndex(2, 2)).toBe(false);
+    expect(isResolvableCoopFormIndex(2, -1)).toBe(false);
+    expect(isResolvableCoopFormIndex(2, 0.5)).toBe(false);
   });
 
   it("buildCheckpoint maps every field mon + the arena", () => {

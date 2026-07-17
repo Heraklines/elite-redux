@@ -1174,13 +1174,17 @@ function observeSemanticSurface(): void {
             const fainted = pokemon.isFainted();
             const allowedInBattle = pokemon.isAllowedInBattle();
             const reserve = slot >= (battle?.getBattlerCount() ?? 1);
+            const coopOwner = pokemon.coopOwner ?? null;
+            const ownedReplacement =
+              runtime?.controller.isVersusSession() === true || (localRole != null && coopOwner === localRole);
             return {
               slot,
               speciesId: pokemon.species.speciesId,
+              coopOwner,
               active,
               fainted,
               allowedInBattle,
-              replacementEligible: reserve && !active && !fainted && allowedInBattle,
+              replacementEligible: reserve && !active && !fainted && allowedInBattle && ownedReplacement,
             };
           })
         : null;

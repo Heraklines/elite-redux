@@ -48,6 +48,17 @@ interface FaintSwitchOpState {
   authorityHost: CoopOperationHost | null;
   receiverGuest: CoopOperationGuest | null;
   readonly retries: Map<string, ReturnType<typeof setTimeout>>;
+  /** One live guest-owned picker terminal, bound to its immutable source address. */
+  readonly pickerTerminals: Map<
+    number,
+    {
+      wave: number;
+      turn: number;
+      consume: (payload: CoopFaintSwitchPayload, operationId: string) => boolean;
+    }
+  >;
+  /** Picker addresses already closed by a local callback before their committed confirmation arrived. */
+  readonly settledPickers: Set<string>;
 }
 
 registerCoopOpSurfaceState(
@@ -58,6 +69,8 @@ registerCoopOpSurfaceState(
     authorityHost: null,
     receiverGuest: null,
     retries: new Map(),
+    pickerTerminals: new Map(),
+    settledPickers: new Set(),
   }),
 );
 
@@ -141,6 +154,8 @@ export function resetCoopFaintSwitchOperationState(): void {
     clearTimeout(timer);
   }
   s.retries.clear();
+  s.pickerTerminals.clear();
+  s.settledPickers.clear();
   s.authorityHost = null;
   s.receiverGuest = null;
   s.revisionFloor = 0;
@@ -283,7 +298,106 @@ export function armCoopFaintSwitchIntentResend(
   s.retries.set(key, setTimeout(tick, retryMs));
 }
 
-export function commitFaintSwitchAuthorityIntent(
+export interface CoopFaintSwitchCommitReceipt {
+  /** Null only when the negotiated operation carrier is disabled and the legacy path owns progression. */
+  readonly operationId: string | null;
+}
+
+function pickerKey(wave: number, turn: number, fieldIndex: number): string {
+  return `${Math.trunc(wave)}:${Math.trunc(turn)}:${Math.trunc(fieldIndex)}`;
+}
+
+function rememberSettledPicker(s: FaintSwitchOpState, key: string): void {
+  s.settledPickers.add(key);
+  while (s.settledPickers.size > 512) {
+    s.settledPickers.delete(s.settledPickers.values().next().value!);
+  }
+}
+
+/**
+ * Bind the real guest picker to the immutable operation address it can terminate. The live operation
+ * sink invokes this synchronously, so materialApplied cannot precede its at-most-once settled latch.
+ */
+export function registerCoopFaintSwitchPickerTerminal(
+  params: {
+    wave: number;
+    turn: number;
+    fieldIndex: number;
+    consume: (payload: CoopFaintSwitchPayload, operationId: string) => boolean;
+  },
+  binding?: CoopFaintSwitchOperationBinding | null,
+): () => void {
+  const s = state(binding);
+  const terminal = {
+    wave: Math.trunc(params.wave),
+    turn: Math.trunc(params.turn),
+    consume: params.consume,
+  };
+  s.pickerTerminals.set(params.fieldIndex, terminal);
+  let live = true;
+  return () => {
+    if (!live) {
+      return;
+    }
+    live = false;
+    if (s.pickerTerminals.get(params.fieldIndex) === terminal) {
+      s.pickerTerminals.delete(params.fieldIndex);
+    }
+  };
+}
+
+/** Record that a local picker callback already closed this exact address before durable confirmation. */
+export function markCoopFaintSwitchPickerSettled(
+  wave: number,
+  turn: number,
+  fieldIndex: number,
+  binding?: CoopFaintSwitchOperationBinding | null,
+): void {
+  const s = state(binding);
+  rememberSettledPicker(s, pickerKey(wave, turn, fieldIndex));
+  s.pickerTerminals.delete(fieldIndex);
+}
+
+/**
+ * Guest live-sink terminal. True means the exact picker was already closed locally or was synchronously
+ * settled now; false keeps the retained operation unacknowledged and retriable.
+ */
+export function materializeCoopFaintSwitchPickerTerminal(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  binding?: CoopFaintSwitchOperationBinding | null,
+): boolean {
+  const operation = envelope.pendingOperation;
+  const payload = operation?.payload as CoopFaintSwitchPayload | undefined;
+  if (operation?.kind !== "FAINT_SWITCH" || payload == null || operation.owner !== coopSeatOfRole("guest")) {
+    return true;
+  }
+  // No legal replacement never opens a picker; its committed sentinel is already terminal.
+  if (payload.partySlot < 0) {
+    return true;
+  }
+  const s = state(binding);
+  const key = pickerKey(envelope.wave, envelope.turn, payload.fieldIndex);
+  if (s.settledPickers.has(key)) {
+    return true;
+  }
+  const terminal = s.pickerTerminals.get(payload.fieldIndex);
+  if (terminal == null || terminal.wave !== envelope.wave || terminal.turn !== envelope.turn) {
+    return false;
+  }
+  if (!terminal.consume(payload, operation.id)) {
+    return false;
+  }
+  s.pickerTerminals.delete(payload.fieldIndex);
+  rememberSettledPicker(s, key);
+  return true;
+}
+
+/**
+ * Commit one authoritative replacement terminal and return the retained identity needed for the
+ * host's peer-material barrier. A null result is a retention failure; an enabled operation always
+ * returns its exact operation id.
+ */
+export function commitFaintSwitchAuthorityResult(
   params: {
     payload: CoopFaintSwitchPayload;
     ownerRole: CoopRole;
@@ -292,13 +406,13 @@ export function commitFaintSwitchAuthorityIntent(
     turn: number;
   },
   binding?: CoopFaintSwitchOperationBinding | null,
-): boolean {
+): CoopFaintSwitchCommitReceipt | null {
   if (!isCoopFaintSwitchOperationEnabled()) {
-    return true;
+    return { operationId: null };
   }
   assertBindingRole(binding, params.localRole);
   if (params.localRole !== "host") {
-    return true;
+    return { operationId: null };
   }
   try {
     const s = state(binding);
@@ -321,18 +435,26 @@ export function commitFaintSwitchAuthorityIntent(
     if (result.kind === "committed" || result.kind === "reack") {
       if (!retainEnvelope(result.envelope, binding)) {
         coopWarn("replay", `faint-switch op could not retain rev=${result.envelope.revision} id=${operation.id}`);
-        return false;
+        return null;
       }
-      return true;
+      return { operationId: operation.id };
     }
-    return false;
+    return null;
   } catch (error) {
     if (isCoopOpRuntimeError(error)) {
       throw error;
     }
     coopWarn("replay", "faint-switch op commit threw; legacy carrier/fallback remains active", error);
-    return false;
+    return null;
   }
+}
+
+/** Compatibility boolean for existing synchronous callers and engine-free contracts. */
+export function commitFaintSwitchAuthorityIntent(
+  params: Parameters<typeof commitFaintSwitchAuthorityResult>[0],
+  binding?: CoopFaintSwitchOperationBinding | null,
+): boolean {
+  return commitFaintSwitchAuthorityResult(params, binding) != null;
 }
 
 function validPayload(value: unknown): value is CoopFaintSwitchPayload {

@@ -460,7 +460,7 @@ export async function selectOptionById(
         action: submit ? "submit" : "selected",
         steps: step,
       });
-      return { steps: step };
+      return { steps: step, surfaceEventIndex: event.index };
     }
     if (plan.kind === "unavailable") {
       throw new Error(

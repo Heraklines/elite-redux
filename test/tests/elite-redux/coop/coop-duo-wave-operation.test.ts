@@ -42,8 +42,10 @@ import {
   broadcastCoopWaveResolved,
   clearCoopRuntime,
   coopRetainedGameOverSupersedesReplay,
+  flushCoopWaveResolvedAfterTurnCommit,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
+import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import * as waveOp from "#data/elite-redux/coop/coop-wave-operation";
 import {
@@ -192,6 +194,23 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       routed.map(payload => payload.wave),
       "the guest advances from the envelope alone",
     ).toContain(2);
+    logs.flush();
+  }, 300_000);
+
+  it("withholds the raw victory hint until the material final-turn commit boundary", async () => {
+    const rig = await bootDuo();
+    const raw = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved");
+
+    await withClient(rig.hostCtx, () => {
+      rig.hostScene.currentBattle.waveIndex = 3;
+      beginCoopRecording(rig.hostScene.currentBattle.turn);
+      broadcastCoopWaveResolved("win");
+      expect(raw, "Victory may stage its transition but cannot publish ahead of turn authority").not.toHaveBeenCalled();
+      endCoopRecording();
+      expect(flushCoopWaveResolvedAfterTurnCommit(3)).toBe(true);
+    });
+
+    expect(raw, "the compatibility hint publishes exactly once after successful turn retention").toHaveBeenCalledOnce();
     logs.flush();
   }, 300_000);
 

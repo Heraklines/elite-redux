@@ -66,7 +66,7 @@ test("calibrated profile contracts are explicit and diagnostic overrides cannot 
   assert.match(soak, /waves_default: "55"[\s\S]*calibration_id: level-55-faint/u);
   assert.match(
     soak,
-    /profile: me-asym[\s\S]*waves_default: "fixed"[\s\S]*accepts_wave_override: false[\s\S]*accepts_seed: false[\s\S]*calibration_id: me-host-guest-plus-asym-six-turn/u,
+    /profile: me-asym[\s\S]*waves_default: "fixed"[\s\S]*accepts_wave_override: false[\s\S]*accepts_seed: false[\s\S]*calibration_id: me-host-guest-asym-double-faint/u,
   );
   assert.match(
     soak,
@@ -104,6 +104,9 @@ test("each matrix leg emits a structured SHA-bound attestation", () => {
   assert.match(soak, /if-no-files-found: error/u);
   assert.equal([...soak.matchAll(/coverage_ledger: dev-logs\/coop-soak\/coverage-ledger\.json/gu)].length, 3);
   assert.match(soak, /coverage_ledger: dev-logs\/coop-soak\/coverage-ledger-level\.json/u);
+  assert.match(soak, /coverage_ledger: dev-logs\/coop-soak\/coverage-ledger-me-asym\.json/u);
+  assert.match(soak, /test\/tests\/elite-redux\/coop\/coop-duo-double-faint\.test\.ts/u);
+  assert.match(soak, /"situation:hostHalfExhausted"[\s\S]*"situation:doublePlayerFaint"/u);
   assert.match(soak, /name: Upload required checkpoint coverage ledger/u);
   assert.match(soak, /name: coop-soak-coverage-\$\{\{ matrix\.profile \}\}-\$\{\{ github\.run_id \}\}/u);
 });
@@ -125,6 +128,7 @@ test("release aggregate requires exactly six calibrated passing profiles at one 
   assert.match(aggregate, /item\.soakExit !== 0/u);
   assert.match(aggregate, /String\(item\.runId\) !== process\.env\.GITHUB_RUN_ID/u);
   assert.match(aggregate, /expected \$\{coverageProfiles\.length\} required coverage ledgers/u);
+  assert.match(aggregate, /const minimumDepth = expected\.get\(profile\)\?\.minimumDepth/u);
   assert.match(aggregate, /profileAttestation\?\.coverageLedger\?\.sha256 !== digest/u);
   assert.match(aggregate, /entry\.seed === campaignSeed/u);
   for (const surface of [

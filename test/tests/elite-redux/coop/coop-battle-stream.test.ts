@@ -1496,13 +1496,17 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
 
     it("wakes a turn-N replay parked before the exact N+1 replacement arrives", async () => {
       const { host, guest } = createLoopbackPair();
-      const current = { epoch: 7, wave: 4, turn: 2 };
-      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
-      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+      const hostCurrent = { epoch: 7, wave: 4, turn: 2 };
+      const guestCurrent = { epoch: 7, wave: 4, turn: 2 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => hostCurrent });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => guestCurrent });
       const parked = guestStream.awaitTurnOrLiveEvent(2, 0);
       await flushWire();
 
-      current.turn = 3;
+      // Production asymmetry: TurnEnd already incremented the authority while the renderer remains in
+      // its turn-2 owner picker. The old test advanced one shared context to 3 on BOTH sides and therefore
+      // never exercised the cross-address admission that stranded the real browser.
+      hostCurrent.turn = 3;
       const replacement = checkpointEnvelope(
         "replacement",
         { ...emptyCheckpoint(), tick: 21 },
@@ -1521,7 +1525,11 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       );
 
       expect(await parked).toEqual({ kind: "checkpoint" });
-      expect(guestStream.peekCheckpoint()).toEqual(replacement);
+      expect(guestCurrent.turn, "the renderer is still parked at the old picker address").toBe(2);
+      expect(guestStream.peekCheckpoint(), "ambient consumers cannot steal future-address authority").toBeNull();
+      expect(guestStream.peekCheckpointForTurn(2)).toEqual(replacement);
+      expect(guestStream.consumeCheckpointForTurn(2)).toEqual(replacement);
+      expect(guestStream.peekCheckpointForTurn(2)).toBeNull();
       guestStream.dispose();
       hostStream.dispose();
     });
@@ -2273,6 +2281,68 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       deadlineTimers.shift()?.();
       await expect(expired).resolves.toBe(false);
       unackedHost.dispose();
+    });
+
+    it("accepts a delayed fatal for an exact retained address after ambient wave state advances", async () => {
+      const pair = createLoopbackPair();
+      const current = { epoch: 7, wave: 190, turn: 3 };
+      const hostStream = new CoopBattleStreamer(pair.host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(pair.guest, { authorityContext: () => current });
+      let routed = 0;
+      guestStream.onAuthorityFailure(() => routed++);
+
+      const awaited = guestStream.awaitTurn(3);
+      hostStream.emitTurn(
+        7,
+        190,
+        3,
+        [],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        emptyAuthoritativeState(190, 3),
+      );
+      expect(await awaited, "the guest admitted immutable authority at the failing address").not.toBeNull();
+
+      // A raw compatibility hint/speculative next battle may update this mutable context first.
+      current.wave = 191;
+      current.turn = 1;
+      await hostStream.broadcastAuthorityFailure({
+        epoch: 7,
+        wave: 190,
+        turn: 3,
+        boundary: "turnResolution",
+        reason: "late final-turn settlement failure",
+      });
+      await flushWire();
+
+      expect(routed, "exact retained evidence outranks the speculative ambient successor").toBe(1);
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
+    it("rejects a cross-wave fatal when no exact authority evidence binds that old address", async () => {
+      const pair = createLoopbackPair();
+      const current = { epoch: 7, wave: 191, turn: 1 };
+      const guestStream = new CoopBattleStreamer(pair.guest, { authorityContext: () => current });
+      let routed = 0;
+      guestStream.onAuthorityFailure(() => routed++);
+
+      pair.host.send({
+        t: "authorityFailure",
+        failureId: "unbound-old-wave",
+        epoch: 7,
+        wave: 190,
+        turn: 3,
+        revision: 1,
+        boundary: "turnResolution",
+        reason: "unbound old failure",
+      });
+      await flushWire();
+
+      expect(routed, "an address jump without immutable evidence remains fail-closed").toBe(0);
+      guestStream.dispose();
     });
   });
 

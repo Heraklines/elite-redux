@@ -4,6 +4,7 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   captureCoopFaintSwitchOperationBinding,
   commitFaintSwitchAuthorityIntent,
+  commitFaintSwitchAuthorityResult,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   beginCoopFaintSwitchWindow,
@@ -13,11 +14,14 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   coopOwnerOfPlayerFieldSlot,
+  coopSessionGeneration,
   failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
+  getCoopRuntime,
   isVersusSession,
+  runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SWITCH_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
@@ -144,6 +148,13 @@ export class SwitchPhase extends BattlePhase {
           // disconnected or idle partner.
           scene.ui.showText("Waiting for your partner to choose their next Pokemon...");
           const faintSeq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
+          // Freeze the boundary before a human/network await. TurnEnd or another async continuation may
+          // advance mutable scene.turn while the picker is open; the terminal still belongs to this wait.
+          const sourceAddress = {
+            wave: scene.currentBattle.waveIndex,
+            turn: scene.currentBattle.turn ?? 0,
+          };
+          const sourceGeneration = coopSessionGeneration();
           // Suppress the stall watchdog while awaiting the partner's HUMAN pick (see
           // ShowdownEnemyFaintSwitchPhase for the rationale): a slow-but-alive partner must not be misread as
           // a deadlock. Paired 1:1 with endCoopFaintSwitchWindow in the .then (always runs).
@@ -187,7 +198,7 @@ export class SwitchPhase extends BattlePhase {
                 slotIndex = this.coopAutoPickReplacement(scene);
               }
               const authoritativePick = scene.getPlayerParty()[slotIndex];
-              const retained = commitFaintSwitchAuthorityIntent(
+              const receipt = commitFaintSwitchAuthorityResult(
                 {
                   payload: {
                     fieldIndex: this.fieldIndex,
@@ -196,29 +207,71 @@ export class SwitchPhase extends BattlePhase {
                   },
                   ownerRole: coopOwnerOfPlayerFieldSlot(this.fieldIndex),
                   localRole: coopController.role,
-                  wave: scene.currentBattle.waveIndex,
-                  turn: scene.currentBattle.turn ?? 0,
+                  wave: sourceAddress.wave,
+                  turn: sourceAddress.turn,
                 },
                 operationBinding,
               );
-              if (!retained) {
+              if (receipt == null) {
                 failCoopSharedSession("The authoritative replacement choice could not be retained.");
                 return;
               }
-              if (slotIndex >= battlerCount && slotIndex < 6) {
-                scene.phaseManager.unshiftNew(
-                  "SwitchSummonPhase",
-                  this.switchType,
-                  fieldIndex,
-                  slotIndex,
-                  this.doReturn,
-                );
-                // #633 guest-faint deadlock: push an OUT-OF-BAND checkpoint AFTER the summon
-                // (FIFO on this level) so the guest materializes the replacement NOW and can
-                // command it - the next turn resolution can never arrive without that command.
-                scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+              const runtime = getCoopRuntime();
+              const releaseAfterPeerMaterial = (): void => {
+                if (slotIndex >= battlerCount && slotIndex < 6) {
+                  scene.phaseManager.unshiftNew(
+                    "SwitchSummonPhase",
+                    this.switchType,
+                    fieldIndex,
+                    slotIndex,
+                    this.doReturn,
+                  );
+                  // The checkpoint is queued only after the retained old-address terminal has materially
+                  // closed the peer picker. It may carry turn N+1, but can no longer race an N modal.
+                  scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+                }
+                void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(() => scene.phaseManager.shiftPhase());
+              };
+              if (receipt.operationId == null) {
+                releaseAfterPeerMaterial();
+                return;
               }
-              void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(() => scene.phaseManager.shiftPhase());
+              const durability = runtime?.durability;
+              if (runtime == null || durability == null || runtime.controller.role !== "host") {
+                failCoopSharedSession(`Replacement terminal ${receipt.operationId} has no host material barrier.`);
+                return;
+              }
+              const operationId = receipt.operationId;
+              void durability
+                .waitForOperationMaterialApplied(operationId)
+                .then(applied => {
+                  if (coopSessionGeneration() !== sourceGeneration) {
+                    return;
+                  }
+                  if (!applied) {
+                    failCoopSharedSession(`Replacement terminal ${operationId} exhausted before peer material apply.`);
+                    return;
+                  }
+                  runWhenCoopRuntimeActive(runtime, () => {
+                    if (
+                      coopSessionGeneration() !== sourceGeneration
+                      || getCoopRuntime() !== runtime
+                      || globalScene.phaseManager.getCurrentPhase() !== this
+                      || globalScene.currentBattle.waveIndex !== sourceAddress.wave
+                    ) {
+                      failCoopSharedSession(`Replacement terminal ${operationId} lost its host phase boundary.`);
+                      return;
+                    }
+                    releaseAfterPeerMaterial();
+                  });
+                })
+                .catch(error => {
+                  if (coopSessionGeneration() !== sourceGeneration) {
+                    return;
+                  }
+                  coopWarn("replay", `replacement terminal ${operationId} material barrier rejected`, error);
+                  failCoopSharedSession(`Replacement terminal ${operationId} material barrier failed.`);
+                });
             });
           return;
         }
