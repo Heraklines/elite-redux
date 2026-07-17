@@ -2302,9 +2302,97 @@
         "species": 10539
       },
       {
-        "abilitySlot": 0,
+        "abilitySlot": 2,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 10074
+        },
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 2,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "IRON"
+          }
+        ],
         "level": null,
+        "moves": [
+          "BITTER_MALICE",
+          "GIGA_DRAIN",
+          "RLA",
+          "RLNA"
+        ],
+        "shiny": {
+          "surface": "mistveil"
+        },
         "species": 201
+      },
+      {
+        "abilitySlot": 2,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 10091
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ENIGMA_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "OMINOUS_WIND",
+          "HURRICANE",
+          "THUNDERBOLT",
+          "AQUA_JET"
+        ],
+        "species": 426
+      },
+      {
+        "abilitySlot": 0,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 10526
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LANSAT_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LIECHI_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "PROTECT",
+          "CURSE",
+          "BULLET_PUNCH",
+          "SHADOW_PUNCH"
+        ],
+        "species": 979
       }
     ],
     "trainerClass": "ALLISTER",
