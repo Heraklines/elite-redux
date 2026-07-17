@@ -40,6 +40,10 @@ KV is **not** used — its ~1,000 writes/day cap can't host saves. D1 is the rig
 | `POST` | `/savedata/system/update` | ✓ | Upsert system save (raw body). |
 | `GET`  | `/savedata/session/get?slot=N` | ✓ | Raw session save, or `404`. |
 | `POST` | `/savedata/session/update?slot=N` | ✓ | Upsert a session slot (raw body). |
+| `POST` | `/savedata/session/coop-cas-update?slot=N&...` | ✓ | Create or advance one co-op checkpoint with exact compare-and-swap evidence. |
+| `POST` | `/savedata/session/coop-cas-delete?slot=N&...` | ✓ | Delete one exact co-op checkpoint and retain its account-wide run tombstone. |
+| `POST` | `/savedata/session/coop-duplicate-exact-delete?slot=N&...` | ✓ | Remove one duplicate only while its exact same-run survivor is still live. |
+| `GET`  | `/savedata/session/coop-run-status?coopRunId=ID[&slot=N]` | ✓ | Account-scoped `{ state: "active" | "tombstoned" | "missing", ... }` proof used before fresh/resume launch. |
 | `GET`  | `/savedata/session/delete?slot=N` | ✓ | Delete a session slot. |
 | `POST` | `/savedata/session/clear?slot=N` | ✓ | Persist the cleared run, `{ success:true }`. |
 | `GET`  | `/savedata/session/newclear?slot=N` | ✓ | `true`. |
@@ -92,6 +96,22 @@ wrangler deploy
 
 `wrangler deploy` prints the Worker URL, e.g.
 `https://er-save-api.<your-subdomain>.workers.dev`.
+
+### Staging co-op route parity
+
+The `Deploy Staging` workflow deploys `er-save-api-staging` first and the Pages browser bundle second from
+the same checkout. This ordering prevents staging from publishing a newer client against an older save
+contract. For a Worker-only recovery deployment, use:
+
+```bash
+cd workers/er-save-api
+npx wrangler deploy --config wrangler.staging.toml
+```
+
+For `/savedata/session/coop-run-status`, a valid session token and a previously unseen valid `coopRunId`
+must return HTTP 200 with exactly `{ "state": "missing", "runId": "..." }`. An authenticated 404 means
+the staging Worker is older than the client contract; it must block the browser checkpoint instead of being
+treated as an empty save slot.
 
 > **Keep `SESSION_SECRET` stable.** Rotating it invalidates every issued token, so
 > all players are silently logged out (their saves are untouched — they just log

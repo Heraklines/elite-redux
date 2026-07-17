@@ -26,7 +26,11 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { adoptAbilityWatcherOutcome } from "#data/elite-redux/coop/coop-ability-operation";
+import {
+  adoptAbilityWatcherOutcome,
+  type CoopAbilityOperationBinding,
+  captureCoopAbilityOperationBinding,
+} from "#data/elite-redux/coop/coop-ability-operation";
 import {
   COOP_ABILITY_OP,
   COOP_ABILITY_WAIT_MS,
@@ -67,6 +71,8 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
   // ---- Co-op (#633 B9c): owner-drives / watcher-applies (see ErAbilityCapsulePhase) ----
   private readonly coopSeq: number;
   private readonly coopIsWatcher: boolean;
+  /** Stable owner-runtime selectors carried across every picker callback / watcher await. */
+  private readonly coopOperationBinding: CoopAbilityOperationBinding | null;
   private coopOutcome: number[] = [COOP_ABILITY_OP.CANCEL];
 
   constructor(partyIndex: number, coopSeq = -1, coopIsWatcher = false) {
@@ -74,6 +80,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
     this.partyIndex = partyIndex;
     this.coopSeq = coopSeq;
     this.coopIsWatcher = coopIsWatcher;
+    this.coopOperationBinding = coopSeq >= 0 ? captureCoopAbilityOperationBinding() : null;
   }
 
   /** Diagnostic trace (captured in the console ring buffer for Send Logs). The solo
@@ -230,11 +237,19 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
       `greaterRandomizer OWNER relay OUTCOME seq=${this.coopSeq} op=${coopAbilityOpName(this.coopOutcome[0])} slot=${this.coopOutcome[1] ?? "-"} abilityId=${this.coopOutcome[2] ?? "-"} data=[${this.coopOutcome.join(",")}]`,
     );
     const controller = getCoopController();
-    sendCoopAbilityPickerOutcome(getCoopInteractionRelay(), this.coopSeq, this.coopOutcome, controller == null ? undefined : {
-      localRole: controller.role,
-      wave: globalScene.currentBattle?.waveIndex ?? 0,
-      turn: globalScene.currentBattle?.turn ?? 0,
-    });
+    sendCoopAbilityPickerOutcome(
+      getCoopInteractionRelay(),
+      this.coopSeq,
+      this.coopOutcome,
+      controller == null
+        ? undefined
+        : {
+            localRole: controller.role,
+            wave: globalScene.currentBattle?.waveIndex ?? 0,
+            turn: globalScene.currentBattle?.turn ?? 0,
+          },
+      this.coopOperationBinding,
+    );
   }
 
   /**
@@ -258,13 +273,16 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
     const relayedData = action?.data ?? null;
     const adopted =
       controller != null
-      && adoptAbilityWatcherOutcome({
-        pinned: this.coopSeq,
-        data: relayedData,
-        localRole: controller.role,
-        wave: globalScene.currentBattle?.waveIndex ?? 0,
-        turn: globalScene.currentBattle?.turn ?? 0,
-      });
+      && adoptAbilityWatcherOutcome(
+        {
+          pinned: this.coopSeq,
+          data: relayedData,
+          localRole: controller.role,
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+        },
+        this.coopOperationBinding,
+      );
     const data = adopted && relayedData != null ? relayedData : [COOP_ABILITY_OP.CANCEL];
     const op = data[0];
     coopLog(

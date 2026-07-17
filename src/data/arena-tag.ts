@@ -50,6 +50,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { CommonBattleAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
+import { erApplyRoomServiceOnTrickRoom, erTacticalBlocksHazards } from "#data/elite-redux/er-tactical-items";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -883,6 +884,17 @@ export abstract class EntryHazardTag extends SerializableArenaTag {
       return false;
     }
 
+    // ER Shield Dust (19): total immunity to ALL entry hazards on switch-in.
+    // Scanned by name (registration-free marker) so any hazard subclass honors it.
+    if (pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "EntryHazardImmunityAbAttr")) {
+      return false;
+    }
+
+    // ER Heavy-Duty Boots: the holder is immune to every entry hazard.
+    if (erTacticalBlocksHazards(pokemon)) {
+      return false;
+    }
+
     if (this.groundedOnly && !pokemon.isGrounded()) {
       return false;
     }
@@ -1215,7 +1227,7 @@ class HotCoalsTag extends EntryHazardTag {
  * Applies a single-layer trap that lowers the Speed of all grounded Pokémon switching in.
  */
 class StickyWebTag extends EntryHazardTag {
-  public readonly tagType = ArenaTagType.STICKY_WEB;
+  public readonly tagType: EntryHazardTagType = ArenaTagType.STICKY_WEB;
   public override get maxLayers() {
     return 1 as const;
   }
@@ -1404,6 +1416,12 @@ export class TrickRoomTag extends RoomArenaTag {
     return "arenaTag:trickRoomOnAdd";
   }
 
+  override onAdd(quiet = false): void {
+    super.onAdd(quiet);
+    // ER Room Service: on-field holders drop Speed by 1 when Trick Room takes hold.
+    erApplyRoomServiceOnTrickRoom();
+  }
+
   protected override get onRemoveMessageKey(): string {
     return "arenaTag:trickRoomOnRemove";
   }
@@ -1443,6 +1461,81 @@ export class InverseRoomTag extends RoomArenaTag {
   protected override get onRemoveMessageKey(): string {
     return "";
   }
+}
+
+/**
+ * Elite Redux — `Magic Room` (move 478). While active, the EFFECTS of all held
+ * items on BOTH sides of the field are suppressed for 5 turns. The suppression
+ * itself is enforced at the held-item apply gate
+ * ({@linkcode PokemonHeldItemModifier.shouldApply}, via
+ * {@linkcode isMagicRoomActive}) — this tag is a pure presence marker (no
+ * `apply` effect). Room-style: removed on overlap, so re-casting Magic Room
+ * while it is up ends it. Field-wide.
+ *
+ * The gate scopes suppression to TRANSFERABLE held items (Leftovers, berries,
+ * Choice items, Life Orb, reactive items, …), i.e. the ones with an in-battle
+ * effect. Permanent, non-transferable held items (base-stat vitamins, evo
+ * trackers, Mega Stones / form-change items) are intentionally NOT suppressed —
+ * suppressing base-stat modifiers would mutate a Pokémon's stats mid-battle.
+ * (Documented residual: the dex line "disables Mega Stones too" has no
+ * observable effect here since ER megas are permanent forms, not stone-driven.)
+ */
+export class MagicRoomTag extends RoomArenaTag {
+  public readonly tagType = ArenaTagType.MAGIC_ROOM;
+  constructor(turnCount: number, sourceId?: number) {
+    super(turnCount, MoveId.MAGIC_ROOM, sourceId);
+  }
+
+  protected override get onAddMessageKey(): string {
+    return ""; // no locale message — cosmetic text omitted, the effect is faithful
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+}
+
+/**
+ * True while an ER Magic Room ({@linkcode MagicRoomTag}) is active on the field.
+ * Consulted by the held-item apply gate so a transferable held item's effect is
+ * suppressed for the duration.
+ */
+export function isMagicRoomActive(): boolean {
+  return globalScene.arena.getTag(ArenaTagType.MAGIC_ROOM) instanceof MagicRoomTag;
+}
+
+/**
+ * Elite Redux — `Wonder Room` (move 472). While active, every Pokemon's Attack
+ * and Sp. Atk are swapped field-wide for 5 turns, and their stat stages
+ * ("buffs") are ignored — the swap reads the RAW base stats. The swap itself is
+ * enforced in {@linkcode Pokemon.getEffectiveStat} (via
+ * {@linkcode isWonderRoomActive}) — this tag is a pure presence marker (no
+ * `apply` effect). Room-style: removed on overlap, so re-casting Wonder Room
+ * while it is up ends it. Field-wide.
+ */
+export class WonderRoomTag extends RoomArenaTag {
+  public readonly tagType = ArenaTagType.WONDER_ROOM;
+  constructor(turnCount: number, sourceId?: number) {
+    super(turnCount, MoveId.WONDER_ROOM, sourceId);
+  }
+
+  protected override get onAddMessageKey(): string {
+    return ""; // no locale message — cosmetic text omitted, the effect is faithful
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+}
+
+/**
+ * True while an ER Wonder Room ({@linkcode WonderRoomTag}) is active on the
+ * field. Consulted by {@linkcode Pokemon.getEffectiveStat} so a Pokemon's
+ * Attack and Sp. Atk are swapped (using raw base stats, ignoring stat stages)
+ * for the duration.
+ */
+export function isWonderRoomActive(): boolean {
+  return globalScene.arena.getTag(ArenaTagType.WONDER_ROOM) instanceof WonderRoomTag;
 }
 
 /**
@@ -2105,6 +2198,10 @@ export function getArenaTag(
       return new TrickRoomTag(turnCount, sourceId);
     case ArenaTagType.INVERSE_ROOM:
       return new InverseRoomTag(turnCount, sourceMove, sourceId);
+    case ArenaTagType.MAGIC_ROOM:
+      return new MagicRoomTag(turnCount, sourceId);
+    case ArenaTagType.WONDER_ROOM:
+      return new WonderRoomTag(turnCount, sourceId);
     case ArenaTagType.GRAVITY:
       return new GravityTag(turnCount, sourceId);
     case ArenaTagType.REFLECT:
@@ -2174,6 +2271,9 @@ export type ArenaTagTypeMap = {
   [ArenaTagType.STEALTH_ROCK]: StealthRockTag;
   [ArenaTagType.STICKY_WEB]: StickyWebTag;
   [ArenaTagType.TRICK_ROOM]: TrickRoomTag;
+  [ArenaTagType.INVERSE_ROOM]: InverseRoomTag;
+  [ArenaTagType.MAGIC_ROOM]: MagicRoomTag;
+  [ArenaTagType.WONDER_ROOM]: WonderRoomTag;
   [ArenaTagType.GRAVITY]: GravityTag;
   [ArenaTagType.REFLECT]: ReflectTag;
   [ArenaTagType.LIGHT_SCREEN]: LightScreenTag;

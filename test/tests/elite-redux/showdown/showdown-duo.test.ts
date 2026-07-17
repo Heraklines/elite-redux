@@ -22,7 +22,9 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { installCoopAuthoritativeProjectionAdapter } from "#data/elite-redux/coop/coop-presentation";
+import { isCoopRendererBlockedPhase } from "#data/elite-redux/coop/coop-renderer-gate";
+import { clearCoopRuntime, isCoopSharedTerminalFrozen, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
 import { detectShowdownVictory } from "#data/elite-redux/showdown/showdown-outcome";
@@ -128,6 +130,17 @@ describe.skipIf(!RUN)("Showdown versus - two-engine end-to-end proof (C6v2d)", (
     const pair = createLoopbackPair();
     const rig: ShowdownDuoRig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown);
 
+    await withClient(rig.guestCtx, () => {
+      expect(
+        isCoopRendererBlockedPhase("ShowdownResultPhase"),
+        "the exact host-decided versus terminal remains a guest presentation surface",
+      ).toBe(false);
+      expect(
+        isCoopRendererBlockedPhase("MovePhase"),
+        "allowing the versus terminal never admits guest-side battle resolution",
+      ).toBe(true);
+    });
+
     // The GUEST commands its OWN team (the enemy side) over the relay: SPLASH (slot 0), a legal move.
     rig.guestPeer.onCommandRequest(() => ({
       command: Command.FIGHT,
@@ -154,7 +167,7 @@ describe.skipIf(!RUN)("Showdown versus - two-engine end-to-end proof (C6v2d)", (
     const turn = rig.hostScene.currentBattle.turn;
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
 
     // The guest replays the host's streamed turn (the authoritative state stream applies on the guest).
@@ -183,24 +196,77 @@ describe.skipIf(!RUN)("Showdown versus - two-engine end-to-end proof (C6v2d)", (
     // open here.)
     const decision = detectShowdownVictory(hostSwept, guestSwept);
     expect(decision?.winner, "the pure outcome rule names the host the winner").toBe("host");
-    await withClient(rig.hostCtx, () => {
+    const hostResultSurfaceBefore = await withClient(rig.hostCtx, () => {
+      const before = {
+        current: rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
+        queued: rig.hostScene.phaseManager.getQueuedPhaseNames(),
+      };
       rig.hostRuntime.localTransport.send({
         t: "showdownResult",
         matchId: null,
         winner: decision!.winner,
         reason: decision!.reason,
       });
+      return before;
     });
-    // Route it on the GUEST (globalScene = guest so wireShowdownResult unshifts the guest's terminal phase).
-    await withClient(rig.guestCtx, async () => {
+    // Activating the GUEST flushes its retained, destination-owned terminal onto the guest phase manager.
+    const guestResultSurface = await withClient(rig.guestCtx, async () => {
       await new Promise<void>(r => setTimeout(r, 0));
+      return {
+        current: rig.guestScene.phaseManager.getCurrentPhase()?.phaseName,
+        queued: rig.guestScene.phaseManager.getQueuedPhaseNames(),
+      };
     });
 
     // BOTH observe the SAME showdownResult: the host won; the guest received winner=host.
     expect(guestReceivedResult, "the guest received the host's showdownResult").not.toBeNull();
     expect(guestReceivedResult!.winner, "the winner is the host on both clients").toBe("host");
     expect(guestReceivedResult!.reason).toBe("victory");
+    expect(
+      guestResultSurface.current === "ShowdownResultPhase" || guestResultSurface.queued.includes("ShowdownResultPhase"),
+      "the received result was routed onto the guest's own phase manager",
+    ).toBe(true);
+    const hostResultSurface = await withClient(rig.hostCtx, () => ({
+      current: rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
+      queued: rig.hostScene.phaseManager.getQueuedPhaseNames(),
+    }));
+    expect(
+      hostResultSurface,
+      "routing the guest's received result left the sender host's pre-existing terminal surface unchanged",
+    ).toEqual(hostResultSurfaceBefore);
 
+    logs.flush();
+  }, 300_000);
+
+  it("fails the shared run closed when the destination renderer cannot prove its projection", async () => {
+    await startHostShowdown([magikarp()]);
+    const pair = createLoopbackPair();
+    const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown);
+    rig.guestPeer.onCommandRequest(() => ({
+      command: Command.FIGHT,
+      cursor: 0,
+      moveId: MoveId.SPLASH,
+      targets: [BattlerIndex.PLAYER],
+      useMode: MoveUseMode.NORMAL,
+    }));
+    const restoreProjection = installCoopAuthoritativeProjectionAdapter(rig.guestScene, async () => false);
+    try {
+      const turn = rig.hostScene.currentBattle.turn;
+      await withClient(rig.hostCtx, async () => {
+        game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
+      });
+      await withClient(rig.guestCtx, async () => {
+        await driveGuestReplayTurn(rig.guestScene, turn);
+      });
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      expect(
+        isCoopSharedTerminalFrozen(rig.guestRuntime),
+        "an incomplete renderer projection entered the bounded shared terminal",
+      ).toBe(true);
+    } finally {
+      restoreProjection();
+    }
     logs.flush();
   }, 300_000);
 });

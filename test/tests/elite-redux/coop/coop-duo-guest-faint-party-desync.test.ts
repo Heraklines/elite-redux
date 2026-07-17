@@ -34,6 +34,7 @@ import { initGlobalScene } from "#app/global-scene";
 import { applyCoopAuthoritativeBattleState, applyCoopCheckpoint } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type {
@@ -152,7 +153,7 @@ describe.skipIf(!RUN)(
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
         game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
 
       // Pull the captured turn-1 resolution payload (the PARKED stale checkpoint - tick N, bi1 fainted).
@@ -210,8 +211,22 @@ describe.skipIf(!RUN)(
           const authoritativeApplied =
             checkpointApplied && applyCoopAuthoritativeBattleState(envelope.authoritativeState, true);
           if (authoritativeApplied) {
+            expect(
+              await settleCoopAuthoritativeProjection(envelope.authoritativeState),
+              "the replacement's sprite and battle-info projection became usable before presentationReady",
+            ).toBe(true);
             rig.guestRuntime.battleStream.retainAppliedOutOfBandCheckpoint(envelope);
-            rig.guestRuntime.battleStream.acknowledgeReplacement(envelope);
+            rig.guestRuntime.battleStream.acknowledgeReplacement(envelope, "materialApplied");
+            rig.guestRuntime.battleStream.acknowledgeReplacement(envelope, "presentationReady");
+            expect(
+              rig.guestRuntime.battleStream.registerReplacementContinuation(envelope, {
+                kind: "command",
+                epoch: envelope.epoch,
+                wave: envelope.wave,
+                turn: envelope.turn,
+              }),
+              "the low-level apply cannot release host retention before its later real command UI",
+            ).toBe(true);
           }
         }
       });
@@ -280,7 +295,22 @@ describe.skipIf(!RUN)(
         const hostPp = hostReplacement?.getMoveset()[0]?.ppUsed;
         const guestPp = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX]?.getMoveset()[0]?.ppUsed;
         expect(guestPp, "the newer replacement state is reasserted after delayed presentation writes").toBe(hostPp);
+        const replacement = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+        expect(replacement?.visible, "the owner still sees the replacement container after stale finalize").toBe(true);
+        expect(
+          replacement?.getSprite()?.visible,
+          "the owner still sees the replacement sprite after stale finalize",
+        ).toBe(true);
+        expect(
+          replacement?.getBattleInfo()?.visible,
+          "the owner still sees the replacement UI bar after stale finalize",
+        ).toBe(true);
       });
+
+      expect(
+        rig.guestRuntime.battleStream.retainedAuthorityDiagnostics().terminal,
+        "an already-finalized duplicate never rewrites staged ACK evidence into a shared terminal",
+      ).toBe(false);
 
       // ZERO forced resyncs on the faint-replacement turn: a resync means a divergence the chooser could see.
       expect(

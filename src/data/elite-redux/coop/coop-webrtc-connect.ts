@@ -26,8 +26,25 @@
 // =============================================================================
 
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import {
+  type CoopP33ClientDependencies,
+  CoopP33HttpError,
+  type CoopP33LobbyCredentialV1,
+  type CoopP33PairingV1,
+  endP33Run,
+  heartbeatP33Run,
+  leaveP33Run,
+  pollP33Signal,
+  pushP33Signal,
+  rejoinP33Run,
+} from "#data/elite-redux/coop/coop-p33-client";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { connectCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import {
+  type CoopP33AuthenticatedContextV1,
+  canAdoptCoopP33Rejoin,
+  createFreshCoopP33Context,
+} from "#data/elite-redux/coop/coop-session-binding";
 import {
   type WebRtcTransport,
   webRtcTransportFromChannel,
@@ -214,6 +231,8 @@ export interface CoopConnectOptions {
   username?: string | undefined;
   /** ICE override; defaults to {@linkcode coopIceConfigFromEnv}. */
   ice?: CoopIceConfig;
+  /** Injectable authenticated-client dependencies for focused browser tests. */
+  p33Dependencies?: CoopP33ClientDependencies;
 }
 
 /**
@@ -283,6 +302,95 @@ async function exchangeAndOpenChannel(
   }
 }
 
+/** Stable-seat gameplay role. Invitation direction is deliberately absent. */
+export function coopP33GameplayRole(context: CoopP33AuthenticatedContextV1): CoopRole {
+  return context.localSeatId === context.authoritySeatId ? "host" : "guest";
+}
+
+async function pollP33PeerSignal(
+  credential: CoopP33LobbyCredentialV1,
+  code: string,
+  dependencies: CoopP33ClientDependencies,
+  timeoutMs = 60_000,
+): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const signal = await pollP33Signal(credential, code, dependencies);
+      if (signal != null) {
+        return signal;
+      }
+    } catch (error) {
+      // Credential failures are terminal. A transient network/5xx failure remains within the bounded poll.
+      if (error instanceof CoopP33HttpError && [401, 403, 409].includes(error.status)) {
+        throw error;
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 1_000));
+  }
+  throw new Error("coop: timed out waiting for the authenticated partner signal");
+}
+
+/** P33 SDP exchange. `transportRole` chooses offer/answer only; it never reaches gameplay ownership. */
+async function exchangeAndOpenP33Channel(
+  credential: CoopP33LobbyCredentialV1,
+  pairing: CoopP33PairingV1,
+  dependencies: CoopP33ClientDependencies,
+  ice?: CoopIceConfig,
+): Promise<{ channel: RTCDataChannel; pc: RTCPeerConnection }> {
+  const iceServers = ice ? buildIceServers(ice) : await fetchIceServers();
+  const pc = new RTCPeerConnection({ iceServers });
+  try {
+    if (pairing.transportRole === "offerer") {
+      const channel = pc.createDataChannel("coop", { ordered: true });
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await waitForIceComplete(pc);
+      await pushP33Signal(credential, pairing.code, JSON.stringify(pc.localDescription), dependencies);
+      const answer = await pollP33PeerSignal(credential, pairing.code, dependencies);
+      await pc.setRemoteDescription(JSON.parse(answer) as RTCSessionDescriptionInit);
+      return { channel: await waitForChannelOpen(channel), pc };
+    }
+
+    const channelPromise = new Promise<RTCDataChannel>(resolve => {
+      pc.addEventListener("datachannel", event => resolve(event.channel));
+    });
+    const offer = await pollP33PeerSignal(credential, pairing.code, dependencies);
+    await pc.setRemoteDescription(JSON.parse(offer) as RTCSessionDescriptionInit);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await waitForIceComplete(pc);
+    await pushP33Signal(credential, pairing.code, JSON.stringify(pc.localDescription), dependencies);
+    return { channel: await waitForChannelOpen(await channelPromise), pc };
+  } catch (error) {
+    try {
+      pc.close();
+    } catch {
+      // The failed attempt may already have closed it.
+    }
+    throw error;
+  }
+}
+
+function p33Context(credential: CoopP33LobbyCredentialV1, pairing: CoopP33PairingV1): CoopP33AuthenticatedContextV1 {
+  if (credential.identity.accountId !== pairing.account.accountId) {
+    throw new Error("co-op P33 pairing does not belong to the authenticated account");
+  }
+  const context = createFreshCoopP33Context({
+    pairingId: pairing.pairingId,
+    pairingBearer: credential.pairingToken,
+    transportRole: pairing.transportRole,
+    account: pairing.account,
+    peerAccount: pairing.peer,
+    connectionGeneration: pairing.connectionGeneration,
+    peerConnectionGeneration: pairing.peer.connectionGeneration,
+  });
+  if (context == null) {
+    throw new Error("co-op P33 pairing context was invalid");
+  }
+  return context;
+}
+
 /**
  * Connect to an already-paired co-op run by its `code` and worker-assigned `role`
  * (#633, matchmaking). The run row already exists (the matchmaker created it), so
@@ -297,6 +405,7 @@ async function exchangeAndOpenChannel(
  * grace semantics. Resolves true on reconnect, false when the window expires.
  */
 const COOP_REJOIN_GRACE_MS = 120_000;
+const COOP_P33_HEARTBEAT_MS = 5_000;
 function makeCoopRejoinDriver(
   code: string,
   role: CoopRole,
@@ -322,6 +431,155 @@ function makeCoopRejoinDriver(
     coopWarn("launch", `rejoin grace EXPIRED code=${code} role=${role} after ${attempt} attempts`);
     return false;
   };
+}
+
+/**
+ * Connect one Worker-authenticated P33 pairing. The bearer fences every signaling call, while stable
+ * account seats determine the gameplay authority independently of offerer/answerer.
+ */
+export async function connectCoopP33Pairing(
+  credential: CoopP33LobbyCredentialV1,
+  pairing: CoopP33PairingV1,
+  opts: CoopConnectOptions = {},
+): Promise<CoopRuntime> {
+  if (!isCoopNetworkingConfigured()) {
+    throw new Error("coop networking is not configured (VITE_COOP_SERVER_URL unset)");
+  }
+  const dependencies = opts.p33Dependencies ?? {};
+  let activeCredential = { ...credential, identity: { ...credential.identity } };
+  let activePairing = structuredClone(pairing);
+  let context = p33Context(activeCredential, activePairing);
+  const gameplayRole = coopP33GameplayRole(context);
+  const { channel, pc } = await exchangeAndOpenP33Channel(activeCredential, activePairing, dependencies, opts.ice);
+  const transport = webRtcTransportFromChannel(gameplayRole, channel, pc, activePairing.connectionGeneration);
+  const runtime = connectCoopSession(transport, {
+    username: activePairing.account.displayName,
+    p33: context,
+  });
+
+  runtime.rejoinDriver = async () => {
+    const startedAt = Date.now();
+    let rebound: Awaited<ReturnType<typeof rejoinP33Run>> | null = null;
+    let attempt = 0;
+    while (Date.now() - startedAt < COOP_REJOIN_GRACE_MS) {
+      attempt++;
+      try {
+        // Mint/rotate once. Every later SDP retry uses the exact accepted credential and generation.
+        rebound ??= await rejoinP33Run(activePairing.code, activeCredential, dependencies);
+        const nextContext = p33Context(rebound, rebound.pairing);
+        if (
+          rebound.pairing.connectionGeneration !== transport.connectionGeneration() + 1
+          || !canAdoptCoopP33Rejoin(context, nextContext)
+        ) {
+          throw new Error("co-op P33 rejoin changed a retained session-binding axis");
+        }
+        // Rotate the HTTP credential as soon as the Worker commits it; the prior bearer is now stale.
+        activeCredential = {
+          presenceId: rebound.presenceId,
+          pairingToken: rebound.pairingToken,
+          identity: { ...rebound.identity },
+        };
+        activePairing = structuredClone(rebound.pairing);
+        const replacement = await exchangeAndOpenP33Channel(activeCredential, activePairing, dependencies, opts.ice);
+        if (!runtime.controller.adoptP33Rejoin(nextContext)) {
+          replacement.pc.close();
+          throw new Error("co-op P33 controller refused the retained rejoin binding");
+        }
+        transport.replaceChannel(wireFromRtcChannel(gameplayRole, replacement.channel, replacement.pc));
+        context = nextContext;
+        coopLog(
+          "launch",
+          `P33 rejoin SUCCESS attempt=${attempt} pairing=${activePairing.pairingId} generation=${activePairing.connectionGeneration}`,
+        );
+        return true;
+      } catch (error) {
+        if (error instanceof CoopP33HttpError && [401, 403].includes(error.status)) {
+          coopWarn("launch", `P33 rejoin terminal credential failure status=${error.status}`);
+          return false;
+        }
+        coopWarn(
+          "launch",
+          `P33 rejoin attempt ${attempt} failed (${error instanceof Error ? error.message : String(error)})`,
+        );
+        await new Promise(resolve => setTimeout(resolve, 5_000));
+      }
+    }
+    try {
+      await leaveP33Run(activeCredential, activePairing.code, dependencies);
+    } catch {
+      // Grace expiry is already terminal locally; stale/absent Worker state needs no further action.
+    }
+    return false;
+  };
+
+  let stopped = false;
+  let ended = false;
+  let timer: ReturnType<typeof setInterval> | null = null;
+  let offState = (): void => {};
+  const stop = (): void => {
+    if (stopped) {
+      return;
+    }
+    stopped = true;
+    if (timer != null) {
+      clearInterval(timer);
+      timer = null;
+    }
+    offState();
+  };
+  const heartbeat = async (): Promise<void> => {
+    const credentialAtStart = activeCredential;
+    const codeAtStart = activePairing.code;
+    const generationAtStart = activePairing.connectionGeneration;
+    const result = await heartbeatP33Run(credentialAtStart, codeAtStart, dependencies);
+    if (result.connectionGeneration !== generationAtStart) {
+      throw new CoopP33HttpError(
+        "co-op P33 heartbeat reported a stale connection generation",
+        409,
+        "/coop/v3/heartbeat",
+      );
+    }
+  };
+  const failClosedHeartbeat = (): void => {
+    const bearerAtStart = activeCredential.pairingToken;
+    void heartbeat().catch(error => {
+      if (
+        bearerAtStart === activeCredential.pairingToken
+        && error instanceof CoopP33HttpError
+        && [401, 403, 409].includes(error.status)
+      ) {
+        coopWarn("launch", `P33 heartbeat lost authenticated ownership status=${error.status}; closing channel`);
+        stop();
+        transport.close();
+      }
+      // Transient network/5xx failures are retried by the next heartbeat tick.
+    });
+  };
+  runtime.p33Signaling = {
+    heartbeat,
+    leave: async () => {
+      stop();
+      await leaveP33Run(activeCredential, activePairing.code, dependencies);
+    },
+    end: async () => {
+      ended = true;
+      stop();
+      await endP33Run(activeCredential, activePairing.code, dependencies);
+    },
+    dispose: stop,
+  };
+  offState = transport.onStateChange(state => {
+    if (state === "closed") {
+      const shouldLeave = !ended;
+      stop();
+      if (shouldLeave) {
+        void leaveP33Run(activeCredential, activePairing.code, dependencies).catch(() => {});
+      }
+    }
+  });
+  timer = setInterval(failClosedHeartbeat, COOP_P33_HEARTBEAT_MS);
+  failClosedHeartbeat();
+  return runtime;
 }
 
 export async function connectCoopWithCode(

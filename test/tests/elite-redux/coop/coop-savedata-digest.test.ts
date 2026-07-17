@@ -40,7 +40,7 @@ import {
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import { CoopInteractionRelay, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, getCoopBattleStreamer, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { erAchvRun } from "#data/elite-redux/er-achievement-run-state";
@@ -53,37 +53,47 @@ import {
   restoreErBiomeStructure,
   setErBiomeOverstayAnchor,
 } from "#data/elite-redux/er-biome-structure";
-import { getRevealedMapNodes, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
+import {
+  getRevealedMapNodes,
+  resetErMapNodes,
+  revealMapNodes,
+  setAuthoritativeMapTravelClassification,
+} from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
+import { restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
 import { BattlerIndex } from "#enums/battler-index";
 import { BerryType } from "#enums/berry-type";
 import { BiomeId } from "#enums/biome-id";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { BerryModifier } from "#modifiers/modifier";
 import { BerryModifierType } from "#modifiers/modifier-type";
 import { SelectBiomePhase } from "#phases/select-biome-phase";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
-  arriveGuestCommandBoundary,
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
+  disposeDuoRig,
   drainLoopback,
+  driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   installDuoLogCapture,
-  remirrorWave,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   setCoopHarnessModuleLetIsolation,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair, type ScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -97,12 +107,14 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
   let phaserGame: Phaser.Game;
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
+  let activeRig: DuoRig | null;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
   });
 
   beforeEach(() => {
+    activeRig = null;
     setCoopWaveBarrierMs(50);
     // #858: the biome-pick tests below drive one side at a time, so the boundary barrier resolves via the
     // fast anti-hang timeout - keep it tiny + explicit (do not lean on the module-global vitest default).
@@ -129,7 +141,12 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     resetErBiomeStructure();
     resetCoopBiomePickerDrivenByTest();
     logs.dispose();
-    clearCoopRuntime();
+    if (activeRig == null) {
+      clearCoopRuntime();
+    } else {
+      disposeDuoRig(activeRig);
+      activeRig = null;
+    }
     vi.restoreAllMocks();
     initGlobalScene(game.scene);
   });
@@ -137,6 +154,13 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
   afterAll(() => {
     // best-effort
   });
+
+  function liveSelectBiome(): SelectBiomePhase {
+    const phase = new SelectBiomePhase();
+    (phase as unknown as { boundaryStillLive(generation: number, wave: number): boolean }).boundaryStillLive = () =>
+      true;
+    return phase;
+  }
 
   function wireGuestCommand(rig: DuoRig): void {
     rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
@@ -147,11 +171,19 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     }));
   }
 
-  async function hostPlayWave(rig: DuoRig): Promise<void> {
+  async function buildSavedataDuo(pair: ReturnType<typeof createLoopbackPair>): Promise<DuoRig> {
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    activeRig = rig;
+    return rig;
+  }
+
+  async function hostPlayWave(rig: DuoRig, guestCommandAlreadyCommitted = false): Promise<void> {
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      if (!guestCommandAlreadyCommitted) {
+        game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+      }
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
 
@@ -162,20 +194,29 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       await game.phaseInterceptor.to("SelectModifierPhase", false);
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     if (hostOwns) {
+      await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
       await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: false }));
-      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
+      await withClient(rig.hostCtx, () => drainLoopback());
+      await withClient(rig.guestCtx, () => drainLoopback());
     } else {
+      await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
       await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: false }));
-      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
+      // A guest-owned UI action is still adjudicated by the host. The host watcher emits the retained
+      // result, the guest owner applies it and publishes its new counter, then the host adopts that exact
+      // counter before either phase queue may cross into the next encounter.
+      await withClient(rig.guestCtx, () => drainLoopback());
+      await withClient(rig.hostCtx, () => drainLoopback());
     }
   }
 
   it("GUARD: the digest is DERIVED FROM getSessionSaveData (new substrate auto-covered) + detects a substrate change", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     await withClient(rig.hostCtx, () => {
@@ -218,15 +259,21 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
 
   it("NO FALSE DESYNC: two real engines produce the SAME save-data digest at each wave boundary", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    wireGuestCommand(rig);
+    const pair: ScheduledCoopPair = createScheduledCoopPair({ automatic: true });
+    const rig = await buildSavedataDuo(pair);
+    // Align the direct guest scene to the real TurnInit/Command queue. Its constructor starts on TitlePhase;
+    // shiftPhase on an empty queue selects production TurnInitPhase, which builds both command slots.
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+    });
+    // The handshake may use ordinary delivery, but every gameplay continuation is delivered only while
+    // its addressed client's complete process-global context is installed. This models two browser
+    // processes and prevents either engine's async phase tail from running against its partner's scene.
+    pair.setAutomaticDelivery(false);
 
     const WAVES = 3;
     for (let w = 1; w <= WAVES; w++) {
-      if (w > 1) {
-        await remirrorWave(rig);
-      }
       // The full checksum states (which now INCLUDE saveDataDigest) match host-vs-guest at wave start.
       const hostStart = await withClient(rig.hostCtx, () => captureCoopChecksumState());
       const guestStart = await withClient(rig.guestCtx, () => captureCoopChecksumState());
@@ -234,22 +281,39 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
         hostStart.saveDataDigest,
       );
 
+      await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: w === 1 });
       const turn = rig.hostScene.currentBattle.turn;
-      await hostPlayWave(rig);
+      await hostPlayWave(rig, true);
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
       });
 
+      const guestAuthorityTerminated = await withClient(
+        rig.guestCtx,
+        () => getCoopBattleStreamer()?.retainedAuthorityDiagnostics().terminal,
+      );
+      expect(
+        guestAuthorityTerminated,
+        `wave ${w}: renderer mutation never invalidates the immutable admitted authority ACK`,
+      ).toBe(false);
       const hostPost = await withClient(rig.hostCtx, () => captureCoopSaveDataDigest());
       const guestPost = await withClient(rig.guestCtx, () => captureCoopSaveDataDigest());
       expect(guestPost, `wave ${w}: save-data digest matches host post-turn`).toBe(hostPost);
 
       await leaveRewardShop(rig);
       if (w < WAVES) {
-        await arriveGuestCommandBoundary(rig, w + 1);
+        // Advance the real queues in authority order. The host first generates and publishes the next
+        // encounter carrier; only then may the guest consume it and open the matching command surface.
         await withClient(rig.hostCtx, async () => {
-          await game.phaseInterceptor.to("CommandPhase");
+          await game.phaseInterceptor.to("CommandPhase", false);
         });
+        await withClient(rig.guestCtx, () =>
+          driveClientPhaseQueueTo(rig.guestScene, `wave ${w + 1} CommandPhase`, {
+            matches: phase => phase.phaseName === "CommandPhase" && rig.guestScene.currentBattle.waveIndex === w + 1,
+          }),
+        );
+        expect(rig.hostScene.currentBattle.waveIndex, `wave ${w}: host opened wave ${w + 1}`).toBe(w + 1);
+        expect(rig.guestScene.currentBattle.waveIndex, `wave ${w}: guest adopted wave ${w + 1}`).toBe(w + 1);
       }
     }
     logs.flush();
@@ -258,7 +322,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
   it("DIVERGE + HEAL: a deliberately diverged money-streak / overstay / relic MISMATCHES then heals to convergence via the resync", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     // Turn ON faithful per-client module-let isolation so the two engines can hold DIFFERENT module state
@@ -324,7 +388,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // no heal path. This proves the extent now rides the full-snapshot resync + heals to convergence.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     // Biome-structure is process-global (er-biome-structure module state), so we set the divergent extents
@@ -380,7 +444,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // full-snapshot resync (erMapState + the routing erPendingNodes) and heals to convergence.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     // The revealed-node set + pending nodes are process-global (er-map-nodes / er-biome-routing module
@@ -464,7 +528,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     setCoopBiomePickerDrivenByTest();
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     // The guest is seed-pinned to the host (adoptCoopHostRunConfig, #658 - proven in coop-duo-launch-sync).
@@ -474,10 +538,14 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     rig.hostScene.currentBattle.waveIndex = WAVE;
     rig.guestScene.currentBattle.waveIndex = WAVE;
     // Two REVEALED onward nodes (shared er-map state); the owner picks the SECOND (a non-default choice).
-    setErPendingNodes([
+    const routeNodes = [
       { biome: BiomeId.FOREST, revealed: true },
       { biome: BiomeId.VOLCANO, revealed: true },
-    ] satisfies ErRouteNode[]);
+    ] satisfies ErRouteNode[];
+    // The duo harness always isolates world-map routing state per simulated browser. Seed the route
+    // inside BOTH client contexts; writing the ambient module let leaves each ctx's saved route unchanged.
+    await withClient(rig.hostCtx, () => setErPendingNodes(routeNodes));
+    await withClient(rig.guestCtx, () => setErPendingNodes(routeNodes));
     const chosen = BiomeId.VOLCANO;
 
     // What the OLD deterministic bypass WOULD have rolled (so we prove the owner's pick is honored INSTEAD).
@@ -501,19 +569,40 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       restore: () => void;
     }
     const mockErMap = (scene: BattleScene): ErMapMock => {
-      const ui = scene.ui as unknown as { setMode: (m: number, ...a: unknown[]) => Promise<void> };
-      const real = ui.setMode.bind(ui);
+      type BoundedResult = "completed" | "forced" | "superseded";
+      const ui = scene.ui as unknown as {
+        setMode: (m: number, ...a: unknown[]) => Promise<void>;
+        setModeBoundedWhen: (
+          m: number,
+          timeoutMs: number,
+          isCurrent: (() => boolean) | undefined,
+          ...a: unknown[]
+        ) => Promise<BoundedResult>;
+      };
+      const realSetMode = ui.setMode.bind(ui);
+      const realSetModeBoundedWhen = ui.setModeBoundedWhen.bind(ui);
       const box: { onSelect?: (b: BiomeId) => void } = {};
-      ui.setMode = (m: number, ...a: unknown[]): Promise<void> => {
+      const capture = (m: number, a: unknown[]): void => {
         if (m === UiMode.ER_MAP) {
           box.onSelect = (a[0] as { onSelect: (b: BiomeId) => void }).onSelect;
         }
+      };
+      ui.setMode = (m: number, ...a: unknown[]): Promise<void> => {
+        capture(m, a);
         return Promise.resolve();
+      };
+      ui.setModeBoundedWhen = (m, _timeoutMs, isCurrent, ...a): Promise<BoundedResult> => {
+        if (!(isCurrent?.() ?? true)) {
+          return Promise.resolve("superseded");
+        }
+        capture(m, a);
+        return Promise.resolve("completed");
       };
       return {
         box,
         restore: () => {
-          ui.setMode = real;
+          ui.setMode = realSetMode;
+          ui.setModeBoundedWhen = realSetModeBoundedWhen;
         },
       };
     };
@@ -528,7 +617,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       // OWNER drives the real picker + relays its chosen biome (buffered for the watcher). #858: the picker
       // opens AFTER the reciprocal boundary barrier, which buffer-hits the watcher arrival above.
       await withClient(ownerCtx, async () => {
-        const phase = new SelectBiomePhase();
+        const phase = liveSelectBiome();
         phase.start();
         for (let i = 0; i < 80 && ownerMock.box.onSelect == null; i++) {
           await drainLoopback();
@@ -539,7 +628,11 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       });
       // WATCHER opens the mirrored copy + adopts the owner's relayed biome.
       await withClient(watcherCtx, async () => {
-        const phase = new SelectBiomePhase();
+        // The harness alternates two engines in one JS process, so the owner's transition just consumed the
+        // process-global classification that remains isolated in two real browsers. Re-materialize the exact
+        // guest carrier field before driving its phase; the retained BIOME_PICK receipt remains untouched.
+        setAuthoritativeMapTravelClassification(WAVE, null);
+        const phase = liveSelectBiome();
         phase.start();
         for (let i = 0; i < 40; i++) {
           await drainLoopback();
@@ -562,14 +655,14 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     logs.flush();
   }, 300_000);
 
-  it("SAME BIOME (#841 item 1, timeout fallback): a disconnected owner backstops BOTH engines to the SAME deterministic roll", async () => {
-    // The anti-hang backstop (#848): if the owner never picks (disconnect / stall), each client falls back to
-    // the deterministic roll it computes off the shared, just-reset wave seed - the SAME value on both, so the
-    // fallback CANNOT desync (it is exactly the old bypass behavior, now only on the timeout path). This drives
-    // the fallback decision on both engines + asserts they converge, guarding the seed pin it relies on.
+  it("SAME BIOME (#841 item 1, missing commit): a disconnected owner cannot make the watcher advance unilaterally", async () => {
+    // A missing raw relay and missing authoritative commit must leave the watcher fail-closed. Re-deriving a
+    // destination locally used to look deterministic, but it allowed one client to enter SwitchBiomePhase
+    // without proof that its partner committed the same route. Recovery/terminal supervision owns liveness;
+    // this surface must never trade a bounded wait for unilateral gameplay mutation.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     expect(rig.guestScene.seed, "the guest is seed-pinned to the host").toBe(rig.hostScene.seed);
@@ -577,12 +670,13 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     const WAVE = 11;
     rig.hostScene.currentBattle.waveIndex = WAVE;
     rig.guestScene.currentBattle.waveIndex = WAVE;
-    setErPendingNodes([
+    const routeNodes = [
       { biome: BiomeId.FOREST, revealed: true },
       { biome: BiomeId.VOLCANO, revealed: true },
-    ] satisfies ErRouteNode[]);
-    // Force every relay await to TIME OUT (a disconnected owner) -> the deterministic fallback. Only the
-    // WATCHER falls back: the OWNER drives the real picker (no timeout); on a true disconnect it is gone.
+    ] satisfies ErRouteNode[];
+    await withClient(rig.hostCtx, () => setErPendingNodes(routeNodes));
+    await withClient(rig.guestCtx, () => setErPendingNodes(routeNodes));
+    // Force every raw relay await to time out. There is deliberately no retained authoritative receipt.
     vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice").mockResolvedValue(null);
 
     const counter = rig.hostRuntime.controller.interactionCounter();
@@ -590,42 +684,27 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     const ownerCtx = hostOwns ? rig.hostCtx : rig.guestCtx;
     const watcherCtx = hostOwns ? rig.guestCtx : rig.hostCtx;
 
-    // The owner reached the shared boundary, then disappeared before sending its choice. This is the
-    // legitimate fallback window: the watcher may cross the already-reciprocal boundary, then its mocked
-    // choice await returns null and it derives the shared-seed fallback. An owner that never reaches the
-    // boundary remains fail-closed (covered by the pacing-barrier tests).
+    // The owner reached the shared boundary, then disappeared before committing its choice.
     await withClient(ownerCtx, () => ownerCtx.runtime.rendezvous.arrive(`biomepick:${WAVE}`));
     await drainLoopback();
 
-    // The deterministic roll BOTH engines compute off the shared, just-reset wave seed (identical by #658
-    // seed pin) - so if both fell back they would match; the fallback cannot desync.
-    const rollUnder = (ctx: typeof rig.hostCtx): Promise<BiomeId> =>
-      withClient(ctx, () => {
-        ctx.scene.resetSeed(WAVE);
-        return ctx.scene.generateRandomBiome(WAVE + 1);
-      });
-    const hostRoll = await rollUnder(rig.hostCtx);
-    const guestRoll = await rollUnder(rig.guestCtx);
-    expect(guestRoll, "the deterministic fallback roll is identical on both engines (cannot desync)").toBe(hostRoll);
-
-    // The WATCHER engine runs the biome pick alone; the owner never sends -> it backstops to the roll.
-    const watcherFallback = await withClient(watcherCtx, async () => {
+    const hostCounter = rig.hostRuntime.controller.interactionCounter();
+    const guestCounter = rig.guestRuntime.controller.interactionCounter();
+    await withClient(watcherCtx, async () => {
+      setAuthoritativeMapTravelClassification(WAVE, null);
       const spy = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
-      const phase = new SelectBiomePhase();
+      const phase = liveSelectBiome();
       phase.start();
-      // #858: the watcher first crosses its natural-pick boundary barrier (owner absent -> anti-hang timeout),
-      // THEN falls back on the mocked relay timeout - poll across both.
       for (let i = 0; i < 80; i++) {
         await drainLoopback();
-        const biome = spy.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined;
-        if (biome !== undefined) {
-          return biome;
-        }
       }
-      return;
+      expect(
+        spy.mock.calls.some(c => c[0] === "SwitchBiomePhase"),
+        "the watcher never derives or applies a biome without the owner's retained commit",
+      ).toBe(false);
     });
-    expect(watcherFallback, "the watcher resolved on timeout (never hangs)").not.toBeUndefined();
-    expect(watcherFallback, "the watcher's fallback IS the deterministic shared-seed roll").toBe(hostRoll);
+    expect(rig.hostRuntime.controller.interactionCounter(), "the disconnected owner did not advance").toBe(hostCounter);
+    expect(rig.guestRuntime.controller.interactionCounter(), "the watcher did not advance alone").toBe(guestCounter);
     logs.flush();
   }, 300_000);
 
@@ -638,7 +717,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // bi-keyed `heldItems` field), and mon-keyed ER substrates map the id to their stable party SLOT.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
     // Per-client module-let isolation so the two engines can hold DIFFERENT money-streak maps (production
     // is one process per client; the shared-state default would collapse them onto one map).
@@ -654,6 +733,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       lead.id = id;
       globalScene.addModifier(new BerryModifier(new BerryModifierType(BerryType.SITRUS), id, BerryType.SITRUS), true);
       restoreErMoneyStreaks([[id, 5]]);
+      restoreErResistBerries([[id, PokemonType.FIRE]]);
     };
     const hostDigest = withClientSync(rig.hostCtx, () => {
       seed(HOST_ID);
@@ -667,6 +747,10 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       expect(normalized.erMoneyStreaks, "the money-streak id normalized to its stable party slot token").toEqual([
         ["p0", 5],
       ]);
+      expect(
+        normalized.erResistBerries,
+        "the legacy resist-berry id normalized to its stable party slot token",
+      ).toEqual([["p0", PokemonType.FIRE]]);
       return captureCoopSaveDataDigest();
     });
     const guestDigest = withClientSync(rig.guestCtx, () => {
@@ -704,7 +788,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     game.override.moveset([MoveId.TRANSFORM, MoveId.TACKLE, MoveId.SPLASH]);
     await game.classicMode.startBattle(SpeciesId.DITTO, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     // Host lead (Ditto) TRANSFORMs into the enemy Magikarp; partner TACKLEs the other enemy.
@@ -712,7 +796,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TRANSFORM, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
 
     // The host's lead is now transformed (copied identity in summonData, species stays DITTO).

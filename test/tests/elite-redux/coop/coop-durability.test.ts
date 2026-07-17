@@ -29,6 +29,14 @@ import { afterEach, describe, expect, it } from "vitest";
 function durableMsg(wave: number): CoopMessage {
   return { t: "waveResolved", wave, outcome: "win" };
 }
+function nestedDurableMsg(value: number): Extract<CoopMessage, { t: "rewardOptions" }> {
+  return {
+    t: "rewardOptions",
+    seq: 1,
+    reroll: 0,
+    options: [{ id: "RARE_CANDY", tier: 0, upgradeCount: 0, cost: 0, pregenArgs: [value] }],
+  };
+}
 /** A cosmetic frame (render tick) - sheddable, never journaled. */
 function cosmeticMsg(seq: number): CoopMessage {
   return { t: "battleEvent", epoch: 7, wave: 1, turn: 1, seq, event: { k: "msg", text: "x" } as never };
@@ -75,6 +83,7 @@ describe("durability §4.1: message classification (authoritative vs cosmetic vs
         checkpointTick: 1,
         stateTick: 2,
         checksum: "deadbeefdeadbeef",
+        stage: "continuationReady",
         status: "applied",
       },
       {
@@ -97,6 +106,7 @@ describe("durability §4.1: message classification (authoritative vs cosmetic vs
         checkpointTick: 1,
         stateTick: 2,
         checksum: "deadbeefdeadbeef",
+        stage: "continuationReady",
       },
       {
         t: "authorityFailure",
@@ -188,6 +198,22 @@ describe("durability §4.3: bounded outbound queue + backpressure", () => {
     expect(q.byteSize()).toBe(0);
   });
 
+  it("owns an immutable snapshot of a dark-channel frame", () => {
+    const q = new CoopOutboundQueue();
+    const offered = nestedDurableMsg(11);
+    expect(q.offer(offered, 10)).toBe("queued");
+    offered.options[0].pregenArgs![0] = 99;
+
+    const flushed: number[] = [];
+    q.drain(message => {
+      if (message.t === "rewardOptions") {
+        flushed.push(message.options[0].pregenArgs?.[0] ?? -1);
+        message.options[0].pregenArgs![0] = 77;
+      }
+    });
+    expect(flushed).toEqual([11]);
+  });
+
   it("sheds cosmetic/internal frames instead of queuing them (fire-and-forget)", () => {
     const q = new CoopOutboundQueue();
     expect(q.offer(cosmeticMsg(1), 10)).toBe("shed");
@@ -238,6 +264,24 @@ describe("durability §4.1/§4.2: journal commit + cumulative ACK + resend tail"
     expect(j.classes()).toEqual(["envelope"]);
   });
 
+  it("keeps journal retention immutable from caller and replay-consumer mutation", () => {
+    const j = new CoopJournal();
+    const committed = nestedDurableMsg(12);
+    expect(j.commit("envelope", 1, committed)).toBe(true);
+    committed.options[0].pregenArgs![0] = 98;
+
+    const replay = j.resendTail("envelope");
+    expect((replay[0].msg as Extract<CoopMessage, { t: "rewardOptions" }>).options[0].pregenArgs).toEqual([12]);
+    (replay[0].msg as Extract<CoopMessage, { t: "rewardOptions" }>).options[0].pregenArgs![0] = 76;
+
+    expect(
+      (j.entry("envelope", 1)?.msg as Extract<CoopMessage, { t: "rewardOptions" }>).options[0].pregenArgs,
+      "mutating a returned replay copy cannot rewrite the retained identity",
+    ).toEqual([12]);
+    expect(j.commit("envelope", 1, nestedDurableMsg(12))).toBe(true);
+    expect(j.commit("envelope", 1, nestedDurableMsg(13))).toBe(false);
+  });
+
   it("resendTail returns the committed-but-unacked tail; a cumulative ACK shrinks it (§4.2)", () => {
     const j = new CoopJournal();
     for (let r = 1; r <= 5; r++) {
@@ -272,6 +316,24 @@ describe("durability §4.1/§4.2: journal commit + cumulative ACK + resend tail"
     j.ack("envelope", 1);
     // The host's resend set is the tail after the last ACK: exactly {2,3}.
     expect(j.resendTail("envelope").map(e => e.seq)).toEqual([2, 3]);
+  });
+
+  it("an exact retry restores an absent high-water entry and rejects a conflicting same-seq payload", () => {
+    const j = new CoopJournal(4);
+    j.restoreHighWater({ envelope: 5 });
+    expect(j.highWaterMark("envelope"), "cold resume retained the committed revision identity").toBe(5);
+    expect(j.tailFrom("envelope", 4), "the bounded replay entry itself was not persisted").toEqual([]);
+
+    expect(j.commit("envelope", 5, durableMsg(5)), "exact retry concretely restores replayability").toBe(true);
+    expect(j.tailFrom("envelope", 4)).toEqual([
+      expect.objectContaining({ cls: "envelope", seq: 5, msg: durableMsg(5) }),
+    ]);
+
+    expect(
+      j.commit("envelope", 5, durableMsg(6)),
+      "the immutable revision cannot be rebound to a conflicting wire payload",
+    ).toBe(false);
+    expect(j.tailFrom("envelope", 4)[0].msg).toEqual(durableMsg(5));
   });
 });
 

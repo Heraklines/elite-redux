@@ -2,20 +2,42 @@ import { consumeClearMeOverrideAfterFirst } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { getCharVariantFromDialogue } from "#data/dialogue";
+import { Egg, type IEggOptions } from "#data/egg";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-presentation";
 import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
-import { commitMeOwnerIntent, nextCoopMePresentationStep } from "#data/elite-redux/coop/coop-me-operation";
 import {
+  CoopMeTerminalOutcomeLatch,
+  commitMeAuthorityGuestIntent,
+  commitMeAuthorityLocalPick,
+  commitMeOwnerIntent,
+  isCoopMeOperationEnabled,
+  isCoopMeOperationJournalActive,
+  nextCoopMePresentationStep,
+  releaseCoopMeRetainedTerminal,
+} from "#data/elite-redux/coop/coop-me-operation";
+import {
+  captureCoopActiveMysteryControl,
   coopMeHandoffBattleStarted,
   coopMeInProgress,
   coopMeInteractionStartValue,
+  setCoopMeActivePresentation,
   setCoopMeInteractionStart,
+  setCoopMeTerminalControl,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
+import type {
+  CoopMeRewardSurfaceProjection,
+  CoopMeTerminalPayload,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  type CoopMeBattleSettlementPlan,
+  commitCoopMeBattleSettlementAtBattleEnd as commitCoopMeBattleSettlementAfterRewardPreparation,
+  coopSessionGeneration,
+  failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopController,
   getCoopInteractionRelay,
@@ -25,7 +47,7 @@ import {
   isCoopAuthoritativeGuest,
   setCoopMeBattleInteractionCounter,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_ME_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_ME_PICK_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { erRecordMysteryEncounterResolved } from "#data/elite-redux/er-achievement-detection";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
@@ -43,7 +65,6 @@ import { getEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
 import type { OptionSelectSettings } from "#mystery-encounters/encounter-phase-utils";
 import {
   COOP_AUTHORITATIVE_BESPOKE_SUB_ME,
-  leaveEncounterWithoutBattle,
   transitionMysteryEncounterIntroVisuals,
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounterOption, OptionPhaseCallback } from "#mystery-encounters/mystery-encounter-option";
@@ -173,51 +194,106 @@ function coopBeginMePump(): void {
  * ONCE for the whole encounter (its embedded reward shop suppresses its own advance while an ME
  * is active, so this is the single advance).
  */
-function coopEndMePump(): void {
+function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync" }>): boolean {
   if (!globalScene.gameMode.isCoop) {
-    return;
+    return true;
   }
   const controller = getCoopController();
   const pump = getCoopMePump();
   if (controller == null || pump == null) {
-    return;
+    coopWarn("me", "coopEndMePump HOLD: shared controller/pump unavailable at the exact ME terminal");
+    return false;
   }
   coopLog("me", "coopEndMePump: close pump + advance alternation", { counter: coopMeInteractionStartValue() });
+  const handoff = coopMeHandoffBattleStarted();
+  const activeControl = captureCoopActiveMysteryControl();
+  const terminalStep = handoff
+    ? activeControl?.interactionCounter === coopMeInteractionStartValue() && activeControl.terminal === "battle-settled"
+      ? (activeControl.terminalStep ?? -1) + 1
+      : -1
+    : 0;
+  let terminalOperationId: string | null = null;
+  if (controller.role === "host" && isCoopMeOperationEnabled()) {
+    if (outcome == null) {
+      coopWarn("me", "coopEndMePump HOLD: leave terminal has no retained authoritative outcome");
+      return false;
+    }
+    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    if (wave < 0 || terminalStep < 0 || terminalStep >= 1_000) {
+      coopWarn("me", "coopEndMePump HOLD: leave terminal has no live addressed destination");
+      return false;
+    }
+    const payload = {
+      terminal: "leave",
+      outcome,
+      destination: {
+        kind: "continue",
+        nextWave: wave + 1,
+        selectBiome: globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome(),
+      },
+    } satisfies CoopMeTerminalPayload;
+    terminalOperationId = commitMeOwnerIntent({
+      kind: "ME_TERMINAL",
+      seq: COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue(),
+      pinned: coopMeInteractionStartValue(),
+      step: terminalStep,
+      payload,
+      localRole: "host",
+      wave,
+      turn: 0,
+    });
+    if (terminalOperationId == null) {
+      coopWarn("me", "coopEndMePump HOLD: exact authoritative leave did not commit");
+      getCoopRuntime()?.durability?.reconnect();
+      return false;
+    }
+    if (terminalOperationId != null) {
+      setCoopMeTerminalControl("leave", undefined, {
+        operationId: terminalOperationId,
+        step: terminalStep,
+        choice: COOP_INTERACTION_LEAVE,
+      });
+    }
+  }
+  // Legacy/non-journal fallback preserves the original DATA-before-terminal order. In journal mode the
+  // complete terminal envelope is the only DATA+destination carrier.
+  if (controller.role === "host" && outcome != null && !isCoopMeOperationJournalActive()) {
+    getCoopInteractionRelay()?.sendInteractionOutcome(
+      COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue(),
+      "meResync",
+      outcome,
+    );
+  }
   // #822 (live 'after the ME it doesn't continue for one player'): for a BATTLE-handoff ME the
   // pump session already ended at the battle spawn, so endOwner() below sends NO leave sentinel -
   // the guest never learns the encounter is over. Send the TRUE ME-end LEAVE explicitly; the
   // guest's detached post-handoff listener leaves + advances on it (idempotent if it already did).
-  if (coopMeHandoffBattleStarted() && controller.role === "host") {
+  if (handoff && controller.role === "host" && !isCoopMeOperationJournalActive()) {
     const relay = getCoopInteractionRelay();
     const termSeq = COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue();
     coopLog("me", "post-handoff ME END: sending TRUE leave terminal (#822)", { termSeq });
+    // This terminal bypasses CoopMePump.endOwner (the pump ended at the initial battle handoff); the
+    // unconditional host record above therefore covers it before raw/journal delivery can be cut.
     relay?.sendInteractionChoice(termSeq, "meBtn", COOP_INTERACTION_LEAVE);
   }
-  // Wave-2c: DUAL-RUN - commit the typed ME_TERMINAL {leave} op (the host states the ME resolved as a
-  // non-battle leave). For a post-battle-handoff ME this is the TRUE ME-end leave (step 1, distinct id
-  // from the earlier battle-handoff terminal committed at coopMeOwnerRelayBattleHandoff step 0); a plain
-  // non-battle ME uses step 0. No-op when the flag is OFF. Host-driven regardless of who owns the ME.
-  if (controller.role === "host") {
-    commitMeOwnerIntent({
-      kind: "ME_TERMINAL",
-      seq: COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue(),
-      pinned: coopMeInteractionStartValue(),
-      step: coopMeHandoffBattleStarted() ? 1 : 0,
-      payload: { terminal: "leave" },
-      localRole: "host",
-      wave: globalScene.currentBattle?.waveIndex ?? -1,
-      turn: 0,
-    });
+  // With a journal, the committed operation materializer is the only wake-up. Raw 9M is retained solely
+  // for the negotiated legacy fallback, where there is no committed envelope to race.
+  try {
+    pump.endOwner(!isCoopMeOperationJournalActive());
+    // Both clients advance LOCALLY + idempotently (keyed to the ME's start counter), so the
+    // whole ME (encounter + its embedded reward shop, which suppresses its own advance) counts
+    // as exactly ONE alternation step on each client - no host-broadcast race (#633).
+    controller.advanceInteraction(coopMeInteractionStartValue());
+  } catch (error) {
+    coopWarn("me", "coopEndMePump HOLD: committed terminal could not close/advance locally", error);
+    return false;
   }
-  pump.endOwner();
-  // Both clients advance LOCALLY + idempotently (keyed to the ME's start counter), so the
-  // whole ME (encounter + its embedded reward shop, which suppresses its own advance) counts
-  // as exactly ONE alternation step on each client - no host-broadcast race (#633).
-  controller.advanceInteraction(coopMeInteractionStartValue());
+  releaseCoopMeRetainedTerminal(terminalOperationId);
   setCoopMeInteractionStart(-1);
   hideCoopControllerTag(); // #817: never outlive the encounter
   // Clear the ME battle handoff key now the encounter is fully over (#633).
   setCoopMeBattleInteractionCounter(-1);
+  return true;
 }
 
 /**
@@ -233,6 +309,11 @@ export class MysteryEncounterPhase extends Phase {
   public readonly phaseName = "MysteryEncounterPhase";
   private readonly FIRST_DIALOGUE_PROMPT_DELAY = 300;
   optionSelectSettings?: OptionSelectSettings | undefined;
+  private coopGuestPickRecoveryAttempts = 0;
+  /** One phase instance may resolve one selector exactly once. */
+  private selectionResolving = false;
+  /** Exact session/phase address captured before the selector is published. */
+  private coopSelectionBoundaryLive: (() => boolean) | null = null;
 
   /**
    * Mostly useful for having repeated queries during a single encounter, where the queries and options may differ each time
@@ -340,16 +421,57 @@ export class MysteryEncounterPhase extends Phase {
       consumeClearMeOverrideAfterFirst();
     }
 
-    // Initiates encounter dialogue window and option select
-    globalScene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, this.optionSelectSettings);
     // Co-op (#633): open the input pump so the owner drives + relays this encounter and the
     // watcher replays it in lockstep (synced choices -> synced rewards). Idempotent across a
     // re-entered/nested option-select; no-op in solo.
     coopBeginMePump();
-    // Co-op AUTHORITATIVE host (#633, P0 / BLOCK-2): stream the host's authoritative presentation
-    // (dialogue tokens + per-option enablement + resolved labels) so the guest renders off it, not
-    // its own diverged-party re-derivation. No-op off the live authoritative host.
-    this.coopHostStreamPresentation();
+    if (globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative" && coopMeInProgress()) {
+      const boundScene = globalScene;
+      const runtime = getCoopRuntime();
+      const controller = getCoopController();
+      const generation = coopSessionGeneration();
+      const pinned = coopMeInteractionStartValue();
+      const wave = globalScene.currentBattle?.waveIndex ?? -1;
+      this.coopSelectionBoundaryLive = (): boolean =>
+        globalScene === boundScene
+        && getCoopRuntime() === runtime
+        && getCoopController() === controller
+        && coopSessionGeneration() === generation
+        && coopMeInteractionStartValue() === pinned
+        && (globalScene.currentBattle?.waveIndex ?? -1) === wave
+        && globalScene.phaseManager.getCurrentPhase() === this;
+    }
+    // The presentation operation causally authorizes opening either selector. If its exact commit/journal
+    // handoff fails, the phase holds/fails closed before any UI or raw carrier can expose the screen.
+    if (!this.coopHostStreamPresentation()) {
+      return;
+    }
+    // Initiate the selector only after the exact Mystery pin exists. Every delayed fade/callback is
+    // fenced to this phase + runtime + controller + generation + pin, so an old selector cannot render
+    // over a recovered/replaced session or submit a choice into the next encounter.
+    if (globalScene.gameMode.isCoop && coopMeInProgress()) {
+      const boundScene = globalScene;
+      const runtime = getCoopRuntime();
+      const controller = getCoopController();
+      const generation = coopSessionGeneration();
+      const pinned = coopMeInteractionStartValue();
+      const live = (): boolean =>
+        globalScene === boundScene
+        && getCoopRuntime() === runtime
+        && getCoopController() === controller
+        && coopSessionGeneration() === generation
+        && coopMeInteractionStartValue() === pinned
+        && globalScene.phaseManager.getCurrentPhase() === this;
+      void globalScene.ui
+        .setModeBoundedWhen(UiMode.MYSTERY_ENCOUNTER, 2_000, live, this.optionSelectSettings)
+        .then(opened => {
+          if (opened === "superseded" && live()) {
+            failCoopSharedSession(`Mystery selector could not bind for ${pinned}`);
+          }
+        });
+    } else {
+      globalScene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, this.optionSelectSettings);
+    }
     // Co-op AUTHORITATIVE host on a GUEST-OWNED ME (#633, ADD-2): the host is the sole engine, so it
     // awaits the guest's relayed option INDEX and applies it programmatically (input-free). No-op
     // when the host owns this ME (it drives the engine off its own local input) or off authoritative.
@@ -363,38 +485,44 @@ export class MysteryEncounterPhase extends Phase {
    * presentation so the guest renders off it. Hard-gated to the live authoritative host; solo /
    * lockstep / guest never emit, so those paths are byte-for-byte unchanged. Best-effort + guarded.
    */
-  private coopHostStreamPresentation(): void {
+  private coopHostStreamPresentation(): boolean {
     if (
       !globalScene.gameMode.isCoop
       || getCoopNetcodeMode() !== "authoritative"
       || getCoopController()?.role !== "host"
       || !coopMeInProgress()
     ) {
-      return;
+      return true;
     }
     try {
       const enc = globalScene.currentBattle.mysteryEncounter!;
       // Ensure tokens + per-option meetsReqs are computed off the host party before snapshotting.
-      enc.populateDialogueTokensFromRequirements();
-      // #831 (audit P0#1, GROUP REPEAT): a re-fired ROUND (press-your-luck delve / Safari Zone) carries its
-      // NEW options in optionSelectSettings.overrideOptions - the SAME set coopHostAwaitGuestIndex applies the
-      // relayed index against, and the SAME set the host's own MysteryEncounterUiHandler renders. Stream THOSE
-      // labels/enablement (not the stale base enc.options) so the guest re-renders the round's real "descend
-      // again? / dig again?" prompt byte-identically. Falls back to enc.options for the top-level round.
-      const options = this.optionSelectSettings?.overrideOptions ?? enc.options;
-      const present: CoopInteractionOutcome = {
-        k: "mePresent",
-        tokens: { ...enc.dialogueTokens },
-        meetsReqs: options.map(o => o.meetsRequirements()),
-        labels: options.map(o => {
-          const d = o.dialogue;
-          if (d == null) {
-            return "";
-          }
-          const ok = o.meetsRequirements();
-          return getEncounterText(!ok && d.disabledButtonLabel ? d.disabledButtonLabel : d.buttonLabel) ?? "";
-        }),
-      };
+      const priorTokens = { ...enc.dialogueTokens };
+      const present: CoopInteractionOutcome = (() => {
+        try {
+          enc.populateDialogueTokensFromRequirements();
+          // #831 (audit P0#1, GROUP REPEAT): a re-fired ROUND (press-your-luck delve / Safari Zone) carries
+          // overrideOptions. Stream those options, not the stale base list.
+          const options = this.optionSelectSettings?.overrideOptions ?? enc.options;
+          return {
+            k: "mePresent",
+            tokens: { ...enc.dialogueTokens },
+            meetsReqs: options.map(o => o.meetsRequirements()),
+            labels: options.map(o => {
+              const d = o.dialogue;
+              if (d == null) {
+                return "";
+              }
+              const ok = o.meetsRequirements();
+              return getEncounterText(!ok && d.disabledButtonLabel ? d.disabledButtonLabel : d.buttonLabel) ?? "";
+            }),
+          };
+        } finally {
+          // A requirements/label callback may throw. Never leak partially derived tokens into the engine
+          // when no presentation operation was retained.
+          enc.dialogueTokens = priorTokens;
+        }
+      })();
       const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
       coopLog("me", "host streams ME presentation (mePresent)", {
         seq: seqMe,
@@ -402,24 +530,37 @@ export class MysteryEncounterPhase extends Phase {
         labels: present.labels.length,
         tokens: Object.keys(present.tokens).length,
       });
-      getCoopInteractionRelay()?.sendInteractionOutcome(seqMe, "mePresent", present);
       // Wave-2c: DUAL-RUN - commit the typed ME_PRESENT op (the host-authoritative ME-presence verdict,
       // #862). Host-driven regardless of who owns the ME (the host is the sole engine, #693). No-op when
       // the flag is OFF; the legacy presentation stream above is the fallback and stays live either way.
-      commitMeOwnerIntent({
+      const pinned = coopMeInteractionStartValue();
+      const operationId = commitMeOwnerIntent({
         kind: "ME_PRESENT",
         seq: seqMe,
-        pinned: coopMeInteractionStartValue(),
-        step: nextCoopMePresentationStep(),
+        pinned,
+        step: nextCoopMePresentationStep(pinned),
         payload: { present: true, presentation: present },
         localRole: getCoopController()?.role ?? "host",
         wave: globalScene.currentBattle?.waveIndex ?? -1,
         turn: 0,
       });
+      if (operationId == null && isCoopMeOperationEnabled()) {
+        failCoopSharedSession(`Mystery presentation ${seqMe} could not enter authoritative control`);
+        return false;
+      }
+      enc.dialogueTokens = { ...present.tokens };
+      if (isCoopMeOperationJournalActive()) {
+        setCoopMeActivePresentation(present);
+      } else {
+        getCoopInteractionRelay()?.sendInteractionOutcome(seqMe, "mePresent", present);
+      }
+      return true;
     } catch {
-      coopWarn("me", "host presentation send threw; guest degrades to local re-derivation", {
+      coopWarn("me", "host presentation commit/send failed; retaining shared boundary", {
         counter: coopMeInteractionStartValue(),
       });
+      failCoopSharedSession("Mystery presentation could not be captured or committed");
+      return false;
     }
   }
 
@@ -427,8 +568,8 @@ export class MysteryEncounterPhase extends Phase {
    * Co-op AUTHORITATIVE host on a GUEST-OWNED ME (#633, ADD-2 / D1): the host runs the sole ME
    * engine but the GUEST makes the top-level pick, so the host awaits the guest's relayed option
    * INDEX and applies it programmatically via {@linkcode handleOptionSelect} (input-free). A null
-   * resolution (a genuinely disconnected guest) safe-leaves the encounter + closes the pump so the
-   * host never hangs; steady state resolves on the human pick. Hard-gated: no-op when the host owns
+   * resolution retains the selector, requests durable replay, and after bounded failure stops the shared
+   * session; it never invents a gameplay choice. Hard-gated: no-op when the host owns
    * this ME, off authoritative, or in solo / lockstep.
    */
   private coopHostAwaitGuestIndex(): void {
@@ -449,29 +590,55 @@ export class MysteryEncounterPhase extends Phase {
     // #817 visibility: the shop's controller tag (top of screen, named, amber) while the
     // PARTNER decides - never drawn into the message box, so nothing layers over the options.
     showCoopControllerTagFor(false);
-    void relay.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(choice => {
+    const pinned = coopMeInteractionStartValue();
+    const scene = globalScene;
+    const runtime = getCoopRuntime();
+    const controller = getCoopController();
+    const generation = coopSessionGeneration();
+    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const live = (): boolean =>
+      globalScene === scene
+      && getCoopRuntime() === runtime
+      && getCoopController() === controller
+      && coopSessionGeneration() === generation
+      && coopMeInteractionStartValue() === pinned
+      && (globalScene.currentBattle?.waveIndex ?? -1) === wave
+      && globalScene.phaseManager.getCurrentPhase() === this;
+    void relay.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_PICK_CHOICE_KINDS).then(choice => {
+      if (!live() || getCoopController()?.role !== "host") {
+        return; // a replaced scene/runtime can never consume this old callback
+      }
       if (choice == null || choice.choice < 0) {
-        // D1 null-end: a disconnected guest must never hang the host's engine - safe-leave + close.
-        coopWarn("me", "host await guest index null/negative (disconnected guest); safe-leave", {
+        this.coopGuestPickRecoveryAttempts++;
+        coopWarn("me", "host await guest index missing; retaining selector and requesting durable replay", {
           seq: seqMe,
           choice: choice == null ? "null" : choice.choice,
+          attempt: this.coopGuestPickRecoveryAttempts,
         });
-        leaveEncounterWithoutBattle();
-        coopEndMePump();
+        getCoopRuntime()?.durability?.reconnect();
+        if (this.coopGuestPickRecoveryAttempts >= 3) {
+          failCoopSharedSession(`Mystery pick ${seqMe} unavailable after bounded recovery`);
+          return;
+        }
+        setTimeout(() => {
+          if (live()) {
+            this.coopHostAwaitGuestIndex();
+          }
+        }, 250);
         return;
       }
+      this.coopGuestPickRecoveryAttempts = 0;
       coopLog("me", "host received guest ME option index", { seq: seqMe, index: choice.choice });
       const encounter = globalScene.currentBattle.mysteryEncounter!;
       const options = this.optionSelectSettings?.overrideOptions ?? encounter.options;
       const opt = options[choice.choice];
       if (opt == null) {
-        coopWarn("me", "host: relayed index out of range; safe-leave", {
+        coopWarn("me", "host: relayed Mystery index out of range; terminating shared session", {
           seq: seqMe,
           index: choice.choice,
           optionCount: options.length,
         });
-        leaveEncounterWithoutBattle();
-        coopEndMePump();
+        failCoopSharedSession(`Malformed Mystery pick ${choice.choice}/${options.length}`);
         return;
       }
       // ADD-2c (BLOCK-3 residual): an ME whose option chain pushes a BESPOKE interactive sub-PHASE
@@ -500,15 +667,31 @@ export class MysteryEncounterPhase extends Phase {
       });
       // Wave-2c: DUAL-RUN - the AUTHORITY (host) COMMITS the guest-owned ME_PICK it just received
       // (invariant 3, the guest minted the intent at handleGuestOptionSelect). No-op when the flag is OFF.
-      commitMeOwnerIntent({
-        kind: "ME_PICK",
-        seq: seqMe,
-        pinned: coopMeInteractionStartValue(),
-        payload: { optionIndex: choice.choice },
-        localRole: "host",
-        wave: globalScene.currentBattle?.waveIndex ?? -1,
-        turn: 0,
-      });
+      if (isCoopMeOperationEnabled()) {
+        const step = choice.data?.[0];
+        if (!Number.isSafeInteger(step) || (step as number) < 0) {
+          failCoopSharedSession(`Mystery pick ${seqMe} arrived without an exact operation step`);
+          return;
+        }
+        const committed = commitMeAuthorityGuestIntent({
+          kind: "ME_PICK",
+          seq: seqMe,
+          pinned,
+          step: step as number,
+          value: choice.choice,
+          wave,
+          turn: 0,
+        });
+        if (committed.kind === "duplicate") {
+          // A delayed resend from the previous round is confirmation noise, never the next round's pick.
+          this.coopHostAwaitGuestIndex();
+          return;
+        }
+        if (committed.kind !== "committed") {
+          failCoopSharedSession(`Mystery pick ${seqMe}/${String(step)} could not commit (${committed.kind})`);
+          return;
+        }
+      }
       hideCoopControllerTag(); // #817: the pick landed - the tag comes down before the engine runs it
       // Input-free option apply (the same path the local handler uses): drives onPre / onOption /
       // onPost; the engine sub-prompts (party target / secondary menu) await the guest's relayed
@@ -523,32 +706,42 @@ export class MysteryEncounterPhase extends Phase {
    * @param index
    */
   handleOptionSelect(option: MysteryEncounterOption, index: number): boolean {
-    // Set option selected flag
-    globalScene.currentBattle.mysteryEncounter!.selectedOption = option;
-
+    if (this.selectionResolving) {
+      return false;
+    }
+    if (this.coopSelectionBoundaryLive != null && !this.coopSelectionBoundaryLive()) {
+      // A fade/input callback from an abandoned selector is not evidence about the replacement session.
+      return false;
+    }
+    this.selectionResolving = true;
     // Wave-2c: DUAL-RUN - commit the HOST-OWNED top-level ME_PICK op (the host drives its own selector off
     // local input, so there is no relayed `me` to commit at coopHostAwaitGuestIndex; this is its owner
     // seam). Gated to a co-op authoritative host that OWNS this ME and to the TOP-LEVEL pick (a repeated
     // round is carried by the round mechanism). Disjoint from the guest-owned commit (which only fires when
     // the guest owns the ME). No-op when the flag is OFF / solo / guest-owned / a sub-round. Never throws.
     if (
-      !this.optionSelectSettings
-      && globalScene.gameMode.isCoop
+      globalScene.gameMode.isCoop
       && getCoopNetcodeMode() === "authoritative"
       && getCoopController()?.role === "host"
       && (getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? false)
       && coopMeInProgress()
     ) {
-      commitMeOwnerIntent({
-        kind: "ME_PICK",
+      const pinned = coopMeInteractionStartValue();
+      const operationId = commitMeAuthorityLocalPick({
         seq: COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue(),
-        pinned: coopMeInteractionStartValue(),
-        payload: { optionIndex: index },
-        localRole: "host",
+        pinned,
+        optionIndex: index,
         wave: globalScene.currentBattle?.waveIndex ?? -1,
         turn: 0,
       });
+      if (operationId == null && isCoopMeOperationEnabled()) {
+        failCoopSharedSession(`Host Mystery pick ${pinned} could not enter authoritative control`);
+        return false;
+      }
     }
+
+    // Set option selected only after the exact operation is committed (or on the negotiated legacy path).
+    globalScene.currentBattle.mysteryEncounter!.selectedOption = option;
 
     // #record-replay (single-player): capture the ME option pick (top-level "me" vs a followup "meSub").
     // No-op unless recording / in co-op (co-op drives the ME via its pump, which owns that path).
@@ -1058,10 +1251,19 @@ export class MysteryEncounterBattlePhase extends Phase {
 export class MysteryEncounterRewardsPhase extends Phase {
   public readonly phaseName = "MysteryEncounterRewardsPhase";
   addHealPhase: boolean;
+  private readonly authoritativeRewardSurfaces: readonly CoopMeRewardSurfaceProjection[] | null;
+  /** Settlement retained after automatic reward preparation on the authoritative host. */
+  private readonly meSettlementPlan: CoopMeBattleSettlementPlan | null;
 
-  constructor(addHealPhase = false) {
+  constructor(
+    addHealPhase = false,
+    authoritativeRewardSurfaces: readonly CoopMeRewardSurfaceProjection[] | null = null,
+    meSettlementPlan: CoopMeBattleSettlementPlan | null = null,
+  ) {
     super();
     this.addHealPhase = addHealPhase;
+    this.authoritativeRewardSurfaces = authoritativeRewardSurfaces;
+    this.meSettlementPlan = meSettlementPlan;
   }
 
   /**
@@ -1078,23 +1280,70 @@ export class MysteryEncounterRewardsPhase extends Phase {
     // (startCoopWatch fills typeOptions from the host's list), so running doEncounterRewards WITHOUT
     // onRewards is safe. The genuinely-interactive engine phases (OptionSelected, Post) stay diverted.
     if (isCoopAuthoritativeGuest()) {
+      if (isCoopMeOperationJournalActive()) {
+        if (this.authoritativeRewardSurfaces == null) {
+          failCoopSharedSession("A retained Mystery reward continuation omitted its ordered surface plan.");
+          return;
+        }
+        coopLog("me", "retained reward continuation: guest opens only the host-stated surfaces", {
+          counter: coopMeInteractionStartValue(),
+          rewardSurfaces: this.authoritativeRewardSurfaces.map(surface => surface.surfaceId),
+        });
+        globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
+        // PhaseTree.addPhase appends and getNextPhase shifts, so unshiftNew is FIFO within this phase's
+        // child level. Forward iteration therefore preserves the host-declared surface order.
+        for (const [ordinal, surface] of this.authoritativeRewardSurfaces.entries()) {
+          if (surface.kind === "modifier") {
+            globalScene.phaseManager.unshiftNew(
+              "SelectModifierPhase",
+              0,
+              undefined,
+              { rerollMultiplier: surface.rerollMultiplier },
+              false,
+              { kind: "ambient" },
+              { surfaceId: surface.surfaceId, ordinal },
+            );
+          } else {
+            const eggOptions = {
+              id: surface.id,
+              timestamp: surface.timestamp,
+              pulled: false,
+              sourceType: surface.sourceType ?? undefined,
+              tier: surface.tier,
+              hatchWaves: surface.hatchWaves,
+              species: surface.species,
+              isShiny: surface.isShiny,
+              variantTier: surface.variantTier,
+              eggMoveIndex: surface.eggMoveIndex,
+              overrideHiddenAbility: surface.overrideHiddenAbility,
+              eggDescriptor: surface.eggDescriptor ?? undefined,
+            } as IEggOptions;
+            coopAllowAccountWrite("me-egg-reward", () => new Egg(eggOptions).addEggToGameDataOnce());
+          }
+        }
+        globalScene.phaseManager.pushNew("PostMysteryEncounterPhase");
+        this.end();
+        return;
+      }
       const guestEncounter = globalScene.currentBattle.mysteryEncounter!;
       coopLog("me", "reward-owner override: guest runs reward shop as WATCHER (host=owner)", {
         counter: coopMeInteractionStartValue(),
         hasDoEncounterRewards: !!guestEncounter.doEncounterRewards,
         addHealPhase: this.addHealPhase,
       });
-      if (guestEncounter.doEncounterRewards) {
-        guestEncounter.doEncounterRewards(); // unshifts the SelectModifierPhase the watcher runs
-      } else if (this.addHealPhase) {
-        globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
-        globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
-          fillRemaining: false,
-          rerollMultiplier: -1,
-        });
+      const guestRewardPlan =
+        guestEncounter.rewardPlan?.openRewardSurfaces === guestEncounter.doEncounterRewards
+          ? guestEncounter.rewardPlan
+          : null;
+      const preparation = guestRewardPlan?.prepareAutomaticEffects();
+      if (preparation != null) {
+        preparation.then(
+          () => this.openLegacyGuestRewardSurface(),
+          error => this.handleRewardPreparationFailure(error),
+        );
+        return;
       }
-      globalScene.phaseManager.pushNew("PostMysteryEncounterPhase"); // ends via its guest guard (:765)
-      this.end();
+      this.openLegacyGuestRewardSurface();
       return;
     }
     const encounter = globalScene.currentBattle.mysteryEncounter!;
@@ -1117,14 +1366,61 @@ export class MysteryEncounterRewardsPhase extends Phase {
     }
   }
 
+  /** Preserve the pre-plan legacy guest watcher path after any automatic helper preparation. */
+  private openLegacyGuestRewardSurface(): void {
+    if (globalScene.phaseManager.getCurrentPhase() !== this) {
+      return;
+    }
+    const guestEncounter = globalScene.currentBattle.mysteryEncounter!;
+    if (guestEncounter.doEncounterRewards) {
+      guestEncounter.doEncounterRewards(); // unshifts the SelectModifierPhase the watcher runs
+    } else if (this.addHealPhase) {
+      globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
+      globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
+        fillRemaining: false,
+        rerollMultiplier: -1,
+      });
+    }
+    globalScene.phaseManager.pushNew("PostMysteryEncounterPhase"); // ends via its guest guard (:765)
+    this.end();
+  }
+
   /**
    * Queues encounter EXP and rewards phases, {@linkcode PostMysteryEncounterPhase}, and ends phase
    */
-  doEncounterRewardsAndContinue() {
+  async doEncounterRewardsAndContinue(): Promise<void> {
     const encounter = globalScene.currentBattle.mysteryEncounter!;
 
     if (encounter.doEncounterExp) {
       encounter.doEncounterExp();
+    }
+
+    // Only a plan still paired with its compatibility callback is current. Direct special-surface callbacks
+    // and encounters that clear/replace doEncounterRewards cannot accidentally reuse a stale helper plan.
+    const rewardPlan =
+      encounter.rewardPlan?.openRewardSurfaces === encounter.doEncounterRewards ? encounter.rewardPlan : null;
+    if (rewardPlan != null) {
+      try {
+        const preparation = rewardPlan.prepareAutomaticEffects();
+        if (preparation != null) {
+          await preparation;
+        }
+      } catch (error) {
+        this.handleRewardPreparationFailure(error);
+        return;
+      }
+    }
+    if (
+      globalScene.currentBattle?.mysteryEncounter !== encounter
+      || globalScene.phaseManager.getCurrentPhase() !== this
+    ) {
+      return;
+    }
+
+    // Capture the complete P36 ordered plan after automatic preparation and before any standard modifier
+    // picker becomes interactive.
+    if (this.meSettlementPlan != null) {
+      commitCoopMeBattleSettlementAfterRewardPreparation(this.meSettlementPlan);
     }
 
     if (encounter.doEncounterRewards) {
@@ -1140,6 +1436,16 @@ export class MysteryEncounterRewardsPhase extends Phase {
     globalScene.phaseManager.pushNew("PostMysteryEncounterPhase");
     this.end();
   }
+
+  /** A malformed typed plan is a shared terminal, never an indefinitely parked reward phase. */
+  private handleRewardPreparationFailure(error: unknown): void {
+    coopWarn("me", "Mystery reward preparation rejected its typed surface plan", error);
+    if (globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
+      failCoopSharedSession("Mystery reward preparation produced an invalid shared surface plan.");
+      return;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -1153,6 +1459,9 @@ export class PostMysteryEncounterPhase extends Phase {
   public readonly phaseName = "PostMysteryEncounterPhase";
   private readonly FIRST_DIALOGUE_PROMPT_DELAY = 750;
   onPostOptionSelect?: OptionPhaseCallback | undefined;
+  private terminalCommitAttempts = 0;
+  private terminalCommitRetry: ReturnType<typeof setTimeout> | null = null;
+  private readonly terminalOutcomeLatch = new CoopMeTerminalOutcomeLatch();
 
   constructor() {
     super();
@@ -1170,6 +1479,14 @@ export class PostMysteryEncounterPhase extends Phase {
     // drained - so coopMeInProgress() stays TRUE across leaveDefensive -> the shop -> here, closing
     // the double-advance window. Solo / lockstep / host unaffected.
     if (isCoopAuthoritativeGuest()) {
+      if (isCoopMeOperationJournalActive()) {
+        // P33/v34: the post-reward state and next-wave route belong to the final retained ME_TERMINAL
+        // leave step. Keep the pin and this exact phase live until that DATA+destination transaction
+        // applies; clearing locally would race the final host image and authorize NewBattle from inference.
+        coopLog("me", "authoritative guest: PostMysteryEncounterPhase holds for retained final leave");
+        getCoopRuntime()?.durability?.reconnect();
+        return;
+      }
       coopLog("me", "authoritative guest: PostMysteryEncounterPhase terminal (clearing pin)", {
         counter: coopMeInteractionStartValue(),
       });
@@ -1225,6 +1542,7 @@ export class PostMysteryEncounterPhase extends Phase {
       // effects, BEFORE coopEndMePump. The host is the sole engine for every authoritative ME
       // (host- and guest-owned alike), so the guest's run only converges via this blob; it adopts it
       // before its leave terminal. No-op off the live authoritative host (solo / lockstep / guest).
+      let terminalOutcome: Extract<CoopInteractionOutcome, { k: "meResync" }> | undefined;
       if (
         globalScene.gameMode.isCoop
         && getCoopNetcodeMode() === "authoritative"
@@ -1232,16 +1550,59 @@ export class PostMysteryEncounterPhase extends Phase {
         && coopMeInProgress()
       ) {
         const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
-        coopLog("me", "host streams comprehensive ME-terminal resync (meResync)", {
+        coopLog("me", "host captures comprehensive ME-terminal transaction (meResync)", {
           seq: seqMe,
           counter: coopMeInteractionStartValue(),
         });
-        getCoopInteractionRelay()?.sendInteractionOutcome(seqMe, "meResync", captureCoopMeOutcome());
+        try {
+          terminalOutcome = this.terminalOutcomeLatch.getOrCapture(captureCoopMeOutcome);
+        } catch (error) {
+          coopWarn("me", "host terminal outcome capture failed; retaining Mystery boundary", error);
+          failCoopSharedSession("Mystery terminal outcome could not be captured");
+          return;
+        }
       }
       // Co-op (#633): the encounter is over - close the input pump (owner sends the leave
       // sentinel; host advances the alternation turn once for the whole encounter). Done before
       // queuing the next wave so the watcher's loop ends cleanly. No-op in solo.
-      coopEndMePump();
+      if (!coopEndMePump(terminalOutcome)) {
+        // A terminal commit is the causal authorization for BOTH peers to leave this encounter. Never
+        // queue the host's biome/new-wave tail while the guest is correctly holding the old boundary.
+        // Retry the same deterministic ME_TERMINAL id once after reconnect; if it still cannot commit,
+        // stop the binary session rather than manufacture an asymmetric local continuation.
+        this.terminalCommitAttempts++;
+        if (this.terminalCommitAttempts <= 1) {
+          const runtime = getCoopRuntime();
+          const controller = getCoopController();
+          const generation = coopSessionGeneration();
+          const scene = globalScene;
+          const pinned = coopMeInteractionStartValue();
+          const wave = globalScene.currentBattle?.waveIndex ?? -1;
+          this.terminalCommitRetry = setTimeout(() => {
+            this.terminalCommitRetry = null;
+            if (
+              globalScene !== scene
+              || getCoopRuntime() !== runtime
+              || getCoopController() !== controller
+              || coopSessionGeneration() !== generation
+              || coopMeInteractionStartValue() !== pinned
+              || (globalScene.currentBattle?.waveIndex ?? -1) !== wave
+              || globalScene.phaseManager.getCurrentPhase() !== this
+            ) {
+              return;
+            }
+            endPhase();
+          }, 250);
+          return;
+        }
+        failCoopSharedSession("Mystery terminal could not commit after exact retry");
+        return;
+      }
+      this.terminalCommitAttempts = 0;
+      if (this.terminalCommitRetry != null) {
+        clearTimeout(this.terminalCommitRetry);
+        this.terminalCommitRetry = null;
+      }
 
       if (globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome()) {
         globalScene.phaseManager.pushNew("SelectBiomePhase");

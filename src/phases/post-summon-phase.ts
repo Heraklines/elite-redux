@@ -6,6 +6,7 @@ import { erBadSpliceOnOpponentSummon } from "#data/elite-redux/abilities/bad-spl
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyCursedIdol } from "#data/elite-redux/er-relics";
+import { erTacticalOnSummon } from "#data/elite-redux/er-tactical-items";
 import { erApplyTerrainSeeds } from "#data/elite-redux/er-terrain-seeds";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -58,6 +59,9 @@ export class PostSummonPhase extends PokemonPhase {
 
     this.applyErBiomeSwitchIn(pokemon);
     erApplyTerrainSeeds(pokemon);
+    // ER tactical on-entry items (Air Balloon float message, Covert Cloak/Cacjack
+    // Eerie Fog, Booster Energy Proto/Quark charge).
+    erTacticalOnSummon(pokemon);
     erApplyCursedIdol(pokemon);
     // ER Bad Splice (5932): if an opposing active holder carries Bad Splice,
     // splice this just-summoned foe from its own party.

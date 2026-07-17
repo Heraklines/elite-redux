@@ -31,7 +31,6 @@ import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, maybeBeginReplayRecording, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { clearReplayRecording, getReplayTrace, isReplayRecording } from "#data/elite-redux/replay-recorder";
 import {
   isReplayCommandEvent,
@@ -48,7 +47,6 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { PokemonData } from "#system/pokemon-data";
 import { GameManager } from "#test/framework/game-manager";
 import {
@@ -58,13 +56,15 @@ import {
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
+  pumpDuoDestinations,
   type ReplayGameManager,
+  reachQueuedRewardShop,
   remirrorWave,
   replayCoopTrace,
   type ShopPhaseSeam,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -101,6 +101,20 @@ function rosterMon(species: SpeciesId, level: number, coopOwner: "host" | "guest
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+/** A fully scheduled replay transport that is automatic only outside retained reward boundaries. */
+function scheduledReplayTransport(): {
+  pairFactory: () => ReturnType<typeof createScheduledCoopPair>;
+  beforeRewardBoundary: () => void;
+  afterRewardBoundary: () => void;
+} {
+  const pair = createScheduledCoopPair({ automatic: true });
+  return {
+    pairFactory: () => pair,
+    beforeRewardBoundary: () => pair.setAutomaticDelivery(false),
+    afterRewardBoundary: () => pair.setAutomaticDelivery(true),
+  };
 }
 
 describe.skipIf(!RUN)(
@@ -210,6 +224,7 @@ describe.skipIf(!RUN)(
       const resyncSpy = vi.spyOn(CoopBattleStreamer.prototype, "requestStateSync");
 
       const result = await replayCoopTrace(game as unknown as ReplayGameManager, trace, {
+        ...scheduledReplayTransport(),
         resyncCount: () => resyncSpy.mock.calls.length,
       });
 
@@ -299,7 +314,7 @@ describe.skipIf(!RUN)(
       game.override.itemRewards([{ name: "LURE" }]);
 
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-      const pair = createLoopbackPair();
+      const pair = createScheduledCoopPair({ automatic: true });
       const rig: DuoRig = await buildDuo(game, pair, setCoopRuntime, toCoop);
       // The guest answers its own slot's command over the real CoopBattleSync relay (TACKLE enemy_2).
       rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
@@ -343,11 +358,14 @@ describe.skipIf(!RUN)(
         await withClient(rig.hostCtx, async () => {
           game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
           game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-          await game.phaseInterceptor.to("TurnEndPhase");
+          await game.phaseInterceptor.to("CoopTurnCommitPhase");
         });
         await withClient(rig.guestCtx, async () => {
           await driveGuestReplayTurn(rig.guestScene, turn);
         });
+        // Battle/boot traffic stays automatic. From this exact retained boundary onward, every envelope
+        // is delivered only while its destination ClientCtx is installed.
+        pair.setAutomaticDelivery(false);
         // The reward shop: at counter 0 the host owns (take the LURE); the production interaction taps
         // (sendInteractionChoice / inbound handle) fire here, recording the reward + leave picks.
         const counterBefore = rig.hostRuntime.controller.interactionCounter();
@@ -356,7 +374,7 @@ describe.skipIf(!RUN)(
           await game.phaseInterceptor.to("SelectModifierPhase", false);
         });
         const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-        const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+        const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
         const takeReward = w === 1 && hostOwns;
         if (hostOwns) {
           await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward }));
@@ -365,7 +383,9 @@ describe.skipIf(!RUN)(
           await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: false }));
           await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
         }
+        await pumpDuoDestinations(rig);
         if (w < RECORD_WAVES) {
+          pair.setAutomaticDelivery(true);
           await arriveGuestCommandBoundary(rig, w + 1);
           await withClient(rig.hostCtx, async () => {
             await game.phaseInterceptor.to("CommandPhase");
@@ -407,7 +427,7 @@ describe.skipIf(!RUN)(
       // FORCE the same deterministic LURE reward so the recorded reward pick reproduces.
       game.override.itemRewards([{ name: "LURE" }]);
 
-      const result = await replayCoopTrace(game as unknown as ReplayGameManager, trace);
+      const result = await replayCoopTrace(game as unknown as ReplayGameManager, trace, scheduledReplayTransport());
       // The CAPTURED run reproduced: both waves replayed, both slots' commands fed, lockstep counters.
       expect(result.wavesReplayed, "the captured run's waves replayed").toBe(RECORD_WAVES);
       expect(result.commandsFed, "the captured commands were fed").toBe(RECORD_WAVES * 2);

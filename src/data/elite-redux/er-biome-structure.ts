@@ -113,18 +113,21 @@ export function erInLateGameZone(waveIndex: number): boolean {
  * though #504 dropped the per-biome bands - lengths are now uniform-ish per entry.
  */
 export function erRollBiomeLength(_biome: BiomeId, startWave: number, runSeed?: string): void {
-  leaveBiomeNow = false;
-  currentStartWave = startWave;
-  // A fresh biome starts with a clean slate: no deliberate overstay yet, so the
-  // global curve runs untouched until the player CHOOSES to linger past the free
-  // window at a Crossroads.
-  overstayAnchorWave = null;
+  const plan = planErBiomeStructure(startWave, runSeed);
+  restoreErBiomeStructure(plan.length, plan.startWave, null);
+}
 
+export interface ErBiomeStructurePlan {
+  readonly length: number | null;
+  readonly startWave: number;
+}
+
+/** Pure, addressable structure plan used by retryable authoritative biome preparation. */
+export function planErBiomeStructure(startWave: number, runSeed?: string): ErBiomeStructurePlan {
   // Finale safety: never roll a variable length once we're at/inside the late
   // zone, or if the biome's worst case could spill into it.
   if (startWave >= lateGameThreshold() || startWave + MAX_BAND_LENGTH - 1 >= lateGameThreshold()) {
-    currentLength = null;
-    return;
+    return { length: null, startWave };
   }
 
   // Mild bias toward the longer end: take the higher of two rolls so the median
@@ -141,7 +144,7 @@ export function erRollBiomeLength(_biome: BiomeId, startWave: number, runSeed?: 
     ?? randSeedIntRange(BIOME_LENGTH_MIN, BIOME_LENGTH_MAX);
   const a = roll();
   const b = roll();
-  currentLength = Math.max(a, b);
+  return { length: Math.max(a, b), startWave };
 }
 
 /** Restore a biome's rolled length + start wave + overstay anchor from a save. */

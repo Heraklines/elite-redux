@@ -148,7 +148,7 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
     await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, turn);
     await withClient(rig.hostCtx, async () => {
       game.move.select(hostMove, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
   }
@@ -202,7 +202,9 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
     // KO turn: host FLAMETHROWERs the ENEMY-slot lead; guest GROWLs ENEMY_2 (no damage, ENEMY_2 survives).
     // Only the ENEMY slot faints -> a clean SINGLE trainer send-out. Cross so the trainer summons its next.
     await playTurn(rig, KO_MOVE, HOLD_MOVE);
-    await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, rig.hostScene.currentBattle.turn + 1);
+    // The completed TurnEndPhase has already advanced the battle's turn. Use the materialized current
+    // boundary instead of manufacturing a second increment that can only describe a phantom turn.
+    await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, rig.hostScene.currentBattle.turn);
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CommandPhase");
     });

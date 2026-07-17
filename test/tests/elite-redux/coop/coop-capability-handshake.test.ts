@@ -146,7 +146,7 @@ describe("co-op capability handshake wiring (#896 W2e-R2)", () => {
     g.connect();
     await flush();
 
-    // Intersection is symmetric, so both controllers converge the shared module set to {opSurface.me}.
+    // Intersection is symmetric, so both controllers converge the shared module set to {opSurface.me.v2}.
     expect(isCoopCapabilityNegotiated(COOP_CAP_OP_ME)).toBe(true);
     expect(isCoopCapabilityNegotiated(COOP_CAP_OP_BIOME)).toBe(false);
     expect(isCoopCapabilityNegotiated(COOP_CAP_OP_REWARD)).toBe(false);

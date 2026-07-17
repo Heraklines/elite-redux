@@ -4,6 +4,7 @@
  */
 
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import { describe, expect, it, vi } from "vitest";
 
@@ -66,6 +67,30 @@ describe("co-op production-transition scheduled transport", () => {
     expect(guestRx.mock.calls.map(([message]) => message.ts)).toEqual([2, 2, 3, 5]);
   });
 
+  it("reorders one valid pair without letting a stale reconnect frame block the queue", () => {
+    const pair = createScheduledCoopPair();
+    const guestRx = vi.fn();
+    pair.guest.onMessage(guestRx);
+
+    pair.reorderNext("guest", message => message.t === "ping" && message.ts === 1);
+    pair.host.send(ping(1));
+    expect(pair.flush("guest"), "reorder waits until the selected frame has a follower").toBe(0);
+    pair.host.send(ping(2));
+    expect(pair.flush("guest")).toBe(2);
+    expect(guestRx.mock.calls.map(([message]) => message.ts)).toEqual([2, 1]);
+
+    pair.reorderNext("guest", message => message.t === "ping" && message.ts === 3);
+    pair.host.send(ping(3));
+    pair.disconnect();
+    pair.reconnect();
+    expect(pair.flush("guest"), "old-generation reorder target is discarded without waiting for a follower").toBe(0);
+    expect(pair.pending("guest")).toBe(0);
+
+    pair.host.send(ping(4));
+    expect(pair.flush("guest")).toBe(1);
+    expect(guestRx.mock.calls.map(([message]) => message.ts)).toEqual([2, 1, 4]);
+  });
+
   it("can boot with ordinary microtask delivery, then switch to explicit per-client scheduling", async () => {
     const pair = createScheduledCoopPair({ automatic: true });
     const guestRx = vi.fn();
@@ -83,5 +108,58 @@ describe("co-op production-transition scheduled transport", () => {
     ).toEqual([1]);
     pair.flush("guest");
     expect(guestRx.mock.calls.map(([message]) => message.ts)).toEqual([1, 2]);
+  });
+
+  it("snapshots queued and duplicated frames like serialized network deliveries", () => {
+    const pair = createScheduledCoopPair();
+    const received: number[] = [];
+    pair.guest.onMessage(message => {
+      if (message.t !== "rewardOptions") {
+        return;
+      }
+      received.push(message.options[0].pregenArgs?.[0] ?? -1);
+      message.options[0].pregenArgs![0] = 77;
+    });
+    pair.duplicateNext("guest", message => message.t === "rewardOptions");
+    const sent: Extract<CoopMessage, { t: "rewardOptions" }> = {
+      t: "rewardOptions",
+      seq: 1,
+      reroll: 0,
+      options: [{ id: "RARE_CANDY", tier: 0, upgradeCount: 0, cost: 0, pregenArgs: [11] }],
+    };
+
+    pair.host.send(sent);
+    sent.options[0].pregenArgs![0] = 99;
+    pair.flush("guest");
+
+    expect(received, "post-send and first-receiver mutation cannot alias into either delivery").toEqual([11, 11]);
+  });
+
+  it("snapshots fault-held frames when the hold begins", () => {
+    const scheduled = createScheduledCoopPair();
+    const pair = wrapCoopFaultPair(
+      scheduled,
+      { drop: 0, reorder: 1, delay: 0, faultable: message => message.t === "rewardOptions" },
+      { seed: 33 },
+    );
+    const received: number[] = [];
+    pair.guest.onMessage(message => {
+      if (message.t === "rewardOptions") {
+        received.push(message.options[0].pregenArgs?.[0] ?? -1);
+      }
+    });
+    const sent: Extract<CoopMessage, { t: "rewardOptions" }> = {
+      t: "rewardOptions",
+      seq: 2,
+      reroll: 0,
+      options: [{ id: "RARE_CANDY", tier: 0, upgradeCount: 0, cost: 0, pregenArgs: [12] }],
+    };
+
+    pair.host.send(sent);
+    sent.options[0].pregenArgs![0] = 98;
+    pair.host.send(ping(3));
+    scheduled.flush("guest");
+
+    expect(received, "reorder/delay storage owns an immutable send-time snapshot").toEqual([12]);
   });
 });

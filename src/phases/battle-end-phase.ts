@@ -1,33 +1,172 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
-import { applyCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  applyCoopAuthoritativeBattleState,
+  coopAppliedStateTick,
+  reapplyAcceptedCoopAuthoritativeBattleState,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
+  awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
+  type CoopAutomaticVictorySealIdentity,
+  type CoopMeBattleSettlementPlan,
+  commitCoopMeBattleSettlementAtBattleEnd,
   consumeCoopPendingWaveEndState,
+  deferCoopAutomaticVictorySealAtBattleEnd,
+  failCoopSharedSession,
+  getCoopWaveAdvanceRuntimeBinding,
+  holdForCoopMeBattleSettlementAtBattleEnd,
   isCoopAuthoritativeGuest,
+  isCoopSettledWaveBoundaryPending,
+  shouldDeferCoopMeBattleSettlementUntilRewardPreparation,
 } from "#data/elite-redux/coop/coop-runtime";
+import { coopAuthorityContinuationSurface } from "#data/elite-redux/coop/coop-ui-registry";
+import {
+  type CoopWaveAdvanceOperationBinding,
+  getCoopPendingWaveAdvanceBoundary,
+  isValidCoopWaveAdvancePayload,
+  registerCoopWaveAdvanceBoundaryDataApplier,
+} from "#data/elite-redux/coop/coop-wave-operation";
 import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
+import { erAdvanceTacticalRecharges } from "#data/elite-redux/er-tactical-items";
 import { advanceErWardStoneCharges } from "#data/elite-redux/er-ward-stones";
 import { LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
 import { BattlePhase } from "#phases/battle-phase";
+
+export type RetainedWaveStateAdmission = "applied" | "superseded" | "reapply" | "rejected";
+
+/**
+ * Classify a retained transition image against the guest's monotonic state high-water. A newer recovery
+ * image satisfies the older transaction's DATA obligation without authorizing a rollback.
+ */
+export function classifyRetainedWaveStateAdmission(
+  applySucceeded: boolean,
+  appliedTick: number,
+  retainedTick: number | undefined,
+): RetainedWaveStateAdmission {
+  if (applySucceeded) {
+    return "applied";
+  }
+  if (retainedTick !== undefined && appliedTick > retainedTick) {
+    return "superseded";
+  }
+  if (retainedTick !== undefined && appliedTick === retainedTick) {
+    return "reapply";
+  }
+  return "rejected";
+}
+
+/**
+ * The one engine-coupled DATA admission seam for retained WAVE_ADVANCE transactions. BattleEnd is the
+ * preferred boundary. A source-wave shared input / biome / terminal surface is also safe when a scheduled
+ * retry runs immediately after BattleEnd handed off: no later reward result can have applied because it is
+ * ordered behind this transaction. Once the next wave begins, applying the old image is forbidden.
+ */
+registerCoopWaveAdvanceBoundaryDataApplier(envelope => {
+  if (!isCoopAuthoritativeGuest()) {
+    return "deferred";
+  }
+  const payload = envelope.pendingOperation?.payload;
+  if (envelope.pendingOperation?.kind !== "WAVE_ADVANCE" || !isValidCoopWaveAdvancePayload(payload)) {
+    return "rejected";
+  }
+  const sourceWave = payload.wave;
+  const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+  const phaseName = globalScene.phaseManager?.getCurrentPhase()?.phaseName;
+  const exactQueuedBattleEnd =
+    phaseName === "BattleEndPhase" && currentWave === sourceWave + 1 && isCoopSettledWaveBoundaryPending(sourceWave);
+  const exactGameOverFinalizer =
+    payload.outcome === "gameOver" && phaseName === "CoopFinalizeTurnPhase" && currentWave === sourceWave;
+  if (currentWave > sourceWave && !exactQueuedBattleEnd) {
+    return "rejected";
+  }
+  if (currentWave !== sourceWave && !exactQueuedBattleEnd) {
+    return "deferred";
+  }
+
+  let publicSourceBoundary = false;
+  try {
+    const handlerActive = globalScene.ui.getHandler()?.active === true;
+    const surface = handlerActive ? coopAuthorityContinuationSurface(globalScene.ui.getMode()) : null;
+    const phaseOwnsPostBattleSharedInput = phaseName === "SelectModifierPhase" || phaseName === "BiomeShopPhase";
+    publicSourceBoundary =
+      (surface === "sharedInput" && phaseOwnsPostBattleSharedInput)
+      || (payload.biomeChange === true && phaseName === "SelectBiomePhase" && handlerActive)
+      || (payload.nextWave === sourceWave && phaseName === "GameOverPhase");
+  } catch {
+    publicSourceBoundary = false;
+  }
+  if (phaseName !== "BattleEndPhase" && !publicSourceBoundary && !exactGameOverFinalizer) {
+    return "deferred";
+  }
+
+  const immutableState = structuredClone(envelope.authoritativeState);
+  let applied = applyCoopAuthoritativeBattleState(immutableState, true);
+  const appliedTick = coopAppliedStateTick();
+  const admission = classifyRetainedWaveStateAdmission(applied, appliedTick, immutableState.tick);
+  if (admission === "superseded") {
+    // A verified recovery image may overtake the older state image retained inside this operation while
+    // BattleEnd is still queued. The operation's DATA obligation is already satisfied in that case: never
+    // roll the engine back to the older image, but do release this operation's structural continuation.
+    // Treating the monotonic rejection as fatal tears the session down after a successful one-heal resync.
+    coopLog(
+      "progression",
+      `GUEST retained WAVE_ADVANCE DATA tick=${immutableState.tick} superseded by recovered tick=${appliedTick}`,
+    );
+    applied = true;
+  } else if (admission === "reapply") {
+    applied = reapplyAcceptedCoopAuthoritativeBattleState(immutableState, true);
+  }
+  return applied ? "applied" : "rejected";
+});
 
 export class BattleEndPhase extends BattlePhase {
   public readonly phaseName = "BattleEndPhase";
   /** If true, will increment battles won */
   isVictory: boolean;
+  private retainedBoundaryReleased = false;
+  private retainedLocalStatsRecorded = false;
+  /**
+   * A queued phase belongs to the runtime that created it. In production there is one runtime per process,
+   * while the two-engine fidelity harness swaps the ambient runtime between clients. Keep the operation
+   * ledger owner stable across that delay instead of looking it up again only when BattleEnd eventually starts.
+   */
+  private readonly retainedWaveBinding: CoopWaveAdvanceOperationBinding | null;
+  /** Whether this exact queued phase was born from a staged wave boundary. */
+  private readonly hasRetainedWaveBoundary: boolean;
+  /** The battle this queued phase closes, before a speculative tail can replace `currentBattle`. */
+  private readonly retainedSourceWave: number;
+  private readonly retainedSourceWasTrainer: boolean;
+  /** Normal retained wins settle only after every automatic post-victory child has drained. */
+  private readonly automaticVictorySeal: CoopAutomaticVictorySealIdentity | null;
+  /** Host-stated ME continuation captured when the battle terminal queues this phase. */
+  private readonly meSettlementPlan: CoopMeBattleSettlementPlan | null;
 
-  constructor(isVictory: boolean) {
+  constructor(
+    isVictory: boolean,
+    automaticVictorySeal: CoopAutomaticVictorySealIdentity | null = null,
+    meSettlementPlan: CoopMeBattleSettlementPlan | null = null,
+  ) {
     super();
 
     this.isVictory = isVictory;
+    this.automaticVictorySeal = automaticVictorySeal;
+    this.meSettlementPlan = meSettlementPlan;
+    this.retainedWaveBinding = getCoopWaveAdvanceRuntimeBinding();
+    const retainedBoundary =
+      this.retainedWaveBinding == null ? null : getCoopPendingWaveAdvanceBoundary(this.retainedWaveBinding);
+    this.hasRetainedWaveBoundary = retainedBoundary != null;
+    this.retainedSourceWave = retainedBoundary?.wave ?? globalScene.currentBattle?.waveIndex ?? -1;
+    this.retainedSourceWasTrainer =
+      retainedBoundary == null
+        ? globalScene.currentBattle?.trainer != null
+        : retainedBoundary.victoryKind === "trainer";
   }
 
   start() {
     super.start();
-
-    this.syncCoopWaveEndProgression();
 
     // cull any extra `BattleEnd` phases from the queue.
     this.isVictory ||= globalScene.phaseManager.hasPhaseOfType(
@@ -36,26 +175,50 @@ export class BattleEndPhase extends BattlePhase {
     );
     globalScene.phaseManager.removeAllPhasesOfType("BattleEndPhase");
 
-    globalScene.gameData.gameStats.battles++;
-    if (
-      globalScene.gameMode.isEndless
-      && globalScene.currentBattle.waveIndex + 1 > globalScene.gameData.gameStats.highestEndlessWave
-    ) {
-      globalScene.gameData.gameStats.highestEndlessWave = globalScene.currentBattle.waveIndex + 1;
+    const retainedBinding = this.retainedWaveBinding ?? getCoopWaveAdvanceRuntimeBinding();
+    // A runtime always owns a wave-ledger binding, including during an ME battle. Only an actual staged
+    // WAVE_ADVANCE boundary at construction makes this BattleEnd wave-owned. The retained DATA can consume
+    // that pending boundary before the queued phase starts, so re-reading ambient state here misclassifies
+    // an ordinary BattleEnd as an ME settlement after a speculative next battle replaces currentBattle.
+    if (!this.hasRetainedWaveBoundary && holdForCoopMeBattleSettlementAtBattleEnd()) {
+      return;
     }
+    if (isCoopAuthoritativeGuest() && retainedBinding == null) {
+      failCoopSharedSession(`The retained wave ${this.retainedSourceWave} BattleEnd had no owning runtime.`);
+      return;
+    }
+
+    // An ME battle owns an ordered retained terminal lifecycle, not a once-per-wave WAVE_ADVANCE. The
+    // guest executes none of the shared mutations below: it holds this exact phase until the host's
+    // post-BattleEnd ME_TERMINAL state image applies and releases the stated reward continuation.
+    // P33 guest: the host's post-BattleEnd image already contains every mutation below. Hold this phase
+    // until that exact retained DATA applies, then release the existing host-stated tail without dual-run.
+    if (
+      awaitCoopSettledWaveAdvanceAtBattleEnd(
+        () => this.releaseRetainedBoundary(),
+        retainedBinding,
+        this.retainedSourceWave,
+      )
+    ) {
+      return;
+    }
+
+    // Legacy/no-journal guest compatibility. Retained peers ignore raw waveEndState entirely.
+    this.applyLegacyCoopWaveEndProgression();
+
+    this.recordLocalBattleStats();
 
     if (this.isVictory) {
       globalScene.currentBattle.addBattleScore();
 
-      if (globalScene.currentBattle.trainer) {
-        globalScene.gameData.gameStats.trainersDefeated++;
-      }
       // ER money streak (#348): a won wave extends every non-fainted party
       // mon's faint-free streak (+1% money per 3 waves, capped +10%/mon).
       advanceErMoneyStreaks();
       // ER Ward Stones (#358): player-held stones charge up over won waves.
       advanceErWardStoneCharges();
       erAdvanceCommunityItemCharges();
+      // ER Booster Energy: a spent charge recharges after 10 won waves.
+      erAdvanceTacticalRecharges();
     }
 
     // Endless graceful end
@@ -73,13 +236,6 @@ export class BattleEndPhase extends BattlePhase {
     }
 
     globalScene.clearEnemyHeldItemModifiers();
-    for (const p of globalScene.getEnemyParty()) {
-      try {
-        p.destroy();
-      } catch {
-        console.warn("Unable to destroy stale pokemon object in BattleEndPhase:", p);
-      }
-    }
 
     const lapsingModifiers = globalScene.findModifiers(
       m => m instanceof LapsingPersistentModifier || m instanceof LapsingPokemonHeldItemModifier,
@@ -95,7 +251,63 @@ export class BattleEndPhase extends BattlePhase {
     }
 
     globalScene.updateModifiers();
+    let meSettlementRetained = false;
+    if (
+      this.meSettlementPlan?.continuation === "rewards"
+      && shouldDeferCoopMeBattleSettlementUntilRewardPreparation()
+    ) {
+      // A standard ME reward plan can still apply automatic party/item mutations before its picker opens.
+      // Keep the guest parked on this exact BattleEnd; MysteryEncounterRewardsPhase captures after that
+      // preparation rather than retaining a stale pre-reward image here.
+      meSettlementRetained = true;
+    } else if (this.meSettlementPlan != null) {
+      meSettlementRetained = commitCoopMeBattleSettlementAtBattleEnd(this.meSettlementPlan);
+    }
+    // Normal retained wins still have automatic TrainerVictory/Money/Modifier/Egg/buff/heal children ahead
+    // of their first interactive continuation. Stage that exact phase-owned boundary here and let the
+    // explicit CoopVictorySealPhase capture after those children drain. Capture/flee and legacy sessions
+    // retain the established BattleEnd settlement timing.
+    if (!meSettlementRetained && !deferCoopAutomaticVictorySealAtBattleEnd(this.automaticVictorySeal)) {
+      broadcastCoopWaveEndState(this.isVictory);
+    }
+    // Keep the enemy objects serializable through the settled capture, then tear down presentation exactly
+    // as before. The retained post-battle image explicitly marks enemy seats hidden on the guest.
+    for (const p of globalScene.getEnemyParty()) {
+      try {
+        p.destroy();
+      } catch {
+        console.warn("Unable to destroy stale pokemon object in BattleEndPhase:", p);
+      }
+    }
     this.end();
+  }
+
+  private releaseRetainedBoundary(): void {
+    if (this.retainedBoundaryReleased) {
+      return;
+    }
+    // Account progression belongs to each local player and is intentionally absent from shared-run DATA.
+    // Preserve it once on the guest while every shared mechanical mutation remains host-authoritative.
+    if (!this.retainedLocalStatsRecorded) {
+      this.recordLocalBattleStats();
+      this.retainedLocalStatsRecorded = true;
+    }
+    coopLog("progression", `GUEST retained WAVE_ADVANCE BattleEnd release wave=${this.retainedSourceWave}`);
+    this.end();
+    this.retainedBoundaryReleased = true;
+  }
+
+  private recordLocalBattleStats(): void {
+    globalScene.gameData.gameStats.battles++;
+    if (
+      globalScene.gameMode.isEndless
+      && this.retainedSourceWave + 1 > globalScene.gameData.gameStats.highestEndlessWave
+    ) {
+      globalScene.gameData.gameStats.highestEndlessWave = this.retainedSourceWave + 1;
+    }
+    if (this.isVictory && this.retainedSourceWasTrainer) {
+      globalScene.gameData.gameStats.trainersDefeated++;
+    }
   }
 
   /**
@@ -108,14 +320,7 @@ export class BattleEndPhase extends BattlePhase {
    * Both arms are hard no-ops off the authoritative path (host gates internal; guest gate explicit), so
    * solo / host-owner / lockstep are byte-for-byte unchanged.
    */
-  private syncCoopWaveEndProgression(): void {
-    if (globalScene.gameMode.isCoop) {
-      coopLog(
-        "progression",
-        `waveEndState BROADCAST wave=${globalScene.currentBattle.waveIndex} (host streams authoritative snapshot)`,
-      );
-    }
-    broadcastCoopWaveEndState();
+  private applyLegacyCoopWaveEndProgression(): void {
     if (!isCoopAuthoritativeGuest()) {
       return;
     }

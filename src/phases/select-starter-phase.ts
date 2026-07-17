@@ -1,11 +1,16 @@
 import { getSessionDataLocalStorageKey } from "#app/account";
-import { consumePendingDevStarters } from "#app/dev-tools/registry";
+import {
+  consumePendingDevCustomTrainerForce,
+  consumePendingDevPartySetup,
+  consumePendingDevStarterLevels,
+  consumePendingDevStarters,
+} from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
 import { allMoves, modifierTypes } from "#data/data-lists";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
-import { isErCustomTrainerDevForceArmed } from "#data/elite-redux/er-custom-trainers";
+import { isErCustomTrainerDevForceArmed, setErCustomTrainerDevForce } from "#data/elite-redux/er-custom-trainers";
 import { PokemonMove } from "#moves/pokemon-move";
 import { installErCustomTrainerForCurrentWave } from "#phases/er-custom-trainer-install";
 
@@ -23,6 +28,7 @@ import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import {
   clearCoopRuntime,
+  failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopController,
   getCoopNetcodeMode,
@@ -97,6 +103,7 @@ export class SelectStarterPhase extends Phase {
     // drop straight into the battle, skipping starter-select. consumePending…
     // returns null in production / on a clean checkout, so this is inert there.
     const devStarters = consumePendingDevStarters();
+    const devStarterLevels = consumePendingDevStarterLevels();
     if (devStarters && devStarters.length > 0) {
       globalScene.sessionSlotId = DEV_SCENARIO_SLOT;
       // The normal starter-select confirm path sets starting money; the dev
@@ -107,7 +114,7 @@ export class SelectStarterPhase extends Phase {
       // Dev scenarios hand-pick movesets for TESTING (e.g. Thunder Wave on a
       // Blastoise) — skip the starter-legality validation that silently
       // rejected them and left scenario mons with NO moves.
-      this.initBattle(devStarters, true);
+      this.initBattle(devStarters, true, undefined, undefined, devStarterLevels ?? undefined);
       return;
     }
 
@@ -317,13 +324,7 @@ export class SelectStarterPhase extends Phase {
         // here creates two valid-looking but different runs and guarantees a later desync.
         if (getCoopNetcodeMode() === "authoritative") {
           if (!(await this.tryCoopGuestSnapshotBoot())) {
-            globalScene.ui.showText(
-              "Could not recover the host's co-op launch state. Reconnect and try again.",
-              null,
-              null,
-              null,
-              true,
-            );
+            failCoopSharedSession("guest could not adopt the exact fresh-launch checkpoint");
           }
           return;
         }
@@ -331,20 +332,36 @@ export class SelectStarterPhase extends Phase {
       });
       return;
     }
-    // HOST: auto-pick the first EMPTY slot (never overwrite an existing run); fall back
-    // to the current slot only when all 5 are full. Occupancy is read from localStorage
-    // DIRECTLY so a transient cloud failure can never false-empty an occupied slot.
-    const slot = await coopHostSessionSlot(
-      async s => localStorage.getItem(getSessionDataLocalStorageKey(s)) != null,
-      globalScene.sessionSlotId,
-    );
-    const allFull = localStorage.getItem(getSessionDataLocalStorageKey(slot)) != null;
-    if (allFull) {
-      console.warn(`[coop-launch] host: all 5 save slots full, falling back to current slot ${slot} (will overwrite)`);
+    // HOST: verify emptiness against BOTH replicas. Cloud-unavailable and all-full fail closed; a fresh
+    // run never overwrites an unrelated save merely because the browser cache was empty/stale.
+    let slot: number | null;
+    try {
+      slot = await globalScene.gameData.findVerifiedEmptyCoopSessionSlot();
+    } catch (error) {
+      console.error("[coop-launch] verified slot lookup failed", error);
+      getCoopBattleStreamer()?.sendLaunchSnapshotAbort(COOP_LAUNCH_WAVE, "no-safe-slot");
+      failCoopSharedSession("fresh co-op slot verification threw");
+      return;
+    }
+    if (slot == null) {
+      console.warn("[coop-launch] host: no verified empty local+cloud save slot; aborting fresh co-op launch");
+      getCoopBattleStreamer()?.sendLaunchSnapshotAbort(COOP_LAUNCH_WAVE);
+      failCoopSharedSession("fresh co-op launch has no verified empty local+cloud save slot");
+      return;
     }
     globalScene.sessionSlotId = slot;
     console.log(`[coop-launch] host: auto-picked slot ${slot} (no picker), clearing STARTER_SELECT -> MESSAGE`);
-    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.initBattle(merged, true, owners));
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+      // The cloud lookup above yielded. Recheck local bytes at the last synchronous boundary before
+      // starter/battle materialization; first-save backend CAS remains the actual ownership commit.
+      if (!globalScene.gameData.confirmPendingFreshCoopSessionSlot(slot)) {
+        globalScene.gameData.cancelPendingFreshCoopSessionSlot();
+        getCoopBattleStreamer()?.sendLaunchSnapshotAbort(COOP_LAUNCH_WAVE, "slot-raced");
+        failCoopSharedSession("fresh co-op save slot changed before starter materialization");
+        return;
+      }
+      this.initBattle(merged, true, owners);
+    });
   }
 
   /**
@@ -602,12 +619,14 @@ export class SelectStarterPhase extends Phase {
    * @param coopOwners - Co-op only (#633, P2): per-launch-mon owner tag, parallel to `starters`.
    *   The merged party is interleaved (host0, guest0, host1, ...), so `coopOwners[i]` is the
    *   owner of `starters[i]`. Omitted / `undefined` for solo and all other modes.
+   * @param startingLevels - Dev scenarios only: optional per-slot construction levels.
    */
   initBattle(
     starters: Starter[],
     ignoreMovesetValidation = false,
     coopOwners?: CoopRole[],
     showdownManifests?: ShowdownMonManifest[],
+    startingLevels?: readonly number[],
   ) {
     const party = globalScene.getPlayerParty();
     const loadPokemonAssets: Promise<void>[] = [];
@@ -647,9 +666,14 @@ export class SelectStarterPhase extends Phase {
       // keeping the turn checksum in parity. Non-showdown paths (showdownMon == null) are unchanged.
       const starterIvs = showdownMon ? [31, 31, 31, 31, 31, 31] : starter.ivs;
       const starterNature = (showdownMon?.nature as Nature | undefined) ?? starter.nature;
+      const stagedLevel = startingLevels?.[i];
+      const starterLevel =
+        stagedLevel != null && Number.isFinite(stagedLevel) && stagedLevel > 0
+          ? Math.floor(stagedLevel)
+          : globalScene.gameMode.getStartingLevel();
       const starterPokemon = globalScene.addPlayerPokemon(
         species,
-        globalScene.gameMode.getStartingLevel(),
+        starterLevel,
         starter.abilityIndex,
         starterFormIndex,
         starterGender,
@@ -760,6 +784,10 @@ export class SelectStarterPhase extends Phase {
     });
     overrideModifiers();
     overrideHeldItems(party[0]);
+    // Dev scenarios can restore per-mon state that the Starter handoff cannot
+    // represent (notably held items). Apply it before newBattle() so the first
+    // battle frame and item bars see the final party state.
+    consumePendingDevPartySetup()?.();
     // Showdown 1v1 (B7 item 6): attach each OWN mon's manifest held item to the PLAYER party -
     // the SAME mapping (buildShowdownHeldItem) the opponent's client fields for you, so both
     // sides field a byte-equal held-item set. MEGA_STONE / unset -> no runtime modifier. The
@@ -794,6 +822,13 @@ export class SelectStarterPhase extends Phase {
         globalScene.gameData.gameStats.classicSessionsPlayed++;
       } else {
         globalScene.gameData.gameStats.endlessSessionsPlayed++;
+      }
+      // Restart rebuilds the title screen, which clears old custom-trainer
+      // forces. Arm the staged force at the last possible point so Reset always
+      // recreates this trainer battle instead of falling through to a wild wave.
+      const pendingCustomTrainerForce = consumePendingDevCustomTrainerForce();
+      if (pendingCustomTrainerForce) {
+        setErCustomTrainerDevForce(pendingCustomTrainerForce);
       }
       globalScene.newBattle();
       // ER (dev-tools only): a staff tester picking a custom trainer from the

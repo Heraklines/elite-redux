@@ -17,11 +17,21 @@ This smart-sharded workflow is the standing default for all future co-op checkpo
   started accidentally, terminate its whole process tree promptly and move the reproduction to an isolated
   external runner.
 - Before declaring a co-op checkpoint deployable, push `feat/elite-redux-port` and require the `Co-op Gate (Sharded)` workflow (`.github/workflows/coop-gate-sharded.yml`) to finish green.
-- The same external workflow must also pass its independent TypeScript and Biome static job. A green
-  13-shard test matrix with a red static job is not deployable.
-- The external gate is the default checkpoint gate: Lane A and Lane P each use one GitHub-hosted runner, Lane B uses eight historically weighted shards, and Lane C uses three shards. Preserve the production-like checkout, including recursive asset submodules. The proven default is one Vitest controller per shard with `--pool=forks --isolate --no-file-parallelism`, reusing Vite transforms while keeping test module state isolated. Only `coop-duo-multiwave.test.ts` and `coop-duo-reward-subpickers.test.ts` are measured fresh-process exceptions; do not expand that list without a green grouped-vs-solo reproduction. Full green run `29179820092` covered all 166 co-op files plus static at exact SHA `12b1a9465`: Lane B completed in 158-270 seconds (versus 5.4-6.5 minutes under one CLI per file), Lane C in 106-129 seconds, Lane P in 90 seconds, and static in 147 seconds. Treat this layout as the standing workflow, rebalancing the slowest shard from green-run timing evidence rather than weakening coverage or environment fidelity.
+- The same external workflow must also pass its independent TypeScript and Biome static job. A green test
+  matrix with a red static or aggregate job is not deployable.
+- The external gate is the default checkpoint gate. Its integration layout is A1/B8/C3/P2/S3/T1 (18 test
+  shards): Lane A stays process-global, Lane B is historically weighted, Lane C owns soak campaigns, each
+  Lane P production-fidelity file owns a runner, Lane S covers Showdown, and Lane T covers triples/topology.
+  Preserve the production-like checkout, including recursive asset submodules. The proven controller model
+  is `--pool=forks --isolate --no-file-parallelism`, reusing Vite transforms while keeping test module state
+  isolated. Only `coop-duo-multiwave.test.ts` and `coop-duo-reward-subpickers.test.ts` are measured
+  fresh-process exceptions; do not expand that list without a green grouped-vs-solo reproduction. Full green
+  run `29179820092` covered the earlier 166-file A/B/C/P layout, and expanded run `29213259047` covered 246
+  files at exact SHA `50531b460` with A1/B8/C3/P1/S3/T1 plus browser/static in 4m19s. The second Lane P
+  runner is the in-flight T2 addition and must be calibrated by the next exact-SHA aggregate gate. Rebalance
+  the slowest shard from green-run timing evidence rather than weakening coverage or environment fidelity.
 - The same workflow runs a browser-native WebRTC checkpoint on its own GitHub-hosted Chrome runner. It must prove two isolated browser contexts complete protocol/fingerprint/identity negotiation and replace a dropped RTCDataChannel through hot rejoin. Keep it separate from the engine shards: the continuous two-engine journey proves gameplay, while this job proves the real browser transport those engines use.
-- Run or inspect one deterministic shard with `node scripts/run-coop-gate.mjs --lane <A|B|C|P> --shard <index>/<total>`. Use `--list` to see its exact files.
+- Run or inspect one deterministic shard with `node scripts/run-coop-gate.mjs --lane <A|B|C|P|S|T> --shard <index>/<total>`. Use `--list` to see its exact files.
 - Do not replace external sharding with many concurrent local Vitest processes. Separate runners provide the speedup without recreating CPU/memory contention.
 - Keep `fail-fast: false` so every shard returns evidence. Download the per-shard log artifact, fix all reproducible failures in one batch, and let the next pushed checkpoint rerun the matrix.
 - A red shard blocks staging promotion. A green focused test is useful during development but does not replace the checkpoint gate.
@@ -38,3 +48,57 @@ This smart-sharded workflow is the standing default for all future co-op checkpo
 - Deploy only to staging unless the user explicitly authorizes production. Keep intermediate staging checkpoints functional for multiplayer testers.
 
 When changing the lane composition or shard count, preserve deterministic, exhaustive file assignment and verify with `--list` that every file appears in exactly one shard. Use historical-duration balancing when timing data is available, fall back to stable deterministic weighting when it is not, and keep the resulting assignment reproducible. Optimize the slowest shard rather than merely increasing concurrency, and do not weaken assertions or omit scenarios to make a shard faster.
+
+## Parallel co-op development and CI capacity
+
+Parallel work is the default when file ownership and protocol dependencies permit it, but parallel writers
+must never share one worktree. Each writer gets an isolated worktree based on the same integration SHA and
+an exclusive owned-file manifest. Only the integration owner may merge/cherry-pick into
+`feat/elite-redux-port`, freeze or change the co-op wire schema, stage the integration index, push the
+integration branch, dispatch the complete gate, or promote staging. Read-only auditors may inspect any
+worktree. A surface branch must not invent a private wire message; freeze the shared schema first, then give
+surface adapters and tests to separate owners. Require every worker handoff to include its branch, exact
+SHA, owned files, static checks, and known fixture/dependency requirements.
+
+Use GitHub-hosted runners as the external compute pool. The account permits up to 40 concurrent standard
+jobs, but keep the ordinary full checkpoint target near 35 so five slots remain available for focused agent
+checks and unrelated workflows. Do not increase sharding merely to consume all 40 slots: repeated checkout,
+dependency setup, Vite transforms, browser startup, and artifact uploads can make finer shards slower.
+
+- The last proven expanded checkpoint (`50531b460`, run `29213259047`) used 17 test shards
+  (A1/B8/C3/P1/S3/T1) plus browser and static jobs and completed in 4m19s. The in-flight T2 expansion gives
+  Lane P two production-fidelity files, one per runner. Preserve that calibrated layout as the fallback
+  until a faster layout is green at an exact integration SHA.
+- The target everyday layout after startup/artifact improvements is 35 concurrent jobs:
+  browser 1, static 1, A1, P2, B13, C5, S8, and T4. Recalculate the exact allocation from tracked-file
+  inventory and green-run p90 timings; keep A as one job because it intentionally shares process-global
+  state. Use a 40-job layout only for measured release experiments when the extra five jobs reduce the
+  critical path.
+- Build the immutable production browser bundle once, then fan public-UI/browser scenarios across isolated
+  runners against that exact artifact. Do not make every browser scenario rebuild source-mode Vite. Engine
+  shards still use their calibrated isolated Vitest controllers and must not share process-global Phaser
+  state across files unless a green grouped-vs-solo calibration proves it safe.
+- Generate and commit/reproduce shard assignment from p90 timing evidence. Optimize the slowest bin, verify
+  exhaustive exactly-once assignment with `--list`, and fall back to stable deterministic weights for new
+  files. Never reduce assertions, fidelity, seeds, events, or transitions to meet a wall-clock target.
+- Use shallow checkout for static work whenever its comparison base can be fetched explicitly. Cache safe
+  immutable dependencies/transforms, but never reuse mutable test state across runners or SHAs.
+- Artifact storage is a constrained resource. Green development shards should upload only a compact
+  manifest/summary and essential causal evidence. Upload complete logs, screenshots, traces, and replay
+  schedules on failure and at release-confidence checkpoints. Keep `fail-fast: false`; all shards still
+  return status even when heavy success artifacts are omitted.
+- Branch-focused CI should trigger from `ci/coop/**` branches with concurrency scoped by the full branch ref,
+  for example `coop-focused-${{ github.ref }}`, so agents cannot cancel each other's checks. Each agent
+  pushes only its exact isolated-worktree commit and dispatches the smallest 1-5 affected shards. The same
+  focused workflow must run its dedicated static job against the ownership planner's exact declared train
+  base, so every surface handoff includes branch-scoped TypeScript and Biome evidence without launching the
+  full checkpoint matrix. A focused green run never replaces the complete integration gate or its independent
+  static job; the full gate remains exclusive to the integration/staging checkpoint.
+- Do not depend on a `workflow_dispatch`-only workflow that exists only off the default branch; GitHub will
+  not register it for dispatch. Until the focused workflow is present on the default branch, use a push
+  trigger on `ci/coop/**` or dispatch an existing registered workflow against the exact branch SHA.
+- After a worker handoff is accepted, remove clean inactive worktrees and their reinstallable dependency
+  directories so parallel work does not accumulate avoidable disk and filesystem-watcher load. Prefer sparse
+  worktrees or worktrees without `node_modules` when the owned-file set and validation commands permit it.
+  Never delete a dirty worktree or delete a branch as part of automated cleanup; preserve it for explicit
+  integration-owner review.

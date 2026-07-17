@@ -30,6 +30,11 @@ ignore:
    - .vscode
    - .github
    - .git
+   # Claude Code project config (skills etc.) - not source, own naming scheme.
+   - .claude
+   # Pre-existing exception: landed via a hook-bypassed cherry-pick before
+   # ls-lint saw it; renaming now would break in-flight references.
+   - test/tests/elite-redux/er-sectionA-dex-residuals.test.ts
    - assets
    - locales
    - dist

@@ -2,19 +2,12 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
-import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
-import { captureCoopAuthoritativeCarrier } from "#data/elite-redux/coop/coop-battle-engine";
-import { coopWarn } from "#data/elite-redux/coop/coop-debug";
-import {
-  coopSessionGeneration,
-  getCoopBattleStreamer,
-  getCoopController,
-  isAuthoritativeBattleSession,
-} from "#data/elite-redux/coop/coop-runtime";
-import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
+import { isCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyFieldMedic } from "#data/elite-redux/er-relics";
+import { erApplyStickyBarbTurnEnd } from "#data/elite-redux/er-tactical-items";
 import { TerrainType } from "#data/terrain";
+import { AbilityId } from "#enums/ability-id";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { HitResult } from "#enums/hit-result";
 import { PokemonType } from "#enums/pokemon-type";
@@ -38,6 +31,14 @@ export class TurnEndPhase extends FieldPhase {
 
   start() {
     super.start();
+
+    // Install the immutable commit sentinel before any TurnEnd work can unshift a child phase.
+    // Every delayed mutation queued below (and every grandchild it queues) will therefore run
+    // in front of the sentinel, while the sentinel remains in front of the pre-existing
+    // Faint/Victory/next-turn tail.
+    if (isCoopRecording()) {
+      globalScene.phaseManager.queueCoopTurnCommitPhase();
+    }
 
     globalScene.currentBattle.incrementTurn();
     globalScene.eventTarget.dispatchEvent(new TurnEndEvent(globalScene.currentBattle.turn));
@@ -65,9 +66,12 @@ export class TurnEndPhase extends FieldPhase {
 
         // ER Toxic Terrain — grounded non-Poison Pokémon take 1/16 max HP each
         // turn (Magic Guard / Block-non-direct-damage abilities exempt them).
+        // Poison Heal (ER 2.65 dex: "Also prevents damage from Toxic terrain.")
+        // is likewise immune to the chip.
         if (
           globalScene.arena.terrain?.terrainType === TerrainType.TOXIC
           && pokemon.isGrounded()
+          && !pokemon.hasAbility(AbilityId.POISON_HEAL)
           && !pokemon.getTypes(true, true).some(t => globalScene.arena.terrain?.isTypeDamageImmune(t))
         ) {
           const cancelled = new BooleanHolder(false);
@@ -119,6 +123,10 @@ export class TurnEndPhase extends FieldPhase {
           );
         }
 
+        // ER Sticky Barb: the holder loses 1/8 max HP at turn end (indirect;
+        // Magic Guard exempt).
+        erApplyStickyBarbTurnEnd(pokemon);
+
         if (!pokemon.isPlayer()) {
           globalScene.applyModifiers(EnemyTurnHealModifier, false, pokemon);
           globalScene.applyModifier(EnemyStatusEffectHealChanceModifier, false, pokemon);
@@ -150,15 +158,22 @@ export class TurnEndPhase extends FieldPhase {
       globalScene.arena.triggerWeatherBasedFormChangesToNormal();
     }
 
-    if (globalScene.arena.terrain && !globalScene.arena.terrain.lapse()) {
-      globalScene.arena.trySetTerrain(TerrainType.NONE);
+    // ER Stench (1): Toxic Terrain turns do NOT decrease while a Stench holder is
+    // on the field (the terrain can still be removed/displaced by another setter).
+    // Freeze the lapse for TOXIC terrain in that case; everything else lapses.
+    const activeTerrain = globalScene.arena.terrain;
+    if (activeTerrain) {
+      const stenchFreezesToxic =
+        activeTerrain.terrainType === TerrainType.TOXIC
+        && globalScene.getField(true).some(p => p?.hasAbility(AbilityId.STENCH));
+      if (!stenchFreezesToxic && !activeTerrain.lapse()) {
+        globalScene.arena.trySetTerrain(TerrainType.NONE);
+      }
     }
 
     this.erAutoShiftNonAdjacentSurvivors();
 
-    if (this.emitCoopTurn()) {
-      this.end();
-    }
+    this.end();
   }
 
   /**
@@ -208,70 +223,6 @@ export class TurnEndPhase extends FieldPhase {
       const centre = lo.i + 1;
       [party[centre], party[hi.i]] = [party[hi.i], party[centre]];
       void hi.p.setFieldPosition(fieldPositionForSlot(centre, capacity), 500);
-    }
-  }
-
-  /**
-   * Co-op HOST, AUTHORITATIVE netcode only (#633, TRACK-2 Phase B): the host is the sole
-   * engine; at the settled post-turn boundary it STREAMS this turn's ordered narration
-   * events (recorded since TurnStart) + the authoritative checkpoint + the full-state
-   * checksum. The guest's CoopReplayTurnPhase awaits + renders them. Emitted with the turn
-   * number STAMPED at TurnStart (incrementTurn() already ran above, so `currentBattle.turn`
-   * is now N+1) so the host's emit-turn matches the guest's await-turn exactly. In LOCKSTEP
-   * there is NO emit (both engines resolve; the per-turn checkpoint heals via CommandPhase).
-   * Hard no-op for solo / non-host; the recording is closed either way so it never leaks
-   * into the next turn.
-   */
-  private emitCoopTurn(): boolean {
-    const recording = endCoopRecording();
-    // Core-battle authoritative stream: co-op OR showdown-versus (C3). Solo/non-host no-op.
-    if (!isAuthoritativeBattleSession()) {
-      return true;
-    }
-    const controller = getCoopController();
-    const streamer = getCoopBattleStreamer();
-    if (controller == null || streamer == null || controller.role !== "host" || recording.turn < 0) {
-      return true;
-    }
-    const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    const fatal = (reason: string): false => {
-      const generation = coopSessionGeneration();
-      void streamer
-        .broadcastAuthorityFailure({
-          epoch: controller.sessionEpoch,
-          wave,
-          turn: recording.turn,
-          boundary: "turnResolution",
-          reason,
-        })
-        .then(() => {
-          if (generation === coopSessionGeneration()) {
-            terminateCoopAuthoritySession(reason);
-          }
-        });
-      return false;
-    };
-    try {
-      const carrier = captureCoopAuthoritativeCarrier(recording.turn, "turnResolution");
-      if (carrier == null) {
-        coopWarn("checkpoint", `host could not capture complete turnResolution turn=${recording.turn}`);
-        return fatal(`Host could not capture complete turn authority for wave ${wave}, turn ${recording.turn}.`);
-      }
-      streamer.emitTurn(
-        controller.sessionEpoch,
-        carrier.authoritativeState.wave,
-        recording.turn,
-        recording.events,
-        carrier.checkpoint,
-        carrier.checksum,
-        carrier.preimage,
-        carrier.fullField,
-        carrier.authoritativeState,
-      );
-      return true;
-    } catch (error) {
-      coopWarn("checkpoint", `host failed to emit turnResolution turn=${recording.turn}`, error);
-      return fatal(`Host could not publish complete turn authority for wave ${wave}, turn ${recording.turn}.`);
     }
   }
 }

@@ -26,6 +26,11 @@
 // =============================================================================
 
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { setCoopMeActivePresentation } from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
+  COOP_ME_REWARD_SURFACE_LIMIT,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 // #840: seq bands now live in the single-source-of-truth registry; re-exported below under their
 // historical names so no call site changes (pure re-export, zero behavior change).
 import {
@@ -43,6 +48,7 @@ import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import type {
   CoopInteractionOutcome,
   CoopMessage,
+  CoopRewardSurfaceIdentity,
   CoopSerializedRewardOption,
   CoopTransport,
 } from "#data/elite-redux/coop/coop-transport";
@@ -67,6 +73,57 @@ export const COOP_INTERACTION_LEAVE = -1;
  * (a fixed field seat), so it is the only band the malicious-peer owner check gates on.
  */
 const COOP_FAINT_SWITCH_SLOT_COUNT = 4;
+
+/** Keep legacy reward keys byte-identical when no ordered ME surface address exists. */
+const COOP_REWARD_SURFACE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$/;
+
+function isWireRewardSurfaceIdentity(value: unknown): value is CoopRewardSurfaceIdentity {
+  return (
+    value != null
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && Number.isSafeInteger((value as CoopRewardSurfaceIdentity).ordinal)
+    && (value as CoopRewardSurfaceIdentity).ordinal >= 0
+    && (value as CoopRewardSurfaceIdentity).ordinal < COOP_ME_REWARD_SURFACE_LIMIT
+    && typeof (value as CoopRewardSurfaceIdentity).surfaceId === "string"
+    && (value as CoopRewardSurfaceIdentity).surfaceId.length <= COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH
+    && COOP_REWARD_SURFACE_ID_PATTERN.test((value as CoopRewardSurfaceIdentity).surfaceId)
+  );
+}
+
+function rewardSurfaceKey(rewardSurface?: CoopRewardSurfaceIdentity): string {
+  return rewardSurface == null ? "ambient" : `${rewardSurface.ordinal}:${encodeURIComponent(rewardSurface.surfaceId)}`;
+}
+
+function rewardOptionsKey(seq: number, reroll: number, rewardSurface?: CoopRewardSurfaceIdentity): string {
+  return rewardSurface == null ? `${seq}:${reroll}` : `${seq}:${reroll}:${rewardSurfaceKey(rewardSurface)}`;
+}
+
+/** Decode an internally canonical reward-options inbox key without accepting a malformed surface address. */
+export function parseCoopRewardOptionsKey(
+  key: string,
+): { seq: number; reroll: number; rewardSurface?: CoopRewardSurfaceIdentity } | null {
+  const [seqText, rerollText, ordinalText, ...surfaceParts] = key.split(":");
+  const seq = Number(seqText);
+  const reroll = Number(rerollText);
+  if (!Number.isSafeInteger(seq) || !Number.isSafeInteger(reroll)) {
+    return null;
+  }
+  if (ordinalText == null) {
+    return { seq, reroll };
+  }
+  const ordinal = Number(ordinalText);
+  const encodedSurfaceId = surfaceParts.join(":");
+  if (!Number.isSafeInteger(ordinal) || ordinal < 0 || encodedSurfaceId.length === 0) {
+    return null;
+  }
+  try {
+    const rewardSurface = { ordinal, surfaceId: decodeURIComponent(encodedSurfaceId) };
+    return isWireRewardSurfaceIdentity(rewardSurface) ? { seq, reroll, rewardSurface } : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Whether `seq` addresses a faint-REPLACEMENT pick (the `COOP_FAINT_SWITCH_SEQ_BASE + fieldIndex` band).
@@ -162,6 +219,8 @@ export interface CoopInteractionChoice {
   kind?: string;
   /** Local-only durable carrier correlation. Never serialized on the legacy interactionChoice wire arm. */
   operationId?: string | undefined;
+  /** Ordered retained Mystery reward surface carried by reward actions. */
+  rewardSurface?: CoopRewardSurfaceIdentity | undefined;
 }
 
 /** Options for {@linkcode CoopInteractionRelay} (timer injection for tests). */
@@ -215,12 +274,31 @@ function kindAccepted(kind: string | undefined, expectedKinds: readonly string[]
   return kind !== undefined && expectedKinds.includes(kind);
 }
 
+/**
+ * Ordered Mystery surfaces deliberately share one interaction pin and reward kind. `undefined` opts out
+ * (legacy callers); `null` means the ambient reward stream; an identity requires an exact semantic match.
+ */
+function rewardSurfaceAccepted(
+  rewardSurface: CoopRewardSurfaceIdentity | undefined,
+  expectedRewardSurface: CoopRewardSurfaceIdentity | null | undefined,
+): boolean {
+  if (expectedRewardSurface === undefined) {
+    return true;
+  }
+  if (expectedRewardSurface === null) {
+    return rewardSurface === undefined;
+  }
+  return rewardSurfaceKey(rewardSurface) === rewardSurfaceKey(expectedRewardSurface);
+}
+
 /** #861: an in-flight {@linkcode CoopInteractionRelay.awaitInteractionChoice} waiter + its declared kinds. */
 interface CoopChoiceWaiter {
   /** Resolve the parked await (a matching choice, or null on timeout/supersede). */
   readonly finish: (res: CoopInteractionChoice | null) => void;
   /** The kinds this await legitimately consumes; undefined = validation opted out (accept any). */
   readonly expectedKinds: readonly string[] | undefined;
+  /** Exact ordered Mystery surface, null for ambient, undefined when surface validation is not requested. */
+  readonly expectedRewardSurface: CoopRewardSurfaceIdentity | null | undefined;
 }
 
 /** Compact, log-safe one-line summary of a host-resolved interaction outcome (discriminated by `k`). */
@@ -339,8 +417,10 @@ export class CoopInteractionRelay {
         return;
       }
       for (const key of this.rewardOptionsPending.keys()) {
-        const [seq, reroll] = key.split(":").map(Number);
-        this.transport.send({ t: "requestRewardOptions", seq, reroll });
+        const request = parseCoopRewardOptionsKey(key);
+        if (request != null) {
+          this.transport.send({ t: "requestRewardOptions", ...request });
+        }
       }
     });
   }
@@ -348,7 +428,11 @@ export class CoopInteractionRelay {
   /** #809: ask the partner to open its Revival Blessing picker for `fieldIndex`. */
   promptRevival(fieldIndex: number, operationId?: string): void {
     coopLog("relay", `SEND revivalPrompt fieldIndex=${fieldIndex} (#809)`);
-    this.transport.send({ t: "revivalPrompt", fieldIndex, ...(operationId === undefined ? {} : { operationId }) });
+    this.transport.send({
+      t: "revivalPrompt",
+      fieldIndex,
+      ...(operationId === undefined ? {} : { operationId }),
+    });
   }
 
   /** Deliver a committed prompt through the same picker seam, suppressing its raw legacy echo. */
@@ -381,7 +465,13 @@ export class CoopInteractionRelay {
   }
 
   /** OWNER: send one pick for interaction `seq` (`kind` is routing/logging only). */
-  sendInteractionChoice(seq: number, kind: string, choice: number, data?: number[]): void {
+  sendInteractionChoice(
+    seq: number,
+    kind: string,
+    choice: number,
+    data?: number[],
+    rewardSurface?: CoopRewardSurfaceIdentity,
+  ): void {
     recordCoopUiRelayCarrier("interactionChoice", `seq=${seq} kind=${kind} choice=${choice}`);
     if (isCoopDebug()) {
       coopLog("relay", `SEND interactionChoice seq=${seq} kind=${kind} ${summarizeChoice({ choice, data })}`);
@@ -392,6 +482,7 @@ export class CoopInteractionRelay {
       kind,
       choice,
       ...(data === undefined ? {} : { data }),
+      ...(rewardSurface == null ? {} : { rewardSurface }),
     });
     // #record-replay: capture this OWNER-sent interaction pick (no-op unless recording on the host).
     recordReplayInteraction({
@@ -416,17 +507,18 @@ export class CoopInteractionRelay {
     choice: number,
     data?: number[],
     operationId?: string | undefined,
+    rewardSurface?: CoopRewardSurfaceIdentity,
   ): void {
     if (!COOP_DURABLE_CHOICE_ECHO_KINDS.has(kind)) {
-      this.deliverInteractionChoice(seq, { choice, data, kind, operationId });
+      this.deliverInteractionChoice(seq, { choice, data, kind, operationId, rewardSurface });
       return;
     }
-    const key = this.choiceCreditKey(seq, kind, choice, data);
+    const key = this.choiceCreditKey(seq, kind, choice, data, rewardSurface);
     if (this.consumeEchoCredit(this.rawChoiceCredits, key)) {
       return;
     }
     this.addEchoCredit(this.committedChoiceCredits, key);
-    this.deliverInteractionChoice(seq, { choice, data, kind, operationId });
+    this.deliverInteractionChoice(seq, { choice, data, kind, operationId, rewardSurface });
   }
 
   /**
@@ -445,6 +537,7 @@ export class CoopInteractionRelay {
     seq: number,
     timeoutMs = this.timeoutMs,
     expectedKinds?: readonly string[],
+    expectedRewardSurface?: CoopRewardSurfaceIdentity | null,
   ): Promise<CoopInteractionChoice | null> {
     if (this.cancelledSeqs.has(seq)) {
       coopWarn("relay", `AWAIT interactionChoice seq=${seq} -> STICKY-CANCELLED (resync rescue) resolve null`);
@@ -456,7 +549,10 @@ export class CoopInteractionRelay {
       // NON-accepted kind (a stale/cross-family arrival at this reused seq) are LEFT in the queue
       // (re-buffered) and loudly logged - they never resolve this await. Legitimate same-family picks
       // keep strict FIFO order because we take the FIRST accepted one.
-      const matchIdx = queue.findIndex(entry => kindAccepted(entry.kind, expectedKinds));
+      const matchIdx = queue.findIndex(
+        entry =>
+          kindAccepted(entry.kind, expectedKinds) && rewardSurfaceAccepted(entry.rewardSurface, expectedRewardSurface),
+      );
       if (matchIdx >= 0) {
         for (let i = 0; i < matchIdx; i++) {
           coopWarn(
@@ -516,7 +612,7 @@ export class CoopInteractionRelay {
         }
         resolve(res);
       };
-      this.pending.set(seq, { finish, expectedKinds });
+      this.pending.set(seq, { finish, expectedKinds, expectedRewardSurface });
       cancelTimer = this.schedule(() => finish(null), timeoutMs);
     });
   }
@@ -528,6 +624,11 @@ export class CoopInteractionRelay {
    * change the result. Same FIFO-per-seq semantics as the choice relay.
    */
   sendInteractionOutcome(seq: number, kind: string, outcome: CoopInteractionOutcome): void {
+    if (outcome.k === "mePresent") {
+      // Snapshot the exact screen before the carrier can be dropped. The pin-state seam self-gates to a
+      // live ME, so unrelated outcomes and non-co-op/legacy sessions remain byte-identical.
+      setCoopMeActivePresentation(outcome);
+    }
     recordCoopUiRelayCarrier("interactionOutcome", `seq=${seq} kind=${kind} outcome=${outcome.k}`);
     if (isCoopDebug()) {
       coopLog("relay", `SEND interactionOutcome seq=${seq} kind=${kind} ${summarizeOutcome(outcome)}`);
@@ -547,6 +648,15 @@ export class CoopInteractionRelay {
     }
     this.addEchoCredit(this.committedOutcomeCredits, key);
     this.deliverInteractionOutcome(seq, outcome, "JOURNAL");
+  }
+
+  /**
+   * Read-only ordering probe used by replay surfaces before they arm competing presentation edges.
+   * This deliberately does not dequeue the outcome: {@linkcode awaitInteractionOutcome} remains the
+   * only consumer, preserving FIFO and the relay's single-waiter semantics.
+   */
+  hasBufferedInteractionOutcomeFor(seq: number): boolean {
+    return (this.outcomeInbox.get(seq)?.length ?? 0) > 0;
   }
 
   /**
@@ -608,8 +718,13 @@ export class CoopInteractionRelay {
   }
 
   /** OWNER: stream the exact reward-option list rolled for `seq` / `reroll` (#633 Fix #2). */
-  sendRewardOptions(seq: number, reroll: number, options: CoopSerializedRewardOption[]): void {
-    const key = `${seq}:${reroll}`;
+  sendRewardOptions(
+    seq: number,
+    reroll: number,
+    options: CoopSerializedRewardOption[],
+    rewardSurface?: CoopRewardSurfaceIdentity,
+  ): void {
+    const key = rewardOptionsKey(seq, reroll, rewardSurface);
     this.sentRewardOptions.set(key, options);
     if (this.sentRewardOptions.size > 64) {
       const oldest = this.sentRewardOptions.keys().next().value;
@@ -623,7 +738,13 @@ export class CoopInteractionRelay {
         `SEND rewardOptions seq=${seq} reroll=${reroll} count=${options.length} ids=[${options.map(o => o.id).join(",")}]`,
       );
     }
-    this.transport.send({ t: "rewardOptions", seq, reroll, options });
+    this.transport.send({
+      t: "rewardOptions",
+      seq,
+      reroll,
+      options,
+      ...(rewardSurface == null ? {} : { rewardSurface }),
+    });
   }
 
   /**
@@ -636,6 +757,7 @@ export class CoopInteractionRelay {
     seq: number,
     reroll: number,
     timeoutMs = this.timeoutMs,
+    rewardSurface?: CoopRewardSurfaceIdentity,
   ): Promise<CoopSerializedRewardOption[] | null> {
     if (this.cancelledSeqs.has(seq)) {
       coopWarn(
@@ -644,7 +766,7 @@ export class CoopInteractionRelay {
       );
       return Promise.resolve(null);
     }
-    const key = `${seq}:${reroll}`;
+    const key = rewardOptionsKey(seq, reroll, rewardSurface);
     const buffered = this.rewardOptionsInbox.get(key);
     if (buffered !== undefined) {
       this.rewardOptionsInbox.delete(key);
@@ -687,7 +809,12 @@ export class CoopInteractionRelay {
       this.rewardOptionsPending.set(key, finish);
       cancelTimer = this.schedule(() => finish(null), timeoutMs);
       coopLog("relay", `SEND requestRewardOptions key=${key} (authoritative replay)`);
-      this.transport.send({ t: "requestRewardOptions", seq, reroll });
+      this.transport.send({
+        t: "requestRewardOptions",
+        seq,
+        reroll,
+        ...(rewardSurface == null ? {} : { rewardSurface }),
+      });
     });
   }
 
@@ -735,11 +862,23 @@ export class CoopInteractionRelay {
    * is the pending interaction the whole session is blocked on (the top co-op softlock signature).
    * Pure read; never mutates relay state.
    */
-  describeAwaitedInteractions(): { seq: number; ageMs: number; expectedKinds: readonly string[] }[] {
+  describeAwaitedInteractions(): {
+    seq: number;
+    ageMs: number;
+    expectedKinds: readonly string[];
+  }[] {
     const now = Date.now();
-    const out: { seq: number; ageMs: number; expectedKinds: readonly string[] }[] = [];
+    const out: {
+      seq: number;
+      ageMs: number;
+      expectedKinds: readonly string[];
+    }[] = [];
     for (const [seq, since] of this.pendingSince) {
-      out.push({ seq, ageMs: now - since, expectedKinds: this.pending.get(seq)?.expectedKinds ?? [] });
+      out.push({
+        seq,
+        ageMs: now - since,
+        expectedKinds: this.pending.get(seq)?.expectedKinds ?? [],
+      });
     }
     return out.sort((a, b) => a.seq - b.seq);
   }
@@ -751,14 +890,19 @@ export class CoopInteractionRelay {
    */
   public onRewardOptionsBuffered: ((key: string) => void) | null = null;
 
-  /** #821: whether buffered rewardOptions exist for a key prefix (already-arrived race). */
-  hasBufferedRewardOptionsFor(prefix: string): boolean {
+  /** Exact first buffered reward-options address matching a key prefix (already-arrived/reconnect race). */
+  bufferedRewardOptionsKeyFor(prefix: string): string | null {
     for (const k of this.rewardOptionsInbox.keys()) {
       if (String(k).startsWith(prefix)) {
-        return true;
+        return k;
       }
     }
-    return false;
+    return null;
+  }
+
+  /** #821 compatibility predicate for callers that need only buffered presence. */
+  hasBufferedRewardOptionsFor(prefix: string): boolean {
+    return this.bufferedRewardOptionsKeyFor(prefix) != null;
   }
 
   cancelWaiters(shouldCancel: (seq: number) => boolean = () => true): void {
@@ -950,7 +1094,11 @@ export class CoopInteractionRelay {
   /** Route a trusted local/wire choice to an accepting waiter or the per-seq FIFO. */
   private deliverInteractionChoice(seq: number, choice: CoopInteractionChoice): void {
     const waiter = this.pending.get(seq);
-    if (waiter && kindAccepted(choice.kind, waiter.expectedKinds)) {
+    if (
+      waiter
+      && kindAccepted(choice.kind, waiter.expectedKinds)
+      && rewardSurfaceAccepted(choice.rewardSurface, waiter.expectedRewardSurface)
+    ) {
       if (isCoopDebug()) {
         coopLog("relay", `DELIVER interactionChoice seq=${seq} -> waiter ${summarizeChoice(choice)}`);
       }
@@ -960,8 +1108,8 @@ export class CoopInteractionRelay {
     if (waiter) {
       coopWarn(
         "relay",
-        `DELIVER interactionChoice seq=${seq} kind=${choice.kind ?? "?"} MISMATCH parked waiter `
-          + `(expected [${(waiter.expectedKinds ?? []).join(",")}]) -> BUFFER, waiter stays parked (#861)`,
+        `DELIVER interactionChoice seq=${seq} kind=${choice.kind ?? "?"} surface=${rewardSurfaceKey(choice.rewardSurface)} MISMATCH parked waiter `
+          + `(expected kinds=[${(waiter.expectedKinds ?? []).join(",")}] surface=${waiter.expectedRewardSurface === undefined ? "any" : rewardSurfaceKey(waiter.expectedRewardSurface ?? undefined)}) -> BUFFER, waiter stays parked (#861/P36)`,
       );
     }
     const queue = this.inbox.get(seq) ?? [];
@@ -1008,7 +1156,11 @@ export class CoopInteractionRelay {
       return;
     }
     if (msg.t === "rewardOptions") {
-      const key = `${msg.seq}:${msg.reroll}`;
+      if (msg.rewardSurface != null && !isWireRewardSurfaceIdentity(msg.rewardSurface)) {
+        coopWarn("relay", "RECV rewardOptions -> invalid ordered reward surface");
+        return;
+      }
+      const key = rewardOptionsKey(msg.seq, msg.reroll, msg.rewardSurface);
       const waiter = this.rewardOptionsPending.get(key);
       if (waiter) {
         if (isCoopDebug()) {
@@ -1038,17 +1190,31 @@ export class CoopInteractionRelay {
       return;
     }
     if (msg.t === "requestRewardOptions") {
-      const key = `${msg.seq}:${msg.reroll}`;
+      if (msg.rewardSurface != null && !isWireRewardSurfaceIdentity(msg.rewardSurface)) {
+        coopWarn("relay", "RECV requestRewardOptions -> invalid ordered reward surface");
+        return;
+      }
+      const key = rewardOptionsKey(msg.seq, msg.reroll, msg.rewardSurface);
       const options = this.sentRewardOptions.get(key);
       if (options == null) {
         coopWarn("relay", `RECV requestRewardOptions key=${key} -> no authoritative cache`);
         return;
       }
       coopLog("relay", `RECV requestRewardOptions key=${key} -> REPLAY count=${options.length}`);
-      this.transport.send({ t: "rewardOptions", seq: msg.seq, reroll: msg.reroll, options });
+      this.transport.send({
+        t: "rewardOptions",
+        seq: msg.seq,
+        reroll: msg.reroll,
+        options,
+        ...(msg.rewardSurface == null ? {} : { rewardSurface: msg.rewardSurface }),
+      });
       return;
     }
     if (msg.t !== "interactionChoice") {
+      return;
+    }
+    if (msg.rewardSurface != null && !isWireRewardSurfaceIdentity(msg.rewardSurface)) {
+      coopWarn("relay", "RECV interactionChoice -> invalid ordered reward surface");
       return;
     }
     // #829 malicious-peer hardening: drop a forged cross-owner faint-replacement switch pick before it
@@ -1066,18 +1232,29 @@ export class CoopInteractionRelay {
       ...(msg.data === undefined ? {} : { data: [...msg.data] }),
     });
     if (COOP_DURABLE_CHOICE_ECHO_KINDS.has(msg.kind)) {
-      const key = this.choiceCreditKey(msg.seq, msg.kind, msg.choice, msg.data);
+      const key = this.choiceCreditKey(msg.seq, msg.kind, msg.choice, msg.data, msg.rewardSurface);
       if (this.consumeEchoCredit(this.committedChoiceCredits, key)) {
         return;
       }
       this.addTransientRawChoiceCredit(key);
     }
     // #861: carry the wire `kind` onto the choice so the KIND-VALIDATION can gate delivery + buffer-hits.
-    this.deliverInteractionChoice(msg.seq, { choice: msg.choice, data: msg.data, kind: msg.kind });
+    this.deliverInteractionChoice(msg.seq, {
+      choice: msg.choice,
+      data: msg.data,
+      kind: msg.kind,
+      rewardSurface: msg.rewardSurface,
+    });
   }
 
-  private choiceCreditKey(seq: number, kind: string, choice: number, data: number[] | undefined): string {
-    return `${seq}:${kind}:${choice}:${JSON.stringify(data ?? null)}`;
+  private choiceCreditKey(
+    seq: number,
+    kind: string,
+    choice: number,
+    data: number[] | undefined,
+    rewardSurface?: CoopRewardSurfaceIdentity,
+  ): string {
+    return `${seq}:${kind}:${choice}:${rewardSurfaceKey(rewardSurface)}:${JSON.stringify(data ?? null)}`;
   }
 
   private addEchoCredit(credits: Map<string, number>, key: string): void {
@@ -1155,7 +1332,10 @@ export class CoopInteractionRelay {
 export interface CoopPeerAdvanceProbe {
   /** Cancellable await that resolves once the PEER broadcasts a counter strictly beyond `counter`
    *  (owner committed + moved on). `cancel()` drops the waiter if the relayed pick wins the race first. */
-  awaitPeerAdvancePast(counter: number): { promise: Promise<void>; cancel: () => void };
+  awaitPeerAdvancePast(counter: number): {
+    promise: Promise<void>;
+    cancel: () => void;
+  };
 }
 
 /** When the owner is observed to have advanced past the interaction, how long to still let a genuinely

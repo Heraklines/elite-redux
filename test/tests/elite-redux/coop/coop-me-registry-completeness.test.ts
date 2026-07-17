@@ -9,6 +9,9 @@
 // turns any new custom UI/phase/loop into a mandatory co-op architecture decision instead of a latent live
 // softlock. Concrete two-engine tests named below prove each exceptional surface.
 
+import { erGauntletPickMeType, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { allMysteryEncounters, initMysteryEncounters } from "#mystery-encounters/mystery-encounters";
 import { readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -88,6 +91,29 @@ describe("co-op Mystery Encounter registry and exceptional-surface completeness"
     );
     expect(registered.size, "the audited biome/gauntlet registry cardinality is explicit").toBe(91);
     expect(enumMembers()).toContain("ER_THE_BARGAIN");
+  });
+
+  it("keeps every seeded gauntlet ME pick concrete and registered", () => {
+    initMysteryEncounters();
+    const syntheticTypes = new Set([MysteryEncounterType.LLM_DIRECTED, MysteryEncounterType.ER_THE_BARGAIN]);
+
+    for (let seedIndex = 0; seedIndex < 512; seedIndex++) {
+      const seed = `gauntlet-registry-${seedIndex}`;
+      for (let wave = 2; wave <= 257; wave++) {
+        if (erGauntletWaveKind(wave) !== "me") {
+          continue;
+        }
+        const selected = erGauntletPickMeType(wave, [], seed);
+        expect(
+          syntheticTypes.has(selected),
+          `seed ${seed} wave ${wave} selected synthetic ${MysteryEncounterType[selected]}`,
+        ).toBe(false);
+        expect(
+          allMysteryEncounters[selected],
+          `seed ${seed} wave ${wave} selected unregistered ${MysteryEncounterType[selected]}`,
+        ).toBeDefined();
+      }
+    }
   });
 
   it("keeps every direct encounter UI escape inside the audited files", () => {

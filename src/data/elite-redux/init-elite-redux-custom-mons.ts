@@ -38,6 +38,7 @@ import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
 import { allAbilities } from "#data/data-lists";
+import { enAbilityName } from "#data/elite-redux/er-canonical-names";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { registerErEditorMon } from "#data/elite-redux/init-elite-redux-custom-species";
@@ -78,8 +79,11 @@ export const ER_EDITOR_MON_ID_MAX = 69999;
 function abilityIdByName(): Map<string, number> {
   const map = new Map<string, number>();
   for (const ability of allAbilities) {
-    if (ability && ability.id !== AbilityId.NONE && ability.name) {
-      const key = ability.name.trim().toLowerCase();
+    if (ability && ability.id !== AbilityId.NONE) {
+      const key = enAbilityName(ability).trim().toLowerCase();
+      if (!key) {
+        continue;
+      }
       if (!map.has(key)) {
         map.set(key, ability.id);
       }

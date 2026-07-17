@@ -269,16 +269,16 @@ type FcRecord = Record<string, number>;
 
 /** ER-only FormChangeItem ids (the custom mega/primal stones). */
 export const ER_MEGA_STONE_ITEMS: ReadonlySet<FormChangeItem> = new Set<FormChangeItem>(
-  ER_STONE_DEFS.map(([name]) => (FormChangeItem as FcRecord)[name]).filter(
+  ER_STONE_DEFS.map(([name]) => (FormChangeItem as unknown as FcRecord)[name]).filter(
     (v): v is FormChangeItem => v !== undefined,
   ),
 );
 
 /** ER stone id -> the existing items-atlas icon frame it reuses. */
 const ER_STONE_ICON_BY_ITEM: ReadonlyMap<FormChangeItem, string> = new Map(
-  ER_STONE_DEFS.map(([name, icon]) => [(FormChangeItem as FcRecord)[name] as FormChangeItem, icon] as const).filter(
-    ([item]) => item !== undefined,
-  ),
+  ER_STONE_DEFS.map(
+    ([name, icon]) => [(FormChangeItem as unknown as FcRecord)[name] as FormChangeItem, icon] as const,
+  ).filter(([item]) => item !== undefined),
 );
 
 /** True if the FormChangeItem is one of the ER-only custom stones. */
@@ -301,6 +301,6 @@ export function resolveErStoneFormChangeItem(requirement: string | undefined | n
     return undefined;
   }
   const name = requirement.slice("ITEM_".length);
-  const v = (FormChangeItem as FcRecord)[name];
+  const v = (FormChangeItem as unknown as FcRecord)[name];
   return typeof v === "number" ? (v as FormChangeItem) : undefined;
 }

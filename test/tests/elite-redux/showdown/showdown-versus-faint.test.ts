@@ -37,6 +37,7 @@ import {
 import {
   type CoopRuntime,
   clearCoopRuntime,
+  isCoopSharedTerminalFrozen,
   setCoopRuntime,
   wireCoopStallWatchdog,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -245,7 +246,7 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
     // HOST turn: THUNDERBOLT the guest's Magikarp (its EnemyCommandPhase awaits the guest's SPLASH).
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     expect(rig.hostScene.getEnemyField()[0]?.isFainted() ?? true, "the guest's lead fainted on the host").toBe(true);
 
@@ -279,6 +280,10 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       expect(rep?.speciesId, "the guest materialized ITS pick (GYARADOS) on its own player field").toBe(GUEST_BENCH_2);
       expect(rep != null && rep.hp > 0 && !rep.fainted, "the guest's replacement is presented ALIVE").toBe(true);
     });
+    expect(
+      isCoopSharedTerminalFrozen(rig.guestRuntime),
+      "a semantically complete replacement projection never closes the shared match",
+    ).toBe(false);
     expect(resyncProbe.count(), "the guest-faint replacement converged with ZERO forced resyncs").toBe(0);
 
     logs.flush();
@@ -307,7 +312,7 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
     // HOST turn N: THUNDERBOLT KOs the guest's Magikarp.
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     expect(rig.hostScene.getEnemyField()[0]?.isFainted() ?? true, "the guest's lead fainted on the host").toBe(true);
 
@@ -395,9 +400,12 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
     ).toBe(MoveId.WATERFALL);
 
     // HOST resolves turn N+1: its EnemyCommandPhase consumes the buffered guest command, NOT the AI timeout.
+    // Use the deliberately non-lethal fixture move here. THUNDERBOLT is 4x effective against the
+    // replacement Gyarados, so speed-order variance could legitimately open a second replacement picker
+    // before the checkpoint this test is trying to assert, turning the coverage into a false-red lottery.
     await withClient(rig.hostCtx, async () => {
-      game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      game.move.select(MoveId.TACKLE, 0, BattlerIndex.ENEMY);
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     expect(
       hostTurn2Cmd?.moveId,
@@ -441,7 +449,7 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
     // HOST turn: EXPLOSION -> the host's own Pikachu faints (self-KO) AND the guest's Magikarp faints.
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.EXPLOSION, 0, BattlerIndex.ENEMY);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     expect(rig.hostScene.getPlayerField()[0]?.isFainted() ?? true, "the HOST's own lead fainted (Explosion)").toBe(
       true,
@@ -523,7 +531,7 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
     // relayed - the host's ShowdownEnemyFaintSwitchPhase await must TIME OUT and AI-pick, never stall.
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     expect(rig.hostScene.getEnemyField()[0]?.isFainted() ?? true, "the guest's lead fainted on the host").toBe(true);
 

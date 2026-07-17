@@ -55,6 +55,7 @@ import type {
   CoopApplyOutcome,
   CoopDurabilityHooks,
   CoopDurabilityManager,
+  CoopOperationContinuationAddress,
 } from "#data/elite-redux/coop/coop-durability";
 import type { CoopAuthoritativeEnvelopeV1, CoopLogicalPhase } from "#data/elite-redux/coop/coop-operation-envelope";
 import type { CoopOperationGuest } from "#data/elite-redux/coop/coop-operation-runtime";
@@ -62,6 +63,7 @@ import {
   type CoopOperationSurfaceClass,
   isCoopOperationSurfaceClass,
 } from "#data/elite-redux/coop/coop-operation-surface-registry";
+import type { CoopOperationContinuationSurface } from "#data/elite-redux/coop/coop-transport";
 import { recordCoopUiRelayCarrier } from "#data/elite-redux/coop/coop-ui-relay-trace";
 
 /** The journaled durability class for a committed op, DERIVED from its logical phase (§4.1). */
@@ -182,25 +184,82 @@ export function setCoopOperationDurability(manager: CoopDurabilityManager | null
   activeDurability = manager;
 }
 
+/**
+ * The currently-installed durability manager (null when durability is OFF / idle). Exposed so a scoping
+ * helper can SAVE and RESTORE it around an async reward continuation that must journal into its OWNING
+ * runtime's manager rather than whatever ambient one happens to be installed at continuation time.
+ */
+export function getActiveCoopOperationDurability(): CoopDurabilityManager | null {
+  return activeDurability;
+}
+
 /** Whether the operation commit path currently journals (durability manager installed). */
 export function isCoopOperationJournalActive(): boolean {
   return activeDurability != null;
 }
 
+/** Explicit-runtime sibling for a callback that captured its owning durability manager. */
+export function isCoopOperationJournalActiveFor(manager: CoopDurabilityManager | null): boolean {
+  return manager != null;
+}
+
+/**
+ * Publish final operation-continuation evidence from the same public-UI chokepoint as battle authority.
+ * Material application alone never reaches this function and therefore cannot retire host retention.
+ */
+export function notifyCoopOperationContinuationSurface(
+  surface: CoopOperationContinuationSurface,
+  address: CoopOperationContinuationAddress,
+): number {
+  return activeDurability?.notifyOperationContinuationSurface(surface, address) ?? 0;
+}
+
+/**
+ * Publish the host's matching real public continuation surface. This does not ACK or release authority; it
+ * starts the peer-convergence stage exactly once while the guest's ordered `continuationReady` remains due.
+ */
+export function notifyCoopOperationAuthorityContinuationSurface(
+  surface: CoopOperationContinuationSurface,
+  address: CoopOperationContinuationAddress,
+): number {
+  return activeDurability?.notifyOperationAuthorityContinuationSurface(surface, address) ?? 0;
+}
+
 /**
  * COMMIT -> JOURNAL (§4.1/§4.2). Called by a migrated surface adapter immediately after its
  * CoopOperationHost COMMITS an op. Journals the committed envelope (for resend / reconnect replay) and
- * broadcasts it on the `envelope` wire arm. No-op when durability is OFF or the phase is not a migrated
- * operation surface. Never throws (a failure must fall back to the legacy relay carrier, dual-run).
+ * broadcasts it on the `envelope` wire arm. Returns true when durability is OFF (legacy mode) or when the
+ * exact entry is concretely retained; returns false for an unmapped surface, journal failure, eviction, or
+ * conflicting same-revision payload. Never throws. Terminal callers must remain closed on false.
  */
-export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelopeV1): void {
-  const manager = activeDurability;
+export function tryJournalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  return tryJournalCoopCommittedEnvelopeFor(activeDurability, envelope);
+}
+
+/**
+ * Retain through the supplied runtime's manager instead of the ambient process selector. Async Phaser/UI
+ * callbacks in the two-engine harness can resume after another client was installed; binding publication
+ * explicitly prevents a host result from being committed into its peer's journal.
+ */
+export function tryJournalCoopCommittedEnvelopeFor(
+  manager: CoopDurabilityManager | null,
+  envelope: CoopAuthoritativeEnvelopeV1,
+): boolean {
   if (manager == null) {
-    return;
+    return true;
   }
   const cls = coopOperationClassForEnvelope(envelope);
   if (cls == null) {
-    return;
+    return false;
+  }
+  let retained = false;
+  try {
+    retained = manager.commit("op:global", envelope.revision, { t: "envelope", envelope });
+  } catch {
+    retained = false;
+  }
+  if (!retained) {
+    return false;
   }
   if (isCoopOperationSurfaceClass(cls)) {
     journalCommittedClasses.add(cls);
@@ -222,12 +281,12 @@ export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelope
     turn: envelope.turn,
     detail: `class=${cls} kind=${envelope.pendingOperation?.kind ?? "none"}`,
   });
-  try {
-    manager.commit("op:global", envelope.revision, { t: "envelope", envelope });
-  } catch {
-    // Journaling is a durability BACKSTOP over the legacy relay carrier (still firing in dual-run); a
-    // failure here must never break the live commit. The relay + the deep-gap snapshot remain the fallback.
-  }
+  return true;
+}
+
+/** Compatibility wrapper for surfaces whose live migration still treats the journal as a backstop. */
+export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelopeV1): void {
+  tryJournalCoopCommittedEnvelope(envelope);
 }
 
 /**

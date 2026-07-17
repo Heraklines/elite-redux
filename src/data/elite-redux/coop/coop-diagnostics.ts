@@ -21,9 +21,20 @@
 
 import { globalScene } from "#app/global-scene";
 import { formatCoopCausalTrace } from "#data/elite-redux/coop/coop-causal-trace";
-import { coopSessionGeneration, getCoopNetcodeMode, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  type CoopReportCorrelationV1,
+  createCoopReportCorrelation,
+  formatCoopReportCorrelation,
+} from "#data/elite-redux/coop/coop-report-correlation";
+import {
+  type CoopRuntime,
+  coopSessionGeneration,
+  getCoopNetcodeMode,
+  getCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { formatCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
+import { getErBuildIdentity } from "#utils/build-identity";
 
 /** The fenced header that opens the control-plane block (kept stable so a triage tool can key off it). */
 export const COOP_CONTROL_PLANE_MARKER = "----- CO-OP CONTROL PLANE -----";
@@ -35,6 +46,72 @@ function formatLastRx(transport: CoopTransport | undefined): string {
   }
   const ms = transport.lastRxMs?.();
   return ms == null ? "never" : `${Math.round(ms / 1000)}s`;
+}
+
+/**
+ * Capture only the immutable axes needed to pair the two clients' reports. Account ids, display names,
+ * signaling bearers and arbitrary environment values are deliberately absent.
+ */
+export function captureCoopReportCorrelation(): CoopReportCorrelationV1 | null {
+  const runtime = getCoopRuntime();
+  if (runtime == null) {
+    return null;
+  }
+  try {
+    const controller = runtime.controller;
+    const binding = safe(() => controller.authenticatedBinding) ?? null;
+    const membership = safe(() => runtime.membership.snapshot()) ?? null;
+    const localRole = controller.role;
+    const localSeat = safe(() => controller.localSeatId) ?? safe(() => controller.seat) ?? null;
+    let partnerSeat =
+      binding?.seatMap.seats.find(seat => seat.seatId !== localSeat)?.seatId
+      ?? safe(() => runtime.membership.snapshot().members.find(member => member.seatId !== localSeat)?.seatId)
+      ?? null;
+    if (!Number.isSafeInteger(partnerSeat) || (partnerSeat as number) < 0) {
+      partnerSeat = null;
+    }
+    return createCoopReportCorrelation({
+      runId: safe(() => controller.runId) ?? null,
+      epoch: safe(() => controller.sessionEpoch) ?? null,
+      seed: safe(() => globalScene.seed) ?? null,
+      bindingId: binding?.bindingId ?? null,
+      sessionId: binding?.sessionId ?? null,
+      bindingSource: binding?.source ?? null,
+      authoritySeat: binding?.authoritySeatId ?? safe(() => controller.authoritySeatId) ?? null,
+      membershipRevision: membership?.revision ?? null,
+      membershipConnectionGeneration: membership?.connectionGeneration ?? null,
+      localRole,
+      localSeat,
+      partnerRole: localRole === "host" ? "guest" : "host",
+      partnerSeat,
+      build: getErBuildIdentity(),
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** Fenced one-line JSON for the plain-text Send Logs path, or `""` outside a live co-op session. */
+export function formatLiveCoopReportCorrelation(): string {
+  const correlation = captureCoopReportCorrelation();
+  return correlation == null ? "" : formatCoopReportCorrelation(correlation);
+}
+
+function formatSessionLine(runtime: CoopRuntime): string {
+  const controller = runtime.controller;
+  const binding = safe(() => controller.authenticatedBinding);
+  const mismatches = [
+    controller.versionMismatch ? "VERSION-MISMATCH" : null,
+    controller.functionalFingerprintMismatch ? "FUNCTIONAL-FINGERPRINT-MISMATCH" : null,
+    controller.presentationFingerprintMismatch ? "PRESENTATION-FINGERPRINT-MISMATCH" : null,
+  ].filter(value => value != null);
+  return (
+    `session:  role=${controller.role} seat=${safe(() => String(controller.localSeatId ?? controller.seat))}`
+    + ` gen=${coopSessionGeneration()}g epoch=${safe(() => controller.sessionEpoch) ?? "-"}`
+    + ` run=${safe(() => controller.runId) || "-"} binding=${binding?.bindingId ?? "-"}`
+    + ` sessionId=${binding?.sessionId ?? "-"} netcode=${getCoopNetcodeMode()}`
+    + (mismatches.length === 0 ? "" : ` ${mismatches.join(" ")}`)
+  );
 }
 
 /**
@@ -59,9 +136,7 @@ export function formatCoopControlPlane(): string {
     const lines: string[] = [COOP_CONTROL_PLANE_MARKER];
 
     // --- Session identifiers ---
-    lines.push(
-      `session:  role=${controller.role} seat=${safe(() => String(controller.seat))} gen=${coopSessionGeneration()}g netcode=${getCoopNetcodeMode()}${controller.versionMismatch ? " VERSION-MISMATCH" : ""}${controller.functionalFingerprintMismatch ? " FUNCTIONAL-FINGERPRINT-MISMATCH" : ""}${controller.presentationFingerprintMismatch ? " PRESENTATION-FINGERPRINT-MISMATCH" : ""}`,
-    );
+    lines.push(formatSessionLine(runtime));
     const membership = safe(() => runtime.membership.snapshot());
     if (membership != null) {
       lines.push(

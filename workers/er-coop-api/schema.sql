@@ -47,3 +47,75 @@ CREATE TABLE IF NOT EXISTS coop_lobby (
   created_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_coop_lobby_seen ON coop_lobby (seen_at);
+
+-- P33 authenticated signaling. Public clients receive a short-lived HMAC identity
+-- ticket from er-save-api; this worker binds each ticket nonce exactly once and
+-- stores only the derived bearer hash. Display names never authorize a run seat.
+CREATE TABLE IF NOT EXISTS coop_ticket_bindings_p33 (
+  ticket_nonce TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  client_nonce TEXT NOT NULL,
+  presence_id TEXT NOT NULL UNIQUE,
+  bearer_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS coop_lobby_p33 (
+  presence_id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL UNIQUE,
+  display_name TEXT NOT NULL,
+  canonical_username TEXT NOT NULL,
+  ticket_nonce TEXT NOT NULL UNIQUE,
+  client_nonce TEXT NOT NULL,
+  bearer_hash TEXT NOT NULL,
+  seen_at INTEGER NOT NULL,
+  paired_code TEXT,
+  transport_role TEXT,
+  created_at INTEGER NOT NULL,
+  req_from TEXT,
+  req_at INTEGER,
+  declined_name TEXT,
+  room TEXT NOT NULL DEFAULT 'default'  -- per-run lobby namespace (#920); '' room-less clients share 'default'
+);
+CREATE INDEX IF NOT EXISTS idx_coop_lobby_p33_seen ON coop_lobby_p33 (seen_at);
+-- Existing deployments migrate additively (the worker's ensureP33SignalingSchema also runs this;
+-- ADD COLUMN throws if it already exists and is swallowed):
+--   ALTER TABLE coop_lobby_p33 ADD COLUMN room TEXT NOT NULL DEFAULT 'default';
+
+CREATE TABLE IF NOT EXISTS coop_runs_p33 (
+  code TEXT PRIMARY KEY,
+  offerer_presence_id TEXT NOT NULL,
+  answerer_presence_id TEXT NOT NULL,
+  offerer_account_id TEXT NOT NULL,
+  answerer_account_id TEXT NOT NULL,
+  offerer_display_name TEXT NOT NULL,
+  answerer_display_name TEXT NOT NULL,
+  offerer_canonical_username TEXT NOT NULL,
+  answerer_canonical_username TEXT NOT NULL,
+  offerer_bearer_hash TEXT NOT NULL,
+  answerer_bearer_hash TEXT NOT NULL,
+  offerer_generation INTEGER NOT NULL DEFAULT 0,
+  answerer_generation INTEGER NOT NULL DEFAULT 0,
+  offerer_seen_at INTEGER NOT NULL,
+  answerer_seen_at INTEGER NOT NULL,
+  state TEXT NOT NULL DEFAULT 'active',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_coop_runs_p33_updated ON coop_runs_p33 (updated_at);
+
+CREATE TABLE IF NOT EXISTS coop_pair_members_p33 (
+  presence_id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL UNIQUE,
+  code TEXT NOT NULL,
+  transport_role TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS coop_signals_p33 (
+  code TEXT NOT NULL,
+  from_role TEXT NOT NULL,
+  signal TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (code, from_role)
+);

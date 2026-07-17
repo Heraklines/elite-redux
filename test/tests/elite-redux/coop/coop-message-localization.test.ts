@@ -45,6 +45,7 @@ import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 import { GameManager } from "#test/framework/game-manager";
+import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import i18next from "i18next";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -92,7 +93,8 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
   /** Start a co-op authoritative double as the HOST and tag field ownership. */
   const startCoopHost = async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    startLocalCoopSession({ username: "Host", netcodeMode: "authoritative" });
+    const runtime = startLocalCoopSession({ username: "Host", netcodeMode: "authoritative" });
+    await negotiateLocalSpoofPeer(runtime);
     game.scene.gameMode = getGameMode(GameModes.COOP);
     expect(game.scene.gameMode.isCoop).toBe(true);
     const field = game.scene.getPlayerField();
@@ -104,7 +106,13 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
   /** Start a co-op authoritative double, then flip the LOCAL engine into the GUEST role. */
   const startCoopGuest = async () => {
     const field = await startCoopHost();
+    const runtime = getCoopRuntime()!;
+    runtime.spoof?.dispose();
     getCoopController()!.role = "guest";
+    // Protocol 33 keys retained/durable operation cursors by runtime role as well as controller
+    // role. This legacy single-engine fixture changes seats after assembly, so move both
+    // identities together just as the guest-renderer fixture does.
+    (runtime.opState as { localRole: "host" | "guest" | null }).localRole = "guest";
     return field;
   };
 
@@ -199,7 +207,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     const hostFainted = i18next.t("battle:fainted", { pokemonNameWithAffix: getPokemonNameWithAffix(enemy0) });
 
     game.move.select(MoveId.TACKLE, BattlerIndex.PLAYER, enemy0.getBattlerIndex());
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
     await new Promise(r => setTimeout(r, 0));
 
     // The structured events are still recorded (the guest regenerates the lines from them).
@@ -235,7 +243,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     });
 
     game.move.select(MoveId.TACKLE, BattlerIndex.PLAYER, enemy0.getBattlerIndex());
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
     await new Promise(r => setTimeout(r, 0));
 
     const faint = events.find(e => e.k === "faint" && e.bi === enemy0.getBattlerIndex());

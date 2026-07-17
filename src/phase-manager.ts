@@ -36,6 +36,7 @@ import { CoopInertPhase } from "#phases/coop-inert-phase";
 import { CoopPartnerSyncPhase } from "#phases/coop-partner-sync-phase";
 import { CoopPushReplacementCheckpointPhase } from "#phases/coop-push-replacement-checkpoint-phase";
 import { CoopReplayLearnMovePhase } from "#phases/coop-replay-learn-move-phase";
+import { CoopTurnCommitPhase } from "#phases/coop-turn-commit-phase";
 // #848: side-effect import so the guest's INLINE batch Move Learn panel opener registers with the coop
 // runtime at boot (the shared co-op level-up path). It exports no phase, so it needs an explicit import.
 import "#phases/coop-replay-learn-move-batch";
@@ -51,6 +52,7 @@ import {
   CoopStatusReplayPhase,
 } from "#phases/coop-replay-phases";
 import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
+import { CoopVictorySealPhase } from "#phases/coop-victory-seal-phase";
 import { DamageAnimPhase } from "#phases/damage-anim-phase";
 import { DynamicPhaseMarker } from "#phases/dynamic-phase-marker";
 import { EggHatchPhase } from "#phases/egg-hatch-phase";
@@ -202,6 +204,7 @@ const PHASES = Object.freeze({
   CoopPartnerSyncPhase,
   CoopInertPhase,
   CoopPushReplacementCheckpointPhase,
+  CoopTurnCommitPhase,
   CoopApplyResyncPhase,
   CoopCaptureReplayPhase,
   CoopFinalizeTurnPhase,
@@ -210,6 +213,7 @@ const PHASES = Object.freeze({
   CoopMoveAnimReplayPhase,
   CoopStatStageReplayPhase,
   CoopStatusReplayPhase,
+  CoopVictorySealPhase,
   CommonAnimPhase,
   DamageAnimPhase,
   DynamicPhaseMarker,
@@ -335,6 +339,12 @@ export class PhaseManager {
   private currentPhase: Phase;
   /** The phase put on standby if {@linkcode overridePhase} is called */
   private standbyPhase: Phase | null = null;
+  /**
+   * Terminal fence for a co-op runtime that is retaining its peer-ACKed shutdown transaction. The current
+   * phase may receive late async completions while that handshake runs; blocking `shiftPhase` prevents
+   * those completions from rebuilding a turn after the gameplay queues were drained.
+   */
+  private coopTerminalProgressionFrozen = false;
 
   /**
    * Clear all previously set phases, then add a new {@linkcode TitlePhase} to transition to the title screen.
@@ -429,12 +439,31 @@ export class PhaseManager {
     this.standbyPhase = null;
   }
 
+  /** Freeze phase progression at the current surface while a co-op shared terminal is retained. */
+  public freezeForCoopTerminal(): void {
+    this.coopTerminalProgressionFrozen = true;
+    this.clearAllPhases();
+  }
+
+  /** Release the terminal fence immediately before exactly-once title teardown. */
+  public releaseCoopTerminalFreeze(): void {
+    this.coopTerminalProgressionFrozen = false;
+  }
+
+  /** Read-only proof used by terminal wiring tests and diagnostics. */
+  public isCoopTerminalFrozen(): boolean {
+    return this.coopTerminalProgressionFrozen;
+  }
+
   /**
    * Determine the next phase to run and start it.
    * @privateRemarks
    * This is called by {@linkcode Phase.end} by default, and should not be called by other methods.
    */
   public shiftPhase(): void {
+    if (this.coopTerminalProgressionFrozen) {
+      return;
+    }
     if (this.standbyPhase) {
       this.currentPhase = this.standbyPhase;
       this.standbyPhase = null;
@@ -645,6 +674,14 @@ export class PhaseManager {
    */
   public unshiftNew<T extends PhaseString>(phase: T, ...args: ConstructorParameters<PhaseConstructorMap[T]>): void {
     this.unshiftPhase(this.create(phase, ...args));
+  }
+
+  /**
+   * Queue the authoritative co-op commit after the current phase's complete child subtree,
+   * but before its pre-existing faint, victory, or next-turn siblings.
+   */
+  public queueCoopTurnCommitPhase(): void {
+    this.phaseQueue.addBarrier(this.create("CoopTurnCommitPhase"));
   }
 
   /**

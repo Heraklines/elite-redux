@@ -12,14 +12,14 @@
 //
 // THREE distinct authoritative-ME code paths, each its own it():
 //   1. HOST-OWNED non-battle ME (counter 0, even): the host drives the pick off its OWN local input;
-//      the guest is a pure renderer (awaits the comprehensive meResync + LEAVE). DEPARTMENT_STORE_SALE.
+//      the guest is a pure renderer that adopts the complete retained DATA+continuation. DEPARTMENT_STORE_SALE.
 //   2. GUEST-OWNED non-battle ME (counter 1, odd): the host CANNOT take the human pick, so it AWAITS
 //      the guest's relayed option INDEX on 8M (coopHostAwaitGuestIndex) and applies it PROGRAMMATICALLY;
 //      the guest renders the selector off the host presentation + relays its pick. DEPARTMENT_STORE_SALE.
-//   3. BATTLE-HANDOFF ME (the documented #693 softlock class): an option that SPAWNS a battle relays
-//      COOP_ME_BATTLE_HANDOFF (-1000) on the 9M term seq with NO trailing 8M meResync; the guest's
-//      CoopReplayMePhase must finishWithoutLeaving() (end WITHOUT advancing - the single advance defers
-//      to the TRUE ME terminal after the battle), NOT hang awaiting an 8M outcome. FIGHT_OR_FLIGHT opt 1.
+//   3. BATTLE-HANDOFF ME (the documented #693 softlock class): an option that SPAWNS a battle commits one
+//      retained ME_TERMINAL carrying the comprehensive state + exact battle destination. The guest must
+//      finishWithoutLeaving() (end WITHOUT advancing - the single advance defers to the TRUE ME terminal
+//      after the battle), with no raw party/9M correctness dependency. FIGHT_OR_FLIGHT opt 1.
 //
 // HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
 //   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-duo-mystery.test.ts --reporter=dot
@@ -36,8 +36,10 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
+import * as meOp from "#data/elite-redux/coop/coop-me-operation";
+import { type CoopMePresentPayload, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import { clearCoopRuntime, getCoopInteractionRelay, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopInteractionOutcome, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattleType } from "#enums/battle-type";
@@ -49,16 +51,18 @@ import { UiMode } from "#enums/ui-mode";
 import { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  beginRewardShopWatch,
   buildDuoForMe,
   drainGuestMeReplayNewRounds,
   drainGuestMeReplayToSettle,
   drainLoopback,
   driveGuestMeReplay,
   driveGuestMirrorQuiz,
+  driveGuestRewardWatch,
+  driveHostMeRewardShopWithGuestReplay,
   driveHostRewardShopOwner,
   type ErQuizPhaseSeam,
   installDuoLogCapture,
-  relayGuestMeOptionIndexOnly,
   relayGuestMeShopLeaveSync,
   type ShopPhaseSeam,
   startGuestMeOutcomeRace,
@@ -78,9 +82,72 @@ const RUN = process.env.ER_SCENARIO === "1";
 /** A valid ME wave: WILD, non-boss, in [10,180], waveIndex % 10 != 1 (see isMysteryEncounterValidForWave). */
 const ME_WAVE = 12;
 
+/** Unique committed Mystery operations observed on the retained transport, in first-send order. */
+function committedMeOperations(calls: readonly (readonly CoopMessage[])[]): {
+  id: string;
+  kind: string;
+  payload: unknown;
+}[] {
+  const byId = new Map<string, { id: string; kind: string; payload: unknown }>();
+  for (const call of calls) {
+    const message = call[0];
+    if (message?.t !== "envelope") {
+      continue;
+    }
+    const operation = message.envelope.pendingOperation;
+    if (operation?.status !== "applied" || (!operation.kind.startsWith("ME_") && operation.kind !== "QUIZ_ANSWER")) {
+      continue;
+    }
+    byId.set(operation.id, { id: operation.id, kind: operation.kind, payload: operation.payload });
+  }
+  return [...byId.values()];
+}
+
+/** Complete host-authored presentations carried by retained ME_PRESENT operations. */
+function committedMePresentations(
+  calls: readonly (readonly CoopMessage[])[],
+): Extract<CoopInteractionOutcome, { k: "mePresent" }>[] {
+  return committedMeOperations(calls).flatMap(operation => {
+    if (operation.kind !== "ME_PRESENT") {
+      return [];
+    }
+    const presentation = (operation.payload as CoopMePresentPayload).presentation;
+    return presentation?.k === "mePresent" ? [presentation] : [];
+  });
+}
+
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+/**
+ * Mint the same retained owner intent and addressed proposal ordinal as the public Mystery selector.
+ * The two-engine harness defers the replay's outcome race until the host has run, so it cannot invoke the
+ * selector handler directly without resolving its promises under the shared process-global host context.
+ */
+function relayGuestMePickWithIntent(replay: Phase, scene: BattleScene, pinned: number, optionIndex: number): void {
+  const relay = getCoopInteractionRelay();
+  if (relay == null) {
+    throw new Error("guest-owned ME test lost its production interaction relay");
+  }
+  const seq = (replay as unknown as { seq: number }).seq;
+  const step = 0;
+  const operationId = meOp.commitMeOwnerIntent({
+    kind: "ME_PICK",
+    seq,
+    pinned,
+    step,
+    payload: { optionIndex },
+    localRole: "guest",
+    wave: scene.currentBattle.waveIndex,
+    turn: scene.currentBattle.turn,
+    resend: () => relay.sendInteractionChoice(seq, "me", optionIndex, [step]),
+  });
+  if (operationId == null) {
+    throw new Error("guest-owned ME test could not retain its typed ME_PICK intent");
+  }
+  relay.sendInteractionChoice(seq, "me", optionIndex, [step]);
 }
 
 /**
@@ -172,6 +239,7 @@ describe.skipIf(!RUN)(
       // Spy the guest's comprehensive ME-outcome apply (the guest's SOLE convergence mechanism - it runs
       // no engine). It must fire EXACTLY once (the host streams meResync at its terminal).
       const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
+      let replay!: Phase;
 
       // ===== Drive the HOST through the ME FULLY (it FIFO-buffers presentation + meResync on 8M and the
       // LEAVE terminal on 9M into the relay), THEN drive the guest which drains with zero network wait.
@@ -193,7 +261,7 @@ describe.skipIf(!RUN)(
         await game.phaseInterceptor.to("SelectModifierPhase", false);
         const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
         expect(hostShop.phaseName, "host reached the embedded end-of-ME reward shop").toBe("SelectModifierPhase");
-        await driveHostRewardShopOwner(hostShop, { takeReward: false });
+        replay = await driveHostMeRewardShopWithGuestReplay(hostShop, rig.guestCtx, rig.guestScene);
         // The embedded shop MUST NOT have advanced the counter (it suppresses during the ME) - still 0.
         expect(
           rig.hostRuntime.controller.interactionCounter(),
@@ -225,7 +293,7 @@ describe.skipIf(!RUN)(
       // ===== Drive the GUEST's REAL CoopReplayMePhase: it consumes the host's buffered 8M present +
       // 8M meResync + 9M LEAVE (FIFO), applies the outcome, leaves the encounter, advances once. A
       // no-progress stall THROWS (the hang detection). =====
-      const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+      const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
 
       // The guest left the encounter exactly once (the single `settled` terminal).
       expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
@@ -263,6 +331,7 @@ describe.skipIf(!RUN)(
       const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore, "Hot Spring is host-owned at the initial even counter").toBe(0);
+      let replay!: Phase;
 
       await withClient(rig.hostCtx, async () => {
         // Dispose the encounter intro using the normal prompt path, then stop on the live selector.
@@ -318,7 +387,7 @@ describe.skipIf(!RUN)(
           "Hot Spring selected narration rendered only after the MESSAGE transition completed",
         ).toBe(true);
         const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-        await driveHostRewardShopOwner(hostShop, { takeReward: false });
+        replay = await driveHostMeRewardShopWithGuestReplay(hostShop, rig.guestCtx, rig.guestScene);
         expect(rig.hostRuntime.controller.interactionCounter(), "empty ME shop did not double-advance").toBe(
           counterBefore,
         );
@@ -328,7 +397,7 @@ describe.skipIf(!RUN)(
       expect(rig.hostRuntime.controller.interactionCounter(), "host completed the Hot Spring exactly once").toBe(
         counterBefore + 1,
       );
-      const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+      const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
       expect(guestReplay.settled, "guest left the exact Hot Spring terminal without parking").toBe(true);
       expect(rig.guestRuntime.controller.interactionCounter(), "guest Hot Spring counter converged").toBe(
         counterBefore + 1,
@@ -409,7 +478,7 @@ describe.skipIf(!RUN)(
       // mysteryEncounterSaveData is the harness's #1 footgun). The guest's OWN outcome/terminal race is
       // deferred to STEP D so ITS awaits also resolve under the guest scene. =====
       const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
+      withClientSync(rig.guestCtx, () => relayGuestMePickWithIntent(replay, rig.guestScene, counterBefore, 0));
 
       // ===== STEP C (host): the relayed index's deliver-microtask is queued but UNFIRED. Pump the host
       // UNDER hostCtx: the first drainLoopback flushes it, the coopHostAwaitGuestIndex await resolves (its
@@ -480,6 +549,8 @@ describe.skipIf(!RUN)(
       await withClient(rig.hostCtx, async () => {
         for (let i = 0; i < 16; i++) {
           await drainLoopback();
+          await withClient(rig.guestCtx, () => drainLoopback());
+          await drainLoopback();
           if (hostScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
             break;
           }
@@ -529,16 +600,13 @@ describe.skipIf(!RUN)(
 
     // ===========================================================================================
     // IT #3 - BATTLE-HANDOFF ME (the documented #693 softlock class). An ME OPTION that SPAWNS a battle
-    // (FIGHT_OR_FLIGHT option 1 -> initBattleWithEnemyConfig) relays COOP_ME_BATTLE_HANDOFF (-1000) on the
-    // 9M term seq with NO trailing 8M meResync. The guest's CoopReplayMePhase.awaitOutcomeThenTerminal
-    // RACES 8M (outcome) vs 9M (terminal): the terminal wins, handleTerminalAction sees the battle-handoff
-    // sentinel and calls finishWithoutLeaving() - it ends WITHOUT leaving the encounter and WITHOUT
-    // advancing the counter (the single ME advance defers to the TRUE terminal AFTER the spawned battle).
-    // This is the EXACT path that hung the guest pre-fix: a guest awaiting ONLY the 8M outcome parks forever
-    // on a meResync the host never sends. The harness asserts the handoff boundary: settled via the
-    // battle-handoff branch (NOT a leave), counter NOT advanced, no meResync applied, no hang.
+    // (FIGHT_OR_FLIGHT option 1 -> initBattleWithEnemyConfig) commits a complete retained battle terminal.
+    // The guest applies that exact DATA image and destination, then calls finishWithoutLeaving() - it ends
+    // WITHOUT leaving the encounter and WITHOUT advancing the counter (the single ME advance defers to the
+    // TRUE terminal AFTER the spawned battle). The harness asserts the handoff boundary: settled via the
+    // battle-handoff branch (NOT a leave), counter NOT advanced, state applied once, no hang.
     // ===========================================================================================
-    it("DUO ME: a host-owned BATTLE-spawning ME (FIGHT_OR_FLIGHT opt 1) hands off via 9M with no meResync - guest finishes WITHOUT leaving/advancing, no hang", async () => {
+    it("DUO ME: a host-owned BATTLE-spawning ME hands off via one retained state+destination transaction", async () => {
       await game.runToMysteryEncounter(MysteryEncounterType.FIGHT_OR_FLIGHT, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
       const hostScene = game.scene;
       expect(hostScene.currentBattle.mysteryEncounter?.encounterType, "the forced ME is FIGHT_OR_FLIGHT").toBe(
@@ -572,19 +640,17 @@ describe.skipIf(!RUN)(
         "host did NOT advance at the battle-handoff (advance defers past the spawned battle)",
       ).toBe(counterBefore);
 
-      // ===== Drive the GUEST's CoopReplayMePhase. The host buffered COOP_ME_BATTLE_HANDOFF on 9M and NO
-      // meResync on 8M. The guest's outcome/terminal race MUST resolve the 9M terminal (battle-handoff) and
-      // finishWithoutLeaving - NOT hang awaiting an 8M meResync that never comes. driveGuestMeReplay drains
-      // to `settled`; a no-progress stall THROWS (the #693 hang detection). =====
+      // ===== Drive the GUEST's CoopReplayMePhase. Its now-live retained receiver requests any fast host
+      // tail, applies the complete state image, and opens the exact battle destination. driveGuestMeReplay
+      // drains to `settled`; a no-progress stall THROWS (the #693 hang detection). =====
       const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
 
       // The guest settled (ended) - via the BATTLE-HANDOFF branch, NOT a leave. Discriminators:
       expect(guestReplay.settled, "guest CoopReplayMePhase settled (ended once) at the battle-handoff").toBe(true);
-      // (1) NO meResync was applied (battle-handoff has no trailing 8M outcome - the softlock-class signature).
-      expect(
-        applyMeOutcomeSpy.mock.calls.length,
-        "guest applied NO meResync at a battle-handoff (the 9M terminal had no trailing 8M outcome)",
-      ).toBe(0);
+      // (1) The comprehensive battle-handoff state applies exactly once before control opens.
+      expect(applyMeOutcomeSpy.mock.calls.length, "guest applied the retained battle-handoff state exactly once").toBe(
+        1,
+      );
       // (2) the guest did NOT advance the counter (finishWithoutLeaving defers the single advance past the
       // spawned battle - a leaveDefensive would have advanced). This is the load-bearing handoff assertion.
       expect(
@@ -607,6 +673,10 @@ describe.skipIf(!RUN)(
         hostEnemies[0].species.speciesId,
       );
       expect(hostEnemies[1].id, "the duplicate has its OWN pokemon id").not.toBe(hostEnemies[0].id);
+      expect(
+        rig.guestScene.currentBattle.enemyParty.map(mon => ({ id: mon.id, species: mon.species.speciesId })),
+        "guest adopted the exact host battle party from the retained transaction",
+      ).toEqual(hostEnemies.map(mon => ({ id: mon.id, species: mon.species.speciesId })));
 
       // ===== LOCKSTEP at the handoff boundary: BOTH controllers are still at counterBefore (the single ME
       // advance is deferred to the TRUE terminal after the spawned battle + its shop). NO double-advance,
@@ -702,6 +772,7 @@ describe.skipIf(!RUN)(
 
       const pair = createLoopbackPair();
       const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+      const hostTransportSendSpy = vi.spyOn(pair.host, "send");
 
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore, "the quiz ME opens on interaction counter 0 (host owns even)").toBe(0);
@@ -709,10 +780,11 @@ describe.skipIf(!RUN)(
 
       // Spy the guest's sole convergence mechanism (fires EXACTLY once at the host's terminal meResync).
       const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
-      // Tap the HOST relay: sendInteractionOutcome carries the streamed quiz SESSION (mePresent subPrompt
-      // kind "quiz"); sendInteractionChoice carries each committed answer as a "quizAns" (the DRIVE proof).
-      const sendOutcomeSpy = vi.spyOn(rig.hostRuntime.interactionRelay, "sendInteractionOutcome");
-      const sendChoiceSpy = vi.spyOn(rig.hostRuntime.interactionRelay, "sendInteractionChoice");
+      // Tap the retained host transport. P33 carries the quiz session and every host-owned answer as
+      // addressed operations; the raw mePresent/quizAns relays are intentionally absent in journal mode.
+      let guestMePhase: Phase | undefined;
+      let guestQuizQuestions = 0;
+      let guestQuizAnswered = 0;
 
       // A mirror-quiz handoff must be INTERLEAVED (the IT #2 split), NOT driven host-fully-first. On the
       // quiz's `mePresent subPrompt {kind:"quiz"}`, the guest's CoopReplayMePhase.start races the 8M outcome
@@ -774,7 +846,38 @@ describe.skipIf(!RUN)(
         await game.phaseInterceptor.to("SelectModifierPhase", false);
         const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
         expect(hostShop.phaseName, "host reached the embedded post-quiz reward shop").toBe("SelectModifierPhase");
-        await driveHostRewardShopOwner(hostShop, { takeReward: false });
+        await driveHostRewardShopOwner(hostShop, {
+          takeReward: false,
+          // A real client cannot leave this reciprocal shop before the watcher arrives. Start the guest's
+          // already-buffered ME replay here, consume the mirrored quiz, and let its production tail reach
+          // the same shop boundary before the host commits LEAVE.
+          partnerReady: async () => {
+            await withClient(rig.guestCtx, async () => {
+              guestMePhase = await startGuestMeReplay(rig.guestScene);
+              let quizPhase: ErQuizPhaseSeam | undefined;
+              for (let i = 0; i < 16; i++) {
+                await drainLoopback();
+                const current = rig.guestScene.phaseManager.getCurrentPhase();
+                if (current?.phaseName === "ErQuizPhase") {
+                  quizPhase = current as unknown as ErQuizPhaseSeam;
+                  break;
+                }
+              }
+              if (quizPhase == null) {
+                throw new Error("guest did not reach its mirrored quiz before the reciprocal reward shop");
+              }
+              guestQuizQuestions = quizPhase.questions.length;
+              guestQuizAnswered = await driveGuestMirrorQuiz(rig.guestScene, quizPhase, QUIZ_QUESTIONS);
+            });
+          },
+          partnerSettle: async () => {
+            await withClient(rig.guestCtx, async () => {
+              for (let i = 0; i < 16; i++) {
+                await drainLoopback();
+              }
+            });
+          },
+        });
         // MAJOR-3: the embedded ME shop suppresses its own advance mid-ME - still counter 0.
         expect(
           rig.hostRuntime.controller.interactionCounter(),
@@ -791,34 +894,42 @@ describe.skipIf(!RUN)(
         "host has NOT advanced yet (terminal parked before PostMysteryEncounterPhase.start)",
       ).toBe(counterBefore);
 
-      // ===== DRIVE-SIDE PROOF (host): it streamed the quiz SESSION and published one "quizAns" per question.
-      const quizSessionSends = sendOutcomeSpy.mock.calls.filter(c => {
-        const outcome = c[2] as CoopInteractionOutcome;
-        return outcome.k === "mePresent" && outcome.subPrompt?.kind === "quiz";
-      });
+      // ===== DRIVE-SIDE PROOF (host): one retained quiz SESSION plus one addressed answer per question.
+      const quizSessionSends = committedMePresentations(hostTransportSendSpy.mock.calls).filter(
+        outcome => outcome.subPrompt?.kind === "quiz",
+      );
       expect(
         quizSessionSends.length,
-        "host streamed the quiz SESSION as a mePresent subPrompt { kind:'quiz' } (#818)",
+        "host retained the quiz SESSION as an ME_PRESENT subPrompt { kind:'quiz' } (#818)",
       ).toBe(1);
-      const streamedSession = quizSessionSends[0][2] as Extract<CoopInteractionOutcome, { k: "mePresent" }>;
+      const streamedSession = quizSessionSends[0];
       expect(
         streamedSession.subPrompt?.kind === "quiz" ? streamedSession.subPrompt.questions.length : -1,
-        "the streamed session carries all GLYPH_COUNT questions",
+        "the retained session carries all GLYPH_COUNT questions",
       ).toBe(QUIZ_QUESTIONS);
 
-      const quizAnsSends = sendChoiceSpy.mock.calls.filter(c => c[1] === "quizAns");
-      expect(quizAnsSends.length, "host published one 'quizAns' per question (the DRIVE-side relay proof, #818)").toBe(
+      const quizAnswerOperations = committedMeOperations(hostTransportSendSpy.mock.calls).filter(
+        operation => operation.kind === "QUIZ_ANSWER",
+      );
+      expect(quizAnswerOperations.length, "host retained one addressed QUIZ_ANSWER operation per question (#818)").toBe(
         QUIZ_QUESTIONS,
       );
-      // Each answer sits on its OWN per-question seq (coopQuizAnswerSeq(counter=0, index) = 8_500_000 + index)
+      // Each answer retains its own per-question address (seq*8000 + QUIZ_ANSWER tag + question index)
       // and carries the fixed committed choice.
       expect(
-        quizAnsSends.map(c => c[0]),
-        "quizAns answers relayed on the per-question 8_500_000 seqs (order-proof, collision-free)",
-      ).toEqual([QUIZ_ANSWER_SEQ_BASE, QUIZ_ANSWER_SEQ_BASE + 1, QUIZ_ANSWER_SEQ_BASE + 2]);
+        quizAnswerOperations.map(operation => parseCoopOperationId(operation.id)?.pinnedSeq),
+        "quiz answers use exact per-question retained addresses (order-proof, collision-free)",
+      ).toEqual([
+        QUIZ_ANSWER_SEQ_BASE * 8000 + 5000,
+        (QUIZ_ANSWER_SEQ_BASE + 1) * 8000 + 5001,
+        (QUIZ_ANSWER_SEQ_BASE + 2) * 8000 + 5002,
+      ]);
       expect(
-        quizAnsSends.every(c => c[2] === HOST_ANSWER),
-        "every relayed quizAns is the fixed committed answer index",
+        quizAnswerOperations.every((operation, questionIndex) => {
+          const payload = operation.payload as { questionIndex: number; choice: number };
+          return payload.questionIndex === questionIndex && payload.choice === HOST_ANSWER;
+        }),
+        "every retained quiz answer carries the exact question and committed choice",
       ).toBe(true);
 
       // ===== STEP B (guest): start the divert, drain to the quiz handoff (the first outcome/terminal race
@@ -826,33 +937,17 @@ describe.skipIf(!RUN)(
       // consuming a terminal), and run the mirror ErQuizPhase - the FOLLOW side, buffer-hitting every
       // owner-relayed quizAns with zero local input. The re-armed race is left PARKED (its outcomeArm2 +
       // terminalArm2 pending) so STEP D can resolve it under the guest ctx. =====
-      let guestMePhase: Phase | undefined;
-      await withClient(rig.guestCtx, async () => {
-        guestMePhase = await startGuestMeReplay(rig.guestScene);
-
-        let quizPhase: ErQuizPhaseSeam | undefined;
-        for (let i = 0; i < 16; i++) {
-          await drainLoopback();
-          const cur = rig.guestScene.phaseManager.getCurrentPhase();
-          if (cur?.phaseName === "ErQuizPhase") {
-            quizPhase = cur as unknown as ErQuizPhaseSeam;
-            break;
-          }
-        }
-        expect(
-          quizPhase,
-          "guest QUEUED its mirror ErQuizPhase after the quiz handoff (#818 settleForWatcherQuiz)",
-        ).toBeDefined();
-        expect(quizPhase!.questions.length, "guest mirror quiz renders the host's identical streamed questions").toBe(
-          QUIZ_QUESTIONS,
-        );
-
-        const answered = await driveGuestMirrorQuiz(rig.guestScene, quizPhase!, QUIZ_QUESTIONS);
-        expect(
-          answered,
-          "guest mirror quiz consumed every owner-relayed answer with zero local input (FOLLOW side, #818)",
-        ).toBe(QUIZ_QUESTIONS);
-      });
+      expect(
+        guestMePhase,
+        "guest QUEUED its mirror ErQuizPhase after the quiz handoff (#818 settleForWatcherQuiz)",
+      ).toBeDefined();
+      expect(guestQuizQuestions, "guest mirror quiz renders the host's identical streamed questions").toBe(
+        QUIZ_QUESTIONS,
+      );
+      expect(
+        guestQuizAnswered,
+        "guest mirror quiz consumed every owner-relayed answer with zero local input (FOLLOW side, #818)",
+      ).toBe(QUIZ_QUESTIONS);
       // The guest has NOT converged / advanced yet (the host has not sent its terminal meResync + LEAVE).
       expect(
         applyMeOutcomeSpy.mock.calls.length,
@@ -975,6 +1070,7 @@ describe.skipIf(!RUN)(
 
       const pair = createLoopbackPair();
       const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+      const hostTransportSendSpy = vi.spyOn(pair.host, "send");
 
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore, "the delve opens on interaction counter 0 (host owns even)").toBe(0);
@@ -982,8 +1078,10 @@ describe.skipIf(!RUN)(
 
       // Spy the guest's sole convergence mechanism (fires EXACTLY once at the host's terminal meResync).
       const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
-      // Tap the HOST relay's outcome sends: a FRESH `mePresent` (no subPrompt) must be streamed PER round.
-      const sendOutcomeSpy = vi.spyOn(rig.hostRuntime.interactionRelay, "sendInteractionOutcome");
+      // Tap the retained host transport: each round is a distinct addressed ME_PRESENT operation.
+      let replay!: Phase;
+      let newRounds = 0;
+      let guestShop!: ShopPhaseSeam;
 
       // ===== STEP A (host): drive the REAL delve DIVE -> PUSH(survives) -> BANK, then the embedded reward
       // shop, and PARK at PostMysteryEncounterPhase WITHOUT running it - so the 3 round presents are streamed
@@ -1023,7 +1121,28 @@ describe.skipIf(!RUN)(
           await game.phaseInterceptor.to("SelectModifierPhase", false);
           const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
           expect(hostShop.phaseName, "host reached the embedded end-of-delve reward shop").toBe("SelectModifierPhase");
-          await driveHostRewardShopOwner(hostShop, { takeReward: false });
+          await driveHostRewardShopOwner(hostShop, {
+            takeReward: false,
+            // Materialize every buffered delve round on the watcher before the owner leaves the
+            // reciprocal shop. This preserves the terminal-empty ordering while matching two browsers:
+            // both are physically present at the shop boundary at the same time.
+            partnerReady: async () => {
+              await withClient(rig.guestCtx, async () => {
+                replay = await startGuestMeReplay(rig.guestScene);
+                newRounds = await drainGuestMeReplayNewRounds(replay, EXPECTED_NEW_ROUNDS);
+                const current = rig.guestScene.phaseManager.getCurrentPhase();
+                expect(
+                  current?.phaseName,
+                  "the repeated-round replay handed off to its real embedded reward watcher",
+                ).toBe("SelectModifierPhase");
+                guestShop = current as unknown as ShopPhaseSeam;
+                await beginRewardShopWatch(guestShop);
+              });
+            },
+            partnerSettle: async () => {
+              await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
+            },
+          });
           expect(
             rig.hostRuntime.controller.interactionCounter(),
             "embedded ME reward shop suppressed its own advance (MAJOR-3, still counter 0 mid-ME)",
@@ -1045,16 +1164,14 @@ describe.skipIf(!RUN)(
         "host has NOT advanced yet (terminal parked before PostMysteryEncounterPhase.start)",
       ).toBe(counterBefore);
 
-      // ===== HOST DRIVE-SIDE PROOF: the host re-streamed a FRESH top-level `mePresent` (no subPrompt) PER
-      // round - the initial DIVE/RISE present + one per re-fired round (PUSH/BANK x2) = 3. =====
-      const presentSends = sendOutcomeSpy.mock.calls
-        .map(c => c[2] as CoopInteractionOutcome)
-        .filter(
-          (o): o is Extract<CoopInteractionOutcome, { k: "mePresent" }> => o.k === "mePresent" && o.subPrompt == null,
-        );
+      // ===== HOST DRIVE-SIDE PROOF: the host retained a distinct top-level `ME_PRESENT` (no subPrompt)
+      // per round - the initial DIVE/RISE present + one per re-fired round (PUSH/BANK x2) = 3. =====
+      const presentSends = committedMePresentations(hostTransportSendSpy.mock.calls).filter(
+        presentation => presentation.subPrompt == null,
+      );
       expect(
         presentSends.length,
-        "host streamed a FRESH bare mePresent per round (initial DIVE/RISE + 2 re-fired press-your-luck rounds)",
+        "host retained a fresh bare ME_PRESENT per round (initial DIVE/RISE + 2 re-fired rounds)",
       ).toBe(EXPECTED_NEW_ROUNDS + 1);
       // #831 host label fix: the re-fired rounds stream the ROUND's overrideOptions (PUSH/BANK), NOT the
       // stale base DIVE/RISE options - so the guest renders the round's real prompt. Round labels differ
@@ -1069,19 +1186,17 @@ describe.skipIf(!RUN)(
       // (beginNewRound re-renders + re-arms, inheriting the live 9M arm). The 9M terminal inbox is still
       // empty, so the phase PARKS (does NOT settle) after the 2 new rounds. A no-progress stall would leave
       // newRoundsRendered < 2 and fail the assert below (loud, not a hang). =====
-      const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-      const newRounds = await withClient(rig.guestCtx, () => drainGuestMeReplayNewRounds(replay, EXPECTED_NEW_ROUNDS));
-
       // The load-bearing #831 assertion: the guest re-rendered BOTH repeated-select rounds (pre-fix it
       // rendered ZERO - the re-fired presents fell to the stray branch and it headed for the terminal).
       expect(newRounds, "guest re-rendered BOTH repeated option-select rounds (two adopted presentations) (#831)").toBe(
         EXPECTED_NEW_ROUNDS,
       );
-      // The phase is PARKED, not settled (the host has not sent its terminal yet) - no premature leave.
+      // The replay is settled because it handed control to the REAL embedded reward watcher. This is a
+      // continuation handoff, not an ME terminal: no outcome was applied and neither counter advanced.
       expect(
         (replay as unknown as { settled: boolean }).settled,
-        "guest CoopReplayMePhase is PARKED mid-delve (NOT settled before the host terminal)",
-      ).toBe(false);
+        "guest CoopReplayMePhase settled only into the embedded reward continuation",
+      ).toBe(true);
       // The guest has not converged / advanced yet (no terminal meResync).
       expect(applyMeOutcomeSpy.mock.calls.length, "guest applied NO meResync yet (host terminal still parked)").toBe(0);
       expect(
@@ -1107,11 +1222,24 @@ describe.skipIf(!RUN)(
       // ===== STEP D (guest): drain so the host's now-buffered meResync (8M) + LEAVE (9M) deliver to the
       // guest's PARKED re-armed race UNDER the guest ctx: applyCoopMeOutcome converges the guest, then the
       // LEAVE runs leaveEncounterWithoutBattle + advanceInteraction (the single terminal). =====
-      const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
+      await withClient(rig.guestCtx, async () => {
+        for (let i = 0; i < 16; i++) {
+          await drainLoopback();
+          if (
+            applyMeOutcomeSpy.mock.calls.length === 1
+            && rig.guestRuntime.controller.interactionCounter() === counterBefore + 1
+          ) {
+            break;
+          }
+        }
+      });
 
       // The terminal STILL settles exactly once after the multi-round loop (all existing terminal machinery
       // unchanged): the guest left once, applied the host's meResync once.
-      expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once) at the delve terminal").toBe(true);
+      expect(
+        (replay as unknown as { settled: boolean }).settled,
+        "guest replay remained exactly-once settled through the detached delve terminal",
+      ).toBe(true);
       expect(
         applyMeOutcomeSpy.mock.calls.length,
         "guest applied the host's comprehensive meResync exactly once (its sole convergence path)",
@@ -1247,7 +1375,7 @@ describe.skipIf(!RUN)(
       // ===== PROVE NO ORPHAN by completing the guest-owned ME through convergence (the IT #2 handshake).
       // The selector is still live, so the guest relays its pick, the host applies it, and both advance in
       // lockstep - impossible if the heal had orphaned the divert. =====
-      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
+      withClientSync(rig.guestCtx, () => relayGuestMePickWithIntent(replay, rig.guestScene, counterBefore, 0));
 
       let hostShop!: ShopPhaseSeam;
       await withClient(rig.hostCtx, async () => {
@@ -1267,6 +1395,8 @@ describe.skipIf(!RUN)(
 
       await withClient(rig.hostCtx, async () => {
         for (let i = 0; i < 16; i++) {
+          await drainLoopback();
+          await withClient(rig.guestCtx, () => drainLoopback());
           await drainLoopback();
           if (hostScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
             break;

@@ -4,11 +4,26 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { resetErGhostRunState, setCoopGhostPool, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { erGauntletPickMeType, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
+import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { allMysteryEncounters, initMysteryEncounters } from "#mystery-encounters/mystery-encounters";
+import { type ErGauntletBargainQueue, queueErGauntletBargainTransition } from "#phases/new-battle-phase";
 import { describe, expect, it } from "vitest";
 
 describe("#814 Mystery Gauntlet schedule (pure)", () => {
+  const queueProbe = (): { queue: ErGauntletBargainQueue; calls: string[] } => {
+    const calls: string[] = [];
+    return {
+      calls,
+      queue: {
+        removeAllPhasesOfType: name => calls.push(`remove:${name}`),
+        pushNew: name => calls.push(`push:${name}`),
+      },
+    };
+  };
+
   it("cycles 5xME -> ghost -> boss -> bargain from wave 2; wave 1 stays wild", () => {
     expect(erGauntletWaveKind(1)).toBe("wild");
     expect([2, 3, 4, 5, 6].map(erGauntletWaveKind)).toEqual(["me", "me", "me", "me", "me"]);
@@ -38,13 +53,94 @@ describe("#814 Mystery Gauntlet schedule (pure)", () => {
       wave++;
     }
     expect(erGauntletPickMeType(9, encountered)).toBe(MysteryEncounterType.ER_THE_BARGAIN);
-    // Synthetic LLM encounter never scheduled.
+    // Synthetic/phase-driven encounters never enter the ordinary ME pool.
     expect(seen.has(MysteryEncounterType.LLM_DIRECTED)).toBe(false);
+    expect(seen.has(MysteryEncounterType.ER_THE_BARGAIN)).toBe(false);
+  });
+
+  it("selects only registered ordinary encounters across seeds and waves", () => {
+    initMysteryEncounters();
+    const syntheticTypes = new Set([MysteryEncounterType.LLM_DIRECTED, MysteryEncounterType.ER_THE_BARGAIN]);
+
+    for (let seedIndex = 0; seedIndex < 512; seedIndex++) {
+      const seed = `gauntlet-registry-${seedIndex}`;
+      for (let wave = 2; wave <= 257; wave++) {
+        if (erGauntletWaveKind(wave) !== "me") {
+          continue;
+        }
+        const selected = erGauntletPickMeType(wave, [], seed);
+        expect(
+          syntheticTypes.has(selected),
+          `seed ${seed} wave ${wave} selected synthetic ${MysteryEncounterType[selected]}`,
+        ).toBe(false);
+        expect(
+          allMysteryEncounters[selected],
+          `seed ${seed} wave ${wave} selected unregistered ${MysteryEncounterType[selected]}`,
+        ).toBeDefined();
+      }
+    }
   });
 
   it("pool exhaustion wraps to repeats instead of failing", () => {
     const all = Object.values(MysteryEncounterType).filter((v): v is MysteryEncounterType => typeof v === "number");
     const pick = erGauntletPickMeType(2, all);
     expect(typeof pick).toBe("number");
+  });
+
+  it("replaces wave 9 generic tails with exactly Bargain then one continuation on both clients", () => {
+    const host = queueProbe();
+    const guest = queueProbe();
+
+    expect(queueErGauntletBargainTransition(host.queue, 9, true)).toBe(true);
+    expect(queueErGauntletBargainTransition(guest.queue, 9, true)).toBe(true);
+    expect(host.calls).toEqual([
+      "remove:NextEncounterPhase",
+      "remove:NewBiomeEncounterPhase",
+      "push:TheBargainPhase",
+      "push:NewBattlePhase",
+    ]);
+    expect(guest.calls).toEqual(host.calls);
+    expect(host.calls.filter(call => call === "push:NewBattlePhase")).toHaveLength(1);
+  });
+
+  it("does not touch non-Bargain waves or an inactive Mystery difficulty", () => {
+    for (const [wave, active] of [
+      [8, true],
+      [10, true],
+      [9, false],
+    ] as const) {
+      const probe = queueProbe();
+      expect(queueErGauntletBargainTransition(probe.queue, wave, active)).toBe(false);
+      expect(probe.calls).toEqual([]);
+    }
+  });
+
+  it("deterministically skips encounters that are illegal for the host's current run state", () => {
+    const baseline = erGauntletPickMeType(2, [], "eligibility-seed");
+    const substitute = erGauntletPickMeType(2, [], "eligibility-seed", type => type !== baseline);
+    expect(substitute).not.toBe(baseline);
+    expect(() => erGauntletPickMeType(2, [], "eligibility-seed", () => false)).toThrow(/no eligible registered/u);
+  });
+
+  it("always materializes the same scripted wave-7 ghost regardless of external pool timing", () => {
+    setErDifficulty("mystery");
+    try {
+      resetErGhostRunState();
+      expect(takeGhostForWave(6, false)).toBeNull();
+      const first = takeGhostForWave(7, false);
+      expect(first?.id).toBe("mystery-gauntlet-scripted-v1");
+      expect(first?.party).toHaveLength(3);
+      expect(takeGhostForWave(7, false)).toBe(first);
+
+      resetErGhostRunState();
+      expect(takeGhostForWave(7, false)).toEqual(first);
+
+      resetErGhostRunState();
+      setCoopGhostPool([{ ...first!, id: "external-host-only", trainerName: "Fetched Player" }]);
+      expect(takeGhostForWave(7, false)).toEqual(first);
+    } finally {
+      resetErGhostRunState();
+      resetErDifficulty();
+    }
   });
 });

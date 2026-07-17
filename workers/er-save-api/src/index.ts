@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+/// <reference path="./cloudflare-workers.d.ts" />
+
 // =============================================================================
 // Elite Redux — cloud-save + account API (Cloudflare Worker + D1). #229
 //
@@ -29,6 +31,19 @@
 // Workers Paid plan (50M writes/mo) scales to ~40,000.
 // =============================================================================
 
+import { BiomeId } from "../../../src/enums/biome-id";
+import { Challenges } from "../../../src/enums/challenges";
+// ER customs live in dedicated high-range enums (moves >= 5000, species >= 10000), registered at
+// init by initEliteReduxCustomMoves()/initEliteReduxSpecies(). A resumable co-op checkpoint can carry
+// them the instant an ER move/species is ROLLED (RNG-dependent), so the resumable allowlists below MUST
+// union the ER enums - see resumableMoveIds/resumableSpeciesIds. Both files are pure value objects.
+import { ErMoveId } from "../../../src/enums/er-move-id";
+import { ErSpeciesId } from "../../../src/enums/er-species-id";
+import { MoveId } from "../../../src/enums/move-id";
+import { MysteryEncounterType } from "../../../src/enums/mystery-encounter-type";
+import { SpeciesId } from "../../../src/enums/species-id";
+import { TrainerType } from "../../../src/enums/trainer-type";
+import { TrainerVariant } from "../../../src/enums/trainer-variant";
 import {
   applyResultReport,
   finalizeExpiredLoneReport,
@@ -65,6 +80,10 @@ interface Env {
   DB: D1Database;
   /** Secret used to sign/verify session tokens. Set via `wrangler secret put`. */
   SESSION_SECRET: string;
+  /** Shared only with the co-op signaling Worker; signs short-lived identity tickets. */
+  COOP_IDENTITY_SECRET?: string;
+  /** Optional ticket lifetime override in milliseconds (default five minutes). */
+  COOP_IDENTITY_TTL_MS?: string;
   /** Optional comma-separated origin allowlist; "*" / unset = allow all. */
   ALLOWED_ORIGIN?: string;
   MIN_USERNAME_LENGTH?: string;
@@ -97,6 +116,17 @@ interface TokenPayload {
   iat: number;
 }
 
+export interface CoopIdentityTicketV1 {
+  v: 1;
+  /** Opaque, immutable account identity. Consumers must not parse its format. */
+  sub: string;
+  displayName: string;
+  canonicalUsername: string;
+  /** Unix epoch milliseconds. */
+  exp: number;
+  nonce: string;
+}
+
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
@@ -104,6 +134,7 @@ const PBKDF2_ITERATIONS = 100_000;
 const PBKDF2_KEY_LEN = 32;
 /** Max accepted save-blob size (defensive; ER system saves are well under this). */
 const MAX_SAVE_BYTES = 4_000_000;
+const DEFAULT_COOP_IDENTITY_TTL_MS = 5 * 60_000;
 
 // #region helpers — encoding
 
@@ -114,7 +145,7 @@ function toBase64(bytes: Uint8Array): string {
   }
   return btoa(s);
 }
-function fromBase64(b64: string): Uint8Array {
+function fromBase64(b64: string): Uint8Array<ArrayBuffer> {
   const bin = atob(b64);
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) {
@@ -182,7 +213,12 @@ async function decompressSave(stored: string): Promise<string> {
 // #endregion
 // #region helpers — crypto (passwords + tokens)
 
-async function pbkdf2(password: string, salt: Uint8Array, iterations: number, keyLen: number): Promise<Uint8Array> {
+async function pbkdf2(
+  password: string,
+  salt: Uint8Array<ArrayBuffer>,
+  iterations: number,
+  keyLen: number,
+): Promise<Uint8Array> {
   const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, key, keyLen * 8);
   return new Uint8Array(bits);
@@ -209,7 +245,7 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
   return timingSafeEqual(actual, expected);
 }
 
-async function hmacSha256(data: Uint8Array, secret: string): Promise<Uint8Array> {
+async function hmacSha256(data: Uint8Array<ArrayBuffer>, secret: string): Promise<Uint8Array> {
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
     "sign",
   ]);
@@ -218,6 +254,12 @@ async function hmacSha256(data: Uint8Array, secret: string): Promise<Uint8Array>
 }
 
 async function signToken(payload: TokenPayload, secret: string): Promise<string> {
+  const body = toBase64Url(enc.encode(JSON.stringify(payload)));
+  const sig = await hmacSha256(enc.encode(body), secret);
+  return `${body}.${toBase64Url(sig)}`;
+}
+
+async function signCoopIdentityTicket(payload: CoopIdentityTicketV1, secret: string): Promise<string> {
   const body = toBase64Url(enc.encode(JSON.stringify(payload)));
   const sig = await hmacSha256(enc.encode(body), secret);
   return `${body}.${toBase64Url(sig)}`;
@@ -384,11 +426,52 @@ async function handleAccountInfo(auth: TokenPayload, env: Env, cors: Record<stri
   const lastSessionSlot = slotRow?.slot ?? -1;
   return json(
     {
+      accountId: `er-account:${user.id}`,
       username: user.username,
       lastSessionSlot,
       discordId: "",
       googleId: "",
       hasAdminRole: user.is_admin === 1,
+    },
+    200,
+    cors,
+  );
+}
+
+async function handleCoopIdentityTicket(auth: TokenPayload, env: Env, cors: Record<string, string>): Promise<Response> {
+  if (typeof env.COOP_IDENTITY_SECRET !== "string" || env.COOP_IDENTITY_SECRET.length < 32) {
+    return text("Co-op identity service unavailable.", 503, cors);
+  }
+  const user = await env.DB.prepare("SELECT id, username, username_lower FROM users WHERE id = ?")
+    .bind(auth.uid)
+    .first<Pick<UserRow, "id" | "username" | "username_lower">>();
+  if (!user) {
+    return text("Account not found.", 404, cors);
+  }
+  const configuredTtl = Number(env.COOP_IDENTITY_TTL_MS);
+  const ttl =
+    Number.isSafeInteger(configuredTtl) && configuredTtl >= 30_000 && configuredTtl <= 15 * 60_000
+      ? configuredTtl
+      : DEFAULT_COOP_IDENTITY_TTL_MS;
+  const now = Date.now();
+  const payload: CoopIdentityTicketV1 = {
+    v: 1,
+    sub: `er-account:${user.id}`,
+    displayName: user.username,
+    canonicalUsername: user.username_lower,
+    exp: now + ttl,
+    nonce: toBase64Url(crypto.getRandomValues(new Uint8Array(16))),
+  };
+  return json(
+    {
+      ticket: await signCoopIdentityTicket(payload, env.COOP_IDENTITY_SECRET),
+      identity: {
+        version: 1,
+        accountId: payload.sub,
+        displayName: payload.displayName,
+        canonicalUsername: payload.canonicalUsername,
+      },
+      expiresAt: payload.exp,
     },
     200,
     cors,
@@ -642,8 +725,13 @@ async function handleSystemUpdate(
 }
 
 function parseSlot(url: URL): number | null {
-  const slot = Number.parseInt(url.searchParams.get("slot") ?? "", 10);
-  if (!Number.isFinite(slot) || slot < 0 || slot > 4) {
+  return parseNamedSlot(url, "slot");
+}
+
+function parseNamedSlot(url: URL, name: string): number | null {
+  const raw = url.searchParams.get(name) ?? "";
+  const slot = /^\d+$/u.test(raw) ? Number(raw) : Number.NaN;
+  if (!Number.isSafeInteger(slot) || slot < 0 || slot > 4) {
     return null;
   }
   return slot;
@@ -668,14 +756,676 @@ async function handleSessionGet(
   return text(row.data, 200, cors);
 }
 
-async function upsertSession(env: Env, userId: number, slot: number, data: string): Promise<void> {
-  await env.DB.prepare(
-    `INSERT INTO session_saves (user_id, slot, data, updated_at)
-       VALUES (?1, ?2, ?3, ?4)
-       ON CONFLICT(user_id, slot) DO UPDATE SET data = ?3, updated_at = ?4`,
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+interface CoopRunRef {
+  runId: string;
+  checkpointRevision: number;
+}
+
+export interface CoopSessionRef extends CoopRunRef {
+  players: [string, string];
+  seats: { host: string; guest: string };
+}
+
+const COOP_GAME_MODE_ID = 6;
+
+/**
+ * A tombstone for a legacy row whose source revision cannot be interpreted still needs a valid
+ * non-negative revision for the public status contract. Zero is a conservative fence-only lower
+ * bound; the exact source bytes remain identified by the tombstone digest.
+ */
+export const COOP_FENCE_ONLY_CHECKPOINT_REVISION = 0;
+
+type SessionProtection = "solo" | "coop-valid" | "coop-invalid" | "unknown";
+
+function coopRunIdFromParsed(parsed: unknown): string | null {
+  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const coopRun = (parsed as { coopRun?: { runId?: unknown } }).coopRun;
+  const runId = coopRun?.runId;
+  return typeof runId === "string" && /^[A-Za-z0-9_-]{16,128}$/u.test(runId) ? runId : null;
+}
+
+function coopRunFromParsed(parsed: unknown): CoopRunRef | null {
+  const runId = coopRunIdFromParsed(parsed);
+  if (runId == null) {
+    return null;
+  }
+  const coopRun = (parsed as { coopRun?: { checkpointRevision?: unknown } }).coopRun;
+  const checkpointRevision = coopRun?.checkpointRevision;
+  return typeof checkpointRevision === "number" && Number.isSafeInteger(checkpointRevision) && checkpointRevision >= 0
+    ? { runId, checkpointRevision }
+    : null;
+}
+
+function normalizeCoopIdentity(identity: string): string {
+  return identity.normalize("NFKC").toLowerCase();
+}
+
+/** Match the uniqueness key actually used by account registration/login. */
+function accountIdentityKey(identity: string): string {
+  return identity.toLowerCase();
+}
+
+function sameCoopIdentity(left: string, right: string): boolean {
+  return normalizeCoopIdentity(left) === normalizeCoopIdentity(right);
+}
+
+function sameCoopAccountIdentity(left: string, right: string): boolean {
+  return accountIdentityKey(left) === accountIdentityKey(right);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isFiniteNonNegative(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isObjectArray(value: unknown): value is Record<string, unknown>[] {
+  return Array.isArray(value) && value.every(isRecord);
+}
+
+function isSafeIntegerInRange(value: unknown, min: number, max = Number.MAX_SAFE_INTEGER): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= min && value <= max;
+}
+
+function isFiniteNumberArray(value: unknown, minimumLength: number): value is number[] {
+  return (
+    Array.isArray(value)
+    && value.length >= minimumLength
+    && value.every(entry => typeof entry === "number" && Number.isFinite(entry))
+  );
+}
+
+function numericEnumValues(value: object): Set<number> {
+  return new Set(Object.values(value).filter((entry): entry is number => typeof entry === "number"));
+}
+
+// CONTRACT (P33 layer-7): every ER-custom enum whose ids can appear in a serialized mon/session MUST be
+// unioned into the matching resumable allowlist, or the fail-closed shape check 409s a valid fresh save
+// the moment RNG rolls that custom ("incoming resumable co-op checkpoint is invalid"). Today only species
+// and moves have ER-custom id enums (ErSpeciesId/ErMoveId); abilities validate abilityIndex (0-2), not an
+// id, and there are no ER-custom MysteryEncounterType/Biome/Trainer enums (those extend the vanilla enums
+// in place, already covered). Adding a new ER id enum here without extending its set silently re-breaks
+// the fresh first-save - the coop-cloud-save-worker-integration test pins one ER id from each enum.
+const resumableSpeciesIds = new Set<number>([...numericEnumValues(SpeciesId), ...numericEnumValues(ErSpeciesId)]);
+const resumableMoveIds = new Set<number>([...numericEnumValues(MoveId), ...numericEnumValues(ErMoveId)]);
+const resumableTrainerTypes = numericEnumValues(TrainerType);
+const resumableTrainerVariants = numericEnumValues(TrainerVariant);
+const resumableChallengeIds = numericEnumValues(Challenges);
+const resumableMysteryEncounterTypes = numericEnumValues(MysteryEncounterType);
+const resumableBiomeIds = new Set<number>(Object.values(BiomeId));
+
+function isPokemonMoveDataShape(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isSafeIntegerInRange(value.moveId, 0)
+    && resumableMoveIds.has(value.moveId)
+    && isSafeIntegerInRange(value.ppUsed, 0)
+    && isSafeIntegerInRange(value.ppUp, 0)
+    && (value.maxPpOverride === undefined || isSafeIntegerInRange(value.maxPpOverride, 1))
+  );
+}
+
+/**
+ * Minimum current `PokemonData` surface needed by its constructor and `toPokemon()`. This is not a
+ * gameplay legality validator; it prevents an object-shaped placeholder from becoming a durable
+ * checkpoint that immediately throws at `getPokemonSpecies(undefined)` or constructs unusable stats.
+ */
+function isPokemonDataShape(value: unknown, expectedPlayer: boolean): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isSafeIntegerInRange(value.id, 0)
+    && value.player === expectedPlayer
+    && isSafeIntegerInRange(value.species, 1)
+    && resumableSpeciesIds.has(value.species)
+    && isSafeIntegerInRange(value.formIndex, 0)
+    && isSafeIntegerInRange(value.abilityIndex, 0)
+    && typeof value.passive === "boolean"
+    && typeof value.shiny === "boolean"
+    && isSafeIntegerInRange(value.variant, 0)
+    && isSafeIntegerInRange(value.level, 1)
+    && isFiniteNonNegative(value.exp)
+    && isFiniteNonNegative(value.levelExp)
+    && isFiniteNonNegative(value.hp)
+    && isFiniteNumberArray(value.stats, 6)
+    && value.stats.every(stat => stat >= 0)
+    && isFiniteNumberArray(value.ivs, 6)
+    && value.ivs.every(iv => Number.isSafeInteger(iv) && iv >= 0 && iv <= 31)
+    && Array.isArray(value.moveset)
+    && value.moveset.every(isPokemonMoveDataShape)
+  );
+}
+
+function isTrainerType(value: unknown): value is number {
+  return isSafeIntegerInRange(value, 0) && resumableTrainerTypes.has(value);
+}
+
+function isTrainerDataShape(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isTrainerType(value.trainerType)
+    && isSafeIntegerInRange(value.variant, 0)
+    && resumableTrainerVariants.has(value.variant)
+    && (value.partyTemplateIndex === undefined || isSafeIntegerInRange(value.partyTemplateIndex, 0))
+    && (value.nameKey === undefined || typeof value.nameKey === "string")
+    && (value.partnerNameKey === undefined || typeof value.partnerNameKey === "string")
+  );
+}
+
+function isChallengeDataShape(value: unknown): boolean {
+  return (
+    isRecord(value)
+    && isSafeIntegerInRange(value.id, 0)
+    && resumableChallengeIds.has(value.id)
+    && isSafeIntegerInRange(value.value, 0)
+    && isSafeIntegerInRange(value.severity, 0)
+    && (value.startingRoots === undefined
+      || (Array.isArray(value.startingRoots) && value.startingRoots.every(root => isSafeIntegerInRange(root, 0))))
+  );
+}
+
+function isPositionalTagShape(value: unknown): boolean {
+  if (!isRecord(value) || !isSafeIntegerInRange(value.turnCount, 0) || !isSafeIntegerInRange(value.targetIndex, 0, 5)) {
+    return false;
+  }
+  return value.tagType === "DELAYED_ATTACK"
+    ? isSafeIntegerInRange(value.sourceId, 0)
+        && isSafeIntegerInRange(value.sourceMove, 0)
+        && resumableMoveIds.has(value.sourceMove)
+    : value.tagType === "WISH" && isFiniteNonNegative(value.healHp) && typeof value.pokemonName === "string";
+}
+
+// `compare-versions`, invoked during parse, throws on a non-semver string.
+const resumableGameVersionPattern =
+  /^v?\d+(?:\.\d+){0,3}(?:-[\da-z-]+(?:\.[\da-z-]+)*)?(?:\+[\da-z-]+(?:\.[\da-z-]+)*)?$/iu;
+
+/**
+ * Top-level fields dereferenced by `GameData.parseSessionData()` / `initSessionFromData()` when a
+ * checkpoint is materialized. The Worker deliberately does not reproduce every gameplay schema,
+ * but it must reject a metadata-only/truncated object that the browser cannot even construct.
+ */
+function hasCoopSessionMaterializationShape(record: Record<string, unknown>): boolean {
+  const arena = record.arena;
+  const pokeballCounts = record.pokeballCounts;
+  const trainer = record.trainer;
+  const mystery = record.mysteryEncounterSaveData;
+  const party = record.party;
+  const enemyParty = record.enemyParty;
+  const battleType = record.battleType;
+  const mysteryEncounterType = record.mysteryEncounterType;
+  const hasKnownMysteryEncounterType =
+    isSafeIntegerInRange(mysteryEncounterType, 0) && resumableMysteryEncounterTypes.has(mysteryEncounterType);
+  // A non-combat Mystery Event is the sole legitimate empty-enemy save boundary. It is only
+  // executable when the exact event type is retained; `getMysteryEncounter(undefined)` may
+  // otherwise select no event (or a queued/daily event different from the saved surface).
+  const allowsEmptyEnemyParty = battleType === 3 && hasKnownMysteryEncounterType;
+  return (
+    typeof record.seed === "string"
+    && record.seed.length > 0
+    && isFiniteNonNegative(record.playTime)
+    && Array.isArray(party)
+    && party.length > 0
+    && party.every(mon => isPokemonDataShape(mon, true))
+    && Array.isArray(enemyParty)
+    && (enemyParty.length > 0 || allowsEmptyEnemyParty)
+    && enemyParty.every(mon => isPokemonDataShape(mon, false))
+    && isObjectArray(record.modifiers)
+    && isObjectArray(record.enemyModifiers)
+    && isRecord(arena)
+    && isSafeIntegerInRange(arena.biome, 0)
+    && resumableBiomeIds.has(arena.biome)
+    && (arena.weather == null || isRecord(arena.weather))
+    && (arena.terrain == null || isRecord(arena.terrain))
+    && (arena.tags === undefined || isObjectArray(arena.tags))
+    && Array.isArray(arena.positionalTags)
+    && arena.positionalTags.every(isPositionalTagShape)
+    && isRecord(pokeballCounts)
+    && Object.values(pokeballCounts).every(
+      value => typeof value === "number" && Number.isSafeInteger(value) && value >= 0,
+    )
+    && isFiniteNonNegative(record.money)
+    && isFiniteNonNegative(record.score)
+    && (battleType === 0 || battleType === 1 || battleType === 3)
+    && (trainer == null ? battleType !== 1 : isTrainerDataShape(trainer))
+    && typeof record.gameVersion === "string"
+    && resumableGameVersionPattern.test(record.gameVersion)
+    && Array.isArray(record.challenges)
+    && record.challenges.every(isChallengeDataShape)
+    && typeof mysteryEncounterType === "number"
+    && Number.isSafeInteger(mysteryEncounterType)
+    && (battleType === 3
+      ? hasKnownMysteryEncounterType
+      : mysteryEncounterType === -1 || resumableMysteryEncounterTypes.has(mysteryEncounterType))
+    && isRecord(mystery)
+    && Array.isArray(mystery.encounteredEvents)
+    && isFiniteNonNegative(mystery.encounterSpawnChance)
+    && Array.isArray(mystery.queuedEncounters)
+    && typeof record.playerFaints === "number"
+    && Number.isSafeInteger(record.playerFaints)
+    && record.playerFaints >= 0
+  );
+}
+
+function sameCoopSessionIdentity(left: CoopSessionRef, right: CoopSessionRef): boolean {
+  return (
+    left.players[0] === right.players[0]
+    && left.players[1] === right.players[1]
+    && left.seats.host === right.seats.host
+    && left.seats.guest === right.seats.guest
+  );
+}
+
+/**
+ * Validate the complete durable shape required by the client resume commitment. A valid run id by
+ * itself is deliberately insufficient: storing a checkpoint that neither browser can materialize
+ * would turn a recoverable legacy row into an undeletable `coop-valid` row.
+ */
+function coopSessionFromParsed(parsed: unknown, authenticatedAccount?: string): CoopSessionRef | null {
+  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const record = parsed as Record<string, unknown>;
+  const run = coopRunFromParsed(parsed);
+  const coopRun = record.coopRun as { version?: unknown } | undefined;
+  const participants = record.coopParticipants as
+    | {
+        version?: unknown;
+        players?: unknown;
+        seats?: { host?: unknown; guest?: unknown };
+      }
+    | undefined;
+  const players = participants?.players;
+  const host = participants?.seats?.host;
+  const guest = participants?.seats?.guest;
+  if (
+    record.gameMode !== COOP_GAME_MODE_ID
+    || typeof record.waveIndex !== "number"
+    || !Number.isInteger(record.waveIndex)
+    || record.waveIndex <= 0
+    || typeof record.timestamp !== "number"
+    || !Number.isSafeInteger(record.timestamp)
+    || record.timestamp < 0
+    || run == null
+    || coopRun?.version !== 1
+    || participants?.version !== 1
+    || !Array.isArray(players)
+    || players.length !== 2
+    || typeof players[0] !== "string"
+    || typeof players[1] !== "string"
+    || players[0].length === 0
+    || players[1].length === 0
+    || typeof host !== "string"
+    || typeof guest !== "string"
+    || host.length === 0
+    || guest.length === 0
+    || !hasCoopSessionMaterializationShape(record)
+  ) {
+    return null;
+  }
+  const first = normalizeCoopIdentity(players[0]);
+  const second = normalizeCoopIdentity(players[1]);
+  const playerAccountKeys = players.map(accountIdentityKey);
+  const hostAccountKey = accountIdentityKey(host);
+  const guestAccountKey = accountIdentityKey(guest);
+  if (
+    first === second
+    || first > second
+    || sameCoopIdentity(host, guest)
+    || ![first, second].includes(normalizeCoopIdentity(host))
+    || ![first, second].includes(normalizeCoopIdentity(guest))
+    || hostAccountKey === guestAccountKey
+    || !playerAccountKeys.includes(hostAccountKey)
+    || !playerAccountKeys.includes(guestAccountKey)
+    || (authenticatedAccount != null && !players.some(player => sameCoopAccountIdentity(player, authenticatedAccount)))
+  ) {
+    return null;
+  }
+  return {
+    ...run,
+    players: [players[0], players[1]],
+    seats: { host, guest },
+  };
+}
+
+interface CoopAccountRow {
+  id: number;
+  username: string;
+  username_lower: string;
+}
+
+function isUnambiguousCoopAccount(row: CoopAccountRow): boolean {
+  return (
+    accountIdentityKey(row.username) === row.username_lower
+    && normalizeCoopIdentity(row.username) === row.username_lower
+  );
+}
+
+/**
+ * Bind username-shaped wire identities back to the authenticated D1 account rows. NFKC is retained
+ * for deterministic pair ordering, but is intentionally insufficient for authorization because the
+ * account table's uniqueness key is case-insensitive only.
+ */
+async function validateCoopSessionAccounts(env: Env, auth: TokenPayload, session: CoopSessionRef): Promise<boolean> {
+  const actual = await env.DB.prepare("SELECT id, username, username_lower FROM users WHERE id = ?")
+    .bind(auth.uid)
+    .first<CoopAccountRow>();
+  if (actual == null || !isUnambiguousCoopAccount(actual)) {
+    return false;
+  }
+  const firstKey = accountIdentityKey(session.players[0]);
+  const secondKey = accountIdentityKey(session.players[1]);
+  if (firstKey === secondKey || (actual.username_lower !== firstKey && actual.username_lower !== secondKey)) {
+    return false;
+  }
+  const [first, second] = await Promise.all([
+    env.DB.prepare("SELECT id, username, username_lower FROM users WHERE username_lower = ?")
+      .bind(firstKey)
+      .first<CoopAccountRow>(),
+    env.DB.prepare("SELECT id, username, username_lower FROM users WHERE username_lower = ?")
+      .bind(secondKey)
+      .first<CoopAccountRow>(),
+  ]);
+  return (
+    first != null
+    && second != null
+    && first.id !== second.id
+    && (first.id === actual.id || second.id === actual.id)
+    && auth.u === actual.username
+    && isUnambiguousCoopAccount(first)
+    && isUnambiguousCoopAccount(second)
+    && first.username_lower === firstKey
+    && second.username_lower === secondKey
+    && session.players[0] === first.username
+    && session.players[1] === second.username
+    && session.seats.host === (accountIdentityKey(session.seats.host) === firstKey ? first.username : second.username)
+    && session.seats.guest === (accountIdentityKey(session.seats.guest) === firstKey ? first.username : second.username)
+  );
+}
+
+/** Complete resumability validation shared by Worker handlers and contract tests. */
+export function parseValidResumableCoopSession(
+  data: string | null,
+  authenticatedAccount?: string,
+): CoopSessionRef | null {
+  if (data == null) {
+    return null;
+  }
+  try {
+    return coopSessionFromParsed(JSON.parse(data) as unknown, authenticatedAccount);
+  } catch {
+    return null;
+  }
+}
+
+/** A co-op row is protected whenever it carries a well-formed durable run identity. */
+export function parseValidCoopRun(data: string | null): CoopRunRef | null {
+  if (data == null) {
+    return null;
+  }
+  try {
+    return coopRunFromParsed(JSON.parse(data) as unknown);
+  } catch {
+    return null;
+  }
+}
+
+/** Recover a syntax-validated lineage fence even when its legacy revision is unusable. */
+function parseTrustedCoopRunId(data: string): string | null {
+  try {
+    return coopRunIdFromParsed(JSON.parse(data) as unknown);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Legacy mutations may touch only an unambiguously solo row. A parsable save carrying any co-op
+ * discriminator is protected even when its durable identity is missing/malformed (including
+ * pre-run-id staging checkpoints); only the dedicated CAS path may decide how to recover it.
+ */
+export function classifySessionProtection(data: string | null): SessionProtection {
+  if (data == null) {
+    return "solo";
+  }
+  try {
+    const parsed = JSON.parse(data) as unknown;
+    if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return "unknown";
+    }
+    if (coopSessionFromParsed(parsed) != null) {
+      return "coop-valid";
+    }
+    const record = parsed as Record<string, unknown>;
+    return record.gameMode === COOP_GAME_MODE_ID
+      || Object.hasOwn(record, "coopRun")
+      || Object.hasOwn(record, "coopParticipants")
+      || Object.hasOwn(record, "coopControlPlane")
+      ? "coop-invalid"
+      : "solo";
+  } catch {
+    return "unknown";
+  }
+}
+
+function isCoopLikeSession(data: string | null): boolean {
+  return classifySessionProtection(data) !== "solo";
+}
+
+/** SQL used by D1 and by the Node-SQLite contract tests. */
+export const COOP_EMPTY_SESSION_INSERT_SQL = `INSERT INTO session_saves (user_id, slot, data, updated_at)
+  SELECT ?1, ?2, ?3, ?4
+  WHERE NOT EXISTS (
+    SELECT 1 FROM coop_run_tombstones_v2 WHERE user_id = ?1 AND run_id = ?5
   )
-    .bind(userId, slot, data, Date.now())
-    .run();
+  AND NOT EXISTS (
+    SELECT 1 FROM session_saves
+    WHERE user_id = ?1
+      AND json_extract(CASE WHEN json_valid(data) THEN data ELSE '{}' END, '$.coopRun.runId') = ?5
+  )
+  ON CONFLICT(user_id, slot) DO NOTHING`;
+
+export const COOP_EXISTING_SESSION_UPDATE_SQL = `UPDATE session_saves SET data = ?1, updated_at = ?2
+  WHERE user_id = ?3 AND slot = ?4 AND data = ?5
+    AND NOT EXISTS (
+      SELECT 1 FROM coop_run_tombstones_v2 WHERE user_id = ?3 AND run_id = ?6
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM session_saves AS duplicate
+      WHERE duplicate.user_id = ?3 AND duplicate.slot <> ?4
+        AND json_extract(
+          CASE WHEN json_valid(duplicate.data) THEN duplicate.data ELSE '{}' END,
+          '$.coopRun.runId'
+        ) = ?6
+    )`;
+
+export const COOP_EXACT_SESSION_REPLAY_SQL = `UPDATE session_saves SET updated_at = updated_at
+  WHERE user_id = ?1 AND slot = ?2 AND data = ?3
+    AND NOT EXISTS (
+      SELECT 1 FROM coop_run_tombstones_v2 WHERE user_id = ?1 AND run_id = ?4
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM session_saves AS duplicate
+      WHERE duplicate.user_id = ?1 AND duplicate.slot <> ?2
+        AND json_extract(
+          CASE WHEN json_valid(duplicate.data) THEN duplicate.data ELSE '{}' END,
+          '$.coopRun.runId'
+        ) = ?4
+    )`;
+
+export const COOP_TOMBSTONE_INSERT_SQL = `INSERT INTO coop_run_tombstones_v2
+    (user_id, slot, run_id, checkpoint_revision, digest, deleted_at)
+  SELECT ?1, ?2, ?3, ?4, ?5, ?6
+  WHERE EXISTS (
+    SELECT 1 FROM session_saves WHERE user_id = ?1 AND slot = ?2 AND data = ?7
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM session_saves AS duplicate
+    WHERE duplicate.user_id = ?1 AND duplicate.slot <> ?2
+      AND json_extract(
+        CASE WHEN json_valid(duplicate.data) THEN duplicate.data ELSE '{}' END,
+        '$.coopRun.runId'
+      ) = ?3
+  )
+  ON CONFLICT(user_id, run_id) DO NOTHING`;
+
+export const COOP_TOMBSTONED_SESSION_DELETE_SQL = `DELETE FROM session_saves
+  WHERE user_id = ?1 AND slot = ?2 AND data = ?3
+    AND EXISTS (
+      SELECT 1 FROM coop_run_tombstones_v2
+      WHERE user_id = ?1 AND run_id = ?4 AND slot = ?2
+        AND checkpoint_revision = ?5 AND digest = ?6
+    )`;
+
+export const COOP_LIVE_RUN_ROWS_SQL = `SELECT slot, data FROM session_saves
+  WHERE user_id = ?1
+    AND json_extract(CASE WHEN json_valid(data) THEN data ELSE '{}' END, '$.coopRun.runId') = ?2
+  ORDER BY slot ASC LIMIT 2`;
+
+/**
+ * Repair a pre-existing duplicate without ever tombstoning the live run. The exact survivor is part
+ * of the delete predicate, so an interleaved survivor update/removal makes this a no-op. Once one
+ * row remains, the ordinary unique-run insert predicate fences any delayed recreation of this row.
+ */
+export const COOP_DUPLICATE_EXACT_DELETE_SQL = `DELETE FROM session_saves
+  WHERE user_id = ?1 AND slot = ?2 AND data = ?3
+    AND json_extract(CASE WHEN json_valid(data) THEN data ELSE '{}' END, '$.coopRun.runId') = ?4
+    AND NOT EXISTS (
+      SELECT 1 FROM coop_run_tombstones_v2 WHERE user_id = ?1 AND run_id = ?4
+    )
+    AND EXISTS (
+      SELECT 1 FROM session_saves AS survivor
+      WHERE survivor.user_id = ?1 AND survivor.slot = ?5 AND survivor.data = ?6
+        AND json_extract(
+          CASE WHEN json_valid(survivor.data) THEN survivor.data ELSE '{}' END,
+          '$.coopRun.runId'
+        ) = ?4
+    )`;
+
+export const COOP_DUPLICATE_DELETE_REPLAY_SQL = `UPDATE session_saves SET updated_at = updated_at
+  WHERE user_id = ?1 AND slot = ?5 AND data = ?6
+    AND json_extract(CASE WHEN json_valid(data) THEN data ELSE '{}' END, '$.coopRun.runId') = ?4
+    AND NOT EXISTS (
+      SELECT 1 FROM coop_run_tombstones_v2 WHERE user_id = ?1 AND run_id = ?4
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM session_saves AS removed
+      WHERE removed.user_id = ?1 AND removed.slot = ?2
+        AND json_extract(
+          CASE WHEN json_valid(removed.data) THEN removed.data ELSE '{}' END,
+          '$.coopRun.runId'
+        ) = ?4
+    )`;
+
+export const UPDATE_ALL_CONDITIONAL_SYSTEM_SQL = `INSERT INTO system_saves (user_id, data, updated_at)
+  SELECT ?1, ?2, ?3
+  WHERE EXISTS (
+    SELECT 1 FROM session_saves WHERE user_id = ?1 AND slot = ?4 AND data = ?5
+  )
+  ON CONFLICT(user_id) DO UPDATE SET data = ?2, updated_at = ?3`;
+
+async function ensureCoopRunTombstones(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS coop_run_tombstones_v2 (
+       user_id INTEGER NOT NULL,
+       slot INTEGER NOT NULL CHECK (slot BETWEEN 0 AND 4),
+       run_id TEXT NOT NULL,
+       checkpoint_revision INTEGER NOT NULL CHECK (checkpoint_revision >= 0),
+       digest TEXT NOT NULL CHECK (length(digest) = 64),
+       deleted_at INTEGER NOT NULL,
+       PRIMARY KEY (user_id, run_id)
+     )`,
+  ).run();
+}
+
+async function exactLiveCoopSessionExists(
+  env: Env,
+  userId: number,
+  slot: number,
+  data: string,
+  runId: string,
+): Promise<boolean> {
+  const result = await env.DB.prepare(COOP_EXACT_SESSION_REPLAY_SQL).bind(userId, slot, data, runId).run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+interface CoopTombstoneRow {
+  slot: number;
+  checkpoint_revision: number;
+  digest: string;
+}
+
+async function exactCoopDeleteSettled(
+  env: Env,
+  userId: number,
+  runId: string,
+  expected: { slot: number; checkpointRevision: number; digest: string },
+): Promise<boolean> {
+  const [tombstoneResult, liveResult] = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT slot, checkpoint_revision, digest FROM coop_run_tombstones_v2
+       WHERE user_id = ? AND run_id = ?`,
+    ).bind(userId, runId),
+    env.DB.prepare(COOP_LIVE_RUN_ROWS_SQL).bind(userId, runId),
+  ]);
+  const tombstone = (tombstoneResult?.results?.[0] ?? null) as CoopTombstoneRow | null;
+  return (
+    exactCoopDeleteReplaySatisfied(
+      tombstone == null
+        ? null
+        : {
+            slot: tombstone.slot,
+            checkpointRevision: tombstone.checkpoint_revision,
+            digest: tombstone.digest,
+          },
+      expected,
+    ) && (liveResult?.results?.length ?? 0) === 0
+  );
+}
+
+/** Exact lost-response idempotence rule for first-save empty-slot CAS. */
+export function coopEmptySessionCasSatisfied(
+  insertedChanges: number,
+  existingData: string | null,
+  incomingData: string,
+): boolean {
+  return insertedChanges > 0 || existingData === incomingData;
+}
+
+export function exactSessionWriteSatisfied(changes: number, readback: string | null, incoming: string): boolean {
+  return changes > 0 || readback === incoming;
+}
+
+export function exactSessionDeleteSatisfied(changes: number, readback: string | null): boolean {
+  return changes > 0 || readback == null;
+}
+
+export function coopTombstoneBlocksRun(tombstonedRunId: string | null, incomingRunId: string): boolean {
+  return tombstonedRunId === incomingRunId;
+}
+
+export function exactCoopDeleteReplaySatisfied(
+  tombstone: { slot: number; checkpointRevision: number; digest: string } | null,
+  expected: { slot: number; checkpointRevision: number; digest: string },
+): boolean {
+  return (
+    tombstone?.slot === expected.slot
+    && tombstone.checkpointRevision === expected.checkpointRevision
+    && tombstone.digest === expected.digest
+  );
 }
 
 async function handleSessionUpdate(
@@ -684,6 +1434,7 @@ async function handleSessionUpdate(
   auth: TokenPayload,
   env: Env,
   cors: Record<string, string>,
+  allowCoopCas = false,
 ): Promise<Response> {
   const slot = parseSlot(url);
   if (slot === null) {
@@ -693,8 +1444,428 @@ async function handleSessionUpdate(
   if (data === null) {
     return text("Save data too large.", 413, cors);
   }
-  await upsertSession(env, auth.uid, slot, data);
-  return text("", 200, cors);
+  const casMode = url.searchParams.get("coopCasMode");
+  if (!allowCoopCas && casMode != null) {
+    return text("Co-op session CAS requires the dedicated endpoint.", 409, cors);
+  }
+  let incomingCoopRun: CoopSessionRef | null = null;
+  if (casMode === "empty" || casMode === "existing") {
+    incomingCoopRun = parseValidResumableCoopSession(data);
+    if (incomingCoopRun == null || !(await validateCoopSessionAccounts(env, auth, incomingCoopRun))) {
+      return text("Session CAS conflict: incoming resumable co-op checkpoint is invalid.", 409, cors);
+    }
+    await ensureCoopRunTombstones(env);
+  }
+  if (casMode === "empty") {
+    const result = await env.DB.prepare(COOP_EMPTY_SESSION_INSERT_SQL)
+      .bind(auth.uid, slot, data, Date.now(), incomingCoopRun!.runId)
+      .run();
+    if ((result.meta.changes ?? 0) > 0) {
+      return text("", 200, cors);
+    }
+    // A byte-identical retry is success only while one atomic write predicate proves the run is
+    // live, unique account-wide, and not tombstoned. A plain readback would reopen delete->insert.
+    return (await exactLiveCoopSessionExists(env, auth.uid, slot, data, incomingCoopRun!.runId))
+      ? text("", 200, cors)
+      : text("Session CAS conflict: expected an empty, untombstoned, unique run slot.", 409, cors);
+  }
+  if (casMode === "existing") {
+    const expectedRunId = url.searchParams.get("coopCasRunId") ?? "";
+    const expectedRevisionRaw = url.searchParams.get("coopCasCheckpointRevision") ?? "";
+    const expectedRevision = /^\d+$/u.test(expectedRevisionRaw) ? Number(expectedRevisionRaw) : Number.NaN;
+    const expectedDigest = url.searchParams.get("coopCasDigest") ?? "";
+    const incomingDigest = await sha256Hex(data);
+    if (
+      incomingCoopRun?.runId !== expectedRunId
+      || !Number.isSafeInteger(expectedRevision)
+      || expectedRevision < 0
+      || !/^[0-9a-f]{64}$/u.test(expectedDigest)
+      || incomingCoopRun.checkpointRevision < expectedRevision
+      || (incomingCoopRun.checkpointRevision === expectedRevision && incomingDigest !== expectedDigest)
+    ) {
+      return text("Session CAS conflict: incoming checkpoint does not advance the expected run.", 409, cors);
+    }
+    const row = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+      .bind(auth.uid, slot)
+      .first<{ data: string }>();
+    if (row == null) {
+      return text("Session CAS conflict: expected checkpoint missing.", 409, cors);
+    }
+    // Direct request replay after a committed-but-lost response. Validate through the same atomic
+    // tombstone/uniqueness predicate rather than rejecting on the now-advanced stored revision.
+    if (row.data === data) {
+      return (await exactLiveCoopSessionExists(env, auth.uid, slot, data, incomingCoopRun!.runId))
+        ? text("", 200, cors)
+        : text("Session CAS conflict: exact checkpoint is deleted or duplicated.", 409, cors);
+    }
+    const existing = parseValidResumableCoopSession(row.data);
+    if (
+      existing?.runId !== expectedRunId
+      || existing.checkpointRevision !== expectedRevision
+      || !sameCoopSessionIdentity(existing, incomingCoopRun!)
+      || !(await validateCoopSessionAccounts(env, auth, existing))
+      || !/^[0-9a-f]{64}$/u.test(expectedDigest)
+      || (await sha256Hex(row.data)) !== expectedDigest
+    ) {
+      return text("Session CAS conflict: checkpoint changed.", 409, cors);
+    }
+    // Exact-row WHERE closes the read->write race: a concurrent tab/device mutation makes changes=0.
+    const result = await env.DB.prepare(COOP_EXISTING_SESSION_UPDATE_SQL)
+      .bind(data, Date.now(), auth.uid, slot, row.data, incomingCoopRun!.runId)
+      .run();
+    if ((result.meta.changes ?? 0) > 0) {
+      return text("", 200, cors);
+    }
+    return (await exactLiveCoopSessionExists(env, auth.uid, slot, data, incomingCoopRun!.runId))
+      ? text("", 200, cors)
+      : text("Session CAS conflict: checkpoint changed during update.", 409, cors);
+  }
+  const existing = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  if (isCoopLikeSession(existing?.data ?? null) || isCoopLikeSession(data)) {
+    return text("Co-op session writes require compare-and-swap.", 409, cors);
+  }
+  const result =
+    existing == null
+      ? await env.DB.prepare(
+          `INSERT INTO session_saves (user_id, slot, data, updated_at)
+         VALUES (?1, ?2, ?3, ?4) ON CONFLICT(user_id, slot) DO NOTHING`,
+        )
+          .bind(auth.uid, slot, data, Date.now())
+          .run()
+      : await env.DB.prepare(
+          `UPDATE session_saves SET data = ?1, updated_at = ?2
+         WHERE user_id = ?3 AND slot = ?4 AND data = ?5`,
+        )
+          .bind(data, Date.now(), auth.uid, slot, existing.data)
+          .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    return text("", 200, cors);
+  }
+  const readback = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  return exactSessionWriteSatisfied(0, readback?.data ?? null, data)
+    ? text("", 200, cors)
+    : text("Session changed during legacy update.", 409, cors);
+}
+
+async function handleCoopSessionCasUpdate(
+  request: Request,
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const casMode = url.searchParams.get("coopCasMode");
+  if (casMode !== "empty" && casMode !== "existing") {
+    return text("Session CAS mode is required.", 400, cors);
+  }
+  return handleSessionUpdate(request, url, auth, env, cors, true);
+}
+
+async function handleCoopSessionCasDelete(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const slot = parseSlot(url);
+  const expectedRunId = url.searchParams.get("coopCasRunId") ?? "";
+  const expectedRevisionRaw = url.searchParams.get("coopCasCheckpointRevision") ?? "";
+  const expectedRevision = /^\d+$/u.test(expectedRevisionRaw) ? Number(expectedRevisionRaw) : Number.NaN;
+  const expectedDigest = url.searchParams.get("coopCasDigest") ?? "";
+  if (
+    slot == null
+    || !/^[A-Za-z0-9_-]{16,128}$/u.test(expectedRunId)
+    || !Number.isSafeInteger(expectedRevision)
+    || expectedRevision < 0
+    || !/^[0-9a-f]{64}$/u.test(expectedDigest)
+  ) {
+    return text("Invalid co-op delete commitment.", 400, cors);
+  }
+  await ensureCoopRunTombstones(env);
+  const expected = { slot, checkpointRevision: expectedRevision, digest: expectedDigest };
+  if (await exactCoopDeleteSettled(env, auth.uid, expectedRunId, expected)) {
+    return text("", 200, cors);
+  }
+  const row = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  // Deletion is deliberately scoped by `auth.uid` + exact slot/revision/digest, rather than requiring
+  // the peer account to remain resolvable. This is the fail-closed escape hatch for an already-stored
+  // structurally valid checkpoint whose peer was missing or whose legacy identity was ambiguous.
+  const run = parseValidResumableCoopSession(row?.data ?? null);
+  if (row == null) {
+    return text("Session CAS conflict: checkpoint missing without exact tombstone.", 409, cors);
+  }
+  if (
+    run?.runId !== expectedRunId
+    || run.checkpointRevision !== expectedRevision
+    || (await sha256Hex(row.data)) !== expectedDigest
+  ) {
+    return text("Session CAS conflict: checkpoint changed before delete.", 409, cors);
+  }
+  const now = Date.now();
+  const results = await env.DB.batch([
+    env.DB.prepare(COOP_TOMBSTONE_INSERT_SQL).bind(
+      auth.uid,
+      slot,
+      expectedRunId,
+      expectedRevision,
+      expectedDigest,
+      now,
+      row.data,
+    ),
+    env.DB.prepare(COOP_TOMBSTONED_SESSION_DELETE_SQL).bind(
+      auth.uid,
+      slot,
+      row.data,
+      expectedRunId,
+      expectedRevision,
+      expectedDigest,
+    ),
+  ]);
+  return (results[1]?.meta.changes ?? 0) > 0 && (await exactCoopDeleteSettled(env, auth.uid, expectedRunId, expected))
+    ? text("", 200, cors)
+    : text("Session CAS conflict: checkpoint changed during delete.", 409, cors);
+}
+
+async function handleCoopDuplicateExactDelete(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const slot = parseSlot(url);
+  const survivorSlot = parseNamedSlot(url, "survivorSlot");
+  const runId = url.searchParams.get("coopCasRunId") ?? "";
+  const revisionRaw = url.searchParams.get("coopCasCheckpointRevision") ?? "";
+  const revision = /^\d+$/u.test(revisionRaw) ? Number(revisionRaw) : Number.NaN;
+  const digest = url.searchParams.get("coopCasDigest") ?? "";
+  const survivorRevisionRaw = url.searchParams.get("survivorCheckpointRevision") ?? "";
+  const survivorRevision = /^\d+$/u.test(survivorRevisionRaw) ? Number(survivorRevisionRaw) : Number.NaN;
+  const survivorDigest = url.searchParams.get("survivorDigest") ?? "";
+  if (
+    slot == null
+    || survivorSlot == null
+    || slot === survivorSlot
+    || !/^[A-Za-z0-9_-]{16,128}$/u.test(runId)
+    || !Number.isSafeInteger(revision)
+    || revision < 0
+    || !/^[0-9a-f]{64}$/u.test(digest)
+    || !Number.isSafeInteger(survivorRevision)
+    || survivorRevision < 0
+    || !/^[0-9a-f]{64}$/u.test(survivorDigest)
+  ) {
+    return text("Invalid co-op duplicate recovery commitment.", 400, cors);
+  }
+  await ensureCoopRunTombstones(env);
+  const survivor = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, survivorSlot)
+    .first<{ data: string }>();
+  const survivorRun = parseValidResumableCoopSession(survivor?.data ?? null);
+  if (
+    survivor == null
+    || survivorRun?.runId !== runId
+    || survivorRun.checkpointRevision !== survivorRevision
+    || (await sha256Hex(survivor.data)) !== survivorDigest
+    || !(await validateCoopSessionAccounts(env, auth, survivorRun))
+    || survivorRevision < revision
+    || (survivorRevision === revision && survivorDigest !== digest)
+  ) {
+    return text("Session CAS conflict: exact duplicate survivor changed.", 409, cors);
+  }
+
+  const replay = async (): Promise<boolean> => {
+    const result = await env.DB.prepare(COOP_DUPLICATE_DELETE_REPLAY_SQL)
+      .bind(auth.uid, slot, "", runId, survivorSlot, survivor.data)
+      .run();
+    return (result.meta.changes ?? 0) > 0;
+  };
+  if (await replay()) {
+    return text("", 200, cors);
+  }
+
+  const duplicate = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  const duplicateRun = parseValidResumableCoopSession(duplicate?.data ?? null);
+  if (
+    duplicate == null
+    || duplicateRun?.runId !== runId
+    || duplicateRun.checkpointRevision !== revision
+    || (await sha256Hex(duplicate.data)) !== digest
+    || !sameCoopSessionIdentity(duplicateRun, survivorRun)
+    || !(await validateCoopSessionAccounts(env, auth, duplicateRun))
+  ) {
+    return text("Session CAS conflict: exact duplicate row changed.", 409, cors);
+  }
+  const result = await env.DB.prepare(COOP_DUPLICATE_EXACT_DELETE_SQL)
+    .bind(auth.uid, slot, duplicate.data, runId, survivorSlot, survivor.data)
+    .run();
+  if ((result.meta.changes ?? 0) > 0 || (await replay())) {
+    return text("", 200, cors);
+  }
+  return text("Session CAS conflict: duplicate recovery lost its exact survivor.", 409, cors);
+}
+
+async function handleCoopRunStatus(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const runId = url.searchParams.get("coopRunId") ?? "";
+  const requestedSlot = url.searchParams.get("slot");
+  if (!/^[A-Za-z0-9_-]{16,128}$/u.test(runId) || (requestedSlot != null && parseSlot(url) == null)) {
+    return text("Invalid co-op run status request.", 400, cors);
+  }
+  await ensureCoopRunTombstones(env);
+  const [tombstoneResult, liveResult] = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT slot, checkpoint_revision, digest FROM coop_run_tombstones_v2
+       WHERE user_id = ? AND run_id = ?`,
+    ).bind(auth.uid, runId),
+    env.DB.prepare(COOP_LIVE_RUN_ROWS_SQL).bind(auth.uid, runId),
+  ]);
+  const tombstone = (tombstoneResult?.results?.[0] ?? null) as CoopTombstoneRow | null;
+  const live = (liveResult?.results ?? []) as { slot: number; data: string }[];
+  if (tombstone != null && live.length === 0) {
+    return json(
+      {
+        state: "tombstoned",
+        runId,
+        slot: tombstone.slot,
+        checkpointRevision: tombstone.checkpoint_revision,
+        digest: tombstone.digest,
+      },
+      200,
+      cors,
+    );
+  }
+  if (tombstone == null && live.length === 0) {
+    return json({ state: "missing", runId }, 200, cors);
+  }
+  if (tombstone != null || live.length !== 1) {
+    return text("Session CAS conflict: co-op run has contradictory account state.", 409, cors);
+  }
+  const active = parseValidResumableCoopSession(live[0].data);
+  if (active?.runId !== runId || !(await validateCoopSessionAccounts(env, auth, active))) {
+    return text("Session CAS conflict: active co-op run identity is invalid.", 409, cors);
+  }
+  return json(
+    {
+      state: "active",
+      runId,
+      slot: live[0].slot,
+      checkpointRevision: active.checkpointRevision,
+      digest: await sha256Hex(live[0].data),
+    },
+    200,
+    cors,
+  );
+}
+
+/**
+ * Recovery-only deletion for an opaque/corrupt row that cannot be proven solo or co-op. The caller
+ * must first read and hash the exact bytes; valid/co-op-like JSON is deliberately ineligible so this
+ * endpoint can never bypass the co-op tombstone protocol.
+ */
+async function handleClassifiedSessionExactDelete(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+  expectedProtection: "unknown" | "coop-invalid",
+  label: "opaque" | "legacy co-op",
+): Promise<Response> {
+  const slot = parseSlot(url);
+  const expectedDigest = url.searchParams.get("exactDigest") ?? "";
+  if (slot == null || !/^[0-9a-f]{64}$/u.test(expectedDigest)) {
+    return text(`Invalid ${label} session delete commitment.`, 400, cors);
+  }
+  const row = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  if (row == null) {
+    return text("", 200, cors);
+  }
+  if (classifySessionProtection(row.data) !== expectedProtection) {
+    return text(`${label} exact delete cannot remove a differently classified session.`, 409, cors);
+  }
+  if ((await sha256Hex(row.data)) !== expectedDigest) {
+    return text(`${label} session changed before exact delete.`, 409, cors);
+  }
+  const strandedRun = expectedProtection === "coop-invalid" ? parseValidCoopRun(row.data) : null;
+  const strandedRunId =
+    expectedProtection === "coop-invalid" ? (strandedRun?.runId ?? parseTrustedCoopRunId(row.data)) : null;
+  if (strandedRunId != null) {
+    // A structurally invalid checkpoint can still carry trustworthy, exact run metadata. Preserve
+    // the same resurrection fence as a fully materializable checkpoint: the tombstone insert and
+    // byte-exact delete execute in one D1 batch, while duplicate live copies make both fail closed.
+    await ensureCoopRunTombstones(env);
+    const now = Date.now();
+    const checkpointRevision = strandedRun?.checkpointRevision ?? COOP_FENCE_ONLY_CHECKPOINT_REVISION;
+    const expected = {
+      slot,
+      checkpointRevision,
+      digest: expectedDigest,
+    };
+    await env.DB.batch([
+      env.DB.prepare(COOP_TOMBSTONE_INSERT_SQL).bind(
+        auth.uid,
+        slot,
+        strandedRunId,
+        checkpointRevision,
+        expectedDigest,
+        now,
+        row.data,
+      ),
+      env.DB.prepare(COOP_TOMBSTONED_SESSION_DELETE_SQL).bind(
+        auth.uid,
+        slot,
+        row.data,
+        strandedRunId,
+        checkpointRevision,
+        expectedDigest,
+      ),
+    ]);
+    return (await exactCoopDeleteSettled(env, auth.uid, strandedRunId, expected))
+      ? text("", 200, cors)
+      : text(`${label} session changed during tombstoned exact delete.`, 409, cors);
+  }
+  const result = await env.DB.prepare("DELETE FROM session_saves WHERE user_id = ?1 AND slot = ?2 AND data = ?3")
+    .bind(auth.uid, slot, row.data)
+    .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    return text("", 200, cors);
+  }
+  const readback = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  return exactSessionDeleteSatisfied(0, readback?.data ?? null)
+    ? text("", 200, cors)
+    : text(`${label} session changed during exact delete.`, 409, cors);
+}
+
+async function handleOpaqueSessionExactDelete(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  return handleClassifiedSessionExactDelete(url, auth, env, cors, "unknown", "opaque");
+}
+
+async function handleLegacyCoopSessionExactDelete(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  return handleClassifiedSessionExactDelete(url, auth, env, cors, "coop-invalid", "legacy co-op");
 }
 
 async function handleSessionDelete(
@@ -707,8 +1878,27 @@ async function handleSessionDelete(
   if (slot === null) {
     return text("Invalid slot.", 400, cors);
   }
-  await env.DB.prepare("DELETE FROM session_saves WHERE user_id = ? AND slot = ?").bind(auth.uid, slot).run();
-  return text("", 200, cors);
+  const existing = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  if (isCoopLikeSession(existing?.data ?? null)) {
+    return text("Co-op session deletes require compare-and-swap.", 409, cors);
+  }
+  if (existing == null) {
+    return text("", 200, cors);
+  }
+  const result = await env.DB.prepare("DELETE FROM session_saves WHERE user_id = ? AND slot = ? AND data = ?")
+    .bind(auth.uid, slot, existing.data)
+    .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    return text("", 200, cors);
+  }
+  const readback = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  return exactSessionDeleteSatisfied(0, readback?.data ?? null)
+    ? text("", 200, cors)
+    : text("Session changed during legacy delete.", 409, cors);
 }
 
 async function handleSessionClear(
@@ -729,9 +1919,31 @@ async function handleSessionClear(
   // "Continue", and loading the all-fainted party instantly game-overed back to
   // the title in a loop. Run history for ghosts/analytics is captured separately
   // via POST /savedata/run, so nothing is lost by deleting here.
-  await readSaveBody(request); // drain the request body (final session, unused)
-  await env.DB.prepare("DELETE FROM session_saves WHERE user_id = ? AND slot = ?").bind(auth.uid, slot).run();
-  return json({ success: true }, 200, cors);
+  const incoming = await readSaveBody(request); // drain the request body (final session)
+  if (incoming == null) {
+    return json({ success: false, error: "Save data too large." }, 413, cors);
+  }
+  const existing = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  if (isCoopLikeSession(existing?.data ?? null) || isCoopLikeSession(incoming)) {
+    return json({ success: false, error: "Co-op session clears require compare-and-swap." }, 409, cors);
+  }
+  if (existing == null) {
+    return json({ success: true }, 200, cors);
+  }
+  const result = await env.DB.prepare("DELETE FROM session_saves WHERE user_id = ? AND slot = ? AND data = ?")
+    .bind(auth.uid, slot, existing.data)
+    .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    return json({ success: true }, 200, cors);
+  }
+  const readback = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  return exactSessionDeleteSatisfied(0, readback?.data ?? null)
+    ? json({ success: true }, 200, cors)
+    : json({ success: false, error: "Session changed during legacy clear." }, 409, cors);
 }
 
 async function handleUpdateAll(
@@ -752,6 +1964,8 @@ async function handleUpdateAll(
   }
   const now = Date.now();
   const stmts: D1PreparedStatement[] = [];
+  let sessionMutation: { index: number; slot: number; data: string } | null = null;
+  let storedSystem: string | null = null;
   if (payload.system !== undefined && payload.system !== null) {
     const sys = typeof payload.system === "string" ? payload.system : JSON.stringify(payload.system);
     const allowReset = new URL(request.url).searchParams.get("allowReset") === "1";
@@ -759,26 +1973,72 @@ async function handleUpdateAll(
     if (guard) {
       return guard;
     }
-    const storedSys = await compressSave(sys);
-    stmts.push(
-      env.DB.prepare(
-        `INSERT INTO system_saves (user_id, data, updated_at) VALUES (?1, ?2, ?3)
-           ON CONFLICT(user_id) DO UPDATE SET data = ?2, updated_at = ?3`,
-      ).bind(auth.uid, storedSys, now),
-    );
+    storedSystem = await compressSave(sys);
   }
-  const slot = Number.parseInt(String(payload.sessionSlotId ?? ""), 10);
-  if (payload.session !== undefined && payload.session !== null && Number.isFinite(slot) && slot >= 0 && slot <= 4) {
-    const sess = typeof payload.session === "string" ? payload.session : JSON.stringify(payload.session);
+  const slotRaw = String(payload.sessionSlotId ?? "");
+  const slot = /^\d+$/u.test(slotRaw) ? Number(slotRaw) : Number.NaN;
+  const sessionPayload = payload.session;
+  const hasSession = sessionPayload !== undefined && sessionPayload !== null;
+  if (hasSession && (!Number.isSafeInteger(slot) || slot < 0 || slot > 4)) {
+    return text("Invalid session slot in updateAll.", 400, cors);
+  }
+  if (hasSession) {
+    const sess = typeof sessionPayload === "string" ? sessionPayload : JSON.stringify(sessionPayload);
+    const existing = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+      .bind(auth.uid, slot)
+      .first<{ data: string }>();
+    if (isCoopLikeSession(existing?.data ?? null) || isCoopLikeSession(sess)) {
+      return text("Co-op session updateAll writes require compare-and-swap.", 409, cors);
+    }
+    const statement =
+      existing == null
+        ? env.DB.prepare(
+            `INSERT INTO session_saves (user_id, slot, data, updated_at)
+           VALUES (?1, ?2, ?3, ?4) ON CONFLICT(user_id, slot) DO NOTHING`,
+          ).bind(auth.uid, slot, sess, now)
+        : env.DB.prepare(
+            `UPDATE session_saves SET data = ?1, updated_at = ?2
+           WHERE user_id = ?3 AND slot = ?4 AND data = ?5`,
+          ).bind(sess, now, auth.uid, slot, existing.data);
+    sessionMutation = { index: stmts.length, slot, data: sess };
+    stmts.push(statement);
+  }
+  let systemMutationIndex: number | null = null;
+  if (storedSystem != null) {
+    systemMutationIndex = stmts.length;
     stmts.push(
-      env.DB.prepare(
-        `INSERT INTO session_saves (user_id, slot, data, updated_at) VALUES (?1, ?2, ?3, ?4)
-           ON CONFLICT(user_id, slot) DO UPDATE SET data = ?3, updated_at = ?4`,
-      ).bind(auth.uid, slot, sess, now),
+      sessionMutation == null
+        ? env.DB.prepare(
+            `INSERT INTO system_saves (user_id, data, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(user_id) DO UPDATE SET data = ?2, updated_at = ?3`,
+          ).bind(auth.uid, storedSystem, now)
+        : env.DB.prepare(UPDATE_ALL_CONDITIONAL_SYSTEM_SQL).bind(
+            auth.uid,
+            storedSystem,
+            now,
+            sessionMutation.slot,
+            sessionMutation.data,
+          ),
     );
   }
   if (stmts.length > 0) {
-    await env.DB.batch(stmts);
+    const results = await env.DB.batch(stmts);
+    if (sessionMutation != null) {
+      const sessionChanged = (results[sessionMutation.index]?.meta.changes ?? 0) > 0;
+      const systemChanged = systemMutationIndex == null || (results[systemMutationIndex]?.meta.changes ?? 0) > 0;
+      if (sessionChanged && !systemChanged) {
+        return text("System save did not commit with the accepted session update.", 500, cors);
+      }
+      if (sessionChanged) {
+        return text("", 200, cors);
+      }
+      const readback = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+        .bind(auth.uid, sessionMutation.slot)
+        .first<{ data: string }>();
+      if (!systemChanged || !exactSessionWriteSatisfied(0, readback?.data ?? null, sessionMutation.data)) {
+        return text("Session changed during updateAll.", 409, cors);
+      }
+    }
   }
   return text("", 200, cors);
 }
@@ -1199,11 +2459,13 @@ type RunSampleRow = {
   username: string | null;
   outcome: string | null;
   difficulty: string | null;
+  mode: string | null;
   wave: number | null;
   created_at: number;
   player_team: string;
   opponent_name: string | null;
   opponent_team: string | null;
+  challenges: string | null;
   presentation?: string | null;
 };
 
@@ -1251,7 +2513,7 @@ async function handleRunSample(
   const MAX_GHOST_SAMPLE_WAVE = 200;
   const NON_GHOST_MODES = "'endless', 'spliced_endless', 'daily'";
   const cols =
-    "id, username, outcome, difficulty, wave, created_at, player_team, opponent_name, opponent_team, presentation";
+    "id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation";
   const maxRow = await env.DB.prepare("SELECT MAX(rowid) AS m FROM runs").first<{ m: number | null }>();
   const maxRowId = maxRow?.m ?? 0;
   const seen = new Set<string>();
@@ -1296,12 +2558,14 @@ async function handleRunSample(
           id: row.id,
           trainerName: row.username ?? "Trainer",
           difficulty: row.difficulty ?? difficulty,
+          mode: row.mode ?? undefined,
           waveReached: row.wave ?? 0,
           isVictory: row.outcome === "victory",
           timestamp: row.created_at,
           party: JSON.parse(row.player_team),
           opponentName: row.opponent_name ?? undefined,
           opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
+          challenges: row.challenges ? JSON.parse(row.challenges) : undefined,
           // ER Ghost Trainer Editor: pass the authored presentation through to the
           // encountering client (which sanitises it before applying). Bad JSON -> omit.
           presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
@@ -3612,6 +4876,9 @@ export default {
       if (pathname === "/account/info" && method === "GET") {
         return await handleAccountInfo(auth, env, cors);
       }
+      if (pathname === "/account/coop-ticket" && method === "GET") {
+        return await handleCoopIdentityTicket(auth, env, cors);
+      }
       if (pathname === "/account/changepw" && method === "POST") {
         return await handleChangePassword(request, auth, env, cors);
       }
@@ -3629,6 +4896,24 @@ export default {
       }
       if (pathname === "/savedata/session/update" && method === "POST") {
         return await handleSessionUpdate(request, url, auth, env, cors);
+      }
+      if (pathname === "/savedata/session/coop-cas-update" && method === "POST") {
+        return await handleCoopSessionCasUpdate(request, url, auth, env, cors);
+      }
+      if (pathname === "/savedata/session/coop-cas-delete" && method === "POST") {
+        return await handleCoopSessionCasDelete(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/session/coop-duplicate-exact-delete" && method === "POST") {
+        return await handleCoopDuplicateExactDelete(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/session/coop-run-status" && method === "GET") {
+        return await handleCoopRunStatus(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/session/opaque-exact-delete" && method === "POST") {
+        return await handleOpaqueSessionExactDelete(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/session/legacy-coop-exact-delete" && method === "POST") {
+        return await handleLegacyCoopSessionExactDelete(url, auth, env, cors);
       }
       if (pathname === "/savedata/session/delete" && method === "GET") {
         return await handleSessionDelete(url, auth, env, cors);

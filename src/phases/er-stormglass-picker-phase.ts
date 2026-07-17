@@ -29,7 +29,12 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
-import { getCoopController, getCoopInteractionRelay, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  failCoopSharedSession,
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_STORMGLASS_CHOICE_KINDS, COOP_STORMGLASS_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
 import { commitCoopStormglassDecision } from "#data/elite-redux/coop/coop-stormglass-operation";
 import {
@@ -116,11 +121,15 @@ export class ErStormglassPickerPhase extends Phase {
       try {
         const relay = getCoopInteractionRelay();
         if (relay != null) {
-          commitCoopStormglassDecision(relay, index, weather, {
+          const retained = commitCoopStormglassDecision(relay, index, weather, {
             localRole: "host",
             wave: globalScene.currentBattle?.waveIndex ?? 0,
             turn: globalScene.currentBattle?.turn ?? 0,
           });
+          if (!retained) {
+            failCoopSharedSession("Stormglass decision could not enter durable authority");
+            return true;
+          }
         }
         coopLog("reward", `stormglass OWNER commit weather=${weather} index=${index} (#130)`);
       } catch {

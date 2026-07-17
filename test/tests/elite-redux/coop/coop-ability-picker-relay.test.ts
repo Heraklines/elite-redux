@@ -24,6 +24,7 @@
 
 import {
   adoptAbilityWatcherOutcome,
+  captureCoopAbilityOperationBinding,
   resetCoopAbilityOperationFlag,
   resetCoopAbilityOutcomeRetryMs,
   setCoopAbilityOperationEnabled,
@@ -193,11 +194,21 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
     const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
     const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
     setCoopRuntime(hostRuntime);
+    const hostBinding = captureCoopAbilityOperationBinding();
+    setCoopRuntime(guestRuntime);
+    const guestBinding = captureCoopAbilityOperationBinding();
+    setCoopRuntime(hostRuntime);
 
-    sendCoopAbilityPickerOutcome(hostRuntime.interactionRelay, SHOP_SEQ, [COOP_ABILITY_OP.CAP_RUNUNLOCK, 2], {
-      localRole: "host",
-      wave: 1,
-    });
+    sendCoopAbilityPickerOutcome(
+      hostRuntime.interactionRelay,
+      SHOP_SEQ,
+      [COOP_ABILITY_OP.CAP_RUNUNLOCK, 2],
+      {
+        localRole: "host",
+        wave: 1,
+      },
+      hostBinding,
+    );
     const outcome = await guestRuntime.interactionRelay.awaitInteractionChoice(SEQ, 25);
 
     expect(pair.faultsInjected(), "the raw abilityPicker carrier was actually dropped").toBe(1);
@@ -206,12 +217,15 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
       2,
     ]);
     expect(
-      adoptAbilityWatcherOutcome({
-        pinned: SHOP_SEQ,
-        data: outcome?.data ?? null,
-        localRole: "guest",
-        wave: 1,
-      }),
+      adoptAbilityWatcherOutcome(
+        {
+          pinned: SHOP_SEQ,
+          data: outcome?.data ?? null,
+          localRole: "guest",
+          wave: 1,
+        },
+        guestBinding,
+      ),
       "the watcher phase admits the journal-materialized result through its ledger gate",
     ).toBe(true);
   });
@@ -221,22 +235,35 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
     const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
     const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
     setCoopRuntime(hostRuntime);
+    const hostBinding = captureCoopAbilityOperationBinding();
+    setCoopRuntime(guestRuntime);
+    const guestBinding = captureCoopAbilityOperationBinding();
+    setCoopRuntime(hostRuntime);
     const firstAwait = guestRuntime.interactionRelay.awaitInteractionChoice(SEQ, 25);
 
-    sendCoopAbilityPickerOutcome(hostRuntime.interactionRelay, SHOP_SEQ, [COOP_ABILITY_OP.CAP_CYCLE], {
-      localRole: "host",
-      wave: 1,
-    });
+    sendCoopAbilityPickerOutcome(
+      hostRuntime.interactionRelay,
+      SHOP_SEQ,
+      [COOP_ABILITY_OP.CAP_CYCLE],
+      {
+        localRole: "host",
+        wave: 1,
+      },
+      hostBinding,
+    );
 
     const first = await firstAwait;
     expect(first?.data).toEqual([COOP_ABILITY_OP.CAP_CYCLE]);
     expect(
-      adoptAbilityWatcherOutcome({
-        pinned: SHOP_SEQ,
-        data: first?.data ?? null,
-        localRole: "guest",
-        wave: 1,
-      }),
+      adoptAbilityWatcherOutcome(
+        {
+          pinned: SHOP_SEQ,
+          data: first?.data ?? null,
+          localRole: "guest",
+          wave: 1,
+        },
+        guestBinding,
+      ),
     ).toBe(true);
     expect(
       await guestRuntime.interactionRelay.awaitInteractionChoice(SEQ, 10),
@@ -263,24 +290,85 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
     pair.armNextDrop("interactionChoice", "guest");
     const hostAwait = hostRuntime.interactionRelay.awaitInteractionChoice(guestSeq, 100);
 
+    setCoopRuntime(hostRuntime);
+    const hostBinding = captureCoopAbilityOperationBinding();
     setCoopRuntime(guestRuntime);
-    sendCoopAbilityPickerOutcome(guestRuntime.interactionRelay, GUEST_SHOP_SEQ, data, {
-      localRole: "guest",
-      wave: 1,
-    });
+    const guestBinding = captureCoopAbilityOperationBinding();
+    sendCoopAbilityPickerOutcome(
+      guestRuntime.interactionRelay,
+      GUEST_SHOP_SEQ,
+      data,
+      {
+        localRole: "guest",
+        wave: 1,
+      },
+      guestBinding,
+    );
     setCoopRuntime(hostRuntime);
 
     const action = await hostAwait;
     expect(pair.faultsInjected(), "the first guest intent was actually dropped").toBe(1);
     expect(action?.data, "the resend reached the host authority").toEqual(data);
     expect(
-      adoptAbilityWatcherOutcome({
-        pinned: GUEST_SHOP_SEQ,
-        data: action?.data ?? null,
-        localRole: "host",
-        wave: 1,
-      }),
+      adoptAbilityWatcherOutcome(
+        {
+          pinned: GUEST_SHOP_SEQ,
+          data: action?.data ?? null,
+          localRole: "host",
+          wave: 1,
+        },
+        hostBinding,
+      ),
       "the host authority committed the guest-owned result",
     ).toBe(true);
+  });
+
+  it("ASYNC BINDING: a guest materializes two host picks while the host remains ambient", async () => {
+    const pair = createLoopbackPair();
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopRuntime(hostRuntime);
+    const hostBinding = captureCoopAbilityOperationBinding();
+    setCoopRuntime(guestRuntime);
+    const guestBinding = captureCoopAbilityOperationBinding();
+
+    // Model a Phaser watcher continuation: the guest captured its binding before awaiting, but another
+    // client is the process-wide ambient runtime by the time the promise resumes.
+    setCoopRuntime(hostRuntime);
+    for (const data of [[COOP_ABILITY_OP.CAP_CYCLE], [COOP_ABILITY_OP.CAP_RUNUNLOCK, 2]]) {
+      const awaited = guestRuntime.interactionRelay.awaitInteractionChoice(SEQ, 25);
+      sendCoopAbilityPickerOutcome(
+        hostRuntime.interactionRelay,
+        SHOP_SEQ,
+        data,
+        { localRole: "host", wave: 1 },
+        hostBinding,
+      );
+      const action = await awaited;
+      expect(action?.data).toEqual(data);
+      expect(
+        adoptAbilityWatcherOutcome(
+          {
+            pinned: SHOP_SEQ,
+            data: action?.data ?? null,
+            localRole: "guest",
+            wave: 1,
+          },
+          guestBinding,
+        ),
+      ).toBe(true);
+      expect(
+        adoptAbilityWatcherOutcome(
+          {
+            pinned: SHOP_SEQ,
+            data: action?.data ?? null,
+            localRole: "guest",
+            wave: 1,
+          },
+          guestBinding,
+        ),
+        "the receiving runtime owns its own exactly-once cursor",
+      ).toBe(false);
+    }
   });
 });

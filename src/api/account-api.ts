@@ -6,6 +6,7 @@ import type {
   AccountLoginRequest,
   AccountLoginResponse,
   AccountRegisterRequest,
+  CoopIdentityTicketResponse,
 } from "#types/api";
 import { removeCookie, setCookie } from "#utils/cookies";
 
@@ -27,6 +28,21 @@ export class PokerogueAccountApi extends ApiBase {
       return [null, response.status];
     } catch (err) {
       console.warn("Could not get account info!", err);
+      return [null, 500];
+    }
+  }
+
+  /** Mint a short-lived, single-lobby co-op identity credential. */
+  public async getCoopIdentityTicket(): Promise<[data: CoopIdentityTicketResponse | null, status: number]> {
+    try {
+      const response = await this.doGet("/account/coop-ticket");
+      if (response.ok) {
+        return [(await response.json()) as CoopIdentityTicketResponse, response.status];
+      }
+      console.warn("Could not get co-op identity ticket!", response.status, response.statusText);
+      return [null, response.status];
+    } catch (err) {
+      console.warn("Could not get co-op identity ticket!", err);
       return [null, 500];
     }
   }

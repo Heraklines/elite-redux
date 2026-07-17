@@ -7,6 +7,7 @@ on:
       - feat/elite-redux-port
     paths:
       - ".github/workflows/coop-gate-sharded.yml"
+      - ".github/workflows/coop-mutation-assurance.yml"
       - ".github/actions/setup-deps/**"
       - ".nvmrc"
       - "assets"
@@ -20,9 +21,16 @@ on:
       - "pnpm-lock.yaml"
       - "patches/**"
       - "public/**"
+      - "scripts/coop-browser-entry.ts"
+      - "scripts/coop-browser-transport-entry.ts"
+      - "scripts/coop-gate-timings.json"
+      - "scripts/prepare-coop-browser-artifact.mjs"
       - "scripts/run-coop-gate.mjs"
+      - "scripts/run-coop-mutation-gate.mjs"
       - "scripts/run-coop-static-gate.mjs"
       - "scripts/run-coop-browser-transport.mjs"
+      - "scripts/vite.coop-browser.config.mjs"
+      - "scripts/write-coop-ci-status.mjs"
       - "src/**"
       - "test/**"
       - "tsconfig*.json"
@@ -30,54 +38,237 @@ on:
       - "vitest.config.ts"
       - "workers/**"
 
+# Full refs plus the workflow name prevent sibling branch/full/focused workflows from cancelling one another.
 concurrency:
-  group: coop-gate-sharded-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  browser:
-    name: Browser-native WebRTC handshake and rejoin
+  plan:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Plan exhaustive co-op matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Generate inventory-safe weighted matrix
+        id: plan
+        env:
+          COOP_CI_PLAN_MANIFEST: coop-ci-full-plan.json
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          node scripts/run-coop-gate.mjs --ci-matrix 2>&1 | tee coop-ci-full-plan.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write planner status evidence
+        if: always()
+        env:
+          PLAN_EXIT: ${{ steps.plan.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs --output coop-ci-full-plan-status.json
+          --kind full-plan --exit-code "$PLAN_EXIT" --log coop-ci-full-plan.log
+          --assignment coop-ci-full-plan.json
+
+      - name: Upload compact matrix evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-ci-full-plan
+          overwrite: true
+          path: |
+            coop-ci-full-plan.json
+            coop-ci-full-plan-status.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload planner failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-ci-full-plan-failure
+          overwrite: true
+          path: |
+            coop-ci-full-plan.json
+            coop-ci-full-plan-status.json
+            coop-ci-full-plan.log
+          retention-days: 7
+          if-no-files-found: warn
+
+  browser-build:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Build immutable production browser bundle
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
+          fetch-depth: 1
           submodules: recursive
 
       - uses: ./.github/actions/setup-deps
+
+      - name: Build and seal browser checkpoint bundle once
+        id: build
+        env:
+          COOP_BROWSER_OUT_DIR: dist-coop-browser
+          VITE_COOP_SERVER_URL: http://127.0.0.1:4174
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          pnpm exec vite build --mode production --config scripts/vite.coop-browser.config.mjs \
+            2>&1 | tee coop-browser-build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -eq 0 ]; then
+            node scripts/prepare-coop-browser-artifact.mjs
+            status=$?
+          fi
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write browser-build status evidence
+        if: always()
+        env:
+          BUILD_EXIT: ${{ steps.build.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs --output coop-browser-build-status.json
+          --kind browser-build --exit-code "$BUILD_EXIT" --log coop-browser-build.log
+
+      - name: Publish immutable browser execution input
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-browser-bundle-${{ github.sha }}
+          overwrite: true
+          path: dist-coop-browser/**
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload compact browser-build evidence
+        if: success() && github.event_name != 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-browser-build-status
+          overwrite: true
+          path: |
+            coop-browser-build-status.json
+            dist-coop-browser/coop-browser-artifact.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload full browser-build diagnostics
+        if: failure() || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-browser-build-diagnostics
+          overwrite: true
+          path: |
+            coop-browser-build-status.json
+            coop-browser-build.log
+            dist-coop-browser/coop-browser-artifact.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  browser:
+    if: github.repository == 'Heraklines/elite-redux'
+    needs: browser-build
+    name: Browser-native production WebRTC handshake and rejoin
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: coop-browser-bundle-${{ github.sha }}
+          path: dist-coop-browser
 
       - name: Install isolated Chrome runtime
         run: pnpm exec puppeteer browsers install chrome
 
-      - name: Run two-context production transport checkpoint
+      - name: Run two-context sealed-production transport checkpoint
+        id: browser
         env:
+          COOP_BROWSER_ASSET_DIR: assets
+          COOP_BROWSER_DIST: dist-coop-browser
           NODE_OPTIONS: --max-old-space-size=4096
-        run: node scripts/run-coop-browser-transport.mjs
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          node scripts/run-coop-browser-transport.mjs 2>&1 | tee coop-browser-transport.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
 
-      - name: Upload browser diagnostics
+      - name: Write browser status evidence
         if: always()
+        env:
+          BROWSER_EXIT: ${{ steps.browser.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs --output coop-browser-status.json
+          --kind browser --exit-code "$BROWSER_EXIT" --log coop-browser-transport.log
+          --assignment dist-coop-browser/coop-browser-artifact.json
+
+      - name: Upload compact browser evidence
+        if: success() && github.event_name != 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: coop-browser-transport
-          path: dev-logs/coop-browser/**
+          name: coop-browser-status
+          overwrite: true
+          path: |
+            coop-browser-status.json
+            dist-coop-browser/coop-browser-artifact.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload full browser diagnostics
+        if: failure() || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-browser-diagnostics
+          overwrite: true
+          path: |
+            coop-browser-status.json
+            coop-browser-transport.log
+            dist-coop-browser/coop-browser-artifact.json
+            dev-logs/coop-browser/**
           retention-days: 7
           if-no-files-found: warn
 
   static:
+    if: github.repository == 'Heraklines/elite-redux'
     name: Co-op static type and format gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           submodules: recursive
 
       - uses: ./.github/actions/setup-deps
 
-      - name: Resolve last successful full-gate base
+      - name: Resolve and explicitly fetch the last successful full-gate base
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -85,68 +276,148 @@ jobs:
           base="$(
             gh api \
               "repos/${GITHUB_REPOSITORY}/actions/workflows/coop-gate-sharded.yml/runs?branch=feat%2Felite-redux-port&status=success&per_page=10" \
-              --jq ".workflow_runs[] | select(.head_sha != \"${GITHUB_SHA}\") | .head_sha" \
-              | head -n 1
+              --jq "first(.workflow_runs[] | select(.head_sha != \"${GITHUB_SHA}\") | .head_sha) // empty"
           )"
-          if [ -z "$base" ]; then
+          if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
             base="${{ github.event.before }}"
           fi
+          if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
+            git fetch --no-tags --depth=1 origin feat/elite-redux-port
+            base="$(git rev-parse FETCH_HEAD)"
+          else
+            git fetch --no-tags --depth=1 origin "$base"
+          fi
+          git cat-file -e "${base}^{commit}"
           echo "COOP_BASE_SHA=$base" >> "$GITHUB_ENV"
 
       - name: Check changed-file types, formatting, and lint
-        run: node scripts/run-coop-static-gate.mjs
+        id: static
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          node scripts/run-coop-static-gate.mjs 2>&1 | tee coop-static.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write static status evidence
+        if: always()
+        env:
+          STATIC_EXIT: ${{ steps.static.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs --output coop-static-status.json
+          --kind static --exit-code "$STATIC_EXIT" --log coop-static.log
+
+      - name: Upload compact static evidence
+        if: success() && github.event_name != 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-static-status
+          overwrite: true
+          path: coop-static-status.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload full static diagnostics
+        if: failure() || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-static-diagnostics
+          overwrite: true
+          path: |
+            coop-static-status.json
+            coop-static.log
+          retention-days: 7
+          if-no-files-found: warn
+
+  public-ui-contracts:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Public UI driver and evidence contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Enforce keyboard-and-DOM-only browser boundaries
+        run: |
+          node test/browser/coop-public-ui/check-public-boundary.mjs
+          node test/browser/coop-public-ui/check-campaign-boundary.mjs
+
+      - name: Run every public-UI source and evidence contract
+        run: node --test test/browser/coop-public-ui/*.test.mjs
 
   gate:
     if: github.repository == 'Heraklines/elite-redux'
+    needs: plan
     name: Lane ${{ matrix.lane }} shard ${{ matrix.shard }}/${{ matrix.total }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { lane: A, shard: 1, total: 1 }
-          - { lane: B, shard: 1, total: 8 }
-          - { lane: B, shard: 2, total: 8 }
-          - { lane: B, shard: 3, total: 8 }
-          - { lane: B, shard: 4, total: 8 }
-          - { lane: B, shard: 5, total: 8 }
-          - { lane: B, shard: 6, total: 8 }
-          - { lane: B, shard: 7, total: 8 }
-          - { lane: B, shard: 8, total: 8 }
-          - { lane: C, shard: 1, total: 3 }
-          - { lane: C, shard: 2, total: 3 }
-          - { lane: C, shard: 3, total: 3 }
-          - { lane: P, shard: 1, total: 1 }
-          - { lane: S, shard: 1, total: 3 }
-          - { lane: S, shard: 2, total: 3 }
-          - { lane: S, shard: 3, total: 3 }
-          - { lane: T, shard: 1, total: 1 }
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
+          fetch-depth: 1
           submodules: recursive
 
       - uses: ./.github/actions/setup-deps
 
       - name: Run isolated co-op gate shard
+        id: shard
         env:
+          COOP_GATE_MANIFEST: coop-gate-assignment.json
           NODE_OPTIONS: --max-old-space-size=8192
         shell: bash
         run: |
+          set +e
           set -o pipefail
           node scripts/run-coop-gate.mjs \
             --lane "${{ matrix.lane }}" \
             --shard "${{ matrix.shard }}/${{ matrix.total }}" \
             2>&1 | tee "coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log"
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
 
-      - name: Upload shard diagnostics
+      - name: Write shard status evidence
         if: always()
+        env:
+          SHARD_EXIT: ${{ steps.shard.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs
+          --output coop-gate-status.json --kind shard --exit-code "$SHARD_EXIT"
+          --lane "${{ matrix.lane }}" --shard "${{ matrix.shard }}/${{ matrix.total }}"
+          --log "coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log"
+          --assignment coop-gate-assignment.json
+
+      - name: Upload compact shard evidence
+        if: success() && github.event_name != 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}
+          name: coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}-status
+          overwrite: true
           path: |
+            coop-gate-status.json
+            coop-gate-assignment.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload full shard diagnostics
+        if: failure() || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}-diagnostics
+          overwrite: true
+          path: |
+            coop-gate-status.json
+            coop-gate-assignment.json
             coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log
             dev-logs/coop-duo/**
             dev-logs/coop-soak/**
@@ -155,18 +426,51 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  mutation-assurance:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Protocol-33 mutation assurance lane
+    uses: ./.github/workflows/coop-mutation-assurance.yml
+
   coop-required:
     name: Co-op required aggregate
     if: always()
-    needs: [browser, static, gate]
+    needs: [browser, static, public-ui-contracts, gate, mutation-assurance]
     runs-on: ubuntu-latest
     steps:
+      - name: Record aggregate status
+        env:
+          BROWSER_RESULT: ${{ needs.browser.result }}
+          STATIC_RESULT: ${{ needs.static.result }}
+          PUBLIC_UI_CONTRACTS_RESULT: ${{ needs.public-ui-contracts.result }}
+          GATE_RESULT: ${{ needs.gate.result }}
+          MUTATION_RESULT: ${{ needs.mutation-assurance.result }}
+        run: >-
+          node -e "require('node:fs').writeFileSync('coop-required-status.json',
+          JSON.stringify({version:1,sha:process.env.GITHUB_SHA,browser:process.env.BROWSER_RESULT,
+          static:process.env.STATIC_RESULT,publicUiContracts:process.env.PUBLIC_UI_CONTRACTS_RESULT,
+          gate:process.env.GATE_RESULT,
+          mutation:process.env.MUTATION_RESULT},null,2)+'\n')"
+
       - name: Require every co-op checkpoint job
         env:
           BROWSER_RESULT: ${{ needs.browser.result }}
           STATIC_RESULT: ${{ needs.static.result }}
+          PUBLIC_UI_CONTRACTS_RESULT: ${{ needs.public-ui-contracts.result }}
           GATE_RESULT: ${{ needs.gate.result }}
+          MUTATION_RESULT: ${{ needs.mutation-assurance.result }}
         run: |
           test "$BROWSER_RESULT" = success
           test "$STATIC_RESULT" = success
+          test "$PUBLIC_UI_CONTRACTS_RESULT" = success
           test "$GATE_RESULT" = success
+          test "$MUTATION_RESULT" = success
+
+      - name: Upload aggregate status evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-required-status
+          overwrite: true
+          path: coop-required-status.json
+          retention-days: 7
+          if-no-files-found: error

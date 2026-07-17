@@ -19,12 +19,16 @@
 //      no receiver is the same bug one layer down.
 // =============================================================================
 
+import { setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import {
   assembleCoopRuntime,
   type CoopRuntime,
   clearCoopRuntime,
+  getCoopSharedTerminalSupervisor,
+  setCoopRuntime,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
+import { createFreshCoopP33Context } from "#data/elite-redux/coop/coop-session-binding";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import {
   beginCoopUiRelayInput,
@@ -65,7 +69,30 @@ function assertFullyWired(runtime: CoopRuntime, label: string): void {
 
 describe("#820 co-op wiring completeness (the two-factories guard)", () => {
   afterEach(() => {
+    setCoopDurabilityEnabled(true);
     clearCoopRuntime();
+  });
+
+  it("runtime assembly never advertises durability when no durability manager is installed", async () => {
+    setCoopDurabilityEnabled(false);
+    const { host, guest } = createLoopbackPair();
+    const hostRuntime = assembleCoopRuntime(host, { username: "no-durability-host" });
+    const guestRuntime = assembleCoopRuntime(guest, { username: "no-durability-guest" });
+    try {
+      expect(hostRuntime.durability).toBeUndefined();
+      expect(guestRuntime.durability).toBeUndefined();
+      hostRuntime.controller.connect();
+      guestRuntime.controller.connect();
+      await new Promise<void>(resolve => queueMicrotask(resolve));
+      expect(
+        hostRuntime.controller.compatibilityAccepted,
+        "protocol 31 must fail closed instead of claiming the missing journal capability",
+      ).toBe(false);
+      expect(guestRuntime.controller.compatibilityAccepted).toBe(false);
+    } finally {
+      hostRuntime.controller.dispose();
+      guestRuntime.controller.dispose();
+    }
   });
 
   it("assembleCoopRuntime (the LIVE + harness factory) installs every critical hook", () => {
@@ -74,6 +101,42 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     const guestRuntime = assembleCoopRuntime(guest, { username: "wiring-guest" });
     assertFullyWired(hostRuntime, "assemble(host)");
     assertFullyWired(guestRuntime, "assemble(guest)");
+  });
+
+  it("the authenticated LIVE factory owns and normally disposes one P33 terminal supervisor", () => {
+    const { host } = createLoopbackPair();
+    const p33 = createFreshCoopP33Context({
+      pairingId: "PAIR33RUNTIME",
+      pairingBearer: "T".repeat(43),
+      transportRole: "answerer",
+      account: {
+        version: 1,
+        accountId: "er-account:10",
+        displayName: "Authority",
+        canonicalUsername: "authority",
+      },
+      peerAccount: {
+        version: 1,
+        accountId: "er-account:20",
+        displayName: "Replica",
+        canonicalUsername: "replica",
+      },
+      connectionGeneration: 2,
+      peerConnectionGeneration: 4,
+    });
+    expect(p33).not.toBeNull();
+    if (p33 == null) {
+      throw new Error("P33 runtime fixture was rejected");
+    }
+    const runtime = assembleCoopRuntime(host, { username: "p33-terminal-runtime", p33 });
+    setCoopRuntime(runtime);
+    expect(getCoopSharedTerminalSupervisor(runtime)).not.toBeNull();
+
+    clearCoopRuntime();
+    expect(
+      getCoopSharedTerminalSupervisor(runtime),
+      "normal teardown disposes and unregisters the supervisor",
+    ).toBeNull();
   });
 
   it("startLocalCoopSession (the DEV factory) produces the SAME wiring", () => {
@@ -155,13 +218,78 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     ).not.toContain("enemies = await streamer.awaitEnemyParty(");
   });
 
+  it("keeps an authoritative guest behind the atomic encounter carrier before Mystery materialization", () => {
+    const root = join(__dirname, "..", "..", "..", "..", "src");
+    const encounterSource = readFileSync(join(root, "phases", "encounter-phase.ts"), "utf8");
+    const battleSceneSource = readFileSync(join(root, "battle-scene.ts"), "utf8");
+
+    const adoptionStart = encounterSource.indexOf("private async runEncounterAfterCoopAdopt(): Promise<void>");
+    const adoptionEnd = encounterSource.indexOf(
+      "protected async prepareCoopAuthoritativeGuestPresentationOnly",
+      adoptionStart,
+    );
+    expect(adoptionStart, "the guest encounter carrier boundary exists").toBeGreaterThanOrEqual(0);
+    expect(adoptionEnd, "the carrier boundary has a bounded source section").toBeGreaterThan(adoptionStart);
+    const adoption = encounterSource.slice(adoptionStart, adoptionEnd);
+    expect(
+      adoption.indexOf("await this.adoptCoopHostEnemyParty("),
+      "the guest awaits the complete host carrier",
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      adoption.indexOf("this.runEncounter()"),
+      "Mystery construction runs only after carrier adoption",
+    ).toBeGreaterThan(adoption.indexOf("await this.adoptCoopHostEnemyParty("));
+
+    const carrierStart = encounterSource.indexOf("private async adoptCoopHostEnemyParty(");
+    const carrierEnd = encounterSource.indexOf("private broadcastCoopEnemyParty", carrierStart);
+    expect(carrierStart, "the atomic carrier apply exists").toBeGreaterThanOrEqual(0);
+    expect(carrierEnd, "the carrier apply has a bounded source section").toBeGreaterThan(carrierStart);
+    const carrier = encounterSource.slice(carrierStart, carrierEnd);
+    expect(
+      carrier.indexOf("const encounter = streamer.consumeEnemyPartyEncounter("),
+      "descriptor is required",
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      carrier.indexOf("applyCoopEncounterAuthority(battle, encounter)"),
+      "descriptor is applied atomically",
+    ).toBeGreaterThan(carrier.indexOf("const encounter = streamer.consumeEnemyPartyEncounter("));
+
+    const pickerStart = battleSceneSource.indexOf("getMysteryEncounter(");
+    const pickerEnd = battleSceneSource.indexOf("// Check for queued encounters first", pickerStart);
+    const picker = battleSceneSource.slice(pickerStart, pickerEnd);
+    expect(picker, "a committed descriptor wins before any live picker").toContain(
+      "encounterType != null && allMysteryEncounters[encounterType] != null",
+    );
+    expect(picker, "a renderer with missing authority fails closed instead of selecting locally").toContain(
+      "refusing local derivation",
+    );
+    expect(picker.indexOf("isCoopAuthoritativeGuest()"), "the guest fence precedes the gauntlet picker").toBeLessThan(
+      picker.indexOf("erGauntletActive()"),
+    );
+  });
+
+  it("purges every reused-key transport buffer at a carried session boundary", () => {
+    const root = join(__dirname, "..", "..", "..", "..", "src");
+    const runtimeSource = readFileSync(join(root, "data", "elite-redux", "coop", "coop-runtime.ts"), "utf8");
+    const gameDataSource = readFileSync(join(root, "system", "game-data.ts"), "utf8");
+    const purgeStart = runtimeSource.indexOf("export function purgeCoopBufferedArrivals(reason: string): void");
+    const purgeEnd = runtimeSource.indexOf("export function isCoopRuntimeActive", purgeStart);
+    expect(purgeStart, "the carried-runtime purge exists").toBeGreaterThanOrEqual(0);
+    expect(purgeEnd, "the purge has a bounded source section").toBeGreaterThan(purgeStart);
+    const purge = runtimeSource.slice(purgeStart, purgeEnd);
+    expect(purge).toContain("active?.interactionRelay.purgeBufferedArrivals(reason)");
+    expect(purge).toContain("active?.rendezvous.purgeBufferedArrivals(reason)");
+    expect(purge).toContain("active?.battleStream.purgeSessionBoundaryState(reason)");
+    expect(gameDataSource).toContain('purgeCoopBufferedArrivals("applyCoopLaunchSession (resume/launch adopt)")');
+  });
+
   it("publishes each complete wave carrier without waiting on a pre-commit interaction generation", () => {
     const encounterSource = readFileSync(
       join(__dirname, "..", "..", "..", "..", "src", "phases", "encounter-phase.ts"),
       "utf8",
     );
     const start = encounterSource.indexOf("private broadcastCoopEnemyParty(): void");
-    const end = encounterSource.indexOf("private broadcastCoopLaunchSnapshot(): void", start);
+    const end = encounterSource.indexOf("private broadcastCoopLaunchSnapshot(", start);
     expect(start, "ordinary-wave authority publisher exists").toBeGreaterThanOrEqual(0);
     expect(end, "publisher has a bounded source section").toBeGreaterThan(start);
     const publisher = encounterSource.slice(start, end);
@@ -194,13 +322,13 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     );
     expect(
       encounterSource.match(/this\.enterEncounterPresentation\(\)/g),
-      "loaded, ephemeral, and persisted encounter branches all cross the chokepoint",
-    ).toHaveLength(3);
+      "loaded, authoritative-guest, ephemeral, and persisted encounter branches all cross the chokepoint",
+    ).toHaveLength(4);
   });
 
   it("routes turn and replacement publication through one all-or-nothing authority capture", () => {
     const root = join(__dirname, "..", "..", "..", "..", "src");
-    const turnEnd = readFileSync(join(root, "phases", "turn-end-phase.ts"), "utf8");
+    const turnEnd = readFileSync(join(root, "phases", "coop-turn-commit-phase.ts"), "utf8");
     const replacement = readFileSync(join(root, "phases", "coop-push-replacement-checkpoint-phase.ts"), "utf8");
     for (const [label, source] of [
       ["turnResolution", turnEnd],
@@ -221,17 +349,47 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     );
     expect(replay, "an ambient timer cannot fire under another duo client context").not.toContain("setTimeout(");
     const terminal = readFileSync(join(root, "data", "elite-redux", "coop", "coop-authority-terminal.ts"), "utf8");
-    for (const terminalPostcondition of [
-      "membership.terminate()",
-      "scene.ui.showText(",
-      "scene.phaseManager.clearPhaseQueue()",
-      "scene.reset()",
-      'scene.phaseManager.unshiftNew("TitlePhase")',
-    ]) {
-      expect(terminal, `shared authority terminal retains ${terminalPostcondition}`).toContain(terminalPostcondition);
-    }
+    expect(terminal, "authority phases delegate to the one retained runtime terminal contract").toContain(
+      "failCoopSharedSession(reason,",
+    );
+    expect(terminal, "authority phases cannot bypass peer ACK retention with immediate local teardown").not.toContain(
+      "clearCoopRuntime(",
+    );
     expect(replay, "turn and replacement failures route through the shared terminal helper").toContain(
       "terminateCoopAuthoritySession(",
     );
+  });
+
+  it("publishes retained SelectBiome readiness only after each real ER_MAP surface opens", () => {
+    const source = readFileSync(
+      join(__dirname, "..", "..", "..", "..", "src", "phases", "select-biome-phase.ts"),
+      "utf8",
+    );
+    const ownerStart = source.indexOf("private coopBiomePickOwner(");
+    const ownerEnd = source.indexOf("/** OWNER terminal:", ownerStart);
+    const watcherStart = source.indexOf("private async coopBiomePickWatch(");
+    const watcherEnd = source.indexOf("private committedBiomePayload(", watcherStart);
+    expect(ownerStart, "the owner World Map implementation exists").toBeGreaterThanOrEqual(0);
+    expect(ownerEnd, "the owner implementation has a bounded source section").toBeGreaterThan(ownerStart);
+    expect(watcherStart, "the watcher World Map implementation exists").toBeGreaterThanOrEqual(0);
+    expect(watcherEnd, "the watcher implementation has a bounded source section").toBeGreaterThan(watcherStart);
+
+    for (const [label, body, mirrorRole] of [
+      ["owner", source.slice(ownerStart, ownerEnd), "owner"],
+      ["watcher", source.slice(watcherStart, watcherEnd), "watcher"],
+    ] as const) {
+      const modeOpen = body.search(/setModeBoundedWhen\(\s*UiMode\.ER_MAP/);
+      const supersededGuard = body.search(/===\s*"superseded"/);
+      const mirrorOpen = body.search(new RegExp(`beginSession\\(\\s*"${mirrorRole}"\\s*,\\s*UiMode\\.ER_MAP`));
+      const readiness = body.indexOf("notifyCoopWaveContinuationSurfaceReady(");
+      expect(modeOpen, `${label} opens ER_MAP through the bounded live-phase seam`).toBeGreaterThanOrEqual(0);
+      expect(supersededGuard, `${label} rejects a replaced UI transition`).toBeGreaterThan(modeOpen);
+      expect(mirrorOpen, `${label} starts its real ER_MAP mirror only after replacement rejection`).toBeGreaterThan(
+        supersededGuard,
+      );
+      expect(readiness, `${label} publishes retained readiness from the open public surface`).toBeGreaterThan(
+        mirrorOpen,
+      );
+    }
   });
 });

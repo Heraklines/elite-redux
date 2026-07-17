@@ -42,7 +42,6 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
@@ -52,11 +51,13 @@ import {
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   installDuoLogCapture,
+  installHeadlessPlayerAtlasCompletionModel,
+  pumpDuoDestinations,
+  reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
   setCoopHarnessLiveEvents,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import {
   COOP_NO_FAULT_PROFILE,
@@ -156,7 +157,7 @@ describe.skipIf(!RUN)(
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
         game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
     }
 
@@ -169,7 +170,7 @@ describe.skipIf(!RUN)(
       });
       const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       expect(hostShop.phaseName, `wave ${w}: host reached SelectModifierPhase`).toBe("SelectModifierPhase");
-      const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+      const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
       if (hostOwns) {
         await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: false }));
         await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
@@ -177,6 +178,7 @@ describe.skipIf(!RUN)(
         await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: false }));
         await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
       }
+      await pumpDuoDestinations(rig);
       expect(
         rig.guestRuntime.controller.interactionCounter(),
         `wave ${w}: guest advanced the interaction counter in lockstep with host`,
@@ -193,6 +195,7 @@ describe.skipIf(!RUN)(
      */
     async function driveFaultRun(faultPair: CoopFaultPair, WAVES: number): Promise<FaultRunResult> {
       const rig = await buildDuo(game, faultPair, setCoopRuntime, toCoop);
+      installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
       wireGuestCommand(rig);
 
       // Count the guest's auto-resyncs: a converged run under CUE-ONLY faults should force NONE (the
@@ -360,6 +363,7 @@ describe.skipIf(!RUN)(
       const faultPair = wrapCoopFaultPair(createLoopbackPair(), burst, { seed });
 
       const rig = await buildDuo(game, faultPair, setCoopRuntime, toCoop);
+      installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
       wireGuestCommand(rig);
       const resyncSpy = vi.spyOn(CoopBattleStreamer.prototype, "requestStateSync");
 
@@ -488,6 +492,7 @@ describe.skipIf(!RUN)(
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
       const faultPair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 0xa07 });
       const rig = await buildDuo(game, faultPair, setCoopRuntime, toCoop);
+      installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
       wireGuestCommand(rig);
       const resyncSpy = vi.spyOn(CoopBattleStreamer.prototype, "requestStateSync");
 
@@ -558,11 +563,11 @@ describe.skipIf(!RUN)(
         });
       } else {
         // Wave resolution: drop the authoritative wave-advance (both messages) as the host advances past the turn.
+        faultPair.armNextDrop(TARGET_TYPE[cls], "host");
+        faultPair.armNextDrop("waveEndState", "host");
         const turn = rig.hostScene.currentBattle.turn;
         await hostPlayWave(rig);
         await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
-        faultPair.armNextDrop(TARGET_TYPE[cls], "host");
-        faultPair.armNextDrop("waveEndState", "host");
         outcome = await classify(async () => {
           await leaveRewardShop(rig, targetWave);
           return lockstepNow() && (await convergedNow()) ? "converged" : "silent-divergence";

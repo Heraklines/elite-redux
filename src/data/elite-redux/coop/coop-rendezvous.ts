@@ -24,16 +24,45 @@
 //     installs its waiter is BUFFERED (remembered in a Set) and consumed on the next await.
 //   - DUPLICATE ARRIVAL: arrivals are set-membership, so a re-sent / re-delivered arrival
 //     for a point already seen is a harmless no-op (idempotent on both ends).
-//   - LOST ARRIVAL / DEAD PARTNER: the timeout retransmits the local arrival and keeps the
-//     boundary CLOSED. It never authorizes unilateral continuation. Transport reconnect handles
-//     a dead channel; a live lost frame heals on the retransmit.
+//   - LOST ARRIVAL / DEAD PARTNER: the timeout retransmits the local arrival a bounded number of
+//     times and keeps the boundary CLOSED. A live lost frame heals on retransmit; exhaustion asks
+//     the owning runtime to enter its deterministic shared safe terminal. It never authorizes
+//     unilateral continuation.
 //
 // Engine-FREE (transport + wire types only) so it is unit-testable headlessly over a
 // LoopbackTransport, exactly like CoopInteractionRelay / CoopBattleStreamer.
 // =============================================================================
 
+import { recordCoopCausalEvent } from "#data/elite-redux/coop/coop-causal-trace";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { beginCoopMachineWait } from "#data/elite-redux/coop/coop-stall-probe";
 import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+
+const RENDEZVOUS_CAUSAL_POINT_LIMIT = 192;
+const DEFAULT_RENDEZVOUS_RECOVERY_MAX_ATTEMPTS = 3;
+
+/** Stable, bounded token for a point that may originate in a future UI surface. */
+function boundedRendezvousPoint(point: string): string {
+  if (point.length <= RENDEZVOUS_CAUSAL_POINT_LIMIT && /^[a-z][a-z0-9-]*(?::\d+){0,2}$/.test(point)) {
+    return point;
+  }
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < point.length; index++) {
+    hash ^= point.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `point#${(hash >>> 0).toString(16).padStart(8, "0")}:len=${point.length}`;
+}
+
+function rendezvousPointAddress(point: string): { wave?: number; turn?: number } {
+  const [surface, waveValue, turnValue] = point.split(":", 3);
+  const wave = Number(waveValue);
+  const turn = Number(turnValue);
+  return {
+    ...(Number.isSafeInteger(wave) && wave >= 0 ? { wave } : {}),
+    ...(surface === "cmd" && Number.isSafeInteger(turn) && turn >= 0 ? { turn } : {}),
+  };
+}
 
 /**
  * How long a rendezvous await blocks for the partner's arrival before giving up. The two live
@@ -89,7 +118,7 @@ function defaultSchedule(cb: () => void, ms: number): () => void {
 export interface CoopRendezvousResult {
   /** The sync point this result is for. */
   point: string;
-  /** True only when the rendezvous was explicitly torn down/superseded; live timeout never resolves. */
+  /** True when torn down/superseded or bounded live recovery exhausts; callers must remain closed. */
   timedOut: boolean;
   /**
    * Set to the OTHER sync point `Q` when the partner is already on a different branch. This remains a
@@ -108,6 +137,31 @@ export interface CoopRendezvousOptions {
   schedule?: (cb: () => void, ms: number) => () => void;
   /** Negotiated session epoch; route/ACK frames from another epoch are rejected. */
   getEpoch?: () => number;
+  /** Retransmissions allowed before the owning runtime must enter its shared safe terminal. */
+  maxRecoveryAttempts?: number;
+  /** Runtime-owned fail-closed terminal hook; the engine-free rendezvous never imports runtime state. */
+  onRecoveryExhausted?: (failure: CoopRendezvousRecoveryFailure) => void;
+}
+
+export interface CoopRendezvousRecoveryFailure {
+  point: string;
+  attempts: number;
+  kind: "arrival" | "route-ack";
+  displacedPoint?: string;
+}
+
+export interface CoopRendezvousControlSnapshot {
+  localArrived: string[];
+  partnerArrived: string[];
+  awaiting: string[];
+}
+
+function validControlPoints(points: unknown): points is string[] {
+  return (
+    Array.isArray(points)
+    && points.every(point => typeof point === "string" && point.length > 0 && point.length <= 512)
+    && new Set(points).size === points.length
+  );
 }
 
 /**
@@ -122,6 +176,8 @@ export class CoopRendezvous {
   private readonly offMessage: () => void;
   private readonly offStateChange: () => void;
   private readonly getEpoch: () => number;
+  private readonly maxRecoveryAttempts: number;
+  private readonly onRecoveryExhausted: ((failure: CoopRendezvousRecoveryFailure) => void) | undefined;
 
   /** Points THIS client has arrived at (idempotent local arrival; suppresses a duplicate send). */
   private readonly localArrived = new Set<string>();
@@ -132,10 +188,21 @@ export class CoopRendezvous {
   /** point -> when each parked wait began (stall-watchdog age, mirrors the relay). */
   private readonly pendingSince = new Map<string, number>();
   private routeRevision = 0;
-  private latestGuestRoute: { revision: number; point: string; displacedPoint: string } | null = null;
+  private latestGuestRoute: {
+    revision: number;
+    point: string;
+    displacedPoint: string;
+  } | null = null;
   private readonly pendingRouteAcks = new Map<
     number,
-    { finish: () => void; abort: () => void; cancel: () => void; point: string; displacedPoint: string }
+    {
+      finish: () => void;
+      abort: () => void;
+      cancel: () => void;
+      point: string;
+      displacedPoint: string;
+      since: number;
+    }
   >();
 
   constructor(transport: CoopTransport, opts: CoopRendezvousOptions = {}) {
@@ -143,12 +210,59 @@ export class CoopRendezvous {
     this.defaultTimeoutMs = opts.timeoutMs ?? getCoopRendezvousWaitMs();
     this.schedule = opts.schedule ?? defaultSchedule;
     this.getEpoch = opts.getEpoch ?? (() => 0);
+    this.maxRecoveryAttempts = opts.maxRecoveryAttempts ?? DEFAULT_RENDEZVOUS_RECOVERY_MAX_ATTEMPTS;
+    if (!Number.isSafeInteger(this.maxRecoveryAttempts) || this.maxRecoveryAttempts <= 0) {
+      throw new Error("invalid rendezvous recovery attempt bound");
+    }
+    this.onRecoveryExhausted = opts.onRecoveryExhausted;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offStateChange = transport.onStateChange(state => {
       if (state === "connected") {
         this.resendControlState();
       }
     });
+  }
+
+  private recordCausalStage(stage: string, point: string, detail?: string): void {
+    const epoch = this.getEpoch();
+    recordCoopCausalEvent({
+      domain: "recovery",
+      stage,
+      causalId: `rendezvous:e${epoch}:${boundedRendezvousPoint(point)}`,
+      role: this.transport.role,
+      epoch,
+      ...rendezvousPointAddress(point),
+      ...(detail == null ? {} : { detail }),
+    });
+  }
+
+  private recordWaitOutcome(point: string, result: CoopRendezvousResult): CoopRendezvousResult {
+    this.recordCausalStage(
+      result.timedOut ? "abort" : "release",
+      point,
+      result.timedOut ? undefined : `outcome=${result.crossPoint == null ? "exact" : "cross-point"}`,
+    );
+    return result;
+  }
+
+  private recoveryExhausted(failure: CoopRendezvousRecoveryFailure): void {
+    this.recordCausalStage(
+      "exhausted",
+      failure.point,
+      `kind=${failure.kind} attempts=${failure.attempts}`
+        + (failure.displacedPoint == null ? "" : ` displaced=${failure.displacedPoint}`),
+    );
+    coopWarn(
+      "rendezvous",
+      `RENDEZVOUS RECOVERY EXHAUSTED point=${failure.point} kind=${failure.kind} `
+        + `attempts=${failure.attempts}${failure.displacedPoint == null ? "" : ` displaced=${failure.displacedPoint}`} `
+        + `- boundary remains closed; entering shared safe terminal role=${this.transport.role}`,
+    );
+    try {
+      this.onRecoveryExhausted?.(failure);
+    } catch (error) {
+      coopWarn("rendezvous", `recovery terminal hook threw point=${failure.point} (boundary remains closed)`, error);
+    }
   }
 
   /**
@@ -167,12 +281,82 @@ export class CoopRendezvous {
    * bug report's control-plane block: a point in `awaiting` that the partner has NOT arrived at is a
    * one-sided barrier the run is parked on. Pure read; never mutates barrier state.
    */
-  describeArrivals(): { localArrived: string[]; partnerArrived: string[]; awaiting: string[] } {
+  describeArrivals(): {
+    localArrived: string[];
+    partnerArrived: string[];
+    awaiting: string[];
+  } {
     return {
       localArrived: [...this.localArrived],
       partnerArrived: [...this.partnerArrived],
       awaiting: [...this.pending.keys()],
     };
+  }
+
+  /**
+   * Restore the complementary view of an authoritative peer snapshot. A peer's local arrival is our
+   * partner arrival; a peer-observed partner arrival proves our local frame reached it. Local arrivals that
+   * the snapshot did not yet observe are preserved only when this client is already parked there or the
+   * peer is explicitly awaiting that point, then retransmitted. No arrival is invented from `awaiting`.
+   */
+  restorePeerControlSnapshot(snapshot: CoopRendezvousControlSnapshot): boolean {
+    if (
+      !validControlPoints(snapshot?.localArrived)
+      || !validControlPoints(snapshot?.partnerArrived)
+      || !validControlPoints(snapshot?.awaiting)
+    ) {
+      coopWarn("rendezvous", "refused malformed peer control snapshot");
+      return false;
+    }
+
+    const previousLocal = new Set(this.localArrived);
+    const previousPartner = new Set(this.partnerArrived);
+    const locallyAwaited = new Set(this.pending.keys());
+    const peerAwaiting = new Set(snapshot.awaiting);
+    const nextLocal = new Set(snapshot.partnerArrived);
+    for (const point of this.localArrived) {
+      if (locallyAwaited.has(point) || peerAwaiting.has(point)) {
+        nextLocal.add(point);
+      }
+    }
+    const nextPartner = new Set(snapshot.localArrived);
+
+    this.localArrived.clear();
+    this.partnerArrived.clear();
+    for (const point of nextLocal) {
+      this.localArrived.add(point);
+    }
+    for (const point of nextPartner) {
+      this.partnerArrived.add(point);
+    }
+    for (const point of nextLocal) {
+      if (!previousLocal.has(point)) {
+        this.recordCausalStage("local-arrival", point, "source=control-restore");
+      }
+    }
+    for (const point of nextPartner) {
+      if (!previousPartner.has(point)) {
+        this.recordCausalStage("peer-arrival", point, "source=control-restore");
+      }
+    }
+
+    // Reassert every proven local arrival before releasing any waiter. If its earlier carrier was the lost
+    // frame, the authoritative peer can now cross the same barrier rather than remaining parked alone.
+    for (const point of nextLocal) {
+      this.transport.send({ t: "rendezvous", point });
+    }
+    for (const [point, finish] of [...this.pending]) {
+      if (!nextPartner.has(point)) {
+        continue;
+      }
+      this.transport.send({ t: "rendezvous", point });
+      finish({ point, timedOut: false });
+    }
+    coopLog(
+      "rendezvous",
+      `restored peer control local=${nextLocal.size} partner=${nextPartner.size} awaiting=${this.pending.size}`,
+    );
+    return true;
   }
 
   /**
@@ -186,6 +370,7 @@ export class CoopRendezvous {
       return;
     }
     this.localArrived.add(point);
+    this.recordCausalStage("local-arrival", point);
     coopLog("rendezvous", `ARRIVE point=${point} (send) role=${this.transport.role}`);
     this.transport.send({ t: "rendezvous", point });
   }
@@ -206,10 +391,19 @@ export class CoopRendezvous {
 
   /**
    * Block until the PARTNER has arrived at `point`. Resolves immediately if the partner's arrival was
-   * already buffered. On timeout, re-send our arrival and continue waiting: a timeout is evidence that
-   * recovery is needed, never permission to cross a shared boundary independently.
+   * already buffered. On timeout, re-send our arrival up to the configured recovery bound. Exhaustion
+   * invokes the runtime terminal hook and returns a closed `timedOut` result; neither outcome grants
+   * permission to cross a shared boundary independently.
    */
-  awaitPartner(point: string, timeoutMs = this.defaultTimeoutMs): Promise<CoopRendezvousResult> {
+  awaitPartner(
+    point: string,
+    timeoutMs = this.defaultTimeoutMs,
+    maxRecoveryAttempts = this.maxRecoveryAttempts,
+  ): Promise<CoopRendezvousResult> {
+    if (!Number.isSafeInteger(maxRecoveryAttempts) || maxRecoveryAttempts <= 0) {
+      throw new Error("invalid rendezvous per-wait recovery attempt bound");
+    }
+    this.recordCausalStage("wait-open", point);
     if (this.partnerArrived.has(point)) {
       if (isCoopDebug()) {
         coopLog(
@@ -217,23 +411,27 @@ export class CoopRendezvous {
           `AWAIT point=${point} -> partner already arrived (buffer-hit) role=${this.transport.role}`,
         );
       }
-      return Promise.resolve({ point, timedOut: false });
+      return Promise.resolve(this.recordWaitOutcome(point, { point, timedOut: false }));
     }
     // A buffered FOREIGN arrival is a classified branch mismatch, not packet loss. Preserve the existing
     // catch-up release until the authoritative phase-route operation replaces it.
     const buffered = this.foreignArrival(point);
     if (buffered !== undefined) {
       if (this.transport.role === "host") {
-        return this.publishAuthoritativeRoute(point, buffered, timeoutMs);
+        return this.publishAuthoritativeRoute(point, buffered, timeoutMs, maxRecoveryAttempts).then(result =>
+          this.recordWaitOutcome(point, result),
+        );
       }
       const route = this.latestGuestRoute;
       if (route != null && route.displacedPoint === point && route.point === buffered) {
-        return Promise.resolve({
-          point,
-          timedOut: false,
-          crossPoint: route.point,
-          authoritativePoint: route.point,
-        });
+        return Promise.resolve(
+          this.recordWaitOutcome(point, {
+            point,
+            timedOut: false,
+            crossPoint: route.point,
+            authoritativePoint: route.point,
+          }),
+        );
       }
       coopLog("rendezvous", `AWAIT point=${point} sees partner at ${buffered}; guest WAITING for host phaseRoute`);
     }
@@ -248,8 +446,16 @@ export class CoopRendezvous {
       stale({ point, timedOut: true });
     }
     this.pendingSince.set(point, Date.now());
+    // A parked reciprocal barrier is useful MUTUAL-stall evidence, but is not ASYMMETRIC-deadlock proof.
+    // One browser can reach cmd/shop while its healthy peer is still rendering narration/animation or
+    // reading the local path to the same point. Treating that ordinary lead as asymmetric terminated live
+    // wave-1 sessions on slower clients. Disconnect supervision + retransmission still bound a dead peer.
+    const endMachineWait = beginCoopMachineWait(`coop-rendezvous:${point}`, {
+      asymmetricEligible: false,
+    });
     return new Promise<CoopRendezvousResult>(resolve => {
       let settled = false;
+      let recoveryAttempts = 0;
       let cancelTimer: () => void = () => {};
       const finish = (res: CoopRendezvousResult) => {
         if (settled) {
@@ -257,6 +463,7 @@ export class CoopRendezvous {
         }
         settled = true;
         cancelTimer();
+        endMachineWait();
         if (this.pending.get(point) === finish) {
           this.pending.delete(point);
           this.pendingSince.delete(point);
@@ -276,6 +483,7 @@ export class CoopRendezvous {
             `AWAIT point=${point} CROSS-POINT release (partner at ${res.crossPoint}) role=${this.transport.role}`,
           );
         }
+        this.recordWaitOutcome(point, res);
         resolve(res);
       };
       const armRecoveryTimer = (): (() => void) =>
@@ -291,13 +499,24 @@ export class CoopRendezvous {
               finish({ point, timedOut: false });
               return;
             }
+            if (recoveryAttempts >= maxRecoveryAttempts) {
+              this.recoveryExhausted({ point, attempts: recoveryAttempts, kind: "arrival" });
+              finish({ point, timedOut: true });
+              return;
+            }
+            recoveryAttempts++;
             coopWarn(
               "rendezvous",
-              `RENDEZVOUS RECOVERY RETRY point=${point} after ${timeoutMs}ms - partner never arrived; `
+              `RENDEZVOUS RECOVERY RETRY point=${point} attempt=${recoveryAttempts}/${maxRecoveryAttempts} `
+                + `after ${timeoutMs}ms - partner never arrived; `
                 + `RETRANSMITTING and KEEPING BOUNDARY CLOSED role=${this.transport.role}`,
             );
             // `arrive()` suppresses duplicates by design; recovery intentionally bypasses that suppression.
-            this.transport.send({ t: "rendezvous", point });
+            try {
+              this.transport.send({ t: "rendezvous", point });
+            } catch (error) {
+              coopWarn("rendezvous", `arrival retransmit threw point=${point} (retry remains bounded)`, error);
+            }
             cancelTimer = armRecoveryTimer();
           });
         }, timeoutMs);
@@ -312,9 +531,13 @@ export class CoopRendezvous {
    * the barrier FIRST blocks until the other arrives, the client that reached it SECOND resolves at
    * once (the first's arrival is already buffered). Neither crosses `point` until both have arrived.
    */
-  rendezvous(point: string, timeoutMs = this.defaultTimeoutMs): Promise<CoopRendezvousResult> {
+  rendezvous(
+    point: string,
+    timeoutMs = this.defaultTimeoutMs,
+    maxRecoveryAttempts = this.maxRecoveryAttempts,
+  ): Promise<CoopRendezvousResult> {
     this.arrive(point);
-    return this.awaitPartner(point, timeoutMs);
+    return this.awaitPartner(point, timeoutMs, maxRecoveryAttempts);
   }
 
   /** Whether the partner has already arrived at `point` (a race check without parking a waiter). */
@@ -364,6 +587,12 @@ export class CoopRendezvous {
     const now = Date.now();
     for (const since of this.pendingSince.values()) {
       const age = now - since;
+      if (age > oldest) {
+        oldest = age;
+      }
+    }
+    for (const route of this.pendingRouteAcks.values()) {
+      const age = now - route.since;
       if (age > oldest) {
         oldest = age;
       }
@@ -429,14 +658,23 @@ export class CoopRendezvous {
       if (this.latestGuestRoute == null || msg.revision >= this.latestGuestRoute.revision) {
         this.latestGuestRoute = msg;
       }
-      this.transport.send({ t: "phaseRouteAck", epoch: msg.epoch, revision: msg.revision });
+      this.transport.send({
+        t: "phaseRouteAck",
+        epoch: msg.epoch,
+        revision: msg.revision,
+      });
       for (const [waitPoint, finish] of [...this.pending.entries()]) {
         if (waitPoint === msg.displacedPoint && waitPoint !== msg.point) {
           coopWarn(
             "rendezvous",
             `guest ROUTED AWAY ${waitPoint} -> host-authoritative ${msg.point} rev=${msg.revision}`,
           );
-          finish({ point: waitPoint, timedOut: false, crossPoint: msg.point, authoritativePoint: msg.point });
+          finish({
+            point: waitPoint,
+            timedOut: false,
+            crossPoint: msg.point,
+            authoritativePoint: msg.point,
+          });
         }
       }
       return;
@@ -457,13 +695,34 @@ export class CoopRendezvous {
     }
     const { point } = msg;
     if (this.partnerArrived.has(point)) {
-      // Idempotent: a duplicate / re-delivered arrival for a point already seen is a harmless no-op.
+      // A duplicate is normally a harmless no-op. There is one important exception: a client can
+      // re-enter an OLD CommandPhase after both peers already crossed a newer host point (the retained
+      // wave-12 CommandPhase that reappeared after guest-owned ME finalization). Its restored rendezvous
+      // state no longer remembers the host's old arrival, so it retransmits the old point and parks. The
+      // host DOES remember that partner arrival and used to drop the retransmit here, leaving the guest
+      // sealed forever. If the host has a causally-later local point, explicitly route the regressed peer
+      // to that point. A duplicate of the newest/current point still remains a no-op.
+      if (this.transport.role === "host") {
+        const authoritativePoint = this.latestAuthoritativeLocalPoint(point);
+        if (authoritativePoint !== undefined) {
+          const routeAlreadyPending = [...this.pendingRouteAcks.values()].some(
+            route => route.point === authoritativePoint && route.displacedPoint === point,
+          );
+          if (!routeAlreadyPending) {
+            coopWarn("rendezvous", `host ROUTE regressed duplicate=${point} -> authoritative=${authoritativePoint}`);
+            void this.publishAuthoritativeRoute(authoritativePoint, point, this.defaultTimeoutMs);
+          }
+          return;
+        }
+      }
+      // Idempotent: a duplicate / re-delivered arrival for the current point is a harmless no-op.
       if (isCoopDebug()) {
         coopLog("rendezvous", `RECV arrival point=${point} -> DUPLICATE (already seen) role=${this.transport.role}`);
       }
       return;
     }
     this.partnerArrived.add(point);
+    this.recordCausalStage("peer-arrival", point);
     const waiter = this.pending.get(point);
     if (waiter) {
       if (isCoopDebug()) {
@@ -503,7 +762,7 @@ export class CoopRendezvous {
     // authoritative logical phase: publish it proactively and require the guest ACK before that wrong branch
     // can close. This is the live cmd:6:2 vs shop:6:5 softlock shape.
     if (this.transport.role === "host" && !this.localArrived.has(point)) {
-      const localPoint = this.latestUnmatchedLocalPointForSameWave(point);
+      const localPoint = this.latestAuthoritativeLocalPoint(point);
       if (localPoint !== undefined) {
         coopWarn(
           "rendezvous",
@@ -537,17 +796,32 @@ export class CoopRendezvous {
     return;
   }
 
-  /** Most-recent host-local point on the same wave that the partner has not reached. */
-  private latestUnmatchedLocalPointForSameWave(foreignPoint: string): string | undefined {
-    const wave = this.pointWave(foreignPoint);
-    if (wave === undefined) {
+  /**
+   * Host-local point that proves `foreignPoint` is no longer the authoritative branch. Set insertion order
+   * is the local causal order: {@linkcode arrive} inserts exactly once and reannounce never moves an entry.
+   * When the host also reached `foreignPoint`, only a later insertion can win. When it never reached that
+   * divergent point, a higher wave is intrinsically newer; on the same wave retain the existing watcher rule
+   * and require a local point the partner has not reached. These guards prevent a normal duplicate of the
+   * newest point, or a stale shared past point, from inventing forward progress.
+   */
+  private latestAuthoritativeLocalPoint(foreignPoint: string): string | undefined {
+    const foreignWave = this.pointWave(foreignPoint);
+    if (foreignWave === undefined) {
       return;
     }
     const local = [...this.localArrived];
-    for (let i = local.length - 1; i >= 0; i--) {
-      const point = local[i];
-      if (point !== foreignPoint && this.pointWave(point) === wave && !this.partnerArrived.has(point)) {
-        return point;
+    const foreignIndex = local.indexOf(foreignPoint);
+    const minimumIndex = foreignIndex < 0 ? 0 : foreignIndex + 1;
+    for (let i = local.length - 1; i >= minimumIndex; i--) {
+      const candidate = local[i];
+      const candidateWave = this.pointWave(candidate);
+      if (
+        candidate !== foreignPoint
+        && candidateWave !== undefined
+        && candidateWave >= foreignWave
+        && (foreignIndex >= 0 || candidateWave > foreignWave || !this.partnerArrived.has(candidate))
+      ) {
+        return candidate;
       }
     }
     return;
@@ -563,18 +837,22 @@ export class CoopRendezvous {
     point: string,
     displacedPoint: string,
     retryMs: number,
+    maxRecoveryAttempts = this.maxRecoveryAttempts,
   ): Promise<CoopRendezvousResult> {
     const revision = ++this.routeRevision;
     const epoch = this.getEpoch();
     return new Promise(resolve => {
       let settled = false;
+      let recoveryAttempts = 0;
       let cancel = () => {};
+      const endMachineWait = beginCoopMachineWait(`coop-rendezvous-route:${point}<-${displacedPoint}`);
       const settle = (timedOut: boolean) => {
         if (settled) {
           return;
         }
         settled = true;
         cancel();
+        endMachineWait();
         this.pendingRouteAcks.delete(revision);
         if (!timedOut) {
           coopLog(
@@ -585,7 +863,12 @@ export class CoopRendezvous {
         resolve(
           timedOut
             ? { point, timedOut: true }
-            : { point, timedOut: false, crossPoint: displacedPoint, authoritativePoint: point },
+            : {
+                point,
+                timedOut: false,
+                crossPoint: displacedPoint,
+                authoritativePoint: point,
+              },
         );
       };
       const finish = () => settle(false);
@@ -594,16 +877,45 @@ export class CoopRendezvous {
         if (settled) {
           return;
         }
-        this.transport.send({ t: "phaseRoute", epoch, revision, point, displacedPoint });
+        try {
+          this.transport.send({
+            t: "phaseRoute",
+            epoch,
+            revision,
+            point,
+            displacedPoint,
+          });
+        } catch (error) {
+          coopWarn("rendezvous", `host phaseRoute send threw rev=${revision} (retry remains bounded)`, error);
+        }
         cancel = this.schedule(() => {
+          if (recoveryAttempts >= maxRecoveryAttempts) {
+            this.recoveryExhausted({
+              point,
+              displacedPoint,
+              attempts: recoveryAttempts,
+              kind: "route-ack",
+            });
+            settle(true);
+            return;
+          }
+          recoveryAttempts++;
           coopWarn(
             "rendezvous",
-            `host phaseRoute RETRY rev=${revision} authoritative=${point} displaced=${displacedPoint}`,
+            `host phaseRoute RETRY rev=${revision} attempt=${recoveryAttempts}/${maxRecoveryAttempts} `
+              + `authoritative=${point} displaced=${displacedPoint}`,
           );
           sendAndArm();
         }, retryMs);
       };
-      this.pendingRouteAcks.set(revision, { finish, abort, cancel: () => cancel(), point, displacedPoint });
+      this.pendingRouteAcks.set(revision, {
+        finish,
+        abort,
+        cancel: () => cancel(),
+        point,
+        displacedPoint,
+        since: Date.now(),
+      });
       sendAndArm();
     });
   }

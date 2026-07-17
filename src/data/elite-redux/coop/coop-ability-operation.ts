@@ -5,7 +5,7 @@
 
 import { COOP_CAP_OP_ABILITY, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
-import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
+import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
 import {
   type CoopAbilityPickPayload,
   type CoopAuthoritativeEnvelopeV1,
@@ -15,11 +15,24 @@ import {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
+  getActiveCoopOperationDurability,
   isCoopOperationJournalActive,
-  journalCoopCommittedEnvelope,
+  isCoopOperationJournalActiveFor,
   registerCoopOperationApplier,
+  tryJournalCoopCommittedEnvelope,
+  tryJournalCoopCommittedEnvelopeFor,
 } from "#data/elite-redux/coop/coop-operation-journal";
-import { CoopOperationGuest, CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
+import {
+  CoopOperationGuest,
+  CoopOperationHost,
+  type CoopRuntimeOpState,
+  getActiveCoopRuntimeOpState,
+  maybeCoopOpSurfaceState,
+  registerCoopOpSurfaceState,
+  requireCoopOpSurfaceState,
+  requireCoopOpSurfaceStateFor,
+  resetActiveCoopRuntimeClocks,
+} from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
 
@@ -27,17 +40,74 @@ export const COOP_ABILITY_ACTION_STRIDE = 100;
 const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_ABILITY_OP === "off");
 
 let enabled = DEFAULT_ENABLED;
-let epoch = 1;
-let revisionFloor = 0;
-let authorityHost: CoopOperationHost | null = null;
-let receiverGuest: CoopOperationGuest | null = null;
-let authorityOrdinalPin = -1;
-let authorityOrdinal = 0;
-let watcherOrdinalPin = -1;
-let watcherOrdinal = 0;
 let retryMs = 1_000;
-const retries = new Map<string, ReturnType<typeof setTimeout>>();
-const pendingMaterializations = new Set<string>();
+
+interface AbilityOpState {
+  epoch: number;
+  revisionFloor: number;
+  authorityHost: CoopOperationHost | null;
+  receiverGuest: CoopOperationGuest | null;
+  authorityOrdinalPin: number;
+  authorityOrdinal: number;
+  watcherOrdinalPin: number;
+  watcherOrdinal: number;
+  readonly retries: Map<string, ReturnType<typeof setTimeout>>;
+  readonly pendingMaterializations: Set<string>;
+}
+
+registerCoopOpSurfaceState(
+  "ability",
+  (): AbilityOpState => ({
+    epoch: 1,
+    revisionFloor: 0,
+    authorityHost: null,
+    receiverGuest: null,
+    authorityOrdinalPin: -1,
+    authorityOrdinal: 0,
+    watcherOrdinalPin: -1,
+    watcherOrdinal: 0,
+    retries: new Map(),
+    pendingMaterializations: new Set(),
+  }),
+);
+
+/** Opaque runtime selectors captured by a picker before any UI or async continuation. */
+export interface CoopAbilityOperationBinding {
+  readonly opState: CoopRuntimeOpState;
+  readonly durability: CoopDurabilityManager | null;
+}
+
+/**
+ * Capture the scheduling client's stable operation state. A co-op phase without an installed runtime is a
+ * programming error: fail at the scheduling boundary instead of silently adopting a process-global ledger.
+ */
+export function captureCoopAbilityOperationBinding(): CoopAbilityOperationBinding {
+  const opState = getActiveCoopRuntimeOpState();
+  if (opState == null) {
+    throw new Error("[coop-op] no runtime installed for surface=ability (cannot capture continuation binding)");
+  }
+  return { opState, durability: getActiveCoopOperationDurability() };
+}
+
+function state(binding?: CoopAbilityOperationBinding | null): AbilityOpState {
+  return binding == null
+    ? requireCoopOpSurfaceState<AbilityOpState>("ability")
+    : requireCoopOpSurfaceStateFor<AbilityOpState>(binding.opState, "ability");
+}
+
+function journalActive(binding?: CoopAbilityOperationBinding | null): boolean {
+  return binding == null ? isCoopOperationJournalActive() : isCoopOperationJournalActiveFor(binding.durability);
+}
+
+function retainEnvelope(envelope: CoopAuthoritativeEnvelopeV1, binding?: CoopAbilityOperationBinding | null): boolean {
+  return binding == null
+    ? tryJournalCoopCommittedEnvelope(envelope)
+    : tryJournalCoopCommittedEnvelopeFor(binding.durability, envelope);
+}
+
+function isCoopOpRuntimeError(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("[coop-op]");
+}
 
 export function isCoopAbilityOperationEnabled(): boolean {
   return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_ABILITY);
@@ -52,10 +122,11 @@ export function resetCoopAbilityOperationFlag(): void {
 }
 
 export function setCoopAbilityOperationEpoch(value: number): void {
-  if (!Number.isSafeInteger(value) || value <= 0 || value === epoch) {
+  const s = maybeCoopOpSurfaceState<AbilityOpState>("ability");
+  if (s == null || !Number.isSafeInteger(value) || value <= 0 || value === s.epoch) {
     return;
   }
-  epoch = value;
+  s.epoch = value;
   resetCoopAbilityOperationState();
 }
 
@@ -68,59 +139,72 @@ export function resetCoopAbilityOutcomeRetryMs(): void {
 }
 
 export function resetCoopAbilityOperationState(): void {
-  CoopOperationHost.resetGlobalOrder();
-  for (const timer of retries.values()) {
+  const s = maybeCoopOpSurfaceState<AbilityOpState>("ability");
+  if (s == null) {
+    return;
+  }
+  resetActiveCoopRuntimeClocks();
+  for (const timer of s.retries.values()) {
     clearTimeout(timer);
   }
-  retries.clear();
-  pendingMaterializations.clear();
-  authorityHost = null;
-  receiverGuest = null;
-  authorityOrdinalPin = -1;
-  authorityOrdinal = 0;
-  watcherOrdinalPin = -1;
-  watcherOrdinal = 0;
-  revisionFloor = 0;
+  s.retries.clear();
+  s.pendingMaterializations.clear();
+  s.authorityHost = null;
+  s.receiverGuest = null;
+  s.authorityOrdinalPin = -1;
+  s.authorityOrdinal = 0;
+  s.watcherOrdinalPin = -1;
+  s.watcherOrdinal = 0;
+  s.revisionFloor = 0;
 }
 
 export function setCoopAbilityOperationRevisionFloor(highWater: number): void {
-  if (!Number.isFinite(highWater) || highWater <= 0 || highWater === revisionFloor) {
+  const s = maybeCoopOpSurfaceState<AbilityOpState>("ability");
+  if (s == null || !Number.isFinite(highWater) || highWater <= 0 || highWater === s.revisionFloor) {
     return;
   }
-  revisionFloor = highWater;
-  authorityHost = null;
-  receiverGuest = null;
+  s.revisionFloor = highWater;
+  s.authorityHost = null;
+  s.receiverGuest = null;
 }
 
-function host(): CoopOperationHost {
-  authorityHost ??= CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
-  return authorityHost;
+function host(binding?: CoopAbilityOperationBinding | null): CoopOperationHost {
+  const s = state(binding);
+  s.authorityHost ??=
+    binding == null
+      ? CoopOperationHost.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
+      : CoopOperationHost.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.authorityHost;
 }
 
-function guest(): CoopOperationGuest {
-  receiverGuest ??= CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
-  return receiverGuest;
+function guest(binding?: CoopAbilityOperationBinding | null): CoopOperationGuest {
+  const s = state(binding);
+  s.receiverGuest ??=
+    binding == null
+      ? CoopOperationGuest.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
+      : CoopOperationGuest.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.receiverGuest;
 }
 
-function nextAuthorityOrdinal(pinned: number): number {
-  if (authorityOrdinalPin !== pinned) {
-    authorityOrdinalPin = pinned;
-    authorityOrdinal = 0;
+function nextAuthorityOrdinal(s: AbilityOpState, pinned: number): number {
+  if (s.authorityOrdinalPin !== pinned) {
+    s.authorityOrdinalPin = pinned;
+    s.authorityOrdinal = 0;
   }
-  return authorityOrdinal++;
+  return s.authorityOrdinal++;
 }
 
-function peekWatcherOrdinal(pinned: number): number {
-  if (watcherOrdinalPin !== pinned) {
-    watcherOrdinalPin = pinned;
-    watcherOrdinal = 0;
+function peekWatcherOrdinal(s: AbilityOpState, pinned: number): number {
+  if (s.watcherOrdinalPin !== pinned) {
+    s.watcherOrdinalPin = pinned;
+    s.watcherOrdinal = 0;
   }
-  return watcherOrdinal;
+  return s.watcherOrdinal;
 }
 
-function opId(pinned: number, ordinal: number): string {
+function opId(s: AbilityOpState, pinned: number, ordinal: number): string {
   return makeCoopOperationId(
-    epoch,
+    s.epoch,
     coopInteractionOwnerSeat(pinned),
     pinned * COOP_ABILITY_ACTION_STRIDE + ordinal,
     "ABILITY_PICK",
@@ -149,68 +233,85 @@ function context(wave: number, turn: number) {
   return { wave, turn, logicalPhase: "INTERACTION" as const, authoritativeState };
 }
 
-function commit(pinned: number, data: number[], wave: number, turn: number): void {
+function commit(
+  pinned: number,
+  data: number[],
+  wave: number,
+  turn: number,
+  binding?: CoopAbilityOperationBinding | null,
+): void {
+  const s = state(binding);
   const owner = coopInteractionOwnerSeat(pinned);
   const operation: CoopPendingOperation = {
-    id: opId(pinned, nextAuthorityOrdinal(pinned)),
+    id: opId(s, pinned, nextAuthorityOrdinal(s, pinned)),
     kind: "ABILITY_PICK",
     owner,
     status: "proposed",
     payload: { data: [...data] } satisfies CoopAbilityPickPayload,
   };
-  const result = host().submit(operation, context(wave, turn), intent =>
+  const result = host(binding).submit(operation, context(wave, turn), intent =>
     intent.owner === owner ? { ok: true } : { ok: false, reason: "wrong-owner" },
   );
   if (result.kind === "committed") {
-    journalCoopCommittedEnvelope(result.envelope);
+    retainEnvelope(result.envelope, binding);
   }
 }
 
-export function commitAbilityOwnerOutcome(params: {
-  pinned: number;
-  data: number[];
-  localRole: CoopRole;
-  wave: number;
-  turn?: number;
-}): void {
+export function commitAbilityOwnerOutcome(
+  params: {
+    pinned: number;
+    data: number[];
+    localRole: CoopRole;
+    wave: number;
+    turn?: number;
+  },
+  binding?: CoopAbilityOperationBinding | null,
+): void {
   if (!isCoopAbilityOperationEnabled() || params.localRole !== "host" || params.pinned < 0) {
     return;
   }
   try {
-    commit(params.pinned, params.data, params.wave, params.turn ?? 0);
+    commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding);
   } catch (error) {
+    if (isCoopOpRuntimeError(error)) {
+      throw error;
+    }
     coopWarn("ability", "ability op commit threw; legacy carrier remains active", error);
   }
 }
 
-export function adoptAbilityWatcherOutcome(params: {
-  pinned: number;
-  data: number[] | null;
-  localRole: CoopRole;
-  wave: number;
-  turn?: number;
-}): boolean {
+export function adoptAbilityWatcherOutcome(
+  params: {
+    pinned: number;
+    data: number[] | null;
+    localRole: CoopRole;
+    wave: number;
+    turn?: number;
+  },
+  binding?: CoopAbilityOperationBinding | null,
+): boolean {
   if (!isCoopAbilityOperationEnabled()) {
     return params.data != null;
   }
   if (params.data == null || params.pinned < 0) {
     return false;
   }
+  const s = state(binding);
   if (params.localRole === "host") {
-    commit(params.pinned, params.data, params.wave, params.turn ?? 0);
+    commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding);
     return true;
   }
-  const ordinal = peekWatcherOrdinal(params.pinned);
-  const id = opId(params.pinned, ordinal);
-  const g = guest();
+  const ordinal = peekWatcherOrdinal(s, params.pinned);
+  const id = opId(s, params.pinned, ordinal);
+  const g = guest(binding);
   if (g.hasApplied(id)) {
-    if (pendingMaterializations.delete(id)) {
-      watcherOrdinal++;
+    if (s.pendingMaterializations.delete(id)) {
+      s.watcherOrdinal++;
       return true;
     }
     return false;
   }
-  if (isCoopOperationJournalActive()) {
+  if (journalActive(binding)) {
     return false;
   }
   const operation: CoopPendingOperation = {
@@ -222,13 +323,13 @@ export function adoptAbilityWatcherOutcome(params: {
   };
   const result = g.applyEnvelope({
     version: 1,
-    sessionEpoch: epoch,
+    sessionEpoch: s.epoch,
     revision: g.getLastAppliedRevision() + 1,
     ...context(params.wave, params.turn ?? 0),
     pendingOperation: operation,
   });
   if (result.kind === "applied") {
-    watcherOrdinal++;
+    s.watcherOrdinal++;
     return true;
   }
   return false;
@@ -238,16 +339,22 @@ function retryKey(pinned: number, data: number[]): string {
   return `${pinned}:${JSON.stringify(data)}`;
 }
 
-export function armCoopAbilityOutcomeResend(pinned: number, data: number[], resend: () => void): void {
+export function armCoopAbilityOutcomeResend(
+  pinned: number,
+  data: number[],
+  resend: () => void,
+  binding?: CoopAbilityOperationBinding | null,
+): void {
   if (!isCoopAbilityOperationEnabled()) {
     return;
   }
+  const s = state(binding);
   const key = retryKey(pinned, data);
-  if (retries.has(key)) {
+  if (s.retries.has(key)) {
     return;
   }
   const tick = () => {
-    if (!retries.has(key)) {
+    if (!s.retries.has(key)) {
       return;
     }
     try {
@@ -255,24 +362,24 @@ export function armCoopAbilityOutcomeResend(pinned: number, data: number[], rese
     } catch (error) {
       coopWarn("ability", "ability outcome resend threw; retry remains armed", error);
     }
-    if (retries.has(key)) {
-      retries.set(key, setTimeout(tick, retryMs));
+    if (s.retries.has(key)) {
+      s.retries.set(key, setTimeout(tick, retryMs));
     }
   };
-  retries.set(key, setTimeout(tick, retryMs));
+  s.retries.set(key, setTimeout(tick, retryMs));
 }
 
-function cancelRetry(pinned: number, data: number[]): void {
+function cancelRetry(s: AbilityOpState, pinned: number, data: number[]): void {
   const key = retryKey(pinned, data);
-  const timer = retries.get(key);
+  const timer = s.retries.get(key);
   if (timer != null) {
     clearTimeout(timer);
-    retries.delete(key);
+    s.retries.delete(key);
   }
 }
 
-export function armCoopAbilityJournalMaterialization(id: string): void {
-  pendingMaterializations.add(id);
+export function armCoopAbilityJournalMaterialization(id: string, binding?: CoopAbilityOperationBinding | null): void {
+  state(binding).pendingMaterializations.add(id);
 }
 
 function applyJournaledAbilityEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
@@ -287,6 +394,7 @@ function applyJournaledAbilityEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
   if (payload == null || !Array.isArray(payload.data) || !payload.data.every(Number.isFinite)) {
     return "rejected";
   }
+  const s = state();
   const g = guest();
   if (g.hasApplied(operation.id)) {
     return "duplicate";
@@ -298,7 +406,7 @@ function applyJournaledAbilityEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
   const parsed = parseCoopOperationId(operation.id);
   if (parsed != null) {
     const pinned = Math.floor(parsed.pinnedSeq / COOP_ABILITY_ACTION_STRIDE);
-    cancelRetry(pinned, payload.data);
+    cancelRetry(s, pinned, payload.data);
   }
   return "applied";
 }

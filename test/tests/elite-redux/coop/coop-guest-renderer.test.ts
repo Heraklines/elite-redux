@@ -36,6 +36,7 @@ import {
 } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   clearCoopRuntime,
+  consumeCoopPendingWaveAdvance,
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
@@ -69,6 +70,8 @@ import { EncounterPhase } from "#phases/encounter-phase";
 import { NextEncounterPhase } from "#phases/next-encounter-phase";
 import { VoucherType } from "#system/voucher";
 import { GameManager } from "#test/framework/game-manager";
+import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
+import { installHeadlessCoopSemanticProjectionOracle } from "#test/tools/coop-semantic-presentation";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -95,6 +98,7 @@ function completeTurnCarrier(turn: number) {
 describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 Phase B)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
+  let restoreProjection: (() => void) | undefined;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
@@ -102,6 +106,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
 
   beforeEach(() => {
     game = new GameManager(phaserGame);
+    restoreProjection = installHeadlessCoopSemanticProjectionOracle(game.scene);
     game.override
       .battleStyle("double")
       .enemySpecies(SpeciesId.MAGIKARP)
@@ -110,12 +115,18 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   });
 
   afterEach(() => {
+    restoreProjection?.();
+    restoreProjection = undefined;
     setCoopWaveTailSanction(null);
     clearCoopRuntime();
   });
 
   /** Production wave completion is the legacy cue plus one committed authoritative envelope. */
-  function sendWaveAdvance(partner: CoopTransport, outcome: CoopWaveOutcome): void {
+  function sendWaveAdvance(
+    partner: CoopTransport,
+    outcome: CoopWaveOutcome,
+    authoritativeStateOverride?: CoopAuthoritativeBattleStateV1,
+  ): void {
     const controller = getCoopController();
     if (controller == null) {
       throw new Error("missing co-op controller");
@@ -123,7 +134,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const wave = globalScene.currentBattle.waveIndex;
     const turn = globalScene.currentBattle.turn;
     const logicalPhase = outcome === "gameOver" ? "GAME_OVER" : outcome === "flee" ? "WAVE_FLEE" : "WAVE_VICTORY";
-    const authoritativeState: CoopAuthoritativeBattleStateV1 = {
+    const authoritativeState: CoopAuthoritativeBattleStateV1 = authoritativeStateOverride ?? {
       version: 1,
       tick: 0,
       wave,
@@ -165,6 +176,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
             eggLapse: false,
             meBoundary: "none",
             ...(outcome === "win" || outcome === "capture" ? { victoryKind: "wild" as const } : {}),
+            settledStateTick: authoritativeState.tick,
           },
         },
         authoritativeState,
@@ -173,17 +185,33 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   }
 
   /** Start a co-op double, then flip the LOCAL engine into the GUEST role. */
+  const setFixtureRole = (role: "host" | "guest"): void => {
+    const controller = getCoopController();
+    const runtime = getCoopRuntime();
+    if (controller == null || runtime == null) {
+      throw new Error(`cannot move the legacy renderer fixture to ${role} without a live runtime`);
+    }
+    controller.role = role;
+    // Protocol 33 owns operation cursors by runtime role as well as controller role. This legacy
+    // single-process fixture deliberately changes seats after assembly, so move both identities as
+    // one operation; real peers assemble directly in their stable seat.
+    (runtime.opState as { localRole: "host" | "guest" | null }).localRole = role;
+  };
+
   const startCoopGuest = async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     // The pure-renderer behavior is the AUTHORITATIVE netcode; opt in explicitly since the
     // selectable default is now "lockstep" (#633, A/B - both engines resolve in lockstep).
-    startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
+    const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
+    // Establish the strict save/carrier identity while this assembled controller is still the host,
+    // then remove the CPU listener before this legacy one-engine fixture changes seats to guest.
+    await negotiateLocalSpoofPeer(runtime, { disposeAfter: true });
     game.scene.gameMode = getGameMode(GameModes.COOP);
     const field = game.scene.getPlayerField();
     field[COOP_HOST_FIELD_INDEX].coopOwner = "host";
     field[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
     // Flip the local controller to GUEST - the local engine now plays the renderer side.
-    getCoopController()!.role = "guest";
+    setFixtureRole("guest");
     return field;
   };
 
@@ -343,6 +371,31 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     } finally {
       runEncounterSpy.mockRestore();
       shouldAdoptSpy.mockRestore();
+    }
+  });
+
+  it("drops a stale next-encounter tween after shared teardown clears its battle", async () => {
+    await startCoopGuest();
+    const battle = globalScene.currentBattle;
+    const phase = new NextEncounterPhase() as unknown as { doEncounter: () => void };
+    let delayedComplete: (() => void) | undefined;
+    const tweenSpy = vi.spyOn(globalScene.tweens, "add").mockImplementation(config => {
+      delayedComplete = (config as Phaser.Types.Tweens.TweenBuilderConfig).onComplete as (() => void) | undefined;
+      return {} as Phaser.Tweens.Tween;
+    });
+    try {
+      phase.doEncounter();
+      expect(delayedComplete, "the real next-encounter transition registered its delayed callback").toBeTypeOf(
+        "function",
+      );
+      globalScene.currentBattle = null!;
+      expect(
+        () => delayedComplete?.(),
+        "a shared-terminal teardown makes the stale presentation callback inert",
+      ).not.toThrow();
+    } finally {
+      globalScene.currentBattle = battle;
+      tweenSpy.mockRestore();
     }
   });
 
@@ -693,7 +746,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   it("PLAYER REPLACEMENT (#786): the host awaits the guest's pick, then auto-picks a guest bench replacement on timeout", async () => {
     const field = await startCoopGuest();
     // This is the HOST simulating the turn (the watcher of the guest-owned slot 1). Flip local role.
-    getCoopController()!.role = "host";
+    setFixtureRole("host");
 
     // Tag field ownership: bi0 = host's mon, bi1 = guest's (partner) mon.
     field[COOP_HOST_FIELD_INDEX].coopOwner = "host";
@@ -750,7 +803,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   // (B2) The auto-pick honors OWNERSHIP: it never pulls the HOST's bench into the guest's slot.
   it("PLAYER REPLACEMENT (#633, HALF B): the auto-pick refuses a host-owned bench for a guest slot", async () => {
     const field = await startCoopGuest();
-    getCoopController()!.role = "host";
+    setFixtureRole("host");
     field[COOP_HOST_FIELD_INDEX].coopOwner = "host";
     field[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
 
@@ -879,6 +932,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
     const queueMessageSpy = vi.spyOn(globalScene.phaseManager, "queueMessage");
     const queueTurnEndSpy = vi.spyOn(globalScene.phaseManager, "queueTurnEndPhases");
+    const turnBeforeFinalize = globalScene.currentBattle.turn;
     // Drive the FINAL turn's replay + its deferred finalize. With the fix it is terminal.
     await driveReplayTurn(finalTurn);
 
@@ -893,6 +947,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase"),
       "no TurnEndPhase queued on the terminal final turn (no phantom turn N+1)",
     ).toBe(false);
+    expect(
+      globalScene.currentBattle.turn,
+      "the renderer still mirrors the host's already-settled numeric turn boundary",
+    ).toBe(turnBeforeFinalize + 1);
     // Exactly one victory tail is queued for this final addressed commit.
     expect(
       pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase").length,
@@ -1094,12 +1152,16 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const turn = globalScene.currentBattle.turn;
     const partner = getCoopRuntime()!.partnerTransport!;
 
-    sendWaveAdvance(partner, "gameOver");
+    const carrier = completeTurnCarrier(turn);
+    sendWaveAdvance(partner, "gameOver", {
+      ...carrier.authoritativeState,
+      tick: carrier.authoritativeState.tick + 1,
+    });
     await new Promise(r => setTimeout(r, 0));
     partner.send({
       t: "turnResolution",
       turn,
-      ...completeTurnCarrier(turn),
+      ...carrier,
       events: [{ k: "message", text: "The run ended." }],
     });
     await new Promise(r => setTimeout(r, 0));
@@ -1173,6 +1235,46 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(pushed("SelectModifierPhase"), "the guest reaches the reward shop (no deadlock)").toBe(true);
     // It does NOT skip straight to a next-wave CommandPhase (the deadlock symptom).
     expect(pushed("CommandPhase"), "the guest does NOT jump to a next-wave CommandPhase").toBe(false);
+  });
+
+  it("retained normal victory cannot be reclassified by a speculative next-wave Mystery Battle", async () => {
+    await startCoopGuest();
+    const sourceWave = 11;
+    globalScene.currentBattle.waveIndex = sourceWave;
+    globalScene.currentBattle.battleType = BattleType.WILD;
+    for (const enemy of globalScene.getEnemyParty()) {
+      enemy.hp = 0;
+      enemy.doSetStatus(StatusEffect.FAINT);
+    }
+    const partner = getCoopRuntime()!.partnerTransport!;
+    sendWaveAdvance(partner, "win");
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(
+      consumeCoopPendingWaveAdvance()?.transition?.wave,
+      "the test adopts the retained transition before constructing its host-stated VictoryPhase",
+    ).toBe(sourceWave);
+
+    // Reproduce C1 exactly: the retained source is ordinary wave 11, while mutable ambient state already
+    // advertises wave 12 as MYSTERY_ENCOUNTER without an encounter object. The old ambient classifier called
+    // handleMysteryEncounterVictory and dereferenced `continuousEncounter` on undefined.
+    globalScene.currentBattle.waveIndex = sourceWave + 1;
+    globalScene.currentBattle.battleType = BattleType.MYSTERY_ENCOUNTER;
+    globalScene.currentBattle.mysteryEncounter = undefined;
+    setCoopWaveTailSanction([
+      "VictoryPhase",
+      "BattleEndPhase",
+      "CoopVictorySealPhase",
+      "NewBattlePhase",
+      "NextEncounterPhase",
+    ]);
+    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
+    const lastEnemy = globalScene.getEnemyParty().at(-1)!;
+    const victory = game.scene.phaseManager.create("VictoryPhase", lastEnemy.id, false, sourceWave);
+
+    expect(() => victory.start(), "retained normal victory never enters Mystery Encounter handling").not.toThrow();
+    const pushed = (name: string) => pushNewSpy.mock.calls.some(([phase]) => phase === name);
+    expect(pushed("BattleEndPhase"), "the immutable normal-wave tail continues through BattleEnd").toBe(true);
+    expect(pushed("SelectModifierPhase"), "wave 11 opens its normal reward continuation").toBe(true);
   });
 
   // (F2) VOUCHER CREDIT (#633 trainer-victory deadlock): because the guest now runs its OWN

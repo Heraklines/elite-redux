@@ -1,0 +1,82 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+const DEFAULT_CAMPAIGN_TIMEOUT_MS = 45 * 60_000;
+// A fresh two-browser run performs two real registrations, onboarding, Settings navigation,
+// lobby consent, WebRTC verification, challenge/starter selection, and the first shared command.
+// Saturated remote runners repeatedly completed pairing at 10-11 minutes, leaving the old
+// 12-minute cap only seconds for run setup and producing deterministic false reds. Keep this
+// independently bounded below the 45-minute campaign ceiling, but budget the public path that the
+// gate actually promises to execute.
+const DEFAULT_SETUP_TIMEOUT_MS = 20 * 60_000;
+const DEFAULT_DIAGNOSTIC_TIMEOUT_MS = 20_000;
+const DEFAULT_CLEANUP_TIMEOUT_MS = 60_000;
+
+function positiveInteger(name, fallback) {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return fallback;
+  }
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return value;
+}
+
+export function loadCampaignLifecyclePolicy() {
+  const campaignTimeoutMs = positiveInteger("COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS", DEFAULT_CAMPAIGN_TIMEOUT_MS);
+  const setupTimeoutMs = positiveInteger("COOP_UI_SETUP_HARD_TIMEOUT_MS", DEFAULT_SETUP_TIMEOUT_MS);
+  if (setupTimeoutMs >= campaignTimeoutMs) {
+    throw new Error("COOP_UI_SETUP_HARD_TIMEOUT_MS must be smaller than COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS");
+  }
+  return Object.freeze({
+    campaignTimeoutMs,
+    setupTimeoutMs,
+    diagnosticTimeoutMs: positiveInteger("COOP_UI_DIAGNOSTIC_TIMEOUT_MS", DEFAULT_DIAGNOSTIC_TIMEOUT_MS),
+    cleanupTimeoutMs: positiveInteger("COOP_UI_CLEANUP_TIMEOUT_MS", DEFAULT_CLEANUP_TIMEOUT_MS),
+  });
+}
+
+export class CampaignLifecycleTimeoutError extends Error {
+  constructor(operation, timeoutMs) {
+    super(`[campaign-lifecycle] ${operation} exceeded immutable ${timeoutMs}ms deadline`);
+    this.name = "CampaignLifecycleTimeoutError";
+    this.operation = operation;
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+/**
+ * Race one operation against an immutable wall-clock deadline. The losing operation's
+ * rejection is consumed because Puppeteer work normally rejects only after the browser is
+ * force-closed by the caller's cleanup path.
+ */
+export async function withinDeadline(operation, timeoutMs, label) {
+  const promise = Promise.resolve(operation);
+  promise.catch(() => {});
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_resolve, reject) => {
+        timer = setTimeout(() => reject(new CampaignLifecycleTimeoutError(label, timeoutMs)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Kill Chromium processes only after graceful close has failed or timed out. */
+export function forceKillBrowsers(rig) {
+  for (const browser of rig?.browsers ?? []) {
+    try {
+      browser.process()?.kill("SIGKILL");
+    } catch {
+      // The process may already have exited between connected/process checks.
+    }
+  }
+}

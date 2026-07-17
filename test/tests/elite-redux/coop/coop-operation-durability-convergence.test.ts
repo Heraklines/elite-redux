@@ -34,12 +34,13 @@
 import {
   adoptBiomeWatcherChoice,
   commitBiomeOwnerIntent,
+  preflightCoopBiomeJournalMaterialization,
   resetCoopBiomeOperationFlag,
   resetCoopBiomeOperationState,
   setCoopBiomeOperationEnabled,
 } from "#data/elite-redux/coop/coop-biome-operation";
 import { CoopDurabilityManager, setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
-import type { CoopBiomePickPayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import type { CoopAuthoritativeEnvelopeV1, CoopBiomePickPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   coopOperationDurabilityHooks,
   getCoopOperationJournalApplied,
@@ -48,11 +49,17 @@ import {
   resetCoopOperationJournalLog,
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
-import { COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
+import {
+  armCoopBiomeTransitionTailPermit,
+  clearCoopBiomeTransitionTailPermit,
+  getCoopBiomeTransitionTailPermit,
+} from "#data/elite-redux/coop/coop-renderer-gate";
+import { COOP_BIOME_PICK_SEQ_BASE, COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Await several microtask turns so the loopback (queueMicrotask) delivery + ACK round-trips settle. */
 async function flush(): Promise<void> {
@@ -130,6 +137,7 @@ function assertNoSelfHeal(...gates: ChannelGate[]): void {
 
 describe("Wave-2e operation<->durability convergence: a cut committed op is repaired by the journal, not a self-heal", () => {
   beforeEach(() => {
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState());
     setCoopDurabilityEnabled(true);
     setCoopBiomeOperationEnabled(true);
     resetCoopBiomeOperationState();
@@ -148,6 +156,7 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     resetCoopBiomeOperationState();
     resetCoopBiomeOperationFlag();
     setCoopDurabilityEnabled(true);
+    setActiveCoopRuntimeOpState(null);
   });
 
   /** Commit a HOST-OWNED biome pick (even pin -> host seat) through the real owner seam; it journals. */
@@ -157,12 +166,187 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
       seq: COOP_BIOME_PICK_SEQ_BASE + pinned,
       pinned,
       choice: 0,
-      payload: { biomeId, nodeIndex: 0 } satisfies CoopBiomePickPayload,
+      payload: { sourceBiomeId: 0, biomeId, nodeIndex: 0, nextWave: 12 } satisfies CoopBiomePickPayload,
       localRole: "host",
       wave: 11,
       turn: 0,
+      boundarySourceBiomeId: 0,
+      boundaryNextWave: 12,
+      allowedRoutes: [biomeId],
+      deterministicDestination: null,
     });
   }
+
+  it("host local-tail reservation precedes journal publish and re-ACK preserves the original revision", () => {
+    const pair = createLoopbackPair();
+    const hostGate = new ChannelGate(pair.host);
+    const hostMgr = new CoopDurabilityManager(hostGate);
+    setCoopOperationDurability(hostMgr);
+
+    expect(
+      armCoopBiomeTransitionTailPermit({
+        operationId: "1:0:BIOME_PICK:9800002",
+        sessionEpoch: 1,
+        revision: 77,
+        wave: 1,
+        sourceBiomeId: 0,
+        destinationBiomeId: 1,
+        nextWave: 2,
+      }),
+    ).toBe(true);
+    const blocked = commitBiomeOwnerIntent({
+      kind: "BIOME_PICK",
+      seq: COOP_BIOME_PICK_SEQ_BASE + 2,
+      pinned: 2,
+      choice: 0,
+      payload: { sourceBiomeId: 0, biomeId: 10, nodeIndex: 0, nextWave: 12 },
+      localRole: "host",
+      wave: 11,
+      turn: 0,
+      boundarySourceBiomeId: 0,
+      boundaryNextWave: 12,
+      allowedRoutes: [10],
+      deterministicDestination: null,
+      armLocalTail: true,
+    });
+    expect(blocked, "a conflicting unfinished permit prevents the commit itself").toBeNull();
+    expect(hostGate.sentTypes, "no envelope is exposed before the local tail slot is reserved").not.toContain(
+      "envelope",
+    );
+
+    clearCoopBiomeTransitionTailPermit();
+    const first = commitBiomeOwnerIntent({
+      kind: "BIOME_PICK",
+      seq: COOP_BIOME_PICK_SEQ_BASE + 2,
+      pinned: 2,
+      choice: 0,
+      payload: { sourceBiomeId: 0, biomeId: 10, nodeIndex: 0, nextWave: 12 },
+      localRole: "host",
+      wave: 11,
+      turn: 0,
+      boundarySourceBiomeId: 0,
+      boundaryNextWave: 12,
+      allowedRoutes: [10],
+      deterministicDestination: null,
+      armLocalTail: true,
+    });
+    expect(first?.revision).toBe(1);
+    const later = commitBiomeOwnerIntent({
+      kind: "CROSSROADS_PICK",
+      seq: COOP_CROSSROADS_SEQ_BASE + 4,
+      pinned: 4,
+      choice: 0,
+      payload: { optionIndex: 0 },
+      localRole: "host",
+      wave: 11,
+      turn: 0,
+      boundarySourceBiomeId: 0,
+      boundaryNextWave: 12,
+      allowedRoutes: [],
+      deterministicDestination: null,
+    });
+    expect(later?.revision).toBe(2);
+    const reack = commitBiomeOwnerIntent({
+      kind: "BIOME_PICK",
+      seq: COOP_BIOME_PICK_SEQ_BASE + 2,
+      pinned: 2,
+      choice: 0,
+      payload: { sourceBiomeId: 0, biomeId: 10, nodeIndex: 0, nextWave: 12 },
+      localRole: "host",
+      wave: 11,
+      turn: 0,
+      boundarySourceBiomeId: 0,
+      boundaryNextWave: 12,
+      allowedRoutes: [10],
+      deterministicDestination: null,
+      armLocalTail: true,
+    });
+    expect(reack?.revision, "re-ACK uses op A's immutable revision, not the later global clock").toBe(1);
+    expect(getCoopBiomeTransitionTailPermit()?.revision).toBe(1);
+    hostMgr.dispose();
+  });
+
+  it("a committed biome transition cannot arm its local permit until exact journal retention succeeds", () => {
+    const pair = createLoopbackPair();
+    const hostGate = new ChannelGate(pair.host);
+    const hostMgr = new CoopDurabilityManager(hostGate);
+    setCoopOperationDurability(hostMgr);
+    const retain = vi.spyOn(hostMgr, "commit").mockReturnValueOnce(false);
+    const params = {
+      kind: "BIOME_PICK" as const,
+      seq: COOP_BIOME_PICK_SEQ_BASE + 2,
+      pinned: 2,
+      choice: 0,
+      payload: { sourceBiomeId: 0, biomeId: 10, nodeIndex: 0, nextWave: 12 },
+      localRole: "host" as const,
+      wave: 11,
+      turn: 0,
+      boundarySourceBiomeId: 0,
+      boundaryNextWave: 12,
+      allowedRoutes: [10],
+      deterministicDestination: null,
+      armLocalTail: true,
+    };
+
+    expect(commitBiomeOwnerIntent(params), "the committed-but-unretained first attempt remains closed").toBeNull();
+    expect(getCoopBiomeTransitionTailPermit(), "no permit can outrun journal retention").toBeNull();
+    expect(hostGate.sentTypes, "a failed retention attempt cannot publish an envelope").not.toContain("envelope");
+
+    const reack = commitBiomeOwnerIntent(params);
+    expect(reack?.revision, "the exact retry re-journals the original immutable commit").toBe(1);
+    expect(getCoopBiomeTransitionTailPermit()).toMatchObject({
+      operationId: reack?.operationId,
+      revision: 1,
+      destinationBiomeId: 10,
+    });
+    expect(retain).toHaveBeenCalledTimes(2);
+    expect(hostGate.sentTypes).toContain("envelope");
+    hostMgr.dispose();
+  });
+
+  it("journal preflight rejects impossible permit ids and incoherent authoritative envelope addresses", () => {
+    const valid = {
+      version: 1,
+      sessionEpoch: 1,
+      revision: 1,
+      wave: 11,
+      turn: 3,
+      logicalPhase: "BIOME_SELECT",
+      pendingOperation: {
+        id: `1:0:BIOME_PICK:${COOP_BIOME_PICK_SEQ_BASE + 2}`,
+        kind: "BIOME_PICK",
+        owner: 0,
+        status: "applied",
+        payload: { sourceBiomeId: 0, biomeId: 10, nodeIndex: 0, nextWave: 12 },
+      },
+      // The materializer deliberately validates only the common authoritative address here. The rest of
+      // the battle carrier is immaterial to this engine-free permit preflight.
+      authoritativeState: { version: 1, wave: 11, turn: 3 },
+    } as CoopAuthoritativeEnvelopeV1;
+    expect(preflightCoopBiomeJournalMaterialization(valid), "the exact interactive address is accepted").not.toBeNull();
+
+    const mutate = (patch: Record<string, unknown>): CoopAuthoritativeEnvelopeV1 =>
+      ({ ...valid, ...patch }) as CoopAuthoritativeEnvelopeV1;
+    const mutateOperation = (patch: Record<string, unknown>): CoopAuthoritativeEnvelopeV1 =>
+      mutate({ pendingOperation: { ...valid.pendingOperation!, ...patch } });
+
+    const impossible: CoopAuthoritativeEnvelopeV1[] = [
+      mutateOperation({ id: `1:0:BIOME_PICK:${COOP_BIOME_PICK_SEQ_BASE + 3}` }), // suffix != BASE + pin
+      mutateOperation({ id: `1:1:BIOME_PICK:${COOP_BIOME_PICK_SEQ_BASE + 2}` }), // id owner != op owner/parity
+      mutateOperation({ id: `2:0:BIOME_PICK:${COOP_BIOME_PICK_SEQ_BASE + 2}` }), // id epoch != envelope/session
+      mutate({ version: 2 }),
+      mutate({ logicalPhase: "SHOP" }),
+      mutate({ authoritativeState: { ...valid.authoritativeState, wave: 10 } }),
+      mutate({ authoritativeState: { ...valid.authoritativeState, turn: 2 } }),
+    ];
+    for (const envelope of impossible) {
+      expect(
+        preflightCoopBiomeJournalMaterialization(envelope),
+        `impossible envelope must fail closed: ${JSON.stringify(envelope)}`,
+      ).toBeNull();
+    }
+    expect(getCoopBiomeTransitionTailPermit(), "rejected preflights cannot reserve a tail slot").toBeNull();
+  });
 
   // ===========================================================================================
   // DIRECTION 1: host-committed op -> guest watcher.
@@ -261,8 +445,55 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
       localRole: "host",
       wave: 11,
       turn: 0,
+      sourceBiomeId: 0,
+      nextWave: 12,
+      allowedRoutes: [30],
+      deterministicDestination: null,
     });
     expect(decision.adopt, "the host committed + adopted the guest's relayed pick").toBe(true);
+    const replay = adoptBiomeWatcherChoice({
+      kind: "BIOME_PICK",
+      seq: COOP_BIOME_PICK_SEQ_BASE + 3,
+      pinned: 3,
+      // A late/callback replay tries to carry a different value. The deterministic id reacks the original.
+      res: { choice: 0, data: [31] },
+      localRole: "host",
+      wave: 11,
+      turn: 0,
+      sourceBiomeId: 0,
+      nextWave: 12,
+      allowedRoutes: [30],
+      deterministicDestination: null,
+    });
+    expect(replay).toEqual({ adopt: true, choice: 0, data: [30] });
+    const invalidRoute = adoptBiomeWatcherChoice({
+      kind: "BIOME_PICK",
+      seq: COOP_BIOME_PICK_SEQ_BASE + 5,
+      pinned: 5,
+      res: { choice: 0, data: [31] },
+      localRole: "host",
+      wave: 11,
+      turn: 0,
+      sourceBiomeId: 0,
+      nextWave: 12,
+      allowedRoutes: [30],
+      deterministicDestination: null,
+    });
+    expect(invalidRoute).toMatchObject({ adopt: false, reason: "host-rejected" });
+    const invalidCrossroads = adoptBiomeWatcherChoice({
+      kind: "CROSSROADS_PICK",
+      seq: COOP_CROSSROADS_SEQ_BASE + 7,
+      pinned: 7,
+      res: { choice: 2 },
+      localRole: "host",
+      wave: 11,
+      turn: 0,
+      sourceBiomeId: 0,
+      nextWave: 12,
+      allowedRoutes: [],
+      deterministicDestination: null,
+    });
+    expect(invalidCrossroads).toMatchObject({ adopt: false, reason: "host-rejected" });
     await flush();
     expect(appliedBiomes()).toEqual([]); // the guest has not received the committed envelope (channel dark)
 
@@ -301,8 +532,9 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     setCoopOperationDurability(hostMgr);
 
     const N = 10;
+    const expected = Array.from({ length: N }, (_, i) => i + 1);
     for (let i = 0; i < N; i++) {
-      commitHostOwnedBiome(2 * (i + 1), 100 + i);
+      commitHostOwnedBiome(2 * (i + 1), expected[i]);
       await flush();
     }
     expect(pair.faultsInjected(), "the run must actually inject faults (not vacuous)").toBeGreaterThan(0);
@@ -317,7 +549,6 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
         break;
       }
     }
-    const expected = Array.from({ length: N }, (_, i) => 100 + i);
     expect(liveBiomes(), "LIVE STATE: every dropped op eventually reached the mutation seam").toEqual(expected);
     expect(appliedBiomes(), "(secondary) journal history converged").toEqual(expected);
     hostMgr.dispose();

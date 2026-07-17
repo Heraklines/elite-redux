@@ -11,7 +11,7 @@ export const mockLocalStorage = () => {
     },
 
     getItem(key: string) {
-      return store[key];
+      return store[key] ?? null;
     },
 
     setItem(key: string, value: string) {

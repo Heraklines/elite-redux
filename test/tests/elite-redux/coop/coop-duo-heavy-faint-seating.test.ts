@@ -165,7 +165,7 @@ describe.skipIf(!RUN)(
       // TURN 1 on the HOST: both leads SPLASH (harmless); the foe's spread ROCK_SLIDE KOs both 1-HP leads.
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       const hostLead = rig.hostScene.getPlayerField()[COOP_HOST_FIELD_INDEX];
       const guestLead = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];

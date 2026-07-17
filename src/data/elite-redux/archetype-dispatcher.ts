@@ -83,7 +83,6 @@ import {
   FogRestoreDisguiseFormChangeAbAttr,
   ForceSwitchOutImmunityAbAttr,
   FullBurnDamageImmunityAbAttr,
-  GorillaTacticsAbAttr,
   getWeatherCondition,
   IgnoreGenderInfatuationAbAttr,
   IgnoreMoveEffectsAbAttr,
@@ -107,7 +106,6 @@ import {
   PostDefendAbilitySwapAbAttr,
   PostDefendContactDamageAbAttr,
   PostDefendHpGatedStatStageChangeAbAttr,
-  PostDefendMoveDisableAbAttr,
   PostDefendWeatherChangeAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   PostStatStageChangeStatStageChangeAbAttr,
@@ -127,6 +125,7 @@ import {
   ReceivedTypeDamageMultiplierAbAttr,
   RedirectTypeMoveAbAttr,
   ReflectStatStageChangeAbAttr,
+  SagePowerMoveLockAbAttr,
   SelfStatDropImmunityAbAttr,
   SetMoveAccuracyAbAttr,
   SpreadTargetByFlagAbAttr,
@@ -1147,8 +1146,10 @@ function dispatchStatTriggerOnEvent(params: Record<string, unknown>): DispatchRe
   switch (trigger) {
     case "on-ko":
       return ok([new StatTriggerOnKoAbAttr({ stats })]);
-    case "on-hit":
-      return ok([new StatTriggerOnHitAbAttr({ stats, filter: parseOnHitFilter(params.filter) ?? undefined })]);
+    case "on-hit": {
+      const filter = parseOnHitFilter(params.filter);
+      return ok([new StatTriggerOnHitAbAttr(filter == null ? { stats } : { stats, filter })]);
+    }
     case "on-entry":
       return ok([new StatTriggerOnEntryAbAttr({ stats })]);
     case "on-stat-lowered": {
@@ -1900,6 +1901,11 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       // SLICING 1.3x), wired as the OUTCOME: a Grass-type 1.3x power boost, since
       // pokerogue has no per-holder move-flag grant.
       return [new MoveTypePowerBoostAbAttr(PokemonType.GRASS, 1.3)];
+    case 606: // Aerialist: "Levitate + 25% more Flying damage + ANOTHER 20% (or
+      // 50% at <=1/3 HP)." Composite parts = Levitate (Ground immunity) + Flock
+      // (Flying x1.2, x1.5 low-HP). The standalone flat +25% Flying boost is the
+      // missing rider — it stacks on top of Flock, netting x1.5 / x1.875.
+      return [new MoveTypePowerBoostAbAttr(PokemonType.FLYING, 1.25)];
     default:
       return [];
   }
@@ -2519,6 +2525,23 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           stages: 1,
         }),
       ]);
+    case 300: {
+      // Fighting Spirit — "Changes Normal moves to Fighting. If the user is
+      // Fighting-type its Fighting moves break screens, otherwise it gains
+      // Fighting STAB." (Was classified type-conversion with a flat 1.2x that
+      // dropped the conditional STAB and the screen-break clause; hand-wired
+      // here to the dex — mirrors Tectonize 308 / Qigong 762's Fighting Spirit.)
+      const breakScreens = new RemoveScreensOnTypedAttackAbAttr({ type: PokemonType.FIGHTING });
+      breakScreens.addCondition(holder => holder.isOfType(PokemonType.FIGHTING));
+      return ok([
+        new TypeConversionAbAttr({ source: { kind: "type", type: PokemonType.NORMAL }, newType: PokemonType.FIGHTING }),
+        // Non-Fighting holder gains Fighting STAB (StabAddAbAttr self-gates: a
+        // Fighting-type holder with natural STAB gets nothing here).
+        new StabAddAbAttr({ targetType: PokemonType.FIGHTING }),
+        // Fighting-type holder: Fighting moves break the target's screens.
+        breakScreens,
+      ]);
+    }
     case 308:
       // Tectonize — "Changes the holder's Normal moves to Ground-type. If the
       // holder is Ground-type it is IMMUNE to Stealth Rock and Spikes; otherwise
@@ -2627,9 +2650,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 335:
       // Haunted Spirit — when KO'd, applies CURSED to the attacker. Vanilla
       // pokerogue's Curse battler tag handles the lapse damage downstream.
+      // Ghost-type attackers are IMMUNE to the curse (dex rom_detail), mirroring
+      // sibling Vengeful Spirit (565).
       return ok([
         new OnFaintEffectAbAttr({
-          effect: { kind: "attacker-battler-tag", tagType: BattlerTagType.CURSED },
+          effect: {
+            kind: "attacker-battler-tag",
+            tagType: BattlerTagType.CURSED,
+            excludeAttackerTypes: [PokemonType.GHOST],
+          },
         }),
       ]);
     case 565:
@@ -3409,10 +3438,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 478:
       // Moon Spirit — "Fairy & Dark gains STAB. Moonlight recovers 75% HP."
-      // Same STAB-add piece as Lunar Eclipse. The 75%-HP-Moonlight rider is
-      // a move-specific heal override (vanilla Moonlight is 50% HP); needs
-      // a move-replacement primitive that distinguishes per-move heal
-      // fractions — deferred. Partial wire.
+      // Same STAB-add piece as Lunar Eclipse. The 75%-HP-Moonlight override is
+      // wired move-side in WeatherHealAttr.apply (gated on ErAbilityId.MOON_SPIRIT
+      // + MoveId.MOONLIGHT), mirroring the Chloroplast userActsInSun special-case.
       return ok([
         new StabAddAbAttr({ targetType: PokemonType.FAIRY }),
         new StabAddAbAttr({ targetType: PokemonType.DARK }),
@@ -3506,6 +3534,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Toxic-Terrain passive recovery (terrain-gated, same shape as Celestial
       // Blessing 591).
       return ok([
+        new RedirectTypeMoveAbAttr(PokemonType.POISON),
         new TypeAbsorbHealAbAttr({ type: PokemonType.POISON, healFraction: 0.25 }),
         new PassiveRecoveryAbAttr({
           healFraction: 1 / 8,
@@ -3515,9 +3544,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 314:
       // Mountaineer — "Immune to Rock-type attacks and Stealth Rock damage."
       // Full Rock immunity via AttackTypeImmunityAbAttr (vanilla primitive,
-      // same shape as Levitate's Ground immunity). The Stealth Rock piece
-      // would need an arena-hazard immunity path; deferred.
-      return ok([new AttackTypeImmunityAbAttr(PokemonType.ROCK)]);
+      // same shape as Levitate's Ground immunity) + StealthRockImmunityAbAttr
+      // for the hazard-damage half (same primitive as ability 271's Rock absorb).
+      return ok([new AttackTypeImmunityAbAttr(PokemonType.ROCK), new StealthRockImmunityAbAttr()]);
     case 271:
       // Keen Edge — "Boosts the power of slashing moves by 1.3x."
       return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.SLICING_MOVE, multiplier: 1.3 })]);
@@ -3842,17 +3871,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 350:
-      // Violent Rush — ER ROM C source (battle_main.c:4892 + battle_util.c:13305):
-      //   - speed = (speed * 150) / 100  (1.5× speed multiplier on first turn)
-      //   - MulModifier(&modifier, UQ_4_12(1.2))  (1.2× damage on first turn)
-      // Both gated on `gDisableStructs[battlerId].isFirstTurn`. Wire as
-      // proper multipliers (NOT stat stages) gated on first-turn predicate.
+      // Violent Rush — ER 2.65 dex: "50% Speed + 20% Attack on first turn."
+      // (ROM C source battle_main.c:4892 + battle_util.c:13305 applies a
+      // MulModifier(1.2) damage mult, but the DEX is authoritative and reads a
+      // literal Attack boost — physical-only, mirroring Rapid Response (573)'s
+      // Sp.Atk clause — so wire ATK×1.2 as a first-turn stat multiplier, NOT an
+      // all-move power boost.) Both gated on the first-turn predicate.
       return ok([
         new FirstTurnStatMultiplierAbAttr({ stat: Stat.SPD, multiplier: 1.5 }),
-        new MovePowerBoostAbAttr(
-          user => !!user && (!user.summonData?.moveHistory || user.summonData.moveHistory.length === 0),
-          1.2,
-        ),
+        new FirstTurnStatMultiplierAbAttr({ stat: Stat.ATK, multiplier: 1.2 }),
       ]);
     case 557:
       // Readied Action — "Doubles attack on first turn." Faithful: ATK × 2.0
@@ -3888,12 +3915,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MIST, targetsSelf: true }),
       ]);
     case 477:
-      // Generator — "Charges up once on entry or when electric terrain is active."
-      // Use the CHARGED battler tag (vanilla Electric move Charge effect).
-      // PostSummon adds the tag once on entry; the "electric terrain"
-      // condition is partial — we don't re-trigger when terrain changes mid-
-      // battle yet.
-      return ok([new PostSummonAddBattlerTagAbAttr(BattlerTagType.CHARGED, 0)]);
+      // Generator — "Charges up once on entry or when Electric Terrain becomes
+      // active during battle." Entry CHARGED via PostSummon + the mid-battle
+      // Electric-Terrain recharge (same primitive Energized 699 uses).
+      return ok([
+        new PostSummonAddBattlerTagAbAttr(BattlerTagType.CHARGED, 0),
+        new RechargeChargedOnElectricTerrainAbAttr(),
+      ]);
     case 699:
       // Energized — "Charges up on entry (doubling the next Electric move),
       // recharges when Electric Terrain becomes active, and recharges on a
@@ -4331,10 +4359,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Let's Roll — "Casts Defense Curl on entry."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DEFENSE_CURL, targetsSelf: true })]);
     case 320:
-      // Air Blower — "Casts a 3-turn Tailwind on entry." Tailwind is a self-side
-      // buff, so `targetsSelf` makes it fire even when Air Blower's holder is sent
-      // out before any opponent (otherwise it silently never triggered).
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TAILWIND, targetsSelf: true })]);
+      // Air Blower — "Casts a 3-turn Tailwind on entry." The scripted TAILWIND
+      // move applies a 4-turn Tailwind (move duration); the dex wants exactly 3.
+      // Use the entry-effect screen-or-room primitive (holder's own side) for a
+      // faithful 3-turn Tailwind. TailwindTag.onAdd still triggers Wind Rider and
+      // doubles the side's Speed.
+      return ok([new EntryEffectAbAttr({ kind: "set-screen-or-room", tag: ArenaTagType.TAILWIND, turns: 3 })]);
     case 428:
       // Cheap Tactics — "Attacks with Scratch on switch-in."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.SCRATCH })]);
@@ -4633,11 +4663,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new SpreadTargetByFlagAbAttr(MoveFlags.SOUND_BASED),
       ]);
     case 438:
-      // Jaws of Carnage — "Devours 1/2 of the foe when defeating it." The
-      // "devours 1/2" wording maps to a heal on KO equal to 50% of max HP
-      // (ER's signature lifesteal-on-KO shape; the "foe" framing is narrative
-      // — the holder recovers 1/2 of *its own* max HP). LifestealOnKo(0.5).
-      return ok([new LifestealOnKoAbAttr({ healFraction: 0.5 })]);
+      // Jaws of Carnage — "Restores 50% max HP when defeating foes with biting
+      // moves, or 25% with other moves." Base 25% heal-on-KO, upgraded to 50%
+      // when the KO move carries the BITING_MOVE flag (Strong Jaw family).
+      return ok([
+        new LifestealOnKoAbAttr({
+          healFraction: 0.25,
+          flagBonus: { flag: MoveFlags.BITING_MOVE, fraction: 0.5 },
+        }),
+      ]);
     case 519:
       // Fortitude — "Boosts SpDef +1 when hit. Maxes SpDef on crit." Mirrors
       // case 488 (Tipping Point) but on the SPDEF stat. The crit-maximize
@@ -4770,11 +4804,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // stat." Same shape as 301 Cryptic Power but at 1.5x instead of 2x.
       return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5)]);
     case 352:
-      // Sage Power — "Ups Special Attack by 50% and locks move." R52
-      // audit-fix: previously SpAtk-only partial; now also adds vanilla
-      // GorillaTacticsAbAttr for the move-lock piece (locks after the
-      // holder's first move of the wave).
-      return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5), new GorillaTacticsAbAttr()]);
+      // Sage Power — "Ups Special Attack by 50% and locks move." (Sp.Atk ONLY.)
+      // audit-fix: previously used vanilla GorillaTacticsAbAttr whose tag onAdd
+      // ALSO applied a spurious ×1.5 physical Attack (Choice-Band-style) the dex
+      // never grants. Now uses SagePowerMoveLockAbAttr → the ER_SAGE_POWER_LOCK
+      // tag, which locks the first move WITHOUT any Attack boost. The +50% Sp.Atk
+      // is the separate StatMultiplier below.
+      return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5), new SagePowerMoveLockAbAttr()]);
     case 599: {
       // Dead Power — "1.5x Attack boost. 20% chance to curse on contact moves."
       // Wire both pieces: StatMultiplier(ATK, 1.5) for the attack boost +
@@ -5200,13 +5236,23 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 35 — SpeedBonusToStat (defensive) + DamageReduction wires
     // -------------------------------------------------------------------------
     case 809:
-      // Blur — "Uses Speed as defense stat when hit by CONTACT." Defensive
-      // SpeedBonus → DEF, gated to contact moves only (the contact gate was missing).
-      return ok([new SpeedBonusToStatAbAttr({ stat: Stat.DEF, speedFraction: 1, filter: { contact: "only" } })]);
+      // Blur — "Uses its Speed stat instead of Defense OR Special Defense when
+      // hit by CONTACT moves." REPLACE (not add) on BOTH defensive stats: a
+      // special contact move (e.g. Draining Kiss) substitutes SpDef, a physical
+      // one substitutes Def. Gated to contact moves only.
+      return ok([
+        new SpeedBonusToStatAbAttr({ stat: Stat.DEF, speedFraction: 1, replace: true, filter: { contact: "only" } }),
+        new SpeedBonusToStatAbAttr({ stat: Stat.SPDEF, speedFraction: 1, replace: true, filter: { contact: "only" } }),
+      ]);
     case 810:
-      // Elude — "Uses Speed as defense stat when hit by NON-contact." Gated to
-      // non-contact moves only (the gate was missing — it was identical to Blur).
-      return ok([new SpeedBonusToStatAbAttr({ stat: Stat.DEF, speedFraction: 1, filter: { contact: "non" } })]);
+      // Elude — "Uses its Speed stat instead of Defense OR Special Defense when
+      // hit by NON-contact moves." REPLACE on BOTH defensive stats (non-contact
+      // moves are overwhelmingly special → SpDef is the common path). Gated to
+      // non-contact moves only.
+      return ok([
+        new SpeedBonusToStatAbAttr({ stat: Stat.DEF, speedFraction: 1, replace: true, filter: { contact: "non" } }),
+        new SpeedBonusToStatAbAttr({ stat: Stat.SPDEF, speedFraction: 1, replace: true, filter: { contact: "non" } }),
+      ]);
     case 838:
       // Guardian Coat — "Provides immunity to Sandstorm/Hail weather damage,
       // blocks all powder moves, and reduces incoming PHYSICAL damage by 20%."
@@ -5363,8 +5409,8 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // unreachable and kept only so the id is accounted for in this switch.
       return SKIP_BESPOKE;
     case 284:
-      // Exploit Weakness — "Targets lowest defense vs statused foes."
-      // Target-stat-selection primitive missing. Defer.
+      // Exploit Weakness — "Targets lowest defense vs statused foes." Handled in
+      // dispatchBespokeR48 (real defensive-stat swap primitive); defer to it.
       return SKIP_BESPOKE;
     case 373:
       // Grip Pincer — "50% chance to trap. Then ignores Defense & accuracy
@@ -6537,11 +6583,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 29 — PostDefendMoveDisable / PerishBody-style wires
     // -------------------------------------------------------------------------
     case 570:
-      // Ill Will — "Deletes the PP of the move that faints this Pokemon."
-      // PostDefendMoveDisable is the closest vanilla shape (Cursed Body):
-      // disables the attacker's move on contact. Adapts the "delete PP"
-      // intent to "disable for several turns".
-      return ok([new PostDefendMoveDisableAbAttr(100)]);
+      // Ill Will — "Drains the PP of the move that defeats the user. Has to be a
+      // direct hit." Real on-faint PP deletion via the on-faint-effect archetype
+      // (attacker-pp-drain), gated on a damaging KO move from a living attacker.
+      // (Was a Cursed-Body proxy: PostDefendMoveDisable fired on SURVIVAL and
+      // disabled for 4 turns rather than draining PP on the KO.)
+      return ok([new OnFaintEffectAbAttr({ effect: { kind: "attacker-pp-drain" } })]);
     case 376: {
       // Deadeye — "Arrow & cannon moves never miss. Crits hit weakest defense."
       // FULL: unable to miss arrow-based attacks and cannon moves; additionally,
@@ -6562,7 +6609,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // (Merciless-style ConditionalCrit).
       return ok([
         new ConditionalAlwaysHitAbAttr({ superEffective: true }),
-        new ConditionalCritAbAttr((user, target, move) => target.getMoveEffectiveness(user, move) > 1),
+        new ConditionalCritAbAttr(
+          (user, target, move) => target != null && target.getMoveEffectiveness(user, move) > 1,
+        ),
       ]);
     case 374:
       // (No ER ability 374 in audit — sentinel to keep formatting.)
@@ -7219,7 +7268,10 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Rage (composite Tipping Point + Rampage).
       return ok([new PostVictoryClearRechargeAbAttr()]);
     case 284:
-      // Exploit Weakness — "Targets lowest defense vs statused foes."
+      // Exploit Weakness — "When attacking a statused opponent, targets their
+      // LOWER defensive stat." Real defensive-stat swap in the damage formula
+      // (effective Def/SpDef incl. stages), consulted source-side in
+      // Pokemon.getAttackDamage when the defender is statused.
       return ok([new DefenseStatSwapOnStatusedFoeAbAttr()]);
     case 285:
       // Ground Shock — "Target Grounds aren't immune to Electric but resist it

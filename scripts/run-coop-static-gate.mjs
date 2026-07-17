@@ -114,10 +114,22 @@ if (typecheck.status !== 0) {
 // written `er-custom-trainers*.json` save, which is excluded in biome.jsonc as generated data.
 const biomeFiles = [...changed].filter(file => /\.(?:[cm]?[jt]sx?|jsonc?|ya?ml)$/.test(file));
 if (biomeFiles.length > 0) {
-  const biome = run(command, ["exec", "biome", "check", "--no-errors-on-unmatched", ...biomeFiles], {
-    stdio: "inherit",
-    encoding: undefined,
-  });
+  const biome = run(
+    command,
+    [
+      "exec",
+      "biome",
+      "check",
+      "--no-errors-on-unmatched",
+      "--diagnostic-level=error",
+      "--max-diagnostics=none",
+      ...biomeFiles,
+    ],
+    {
+      stdio: "inherit",
+      encoding: undefined,
+    },
+  );
   if (biome.status !== 0) {
     process.exit(biome.status ?? 1);
   }

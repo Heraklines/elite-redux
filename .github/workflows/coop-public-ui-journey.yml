@@ -1,0 +1,434 @@
+name: Co-op Public UI Journey
+
+on:
+  push:
+    branches:
+      - "ci/coop/**"
+    paths:
+      - ".github/workflows/coop-public-ui-journey.yml"
+      - "scripts/coop-browser-entry.ts"
+      - "scripts/prepare-coop-browser-artifact.mjs"
+      - "src/dev-tools/registry.ts"
+      - "src/ui/handlers/starter-select-ui-handler.ts"
+      - "test/browser/coop-public-ui/**"
+      - "workers/er-save-api/**"
+      - "workers/er-coop-api/**"
+  workflow_dispatch:
+    inputs:
+      journey:
+        description: Public player journey to drive on the primary account pair
+        required: true
+        type: choice
+        default: fresh-resume
+        options:
+          - probe
+          - fresh-wave2
+          - fresh-resume
+          - reverse-resume
+          - faint-replacement
+          - commander-skip
+          - save-mutations
+          - market-wide-lens
+      requester_seat:
+        description: Seat that sends the first lobby invitation
+        required: true
+        type: choice
+        default: guest-seat
+        options:
+          - guest-seat
+          - host-seat
+      faint_owner_seat:
+        description: Prepared fainted battler owner for faint-replacement
+        required: true
+        type: choice
+        default: guest-seat
+        options:
+          - guest-seat
+          - host-seat
+      cadence:
+        description: Human input cadence
+        required: true
+        type: choice
+        default: normal
+        options:
+          - fast
+          - normal
+          - slow
+      fan_out_reverse:
+        description: Also run reverse-resume on the separately provisioned alternate account pair
+        required: true
+        type: boolean
+        default: false
+      chrome_trace:
+        description: Diagnostic opt-in for the resource-heavy Chrome CDP performance timeline
+        required: true
+        type: boolean
+        default: false
+      host_title_keys:
+        description: JSON keys before host selects New Game; use ["ArrowDown"] for an existing save
+        required: true
+        type: string
+        default: "[]"
+      guest_title_keys:
+        description: JSON keys before guest selects New Game; use ["ArrowDown"] for an existing save
+        required: true
+        type: string
+        default: "[]"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coop-public-ui-${{ github.ref }}-${{ inputs.journey || 'fresh-resume' }}
+  cancel-in-progress: false
+
+env:
+  COOP_BROWSER_ENTRY_CONTRACT: public-ui-v1
+  # Ordinary journeys use the isolated P33 staging workers, hardcoded to match the campaign workflow (same
+  # COOP_IDENTITY_SECRET so the save-API-minted identity tickets validate on the signal worker).
+  # Previously the signal origin defaulted to the PROD worker (er-coop-api, no -staging) while the
+  # save-API defaulted to staging - a stale/unset repo var split the ticket-issuer from the signal
+  # origin, so the staging-minted ticket failed to validate on the prod signal worker and pairing
+  # never completed (the audit's journey-run pairing failure). Both stay paired. `save-mutations`
+  # instead seals localhost origins and starts fresh in-memory instances of the real Worker modules.
+  COOP_UI_SIGNAL_ORIGIN: ${{ inputs.journey == 'save-mutations' && 'http://127.0.0.1:8789' || 'https://er-coop-api-staging.heraklines.workers.dev' }}
+  COOP_UI_API_ORIGIN: ${{ inputs.journey == 'save-mutations' && 'http://127.0.0.1:8788' || 'https://er-save-api-staging.heraklines.workers.dev' }}
+
+jobs:
+  browser-build:
+    name: Build and seal exact-SHA browser bundle once
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact implementation SHA
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Resolve exact production asset SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          SHA="$(gh api repos/Heraklines/er-assets/commits/main --jq .sha)"
+          echo "$SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "Invalid er-assets SHA: $SHA"; exit 1; }
+          echo "COOP_BROWSER_ASSET_SHA=$SHA" >> "$GITHUB_ENV"
+          echo "Sealing er-assets pin $SHA into the public-UI bundle"
+
+      - name: Run owned-file type and format gate externally
+        shell: bash
+        run: |
+          set +e
+          pnpm typecheck > coop-public-ui-typecheck.log 2>&1
+          status=$?
+          set -e
+          diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/dev-tools/registry|src/system/game-data|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          if [ -n "$owned" ]; then
+            printf '%s\n' "$owned"
+            exit 1
+          fi
+          if [ "$status" -ne 0 ] && [ "$diagnostics" -eq 0 ]; then
+            cat coop-public-ui-typecheck.log
+            echo "Repository typecheck failed without parseable diagnostics"
+            exit 1
+          fi
+          echo "Public-UI TypeScript slice is clean; repository baseline reported $diagnostics unrelated diagnostics"
+          pnpm exec biome check \
+            .github/workflows/coop-public-ui-journey.yml \
+            scripts/coop-browser-entry.ts \
+            scripts/prepare-coop-browser-artifact.mjs \
+            src/dev-tools/registry.ts \
+            src/ui/handlers/save-slot-select-ui-handler.ts \
+            src/ui/handlers/starter-select-ui-handler.ts \
+            test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
+            test/browser/coop-public-ui/campaign-policy.mjs \
+            test/browser/coop-public-ui/campaign.mjs \
+            test/browser/coop-public-ui/campaign-nav.mjs \
+            test/browser/coop-public-ui/check-campaign-boundary.mjs \
+            test/browser/coop-public-ui/check-public-boundary.mjs \
+            test/browser/coop-public-ui/commander-evidence.test.mjs \
+            test/browser/coop-public-ui/config.mjs \
+            test/browser/coop-public-ui/evidence.mjs \
+            test/browser/coop-public-ui/journeys.mjs \
+            test/browser/coop-public-ui/local-worker-server.ts \
+            test/browser/coop-public-ui/local-worker-vite.config.mjs \
+            test/browser/coop-public-ui/market-gold-standard.test.mjs \
+            test/browser/coop-public-ui/market-journey.mjs \
+            test/browser/coop-public-ui/preview-server.mjs \
+            test/browser/coop-public-ui/provision-accounts.mjs \
+            test/browser/coop-public-ui/public-ui-harness.mjs \
+            test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs \
+            test/browser/coop-public-ui/run-campaign.mjs \
+            test/browser/coop-public-ui/run.mjs \
+            test/browser/coop-public-ui/save-mutation-evidence.test.mjs \
+            test/browser/coop-public-ui/semantic-surface-evidence.test.mjs \
+            test/browser/coop-public-ui/terminal-watchdog.mjs \
+            test/browser/coop-public-ui/vite.config.mjs
+
+      - name: Enforce public-driver boundary
+        run: node test/browser/coop-public-ui/check-public-boundary.mjs
+
+      - name: Enforce public campaign-driver boundary
+        run: node test/browser/coop-public-ui/check-campaign-boundary.mjs
+
+      - name: Verify browser fan-out checkout isolation
+        run: node --test test/browser/coop-public-ui/browser-workflow-fanout.test.mjs
+
+      - name: Verify bounded public post-turn progress contracts
+        run: node --test test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs
+
+      - name: Verify strict Commander browser evidence contracts
+        run: node --test test/browser/coop-public-ui/commander-evidence.test.mjs
+
+      - name: Verify strict Wide Lens market contracts
+        run: node --test test/browser/coop-public-ui/market-gold-standard.test.mjs
+
+      - name: Verify strict semantic surface evidence contracts
+        run: node --test test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
+
+      - name: Verify exact save mutation browser evidence contracts
+        run: node --test test/browser/coop-public-ui/save-mutation-evidence.test.mjs
+
+      - name: Build normal application with CI-only read-only observer
+        env:
+          COOP_BROWSER_OUT_DIR: dist-coop-public-ui
+          VITE_BYPASS_LOGIN: 0
+          VITE_BYPASS_TUTORIAL: 0
+          VITE_COOP_LOBBY_ROOM_QUERY: 1
+          VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || 'off' }}
+          VITE_COOP_SIGNALING_PROTOCOL: p33
+          VITE_SERVER_URL: ${{ env.COOP_UI_API_ORIGIN }}
+        run: pnpm exec vite build --mode beta --config test/browser/coop-public-ui/vite.config.mjs
+
+      - name: Seal immutable execution input
+        env:
+          COOP_BROWSER_DIST: dist-coop-public-ui
+          COOP_BROWSER_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
+          VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
+        run: node scripts/prepare-coop-browser-artifact.mjs
+
+      - name: Publish exact bundle for isolated journey runners
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-bundle-${{ github.sha }}
+          path: dist-coop-public-ui/**
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: error
+
+  primary-journey:
+    name: ${{ inputs.journey || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / ${{ inputs.journey == 'commander-skip' && matrix.commander_owner_seat || 'primary accounts' }}
+    needs: browser-build
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.journey == 'market-wide-lens' && 55 || inputs.journey == 'save-mutations' && 50 || inputs.journey == 'commander-skip' && 45 || 35 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        commander_owner_seat: ${{ fromJSON(inputs.journey == 'commander-skip' && '["host-seat","guest-seat"]' || '["host-seat"]') }}
+    steps:
+      - name: Check out exact implementation SHA (harness only)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Download the once-built exact-SHA bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: coop-public-ui-bundle-${{ github.sha }}
+          path: dist-coop-public-ui
+
+      - name: Install isolated Chrome runtime
+        run: pnpm exec puppeteer browsers install chrome
+
+      - name: Start isolated in-memory Worker fixtures for save mutation coverage
+        if: inputs.journey == 'save-mutations'
+        shell: bash
+        run: |
+          pnpm exec vite build --config test/browser/coop-public-ui/local-worker-vite.config.mjs
+          nohup node dist-coop-local-workers/local-worker-server.mjs > local-worker-fixture.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            save_status="$(curl --silent --output save-worker-health.txt --write-out '%{http_code}' http://127.0.0.1:8788/game/titlestats || true)"
+            coop_status="$(curl --silent --output coop-worker-health.txt --write-out '%{http_code}' http://127.0.0.1:8789/coop/health || true)"
+            if [[ "$save_status" == "200" && "$coop_status" == "200" ]]; then
+              exit 0
+            fi
+            if [[ "$attempt" == "1" || $((attempt % 10)) == "0" ]]; then
+              printf 'worker readiness attempt=%s save=%s coop=%s\n' "$attempt" "$save_status" "$coop_status"
+              cat save-worker-health.txt coop-worker-health.txt 2>/dev/null || true
+            fi
+            sleep 1
+          done
+          cat local-worker-fixture.log
+          printf 'save status=%s body=' "$save_status"
+          cat save-worker-health.txt || true
+          printf '\ncoop status=%s body=' "$coop_status"
+          cat coop-worker-health.txt || true
+          printf '\n'
+          exit 1
+
+      - name: Prepare an isolated account pair for visible registration
+        run: node test/browser/coop-public-ui/provision-accounts.mjs
+
+      - name: Drive two isolated built clients exclusively through public UI
+        env:
+          COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
+          COOP_UI_BROWSER_DIST: dist-coop-public-ui
+          COOP_UI_ASSET_DIR: .coop-no-local-asset-fallback
+          COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
+          COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
+          # run-campaign.mjs consumes the same base config but owns its own campaign policy;
+          # `probe` keeps the base journey validator satisfied for the dedicated market route.
+          COOP_UI_JOURNEY: ${{ inputs.journey == 'market-wide-lens' && 'probe' || inputs.journey || 'fresh-resume' }}
+          COOP_UI_ACCOUNT_MODE: register
+          COOP_UI_LOBBY_ROOM: primary-${{ github.run_id }}-${{ matrix.commander_owner_seat }}-${{ github.run_attempt }}
+          COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
+          COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat || 'guest-seat' }}
+          COOP_UI_COMMANDER_OWNER_SEAT: ${{ matrix.commander_owner_seat }}
+          COOP_UI_HOST_LOCALE: en
+          COOP_UI_GUEST_LOCALE: de
+          COOP_UI_HOST_TITLE_NEW_GAME_KEYS: ${{ inputs.host_title_keys || '[]' }}
+          COOP_UI_GUEST_TITLE_NEW_GAME_KEYS: ${{ inputs.guest_title_keys || '[]' }}
+          COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'fast' && '70') || (inputs.cadence == 'slow' && '420') || '180' }}
+          COOP_UI_SETTLE_DELAY_MS: ${{ (inputs.cadence == 'fast' && '300') || (inputs.cadence == 'slow' && '1300') || '750' }}
+          # The continuous wave-1 -> wave-20 profile naturally reaches the wave-10 guest-owned
+          # and wave-20 host-owned markets (boss auto-grants do not consume an interaction).
+          # Both visits must buy Wide Lens, return to the same grid, leave normally and prove
+          # the following public command surface. This is one real run, so no save/runtime
+          # fixture or cross-job aggregation can counterfeit the owner alternation.
+          COOP_UI_CAMPAIGN_WAVES: "20"
+          COOP_UI_CAMPAIGN_MODE: gating
+          COOP_UI_RENDER_PROFILE: animations-skipped-depth
+          COOP_UI_REWARD_MODE: leave
+          COOP_UI_RAISE_SPEED: "1"
+          COOP_UI_MARKET_MODE: ${{ inputs.journey == 'market-wide-lens' && 'target-held' || 'leave' }}
+          COOP_UI_MARKET_TARGET_ID: WIDE_LENS
+          COOP_UI_MARKET_SECOND_PURCHASE: "1"
+          COOP_UI_MARKET_REQUIRED_PURCHASES: ${{ inputs.journey == 'market-wide-lens' && '2' || '0' }}
+          COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: ${{ inputs.journey == 'market-wide-lens' && '1' || '0' }}
+          # A measured 537 MB screenshot-enabled CDP performance trace starved two real 10x clients.
+          # Normal two-player fidelity keeps PNGs, semantic/network JSONL, key latency, render and
+          # WebRTC evidence while omitting only that optional timeline. Manual diagnostics may opt in.
+          COOP_UI_CHROME_TRACE: ${{ inputs.chrome_trace && '1' || '0' }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        shell: bash
+        run: |
+          if [[ "${{ inputs.journey || 'fresh-resume' }}" == "market-wide-lens" ]]; then
+            node test/browser/coop-public-ui/run-campaign.mjs
+          else
+            node test/browser/coop-public-ui/run.mjs
+          fi
+
+      - name: Upload compact public-UI diagnosis first
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-primary-compact-${{ matrix.commander_owner_seat }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dev-logs/coop-public-ui/**/summary.json
+            dev-logs/coop-public-ui/**/*.jsonl
+            dev-logs/coop-public-ui/**/*.png
+            dev-logs/coop-public-ui/**/*.dom.json
+            dev-logs/coop-public-ui/**/*.cookies.json
+            local-worker-fixture.log
+          compression-level: 9
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload full public-UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-primary-${{ matrix.commander_owner_seat }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: dev-logs/coop-public-ui/**
+          retention-days: 14
+          if-no-files-found: warn
+
+  reverse-journey:
+    if: github.event_name == 'workflow_dispatch' && inputs.fan_out_reverse && inputs.journey != 'save-mutations'
+    name: reverse-resume / slow / alternate accounts
+    needs: browser-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact implementation SHA (harness only)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Download the same exact-SHA bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: coop-public-ui-bundle-${{ github.sha }}
+          path: dist-coop-public-ui
+
+      - name: Install isolated Chrome runtime
+        run: pnpm exec puppeteer browsers install chrome
+
+      - name: Reject missing alternate staging credentials
+        env:
+          HOST_USERNAME: ${{ secrets.COOP_UI_ALT_HOST_USERNAME }}
+          HOST_PASSWORD: ${{ secrets.COOP_UI_ALT_HOST_PASSWORD }}
+          GUEST_USERNAME: ${{ secrets.COOP_UI_ALT_GUEST_USERNAME }}
+          GUEST_PASSWORD: ${{ secrets.COOP_UI_ALT_GUEST_PASSWORD }}
+        shell: bash
+        run: |
+          test -n "$HOST_USERNAME" || { echo "COOP_UI_ALT_HOST_USERNAME is not configured"; exit 1; }
+          test -n "$HOST_PASSWORD" || { echo "COOP_UI_ALT_HOST_PASSWORD is not configured"; exit 1; }
+          test -n "$GUEST_USERNAME" || { echo "COOP_UI_ALT_GUEST_USERNAME is not configured"; exit 1; }
+          test -n "$GUEST_PASSWORD" || { echo "COOP_UI_ALT_GUEST_PASSWORD is not configured"; exit 1; }
+
+      - name: Drive reverse invitation and resume at slow cadence
+        env:
+          COOP_UI_BASE_URL: http://127.0.0.1:4176/?coopdebug=1
+          COOP_UI_BROWSER_DIST: dist-coop-public-ui
+          COOP_UI_ASSET_DIR: .coop-no-local-asset-fallback
+          COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
+          COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
+          COOP_UI_JOURNEY: reverse-resume
+          COOP_UI_LOBBY_ROOM: reverse-${{ github.run_id }}-${{ github.run_attempt }}
+          COOP_UI_REQUESTER_SEAT: host-seat
+          COOP_UI_HOST_LOCALE: en
+          COOP_UI_GUEST_LOCALE: de
+          COOP_UI_ACTION_DELAY_MS: 420
+          COOP_UI_SETTLE_DELAY_MS: 1300
+          COOP_UI_HOST_USERNAME: ${{ secrets.COOP_UI_ALT_HOST_USERNAME }}
+          COOP_UI_HOST_PASSWORD: ${{ secrets.COOP_UI_ALT_HOST_PASSWORD }}
+          COOP_UI_GUEST_USERNAME: ${{ secrets.COOP_UI_ALT_GUEST_USERNAME }}
+          COOP_UI_GUEST_PASSWORD: ${{ secrets.COOP_UI_ALT_GUEST_PASSWORD }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: node test/browser/coop-public-ui/run.mjs
+
+      - name: Upload compact reverse diagnosis first
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-reverse-compact-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dev-logs/coop-public-ui/**/summary.json
+            dev-logs/coop-public-ui/**/*.jsonl
+            dev-logs/coop-public-ui/**/*.png
+            dev-logs/coop-public-ui/**/*.dom.json
+            dev-logs/coop-public-ui/**/*.cookies.json
+          compression-level: 9
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload full reverse public-UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-reverse-${{ github.sha }}-${{ github.run_attempt }}
+          path: dev-logs/coop-public-ui/**
+          retention-days: 14
+          if-no-files-found: warn

@@ -1,0 +1,540 @@
+name: Focused Co-op Branch Gate
+
+on:
+  push:
+    branches:
+      - "ci/coop/**"
+    paths:
+      - ".github/coop-task-ownership/**"
+      - ".github/workflows/coop-focused-branch.yml"
+      - ".github/workflows/coop-gate-sharded.yml"
+      - ".github/actions/setup-deps/**"
+      - ".nvmrc"
+      - "biome.jsonc"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/coop-gate-timings.json"
+      - "scripts/coop-browser-transport-entry.ts"
+      - "scripts/guard-coop-task-ownership.mjs"
+      - "scripts/prepare-coop-browser-artifact.mjs"
+      - "scripts/run-coop-browser-transport.mjs"
+      - "scripts/run-coop-gate.mjs"
+      - "scripts/run-coop-static-gate.mjs"
+      - "scripts/write-coop-ci-status.mjs"
+      - "src/**"
+      - "test/**"
+      - "docs/coop-task-ownership.md"
+      - "tsconfig*.json"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Select affected integration shards
+    runs-on: ubuntu-latest
+    outputs:
+      browser_transport: ${{ steps.browser.outputs.browser_transport }}
+      declared_base_sha: ${{ steps.ownership.outputs.base_sha }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The planner fetches the previous pushed tip explicitly below. Two commits are enough for a
+          # newly-created branch fallback without downloading the long-lived integration history.
+          fetch-depth: 2
+          submodules: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Resolve this branch's train and ownership contract
+        id: ownership
+        env:
+          COOP_TASK_BRANCH: ${{ github.ref_name }}
+        shell: bash
+        run: >-
+          node scripts/guard-coop-task-ownership.mjs resolve
+          --branch "$COOP_TASK_BRANCH"
+          --output coop-task-ownership-resolution.json
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Fetch the exact declared train base
+        id: train
+        env:
+          COOP_DECLARED_BASE: ${{ steps.ownership.outputs.base_sha }}
+          COOP_PUSH_BASE: ${{ github.event.before }}
+          COOP_TASK_BRANCH: ${{ github.ref_name }}
+          COOP_TRAIN_REF: ${{ steps.ownership.outputs.train_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          task_refspec="+refs/heads/$COOP_TASK_BRANCH:refs/remotes/origin/coop-task-history"
+          train_refspec=""
+          if [ "$COOP_TASK_BRANCH" = "$COOP_TRAIN_REF" ]; then
+            if [[ -z "$COOP_PUSH_BASE" || "$COOP_PUSH_BASE" =~ ^0+$ ]]; then
+              echo "integration-train pushes require a real github.event.before SHA" >&2
+              exit 1
+            fi
+            expected_base="$COOP_PUSH_BASE"
+            git fetch --no-tags --depth=1 origin "$expected_base"
+            train_tip="$(git rev-parse HEAD)"
+          else
+            # Start with only the recent train lineage. The bounded ancestry resolver below deepens this
+            # exact ref when an older fork point is genuinely needed; it does not download unrelated history.
+            train_refspec="+refs/heads/$COOP_TRAIN_REF:refs/remotes/origin/coop-declared-train"
+            git fetch --no-tags --filter=blob:none --depth=64 origin "$train_refspec"
+            train_tip="$(git rev-parse refs/remotes/origin/coop-declared-train)"
+            expected_base="$COOP_DECLARED_BASE"
+          fi
+          git fetch --no-tags --depth=1 origin "$COOP_DECLARED_BASE"
+          git cat-file -e "${COOP_DECLARED_BASE}^{commit}"
+
+          # A depth-one checkout marks HEAD as a synthetic root, so fetching the declared base object alone
+          # cannot prove ancestry. Deepen only the relevant task/train refs, exponentially and without blobs.
+          # A full history fetch remains a last-resort correctness fallback for unusually old branches.
+          git fetch --no-tags --filter=blob:none --depth=2 origin "$task_refspec"
+          deepen_until_ancestor() {
+            local ancestor="$1"
+            local descendant="$2"
+            local refspec="$3"
+            local label="$4"
+            if git merge-base --is-ancestor "$ancestor" "$descendant"; then
+              return 0
+            fi
+            for deepen in 32 128 512 2048; do
+              echo "deepening $label lineage by $deepen commits"
+              git fetch --no-tags --filter=blob:none --deepen="$deepen" origin "$refspec"
+              if git merge-base --is-ancestor "$ancestor" "$descendant"; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          needs_full_history=0
+          if ! deepen_until_ancestor "$COOP_DECLARED_BASE" HEAD "$task_refspec" task; then
+            needs_full_history=1
+          fi
+          if [ -n "$train_refspec" ] \
+            && ! deepen_until_ancestor "$COOP_DECLARED_BASE" "$train_tip" "$train_refspec" train; then
+            needs_full_history=1
+          fi
+          if [ "$needs_full_history" -eq 1 ]; then
+            shallow_file="$(git rev-parse --git-path shallow)"
+            if [ -s "$shallow_file" ]; then
+              full_refspecs=("$task_refspec")
+              if [ -n "$train_refspec" ]; then
+                full_refspecs+=("$train_refspec")
+              fi
+              echo "bounded lineage deepening exhausted; fetching full blobless task/train history"
+              git fetch --no-tags --filter=blob:none --unshallow origin "${full_refspecs[@]}"
+            fi
+          fi
+          git merge-base --is-ancestor "$COOP_DECLARED_BASE" HEAD
+          if [ -n "$train_refspec" ]; then
+            git merge-base --is-ancestor "$COOP_DECLARED_BASE" "$train_tip"
+          fi
+          echo "resolved train $COOP_TRAIN_REF tip=$train_tip task-base=$expected_base (declared $COOP_DECLARED_BASE)"
+          echo "expected_base=$expected_base" >> "$GITHUB_OUTPUT"
+          echo "train_tip=$train_tip" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce train base, owned files, and frozen P33 schema
+        env:
+          COOP_EXPECTED_BASE: ${{ steps.train.outputs.expected_base }}
+          COOP_MANIFEST_PATH: ${{ steps.ownership.outputs.manifest_path }}
+          COOP_TASK_BRANCH: ${{ github.ref_name }}
+          COOP_TRAIN_TIP: ${{ steps.train.outputs.train_tip }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test test/scripts/guard-coop-task-ownership.test.mjs
+          node scripts/guard-coop-task-ownership.mjs verify \
+            --branch "$COOP_TASK_BRANCH" \
+            --manifest "$COOP_MANIFEST_PATH" \
+            --expected-base "$COOP_EXPECTED_BASE" \
+            --train-tip "$COOP_TRAIN_TIP" \
+            --output coop-task-ownership-evidence.json
+
+      - name: Select one to five affected shards deterministically
+        id: plan
+        env:
+          COOP_CI_PLAN_MANIFEST: coop-ci-focused-plan.json
+          COOP_PUSH_BASE: ${{ github.event.before }}
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          # A push can contain several commits. HEAD^ covers only the final commit and can crowd earlier
+          # directly-changed tests out of the five-shard cap. Rank the complete pushed delta instead.
+          if [[ -n "$COOP_PUSH_BASE" && ! "$COOP_PUSH_BASE" =~ ^0+$ ]]; then
+            git fetch --no-tags --depth=1 origin "$COOP_PUSH_BASE"
+            priority_base="$COOP_PUSH_BASE"
+          else
+            priority_base="HEAD^"
+          fi
+          node scripts/run-coop-gate.mjs --focused-matrix \
+            --base "${{ steps.ownership.outputs.base_sha }}" --priority-base "$priority_base" --max-shards 5 \
+            2>&1 | tee coop-ci-focused-plan.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Select the real-browser transport lane when its owned stack changed
+        id: browser
+        env:
+          COOP_DECLARED_BASE: ${{ steps.ownership.outputs.base_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet "$COOP_DECLARED_BASE" HEAD -- \
+            scripts/coop-browser-transport-entry.ts \
+            scripts/prepare-coop-browser-artifact.mjs \
+            scripts/run-coop-browser-transport.mjs \
+            scripts/vite.coop-browser.config.mjs \
+            src/data/elite-redux/coop/coop-webrtc-connect.ts \
+            src/data/elite-redux/coop/coop-webrtc-transport.ts; then
+            echo "browser_transport=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "browser_transport=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write focused planner status evidence
+        if: always()
+        env:
+          PLAN_EXIT: ${{ steps.plan.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs --output coop-ci-focused-plan-status.json
+          --kind focused-plan --exit-code "$PLAN_EXIT" --log coop-ci-focused-plan.log
+          --assignment coop-ci-focused-plan.json
+
+      - name: Upload focused plan evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-plan-${{ github.sha }}
+          overwrite: true
+          path: |
+            coop-ci-focused-plan.json
+            coop-ci-focused-plan-status.json
+            coop-task-ownership-evidence.json
+            coop-task-ownership-resolution.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload focused plan failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-plan-${{ github.sha }}-failure
+          overwrite: true
+          path: |
+            coop-ci-focused-plan.json
+            coop-ci-focused-plan-status.json
+            coop-ci-focused-plan.log
+            coop-task-ownership-evidence.json
+            coop-task-ownership-resolution.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  static:
+    if: github.repository == 'Heraklines/elite-redux'
+    needs: plan
+    name: Focused co-op static type and format gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Fetch the exact planner-declared train base
+        env:
+          COOP_BASE_SHA: ${{ needs.plan.outputs.declared_base_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$COOP_BASE_SHA"
+          [[ ! "$COOP_BASE_SHA" =~ ^0+$ ]]
+          git fetch --no-tags --depth=1 origin "$COOP_BASE_SHA"
+          git cat-file -e "${COOP_BASE_SHA}^{commit}"
+          printf '%s\n' "$COOP_BASE_SHA" > coop-focused-static-base.txt
+
+      - name: Check branch-scoped types, formatting, and lint
+        id: static
+        env:
+          COOP_BASE_SHA: ${{ needs.plan.outputs.declared_base_sha }}
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          node scripts/run-coop-static-gate.mjs 2>&1 | tee coop-focused-static.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write focused static status evidence
+        if: always()
+        env:
+          STATIC_EXIT: ${{ steps.static.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs --output coop-focused-static-status.json
+          --kind focused-static --exit-code "$STATIC_EXIT" --log coop-focused-static.log
+
+      - name: Upload compact focused static evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-static-${{ github.sha }}-status
+          overwrite: true
+          path: |
+            coop-focused-static-status.json
+            coop-focused-static-base.txt
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload full focused static failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-static-${{ github.sha }}-failure
+          overwrite: true
+          path: |
+            coop-focused-static-status.json
+            coop-focused-static-base.txt
+            coop-focused-static.log
+          retention-days: 7
+          if-no-files-found: warn
+
+  browser-build:
+    if: github.repository == 'Heraklines/elite-redux' && needs.plan.outputs.browser_transport == 'true'
+    needs: plan
+    name: Focused immutable production browser bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Build and seal the exact branch browser bundle once
+        id: build
+        env:
+          COOP_BROWSER_OUT_DIR: dist-coop-browser
+          VITE_COOP_SERVER_URL: http://127.0.0.1:4174
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          pnpm exec vite build --mode production --config scripts/vite.coop-browser.config.mjs \
+            2>&1 | tee coop-focused-browser-build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -eq 0 ]; then
+            node scripts/prepare-coop-browser-artifact.mjs
+            status=$?
+          fi
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write focused browser-build status evidence
+        if: always()
+        env:
+          BUILD_EXIT: ${{ steps.build.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs --output coop-focused-browser-build-status.json
+          --kind browser-build --exit-code "$BUILD_EXIT" --log coop-focused-browser-build.log
+
+      - name: Publish the immutable browser execution input
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-browser-bundle-${{ github.sha }}
+          overwrite: true
+          path: dist-coop-browser/**
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload focused browser-build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-browser-build-${{ github.sha }}-${{ steps.build.outcome }}
+          overwrite: true
+          path: |
+            coop-focused-browser-build-status.json
+            coop-focused-browser-build.log
+            dist-coop-browser/coop-browser-artifact.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  browser:
+    if: github.repository == 'Heraklines/elite-redux' && needs.plan.outputs.browser_transport == 'true' && needs.browser-build.result == 'success'
+    needs: [plan, browser-build]
+    name: Focused browser-native WebRTC lifecycle and rejoin
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: coop-focused-browser-bundle-${{ github.sha }}
+          path: dist-coop-browser
+
+      - name: Install isolated Chrome runtime
+        run: pnpm exec puppeteer browsers install chrome
+
+      - name: Run two-context sealed-production transport checkpoint
+        id: browser
+        env:
+          COOP_BROWSER_ASSET_DIR: assets
+          COOP_BROWSER_DIST: dist-coop-browser
+          NODE_OPTIONS: --max-old-space-size=4096
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          node scripts/run-coop-browser-transport.mjs 2>&1 | tee coop-focused-browser-transport.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write focused browser status evidence
+        if: always()
+        env:
+          BROWSER_EXIT: ${{ steps.browser.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs --output coop-focused-browser-status.json
+          --kind browser --exit-code "$BROWSER_EXIT" --log coop-focused-browser-transport.log
+          --assignment dist-coop-browser/coop-browser-artifact.json
+
+      - name: Upload focused browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-browser-${{ github.sha }}-${{ steps.browser.outcome }}
+          overwrite: true
+          path: |
+            coop-focused-browser-status.json
+            coop-focused-browser-transport.log
+            dist-coop-browser/coop-browser-artifact.json
+            dev-logs/coop-browser/**
+          retention-days: 7
+          if-no-files-found: warn
+
+  gate:
+    if: github.repository == 'Heraklines/elite-redux'
+    needs: plan
+    name: Focused ${{ matrix.lane }} ${{ matrix.shard }}/${{ matrix.total }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Run affected isolated shard
+        id: shard
+        env:
+          COOP_GATE_MANIFEST: coop-focused-assignment.json
+          NODE_OPTIONS: --max-old-space-size=8192
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          node scripts/run-coop-gate.mjs \
+            --lane "${{ matrix.lane }}" \
+            --shard "${{ matrix.shard }}/${{ matrix.total }}" \
+            2>&1 | tee "coop-focused-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log"
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write focused status evidence
+        if: always()
+        env:
+          SHARD_EXIT: ${{ steps.shard.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs
+          --output coop-focused-status.json --kind focused-shard --exit-code "$SHARD_EXIT"
+          --lane "${{ matrix.lane }}" --shard "${{ matrix.shard }}/${{ matrix.total }}"
+          --log "coop-focused-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log"
+          --assignment coop-focused-assignment.json
+
+      - name: Upload compact focused evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}-status
+          overwrite: true
+          path: |
+            coop-focused-status.json
+            coop-focused-assignment.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload full focused failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}-failure
+          overwrite: true
+          path: |
+            coop-focused-status.json
+            coop-focused-assignment.json
+            coop-focused-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log
+            dev-logs/coop-duo/**
+            dev-logs/coop-soak/**
+            .vitest-reports/**
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
+
+  focused-required:
+    name: Focused co-op required aggregate
+    if: always()
+    needs: [plan, static, browser-build, browser, gate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require planner, branch static checks, and every selected shard
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          STATIC_RESULT: ${{ needs.static.result }}
+          BROWSER_SCOPE: ${{ needs.plan.outputs.browser_transport }}
+          BROWSER_BUILD_RESULT: ${{ needs.browser-build.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+          GATE_RESULT: ${{ needs.gate.result }}
+        run: |
+          test "$PLAN_RESULT" = success
+          test "$STATIC_RESULT" = success
+          test "$GATE_RESULT" = success
+          if [ "$BROWSER_SCOPE" = true ]; then
+            test "$BROWSER_BUILD_RESULT" = success
+            test "$BROWSER_RESULT" = success
+          else
+            test "$BROWSER_BUILD_RESULT" = skipped
+            test "$BROWSER_RESULT" = skipped
+          fi

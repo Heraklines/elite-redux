@@ -11,6 +11,7 @@ export type EntryHazardTagType =
   | ArenaTagType.STEALTH_ROCK
   | ArenaTagType.IMPRISON
   | ArenaTagType.HOT_COALS
+  | ArenaTagType.FOAMY_WEB
   | ArenaTagType.CREEPING_THORNS
   | ArenaTagType.ER_INFESTATION_TRAP;
 
@@ -25,7 +26,11 @@ export type TurnProtectArenaTagType =
   | ArenaTagType.CRAFTY_SHIELD;
 
 /** Subset of {@linkcode ArenaTagType}s that create Trick Room-like effects which are removed upon overlap. */
-export type RoomArenaTagType = ArenaTagType.TRICK_ROOM | ArenaTagType.INVERSE_ROOM;
+export type RoomArenaTagType =
+  | ArenaTagType.TRICK_ROOM
+  | ArenaTagType.INVERSE_ROOM
+  | ArenaTagType.MAGIC_ROOM
+  | ArenaTagType.WONDER_ROOM;
 
 /** Subset of {@linkcode ArenaTagType}s that are **not** able to persist across turns, and should therefore not be serialized in {@linkcode SessionSaveData}. */
 export type NonSerializableArenaTagType = ArenaTagType.NONE | TurnProtectArenaTagType | ArenaTagType.ION_DELUGE;

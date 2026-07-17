@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import { BattleType } from "#enums/battle-type";
 import type { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
@@ -20,6 +21,27 @@ import { paginate } from "#system/llm-director/text-pagination";
 import { trainerConfigs } from "#trainers/trainer-config";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
+export interface ErGauntletBargainQueue {
+  removeAllPhasesOfType(name: "NextEncounterPhase" | "NewBiomeEncounterPhase"): void;
+  pushNew(name: "TheBargainPhase" | "NewBattlePhase"): unknown;
+}
+
+/** Replace the synthetic Bargain wave's ordinary encounter tail with one durable phase. */
+export function queueErGauntletBargainTransition(
+  queue: ErGauntletBargainQueue,
+  wave: number,
+  active = erGauntletActive(),
+): boolean {
+  if (!active || erGauntletWaveKind(wave) !== "bargain") {
+    return false;
+  }
+  queue.removeAllPhasesOfType("NextEncounterPhase");
+  queue.removeAllPhasesOfType("NewBiomeEncounterPhase");
+  queue.pushNew("TheBargainPhase");
+  queue.pushNew("NewBattlePhase");
+  return true;
+}
+
 export class NewBattlePhase extends BattlePhase {
   public readonly phaseName = "NewBattlePhase";
   start() {
@@ -28,6 +50,11 @@ export class NewBattlePhase extends BattlePhase {
     globalScene.phaseManager.removeAllPhasesOfType("NewBattlePhase");
 
     globalScene.newBattle();
+
+    if (this.routeMysteryGauntletBargain()) {
+      this.end();
+      return;
+    }
 
     // Elite Redux: staff-authored custom trainers (er-custom-trainers.json).
     // Runs after newBattle() has built the wave but before EncounterPhase's
@@ -61,6 +88,15 @@ export class NewBattlePhase extends BattlePhase {
     }
 
     this.end();
+  }
+
+  private routeMysteryGauntletBargain(): boolean {
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    if (!queueErGauntletBargainTransition(globalScene.phaseManager, wave)) {
+      return false;
+    }
+    console.log(`[er-gauntlet] wave=${wave} kind=bargain -> TheBargainPhase -> wave ${wave + 1}`);
+    return true;
   }
 
   /**

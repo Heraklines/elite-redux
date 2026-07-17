@@ -52,6 +52,8 @@ describe("co-op role reconciliation (#633)", () => {
       role: "host",
       tiebreak: 0.8,
       epoch: clientB.sessionEpoch,
+      runId: clientB.runId,
+      checkpointRevision: clientB.checkpointRevision,
     });
     b.guest.send({
       t: "hello",
@@ -60,6 +62,8 @@ describe("co-op role reconciliation (#633)", () => {
       role: "host",
       tiebreak: 0.2,
       epoch: clientA.sessionEpoch,
+      runId: clientA.runId,
+      checkpointRevision: clientA.checkpointRevision,
     });
     await new Promise(r => setTimeout(r, 0));
     // Lower tiebreak (A, 0.2) is host; B is guest. They are OPPOSITE.

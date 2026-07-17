@@ -301,3 +301,29 @@ export function coopUnmirroredTripwireReason(mode: UiMode, partnerOwnsLiveIntera
   }
   return `possible unmirrored interactive screen during partner-owned interaction (mode=${UiMode[mode]})`;
 }
+
+/**
+ * Protocol-33 continuation evidence is emitted only from modes that unambiguously expose real shared-run
+ * input. Message, transition, local-account, and dual-use PARTY/SUMMARY/ER_MAP modes are intentionally
+ * absent: merely drawing local or generic chrome must never retire a retained authority commit. Ambiguous
+ * modes need an explicit phase-owned continuation signal rather than a mode-only inference.
+ */
+export function coopAuthorityContinuationSurface(mode: UiMode): "command" | "sharedInput" | null {
+  switch (mode) {
+    case UiMode.COMMAND:
+    case UiMode.FIGHT:
+    case UiMode.BALL:
+    case UiMode.TARGET_SELECT:
+      return "command";
+    case UiMode.MODIFIER_SELECT:
+    case UiMode.MYSTERY_ENCOUNTER:
+    case UiMode.BIOME_SHOP:
+    case UiMode.COLOSSEUM:
+    case UiMode.ER_QUIZ:
+    case UiMode.ER_BARGAIN:
+    case UiMode.LEARN_MOVE_BATCH:
+      return "sharedInput";
+    default:
+      return null;
+  }
+}

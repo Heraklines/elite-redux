@@ -1,3 +1,4 @@
+import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -6,7 +7,7 @@ import type { EnemyPokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
 import { toDmgValue } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 describe("Boss Pokemon / Shields", () => {
   let phaserGame: Phaser.Game;
@@ -31,6 +32,18 @@ describe("Boss Pokemon / Shields", () => {
       .startingLevel(1000)
       .moveset([MoveId.FALSE_SWIPE, MoveId.SUPER_FANG, MoveId.SPLASH, MoveId.PSYCHIC])
       .ability(AbilityId.NO_GUARD);
+  });
+
+  afterEach(() => resetErDifficulty());
+
+  it("Mystery Gauntlet structurally forces boss segments only on its boss waves", () => {
+    setErDifficulty("mystery");
+    const ordinary = getPokemonSpecies(SpeciesId.RATTATA);
+
+    expect(game.scene.getEncounterBossSegments(7, 20, ordinary)).toBe(0);
+    expect(game.scene.getEncounterBossSegments(8, 20, ordinary)).toBe(2);
+    expect(game.scene.getEncounterBossSegments(9, 20, ordinary)).toBe(0);
+    expect(game.scene.getEncounterBossSegments(16, 20, ordinary)).toBe(2);
   });
 
   it("Pokemon should get shields based on their Species and level and the current wave", async () => {

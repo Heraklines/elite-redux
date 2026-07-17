@@ -29,11 +29,9 @@ import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-re
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -41,18 +39,21 @@ import { UiMode } from "#enums/ui-mode";
 import { type ModifierSelectCallback, SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
-  arriveGuestCommandBoundary,
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   drainLoopback,
+  driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   forceItemRewards,
   installDuoLogCapture,
-  remirrorWave,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
 import Phaser from "phaser";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -102,20 +103,13 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     initGlobalScene(game.scene);
   });
 
-  function wireGuestCommand(rig: DuoRig): void {
-    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.TACKLE,
-      targets: [BattlerIndex.ENEMY_2],
-    }));
-  }
-
-  async function hostPlayWave(rig: DuoRig): Promise<void> {
+  async function hostPlayWave(rig: DuoRig, guestCommandAlreadyCommitted = false): Promise<void> {
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      if (!guestCommandAlreadyCommitted) {
+        game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+      }
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
 
@@ -153,9 +147,15 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
   it("copy() carries the pin, an unpinned advance is refused, counters stay lockstep, wave 2 resolves", async () => {
     forceItemRewards(game.override, [{ name: "LURE" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    wireGuestCommand(rig);
+    // Align the directly-constructed guest to its real TurnInit/Command queue, then make all gameplay
+    // delivery addressed-context-only. Wave 1 and wave 2 both use the public command UI below.
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+    });
+    pair.setAutomaticDelivery(false);
     // This scenario verifies reward relay/counter symmetry for returning players. The first-time item
     // tutorial is a separate MESSAGE interaction that deliberately blocks reward ACTION input until its
     // text is acknowledged; keep it out of this call-chain proof on both simulated clients.
@@ -164,9 +164,13 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
 
     // ===== Wave 1: host plays to a win + guest replays (reach the reward shop, counter 0 = host owns). =====
     const turn = rig.hostScene.currentBattle.turn;
-    await hostPlayWave(rig);
+    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
+    await hostPlayWave(rig, true);
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
-
+    // From this point onward, deliver each retained continuation under its addressed client's
+    // process-global context. The ordinary loopback resumes both sides in whichever context happened
+    // to send last, which is impossible in production (one client per process) and can project the
+    // owner's asynchronous reward continuation into the guest UI.
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     expect(counterBefore % 2, "wave 1: host owns the shop (even counter)").toBe(0);
 
@@ -232,8 +236,11 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
 
     // Start the reciprocal real watcher BEFORE the owner can commit. This resolves the production shop
     // arrival barrier and removes the old harness fiction where the owner selected before a watcher existed.
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
-    withClientSync(rig.guestCtx, () => guestShop.start());
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
+    // Keep the guest's complete process-global client context installed while the asynchronous watcher
+    // adopts its options and commits MODIFIER_SELECT. That public UI commit is what publishes P33
+    // continuationReady and releases the retained wave transaction ahead of this reward result.
+    await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
     // Deliver the guest's arrival while the HOST context is installed. Production has one scene per
     // process; the two-engine harness shares a process-global scene binding, so draining outside a client
     // context would resume the host's async barrier continuation against the guest UI object.
@@ -264,6 +271,10 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
         await drainLoopback();
       }
     });
+    // The watcher publishes its completed counter back to the owner. In scheduled mode that addressed
+    // snapshot remains in the host inbox until the host context is installed; consume it before the
+    // host's real NewBattlePhase reaches CoopPartnerSyncPhase.
+    await withClient(rig.hostCtx, () => drainLoopback());
 
     // The interaction counter advanced EXACTLY ONCE and is IDENTICAL on both clients (the #837 invariant).
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter exactly once").toBe(
@@ -274,27 +285,30 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     );
 
     // ===== The NEXT battle resolves turns 1-2 with NO stall (the wedge the counter drift caused). =====
-    await arriveGuestCommandBoundary(rig, 2);
-    await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase");
-    });
-    expect(rig.hostScene.currentBattle.waveIndex, "host crossed into wave 2").toBe(2);
-
-    await remirrorWave(rig);
+    // Cross the real between-wave queues in authority order. The host must generate and publish wave 2's
+    // immutable enemy carrier before the guest's NextEncounterPhase can consume it. Stop both before their
+    // CommandPhase starts; the public command driver below then opens the reciprocal barrier on both sides.
+    await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase", false));
+    await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "wave 2 CommandPhase", {
+        matches: phase => phase.phaseName === "CommandPhase" && rig.guestScene.currentBattle.waveIndex === 2,
+      }),
+    );
+    expect(rig.hostScene.currentBattle.waveIndex, "host generated wave 2 before command input").toBe(2);
+    expect(rig.guestScene.currentBattle.waveIndex, "guest consumed the authoritative wave-2 carrier").toBe(2);
     for (let t = 0; t < 2; t++) {
+      await driveDuoGuestTackleThroughPublicUi(game, rig);
+      if (t === 0) {
+        expect(rig.hostScene.currentBattle.waveIndex, "host crossed into wave 2").toBe(2);
+        expect(rig.guestScene.currentBattle.waveIndex, "guest adopted wave 2").toBe(2);
+      }
       const w2turn = rig.hostScene.currentBattle.turn;
-      await hostPlayWave(rig);
+      await hostPlayWave(rig, true);
       await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, w2turn));
       // Guest kept converging turn-by-turn (a wedge would THROW inside driveGuestReplayTurn).
       if (rig.guestScene.currentBattle.enemyParty.every(e => e.isFainted())) {
         break;
       }
-      await withClient(rig.hostCtx, async () => {
-        if (rig.hostScene.phaseManager.getCurrentPhase()?.phaseName === "CommandPhase") {
-          return;
-        }
-        await game.phaseInterceptor.to("CommandPhase", false).catch(() => {});
-      });
     }
     expect(
       rig.guestScene.currentBattle.enemyParty.every(e => e.isFainted()),

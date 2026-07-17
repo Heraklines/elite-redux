@@ -59,15 +59,19 @@
 import { PostFaintAbAttr, type PostFaintAbAttrParams } from "#abilities/ab-attrs";
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { getPokemonNameWithAffix } from "#app/messages";
 import type { TerrainType } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
 import type { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
+import { MoveCategory } from "#enums/move-category";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { BattleStat } from "#enums/stat";
 import { WeatherType } from "#enums/weather-type";
+import { MoveUsedEvent } from "#events/battle-scene";
 import { BooleanHolder, toDmgValue } from "#utils/common";
+import i18next from "i18next";
 
 /** Set a weather condition when the subject faints. */
 export interface OnFaintEffectSetWeather {
@@ -164,6 +168,16 @@ export interface OnFaintEffectAttackerStatChange {
 }
 
 /**
+ * Fully drain the PP of the move that caused the faint, in the attacker's
+ * moveset. Models ER's `Ill Will` ("Deletes the PP of the move that faints this
+ * Pokemon. Has to be a direct hit"). The faint must be caused by a damaging
+ * move from a living attacker; otherwise the effect is a no-op.
+ */
+export interface OnFaintEffectAttackerPpDrain {
+  readonly kind: "attacker-pp-drain";
+}
+
+/**
  * Discriminated union describing every post-faint side-effect this archetype
  * can carry. New sub-shapes should extend this union additively.
  */
@@ -173,7 +187,8 @@ export type OnFaintEffect =
   | OnFaintEffectAttackerDamageFlat
   | OnFaintEffectSetHazard
   | OnFaintEffectAttackerBattlerTag
-  | OnFaintEffectAttackerStatChange;
+  | OnFaintEffectAttackerStatChange
+  | OnFaintEffectAttackerPpDrain;
 
 /** All valid {@linkcode OnFaintEffect.kind} discriminator strings. */
 export type OnFaintEffectKind = OnFaintEffect["kind"];
@@ -240,6 +255,8 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
         );
       case "attacker-stat-change":
         return params.attacker !== undefined && !params.attacker.isFainted();
+      case "attacker-pp-drain":
+        return OnFaintEffectAbAttr.canApplyPpDrain(params);
     }
   }
 
@@ -265,6 +282,9 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
         return;
       case "attacker-stat-change":
         OnFaintEffectAbAttr.applyAttackerStatChange(this.effect, params);
+        return;
+      case "attacker-pp-drain":
+        OnFaintEffectAbAttr.applyAttackerPpDrain(params);
     }
   }
 
@@ -296,6 +316,10 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
         return;
       case "attacker-stat-change":
         OnFaintEffectAbAttr.validateAttackerStatChange(effect);
+        return;
+      case "attacker-pp-drain":
+        // No configuration to validate — the effect is parameterless.
+        return;
     }
   }
 
@@ -449,5 +473,50 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
         change.stages,
       );
     }
+  }
+
+  /**
+   * canApply for the PP-drain variant (Ill Will): requires a living attacker,
+   * a DAMAGING move that caused the faint ("direct hit"), and that move present
+   * in the attacker's moveset with PP still remaining to drain.
+   */
+  private static canApplyPpDrain({ attacker, move }: PostFaintAbAttrParams): boolean {
+    if (attacker === undefined || move === undefined || attacker.isFainted()) {
+      return false;
+    }
+    if (move.category === MoveCategory.STATUS) {
+      return false;
+    }
+    const movesetMove = attacker.getMoveset().find(m => m.moveId === move.id);
+    return movesetMove !== undefined && movesetMove.getPpRatio() > 0;
+  }
+
+  /**
+   * Fully deplete the PP of the move that KO'd the holder, in the attacker's
+   * moveset. Mirrors `ReducePpMoveAttr`'s bookkeeping (MoveUsedEvent + the
+   * `battle:ppReduced` message) but drains ALL remaining PP.
+   */
+  private static applyAttackerPpDrain({ attacker, move, simulated }: PostFaintAbAttrParams): void {
+    if (simulated || attacker === undefined || move === undefined) {
+      return;
+    }
+    const movesetMove = attacker.getMoveset().find(m => m.moveId === move.id);
+    if (movesetMove === undefined) {
+      return;
+    }
+    const prevPpUsed = movesetMove.ppUsed;
+    movesetMove.ppUsed = movesetMove.getMovePp();
+    const reduction = movesetMove.ppUsed - prevPpUsed;
+    if (reduction <= 0) {
+      return;
+    }
+    globalScene.eventTarget.dispatchEvent(new MoveUsedEvent(attacker.id, movesetMove.getMove(), movesetMove.ppUsed));
+    globalScene.phaseManager.queueMessage(
+      i18next.t("battle:ppReduced", {
+        targetName: getPokemonNameWithAffix(attacker),
+        moveName: movesetMove.getName(),
+        reduction,
+      }),
+    );
   }
 }

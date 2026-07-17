@@ -12,6 +12,7 @@
 
 import { setCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
+import { coopMachineWaitLabels } from "#data/elite-redux/coop/coop-stall-probe";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { CoopFlapTransport } from "#test/tools/coop-flap-transport";
@@ -173,6 +174,60 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     guest.dispose();
   });
 
+  it("restores the peer-complementary barrier, releases the exact waiter, and never invents an arrival", async () => {
+    const faulted = wrapCoopFaultPair(createLoopbackPair(), { drop: 0, reorder: 0, delay: 0 }, { seed: 933 });
+    faulted.armNextDrop("rendezvous", "guest");
+    const host = new CoopRendezvous(faulted.host);
+    const guest = new CoopRendezvous(faulted.guest);
+    const point = "cmd:7:1";
+
+    const guestWait = guest.rendezvous(point);
+    await flush();
+    expect(host.partnerHasArrived(point), "the original guest arrival was lost").toBe(false);
+
+    expect(
+      guest.restorePeerControlSnapshot({
+        localArrived: [point],
+        partnerArrived: [],
+        awaiting: [point, "cmd:future:1"],
+      }),
+    ).toBe(true);
+    const result = await guestWait;
+    await flush();
+
+    expect(result).toMatchObject({ point, timedOut: false });
+    expect(host.partnerHasArrived(point), "the preserved local arrival is retransmitted to the peer").toBe(true);
+    expect(guest.describeArrivals()).toMatchObject({
+      localArrived: [point],
+      partnerArrived: [point],
+      awaiting: [],
+    });
+    expect(
+      guest.describeArrivals().localArrived,
+      "a peer wait alone is not proof that this client reached a future barrier",
+    ).not.toContain("cmd:future:1");
+
+    host.dispose();
+    guest.dispose();
+  });
+
+  it("refuses malformed barrier snapshots without mutating the live view", () => {
+    const pair = createLoopbackPair();
+    const guest = new CoopRendezvous(pair.guest);
+    guest.arrive("shop:8:2");
+    const before = guest.describeArrivals();
+
+    expect(
+      guest.restorePeerControlSnapshot({
+        localArrived: ["cmd:8:2", "cmd:8:2"],
+        partnerArrived: [],
+        awaiting: [],
+      }),
+    ).toBe(false);
+    expect(guest.describeArrivals()).toEqual(before);
+    guest.dispose();
+  });
+
   it("LOST ARRIVAL: timeout retransmits and keeps the boundary closed until the partner arrives", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const pair = createLoopbackPair();
@@ -201,6 +256,63 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     expect(hr.timedOut).toBe(false);
     expect(hr.point).toBe("cmd:99:9");
 
+    host.dispose();
+  });
+
+  it("incompatible cmd:3:2 wait exhausts finitely into a fatal closed result", async () => {
+    const pair = createLoopbackPair();
+    const manual = makeManualScheduler();
+    const failures: unknown[] = [];
+    const host = new CoopRendezvous(pair.host, {
+      schedule: manual.schedule,
+      maxRecoveryAttempts: 2,
+      onRecoveryExhausted: failure => failures.push(failure),
+    });
+
+    const wait = host.rendezvous("cmd:3:2");
+    expect(coopMachineWaitLabels().some(label => label.startsWith("coop-rendezvous:cmd:3:2@"))).toBe(true);
+
+    manual.fireNext();
+    await flush();
+    manual.fireNext();
+    await flush();
+    let crossed = false;
+    void wait.then(() => {
+      crossed = true;
+    });
+    expect(crossed, "two bounded retransmits never authorize the incompatible command point").toBe(false);
+
+    manual.fireNext();
+    await flush();
+    const result = await wait;
+    expect(result).toEqual({ point: "cmd:3:2", timedOut: true });
+    expect(failures).toEqual([{ point: "cmd:3:2", attempts: 2, kind: "arrival" }]);
+    expect(coopMachineWaitLabels().some(label => label.startsWith("coop-rendezvous:cmd:3:2@"))).toBe(false);
+
+    host.dispose();
+  });
+
+  it("supports a longer command-pacing retry budget without weakening the bounded terminal", async () => {
+    const pair = createLoopbackPair();
+    const manual = makeManualScheduler();
+    const failures: unknown[] = [];
+    const host = new CoopRendezvous(pair.host, {
+      schedule: manual.schedule,
+      maxRecoveryAttempts: 2,
+      onRecoveryExhausted: failure => failures.push(failure),
+    });
+
+    const wait = host.rendezvous("cmd:1:1", 60_000, 7);
+    for (let attempt = 0; attempt < 7; attempt++) {
+      manual.fireNext();
+      await flush();
+      expect(failures, `command pacing remains open after retransmit ${attempt + 1}/7`).toEqual([]);
+    }
+    manual.fireNext();
+    await flush();
+
+    expect(await wait).toEqual({ point: "cmd:1:1", timedOut: true });
+    expect(failures).toEqual([{ point: "cmd:1:1", attempts: 7, kind: "arrival" }]);
     host.dispose();
   });
 
@@ -335,6 +447,53 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     expect(gr.timedOut).toBe(false);
     expect(gr.authoritativePoint).toBe("shop:6:5");
     expect(gr.point).toBe("cmd:6:2");
+
+    host.dispose();
+    guest.dispose();
+  });
+
+  it("routes a guest that regresses to an already-observed command after both peers crossed the next wave", async () => {
+    const pair = createLoopbackPair();
+    const host = new CoopRendezvous(pair.host);
+    const guest = new CoopRendezvous(pair.guest);
+
+    // The guest alone touched the phantom cmd:12:1 while the host took a non-battle ME branch. Both peers
+    // then genuinely crossed cmd:13:1. This is the live guest-owned ME ordering: a retained old wave-12
+    // CommandPhase became current after its rendezvous control state had been rebuilt. Its retransmit is a
+    // duplicate to the host, and the host never had a local cmd:12:1 from which same-wave matching could heal.
+    guest.arrive("cmd:12:1");
+    await flush();
+    guest.arrive("cmd:13:1");
+    await flush();
+    host.arrive("cmd:13:1");
+    await flush();
+    guest.purgeBufferedArrivals("simulate retained old CommandPhase after authoritative wave advance");
+
+    const result = await guest.rendezvous("cmd:12:1");
+
+    expect(result.timedOut).toBe(false);
+    expect(result.point).toBe("cmd:12:1");
+    expect(result.crossPoint).toBe("cmd:13:1");
+    expect(result.authoritativePoint).toBe("cmd:13:1");
+
+    host.dispose();
+    guest.dispose();
+  });
+
+  it("routes a stale duplicate command to a causally-later same-wave shop boundary", async () => {
+    const pair = createLoopbackPair();
+    const host = new CoopRendezvous(pair.host);
+    const guest = new CoopRendezvous(pair.guest);
+
+    await Promise.all([host.rendezvous("cmd:3:1"), guest.rendezvous("cmd:3:1")]);
+    host.arrive("shop:3:0");
+    await flush();
+    guest.purgeBufferedArrivals("simulate catch finalization retaining the old CommandPhase");
+
+    const result = await guest.rendezvous("cmd:3:1");
+
+    expect(result.timedOut).toBe(false);
+    expect(result.authoritativePoint).toBe("shop:3:0");
 
     host.dispose();
     guest.dispose();

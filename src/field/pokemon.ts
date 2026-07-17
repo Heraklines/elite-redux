@@ -33,7 +33,7 @@ import {
 import { tmSpecies } from "#balance/tm-species-map";
 import { reverseCompatibleTms, speciesTmMoves } from "#balance/tms";
 import type { SuppressAbilitiesTag } from "#data/arena-tag";
-import { EntryHazardTag, NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
+import { EntryHazardTag, isMagicRoomActive, isWonderRoomActive, NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
 import { fieldSpriteOffset } from "#data/battle-format";
 import {
   AutotomizedTag,
@@ -131,6 +131,18 @@ import {
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { getErShinyLabEarnedTierForPokemon, rollErShinyLabWildSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
 import { applyErAtlasFrameRate } from "#data/elite-redux/er-sprite-anim";
+import {
+  erApplyTacticalDamage,
+  erTacticalAirBalloonUngrounds,
+  erTacticalBlocksBattlerTag,
+  erTacticalBypassesTrap,
+  erTacticalIronBallGrounds,
+  erTacticalProtectsAbility,
+  erTacticalSpeedMultiplier,
+  erTacticalUtilityUmbrella,
+  erTacticalZoomLensMultiplier,
+  erTryApplyExpertBelt,
+} from "#data/elite-redux/er-tactical-items";
 import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
 import {
   applyErWardStoneBlock,
@@ -1930,7 +1942,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     simulated = true,
     ignoreHeldItems = false,
   ): number {
-    const statVal = new NumberHolder(this.getStat(stat, false));
+    // ER Wonder Room (move 472): while active, ATK and SpAtk are swapped
+    // field-wide, and their stat stages ("buffs") are ignored. The swap reads
+    // the OTHER offensive stat's RAW base value; the stat-stage multiplier is
+    // skipped for the swapped stat below. Ability/held-item multipliers stay
+    // keyed to the requested offensive slot (they are not stat "buffs").
+    const wonderRoomSwapped = (stat === Stat.ATK || stat === Stat.SPATK) && isWonderRoomActive();
+    const baseStat = wonderRoomSwapped ? (stat === Stat.ATK ? Stat.SPATK : Stat.ATK) : stat;
+    const statVal = new NumberHolder(this.getStat(baseStat, false));
     if (!ignoreHeldItems) {
       globalScene.applyModifiers(StatBoosterModifier, this.isPlayer(), this, stat, statVal);
     }
@@ -1991,7 +2010,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     let ret =
       statVal.value
-      * this.getStatStageMultiplier(stat, opponent, move, ignoreOppAbility, isCritical, simulated, ignoreHeldItems);
+      * (wonderRoomSwapped
+        ? 1 // ER Wonder Room: swapped ATK/SpAtk ignore stat stages ("buffs")
+        : this.getStatStageMultiplier(stat, opponent, move, ignoreOppAbility, isCritical, simulated, ignoreHeldItems));
 
     switch (stat) {
       case Stat.ATK:
@@ -2007,11 +2028,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         break;
       case Stat.DEF:
         // Ice-types gain +50% Def in snow — and in ER's Snowy Wrath (er 666), a
-        // damaging snow that carries the same Ice Defense boost.
+        // damaging snow that carries the same Ice Defense boost. ER Snow Warning
+        // (117) summons HAIL, which the dex says also grants Ice types the +50%
+        // Def boost, so HAIL is included here too.
         if (
           this.isOfType(PokemonType.ICE)
           && (globalScene.arena.weather?.weatherType === WeatherType.SNOW
-            || globalScene.arena.weather?.weatherType === WeatherType.SNOWY_WRATH)
+            || globalScene.arena.weather?.weatherType === WeatherType.SNOWY_WRATH
+            || globalScene.arena.weather?.weatherType === WeatherType.HAIL)
         ) {
           ret *= 1.5;
         }
@@ -2044,6 +2068,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         }
         if (this.getTag(BattlerTagType.UNBURDEN) && this.hasAbility(AbilityId.UNBURDEN)) {
           ret *= 2;
+        }
+        // ER tactical items: Iron Ball halves Speed, Float Stone raises it 10%.
+        if (!ignoreHeldItems) {
+          ret *= erTacticalSpeedMultiplier(this);
         }
         break;
       }
@@ -2950,6 +2978,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @param passive - Whether to set the passive ability instead of the non-passive one; default `false`
    */
   public setTempAbility(ability: Ability, passive = false): void {
+    // ER Ability Shield: the holder's ability cannot be changed or replaced.
+    if (erTacticalProtectsAbility(this)) {
+      globalScene.phaseManager.queueMessage(`${this.getNameToRender()}'s Ability Shield protected its Ability!`);
+      return;
+    }
     applyOnLoseAbAttrs({ pokemon: this, passive });
     if (passive) {
       this.summonData.passiveAbility = ability.id;
@@ -2999,6 +3032,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * Suppresses an ability and calls its onlose attributes
    */
   public suppressAbility() {
+    // ER Ability Shield: the holder's ability cannot be suppressed.
+    if (erTacticalProtectsAbility(this)) {
+      globalScene.phaseManager.queueMessage(`${this.getNameToRender()}'s Ability Shield protected its Ability!`);
+      return;
+    }
     applyOnLoseAbAttrs({ pokemon: this, passive: true });
     applyOnLoseAbAttrs({ pokemon: this, passive: false });
     this.summonData.abilitySuppressed = true;
@@ -3482,6 +3520,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   public isGrounded(): boolean {
+    // ER Iron Ball grounds the holder unconditionally (wins over any float);
+    // an unpopped Air Balloon ungrounds it. Iron Ball is checked first.
+    if (erTacticalIronBallGrounds(this)) {
+      return true;
+    }
+    if (erTacticalAirBalloonUngrounds(this)) {
+      return false;
+    }
     return (
       !!this.getTag(GroundedTag)
       || (!this.isOfType(PokemonType.FLYING, true, true)
@@ -3507,6 +3553,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     if (this.isOfType(PokemonType.GHOST)) {
+      return false;
+    }
+
+    // ER Shed Shell / Smoke Ball: the holder can always switch out / flee,
+    // bypassing every trapping effect (ability, move-tag and Fairy Lock).
+    if (erTacticalBypassesTrap(this)) {
       return false;
     }
 
@@ -3751,6 +3803,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     const types = this.getTypes(true, true, false, useIllusion);
     const { arena } = globalScene;
+
+    // ER Air Balloon: a non-popped balloon makes ANY holder immune to Ground moves
+    // (the engine's ground immunity below only covers Flying types + Levitate; the
+    // balloon must grant it directly). Iron Ball wins if both are held (isGrounded
+    // is then true, so this is skipped).
+    if (moveType === PokemonType.GROUND && !this.isGrounded() && erTacticalAirBalloonUngrounds(this)) {
+      return 0;
+    }
 
     // Handle flying v ground type immunity without removing flying type so effective types are still effective
     // Related to https://github.com/pagefaultgames/pokerogue/issues/524
@@ -4933,7 +4993,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       });
     }
 
-    return accuracyMultiplier.value / evasionMultiplier.value;
+    // ER Zoom Lens (held by the attacker): +20% accuracy when the target has
+    // already acted this turn.
+    return (accuracyMultiplier.value / evasionMultiplier.value) * erTacticalZoomLensMultiplier(this, target);
   }
 
   /**
@@ -5045,6 +5107,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // defender's WEAKER defensive stat (Deadeye 376). Source-side, crit-only.
     if (isCritical && !ignoreSourceAbility) {
       applyAbAttrs("CritUseLowerDefensiveStatAbAttr", {
+        pokemon: source,
+        simulated,
+        defender: this,
+        statHolder: defensiveStatHolder,
+      });
+    }
+    // Elite Redux: Exploit Weakness (284) retargets the defender's WEAKER
+    // defensive stat when the defender is statused. Source-side; gated on the
+    // cheap status check so the hot path only fires the dispatch vs statused foes.
+    if (this.status != null && this.status.effect !== StatusEffect.NONE && !ignoreSourceAbility) {
+      applyAbAttrs("LowerDefensiveStatVsStatusedFoeAbAttr", {
         pokemon: source,
         simulated,
         defender: this,
@@ -5253,6 +5326,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       globalScene.arena.getAttackTypeMultiplier(moveType, source.isGrounded()),
     );
     applyMoveAttrs("IgnoreWeatherTypeDebuffAttr", source, this, move, arenaAttackTypeMultiplier);
+    // ER Utility Umbrella (held by the attacker): the holder ignores the sun's /
+    // rain's boost and penalty on its OWN moves (divide the weather component out).
+    erTacticalUtilityUmbrella(source, moveType, arenaAttackTypeMultiplier);
     // Ability-side analogue (ER Catastrophe): let the attacker's ability cancel an
     // adverse weather type debuff for the resolved move type, matching Hydro Steam.
     if (!ignoreSourceAbility) {
@@ -5462,6 +5538,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     /** ER FEAR: the feared target takes 50% more damage (ROM). */
     const fearMultiplier = this.getTag(BattlerTagType.ER_FEAR) ? 1.5 : 1;
 
+    /** ER Safe Passage (979): the guided switch-in takes -35% damage this turn. */
+    const safePassageMultiplier = this.getTag(BattlerTagType.ER_SAFE_PASSAGE) ? 0.65 : 1;
+
     /** Reduces damage if this Pokemon has a relevant screen (e.g. Light Screen for special attacks) */
     const screenMultiplier = new NumberHolder(1);
 
@@ -5537,6 +5616,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * burnMultiplier
         * frostbiteMultiplier
         * fearMultiplier
+        * safePassageMultiplier
         * screenMultiplier.value
         * hitsTagMultiplier.value
         * mistyTerrainMultiplier
@@ -5596,6 +5676,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // ER elemental Gems: 1.3x to the attacker's first move of the matching type,
     // then the gem shatters (consumed only on real calcs).
     erTryApplyGem(source, moveType, damage, simulated);
+
+    // ER Expert Belt (held by the attacker): x1.2 on super-effective hits
+    // (effectiveness >= 2, per ER battle_util.c). Passive - never consumed -
+    // so it applies to simulated calcs too, like the recreated Life Orb below.
+    erTryApplyExpertBelt(source, typeMultiplier, damage);
+
+    // ER tactical boosters (held by the attacker): Punching Glove (+10% punching),
+    // Muscle Band (+10% physical), Wise Glasses (+10% special), Metronome
+    // (+20%/consecutive same-move use). All passive - apply on simulated calcs.
+    erApplyTacticalDamage(source, move, moveCategory, damage);
 
     // ER resistance berries (#357): if the DEFENDER holds the berry matching
     // this hit's type, halve the damage BEFORE it lands and consume the berry
@@ -5859,6 +5949,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     } = {},
   ): number {
     const isIndirectDamage = [HitResult.INDIRECT, HitResult.INDIRECT_KO].includes(result);
+    // ER Magic Room (move 478) — dex: "Prevents passive damage ... for 5 turns."
+    // While Magic Room is active, ALL passive/indirect damage on the field (weather,
+    // status, hazards, Leech Seed, bleed, etc.) is nullified. (The dex's "disables
+    // mega stones" half is a battle no-op here — ER megas are permanent forms.)
+    if (isIndirectDamage && isMagicRoomActive()) {
+      return 0;
+    }
     const damagePhase = globalScene.phaseManager.create(
       "DamageAnimPhase",
       this.getBattlerIndex(),
@@ -6068,6 +6165,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       && sourceId !== this.id
       && applyErWardStoneBlock(this, erWardStoneTagLabel(tagType))
     ) {
+      return false;
+    }
+
+    // ER tactical items: Mental Herb cures a mental affliction (consumed), and
+    // Throat Spray blocks Throat Chop while held.
+    if (erTacticalBlocksBattlerTag(this, tagType, sourceId)) {
       return false;
     }
 
@@ -6844,7 +6947,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         });
         break;
       case StatusEffect.PARALYSIS:
-        isImmune = this.isOfType(PokemonType.ELECTRIC);
+        // ER Glare (er move 137, effect 41 "Paralyze Ignore Type"): its status
+        // attr sets `ignoreTypeImmunity`, letting it paralyze Electric types for
+        // that move ONLY. Every other paralysis source keeps the Electric immunity.
+        isImmune = !ignoreTypeImmunity && this.isOfType(PokemonType.ELECTRIC);
         break;
       case StatusEffect.SLEEP:
         isImmune = this.isGrounded() && globalScene.arena.terrainType === TerrainType.ELECTRIC;

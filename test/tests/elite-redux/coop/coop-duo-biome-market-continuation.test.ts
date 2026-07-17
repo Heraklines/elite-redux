@@ -35,9 +35,15 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
+import { captureCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  adoptRewardWatcherChoice,
+  type CoopRewardOperationBinding,
+  captureCoopRewardOperationBinding,
+} from "#data/elite-redux/coop/coop-reward-operation";
+import { clearCoopRuntime, isCoopSharedTerminalFrozen, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { generateModifierTypeOption } from "#data/mystery-encounters/utils/encounter-phase-utils";
@@ -55,12 +61,14 @@ import {
   drainLoopback,
   driveGuestReplayTurn,
   installDuoLogCapture,
+  pumpDuoDestinations,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -82,6 +90,18 @@ interface BiomeShopSeam {
   buildStock(): void;
   copy(): BiomeShopSeam;
   coopBiomeTerminal(): void;
+  pendingIndex: number;
+  coopPendingAuthorityOperationId: string | null;
+  coopRewardOperationBinding: CoopRewardOperationBinding | null;
+  applyCoopRelayedPurchase(modifier: unknown, validatedCost: number, authoritativeMoney: number): boolean;
+  applyCoopProjectedMarketBuy(
+    slot: number,
+    modifierType: unknown,
+    partySlot: number,
+    nestedOption: number,
+    validatedCost: number,
+    operationId: string | undefined,
+  ): boolean;
 }
 
 describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned copy, lockstep advance", () => {
@@ -118,6 +138,13 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     initGlobalScene(game.scene);
   });
 
+  function liveBiomeShop(): BiomeShopPhase {
+    const phase = new BiomeShopPhase();
+    (phase as unknown as { coopBoundaryStillLive(generation: number, wave: number): boolean }).coopBoundaryStillLive =
+      () => true;
+    return phase;
+  }
+
   function wireGuestCommand(rig: DuoRig): void {
     rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
       command: Command.FIGHT,
@@ -131,15 +158,87 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
 
   /** A single TM stock option (a CONTINUATION item, so a buy runs the queuesContinuation path). */
-  function makeTmOption(): unknown {
+  function makeTmOption(): NonNullable<ReturnType<typeof generateModifierTypeOption>> {
     const opt = generateModifierTypeOption(modifierTypes.TM_GREAT, [MoveId.SWORDS_DANCE]);
+    if (opt == null) {
+      throw new Error("TM market fixture must materialize an option");
+    }
     (opt as unknown as { cost: number }).cost = 100;
     return opt;
+  }
+
+  /** The live #moulas capture bought this non-continuation held item from a guest-owned market. */
+  function makeWideLensOption(): NonNullable<ReturnType<typeof generateModifierTypeOption>> {
+    const opt = generateModifierTypeOption(modifierTypes.WIDE_LENS);
+    if (opt == null) {
+      throw new Error("Wide Lens market fixture must materialize an option");
+    }
+    (opt as unknown as { cost: number }).cost = 100;
+    return opt;
+  }
+
+  /** Prepare the exact retained host-side intent that a guest-owned market relay normally installs. */
+  function prepareHostMarketIntent(phase: BiomeShopSeam, pinned: number, slot: number, data: number[]): string {
+    const binding = captureCoopRewardOperationBinding();
+    if (binding == null) {
+      throw new Error("retained market test requires an installed host operation binding");
+    }
+    phase.coopRewardOperationBinding = binding;
+    const decision = adoptRewardWatcherChoice(
+      {
+        surface: "market",
+        pinned,
+        action: { choice: slot, data },
+        terminal: false,
+        localRole: "host",
+        wave: globalScene.currentBattle?.waveIndex ?? 0,
+        turn: globalScene.currentBattle?.turn ?? 0,
+      },
+      binding,
+    );
+    if (!decision.adopt || decision.requiresAuthorityCommit !== true || decision.operationId == null) {
+      throw new Error(`host retained intent was not prepared: ${decision.adopt ? "incomplete" : decision.reason}`);
+    }
+    phase.coopPendingAuthorityOperationId = decision.operationId;
+    return decision.operationId;
+  }
+
+  function marketMaterialSignature(): string {
+    const state = captureCoopAuthoritativeBattleState(globalScene.currentBattle?.turn ?? 0);
+    if (state == null) {
+      throw new Error("market material signature requires a live battle image");
+    }
+    return JSON.stringify({
+      money: state.money,
+      playerParty: state.playerParty,
+      playerModifiers: state.playerModifiers,
+      pokeballCounts: state.pokeballCounts,
+    });
+  }
+
+  /**
+   * A shared terminal deliberately resets the scene once its quorum completes. Observe the last material
+   * boundary before that reset (or the still-live boundary when finalization is asynchronous) so rollback
+   * assertions distinguish an actual partial mutation from the intentional post-terminal empty title state.
+   */
+  function observeBeforeTerminalReset<T>(scene: BattleScene, read: () => T): { read(): T; dispose(): void } {
+    let captured: T | undefined;
+    let didCapture = false;
+    const reset = scene.reset.bind(scene);
+    const spy = vi.spyOn(scene, "reset").mockImplementation((clearScene, clearData, reloadI18n) => {
+      captured = read();
+      didCapture = true;
+      reset(clearScene, clearData, reloadI18n);
+    });
+    return {
+      read: () => (didCapture ? captured! : read()),
+      dispose: () => spy.mockRestore(),
+    };
   }
 
   // ===========================================================================================
@@ -179,19 +278,209 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     expect(result.copiedOwner, "the copy inherits the pick-owner role").toBe(true);
   }, 120_000);
 
+  it("guest-owned Wide Lens intent is executed and priced by the host without ending the market", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, async () => {
+      // Odd interaction => guest owns the market and the host is the watcher,
+      // matching the tester capture. A peer counter broadcast is only advisory; each controller
+      // crosses its own local terminal, so put both engines on the same pin explicitly.
+      rig.hostRuntime.controller.advanceInteraction(0);
+    });
+    await withClient(rig.guestCtx, async () => {
+      rig.guestRuntime.controller.advanceInteraction(0);
+    });
+    expect(rig.hostRuntime.controller.interactionCounter()).toBe(1);
+    expect(rig.guestRuntime.controller.interactionCounter()).toBe(1);
+
+    await withClient(rig.hostCtx, async () => {
+      const phase = liveBiomeShop() as unknown as BiomeShopSeam;
+      const option = makeWideLensOption();
+      const target = rig.hostScene.getPlayerParty()[1];
+      const modifier = option.type.newModifier(target);
+      expect(modifier).not.toBeNull();
+      phase.coopBiomeStart = 1;
+      phase.coopBiomeOwner = false;
+      phase.coopBiomeOptionOwner = true;
+      phase.shopOptions = [option];
+      phase.qtys = [1];
+      phase.pendingIndex = 0;
+      rig.hostScene.money = 2_000;
+      prepareHostMarketIntent(phase, 1, 0, [1, 1_020, 0, 100]);
+
+      expect(phase.applyCoopRelayedPurchase(modifier!, 100, 1_020)).toBe(true);
+
+      expect(rig.hostRuntime.controller.interactionCounter(), "buy does not terminate the pinned market").toBe(1);
+      expect(rig.hostScene.money, "the host ignores raw proposed money and applies its exact local price").toBe(1_900);
+      expect(phase.qtys[0], "watcher decrements the bought stock once").toBe(0);
+      expect(phase.coopPendingAuthorityOperationId, "the complete retained host result releases the intent").toBeNull();
+    });
+
+    const allLogs = [...logs.host, ...logs.guest];
+    expect(
+      allLogs.filter(line => /advance interaction SKIP unpinned/i.test(line)),
+      "a paid watcher replay never enters the free-reward terminal path",
+    ).toHaveLength(0);
+  }, 120_000);
+
+  it("watcher rejects a failed market apply without adopting money or consuming stock", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, async () => {
+      const phase = liveBiomeShop() as unknown as BiomeShopSeam;
+      const option = makeWideLensOption();
+      const modifier = option.type.newModifier(rig.hostScene.getPlayerParty()[1]);
+      expect(modifier).not.toBeNull();
+      phase.coopBiomeStart = 1;
+      phase.coopBiomeOwner = false;
+      phase.coopBiomeOptionOwner = true;
+      phase.shopOptions = [option];
+      phase.qtys = [1];
+      phase.pendingIndex = 0;
+      rig.hostScene.money = 2_000;
+      prepareHostMarketIntent(phase, 1, 0, [1, 1_900, 0, 100]);
+      const before = marketMaterialSignature();
+      const terminalBoundary = observeBeforeTerminalReset(rig.hostScene, () => ({
+        material: marketMaterialSignature(),
+        qtys: [...phase.qtys],
+        pendingIndex: phase.pendingIndex,
+      }));
+
+      const addModifierSpy = vi.spyOn(rig.hostScene, "addModifier").mockReturnValue(false);
+      let observed: ReturnType<typeof terminalBoundary.read> | null = null;
+      try {
+        expect(phase.applyCoopRelayedPurchase(modifier!, 100, 1_900)).toBe(false);
+        observed = terminalBoundary.read();
+      } finally {
+        addModifierSpy.mockRestore();
+        terminalBoundary.dispose();
+      }
+      if (observed == null) {
+        throw new Error("rejected market apply did not expose its terminal boundary");
+      }
+
+      expect(observed.material, "a rejected apply cannot mutate money, party, held items, or balls").toBe(before);
+      expect(observed.qtys, "a rejected apply cannot consume authoritative stock").toEqual([1]);
+      expect(observed.pendingIndex).toBe(0);
+      expect(isCoopSharedTerminalFrozen(rig.hostRuntime), "a rejected addressed intent fails both peers closed").toBe(
+        true,
+      );
+    });
+  }, 120_000);
+
+  it("thrown host TM execution restores the exact material image and cannot leak a continuation", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, async () => {
+      rig.hostRuntime.controller.advanceInteraction(0);
+      const phase = liveBiomeShop() as unknown as BiomeShopSeam;
+      const tmOption = makeTmOption();
+      const target = rig.hostScene.getPlayerParty()[0];
+      const modifier = tmOption.type.newModifier(target);
+      const leakedHeldItem = makeWideLensOption().type.newModifier(target);
+      expect(modifier).not.toBeNull();
+      expect(leakedHeldItem).not.toBeNull();
+      phase.coopBiomeStart = 1;
+      phase.coopBiomeOwner = false;
+      phase.coopBiomeOptionOwner = true;
+      phase.shopOptions = [tmOption];
+      phase.qtys = [1];
+      phase.pendingIndex = 0;
+      rig.hostScene.money = 2_000;
+      prepareHostMarketIntent(phase, 1, 0, [0, 1_900, 0, 100]);
+      const before = marketMaterialSignature();
+      const hpBefore = target.hp;
+      const rngBefore = Phaser.Math.RND.state();
+      const terminalBoundary = observeBeforeTerminalReset(rig.hostScene, () => ({
+        material: marketMaterialSignature(),
+        hp: target.hp,
+        rng: Phaser.Math.RND.state(),
+        qtys: [...phase.qtys],
+        pendingIndex: phase.pendingIndex,
+        queued: rig.hostScene.phaseManager.getQueuedPhaseNames(),
+      }));
+
+      const addModifierSpy = vi.spyOn(rig.hostScene, "addModifier").mockImplementation(() => {
+        rig.hostScene.money = 17;
+        target.hp = 1;
+        Phaser.Math.RND.frac();
+        (rig.hostScene.modifiers as unknown[]).push(leakedHeldItem!);
+        (rig.hostScene.phaseManager as unknown as { unshiftPhase(queued: unknown): void }).unshiftPhase(phase.copy());
+        throw new Error("injected TM apply failure after partial mutation");
+      });
+      let observed: ReturnType<typeof terminalBoundary.read> | null = null;
+      try {
+        expect(phase.applyCoopRelayedPurchase(modifier!, 100, 1_900)).toBe(false);
+        observed = terminalBoundary.read();
+      } finally {
+        addModifierSpy.mockRestore();
+        terminalBoundary.dispose();
+      }
+      if (observed == null) {
+        throw new Error("thrown market apply did not expose its terminal boundary");
+      }
+
+      expect(observed.material, "money, party data, and held items return to the exact before-image").toBe(before);
+      expect(observed.hp).toBe(hpBefore);
+      expect(observed.rng, "a failed modifier cannot consume the authoritative RNG cursor").toBe(rngBefore);
+      expect(observed.qtys).toEqual([1]);
+      expect(observed.pendingIndex).toBe(0);
+      expect(
+        observed.queued.filter(name => name === "SelectModifierPhase"),
+        "the failed TM cannot leave its market continuation runnable",
+      ).toHaveLength(0);
+      expect(isCoopSharedTerminalFrozen(rig.hostRuntime), "the partial apply enters the retained shared terminal").toBe(
+        true,
+      );
+    });
+  }, 120_000);
+
+  it("malformed projected TM result rolls back stock and fails the guest continuation closed", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    await withClient(rig.guestCtx, async () => {
+      const phase = liveBiomeShop() as unknown as BiomeShopSeam;
+      const tmOption = makeTmOption();
+      phase.coopBiomeStart = 0;
+      phase.coopBiomeOwner = false;
+      phase.coopBiomeOptionOwner = false;
+      phase.shopOptions = [tmOption];
+      phase.qtys = [1];
+      phase.pendingIndex = 0;
+
+      expect(phase.applyCoopProjectedMarketBuy(0, tmOption.type, -1, 0, 100, "reward:market:projected-tm")).toBe(false);
+      expect(phase.qtys, "a rejected renderer projection cannot consume stock").toEqual([1]);
+      expect(phase.pendingIndex).toBe(0);
+      expect(
+        rig.guestScene.phaseManager
+          .getQueuedPhaseNames()
+          .filter(name => name === "LearnMovePhase" || name === "SelectModifierPhase"),
+        "no malformed LearnMove/market tail survives the rollback",
+      ).toHaveLength(0);
+      expect(isCoopSharedTerminalFrozen(rig.guestRuntime), "the guest cannot continue without its exact TM UI").toBe(
+        true,
+      );
+    });
+  }, 120_000);
+
   // ===========================================================================================
   // B. END-TO-END over BOTH engines: the OWNER buys a TM in the biome market + leaves; the WATCHER
   // adopts + applies + leaves. The queued continuation must be a PINNED BiomeShopPhase, NO "SKIP
   // unpinned" WARN may fire, and both engines must advance the interaction counter exactly once.
   // ===========================================================================================
-  it("durability: dropped biomeShop relays still materialize TM buy + leave in ordinal order", async () => {
+  it("durability: dropped/reordered biomeShop relays still materialize TM buy + leave in ordinal order", async () => {
     setCoopBiomeMarketTestSkip(false); // drive the REAL co-op market
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const scheduledPair = createScheduledCoopPair({ automatic: true });
     const pair = wrapCoopFaultPair(
-      createLoopbackPair(),
+      scheduledPair,
       {
         drop: 1,
-        reorder: 0,
+        reorder: 1,
         delay: 0,
         faultable: msg => msg.t === "interactionChoice" && msg.kind === "biomeShop",
       },
@@ -205,6 +494,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     await withClient(rig.guestCtx, async () => {
       await driveGuestReplayTurn(rig.guestScene, turn);
     });
+    scheduledPair.setAutomaticDelivery(false);
 
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     // Counter 0 => the HOST owns this interaction (the host buys + relays; the guest is the watcher).
@@ -217,9 +507,29 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     // Track the continuation copy the owner's TM buy queues (its phaseName + carried biome pin).
     const queuedContinuation: { hasBiomeStart: boolean; biomeStart: number }[] = [];
 
+    // Park the watcher's real market surface before the owner can buy or leave. P33 intentionally
+    // retains the terminal until this reciprocal continuation exists; owner-first was the old harness
+    // fiction that let one client cross the market while its partner had not opened it yet.
+    await withClient(rig.guestCtx, async () => {
+      const guestPhase = liveBiomeShop() as unknown as BiomeShopSeam;
+      (guestPhase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
+      const gui = globalScene.ui as unknown as { getHandler: () => Record<string, unknown> };
+      const realGH = gui.getHandler.bind(globalScene.ui);
+      gui.getHandler = () => {
+        const h = realGH();
+        if (h != null && typeof h.setStock !== "function") {
+          h.setStock = () => {};
+        }
+        return h;
+      };
+      guestPhase.start();
+      await drainLoopback();
+      expect(guestPhase.coopBiomeStart, "the watcher opened the exact market interaction").toBe(counterBefore);
+    });
+
     try {
       await withClient(rig.hostCtx, async () => {
-        const phase = new BiomeShopPhase() as unknown as BiomeShopSeam;
+        const phase = liveBiomeShop() as unknown as BiomeShopSeam;
         // Inject a TM as the sole stock item (a continuation item) so the buy runs queuesContinuation.
         (phase as unknown as { buildStock: () => void }).buildStock = function (this: {
           shopOptions: unknown[];
@@ -238,11 +548,12 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
           if (pp != null && Object.hasOwn(pp, "coopBiomeStart")) {
             queuedContinuation.push({ hasBiomeStart: true, biomeStart: pp.coopBiomeStart ?? -999 });
           }
-          return origUnshift(p);
+          origUnshift(p);
         };
 
         const ui = globalScene.ui as unknown as {
           setMode: (...args: unknown[]) => unknown;
+          setModeBoundedWhen: (...args: unknown[]) => Promise<"completed" | "forced" | "superseded">;
           setModeWithoutClear: (...args: unknown[]) => unknown;
           setOverlayMode: (...args: unknown[]) => unknown;
           showText: (...args: unknown[]) => unknown;
@@ -263,29 +574,49 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
           if (args[0] === UiMode.PARTY) {
             (args[3] as (slotIndex: number, option: number) => void)(0, 0);
           }
+          if (args[0] === UiMode.CONFIRM) {
+            (args[1] as () => void)(); // co-op bounded confirm callback
+          }
           return Promise.resolve(true);
         };
         let drove = false;
-        ui.setMode = (...args: unknown[]): unknown => {
+        ui.setModeBoundedWhen = (...args: unknown[]): Promise<"completed"> => {
+          if (args[0] === UiMode.CONFIRM) {
+            // BiomeShopPhase uses the bounded co-op transition seam for the
+            // leave prompt. The old harness only drove setOverlayMode/
+            // setModeWithoutClear, so it never clicked Yes and therefore never
+            // sent the LEAVE terminal it later expected the watcher to apply.
+            queueMicrotask(() => (args[3] as () => void)());
+          }
           if (args[0] === UiMode.BIOME_SHOP && !drove) {
-            drove = true; // drive the buy-then-leave ONCE (the re-shown grid on re-open is inert here)
-            const cb = args[3] as (index: number) => boolean;
+            drove = true;
+            // Production opens the market through the bounded transition seam:
+            // mode, timeout, liveness fence, stock, biome, public selection callback, quantities.
+            const cb = args[5] as (index: number) => boolean;
             queueMicrotask(() => {
               cb(0); // buy the TM
-              queueMicrotask(() => cb(-1)); // then leave
+              // A human cannot leave until the party pick has applied and the continuation grid is
+              // available again. Wait for that exact production queue evidence instead of issuing a
+              // second synthetic click in the buy's unresolved microtask.
+              let attempts = 0;
+              const leaveAfterContinuation = (): void => {
+                if (queuedContinuation.length > 0 || attempts++ >= 8) {
+                  cb(-1);
+                  return;
+                }
+                setTimeout(leaveAfterContinuation, 0);
+              };
+              setTimeout(leaveAfterContinuation, 0);
             });
           }
-          if (args[0] === UiMode.PARTY) {
-            (args[3] as (slotIndex: number, option: number) => void)(0, 0);
-          }
-          return Promise.resolve(true);
+          return Promise.resolve("completed");
         };
         ui.showText = (...args: unknown[]): unknown => {
           const cb = args[2];
           if (typeof cb === "function") {
             (cb as () => void)();
           }
-          return undefined;
+          return;
         };
         ui.setOverlayMode = (...args: unknown[]): unknown => {
           if (args[0] === UiMode.CONFIRM) {
@@ -307,10 +638,10 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       Overrides.WAIVE_ROLL_FEE_OVERRIDE = waiveBefore;
     }
 
-    // The owner bought the TM and advanced the market interaction exactly once.
-    expect(rig.hostRuntime.controller.interactionCounter(), "owner advanced the interaction once").toBe(
-      counterBefore + 1,
-    );
+    expect(
+      rig.hostRuntime.controller.interactionCounter(),
+      "the owner crosses its own local terminal after the human confirms Leave",
+    ).toBe(counterBefore + 1);
     expect(pair.faultsInjected(), "the legacy market buy + leave stream must actually be dropped").toBeGreaterThan(0);
     // The continuation the buy queued is a PINNED BiomeShopPhase (carries coopBiomeStart), not the
     // unpinned plain-SelectModifierPhase orphan (pre-fix this array is empty - the copy had no coopBiomeStart).
@@ -319,20 +650,9 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       counterBefore,
     );
 
-    // WATCHER (guest): adopts the streamed stock + applies the buffered TM buy + leave, then advances.
+    // WATCHER (guest): adopt the retained stock/result and acknowledge its continuation. Then pump both
+    // destinations through the retry/ACK transaction until the watcher's own local terminal crosses.
     await withClient(rig.guestCtx, async () => {
-      const phase = new BiomeShopPhase() as unknown as BiomeShopSeam;
-      (phase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
-      const gui = globalScene.ui as unknown as { getHandler: () => Record<string, unknown> };
-      const realGH = gui.getHandler.bind(globalScene.ui);
-      gui.getHandler = () => {
-        const h = realGH();
-        if (h != null && typeof h.setStock !== "function") {
-          h.setStock = () => {};
-        }
-        return h;
-      };
-      phase.start();
       for (let i = 0; i < 32; i++) {
         await drainLoopback();
         if (rig.guestRuntime.controller.interactionCounter() > counterBefore) {
@@ -340,6 +660,19 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
         }
       }
     });
+    await withClient(rig.hostCtx, async () => {
+      for (let i = 0; i < 32 && rig.hostRuntime.controller.interactionCounter() === counterBefore; i++) {
+        await drainLoopback();
+      }
+    });
+    await withClient(rig.guestCtx, async () => {
+      for (let i = 0; i < 32 && rig.guestRuntime.controller.interactionCounter() === counterBefore; i++) {
+        await drainLoopback();
+      }
+    });
+    // Fault recovery can require result -> material-applied -> authority release -> final counter broadcast.
+    // Pump the bounded complete transaction, not merely the first result/ACK pair.
+    await pumpDuoDestinations(rig, 8);
 
     // Both engines advanced the alternating interaction exactly once - lockstep, no asymmetric drift.
     expect(rig.guestRuntime.controller.interactionCounter(), "watcher advanced the interaction once (lockstep)").toBe(

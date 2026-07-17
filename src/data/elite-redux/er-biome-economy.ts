@@ -106,20 +106,22 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
     // wildcard rolls; see stock builder).
     cheap: [],
     dear: [],
-    signature: ["GRIP_CLAW", "BATON"],
+    signature: ["GRIP_CLAW", "BATON", "ER_SAFETY_GOGGLES"],
     priceMod: 1.3,
   },
   [BiomeId.ICE_CAVE]: { cheap: ["EVO"], dear: ["BERRY"], signature: ["FROSTBITE_ORB", "EVIOLITE", "ER_ICE_GEM", "ER_SNOWBALL"], priceMod: 1.2 },
-  [BiomeId.MEADOW]: { cheap: ["MINT", "BERRY", "VITAMIN"], dear: ["BATTLE"], signature: ["SOOTHE_BELL", "BERRY", "ER_GRASSY_SEED"], priceMod: 0.9 },
+  [BiomeId.MEADOW]: { cheap: ["MINT", "BERRY", "VITAMIN"], dear: ["BATTLE"], signature: ["SOOTHE_BELL", "BERRY", "ER_GRASSY_SEED", "ER_MENTAL_HERB"], priceMod: 0.9 },
   [BiomeId.POWER_PLANT]: { cheap: ["TM", "BATTLE"], dear: ["BERRY"], signature: ["MULTI_LENS", "WIDE_LENS", "ER_ELECTRIC_GEM", "ER_CELL_BATTERY", "ER_ELECTRIC_SEED"], priceMod: 1 },
   [BiomeId.VOLCANO]: { cheap: ["EVO"], dear: ["BALLS"], signature: ["FLAME_ORB", "ER_CHILI_SAMPLE", "ER_FIRE_GEM"], priceMod: 1.1 },
-  [BiomeId.GRAVEYARD]: { cheap: ["EVO"], dear: ["BALLS"], signature: ["REVIVER_SEED", "ER_RUSTY_CLAW", "ER_GHOST_GEM"], priceMod: 1 },
+  // Covert Cloak is SHOP-ONLY for players (maintainer 2026-07-16): it never
+  // enters the random reward pools, only these signature slots.
+  [BiomeId.GRAVEYARD]: { cheap: ["EVO"], dear: ["BALLS"], signature: ["REVIVER_SEED", "ER_RUSTY_CLAW", "ER_GHOST_GEM", "ER_COVERT_CLOAK"], priceMod: 1 },
   // The training hall: vitamins are the headline, and martial mastery puts the
   // Mega Bracelet (KEYSTONE) on offer here too.
-  [BiomeId.DOJO]: { cheap: ["BATTLE", "VITAMIN", "KEYSTONE"], dear: ["TM"], signature: ["FOCUS_BAND", "KINGS_ROCK", "ER_FIGHTING_GEM", "ER_WEAKNESS_POLICY"], priceMod: 1 },
+  [BiomeId.DOJO]: { cheap: ["BATTLE", "VITAMIN", "KEYSTONE"], dear: ["TM"], signature: ["FOCUS_BAND", "KINGS_ROCK", "ER_FIGHTING_GEM", "ER_WEAKNESS_POLICY", "ER_EXPERT_BELT", "ER_MUSCLE_BAND"], priceMod: 1 },
   [BiomeId.FACTORY]: { cheap: ["HELD"], dear: ["BERRY"], signature: ["WHITE_HERB", "ER_LOADED_DICE", "ER_STEEL_GEM", "ER_CELL_BATTERY"], priceMod: 1 },
   // Ancient arcane power: Omni Gem / Move Slot Expander / Ability Randomizer.
-  [BiomeId.RUINS]: { cheap: ["ARCANE"], dear: ["BALLS"], signature: ["RELIC_GOLD", "REVIVER_SEED", "ER_PSYCHIC_GEM", "ER_PSYCHIC_SEED"], priceMod: 1.1 },
+  [BiomeId.RUINS]: { cheap: ["ARCANE"], dear: ["BALLS"], signature: ["RELIC_GOLD", "REVIVER_SEED", "ER_PSYCHIC_GEM", "ER_PSYCHIC_SEED", "ER_WISE_GLASSES"], priceMod: 1.1 },
   [BiomeId.WASTELAND]: { cheap: ["BATTLE"], dear: ["BALLS"], signature: ["DNA_SPLICERS", "REVIVER_SEED"], priceMod: 1.2 },
   [BiomeId.ABYSS]: { cheap: [], dear: [], signature: [], priceMod: 1, noShop: true },
   // Cosmic mutation: the observatory tinkers with abilities/moves (ARCANE).
@@ -129,7 +131,7 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
     // (see ErBiomeRule.extraRewardSlots) - a place to stock up cheaply.
     cheap: ["BATTLE", "VITAMIN"],
     dear: ["MINT"],
-    signature: ["GOLDEN_PUNCH", "FOCUS_BAND", "ER_STEEL_GEM"],
+    signature: ["GOLDEN_PUNCH", "FOCUS_BAND", "ER_STEEL_GEM", "ER_HEAVY_DUTY_BOOTS"],
     priceMod: 0.5,
   },
   [BiomeId.JUNGLE]: { cheap: ["BERRY", "CANDY"], dear: ["BALLS"], signature: ["LUCKY_EGG", "BERRY", "ER_GRASS_GEM", "ER_GRASSY_SEED"], priceMod: 1.1 },
@@ -140,7 +142,7 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
     // ships with the curse system, not in P1.)
     cheap: [],
     dear: [],
-    signature: ["WIDE_LENS", "ER_LOADED_DICE"],
+    signature: ["WIDE_LENS", "ER_LOADED_DICE", "ER_COVERT_CLOAK", "ER_SMOKE_BALL"],
     priceMod: 0.75,
     buysDear: "EVO",
   },

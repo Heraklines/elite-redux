@@ -16,17 +16,16 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   driveGuestReplayTurn,
@@ -34,11 +33,13 @@ import {
   driveHostRewardShopOwner,
   forceItemRewards,
   installDuoLogCapture,
+  pumpDuoDestinations,
+  reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair, type ScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -94,27 +95,44 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
 
   /** Drive ONE alternating reward interaction where the OWNER TAKES the forced (non-party) ball reward. */
-  async function driveBallReward(rig: DuoRig): Promise<{ hostOwns: boolean }> {
+  async function driveBallReward(rig: DuoRig, pair: ScheduledCoopPair): Promise<{ hostOwns: boolean }> {
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
+    // Command request/reply uses ordinary automatic delivery. At the reward boundary, queue every frame
+    // until its destination ClientCtx is installed: a real browser can never resume the host watcher's
+    // await against the guest's global scene (or vice versa).
+    pair.setAutomaticDelivery(false);
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("SelectModifierPhase", false);
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     if (hostOwns) {
+      const watcherPinned = await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+      expect(watcherPinned, "guest watcher parked before the host-owned ball pick").toBe(counterBefore);
       await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: true }));
-      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
     } else {
+      // The host is still the option authority on a guest-owned reward. Starting its real watcher first
+      // both arrives at the reciprocal shop barrier and streams the canonical pool the guest must adopt
+      // before a human-visible pick can occur. Driving the guest first let the 50 ms harness barrier expire,
+      // observed an empty not-yet-adopted pool, and silently exercised LEAVE instead of the asserted TAKE.
+      const watcherPinned = await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
+      expect(watcherPinned, "host watcher parked before the guest-owned ball pick").toBe(counterBefore);
       await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: true }));
-      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
     }
+    // A guest-owned TAKE is an intent: the host watcher commits it, then the retained result must return
+    // to the guest owner before either scene is inspected. Real browsers receive that final hop in the
+    // guest process; the one-realm harness closes it explicitly under each destination context.
+    await pumpDuoDestinations(rig, 8);
+    pair.setAutomaticDelivery(true);
     return { hostOwns };
   }
 
@@ -122,7 +140,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
     const ballCount = (s: BattleScene): number => (s.pokeballCounts as Record<number, number>)[PokeballType.GREAT_BALL];
     forceItemRewards(game.override, [{ name: "GREAT_BALL" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
 
@@ -137,7 +155,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
       });
-      const { hostOwns } = await driveBallReward(rig);
+      const { hostOwns } = await driveBallReward(rig, pair);
       expect(hostOwns, "wave 1 reward is host-owned").toBe(true);
       expect(ballCount(rig.hostScene), "wave 1: host granted +5 great balls").toBe(hostBase + 5);
       expect(ballCount(rig.guestScene), "wave 1: guest (watcher) mirrored the SAME +5 (no drift)").toBe(guestBase + 5);
@@ -162,7 +180,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
       });
-      const { hostOwns } = await driveBallReward(rig);
+      const { hostOwns } = await driveBallReward(rig, pair);
       expect(hostOwns, "wave 2 reward is guest-owned").toBe(false);
       expect(ballCount(rig.guestScene), "wave 2: guest (owner) granted +5 great balls").toBe(guestBefore + 5);
       expect(ballCount(rig.hostScene), "wave 2: host (watcher) mirrored the SAME +5 (no drift)").toBe(hostBefore + 5);

@@ -39,7 +39,6 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { commitRewardOwnerIntent } from "#data/elite-redux/coop/coop-reward-operation";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -48,21 +47,23 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
   type DuoRig,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
-  driveGuestTmCaseRegression,
   driveHostPartyRewardOwner,
+  driveHostTeachMoveRewardOwner,
+  driveRetainedTeachMoveRewardWatch,
   forceItemRewards,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair, type ScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import { PartyOption } from "#ui/party-ui-handler";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -123,19 +124,19 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
   }
 
-  /** Reach the host's SelectModifierPhase and build the guest's mirror shop phase. */
+  /** Reach both clients' queued production SelectModifierPhase. */
   async function reachShops(rig: DuoRig): Promise<{ hostShop: ShopPhaseSeam; guestShop: ShopPhaseSeam }> {
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("SelectModifierPhase", false);
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     return { hostShop, guestShop };
   }
 
@@ -251,7 +252,7 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
    *  LearnMovePhase adopt it. Returns the guest's phase-queue observations + whether it grew a move. */
   async function driveContinuation(
     rig: DuoRig,
-    pair: ReturnType<typeof createLoopbackPair>,
+    pair: ScheduledCoopPair,
     resolvePick: (party: ReturnType<BattleScene["getPlayerParty"]>) => { slot: number; moveIndex: number },
   ): Promise<{
     queuedContinuation: boolean;
@@ -266,33 +267,19 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
       () => rig.guestScene.getPlayerParty()[pick.slot].getMoveset().length,
     );
 
-    // HOST owner: start() streams the rolled option list (buffered so the watcher's await resolves at once).
+    // From the reciprocal reward boundary onward, pump every retained transaction only under its addressed
+    // client's complete context. This is the same isolation as two browser processes.
+    pair.setAutomaticDelivery(false);
     const { hostShop, guestShop } = await reachShops(rig);
-    await withClient(rig.hostCtx, async () => {
-      hostShop.start();
-    });
-
-    // The production owner send is dual-carried: the legacy interactionChoice plus the
-    // authoritative REWARD envelope. This helper injects the legacy frame directly because
-    // headless Phaser cannot drive the nested party menu, so commit the matching envelope here
-    // before the guest watcher consumes it. Raw-only injection is intentionally rejected now
-    // that the journal is the leading carrier for migrated reward actions.
-    await withClient(rig.hostCtx, () => {
-      commitRewardOwnerIntent({
-        surface: "reward",
-        pinned: hostShop.coopInteractionStart,
-        label: "reward",
-        choice: 0,
-        data: [0, pick.slot, pick.moveIndex],
-        terminal: false,
-        localRole: "host",
-        wave: rig.hostScene.currentBattle.waveIndex,
-      });
-    });
-
-    // GUEST watcher: adopt the relayed pick, apply it (queues the continuation copy + LearnMovePhase),
-    // then drive the no-op LearnMovePhase which must remove the copy (pre-#698 it orphaned + hung).
-    const result = await withClient(rig.guestCtx, () => driveGuestTmCaseRegression(guestShop, pair.host, pick));
+    // Park the watcher before the owner can commit, then drive the owner's real reward phase + PARTY
+    // callback. The host retains the typed intent/result transaction; the guest materializes that exact
+    // result and its real LearnMovePhase removes the continuation copy.
+    const result = await withClient(rig.guestCtx, () =>
+      driveRetainedTeachMoveRewardWatch(guestShop, async () => {
+        await withClient(rig.hostCtx, () => driveHostTeachMoveRewardOwner(hostShop, pick));
+        await withClient(rig.guestCtx, () => pair.flush("guest"));
+      }),
+    );
 
     const movesAfter = withClientSync(
       rig.guestCtx,
@@ -304,7 +291,7 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
   it("TM_MODIFIER (TM): owner teaches a TM to party[0], watcher adopts it + removes the continuation copy", async () => {
     forceItemRewards(game.override, [{ name: "TM_COMMON" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
     await playWaveToShop(rig);
@@ -321,7 +308,7 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
   it("REMEMBER_MOVE (Memory Mushroom): owner relearns a move, watcher adopts it + removes the copy", async () => {
     forceItemRewards(game.override, [{ name: "MEMORY_MUSHROOM" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
     await playWaveToShop(rig);
@@ -344,7 +331,7 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
   it("ER_LEARNERS_SHROOM: owner teaches an egg/TM/tutor move, watcher adopts it + removes the copy", async () => {
     forceItemRewards(game.override, [{ name: "ER_LEARNERS_SHROOM" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
     await playWaveToShop(rig);
@@ -366,7 +353,7 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
   it("ER_TM_CASE: owner teaches a compatible-TM move, watcher adopts it + removes the copy", async () => {
     forceItemRewards(game.override, [{ name: "TM_CASE" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
     await playWaveToShop(rig);

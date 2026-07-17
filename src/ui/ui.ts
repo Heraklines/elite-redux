@@ -9,15 +9,25 @@ import {
   coopMeInteractionStartValue,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
+  notifyCoopOperationAuthorityContinuationSurface,
+  notifyCoopOperationContinuationSurface,
+} from "#data/elite-redux/coop/coop-operation-journal";
+import {
   coopHostStreamMeMessage,
+  getCoopBattleStreamer,
   getCoopController,
   getCoopMePump,
   getCoopNetcodeMode,
   getCoopUiMirror,
+  isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
 // #840: the total UiMode co-op classification + the unmirrored-screen tripwire decision.
-import { coopUiClassOf, coopUnmirroredTripwireReason } from "#data/elite-redux/coop/coop-ui-registry";
+import {
+  coopAuthorityContinuationSurface,
+  coopUiClassOf,
+  coopUnmirroredTripwireReason,
+} from "#data/elite-redux/coop/coop-ui-registry";
 import { beginCoopUiRelayInput, endCoopUiRelayInput } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
@@ -191,6 +201,10 @@ export class UI extends Phaser.GameObjects.Container {
   private tooltipContent: Phaser.GameObjects.Text;
 
   private overlayActive: boolean;
+  /** Invalidates late fade/delayed callbacks when a newer or bounded mode transition supersedes them. */
+  private modeTransitionGeneration = 0;
+  /** Releases a killed overlay tween so superseded setMode promises cannot remain pending forever. */
+  private overlayTransitionRelease: (() => void) | null = null;
 
   /** Co-op (#633): cached engine surface for the live-cursor UI mirror (lazily built). */
   private _coopMirrorEngine: CoopUiMirrorEngine | null = null;
@@ -723,36 +737,50 @@ export class UI extends Phaser.GameObjects.Container {
 
   fadeOut(duration: number): Promise<void> {
     return new Promise(resolve => {
+      this.cancelOverlayTransitionTween();
       if (this.overlayActive) {
         return resolve();
       }
       this.overlayActive = true;
       this.overlay.setAlpha(0);
       this.overlay.setVisible(true);
+      const finish = (): void => {
+        if (this.overlayTransitionRelease === finish) {
+          this.overlayTransitionRelease = null;
+        }
+        resolve();
+      };
+      this.overlayTransitionRelease = finish;
       globalScene.tweens.add({
         targets: this.overlay,
         alpha: 1,
         duration,
         ease: "Sine.easeOut",
-        onComplete: () => resolve(),
+        onComplete: finish,
       });
     });
   }
 
   fadeIn(duration: number): Promise<void> {
     return new Promise(resolve => {
+      this.cancelOverlayTransitionTween();
       if (!this.overlayActive) {
         return resolve();
       }
+      const finish = (): void => {
+        if (this.overlayTransitionRelease === finish) {
+          this.overlayTransitionRelease = null;
+          this.overlay.setVisible(false);
+        }
+        resolve();
+      };
+      this.overlayTransitionRelease = finish;
       globalScene.tweens.add({
         targets: this.overlay,
         alpha: 0,
         duration,
         ease: "Sine.easeIn",
-        onComplete: () => {
-          this.overlay.setVisible(false);
-          resolve();
-        },
+        onComplete: finish,
       });
       this.overlayActive = false;
     });
@@ -765,11 +793,27 @@ export class UI extends Phaser.GameObjects.Container {
     forceTransition: boolean,
     chainMode: boolean,
     args: any[],
+    isCurrent?: () => boolean,
   ): Promise<void> {
+    // A bounded caller can arrive after its phase/session was replaced. Reject it before claiming a new
+    // transition generation or reading scene-owned state: teardown may already have removed gameMode, and
+    // a stale attempt must not supersede the replacement screen's legitimate transition.
+    if (isCurrent?.() === false) {
+      return Promise.resolve();
+    }
+    const transitionGeneration = ++this.modeTransitionGeneration;
+    const attemptCurrent = (): boolean =>
+      transitionGeneration === this.modeTransitionGeneration && (isCurrent?.() ?? true);
+    const abortCurrentAttempt = (): void => {
+      if (transitionGeneration === this.modeTransitionGeneration) {
+        ++this.modeTransitionGeneration;
+        this.normalizeTransitionOverlay();
+      }
+    };
     // Co-op (#633): keep the live-cursor mirror's engine surface attached so the WATCHER
     // can replay the owner's relayed buttons even while the local human is idle (its screen
     // opens via setMode, not via local input). Cheap + idempotent; hard no-op in solo.
-    if (globalScene.gameMode.isCoop) {
+    if (globalScene.gameMode?.isCoop === true) {
       getCoopUiMirror()?.attach(this.coopMirrorEngine());
       // #840 unmirrored-screen tripwire. DEV/staging only (coopWarn is silenced in prod), zero
       // behavior change: surface a non-mirrored interactive screen opening on this client while the
@@ -780,11 +824,35 @@ export class UI extends Phaser.GameObjects.Container {
       }
     }
     return new Promise(resolve => {
-      if (this.mode === mode && !forceTransition) {
+      if (!attemptCurrent()) {
+        abortCurrentAttempt();
         resolve();
         return;
       }
-      const doSetMode = () => {
+      if (this.mode === mode && !forceTransition) {
+        // A newer same-mode winner must still clear an opaque fade left by the superseded attempt.
+        this.normalizeTransitionOverlay();
+        // Mode identity alone is not a public surface. A prior clear/teardown can leave the selected
+        // handler inactive; bounded callers must be able to re-open that exact same mode instead of
+        // reporting a false completion that can strand a retained co-op continuation.
+        const handler = this.getHandler();
+        if (!handler.active) {
+          handler.show(args);
+        }
+        this.coopAuthoritySurfaceReady(mode);
+        resolve();
+        return;
+      }
+      const doSetMode = (normalizeOverlay: boolean) => {
+        if (!attemptCurrent()) {
+          abortCurrentAttempt();
+          resolve();
+          return;
+        }
+        if (normalizeOverlay) {
+          // Direct/no-transition winners own the screen now; normalize any older fade globally.
+          this.normalizeTransitionOverlay();
+        }
         if (this.mode !== mode) {
           if (clear) {
             this.getHandler().clear();
@@ -794,11 +862,12 @@ export class UI extends Phaser.GameObjects.Container {
             globalScene.updateGameInfo();
           }
           this.mode = mode;
-          const touchControls = document?.getElementById("touchControls");
+          const touchControls = typeof document === "undefined" ? null : document.getElementById("touchControls");
           if (touchControls) {
             touchControls.dataset.uiMode = UiMode[mode];
           }
           this.getHandler().show(args);
+          this.coopAuthoritySurfaceReady(mode);
         }
         resolve();
       };
@@ -809,14 +878,33 @@ export class UI extends Phaser.GameObjects.Container {
           && noTransitionModes.indexOf(mode) === -1)
         || (chainMode && noTransitionModes.indexOf(mode) === -1)
       ) {
+        if (!attemptCurrent()) {
+          abortCurrentAttempt();
+          resolve();
+          return;
+        }
+        // Cancel any prior fadeIn/fadeOut owner before starting this generation's fade.
+        this.normalizeTransitionOverlay();
         this.fadeOut(250).then(() => {
+          if (!attemptCurrent()) {
+            abortCurrentAttempt();
+            resolve();
+            return;
+          }
           globalScene.time.delayedCall(100, () => {
-            doSetMode();
-            this.fadeIn(250);
+            if (!attemptCurrent()) {
+              abortCurrentAttempt();
+              resolve();
+              return;
+            }
+            doSetMode(false);
+            if (attemptCurrent()) {
+              this.fadeIn(250);
+            }
           });
         });
       } else {
-        doSetMode();
+        doSetMode(true);
       }
     });
   }
@@ -844,12 +932,123 @@ export class UI extends Phaser.GameObjects.Container {
     }
   }
 
+  /** Publish protocol-33 continuation evidence only after this UI has actually committed its public mode. */
+  private coopAuthoritySurfaceReady(mode: UiMode): void {
+    // The netcode predicate intentionally includes Showdown, which rides this authoritative substrate even
+    // though its game mode is not classic co-op. Both roles report through this post-commit chokepoint: the
+    // guest publishes ordered evidence, while the host can rearm one bounded peer-convergence stage.
+    if (!this.getHandler().active) {
+      return;
+    }
+    const surface = coopAuthorityContinuationSurface(mode);
+    if (surface != null) {
+      const controller = getCoopController();
+      const battle = globalScene.currentBattle;
+      if (controller != null && battle != null) {
+        const address = {
+          epoch: controller.sessionEpoch,
+          wave: battle.waveIndex,
+          turn: battle.turn,
+        };
+        if (isCoopAuthoritativeGuest()) {
+          getCoopBattleStreamer()?.notifyContinuationSurface(surface);
+          notifyCoopOperationContinuationSurface(surface, address);
+        } else if (controller.role === "host") {
+          notifyCoopOperationAuthorityContinuationSurface(surface, address);
+        }
+      }
+    }
+  }
+
   getMode(): UiMode {
     return this.mode;
   }
 
   setMode(mode: UiMode, ...args: any[]): Promise<void> {
     return this.setModeInternal(mode, true, false, false, args);
+  }
+
+  /** Clear only the transition-black overlay; generation owners call this before committing their screen. */
+  private normalizeTransitionOverlay(): void {
+    this.cancelOverlayTransitionTween();
+    this.overlayActive = false;
+    this.overlay.setAlpha(0);
+    this.overlay.setVisible(false);
+  }
+
+  private cancelOverlayTransitionTween(): void {
+    const release = this.overlayTransitionRelease;
+    this.overlayTransitionRelease = null;
+    try {
+      globalScene.tweens.killTweensOf(this.overlay);
+    } catch {
+      // Teardown may already have destroyed the scene/tween manager; the local flags still normalize.
+    }
+    release?.();
+  }
+
+  /**
+   * Co-op boundary seam: a lost fade/delayed callback cannot hold a shared transition forever. Timeout
+   * invalidates every callback from that attempt, clears the old handler, and commits the target mode
+   * synchronously; a later transition wins and reports `superseded` instead of being overwritten.
+   */
+  setModeBounded(mode: UiMode, timeoutMs = 2_000, ...args: any[]): Promise<"completed" | "forced" | "superseded"> {
+    return this.setModeBoundedWhen(mode, timeoutMs, undefined, ...args);
+  }
+
+  /** Bounded co-op mode transition whose mutations are aborted when its exact phase/session fence expires. */
+  setModeBoundedWhen(
+    mode: UiMode,
+    timeoutMs: number,
+    isCurrent: (() => boolean) | undefined,
+    ...args: any[]
+  ): Promise<"completed" | "forced" | "superseded"> {
+    const transition = this.setModeInternal(mode, true, false, false, args, isCurrent);
+    const generation = this.modeTransitionGeneration;
+    return new Promise(resolve => {
+      let settled = false;
+      const finish = (result: "completed" | "forced" | "superseded"): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        resolve(result);
+      };
+      const timer = setTimeout(
+        () => {
+          if (generation !== this.modeTransitionGeneration || !(isCurrent?.() ?? true)) {
+            if (generation === this.modeTransitionGeneration) {
+              ++this.modeTransitionGeneration;
+              this.normalizeTransitionOverlay();
+            }
+            finish("superseded");
+            return;
+          }
+          ++this.modeTransitionGeneration;
+          try {
+            this.normalizeTransitionOverlay();
+            this.getHandler().clear();
+            this.mode = mode;
+            const touchControls = typeof document === "undefined" ? null : document.getElementById("touchControls");
+            if (touchControls) {
+              touchControls.dataset.uiMode = UiMode[mode];
+            }
+            this.getHandler().show(args);
+            this.coopAuthoritySurfaceReady(mode);
+            finish("forced");
+          } catch {
+            // The caller's exact phase/operation fence decides whether it may proceed after a failed force.
+            finish("superseded");
+          }
+        },
+        Math.max(1, Math.trunc(timeoutMs)),
+      );
+      transition.then(
+        () => finish(generation === this.modeTransitionGeneration ? "completed" : "superseded"),
+        () => finish("superseded"),
+      );
+    });
   }
 
   setModeForceTransition(mode: UiMode, ...args: any[]): Promise<void> {
@@ -885,6 +1084,7 @@ export class UI extends Phaser.GameObjects.Container {
         if (touchControls) {
           touchControls.dataset.uiMode = UiMode[this.mode];
         }
+        this.coopAuthoritySurfaceReady(this.mode);
         resolve(true);
       };
 

@@ -36,8 +36,12 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   adoptRewardWatcherChoice,
+  COOP_REWARD_ACTION_STRIDE,
+  commitRewardOwnerIntent,
   isCoopRewardOperationEnabled,
   resetCoopRewardOperationFlag,
   resetCoopRewardOperationState,
@@ -51,7 +55,6 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -61,9 +64,9 @@ import {
   driveHostPartyRewardOwner,
   forceItemRewards,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import Phaser from "phaser";
@@ -125,12 +128,23 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
     }));
   }
 
+  /** Install the one logical guest runtime modeled by the direct watcher-gate adversarial cases. */
+  function installDirectGuestRewardRuntime(): void {
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState("guest"));
+    resetCoopRewardOperationState();
+  }
+
+  function installDirectRewardRuntime(role: "host" | "guest"): void {
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState(role));
+    resetCoopRewardOperationState();
+  }
+
   /** Drive ONE host wave to a win (both player slots FIGHT the frail enemies) under the host ctx. */
   async function hostPlayWave(rig: DuoRig): Promise<void> {
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
 
@@ -163,7 +177,7 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
 
     const hostModsBefore = rig.hostScene.modifiers.length;
     const guestModsBefore = rig.guestScene.modifiers.length;
@@ -215,7 +229,7 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
       await game.phaseInterceptor.to("SelectModifierPhase", false);
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     const guestModsBefore = rig.guestScene.modifiers.length;
 
     await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot: SLOT }));
@@ -238,8 +252,24 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
   //    rejections/adoptions below are proof the primitive is gating adoption (invariants 5, 6, §1.6).
   //    Host-owned EVEN interactions -> the GUEST watches (localRole "guest").
   // =====================================================================================
+  it("ADVERSARIAL runtime guard: a watcher without its owning runtime fails loud instead of falling back", () => {
+    setActiveCoopRuntimeOpState(null);
+
+    expect(() =>
+      adoptRewardWatcherChoice({
+        surface: "reward",
+        pinned: 2,
+        action: { choice: 0, data: [1, 0, 0, 0] },
+        terminal: false,
+        localRole: "guest",
+        wave: 11,
+      }),
+    ).toThrow(/no runtime installed for surface=reward/);
+    logs.flush();
+  });
+
   it("ADVERSARIAL a: a STALE buffered pick from a strictly-EARLIER interaction is REJECTED (#861 shape)", () => {
-    resetCoopRewardOperationState();
+    installDirectGuestRewardRuntime();
     const LATER = 6; // even -> host owns, guest watches
     const EARLIER = 4; // an EARLIER host-owned interaction
 
@@ -271,7 +301,7 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
   });
 
   it("ADVERSARIAL b: a LATE choice for an interaction the watcher already LEFT is REJECTED", () => {
-    resetCoopRewardOperationState();
+    installDirectGuestRewardRuntime();
     const START = 8; // even -> host owns, guest watches
 
     // Adopt a buy, then the LEAVE terminal for interaction START.
@@ -310,8 +340,114 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
     logs.flush();
   });
 
+  it("ADVERSARIAL P36: leaving surface A does not reject surface B at the same Mystery pin", () => {
+    installDirectGuestRewardRuntime();
+    const START = 12;
+    const firstSurface = { surfaceId: "modifier:me:graves:0", ordinal: 0 } as const;
+    const secondSurface = { surfaceId: "modifier:me:graves:1", ordinal: 1 } as const;
+
+    const firstLeave = adoptRewardWatcherChoice({
+      surface: "reward",
+      rewardSurface: firstSurface,
+      pinned: START,
+      action: { choice: -1, rewardSurface: firstSurface },
+      terminal: true,
+      localRole: "guest",
+      wave: 11,
+    });
+    expect(firstLeave.adopt, "surface A terminal is adopted").toBe(true);
+
+    const secondAction = adoptRewardWatcherChoice({
+      surface: "reward",
+      rewardSurface: secondSurface,
+      pinned: START,
+      action: { choice: 0, data: [0], rewardSurface: secondSurface },
+      terminal: false,
+      localRole: "guest",
+      wave: 11,
+    });
+    expect(secondAction.adopt, "surface B owns an independent same-pin ordinal and terminal fence").toBe(true);
+
+    const lateFirstAction = adoptRewardWatcherChoice({
+      surface: "reward",
+      rewardSurface: firstSurface,
+      pinned: START,
+      action: { choice: 1, data: [0], rewardSurface: firstSurface },
+      terminal: false,
+      localRole: "guest",
+      wave: 11,
+    });
+    expect(lateFirstAction).toEqual({ adopt: false, reason: "stale-or-late" });
+    logs.flush();
+  });
+
+  it.each([
+    { ownerRole: "host", watcherRole: "guest", pinned: 14, order: ["reward", "market", "reward"] },
+    { ownerRole: "host", watcherRole: "guest", pinned: 14, order: ["market", "reward", "market"] },
+    { ownerRole: "guest", watcherRole: "host", pinned: 15, order: ["reward", "market", "reward"] },
+    { ownerRole: "guest", watcherRole: "host", pinned: 15, order: ["market", "reward", "market"] },
+  ] as const)("ADVERSARIAL stream parity: $ownerRole owner and $watcherRole watcher agree for same-pin $order", ({
+    ownerRole,
+    watcherRole,
+    pinned,
+    order,
+  }) => {
+    installDirectRewardRuntime(ownerRole);
+    const ownerIds = order.map(surface => {
+      const committed = commitRewardOwnerIntent({
+        surface,
+        pinned,
+        label: surface === "reward" ? "reward" : "biomeShop",
+        choice: 0,
+        data: surface === "reward" ? [0] : undefined,
+        terminal: false,
+        localRole: ownerRole,
+        wave: 11,
+      });
+      if (committed == null) {
+        throw new Error(`owner did not mint ${surface} operation`);
+      }
+      return committed.operationId;
+    });
+
+    installDirectRewardRuntime(watcherRole);
+    const watcherIds = order.map(surface => {
+      const adopted = adoptRewardWatcherChoice({
+        surface,
+        pinned,
+        action: {
+          label: surface === "reward" ? "reward" : "biomeShop",
+          choice: 0,
+          data: surface === "reward" ? [0] : undefined,
+        },
+        terminal: false,
+        localRole: watcherRole,
+        wave: 11,
+      });
+      if (!adopted.adopt || adopted.operationId == null) {
+        throw new Error(`watcher did not address ${surface} operation: ${JSON.stringify(adopted)}`);
+      }
+      return adopted.operationId;
+    });
+
+    expect(watcherIds, "owner and watcher derive the same operation ids in the same surface order").toEqual(ownerIds);
+    expect(
+      ownerIds.map(id => parseCoopOperationId(id)?.pinnedSeq),
+      "each operation class has an independent ordinal and returning to the first stream advances without reuse",
+    ).toEqual([
+      pinned * COOP_REWARD_ACTION_STRIDE,
+      pinned * COOP_REWARD_ACTION_STRIDE,
+      pinned * COOP_REWARD_ACTION_STRIDE + 1,
+    ]);
+    expect(
+      ownerIds.map(id => parseCoopOperationId(id)?.kind),
+      "the equal numeric address remains disambiguated by the canonical operation class",
+    ).toEqual(order.map(surface => (surface === "reward" ? "REWARD" : "SHOP_BUY")));
+    logs.flush();
+  });
+
   it("ADVERSARIAL c: a CONTINUATION action on the SAME pinned interaction KEEPS its operation identity (#866)", () => {
-    resetCoopRewardOperationState();
+    installDirectGuestRewardRuntime();
     const START = 10; // even -> host owns, guest watches
 
     // The owner buys a TM (a continuation-class reward): the watcher adopts the first action...

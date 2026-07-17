@@ -7,24 +7,40 @@ import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { modifierTypes } from "#data/data-lists";
 import type { IEggOptions } from "#data/egg";
 import { Egg } from "#data/egg";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
+  commitMeAuthorityGuestIntent,
   commitMeOwnerIntent,
-  nextCoopMeAuthoritySubPickStep,
+  isCoopMeOperationEnabled,
+  isCoopMeOperationJournalActive,
   nextCoopMePresentationStep,
 } from "#data/elite-redux/coop/coop-me-operation";
-import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  coopMeInProgress,
+  coopMeInteractionStartValue,
+  setCoopMeActivePresentation,
+} from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  COOP_ME_REWARD_SURFACE_LIMIT,
+  type CoopMeRewardSurfaceProjection,
+  makeCoopMeModifierRewardSurfaceProjection,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   coopGuestAwaitMeBattleParty,
   coopGuestShouldAdoptMeBattleParty,
   coopHostStreamMeBattleParty,
   coopMeOwnerRelayBattleHandoff,
+  coopSessionGeneration,
+  failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
+  getCoopRuntime,
+  isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_ME_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_SUB_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import type { Gender } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -58,7 +74,11 @@ import {
 } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import { showEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
-import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
+import type {
+  MysteryEncounter,
+  MysteryEncounterRewardPlan,
+  MysteryEncounterRewardPreparationContext,
+} from "#mystery-encounters/mystery-encounter";
 import type { MysteryEncounterOption } from "#mystery-encounters/mystery-encounter-option";
 import type { Variant } from "#sprites/variant";
 import type { PokemonData } from "#system/pokemon-data";
@@ -86,18 +106,113 @@ import i18next from "i18next";
 /** Disconnect ceiling for every host<->guest ME await; steady state resolves on the relayed pick. */
 const COOP_ME_REPLAY_WAIT_MS = 1_200_000;
 
-/** Authority commit for one guest-owned ME sub-pick accepted from the host's real FIFO waiter. */
-function commitGuestMeSubPick(seq: number, value: number): void {
-  commitMeOwnerIntent({
-    kind: "ME_SUB",
-    seq,
+interface CoopMeWaitBoundary {
+  scene: typeof globalScene;
+  runtime: ReturnType<typeof getCoopRuntime>;
+  controller: ReturnType<typeof getCoopController>;
+  generation: number;
+  pinned: number;
+  wave: number;
+  phase: unknown;
+}
+
+function captureCoopMeWaitBoundary(): CoopMeWaitBoundary {
+  return {
+    scene: globalScene,
+    runtime: getCoopRuntime(),
+    controller: getCoopController(),
+    generation: coopSessionGeneration(),
     pinned: coopMeInteractionStartValue(),
-    step: nextCoopMeAuthoritySubPickStep(),
-    payload: { value },
-    localRole: "host",
-    wave: globalScene?.currentBattle?.waveIndex ?? -1,
+    wave: globalScene.currentBattle?.waveIndex ?? -1,
+    phase: globalScene.phaseManager.getCurrentPhase(),
+  };
+}
+
+function coopMeWaitBoundaryLive(boundary: CoopMeWaitBoundary): boolean {
+  return (
+    globalScene === boundary.scene
+    && getCoopRuntime() === boundary.runtime
+    && getCoopController() === boundary.controller
+    && coopSessionGeneration() === boundary.generation
+    && coopMeInteractionStartValue() === boundary.pinned
+    && (globalScene.currentBattle?.waveIndex ?? -1) === boundary.wave
+    && globalScene.phaseManager.getCurrentPhase() === boundary.phase
+  );
+}
+
+/** Commit then publish one host-owned presentation. Journal mode never uses raw as correctness carrier. */
+function commitAndPublishMePresentation(
+  relay: ReturnType<typeof getCoopInteractionRelay>,
+  seq: number,
+  presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }>,
+): boolean {
+  const pinned = coopMeInteractionStartValue();
+  const operationId = commitMeOwnerIntent({
+    kind: "ME_PRESENT",
+    seq,
+    pinned,
+    step: nextCoopMePresentationStep(pinned),
+    payload: { present: true, presentation },
+    localRole: getCoopController()?.role ?? "host",
+    wave: globalScene.currentBattle?.waveIndex ?? -1,
     turn: 0,
   });
+  if (operationId == null && isCoopMeOperationEnabled()) {
+    failCoopSharedSession(`Mystery presentation ${seq} could not enter authoritative control`);
+    return false;
+  }
+  if (isCoopMeOperationJournalActive()) {
+    setCoopMeActivePresentation(presentation);
+  } else {
+    relay?.sendInteractionOutcome(seq, "mePresent", presentation);
+  }
+  return true;
+}
+
+/** Consume duplicates without allowing an old retry to satisfy the next sub-picker. */
+async function awaitCommittedGuestMeSubPick(
+  relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+  seq: number,
+  boundary: CoopMeWaitBoundary,
+  label: string,
+): Promise<number | null> {
+  while (coopMeWaitBoundaryLive(boundary)) {
+    const pick = await relay.awaitInteractionChoice(seq, COOP_ME_REPLAY_WAIT_MS, COOP_ME_SUB_CHOICE_KINDS);
+    if (!coopMeWaitBoundaryLive(boundary)) {
+      return null;
+    }
+    if (pick == null) {
+      getCoopRuntime()?.durability?.reconnect();
+      failCoopSharedSession(`${label} ${seq} unavailable after bounded wait`);
+      return null;
+    }
+    if (!isCoopMeOperationEnabled()) {
+      return pick.choice;
+    }
+    const step = pick.data?.[0];
+    if (!Number.isSafeInteger(step) || (step as number) < 0) {
+      failCoopSharedSession(`${label} ${seq} arrived without an exact operation step`);
+      return null;
+    }
+    const result = commitMeAuthorityGuestIntent({
+      kind: "ME_SUB",
+      seq,
+      pinned: boundary.pinned,
+      step: step as number,
+      value: pick.choice,
+      wave: boundary.wave,
+      turn: 0,
+    });
+    if (result.kind === "duplicate") {
+      continue;
+    }
+    if (result.kind !== "committed") {
+      failCoopSharedSession(`${label} ${seq}/${String(step)} could not commit (${result.kind})`);
+      return null;
+    }
+    return pick.choice;
+  }
+  return null;
 }
 /**
  * Co-op authoritative non-battle ME (#633, ADD-2c; #818/#827 mirrored): MEs whose selected-option chain
@@ -171,28 +286,19 @@ export function coopHostStreamSecondaryAwaitIndex(labels: string[]): Promise<num
     seq: seqMe,
     labels: labels.length,
   });
-  relay?.sendInteractionOutcome(seqMe, "mePresent", prompt);
-  commitMeOwnerIntent({
-    kind: "ME_PRESENT",
-    seq: seqMe,
-    pinned: coopMeInteractionStartValue(),
-    step: nextCoopMePresentationStep(),
-    payload: { present: true, presentation: prompt },
-    localRole: getCoopController()?.role ?? "host",
-    wave: globalScene?.currentBattle?.waveIndex ?? -1,
-    turn: 0,
-  });
-  const awaited =
-    relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS) ?? Promise.resolve(null);
-  return awaited.then(pick => {
-    const idx = pick?.choice ?? null;
-    if (idx != null) {
-      commitGuestMeSubPick(seqMe, idx);
+  if (relay == null || !commitAndPublishMePresentation(relay, seqMe, prompt)) {
+    failCoopSharedSession(`Mystery secondary presentation ${seqMe} unavailable`);
+    return Promise.resolve(null);
+  }
+  const boundary = captureCoopMeWaitBoundary();
+  return awaitCommittedGuestMeSubPick(relay, seqMe, boundary, "Mystery secondary choice").then(idx => {
+    if (idx == null || !coopMeWaitBoundaryLive(boundary)) {
+      return null;
     }
     coopLog("me", "host received guest bespoke yes/no sub-pick (#827)", {
       seq: seqMe,
       idx,
-      fromNull: pick == null,
+      fromNull: false,
     });
     return idx;
   });
@@ -222,23 +328,14 @@ export function coopHostStreamCatchFullAwaitSlot(pokemonName: string): Promise<n
     subPrompt: { kind: "catchFull", pokemonName },
   };
   coopLog("me", "host streams catch-FULL replace-or-skip sub-prompt + awaits guest slot (#855)", { seq: seqMe });
-  relay?.sendInteractionOutcome(seqMe, "mePresent", prompt);
-  commitMeOwnerIntent({
-    kind: "ME_PRESENT",
-    seq: seqMe,
-    pinned: coopMeInteractionStartValue(),
-    step: nextCoopMePresentationStep(),
-    payload: { present: true, presentation: prompt },
-    localRole: getCoopController()?.role ?? "host",
-    wave: globalScene?.currentBattle?.waveIndex ?? -1,
-    turn: 0,
-  });
-  const awaited =
-    relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS) ?? Promise.resolve(null);
-  return awaited.then(pick => {
-    const slot = pick?.choice ?? null;
-    if (slot != null) {
-      commitGuestMeSubPick(seqMe, slot);
+  if (relay == null || !commitAndPublishMePresentation(relay, seqMe, prompt)) {
+    failCoopSharedSession(`Mystery catch-full presentation ${seqMe} unavailable`);
+    return Promise.resolve(null);
+  }
+  const boundary = captureCoopMeWaitBoundary();
+  return awaitCommittedGuestMeSubPick(relay, seqMe, boundary, "Mystery catch-full choice").then(slot => {
+    if (slot == null || !coopMeWaitBoundaryLive(boundary)) {
+      return null;
     }
     const partySize = globalScene.getPlayerParty().length;
     if (slot == null || slot < 0 || slot >= partySize) {
@@ -246,7 +343,7 @@ export function coopHostStreamCatchFullAwaitSlot(pokemonName: string): Promise<n
         seq: seqMe,
         slot,
         partySize,
-        fromNull: pick == null,
+        fromNull: false,
       });
       return null;
     }
@@ -675,7 +772,14 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
     battle.setDouble(false);
   }
   coopHostStreamMeBattleParty();
-  coopMeOwnerRelayBattleHandoff();
+  if (
+    !(await coopMeOwnerRelayBattleHandoff({
+      encounterMode: battle.mysteryEncounter?.encounterMode,
+      disableSwitch: partyConfig.disableSwitch ?? false,
+    }))
+  ) {
+    return;
+  }
   if (coopGuestShouldAdoptMeBattleParty()) {
     await adoptCoopMeBattleParty(battle, loadEnemyAssets);
   }
@@ -847,6 +951,24 @@ export function selectPokemonForOption(
 ): Promise<boolean> {
   return new Promise(resolve => {
     const modeToSetOnExit = globalScene.ui.getMode();
+    const boundScene = globalScene;
+    const boundRuntime = getCoopRuntime();
+    const boundController = getCoopController();
+    const boundGeneration = coopSessionGeneration();
+    const boundPin = coopMeInteractionStartValue();
+    const coopFence =
+      coopMeInProgress() && boundRuntime != null && boundController != null
+        ? () =>
+            globalScene === boundScene
+            && getCoopRuntime() === boundRuntime
+            && getCoopController() === boundController
+            && coopSessionGeneration() === boundGeneration
+            && coopMeInteractionStartValue() === boundPin
+        : undefined;
+    const setMode = (mode: UiMode, ...args: unknown[]) =>
+      coopFence == null
+        ? globalScene.ui.setMode(mode, ...args)
+        : globalScene.ui.setModeBoundedWhen(mode, 2_000, coopFence, ...args);
 
     // Co-op AUTHORITATIVE host on a GUEST-OWNED ME (#633, ADD-2b): the host runs the sole engine, so
     // the party target + any secondary index come from the GUEST's relayed picks, NOT a local host
@@ -864,27 +986,19 @@ export function selectPokemonForOption(
         subPrompt: { kind: "party" },
       };
       coopLog("me", "host streams PARTY sub-prompt + awaits guest slot", { seq: seqMe });
-      relay?.sendInteractionOutcome(seqMe, "mePresent", partyPrompt);
-      commitMeOwnerIntent({
-        kind: "ME_PRESENT",
-        seq: seqMe,
-        pinned: coopMeInteractionStartValue(),
-        step: nextCoopMePresentationStep(),
-        payload: { present: true, presentation: partyPrompt },
-        localRole: getCoopController()?.role ?? "host",
-        wave: globalScene?.currentBattle?.waveIndex ?? -1,
-        turn: 0,
-      });
-      void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(async pick => {
-        // A null (disconnected guest) maps past the party tail => the not-selected branch.
-        const slotIndex = pick?.choice ?? globalScene.getPlayerParty().length;
-        if (pick != null) {
-          commitGuestMeSubPick(seqMe, slotIndex);
+      if (relay == null || !commitAndPublishMePresentation(relay, seqMe, partyPrompt)) {
+        failCoopSharedSession(`Mystery party presentation ${seqMe} unavailable`);
+        return;
+      }
+      const boundary = captureCoopMeWaitBoundary();
+      void awaitCommittedGuestMeSubPick(relay, seqMe, boundary, "Mystery party choice").then(async slotIndex => {
+        if (slotIndex == null || !coopMeWaitBoundaryLive(boundary)) {
+          return;
         }
         coopLog("me", "host received guest party sub-pick", {
           seq: seqMe,
           slotIndex,
-          fromNull: pick == null,
+          fromNull: false,
         });
         if (slotIndex >= globalScene.getPlayerParty().length) {
           coopWarn("me", "host: party sub-pick out of range; not-selected branch", {
@@ -917,23 +1031,14 @@ export function selectPokemonForOption(
           slotIndex,
           labels: secondaryOptions.length,
         });
-        relay?.sendInteractionOutcome(seqMe, "mePresent", secondaryPrompt);
-        commitMeOwnerIntent({
-          kind: "ME_PRESENT",
-          seq: seqMe,
-          pinned: coopMeInteractionStartValue(),
-          step: nextCoopMePresentationStep(),
-          payload: { present: true, presentation: secondaryPrompt },
-          localRole: getCoopController()?.role ?? "host",
-          wave: globalScene?.currentBattle?.waveIndex ?? -1,
-          turn: 0,
-        });
-        void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(sec => {
-          globalScene.currentBattle.mysteryEncounter!.setDialogueToken("selectedPokemon", pokemon.getNameToRender());
-          const idx = sec?.choice ?? -1;
-          if (sec != null) {
-            commitGuestMeSubPick(seqMe, idx);
+        if (!commitAndPublishMePresentation(relay, seqMe, secondaryPrompt)) {
+          return;
+        }
+        void awaitCommittedGuestMeSubPick(relay, seqMe, boundary, "Mystery secondary choice").then(idx => {
+          if (idx == null || !coopMeWaitBoundaryLive(boundary)) {
+            return;
           }
+          globalScene.currentBattle.mysteryEncounter!.setDialogueToken("selectedPokemon", pokemon.getNameToRender());
           coopLog("me", "host received guest secondary sub-pick", {
             seq: seqMe,
             idx,
@@ -949,12 +1054,18 @@ export function selectPokemonForOption(
     }
 
     // Open party screen to choose pokemon
-    globalScene.ui.setMode(
+    setMode(
       UiMode.PARTY,
       PartyUiMode.SELECT,
       -1,
       async (slotIndex: number, _option: PartyOption) => {
-        await globalScene.ui.setMode(modeToSetOnExit);
+        if (coopFence != null && !coopFence()) {
+          return;
+        }
+        await setMode(modeToSetOnExit);
+        if (coopFence != null && !coopFence()) {
+          return;
+        }
         if (slotIndex >= globalScene.getPlayerParty().length) {
           onPokemonNotSelected?.();
           resolve(false);
@@ -970,7 +1081,10 @@ export function selectPokemonForOption(
         }
 
         // There is a second option to choose after selecting the Pokemon
-        await globalScene.ui.setMode(UiMode.MESSAGE);
+        await setMode(UiMode.MESSAGE);
+        if (coopFence != null && !coopFence()) {
+          return;
+        }
         // TODO: fix this
         const displayOptions = () => {
           // Always appends a cancel option to bottom of options
@@ -979,6 +1093,9 @@ export function selectPokemonForOption(
               // Update handler to resolve promise
               const onSelect = option.handler;
               option.handler = () => {
+                if (coopFence != null && !coopFence()) {
+                  return false;
+                }
                 onSelect();
                 globalScene.currentBattle.mysteryEncounter!.setDialogueToken(
                   "selectedPokemon",
@@ -992,8 +1109,11 @@ export function selectPokemonForOption(
             .concat({
               label: i18next.t("menu:cancel"),
               handler: () => {
+                if (coopFence != null && !coopFence()) {
+                  return false;
+                }
                 globalScene.ui.clearText();
-                globalScene.ui.setMode(modeToSetOnExit);
+                setMode(modeToSetOnExit);
                 resolve(false);
                 return true;
               },
@@ -1013,7 +1133,11 @@ export function selectPokemonForOption(
           if (fullOptions[0]?.onHover) {
             fullOptions[0].onHover();
           }
-          globalScene.ui.setModeWithoutClear(UiMode.OPTION_SELECT, config, null, true);
+          if (coopFence == null) {
+            globalScene.ui.setModeWithoutClear(UiMode.OPTION_SELECT, config, null, true);
+          } else {
+            globalScene.ui.setModeBoundedWhen(UiMode.OPTION_SELECT, 2_000, coopFence, config, null, true);
+          }
         };
 
         const textPromptKey = globalScene.currentBattle.mysteryEncounter?.selectedOption?.dialogue?.secondOptionPrompt;
@@ -1049,9 +1173,30 @@ export function selectOptionThenPokemon(
 ): Promise<PokemonAndOptionSelected | null> {
   return new Promise<PokemonAndOptionSelected | null>(resolve => {
     const modeToSetOnExit = globalScene.ui.getMode();
+    const boundScene = globalScene;
+    const boundRuntime = getCoopRuntime();
+    const boundController = getCoopController();
+    const boundGeneration = coopSessionGeneration();
+    const boundPin = coopMeInteractionStartValue();
+    const coopFence =
+      coopMeInProgress() && boundRuntime != null && boundController != null
+        ? () =>
+            globalScene === boundScene
+            && getCoopRuntime() === boundRuntime
+            && getCoopController() === boundController
+            && coopSessionGeneration() === boundGeneration
+            && coopMeInteractionStartValue() === boundPin
+        : undefined;
+    const setMode = (mode: UiMode, ...args: unknown[]) =>
+      coopFence == null
+        ? globalScene.ui.setMode(mode, ...args)
+        : globalScene.ui.setModeBoundedWhen(mode, 2_000, coopFence, ...args);
 
     const displayOptions = async (config: OptionSelectConfig) => {
-      await globalScene.ui.setMode(UiMode.MESSAGE);
+      await setMode(UiMode.MESSAGE);
+      if (coopFence != null && !coopFence()) {
+        return;
+      }
       if (optionSelectPromptKey) {
         showEncounterText(optionSelectPromptKey);
       }
@@ -1059,19 +1204,25 @@ export function selectOptionThenPokemon(
       if (fullOptions[0]?.onHover) {
         fullOptions[0].onHover();
       }
-      globalScene.ui.setMode(UiMode.OPTION_SELECT, config);
+      setMode(UiMode.OPTION_SELECT, config);
     };
 
     const selectPokemonAfterOption = (selectedOptionIndex: number) => {
       // Open party screen to choose a Pokemon
-      globalScene.ui.setMode(
+      setMode(
         UiMode.PARTY,
         PartyUiMode.SELECT,
         -1,
         (slotIndex: number, _option: PartyOption) => {
+          if (coopFence != null && !coopFence()) {
+            return;
+          }
           if (slotIndex < globalScene.getPlayerParty().length) {
             // Pokemon and option selected
-            globalScene.ui.setMode(modeToSetOnExit).then(() => {
+            setMode(modeToSetOnExit).then(() => {
+              if (coopFence != null && !coopFence()) {
+                return;
+              }
               const result: PokemonAndOptionSelected = {
                 selectedPokemonIndex: slotIndex,
                 selectedOptionIndex,
@@ -1093,6 +1244,9 @@ export function selectOptionThenPokemon(
         // Update handler to resolve promise
         const onSelect = option.handler;
         option.handler = () => {
+          if (coopFence != null && !coopFence()) {
+            return false;
+          }
           onSelect();
           selectPokemonAfterOption(index);
           return true;
@@ -1102,8 +1256,11 @@ export function selectOptionThenPokemon(
       .concat({
         label: i18next.t("menu:cancel"),
         handler: () => {
+          if (coopFence != null && !coopFence()) {
+            return false;
+          }
           globalScene.ui.clearText();
-          globalScene.ui.setMode(modeToSetOnExit);
+          setMode(modeToSetOnExit);
           resolve(null);
           return true;
         },
@@ -1131,33 +1288,177 @@ export function selectOptionThenPokemon(
  * Can have shop displayed or skipped
  * @param customShopRewards - adds a shop phase with the specified rewards / reward tiers
  * @param eggRewards
- * @param preRewardsCallback - can execute an arbitrary callback before the new phases if necessary (useful for updating items/party/injecting new phases before {@linkcode MysteryEncounterRewardsPhase})
+ * @param preRewardsCallback - can execute automatic mutations before the new phases. Any additional
+ * interactive modifier surface must use the callback context's explicit registrar.
  */
 export function setEncounterRewards(
   customShopRewards?: CustomModifierSettings,
   eggRewards?: IEggOptions[],
-  preRewardsCallback?: () => void,
+  preRewardsCallback?: (context: MysteryEncounterRewardPreparationContext) => void | Promise<void>,
 ): void {
-  globalScene.currentBattle.mysteryEncounter!.doEncounterRewards = () => {
-    if (preRewardsCallback) {
-      preRewardsCallback();
+  const encounter = globalScene.currentBattle.mysteryEncounter!;
+  const surfaces: MysteryEncounterRewardPlan["surfaces"][number][] = [];
+  const rewardSurfaceProjections: CoopMeRewardSurfaceProjection[] = [];
+  const preparedEggs: Egg[] = [];
+  const appendModifierSurface = (settings: CustomModifierSettings) => {
+    if (surfaces.length >= COOP_ME_REWARD_SURFACE_LIMIT) {
+      throw new Error(`Mystery Encounter reward plan exceeds ${COOP_ME_REWARD_SURFACE_LIMIT} surfaces`);
     }
-
-    if (customShopRewards) {
-      globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, customShopRewards);
-    } else {
-      globalScene.phaseManager.removeAllPhasesOfType("MysteryEncounterRewardsPhase");
-    }
-
-    if (eggRewards) {
-      eggRewards.forEach(eggOptions => {
-        const egg = new Egg(eggOptions);
-        egg.addEggToGameData();
-      });
-    }
-
-    return true;
+    const ordinal = surfaces.length;
+    const projection = makeCoopMeModifierRewardSurfaceProjection(
+      `modifier:me:${encounter.encounterType}:${ordinal}`,
+      settings.rerollMultiplier ?? 1,
+    );
+    rewardSurfaceProjections.push(projection);
+    const surface = { ...projection, ordinal, settings };
+    surfaces.push(surface);
+    return surface;
   };
+  if (customShopRewards != null) {
+    appendModifierSurface(customShopRewards);
+  }
+  let preparationComplete = false;
+  let preparationInFlight: Promise<void> | null = null;
+  let registrationOpen = false;
+  const preparationContext: MysteryEncounterRewardPreparationContext = {
+    registerModifierSurface: settings => {
+      if (!registrationOpen) {
+        throw new Error("Mystery Encounter reward surfaces may only be registered during reward preparation");
+      }
+      appendModifierSurface(settings);
+    },
+  };
+  const rewardPlan: MysteryEncounterRewardPlan = {
+    surfaces,
+    rewardSurfaceProjections,
+    prepareAutomaticEffects: () => {
+      if (preparationComplete) {
+        return;
+      }
+      if (preparationInFlight != null) {
+        return preparationInFlight;
+      }
+      const queuedModifierSurfaceCount = globalScene.phaseManager
+        .getQueuedPhaseNames()
+        .filter(phaseName => phaseName === "SelectModifierPhase").length;
+      const surfaceCountBeforePreparation = surfaces.length;
+      const projectionCountBeforePreparation = rewardSurfaceProjections.length;
+      const eggCountBeforePreparation = preparedEggs.length;
+      const rollbackPreparation = () => {
+        registrationOpen = false;
+        preparationInFlight = null;
+        surfaces.length = surfaceCountBeforePreparation;
+        rewardSurfaceProjections.length = projectionCountBeforePreparation;
+        preparedEggs.length = eggCountBeforePreparation;
+      };
+      const finalizePreparation = () => {
+        try {
+          registrationOpen = false;
+          const queuedModifierSurfaceCountAfterPreparation = globalScene.phaseManager
+            .getQueuedPhaseNames()
+            .filter(phaseName => phaseName === "SelectModifierPhase").length;
+          if (queuedModifierSurfaceCountAfterPreparation !== queuedModifierSurfaceCount) {
+            throw new Error(
+              "Mystery Encounter reward preparation queued an unregistered SelectModifierPhase; use registerModifierSurface",
+            );
+          }
+          for (const [eggOrdinal, eggOptions] of (eggRewards ?? []).entries()) {
+            if (rewardSurfaceProjections.length >= COOP_ME_REWARD_SURFACE_LIMIT) {
+              throw new Error(`Mystery Encounter reward plan exceeds ${COOP_ME_REWARD_SURFACE_LIMIT} surfaces`);
+            }
+            if (eggOptions.pulled === true) {
+              throw new Error("Mystery Encounter reward eggs cannot use pulled:true (constructor auto-adds them)");
+            }
+            const egg = new Egg({ ...eggOptions, pulled: false });
+            preparedEggs.push(egg);
+            rewardSurfaceProjections.push({
+              kind: "egg",
+              surfaceId: `egg:me:${encounter.encounterType}:${eggOrdinal}`,
+              id: egg.id,
+              timestamp: egg.timestamp,
+              sourceType: egg.sourceType ?? null,
+              tier: egg.tier,
+              hatchWaves: egg.hatchWaves,
+              species: egg.species,
+              isShiny: egg.isShiny,
+              variantTier: egg.variantTier,
+              eggMoveIndex: egg.eggMoveIndex,
+              overrideHiddenAbility: egg.overrideHiddenAbility,
+              eggDescriptor: eggOptions.eggDescriptor ?? null,
+            });
+          }
+        } catch (error) {
+          rollbackPreparation();
+          throw error;
+        }
+        preparationComplete = true;
+        preparationInFlight = null;
+      };
+      registrationOpen = true;
+      let result: void | Promise<void>;
+      try {
+        result = preRewardsCallback?.(preparationContext);
+      } catch (error) {
+        rollbackPreparation();
+        throw error;
+      }
+      if (result != null) {
+        preparationInFlight = result.then(finalizePreparation, error => {
+          rollbackPreparation();
+          throw error;
+        });
+        return preparationInFlight;
+      }
+      finalizePreparation();
+    },
+    openRewardSurfaces: () => {
+      if (surfaces.length > 0) {
+        for (const surface of surfaces) {
+          globalScene.phaseManager.unshiftNew(
+            "SelectModifierPhase",
+            0,
+            undefined,
+            surface.settings,
+            false,
+            { kind: "ambient" },
+            { surfaceId: surface.surfaceId, ordinal: surface.ordinal },
+          );
+        }
+      } else {
+        globalScene.phaseManager.removeAllPhasesOfType("MysteryEncounterRewardsPhase");
+      }
+
+      for (const egg of preparedEggs) {
+        coopAllowAccountWrite("me-egg-reward", () => egg.addEggToGameDataOnce());
+      }
+
+      return true;
+    },
+  };
+  encounter.rewardPlan = rewardPlan;
+  // Existing encounter callsites still observe the established callback. MysteryEncounterRewardsPhase owns
+  // preparation and freezes the P36 ordered projection before invoking this surface seam.
+  encounter.doEncounterRewards = rewardPlan.openRewardSurfaces;
+}
+
+/** Build the exact ordered standard reward projection, or reject an untyped raw callback. */
+function mysteryEncounterRewardSurfaces(
+  encounter: MysteryEncounter,
+  continuation: "rewards" | "encounter" | "none",
+  addHealPhase: boolean,
+): readonly CoopMeRewardSurfaceProjection[] | null {
+  if (continuation !== "rewards") {
+    return [];
+  }
+  const rewardPlan =
+    encounter.rewardPlan?.openRewardSurfaces === encounter.doEncounterRewards ? encounter.rewardPlan : null;
+  if (rewardPlan != null) {
+    return rewardPlan.rewardSurfaceProjections;
+  }
+  if (encounter.doEncounterRewards != null) {
+    return null;
+  }
+  return addHealPhase ? [makeCoopMeModifierRewardSurfaceProjection("modifier:heal", -1)] : [];
 }
 
 /**
@@ -1254,12 +1555,42 @@ export function handleMysteryEncounterVictory(addHealPhase = false, doNotContinu
         encounter.encounterMode === MysteryEncounterMode.TRAINER_BATTLE ? !p?.isFainted(true) : p.isOnField(),
       )
   ) {
-    globalScene.phaseManager.pushNew("BattleEndPhase", true);
-    if (encounter.encounterMode === MysteryEncounterMode.TRAINER_BATTLE) {
+    const queueRewards =
+      globalScene.gameMode.isEndless || !globalScene.gameMode.isWaveFinal(globalScene.currentBattle.waveIndex);
+    const trainerVictory = encounter.encounterMode === MysteryEncounterMode.TRAINER_BATTLE;
+    const continuation = encounter.doContinueEncounter ? "encounter" : queueRewards ? "rewards" : "none";
+    if (globalScene.gameMode.isCoop && continuation === "none") {
+      failCoopSharedSession("A final-wave Mystery battle has no retained GameOver continuation in protocol 36.");
+      return;
+    }
+    const rewardSurfaces = mysteryEncounterRewardSurfaces(encounter, continuation, addHealPhase);
+    if (rewardSurfaces == null && globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
+      failCoopSharedSession("A Mystery battle reward callback had no typed reward-surface plan.");
+      return;
+    }
+    const settlementPlan = {
+      result: "victory",
+      continuation,
+      trainerVictory,
+      rewardSurfaces: rewardSurfaces ?? [],
+      eggLapse: continuation === "rewards",
+    } as const;
+    globalScene.phaseManager.pushNew("BattleEndPhase", true, null, settlementPlan);
+    // The retained battle-settled terminal constructs every following guest phase only after its complete
+    // post-BattleEnd DATA image applies. Never pre-queue a locally-derived reward tail on the renderer.
+    if (isCoopAuthoritativeGuest()) {
+      return;
+    }
+    if (trainerVictory) {
       globalScene.phaseManager.pushNew("TrainerVictoryPhase");
     }
-    if (globalScene.gameMode.isEndless || !globalScene.gameMode.isWaveFinal(globalScene.currentBattle.waveIndex)) {
-      globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase);
+    if (queueRewards) {
+      globalScene.phaseManager.pushNew(
+        "MysteryEncounterRewardsPhase",
+        addHealPhase,
+        null,
+        continuation === "rewards" ? settlementPlan : null,
+      );
       if (!encounter.doContinueEncounter) {
         // Only lapse eggs once for multi-battle encounters
         globalScene.phaseManager.pushNew("EggLapsePhase");
@@ -1287,11 +1618,33 @@ export function handleMysteryEncounterBattleFailed(addHealPhase = false, doNotCo
   if (encounter.continuousEncounter || doNotContinue) {
     return;
   }
-  if (encounter.encounterMode !== MysteryEncounterMode.NO_BATTLE) {
-    globalScene.phaseManager.pushNew("BattleEndPhase", false);
+  if (encounter.encounterMode === MysteryEncounterMode.NO_BATTLE) {
+    globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase);
+  } else {
+    const continuation = encounter.doContinueEncounter ? "encounter" : "rewards";
+    const rewardSurfaces = mysteryEncounterRewardSurfaces(encounter, continuation, addHealPhase);
+    if (rewardSurfaces == null && globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
+      failCoopSharedSession("A failed Mystery battle reward callback had no typed reward-surface plan.");
+      return;
+    }
+    const settlementPlan = {
+      result: "failure",
+      continuation,
+      trainerVictory: false,
+      rewardSurfaces: rewardSurfaces ?? [],
+      eggLapse: continuation === "rewards",
+    } as const;
+    globalScene.phaseManager.pushNew("BattleEndPhase", false, null, settlementPlan);
+    if (isCoopAuthoritativeGuest()) {
+      return;
+    }
+    globalScene.phaseManager.pushNew(
+      "MysteryEncounterRewardsPhase",
+      addHealPhase,
+      null,
+      continuation === "rewards" ? settlementPlan : null,
+    );
   }
-
-  globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase);
 
   if (!encounter.doContinueEncounter) {
     // Only lapse eggs once for multi-battle encounters

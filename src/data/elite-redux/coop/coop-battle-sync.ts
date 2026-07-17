@@ -17,8 +17,9 @@
 //         `command`. It never needs the engine - the host did the legality work.
 //
 // The host never trusts the peer with engine state: it only accepts a slot index
-// it itself offered. A missing/slow reply resolves to `null` after a timeout so
-// the caller falls back to the AI picker and the turn never hangs.
+// it itself offered. A fully addressed missing reply enters the shared terminal
+// before resolving the retained promise; legacy unaddressed probes keep the old
+// `null` result for compatibility, but production never converts it into AI.
 //
 // Engine-FREE (transport + the wire types only), so the whole relay is unit-
 // testable headlessly over a LoopbackTransport with a spoof responder - the same
@@ -57,26 +58,51 @@ export interface CoopCommandAddress {
   pokemonId: number;
 }
 
+/** Exact host-retained command surface carried by a checksum-bound control snapshot. */
+export interface CoopPendingCommandSnapshot extends CoopCommandRequest {
+  owner?: CoopRole | undefined;
+  address?: CoopCommandAddress | undefined;
+}
+
+/** Exact immutable command surface whose bounded peer wait exhausted. */
+export interface CoopCommandTimeout {
+  epoch: number;
+  wave: number;
+  turn: number;
+  owner: CoopRole;
+  pokemonId: number;
+  fieldIndex: number;
+}
+
+interface PendingCommandRequest extends CoopPendingCommandSnapshot {
+  finish: (cmd: SerializedCommand | null) => void;
+}
+
 /** Turns a {@linkcode CoopCommandRequest} into the command to send back. */
 export type CoopCommandResponder = (req: CoopCommandRequest) => SerializedCommand;
 
 /** Options for {@linkcode CoopBattleSync}. */
 export interface CoopBattleSyncOptions {
   /** Per-request timeout before {@linkcode CoopBattleSync.requestPartnerCommand}
-   *  resolves null (the caller then falls back to AI). Default 20min. */
+   *  exhausts its retained command surface. Default 20min. */
   timeoutMs?: number;
   /** Timer injection (tests). Returns a cancel fn. Defaults to setTimeout/clearTimeout. */
   schedule?: (cb: () => void, ms: number) => () => void;
+  /**
+   * Fail-closed production callback for a fully addressed command surface that times out or is declined.
+   * It runs synchronously before the retained request resolves `null`, allowing the runtime to enter shared
+   * terminal control before a CommandPhase continuation can mistake that release for permission to choose AI.
+   */
+  onCommandTimeout?: (timeout: CoopCommandTimeout) => void;
 }
 
-// Wait up to 20 MINUTES for the real partner's move before the AI takes over (#633).
-// The AI fallback is the single biggest live desync source: when it fires it picks a
+// Wait up to 20 MINUTES for the real partner's move before shared terminal control (#633).
+// The former AI fallback was the single biggest live desync source: when it fired it picked a
 // DIFFERENT move than the one the partner then actually sends -> the two engines diverge
 // from that turn on (one player ends up in the shop while the other is still choosing a
 // move). The old 30s window tripped it constantly; 5min still occasionally caught a slow
-// thinker. 20 minutes effectively means "wait for the human" - the AI is now ONLY a
-// last-resort safety net for a genuinely-disconnected partner, never a turn-timer that
-// fires while someone is mid-think.
+// thinker. 20 minutes effectively means "wait for the human"; exhaustion now stops both
+// clients coherently instead of authoring a move the absent player never chose.
 const DEFAULT_TIMEOUT_MS = 1_200_000;
 
 function defaultSchedule(cb: () => void, ms: number): () => void {
@@ -268,6 +294,11 @@ interface BufferedCommand extends CommandRoute {
   command: SerializedCommand;
 }
 
+interface BufferedCommandRequest extends CommandRoute {
+  moveSlots: number[];
+  offer?: CoopBattleCommandOffer | undefined;
+}
+
 function commandRoute(fieldIndex: number, turn: number, owner?: CoopRole, address?: CoopCommandAddress): CommandRoute {
   return {
     fieldIndex,
@@ -277,30 +308,40 @@ function commandRoute(fieldIndex: number, turn: number, owner?: CoopRole, addres
   };
 }
 
-/**
- * The live clients can briefly disagree on a copied player Pokemon's id even though they agree on the
- * logical command slot. Recover ONLY the safe, observable case: same owner, same visible field slot, same
- * epoch/wave/turn, and exactly one candidate. Field-index skew is already handled by an exact owner+Pokemon
- * key; requiring the field index here means we never guess when one owner commands multiple active Pokemon.
- */
-function findUnambiguousEntityIdSkew<T extends CommandRoute>(
-  entries: ReadonlyMap<string, T>,
-  expected: CommandRoute,
-): { key: string; value: T } | undefined {
-  if (expected.owner == null || expected.address == null) {
-    return;
+/** Compare immutable command boundaries without treating a reused numeric turn as the same surface. */
+function compareCommandBoundary(left: CommandRoute, right: CommandRoute): number {
+  for (const [leftPart, rightPart] of [
+    [left.address?.epoch ?? 0, right.address?.epoch ?? 0],
+    [left.address?.wave ?? 0, right.address?.wave ?? 0],
+    [left.turn, right.turn],
+  ]) {
+    if (leftPart !== rightPart) {
+      return leftPart - rightPart;
+    }
   }
-  const matches = [...entries].filter(
-    ([, candidate]) =>
-      candidate.owner === expected.owner
-      && candidate.fieldIndex === expected.fieldIndex
-      && candidate.turn === expected.turn
-      && candidate.address != null
-      && candidate.address.epoch === expected.address!.epoch
-      && candidate.address.wave === expected.address!.wave
-      && candidate.address.pokemonId !== expected.address!.pokemonId,
+  return 0;
+}
+
+/**
+ * Whether two requests name the same immutable command surface.
+ *
+ * A fully addressed surface is the stable owner/slot plus the exact Pokemon identity. Two copied engines
+ * disagreeing on that identity is state divergence, not permission to alias one actor's command onto another.
+ * Legacy unaddressed callers retain their historical owner/field matching within their per-runtime relay.
+ */
+function sameCommandSurface(left: CommandRoute, right: CommandRoute): boolean {
+  const sameStableSlot =
+    left.owner != null && right.owner != null ? left.owner === right.owner : left.fieldIndex === right.fieldIndex;
+  if (left.address == null || right.address == null) {
+    return left.address == null && right.address == null && sameStableSlot;
+  }
+  return (
+    sameStableSlot
+    && left.address.epoch === right.address.epoch
+    && left.address.wave === right.address.wave
+    && left.address.pokemonId === right.address.pokemonId
+    && left.turn === right.turn
   );
-  return matches.length === 1 ? { key: matches[0][0], value: matches[0][1] } : undefined;
 }
 
 function commandAddressLabel(route: CommandRoute): string {
@@ -356,40 +397,32 @@ function commandAddressOf(message: {
 /**
  * Rides on a {@linkcode CoopTransport} to relay the partner's battle command. One
  * instance per client. The host calls {@linkcode requestPartnerCommand}; the peer
- * sets a responder via {@linkcode onCommandRequest}. Matching is by `fieldIndex`
- * (a slot has at most one outstanding request per turn).
+ * sets a responder via {@linkcode onCommandRequest}. Production matching uses the immutable
+ * epoch/wave/turn/owner/Pokemon address; legacy callers remain isolated in their unaddressed namespace.
  */
 export class CoopBattleSync {
   private readonly transport: CoopTransport;
   private readonly timeoutMs: number;
   private readonly schedule: (cb: () => void, ms: number) => () => void;
+  private readonly onCommandTimeout: ((timeout: CoopCommandTimeout) => void) | null;
+  /** Set before terminal cancellation releases any retained command promise. */
+  private terminalFrozen = false;
   /** Full request state retained until resolution so a replaced channel can reissue it verbatim. */
-  private readonly pending = new Map<
-    string,
-    {
-      finish: (cmd: SerializedCommand | null) => void;
-      fieldIndex: number;
-      turn: number;
-      moveSlots: number[];
-      offer?: CoopBattleCommandOffer | undefined;
-      owner?: CoopRole | undefined;
-      address?: CoopCommandAddress | undefined;
-    }
-  >();
+  private readonly pending = new Map<string, PendingCommandRequest>();
   /**
-   * `fieldIndex:turn` -> a `command` that arrived with NO pending request yet (#633,
+   * Complete command address -> a `command` that arrived with NO pending request yet (#633,
    * LIVE-C). In lockstep the two clients are NOT time-locked: the peer may broadcast
    * its move before this client reaches that slot's await. Buffer it so the next
    * {@linkcode requestPartnerCommand} for that slot resolves instantly instead of
    * dropping the move and timing out -> AI (the live "stuck 30s then desync" bug).
    *
-   * Keyed by `(fieldIndex, TURN)`, NOT fieldIndex alone (#633 desync fix): a peer
+   * Keyed by the exact epoch/wave/owner/Pokemon/turn, NOT fieldIndex alone (#633 desync fix): a peer
    * that races ahead can broadcast turn N then turn N+1 (or a switch then a move on
    * the same slot) before the awaiter consumes turn N. A fieldIndex-only latest-wins
    * buffer silently overwrote the earlier one, so the awaiter applied the WRONG turn's
    * command -> one client switched/moved while the other did something else (the live
-   * move/switch/target desync). Turn-keying makes an await for turn N accept ONLY the
-   * turn-N command; stale older-turn entries are pruned on request.
+   * move/switch/target desync). Full-address keying makes an await accept only that actor's
+   * command at that boundary; stale entries remain isolated or are pruned when their boundary expires.
    */
   private readonly inbox = new Map<string, BufferedCommand>();
   /** The local human's committed pick, retained so a replaced channel can request it again. */
@@ -415,6 +448,7 @@ export class CoopBattleSync {
     this.transport = transport;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.schedule = opts.schedule ?? defaultSchedule;
+    this.onCommandTimeout = opts.onCommandTimeout ?? null;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offStateChange = transport.onStateChange(state => {
       if (state !== "connected") {
@@ -435,6 +469,31 @@ export class CoopBattleSync {
         this.sendCommandRequest(request);
       }
     });
+  }
+
+  /** Fence a fully addressed command release before its promise continuation can authorize local AI. */
+  private failClosedAddressedRequest(request: PendingCommandRequest, cause: "timeout" | "decline"): boolean {
+    const { owner, address } = request;
+    if (owner == null || address == null) {
+      return false;
+    }
+    // Fence FIRST. Even if an injected callback throws, CommandPhase can never reinterpret the terminal
+    // release as permission to synthesize the absent owner's command locally.
+    this.terminalFrozen = true;
+    try {
+      this.onCommandTimeout?.({
+        epoch: address.epoch,
+        wave: address.wave,
+        turn: request.turn,
+        owner,
+        pokemonId: address.pokemonId,
+        fieldIndex: request.fieldIndex,
+      });
+    } catch (error) {
+      // The terminal fence remains observable and the retained promise must still settle.
+      coopWarn("relay", `command-${cause} terminal callback threw`, error);
+    }
+    return true;
   }
 
   private sendCommandRequest(request: {
@@ -460,7 +519,9 @@ export class CoopBattleSync {
   /**
    * HOST: ask the peer for the command for `fieldIndex` on `turn`, offering the
    * `moveSlots` the host computed as legal. Resolves with the peer's chosen
-   * command, or `null` if no reply arrives within the timeout (caller -> AI).
+   * command, or `null` if no reply arrives within the timeout. Fully addressed requests synchronously
+   * enter the injected terminal fence before that null is observable; only legacy unaddressed callers can
+   * retain the historical fallback behavior.
    * A second request for the same slot supersedes the first (resolves it null).
    *
    * `owner` (#851, optional) is the awaited slot's resolved `coopOwner`
@@ -477,8 +538,11 @@ export class CoopBattleSync {
     offer?: CoopBattleCommandOffer,
     address?: CoopCommandAddress,
   ): Promise<SerializedCommand | null> {
+    if (this.terminalFrozen) {
+      traceCommand("rejected", fieldIndex, turn, owner, address, "shared-terminal-frozen");
+      return Promise.resolve(null);
+    }
     const key = commandKey(fieldIndex, turn, owner, address);
-    const requestedRoute = commandRoute(fieldIndex, turn, owner, address);
     const slotPrefix = key.slice(0, key.lastIndexOf(":") + 1); // `wave:fieldIndex:` (#819)
     // Supersede any stale in-flight request on this SLOT (the turn has moved on, so an
     // older-turn await is moot) and prune any stale older-turn buffered command for it,
@@ -499,25 +563,12 @@ export class CoopBattleSync {
     }
     // The peer may have already broadcast its move for THIS turn (lockstep, no
     // time-lock). If so, consume the buffered command immediately - no request, no wait.
-    let bufferedKey = key;
-    let buffered = this.inbox.get(key);
-    if (buffered === undefined) {
-      const skewed = findUnambiguousEntityIdSkew(this.inbox, requestedRoute);
-      if (skewed != null) {
-        bufferedKey = skewed.key;
-        buffered = skewed.value;
-        coopWarn(
-          "relay",
-          `host requestPartnerCommand recovered entity-id skew (${commandAddressLabel(buffered)} -> ${commandAddressLabel(requestedRoute)})`,
-        );
-      }
-    }
+    const buffered = this.inbox.get(key);
     if (buffered !== undefined) {
-      this.inbox.delete(bufferedKey);
+      this.inbox.delete(key);
       const validation = offer == null ? { valid: true } : validateCoopBattleCommand(buffered.command, offer);
       if (validation.valid) {
         this.settled.add(key);
-        this.settled.add(bufferedKey);
         if (isCoopDebug()) {
           coopLog(
             "relay",
@@ -536,15 +587,7 @@ export class CoopBattleSync {
     return new Promise<SerializedCommand | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
-      let request: {
-        finish: (cmd: SerializedCommand | null) => void;
-        fieldIndex: number;
-        turn: number;
-        moveSlots: number[];
-        offer?: CoopBattleCommandOffer | undefined;
-        owner?: CoopRole | undefined;
-        address?: CoopCommandAddress | undefined;
-      };
+      let request: PendingCommandRequest;
       const finish = (cmd: SerializedCommand | null) => {
         if (settled) {
           return;
@@ -572,9 +615,10 @@ export class CoopBattleSync {
       cancelTimer = this.schedule(() => {
         coopWarn(
           "relay",
-          `host requestPartnerCommand TIMEOUT fieldIndex=${fieldIndex} turn=${turn} after=${this.timeoutMs}ms -> resolving null (caller falls back to AI)`,
+          `host requestPartnerCommand TIMEOUT fieldIndex=${fieldIndex} turn=${turn} after=${this.timeoutMs}ms -> fail closed`,
         );
         traceCommand("timed-out", fieldIndex, turn, owner, address);
+        this.failClosedAddressedRequest(request, "timeout");
         finish(null);
       }, this.timeoutMs);
       if (isCoopDebug()) {
@@ -589,15 +633,8 @@ export class CoopBattleSync {
     });
   }
 
-  /** #812: requests that arrived before the responder installed (guest mid-replay). */
-  private readonly bufferedRequests: {
-    fieldIndex: number;
-    turn: number;
-    moveSlots: number[];
-    offer?: CoopBattleCommandOffer | undefined;
-    owner?: CoopRole;
-    address?: CoopCommandAddress;
-  }[] = [];
+  /** #812/P33: exact addressed requests that arrived before the responder installed (guest mid-replay). */
+  private readonly bufferedRequests = new Map<string, BufferedCommandRequest>();
   /** #812: injected by the runtime (cycle-free); true = this client owns the field slot. */
   private slotOwnershipProbe: ((fieldIndex: number) => boolean) | null = null;
 
@@ -617,8 +654,8 @@ export class CoopBattleSync {
     turn: number;
     moveSlots: number[];
     offer?: CoopBattleCommandOffer | undefined;
-    owner?: CoopRole;
-    address?: CoopCommandAddress;
+    owner?: CoopRole | undefined;
+    address?: CoopCommandAddress | undefined;
   }): void {
     const responder = this.responder;
     if (responder == null) {
@@ -664,8 +701,10 @@ export class CoopBattleSync {
   onCommandRequest(responder: CoopCommandResponder): void {
     this.responder = responder;
     // #812: drain requests that arrived while the responder was not yet installed (the
-    // guest was still replaying the previous turn). Stale turns are ignored host-side.
-    const buffered = this.bufferedRequests.splice(0);
+    // guest was still replaying the previous turn). P33 retains only the newest immutable
+    // boundary for each surface, so a delayed prior-wave request can never be answered here.
+    const buffered = [...this.bufferedRequests.values()];
+    this.bufferedRequests.clear();
     for (const req of buffered) {
       coopLog("relay", `answering BUFFERED commandRequest fieldIndex=${req.fieldIndex} turn=${req.turn} (#812)`);
       this.answerRequest(req);
@@ -743,7 +782,26 @@ export class CoopBattleSync {
     this.peerOffers.clear();
     this.settled.clear();
     this.responder = null;
-    this.bufferedRequests.length = 0;
+    this.bufferedRequests.clear();
+  }
+
+  /**
+   * Enter terminal command control before releasing retained requests. This ordering is load-bearing:
+   * every promise continuation can observe the terminal fence and therefore cannot convert `null` into a
+   * local AI decision while the peer is entering the same retained terminal transaction.
+   */
+  freezeForTerminal(): void {
+    this.terminalFrozen = true;
+    // Idempotently drain on every call. An addressed timeout sets the fence immediately before invoking
+    // the runtime callback; that callback then reaches this method and must still release this request and
+    // any sibling command surfaces even though the boolean was already true.
+    this.cancelPending();
+    this.bufferedRequests.clear();
+  }
+
+  /** Whether terminal cancellation, rather than a gameplay timeout fallback, released this relay. */
+  isTerminalFrozen(): boolean {
+    return this.terminalFrozen;
   }
 
   /** Terminal membership loss: release every retained request only after recovery is no longer possible. */
@@ -773,6 +831,76 @@ export class CoopBattleSync {
     }));
   }
 
+  /**
+   * Re-deliver authoritative peer command requests through the same live inbound path after a full snapshot.
+   * The whole set is preflighted before any request is admitted: P33 recovery never guesses an owner/entity
+   * from a numeric turn, and a stale epoch/wave cannot reopen a prior command surface.
+   */
+  restorePeerPendingRequests(
+    requests: readonly CoopPendingCommandSnapshot[],
+    expectedEpoch: number,
+    expectedWave?: number,
+  ): boolean {
+    if (this.terminalFrozen || !Array.isArray(requests) || !Number.isSafeInteger(expectedEpoch)) {
+      return false;
+    }
+    const keys = new Set<string>();
+    for (const request of requests) {
+      const address = request?.address;
+      if (
+        !Number.isSafeInteger(request?.fieldIndex)
+        || request.fieldIndex < 0
+        || request.fieldIndex > 255
+        || !Number.isSafeInteger(request.turn)
+        || request.turn < 0
+        || !Array.isArray(request.moveSlots)
+        || request.moveSlots.some(slot => !Number.isSafeInteger(slot) || slot < 0 || slot > 3)
+        || (request.owner !== "host" && request.owner !== "guest")
+        || request.owner !== this.transport.role
+        || address == null
+        || !Number.isSafeInteger(address.epoch)
+        || address.epoch !== expectedEpoch
+        || !Number.isSafeInteger(address.wave)
+        || address.wave < 0
+        || (expectedWave != null && address.wave !== expectedWave)
+        || !Number.isSafeInteger(address.pokemonId)
+        || address.pokemonId < 0
+      ) {
+        coopWarn("relay", "refused malformed or stale snapshot command surface");
+        return false;
+      }
+      const key = commandKey(request.fieldIndex, request.turn, request.owner, address);
+      if (keys.has(key)) {
+        coopWarn("relay", `refused duplicate snapshot command surface key=${key}`);
+        return false;
+      }
+      keys.add(key);
+    }
+
+    for (const request of requests) {
+      this.handle({
+        t: "commandRequest",
+        fieldIndex: request.fieldIndex,
+        turn: request.turn,
+        moveSlots: [...request.moveSlots],
+        ...(request.offer == null ? {} : { offer: request.offer }),
+        owner: request.owner!,
+        ...request.address!,
+      });
+    }
+    return true;
+  }
+
+  /** True when every restored request already has the exact retained local human decision. */
+  hasRetainedSnapshotCommand(requests: readonly CoopPendingCommandSnapshot[]): boolean {
+    return requests.every(request => {
+      if (request.owner == null || request.address == null) {
+        return false;
+      }
+      return this.localOutbox.has(commandKey(request.fieldIndex, request.turn, request.owner, request.address));
+    });
+  }
+
   private handle(msg: CoopMessage): void {
     if (msg.t === "commandRequest") {
       const address = commandAddressOf(msg);
@@ -781,29 +909,13 @@ export class CoopBattleSync {
       if (msg.offer != null) {
         this.peerOffers.set(key, msg.offer);
       }
-      const requestedRoute = commandRoute(msg.fieldIndex, msg.turn, msg.owner, address);
-      let cachedKey = key;
-      let cached = this.localOutbox.get(key);
-      if (cached == null) {
-        const skewed = findUnambiguousEntityIdSkew(this.localOutbox, requestedRoute);
-        if (skewed != null) {
-          cachedKey = skewed.key;
-          cached = skewed.value;
-          coopWarn(
-            "relay",
-            `peer commandRequest recovered retained entity-id skew (${commandAddressLabel(cached)} -> ${commandAddressLabel(requestedRoute)})`,
-          );
-        }
-      }
+      const cached = this.localOutbox.get(key);
       if (cached != null) {
         coopLog(
           "relay",
           `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> replay retained local command`,
         );
         const normalizedCommand = normalizeLocalCommand(cached.command, msg.offer);
-        if (cachedKey !== key) {
-          this.localOutbox.delete(cachedKey);
-        }
         this.localOutbox.set(key, {
           fieldIndex: msg.fieldIndex,
           turn: msg.turn,
@@ -830,20 +942,61 @@ export class CoopBattleSync {
         //    timeout+AI fallback still bounds the worst case, so this can never hang.
         //  - the slot is provably NOT ours (#693's mutual-misresolve deadlock): DECLINE so
         //    the host's await resolves null and its AI fallback breaks the deadlock.
-        const ours = this.slotOwnershipProbe?.(msg.fieldIndex) ?? true;
+        // A fully addressed request already carries the stable logical owner. That identity must win over
+        // a field-index probe: after a host-side half-wipe/recenter, the guest can still render the old field
+        // layout while the host has compacted the same guest-owned Pokemon to another index. Re-deriving
+        // ownership from that transient index produced a false DECLINE, so the host AI-commanded the guest's
+        // mon before its replay reached the real picker (#851 live wave-1/turn-2 trace). Only legacy requests
+        // without an owner need the best-effort field-layout probe.
+        const ours =
+          msg.owner == null ? (this.slotOwnershipProbe?.(msg.fieldIndex) ?? true) : msg.owner === this.transport.role;
         if (ours) {
           coopLog(
             "relay",
             `peer recv commandRequest fieldIndex=${msg.fieldIndex} owner=${msg.owner ?? "-"} turn=${msg.turn} before responder install -> BUFFERED (own slot, #812)`,
           );
-          this.bufferedRequests.push({
+          const bufferedRequest: BufferedCommandRequest = {
             fieldIndex: msg.fieldIndex,
             turn: msg.turn,
             moveSlots: msg.moveSlots,
             ...(msg.offer == null ? {} : { offer: msg.offer }),
             ...(msg.owner == null ? {} : { owner: msg.owner }),
             ...(address == null ? {} : { address }),
-          });
+          };
+          let stale = false;
+          for (const [bufferedKey, prior] of [...this.bufferedRequests]) {
+            const order = compareCommandBoundary(prior, bufferedRequest);
+            if (order > 0) {
+              stale = true;
+              coopWarn(
+                "relay",
+                `drop stale pre-responder commandRequest (${commandAddressLabel(bufferedRequest)}); `
+                  + `newer buffered boundary is ${commandAddressLabel(prior)}`,
+              );
+              break;
+            }
+            if (order < 0) {
+              this.bufferedRequests.delete(bufferedKey);
+              continue;
+            }
+            if (!sameCommandSurface(prior, bufferedRequest)) {
+              continue;
+            }
+            // The same complete address is an idempotent retransmission. A different entity at the same
+            // epoch/wave/turn/slot is conflicting authority; first writer stays canonical and is answered.
+            stale = true;
+            if (bufferedKey !== key) {
+              coopWarn(
+                "security",
+                `conflicting pre-responder commandRequest at ${commandAddressLabel(bufferedRequest)}; `
+                  + `retaining canonical ${commandAddressLabel(prior)}`,
+              );
+            }
+            break;
+          }
+          if (!stale) {
+            this.bufferedRequests.set(key, bufferedRequest);
+          }
           return;
         }
         coopWarn(
@@ -878,13 +1031,9 @@ export class CoopBattleSync {
       const route = commandRoute(msg.fieldIndex, msg.turn, msg.owner, address);
       const key = commandKey(msg.fieldIndex, msg.turn, msg.owner, address);
       this.localOutbox.delete(key);
-      const skewed = findUnambiguousEntityIdSkew(this.localOutbox, route);
-      if (skewed != null) {
-        this.localOutbox.delete(skewed.key);
-      }
       coopWarn(
         "relay",
-        `host rejected local command fieldIndex=${msg.fieldIndex} turn=${msg.turn} reason=${msg.reason}; authoritative default applied`,
+        `host rejected local command ${commandAddressLabel(route)} reason=${msg.reason}; exact retained intent dropped`,
       );
       return;
     }
@@ -894,37 +1043,26 @@ export class CoopBattleSync {
       const address = commandAddressOf(msg);
       const key = commandKey(msg.fieldIndex, msg.turn, msg.owner, address);
       const incomingRoute = commandRoute(msg.fieldIndex, msg.turn, msg.owner, address);
-      let requestKey = key;
-      let request = this.pending.get(key);
-      if (request == null) {
-        const skewed = findUnambiguousEntityIdSkew(this.pending, incomingRoute);
-        if (skewed != null) {
-          requestKey = skewed.key;
-          request = skewed.value;
-          coopWarn(
-            "relay",
-            `recv command recovered entity-id skew (${commandAddressLabel(incomingRoute)} -> ${commandAddressLabel(request)})`,
-          );
-        }
-      }
+      const request = this.pending.get(key);
       if (this.settled.has(key)) {
         traceCommand("duplicate", msg.fieldIndex, msg.turn, msg.owner, address);
         coopLog("relay", `recv command DUPLICATE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> ignored`);
         return;
       }
-      // #693: an explicit DECLINE resolves the awaiter with null -> the caller's AI
-      // fallback commands the slot. Never treated as a real command.
+      // #693 compatibility: only an UNADDRESSED legacy DECLINE can release to the caller's AI fallback.
+      // A fully addressed decline means the peers disagree about immutable command ownership, so it must
+      // enter the same terminal fence as an addressed timeout before the retained promise resolves.
       if (msg.decline && request != null) {
         traceCommand("declined", msg.fieldIndex, msg.turn, msg.owner, address);
-        this.pending.delete(requestKey);
-        coopLog("relay", `recv command DECLINE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> AI fallback`);
+        const terminal = this.failClosedAddressedRequest(request, "decline");
+        coopLog(
+          "relay",
+          `recv command DECLINE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> ${terminal ? "fail closed" : "legacy AI fallback"}`,
+        );
         request.finish(null);
         return;
       }
       if (request) {
-        if (requestKey !== key) {
-          this.settled.add(key);
-        }
         if (request.offer != null) {
           const validation = validateCoopBattleCommand(msg.command, request.offer);
           if (!validation.valid) {

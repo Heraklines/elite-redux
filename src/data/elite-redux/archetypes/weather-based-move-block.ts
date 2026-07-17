@@ -19,6 +19,12 @@
 import { PreDefendAbAttr, type TypeMultiplierAbAttrParams } from "#abilities/ab-attrs";
 import { MoveId } from "#enums/move-id";
 
+// The dex enumerates the OFFENSIVE weather-based moves Weather Control negates
+// from enemies: Weather Ball, Solar Beam/Blade, Hurricane, Thunder, Blizzard,
+// Silver Wind, the four Storm moves, Sheer Cold, and the three Pledge moves.
+// The self-targeting weather heals (Morning Sun / Synthesis / Moonlight / Shore
+// Up / Aurora Veil) are dropped — they never arrive as an incoming enemy move,
+// so blocking them was inert and not in the dex list.
 const WEATHER_BASED_MOVES = new Set<MoveId>([
   MoveId.WEATHER_BALL,
   MoveId.SOLAR_BEAM,
@@ -26,11 +32,15 @@ const WEATHER_BASED_MOVES = new Set<MoveId>([
   MoveId.HURRICANE,
   MoveId.THUNDER,
   MoveId.BLIZZARD,
-  MoveId.MORNING_SUN,
-  MoveId.SYNTHESIS,
-  MoveId.MOONLIGHT,
-  MoveId.SHORE_UP,
-  MoveId.AURORA_VEIL,
+  MoveId.SILVER_WIND,
+  MoveId.WILDBOLT_STORM,
+  MoveId.BLEAKWIND_STORM,
+  MoveId.SANDSEAR_STORM,
+  MoveId.SPRINGTIDE_STORM,
+  MoveId.SHEER_COLD,
+  MoveId.FIRE_PLEDGE,
+  MoveId.WATER_PLEDGE,
+  MoveId.GRASS_PLEDGE,
 ]);
 
 export class WeatherBasedMoveBlockAbAttr extends PreDefendAbAttr {

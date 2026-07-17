@@ -22,7 +22,11 @@
 // top and is individually flag-gated (§5).
 // =============================================================================
 
-import type { CoopAuthoritativeBattleStateV1, CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopInteractionOutcome,
+  CoopRewardSurfaceIdentity,
+} from "#data/elite-redux/coop/coop-transport";
 
 /** A co-op player seat id (0..N-1). The host/authority is a specific id, conventionally 0. */
 export type CoopPlayerId = number;
@@ -135,6 +139,8 @@ export interface CoopAuthoritativeEnvelopeV1 {
 
 /** BIOME_PICK intent/outcome: the chosen biome + the route-node index the owner travelled to (#15/#865). */
 export interface CoopBiomePickPayload {
+  /** The biome the committed transition leaves. Guards a delayed pick from authorizing a later boundary. */
+  readonly sourceBiomeId: number;
   /** The BiomeId the owner chose to travel to. */
   readonly biomeId: number;
   /**
@@ -142,6 +148,8 @@ export interface CoopBiomePickPayload {
    * natural single-node terminal (#865 - the World-Map auto-travel path with exactly one destination).
    */
   readonly nodeIndex: number;
+  /** The first wave in the committed destination biome. */
+  readonly nextWave: number;
 }
 
 /** CROSSROADS_PICK intent/outcome: the crossroads option index the owner chose (Stay/Leave, #14). */
@@ -160,6 +168,8 @@ export interface CoopCrossroadsPickPayload {
  * collapses the party-target menu into the single terminal relay this operation carries.
  */
 export interface CoopRewardActionPayload {
+  /** Ordered ME surface address, when this reward action belongs to a retained Mystery reward plan. */
+  readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
   /** The wire `label` the legacy relay sent this action with (reward/shop/skip/reroll/check/transfer/lock). */
   readonly label: string;
   /** The picked option/cursor index, or a sentinel (COOP_INTERACTION_LEAVE = -1 / _REROLL = -2). */
@@ -192,8 +202,8 @@ export interface CoopBargainPayload {
 
 /** COLO_PICK stream: repeated host-stated boards and owner decisions within one pinned gauntlet. */
 export type CoopColosseumPayload =
-  | { readonly type: "board"; readonly labels: string[] }
-  | { readonly type: "decision"; readonly index: number };
+  | { readonly type: "board"; readonly round: number; readonly labels: string[] }
+  | { readonly type: "decision"; readonly round: number; readonly index: number };
 
 /** ABILITY_PICK outcome: literal operation code and resolved slots/ability id. */
 export interface CoopAbilityPickPayload {
@@ -268,7 +278,100 @@ export type CoopLearnMoveBatchPayload =
  */
 export type CoopMeTerminalKind =
   | "leave" // the ME ended (non-battle): the watcher leaves the encounter + advances the alternation
-  | "battle"; // an option spawned a battle: the watcher finishes WITHOUT leaving (the battle runs host-authoritative)
+  | "battle" // an option spawned a battle: the watcher finishes WITHOUT leaving (the battle runs host-authoritative)
+  | "battle-settled"; // that battle's post-BattleEnd image is retained and its reward tail is executable
+
+/** Durable control sentinel for the ME battle-settled terminal; never carried as a raw input choice. */
+export const COOP_ME_BATTLE_SETTLED_CHOICE = -1001;
+
+/** Maximum number of post-battle reward surfaces one retained Mystery transaction may project. */
+export const COOP_ME_REWARD_SURFACE_LIMIT = 16;
+
+/** Maximum canonical wire length of a stable reward-surface identity. */
+export const COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH = 64;
+
+/** Largest reroll-cost multiplier the current modifier UI can execute from an untrusted wire plan. */
+export const COOP_ME_REROLL_MULTIPLIER_MAX = 1_000;
+
+/**
+ * One host-authored modifier picker in the ordered post-battle reward plan. The stable identity binds
+ * retries/reconnects to the same semantic surface; the renderer must not infer either the number of
+ * surfaces or their reroll policy from its local encounter callbacks.
+ */
+export interface CoopMeModifierRewardSurfaceProjection {
+  readonly kind: "modifier";
+  readonly surfaceId: string;
+  /** `-1` disables rerolls; otherwise this is the finite non-negative cost multiplier. */
+  readonly rerollMultiplier: number;
+}
+
+/** Exact authority-materialized account egg grant carried beside ordered reward UI surfaces. */
+export interface CoopMeEggRewardSurfaceProjection {
+  readonly kind: "egg";
+  readonly surfaceId: string;
+  readonly id: number;
+  readonly timestamp: number;
+  readonly sourceType: number | null;
+  readonly tier: number;
+  readonly hatchWaves: number;
+  readonly species: number;
+  readonly isShiny: boolean;
+  readonly variantTier: number;
+  readonly eggMoveIndex: number;
+  readonly overrideHiddenAbility: boolean;
+  readonly eggDescriptor: string | null;
+}
+
+/** Closed projection union. New shared reward/account kinds require a protocol bump and validator arm. */
+export type CoopMeRewardSurfaceProjection = CoopMeModifierRewardSurfaceProjection | CoopMeEggRewardSurfaceProjection;
+
+/**
+ * Construct a modifier projection while normalizing the UI's implicit default into explicit wire data.
+ * Validation remains mandatory at the receive boundary; this helper only prevents omission-based drift.
+ */
+export function makeCoopMeModifierRewardSurfaceProjection(
+  surfaceId: string,
+  rerollMultiplier = 1,
+): CoopMeModifierRewardSurfaceProjection {
+  return { kind: "modifier", surfaceId, rerollMultiplier };
+}
+
+/** Complete post-BattleEnd reward destination authored by the authority. */
+export interface CoopMeRewardDestination {
+  readonly kind: "reward";
+  /** Exact battle turn whose post-BattleEnd image this transaction settles. */
+  readonly hostTurn: number;
+  /** Host-stated battle result; the renderer never infers it from its reconstructed field. */
+  readonly result: "victory" | "failure";
+  /** Exact executable continuation after the settled BattleEnd. */
+  readonly continuation: "rewards" | "encounter" | "none";
+  /** Whether the deterministic trainer-victory presentation precedes the reward phase. */
+  readonly trainerVictory: boolean;
+  /** Ordered shared modifier surfaces opened before the post-encounter continuation. */
+  readonly rewardSurfaces: readonly CoopMeRewardSurfaceProjection[];
+  /** Whether EggLapsePhase follows this encounter's reward phase. Meaningful only for `rewards`. */
+  readonly eggLapse: boolean;
+}
+
+/** Exact host-authored continuation opened after the terminal state image has been adopted. */
+export type CoopMeTerminalDestination =
+  | {
+      readonly kind: "battle";
+      /** Host turn-space at the instant the spawned battle becomes executable. */
+      readonly hostTurn: number;
+      /** Exact {@linkcode MysteryEncounterMode}; the guest must never infer it from its reconstructed party. */
+      readonly encounterMode: number;
+      /** Constructor argument for the host's `MysteryEncounterBattlePhase`. */
+      readonly disableSwitch: boolean;
+    }
+  | {
+      readonly kind: "continue";
+      /** Exact next wave expected after this encounter. Guards a late terminal from advancing a newer wave. */
+      readonly nextWave: number;
+      /** Whether `SelectBiomePhase` precedes `NewBattlePhase` at this boundary. */
+      readonly selectBiome: boolean;
+    }
+  | CoopMeRewardDestination;
 
 /** ME_PICK intent/outcome: the top-level option index the ME owner selected (#8, guest->host forward). */
 export interface CoopMePickPayload {
@@ -296,13 +399,36 @@ export interface CoopMePresentPayload {
   readonly presentation?: Extract<CoopInteractionOutcome, { k: "mePresent" }>;
 }
 
-/** ME_TERMINAL intent/outcome: the ME's terminal transition (#10). Carries the host-stated resolution (#859). */
-export interface CoopMeTerminalPayload {
-  /** The terminal resolution the host committed: leave (non-battle) or battle (an option spawned a fight). */
-  readonly terminal: CoopMeTerminalKind;
-  /** For a battle terminal, the host's current battle turn to align the guest's ME-battle boot (#822). Absent for leave. */
-  readonly hostTurn?: number;
-}
+/**
+ * ME_TERMINAL transaction: one retained host state image plus the exact executable destination (#10).
+ * Both variants are complete. In particular a battle handoff may not delegate DATA to a separately timed
+ * party/raw terminal carrier: the guest adopts `outcome` first, then opens `destination`, exactly once.
+ */
+export type CoopMeTerminalPayload =
+  | {
+      /** The option spawned a battle. */
+      readonly terminal: "battle";
+      /** Comprehensive post-effect state, including the generated/degraded battle party. */
+      readonly outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>;
+      /** Exact battle boot, causally bound to the state image above. */
+      readonly destination: Extract<CoopMeTerminalDestination, { kind: "battle" }>;
+    }
+  | {
+      /** The spawned battle reached its exact post-BattleEnd reward boundary. */
+      readonly terminal: "battle-settled";
+      /** Comprehensive state after every automatic BattleEnd mutation. */
+      readonly outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>;
+      /** Exact deterministic reward presentation opened from that state. */
+      readonly destination: Extract<CoopMeTerminalDestination, { kind: "reward" }>;
+    }
+  | {
+      /** The encounter reached its true final leave (directly or after a spawned battle). */
+      readonly terminal: "leave";
+      /** Comprehensive post-effect/final reward/material state. */
+      readonly outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>;
+      /** Exact between-wave continuation, causally bound to the state image above. */
+      readonly destination: Extract<CoopMeTerminalDestination, { kind: "continue" }>;
+    };
 
 /** QUIZ_ANSWER intent/outcome: one committed answer of an embedded ME quiz minigame (#9/#818). */
 export interface CoopQuizAnswerPayload {
@@ -320,7 +446,8 @@ export interface CoopQuizAnswerPayload {
 // / SelectBiomePhase / GameOverPhase) by ADOPTION instead of DERIVATION. Committing this makes
 // logicalPhase host-authoritative for the between-wave transition - the keystone that lets §3's renderer
 // allowlist stop DENYING the boundary tails and start OP-SANCTIONING them (§3 strict-tails). The DATA
-// still rides waveResolved/waveEndState (dual-run); this op is the CONTROL statement.
+// plane rides inside the retained P33 envelope as the settled post-BattleEnd state image. The raw
+// waveResolved/waveEndState arms remain negotiated legacy/presentation carriers only.
 // -----------------------------------------------------------------------------
 
 /**
@@ -362,6 +489,13 @@ export interface CoopWaveAdvancePayload {
   readonly meBoundary: CoopWaveMeBoundary;
   /** The victory kind for win/capture (wild vs trainer, drives TrainerVictoryPhase); absent for flee/gameOver. */
   readonly victoryKind?: CoopWaveVictoryKind;
+  /**
+   * Tick of the settled authoritativeState embedded in this exact retained envelope. Absent only on the
+   * early raw waveResolved compatibility hint, which is deliberately insufficient to advance a P33 guest.
+   * A journal receiver requires this value and exact equality with authoritativeState.tick before it may
+   * stage DATA or make the stated continuation executable.
+   */
+  readonly settledStateTick?: number;
 }
 
 // -----------------------------------------------------------------------------

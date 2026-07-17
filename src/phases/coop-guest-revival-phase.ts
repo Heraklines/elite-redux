@@ -8,8 +8,12 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_REVIVAL_SEQ_BASE, sendCoopRevivalChoice } from "#data/elite-redux/coop/coop-interaction-relay";
-import { armCoopRevivalIntentResend } from "#data/elite-redux/coop/coop-revival-operation";
-import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import {
+  armCoopRevivalIntentResend,
+  type CoopRevivalOperationBinding,
+  captureCoopRevivalOperationBinding,
+} from "#data/elite-redux/coop/coop-revival-operation";
+import { failCoopSharedSession, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
 import { PartyUiHandler, PartyUiMode } from "#ui/handlers/party-ui-handler";
 
@@ -47,6 +51,14 @@ export class CoopGuestRevivalPhase extends Phase {
       this.end();
       return;
     }
+    let operationBinding: CoopRevivalOperationBinding;
+    try {
+      operationBinding = captureCoopRevivalOperationBinding("guest");
+    } catch {
+      failCoopSharedSession("The Revival Blessing picker lost its guest runtime binding.");
+      this.end();
+      return;
+    }
     const seq = COOP_REVIVAL_SEQ_BASE + this.fieldIndex;
     coopLog("replay", `guest revival picker OPEN slot=${this.fieldIndex} seq=${seq} (choose who to revive)`);
     try {
@@ -65,17 +77,21 @@ export class CoopGuestRevivalPhase extends Phase {
             const wave = globalScene.currentBattle?.waveIndex ?? 0;
             const turn = globalScene.currentBattle?.turn ?? 0;
             sendCoopRevivalChoice(relay, this.fieldIndex, slotIndex, data);
-            armCoopRevivalIntentResend({
-              payload: {
-                type: "decision",
-                fieldIndex: this.fieldIndex,
-                partySlot: slotIndex,
-                speciesId: pickedSpecies,
+            armCoopRevivalIntentResend(
+              {
+                payload: {
+                  type: "decision",
+                  fieldIndex: this.fieldIndex,
+                  partySlot: slotIndex,
+                  speciesId: pickedSpecies,
+                },
+                localRole: "guest",
+                wave,
+                turn,
+                resend: () => sendCoopRevivalChoice(relay, this.fieldIndex, slotIndex, data),
               },
-              wave,
-              turn,
-              resend: () => sendCoopRevivalChoice(relay, this.fieldIndex, slotIndex, data),
-            });
+              operationBinding,
+            );
           }
           void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => this.end());
         },

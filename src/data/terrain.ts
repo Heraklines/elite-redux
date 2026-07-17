@@ -87,11 +87,12 @@ export class Terrain {
 
   /**
    * Whether a Pokémon of {@linkcode type} is immune to this terrain's end-of-turn
-   * chip. Poison-types are at home in Toxic Terrain (mirrors every terrain's
-   * type-affinity convention), so they take no damage.
+   * chip. In Toxic Terrain, grounded Pokémon take 1/16 max HP UNLESS they are
+   * Poison- OR Steel-type (dex rom_detail: "grounded non-Poison and non-Steel
+   * Pokémon take 1/16 damage"). Poison/Steel are at home in the poison terrain.
    */
   isTypeDamageImmune(type: PokemonType): boolean {
-    return this.terrainType === TerrainType.TOXIC && type === PokemonType.POISON;
+    return this.terrainType === TerrainType.TOXIC && (type === PokemonType.POISON || type === PokemonType.STEEL);
   }
 
   isMoveTerrainCancelled(user: Pokemon, targets: BattlerIndex[], move: Move): boolean {
@@ -216,6 +217,9 @@ export function getTerrainBlockMessage(pokemon: Pokemon, terrainType: TerrainTyp
         pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
         terrainName: getTerrainName(terrainType),
       });
+    case TerrainType.TOXIC:
+      console.warn(`${terrainType} unexpectedly provided as terrain type to getTerrainBlockMessage!`);
+      return "";
     case TerrainType.NONE:
     default:
       terrainType satisfies TerrainType.NONE;

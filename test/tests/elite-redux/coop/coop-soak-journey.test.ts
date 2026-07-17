@@ -118,7 +118,22 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
 
     expect(result.wavesCompleted, "the campaign continued after the final forced event").toBe(LAST_WAVE);
     expect(result.runEnded, "the campaign did not silently terminal/degrade").toBeUndefined();
+    expect(result.actionScript, "wave 30 used the odd-seat guest as the real biome-market owner").toContain(
+      "wave 30: biome market owner=guest leave",
+    );
+    expect(result.actionScript, "wave 10 drained its milestone continuation without parking either renderer").toContain(
+      "wave 10: drained 1 milestone reward continuation(s)",
+    );
     expect(result.mysteryEncounters, "every scheduled event was driven exactly once").toHaveLength(EVENT_SCHEDULE.size);
+    expect(result.actionScript, "Field Trip selected a real party row through the guest capture UI").toContain(
+      "wave 24: ME FIELD_TRIP public PARTY pick=0",
+    );
+    expect(result.actionScript, "Field Trip selected a real move row through the guest capture UI").toContain(
+      "wave 24: ME FIELD_TRIP public OPTION_SELECT pick=0",
+    );
+    expect(result.actionScript, "Field Trip left its embedded reward through the guest public UI").toContain(
+      "wave 24: ME FIELD_TRIP public embedded reward leave",
+    );
     expect(new Set(result.mysteryEncounters.map(event => event.type)).size, "event types are heterogeneous").toBe(
       EVENT_SCHEDULE.size,
     );

@@ -25,7 +25,25 @@
 // ER_SCENARIO.
 // =============================================================================
 
-import { openDevMenuOverlay } from "#app/dev-tools/test-suite/custom-trainer-picker";
+import { consumePendingDevCustomTrainerForce } from "#app/dev-tools/registry";
+import {
+  openDevMenuOverlay,
+  pickErCustomTrainerGhost,
+  planErCustomTrainerLaunch,
+} from "#app/dev-tools/test-suite/custom-trainer-picker";
+import {
+  applyPreparedGhostChallenges,
+  buildErCustomTrainerDevScenario,
+  resetDevOverrides,
+  translatePreparedGhostLevels,
+} from "#app/dev-tools/test-suite/scenarios";
+import { getGameMode } from "#app/game-mode";
+import Overrides from "#app/overrides";
+import type { ErCustomTrainerResolved } from "#data/elite-redux/er-custom-trainers";
+import { setErCustomTrainerDevForce } from "#data/elite-redux/er-custom-trainers";
+import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
+import { Challenges } from "#enums/challenges";
+import { GameModes } from "#enums/game-modes";
 import { describe, expect, it, vi } from "vitest";
 
 /** A stand-in for the MESSAGE UiMode number (the helper is mode-agnostic). */
@@ -78,5 +96,154 @@ describe("Custom Trainers picker — openDevMenuOverlay (regression lock)", () =
     // Must resolve (not reject): the dev-menu handlers are fire-and-forget.
     await expect(openDevMenuOverlay(ui, MESSAGE_MODE, open)).resolves.toBeUndefined();
     expect(open).toHaveBeenCalledTimes(1);
+  });
+});
+
+const trainer = {
+  id: 7,
+  key: "TESTER",
+  name: "Tester",
+  difficulties: ["elite"],
+  minWave: 17,
+  maxWave: 23,
+  endless: false,
+} as unknown as ErCustomTrainerResolved;
+
+function ghost(
+  id: string,
+  waveReached: number,
+  difficulty: GhostTeamSnapshot["difficulty"] = "elite",
+): GhostTeamSnapshot {
+  return {
+    id,
+    trainerName: id,
+    difficulty,
+    waveReached,
+    isVictory: false,
+    timestamp: 1,
+    party: [
+      {
+        speciesId: 1,
+        formIndex: 0,
+        abilityIndex: 0,
+        ivs: [31, 31, 31, 31, 31, 31],
+        nature: 0,
+        level: 20,
+        gender: 0,
+        shiny: false,
+        variant: 0,
+        passive: false,
+        moves: [1],
+      },
+    ],
+  };
+}
+
+describe("Custom Trainers picker - prepared fight selection", () => {
+  it("samples across every eligible wave in the authored range", () => {
+    const fixed = (wave: number) => wave === 18 || wave === 22;
+
+    expect(planErCustomTrainerLaunch(trainer, fixed, () => 0)).toEqual({
+      ok: true,
+      plan: { difficulty: "elite", wave: 17 },
+    });
+    expect(planErCustomTrainerLaunch(trainer, fixed, () => 0.999)).toEqual({
+      ok: true,
+      plan: { difficulty: "elite", wave: 23 },
+    });
+    // Eligible list is [17, 19, 21, 23]: fixed waves and boss wave 20 are gone.
+    expect(planErCustomTrainerLaunch(trainer, fixed, () => 0.5)).toEqual({
+      ok: true,
+      plan: { difficulty: "elite", wave: 21 },
+    });
+  });
+
+  it("selects only ghosts proven viable in the target wave's fairness window", () => {
+    const picked = pickErCustomTrainerGhost(
+      [ghost("too-shallow", 20), ghost("left", 50), ghost("right", 80), ghost("too-deep", 81)],
+      40,
+      "elite",
+      () => 0.999,
+    );
+
+    expect(picked?.ghost.id).toBe("right");
+    expect(picked?.candidateCount).toBe(2);
+  });
+
+  it("prefers the selected difficulty but falls back for a sparse local pool", () => {
+    const preferred = pickErCustomTrainerGhost(
+      [ghost("ace", 45, "ace"), ghost("elite", 45, "elite")],
+      40,
+      "elite",
+      () => 0,
+    );
+    expect(preferred?.ghost.id).toBe("elite");
+    expect(preferred?.candidateCount).toBe(1);
+
+    const fallback = pickErCustomTrainerGhost([ghost("ace", 45, "ace")], 40, "elite", () => 0);
+    expect(fallback?.ghost.id).toBe("ace");
+  });
+
+  it("returns null instead of silently restoring the old static test party", () => {
+    expect(pickErCustomTrainerGhost([ghost("shallow", 12), ghost("deep", 100)], 40, "elite", () => 0)).toBeNull();
+  });
+
+  it("rebuilds the same prepared fight on restart and restores stored challenges", () => {
+    const snapshot = ghost("challenge-player", 45);
+    snapshot.mode = "challenge";
+    snapshot.challenges = [[Challenges.INVERSE_BATTLE, 1]];
+    snapshot.party.push({
+      ...snapshot.party[0],
+      speciesId: 25,
+      level: 17,
+      moves: [85, 98],
+    });
+    const built = buildErCustomTrainerDevScenario(trainer, {
+      plan: { difficulty: "elite", wave: 21 },
+      ghost: snapshot,
+      candidateCount: 4,
+    });
+    expect("error" in built).toBe(false);
+    if ("error" in built) {
+      return;
+    }
+
+    try {
+      const first = built.scenario.setup();
+      expect(first.map(starter => starter.speciesId)).toEqual([1, 25]);
+      expect(first[1].moveset).toEqual([85, 98]);
+      expect(Overrides.STARTING_WAVE_OVERRIDE).toBe(21);
+      expect(Overrides.STARTING_LEVEL_OVERRIDE).toBe(getGameMode(GameModes.CHALLENGE).getMaxExpLevelForWave(21));
+      const cap = getGameMode(GameModes.CHALLENGE).getMaxExpLevelForWave(21);
+      expect(built.scenario.startingLevels).toEqual([cap, cap - 3]);
+      expect(translatePreparedGhostLevels(snapshot.party, cap)).toEqual([cap, cap - 3]);
+      expect(Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE).toBe(0);
+      expect(consumePendingDevCustomTrainerForce()).toBe("TESTER");
+
+      // Banner Restart invokes setup on this same prepared scenario. It must
+      // stage the force again and reproduce the exact roster/wave, not reroll.
+      // The title cleanup can clear the old live force without touching the
+      // just-staged handoff consumed immediately before newBattle().
+      setErCustomTrainerDevForce(null);
+      const restarted = built.scenario.setup();
+      expect(restarted).not.toBe(first);
+      expect(restarted).toEqual(first);
+      expect(Overrides.STARTING_WAVE_OVERRIDE).toBe(21);
+      setErCustomTrainerDevForce(null);
+      expect(consumePendingDevCustomTrainerForce()).toBe("TESTER");
+
+      expect(built.scenario.gameMode).toBe(GameModes.CHALLENGE);
+      const setChallengeValue = vi.fn();
+      applyPreparedGhostChallenges({ setChallengeValue }, snapshot.challenges ?? []);
+      expect(setChallengeValue).toHaveBeenCalledWith(Challenges.INVERSE_BATTLE, 1);
+
+      // Each member is constructed at its translated snapshot level. The top
+      // member reaches the wave cap while the saved three-level gap survives.
+      expect(Overrides.STARTING_LEVEL_OVERRIDE).not.toBe(20);
+    } finally {
+      consumePendingDevCustomTrainerForce();
+      setErCustomTrainerDevForce(null);
+      resetDevOverrides();
+    }
   });
 });

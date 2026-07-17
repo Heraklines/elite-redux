@@ -9,16 +9,31 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
-import { adoptRewardWatcherChoice, commitRewardOwnerIntent } from "#data/elite-redux/coop/coop-reward-operation";
+import {
+  adoptRewardWatcherChoice,
+  type CoopRewardOperationBinding,
+  captureCoopRewardOperationBinding,
+  commitRewardAuthoritativeResult,
+  commitRewardOwnerIntent,
+  coopRewardMirrorSeq,
+  isCoopRewardRetainedResultMode,
+  isValidCoopRewardSurfaceIdentity,
+} from "#data/elite-redux/coop/coop-reward-operation";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
+  type CoopRetainedWaveContinuationAddress,
   coopMeInProgress,
+  coopSessionGeneration,
+  failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
+  notifyCoopWaveContinuationSurfaceReady,
+  resolveCoopRetainedWaveContinuationIdentity,
+  runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REWARD_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import {
@@ -31,6 +46,7 @@ import {
   COOP_CHECK_OP_UNPAUSE_EVO,
   COOP_CHECK_OP_UNSPLICE,
 } from "#data/elite-redux/coop/coop-shop-check-relay";
+import type { CoopRewardSurfaceIdentity } from "#data/elite-redux/coop/coop-transport";
 import { erBalanceArr, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
@@ -42,6 +58,7 @@ import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-r
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { BattleType } from "#enums/battle-type";
 import { FormChangeItem } from "#enums/form-change-item";
+import { LearnMoveType } from "#enums/learn-move-type";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import type { ModifierTier } from "#enums/modifier-tier";
 import { SpeciesId } from "#enums/species-id";
@@ -58,6 +75,8 @@ import {
 import type { CustomModifierSettings, ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import {
   ErAbilityCapsuleModifierType,
+  ErGreaterAbilityCapsuleModifierType,
+  ErGreaterAbilityRandomizerModifierType,
   ErLearnersShroomModifierType,
   ErTmCaseModifierType,
   FusePokemonModifierType,
@@ -82,6 +101,12 @@ import i18next from "i18next";
 
 export type ModifierSelectCallback = (rowCursor: number, cursor: number) => boolean;
 
+/** Construction-time provenance for the reward phase's co-op address. */
+export type SelectModifierCoopContinuation =
+  | { readonly kind: "ambient" }
+  | { readonly kind: "wave-boundary" }
+  | { readonly kind: "inherited"; readonly address: CoopRetainedWaveContinuationAddress | null };
+
 // Co-op (#633): action-type codes packed as data[0] of a relayed reward choice, so the
 // WATCHER can route a pick whose `choice` alone is ambiguous (reward vs shop both carry a
 // cursor; lock vs transfer both carry 0). REROLL / LEAVE are distinguished by the sentinel
@@ -97,6 +122,9 @@ const COOP_ACT_LOCK = 3;
  *  0x4d4f ('MO'); only stripped when it sits at data[len-2], and every producer appends exactly
  *  the [TAG, money] pair, so it cannot collide with a legitimate trailing positional value. */
 const COOP_MONEY_TAG = 0x4d4f;
+
+/** Trailing marker for the host-validated price used by a paid continuation picker. */
+const COOP_COST_TAG = 0x434f;
 
 /** Co-op (#633): decode a relayed CHECK-team op code to a greppable name for the watcher-apply
  *  diagnostic log in {@linkcode SelectModifierPhase.applyRelayedCheckOp}. Logging-only / pure. */
@@ -163,11 +191,14 @@ function coopMeRewardOptionOwnerOverride(): boolean | null {
   if (!globalScene.gameMode.isCoop || getCoopNetcodeMode() !== "authoritative") {
     return null;
   }
-  if (!coopMeInProgress()) {
-    return null;
-  }
   if (getCoopRuntime()?.spoof != null) {
     return null; // hotseat: the local human owns everything (unchanged)
+  }
+  // P33 retained-result mode has one engine authority for every reward surface, not only embedded MEs.
+  // The host rolls/streams; the guest always adopts. This prevents a guest-owned reroll from consuming a
+  // second RNG path before its host result arrives.
+  if (!isCoopRewardRetainedResultMode() && !coopMeInProgress()) {
+    return null;
   }
   return getCoopController()?.role === "host";
 }
@@ -200,6 +231,8 @@ export class SelectModifierPhase extends BattlePhase {
   /** Watcher-side: the owner's relayed party-target slot + sub-option for the pick being replayed. */
   private coopRelayedSlot = -1;
   private coopRelayedOption = 0;
+  /** Most recently resolved nested option; subclasses use it in their own typed market payload. */
+  protected coopResolvedModifierOption = 0;
   /** Watcher-side (#698): the host's authoritative money AFTER this relayed spend, streamed on the
    *  relay message. -1 = none streamed (older host / non-spend action) -> the watcher keeps its own
    *  deduction (current behavior, no regression). Reset to -1 after each apply so it cannot bleed. */
@@ -207,17 +240,42 @@ export class SelectModifierPhase extends BattlePhase {
   /** Owner-side (#698): the post-spend money to stream with the next relay send, or -1 to append
    *  nothing. Transient: set just before the spend's relay send, consumed + reset inside it. */
   private coopOwnerPostMoney = -1;
+  /** Prepared action whose complete host result must be committed after the safe state mutation seam.
+   * `protected` (not `private`) so the BiomeShopPhase subclass shares this exact field instead of
+   * redeclaring a same-name private (TS2415) - it is the SAME runtime slot the base reads via
+   * applyModifier -> coopCommitPendingAuthorityResult, so sharing it is behavior-identical. */
+  protected coopPendingAuthorityOperationId: string | null = null;
+  /** Runtime captured while this phase is installed; survives async UI callbacks without ambient rebinding. */
+  protected coopRewardOperationBinding: CoopRewardOperationBinding | null = null;
+  /** Prevents duplicate durable-result wait loops when a retained intent is re-clicked/replayed. */
+  private readonly coopAwaitingAuthorityResults = new Set<string>();
+  /** Host terminal results parked until the guest proves the exact material state was installed. */
+  private readonly coopAwaitingMaterialResults = new Set<string>();
+  /** Live owner callback reused after a retained paid result temporarily parks the interactive shop. */
+  private coopModifierSelectCallback: ModifierSelectCallback | null = null;
   /** The interaction-turn counter observed when THIS shop opened (#633). Makes the
    *  alternation advance idempotent: the advance only fires while the counter is still
    *  at this value, so the owner's terminal + the watcher's terminal + a reconcile
    *  broadcast can't double-count this one interaction. -1 = solo / not captured. */
   private coopInteractionStart = -1;
+  /** Durable source address; ambient currentBattle may already be a speculative future wave/turn. */
+  protected readonly coopSourceAddress: CoopRetainedWaveContinuationAddress | null;
+  /** Runtime that constructed this phase; async UI completion may resume under the other in-process client. */
+  private readonly coopOwningRuntime = getCoopRuntime();
+  /** Scene that owns this phase. Unlike ambient `globalScene`, this stays stable across duo-harness context swaps. */
+  private readonly coopOwningScene = globalScene;
+  /** A retained guest continuation with no single source identity may not open or mutate a reward surface. */
+  private readonly coopContinuationIdentityFailure: string | null;
+  /** Stable P36 address of this ordered Mystery reward surface; absent for ordinary reward shops. */
+  private readonly coopRewardSurface: CoopRewardSurfaceIdentity | undefined;
 
   constructor(
     rerollCount = 0,
     modifierTiers?: ModifierTier[],
     customModifierSettings?: CustomModifierSettings,
     isCopy = false,
+    coopContinuation: SelectModifierCoopContinuation = { kind: "ambient" },
+    coopRewardSurface?: CoopRewardSurfaceIdentity,
   ) {
     super();
 
@@ -225,10 +283,36 @@ export class SelectModifierPhase extends BattlePhase {
     this.modifierTiers = modifierTiers;
     this.customModifierSettings = customModifierSettings;
     this.isCopy = isCopy;
+    this.coopRewardSurface = coopRewardSurface;
+    const continuationIdentity =
+      coopContinuation.kind === "wave-boundary"
+        ? resolveCoopRetainedWaveContinuationIdentity(true)
+        : coopContinuation.kind === "inherited" && coopContinuation.address != null
+          ? ({ kind: "retained", address: coopContinuation.address } as const)
+          : ({ kind: "ambient" } as const);
+    this.coopSourceAddress = continuationIdentity.kind === "retained" ? continuationIdentity.address : null;
+    this.coopContinuationIdentityFailure = continuationIdentity.kind === "invalid" ? continuationIdentity.reason : null;
+  }
+
+  protected coopRewardWave(): number {
+    return this.coopSourceAddress?.wave ?? globalScene.currentBattle?.waveIndex ?? -1;
+  }
+
+  protected coopRewardTurn(): number {
+    return this.coopSourceAddress?.turn ?? globalScene.currentBattle?.turn ?? 0;
   }
 
   start() {
     super.start();
+
+    if (!this.coopContinuationIdentityIsUsable()) {
+      return false;
+    }
+
+    if (this.coopRewardSurface != null && !isValidCoopRewardSurfaceIdentity(this.coopRewardSurface)) {
+      failCoopSharedSession("A reward picker was constructed with an invalid ordered Mystery surface address");
+      return false;
+    }
 
     if (!this.isPlayer()) {
       return false;
@@ -239,6 +323,9 @@ export class SelectModifierPhase extends BattlePhase {
     // own identical pool (same seed -> identical options/prices/money). Resolved once
     // here; solo / non-coop keeps the original flow untouched.
     const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
+    if (coopController != null && this.coopRewardOperationBinding == null) {
+      this.coopRewardOperationBinding = captureCoopRewardOperationBinding();
+    }
     // Capture the alternation counter this shop opened on, so its terminal advance is
     // idempotent (both clients advance locally now; this stops a double-count) (#633).
     if (coopController != null && this.coopInteractionStart < 0) {
@@ -317,7 +404,12 @@ export class SelectModifierPhase extends BattlePhase {
               globalScene.ui.setMode(UiMode.MESSAGE);
               // Co-op (#633): relay the skip to the watcher, then advance the turn.
               this.coopEndMirror();
-              this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip");
+              if (this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip")) {
+                return;
+              }
+              if (!this.coopCommitPendingAuthorityResult()) {
+                return;
+              }
               // #record-replay (single-player): capture the reward-shop LEAVE (no-op unless recording / in co-op).
               recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
               super.end();
@@ -354,6 +446,7 @@ export class SelectModifierPhase extends BattlePhase {
         }
       }
     };
+    this.coopModifierSelectCallback = modifierSelectCallback;
 
     // Co-op (#633): only the player whose alternating turn it is drives the reward
     // screen; the partner watches and mirrors the relayed picks. Solo / non-coop falls
@@ -393,7 +486,7 @@ export class SelectModifierPhase extends BattlePhase {
       if (spoofed || ownsThisShop) {
         coopLog(
           "reward",
-          `OWNER drives reward screen (start=${this.coopInteractionStart} role=${coopController.role} spoof=${spoofed} adoptsOptions=${coopIsWatcher} wave=${globalScene.currentBattle?.waveIndex})`,
+          `OWNER drives reward screen (start=${this.coopInteractionStart} role=${coopController.role} spoof=${spoofed} adoptsOptions=${coopIsWatcher} wave=${this.coopRewardWave()})`,
         );
         // The OWNER WAITS at the barrier until the partner reaches the shop, THEN opens the pickable
         // screen (a dead partner resolves the wait via the anti-hang timeout so the owner never hangs).
@@ -401,7 +494,7 @@ export class SelectModifierPhase extends BattlePhase {
       } else {
         coopLog(
           "reward",
-          `WATCHER waits for partner's reward picks (start=${this.coopInteractionStart} role=${coopController.role} wave=${globalScene.currentBattle?.waveIndex})`,
+          `WATCHER waits for partner's reward picks (start=${this.coopInteractionStart} role=${coopController.role} wave=${this.coopRewardWave()})`,
         );
         // #800 (live "it's not letting me pick anything"): the mirrored screen looks EXACTLY like
         // the watcher's own, so blocked input reads as a bug. Say whose turn it is, plainly.
@@ -423,6 +516,19 @@ export class SelectModifierPhase extends BattlePhase {
     this.resetModifierSelect(modifierSelectCallback);
   }
 
+  /** Refuse a retained wave surface whose immutable construction identity was lost or ambiguous. */
+  protected coopContinuationIdentityIsUsable(): boolean {
+    if (this.coopContinuationIdentityFailure == null) {
+      return true;
+    }
+    coopWarn("reward", `${this.coopContinuationIdentityFailure} - refusing mutable ambient reward address`);
+    failCoopSharedSession(this.coopContinuationIdentityFailure, {
+      boundary: "surface",
+      reasonCode: "continuation-failed",
+    });
+    return false;
+  }
+
   // Pick a modifier from among the rewards and apply it
   private selectRewardModifierOption(cursor: number, modifierSelectCallback: ModifierSelectCallback): boolean {
     if (this.typeOptions.length === 0) {
@@ -430,7 +536,12 @@ export class SelectModifierPhase extends BattlePhase {
       globalScene.ui.setMode(UiMode.MESSAGE);
       // Co-op (#633): no reward to pick is the same as leaving - relay + advance.
       this.coopEndMirror();
-      this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip");
+      if (this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip")) {
+        return true;
+      }
+      if (!this.coopCommitPendingAuthorityResult()) {
+        return true;
+      }
       // #record-replay (single-player): no reward to pick is a LEAVE (no-op unless recording / in co-op).
       recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
       super.end();
@@ -455,7 +566,7 @@ export class SelectModifierPhase extends BattlePhase {
     modifierSelectCallback: ModifierSelectCallback,
   ): boolean {
     const shopOptions = getPlayerShopModifierTypeOptionsForWave(
-      globalScene.currentBattle.waveIndex,
+      this.coopRewardWave(),
       globalScene.getWaveMoneyAmount(1),
     );
     const shopOption =
@@ -520,7 +631,9 @@ export class SelectModifierPhase extends BattlePhase {
     } else {
       // Co-op (#633): a non-party item resolves immediately - relay the pick now (the
       // party-target items relay from their menu callbacks once the slot is chosen).
-      this.coopFlushPending([], cost);
+      if (this.coopFlushPending([], cost)) {
+        return cost === -1;
+      }
       this.applyModifier(modifierType.newModifier()!, cost);
     }
     return cost === -1;
@@ -533,14 +646,12 @@ export class SelectModifierPhase extends BattlePhase {
       globalScene.ui.playError();
       return false;
     }
+    // Publish the intent before mutation. A guest owner stays parked; only the host executes the reroll.
+    this.coopOwnerPostMoney = Overrides.WAIVE_ROLL_FEE_OVERRIDE ? -1 : Math.trunc(globalScene.money - rerollCost);
+    if (this.coopRelaySend(COOP_INTERACTION_REROLL, undefined, "reroll")) {
+      return true;
+    }
     globalScene.reroll = true;
-    globalScene.phaseManager.unshiftNew(
-      "SelectModifierPhase",
-      this.rerollCount + 1,
-      this.typeOptions.map(o => o.type?.tier).filter(t => t !== undefined) as ModifierTier[],
-    );
-    globalScene.ui.clearText();
-    globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
     if (!Overrides.WAIVE_ROLL_FEE_OVERRIDE) {
       if (this.coopWatcher && this.coopAdoptsOptions && this.coopRelayedMoney >= 0) {
         // Co-op (#698): the OWNER is authoritative - SET the streamed post-reroll money instead of
@@ -555,12 +666,21 @@ export class SelectModifierPhase extends BattlePhase {
       globalScene.updateMoneyText();
       globalScene.animateMoneyChanged(false);
     }
-    // Co-op (#633/#698): relay the reroll so the watcher rerolls its identical pool too. Sent
-    // AFTER the deduction above so the streamed money is the POST-reroll authoritative value (the
-    // watcher reaches this same method on replay, where the send is a no-op since it is not the
-    // interaction owner). coopOwnerPostMoney is read + reset inside coopRelaySend.
-    this.coopOwnerPostMoney = Overrides.WAIVE_ROLL_FEE_OVERRIDE ? -1 : Math.trunc(globalScene.money);
-    this.coopRelaySend(COOP_INTERACTION_REROLL, undefined, "reroll");
+    if (!this.coopCommitPendingAuthorityResult()) {
+      return true;
+    }
+    // Continuation opens only after the complete retained result exists.
+    globalScene.phaseManager.unshiftNew(
+      "SelectModifierPhase",
+      this.rerollCount + 1,
+      this.typeOptions.map(o => o.type?.tier).filter(t => t !== undefined) as ModifierTier[],
+      undefined,
+      false,
+      { kind: "inherited", address: this.coopSourceAddress },
+      this.coopRewardSurface,
+    );
+    globalScene.ui.clearText();
+    globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
     // #record-replay (single-player): capture the reroll (a fresh SelectModifierPhase follows with its
     // own reward/skip interaction). No-op unless recording / in co-op.
     recordSinglePlayerInteraction("reroll", COOP_INTERACTION_REROLL);
@@ -597,7 +717,9 @@ export class SelectModifierPhase extends BattlePhase {
    * `op` is a COOP_CHECK_OP_*; `data` is its payload (slots / codepoints / form index).
    */
   public coopReportCheckMutation(op: number, data: number[]): void {
-    this.coopRelaySend(0, [COOP_ACT_CHECK, op, ...data], "check");
+    if (!this.coopRelaySend(0, [COOP_ACT_CHECK, op, ...data], "check")) {
+      this.coopCommitPendingAuthorityResult();
+    }
   }
 
   // Transfer modifiers among party pokemon
@@ -616,8 +738,13 @@ export class SelectModifierPhase extends BattlePhase {
         ) {
           // Co-op (#633): relay the resolved transfer so the watcher mirrors it on its
           // identical party (same held items), then apply it locally.
-          this.coopRelaySend(0, [COOP_ACT_TRANSFER, fromSlotIndex, itemIndex, itemQuantity, toSlotIndex], "transfer");
+          if (
+            this.coopRelaySend(0, [COOP_ACT_TRANSFER, fromSlotIndex, itemIndex, itemQuantity, toSlotIndex], "transfer")
+          ) {
+            return;
+          }
           this.applyTransfer(fromSlotIndex, itemIndex, itemQuantity, toSlotIndex);
+          this.coopCommitPendingAuthorityResult();
         } else {
           this.resetModifierSelect(modifierSelectCallback);
         }
@@ -665,9 +792,14 @@ export class SelectModifierPhase extends BattlePhase {
       }
       return false;
     }
+    // Co-op: send the intent before changing the lock. A guest owner waits for the host result.
+    if (this.coopRelaySend(0, [COOP_ACT_LOCK], "lock")) {
+      return true;
+    }
     globalScene.lockModifierTiers = !globalScene.lockModifierTiers;
-    // Co-op (#633): relay the lock toggle (engine state the next pool generation reads).
-    this.coopRelaySend(0, [COOP_ACT_LOCK], "lock");
+    if (!this.coopCommitPendingAuthorityResult()) {
+      return true;
+    }
     // #record-replay (single-player): capture the reroll-lock toggle (engine state the next reward-pool
     // roll reads, so a faithful replay must reproduce it). No-op unless recording / in co-op.
     recordSinglePlayerInteraction("lock", 0, [COOP_ACT_LOCK]);
@@ -681,13 +813,93 @@ export class SelectModifierPhase extends BattlePhase {
     return false;
   }
 
+  /** Whether applying this item deliberately leaves a back-out-safe copy of the current shop. */
+  protected modifierQueuesContinuation(modifierType: ModifierType): boolean {
+    return (
+      modifierType instanceof RememberMoveModifierType
+      || modifierType instanceof TmModifierType
+      || modifierType instanceof ErLearnersShroomModifierType
+      || modifierType instanceof ErTmCaseModifierType
+      || modifierType instanceof ErAbilityCapsuleModifierType
+      || modifierType instanceof ErGreaterAbilityCapsuleModifierType
+      || modifierType instanceof ErGreaterAbilityRandomizerModifierType
+    );
+  }
+
+  /**
+   * Renderer-only counterpart of the modifier's queued phase effect. The complete host result has already
+   * installed every gameplay mutation before this runs, so the guest must never call addModifier/apply a
+   * second time. It recreates only the follow-up surface that the authoritative modifier queued.
+   *
+   * @returns true when the projected follow-up owns a back-out-safe shop continuation.
+   */
+  protected queueCoopProjectedModifierFollowUp(
+    modifierType: ModifierType,
+    slotIndex: number,
+    option: number,
+    cost: number,
+  ): boolean {
+    const target = globalScene.getPlayerParty()[slotIndex];
+    if (target == null) {
+      return false;
+    }
+
+    let queued = true;
+    if (modifierType instanceof TmModifierType) {
+      globalScene.phaseManager.unshiftNew("LearnMovePhase", slotIndex, modifierType.moveId, LearnMoveType.TM);
+    } else if (modifierType instanceof RememberMoveModifierType) {
+      const moveId = target.getLearnableLevelMoves()[option];
+      if (moveId == null) {
+        return false;
+      }
+      globalScene.phaseManager.unshiftNew("LearnMovePhase", slotIndex, moveId, LearnMoveType.MEMORY, cost);
+    } else if (modifierType instanceof ErLearnersShroomModifierType) {
+      const moveId = target.getErLearnableShroomMoves()[option];
+      if (moveId == null) {
+        return false;
+      }
+      globalScene.phaseManager.unshiftNew("LearnMovePhase", slotIndex, moveId, LearnMoveType.MEMORY, cost);
+    } else if (modifierType instanceof ErTmCaseModifierType) {
+      const moveId = target.getErTmCaseMoves()[option];
+      if (moveId == null) {
+        return false;
+      }
+      globalScene.phaseManager.unshiftNew("LearnMovePhase", slotIndex, moveId, LearnMoveType.TM);
+    } else if (modifierType instanceof PokemonAddMoveSlotModifierType) {
+      const moveId = target.getLearnableLevelMoves()[option];
+      if (moveId == null) {
+        return false;
+      }
+      // The host result already contains the raised move cap. This is only the deterministic learn UI tail;
+      // unlike the interactive items below it does not keep a back-out continuation copy.
+      globalScene.phaseManager.unshiftNew("LearnMovePhase", slotIndex, moveId, LearnMoveType.MEMORY);
+    } else if (modifierType instanceof ErAbilityCapsuleModifierType) {
+      const { seq, watcher } = this.coopAbilityContext();
+      globalScene.phaseManager.unshiftNew("ErAbilityCapsulePhase", slotIndex, seq, watcher);
+    } else if (modifierType instanceof ErGreaterAbilityCapsuleModifierType) {
+      const { seq, watcher } = this.coopAbilityContext();
+      globalScene.phaseManager.unshiftNew("ErGreaterAbilityCapsulePhase", slotIndex, seq, watcher);
+    } else if (modifierType instanceof ErGreaterAbilityRandomizerModifierType) {
+      const { seq, watcher } = this.coopAbilityContext();
+      globalScene.phaseManager.unshiftNew("ErGreaterAbilityRandomizerPhase", slotIndex, seq, watcher);
+    } else {
+      queued = false;
+    }
+
+    const continuation = queued && this.modifierQueuesContinuation(modifierType);
+    if (continuation) {
+      globalScene.phaseManager.unshiftPhase(this.copy());
+    }
+    return continuation;
+  }
+
   /**
    * Apply the effects of the chosen modifier
    * @param modifier - The modifier to apply
    * @param cost - The cost of the modifier if it was purchased, or -1 if selected as the modifier reward
    * @param playSound - Whether the 'obtain modifier' sound should be played when adding the modifier.
    */
-  protected applyModifier(modifier: Modifier, cost = -1, playSound = false): void {
+  protected applyModifier(modifier: Modifier, cost = -1, playSound = false): boolean {
     const result = globalScene.addModifier(modifier, false, playSound, undefined, undefined, cost);
     // Causal reward trace: record the exact generated identity + resolved holder and whether the engine
     // accepted it on EACH side. A type-id-only log cannot distinguish two BERRY variants, and the live
@@ -721,12 +933,7 @@ export class SelectModifierPhase extends BattlePhase {
     // (the option-select + run-unlock innate sub-picker), which runs BEFORE this copy and
     // removes it (tryRemovePhase) only once a choice is committed - so backing out of the
     // capsule's choice / sub-picker re-offers the capsule, identical to #25.
-    const queuesContinuation =
-      modifier.type instanceof RememberMoveModifierType
-      || modifier.type instanceof TmModifierType
-      || modifier.type instanceof ErLearnersShroomModifierType
-      || modifier.type instanceof ErTmCaseModifierType
-      || modifier.type instanceof ErAbilityCapsuleModifierType;
+    const queuesContinuation = this.modifierQueuesContinuation(modifier.type);
     if (queuesContinuation) {
       globalScene.phaseManager.unshiftPhase(this.copy());
     }
@@ -747,6 +954,9 @@ export class SelectModifierPhase extends BattlePhase {
           globalScene.updateMoneyText();
           globalScene.animateMoneyChanged(false);
         }
+        if (!this.coopCommitPendingAuthorityResult()) {
+          return false;
+        }
         globalScene.playSound("se/buy");
         // Co-op (#633): the WATCHER has no MODIFIER_SELECT handler open (it shows a
         // "partner is choosing" message) - the money is still deducted above to stay in
@@ -756,9 +966,20 @@ export class SelectModifierPhase extends BattlePhase {
           (globalScene.ui.getHandler() as ModifierSelectUiHandler).updateCostText();
         }
       } else {
+        // A rejected add is not an authoritative result. In particular, a market watcher must not ACK
+        // the retained operation or adopt its money after its local materialization failed. An owner has
+        // already exposed an intent at this point, so terminate the shared run instead of leaving that
+        // intent eligible for a later, unrelated commit.
+        if (this.coopPendingAuthorityOperationId != null && !this.coopWatcher) {
+          failCoopSharedSession(`Reward operation ${this.coopPendingAuthorityOperationId} was rejected locally`);
+          return false;
+        }
         globalScene.ui.playError();
       }
     } else {
+      if (!this.coopCommitPendingAuthorityResult()) {
+        return false;
+      }
       // Co-op (#633): the reward screen is closing - stop mirroring the cursor (a queued
       // move-learn continuation re-opens it via the copy phase, which re-begins the mirror).
       this.coopEndMirror();
@@ -771,6 +992,41 @@ export class SelectModifierPhase extends BattlePhase {
       if (!queuesContinuation) {
         this.coopAdvanceInteraction();
       }
+    }
+    return result;
+  }
+
+  /**
+   * Apply a paid modifier replay on a non-interactive co-op watcher.
+   *
+   * A negative cost is the base reward phase's terminal sentinel: it clears the
+   * UI, ends the phase, and advances the interaction. Market replays used to
+   * pass `-1` merely to avoid charging twice, which accidentally tore down the
+   * watcher after the first held item and let the next biome start before the
+   * owner had left the market. Preserve paid-purchase control flow instead and
+   * temporarily install the normal watcher money/UI context so the owner's
+   * post-purchase balance is adopted without touching an interactive handler.
+   */
+  protected applyCoopRelayedPurchase(
+    modifier: Modifier,
+    validatedCost: number,
+    authoritativeMoney: number,
+    playSound = false,
+  ): boolean {
+    const priorWatcher = this.coopWatcher;
+    const priorAdoptsOptions = this.coopAdoptsOptions;
+    const priorRelayedMoney = this.coopRelayedMoney;
+    this.coopWatcher = true;
+    this.coopAdoptsOptions = true;
+    this.coopRelayedMoney = authoritativeMoney;
+    try {
+      // Older compatibility carriers did not include the validated cost. Zero
+      // still selects the paid-shop branch without recomputing or double-paying.
+      return this.applyModifier(modifier, Math.max(0, validatedCost), playSound);
+    } finally {
+      this.coopWatcher = priorWatcher;
+      this.coopAdoptsOptions = priorAdoptsOptions;
+      this.coopRelayedMoney = priorRelayedMoney;
     }
   }
 
@@ -802,8 +1058,11 @@ export class SelectModifierPhase extends BattlePhase {
           && fromSlotIndex !== spliceSlotIndex
         ) {
           globalScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
+            this.coopResolvedModifierOption = spliceSlotIndex;
             // Co-op (#633): relay the resolved fusion pair so the watcher mirrors it.
-            this.coopFlushPending([fromSlotIndex, spliceSlotIndex], cost);
+            if (this.coopFlushPending([fromSlotIndex, spliceSlotIndex], cost)) {
+              return;
+            }
             const modifier = modifierType.newModifier(party[fromSlotIndex], party[spliceSlotIndex])!; //TODO: is the bang correct?
             this.applyModifier(modifier, cost, true);
           });
@@ -854,6 +1113,7 @@ export class SelectModifierPhase extends BattlePhase {
     // Co-op (#633) WATCHER: apply the owner's relayed target slot + sub-option directly,
     // never opening the party UI on a mon it does not drive.
     if (this.coopWatcher) {
+      this.coopResolvedModifierOption = this.coopRelayedOption;
       const modifier = this.buildPokemonModifier(modifierType, this.coopRelayedSlot, this.coopRelayedOption);
       if (modifier != null) {
         this.applyModifier(modifier, cost, true);
@@ -867,8 +1127,11 @@ export class SelectModifierPhase extends BattlePhase {
       (slotIndex: number, option: PartyOption) => {
         if (slotIndex < 6) {
           globalScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
+            this.coopResolvedModifierOption = option;
             // Co-op (#633): relay the resolved target slot + sub-option to the watcher.
-            this.coopFlushPending([slotIndex, option], cost);
+            if (this.coopFlushPending([slotIndex, option], cost)) {
+              return;
+            }
             const modifier = this.buildPokemonModifier(modifierType, slotIndex, option);
             this.applyModifier(modifier!, cost, true); // TODO: is the bang correct?
           });
@@ -934,13 +1197,29 @@ export class SelectModifierPhase extends BattlePhase {
   // Function that resets the reward selection screen,
   // e.g. after pressing cancel in the party ui or while learning a move
   protected resetModifierSelect(modifierSelectCallback: ModifierSelectCallback) {
-    globalScene.ui.setMode(
-      UiMode.MODIFIER_SELECT,
-      this.isPlayer(),
-      this.typeOptions,
-      modifierSelectCallback,
-      this.getRerollCost(globalScene.lockModifierTiers),
-    );
+    void globalScene.ui
+      .setMode(
+        UiMode.MODIFIER_SELECT,
+        this.isPlayer(),
+        this.typeOptions,
+        modifierSelectCallback,
+        this.getRerollCost(globalScene.lockModifierTiers),
+      )
+      .then(() => {
+        // The retained wave's DATA already landed in the queued BattleEndPhase. Record readiness only
+        // after this real public shop handler has committed, never when a phase object is constructed.
+        this.notifyCoopContinuationSurfaceReady();
+      });
+  }
+
+  /** Preserve the phase's runtime across async UI completion in the two-engine fidelity harness. */
+  private notifyCoopContinuationSurfaceReady(): void {
+    const notify = () => notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
+    if (this.coopOwningRuntime == null) {
+      notify();
+      return;
+    }
+    runWhenCoopRuntimeActive(this.coopOwningRuntime, notify);
   }
 
   updateSeed(): void {
@@ -978,7 +1257,7 @@ export class SelectModifierPhase extends BattlePhase {
     }
 
     const baseMultiplier = Math.min(
-      Math.ceil(globalScene.currentBattle.waveIndex / 10) * baseValue * 2 ** this.rerollCount * multiplier,
+      Math.ceil(this.coopRewardWave() / 10) * baseValue * 2 ** this.rerollCount * multiplier,
       Number.MAX_SAFE_INTEGER,
     );
 
@@ -1047,6 +1326,8 @@ export class SelectModifierPhase extends BattlePhase {
         allowLuckUpgrades: false,
       },
       true,
+      { kind: "inherited", address: this.coopSourceAddress },
+      this.coopRewardSurface,
     );
     // Co-op (#837): the continuation copy MUST inherit the SAME pinned interaction counter this shop
     // opened on. Without it the copy starts at -1 and, if its own terminal ever advances (a backed-out
@@ -1056,6 +1337,7 @@ export class SelectModifierPhase extends BattlePhase {
     // no-ops - so the partner DEFERS the broadcast and lags N-behind, wedging the next battle. Pinned
     // here, the copy's terminal advance is from-pinned + idempotent (a duplicate no-ops on both sides).
     copied.coopInteractionStart = this.coopInteractionStart;
+    copied.coopRewardOperationBinding = this.coopRewardOperationBinding;
     return copied;
   }
 
@@ -1073,13 +1355,21 @@ export class SelectModifierPhase extends BattlePhase {
 
   /** Build the modifier for a resolved party-target pick (shared by the owner's menu
    *  callback and the watcher's direct replay) - mirrors the openModifierMenu dispatch. */
-  private buildPokemonModifier(modifierType: PokemonModifierType, slotIndex: number, option: number): Modifier | null {
+  protected buildPokemonModifier(
+    modifierType: PokemonModifierType,
+    slotIndex: number,
+    option: number,
+  ): Modifier | null {
     const target = globalScene.getPlayerParty()[slotIndex];
     if (target == null) {
       return null;
     }
     if (modifierType instanceof PokemonMoveModifierType) {
       return modifierType.newModifier(target, option - PartyOption.MOVE_1);
+    }
+    if (modifierType instanceof FusePokemonModifierType) {
+      const partner = globalScene.getPlayerParty()[option];
+      return partner == null ? null : modifierType.newModifier(target, partner);
     }
     if (modifierType instanceof PokemonAbilityModifierType) {
       return modifierType.newModifier(target, option - PartyOption.ABILITY_SLOT_0);
@@ -1100,18 +1390,18 @@ export class SelectModifierPhase extends BattlePhase {
    *  counter can be bumped mid-interaction by an inbound reconcile broadcast, which would
    *  send a later pick on a DIFFERENT seq than the watcher's captured await seq (the watcher
    *  then stops following the owner's picks - the live cursor/relay desync). */
-  private coopRelaySend(choice: number, data: number[] | undefined, label: string): void {
+  private coopRelaySend(choice: number, data: number[] | undefined, label: string): boolean {
     if (!globalScene.gameMode.isCoop) {
-      return;
+      return false;
     }
     const controller = getCoopController();
     if (controller == null || !controller.isLocalOwnerAtCounter(this.coopInteractionStart)) {
-      return;
+      return false;
     }
     // Past the co-op + pinned-owner fence: this client OWNS this shop interaction and is the
-    // relay source. Log the exact send (seq + label + choice + payload) so the watcher's apply
-    // can be matched against it in the captured log. Hot-ish (per reward action) - guard the
-    // string build behind isCoopDebug().
+    // relay source. Log the exact preparation (seq + label + choice + payload) so a retained result or
+    // compatibility carrier can be matched against it in the captured log. Hot-ish (per reward action) -
+    // guard the string build behind isCoopDebug().
     // Co-op (#698): for a money-moving pick the owner stashes its POST-spend authoritative money in
     // coopOwnerPostMoney just before this send; append it as a trailing [COOP_MONEY_TAG, money] pair
     // so the watcher sets money verbatim (the watcher strips it before its positional decode). The
@@ -1124,23 +1414,248 @@ export class SelectModifierPhase extends BattlePhase {
     if (isCoopDebug()) {
       coopLog(
         "relay",
-        `OWNER send seq=${this.coopInteractionStart} kind=${label} choice=${choice} data=[${wire?.join(",") ?? ""}] role=${controller.role}`,
+        `OWNER prepare seq=${this.coopInteractionStart} kind=${label} choice=${choice} data=[${wire?.join(",") ?? ""}] role=${controller.role}`,
       );
     }
-    getCoopInteractionRelay()?.sendInteractionChoice(this.coopInteractionStart, label, choice, wire);
-    // Wave-2d: DUAL-RUN - additionally COMMIT the typed intent through the authoritative operation
-    // primitive (the host validates + commits exactly once). No-op when the flag is OFF; the legacy relay
-    // above is the fallback and stays live either way. terminal = a skip/leave that ends the interaction.
-    commitRewardOwnerIntent({
-      surface: "reward",
-      pinned: this.coopInteractionStart,
+    // Prepare the typed intent BEFORE publishing its compatibility carrier. In retained-result mode this
+    // does not commit state; the host executes once and captures the complete post-action result later.
+    this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
+    const prepared = commitRewardOwnerIntent(
+      {
+        surface: "reward",
+        rewardSurface: this.coopRewardSurface,
+        pinned: this.coopInteractionStart,
+        label,
+        choice,
+        data: wire,
+        terminal: choice === COOP_INTERACTION_LEAVE,
+        localRole: controller.role,
+        wave: this.coopRewardWave(),
+        turn: this.coopRewardTurn(),
+      },
+      this.coopRewardOperationBinding,
+    );
+    this.coopPendingAuthorityOperationId = prepared?.operationId ?? null;
+    // A host-owned LEAVE has no gameplay mutation after this seam: the next statement in every caller is
+    // phase teardown / interaction-counter advancement. Commit its complete retained result HERE, before
+    // publishing a raw compatibility carrier or allowing the caller to continue. This also closes the
+    // production-fidelity driver seam, which legitimately invokes coopRelaySend directly and therefore
+    // cannot rely on the confirmation callback's second commit call.
+    //
+    // In retained-result mode the committed envelope is itself materialized into the guest's reward FIFO,
+    // so a second raw host LEAVE would be both redundant and dangerous: it can remain buffered behind the
+    // tagged terminal and poison a continuation that reuses the pinned interaction. Guest-owned terminals
+    // still publish their raw intent so the host can validate, execute, and commit it.
+    if (
+      choice === COOP_INTERACTION_LEAVE
+      && controller.role === "host"
+      && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
+    ) {
+      if (prepared == null) {
+        failCoopSharedSession("Host reward terminal could not retain its authoritative intent");
+        return true;
+      }
+      if (!this.coopCommitPendingAuthorityResult(prepared.operationId)) {
+        return true;
+      }
+      coopLog(
+        "reward",
+        `OWNER retained terminal before continuation seq=${this.coopInteractionStart} id=${prepared.operationId}`,
+      );
+      // Preserve the replay decision point. A real peer owns an independent renderer and must materially
+      // apply this exact canonical result before this phase may tear down or advance the shared counter.
+      // The local-dev SpoofGuest has no scene on which to apply/ACK the result, so it deliberately keeps the
+      // historical fall-through contract and lets the caller finish locally after the retained commit.
+      recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
+      if (getCoopRuntime()?.spoof == null) {
+        this.coopAwaitTerminalMaterialApplied(prepared.operationId);
+        return true;
+      }
+      return false;
+    }
+    if (isCoopDebug()) {
+      coopLog(
+        "relay",
+        `OWNER send raw seq=${this.coopInteractionStart} kind=${label} choice=${choice} role=${controller.role}`,
+      );
+    }
+    getCoopInteractionRelay()?.sendInteractionChoice(
+      this.coopInteractionStart,
       label,
       choice,
-      data: wire,
-      terminal: choice === COOP_INTERACTION_LEAVE,
-      localRole: controller.role,
-      wave: globalScene.currentBattle?.waveIndex ?? -1,
-    });
+      wire,
+      this.coopRewardSurface,
+    );
+    if (
+      controller.role === "guest"
+      && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
+      && prepared != null
+    ) {
+      this.coopAwaitAuthoritativeResult(prepared.operationId);
+      return true;
+    }
+    return false;
+  }
+
+  /** HOST: publish the complete post-action result before any continuation surface opens. */
+  private coopCommitPendingAuthorityResult(operationId = this.coopPendingAuthorityOperationId): boolean {
+    // A host-owned terminal already committed at the relay seam and armed its peer-material barrier. Stop a
+    // following legacy caller before teardown/counter advance; the barrier callback owns that continuation.
+    // Local SpoofGuest sessions never arm this set and therefore retain their synchronous fall-through.
+    if (operationId == null && this.coopAwaitingMaterialResults.size > 0) {
+      return false;
+    }
+    if (operationId == null || !isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)) {
+      return true;
+    }
+    if (getCoopController()?.role !== "host") {
+      return false;
+    }
+    const committed = commitRewardAuthoritativeResult(operationId, undefined, this.coopRewardOperationBinding);
+    if (committed == null) {
+      getCoopRuntime()?.durability?.reconnect();
+      failCoopSharedSession(`Reward result ${operationId} could not capture/retain complete host state`);
+      return false;
+    }
+    if (this.coopPendingAuthorityOperationId === operationId) {
+      this.coopPendingAuthorityOperationId = null;
+    }
+    return true;
+  }
+
+  /** HOST terminal: wait for exact peer material without weakening the later continuation-ready gate. */
+  private coopAwaitTerminalMaterialApplied(operationId: string): void {
+    if (this.coopAwaitingMaterialResults.has(operationId)) {
+      return;
+    }
+    const runtime = getCoopRuntime();
+    const durability = runtime?.durability;
+    if (runtime == null || durability == null || runtime.controller.role !== "host") {
+      failCoopSharedSession(`Reward terminal ${operationId} has no host material-apply barrier`);
+      return;
+    }
+    const generation = coopSessionGeneration();
+    this.coopAwaitingMaterialResults.add(operationId);
+    void durability
+      .waitForOperationMaterialApplied(operationId)
+      .then(applied => {
+        if (!applied) {
+          this.coopAwaitingMaterialResults.delete(operationId);
+          if (coopSessionGeneration() === generation && getCoopRuntime() === runtime) {
+            failCoopSharedSession(`Reward terminal ${operationId} exhausted before peer material apply`);
+          }
+          return;
+        }
+        runWhenCoopRuntimeActive(runtime, () =>
+          this.coopFinishTerminalAfterMaterialApplied(operationId, runtime, generation),
+        );
+      })
+      .catch(error => {
+        this.coopAwaitingMaterialResults.delete(operationId);
+        coopWarn("reward", `Reward terminal ${operationId} material barrier rejected`, error);
+        if (coopSessionGeneration() === generation && getCoopRuntime() === runtime) {
+          failCoopSharedSession(`Reward terminal ${operationId} material barrier failed`);
+        }
+      });
+  }
+
+  /** Resume under the captured host runtime only; a replaced session/phase callback has no mutation right. */
+  private coopFinishTerminalAfterMaterialApplied(
+    operationId: string,
+    runtime: NonNullable<ReturnType<typeof getCoopRuntime>>,
+    generation: number,
+  ): void {
+    this.coopAwaitingMaterialResults.delete(operationId);
+    if (coopSessionGeneration() !== generation || getCoopRuntime() !== runtime) {
+      return;
+    }
+    if (
+      runtime.controller.role !== "host"
+      || globalScene.currentBattle == null
+      || globalScene.phaseManager.getCurrentPhase() !== this
+    ) {
+      failCoopSharedSession(`Reward terminal ${operationId} materialized after its host phase was replaced`);
+      return;
+    }
+    coopLog(
+      "reward",
+      `OWNER peer material applied; release terminal engine barrier seq=${this.coopInteractionStart} id=${operationId}`,
+    );
+    super.end();
+    this.coopAdvanceInteraction();
+  }
+
+  /** GUEST intent owner: remain parked until the retained host result has applied, then project its UI tail. */
+  private coopAwaitAuthoritativeResult(operationId: string): void {
+    if (this.coopAwaitingAuthorityResults.has(operationId)) {
+      return;
+    }
+    this.coopAwaitingAuthorityResults.add(operationId);
+    this.coopEndMirror();
+    void globalScene.ui.setMode(UiMode.MESSAGE);
+    this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
+    void (async () => {
+      try {
+        const relay = getCoopInteractionRelay();
+        if (relay == null) {
+          failCoopSharedSession(`Reward result ${operationId} has no live relay`);
+          return;
+        }
+        for (;;) {
+          const action = await relay.awaitInteractionChoice(
+            this.coopInteractionStart,
+            COOP_REWARD_WAIT_MS,
+            COOP_REWARD_CHOICE_KINDS,
+            this.coopRewardSurface ?? null,
+          );
+          if (action == null) {
+            getCoopRuntime()?.durability?.reconnect();
+            failCoopSharedSession(`Reward result ${operationId} was not recovered`);
+            return;
+          }
+          const terminal = action.choice === COOP_INTERACTION_LEAVE;
+          const decision = adoptRewardWatcherChoice(
+            {
+              surface: "reward",
+              rewardSurface: this.coopRewardSurface,
+              pinned: this.coopInteractionStart,
+              action: {
+                choice: action.choice,
+                data: action.data,
+                operationId: action.operationId,
+                rewardSurface: action.rewardSurface,
+              },
+              terminal,
+              localRole: "guest",
+              wave: this.coopRewardWave(),
+              turn: this.coopRewardTurn(),
+            },
+            this.coopRewardOperationBinding,
+          );
+          if (!decision.adopt && decision.reason === "reward-surface-mismatch") {
+            failCoopSharedSession(`Reward result ${operationId} targeted a different ordered surface`);
+            return;
+          }
+          if (!decision.adopt || decision.operationId !== operationId || decision.authoritativeProjection !== true) {
+            continue;
+          }
+          if (this.applyRelayedRewardAction(action, decision)) {
+            return;
+          }
+        }
+      } finally {
+        this.coopAwaitingAuthorityResults.delete(operationId);
+      }
+    })();
+  }
+
+  /** Return a guest action owner from the bounded result wait to the same still-live shop. */
+  private coopResumeOwnerShopAfterProjection(): void {
+    if (this.coopWatcher) {
+      return;
+    }
+    this.resetModifierSelect(this.coopModifierSelectCallback ?? (() => false));
+    this.coopBeginMirror("owner");
   }
 
   /** OWNER (#633 Fix #2): stream the rolled reward-option list for THIS reroll round so the
@@ -1156,7 +1671,12 @@ export class SelectModifierPhase extends BattlePhase {
         "reward",
         `OWNER streams reward options (start=${this.coopInteractionStart} reroll=${this.rerollCount} count=${serialized.length} ids=[${serialized.map(o => o.id).join(",")}])`,
       );
-      getCoopInteractionRelay()?.sendRewardOptions(this.coopInteractionStart, this.rerollCount, serialized);
+      getCoopInteractionRelay()?.sendRewardOptions(
+        this.coopInteractionStart,
+        this.rerollCount,
+        serialized,
+        this.coopRewardSurface,
+      );
     } catch {
       /* a serialize/send failure must never break the owner's reward screen */
     }
@@ -1183,6 +1703,7 @@ export class SelectModifierPhase extends BattlePhase {
         this.coopInteractionStart,
         this.rerollCount,
         COOP_REWARD_WAIT_MS,
+        this.coopRewardSurface,
       );
       if (serialized == null) {
         coopWarn(
@@ -1287,7 +1808,7 @@ export class SelectModifierPhase extends BattlePhase {
    * counter (never the live counter), so a mid-interaction reconcile can't move it.
    */
   private coopShopPoint(): string | null {
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.coopRewardWave();
     if (this.coopInteractionStart < 0 || wave < 0) {
       return null;
     }
@@ -1323,41 +1844,64 @@ export class SelectModifierPhase extends BattlePhase {
     if (!(await this.coopAwaitShopBarrier(spoofed))) {
       return;
     }
-    // #872: the barrier wait can resume AFTER the scene moved on (run over /
-    // wave torn down / this phase superseded). Opening the shop then reads currentBattle.waveIndex on
-    // null - an UNCAUGHT rejection that kills the client's phase machine (the live "game froze, only
-    // arrow keys work" class). Bail loudly instead; the phase machine has already moved past us.
-    if (!this.coopShopSceneAlive("post-barrier owner open")) {
-      return;
-    }
-    if (coopIsWatcher) {
-      // #828 guest pick-owner on a guest-owned ME: it does NOT roll (the HOST is the sole ME engine +
-      // streamed the pool), so ADOPT the host's streamed options first, THEN open the owner screen.
-      await this.startCoopOwnerAdoptOptions(modifierSelectCallback);
-      return;
-    }
-    this.resetModifierSelect(modifierSelectCallback);
-    // Co-op (#633): relay our cursor so the partner's screen mirrors it live.
-    this.coopBeginMirror("owner");
+    // The wait can settle while the other in-process client is ambient. Re-enter the runtime/scene that
+    // owns THIS phase before checking currency or touching UI. Production invokes immediately; the duo
+    // harness queues until it next installs this exact client context.
+    this.coopResumeOnOwningRuntime(() => {
+      // #872/#P33: the barrier can also settle AFTER this shop was superseded by the next encounter. A
+      // merely non-null currentBattle is insufficient: wave 16 can be live while this wave-15 promise is
+      // stale. Only the phase instance that still owns its captured scene may reopen MODIFIER_SELECT.
+      if (!this.coopShopSceneAlive("post-barrier owner open")) {
+        return;
+      }
+      if (coopIsWatcher) {
+        // #828 guest pick-owner on a guest-owned ME: it does NOT roll (the HOST is the sole ME engine +
+        // streamed the pool), so ADOPT the host's streamed options first, THEN open the owner screen.
+        void this.startCoopOwnerAdoptOptions(modifierSelectCallback);
+        return;
+      }
+      this.resetModifierSelect(modifierSelectCallback);
+      // Co-op (#633): relay our cursor so the partner's screen mirrors it live.
+      this.coopBeginMirror("owner");
+    });
   }
 
   /**
-   * #872: is this shop phase still entitled to touch the screen after an async wait? A parked
-   * continuation (shop barrier / option adopt) can resolve long after the run ended - opening the
-   * modifier UI then NPEs on the torn-down battle (getRerollCost reads currentBattle.waveIndex),
-   * an UNCAUGHT rejection that kills the client's phase machine (the live freeze class caught by
-   * the me-asym soak). False = log + walk away WITHOUT touching the phase manager. Deliberately
-   * ONLY the battle-gone check (the exact NPE precondition): a phase-currency check over-fires in
-   * the two-engine harness, where async continuations can resume under the OTHER client's ctx swap.
+   * Run a post-await continuation only under the runtime/scene that constructed this phase. Ambient
+   * `globalScene` is process-wide and can point at the other duo-harness client when a promise settles.
+   * Binding both together makes the production entitlement check testable without weakening it for the
+   * harness. The returned cancel handle is intentionally unused: session teardown clears runtime work.
+   */
+  private coopResumeOnOwningRuntime(callback: () => void): void {
+    if (this.coopOwningRuntime == null) {
+      callback();
+      return;
+    }
+    runWhenCoopRuntimeActive(this.coopOwningRuntime, () => {
+      if (globalScene !== this.coopOwningScene) {
+        coopWarn("reward", "stale shop continuation DROPPED: owning runtime was rebound to another scene");
+        return;
+      }
+      callback();
+    });
+  }
+
+  /**
+   * #872/P33: is this exact shop phase still entitled to touch its owning screen after an async wait?
+   * A parked continuation can resolve after teardown OR after a later battle replaced it. Inspect the
+   * captured scene, not ambient `globalScene`, so a legitimate duo-client context swap never over-fires.
    */
   private coopShopSceneAlive(context: string): boolean {
-    if (globalScene.currentBattle != null) {
+    const battleLive = this.coopOwningScene.currentBattle != null;
+    const currentPhase = this.coopOwningScene.phaseManager.getCurrentPhase();
+    if (battleLive && currentPhase === this) {
       return true;
     }
     coopWarn(
       "reward",
-      `stale shop continuation DROPPED (${context}): currentBattle is gone `
-        + "- the run moved on during an async wait; not opening the shop screen (#872 anti-freeze)",
+      `stale shop continuation DROPPED (${context}): `
+        + `${battleLive ? `phase was replaced by ${currentPhase?.phaseName ?? "none"}` : "currentBattle is gone"} `
+        + "- not opening the shop screen (#872/P33 anti-freeze)",
     );
     return false;
   }
@@ -1381,14 +1925,16 @@ export class SelectModifierPhase extends BattlePhase {
           `shop-pick-commit barrier ${point} ABORTED during teardown/recovery - pick screen remains closed`,
         );
         return false;
-      } else if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
+      }
+      if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
         coopWarn(
           "rendezvous",
           `shop-pick-commit barrier ${point} ROUTED AWAY to host-authoritative ${result.authoritativePoint}; closing stale shop phase`,
         );
         this.end();
         return false;
-      } else if (result.crossPoint !== undefined) {
+      }
+      if (result.crossPoint !== undefined) {
         // #847 CROSS-POINT: the partner is parked at another sync point (e.g. a phantom next command) and
         // will never reach this shop barrier. Open the pick screen now - the catch-up machinery reconciles.
         // INFO, not the anti-hang WARN (no dead partner, no 60s wait).
@@ -1423,19 +1969,22 @@ export class SelectModifierPhase extends BattlePhase {
    *  owner is ABOUT to deduct (-1 = free reward, no spend); the post-spend money is streamed so
    *  the watcher sets it verbatim. The flush runs BEFORE the applyModifier deduction, so the
    *  post value is computed inline (money - cost) here rather than read live. */
-  private coopFlushPending(extra: number[], cost = -1): void {
+  private coopFlushPending(extra: number[], cost = -1): boolean {
     if (this.coopPendingKind == null) {
-      return;
+      return false;
     }
     const data =
-      this.coopPendingKind === "shop" ? [COOP_ACT_SHOP, this.coopPendingRow, ...extra] : [COOP_ACT_REWARD, ...extra];
+      this.coopPendingKind === "shop"
+        ? [COOP_ACT_SHOP, this.coopPendingRow, ...extra, COOP_COST_TAG, Math.trunc(cost)]
+        : [COOP_ACT_REWARD, ...extra];
     // Stream post-spend money only for an actual paid pick (cost > 0). Free rewards (cost -1/0)
     // and WAIVE_ROLL_FEE_OVERRIDE deduct nothing, so leave coopOwnerPostMoney at -1 -> no tag ->
     // the watcher keeps its own (also-nothing) deduction.
     this.coopOwnerPostMoney =
       cost > 0 && !Overrides.WAIVE_ROLL_FEE_OVERRIDE ? Math.trunc(globalScene.money - cost) : -1;
-    this.coopRelaySend(this.coopPendingCursor, data, this.coopPendingKind);
+    const deferred = this.coopRelaySend(this.coopPendingCursor, data, this.coopPendingKind);
     this.coopPendingKind = null;
+    return deferred;
   }
 
   /**
@@ -1451,7 +2000,7 @@ export class SelectModifierPhase extends BattlePhase {
     if (getCoopController() == null || this.coopInteractionStart < 0) {
       return -1;
     }
-    return this.coopInteractionStart * 64 + Math.min(this.rerollCount, 63);
+    return coopRewardMirrorSeq(this.coopInteractionStart, this.rerollCount, this.coopRewardSurface) ?? -1;
   }
 
   /**
@@ -1543,14 +2092,22 @@ export class SelectModifierPhase extends BattlePhase {
       () => false,
       this.getRerollCost(globalScene.lockModifierTiers),
     );
+    // Watchers open the same real surface through a separate async path from resetModifierSelect.
+    this.notifyCoopContinuationSurfaceReady();
     this.coopBeginMirror("watcher");
     // Await on the PINNED interaction counter (#633), matching the owner's pinned send seq.
     // Reading the live counter here would let an inbound reconcile broadcast (which can bump
     // it mid-interaction) move our await seq off the owner's send seq -> we'd stop receiving
     // the owner's picks and hang ("watcher stuck / cursor at the wrong spots").
     const seq = this.coopInteractionStart;
+    this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
     for (;;) {
-      const action = await relay.awaitInteractionChoice(seq, COOP_REWARD_WAIT_MS, COOP_REWARD_CHOICE_KINDS);
+      const action = await relay.awaitInteractionChoice(
+        seq,
+        COOP_REWARD_WAIT_MS,
+        COOP_REWARD_CHOICE_KINDS,
+        this.coopRewardSurface ?? null,
+      );
       if (action == null) {
         coopLog("reward", "WATCHER timed out waiting for partner -> leaving reward screen");
         this.coopEndMirror();
@@ -1562,22 +2119,36 @@ export class SelectModifierPhase extends BattlePhase {
       // stale-/late-rejecting a pick from an earlier interaction or after this one left - the #861 shape).
       // When the flag is OFF this passes through verbatim (legacy). A reject IGNORES the action + keeps
       // awaiting the authoritative terminal, exactly like the existing #854 out-of-range guard.
-      const decision = adoptRewardWatcherChoice({
-        surface: "reward",
-        pinned: this.coopInteractionStart,
-        action: { choice: action.choice, data: action.data, operationId: action.operationId },
-        terminal: action.choice === COOP_INTERACTION_LEAVE,
-        localRole: controller.role,
-        wave: globalScene.currentBattle?.waveIndex ?? -1,
-      });
+      const decision = adoptRewardWatcherChoice(
+        {
+          surface: "reward",
+          rewardSurface: this.coopRewardSurface,
+          pinned: this.coopInteractionStart,
+          action: {
+            choice: action.choice,
+            data: action.data,
+            operationId: action.operationId,
+            rewardSurface: action.rewardSurface,
+          },
+          terminal: action.choice === COOP_INTERACTION_LEAVE,
+          localRole: controller.role,
+          wave: this.coopRewardWave(),
+          turn: this.coopRewardTurn(),
+        },
+        this.coopRewardOperationBinding,
+      );
       if (!decision.adopt) {
+        if (decision.reason === "reward-surface-mismatch") {
+          failCoopSharedSession(`Reward interaction ${seq} targeted a different ordered surface`);
+          return;
+        }
         coopWarn(
           "reward",
           `WATCHER op-gate rejected relayed action (${decision.reason}) seq=${seq} choice=${action.choice} - keep awaiting terminal (Wave-2d)`,
         );
         continue;
       }
-      if (this.applyRelayedRewardAction(action)) {
+      if (this.applyRelayedRewardAction(action, decision)) {
         return;
       }
     }
@@ -1588,17 +2159,26 @@ export class SelectModifierPhase extends BattlePhase {
    * Returns true when this phase is finished (terminal pick / skip / reroll-handoff),
    * false to keep waiting for the next pick (shop buy / lock / transfer).
    */
-  private applyRelayedRewardAction(action: CoopInteractionChoice): boolean {
+  private applyRelayedRewardAction(
+    action: CoopInteractionChoice,
+    decision?: Extract<ReturnType<typeof adoptRewardWatcherChoice>, { adopt: true }>,
+  ): boolean {
+    if (decision?.requiresAuthorityCommit) {
+      this.coopPendingAuthorityOperationId = decision.operationId ?? null;
+    }
+    const projectionOnly = decision?.authoritativeProjection === true;
     const noop: ModifierSelectCallback = () => false;
-    // Co-op (#698): peel the trailing [COOP_MONEY_TAG, hostMoney] pair (if the owner appended it)
-    // off the data BEFORE the positional decode below, so the existing slot/opt indices are read
-    // exactly as today. An older host that does not append it leaves coopRelayedMoney at -1, so the
-    // watcher falls back to its own deduction (current behavior, no regression). Consumed by
-    // rerollModifiers / applyModifier set-verbatim; reset to -1 at every return so it can't bleed.
+    // Peel the tagged post-money and validated price before positional decoding. The retained payload keeps
+    // both so a renderer can recreate a paid continuation without recalculating a potentially divergent cost.
     let relayedMoney = -1;
+    let relayedCost = -1;
     let data = action.data ?? [];
     if (data.length >= 2 && data.at(-2) === COOP_MONEY_TAG) {
       relayedMoney = data.at(-1) ?? -1;
+      data = data.slice(0, -2);
+    }
+    if (data.length >= 2 && data.at(-2) === COOP_COST_TAG) {
+      relayedCost = data.at(-1) ?? -1;
       data = data.slice(0, -2);
     }
     this.coopRelayedMoney = relayedMoney;
@@ -1624,9 +2204,32 @@ export class SelectModifierPhase extends BattlePhase {
       `WATCHER applying relayed action seq=${this.coopInteractionStart} act=${actName} choice=${action.choice} data=${action.data === undefined ? "-" : `[${action.data.join(",")}]`}`,
     );
     if (action.choice === COOP_INTERACTION_LEAVE) {
+      const operationId = decision?.operationId ?? this.coopPendingAuthorityOperationId;
+      const hostRetainedTerminal =
+        !projectionOnly
+        && getCoopController()?.role === "host"
+        && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding);
+      if (!projectionOnly) {
+        if (hostRetainedTerminal && operationId == null) {
+          failCoopSharedSession("Host reward watcher terminal had no retained operation identity");
+          return true;
+        }
+        if (!this.coopCommitPendingAuthorityResult(operationId)) {
+          return true;
+        }
+      }
       this.coopRelayedMoney = -1;
       this.coopEndMirror();
-      globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+      if (hostRetainedTerminal) {
+        void globalScene.ui.setMode(UiMode.MESSAGE);
+        this.coopAwaitTerminalMaterialApplied(operationId!);
+        return true;
+      }
+      // This retained terminal already owns the structural continuation. Do not defer the queue shift behind
+      // a cosmetic mode-transition promise: a scene/context replacement can outlive that promise and leave
+      // the watcher parked after it has already materialized and ACKed the authoritative result.
+      void globalScene.ui.setMode(UiMode.MESSAGE);
+      super.end();
       this.coopAdvanceInteraction();
       return true;
     }
@@ -1636,19 +2239,46 @@ export class SelectModifierPhase extends BattlePhase {
       // one - so end this round's cursor stream before the new screen opens. rerollModifiers
       // reads coopRelayedMoney (set above) to set money host-authoritatively (#698).
       this.coopEndMirror();
-      this.rerollModifiers();
+      if (projectionOnly) {
+        globalScene.reroll = true;
+        globalScene.phaseManager.unshiftNew(
+          "SelectModifierPhase",
+          this.rerollCount + 1,
+          this.typeOptions.map(o => o.type?.tier).filter(t => t !== undefined) as ModifierTier[],
+          undefined,
+          false,
+          { kind: "inherited", address: this.coopSourceAddress },
+          this.coopRewardSurface,
+        );
+        globalScene.ui.clearText();
+        globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+      } else {
+        this.rerollModifiers();
+      }
       this.coopRelayedMoney = -1;
       return true;
     }
     const act = data[0];
     if (act === COOP_ACT_LOCK) {
       this.coopRelayedMoney = -1;
-      this.toggleRerollLock();
+      if (projectionOnly) {
+        // lockModifierTiers is a shop-control projection outside the battle-state schema. The retained,
+        // operation-id-deduped result authorizes this one toggle; no modifier/money simulation runs.
+        globalScene.lockModifierTiers = !globalScene.lockModifierTiers;
+        this.coopResumeOwnerShopAfterProjection();
+      } else {
+        this.toggleRerollLock();
+      }
       return false;
     }
     if (act === COOP_ACT_TRANSFER) {
       this.coopRelayedMoney = -1;
-      this.applyTransfer(data[1], data[2], data[3], data[4]);
+      if (projectionOnly) {
+        this.coopResumeOwnerShopAfterProjection();
+      } else {
+        this.applyTransfer(data[1], data[2], data[3], data[4]);
+        this.coopCommitPendingAuthorityResult(decision?.operationId);
+      }
       return false;
     }
     if (act === COOP_ACT_REWARD) {
@@ -1673,6 +2303,19 @@ export class SelectModifierPhase extends BattlePhase {
       }
       this.coopRelayedSlot = data[1] ?? -1;
       this.coopRelayedOption = data[2] ?? 0;
+      if (projectionOnly) {
+        const modifierType = this.typeOptions[action.choice]?.type;
+        const continuation =
+          modifierType != null
+          && this.queueCoopProjectedModifierFollowUp(modifierType, this.coopRelayedSlot, this.coopRelayedOption, -1);
+        this.coopRelayedMoney = -1;
+        this.coopEndMirror();
+        globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+        if (!continuation) {
+          this.coopAdvanceInteraction();
+        }
+        return true;
+      }
       // coopRelayedMoney (set above) drives applyModifier's set-verbatim for a PAID reward (#698);
       // -1 (free reward / older host) falls back to the unchanged deduction.
       this.selectRewardModifierOption(action.choice, noop);
@@ -1682,6 +2325,30 @@ export class SelectModifierPhase extends BattlePhase {
     if (act === COOP_ACT_SHOP) {
       this.coopRelayedSlot = data[2] ?? -1;
       this.coopRelayedOption = data[3] ?? 0;
+      if (projectionOnly) {
+        const shopOptions = getPlayerShopModifierTypeOptionsForWave(
+          this.coopRewardWave(),
+          globalScene.getWaveMoneyAmount(1),
+        );
+        const row = data[1] ?? -1;
+        const shopOption =
+          shopOptions[
+            row > 2 || shopOptions.length <= SHOP_OPTIONS_ROW_LIMIT
+              ? action.choice
+              : action.choice + SHOP_OPTIONS_ROW_LIMIT
+          ];
+        if (shopOption?.type != null) {
+          this.queueCoopProjectedModifierFollowUp(
+            shopOption.type,
+            this.coopRelayedSlot,
+            this.coopRelayedOption,
+            relayedCost,
+          );
+        }
+        this.coopRelayedMoney = -1;
+        this.coopResumeOwnerShopAfterProjection();
+        return false;
+      }
       // coopRelayedMoney (set above) drives applyModifier's set-verbatim for the buy (#698).
       this.selectShopModifierOption(data[1], action.choice, noop);
       this.coopRelayedMoney = -1;
@@ -1691,7 +2358,12 @@ export class SelectModifierPhase extends BattlePhase {
       // CHECK ops are NON-terminal: the owner is still in the shop. Apply against our identical
       // party and keep watching for the next relayed pick / op / leave.
       this.coopRelayedMoney = -1;
-      this.applyRelayedCheckOp(data[1], data.slice(2));
+      if (projectionOnly) {
+        this.coopResumeOwnerShopAfterProjection();
+      } else {
+        this.applyRelayedCheckOp(data[1], data.slice(2));
+        this.coopCommitPendingAuthorityResult(decision?.operationId);
+      }
       return false;
     }
     this.coopRelayedMoney = -1;

@@ -1,6 +1,5 @@
 import { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
-import { isBeta, isDev } from "#constants/app-constants";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { TextStyle } from "#enums/text-style";
@@ -26,6 +25,14 @@ export enum SaveSlotUiMode {
 }
 
 export type SaveSlotSelectCallback = (cursor: number) => void;
+
+export type SaveSlotSemanticState = "loading" | "empty" | "occupied" | "malformed";
+
+export interface SaveSlotSemanticSelection {
+  readonly slotId: number;
+  readonly loaded: boolean;
+  readonly state: SaveSlotSemanticState;
+}
 
 export class SaveSlotSelectUiHandler extends MessageUiHandler {
   private saveSlotSelectContainer: Phaser.GameObjects.Container;
@@ -122,6 +129,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
             case SaveSlotUiMode.LOAD:
               if (!sessionSlot.malformed) {
                 manageDataOptions.push({
+                  semanticId: "load-game",
                   label: i18next.t("menu:loadGame"),
                   handler: () => {
                     globalScene.ui.revertMode();
@@ -132,6 +140,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
                 });
 
                 manageDataOptions.push({
+                  semanticId: "rename-run",
                   label: i18next.t("saveSlotSelectUiHandler:renameRun"),
                   handler: () => {
                     globalScene.ui.revertMode();
@@ -142,9 +151,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
                           (sanitizedName: string) => {
                             const name = decodeURIComponent(atob(sanitizedName));
                             globalScene.gameData.renameSession(cursor, name).then(response => {
-                              if (response[0] === false) {
-                                globalScene.reset(true);
-                              } else {
+                              if (response) {
                                 this.clearSessionSlots();
                                 this.cursorObj = null;
                                 this.populateSessionSlots();
@@ -152,6 +159,8 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
                                 this.setCursor(0);
                                 ui.revertMode();
                                 ui.showText("", 0);
+                              } else {
+                                globalScene.reset(true);
                               }
                             });
                           },
@@ -175,15 +184,18 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
               };
 
               manageDataOptions.push({
+                semanticId: "delete-run",
                 label: i18next.t("saveSlotSelectUiHandler:deleteRun"),
                 handler: () => {
                   globalScene.ui.revertMode();
                   ui.showText(i18next.t("saveSlotSelectUiHandler:deleteData"), null, () => {
+                    // The animated message already requires a separate completed action before this overlay opens.
+                    // A second ConfirmUi delay can strand a visible Yes behind a throttled/paused Phaser clock.
                     ui.setOverlayMode(
                       UiMode.CONFIRM,
                       () => {
                         globalScene.gameData.deleteSession(cursor).then(response => {
-                          if (response[0] === false) {
+                          if (response === false) {
                             globalScene.reset(true);
                           } else {
                             this.clearSessionSlots();
@@ -203,7 +215,6 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
                       false,
                       0,
                       19,
-                      isBeta || isDev ? 300 : 2000,
                     );
                   });
                   return true;
@@ -212,6 +223,7 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
               });
 
               manageDataOptions.push({
+                semanticId: "cancel",
                 label: i18next.t("menuUiHandler:cancel"),
                 handler: () => {
                   globalScene.ui.revertMode();
@@ -234,10 +246,11 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
               };
               if (this.sessionSlots[cursor].hasData) {
                 ui.showText(i18next.t("saveSlotSelectUiHandler:overwriteData"), null, () => {
+                  // As above, the prompt boundary supplies the key-bleed guard; the visible confirm must be actionable.
                   ui.setOverlayMode(
                     UiMode.CONFIRM,
                     () => {
-                      globalScene.gameData.deleteSession(cursor).then(response => {
+                      globalScene.gameData.deleteSession(cursor, true).then(response => {
                         if (response === false) {
                           globalScene.reset(true);
                         } else {
@@ -252,7 +265,6 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
                     false,
                     0,
                     19,
-                    isBeta || isDev ? 300 : 2000,
                   );
                 });
               } else if (this.sessionSlots[cursor].hasData === false) {
@@ -322,6 +334,28 @@ export class SaveSlotSelectUiHandler extends MessageUiHandler {
     }
 
     return success || error;
+  }
+
+  /**
+   * Read-only public projection of the selected visible slot. Consumers must wait for `loaded`
+   * before issuing an action: SAVE deliberately rejects input while `hasData` is unresolved.
+   */
+  getSelectedSlotSemanticSelection(): SaveSlotSemanticSelection | null {
+    const slot = this.sessionSlots[this.cursor + this.scrollCursor];
+    if (slot == null) {
+      return null;
+    }
+    if (slot.hasData === undefined) {
+      return { slotId: slot.slotId, loaded: false, state: "loading" };
+    }
+    if (slot.malformed) {
+      return { slotId: slot.slotId, loaded: true, state: "malformed" };
+    }
+    return {
+      slotId: slot.slotId,
+      loaded: true,
+      state: slot.hasData ? "occupied" : "empty",
+    };
   }
 
   populateSessionSlots() {
@@ -553,18 +587,14 @@ class SessionSlot extends Phaser.GameObjects.Container {
     return fallbackName;
   }
 
-  async setupWithData(data: SessionSaveData) {
-    const hasName = data?.name;
+  setupWithData(data: SessionSaveData) {
     this.remove(this.loadingLabel, true);
-    if (hasName) {
-      const nameLabel = addTextObject(8, 5, data.name, TextStyle.WINDOW);
-      this.add(nameLabel);
-    } else {
-      const fallbackName = this.decideFallback(data);
-      await globalScene.gameData.renameSession(this.slotId, fallbackName);
-      const nameLabel = addTextObject(8, 5, fallbackName, TextStyle.WINDOW);
-      this.add(nameLabel);
-    }
+    // Save-list rendering must remain read-only. Persisting a generated fallback name here used to
+    // start an unawaited cloud CAS while the slot was already actionable, so an immediate Delete or
+    // Overwrite could race that rename and fail its exact local-byte cleanup after the cloud delete.
+    const displayName = data.name || this.decideFallback(data);
+    const nameLabel = addTextObject(8, 5, displayName, TextStyle.WINDOW);
+    this.add(nameLabel);
 
     const gameModeLabel = addTextObject(
       8,

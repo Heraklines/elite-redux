@@ -98,8 +98,15 @@ export class PokemonData {
     this.nickname = source.nickname;
     this.formIndex = Math.max(Math.min(source.formIndex, getPokemonSpecies(this.species).forms.length - 1), 0);
     this.abilityIndex = source.abilityIndex;
-    this.passive = source.passive;
-    this.shiny = source.shiny;
+    // `passive`/`shiny` are declared `boolean`, but a FRESHLY-GENERATED Pokemon (not built from a
+    // dataSource) never assigns `passive` (Pokemon only sets it via `!!dataSource.passive` on the load
+    // path), so `source.passive` is `undefined` here on a fresh mon. JSON.stringify then DROPS the key,
+    // and the co-op fresh first-save CAS validator (er-save-api isPokemonDataShape) requires
+    // `typeof passive === "boolean"` -> the whole first save is rejected (409). Default to a real boolean
+    // at this serialization boundary so the persisted shape is always valid (symmetric with the load
+    // path's `!!`). `false` is the correct default: an un-unlocked passive is inactive.
+    this.passive = source.passive ?? false;
+    this.shiny = source.shiny ?? false;
     this.variant = source.variant;
     this.pokeball = source.pokeball ?? PokeballType.POKEBALL;
     this.level = source.level;
@@ -141,7 +148,9 @@ export class PokemonData {
     this.fusionSpecies = sourcePokemon?.fusionSpecies?.speciesId ?? source.fusionSpecies;
     this.fusionFormIndex = source.fusionFormIndex;
     this.fusionAbilityIndex = source.fusionAbilityIndex;
-    this.fusionShiny = source.fusionShiny;
+    // Same declared-boolean-serialized-as-undefined class as `passive`/`shiny` above (a non-fused mon
+    // never sets `fusionShiny`); default it so the serialized shape never carries an undefined boolean.
+    this.fusionShiny = source.fusionShiny ?? false;
     this.fusionVariant = source.fusionVariant;
     this.fusionGender = source.fusionGender;
     this.fusionLuck = source.fusionLuck ?? (source.fusionShiny ? source.fusionVariant + 1 : 0);

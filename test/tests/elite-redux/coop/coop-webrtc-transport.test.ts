@@ -15,6 +15,9 @@ import type { CoopConnectionState, CoopMessage } from "#data/elite-redux/coop/co
 import { COOP_PROTOCOL_VERSION, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import {
   COOP_KEEPALIVE_MS,
+  COOP_PC_DISCONNECTED_GRACE_MS,
+  COOP_WIRE_BUFFER_HIGH_BYTES,
+  COOP_WIRE_CHUNK_PAYLOAD_CHARS,
   type CoopWireChannel,
   WebRtcTransport,
   wireFromRtcChannel,
@@ -22,19 +25,35 @@ import {
 import { GameModes } from "#enums/game-modes";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const TEST_RUN_ID = `test-run-${"a".repeat(24)}`;
+const TEST_CONTROL_PLANE = { interactionCounter: 0, journalHighWater: {} } as const;
+
+function loadedResumeSession<T extends object>(session: T, sessionJson = JSON.stringify(session)) {
+  return { session, sessionJson };
+}
+
 /** In-process mock of a data channel implementing {@linkcode CoopWireChannel}.
  *  Two are cross-wired (`link`) to simulate the two ends of an open channel. */
 class MockWire implements CoopWireChannel {
   readyState = "open";
+  bufferedAmount = 0;
+  bufferedAmountLowThreshold = 0;
   peer: MockWire | null = null;
   sent: string[] = [];
+  throwOnSendNumber: number | null = null;
+  private sendCount = 0;
   /** #857: settable so a test can assert the transport surfaces the channel's last error as the drop reason. */
   lastError: string | undefined = undefined;
   private msgHandler: ((d: string) => void) | null = null;
   private openHandler: (() => void) | null = null;
   private closeHandler: (() => void) | null = null;
+  private bufferedAmountLowHandler: (() => void) | null = null;
 
   send(data: string): void {
+    this.sendCount++;
+    if (this.throwOnSendNumber === this.sendCount) {
+      throw new Error(`forced send failure ${this.sendCount}`);
+    }
     this.sent.push(data);
     this.peer?.msgHandler?.(data);
   }
@@ -58,6 +77,9 @@ class MockWire implements CoopWireChannel {
   onClose(handler: () => void): void {
     this.closeHandler = handler;
   }
+  onBufferedAmountLow(handler: () => void): void {
+    this.bufferedAmountLowHandler = handler;
+  }
   /** Deliver a RAW frame to this end (bypassing the peer) - for malformed-frame tests. */
   injectRaw(data: string): void {
     this.msgHandler?.(data);
@@ -67,6 +89,9 @@ class MockWire implements CoopWireChannel {
     this.readyState = "open";
     this.openHandler?.();
   }
+  fireBufferedAmountLow(): void {
+    this.bufferedAmountLowHandler?.();
+  }
 }
 
 function linkedWires(): { a: MockWire; b: MockWire } {
@@ -75,6 +100,21 @@ function linkedWires(): { a: MockWire; b: MockWire } {
   a.peer = b;
   b.peer = a;
   return { a, b };
+}
+
+function resumeCommitment(wave: number, host = "H", guest = "G") {
+  return {
+    version: 1 as const,
+    digest: "0".repeat(64),
+    gameMode: GameModes.COOP,
+    wave,
+    revision: 0,
+    runId: TEST_RUN_ID,
+    checkpointRevision: wave,
+    timestamp: wave * 10,
+    participants: [host, guest].sort() as [string, string],
+    seats: { host, guest },
+  };
 }
 
 describe("co-op WebRTC transport (#633, P6) - framing", () => {
@@ -93,6 +133,91 @@ describe("co-op WebRTC transport (#633, P6) - framing", () => {
     expect(a.sent).toEqual([JSON.stringify(msg)]);
     // ...and decoded back into the same message on the peer.
     expect(received).toEqual([msg]);
+  });
+
+  it("chunks and exactly reassembles a realistic late-campaign resume checkpoint below SCTP frame limits", () => {
+    const { a, b } = linkedWires();
+    const host = new WebRtcTransport("host", a);
+    const guest = new WebRtcTransport("guest", b);
+    const received: CoopMessage[] = [];
+    guest.onMessage(message => received.push(message));
+    const msg: CoopMessage = {
+      t: "resumeCheckpoint",
+      checkpointId: "late-wave-large-save",
+      commitment: resumeCommitment(200),
+      session: JSON.stringify({ waveIndex: 200, accumulatedRunState: "x".repeat(512_000) }),
+      mirrorCloud: true,
+    };
+
+    host.send(msg);
+
+    expect(a.sent.length, "large checkpoint was split into bounded wire frames").toBeGreaterThan(1);
+    expect(
+      Math.max(...a.sent.map(frame => frame.length)),
+      "each encoded chunk stays well below a typical RTCDataChannel maxMessageSize",
+    ).toBeLessThan(COOP_WIRE_CHUNK_PAYLOAD_CHARS * 2);
+    expect(received, "the protocol consumer sees one byte-exact logical checkpoint").toEqual([msg]);
+  });
+
+  it("uses UTF-8 byte chunks and restarts chunk zero with a new id after a mid-send channel replacement", () => {
+    const { a, b } = linkedWires();
+    const host = new WebRtcTransport("host", a);
+    const guest = new WebRtcTransport("guest", b);
+    const received: CoopMessage[] = [];
+    guest.onMessage(message => received.push(message));
+    const msg: CoopMessage = {
+      t: "resumeCheckpoint",
+      checkpointId: "utf8-mid-send",
+      commitment: resumeCommitment(77),
+      session: JSON.stringify({
+        waveIndex: 77,
+        quoteHeavy: '"quoted\\\\path" — café — 漢字 — 🧬 — e\u0301\n'.repeat(20_000),
+      }),
+      mirrorCloud: false,
+    };
+    a.throwOnSendNumber = 6;
+
+    host.send(msg);
+    expect(received, "a partial transfer never reaches the protocol consumer").toEqual([]);
+    const abandoned = a.sent.map(frame => JSON.parse(frame)).filter(frame => frame.__coopChunk === 1);
+    expect(abandoned.length).toBe(5);
+    expect(abandoned[0].index).toBe(0);
+
+    const next = linkedWires();
+    guest.replaceChannel(next.b);
+    host.replaceChannel(next.a);
+
+    expect(received, "replacement reassembles one complete logical checkpoint").toEqual([msg]);
+    const restarted = next.a.sent.map(frame => JSON.parse(frame)).filter(frame => frame.__coopChunk === 1);
+    expect(restarted[0].index, "replacement starts from chunk zero").toBe(0);
+    expect(restarted[0].id, "replacement owns a new transfer id").not.toBe(abandoned[0].id);
+    for (const frame of restarted) {
+      expect(frame.bytes).toBeLessThanOrEqual(COOP_WIRE_CHUNK_PAYLOAD_CHARS);
+      expect(Uint8Array.from(atob(frame.payload), char => char.charCodeAt(0)).byteLength).toBe(frame.bytes);
+    }
+
+    const continued: CoopMessage = { t: "stallBeat", waitingMs: 123 };
+    host.send(continued);
+    expect(received, "FIFO continues after the restarted logical transfer").toEqual([msg, continued]);
+  });
+
+  it("pauses above bufferedAmount high-water and resumes only on bufferedamountlow", () => {
+    const { a, b } = linkedWires();
+    a.bufferedAmount = COOP_WIRE_BUFFER_HIGH_BYTES;
+    const host = new WebRtcTransport("host", a);
+    const guest = new WebRtcTransport("guest", b);
+    const received: CoopMessage[] = [];
+    guest.onMessage(message => received.push(message));
+    const msg: CoopMessage = { t: "stallBeat", waitingMs: 456 };
+
+    host.send(msg);
+    expect(a.sent, "no frame is accepted above the high-water byte budget").toEqual([]);
+    expect(received).toEqual([]);
+
+    a.bufferedAmount = 0;
+    a.fireBufferedAmountLow();
+    expect(a.bufferedAmountLowThreshold).toBeGreaterThan(0);
+    expect(received, "the queued logical message resumes in FIFO order").toEqual([msg]);
   });
 
   it("isolates a throwing subscriber so later WebRTC and loopback protocol consumers still receive the frame", async () => {
@@ -440,7 +565,10 @@ describe("#857 R2 (intermittent flap): the hot-rejoin transport retires the SUPE
   }
   function fakePc(log: string[]): RTCPeerConnection {
     return {
+      connectionState: "connected",
+      iceConnectionState: "connected",
       close: () => log.push("pc.close"),
+      addEventListener: (type: string) => log.push(`pc.on:${type}`),
     } as unknown as RTCPeerConnection;
   }
 
@@ -470,6 +598,154 @@ describe("#857 R2 (intermittent flap): the hot-rejoin transport retires the SUPE
     expect(oldLog).toContain("pc.close");
     // ...and the live pc is untouched (still carrying the session).
     expect(newLog).not.toContain("pc.close");
+  });
+});
+
+describe("peer-connection lifecycle: a failed PC cannot hide behind an open DataChannel", () => {
+  class FakeRtcChannel {
+    readyState: RTCDataChannelState = "open";
+    bufferedAmount = 0;
+    bufferedAmountLowThreshold = 0;
+    closeCount = 0;
+    private readonly listeners = new Map<string, Array<(event: Event) => void>>();
+
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
+      const callback = typeof listener === "function" ? listener : (event: Event) => listener.handleEvent(event);
+      const listeners = this.listeners.get(type) ?? [];
+      listeners.push(callback);
+      this.listeners.set(type, listeners);
+    }
+
+    send(): void {}
+
+    close(): void {
+      this.closeCount++;
+      if (this.readyState === "closed") {
+        return;
+      }
+      this.readyState = "closed";
+      this.fire("close");
+    }
+
+    fire(type: string): void {
+      for (const listener of this.listeners.get(type) ?? []) {
+        listener(new Event(type));
+      }
+    }
+  }
+
+  class FakeRtcPeerConnection {
+    connectionState: RTCPeerConnectionState = "connected";
+    iceConnectionState: RTCIceConnectionState = "connected";
+    closeCount = 0;
+    private readonly listeners = new Map<string, Array<(event: Event) => void>>();
+
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
+      const callback = typeof listener === "function" ? listener : (event: Event) => listener.handleEvent(event);
+      const listeners = this.listeners.get(type) ?? [];
+      listeners.push(callback);
+      this.listeners.set(type, listeners);
+    }
+
+    close(): void {
+      this.closeCount++;
+      if (this.connectionState === "closed") {
+        return;
+      }
+      this.connectionState = "closed";
+      this.fire("connectionstatechange");
+    }
+
+    setConnectionState(state: RTCPeerConnectionState): void {
+      this.connectionState = state;
+      this.fire("connectionstatechange");
+    }
+
+    fire(type: string): void {
+      for (const listener of this.listeners.get(type) ?? []) {
+        listener(new Event(type));
+      }
+    }
+  }
+
+  function makeTransport() {
+    const channel = new FakeRtcChannel();
+    const pc = new FakeRtcPeerConnection();
+    const transport = new WebRtcTransport(
+      "host",
+      wireFromRtcChannel("host", channel as unknown as RTCDataChannel, pc as unknown as RTCPeerConnection),
+    );
+    const states: CoopConnectionState[] = [];
+    transport.onStateChange(state => states.push(state));
+    return { channel, pc, states, transport };
+  }
+
+  it.each([
+    "failed",
+    "closed",
+  ] as const)("treats peer connection %s as immediately terminal even while the DataChannel still says open", terminalState => {
+    const { channel, pc, states, transport } = makeTransport();
+    expect(channel.readyState).toBe("open");
+
+    pc.setConnectionState(terminalState);
+
+    expect(transport.state).toBe("disconnected");
+    expect(states, "lifecycle/rejoin receives exactly one disconnect transition").toEqual(["disconnected"]);
+    expect(transport.disconnectReason()).toBe(`peer connection ${terminalState}`);
+    expect(channel.closeCount, "the stuck-open data channel is retired").toBe(1);
+    expect(pc.closeCount, "the failed peer connection is retired").toBe(1);
+
+    pc.fire("connectionstatechange");
+    channel.fire("close");
+    expect(states, "duplicate carrier callbacks cannot start another rejoin").toEqual(["disconnected"]);
+  });
+
+  it("debounces a transient disconnected state, cancels on recovery, then fails once after the bounded grace", async () => {
+    vi.useFakeTimers();
+    try {
+      const { channel, pc, states, transport } = makeTransport();
+      pc.setConnectionState("disconnected");
+      await vi.advanceTimersByTimeAsync(COOP_PC_DISCONNECTED_GRACE_MS - 1);
+      expect(transport.state).toBe("connected");
+      expect(channel.readyState).toBe("open");
+
+      pc.setConnectionState("connected");
+      await vi.advanceTimersByTimeAsync(COOP_PC_DISCONNECTED_GRACE_MS + 1);
+      expect(transport.state, "a recovered ICE route keeps the current generation").toBe("connected");
+      expect(states).toEqual([]);
+
+      pc.setConnectionState("disconnected");
+      await vi.advanceTimersByTimeAsync(COOP_PC_DISCONNECTED_GRACE_MS);
+      expect(transport.state).toBe("disconnected");
+      expect(states).toEqual(["disconnected"]);
+      expect(transport.disconnectReason()).toContain("remained disconnected");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("generation-fences obsolete peer-connection callbacks after a replacement", () => {
+    const first = makeTransport();
+    const replacementChannel = new FakeRtcChannel();
+    const replacementPc = new FakeRtcPeerConnection();
+    first.transport.replaceChannel(
+      wireFromRtcChannel(
+        "host",
+        replacementChannel as unknown as RTCDataChannel,
+        replacementPc as unknown as RTCPeerConnection,
+      ),
+    );
+    expect(first.transport.state).toBe("connected");
+
+    first.pc.setConnectionState("failed");
+    expect(first.transport.state, "the superseded PC cannot tear down the replacement").toBe("connected");
+    expect(first.states).toEqual([]);
+    expect(replacementChannel.closeCount).toBe(0);
+
+    replacementPc.setConnectionState("failed");
+    expect(first.transport.state).toBe("disconnected");
+    expect(first.states).toEqual(["disconnected"]);
+    expect(replacementChannel.closeCount).toBe(1);
   });
 });
 
@@ -590,6 +866,80 @@ describe("#810: resume offer/reply protocol + marker", () => {
     }
   });
 
+  it("compatibility barrier waits for identity plus the required functional fingerprint", async () => {
+    const a = new MockWire();
+    const b = new MockWire();
+    a.peer = null;
+    b.peer = a;
+    const host = new CoopSessionController(new WebRtcTransport("host", a), {
+      username: "Alice",
+      version: COOP_PROTOCOL_VERSION,
+      requireFunctionalFingerprint: true,
+    });
+    const guest = new CoopSessionController(new WebRtcTransport("guest", b), {
+      username: "Bob",
+      version: COOP_PROTOCOL_VERSION,
+      requireFunctionalFingerprint: true,
+    });
+
+    host.connect();
+    let settled = false;
+    const compatible = host.awaitPartnerCompatibility(1_000).then(snapshot => {
+      settled = true;
+      return snapshot;
+    });
+    await Promise.resolve();
+    expect(settled, "an open channel without peer hello/fingerprint remains behind the barrier").toBe(false);
+
+    a.peer = b;
+    guest.connect();
+    await expect(compatible).resolves.toMatchObject({ partnerName: "Bob", partnerConnected: true });
+  });
+
+  it("compatibility barrier fails immediately on functional drift and controller disposal", async () => {
+    const a = new MockWire();
+    const host = new CoopSessionController(new WebRtcTransport("host", a), {
+      username: "Alice",
+      version: COOP_PROTOCOL_VERSION,
+      requireFunctionalFingerprint: true,
+    });
+    host.connect();
+    const localFingerprint = a.sent
+      .map(raw => JSON.parse(raw) as CoopMessage)
+      .find((frame): frame is Extract<CoopMessage, { t: "dataFingerprint" }> => frame.t === "dataFingerprint");
+    expect(localFingerprint, "connect sent the local functional fingerprint").toBeDefined();
+    a.injectRaw(
+      JSON.stringify({
+        t: "hello",
+        version: COOP_PROTOCOL_VERSION,
+        username: "Bob",
+        role: "guest",
+        epoch: 1,
+      } satisfies CoopMessage),
+    );
+    a.injectRaw(
+      JSON.stringify({
+        t: "dataFingerprint",
+        fp: {
+          ...localFingerprint!.fp,
+          movesData: { ...localFingerprint!.fp.movesData, hash: `${localFingerprint!.fp.movesData.hash}-drift` },
+        },
+      } satisfies CoopMessage),
+    );
+    await expect(
+      host.awaitPartnerCompatibility(1_000),
+      "functional drift is terminal, not a ready proxy",
+    ).resolves.toBeNull();
+
+    const isolated = new CoopSessionController(new WebRtcTransport("host", new MockWire()), {
+      username: "Carol",
+      requireFunctionalFingerprint: true,
+    });
+    const pending = isolated.awaitPartnerCompatibility(10_000);
+    isolated.dispose();
+    await expect(pending, "teardown settles the barrier without waiting for its timeout").resolves.toBeNull();
+  });
+
   it("offer -> guest handler fires (buffered if armed late) -> reply resolves the host promise", async () => {
     const a = new MockWire();
     const b = new MockWire();
@@ -601,10 +951,10 @@ describe("#810: resume offer/reply protocol + marker", () => {
     guest.connect();
 
     // Host offers BEFORE the guest arms its handler: the offer must buffer, not vanish.
-    const replyPromise = host.offerResume(42);
+    const replyPromise = host.offerResume(resumeCommitment(42));
     let offeredWave = -1;
-    guest.armResumeOfferHandler(wave => {
-      offeredWave = wave;
+    guest.armResumeOfferHandler(commitment => {
+      offeredWave = commitment.wave;
     });
     expect(offeredWave, "buffered offer fired on arm").toBe(42);
 
@@ -615,13 +965,36 @@ describe("#810: resume offer/reply protocol + marker", () => {
 
     // Second round, armed-first + decline path.
     let secondWave = -1;
-    guest.armResumeOfferHandler(wave => {
-      secondWave = wave;
+    guest.armResumeOfferHandler(commitment => {
+      secondWave = commitment.wave;
     });
-    const decline = host.offerResume(77);
+    const decline = host.offerResume(resumeCommitment(77));
     expect(secondWave).toBe(77);
     await guest.replyResume(false);
     await expect(decline).resolves.toBe(false);
+  });
+
+  it("resume commitments reject duplicate, non-canonical, and foreign authority-seat identities", async () => {
+    const a = new MockWire();
+    const b = new MockWire();
+    a.peer = b;
+    b.peer = a;
+    const host = new CoopSessionController(new WebRtcTransport("host", a), { username: "H" });
+    const guest = new CoopSessionController(new WebRtcTransport("guest", b), { username: "G" });
+    host.connect();
+    guest.connect();
+
+    await expect(
+      host.offerResume({ ...resumeCommitment(4), participants: ["H", "H"], seats: { host: "H", guest: "H" } }),
+    ).resolves.toBe(false);
+    await expect(
+      host.offerResume({ ...resumeCommitment(4), participants: ["H", "G"] }),
+      "wire participants must use canonical order",
+    ).resolves.toBe(false);
+    await expect(
+      host.offerResume({ ...resumeCommitment(4), seats: { host: "G", guest: "H" } }),
+      "a structurally valid foreign/reversed seat map is not this controller's session",
+    ).resolves.toBe(false);
   });
 
   it("barrier: host sendResumeStartNew releases the guest, ACKs it, and remains idempotent", async () => {
@@ -634,14 +1007,24 @@ describe("#810: resume offer/reply protocol + marker", () => {
     host.connect();
     guest.connect();
 
-    // Host releases BEFORE the guest arms: the release must buffer, not vanish (or the guest hangs).
+    // A new-run decision atomically supersedes an offer that beat the guest UI. The abandoned host waiter
+    // settles and arming the offer handler later must not resurrect that stale prompt.
+    const supersededOffer = host.offerResume(resumeCommitment(12));
     const committed = host.sendResumeStartNew();
+    let staleOffers = 0;
+    guest.armResumeOfferHandler(() => {
+      staleOffers++;
+    });
+    expect(staleOffers, "the superseded offer buffer was cleared by start-new").toBe(0);
+    await expect(supersededOffer, "the superseded host offer waiter was settled").resolves.toBe(false);
+
+    // Host releases BEFORE the guest arms: the release must buffer, not vanish (or the guest hangs).
     let released = 0;
     guest.armResumeStartNewHandler(() => {
       released++;
     });
     expect(released, "buffered release fired on arm").toBe(1);
-    await expect(committed).resolves.toBeUndefined();
+    await expect(committed).resolves.toBe(true);
 
     // Repeating the already-ACKed decision is idempotent: it neither invents a new
     // operation epoch nor releases the guest UI a second time.
@@ -649,8 +1032,123 @@ describe("#810: resume offer/reply protocol + marker", () => {
     guest.armResumeStartNewHandler(() => {
       released2++;
     });
-    await expect(host.sendResumeStartNew()).resolves.toBeUndefined();
+    await expect(host.sendResumeStartNew()).resolves.toBe(true);
     expect(released2).toBe(0);
+  });
+
+  it("start-new ACK survives a delayed return path and fails closed when it is permanently dropped", async () => {
+    const a = new MockWire();
+    const b = new MockWire();
+    a.peer = b;
+    b.peer = a;
+    const host = new CoopSessionController(new WebRtcTransport("host", a), { username: "H" });
+    const guest = new CoopSessionController(new WebRtcTransport("guest", b), { username: "G" });
+    guest.armResumeStartNewHandler(() => {});
+
+    // Host->guest lands, but the first guest->host ACK is dark. A repeat uses the same decision id;
+    // the guest re-ACKs the duplicate and the original promise settles true.
+    b.peer = null;
+    const delayed = host.sendResumeStartNew(1_000);
+    b.peer = a;
+    expect(host.sendResumeStartNew(1_000), "repeat returns the same pending transaction").toBe(delayed);
+    await expect(delayed).resolves.toBe(true);
+
+    vi.useFakeTimers();
+    try {
+      const isolated = new CoopSessionController(new WebRtcTransport("host", new MockWire()), { username: "Solo" });
+      const dropped = isolated.sendResumeStartNew(25);
+      await vi.advanceTimersByTimeAsync(25);
+      await expect(dropped, "a permanently missing ACK cannot release the host").resolves.toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("negative resumeApplied waits for explicit host observation and bounds a dropped ACK", async () => {
+    vi.useFakeTimers();
+    try {
+      const a = new MockWire();
+      const b = new MockWire();
+      a.peer = b;
+      b.peer = a;
+      const host = new CoopSessionController(new WebRtcTransport("host", a), { username: "H" });
+      const guest = new CoopSessionController(new WebRtcTransport("guest", b), { username: "G" });
+      host.connect();
+      guest.connect();
+      guest.armResumeOfferHandler(() => {});
+      const offered = host.offerResume(resumeCommitment(9));
+      const committed = guest.replyResume(true);
+      await expect(offered).resolves.toBe(true);
+      await expect(committed).resolves.toBe(true);
+
+      const hostObserved = host.awaitResumeApplied(1_000);
+      a.peer = null; // guest->host result lands through b; host->guest resumeAppliedAck is dropped.
+      const guestDelivery = guest.reportResumeApplied(false, 25);
+      await expect(hostObserved, "host observes the explicit negative result immediately").resolves.toBe(false);
+      await vi.advanceTimersByTimeAsync(25);
+      await expect(guestDelivery, "guest teardown wait is bounded when the ACK is lost").resolves.toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("unsafe-save blockers are mirrored and ACKed before either lobby tears down", async () => {
+    const a = new MockWire();
+    const b = new MockWire();
+    a.peer = b;
+    b.peer = a;
+    const host = new CoopSessionController(new WebRtcTransport("host", a), { username: "H" });
+    const guest = new CoopSessionController(new WebRtcTransport("guest", b), { username: "G" });
+    let blocked: { reason: string; wave: number } | null = null;
+    guest.armResumeBlockedHandler((reason, wave) => {
+      blocked = { reason, wave };
+    });
+    await expect(host.sendResumeBlocked("unsafe-role-reversal", 41)).resolves.toBe(true);
+    expect(blocked).toEqual({ reason: "unsafe-role-reversal", wave: 41 });
+  });
+
+  it("dispose settles every pending resume transaction instead of leaving stale continuations", async () => {
+    const offerA = new MockWire();
+    const offerB = new MockWire();
+    offerA.peer = offerB;
+    offerB.peer = offerA;
+    const isolatedOffer = new CoopSessionController(new WebRtcTransport("host", offerA), { username: "H" });
+    const silentGuest = new CoopSessionController(new WebRtcTransport("guest", offerB), { username: "G" });
+    isolatedOffer.connect();
+    silentGuest.connect();
+    silentGuest.armResumeOfferHandler(() => {});
+    const offer = isolatedOffer.offerResume(resumeCommitment(3), 60_000);
+    const checkpoint = isolatedOffer.sendResumeCheckpoint("{}", resumeCommitment(3), 60_000);
+    isolatedOffer.dispose();
+    await expect(offer).resolves.toBe(false);
+    await expect(checkpoint).resolves.toBe(false);
+    silentGuest.dispose();
+
+    const isolatedStart = new CoopSessionController(new WebRtcTransport("host", new MockWire()), { username: "H" });
+    const startNew = isolatedStart.sendResumeStartNew(60_000);
+    const blocked = isolatedStart.sendResumeBlocked("legacy-unmappable", 8, 60_000);
+    isolatedStart.dispose();
+    await expect(startNew).resolves.toBe(false);
+    await expect(blocked).resolves.toBe(false);
+
+    const a = new MockWire();
+    const b = new MockWire();
+    a.peer = b;
+    b.peer = a;
+    const host = new CoopSessionController(new WebRtcTransport("host", a), { username: "H" });
+    const guest = new CoopSessionController(new WebRtcTransport("guest", b), { username: "G" });
+    host.connect();
+    guest.connect();
+    guest.armResumeOfferHandler(() => {});
+    const acceptedByHost = host.offerResume(resumeCommitment(5));
+    a.peer = null; // host receives the reply but its resumeAccepted cannot return to the guest.
+    const guestCommit = guest.replyResume(true, 60_000);
+    await expect(acceptedByHost).resolves.toBe(true);
+    const hostApply = host.awaitResumeApplied(60_000);
+    guest.dispose();
+    host.dispose();
+    await expect(guestCommit).resolves.toBe(false);
+    await expect(hostApply).resolves.toBe(false);
   });
 
   it("barrier: an unanswered resume offer times out to declined (host never hangs)", async () => {
@@ -669,7 +1167,7 @@ describe("#810: resume offer/reply protocol + marker", () => {
       guest.armResumeOfferHandler(() => {
         /* deliberately no reply */
       });
-      const reply = host.offerResume(55);
+      const reply = host.offerResume(resumeCommitment(55));
       await vi.advanceTimersByTimeAsync(60_000);
       await expect(reply, "no-reply offer resolves declined after the 60s timeout").resolves.toBe(false);
     } finally {
@@ -683,7 +1181,7 @@ describe("#810: resume offer/reply protocol + marker", () => {
     );
     clearCoopResumeMarker();
     expect(readCoopResumeMarker("Alice", "Bob")).toBeNull();
-    recordCoopResumeMarker(3, "Alice", "Bob", 27);
+    recordCoopResumeMarker(3, "Alice", "Bob", 27, TEST_RUN_ID, 4);
     // Exact pair matches, case-insensitively on BOTH identities.
     expect(readCoopResumeMarker("alice", "bob")?.slot, "case-insensitive pair match").toBe(3);
     expect(readCoopResumeMarker("ALICE", "BOB")?.wave).toBe(27);
@@ -710,7 +1208,13 @@ describe("#810: resume offer/reply protocol + marker", () => {
           gameMode: GameModes.COOP,
           waveIndex: 20,
           timestamp: 200,
-          coopParticipants: { players: ["Alice", "Carol"] as [string, string] },
+          coopParticipants: {
+            version: 1 as const,
+            players: ["Alice", "Carol"] as [string, string],
+            seats: { host: "Alice", guest: "Carol" },
+          },
+          coopControlPlane: TEST_CONTROL_PLANE,
+          coopRun: { version: 1 as const, runId: `test-run-${"c".repeat(24)}`, checkpointRevision: 8 },
         },
       ],
       [
@@ -719,13 +1223,31 @@ describe("#810: resume offer/reply protocol + marker", () => {
           gameMode: GameModes.COOP,
           waveIndex: 17,
           timestamp: 170,
-          coopParticipants: { players: ["alice", "bob"] as [string, string] },
+          coopParticipants: {
+            version: 1 as const,
+            players: ["alice", "bob"] as [string, string],
+            seats: { host: "alice", guest: "bob" },
+          },
+          coopControlPlane: TEST_CONTROL_PLANE,
+          coopRun: { version: 1 as const, runId: TEST_RUN_ID, checkpointRevision: 7 },
         },
       ],
     ]);
 
-    const candidate = await findCoopResumeCandidate("Alice", "Bob", async slot => saves.get(slot));
-    expect(candidate).toMatchObject({ slot: 3, wave: 17, self: "Alice", partner: "Bob" });
+    const discovery = await findCoopResumeCandidate("Alice", "Bob", "host", async slot => {
+      const session = saves.get(slot);
+      return session == null ? undefined : loadedResumeSession(session);
+    });
+    expect(discovery).toMatchObject({
+      kind: "candidate",
+      candidate: { slot: 3, wave: 17, self: "Alice", partner: "Bob" },
+    });
+    expect(discovery.kind).toBe("candidate");
+    if (discovery.kind !== "candidate") {
+      throw new Error("expected a same-seat resume candidate");
+    }
+    expect(discovery.candidate.commitment).toMatchObject({ gameMode: GameModes.COOP, wave: 17, revision: 0 });
+    expect(discovery.candidate.commitment.digest).toMatch(/^[0-9a-f]{64}$/u);
     expect(readCoopResumeMarker("Alice", "Bob")?.slot, "recovered pointer is repaired for the next lobby").toBe(3);
     clearCoopResumeMarker();
   });
@@ -735,7 +1257,7 @@ describe("#810: resume offer/reply protocol + marker", () => {
       "#data/elite-redux/coop/coop-resume-marker"
     );
     clearCoopResumeMarker();
-    recordCoopResumeMarker(2, "Alice", "Bob", 99);
+    recordCoopResumeMarker(2, "Alice", "Bob", 99, TEST_RUN_ID, 1);
     const saves = new Map([
       [
         2,
@@ -743,12 +1265,136 @@ describe("#810: resume offer/reply protocol + marker", () => {
           gameMode: GameModes.COOP,
           waveIndex: 30,
           timestamp: 300,
-          coopParticipants: { players: ["Alice", "Carol"] as [string, string] },
+          coopParticipants: {
+            version: 1 as const,
+            players: ["Alice", "Carol"] as [string, string],
+            seats: { host: "Alice", guest: "Carol" },
+          },
+          coopRun: { version: 1 as const, runId: `test-run-${"c".repeat(24)}`, checkpointRevision: 2 },
         },
       ],
     ]);
 
-    await expect(findCoopResumeCandidate("Alice", "Bob", async slot => saves.get(slot))).resolves.toBeNull();
+    await expect(
+      findCoopResumeCandidate("Alice", "Bob", "host", async slot => {
+        const session = saves.get(slot);
+        return session == null ? undefined : loadedResumeSession(session);
+      }),
+    ).resolves.toEqual({ kind: "no-save" });
     clearCoopResumeMarker();
+  });
+
+  it("cold resume rejects a reversed host/guest seat assignment instead of swapping player ownership", async () => {
+    const { coopResumeBlockMessage, findCoopResumeCandidate } = await import(
+      "#data/elite-redux/coop/coop-resume-marker"
+    );
+    const saved = {
+      gameMode: GameModes.COOP,
+      waveIndex: 41,
+      timestamp: 410,
+      coopParticipants: {
+        version: 1 as const,
+        players: ["Alice", "Bob"] as [string, string],
+        seats: { host: "Alice", guest: "Bob" },
+      },
+      coopControlPlane: TEST_CONTROL_PLANE,
+      coopRun: { version: 1 as const, runId: TEST_RUN_ID, checkpointRevision: 12 },
+    };
+    const discovery = await findCoopResumeCandidate("Alice", "Bob", "guest", async slot =>
+      slot === 0 ? loadedResumeSession(saved) : undefined,
+    );
+    expect(discovery, "Alice was host in the snapshot and cannot silently resume as guest").toMatchObject({
+      kind: "unsafe-role-reversal",
+      slot: 0,
+      wave: 41,
+    });
+    expect(coopResumeBlockMessage(discovery)).toContain("same player accepting the invite");
+  });
+
+  it("does not advertise a legacy unordered-pair save as safely resumable", async () => {
+    const { coopResumeBlockMessage, findCoopResumeCandidate } = await import(
+      "#data/elite-redux/coop/coop-resume-marker"
+    );
+    const legacy = {
+      gameMode: GameModes.COOP,
+      waveIndex: 8,
+      timestamp: 80,
+      coopParticipants: { players: ["Alice", "Bob"] as [string, string] },
+    };
+    const discovery = await findCoopResumeCandidate("Alice", "Bob", "host", async slot =>
+      slot === 0 ? loadedResumeSession(legacy as never) : undefined,
+    );
+    expect(discovery, "an unordered pair cannot prove authority-seat ownership").toMatchObject({
+      kind: "legacy-unmappable",
+      slot: 0,
+      wave: 8,
+    });
+    expect(coopResumeBlockMessage(discovery)).toContain("no safe player-seat mapping");
+  });
+
+  it("surfaces the oldest participant-less co-op save when an exact-pair marker points to it", async () => {
+    const { clearCoopResumeMarker, findCoopResumeCandidate, recordCoopResumeMarker } = await import(
+      "#data/elite-redux/coop/coop-resume-marker"
+    );
+    clearCoopResumeMarker();
+    recordCoopResumeMarker(2, "Alice", "Bob", 6, TEST_RUN_ID, 1);
+    const legacy = { gameMode: GameModes.COOP, waveIndex: 6, timestamp: 60 };
+    await expect(
+      findCoopResumeCandidate("Alice", "Bob", "host", async slot =>
+        slot === 2 ? loadedResumeSession(legacy as never) : undefined,
+      ),
+      "the exact marker turns identity-unknown legacy bytes into a visible blocker, never New Game",
+    ).resolves.toMatchObject({ kind: "legacy-unmappable", slot: 2, wave: 6 });
+    clearCoopResumeMarker();
+  });
+
+  it("freezes discovered resume bytes so a later slot replacement cannot change the accepted snapshot", async () => {
+    const { findCoopResumeCandidate, digestCoopResumeSession } = await import(
+      "#data/elite-redux/coop/coop-resume-marker"
+    );
+    const saves = new Map([
+      [
+        0,
+        {
+          gameMode: GameModes.COOP,
+          waveIndex: 12,
+          timestamp: 120,
+          coopParticipants: {
+            version: 1 as const,
+            players: ["Alice", "Bob"] as [string, string],
+            seats: { host: "Alice", guest: "Bob" },
+          },
+          coopControlPlane: TEST_CONTROL_PLANE,
+          coopRun: { version: 1 as const, runId: TEST_RUN_ID, checkpointRevision: 3 },
+        },
+      ],
+    ]);
+    const selectedRaw = `  ${JSON.stringify(saves.get(0))}\n`;
+    const discovery = await findCoopResumeCandidate("Alice", "Bob", "host", async slot => {
+      const session = saves.get(slot);
+      return session == null ? undefined : loadedResumeSession(session, selectedRaw);
+    });
+    expect(discovery.kind).toBe("candidate");
+    if (discovery.kind !== "candidate") {
+      throw new Error("expected frozen resume candidate");
+    }
+    const candidate = discovery.candidate;
+    expect(candidate.sessionJson, "discovery preserves exact selected raw bytes").toBe(selectedRaw);
+    saves.set(0, {
+      ...saves.get(0)!,
+      waveIndex: 99,
+      timestamp: 999,
+    });
+    expect(JSON.parse(candidate.sessionJson).waveIndex, "candidate retains the scanned bytes").toBe(12);
+    await expect(digestCoopResumeSession(candidate.sessionJson)).resolves.toBe(candidate.commitment.digest);
+  });
+
+  it("participant matching is exact, order-independent, and rejects malformed serialized identities", async () => {
+    const { coopParticipantPairMatches } = await import("#data/elite-redux/coop/coop-resume-marker");
+    expect(coopParticipantPairMatches(["Bob", "Alice"], "Alice", "Bob")).toBe(true);
+    expect(coopParticipantPairMatches(["Alice", "Carol"], "Alice", "Bob")).toBe(false);
+    expect(coopParticipantPairMatches(undefined, "Alice", "Bob")).toBe(false);
+    expect(coopParticipantPairMatches(["Alice"], "Alice", "Bob")).toBe(false);
+    expect(coopParticipantPairMatches(["Alice", 7], "Alice", "Bob")).toBe(false);
   });
 });

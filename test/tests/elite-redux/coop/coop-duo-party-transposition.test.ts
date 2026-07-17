@@ -52,6 +52,10 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import {
+  resetCoopWaveAdvanceOperationFlag,
+  setCoopWaveAdvanceOperationEnabled,
+} from "#data/elite-redux/coop/coop-wave-operation";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -66,6 +70,7 @@ import {
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
+  pumpDuoDestinations,
   setCoopHarnessLiveEvents,
   withClient,
   withClientSync,
@@ -96,6 +101,8 @@ describe.skipIf(!RUN)(
     });
 
     beforeEach(() => {
+      // This test's direct waveEndState section is the negotiated legacy compatibility path.
+      setCoopWaveAdvanceOperationEnabled(false);
       // Force-hit so the foe's spread ROCK_SLIDE reliably KOs the 1-HP host lead. A determinism knob.
       accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
       setCoopFaintSwitchWaitMs(4000);
@@ -119,6 +126,7 @@ describe.skipIf(!RUN)(
     });
 
     afterEach(() => {
+      resetCoopWaveAdvanceOperationFlag();
       setCoopFaintSwitchWaitMs(60_000);
       setCoopWaveBarrierMs(60_000);
       resetCoopRendezvousWaitMs();
@@ -182,7 +190,7 @@ describe.skipIf(!RUN)(
       // TURN 1 on the HOST: the host lead SPLASHes (harmless); the foe's ROCK_SLIDE KOs the 1-HP host lead.
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       expect(rig.hostScene.getPlayerField()[COOP_HOST_FIELD_INDEX]?.isFainted() ?? true, "the host lead fainted").toBe(
         true,
@@ -235,6 +243,9 @@ describe.skipIf(!RUN)(
         broadcastCoopWaveEndState();
         await drainLoopback();
       });
+      // waveEndState is intentionally destination-pumped by the two-engine adapter: apply it only while
+      // the guest's complete scene/runtime context is installed, as two independent browsers would.
+      await pumpDuoDestinations(rig, 4);
       const waveEndApplied = withClientSync(rig.guestCtx, () =>
         applyCoopAuthoritativeBattleState(consumeCoopPendingWaveEndState() ?? undefined, true),
       );

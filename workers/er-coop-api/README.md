@@ -11,12 +11,20 @@ handshake + a thin save blob — it is effectively free to run.
 cd workers/er-coop-api
 npx wrangler d1 create er-coop                       # once; paste the id into wrangler.toml
 npx wrangler d1 execute er-coop --remote --file ./schema.sql
+npx wrangler secret put COOP_IDENTITY_SECRET             # same dedicated secret as er-save-api
 npx wrangler deploy
 ```
 
 Then point the client at it with `VITE_COOP_SERVER_URL=https://er-coop-api.<acct>.workers.dev`
 (the WebRTC transport reads this; see `src/data/elite-redux/coop/`). Until then,
 co-op runs locally against the in-process `LoopbackTransport` + `SpoofGuest`.
+
+P33 public matchmaking uses `/coop/v3/**`. Its lobby identity comes only from an
+authenticated, short-lived account ticket; every subsequent lobby, signaling,
+heartbeat, leave, and hot-rejoin request requires the derived bearer token. A hot
+rejoin accepts only the same immutable account ID and rotates that member's token
+and connection generation. The unauthenticated legacy routes remain separate
+during migration and are never used after a client selects P33.
 
 ## Pairing flow
 

@@ -20,10 +20,22 @@
 
 import { globalScene } from "#app/global-scene";
 import { version } from "#package.json";
-import { formatCoopControlPlane } from "#data/elite-redux/coop/coop-diagnostics";
+import {
+  captureCoopReportCorrelation,
+  formatCoopControlPlane,
+} from "#data/elite-redux/coop/coop-diagnostics";
+import {
+  formatCoopReportCorrelation,
+  type CoopReportCorrelationV1,
+} from "#data/elite-redux/coop/coop-report-correlation";
 import { captureDeviceInfo, formatBootDiagnostics } from "#data/elite-redux/er-boot-diagnostics";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getReplayTrace } from "#data/elite-redux/replay-recorder";
+import {
+  formatErBuildIdentity,
+  getErBuildIdentity,
+  type ErBuildIdentityV1,
+} from "#utils/build-identity";
 import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
 
 interface BugReportState {
@@ -49,6 +61,10 @@ interface BugReportState {
 export interface BugReport {
   description: string;
   state: BugReportState;
+  /** Exact source/workflow/deployment identity. Contains no environment dump or credentials. */
+  buildIdentity: ErBuildIdentityV1;
+  /** Shared run/session axes for automatically pairing the host and guest reports from one incident. */
+  coopCorrelation: CoopReportCorrelationV1 | null;
   logs: string;
   /**
    * #record-replay (Phase 2): the captured deterministic replay trace (JSON of a {@linkcode ReplayTrace}),
@@ -76,7 +92,7 @@ export interface BugReportResult {
 }
 
 function readEnv(name: string): string {
-  const value = (import.meta.env as Record<string, unknown> | undefined)?.[name];
+  const value = (import.meta.env as unknown as Record<string, unknown> | undefined)?.[name];
   return typeof value === "string" ? value : "";
 }
 
@@ -151,6 +167,8 @@ export function buildBugReport(description: string): BugReport {
   return {
     description,
     state: captureState(),
+    buildIdentity: getErBuildIdentity(),
+    coopCorrelation: captureCoopReportCorrelation(),
     logs: formatConsoleSnapshot(),
     replayTrace: captureReplayTrace(),
     controlPlane: captureControlPlane(),
@@ -223,6 +241,8 @@ async function postReport(report: BugReport): Promise<boolean> {
     from_name: "Elite Redux Bug Reporter",
     description: report.description,
     state: report.state,
+    buildIdentity: report.buildIdentity,
+    coopCorrelation: report.coopCorrelation,
     logs: report.logs,
     // `content` mirrors the Discord-webhook field name so the same endpoint var
     // can target a webhook too (truncated to keep within typical limits).
@@ -260,12 +280,13 @@ const DEVLOG_SINK_URL = "https://er-editor-api.heraklines.workers.dev/devlog";
 export const DEVLOG_REPLAY_TRACE_MARKER = "----- REPLAY TRACE (JSON) -----";
 
 /** Render the report as the plain-text capture format the /devlog sink stores. */
-function buildDevLogText(report: BugReport): string {
+export function buildDevLogText(report: BugReport): string {
   const s = report.state;
   const party = s.party.map(p => `${p.species}(L${p.level} ${p.hp})`).join(", ");
   return [
     "----- BUG REPORT (in-game) -----",
     `version:  ${s.version}`,
+    `build:    ${report.buildIdentity.id}`,
     `url:      ${s.url}`,
     `ua:       ${s.userAgent}`,
     // #ios-stability: device fingerprint + boot breadcrumb (a crash-then-reload reports where the
@@ -281,6 +302,9 @@ function buildDevLogText(report: BugReport): string {
     "----- DESCRIPTION -----",
     report.description.trim() || "(none)",
     "",
+    formatErBuildIdentity(report.buildIdentity),
+    "",
+    ...(report.coopCorrelation == null ? [] : [formatCoopReportCorrelation(report.coopCorrelation), ""]),
     // #diagnostics: the co-op control-plane block (omitted for a solo run / menu report, where it is "").
     ...(report.controlPlane ? [report.controlPlane, ""] : []),
     "----- CONSOLE -----",

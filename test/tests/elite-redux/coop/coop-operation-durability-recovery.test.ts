@@ -27,7 +27,6 @@ import {
   type CoopJournalEntry,
   setCoopDurabilityEnabled,
 } from "#data/elite-redux/coop/coop-durability";
-import { adoptCoopSnapshotHighWater } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -188,7 +187,10 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     await flush();
     expect(hostMgr.unackedCount()).toBe(3);
 
-    adoptCoopSnapshotHighWater(guestMgr, { journalHighWater: { "op:wave": 3 } });
+    const marks = { "op:wave": 3 };
+    expect(hostMgr.retainSnapshotFrontier("i2b-control", marks)).toBe(true);
+    guestMgr.adoptSnapshotMarksForTransaction(marks);
+    expect(guestMgr.ackSnapshotMarksAfterTransaction(marks, "i2b-control")).toBe(true);
     await flush();
 
     expect(hostMgr.unackedCount(), "snapshot adoption must ACK every operation revision it subsumed").toBe(0);
@@ -251,19 +253,24 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     const guestStream = new CoopBattleStreamer(pair.guest);
     const guestMgr = new CoopDurabilityManager(pair.guest);
     let liveSnapshotHead = 0;
-    const hostMgr = new CoopDurabilityManager(
+    let hostMgr!: CoopDurabilityManager;
+    hostMgr = new CoopDurabilityManager(
       pair.host,
       {
         sendFullSnapshot: (cls, head) => {
-          hostStream.sendDurabilitySnapshot(JSON.stringify({ journalHighWater: { [cls]: head } }));
+          const marks = { [cls]: head };
+          const controlDigest = `deep-gap-${cls}-${head}`;
+          expect(hostMgr.retainSnapshotFrontier(controlDigest, marks)).toBe(true);
+          hostStream.sendDurabilitySnapshot(JSON.stringify({ controlDigest, journalHighWater: marks }));
         },
       },
       3,
     );
     guestStream.onDurabilitySnapshot(blob => {
-      const snapshot = JSON.parse(blob) as { journalHighWater: Record<string, number> };
+      const snapshot = JSON.parse(blob) as { controlDigest: string; journalHighWater: Record<string, number> };
       liveSnapshotHead = snapshot.journalHighWater.wave ?? 0;
-      adoptCoopSnapshotHighWater(guestMgr, snapshot);
+      guestMgr.adoptSnapshotMarksForTransaction(snapshot.journalHighWater);
+      guestMgr.ackSnapshotMarksAfterTransaction(snapshot.journalHighWater, snapshot.controlDigest);
     });
 
     for (let revision = 1; revision <= 6; revision++) {
@@ -279,6 +286,56 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     guestMgr.dispose();
     hostStream.dispose();
     guestStream.dispose();
+  });
+
+  it("I3c: only the exact host-retained snapshot digest and complete frontier can retire operations", async () => {
+    const pair = createLoopbackPair();
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest);
+    for (let revision = 1; revision <= 3; revision++) {
+      hostMgr.commit("wave", revision, waveMsg(revision));
+    }
+    await flush();
+    const marks = { wave: 3 };
+    expect(hostMgr.retainSnapshotFrontier("exact-control", marks)).toBe(true);
+
+    pair.guest.send({ t: "coopSnapshotAck", controlDigest: "unknown-control", marks });
+    pair.guest.send({ t: "coopSnapshotAck", controlDigest: "exact-control", marks: { wave: 2 } });
+    pair.guest.send({ t: "coopSnapshotAck", controlDigest: "exact-control", marks: { wave: 3, forged: 9 } });
+    await flush();
+    expect(hostMgr.unackedCount(), "unknown or altered snapshot proofs must fail closed").toBe(3);
+
+    guestMgr.adoptSnapshotMarksForTransaction(marks);
+    expect(guestMgr.ackSnapshotMarksAfterTransaction(marks, "exact-control")).toBe(true);
+    await flush();
+    expect(hostMgr.unackedCount()).toBe(0);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  it("I3d: a committed snapshot proof is retransmitted after channel replacement", async () => {
+    const pair = createLoopbackPair();
+    const guestGate = new ChannelGate(pair.guest);
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(guestGate);
+    hostMgr.commit("wave", 1, waveMsg(1));
+    await flush();
+    const marks = { wave: 1 };
+    expect(hostMgr.retainSnapshotFrontier("rejoin-control", marks)).toBe(true);
+    guestMgr.adoptSnapshotMarksForTransaction(marks);
+
+    guestGate.cut = true;
+    expect(guestMgr.ackSnapshotMarksAfterTransaction(marks, "rejoin-control")).toBe(true);
+    await flush();
+    expect(hostMgr.unackedCount(), "the first proof was lost with the channel").toBe(1);
+
+    guestGate.cut = false;
+    guestMgr.reconnect();
+    await flush();
+    expect(hostMgr.unackedCount(), "reconnect must replay the exact committed snapshot proof").toBe(0);
+    expect(guestGate.sentTypes.filter(type => type === "coopSnapshotAck")).toHaveLength(2);
+    hostMgr.dispose();
+    guestMgr.dispose();
   });
 
   // ===========================================================================================

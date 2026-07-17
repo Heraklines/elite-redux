@@ -37,6 +37,7 @@
 import { globalScene } from "#app/global-scene";
 import { speciesStarterCosts } from "#balance/starters";
 import { Egg } from "#data/egg";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { grantErShinyLabEffectAvailability } from "#data/elite-redux/er-shiny-lab-config";
 import {
   ER_SHINY_LAB_EFFECT_INDEX,
@@ -942,14 +943,18 @@ function applyRewardSpec(spec: RewardSpec): GrantedReward | null {
     }
     case "eggs": {
       const isShiny = spec.shiny === true;
-      for (let i = 0; i < spec.count; i++) {
-        new Egg({
-          tier: spec.tier,
-          sourceType: EggSourceType.EVENT,
-          isShiny,
-          ...(spec.species != null ? { species: spec.species } : {}),
-        }).addEggToGameData();
-      }
+      // This is the same local, one-time account grant as candy/vouchers/dex unlocks above. The
+      // default-deny co-op gate must not silently discard only the egg member of that reward set.
+      coopAllowAccountWrite("achievement-egg-reward", () => {
+        for (let i = 0; i < spec.count; i++) {
+          new Egg({
+            tier: spec.tier,
+            sourceType: EggSourceType.EVENT,
+            isShiny,
+            ...(spec.species != null ? { species: spec.species } : {}),
+          }).addEggToGameData();
+        }
+      });
       return { text: describeRewardSpec(spec) ?? "" };
     }
     case "voucher": {

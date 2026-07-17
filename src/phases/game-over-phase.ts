@@ -5,7 +5,12 @@ import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { bypassLogin } from "#constants/app-constants";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
-import { broadcastCoopWaveResolved, clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  broadcastCoopWaveResolved,
+  clearCoopRuntime,
+  getCoopBattleStreamer,
+  isCoopAuthoritativeGuest,
+} from "#data/elite-redux/coop/coop-runtime";
 import { erRecordDailySeedWon } from "#data/elite-redux/er-achievement-detection";
 import { enqueueFounderPublish, recordLocalDraftAttempt } from "#data/elite-redux/er-community-challenges";
 import { getFounderRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
@@ -63,12 +68,6 @@ export class GameOverPhase extends BattlePhase {
       return this.end();
     }
 
-    // Co-op (#633, authoritative wave-advance handshake): the host's run ended. Signal the guest
-    // renderer so the protocol is complete. The guest currently treats `gameOver` as terminal
-    // (it does not run the next-wave victory tail; the full guest game-over render is a TODO) -
-    // the wave guard still consumes it safely. Hard no-op for solo / non-host / lockstep.
-    broadcastCoopWaveResolved("gameOver");
-
     globalScene.phaseManager.hideAbilityBar();
 
     // Failsafe if players somehow skip floor 200 in classic mode
@@ -95,6 +94,18 @@ export class GameOverPhase extends BattlePhase {
       return this.end();
     }
     // Otherwise, continue standard Game Over logic
+
+    // The ME hook above is allowed to turn a battle loss back into a live encounter. Only a true terminal
+    // can prove continuationReady; otherwise the retained battle transaction must remain owned by the
+    // resumed ME surface instead of being released against a terminal that never opened.
+    if (isCoopAuthoritativeGuest()) {
+      getCoopBattleStreamer()?.notifyContinuationSurface("terminal");
+    }
+
+    // Co-op (#633, authoritative wave-advance handshake): publish only after an ME's onGameOver hook
+    // confirms this is a real run terminal. Expert Breeder losses deliberately resume the encounter;
+    // announcing WAVE_ADVANCE(gameOver) before that hook split the guest onto a terminal screen forever.
+    broadcastCoopWaveResolved("gameOver");
 
     if (this.isVictory && globalScene.gameMode.isEndless) {
       const genderIndex = globalScene.gameData.gender ?? PlayerGender.UNSET;

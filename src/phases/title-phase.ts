@@ -10,14 +10,22 @@ import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed/daily-run";
 import { modifierTypes } from "#data/data-lists";
 import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
-import { findCoopResumeCandidate } from "#data/elite-redux/coop/coop-resume-marker";
 import {
-  getCoopBattleStreamer,
+  type CoopResumeCandidate,
+  coopResumeBlockMessage,
+  coopSeatMapMatches,
+  findCoopResumeCandidate,
+} from "#data/elite-redux/coop/coop-resume-marker";
+import {
+  type CoopRuntime,
+  clearCoopRuntime,
+  coopSessionGeneration,
   getCoopController,
+  getCoopRuntime,
   isVersusSession,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopNetcodeMode, CoopSessionKind } from "#data/elite-redux/coop/coop-transport";
+import type { CoopNetcodeMode, CoopResumeCommitment, CoopSessionKind } from "#data/elite-redux/coop/coop-transport";
 import { markBootMilestone } from "#data/elite-redux/er-boot-diagnostics";
 import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-challenge-launch";
@@ -71,6 +79,16 @@ export class TitlePhase extends Phase {
   // by the browser's onPlay closure and consumed in end() (after the CHALLENGE
   // gameMode is rebuilt). null for every non-community launch.
   private pendingCommunityConfig: CommunityChallengeConfig | null = null;
+
+  private isExactCoopSession(runtime: CoopRuntime, controller: CoopRuntime["controller"], generation: number): boolean {
+    return getCoopRuntime() === runtime && getCoopController() === controller && coopSessionGeneration() === generation;
+  }
+
+  private clearExactCoopSession(runtime: CoopRuntime, controller: CoopRuntime["controller"], generation: number): void {
+    if (this.isExactCoopSession(runtime, controller, generation)) {
+      clearCoopRuntime();
+    }
+  }
 
   async start(): Promise<void> {
     super.start();
@@ -138,6 +156,7 @@ export class TitlePhase extends Phase {
     // Add a "continue" menu if the session slot ID is >-1
     if (lastSessionSlot > NO_SAVE_SLOT) {
       options.push({
+        semanticId: "continue",
         label: i18next.t("continue", { ns: "menu" }),
         handler: () => {
           this.loadSaveSlot(lastSessionSlot);
@@ -147,6 +166,7 @@ export class TitlePhase extends Phase {
     }
     options.push(
       {
+        semanticId: "new-game",
         label: i18next.t("menu:newGame"),
         handler: () => {
           const setModeAndEnd = (gameMode: GameModes) => {
@@ -158,6 +178,7 @@ export class TitlePhase extends Phase {
           const { gameData } = globalScene;
           const options: OptionSelectItem[] = [];
           options.push({
+            semanticId: "classic",
             label: GameMode.getModeName(GameModes.CLASSIC),
             handler: () => {
               setModeAndEnd(GameModes.CLASSIC);
@@ -179,6 +200,7 @@ export class TitlePhase extends Phase {
             // A/B toggle are retired - authoritative is the one and only co-op netcode. Same
             // dev/beta/devTools gate.
             options.push({
+              semanticId: "co-op",
               label: GameMode.getModeName(GameModes.COOP),
               handler: () => {
                 this.openCoopLobby(setModeAndEnd, "authoritative");
@@ -208,6 +230,7 @@ export class TitlePhase extends Phase {
             });
           }
           options.push({
+            semanticId: "daily-run",
             label: i18next.t("menu:dailyRun"),
             handler: () => {
               this.initDailyRun();
@@ -314,6 +337,7 @@ export class TitlePhase extends Phase {
           }
           // Cancel button = back to title
           options.push({
+            semanticId: "cancel",
             label: i18next.t("menu:cancel"),
             handler: () => {
               globalScene.phaseManager.toTitleScreen();
@@ -330,6 +354,7 @@ export class TitlePhase extends Phase {
         },
       },
       {
+        semanticId: "load-game",
         label: i18next.t("menu:loadGame"),
         handler: () => {
           globalScene.ui.setOverlayMode(UiMode.SAVE_SLOT, SaveSlotUiMode.LOAD, (slotId: number) => {
@@ -732,12 +757,60 @@ export class TitlePhase extends Phase {
     // The aesthetic stage (backdrop + two seat cards + status strip); the option
     // panel below is the INPUT. Torn down on every exit path.
     const stage = new CoopLobbyStage(username);
+    let lobbyTerminated = false;
+    let lobbyCompleted = false;
+    let flowRuntime: CoopRuntime | null = null;
+    let flowController: CoopRuntime["controller"] | null = null;
+    let flowGeneration: number | null = null;
+    // Lobby polling may reorder the live player list while a human is moving from
+    // a highlighted row to ACTION. Preserve the highlighted player by identity,
+    // never by its transient array index.
+    let selectedLobbyOptionId: string | null = null;
+    // When an Accept/Decline takeover disappears, a submit key may already be queued from the
+    // old panel. Make the first row inert until a fresh navigation/hover proves the player has
+    // selected an action from the new generation.
+    let lobbyActionRequiresReselection = false;
+    let panelGeneration = 0;
 
-    const backToTitle = () => {
+    const isCurrentFlow = (): boolean =>
+      !lobbyTerminated
+      && !lobbyCompleted
+      && flowRuntime != null
+      && flowController != null
+      && flowGeneration != null
+      && this.isExactCoopSession(flowRuntime, flowController, flowGeneration);
+
+    /**
+     * Single terminal lobby/resume abort seam. Runtime teardown bumps the co-op session
+     * generation and closes transport/watchdogs/hooks, invalidating every late continuation
+     * before a replacement TitlePhase can be entered.
+     */
+    const terminateLobby = () => {
+      if (lobbyTerminated) {
+        return;
+      }
+      lobbyTerminated = true;
       stage.destroy();
       controller?.cancel();
+      if (flowRuntime != null && flowController != null && flowGeneration != null) {
+        this.clearExactCoopSession(flowRuntime, flowController, flowGeneration);
+      }
+    };
+
+    const backToTitle = () => {
+      terminateLobby();
       globalScene.phaseManager.toTitleScreen();
       super.end();
+    };
+
+    const terminalFailure = (message: string) => {
+      if (lobbyTerminated) {
+        return;
+      }
+      terminateLobby();
+      globalScene.ui.setMode(UiMode.MESSAGE);
+      globalScene.ui.resetModeChain();
+      globalScene.ui.showText(message, null, backToTitle, null, true);
     };
 
     // Render (or re-render) the current INPUT panel as a blue OPTION_SELECT.
@@ -745,11 +818,15 @@ export class TitlePhase extends Phase {
     // state change REPLACES the panel rather than stacking a new one. An incoming
     // join request takes over the panel (Accept / Decline) until it is answered.
     const renderPanel = () => {
+      const generation = ++panelGeneration;
       const opts: OptionSelectItem[] = [];
+      let initialCursor = 0;
       if (incoming) {
+        selectedLobbyOptionId = null;
         const from = incoming;
         opts.push(
           {
+            semanticId: `accept:${from.name}`,
             label: `Accept ${from.name}`,
             handler: () => {
               incoming = null;
@@ -758,6 +835,7 @@ export class TitlePhase extends Phase {
             },
           },
           {
+            semanticId: "decline",
             label: "Decline",
             handler: () => {
               incoming = null;
@@ -770,17 +848,58 @@ export class TitlePhase extends Phase {
           },
         );
       } else {
-        for (const p of lastPlayers) {
+        if (lobbyActionRequiresReselection) {
           opts.push({
+            label: "Lobby updated - choose again",
+            handler: () => false,
+          });
+        }
+        const selectedPlayerId = selectedLobbyOptionId?.startsWith("player:")
+          ? selectedLobbyOptionId.slice("player:".length)
+          : null;
+        const selectedPlayerStillPresent = selectedPlayerId == null || lastPlayers.some(p => p.id === selectedPlayerId);
+        if (!selectedPlayerStillPresent) {
+          opts.push({
+            label: "That player left - choose again",
+            handler: () => false,
+            onHover: () => {
+              selectedLobbyOptionId = null;
+            },
+          });
+        }
+        for (const p of lastPlayers) {
+          const optionIndex = opts.length;
+          if (!lobbyActionRequiresReselection && `player:${p.id}` === selectedLobbyOptionId) {
+            initialCursor = optionIndex;
+          }
+          opts.push({
+            semanticId: `ask:${p.name}`,
             label: `Ask ${p.name} to play`,
+            onHover: () => {
+              lobbyActionRequiresReselection = false;
+              selectedLobbyOptionId = `player:${p.id}`;
+            },
             handler: () => {
+              // The player can disappear during the final input frame. Do not let
+              // a stale row request somebody else or fall through to Cancel.
+              if (!lastPlayers.some(player => player.id === p.id)) {
+                renderPanel();
+                return false;
+              }
               void controller?.request(p.id, p.name);
               return true;
             },
           });
         }
+        if (!lobbyActionRequiresReselection && selectedLobbyOptionId === "cpu") {
+          initialCursor = opts.length;
+        }
         opts.push({
           label: "Play vs CPU",
+          onHover: () => {
+            lobbyActionRequiresReselection = false;
+            selectedLobbyOptionId = "cpu";
+          },
           handler: () => {
             stage.destroy();
             controller?.cancel();
@@ -790,8 +909,16 @@ export class TitlePhase extends Phase {
           },
         });
       }
+      if (!lobbyActionRequiresReselection && selectedLobbyOptionId === "cancel") {
+        initialCursor = opts.length;
+      }
       opts.push({
+        semanticId: "cancel",
         label: i18next.t("menu:cancel"),
+        onHover: () => {
+          lobbyActionRequiresReselection = false;
+          selectedLobbyOptionId = "cancel";
+        },
         handler: () => {
           backToTitle();
           return true;
@@ -803,9 +930,23 @@ export class TitlePhase extends Phase {
       // 8px above the screen edge so it sits INSIDE the stage's ACTIONS dock (no overlap
       // with the seat cards), xOffset 2 gives it a right margin, maxOptions bounds a busy
       // lobby to a scrolling list instead of a screen-tall tower.
-      globalScene.ui.showText("", null, () =>
-        globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options: opts, maxOptions: 6, xOffset: 2, yOffset: 40 }),
-      );
+      globalScene.ui.showText("", null, () => {
+        if (generation !== panelGeneration || lobbyTerminated || lobbyCompleted) {
+          return;
+        }
+        globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
+          options: opts,
+          maxOptions: 6,
+          xOffset: 2,
+          yOffset: 40,
+          initialCursor,
+          supportHover: true,
+          // Swallow a key that was already in flight when polling repainted the
+          // menu. This is short enough to be imperceptible but closes the exact
+          // select-then-Cancel race seen by real browsers and humans.
+          delay: 150,
+        });
+      });
     };
 
     controller = new CoopLobbyController(username, {
@@ -830,6 +971,7 @@ export class TitlePhase extends Phase {
       },
       // Lobby v2: someone asked to join US - take over the panel with Accept/Decline.
       onRequest: from => {
+        lobbyActionRequiresReselection = false;
         incoming = { id: from.id, name: from.name };
         stage.setSeat(1, { name: from.name, detail: "Wants to join!", dot: "red" });
         stage.setStatus(`${from.name} wants to join your run!`);
@@ -837,6 +979,7 @@ export class TitlePhase extends Phase {
       },
       onRequestGone: () => {
         incoming = null;
+        lobbyActionRequiresReselection = true;
         stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
         stage.setStatus("They withdrew. Looking for other players...");
         renderPanel();
@@ -848,6 +991,14 @@ export class TitlePhase extends Phase {
       onDeclined: name => {
         stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
         stage.setStatus(`${name} declined. Pick another player.`);
+        renderPanel();
+      },
+      onTransientError: message => {
+        incoming = null;
+        lobbyActionRequiresReselection = true;
+        stage.setSeat(1, { name: null, detail: "Lobby changed", dot: "amber" });
+        stage.setStatus(`${message} Choose a player again.`);
+        renderPanel();
       },
       onConnecting: () => {
         stage.setSeat(1, { name: null, detail: "Connecting...", dot: "amber" });
@@ -857,6 +1008,16 @@ export class TitlePhase extends Phase {
         globalScene.ui.showText("Connecting to your partner...", null);
       },
       onConnected: runtime => {
+        if (lobbyTerminated || getCoopRuntime() !== runtime) {
+          return;
+        }
+        const controller = runtime.controller;
+        const sessionGeneration = coopSessionGeneration();
+        flowRuntime = runtime;
+        flowController = controller;
+        flowGeneration = sessionGeneration;
+        const isCurrentSession = (): boolean =>
+          !lobbyTerminated && !lobbyCompleted && this.isExactCoopSession(runtime, controller, sessionGeneration);
         // Co-op is authoritative-only (#633 M6c); pinning the mode here is a no-op
         // kept for the wire config's back-compat field.
         if (runtime.controller.role === "host") {
@@ -869,17 +1030,19 @@ export class TitlePhase extends Phase {
         // "coop" and disabled every versus gate (perspective flip, showdown command menu, pure-
         // renderer divert): the guest then ran a full live engine on the host's snapshot.
         runtime.controller.setSessionKind(sessionKind);
-        const controller = runtime.controller;
-        // The data channel is open, but the peer hello (identity + final role reconciliation)
-        // may still be in flight. Resume discovery is pair-keyed, so reading partnerName here
-        // used to race as null and silently skip a perfectly valid save. Hold both clients at
-        // the lobby until the identity handshake is complete.
+        // The data channel is open, but peer identity and the functional-build fingerprint may
+        // still be in flight. Resume discovery is pair-keyed and then deserializes a full save,
+        // so hold both clients until the complete compatibility contract has settled.
         stage.setSeat(1, { name: null, detail: "Verifying...", dot: "amber" });
         stage.setStatus("Connected! Verifying your partner...");
         globalScene.ui.setMode(UiMode.MESSAGE);
         globalScene.ui.resetModeChain();
         globalScene.ui.showText("Connected! Verifying your partner and co-op saves...", null);
         const startNewRun = () => {
+          if (!isCurrentSession()) {
+            return;
+          }
+          lobbyCompleted = true;
           stage.destroy();
           setModeAndEnd(launchMode);
         };
@@ -896,26 +1059,28 @@ export class TitlePhase extends Phase {
         }
 
         void controller
-          .awaitPartnerIdentity()
+          .awaitPartnerCompatibility()
           .then(async identity => {
+            if (!isCurrentSession()) {
+              return;
+            }
             if (identity == null || identity.partnerName == null) {
               console.warn(
-                "[coop-resume] peer identity handshake timed out; keeping lobby closed (no unilateral start)",
+                "[coop-resume] peer compatibility barrier failed; keeping lobby closed (no unilateral start)",
               );
               stage.setSeat(1, { name: null, detail: "Reconnect needed", dot: "red" });
-              stage.setStatus("Could not verify your partner. Reconnect and try again.");
-              globalScene.ui.showText(
-                "Could not verify your co-op partner. Please reconnect and try again.",
-                null,
-                backToTitle,
-                null,
-                true,
+              stage.setStatus("Could not verify a compatible partner build. Reconnect and try again.");
+              terminalFailure(
+                "Could not verify your co-op partner's build. Both players should refresh, reconnect, and try again.",
               );
               return;
             }
             const partner = identity.partnerName;
             stage.setSeat(1, { name: partner, detail: "Connected", dot: "green" });
             stage.setStatus("Connected! Checking for a co-op save...");
+            if (identity.localRole === "guest") {
+              globalScene.gameData.armCoopResumeCheckpointPersistence();
+            }
 
             // #810 RESUME FLOW (maintainer directive): after the ACCEPT handshake, decide RESUME
             // vs NEW GAME BEFORE anyone advances into starter-select. The HOST owns the decision
@@ -944,17 +1109,13 @@ export class TitlePhase extends Phase {
                 return true;
               };
               const guestWaitTimer = setTimeout(() => {
-                if (claim()) {
+                if (isCurrentSession() && claim()) {
                   console.warn(
                     `[coop-resume] guest: no Resume/New Game from ${partner} in ${COOP_RESUME_GUEST_WAIT_MS}ms -> reconnect (fail-closed)`,
                   );
                   stage.setStatus("Partner decision timed out. Reconnect and try again.");
-                  globalScene.ui.showText(
+                  terminalFailure(
                     "Your partner did not finish the co-op save decision. Please reconnect and try again.",
-                    null,
-                    backToTitle,
-                    null,
-                    true,
                   );
                 }
               }, COOP_RESUME_GUEST_WAIT_MS);
@@ -962,46 +1123,87 @@ export class TitlePhase extends Phase {
               // Host chose New Game (or had no save / we declined / the offer timed out): release.
               controller.armResumeStartNewHandler(() => {
                 clearTimeout(guestWaitTimer);
-                if (claim()) {
+                if (isCurrentSession() && claim()) {
                   startNewRun();
                 }
+              });
+              controller.armResumeBlockedHandler((reason, wave) => {
+                clearTimeout(guestWaitTimer);
+                if (!isCurrentSession() || !claim()) {
+                  return;
+                }
+                const message =
+                  reason === "unsafe-role-reversal"
+                    ? `A co-op save was found at wave ${wave}, but the host/guest seats are reversed. Reconnect with the same player accepting the invite as in the saved run, then choose Continue.`
+                    : reason === "legacy-unmappable"
+                      ? `A legacy co-op save was found at wave ${wave}, but it has no safe player-seat mapping. This save cannot be resumed without risking swapped Pokemon ownership.`
+                      : `A co-op save exists at wave ${wave}, but this account had no verified free save slot for its resume copy (slots were occupied or cloud status was unavailable). Free a slot if needed, then reconnect with this partner; a new game was not started.`;
+                terminalFailure(message);
               });
               // Host offers to resume: surface accept/decline. Keep the start-new handler live (the
               // host can still time out and release us). Accept claims Resume; Decline remains behind
               // the barrier until the host durably commits New Game.
-              controller.armResumeOfferHandler(wave => {
+              controller.armResumeOfferHandler(commitment => {
                 clearTimeout(guestWaitTimer);
-                if (settled) {
+                if (settled || !isCurrentSession()) {
+                  return;
+                }
+                if (
+                  commitment.gameMode !== GameModes.COOP
+                  || !coopSeatMapMatches(
+                    { version: 1, players: commitment.participants, seats: commitment.seats },
+                    controller.localName(),
+                    partner,
+                    controller.role,
+                  )
+                ) {
+                  terminalFailure("The co-op resume offer did not match this exact session. Reconnect and try again.");
                   return;
                 }
                 globalScene.ui.showText(
-                  `${partner} wants to resume your saved co-op run (wave ${wave}). Accept?`,
+                  `${partner} wants to resume your saved co-op run (wave ${commitment.wave}). Accept?`,
                   null,
                   () => {
+                    if (!isCurrentSession()) {
+                      return;
+                    }
                     globalScene.ui.setMode(
                       UiMode.CONFIRM,
                       () => {
-                        if (claim()) {
+                        if (isCurrentSession() && claim()) {
                           globalScene.ui.setMode(UiMode.MESSAGE);
                           globalScene.ui.showText(`Waiting for ${partner} to commit the resume...`, null);
-                          void controller.replyResume(true).then(committed => {
-                            if (!committed) {
-                              globalScene.ui.showText(
-                                "The resume decision could not be committed. Reconnect and try again.",
-                                null,
-                                backToTitle,
-                                null,
-                                true,
+                          void controller
+                            .replyResume(true)
+                            .then(committed => {
+                              if (!isCurrentSession()) {
+                                return;
+                              }
+                              if (!committed) {
+                                terminalFailure("The resume decision could not be committed. Reconnect and try again.");
+                                return;
+                              }
+                              lobbyCompleted = true;
+                              stage.destroy();
+                              void this.coopGuestResumeBoot(
+                                commitment,
+                                runtime,
+                                controller,
+                                sessionGeneration,
+                                terminalFailure,
                               );
-                              return;
-                            }
-                            stage.destroy();
-                            void this.coopGuestResumeBoot(wave);
-                          });
+                            })
+                            .catch(error => {
+                              if (!isCurrentSession()) {
+                                return;
+                              }
+                              console.error("[coop-resume] guest resume commit failed", error);
+                              terminalFailure("The resume decision could not be committed. Reconnect and try again.");
+                            });
                         }
                       },
                       () => {
-                        if (!settled) {
+                        if (!settled && isCurrentSession()) {
                           controller
                             .replyResume(false)
                             .catch(error => console.warn("[coop-resume] failed to relay decline", error));
@@ -1022,16 +1224,58 @@ export class TitlePhase extends Phase {
             }
 
             // HOST: is there a saved run with EXACTLY this partner (self+partner account pair)?
-            const marker = await findCoopResumeCandidate(controller.localName(), partner, slot =>
-              globalScene.gameData.getSession(slot),
+            const resumeSnapshot = await globalScene.gameData.getSessionsForCoopResume();
+            const discovery = await findCoopResumeCandidate(
+              controller.localName(),
+              partner,
+              controller.role,
+              async slot => resumeSnapshot.get(slot),
             );
+            if (!isCurrentSession()) {
+              return;
+            }
+            const blockedMessage = coopResumeBlockMessage(discovery);
+            if (blockedMessage != null && discovery.kind !== "candidate" && discovery.kind !== "no-save") {
+              const acknowledged = await controller.sendResumeBlocked(
+                discovery.kind === "replica-indeterminate" ? "replica-unavailable" : discovery.kind,
+                discovery.wave,
+              );
+              if (!isCurrentSession()) {
+                return;
+              }
+              if (!acknowledged) {
+                console.warn(`[coop-resume] guest did not ACK blocked-save reason=${discovery.kind}`);
+              }
+              terminalFailure(blockedMessage);
+              return;
+            }
+            const marker = discovery.kind === "candidate" ? discovery.candidate : null;
             // Every host non-resume path relays the release so the waiting guest never hangs.
             const hostStartNew = () => {
+              if (!isCurrentSession()) {
+                return;
+              }
               globalScene.ui.setMode(UiMode.MESSAGE);
               globalScene.ui.showText(`Waiting for ${partner} to enter team selection...`, null);
-              void controller.sendResumeStartNew().then(() => {
-                startNewRun();
-              });
+              void controller
+                .sendResumeStartNew()
+                .then(acknowledged => {
+                  if (!isCurrentSession()) {
+                    return;
+                  }
+                  if (acknowledged) {
+                    startNewRun();
+                  } else {
+                    terminalFailure("Could not commit the new co-op run. Reconnect and try again.");
+                  }
+                })
+                .catch(error => {
+                  if (!isCurrentSession()) {
+                    return;
+                  }
+                  console.error("[coop-resume] start-new commit failed", error);
+                  terminalFailure("Could not commit the new co-op run. Reconnect and try again.");
+                });
             };
             if (marker == null) {
               // Release the guest only when the host actually presses Start. Sending this before
@@ -1050,24 +1294,43 @@ export class TitlePhase extends Phase {
               `Found a saved co-op run with ${partner} (wave ${marker.wave}). Resume it?`,
               null,
               () => {
+                if (!isCurrentSession()) {
+                  return;
+                }
                 globalScene.ui.setMode(
                   UiMode.CONFIRM,
                   () => {
+                    if (!isCurrentSession()) {
+                      return;
+                    }
                     // RESUME: relay the offer; both proceed identically on accept. offerResume has
                     // its own 60s no-reply timeout -> resolves false -> we fall to NEW GAME (and
                     // release the guest), so the barrier can never hang on an unresponsive guest.
                     globalScene.ui.setMode(UiMode.MESSAGE);
                     globalScene.ui.showText(`Waiting for ${partner} to accept...`, null);
-                    void controller.offerResume(marker.wave).then(accepted => {
-                      if (accepted) {
-                        stage.destroy();
-                        void this.loadCoopResumeSlot(marker.slot, marker.wave, controller, backToTitle);
-                      } else {
-                        // The guest remains behind the barrier after declining; this single durable
-                        // release moves both clients into team select together.
-                        hostStartNew();
-                      }
-                    });
+                    void controller
+                      .offerResume(marker.commitment)
+                      .then(accepted => {
+                        if (!isCurrentSession()) {
+                          return;
+                        }
+                        if (accepted) {
+                          lobbyCompleted = true;
+                          stage.destroy();
+                          void this.loadCoopResumeSlot(marker, runtime, controller, sessionGeneration, terminalFailure);
+                        } else {
+                          // The guest remains behind the barrier after declining; this single durable
+                          // release moves both clients into team select together.
+                          hostStartNew();
+                        }
+                      })
+                      .catch(error => {
+                        if (!isCurrentSession()) {
+                          return;
+                        }
+                        console.error("[coop-resume] resume offer failed", error);
+                        terminalFailure("Could not commit the co-op resume. Reconnect and try again.");
+                      });
                   },
                   // NEW GAME: release the guest and start fresh.
                   hostStartNew,
@@ -1078,18 +1341,17 @@ export class TitlePhase extends Phase {
             );
           })
           .catch(error => {
+            if (!isCurrentSession()) {
+              return;
+            }
             console.error("[coop-resume] identity/resume decision failed", error);
-            globalScene.ui.showText(
-              "Could not check co-op saves. Please reconnect and try again.",
-              null,
-              backToTitle,
-              null,
-              true,
-            );
+            terminalFailure("Could not check co-op saves. Please reconnect and try again.");
           });
       },
       onError: e => {
-        globalScene.ui.showText(`Co-op error:\n${e}`, null, backToTitle, null, true);
+        if (flowRuntime == null || isCurrentFlow()) {
+          terminalFailure(`Co-op error:\n${e}`);
+        }
       },
     });
 
@@ -1106,32 +1368,89 @@ export class TitlePhase extends Phase {
    * transition). Await it, apply it, and enter the run as a LOADED encounter - the guest
    * computes nothing, so a resumed run cannot diverge at boot.
    */
-  private async coopGuestResumeBoot(wave: number): Promise<void> {
+  private async coopGuestResumeBoot(
+    commitment: CoopResumeCommitment,
+    runtime: CoopRuntime,
+    controller: CoopRuntime["controller"],
+    generation: number,
+    terminalFailure: (message: string) => void,
+  ): Promise<void> {
+    if (!this.isExactCoopSession(runtime, controller, generation)) {
+      return;
+    }
     globalScene.ui.setMode(UiMode.MESSAGE);
     globalScene.ui.resetModeChain();
     globalScene.ui.showText("Resuming co-op run...", null);
     this.gameMode = GameModes.COOP;
     globalScene.gameMode = getGameMode(GameModes.COOP);
-    const streamer = getCoopBattleStreamer();
-    const json = streamer == null ? null : await streamer.awaitLaunchSnapshot(wave);
-    const booted = json != null && (await globalScene.gameData.applyCoopLaunchSession(json));
-    const controller = getCoopController();
-    controller?.reportResumeApplied(booted);
+    let booted = false;
+    let resumeJson: string | null = null;
+    try {
+      const json = await runtime.battleStream.awaitLaunchSnapshot(commitment.wave);
+      if (!this.isExactCoopSession(runtime, controller, generation)) {
+        return;
+      }
+      resumeJson = json;
+      booted = json != null && (await globalScene.gameData.applyCoopLaunchSession(json, commitment));
+      if (!this.isExactCoopSession(runtime, controller, generation)) {
+        return;
+      }
+    } catch (error) {
+      // A parsed snapshot can still fail during asset/session materialization. Convert every such
+      // failure into the explicit negative half of the two-phase resume transaction so the host
+      // never waits for its long timeout while this client has already fallen out of the flow.
+      if (!this.isExactCoopSession(runtime, controller, generation)) {
+        return;
+      }
+      console.error(`[coop-resume] guest: resume materialization threw for wave=${commitment.wave}`, error);
+      booted = false;
+    }
     if (!booted) {
-      console.warn(`[coop-resume] guest: no/unusable resume snapshot for wave=${wave} -> fail closed`);
-      globalScene.ui.showText(
-        "Could not apply the shared co-op save. Reconnect and try again.",
-        null,
-        () => {
-          globalScene.phaseManager.toTitleScreen();
-          super.end();
-        },
-        null,
-        true,
+      const acknowledged = await controller.reportResumeApplied(false);
+      if (!this.isExactCoopSession(runtime, controller, generation)) {
+        return;
+      }
+      console.warn(
+        `[coop-resume] guest: no/unusable resume snapshot for wave=${commitment.wave} ack=${acknowledged} -> fail closed`,
       );
+      terminalFailure("Could not apply the shared co-op save. Reconnect and try again.");
       return;
     }
-    console.log(`[coop-resume] guest: booted from resume snapshot wave=${wave} -> LOADED EncounterPhase`);
+    const persisted =
+      resumeJson == null
+        ? { success: false as const, reason: "invalid-checkpoint" as const }
+        : await globalScene.gameData.persistCurrentCoopResumeCheckpoint(resumeJson, commitment, true);
+    if (!this.isExactCoopSession(runtime, controller, generation)) {
+      return;
+    }
+    if (!persisted.success) {
+      const acknowledged = await controller.reportResumeApplied(false);
+      if (this.isExactCoopSession(runtime, controller, generation)) {
+        console.warn(
+          `[coop-resume] guest: exact resume persistence failed reason=${persisted.reason ?? "unknown"} ack=${acknowledged}`,
+        );
+        terminalFailure("Could not durably store the shared co-op save. Reconnect and try again.");
+      }
+      return;
+    }
+    const acknowledged = await controller.reportResumeApplied(true);
+    if (!this.isExactCoopSession(runtime, controller, generation)) {
+      return;
+    }
+    if (!acknowledged) {
+      terminalFailure("Your partner did not confirm the resumed state. Reconnect and try again.");
+      return;
+    }
+    if (!(await controller.awaitResumeGameplayRelease())) {
+      if (this.isExactCoopSession(runtime, controller, generation)) {
+        terminalFailure("The final co-op resume barrier did not complete. Reconnect and try again.");
+      }
+      return;
+    }
+    if (!this.isExactCoopSession(runtime, controller, generation)) {
+      return;
+    }
+    console.log(`[coop-resume] guest: booted from resume snapshot wave=${commitment.wave} -> LOADED EncounterPhase`);
     this.loaded = true;
     this.end();
   }
@@ -1143,42 +1462,59 @@ export class TitlePhase extends Phase {
    * actually loaded the same state.
    */
   private async loadCoopResumeSlot(
-    slotId: number,
-    wave: number,
-    controller: NonNullable<ReturnType<typeof getCoopController>>,
-    backToTitle: () => void,
+    candidate: CoopResumeCandidate,
+    runtime: CoopRuntime,
+    controller: CoopRuntime["controller"],
+    generation: number,
+    terminalFailure: (message: string) => void,
   ): Promise<void> {
+    if (!this.isExactCoopSession(runtime, controller, generation)) {
+      return;
+    }
     globalScene.ui.setMode(UiMode.MESSAGE);
     globalScene.ui.resetModeChain();
-    globalScene.sessionSlotId = slotId;
+    globalScene.sessionSlotId = candidate.slot;
     try {
-      const success = await globalScene.gameData.loadSession(slotId);
-      const streamer = getCoopBattleStreamer();
-      if (!success || streamer == null) {
-        globalScene.ui.showText("Could not load the shared co-op save. Reconnect and try again.", null, backToTitle);
+      // Apply the exact bytes validated during discovery. Never re-read the mutable slot after
+      // the human and guest have committed to its digest (closes the scan->load TOCTOU seam).
+      const success = await globalScene.gameData.applyCoopLaunchSession(candidate.sessionJson, candidate.commitment);
+      if (!this.isExactCoopSession(runtime, controller, generation)) {
         return;
       }
-      const session = globalScene.gameData.getSessionSaveData();
-      const json = JSON.stringify(session, (_key, value: unknown) =>
-        typeof value === "bigint" ? value.toString() : value,
-      );
-      streamer.sendLaunchSnapshot(wave, json);
+      if (!success) {
+        terminalFailure("Could not load the shared co-op save. Reconnect and try again.");
+        return;
+      }
+      runtime.battleStream.sendLaunchSnapshot(candidate.commitment.wave, candidate.sessionJson);
       globalScene.ui.showText("Waiting for your partner to apply the shared save...", null);
       if (!(await controller.awaitResumeApplied())) {
-        globalScene.ui.showText(
-          "Your partner could not apply the shared co-op save. Reconnect and try again.",
-          null,
-          backToTitle,
-          null,
-          true,
-        );
+        if (!this.isExactCoopSession(runtime, controller, generation)) {
+          return;
+        }
+        terminalFailure("Your partner could not apply the shared co-op save. Reconnect and try again.");
+        return;
+      }
+      if (!this.isExactCoopSession(runtime, controller, generation)) {
+        return;
+      }
+      if (!(await controller.releaseResumeGameplay())) {
+        if (this.isExactCoopSession(runtime, controller, generation)) {
+          terminalFailure("The final co-op resume barrier did not complete. Reconnect and try again.");
+        }
+        return;
+      }
+      if (!this.isExactCoopSession(runtime, controller, generation)) {
         return;
       }
       this.loaded = true;
-      globalScene.ui.showText(i18next.t("menu:sessionSuccess"), null, () => this.end());
+      globalScene.ui.showText(i18next.t("menu:sessionSuccess"), null);
+      this.end();
     } catch (err) {
+      if (!this.isExactCoopSession(runtime, controller, generation)) {
+        return;
+      }
       console.error(err);
-      globalScene.ui.showText(i18next.t("menu:failedToLoadSession"), null, backToTitle);
+      terminalFailure(i18next.t("menu:failedToLoadSession"));
     }
   }
 
@@ -1194,12 +1530,25 @@ export class TitlePhase extends Phase {
         this.loaded = true;
         globalScene.ui.showText(i18next.t("menu:sessionSuccess"), null, () => this.end());
       } else {
-        this.end();
+        this.returnToTitleAfterSaveLoadFailure();
       }
     } catch (err) {
       console.error(err);
-      globalScene.ui.showText(i18next.t("menu:failedToLoadSession"), null);
+      this.returnToTitleAfterSaveLoadFailure();
     }
+  }
+
+  private returnToTitleAfterSaveLoadFailure(): void {
+    this.loaded = false;
+    globalScene.ui.showText(
+      `${i18next.t("menu:failedToLoadSession")} If this is a co-op save, choose New Game > Co-op and connect to the exact saved partner before continuing.`,
+      null,
+      () => {
+        void this.showOptions(NO_SAVE_SLOT);
+      },
+      null,
+      true,
+    );
   }
 
   initDailyRun(): void {

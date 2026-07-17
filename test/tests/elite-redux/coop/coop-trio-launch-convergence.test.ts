@@ -113,12 +113,28 @@ describe.skipIf(!RUN)("co-op TRIO M5: 1 authority + 2 renderers converge from on
     expect([1, 2].some(s => coopSeatIsAuthority(s))).toBe(false);
     expect([coopRoleOfSeat(0), coopRoleOfSeat(1), coopRoleOfSeat(2)]).toEqual(["host", "guest", "guest"]);
 
-    // THIRD client (renderer seat 2): its own real BattleScene + runtime on a SECOND loopback pair.
-    // Its controller is never connected - the direct-apply leg below needs no wire, which is the point:
-    // a renderer boots from BYTES, not from a conversation.
+    // SECOND isolated renderer replica: its own real BattleScene + an independently authenticated runtime
+    // on another loopback pair. P33 deliberately refuses snapshot materialization on an unbound controller,
+    // so the replica must prove the same Host/Guest run identity before applying the same immutable bytes.
+    // This remains a renderer-projection proof; distinct third-seat membership belongs to the topology lane.
     const pair2 = createLoopbackPair();
-    const guest2Runtime = buildRuntime(pair2.guest, "Guest2", "authoritative");
+    const host2Runtime = buildRuntime(pair2.host, "Host", "authoritative");
+    const guest2Runtime = buildRuntime(pair2.guest, "Guest", "authoritative");
+    host2Runtime.controller.role = "host";
     guest2Runtime.controller.role = "guest";
+    expect(
+      host2Runtime.controller.restoreCheckpointIdentity(
+        rig.hostRuntime.controller.runId,
+        rig.hostRuntime.controller.checkpointRevision,
+        "isolated-renderer-replica",
+      ),
+      "the isolated authority endpoint shares the exact launch lineage",
+    ).toBe(true);
+    setCoopRuntime(host2Runtime);
+    host2Runtime.controller.connect();
+    setCoopRuntime(guest2Runtime);
+    guest2Runtime.controller.connect();
+    await drainLoopback();
     const guest2Scene = buildGuestScene(game);
     const guest2Ctx: ClientCtx = {
       label: "guest",
@@ -127,6 +143,10 @@ describe.skipIf(!RUN)("co-op TRIO M5: 1 authority + 2 renderers converge from on
       rndState: Phaser.Math.RND.state(),
       ghost: emptyGhostSnapshot(),
       moduleLets: structuredClone(rig.hostCtx.moduleLets!),
+      // World-map/biome module state is always isolated, independently of the optional broader
+      // module-let isolation switch. Without an owned snapshot, applyCoopLaunchSession restored the
+      // host map only into the ambient process global and the next guest-2 swap observed stale state.
+      biomeState: structuredClone(rig.hostCtx.biomeState!),
     };
     await withClient(guest2Ctx, () => {
       toCoop(guest2Scene);

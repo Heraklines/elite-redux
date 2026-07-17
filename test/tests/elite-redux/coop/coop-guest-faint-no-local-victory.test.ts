@@ -17,7 +17,7 @@
 // does) and NEVER runs queueTurnEndPhases; victory arrives ONLY via the host's waveResolved tail.
 // Solo / host / lockstep keep queueTurnEndPhases verbatim (byte-identical).
 //
-// The authoritative path is CoopFinalizeTurnPhase.finishTurn(). Protocol 32 deliberately has no
+// The authoritative path is CoopFinalizeTurnPhase.finishTurn(). Protocol 33 deliberately has no
 // no-stream gameplay fallback: missing authority routes both peers to the visible terminal instead.
 //
 // This drives the REAL private methods over a REAL local co-op session (the same engine-free spoof

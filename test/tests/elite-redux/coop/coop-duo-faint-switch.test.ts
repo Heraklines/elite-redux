@@ -148,7 +148,7 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
       game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     const hostSlotAfterFaint = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
     expect(
@@ -166,7 +166,15 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       ui.setMode = (...args: unknown[]): unknown => {
         if (args[0] === UiMode.PARTY) {
           ui.setMode = realSetMode; // one-shot
-          (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
+          // Exercise the real public picker callback after the peer becomes the ambient runtime. Production
+          // browsers cannot share this selector, while the two-engine harness deliberately can; the callback
+          // must use the immutable guest binding captured when its phase opened.
+          setCoopRuntime(rig.hostRuntime);
+          try {
+            (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
+          } finally {
+            setCoopRuntime(rig.guestRuntime);
+          }
           return;
         }
         if (args[0] === UiMode.MESSAGE) {

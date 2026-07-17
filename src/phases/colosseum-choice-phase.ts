@@ -26,6 +26,8 @@ import {
   coopColosseumSendDecision,
   coopColosseumStreamBoard,
 } from "#data/elite-redux/coop/coop-colosseum";
+import { coopMeInteractionStartValue, setCoopMeColosseumControl } from "#data/elite-redux/coop/coop-me-pin-state";
+import { coopSessionGeneration, failCoopSharedSession, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
@@ -72,6 +74,14 @@ export class ColosseumChoicePhase extends Phase {
 
   /** Preload the revealed challengers' portraits, then open the standings board. */
   private async open(): Promise<void> {
+    const runtime = getCoopRuntime();
+    const generation = coopSessionGeneration();
+    const pinned = coopMeInteractionStartValue();
+    const live = (): boolean =>
+      globalScene.phaseManager.getCurrentPhase() === this
+      && getCoopRuntime() === runtime
+      && coopSessionGeneration() === generation
+      && coopMeInteractionStartValue() === pinned;
     const gauntlet = (globalScene.currentBattle.mysteryEncounter?.misc?.gauntlet as ColosseumChallenger[]) ?? [];
 
     // Load every challenger's class atlas: revealed ones render in colour, the
@@ -80,6 +90,9 @@ export class ColosseumChoicePhase extends Phase {
     await Promise.all(
       [...types].map(t => trainerConfigs[t]?.loadAssets(TrainerVariant.DEFAULT).catch(() => undefined)),
     );
+    if (!live()) {
+      return;
+    }
 
     const challengers: ColosseumChallengerView[] = gauntlet.map((ch, i) => ({
       name: ch.name,
@@ -100,20 +113,42 @@ export class ColosseumChoicePhase extends Phase {
     // engine). Index 0 == COLOSSEUM_CONTINUE, index 1 == COLOSSEUM_CASH_OUT, aligned with onChoice.
     // FIRE-AND-FORGET + hard no-op off the authoritative host / in solo, so solo is byte-identical and
     // the host never blocks on the partner. No em dashes in the labels (project rule).
-    coopColosseumStreamBoard([`CONTINUE (risk for ${data.nextTierLabel})`, `CASH OUT (claim ${data.tierLabel})`]);
+    if (
+      !coopColosseumStreamBoard(
+        [`CONTINUE (risk for ${data.nextTierLabel})`, `CASH OUT (claim ${data.tierLabel})`],
+        data.round,
+      )
+    ) {
+      return;
+    }
     // Co-op (#829): on a GUEST-OWNED board the partner (guest) drives the CONTINUE / CASH-OUT decision on
     // its own capture UI + relays it; the host (sole engine) AWAITS the relayed index and applies it, taking
-    // NO local input (mirrors coopHostAwaitGuestIndex for the top-level ME pick). A null resolution (a
-    // disconnected partner) defaults to CASH OUT so the host never hangs. Host-owned board / solo drive off
+    // NO local input (mirrors coopHostAwaitGuestIndex for the top-level ME pick). A null resolution retains
+    // the shared boundary and terminates recovery safely; it is never synthesized as CASH OUT. Host-owned board / solo drive off
     // local input below - coopColosseumBoardIsCoop() is false in solo, so solo is byte-identical.
     if (coopColosseumBoardIsCoop() && !coopColosseumBoardOwnedLocally()) {
       showCoopControllerTagFor(false); // amber: the partner is deciding
       const idx = await coopColosseumAwaitDecision();
+      if (!live()) {
+        return;
+      }
       hideCoopControllerTag();
-      void this.onChoice(idx ?? COLOSSEUM_CASH_OUT);
+      if (idx !== COLOSSEUM_CONTINUE && idx !== COLOSSEUM_CASH_OUT) {
+        getCoopRuntime()?.durability?.reconnect();
+        failCoopSharedSession(`Colosseum host decision ${String(idx)} unavailable or malformed`);
+        return;
+      }
+      void this.onChoice(idx);
       return;
     }
-    globalScene.ui.setMode(UiMode.COLOSSEUM, data, (choice: number) => this.onChoice(choice));
+    const opened = await globalScene.ui.setModeBoundedWhen(UiMode.COLOSSEUM, 2_000, live, data, (choice: number) => {
+      if (live()) {
+        void this.onChoice(choice);
+      }
+    });
+    if (opened === "superseded" && live()) {
+      failCoopSharedSession(`Colosseum board UI could not bind for ${pinned}`);
+    }
   }
 
   private async onChoice(choice: number): Promise<void> {
@@ -126,20 +161,41 @@ export class ColosseumChoicePhase extends Phase {
     // SAME branch - but ONLY when the LOCAL client owns the board (host-owned, or solo where the send is a
     // hard no-op anyway). On a GUEST-owned board the guest already relayed its pick and the host is APPLYING
     // it here (open() awaited it), so re-sending would echo a second pick onto the board seq. FIRE-AND-FORGET.
-    if (!coopColosseumBoardIsCoop() || coopColosseumBoardOwnedLocally()) {
-      coopColosseumSendDecision(choice);
+    if ((!coopColosseumBoardIsCoop() || coopColosseumBoardOwnedLocally()) && !coopColosseumSendDecision(choice)) {
+      return;
     }
 
     // Hand the UI back to MESSAGE FIRST. endColosseum/startNextColosseumBattle
     // run dialogue + reward flow (showEncounterText, leaveEncounterWithoutBattle)
     // that need a normal mode; running them while still in UiMode.COLOSSEUM
     // stalled the cash-out (#439).
-    await globalScene.ui.setMode(UiMode.MESSAGE);
+    const runtime = getCoopRuntime();
+    const generation = coopSessionGeneration();
+    const pinned = coopMeInteractionStartValue();
+    const live = (): boolean =>
+      getCoopRuntime() === runtime
+      && coopSessionGeneration() === generation
+      && coopMeInteractionStartValue() === pinned;
+    const opened = await globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, live);
+    if (opened === "superseded" || !live()) {
+      failCoopSharedSession(`Colosseum resolution UI became stale for ${pinned}`);
+      return;
+    }
 
-    if (choice === COLOSSEUM_CONTINUE) {
-      await startNextColosseumBattle(this.wins + 1);
-    } else {
-      await endColosseum(this.wins);
+    try {
+      if (choice === COLOSSEUM_CONTINUE) {
+        await startNextColosseumBattle(this.wins + 1);
+        if (coopColosseumBoardIsCoop() && !setCoopMeColosseumControl(pinned, { expectedRound: this.wins + 1 })) {
+          throw new Error("next Colosseum round control could not be retained");
+        }
+      } else {
+        await endColosseum(this.wins);
+      }
+    } catch (error) {
+      failCoopSharedSession(
+        `Colosseum ${choice === COLOSSEUM_CONTINUE ? "continue" : "cash-out"} transition failed: ${String(error)}`,
+      );
+      return;
     }
 
     this.end();

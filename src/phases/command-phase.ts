@@ -5,7 +5,10 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
-import { applyCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  applyCoopAuthoritativeBattleState,
+  reapplyAcceptedCoopAuthoritativeBattleState,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
@@ -18,12 +21,14 @@ import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous"
 import {
   coopHasPendingWaveAdvance,
   coopOwnerOfPlayerFieldSlot,
+  failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopBattleSync,
   getCoopController,
   getCoopNetcodeMode,
   getCoopRendezvous,
   getCoopRuntime,
+  isCoopSharedTerminalFrozen,
   isVersusSession,
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
@@ -58,11 +63,20 @@ import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { getMoveTargets } from "#moves/move-utils";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
+import {
+  applyCoopEncounterAuthority,
+  rebroadcastCoopWaveStartAuthorityAfterEntryEffects,
+} from "#phases/encounter-phase";
 import { FieldPhase } from "#phases/field-phase";
 import type { MoveTargetSet } from "#types/move-target-set";
 import type { TurnMove } from "#types/turn-move";
 import { canTerastallize } from "#utils/pokemon-utils";
 import i18next from "i18next";
+
+// A healthy peer can spend more than four minutes in autonomous Commander presentation on a constrained
+// browser runner before it is able to reach the same command point. Keep this command-only wait bounded,
+// but beyond the measured seven-minute browser ceiling; shop/route waits retain the tighter default.
+const COMMAND_RENDEZVOUS_RECOVERY_MAX_ATTEMPTS = 7;
 
 export class CommandPhase extends FieldPhase {
   public readonly phaseName = "CommandPhase";
@@ -174,10 +188,13 @@ export class CommandPhase extends FieldPhase {
     // If the Pokemon has applied Commander's effects to an ally, skip this command.
     // Any multi format + ANY ally (was `double` + first-ally-only, so a triple's
     // hidden Tatsugiri still got prompted for a command).
+    // The tag's source id is the durable Commander relationship. An authoritative co-op
+    // materialization can resolve that id to a different Pokemon object than this phase's
+    // presentation instance, so reference equality would incorrectly expose command input.
     const pokemon = this.getPokemon();
     if (
       (globalScene.currentBattle?.getBattlerCount() ?? 0) > 1
-      && pokemon.getAllies().some(ally => ally.getTag(BattlerTagType.COMMANDED)?.getSourcePokemon() === pokemon)
+      && pokemon.getAllies().some(ally => ally.getTag(BattlerTagType.COMMANDED)?.sourceId === pokemon.id)
     ) {
       globalScene.currentBattle.turnCommands[this.fieldIndex] = {
         command: Command.FIGHT,
@@ -431,6 +448,11 @@ export class CommandPhase extends FieldPhase {
     if (controller == null) {
       return false;
     }
+    if (isCoopSharedTerminalFrozen()) {
+      // Terminal preparation owns this phase now. Keep it parked until exactly-once finalization; do not
+      // open local input, synthesize a command, or advance a queue already cleared by the runtime fence.
+      return true;
+    }
     // Only auto-resolve the PARTNER's slot; the local player commands their own.
     const slotOwner = coopOwnerOfPlayerFieldSlot(this.fieldIndex);
     // #819 diagnostics: ownership decides who prompts/relays this slot - a misresolve here IS
@@ -476,6 +498,7 @@ export class CommandPhase extends FieldPhase {
       apply(fallback());
       return true;
     }
+    const runtimeAtRequest = getCoopRuntime();
     // Offer the legal move slots WE computed and await the partner's pick. The
     // partner's command is applied EXACTLY ({@linkcode applyWiredPartnerCommand}:
     // matched by move ID + verbatim targets, no RNG re-roll) so both engines stay
@@ -506,6 +529,21 @@ export class CommandPhase extends FieldPhase {
         pokemonId: partner.id,
       })
       .then(cmd => {
+        if (
+          sync.isTerminalFrozen()
+          || runtimeAtRequest == null
+          || getCoopRuntime() !== runtimeAtRequest
+          || isCoopSharedTerminalFrozen(runtimeAtRequest)
+        ) {
+          // A shared terminal releases retained command promises with null only to drain the old control
+          // surface. It is never authority to invent a local AI command or end this phase independently.
+          coopWarn(
+            "battle",
+            `CommandPhase terminal fence held owner=${slotOwner} field=${this.fieldIndex} `
+              + `turn=${globalScene.currentBattle?.turn ?? -1}`,
+          );
+          return;
+        }
         // A relayed BALL / RUN (the partner threw a Poke Ball or fled) is applied
         // verbatim, NOT routed through the move path: its `cursor` is a ball type,
         // not a move slot, so applyWiredPartnerCommand would mis-read it as a move.
@@ -541,14 +579,14 @@ export class CommandPhase extends FieldPhase {
    * guarded: no-op outside a live co-op session, and the apply/capture are themselves
    * wrapped so a sync hiccup can never break the turn.
    */
-  private tryCoopCheckpointSync(): void {
+  private tryCoopCheckpointSync(): boolean {
     if (!globalScene.gameMode.isCoop) {
-      return;
+      return true;
     }
     const controller = getCoopController();
     const streamer = getCoopBattleStreamer();
     if (controller == null || streamer == null) {
-      return;
+      return true;
     }
     const { turn, waveIndex } = globalScene.currentBattle;
     // M6c (#633): the LOCKSTEP per-turn checkpoint broadcast/adopt that used to live here was
@@ -561,12 +599,50 @@ export class CommandPhase extends FieldPhase {
       // checksum verification is owned by CoopReplayTurnPhase now (Phase B), not here.
       const enemies = streamer.consumeEnemyParty(waveIndex);
       if (enemies != null) {
+        // enemyPartySync is one authoritative carrier split across party, encounter identity, and state
+        // inboxes. A blocked NextEncounterPhase can leave all three for this final pre-input fallback.
+        // Never adopt only the party: trainer victory/reward routing depends on the exact descriptor.
+        const encounter = streamer.consumeEnemyPartyEncounter(waveIndex);
+        if (encounter == null) {
+          failCoopSharedSession(
+            `Wave ${waveIndex} authoritative encounter descriptor was unavailable at command input`,
+          );
+          return false;
+        }
+        applyCoopEncounterAuthority(globalScene.currentBattle, encounter);
         // #818: STRUCTURAL adopt - an ME-spawned battle's party exists only on the host,
         // so the guest must be able to BUILD it (species/count/shape), not just correct it.
         adoptCoopEnemiesStructural(enemies);
-        applyCoopAuthoritativeBattleState(streamer.consumeEnemyPartyState(waveIndex), true);
       }
+      // The party image and its complete state are intentionally separate one-shot buffers. EncounterPhase
+      // can consume the repeated party first while a newer post-PostSummon carrier is delivered afterward;
+      // gating the state read on `enemies != null` then strands that newer state until checksum repair. Always
+      // consume/apply the latest state at this final pre-input funnel. `undefined` remains a guarded no-op.
+      const waveStartState = streamer.consumeEnemyPartyState(waveIndex);
+      if (
+        waveStartState !== undefined
+        && !applyCoopAuthoritativeBattleState(waveStartState, true)
+        && !reapplyAcceptedCoopAuthoritativeBattleState(waveStartState, true)
+      ) {
+        // EncounterPhase may already have accepted this exact tick for coherent intro rendering. Reassert
+        // only that same accepted image at the final public-input seal; a stale/different payload remains
+        // rejected, while a newer post-summon carrier is admitted normally above.
+        failCoopSharedSession(`Wave ${waveIndex} authoritative entry state could not seal before command input`);
+        return false;
+      }
+      // Applying an encounter descriptor may reconstruct local trainer presentation. Reassert the pure
+      // renderer contract after the complete carrier has landed and before any public command input opens.
+      ensureCoopAuthoritativeCommandPresentation();
+    } else if (controller.role === "host" && turn === 1 && this.fieldIndex === 0) {
+      // Co-op HOST (#920): the entry-ability chain (PostSummonPhase) has now settled - terrain, weather,
+      // entry-hazard arena tags and entry form changes are on the arena/field, but the wave-start
+      // enemyPartySync captured its authoritative state BEFORE PostSummon (pre-summon boundary). Re-broadcast
+      // the post-summon re-capture so the guest adopts those on-entry effects at its OWN turn-1 belt-and-
+      // suspenders above, BEFORE it commands, instead of at the turn-1 END checkpoint. Gated to field slot 0
+      // so it evaluates once per wave; a hard no-op unless an entry effect actually changed state (self-latching).
+      rebroadcastCoopWaveStartAuthorityAfterEntryEffects();
     }
+    return true;
   }
 
   public override start(): void {
@@ -577,7 +653,9 @@ export class CommandPhase extends FieldPhase {
     // membership must come from an authoritative seat manifest, never a local presentation guess.
     ensureCoopAuthoritativeCommandPresentation();
 
-    this.tryCoopCheckpointSync();
+    if (!this.tryCoopCheckpointSync()) {
+      return;
+    }
 
     globalScene.updateGameInfo();
     this.resetCursorIfNeeded();
@@ -588,16 +666,41 @@ export class CommandPhase extends FieldPhase {
 
     this.checkCommander();
 
-    if (globalScene.currentBattle.turnCommands[this.fieldIndex]?.skip) {
+    const hasGeneratedSkip = globalScene.currentBattle.turnCommands[this.fieldIndex]?.skip === true;
+
+    const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
+    const coopSlotOwner = coopController == null ? null : coopOwnerOfPlayerFieldSlot(this.fieldIndex);
+    const isLocalCoopSlot = coopController != null && coopSlotOwner === coopController.role;
+    const isAuthoritativeGuestPartnerSlot =
+      coopController?.role === "guest"
+      && getCoopNetcodeMode() === "authoritative"
+      && coopSlotOwner !== coopController.role;
+
+    // Generated skips are commands too. Commander, and the trailing slots after BALL/RUN, do not open
+    // input, but an OWNED skipped slot must still announce the reciprocal command boundary. Ending it
+    // here used to strand the peer at cmd:<wave>:<turn> exactly like a queued recharge did. Non-owned
+    // renderer/engine slots keep the immediate skip: their owning peer is responsible for the arrival.
+    if (hasGeneratedSkip && !isLocalCoopSlot) {
       this.end();
       return;
     }
 
-    if (this.tryExecuteQueuedMove()) {
+    // An authoritative guest must classify the host-owned slot as renderer-only BEFORE consulting the
+    // checkpoint-carried move queue. Otherwise a host recharge sentinel can execute on the guest engine.
+    if (isAuthoritativeGuestPartnerSlot && this.tryCoopAutoResolve()) {
       return;
     }
 
-    if (this.tryCoopAutoResolve()) {
+    // Forced/queued commands on THIS client's owned slot still represent arrival at the reciprocal command
+    // boundary. Do not execute them before the barrier: Meteor Assault/Hyper Beam leaves MoveId.NONE queued,
+    // and the old ordering skipped the guest's arrival while the host remained sealed at cmd:<wave>:<turn>.
+    // Partner slots retain the legacy authoritative ordering so the host can execute a forced partner action
+    // directly instead of asking the peer to choose an action that is not actually selectable.
+    if (!isLocalCoopSlot && this.tryExecuteQueuedMove()) {
+      return;
+    }
+
+    if (!isLocalCoopSlot && this.tryCoopAutoResolve()) {
       return;
     }
 
@@ -613,14 +716,45 @@ export class CommandPhase extends FieldPhase {
       // SYNC fast-path: solo / spoof / no rendezvous / partner-half-exhausted / partner ALREADY at this
       // command point. Open immediately - deferring behind a `.then` when there is nothing to wait for
       // reorders the UI open by a microtask for no reason (solo must stay byte-identical).
-      this.openOwnCommandUi();
+      this.enterOwnCommandBoundary();
       return;
     }
     void pendingBarrier.then(crossed => {
       if (crossed) {
-        this.openOwnCommandUi();
+        // The single continuation funnel re-consumes the latest wave-start authority immediately before
+        // public input opens, including after a retained phase-route displacement.
+        this.enterOwnCommandBoundary();
       }
     });
+  }
+
+  /** Execute a forced owned-slot action only after the reciprocal command boundary, else open its UI. */
+  private enterOwnCommandBoundary(): void {
+    // This is the single continuation funnel for every reciprocal-command path: synchronous arrival,
+    // delayed arrival, and a command point temporarily displaced by a retained Crossroads/biome route.
+    // Re-consume the latest wave-start authority here, immediately before public input can open. A renderer
+    // may have consumed the pre-summon carrier when it first reached CommandPhase, then received the host's
+    // post-PostSummon/biome-preparation refresh while that command point was rerouted. Applying only in the
+    // ordinary rendezvous callback left that newer carrier buffered and opened input with stale map/biome
+    // state. The consume is one-shot and host-safe, so making the funnel own it covers every route without
+    // deriving or mutating guest mechanics.
+    if (!this.tryCoopCheckpointSync()) {
+      return;
+    }
+    // The authoritative guest can reach its owned slot before the host has completed PostSummon. In that
+    // race, the first checkCommander() above legitimately sees no CommandedTag, then the post-summon
+    // checkpoint consumed at the reciprocal barrier materializes the tag. Re-evaluate at the actual
+    // continuation boundary so a late authoritative Commander relationship cannot expose one frame of
+    // selectable input. The operation is idempotent: it only reasserts the same inert skipped command.
+    this.checkCommander();
+    const hasGeneratedSkip = globalScene.currentBattle.turnCommands[this.fieldIndex]?.skip === true;
+    if (hasGeneratedSkip) {
+      this.end();
+      return;
+    }
+    if (!this.tryExecuteQueuedMove()) {
+      this.openOwnCommandUi();
+    }
   }
 
   /**
@@ -775,7 +909,7 @@ export class CommandPhase extends FieldPhase {
       }
       coopLog("rendezvous", `next-command barrier ARRIVE+AWAIT ${point} slot=${this.fieldIndex}`);
       return rendezvous
-        .rendezvous(point, getCoopRendezvousWaitMs())
+        .rendezvous(point, getCoopRendezvousWaitMs(), COMMAND_RENDEZVOUS_RECOVERY_MAX_ATTEMPTS)
         .then(result => {
           if (result.timedOut) {
             coopWarn(

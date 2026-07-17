@@ -89,6 +89,9 @@ export class MenuUiHandler extends MessageUiHandler {
         condition: !(globalScene.gameMode.isShowdown && globalScene.currentBattle != null),
         options: [MenuOptions.FORFEIT],
       },
+      // A unilateral save-and-title transition destroys only one side of a shared run. Co-op
+      // persistence/resume must cross the two-player transaction boundary instead.
+      { condition: globalScene.gameMode.isCoop, options: [MenuOptions.SAVE_AND_QUIT] },
     ];
 
     this.menuOptions = getEnumValues(MenuOptions).filter(m => {
@@ -146,6 +149,7 @@ export class MenuUiHandler extends MessageUiHandler {
       // Showdown 1v1 (D4): a versus match is ephemeral (never saved) - hide Save and Quit and offer
       // Forfeit instead. Forfeit shows ONLY inside a live showdown battle.
       { condition: globalScene.gameMode.isShowdown, options: [MenuOptions.SAVE_AND_QUIT] },
+      { condition: globalScene.gameMode.isCoop, options: [MenuOptions.SAVE_AND_QUIT] },
       {
         condition: !(globalScene.gameMode.isShowdown && globalScene.currentBattle != null),
         options: [MenuOptions.FORFEIT],
@@ -761,6 +765,11 @@ export class MenuUiHandler extends MessageUiHandler {
           break;
         case MenuOptions.SAVE_AND_QUIT: {
           success = true;
+          // Defense in depth for a stale menu rendered just before mode changed to co-op.
+          if (globalScene.gameMode.isCoop) {
+            ui.showText("Save & Quit is unavailable during a live co-op session.", null, undefined, 3000);
+            break;
+          }
           // ER (#389): the save runs BEFORE switching to the loading screen so
           // a failed cloud push can be surfaced - the full save (system +
           // session) is force-pushed (forceSync bypasses the sync throttle and

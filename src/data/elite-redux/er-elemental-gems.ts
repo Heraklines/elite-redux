@@ -94,7 +94,18 @@ export class ErGemModifier extends PokemonHeldItemModifier {
 
   override getIcon(forSummary?: boolean): Phaser.GameObjects.Container {
     if (forSummary) {
-      return super.getIcon(forSummary);
+      // Standalone er-assets texture - super would render a blank "items"-atlas
+      // frame in the summary/party view (the "item disappeared" report class).
+      const summary = globalScene.add.container(0, 0);
+      const summaryItem = globalScene.add.sprite(0, 12, erGemTextureKey(this.gemType));
+      summaryItem.setScale(0.5);
+      summaryItem.setOrigin(0, 0.5);
+      summary.add(summaryItem);
+      const summaryStack = this.getIconStackText();
+      if (summaryStack) {
+        summary.add(summaryStack);
+      }
+      return summary;
     }
     // Mirror PokemonHeldItemModifier.getIcon's item-bar layout so the gem shows
     // WHOSE it is: the holder's Pokemon icon on the left, then the gem sprite
@@ -153,6 +164,14 @@ export function erTryApplyGem(
   simulated: boolean,
 ): void {
   if (damage.value <= 0) {
+    return;
+  }
+  // Foe item-use suppression (Unnerve 127, As-One 266/267 — anything carrying
+  // PreventItemUseAbAttr): a Pokemon whose opponent suppresses held-item use may
+  // not consume its elemental Gem. Same gate the ER reactive-item consume path
+  // uses (er-reactive-items.ts). Applies to simulated calcs too, so the AI does
+  // not "see" a Gem boost that will not fire.
+  if (source.getOpponents().some(opp => opp.hasAbilityWithAttr("PreventItemUseAbAttr"))) {
     return;
   }
   const gem = source

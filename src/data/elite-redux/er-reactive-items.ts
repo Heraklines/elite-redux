@@ -155,7 +155,18 @@ export class ErReactiveItemModifier extends PokemonHeldItemModifier {
 
   override getIcon(forSummary?: boolean): Phaser.GameObjects.Container {
     if (forSummary) {
-      return super.getIcon(forSummary);
+      // Standalone er-assets texture - super would render a blank "items"-atlas
+      // frame in the summary/party view (the "item disappeared" report class).
+      const summary = globalScene.add.container(0, 0);
+      const summaryItem = globalScene.add.sprite(0, 12, ER_REACTIVE_CONFIG[this.kind].icon);
+      summaryItem.setScale(0.5);
+      summaryItem.setOrigin(0, 0.5);
+      summary.add(summaryItem);
+      const summaryStack = this.getIconStackText();
+      if (summaryStack) {
+        summary.add(summaryStack);
+      }
+      return summary;
     }
     // Item-bar layout matching the elemental gems: the HOLDER's Pokemon icon on the
     // left, THEN the reactive item's standalone er-assets sprite (it is NOT in the

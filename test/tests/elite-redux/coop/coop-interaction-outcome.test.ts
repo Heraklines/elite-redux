@@ -72,8 +72,10 @@ describe("co-op interaction OUTCOME primitive (#633, TRACK-2 Phase C)", () => {
     owner.sendInteractionOutcome(2, "reward", grant({ modifierTypeId: "LUCKY_EGG" }));
     await new Promise(r => setTimeout(r, 0)); // land in the watcher buffer
 
+    expect(watcher.hasBufferedInteractionOutcomeFor(2)).toBe(true);
     const res = await watcher.awaitInteractionOutcome(2);
     expect(res?.k === "rewardGrant" ? res.modifierTypeId : undefined).toBe("LUCKY_EGG");
+    expect(watcher.hasBufferedInteractionOutcomeFor(2)).toBe(false);
   });
 
   it("an outcome for a stale/other seq is buffered harmlessly, never consumed by a different seq", async () => {
@@ -115,12 +117,22 @@ describe("co-op interaction OUTCOME primitive (#633, TRACK-2 Phase C)", () => {
 
   it("the interactionOutcome wire shape is pure JSON (survives a serialize round-trip byte-identical)", () => {
     const outcomes: CoopInteractionOutcome[] = [
-      grant({ modifierTypeId: "MASTER_BALL", args: [1, 2], partySlot: 3, moneyDelta: -1000 }),
+      grant({
+        modifierTypeId: "MASTER_BALL",
+        args: [1, 2],
+        partySlot: 3,
+        moneyDelta: -1000,
+      }),
       { k: "reroll", moneyDelta: -75 },
       { k: "leave" },
     ];
     for (const outcome of outcomes) {
-      const msg: CoopMessage = { t: "interactionOutcome", seq: 1, kind: "reward", outcome };
+      const msg: CoopMessage = {
+        t: "interactionOutcome",
+        seq: 1,
+        kind: "reward",
+        outcome,
+      };
       expect(JSON.parse(JSON.stringify(msg))).toEqual(msg);
     }
   });

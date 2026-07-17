@@ -1,6 +1,6 @@
 import type { PokeballCounts } from "#app/battle-scene";
 import type { Tutorial } from "#app/tutorial";
-import type { CoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-control-plane";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
@@ -185,6 +185,14 @@ export interface SessionSaveData {
    * instead of resetting to base 0. Optional + absent for every solo / pre-W2b save (fully save-compatible).
    */
   coopControlPlane?: CoopControlPlaneSaveData | undefined;
+  /** Stable logical co-op run identity plus host-monotonic persistence order. */
+  coopRun?:
+    | {
+        version: 1;
+        runId: string;
+        checkpointRevision: number;
+      }
+    | undefined;
   /**
    * ER achievement-expansion catalog-v2 (#900): run-local achievement state that must survive a
    * mid-run save/reload (bargain accept/refuse flags, one-per-run black-market credit, learned-move
@@ -193,11 +201,16 @@ export interface SessionSaveData {
    */
   erAchievementRunState?: import("#data/elite-redux/er-achievement-run-state").ErAchievementRunSaveData;
   /**
-   * Stable account pair for co-op resume discovery. The separate local marker is only a fast
-   * pointer; keeping the pair in the save lets the lobby recover the option when that marker is
-   * missing/stale or the save was restored from cloud on another browser. Optional for legacy saves.
+   * Stable account pair plus the authority-seat identity mapping for cold resume. The seat map is
+   * mandatory for resumability: unordered legacy pairs cannot safely survive host/guest reversal.
    */
-  coopParticipants?: { players: [string, string] } | undefined;
+  coopParticipants?:
+    | {
+        version: 1;
+        players: [string, string];
+        seats: { host: string; guest: string };
+      }
+    | undefined;
 }
 
 export interface Unlocks {

@@ -48,15 +48,25 @@ import {
   resetCoopOperationJournalLog,
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
+import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
+  commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
   resetCoopRewardOperationFlag,
   resetCoopRewardOperationState,
+  setCoopRewardAuthorityStateHooksForTest,
   setCoopRewardOperationEnabled,
 } from "#data/elite-redux/coop/coop-reward-operation";
 import { COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
-import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopConnectionState,
+  CoopMessage,
+  CoopRole,
+  CoopTransport,
+} from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { BiomeId } from "#enums/biome-id";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /** Await several microtask turns so the loopback (queueMicrotask) delivery + ACK round-trips settle. */
@@ -102,6 +112,9 @@ function sinkBiomes(): number[] {
 
 describe("W2e-R P0 remediation: the operation<->durability seam mutates (or declines to ACK), never a phantom ACK", () => {
   beforeEach(() => {
+    // Biome and reward apply state are per-runtime (fail-loud without an installed runtime). Install one
+    // op-state for this engine-free realm so both surface records exist.
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState());
     setCoopDurabilityEnabled(true);
     setCoopBiomeOperationEnabled(true);
     setCoopRewardOperationEnabled(true);
@@ -115,6 +128,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
 
   afterEach(() => {
     setCoopOperationDurability(null);
+    setCoopRewardAuthorityStateHooksForTest(null);
     registerCoopOperationLiveSink("op:biome", null);
     registerCoopOperationLiveSink("op:reward", null);
     resetCoopOperationJournalLog();
@@ -123,6 +137,8 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     resetCoopBiomeOperationFlag();
     resetCoopRewardOperationFlag();
     setCoopDurabilityEnabled(true);
+    // Citizenship: clear the installed op-state so the next (--no-isolate) file starts with none installed.
+    setActiveCoopRuntimeOpState(null);
   });
 
   function commitHostOwnedBiome(pinned: number, biomeId: number): void {
@@ -131,10 +147,14 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
       seq: COOP_BIOME_PICK_SEQ_BASE + pinned,
       pinned,
       choice: 0,
-      payload: { biomeId, nodeIndex: 0 } satisfies CoopBiomePickPayload,
+      payload: { sourceBiomeId: 0, biomeId, nodeIndex: 0, nextWave: 12 } satisfies CoopBiomePickPayload,
       localRole: "host",
       wave: 11,
       turn: 0,
+      boundarySourceBiomeId: 0,
+      boundaryNextWave: 12,
+      allowedRoutes: [biomeId],
+      deterministicDestination: null,
     });
   }
 
@@ -155,12 +175,14 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
     setCoopOperationDurability(hostMgr);
 
-    commitHostOwnedBiome(2, 42);
+    commitHostOwnedBiome(2, BiomeId.LABORATORY);
     await flush();
 
     // The op reached the ONE live-mutation seam carrying the ACTUAL biome target (not just sidecar history).
-    expect(sinkSeen, "the journal carrier must route the committed biome op into the live-mutation sink").toEqual([42]);
-    expect(sinkBiomes()).toEqual([42]);
+    expect(sinkSeen, "the journal carrier must route the committed biome op into the live-mutation sink").toEqual([
+      BiomeId.LABORATORY,
+    ]);
+    expect(sinkBiomes()).toEqual([BiomeId.LABORATORY]);
     hostMgr.dispose();
     guestMgr.dispose();
   });
@@ -179,7 +201,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
     setCoopOperationDurability(hostMgr);
 
-    commitHostOwnedBiome(2, 43);
+    commitHostOwnedBiome(2, BiomeId.ISLAND);
     await flush();
 
     expect(hostMgr.unackedCount(), "no materialization means no ACK").toBe(1);
@@ -189,8 +211,11 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     registerCoopOperationLiveSink("op:biome", () => true);
     hostMgr.reconnect();
     await flush();
-    expect(hostMgr.unackedCount(), "the retained op ACKs once materialization recovers").toBe(0);
+    expect(hostMgr.unackedCount(), "material recovery alone cannot release the retained authority").toBe(1);
     expect(guestMgr.appliedMarks()).toEqual({ "op:global": 1 });
+    expect(guestMgr.notifyOperationContinuationSurface("sharedInput", { epoch: 1, wave: 11, turn: 0 })).toBe(1);
+    await flush();
+    expect(hostMgr.unackedCount(), "the exact shared continuation releases the retained op").toBe(0);
     hostMgr.dispose();
     guestMgr.dispose();
   });
@@ -237,6 +262,62 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     guestMgr.dispose();
   });
 
+  it("T2a: rejected N plus retained N+1 coalesces and exhausts without recursive replay ping-pong", async () => {
+    const pair = createLoopbackPair();
+    const scheduled: { callback: () => void; cancelled: boolean }[] = [];
+    const failures: { cls: string; from: number; blockedSeq: number; attempts: number; reason: string }[] = [];
+    let resyncRequests = 0;
+    pair.host.onMessage(message => {
+      if (message.t === "coopResync") {
+        resyncRequests++;
+      }
+    });
+    const hooks: CoopDurabilityHooks = {
+      extractKey: message => (message.t === "waveResolved" ? { cls: "wave", seq: message.wave } : null),
+      apply: () => "rejected",
+      scheduleRecovery: callback => {
+        const timer = { callback, cancelled: false };
+        scheduled.push(timer);
+        return () => {
+          timer.cancelled = true;
+        };
+      },
+      recoveryInitialMs: 1,
+      recoveryMaxMs: 1,
+      recoveryMaxAttempts: 3,
+      recoveryDeadlineMs: 100,
+      onRecoveryExhausted: failure => failures.push(failure),
+    };
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest, hooks);
+
+    // Pre-fix, seq=2's synchronous gap response recursively replayed [1,2] until the process OOMed.
+    expect(hostMgr.commit("wave", 1, { t: "waveResolved", wave: 1, outcome: "win" })).toBe(true);
+    expect(hostMgr.commit("wave", 2, { t: "waveResolved", wave: 2, outcome: "win" })).toBe(true);
+    await flush();
+    expect(resyncRequests, "nested rejection/gap deliveries coalesce behind the in-flight request").toBe(1);
+
+    while (scheduled.some(timer => !timer.cancelled) && failures.length === 0) {
+      const next = scheduled.find(timer => !timer.cancelled)!;
+      next.cancelled = true;
+      next.callback();
+      await flush();
+    }
+
+    expect(failures).toEqual([{ cls: "wave", from: 0, blockedSeq: 2, attempts: 3, reason: "apply-rejected" }]);
+    expect(resyncRequests, "the retry budget is finite and never recursively amplifies").toBe(3);
+    const requestsAtTerminal = resyncRequests;
+    hostMgr.reconnect();
+    await flush();
+    expect(resyncRequests, "the exhausted boundary stays latched until state actually advances").toBe(
+      requestsAtTerminal,
+    );
+    expect(guestMgr.appliedMarks()).toEqual({});
+
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
   it("T2b: a DUPLICATE apply (already consumed) still ACKs, so a resend cannot spin the committer forever", async () => {
     const pair = createLoopbackPair();
     const guestGate = new ChannelGate(pair.guest);
@@ -274,7 +355,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
     setCoopOperationDurability(hostMgr);
 
-    commitHostOwnedBiome(2, 51);
+    commitHostOwnedBiome(2, BiomeId.END);
     await flush();
     // A redundant resend + a reconnect tail re-deliver the SAME committed op - it must NOT re-route.
     hostMgr.reconnect();
@@ -283,7 +364,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     hostMgr.reconnect();
     await flush();
 
-    expect(sinkSeen, "exactly-once routing across resend + reconnect re-deliveries").toEqual([51]);
+    expect(sinkSeen, "exactly-once routing across resend + reconnect re-deliveries").toEqual([BiomeId.END]);
     hostMgr.dispose();
     guestMgr.dispose();
   });
@@ -308,7 +389,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
 
     // The FIRST post-resume producer op must emit revision N+1 (not 1) so the restored receiver ACCEPTS it
     // (pre-fix: the producer restarts at 0 -> emits revision 1 -> the receiver ledger at N drops it as stale).
-    commitHostOwnedBiome(2, 77);
+    commitHostOwnedBiome(2, BiomeId.VOLCANO);
     await flush();
 
     const applied = getCoopOperationJournalApplied();
@@ -317,7 +398,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     expect(
       applied.map(e => (e.pendingOperation?.payload as CoopBiomePickPayload).biomeId),
       "the restored receiver must APPLY the resumed op (not discard it as a stale duplicate)",
-    ).toEqual([77]);
+    ).toEqual([BiomeId.VOLCANO]);
     hostMgr.dispose();
     guestMgr.dispose();
   });
@@ -338,10 +419,33 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     const hostMgr = new CoopDurabilityManager(hostGate);
     const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
     setCoopOperationDurability(hostMgr);
+    setCoopRewardAuthorityStateHooksForTest({
+      capture: () => null,
+      apply: () => true,
+      reapply: () => true,
+    });
 
     const pinned = 4; // even -> host seat (host-owned reward stream)
+    const authoritativeState = (tick: number): CoopAuthoritativeBattleStateV1 => ({
+      version: 1,
+      tick,
+      wave: 11,
+      turn: 0,
+      playerParty: [{ id: 1 }],
+      enemyParty: [],
+      field: [],
+      weather: 0,
+      weatherTurnsLeft: 0,
+      terrain: 0,
+      terrainTurnsLeft: 0,
+      arenaTags: [],
+      money: 1_000 - tick,
+      pokeballCounts: [],
+      playerModifiers: [{ typeId: `reward-${tick}` }],
+      enemyModifiers: [],
+    });
     function commitAction(label: string, choice: number, terminal: boolean): void {
-      commitRewardOwnerIntent({
+      const prepared = commitRewardOwnerIntent({
         surface: "reward",
         pinned,
         label,
@@ -351,6 +455,21 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
         localRole: "host",
         wave: 11,
       } satisfies Parameters<typeof commitRewardOwnerIntent>[0]);
+      expect(prepared, "the typed intent must be retained before host execution").not.toBeNull();
+      if (choice === 0) {
+        expect(
+          commitRewardAuthoritativeResult(prepared!.operationId, {
+            ...authoritativeState(1),
+            tick: 0,
+            playerParty: [],
+          }),
+          "an empty control placeholder must never be journaled as a completed reward",
+        ).toBeNull();
+      }
+      expect(
+        commitRewardAuthoritativeResult(prepared!.operationId, authoritativeState(choice + 1)),
+        "only the complete post-action result may enter the durability journal",
+      ).not.toBeNull();
     }
 
     commitAction("reward", 0, false); // ordinal 0 -> revision 1

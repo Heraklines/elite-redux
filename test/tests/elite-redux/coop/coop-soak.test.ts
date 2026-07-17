@@ -22,8 +22,10 @@
 // =============================================================================
 
 import { initGlobalScene } from "#app/global-scene";
+import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { Stat } from "#enums/stat";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
@@ -68,6 +70,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
   let accuracySpy: MockInstance | undefined;
+  let recoverySpy: MockInstance | undefined;
   // #832 SOAK_PROFILE: "god" (default, byte-identical to today) or "level" (the faint-heavy level-65 party).
   // Resolved once per test in beforeEach so the override party + the coverage assertion agree on it.
   let profile: ReturnType<typeof resolveSoakProfile>;
@@ -138,6 +141,8 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
     setCoopFaintSwitchWaitMs(60_000);
     accuracySpy?.mockRestore();
     accuracySpy = undefined;
+    recoverySpy?.mockRestore();
+    recoverySpy = undefined;
     logs.dispose();
     clearCoopRuntime();
     // #710 harness-citizenship: restore the host GameManager scene (buildDuo builds a 2nd BattleScene).
@@ -271,4 +276,70 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
     },
     SOAK_TEST_TIMEOUT_MS,
   );
+
+  it("retained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery", async () => {
+    const seed = 0xc533a11;
+    const waves = 6;
+    // One deterministic non-party reward is taken only on wave 1. Later shops leave, so the five-battle
+    // TEMP_STAT_STAGE_BOOSTER lifecycle can lapse naturally at each real retained BattleEnd boundary.
+    game.override
+      .startingLevel(SOAK_PROFILES.god.startingLevel)
+      .itemRewards([{ name: "TEMP_STAT_STAGE_BOOSTER", type: Stat.ATK }]);
+    prepareCoopSoakContent(game, seed);
+    await game.classicMode.startBattle(...SOAK_PROFILES.god.species);
+    recoverySpy = vi.spyOn(CoopBattleStreamer.prototype, "requestStateSync");
+
+    const result = await runCoopSoak(game, {
+      seed,
+      waves,
+      logs,
+      profile: "god",
+      fidelity: "production",
+      rewardPolicy: "leave",
+      forceTakeRewardWaves: new Set([1]),
+      capturePostWaveState: true,
+    });
+
+    expect(result.wavesCompleted, "the focused lifecycle crossed every requested battle boundary").toBe(waves);
+    expect(result.findings, "no modifier/save divergence survived a boundary").toEqual([]);
+    expect(result.preHealMismatches, "no mismatch was hidden by the one-heal path").toEqual([]);
+    expect(result.resyncHeals, "the boundary driver never invoked recovery").toBe(0);
+    expect(result.assertions, "the live per-turn checksum never requested a heal").toBe(0);
+    expect(recoverySpy, "the guest never requested a production full-state recovery").not.toHaveBeenCalled();
+    expect(result.postWaveStates.map(state => state.wave)).toEqual([1, 2, 3, 4, 5, 6]);
+
+    const remainingBattles = [5, 4, 3, 2, 1, 0];
+    for (const [index, state] of result.postWaveStates.entries()) {
+      expect(
+        state.retainedWaveTransaction,
+        `wave ${state.wave}: the exact retained WAVE_ADVANCE transaction was staged`,
+      ).not.toBeNull();
+      expect(
+        state.retainedWaveTransaction?.dataApplied,
+        `wave ${state.wave}: BattleEnd applied the immutable authoritative DATA`,
+      ).toBe(true);
+      expect(
+        state.retainedWaveTransaction?.continuationReady,
+        `wave ${state.wave}: the real queued reward UI published continuationReady`,
+      ).toBe(true);
+      expect(state.resyncHeals, `wave ${state.wave}: no earlier boundary recovered`).toBe(0);
+      expect(
+        state.guestPlayerModifiers,
+        `wave ${state.wave}: complete normalized player modifiers equal the host`,
+      ).toEqual(state.hostPlayerModifiers);
+
+      const expected = remainingBattles[index];
+      const hostXAttack = state.hostPlayerModifiers
+        .filter(modifier => modifier.typeId === "TEMP_STAT_STAGE_BOOSTER")
+        .map(modifier => ({ args: modifier.args, stackCount: modifier.stackCount }));
+      expect(
+        hostXAttack,
+        expected > 0
+          ? `wave ${state.wave}: X Attack preserves [stat,maxBattles,battleCount] exactly`
+          : `wave ${state.wave}: X Attack expired instead of surviving with a stale count`,
+      ).toEqual(expected > 0 ? [{ args: [Stat.ATK, 5, expected], stackCount: 1 }] : []);
+    }
+
+    logs.flush();
+  }, 300_000);
 });

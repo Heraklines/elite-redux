@@ -29,15 +29,26 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import { deriveCoopResumeCommitment } from "#data/elite-redux/coop/coop-resume-marker";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { materializeCoopAdoptedEnemyField, materializeCoopLoadedPlayerField } from "#phases/encounter-phase";
+import { PlayerPokemon } from "#field/pokemon";
+import {
+  EncounterPhase,
+  materializeCoopAdoptedEnemyField,
+  materializeCoopLoadedPlayerField,
+} from "#phases/encounter-phase";
 import { ShowTrainerPhase } from "#phases/show-trainer-phase";
 import { GameManager } from "#test/framework/game-manager";
-import { buildDuo, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
+import {
+  buildDuo,
+  installDuoLogCapture,
+  installHeadlessPlayerAtlasCompletionModel,
+  withClient,
+} from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -53,6 +64,14 @@ function serializeHostLaunchSnapshot(hostScene: BattleScene): string {
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+class LaunchPresentationProbePhase extends EncounterPhase {
+  public continuationOpened = false;
+
+  protected override completeEncounterEnd(): void {
+    this.continuationOpened = true;
+  }
 }
 
 describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the host snapshot (#633 M4)", () => {
@@ -161,6 +180,13 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
     await withClient(rig.guestCtx, () => {
       const capacity = rig.guestScene.currentBattle.arrangement.enemyCapacity;
       const enemies = rig.guestScene.getEnemyParty().slice(0, capacity);
+      // TrainerEncounter shows both party-ball trays before the normal SummonPhase hides them. The guest
+      // replaces that mechanics-owning phase with this exact materialization boundary, so require the trays
+      // to be gone synchronously here, before any next intro/Command postcondition could conceal the bug.
+      rig.guestScene.pbTray.setVisible(true);
+      rig.guestScene.pbTray.shown = true;
+      rig.guestScene.pbTrayEnemy.setVisible(true);
+      rig.guestScene.pbTrayEnemy.shown = true;
       for (const enemy of enemies) {
         rig.guestScene.field.remove(enemy, false);
         enemy.setVisible(false);
@@ -171,6 +197,10 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
       expect(materializeCoopAdoptedEnemyField(), "all adopted enemy seats are presentation-materialized").toBe(
         capacity,
       );
+      expect(rig.guestScene.pbTray.shown, "player trainer-intro tray is no longer logically shown").toBe(false);
+      expect(rig.guestScene.pbTray.visible, "player trainer-intro tray is hidden before command").toBe(false);
+      expect(rig.guestScene.pbTrayEnemy.shown, "enemy trainer-intro tray is no longer logically shown").toBe(false);
+      expect(rig.guestScene.pbTrayEnemy.visible, "enemy trainer-intro tray is hidden before command").toBe(false);
       const field = rig.guestScene.getEnemyField(true);
       expect(field, "guest renders every authoritative enemy seat").toHaveLength(capacity);
       for (const [index, enemy] of field.entries()) {
@@ -181,6 +211,187 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
       }
     });
 
+    logs.flush();
+  }, 300_000);
+
+  it("keeps the launch continuation closed until both real player atlases finish loading", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const hostJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    await expect(
+      withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(hostJson)),
+      "guest boots the exact host launch carrier",
+    ).resolves.toBe(true);
+    // Snapshot materialization replaces the guest party objects that buildDuo initially wrapped. Install
+    // the HEADLESS cache-completion model on the reconstructed objects that this launch boundary will load.
+    await withClient(rig.guestCtx, () => installHeadlessPlayerAtlasCompletionModel(rig.guestScene));
+
+    await withClient(rig.guestCtx, async () => {
+      // This proof isolates the atlas/surface prerequisite. EncounterPhase still awaits the real tutorial
+      // prerequisite in production; disable tutorials here so an unrelated UI callback cannot hide whether
+      // the two deferred production loaders are the exact continuation gate under test.
+      rig.guestScene.enableTutorials = false;
+      const capacity = rig.guestScene.currentBattle.arrangement.playerCapacity;
+      const seats = rig.guestScene.getPlayerParty().slice(0, capacity);
+      expect(seats, "the production co-op launch has both active player seats").toHaveLength(2);
+      for (const pokemon of seats) {
+        rig.guestScene.field.remove(pokemon, false);
+        pokemon.setVisible(false);
+        pokemon.getSprite()?.setVisible(false);
+        pokemon.getBattleInfo()?.setVisible(false);
+      }
+
+      const phase = new LaunchPresentationProbePhase(true);
+      const currentPhase = vi.spyOn(rig.guestScene.phaseManager, "getCurrentPhase").mockReturnValue(phase);
+      // buildDuo installs the shared HEADLESS atlas-completion model. This proof delays the two real loaders
+      // but must not wrap TextureManager/AnimationManager a second time: stacking a spy around an existing
+      // spy makes the captured "original" point back at itself and recurses instead of modeling Phaser.
+      const releases: (() => Promise<void>)[] = [];
+      const assetLoads = seats.map(pokemon => {
+        const original = pokemon.loadAssets.bind(pokemon);
+        const key = pokemon.getBattleSpriteKey();
+        return vi.spyOn(pokemon, "loadAssets").mockImplementationOnce(
+          () =>
+            new Promise<void>((resolve, reject) => {
+              releases.push(async () => {
+                try {
+                  await original(false);
+                  const sprite = pokemon.getSprite() as unknown as {
+                    texture: { key: string };
+                    anims: { currentAnim?: { key: string } };
+                  };
+                  sprite.texture.key = key;
+                  sprite.anims.currentAnim = { key };
+                  resolve();
+                } catch (error) {
+                  reject(error);
+                  throw error;
+                }
+              });
+            }),
+        );
+      });
+
+      phase.end();
+      await Promise.resolve();
+      expect(phase.continuationOpened, "placeholder nodes cannot open an actionable command surface").toBe(false);
+      expect(releases, "both active player atlases are part of the same launch gate").toHaveLength(2);
+
+      await releases[0]();
+      expect(phase.continuationOpened, "one loaded seat cannot release a two-seat command surface").toBe(false);
+
+      await releases[1]();
+      await vi.waitFor(() => {
+        expect(phase.continuationOpened, "the encounter shifts only after both real atlases are ready").toBe(true);
+      });
+      for (const [index, pokemon] of seats.entries()) {
+        expect(assetLoads[index], `${pokemon.name} used the production atlas loader`).toHaveBeenCalledWith(false);
+        expect(pokemon.isOnField(), `${pokemon.name} is seated before continuation`).toBe(true);
+        expect(pokemon.getSprite()?.visible, `${pokemon.name} sprite is visible before continuation`).toBe(true);
+        expect(pokemon.getBattleInfo()?.visible, `${pokemon.name} info bar is visible before continuation`).toBe(true);
+        const key = pokemon.getBattleSpriteKey();
+        expect(rig.guestScene.textures.exists(key), `${pokemon.name} real texture cache is resident`).toBe(true);
+        expect(rig.guestScene.anims.exists(key), `${pokemon.name} real animation cache is resident`).toBe(true);
+      }
+      currentPhase.mockRestore();
+    });
+    logs.flush();
+  }, 300_000);
+
+  it("returns false when a parseable launch snapshot fails during session materialization", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const hostJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    const materializer = vi
+      .spyOn(
+        rig.guestScene.gameData as unknown as {
+          initSessionFromData: (data: unknown) => Promise<void>;
+        },
+        "initSessionFromData",
+      )
+      .mockRejectedValueOnce(new Error("asset materialization failed"));
+
+    await expect(
+      withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(hostJson)),
+      "a post-parse failure becomes an explicit negative resume result",
+    ).resolves.toBe(false);
+    expect(materializer).toHaveBeenCalledOnce();
+    materializer.mockRestore();
+    logs.flush();
+  }, 300_000);
+
+  it("rejects wrong-mode, wrong-seat, and digest-swapped snapshots before session mutation", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const hostJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    const parsed = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(hostJson));
+    const commitment = await deriveCoopResumeCommitment(hostJson, parsed);
+    expect(commitment).not.toBeNull();
+    const raw = JSON.parse(hostJson) as Record<string, unknown>;
+
+    const wrongMode = JSON.stringify({ ...raw, gameMode: GameModes.CLASSIC });
+    await expect(
+      withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(wrongMode)),
+      "a parseable solo snapshot cannot cross the co-op adoption boundary",
+    ).resolves.toBe(false);
+
+    const participants = raw.coopParticipants as {
+      version: 1;
+      players: [string, string];
+      seats: { host: string; guest: string };
+    };
+    const wrongSeat = JSON.stringify({
+      ...raw,
+      coopParticipants: { ...participants, seats: { ...participants.seats, guest: "Mallory" } },
+    });
+    await expect(
+      withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(wrongSeat)),
+      "the right pair in the wrong authority seats is rejected",
+    ).resolves.toBe(false);
+
+    const swappedAfterOffer = JSON.stringify({ ...raw, money: Number(raw.money ?? 0) + 1 });
+    await expect(
+      withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(swappedAfterOffer, commitment!)),
+      "bytes changed after the offer cannot satisfy its digest",
+    ).resolves.toBe(false);
+    logs.flush();
+  }, 300_000);
+
+  it("stages assets without mutating the scene when the exact runtime is replaced mid-load", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const hostJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    const moneyBefore = rig.guestScene.money;
+    const partyBefore = rig.guestScene.getPlayerParty().map(pokemon => pokemon.id);
+    let releaseLoad!: () => void;
+    let markLoadStarted!: () => void;
+    const loadStarted = new Promise<void>(resolve => {
+      markLoadStarted = resolve;
+    });
+    const heldLoad = new Promise<void>(resolve => {
+      releaseLoad = resolve;
+    });
+    const loadSpy = vi.spyOn(PlayerPokemon.prototype, "loadAssets").mockImplementationOnce(async () => {
+      markLoadStarted();
+      await heldLoad;
+    });
+
+    const applying = withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(hostJson));
+    await loadStarted;
+    expect(rig.guestScene.money, "money is not committed before staged assets settle").toBe(moneyBefore);
+    expect(
+      rig.guestScene.getPlayerParty().map(pokemon => pokemon.id),
+      "party is not replaced before staged assets settle",
+    ).toEqual(partyBefore);
+    setCoopRuntime(rig.hostRuntime);
+    releaseLoad();
+    await expect(applying, "the stale materialization lease fails closed").resolves.toBe(false);
+    expect(rig.guestScene.money, "stale staged bytes never commit money").toBe(moneyBefore);
+    expect(
+      rig.guestScene.getPlayerParty().map(pokemon => pokemon.id),
+      "stale staged bytes never replace party",
+    ).toEqual(partyBefore);
+    loadSpy.mockRestore();
     logs.flush();
   }, 300_000);
 });

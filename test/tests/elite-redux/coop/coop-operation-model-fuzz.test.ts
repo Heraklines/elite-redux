@@ -51,7 +51,7 @@ function committedRun(epoch: number, count: number): CoopAuthoritativeEnvelopeV1
         kind: "BIOME_PICK",
         owner: i % 2,
         status: "proposed",
-        payload: { biomeId: i % 35, nodeIndex: i % 3 },
+        payload: { sourceBiomeId: (i + 34) % 35, biomeId: i % 35, nodeIndex: i % 3, nextWave: i + 1 },
       },
       { wave: i, turn: 0, logicalPhase: "BIOME_SELECT", authoritativeState: { ...STATE, wave: i } },
       () => ({ ok: true }),

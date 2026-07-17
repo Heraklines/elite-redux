@@ -19,18 +19,28 @@
 // "owner re-send on timeout" safe and convergent: the recovery is at-least-once delivery + exactly-once
 // commit, keyed on the deterministic id. The tests are the enforceable spec of that contract.
 //
-// RESIDUAL (honest, out of this layer): the re-send TRIGGER (the owner re-sending on the relay timeout, or a
-// barrier-level re-request) lives in the surface adapter / interaction relay, not the pure commit log. This
-// suite proves the commit log makes the re-send SAFE + exactly-once; wiring the trigger is a relay/adapter
-// follow-up (noted so the guarantee is not overclaimed).
+// The pure log proves re-send safety; migrated surface adapters own their timer lifecycle. This suite also
+// pins the biome adapter's deterministic repeat/cancel trigger so the first dropped map/crossroads intent
+// cannot leave its guest owner parked forever.
 // =============================================================================
 
+import {
+  armCoopBiomeIntentResend,
+  releaseCoopBiomeCommitReceipt,
+  resetCoopBiomeIntentRetryMs,
+  resetCoopBiomeOperationFlag,
+  resetCoopBiomeOperationState,
+  setCoopBiomeIntentRetryMs,
+  setCoopBiomeOperationEnabled,
+  setCoopBiomeOperationEpoch,
+} from "#data/elite-redux/coop/coop-biome-operation";
 import {
   commitMeOwnerIntent,
   resetCoopMeOperationFlag,
   resetCoopMeOperationState,
   setCoopMeOperationEnabled,
   setCoopMeOperationEpoch,
+  settleCoopMeOwnerIntentRetries,
 } from "#data/elite-redux/coop/coop-me-operation";
 import type {
   CoopLogicalPhase,
@@ -43,9 +53,11 @@ import {
   type CoopCommitContext,
   type CoopIntentValidator,
   CoopOperationHost,
+  createCoopRuntimeOpState,
+  setActiveCoopRuntimeOpState,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** A minimal, complete authoritative DATA plane (§1.2) - the envelope embeds it unchanged. */
 function makeState(wave = 3, turn = 1): CoopAuthoritativeBattleStateV1 {
@@ -90,6 +102,99 @@ const GUEST_OWNER = 1; // an odd seat = guest-owned interaction (guest->host rel
 const PIN = 9_700_100;
 
 describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the deterministic id is committed exactly once", () => {
+  beforeEach(() => {
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState());
+  });
+
+  afterEach(() => {
+    resetCoopBiomeOperationState();
+    setActiveCoopRuntimeOpState(null);
+  });
+
+  it("keeps identical guest proposal retry ids isolated per runtime", async () => {
+    vi.useFakeTimers();
+    const runtimeA = createCoopRuntimeOpState("guest");
+    const runtimeB = createCoopRuntimeOpState("guest");
+    const resendA = vi.fn();
+    const resendB = vi.fn();
+    const params = {
+      kind: "ME_PICK" as const,
+      seq: 8_000_003,
+      pinned: 3,
+      payload: { optionIndex: 1 },
+      localRole: "guest" as const,
+      wave: 12,
+      turn: 0,
+    };
+    try {
+      setCoopMeOperationEnabled(true);
+      setActiveCoopRuntimeOpState(runtimeA);
+      expect(commitMeOwnerIntent({ ...params, resend: resendA })).not.toBeNull();
+
+      setActiveCoopRuntimeOpState(runtimeB);
+      expect(commitMeOwnerIntent({ ...params, resend: resendB })).not.toBeNull();
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(resendA).toHaveBeenCalledOnce();
+      expect(resendB).toHaveBeenCalledOnce();
+
+      setActiveCoopRuntimeOpState(runtimeA);
+      settleCoopMeOwnerIntentRetries();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(resendA, "settling A cancels only A's retry ledger").toHaveBeenCalledOnce();
+      expect(resendB, "B's same deterministic id remains live in B's ledger").toHaveBeenCalledTimes(2);
+    } finally {
+      for (const runtime of [runtimeA, runtimeB]) {
+        setActiveCoopRuntimeOpState(runtime);
+        resetCoopMeOperationState();
+      }
+      resetCoopMeOperationFlag();
+      vi.useRealTimers();
+    }
+  });
+
+  it("the biome adapter repeats one deterministic intent until committed receipt consumption cancels it", async () => {
+    vi.useFakeTimers();
+    setCoopBiomeOperationEnabled(true);
+    resetCoopBiomeOperationState();
+    setCoopBiomeOperationEpoch(EPOCH);
+    setCoopBiomeIntentRetryMs(25);
+    const resend = vi.fn();
+    const operationId = makeCoopOperationId(EPOCH, GUEST_OWNER, PIN, "BIOME_PICK");
+    let current = true;
+    const retry = {
+      operationId,
+      wave: 3,
+      phaseName: "SelectBiomePhase" as const,
+      sessionGeneration: 7,
+      isCurrent: () => current,
+      resend,
+    };
+    try {
+      armCoopBiomeIntentResend(retry);
+      armCoopBiomeIntentResend(retry);
+      await vi.advanceTimersByTimeAsync(60);
+      expect(resend, "the same operation id owns one retry timer, not duplicate loops").toHaveBeenCalledTimes(2);
+
+      releaseCoopBiomeCommitReceipt(operationId);
+      await vi.advanceTimersByTimeAsync(250);
+      expect(resend, "committed materialization stops all further proposal sends").toHaveBeenCalledTimes(2);
+
+      armCoopBiomeIntentResend(retry);
+      current = false;
+      await vi.advanceTimersByTimeAsync(30);
+      expect(resend, "an abandoned phase/session guard cancels before injecting a stale choice").toHaveBeenCalledTimes(
+        2,
+      );
+    } finally {
+      resetCoopBiomeIntentRetryMs();
+      resetCoopBiomeOperationFlag();
+      resetCoopBiomeOperationState();
+      setCoopBiomeOperationEpoch(1);
+      vi.useRealTimers();
+    }
+  });
+
   it("rejects a guest watcher proposal for a host-owned pinned ME without arming a retry", async () => {
     vi.useFakeTimers();
     setCoopMeOperationEnabled(true);
@@ -228,7 +333,7 @@ describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the determinist
       kind: "BIOME_PICK",
       owner: GUEST_OWNER,
       status: "proposed",
-      payload: { biomeId: 0, nodeIndex: 0 },
+      payload: { sourceBiomeId: 1, biomeId: 0, nodeIndex: 0, nextWave: 4 },
     };
     expect(host.submit(defaultOp, ctx, ACCEPT).kind).toBe("committed");
     expect(host.getRevision()).toBe(1);
@@ -240,7 +345,7 @@ describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the determinist
       kind: "BIOME_PICK",
       owner: GUEST_OWNER,
       status: "proposed",
-      payload: { biomeId: 42, nodeIndex: 0 },
+      payload: { sourceBiomeId: 1, biomeId: 42, nodeIndex: 0, nextWave: 4 },
     };
     expect(host.submit(realOp, ctx, ACCEPT).kind).toBe("reack");
     expect(host.getRevision()).toBe(1);

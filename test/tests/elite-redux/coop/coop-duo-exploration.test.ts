@@ -41,7 +41,6 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { BiomeShopPhase, setCoopBiomeMarketTestSkip } from "#phases/biome-shop-phase";
 import { ErAbilityCapsulePhase } from "#phases/er-ability-capsule-phase";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -53,12 +52,15 @@ import {
   forceItemRewards,
   haltQueueAfterCurrent,
   installDuoLogCapture,
+  pumpDuoDestinations,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   stubBattleInfo,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import { PartyOption } from "#ui/party-ui-handler";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -103,6 +105,13 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     initGlobalScene(game.scene);
   });
 
+  function liveBiomeShop(): BiomeShopPhase {
+    const phase = new BiomeShopPhase();
+    (phase as unknown as { coopBoundaryStillLive(generation: number, wave: number): boolean }).coopBoundaryStillLive =
+      () => true;
+    return phase;
+  }
+
   function wireGuestCommand(rig: DuoRig): void {
     rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
       command: Command.FIGHT,
@@ -116,7 +125,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
 
@@ -201,7 +210,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     expect(hostShop.phaseName).toBe("SelectModifierPhase");
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
 
     // The unlockable innate slot must be computed on the TARGET mon before the pick (fresh
     // harness mons have no candy unlocks, so every registered innate slot is run-unlockable).
@@ -251,6 +260,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       }
       return true;
     });
+    await pumpDuoDestinations(rig);
     expect(watcherDrove, "the watcher capsule phase ran (directly or via fallback)").toBe(true);
     expect(
       guestTarget.customPokemonData.erRunUnlockedAbilitySlots,
@@ -267,7 +277,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
   it("PROBE #673: the biome market alternates - owner buys relay, watcher applies verbatim, counters advance", async () => {
     setCoopBiomeMarketTestSkip(false); // this probe drives the REAL co-op market
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
 
@@ -276,6 +286,9 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     await withClient(rig.guestCtx, async () => {
       await driveGuestReplayTurn(rig.guestScene, turn);
     });
+    // From the market boundary onward, deliver every frame only while its destination client context is
+    // installed. Boot and battle stay automatic so this focused probe pays no unrelated scheduling cost.
+    pair.setAutomaticDelivery(false);
 
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostModsBefore = rig.hostScene.modifiers.length;
@@ -283,11 +296,21 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     const waiveBefore = Overrides.WAIVE_ROLL_FEE_OVERRIDE;
     Overrides.WAIVE_ROLL_FEE_OVERRIDE = true; // wave-1 money cannot afford market goods
 
-    // OWNER (host, counter parity 0): drive the REAL market - buy ONE non-party item, then leave.
+    // OWNER (host, counter parity 0): drive the REAL market - buy ONE non-party item, then leave. The
+    // market has a reciprocal rendezvous, so stage BOTH real phases before expecting either to complete.
     let boughtTypeId = "";
+    let ownerDone = false;
+    let watcherDone = false;
+    let restoreHostUi: (() => void) | null = null;
     try {
       await withClient(rig.hostCtx, async () => {
-        const phase = new BiomeShopPhase();
+        const phase = liveBiomeShop();
+        const ownerSeam = phase as unknown as { end: () => void };
+        const realOwnerEnd = ownerSeam.end.bind(phase);
+        ownerSeam.end = () => {
+          ownerDone = true;
+          realOwnerEnd();
+        };
         // The leave-confirm path first hides the shop backdrop via real UI handler calls the
         // headless mock cannot service - neutralize it (purely cosmetic; the flow continues).
         (phase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
@@ -304,14 +327,25 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         };
         const ui = globalScene.ui as unknown as {
           setMode: (...args: unknown[]) => unknown;
+          setModeBoundedWhen: (...args: unknown[]) => Promise<"completed" | "forced" | "superseded">;
           setModeWithoutClear: (...args: unknown[]) => unknown;
           setOverlayMode: (...args: unknown[]) => unknown;
           showText: (...args: unknown[]) => unknown;
         };
         const realSetMode = ui.setMode.bind(ui);
+        const realSetModeBoundedWhen = ui.setModeBoundedWhen.bind(ui);
         const realSetModeWC = ui.setModeWithoutClear.bind(ui);
         const realSetOverlay = ui.setOverlayMode.bind(ui);
         const realShowText = ui.showText.bind(ui);
+        let bought = false;
+        restoreHostUi = () => {
+          uiAny.getHandler = realGetHandler;
+          ui.setMode = realSetMode;
+          ui.setModeBoundedWhen = realSetModeBoundedWhen;
+          ui.setModeWithoutClear = realSetModeWC;
+          ui.setOverlayMode = realSetOverlay;
+          ui.showText = realShowText;
+        };
         // Party-target market goods open the party menu via setModeWithoutClear - auto-pick slot 0.
         ui.setModeWithoutClear = (...args: unknown[]): unknown => {
           if (args[0] === UiMode.PARTY) {
@@ -320,11 +354,8 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
           }
           return Promise.resolve(true);
         };
-        ui.setMode = (...args: unknown[]): unknown => {
-          if (args[0] === UiMode.BIOME_SHOP) {
-            const options = args[1] as { type?: { id?: string } }[];
-            // Signature: (BIOME_SHOP, shopOptions, biomeId, onSelect, qtys) - the callback is [3].
-            const cb = args[3] as (index: number) => boolean;
+        const driveBiomeShop = (options: { type?: { id?: string } }[], cb: (index: number) => boolean): void => {
+          if (!bought) {
             // Buy a KNOWN NON-party item (balls/lures apply directly, no party sub-menu) so the
             // probe stays deterministic; the relay path is identical for party-target goods.
             // LURE: non-party AND lands in scene.modifiers (balls only bump the ball inventory,
@@ -334,10 +365,18 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
               idx = options.findIndex(o => o?.type != null);
             }
             boughtTypeId = options[idx]?.type?.id ?? "";
+            bought = true;
+            // A paid non-party purchase keeps the same public grid open. Issue the leave click on the
+            // next task only after the buy callback has synchronously applied and retained its result.
             queueMicrotask(() => {
               cb(idx);
-              queueMicrotask(() => cb(-1)); // leave after the buy resolves
+              setTimeout(() => cb(-1), 0);
             });
+          }
+        };
+        ui.setMode = (...args: unknown[]): unknown => {
+          if (args[0] === UiMode.BIOME_SHOP) {
+            driveBiomeShop(args[1] as { type?: { id?: string } }[], args[3] as (index: number) => boolean);
             return Promise.resolve(true);
           }
           if (args[0] === UiMode.PARTY) {
@@ -345,7 +384,25 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
             cb(0, 0);
             return Promise.resolve(true);
           }
+          if (args[0] === UiMode.CONFIRM) {
+            (args[1] as () => void)(); // co-op uses bounded base-mode confirm, not an overlay
+            return Promise.resolve(true);
+          }
           return Promise.resolve(true);
+        };
+        ui.setModeBoundedWhen = (...args: unknown[]): Promise<"completed" | "superseded"> => {
+          const stillLive = args[2] as (() => boolean) | undefined;
+          if (!(stillLive?.() ?? true)) {
+            return Promise.resolve("superseded");
+          }
+          if (args[0] === UiMode.BIOME_SHOP) {
+            // Production co-op opens the market only through the bounded transition seam:
+            // mode, timeout, liveness fence, stock, biome, public selection callback, quantities.
+            driveBiomeShop(args[3] as { type?: { id?: string } }[], args[5] as (index: number) => boolean);
+          } else if (args[0] === UiMode.CONFIRM) {
+            queueMicrotask(args[3] as () => void); // YES: leave the market
+          }
+          return Promise.resolve("completed");
         };
         ui.showText = (...args: unknown[]): unknown => {
           const cb = args[2] as (() => void) | undefined;
@@ -359,36 +416,44 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
           }
           return realSetOverlay(...args);
         };
-        try {
-          haltQueueAfterCurrent();
-          phase.start();
-          for (let i = 0; i < 16; i++) {
-            await drainLoopback();
-          }
-        } finally {
-          ui.setMode = realSetMode;
-          ui.setModeWithoutClear = realSetModeWC;
-          ui.setOverlayMode = realSetOverlay;
-          ui.showText = realShowText;
-        }
+        haltQueueAfterCurrent();
+        phase.start();
+        await drainLoopback();
       });
+
+      await withClient(rig.guestCtx, async () => {
+        const phase = liveBiomeShop();
+        const watcherSeam = phase as unknown as { end: () => void };
+        const realWatcherEnd = watcherSeam.end.bind(phase);
+        watcherSeam.end = () => {
+          watcherDone = true;
+          realWatcherEnd();
+        };
+        haltQueueAfterCurrent();
+        phase.start();
+        await drainLoopback();
+      });
+
+      for (let i = 0; i < 40 && (!ownerDone || !watcherDone); i++) {
+        await withClient(rig.hostCtx, () => drainLoopback());
+        await withClient(rig.guestCtx, () => drainLoopback());
+      }
+      await pumpDuoDestinations(rig);
     } finally {
+      if (restoreHostUi != null) {
+        await withClient(rig.hostCtx, () => restoreHostUi!());
+      }
       Overrides.WAIVE_ROLL_FEE_OVERRIDE = waiveBefore;
     }
+    expect(ownerDone, "OWNER completed the reciprocal market rendezvous").toBe(true);
+    expect(watcherDone, "WATCHER applied the terminal and completed").toBe(true);
     expect(rig.hostScene.modifiers.length, "OWNER bought exactly one market item").toBe(hostModsBefore + 1);
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the market interaction").toBe(
       counterBefore + 1,
     );
 
-    // WATCHER (guest): its market phase adopts the streamed stock + applies the buffered buy + leave.
-    await withClient(rig.guestCtx, async () => {
-      const phase = new BiomeShopPhase();
-      haltQueueAfterCurrent();
-      phase.start();
-      for (let i = 0; i < 16; i++) {
-        await drainLoopback();
-      }
-    });
+    // WATCHER adopted the streamed stock and applied the retained buy + leave while the two real phases
+    // were alternately pumped above.
     expect(rig.guestScene.modifiers.length, "WATCHER applied the same buy (one new modifier)").toBe(
       guestModsBefore + 1,
     );
@@ -427,7 +492,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     // OWNER opens the market + streams the stock but does NOT leave yet (the watcher must PARK).
     let leaveCb: ((index: number) => boolean) | null = null;
     await withClient(rig.hostCtx, async () => {
-      const phase = new BiomeShopPhase();
+      const phase = liveBiomeShop();
       (phase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
       const ui = globalScene.ui as unknown as {
         setMode: (...args: unknown[]) => unknown;
@@ -437,6 +502,8 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       ui.setMode = (...args: unknown[]): unknown => {
         if (args[0] === UiMode.BIOME_SHOP) {
           leaveCb = args[3] as (index: number) => boolean;
+        } else if (args[0] === UiMode.CONFIRM) {
+          (args[1] as () => void)();
         }
         return Promise.resolve(true);
       };
@@ -461,7 +528,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     // WATCHER parks mid-market (stock adopted, no buys yet), then the resync sweep fires.
     let watchDone = false;
     await withClient(rig.guestCtx, async () => {
-      const phase = new BiomeShopPhase();
+      const phase = liveBiomeShop();
       haltQueueAfterCurrent();
       const seamEnd = phase as unknown as { end: () => void };
       const realEnd = seamEnd.end.bind(phase);
@@ -584,7 +651,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.EXPLOSION, 0);
         game.move.select(MoveId.SPLASH, 1);
-        await game.phaseInterceptor.to("TurnEndPhase");
+        await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
       const f0 = rig.hostScene.getPlayerField()[0];
       const f1 = rig.hostScene.getPlayerField()[1];
@@ -640,10 +707,25 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       withClientSync(rig.guestCtx, () => {
         const g0 = rig.guestScene.getPlayerField()[0];
         const g1 = rig.guestScene.getPlayerField()[1];
+        expect(
+          rig.guestScene.getPlayerParty().map(mon => mon.id),
+          "double replacement preserves the host's exact authoritative party order",
+        ).toEqual(rig.hostScene.getPlayerParty().map(mon => mon.id));
         expect(g0?.species.speciesId, "guest materialized slot 0 (LAPRAS)").toBe(SpeciesId.LAPRAS);
         expect(g1?.species.speciesId, "guest materialized slot 1 (CHARIZARD)").toBe(SpeciesId.CHARIZARD);
         expect(g0?.isFainted(), "guest slot 0 battle-ready").toBe(false);
         expect(g1?.isFainted(), "guest slot 1 battle-ready").toBe(false);
+        expect(g0?.getBattlerIndex(), "first replacement retained authoritative seat 0").toBe(0);
+        expect(g1?.getBattlerIndex(), "second replacement retained authoritative seat 1").toBe(1);
+        for (const [slot, mon] of [g0, g1].entries()) {
+          expect(
+            mon == null ? -1 : rig.guestScene.field.getIndex(mon),
+            `replacement ${slot} is a real field-container member`,
+          ).toBeGreaterThanOrEqual(0);
+          expect(mon?.visible, `replacement ${slot} container is visible`).toBe(true);
+          expect(mon?.getSprite()?.visible, `replacement ${slot} sprite is visible`).toBe(true);
+          expect(mon?.getBattleInfo()?.visible, `replacement ${slot} UI bar is visible`).toBe(true);
+        }
       });
     } finally {
       setCoopFaintSwitchWaitMs(60_000);
@@ -1020,6 +1102,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         await drainLoopback();
       }
     });
+    await pumpDuoDestinations(rig);
     expect(watchDone, "watcher converged and ended").toBe(true);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the bargain interaction").toBe(
       counterBefore + 1,

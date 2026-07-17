@@ -31,6 +31,7 @@ export class ConfirmUiHandler extends AbstractOptionSelectUiHandler {
       const config: OptionSelectConfig = {
         options: [
           {
+            semanticId: "summary",
             label: i18next.t("partyUiHandler:summary"),
             handler: () => {
               args[0]();
@@ -38,6 +39,7 @@ export class ConfirmUiHandler extends AbstractOptionSelectUiHandler {
             },
           },
           {
+            semanticId: "pokedex",
             label: i18next.t("partyUiHandler:pokedex"),
             handler: () => {
               args[1]();
@@ -45,6 +47,7 @@ export class ConfirmUiHandler extends AbstractOptionSelectUiHandler {
             },
           },
           {
+            semanticId: "yes",
             label: i18next.t("menu:yes"),
             handler: () => {
               args[2]();
@@ -52,6 +55,7 @@ export class ConfirmUiHandler extends AbstractOptionSelectUiHandler {
             },
           },
           {
+            semanticId: "no",
             label: i18next.t("menu:no"),
             handler: () => {
               args[3]();
@@ -78,6 +82,7 @@ export class ConfirmUiHandler extends AbstractOptionSelectUiHandler {
       const config: OptionSelectConfig = {
         options: [
           {
+            semanticId: "yes",
             label: i18next.t("menu:yes"),
             handler: () => {
               args[0]();
@@ -85,6 +90,7 @@ export class ConfirmUiHandler extends AbstractOptionSelectUiHandler {
             },
           },
           {
+            semanticId: "no",
             label: i18next.t("menu:no"),
             handler: () => {
               args[1]();

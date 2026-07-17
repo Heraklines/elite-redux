@@ -9,6 +9,10 @@ export class NextEncounterPhase extends EncounterPhase {
   public readonly phaseName = "NextEncounterPhase";
 
   protected override doEncounter(): void {
+    // This phase owns a two-second tween. A shared terminal/rejoin failure can tear down the battle while
+    // that callback is still pending; retain the exact battle identity so stale presentation work cannot
+    // mutate a replacement run or dereference the cleared scene after co-op has already failed closed.
+    const battle = globalScene.currentBattle;
     globalScene.playBgm(undefined, true);
 
     // Reset all player transient wave data/intel before starting a new wild encounter.
@@ -27,7 +31,7 @@ export class NextEncounterPhase extends EncounterPhase {
     const moveTargets: any[] = [
       globalScene.arenaEnemy,
       globalScene.arenaNextEnemy,
-      globalScene.currentBattle.trainer,
+      battle.trainer,
       enemyField,
       globalScene.lastEnemyTrainer,
     ];
@@ -35,7 +39,7 @@ export class NextEncounterPhase extends EncounterPhase {
     if (lastEncounterVisuals) {
       moveTargets.push(lastEncounterVisuals);
     }
-    const nextEncounterVisuals = globalScene.currentBattle.mysteryEncounter?.introVisuals;
+    const nextEncounterVisuals = battle.mysteryEncounter?.introVisuals;
     if (nextEncounterVisuals) {
       const enterFromRight = nextEncounterVisuals.enterFromRight;
       if (enterFromRight) {
@@ -55,6 +59,9 @@ export class NextEncounterPhase extends EncounterPhase {
       x: "+=300",
       duration: 2000,
       onComplete: () => {
+        if (globalScene.currentBattle !== battle || globalScene.phaseManager.getCurrentPhase() !== this) {
+          return;
+        }
         globalScene.arenaEnemy.setBiome(globalScene.arena.biomeId);
         globalScene.arenaEnemy.setX(globalScene.arenaNextEnemy.x);
         globalScene.arenaEnemy.setAlpha(1);
@@ -68,7 +75,7 @@ export class NextEncounterPhase extends EncounterPhase {
           globalScene.lastMysteryEncounter!.introVisuals = undefined;
         }
 
-        if (globalScene.currentBattle.isClassicFinalBoss) {
+        if (battle.isClassicFinalBoss) {
           this.displayFinalBossDialogue();
         } else {
           this.doEncounterCommon();

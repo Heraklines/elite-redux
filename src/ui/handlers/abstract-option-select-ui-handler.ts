@@ -17,9 +17,16 @@ export interface OptionSelectConfig {
   delay?: number;
   noCancel?: boolean;
   supportHover?: boolean;
+  /** Initial cursor in the selectable (non-skipped) option list. */
+  initialCursor?: number;
 }
 
 export interface OptionSelectItem {
+  /**
+   * Stable, locale-independent identity for automation and accessibility projections.
+   * Presentation text must never be used as an authoritative option identity.
+   */
+  semanticId?: string;
   label: string;
   handler: () => boolean;
   onHover?: () => void;
@@ -44,6 +51,9 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
   protected config: OptionSelectConfig | null;
 
   protected blockInput: boolean;
+
+  /** Monotonic identity for each visible option surface opened by this handler instance. */
+  private surfaceGeneration = 0;
 
   protected scrollCursor = 0;
   protected fullCursor = 0;
@@ -198,6 +208,7 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
 
     this.config = args[0] as OptionSelectConfig;
     this.blockInput = false;
+    this.surfaceGeneration += 1;
     this.setupOptions();
 
     globalScene.ui.bringToTop(this.optionSelectContainer);
@@ -205,7 +216,8 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
     this.optionSelectContainer.setVisible(true);
     this.scrollCursor = 0;
     this.fullCursor = 0;
-    this.setCursor(0);
+    const initialCursor = Math.max(0, Math.min(this.config.initialCursor ?? 0, this.unskippedIndices.length - 1));
+    this.setCursor(initialCursor);
 
     if (this.config.delay) {
       this.blockInput = true;
@@ -322,6 +334,16 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
     this.blockInput = false;
     this.optionSelectTextContainer.setAlpha(1);
     this.cursorObj?.setAlpha(1);
+  }
+
+  /** Read-only readiness used by semantic/browser observers; never bypasses the input delay. */
+  isInputBlocked(): boolean {
+    return this.blockInput;
+  }
+
+  /** Distinguishes repeated option/confirmation surfaces within one long-lived game phase. */
+  getSurfaceGeneration(): number {
+    return this.surfaceGeneration;
   }
 
   getOptionsWithScroll(): OptionSelectItem[] {

@@ -24,9 +24,11 @@
 // =============================================================================
 
 import { planErCustomTrainerLaunch, summarizeErCustomTrainer } from "#app/dev-tools/test-suite/custom-trainer-picker";
+import { applyPreparedGhostHeldItems, translatePreparedGhostLevels } from "#app/dev-tools/test-suite/scenarios";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import {
+  applyErCustomTrainerDisplayName,
   applyErCustomTrainerPresentation,
   buildErCustomTrainerMember,
   clearErCustomTrainerDevForce,
@@ -61,11 +63,15 @@ import {
 } from "#data/elite-redux/er-custom-trainers";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
+import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { TrainerSlot } from "#enums/trainer-slot";
+import { TrainerVariant } from "#enums/trainer-variant";
 import type { Trainer } from "#field/trainer";
+import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -213,6 +219,78 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     const keys = resolved.map(t => t.key).sort();
     expect(keys).toEqual(["ACE_RICO", "ENDLESS_T", "GHOST_ONLY", "HARDCORE_ONLY", "HELL_BOSS"]);
     expect(keys).not.toContain("BROKEN");
+  });
+
+  it("uses the same wave cap for scenario construction and live EXP progression", () => {
+    expect(globalScene.gameMode.getMaxExpLevelForWave(3)).toBe(10);
+    expect(globalScene.gameMode.getMaxExpLevelForWave(153)).toBe(150);
+  });
+
+  it("preserves every sampled ghost member's level gap", () => {
+    const members = [164, 161, 150].map(level => ({ level }));
+    expect(translatePreparedGhostLevels(members, 150)).toEqual([150, 147, 136]);
+  });
+
+  it("renders an authored title before a named trainer class", () => {
+    const namedTrainer = {
+      config: {
+        title: "Gym Leader",
+        getTitle: () => "Sabrina",
+      },
+      variant: TrainerVariant.DEFAULT,
+      name: "",
+      partnerName: "",
+    } as unknown as Trainer;
+
+    applyErCustomTrainerDisplayName(namedTrainer, "Leader");
+
+    expect(namedTrainer.getName(TrainerSlot.NONE, false)).toBe("Sabrina");
+    expect(namedTrainer.getName(TrainerSlot.NONE, true)).toBe("Leader Sabrina");
+  });
+
+  it("keeps generic trainer classes on their normal naming path", () => {
+    const genericTrainer = {
+      config: { title: undefined },
+      name: "",
+    } as unknown as Trainer;
+
+    applyErCustomTrainerDisplayName(genericTrainer, "Calvin");
+
+    expect(genericTrainer.name).toBe("Calvin");
+    expect(Object.hasOwn(genericTrainer, "getName")).toBe(false);
+  });
+
+  it("restores sampled ghost held items with their stack counts", () => {
+    const mon = globalScene.getPlayerParty()[0];
+    const applied = applyPreparedGhostHeldItems(
+      [mon],
+      [
+        {
+          speciesId: mon.species.speciesId,
+          formIndex: mon.formIndex,
+          abilityIndex: mon.abilityIndex,
+          ivs: [...mon.ivs],
+          nature: mon.nature,
+          level: mon.level,
+          gender: mon.gender,
+          shiny: mon.shiny,
+          variant: mon.variant,
+          passive: mon.passive,
+          moves: mon.moveset.map(move => move.moveId),
+          heldItems: [
+            ["LEFTOVERS", 2],
+            ["REMOVED_ITEM", 9],
+          ],
+        },
+      ],
+    );
+
+    const held = globalScene.findModifiers(
+      modifier => modifier instanceof PokemonHeldItemModifier && modifier.pokemonId === mon.id,
+      true,
+    ) as PokemonHeldItemModifier[];
+    expect(applied).toBe(1);
+    expect(held.map(item => [item.type.id, item.stackCount])).toContainEqual(["LEFTOVERS", 2]);
   });
 
   it("gates by difficulty: hell-only trainer never appears on ace, appears once on hell", () => {
@@ -622,7 +700,11 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
 
     // Force-adjusts difficulty to the trainer's first, and picks wave 31: minWave
     // 30 is a boss wave (%10) so it is skipped; 31 is in range, not boss, not fixed.
-    const hell = planErCustomTrainerLaunch(byKey.get("HELLGUY")!, () => false);
+    const hell = planErCustomTrainerLaunch(
+      byKey.get("HELLGUY")!,
+      () => false,
+      () => 0,
+    );
     expect(hell.ok).toBe(true);
     if (hell.ok) {
       expect(hell.plan.difficulty).toBe("hell");
@@ -638,7 +720,11 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     }
 
     // Injected fixed-battle predicate is honored: wave 31 marked fixed -> slides to 32.
-    const hellFixed = planErCustomTrainerLaunch(byKey.get("HELLGUY")!, w => w === 30 || w === 31);
+    const hellFixed = planErCustomTrainerLaunch(
+      byKey.get("HELLGUY")!,
+      w => w === 30 || w === 31,
+      () => 0,
+    );
     expect(hellFixed.ok).toBe(true);
     if (hellFixed.ok) {
       expect(hellFixed.plan.wave).toBe(32);
@@ -687,6 +773,53 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // Fusion constructed on the enemy side.
     expect(enemy!.isFusion()).toBe(true);
     expect(enemy!.fusionSpecies?.speciesId).toBe(SpeciesId.RAYQUAZA);
+  });
+
+  it("applies Insanity abilities only to the spawned enemy instance", () => {
+    setErCustomTrainersForTesting({
+      INSANITY_TEST: {
+        id: 70007,
+        name: "Insanity Test",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [
+          {
+            species: SpeciesId.SNORLAX,
+            abilitySlot: 0,
+            insanity: {
+              ability: AbilityId.DRIZZLE,
+              innates: [AbilityId.STURDY, AbilityId.MOXIE, AbilityId.SPEED_BOOST],
+            },
+          },
+        ],
+      },
+    } as never);
+    const member = getErCustomTrainers()[0].members[0];
+    const enemy = buildErCustomTrainerMember(member, 0, 50, false)!;
+
+    expect(enemy.getAbility().id).toBe(AbilityId.DRIZZLE);
+    expect(
+      enemy
+        .getPassiveAbilities()
+        .slice(0, 3)
+        .map(ability => ability?.id ?? AbilityId.NONE),
+    ).toEqual([AbilityId.STURDY, AbilityId.MOXIE, AbilityId.SPEED_BOOST]);
+
+    // The shared species/form still reports its original kit. A second spawn of
+    // the same resolved member with Insanity removed also gets that normal kit.
+    const speciesActive = enemy.species.getAbility(enemy.abilityIndex);
+    const speciesInnates = enemy.species.getPassiveAbilities(enemy.formIndex);
+    expect(speciesActive).not.toBe(AbilityId.DRIZZLE);
+    expect(speciesInnates).not.toEqual([AbilityId.STURDY, AbilityId.MOXIE, AbilityId.SPEED_BOOST]);
+
+    const normal = buildErCustomTrainerMember({ ...member, insanity: null }, 1, 50, false)!;
+    expect(normal.getAbility().id).toBe(speciesActive);
+    expect(
+      normal
+        .getPassiveAbilities()
+        .slice(0, 3)
+        .map(ability => ability?.id ?? AbilityId.NONE),
+    ).toEqual(speciesInnates);
   });
 
   it("battleBgm normalizes: valid key kept, garbage/absent -> '' (no override)", () => {

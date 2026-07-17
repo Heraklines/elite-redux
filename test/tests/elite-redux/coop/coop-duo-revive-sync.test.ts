@@ -32,7 +32,6 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -44,6 +43,7 @@ import {
   forceItemRewards,
   installCoopResyncProbe,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
@@ -111,7 +111,7 @@ describe.skipIf(!RUN)("co-op DUO revive-in-shop: a Revive on a fainted bench mon
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
 
@@ -154,7 +154,7 @@ describe.skipIf(!RUN)("co-op DUO revive-in-shop: a Revive on a fainted bench mon
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
 
     // OWNER (host) picks the REVIVE onto the fainted bench slot; WATCHER (guest) mirrors the relayed pick.
     await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot: REVIVE_SLOT }));

@@ -123,6 +123,27 @@ describe("co-op alternating-interaction relay (#633)", () => {
     expect(await awaited).toBeNull();
   });
 
+  it("routes same-pin reward choices only to their exact ordered Mystery surface", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopInteractionRelay(host);
+    const watcher = new CoopInteractionRelay(guest);
+    const firstSurface = { surfaceId: "modifier:me:graves:0", ordinal: 0 } as const;
+    const secondSurface = { surfaceId: "modifier:me:graves:1", ordinal: 1 } as const;
+
+    owner.sendInteractionChoice(12, "reward", COOP_INTERACTION_LEAVE, undefined, firstSurface);
+    owner.sendInteractionChoice(12, "reward", 0, [0], secondSurface);
+    await Promise.resolve();
+
+    expect(
+      await watcher.awaitInteractionChoice(12, 1000, ["reward"], secondSurface),
+      "surface B skips a buffered surface-A terminal even though seq and kind match",
+    ).toMatchObject({ choice: 0, rewardSurface: secondSurface });
+    expect(await watcher.awaitInteractionChoice(12, 1000, ["reward"], firstSurface)).toMatchObject({
+      choice: COOP_INTERACTION_LEAVE,
+      rewardSurface: firstSurface,
+    });
+  });
+
   // Fix #2 (#633): the OWNER host-streams its rolled reward-option list so the WATCHER
   // rebuilds it instead of re-rolling (party luck would diverge the pools + the RNG cursor).
   describe("reward-option streaming (#633 Fix #2)", () => {
@@ -189,6 +210,63 @@ describe("co-op alternating-interaction relay (#633)", () => {
       // Owner streams the reroll-0 list; the watcher is waiting on reroll 1.
       owner.sendRewardOptions(7, 0, options);
       const awaited = watcher.awaitRewardOptions(7, 1, 1000);
+      await new Promise(r => setTimeout(r, 0));
+      timer.fire?.();
+      expect(await awaited).toBeNull();
+    });
+
+    it("does not alias two ordered ME surfaces at the same seq and reroll", async () => {
+      const { host, guest } = createLoopbackPair();
+      const owner = new CoopInteractionRelay(host);
+      const timer: { fire?: () => void } = {};
+      const watcher = new CoopInteractionRelay(guest, {
+        schedule: cb => {
+          timer.fire = cb;
+          return () => {};
+        },
+      });
+      const firstSurface = { surfaceId: "modifier:me:graves:0", ordinal: 0 } as const;
+      const secondSurface = { surfaceId: "modifier:me:graves:1", ordinal: 1 } as const;
+
+      owner.sendRewardOptions(7, 0, options, firstSurface);
+      await new Promise(r => setTimeout(r, 0));
+      const wrongSurface = watcher.awaitRewardOptions(7, 0, 1000, secondSurface);
+      timer.fire?.();
+      expect(await wrongSurface).toBeNull();
+      expect(await watcher.awaitRewardOptions(7, 0, 1000, firstSurface)).toEqual(options);
+    });
+
+    it("returns the exact ordered surface key when a reconnect installs its listener after buffering", async () => {
+      const { host, guest } = createLoopbackPair();
+      const owner = new CoopInteractionRelay(host);
+      const watcher = new CoopInteractionRelay(guest);
+      const rewardSurface = { surfaceId: "modifier:me:graves:0", ordinal: 0 } as const;
+
+      owner.sendRewardOptions(7, 0, options, rewardSurface);
+      await new Promise(r => setTimeout(r, 0));
+
+      expect(watcher.bufferedRewardOptionsKeyFor("7:")).toBe("7:0:0:modifier%3Ame%3Agraves%3A0");
+    });
+
+    it("drops a malformed ordered surface before it can satisfy an option waiter", async () => {
+      const { host, guest } = createLoopbackPair();
+      const timer: { fire?: () => void } = {};
+      const watcher = new CoopInteractionRelay(guest, {
+        schedule: cb => {
+          timer.fire = cb;
+          return () => {};
+        },
+      });
+      const expectedSurface = { surfaceId: "modifier:me:graves:0", ordinal: 0 } as const;
+      const awaited = watcher.awaitRewardOptions(7, 0, 1000, expectedSurface);
+
+      host.send({
+        t: "rewardOptions",
+        seq: 7,
+        reroll: 0,
+        options,
+        rewardSurface: { surfaceId: "Modifier 0", ordinal: 0 },
+      });
       await new Promise(r => setTimeout(r, 0));
       timer.fire?.();
       expect(await awaited).toBeNull();

@@ -373,6 +373,8 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
   it("er id 772 (Relentless) appends the 1.25× statused-foe damage boost", () => {
     const res = dispatchArchetype("composite-vanilla-mashup", { parts: ["Exploit Weakness", "Merciless"] }, 772);
     expect(res.skipReason).toBeNull();
+    // Exploit Weakness (284) now wires the real defensive-stat swap primitive
+    // (the archetype alias subclasses LowerDefensiveStatVsStatusedFoeAbAttr).
     expect(res.attrs.some(a => a.constructor.name === "DefenseStatSwapOnStatusedFoeAbAttr")).toBe(true);
     expect(res.attrs.some(a => a.constructor.name === "ConditionalCritAbAttr")).toBe(true);
     expect(res.attrs.some(a => a.constructor.name === "MovePowerBoostAbAttr")).toBe(true);
@@ -1632,11 +1634,13 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.attrs.filter(a => a.constructor.name === "ChanceBattlerTagOnAttackAbAttr")).toHaveLength(1);
   });
 
-  it("er id 344 (Poison Absorb) wires TypeAbsorbHeal(Poison) + terrain-gated PassiveRecovery", () => {
-    // Audit-fix: absorb-heal ✓; added the "heal 1/8 on Toxic Terrain" half.
+  it("er id 344 (Poison Absorb) wires RedirectTypeMove(Poison) + TypeAbsorbHeal(Poison) + terrain-gated PassiveRecovery", () => {
+    // Audit-fix: absorb-heal ✓, Toxic-Terrain 1/8 heal ✓; added the Storm-Drain-style
+    // Poison-move REDIRECT (short_desc "Redirects Poison moves") as the third attr.
     const res = dispatchArchetype("bespoke", null, 344);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(2);
+    expect(res.attrs).toHaveLength(3);
+    expect(res.attrs.find(a => a.constructor.name === "RedirectTypeMoveAbAttr")).toBeDefined();
     expect(res.attrs.find(a => a.constructor.name === "TypeAbsorbHealAbAttr")).toBeDefined();
     expect(res.attrs.find(a => a.constructor.name === "PassiveRecoveryAbAttr")).toBeDefined();
   });
@@ -1814,13 +1818,14 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(spread?.flag).toBe(MoveFlags.SLICING_MOVE);
   });
 
-  it("er id 438 (Jaws of Carnage) wires LifestealOnKo(0.5)", () => {
+  it("er id 438 (Jaws of Carnage) wires LifestealOnKo(0.25) with a BITING_MOVE 0.5 flagBonus", () => {
+    // Audit-fix: base 25% heal-on-KO, upgraded to 50% when the KO move is biting.
     const res = dispatchArchetype("bespoke", null, 438);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(1);
     const attr = res.attrs[0] as LifestealOnKoAbAttr;
     expect(attr).toBeInstanceOf(LifestealOnKoAbAttr);
-    expect(attr.getHealFraction()).toBeCloseTo(0.5);
+    expect(attr.getHealFraction()).toBeCloseTo(0.25);
   });
 
   it("er id 519 (Fortitude) wires StatTriggerOnHit(SPDEF +1) + PostReceiveCritStatStageChange(SPDEF +12)", () => {

@@ -1,0 +1,24 @@
+# Cloudflare Worker - ISOLATED STAGING for co-op signaling.
+#
+# This file is a fail-closed template. deploy-staging.yml resolves the dedicated
+# `er-coop-staging` D1 by name, proves that its id differs from production, and
+# materializes both placeholders into .tmp/ before invoking Wrangler. Never
+# deploy this template directly and never replace the D1 placeholder by hand.
+name = "er-coop-api-staging"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "er-coop-staging"
+database_id = "__STAGING_COOP_D1_ID__"
+
+[vars]
+ALLOWED_ORIGIN = "*"
+PRESENCE_WINDOW_MS = "30000"
+P33_REJOIN_GRACE_MS = "120000"
+RUN_TTL_MS = "86400000"
+SOURCE_SHA = "__SOURCE_SHA__"
+
+[triggers]
+crons = ["0 * * * *"]

@@ -64,6 +64,7 @@
 //      reach the next wave; a no-progress stall THROWS (driveGuestReplayTurn) so a regression hangs loudly.
 // =============================================================================
 
+import { loggedInUser } from "#app/account";
 import { Battle } from "#app/battle";
 import { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
@@ -78,13 +79,33 @@ import {
   reconcileCoopPlayerModifiers,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import {
+  clearCoopBiomeInteractionStart,
+  coopBiomeInteractionInProgress,
+  coopBiomeInteractionStartValue,
+  setCoopBiomeInteractionStart,
+} from "#data/elite-redux/coop/coop-biome-pin-state";
+import {
+  commitMeOwnerIntent,
+  isCoopMeOperationEnabled,
+  isCoopMeOperationJournalActive,
+} from "#data/elite-redux/coop/coop-me-operation";
+import {
+  captureCoopActiveMysteryControl,
   coopMeHandoffBattleStarted,
   coopMeHandoffBattleWaveValue,
+  restoreCoopActiveMysteryControlForHarness,
   restoreCoopMeHandoffBattleState,
+  restoreCoopMeInteractionStartForHarness,
 } from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  type CoopBiomeTransitionTailPermit,
+  restoreCoopBiomeTransitionTailPermit,
+  snapshotCoopBiomeTransitionTailPermit,
+} from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   assembleCoopRuntime,
   type CoopRuntime,
+  clearCoopRuntime,
   getCoopInteractionRelay,
   getCoopMeBattleInteractionCounter,
   getCoopRuntime,
@@ -94,12 +115,28 @@ import {
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import { captureCoopTrainerVictoryBoundary } from "#data/elite-redux/coop/coop-trainer-victory-boundary";
+import {
+  type CoopActiveMysteryEncounterSnapshotV1,
+  type CoopMessage,
+  type CoopRole,
+  type CoopTransport,
+  createLoopbackPair,
+  type SerializedCommand,
+} from "#data/elite-redux/coop/coop-transport";
+import { isCoopWaveAdvanceOperationEnabled } from "#data/elite-redux/coop/coop-wave-operation";
 import {
   type ErAchievementRunSaveData,
   getErAchievementRunState,
   restoreErAchievementRunState,
 } from "#data/elite-redux/er-achievement-run-state";
+import {
+  type ErRouteNode,
+  erPendingNodesReady,
+  getErPendingNodes,
+  markErPendingNodesAwaitingAuthority,
+  setErPendingNodes,
+} from "#data/elite-redux/er-biome-routing";
 import {
   erBiomeOverstayAnchor,
   getErBiomeLength,
@@ -113,6 +150,13 @@ import {
   restoreErGhostRunState,
   snapshotErGhostRunState,
 } from "#data/elite-redux/er-ghost-teams";
+import {
+  type ErMapSaveData,
+  getErMapSaveData,
+  restoreAuthoritativeMapTravelClassification,
+  restoreErMapState,
+  snapshotAuthoritativeMapTravelClassification,
+} from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
 import {
@@ -134,6 +178,7 @@ import { Terrain, TerrainType } from "#data/terrain";
 import { Weather } from "#data/weather";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
+import type { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -145,26 +190,36 @@ import { WeatherType } from "#enums/weather-type";
 import { EnemyPokemon, PlayerPokemon, type Pokemon } from "#field/pokemon";
 import { Modifier, PersistentModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
-import { PokemonModifierType, PokemonReviveModifierType } from "#modifiers/modifier-type";
-import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
-import { getCoopMeHostPresentation, setCoopMeHostPresentation } from "#phases/coop-replay-me-phase";
 import {
-  coopClearMePinForGuest,
-  coopMeInteractionStartValue,
-  coopSetMePinForGuest,
-} from "#phases/mystery-encounter-phases";
+  ErLearnersShroomModifierType,
+  ErTmCaseModifierType,
+  PokemonModifierType,
+  PokemonReviveModifierType,
+  RememberMoveModifierType,
+  TmModifierType,
+} from "#modifiers/modifier-type";
+import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
+import {
+  getActiveCoopReplayMePhaseForHarness,
+  getCoopMeHostPresentation,
+  setActiveCoopReplayMePhaseForHarness,
+  setCoopMeHostPresentation,
+} from "#phases/coop-replay-me-phase";
+import { coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import { ModifierData } from "#system/modifier-data";
 import { PokemonData } from "#system/pokemon-data";
 import type { GameManager } from "#test/framework/game-manager";
 import type { GameWrapper } from "#test/framework/game-wrapper";
 import { TextInterceptor } from "#test/framework/text-interceptor";
+import { installHeadlessCoopSemanticProjectionOracle } from "#test/tools/coop-semantic-presentation";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import fs from "node:fs";
 import path from "node:path";
 import Phaser from "phaser";
+import { afterEach, expect } from "vitest";
 
 /**
- * The three PROCESS-GLOBAL mystery-encounter pins that are NOT carried on the `active` runtime and
+ * The PROCESS-GLOBAL mystery-encounter pins/control that are NOT carried on the `active` runtime and
  * therefore bleed between the two engines unless swapped per client (the documented ME/ghost-wave
  * harness gap). They are module lets across three files:
  *  - `start`        = `coopMeInteractionStart` (mystery-encounter-phases.ts): the pinned ME-entry
@@ -173,12 +228,16 @@ import Phaser from "phaser";
  *                     party handoff (meBattleHandoffKey). Must equal `start` on the same client.
  *  - `presentation` = `coopMeHostPresentation` (coop-replay-me-phase.ts): the host-streamed ME
  *                     presentation the GUEST's MysteryEncounterUiHandler reads; non-null only mid-ME.
+ *  - `activeReplay` = retained CoopReplayMePhase pointer used by verified snapshot UI/terminal rebound.
+ *  - `activeControl`= checksum-bound selector/terminal state carried by hot-rejoin snapshots.
  * `-1` / `null` = idle.
  */
 interface MePins {
   start: number;
   battleCounter: number;
   presentation: ReturnType<typeof getCoopMeHostPresentation>;
+  activeReplay: ReturnType<typeof getActiveCoopReplayMePhaseForHarness>;
+  activeControl: CoopActiveMysteryEncounterSnapshotV1 | undefined;
   handoffBattle: boolean;
   handoffWave: number;
 }
@@ -187,6 +246,8 @@ const IDLE_ME_PINS: MePins = {
   start: -1,
   battleCounter: -1,
   presentation: null,
+  activeReplay: null,
+  activeControl: undefined,
   handoffBattle: false,
   handoffWave: -1,
 };
@@ -197,6 +258,8 @@ function readMePins(): MePins {
     start: coopMeInteractionStartValue(),
     battleCounter: getCoopMeBattleInteractionCounter(),
     presentation: getCoopMeHostPresentation(),
+    activeReplay: getActiveCoopReplayMePhaseForHarness(),
+    activeControl: captureCoopActiveMysteryControl(),
     handoffBattle: coopMeHandoffBattleStarted(),
     handoffWave: coopMeHandoffBattleWaveValue(),
   };
@@ -204,14 +267,12 @@ function readMePins(): MePins {
 
 /** Install `pins` as the live process-global ME pins (the inverse of {@linkcode readMePins}). */
 function writeMePins(pins: MePins): void {
-  if (pins.start >= 0) {
-    coopSetMePinForGuest(pins.start);
-  } else {
-    coopClearMePinForGuest();
-  }
+  restoreCoopMeInteractionStartForHarness(pins.start);
   setCoopMeBattleInteractionCounter(pins.battleCounter);
   setCoopMeHostPresentation(pins.presentation);
+  restoreCoopActiveMysteryControlForHarness(pins.activeControl);
   restoreCoopMeHandoffBattleState(pins.handoffBattle, pins.handoffWave);
+  setActiveCoopReplayMePhaseForHarness(pins.activeReplay);
 }
 
 /**
@@ -223,6 +284,12 @@ export interface ClientCtx {
   label: "host" | "guest";
   scene: BattleScene;
   runtime: CoopRuntime;
+  /**
+   * Optional per-browser account identity for authenticated persistence tests.
+   * Production clients own independent account modules; the two-engine harness
+   * must therefore swap this process-global value with the scene/runtime.
+   */
+  accountIdentity?: string;
   /** Phaser.Math.RND.state() string for THIS client's last pump (process-global RNG cursor). */
   rndState: string;
   /** The er-ghost per-run cache for this client (save/restore around the swap). */
@@ -236,11 +303,24 @@ export interface ClientCtx {
    */
   moduleLets?: CoopModuleLetSnapshot;
   /**
+   * The complete World-Map / biome-transition substrate for this browser process. Unlike the older
+   * money/relic module-let model, this is always isolated: a committed BIOME_PICK permit is one-shot and
+   * letting the host and guest share it lets the first client consume/clear the other client's authority.
+   */
+  biomeState?: CoopBiomeModuleSnapshot;
+  /**
    * The 3 mystery-encounter pins for THIS client (save/restore around the swap; idle off-ME).
    * Optional: ctxs that never reach an ME (the wave/shop spike tests) omit it and the swap treats
    * them as idle; an ME-driving ctx carries the live pins so the host's and guest's never bleed.
    */
   mePins?: MePins;
+  /**
+   * Monotonic ownership token for asynchronous ME-pin save-back. The one-process harness can have an
+   * older `withClient(ctx)` continuation finish after a newer scope has already persisted this browser's
+   * terminal boundary. Only the latest claimant may write `mePins`, preventing that older continuation
+   * from resurrecting its stale active replay + interaction pin as a seemingly-live Mystery boundary.
+   */
+  mePinsSaveGeneration?: number;
   /**
    * Optional explicitly scheduled transport inbox for production-transition journeys. The pump is
    * invoked only while this client's complete process-global context is installed, so a network
@@ -277,6 +357,66 @@ interface CoopModuleLetSnapshot {
   biomeLength: number | null;
   biomeStartWave: number;
   relic: ErRelicBattleStateData;
+  /** Full World-Map UI/routing substrate; production clients own independent module instances. */
+  mapState: ErMapSaveData;
+  /** The actual route-decision input, intentionally separate from the persisted map state. */
+  pendingNodes: ErRouteNode[];
+  pendingNodesReady: boolean;
+  /** Deferred Crossroads Leave -> SelectBiome interaction pin, or -1 when idle. */
+  biomeInteractionStart: number;
+  /** Exact committed Switch/NewBiome permit, including this client's independent stage progress. */
+  biomeTailPermit: CoopBiomeTransitionTailPermit | null;
+  authoritativeTravelClassification: { readonly wave: number; readonly target: BiomeId | null } | null;
+}
+
+interface CoopBiomeModuleSnapshot {
+  /** Full World-Map UI/routing substrate; production clients own independent module instances. */
+  mapState: ErMapSaveData;
+  /** The actual route-decision input, intentionally separate from the persisted map state. */
+  pendingNodes: ErRouteNode[];
+  pendingNodesReady: boolean;
+  /** Deferred Crossroads Leave -> SelectBiome interaction pin, or -1 when idle. */
+  biomeInteractionStart: number;
+  /** Exact committed Switch/NewBiome permit, including this client's independent stage progress. */
+  biomeTailPermit: CoopBiomeTransitionTailPermit | null;
+  authoritativeTravelClassification: { readonly wave: number; readonly target: BiomeId | null } | null;
+  overstayAnchor: number | null;
+  biomeLength: number | null;
+  biomeStartWave: number;
+}
+
+function snapshotBiomeModuleState(): CoopBiomeModuleSnapshot {
+  return {
+    mapState: structuredClone(getErMapSaveData()),
+    pendingNodes: getErPendingNodes().map(node => ({ ...node })),
+    pendingNodesReady: erPendingNodesReady(),
+    biomeInteractionStart: coopBiomeInteractionInProgress() ? coopBiomeInteractionStartValue() : -1,
+    biomeTailPermit: snapshotCoopBiomeTransitionTailPermit(),
+    authoritativeTravelClassification: snapshotAuthoritativeMapTravelClassification(),
+    overstayAnchor: erBiomeOverstayAnchor(),
+    biomeLength: getErBiomeLength(),
+    biomeStartWave: getErBiomeStartWave(),
+  };
+}
+
+function restoreBiomeModuleState(s: CoopBiomeModuleSnapshot): void {
+  restoreErMapState(structuredClone(s.mapState), s.biomeStartWave);
+  if (s.pendingNodesReady) {
+    setErPendingNodes(s.pendingNodes.map(node => ({ ...node })));
+  } else {
+    markErPendingNodesAwaitingAuthority();
+  }
+  setErBiomeOverstayAnchor(s.overstayAnchor);
+  setErBiomeStructureExtent(s.biomeLength, s.biomeStartWave);
+  if (s.biomeInteractionStart >= 0) {
+    setCoopBiomeInteractionStart(s.biomeInteractionStart);
+  } else {
+    clearCoopBiomeInteractionStart();
+  }
+  if (!restoreCoopBiomeTransitionTailPermit(s.biomeTailPermit)) {
+    throw new Error("Invalid isolated co-op biome-tail permit snapshot");
+  }
+  restoreAuthoritativeMapTravelClassification(s.authoritativeTravelClassification);
 }
 
 function snapshotModuleLets(): CoopModuleLetSnapshot {
@@ -287,15 +427,30 @@ function snapshotModuleLets(): CoopModuleLetSnapshot {
     biomeLength: getErBiomeLength(),
     biomeStartWave: getErBiomeStartWave(),
     relic: getErRelicBattleState(),
+    mapState: structuredClone(getErMapSaveData()),
+    pendingNodes: getErPendingNodes().map(node => ({ ...node })),
+    pendingNodesReady: erPendingNodesReady(),
+    biomeInteractionStart: coopBiomeInteractionInProgress() ? coopBiomeInteractionStartValue() : -1,
+    biomeTailPermit: snapshotCoopBiomeTransitionTailPermit(),
+    authoritativeTravelClassification: snapshotAuthoritativeMapTravelClassification(),
   };
 }
 
 function restoreModuleLets(s: CoopModuleLetSnapshot): void {
   restoreErAchievementRunState(s.achievementRun);
   restoreErMoneyStreaks(s.moneyStreaks);
-  setErBiomeOverstayAnchor(s.overstayAnchor);
-  setErBiomeStructureExtent(s.biomeLength, s.biomeStartWave);
   restoreErRelicBattleState(s.relic);
+  restoreBiomeModuleState({
+    mapState: s.mapState,
+    pendingNodes: s.pendingNodes,
+    pendingNodesReady: s.pendingNodesReady,
+    biomeInteractionStart: s.biomeInteractionStart,
+    biomeTailPermit: s.biomeTailPermit,
+    authoritativeTravelClassification: s.authoritativeTravelClassification,
+    overstayAnchor: s.overstayAnchor,
+    biomeLength: s.biomeLength,
+    biomeStartWave: s.biomeStartWave,
+  });
 }
 
 function snapshotGhostState(): ErGhostRunStateSnapshot {
@@ -361,6 +516,7 @@ function captureLiveCtx(): {
   rndState: string;
   ghost: ErGhostRunStateSnapshot;
   moduleLets: CoopModuleLetSnapshot;
+  biomeState: CoopBiomeModuleSnapshot;
   mePins: MePins;
 } {
   return {
@@ -370,6 +526,7 @@ function captureLiveCtx(): {
     ghost: snapshotGhostState(),
     // Snapshot the module-lets so the prev-restore is faithful when isolation is ON; harmless when OFF.
     moduleLets: snapshotModuleLets(),
+    biomeState: snapshotBiomeModuleState(),
     mePins: readMePins(),
   };
 }
@@ -384,6 +541,20 @@ function captureLiveCtx(): {
 export let activeClientLabel: "host" | "guest" | "none" = "none";
 let activeClientInboundPump: (() => number) | undefined;
 
+let meBoundaryGeneration = 0;
+
+function restoreScopedMePins(pins: MePins, capturedBoundaryGeneration: number): void {
+  const boundaryWasInvalidated = capturedBoundaryGeneration !== meBoundaryGeneration;
+  writeMePins(boundaryWasInvalidated ? IDLE_ME_PINS : pins);
+  if (
+    boundaryWasInvalidated
+    && (coopMeInteractionStartValue() !== IDLE_ME_PINS.start
+      || getActiveCoopReplayMePhaseForHarness() !== IDLE_ME_PINS.activeReplay)
+  ) {
+    throw new Error("an invalidated client scope resurrected a stale Mystery boundary during restore");
+  }
+}
+
 /**
  * SYNCHRONOUS sibling of {@linkcode withClient}: install `ctx`'s 4-part process-global context, run a
  * SYNC `fn`, then restore the previous context - all before returning. Use this when the body is purely
@@ -396,17 +567,28 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   const prev = captureLiveCtx();
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
+  const prevAccountIdentity = loggedInUser?.username;
+  const capturedBoundaryGeneration = meBoundaryGeneration;
   activeClientLabel = ctx.label;
   activeClientInboundPump = ctx.pumpInbound;
+  if (ctx.accountIdentity != null && loggedInUser != null) {
+    loggedInUser.username = ctx.accountIdentity;
+  }
   initGlobalScene(ctx.scene);
-  setCoopRuntime(ctx.runtime);
-  installCoopHooksForActive(ctx.runtime);
   Phaser.Math.RND.state(ctx.rndState);
   restoreGhostState(ctx.ghost);
   if (coopHarnessModuleLetIsolation && ctx.moduleLets !== undefined) {
     restoreModuleLets(ctx.moduleLets);
   }
+  if (ctx.biomeState !== undefined) {
+    restoreBiomeModuleState(ctx.biomeState);
+  }
   writeMePins(ctx.mePins ?? IDLE_ME_PINS);
+  // Runtime activation is deliberately LAST: setCoopRuntime flushes continuations
+  // queued by runWhenCoopRuntimeActive. Those callbacks must see this client's
+  // complete browser-local state, especially its ME pin and active replay pointer.
+  setCoopRuntime(ctx.runtime);
+  installCoopHooksForActive(ctx.runtime);
   try {
     return fn();
   } finally {
@@ -415,72 +597,114 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     if (coopHarnessModuleLetIsolation) {
       ctx.moduleLets = snapshotModuleLets();
     }
-    initGlobalScene(prev.scene);
-    if (prev.runtime != null) {
-      setCoopRuntime(prev.runtime);
-      installCoopHooksForActive(prev.runtime);
+    if (ctx.biomeState !== undefined) {
+      ctx.biomeState = snapshotBiomeModuleState();
     }
+    initGlobalScene(prev.scene);
     Phaser.Math.RND.state(prev.rndState);
     restoreGhostState(prev.ghost);
     if (coopHarnessModuleLetIsolation) {
       restoreModuleLets(prev.moduleLets);
     }
-    writeMePins(prev.mePins);
+    restoreBiomeModuleState(prev.biomeState);
+    restoreScopedMePins(prev.mePins, capturedBoundaryGeneration);
+    if (prevAccountIdentity != null && loggedInUser != null) {
+      loggedInUser.username = prevAccountIdentity;
+    }
     activeClientLabel = prevLabel;
     activeClientInboundPump = prevInboundPump;
+    if (prev.runtime != null) {
+      setCoopRuntime(prev.runtime);
+      installCoopHooksForActive(prev.runtime);
+    }
   }
 }
 
 export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<T> {
+  // Async scopes may overlap and finish out of entry order. Claim ME-pin save ownership before installing
+  // this browser; a later scope (or an explicit persistInstalledClientMePins) invalidates this claim.
+  const mePinsSaveGeneration = (ctx.mePinsSaveGeneration ?? 0) + 1;
+  ctx.mePinsSaveGeneration = mePinsSaveGeneration;
   const prev = captureLiveCtx();
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
+  const prevAccountIdentity = loggedInUser?.username;
+  const capturedBoundaryGeneration = meBoundaryGeneration;
   activeClientLabel = ctx.label;
   activeClientInboundPump = ctx.pumpInbound;
+  if (ctx.accountIdentity != null && loggedInUser != null) {
+    loggedInUser.username = ctx.accountIdentity;
+  }
   // 1. globalScene
   initGlobalScene(ctx.scene);
-  // 2. coop active runtime (also installs the authoritative-guest predicate)
-  setCoopRuntime(ctx.runtime);
-  // 2b. per-client ROLE-GATED process hooks (ghost-pool publisher/suppression always; live-event emitter
-  //     when opted in): re-point the last-write-wins process-globals at THIS runtime's role-gated closures
-  //     (#633 bounded-scope), so a host pump owns the host publisher and a guest pump owns the guest
-  //     suppression/adopt - not whichever runtime happened to wire last.
-  installCoopHooksForActive(ctx.runtime);
-  // 3. process-global RND cursor
+  // 2. process-global RND cursor
   Phaser.Math.RND.state(ctx.rndState);
-  // 4. er-ghost per-run cache
+  // 3. er-ghost per-run cache
   restoreGhostState(ctx.ghost);
-  // 4b. ER module-let substrates (#837): money-streak / overstay anchor / relic lists. Gated on the
+  // 3b. ER module-let substrates (#837): money-streak / overstay anchor / relic lists. Gated on the
   //     opt-in isolation flag (default OFF = shared, pre-#837 behavior); ON = faithful per-client state.
   if (coopHarnessModuleLetIsolation && ctx.moduleLets !== undefined) {
     restoreModuleLets(ctx.moduleLets);
   }
-  // 5. mystery-encounter pins (start / battleCounter / presentation)
+  if (ctx.biomeState !== undefined) {
+    restoreBiomeModuleState(ctx.biomeState);
+  }
+  // 4. mystery-encounter pins (start / battleCounter / presentation)
   writeMePins(ctx.mePins ?? IDLE_ME_PINS);
+  // 5. coop active runtime + role-gated hooks, LAST. setCoopRuntime flushes
+  // runWhenCoopRuntimeActive callbacks synchronously; installing it earlier let a
+  // destination continuation observe the previous client's pins/RNG/module state.
+  setCoopRuntime(ctx.runtime);
+  installCoopHooksForActive(ctx.runtime);
   try {
     return await fn();
   } finally {
-    // Persist THIS client's mutated RND cursor + ghost cache + module-lets + ME pins into its ctx, restore prev.
     ctx.rndState = Phaser.Math.RND.state();
     ctx.ghost = snapshotGhostState();
     if (coopHarnessModuleLetIsolation) {
       ctx.moduleLets = snapshotModuleLets();
     }
-    ctx.mePins = readMePins();
-    initGlobalScene(prev.scene);
-    if (prev.runtime != null) {
-      setCoopRuntime(prev.runtime);
-      installCoopHooksForActive(prev.runtime);
+    if (ctx.biomeState !== undefined) {
+      ctx.biomeState = snapshotBiomeModuleState();
     }
+    if (ctx.mePinsSaveGeneration === mePinsSaveGeneration) {
+      ctx.mePins = readMePins();
+    }
+    initGlobalScene(prev.scene);
     Phaser.Math.RND.state(prev.rndState);
     restoreGhostState(prev.ghost);
     if (coopHarnessModuleLetIsolation) {
       restoreModuleLets(prev.moduleLets);
     }
-    writeMePins(prev.mePins);
+    restoreBiomeModuleState(prev.biomeState);
+    restoreScopedMePins(prev.mePins, capturedBoundaryGeneration);
+    if (prevAccountIdentity != null && loggedInUser != null) {
+      loggedInUser.username = prevAccountIdentity;
+    }
     activeClientLabel = prevLabel;
     activeClientInboundPump = prevInboundPump;
+    if (prev.runtime != null) {
+      setCoopRuntime(prev.runtime);
+      installCoopHooksForActive(prev.runtime);
+    }
   }
+}
+
+/**
+ * Save the currently installed client's live Mystery state before a long-running journey crosses into the
+ * other synthetic browser. This is intentionally ME-only and requires an exact scene/runtime match: unlike
+ * production, the one-process journey can mutate the installed host between scoped pumps, while its stored
+ * ClientCtx is updated only on scope exit. Broader ambient-state adoption is unsafe for focused fixtures.
+ */
+export function persistInstalledClientMePins(ctx: ClientCtx): void {
+  if (globalScene !== ctx.scene || getCoopRuntime() !== ctx.runtime) {
+    throw new Error(`cannot persist ${ctx.label} ME pins while a different client is installed`);
+  }
+  // This explicit snapshot is newer than every already-entered async scope. Advance the generation so a
+  // late finally from one of those scopes cannot overwrite it with the older replay pointer + pin pair.
+  ctx.mePinsSaveGeneration = (ctx.mePinsSaveGeneration ?? 0) + 1;
+  meBoundaryGeneration++;
+  ctx.mePins = readMePins();
 }
 
 // ---------------------------------------------------------------------------
@@ -585,6 +809,14 @@ function safeStr(a: unknown): string {
 export function buildGuestScene(hostGame: GameManager): BattleScene {
   const savedRnd = Phaser.Math.RND.state();
   const guestScene = new BattleScene(); // ctor calls initGlobalScene(this) - steals globalScene.
+  // Install the cooperative scheduler BEFORE create(). BattleScene.create() seeds the title/login phase
+  // queue and may otherwise start an asynchronous LoginPhase immediately. In the one-process harness that
+  // late login can mutate the shared account module while an authenticated host/guest persistence
+  // transaction is awaiting cloud I/O. Real browsers finish their own login before pairing; this synthetic
+  // guest is reconstructed directly into the paired battle and must never run an independent boot flow.
+  guestScene.phaseManager["startCurrentPhase"] = () => {
+    /* inert: the cooperative scheduler calls phase.start() explicitly */
+  };
   // Re-run the SAME mock injection the host wrapper did, but on the guest scene, WITHOUT
   // re-seeding the RND (GameWrapper's ctor sow is the only re-seed; setScene/injectMandatory
   // does not sow). We call the private injectMandatory + preload + create via setScene.
@@ -602,8 +834,7 @@ export function buildGuestScene(hostGame: GameManager): BattleScene {
   neutralizeCoopCandyBar(guestScene);
   // Restore the RND cursor the ctor/injection may have touched.
   Phaser.Math.RND.state(savedRnd);
-  // Make the guest scene's phase pump MANUAL (the cooperative scheduler drives it). Without
-  // this, phase.end() -> shiftPhase() -> startCurrentPhase() would auto-run the whole queue.
+  // Reassert the manual pump in case create() replaced phase-manager wiring while initializing the scene.
   guestScene.phaseManager["startCurrentPhase"] = () => {
     /* inert: the cooperative scheduler calls phase.start() explicitly */
   };
@@ -789,6 +1020,9 @@ export function mirrorHostBattleToGuest(
     trainer: hostBattle.trainer ?? undefined,
     double: hostBattle.double,
   });
+  // Production captures this immutable source-wave context when it applies the authoritative encounter
+  // descriptor. This direct test mirror bypasses EncounterPhase, so mirror that same seam explicitly.
+  captureCoopTrainerVictoryBoundary(guestScene, guestScene.currentBattle);
   guestScene.currentBattle.turn = hostBattle.turn;
   const enemyParty: EnemyPokemon[] = [];
   // Versus flip: the guest's local ENEMY party is the host's PLAYER party (the opponent). Co-op: the
@@ -922,6 +1156,71 @@ function neutralizeCoopCandyBar(scene: BattleScene): void {
  * chainable setters; it is a semantic adapter oracle, never evidence that a browser canvas rendered. Pixel
  * postconditions belong in the built-client two-browser lane.
  */
+function makeHeadlessSprite(key: string, visible: boolean): Phaser.GameObjects.Sprite {
+  const target: Record<PropertyKey, unknown> = {
+    active: true,
+    alpha: 1,
+    anims: {
+      currentAnim: { key },
+      duration: 1,
+      msPerFrame: 1,
+      nextFrame: () => undefined,
+      pause: () => undefined,
+    },
+    frame: { name: 0 },
+    originX: 0.5,
+    originY: 0.5,
+    pipelineData: {},
+    texture: { key },
+    visible,
+    x: 0,
+    y: 0,
+  };
+  let proxy: Record<PropertyKey, unknown>;
+  const chain = () => proxy;
+  proxy = new Proxy(target, {
+    get(t, property) {
+      return Reflect.has(t, property) ? Reflect.get(t, property) : chain;
+    },
+  });
+  target.play = (nextKey: string) => {
+    target.texture = { key: nextKey };
+    target.anims = {
+      ...(target.anims as object),
+      currentAnim: { key: nextKey },
+    };
+    return proxy;
+  };
+  target.setActive = (active: boolean) => {
+    target.active = active;
+    return proxy;
+  };
+  target.setAlpha = (alpha: number) => {
+    target.alpha = alpha;
+    return proxy;
+  };
+  target.setOrigin = (originX: number, originY = originX) => {
+    target.originX = originX;
+    target.originY = originY;
+    return proxy;
+  };
+  target.setPosition = (x: number, y: number) => {
+    target.x = x;
+    target.y = y;
+    return proxy;
+  };
+  target.setTexture = (nextKey: string, frame?: string | number) => {
+    target.texture = { key: nextKey };
+    target.frame = { name: frame ?? 0 };
+    return proxy;
+  };
+  target.setVisible = (nextVisible: boolean) => {
+    target.visible = nextVisible;
+    return proxy;
+  };
+  return proxy as unknown as Phaser.GameObjects.Sprite;
+}
+
 export function stubBattleInfo(mon: Pokemon): void {
   // The real PlayerBattleInfo/EnemyBattleInfo was never built (we skipped init()). Keep the small async
   // fallback for data-refresh methods, but model the stateful Phaser setters explicitly. The old proxy
@@ -957,6 +1256,80 @@ export function stubBattleInfo(mon: Pokemon): void {
     return proxy;
   };
   (mon as unknown as { battleInfo: unknown }).battleInfo = proxy;
+  const key = mon.getBattleSpriteKey();
+  const sprite = makeHeadlessSprite(key, false);
+  const tintSprite = makeHeadlessSprite(key, false);
+  (mon as unknown as { getSprite: () => Phaser.GameObjects.Sprite }).getSprite = () => sprite;
+  (mon as unknown as { getTintSprite: () => Phaser.GameObjects.Sprite }).getTintSprite = () => tintSprite;
+}
+
+/**
+ * Phaser HEADLESS executes the real player-atlas loader but does not populate the texture/animation
+ * caches or advance the live sprite from its substitute key. Model only those renderer side effects
+ * after the real promise settles. This keeps the production launch gate dependent on a completed load,
+ * cache residency, and the exact final live key instead of weakening any of those assertions for CI.
+ */
+const headlessTextureKeys = new WeakMap<object, Set<string>>();
+const headlessAnimationKeys = new WeakMap<object, Set<string>>();
+const headlessWrappedPokemon = new WeakMap<BattleScene, WeakSet<object>>();
+
+export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): void {
+  let textureKeys = headlessTextureKeys.get(scene.textures);
+  if (textureKeys == null) {
+    textureKeys = new Set<string>();
+    headlessTextureKeys.set(scene.textures, textureKeys);
+    const originalTextureExists = scene.textures.exists.bind(scene.textures);
+    const releasedTextureKeys = textureKeys;
+    // Phaser shares cache managers across the BattleScenes created by one HEADLESS game. A per-scene
+    // vi.spyOn therefore spies on an existing spy in the next duo test and can recurse. Install one plain,
+    // manager-scoped adapter and share its released-key model across every scene using that manager.
+    scene.textures.exists = key => releasedTextureKeys.has(String(key)) || originalTextureExists(key);
+  }
+  let animationKeys = headlessAnimationKeys.get(scene.anims);
+  if (animationKeys == null) {
+    animationKeys = new Set<string>();
+    headlessAnimationKeys.set(scene.anims, animationKeys);
+    const originalAnimationExists = scene.anims.exists.bind(scene.anims);
+    const releasedAnimationKeys = animationKeys;
+    scene.anims.exists = key => releasedAnimationKeys.has(String(key)) || originalAnimationExists(key);
+  }
+  const releasedTextureKeys = textureKeys;
+  const releasedAnimationKeys = animationKeys;
+  let wrappedPokemon = headlessWrappedPokemon.get(scene);
+  if (wrappedPokemon == null) {
+    wrappedPokemon = new WeakSet<object>();
+    headlessWrappedPokemon.set(scene, wrappedPokemon);
+  }
+
+  // Wrap every currently materialized party object, not only the opening player leads. Turn-finalize
+  // readiness also awaits live enemy atlases, and later presentation boundaries may promote a bench mon.
+  for (const pokemon of [...scene.getPlayerParty(), ...scene.getEnemyParty()]) {
+    if (wrappedPokemon.has(pokemon)) {
+      continue;
+    }
+    wrappedPokemon.add(pokemon);
+    const original = pokemon.loadAssets.bind(pokemon);
+    // Install a plain per-instance adapter, not a Vitest spy. Renderer proofs legitimately layer their
+    // own delay/count spy around this model; spying on an existing spy makes the captured "original"
+    // resolve to the newly replaced implementation and recurse forever.
+    pokemon.loadAssets = async (ignoreOverride = true, useIllusion = false) => {
+      await original(ignoreOverride, useIllusion);
+      const key = pokemon.getBattleSpriteKey();
+      releasedTextureKeys.add(key);
+      releasedAnimationKeys.add(key);
+      for (const sprite of [pokemon.getSprite(), pokemon.getTintSprite()]) {
+        if (sprite == null) {
+          continue;
+        }
+        const live = sprite as unknown as {
+          texture: { key: string };
+          anims: { currentAnim?: { key: string } };
+        };
+        live.texture.key = key;
+        live.anims.currentAnim = { key };
+      }
+    };
+  }
 }
 
 /**
@@ -973,6 +1346,131 @@ export function buildRuntime(endpoint: CoopTransport, username: string, netcodeM
 // ---------------------------------------------------------------------------
 // Cooperative scheduler.
 // ---------------------------------------------------------------------------
+
+/** A pair whose retained operation envelopes can be pumped only under their destination ClientCtx. */
+interface DestinationEnvelopePumpPair {
+  host: CoopTransport;
+  guest: CoopTransport;
+  flush(role: CoopRole, limit?: number): number;
+  /**
+   * Queue every frame until its destination ClientCtx is installed. The ordinary harness keeps this off
+   * outside production-transition surfaces so legacy request/response helpers retain automatic loopback.
+   */
+  setDestinationContextDelivery?(enabled: boolean): void;
+}
+
+/**
+ * Test-only adapter for the ordinary microtask loopback used by the legacy duo harness.
+ *
+ * A retained operation result is applied from the inbound `envelope` handler. Letting the ordinary
+ * loopback deliver that handler while the sender's {@linkcode withClient} scope is still installed
+ * applies the destination runtime's result against the sender's `globalScene`, then records it as
+ * already applied. The later watcher can therefore materialize the journal entry without ever mutating
+ * its own scene. Real clients cannot do this because each browser owns an independent global context.
+ *
+ * Queue `envelope` frames by default. A production-transition surface may temporarily opt every frame
+ * into the same destination-context queue while it explicitly alternates client pumps. Handshake,
+ * command/request, relay, checkpoint, and state traffic otherwise retain the legacy automatic loopback
+ * behavior, so existing command-response tests cannot deadlock. `drainLoopback()` flushes this queue
+ * through the active destination ClientCtx. Callers that already provide a full scheduled pair bypass
+ * this adapter entirely.
+ */
+function destinationPumpOperationEnvelopes(pair: {
+  host: CoopTransport;
+  guest: CoopTransport;
+}): DestinationEnvelopePumpPair {
+  const queues: Record<CoopRole, CoopMessage[]> = { host: [], guest: [] };
+  let destinationContextDelivery = false;
+
+  // These carriers either validate/apply against globalScene immediately or resume a continuation which
+  // does. Delivering them synchronously while the sender's ClientCtx is installed can make a valid guest
+  // turn inspect the host preimage (and be rejected as malformed), or mutate the host scene through the
+  // guest runtime. Real browsers can never borrow one another's globals, so these always wait for the
+  // destination pump even outside an explicitly fully-scheduled transition surface.
+  const requiresDestinationScene = new Set<CoopMessage["t"]>([
+    "envelope",
+    "turnResolution",
+    "waveResolved",
+    "waveEndState",
+    "enemyPartySync",
+    "stateSync",
+    "rewardOptions",
+  ]);
+
+  const wrap = (inner: CoopTransport): { transport: CoopTransport; deliverQueued(message: CoopMessage): void } => {
+    const handlers = new Set<(message: CoopMessage) => void>();
+    const unsubscribe = inner.onMessage(message => {
+      if (requiresDestinationScene.has(message.t) || destinationContextDelivery) {
+        queues[inner.role].push(message);
+        return;
+      }
+      for (const handler of [...handlers]) {
+        handler(message);
+      }
+    });
+
+    const transport: CoopTransport = {
+      get role(): CoopRole {
+        return inner.role;
+      },
+      get state() {
+        return inner.state;
+      },
+      send: message => inner.send(message),
+      onMessage(handler): () => void {
+        handlers.add(handler);
+        return () => handlers.delete(handler);
+      },
+      onStateChange: handler => inner.onStateChange(handler),
+      close(): void {
+        unsubscribe();
+        handlers.clear();
+        queues[inner.role].length = 0;
+        inner.close();
+      },
+      ...(typeof inner.disconnectReason === "function" ? { disconnectReason: () => inner.disconnectReason!() } : {}),
+      ...(typeof inner.connectionGeneration === "function"
+        ? { connectionGeneration: () => inner.connectionGeneration!() }
+        : {}),
+      ...(typeof inner.lastRxMs === "function" ? { lastRxMs: () => inner.lastRxMs!() } : {}),
+      ...(typeof inner.outboundQueueDepth === "function"
+        ? { outboundQueueDepth: () => inner.outboundQueueDepth!() }
+        : {}),
+      ...(typeof inner.outboundQueueNeedsResync === "function"
+        ? { outboundQueueNeedsResync: () => inner.outboundQueueNeedsResync!() }
+        : {}),
+    };
+
+    return {
+      transport,
+      deliverQueued(message): void {
+        for (const handler of [...handlers]) {
+          handler(message);
+        }
+      },
+    };
+  };
+
+  const host = wrap(pair.host);
+  const guest = wrap(pair.guest);
+  const endpoints: Record<CoopRole, ReturnType<typeof wrap>> = { host, guest };
+  const wrapped: DestinationEnvelopePumpPair = {
+    host: host.transport,
+    guest: guest.transport,
+    flush(role, limit = Number.POSITIVE_INFINITY): number {
+      let delivered = 0;
+      while (queues[role].length > 0 && delivered < limit) {
+        endpoints[role].deliverQueued(queues[role].shift()!);
+        delivered++;
+      }
+      return delivered;
+    },
+    setDestinationContextDelivery(enabled): void {
+      destinationContextDelivery = enabled;
+    },
+  };
+  return wrapped;
+}
 
 /** Drain the loopback microtask queue (LoopbackTransport delivers on queueMicrotask). */
 /**
@@ -1004,6 +1502,21 @@ export async function drainLoopback(): Promise<void> {
 }
 
 /**
+ * Reproduce the one scheduler edge omitted by the directly-constructed guest scene. Its boot TitlePhase is
+ * deliberately inert, while production Phaser automatically shifts an engine-owned retained wave tail that
+ * arrives behind it. No other queue shape is admitted here.
+ */
+export function shiftQueuedGuestBootTail(scene: BattleScene): boolean {
+  const phase = scene.phaseManager.getCurrentPhase();
+  const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+  if (phase?.phaseName !== "TitlePhase" || (queued[0] !== "CoopFinalizeTurnPhase" && queued[0] !== "VictoryPhase")) {
+    return false;
+  }
+  scene.phaseManager.shiftPhase();
+  return true;
+}
+
+/**
  * Drive one manually-pumped client's REAL phase queue until `target` is current, stopping BEFORE the
  * target starts. This is the guest-side counterpart to {@linkcode PhaseInterceptor.to(..., false)}:
  * the duo guest has no interceptor because its scene is constructed directly, but production-transition
@@ -1022,6 +1535,10 @@ export async function driveClientPhaseQueueTo(
     matches?: (phase: Phase) => boolean;
     maxPhases?: number;
     perPhaseTimeoutMs?: number;
+    /** Pump the other browser's scheduled inbox while this client's real phase awaits a reciprocal route. */
+    pumpPeer?: () => Promise<void>;
+    /** Drive an explicitly-recognized public prompt while the current phase remains blocked on human input. */
+    drivePublicPhaseInput?: (phase: Phase) => boolean | Promise<boolean>;
   } = {},
 ): Promise<Phase> {
   const matches = options.matches ?? (phase => phase.phaseName === target);
@@ -1038,9 +1555,20 @@ export async function driveClientPhaseQueueTo(
       return phase;
     }
 
+    if (shiftQueuedGuestBootTail(scene)) {
+      continue;
+    }
+
+    // The production browser's atlas loader populates renderer caches for every newly materialized
+    // battler. A long-running headless journey creates fresh enemy objects after buildDuo's initial
+    // installation, so refresh the completion model at each real phase boundary before that phase can
+    // exercise the exact launch-ready gate. This wraps only newly seen Pokemon and remains idempotent.
+    installHeadlessPlayerAtlasCompletionModel(scene);
     phase.start();
     const deadline = Date.now() + perPhaseTimeoutMs;
     while (scene.phaseManager.getCurrentPhase() === phase) {
+      await options.drivePublicPhaseInput?.(phase);
+      await options.pumpPeer?.();
       await drainLoopback();
       if (Date.now() >= deadline) {
         const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
@@ -1079,7 +1607,244 @@ export interface DuoRig {
   hostCtx: ClientCtx;
   guestCtx: ClientCtx;
   /** The loopback pair both runtimes ride (raw endpoints exposed for assertion taps). */
-  pair: { host: CoopTransport; guest: CoopTransport };
+  pair: {
+    host: CoopTransport;
+    guest: CoopTransport;
+    /** Test-only full destination scheduling used by production-transition interaction surfaces. */
+    setDestinationContextDelivery?: (enabled: boolean) => void;
+  };
+}
+
+/**
+ * A guest wave reached through the real queued between-wave transition. Every turn in that same wave must
+ * replace its live command surface through the phase manager, rather than start a detached replay object
+ * whose `end()` would shift an unrelated queue. The exact wave fence naturally expires at the next battle.
+ */
+const realGuestCommandBoundaries = new WeakMap<object, { wave: number; turn: number }>();
+
+/**
+ * Record that the guest reached its real queued public CommandPhase for this exact address. The replay
+ * pump then replaces that proven surface through the phase manager instead of starting a detached replay
+ * object whose end() would shift an unrelated tail.
+ */
+export function markRealGuestCommandBoundary(scene: BattleScene, wave: number, turn: number): void {
+  const current = scene.phaseManager.getCurrentPhase();
+  if (
+    current?.phaseName !== "CommandPhase"
+    || scene.currentBattle.waveIndex !== wave
+    || scene.currentBattle.turn !== turn
+  ) {
+    throw new Error(
+      `cannot mark guest command boundary ${wave}:${turn} from `
+        + `${current?.phaseName ?? "none"} ${scene.currentBattle.waveIndex}:${scene.currentBattle.turn}`,
+    );
+  }
+  realGuestCommandBoundaries.set(scene, { wave, turn });
+}
+
+/**
+ * Replace the directly-constructed guest scene's inert boot TitlePhase with the production guest input tail.
+ *
+ * A real browser reaches wave one through NewBattle -> Encounter -> TurnInit. `buildDuo` intentionally mirrors
+ * the already-live host battle instead, so those boot phases never ran. Depending on whether the fixture's
+ * phase interceptor has advanced once, the inert shape is Login -> [Title] or Title -> [].
+ * Materialize exactly the omitted TurnInit boundary through the real phase manager; TurnInit then creates the
+ * actual per-slot CommandPhases and renderer TurnStart tail. This is valid only for that empty boot shape.
+ */
+export function materializeMirroredGuestInputTurn(scene: BattleScene): void {
+  const current = scene.phaseManager.getCurrentPhase();
+  const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+  const untouchedLoginBoot = current?.phaseName === "LoginPhase" && queued.length === 1 && queued[0] === "TitlePhase";
+  const untouchedTitleBoot = current?.phaseName === "TitlePhase" && queued.length === 0;
+  if (!untouchedLoginBoot && !untouchedTitleBoot) {
+    throw new Error(
+      `cannot materialize mirrored guest input from ${current?.phaseName ?? "none"}; queued=[${queued.join(",")}]`,
+    );
+  }
+  scene.phaseManager.clearPhaseQueue();
+  scene.phaseManager.unshiftPhase(scene.phaseManager.create("TurnInitPhase"));
+  scene.phaseManager.shiftPhase();
+}
+
+/**
+ * Drain retained-operation follow-ups under each destination's complete client context.
+ *
+ * One pass delivers the result and may enqueue an exact ACK or an authority response in the opposite
+ * direction. A second pass therefore closes the round trip without ever installing the wrong scene for
+ * an inbound envelope. Scheduled and ordinary envelope-pumped rigs share this same primitive.
+ */
+export async function pumpDuoDestinations(rig: DuoRig, rounds = 2): Promise<void> {
+  for (let round = 0; round < rounds; round++) {
+    await withClient(rig.hostCtx, () => drainLoopback());
+    await withClient(rig.guestCtx, () => drainLoopback());
+  }
+}
+
+/**
+ * Bring both real clients to the reciprocal command boundary and submit Tackle for the guest-owned
+ * battler exclusively through the production Command/Fight/TargetSelect UI handlers.
+ *
+ * Scheduled duo tests call this while automatic transport delivery is disabled. Every addressed packet
+ * is therefore pumped only while its destination's complete client context is installed, matching two
+ * browser processes instead of allowing a shared-process async continuation to borrow the other scene.
+ */
+export async function driveDuoGuestTackleThroughPublicUi(
+  hostGame: GameManager,
+  rig: DuoRig,
+  options: { restartAlreadyOpenHost?: boolean } = {},
+): Promise<void> {
+  const guestOwnCommand = await withClient(rig.guestCtx, () =>
+    driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
+      matches: phase =>
+        phase.phaseName === "CommandPhase"
+        && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+    }),
+  );
+  await withClient(rig.guestCtx, async () => {
+    guestOwnCommand.start();
+    await drainLoopback();
+  });
+
+  await withClient(rig.hostCtx, async () => {
+    await drainLoopback();
+    if (options.restartAlreadyOpenHost) {
+      // Wave 1 opened before buildDuo installed the live runtime. Re-enter that untouched public phase
+      // once so it participates in the now-live reciprocal rendezvous.
+      rig.hostScene.phaseManager.getCurrentPhase().start();
+      await drainLoopback();
+    } else if (rig.hostScene.phaseManager.getCurrentPhase().phaseName === "CommandPhase") {
+      // Between-wave callers deliberately stop BEFORE this exact phase so both clients can materialize
+      // before either input surface opens. Start the prepared host phase here, alongside the prepared guest
+      // phase above. Treating a merely-current phase as already started omitted the host rendezvous arrival
+      // and left the guest correctly sealed at MESSAGE on every wave after the first. A few older journeys
+      // intentionally ran the target CommandPhase before the next loop; preserve that already-open surface
+      // instead of starting the same phase twice.
+      if (rig.hostScene.ui.getMode() !== UiMode.COMMAND && rig.hostScene.ui.getMode() !== UiMode.FIGHT) {
+        rig.hostScene.phaseManager.getCurrentPhase().start();
+      }
+      await drainLoopback();
+    } else {
+      await hostGame.phaseInterceptor.to("CommandPhase");
+    }
+  });
+
+  await withClient(rig.guestCtx, async () => {
+    await drainLoopback();
+    expect(rig.guestScene.ui.getMode(), "guest command UI opens only after both clients arrive").toBe(UiMode.COMMAND);
+    expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Fight through COMMAND UI").toBe(true);
+    expect(rig.guestScene.ui.getMode(), "guest reaches the move picker").toBe(UiMode.FIGHT);
+    expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Tackle through FIGHT UI").toBe(true);
+
+    // The direct guest scene uses a manual phase manager. The Fight click queues the production target
+    // phase, so start that real queued phase before sending the target inputs.
+    const targetPhase = await driveClientPhaseQueueTo(rig.guestScene, "SelectTargetPhase");
+    targetPhase.start();
+    await drainLoopback();
+    expect(rig.guestScene.ui.getMode(), "guest reaches the real target picker").toBe(UiMode.TARGET_SELECT);
+    expect(rig.guestScene.ui.processInput(Button.RIGHT), "guest moves to the second enemy target").toBe(true);
+    expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the second enemy target").toBe(true);
+    await drainLoopback();
+    await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase");
+  });
+  await withClient(rig.hostCtx, () => drainLoopback());
+}
+
+/** Every in-process duo assembled by this module and not yet fully torn down. */
+const liveDuoRigs = new Set<DuoRig>();
+
+/**
+ * Dispose both independently assembled runtimes owned by a duo rig.
+ *
+ * `clearCoopRuntime()` can only see the process-global active runtime. Most duo tests leave the guest
+ * active after their final context swap, which used to dispose only that side and leave the host's
+ * retransmit/watchdog timers alive in the next test. Select each side explicitly so test isolation matches
+ * two real browser processes and no retained commit from a completed rig can bleed into another session.
+ */
+export function disposeDuoRig(rig: DuoRig): void {
+  liveDuoRigs.delete(rig);
+  for (const runtime of [rig.guestRuntime, rig.hostRuntime]) {
+    if (runtime.localTransport.state === "closed") {
+      continue;
+    }
+    setCoopRuntime(runtime);
+    clearCoopRuntime();
+  }
+}
+
+/**
+ * A duo test owns two runtimes even though production's global accessor exposes only one. Register this
+ * file-local hook once so every importing suite gets strict two-process-equivalent teardown, including a
+ * failed test that never reaches its own cleanup statements.
+ */
+afterEach(() => {
+  for (const rig of [...liveDuoRigs]) {
+    disposeDuoRig(rig);
+  }
+});
+
+interface RetainedWaveBoundaryBridge {
+  readonly hostScene: BattleScene;
+  readonly hostCtx: ClientCtx;
+  readonly runBattleEnd: () => Promise<void>;
+}
+
+/**
+ * Test-only bridge from a headless guest scene to the real host BattleEnd boundary that owns the complete
+ * retained WAVE_ADVANCE transaction. Production clients advance concurrently; the in-process duo harness
+ * deliberately pumps them sequentially and therefore must finish this host boundary before replaying a
+ * winning guest turn. Weak keys prevent a completed rig from becoming process-global test state.
+ */
+const retainedWaveBoundaryByGuestScene = new WeakMap<object, RetainedWaveBoundaryBridge>();
+
+function registerRetainedWaveBoundaryBridge(
+  hostGame: GameManager,
+  hostScene: BattleScene,
+  guestScene: BattleScene,
+  hostCtx: ClientCtx,
+): void {
+  retainedWaveBoundaryByGuestScene.set(guestScene, {
+    hostScene,
+    hostCtx,
+    runBattleEnd: async () => {
+      await hostGame.phaseInterceptor.to("BattleEndPhase");
+    },
+  });
+}
+
+async function maybeSealHostRetainedWaveBoundary(
+  guestScene: ReplayPumpScene,
+  sealRetainedWaveBoundary: boolean,
+): Promise<void> {
+  if (!sealRetainedWaveBoundary) {
+    return;
+  }
+  const bridge = retainedWaveBoundaryByGuestScene.get(guestScene as object);
+  if (bridge == null) {
+    return;
+  }
+  await withClient(bridge.hostCtx, async () => {
+    const hostBattle = bridge.hostScene.currentBattle;
+    const guestBattle = (guestScene as BattleScene).currentBattle;
+    const hostPhase = bridge.hostScene.phaseManager.getCurrentPhase();
+    const mysteryBattle =
+      hostBattle?.battleType === BattleType.MYSTERY_ENCOUNTER
+      || (coopMeHandoffBattleStarted() && coopMeHandoffBattleWaveValue() === hostBattle?.waveIndex);
+    if (
+      !isCoopWaveAdvanceOperationEnabled()
+      || bridge.hostCtx.runtime.controller.role !== "host"
+      || hostBattle == null
+      || guestBattle == null
+      || hostBattle.waveIndex !== guestBattle.waveIndex
+      || hostPhase?.phaseName !== "BattleEndPhase"
+      || mysteryBattle
+    ) {
+      return;
+    }
+    await bridge.runBattleEnd();
+  });
+  // The nested host pump restores the caller's guest context before this drain. Any retained envelope is
+  // therefore delivered/applied under the correct process-global scene/runtime in the sequential harness.
+  await drainLoopback();
 }
 
 /**
@@ -1102,9 +1867,15 @@ export async function buildDuo(
   // Headless best-effort UI: neutralize the host's achievement candy-bar UI (see neutralizeCoopCandyBar)
   // so a won wave's REALISTIC_FLASH candy grant on an evolved starter can't throw an unhandled rejection.
   neutralizeCoopCandyBar(hostScene);
-  const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
-  const guestRuntime = buildRuntime(pair.guest, "Guest", "authoritative");
-  const scheduledPair = pair as typeof pair & { flush?: (role: "host" | "guest", limit?: number) => number };
+  const suppliedPair = pair as typeof pair & { flush?: (role: CoopRole, limit?: number) => number };
+  // Full scheduled (including fault-wrapped scheduled) pairs already own destination delivery. Ordinary
+  // loopback/fault pairs gain only the retained-envelope pump; all other traffic remains automatic.
+  const runtimePair: DestinationEnvelopePumpPair =
+    typeof suppliedPair.flush === "function"
+      ? (suppliedPair as DestinationEnvelopePumpPair)
+      : destinationPumpOperationEnvelopes(suppliedPair);
+  const hostRuntime = buildRuntime(runtimePair.host, "Host", "authoritative");
+  const guestRuntime = buildRuntime(runtimePair.guest, "Guest", "authoritative");
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
 
@@ -1123,12 +1894,14 @@ export async function buildDuo(
     // #837: seed both ctxs from the host's current module-let state (the launch mirror), so each engine
     // starts identical and thereafter keeps its OWN money-streak / overstay / relic state.
     moduleLets: snapshotModuleLets(),
+    biomeState: snapshotBiomeModuleState(),
     mePins: { ...IDLE_ME_PINS },
-    ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("host") } : {}),
+    pumpInbound: () => runtimePair.flush("host"),
   };
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
   const guestScene = buildGuestScene(hostGame);
+  installHeadlessCoopSemanticProjectionOracle(guestScene);
   // BattleScene construction resets process-global ER module state. Production clients are separate
   // processes, so creating the guest must not clobber the already-running host's authoritative state.
   restoreModuleLets(hostCtx.moduleLets!);
@@ -1139,16 +1912,22 @@ export async function buildDuo(
     rndState: Phaser.Math.RND.state(),
     ghost: emptyGhostSnapshot(),
     moduleLets: structuredClone(hostCtx.moduleLets!),
+    biomeState: structuredClone(hostCtx.biomeState!),
     mePins: { ...IDLE_ME_PINS },
-    ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("guest") } : {}),
+    pumpInbound: () => runtimePair.flush("guest"),
   };
   await withClient(guestCtx, () => {
     toCoopGameMode(guestScene);
     mirrorHostBattleToGuest(hostScene, guestScene);
+    // The real-browser loader populates Phaser's texture/animation caches and advances the live sprite key.
+    // HEADLESS deliberately omits those renderer effects. Install their faithful completion model for every
+    // two-engine rig, rather than relying on individual tests to remember a non-gameplay wiring step.
+    installHeadlessPlayerAtlasCompletionModel(guestScene);
     const gf = guestScene.getPlayerField();
     gf[0].coopOwner = "host";
     gf[1].coopOwner = "guest";
   });
+  registerRetainedWaveBoundaryBridge(hostGame, hostScene, guestScene, hostCtx);
 
   // Connect both controllers over the live loopback (exchange hello / runConfig).
   setCoopRuntimeFn(hostRuntime);
@@ -1157,18 +1936,27 @@ export async function buildDuo(
   guestRuntime.controller.connect();
   await drainLoopback();
 
-  return { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair };
+  const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair: runtimePair };
+  liveDuoRigs.add(rig);
+  return rig;
 }
 
 /**
- * Re-mirror the host's CURRENT (freshly-rolled, post-shop) battle onto the guest scene for the next
- * wave. In production the guest reaches wave N+1 through its own NewBattlePhase -> EncounterPhase ->
- * adoptCoopHostEnemyParty; the duo harness instead re-applies {@linkcode mirrorHostBattleToGuest}
- * per wave (the spike's wave-1 technique, looped) so the guest's REAL replay pipeline runs against
- * each wave's host-authoritative field without driving the full launch handshake. Runs inside
- * withClient(guestCtx) so globalScene is the guest while the clone is built.
+ * Re-mirror a deliberately abbreviated/bootstrapped guest fixture. A guest that already crossed the real
+ * queued NewBattle -> Encounter -> Command boundary must retain the state it adopted from the carrier;
+ * overwriting it here would turn a production-transition test back into a state-clone test.
  */
 export async function remirrorWave(rig: DuoRig, opts?: { preserveGuestPlayerParty?: boolean }): Promise<void> {
+  const materialized = realGuestCommandBoundaries.get(rig.guestScene);
+  if (
+    materialized != null
+    && materialized.wave === rig.hostScene.currentBattle.waveIndex
+    && materialized.wave === rig.guestScene.currentBattle.waveIndex
+    && materialized.turn === rig.guestScene.currentBattle.turn
+  ) {
+    return;
+  }
+  realGuestCommandBoundaries.delete(rig.guestScene);
   await withClient(rig.guestCtx, () => {
     mirrorHostBattleToGuest(rig.hostScene, rig.guestScene, opts);
     const gf = rig.guestScene.getPlayerField();
@@ -1185,12 +1973,49 @@ export async function remirrorWave(rig: DuoRig, opts?: { preserveGuestPlayerPart
 }
 
 /**
- * Materialize the command-boundary arrival omitted by {@linkcode remirrorWave}'s abbreviated guest
- * transition. Call this AFTER both reward terminals and BEFORE awaiting the host's next CommandPhase:
- * the host phase is fail-closed and therefore cannot finish first so a later remirror can rescue it.
- * This sends a real rendezvous frame and drains the loopback; it never authorizes a unilateral cross.
+ * Bring the two-engine fixture to a reciprocal command boundary.
+ *
+ * For an ordinary next-turn rendezvous, the already-materialized guest only needs to announce arrival.
+ * For a between-wave boundary, first drive the HOST's real post-shop queue until its Encounter publishes
+ * the retained enemy carrier, then drive the GUEST's real CoopPartnerSync -> NewBattle -> Encounter queue
+ * until it consumes that carrier and reaches CommandPhase. Only after both engines have materialized the
+ * exact wave/turn does the harness announce the guest command arrival. This preserves the production
+ * ordering while leaving the host CommandPhase unstarted for the test framework's public driver.
  */
 export async function arriveGuestCommandBoundary(rig: DuoRig, wave: number, turn = 1): Promise<void> {
+  if (rig.hostScene.currentBattle.waveIndex < wave || rig.guestScene.currentBattle.waveIndex < wave) {
+    await withClient(rig.hostCtx, () =>
+      driveClientPhaseQueueTo(rig.hostScene, `host wave ${wave} CommandPhase`, {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && rig.hostScene.currentBattle.waveIndex === wave
+          && rig.hostScene.currentBattle.turn === turn,
+      }),
+    );
+    await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, `guest wave ${wave} CommandPhase`, {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && rig.guestScene.currentBattle.waveIndex === wave
+          && rig.guestScene.currentBattle.turn === turn,
+      }),
+    );
+    markRealGuestCommandBoundary(rig.guestScene, wave, turn);
+  }
+
+  if (
+    rig.hostScene.currentBattle.waveIndex !== wave
+    || rig.guestScene.currentBattle.waveIndex !== wave
+    || rig.hostScene.currentBattle.turn !== turn
+    || rig.guestScene.currentBattle.turn !== turn
+  ) {
+    throw new Error(
+      `command boundary ${wave}:${turn} was not materialized on both clients `
+        + `(host=${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}, `
+        + `guest=${rig.guestScene.currentBattle.waveIndex}:${rig.guestScene.currentBattle.turn})`,
+    );
+  }
+
   await withClient(rig.guestCtx, () => {
     rig.guestRuntime.rendezvous.arrive(`cmd:${wave}:${turn}`);
   });
@@ -1256,10 +2081,14 @@ export const REPLAY_DRAIN_PHASES = new Set([
 
 /** Minimal phase-manager surface the guest replay pump needs (the guest scene satisfies it). */
 interface ReplayPumpScene {
+  currentBattle: { waveIndex: number; turn: number };
   phaseManager: {
+    clearPhaseQueue: () => void;
     create: (n: "CoopReplayTurnPhase", t: number) => Phase;
     getCurrentPhase(): Phase;
     getQueuedPhaseNames?: () => string[];
+    shiftPhase: () => void;
+    unshiftPhase: (phase: Phase) => void;
   };
 }
 
@@ -1269,17 +2098,43 @@ interface ReplayPumpScene {
  * withClient(guestCtx, ...). Throws on a >16-iter no-progress stall (the hang-detection the duo
  * harness exists to surface). Returns when the finalize has run (checkpoint applied, tail queued).
  */
-export async function driveGuestReplayTurn(guestScene: ReplayPumpScene, turn: number): Promise<void> {
+export async function driveGuestReplayTurn(
+  guestScene: ReplayPumpScene,
+  turn: number,
+  options: { sealRetainedWaveBoundary?: boolean } = {},
+): Promise<void> {
+  await maybeSealHostRetainedWaveBoundary(guestScene, options.sealRetainedWaveBoundary !== false);
   // Production-transition journeys arrive here through the guest's real TurnStartPhase, which has already
   // queued and selected CoopReplayTurnPhase. Reuse that CURRENT object so its end() advances the same phase
   // tree (Victory/reward/NewBattle tails cannot be stranded behind an unrelated constructor phase). Legacy
   // focused repros that deliberately invoke the replay seam still get a detached freshly-created phase.
   const current = guestScene.phaseManager.getCurrentPhase();
-  const replay =
-    current?.phaseName === "CoopReplayTurnPhase"
-      ? current
-      : guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
-  replay.start();
+  const realBoundary = realGuestCommandBoundaries.get(guestScene);
+  let replay: Phase;
+  let replayStarted = false;
+  if (current?.phaseName === "CoopReplayTurnPhase") {
+    replay = current;
+  } else {
+    replay = guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
+    if (
+      realBoundary?.wave === guestScene.currentBattle.waveIndex
+      && guestScene.currentBattle.turn === turn
+      && current?.phaseName === "CommandPhase"
+    ) {
+      // The production guest reaches CoopReplayTurnPhase through TurnStart after public commands. These
+      // engine-focused tests supply commands to the host relay directly, so replace the now-proven guest
+      // command surface with the authoritative replay through the REAL phase manager. Clearing the local
+      // command-resolution tail is the same structural diversion TurnStart performs in production; most
+      // importantly, replay.end() now advances ITS OWN queue instead of an unrelated stale NewBattle tail.
+      guestScene.phaseManager.clearPhaseQueue();
+      guestScene.phaseManager.unshiftPhase(replay);
+      guestScene.phaseManager.shiftPhase();
+      replayStarted = true;
+    }
+  }
+  if (!replayStarted) {
+    replay.start();
+  }
   await drainLoopback();
   // Stall detection by phase IDENTITY (#827): the #782 instant-streaming continuation re-enters as a NEW
   // CoopReplayTurnPhase object each increment, so a real advance resets the counter; only the SAME object
@@ -1287,6 +2142,11 @@ export async function driveGuestReplayTurn(guestScene: ReplayPumpScene, turn: nu
   // phase object changes every iteration anyway). The #847 finishTurnNoStream path still terminates the
   // loop cleanly: on a host stall the pump ends WITHOUT a CoopFinalizeTurnPhase, so the next current phase
   // is a turn-end phase outside this set and the loop returns.
+  // A detached/current replay was started explicitly above. The production-boundary branch only
+  // installed it through the test phase manager (whose automatic starter is inert), so it still needs
+  // exactly one start in the loop. An async replay can then remain current across several transport
+  // drains; never start that same object a second time.
+  let startedPhase: Phase | null = replayStarted ? null : replay;
   let lastPhase: Phase | null = null;
   let stall = 0;
   for (let i = 0; i < 256; i++) {
@@ -1309,7 +2169,10 @@ export async function driveGuestReplayTurn(guestScene: ReplayPumpScene, turn: nu
     }
     lastPhase = cur;
     const wasFinalize = cur.phaseName === "CoopFinalizeTurnPhase";
-    cur.start();
+    if (cur !== startedPhase) {
+      startedPhase = cur;
+      cur.start();
+    }
     await drainLoopback();
     if (wasFinalize) {
       return;
@@ -1404,9 +2267,40 @@ export interface ShopPhaseSeam {
   coopInteractionStart: number;
   typeOptions: unknown[];
   selectRewardModifierOption(cursor: number, cb: () => boolean): boolean;
-  coopRelaySend(choice: number, data: number[] | undefined, label: string): void;
+  coopRelaySend(choice: number, data: number[] | undefined, label: string): boolean;
   coopEndMirror(): void;
   coopAdvanceInteraction(): void;
+}
+
+/**
+ * Reach the reward shop through the client's queued production victory tail.
+ *
+ * Detached `new SelectModifierPhase()` fixtures skip BattleEnd, so a retained WAVE_ADVANCE correctly
+ * remains the unacknowledged head of the global operation stream and every later reward result waits
+ * behind it. Production never enters a shop that way. This helper makes transition tests execute the
+ * real Victory -> BattleEnd -> SelectModifier path and stops before the public reward surface starts.
+ * Call inside the destination client's {@linkcode withClient} context.
+ */
+export async function reachQueuedRewardShop(
+  scene: BattleScene,
+  options: {
+    pumpPeer?: () => Promise<void>;
+    drivePublicPhaseInput?: (phase: Phase) => boolean | Promise<boolean>;
+  } = {},
+): Promise<ShopPhaseSeam> {
+  const current = scene.phaseManager.getCurrentPhase();
+  const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+
+  // Detached replay fixtures can finish with the real post-battle boundary wake / Victory tail queued
+  // behind the scene's inert boot TitlePhase. Production reaches the same queued phase by ending the
+  // replay/current engine phase. Admit only those exact production-owned shapes, then continue through
+  // the real phase manager; do not clear the queue or construct/apply a reward surface out of order.
+  if (current?.phaseName === "TitlePhase" && (queued[0] === "CoopFinalizeTurnPhase" || queued[0] === "VictoryPhase")) {
+    scene.phaseManager.shiftPhase();
+    await drainLoopback();
+  }
+
+  return (await driveClientPhaseQueueTo(scene, "SelectModifierPhase", options)) as unknown as ShopPhaseSeam;
 }
 
 /**
@@ -1419,15 +2313,42 @@ export interface ShopPhaseSeam {
  */
 export async function driveHostRewardShopOwner(
   hostPhase: ShopPhaseSeam,
-  opts: { takeReward?: boolean; reviveSlot?: number } = {},
+  opts: {
+    takeReward?: boolean;
+    reviveSlot?: number;
+    /** The real queued phase already arrived while routing a late retained partner boundary. */
+    alreadyStarted?: boolean;
+    /** Start/arrive the other real client at this same reciprocal shop boundary. */
+    partnerReady?: () => Promise<void>;
+    /** Let the other client materialize the retained terminal before the owner continues. */
+    partnerSettle?: () => Promise<void>;
+  } = {},
 ): Promise<number> {
   // start() resolves owner/watcher from the pinned counter, streams the rolled options to the watcher,
   // and opens the owner screen (the prompt handler would drive the UI; here we drive the logic directly).
-  hostPhase.start();
-  await drainLoopback();
+  if (!opts.alreadyStarted) {
+    hostPhase.start();
+  }
+  await opts.partnerReady?.();
+  // A guest owner adopts the host-rolled list over transport. Real UI input cannot occur until that
+  // asynchronous adoption populates the grid; observe the same readiness boundary here so takeReward
+  // cannot mistake an empty, not-yet-delivered list for a request to leave.
+  for (let i = 0; i < 16; i++) {
+    await drainLoopback();
+    if ((hostPhase.typeOptions as unknown[]).length > 0) {
+      break;
+    }
+  }
   const pinned = hostPhase.coopInteractionStart;
   const noop = () => false;
   let tookTerminalReward = false;
+  let partnerSettled = false;
+  const settlePartner = async (): Promise<void> => {
+    if (!partnerSettled) {
+      partnerSettled = true;
+      await opts.partnerSettle?.();
+    }
+  };
   // #832 REVIVE-TAKE (level soak): when the caller passes a fainted `reviveSlot` AND this wave's REAL pool
   // rolled a Revive (it gates on a fainted party member), TAKE it (revive that mon) over leaving it dead.
   // A Revive is a party-target reward, so drive the ONE PARTY open the owner's openModifierMenu issues -
@@ -1459,6 +2380,8 @@ export async function driveHostRewardShopOwner(
         ui.setModeWithoutClear = realSetModeWithoutClear; // restore even if the PARTY open never came
       }
       await drainLoopback();
+      await settlePartner();
+      await drainLoopback();
       return pinned;
     }
   }
@@ -1479,23 +2402,56 @@ export async function driveHostRewardShopOwner(
     }
   }
   if (!tookTerminalReward) {
-    // LEAVE: relay the skip + advance the interaction counter (the watcher mirrors this terminal).
+    // LEAVE: relay the skip. A retained guest-owned intent deliberately parks this owner until the
+    // host watcher commits and returns the complete result; advancing/end() here would let NewBattlePhase
+    // open and then allow the late result to rewind its battle state underneath that continuation.
     hostPhase.coopEndMirror();
-    hostPhase.coopRelaySend(/* COOP_INTERACTION_LEAVE */ -1, undefined, "skip");
-    hostPhase.end();
-    hostPhase.coopAdvanceInteraction();
+    const parkedForAuthority = hostPhase.coopRelaySend(/* COOP_INTERACTION_LEAVE */ -1, undefined, "skip");
+    if (!parkedForAuthority) {
+      hostPhase.end();
+      hostPhase.coopAdvanceInteraction();
+    }
   }
+  await drainLoopback();
+  await settlePartner();
   await drainLoopback();
   return pinned;
 }
 
+/** Wait until an already-started owner shop reaches the same public input boundary a human sees. */
+async function awaitRewardShopOwnerInputReady(hostPhase: ShopPhaseSeam): Promise<number> {
+  const pinned = hostPhase.coopInteractionStart;
+  let shopReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    await drainLoopback();
+    const handler = globalScene.ui.getHandler() as unknown as { awaitingActionInput?: boolean };
+    const ui = globalScene.ui as unknown as { overlayActive?: boolean };
+    if (
+      globalScene.ui.getMode() === UiMode.MODIFIER_SELECT
+      && handler.awaitingActionInput === true
+      && ui.overlayActive !== true
+    ) {
+      shopReady = true;
+      break;
+    }
+  }
+  if (!shopReady) {
+    const handler = globalScene.ui.getHandler() as unknown as { awaitingActionInput?: boolean };
+    const ui = globalScene.ui as unknown as { overlayActive?: boolean };
+    throw new Error(
+      `reward UI owner did not become input-ready (mode=${UiMode[globalScene.ui.getMode()]}, awaiting=${handler.awaitingActionInput === true}, overlay=${ui.overlayActive === true}, pinned=${pinned})`,
+    );
+  }
+  return pinned;
+}
+
 /**
- * Drive the ordinary reward-shop LEAVE path exclusively through the public UI adapter. This is the
- * production-transition counterpart to the legacy seam driver above: phase start opens the real
- * MODIFIER_SELECT handler, CANCEL opens its real confirmation, and ACTION commits the leave intent.
- * No private selection/terminal method is invoked. MUST run inside the owner's ClientCtx.
+ * Start the ordinary reward owner phase and keep its ClientCtx installed until the real public handler is
+ * input-ready. This explicit half-step lets a two-engine test switch to the destination client and settle
+ * an independently-awaited watcher continuation before returning to drive the owner. No gameplay input is
+ * synthesized here. MUST run inside the owner's ClientCtx.
  */
-export async function driveRewardShopOwnerLeaveViaUi(hostPhase: ShopPhaseSeam): Promise<number> {
+export async function beginRewardShopOwnerUi(hostPhase: ShopPhaseSeam): Promise<number> {
   // The legacy multiwave fixture constructs the non-current client's matching shop phase directly.
   // Its previous watcher UI can therefore remain MODIFIER_SELECT even though production's real phase
   // tail would have cleared it. Force a clean MESSAGE base only for that synthetic phase so setMode
@@ -1504,18 +2460,42 @@ export async function driveRewardShopOwnerLeaveViaUi(hostPhase: ShopPhaseSeam): 
     await globalScene.ui.setModeForceTransition(UiMode.MESSAGE);
   }
   hostPhase.start();
-  await drainLoopback();
-  const pinned = hostPhase.coopInteractionStart;
-  if (globalScene.ui.getMode() !== UiMode.MODIFIER_SELECT) {
-    throw new Error(
-      `reward UI owner did not open MODIFIER_SELECT (mode=${UiMode[globalScene.ui.getMode()]}, pinned=${pinned})`,
-    );
-  }
+  return awaitRewardShopOwnerInputReady(hostPhase);
+}
+
+/**
+ * Drive the ordinary reward-shop LEAVE path exclusively through the public UI adapter. This is the
+ * production-transition counterpart to the legacy seam driver above: phase start opens the real
+ * MODIFIER_SELECT handler, CANCEL opens its real confirmation, and ACTION commits the leave intent.
+ * No private selection/terminal method is invoked. MUST run inside the owner's ClientCtx.
+ */
+export async function driveRewardShopOwnerLeaveViaUi(
+  hostPhase: ShopPhaseSeam,
+  opts: { alreadyStarted?: boolean } = {},
+): Promise<number> {
+  // Opening the production shop is asynchronous twice over: the reciprocal co-op barrier must release,
+  // then the real handler waits for its reward/tween/tutorial work before it accepts input. Merely seeing
+  // MODIFIER_SELECT is insufficient because setMode installs the mode before the transition overlay and
+  // AwaitableUiHandler are ready. A human cannot press through that overlay; doing so here made the public
+  // driver report CANCEL=false while a later callback continued in the background. Wait for the exact
+  // public-input boundary instead of racing it.
+  const pinned = opts.alreadyStarted
+    ? await awaitRewardShopOwnerInputReady(hostPhase)
+    : await beginRewardShopOwnerUi(hostPhase);
   if (!globalScene.ui.processInput(Button.CANCEL)) {
     throw new Error(`reward UI owner rejected CANCEL at interaction ${pinned}`);
   }
-  await drainLoopback();
-  if (globalScene.ui.getMode() !== UiMode.CONFIRM) {
+
+  let confirmReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    await drainLoopback();
+    const ui = globalScene.ui as unknown as { overlayActive?: boolean };
+    if (globalScene.ui.getMode() === UiMode.CONFIRM && ui.overlayActive !== true) {
+      confirmReady = true;
+      break;
+    }
+  }
+  if (!confirmReady) {
     throw new Error(
       `reward UI owner did not open leave CONFIRM (mode=${UiMode[globalScene.ui.getMode()]}, pinned=${pinned})`,
     );
@@ -1537,6 +2517,115 @@ export async function beginRewardShopWatch(guestPhase: ShopPhaseSeam): Promise<n
 }
 
 /**
+ * Drive a host-owned teach-a-move reward through the real reward phase and its real PARTY callback.
+ * The callback is the public party UI's resolved selection seam: invoking it runs the production
+ * `coopFlushPending` path, retains the typed intent, applies the modifier on the authority, and publishes
+ * the complete result. No raw relay frame or direct state application is synthesized here.
+ *
+ * The watcher must already be parked before calling this helper so the shop rendezvous is reciprocal.
+ * Call inside the host's {@linkcode withClient} context.
+ */
+export async function driveHostTeachMoveRewardOwner(
+  hostPhase: ShopPhaseSeam,
+  pick: { slot: number; moveIndex: number },
+): Promise<number> {
+  hostPhase.start();
+  await drainLoopback();
+  const pinned = hostPhase.coopInteractionStart;
+  const rewardIndex = (hostPhase.typeOptions as { type?: unknown }[]).findIndex(
+    option =>
+      option.type instanceof TmModifierType
+      || option.type instanceof RememberMoveModifierType
+      || option.type instanceof ErLearnersShroomModifierType
+      || option.type instanceof ErTmCaseModifierType,
+  );
+  if (rewardIndex < 0) {
+    throw new Error(`teach-move reward owner found no compatible reward at interaction ${pinned}`);
+  }
+
+  const ui = globalScene.ui as unknown as { setModeWithoutClear: (...args: unknown[]) => unknown };
+  const realSetModeWithoutClear = ui.setModeWithoutClear.bind(ui);
+  let partySurfaceOpened = false;
+  ui.setModeWithoutClear = (...args: unknown[]): unknown => {
+    if (args[0] === UiMode.PARTY) {
+      partySurfaceOpened = true;
+      ui.setModeWithoutClear = realSetModeWithoutClear;
+      (args[3] as (slotIndex: number, option: number) => void)(pick.slot, pick.moveIndex);
+      return;
+    }
+    return realSetModeWithoutClear(...args);
+  };
+  try {
+    hostPhase.selectRewardModifierOption(rewardIndex, () => false);
+    for (let i = 0; i < 8; i++) {
+      await drainLoopback();
+    }
+  } finally {
+    ui.setModeWithoutClear = realSetModeWithoutClear;
+  }
+  if (!partySurfaceOpened) {
+    throw new Error(`teach-move reward owner never opened PARTY at interaction ${pinned}`);
+  }
+  return pinned;
+}
+
+/**
+ * Observe a watcher materializing a retained teach-a-move result through its real queued phase tail.
+ * Starts the watcher first, calls `driveOwner` only after the reciprocal surface exists, then pumps the
+ * retained result until the projected LearnMovePhase runs and removes its back-out shop continuation.
+ * Call inside the watcher's {@linkcode withClient} context; `driveOwner` may temporarily install the host.
+ */
+export async function driveRetainedTeachMoveRewardWatch(
+  guestPhase: ShopPhaseSeam,
+  driveOwner: () => Promise<void>,
+): Promise<{ queuedContinuation: boolean; queuedLearnMove: boolean; continuationRemoved: boolean }> {
+  const pm = globalScene.phaseManager as unknown as {
+    getCurrentPhase(): Phase | undefined;
+    unshiftPhase(phase: { phaseName?: string }): void;
+    tryRemovePhase(name: string): boolean;
+  };
+  const queued: string[] = [];
+  const removed: string[] = [];
+  const originalUnshift = pm.unshiftPhase.bind(pm);
+  const originalTryRemove = pm.tryRemovePhase.bind(pm);
+  pm.unshiftPhase = (phase: { phaseName?: string }) => {
+    queued.push(phase.phaseName ?? "?");
+    originalUnshift(phase);
+  };
+  pm.tryRemovePhase = (name: string) => {
+    removed.push(name);
+    return originalTryRemove(name);
+  };
+
+  try {
+    await beginRewardShopWatch(guestPhase);
+    await driveOwner();
+    for (let i = 0; i < 32; i++) {
+      await drainLoopback();
+      if (queued.includes("LearnMovePhase")) {
+        break;
+      }
+    }
+    const current = pm.getCurrentPhase();
+    if (current?.phaseName === "LearnMovePhase") {
+      current.start();
+      for (let i = 0; i < 8; i++) {
+        await drainLoopback();
+      }
+    }
+  } finally {
+    pm.unshiftPhase = originalUnshift;
+    pm.tryRemovePhase = originalTryRemove;
+  }
+
+  return {
+    queuedContinuation: queued.includes("SelectModifierPhase"),
+    queuedLearnMove: queued.includes("LearnMovePhase"),
+    continuationRemoved: removed.includes("SelectModifierPhase"),
+  };
+}
+
+/**
  * Drive the GUEST's REAL watcher reward shop: start the phase (it detects watcher from the pinned
  * counter+role, adopts the owner's streamed option list, and runs startCoopWatch's relay loop),
  * draining the loopback so the relayed owner picks + the terminal LEAVE arrive and are applied.
@@ -1545,10 +2634,44 @@ export async function beginRewardShopWatch(guestPhase: ShopPhaseSeam): Promise<n
  */
 const REWARD_WATCH_MAX_IDLE = 32;
 
+/**
+ * Require a real queued reward phase to release before a caller crosses into its next surface. Mechanical
+ * counter/result completion is necessary but insufficient: SelectModifierPhase ends only after its bounded
+ * MESSAGE transition settles. Call inside the phase owner's ClientCtx. An already-exited phase is a no-op;
+ * detached-fixture compatibility is isolated in driveGuestRewardWatch and earns no queue-exit proof.
+ */
+export async function awaitRewardShopPhaseExit(phase: ShopPhaseSeam): Promise<void> {
+  const phaseManager = globalScene.phaseManager;
+  if (phaseManager.getCurrentPhase() !== (phase as unknown as Phase)) {
+    return;
+  }
+  for (let attempt = 0; attempt < 320; attempt++) {
+    await drainLoopback();
+    if (phaseManager.getCurrentPhase() !== (phase as unknown as Phase)) {
+      return;
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, 10));
+  }
+  const queued = phaseManager.getQueuedPhaseNames?.() ?? [];
+  throw new Error(
+    "reward terminal completed but live SelectModifierPhase did not exit within 320 pumps "
+      + `(interaction=${phase.coopInteractionStart}, queued=[${queued.join(",")}])`,
+  );
+}
+
 export async function driveGuestRewardWatch(
   guestPhase: ShopPhaseSeam,
   opts: { alreadyStarted?: boolean } = {},
 ): Promise<void> {
+  const phaseManager = globalScene.phaseManager;
+  // Production queues one concrete SelectModifierPhase and Phase.end() must actually release it before
+  // the next surface is ready. A counter advance is only the mechanical terminal: the UI transition that
+  // calls super.end() can still be pending. Returning at the counter used to let the shared-process soak
+  // swap globals while that promise was unresolved, leaving the guest on SelectModifierPhase while the
+  // host entered Crossroads/World Map. Keep detached legacy fixtures compatible in one isolated branch;
+  // they deliberately drive a phase that is not installed in the phase manager and therefore have no
+  // meaningful queue-exit boundary to await.
+  const drivesLiveQueuedPhase = phaseManager.getCurrentPhase() === (guestPhase as unknown as Phase);
   // start() (watcher branch) is async-ish: it awaits the owner's options, opens the cosmetic screen,
   // then loops on awaitInteractionChoice. We kick it off, then drain the loopback repeatedly so each
   // buffered/relayed owner pick is delivered + applied until the LEAVE/terminal ADVANCES the interaction.
@@ -1558,11 +2681,14 @@ export async function driveGuestRewardWatch(
   // the phase's end() directly as a third completion signal (found by the #789 exploration probe:
   // the old leave-or-advance detector misread this legitimate terminal as a WATCH HANG).
   let terminalApplied = false;
-  const seamApply = guestPhase as unknown as { applyRelayedRewardAction?: (a: unknown) => boolean };
+  const seamApply = guestPhase as unknown as { applyRelayedRewardAction?: (...args: unknown[]) => boolean };
   const realApply = seamApply.applyRelayedRewardAction?.bind(guestPhase);
   if (realApply) {
-    seamApply.applyRelayedRewardAction = (a: unknown): boolean => {
-      const terminal = realApply(a);
+    seamApply.applyRelayedRewardAction = (...args: unknown[]): boolean => {
+      // Forward the complete watcher decision. Dropping its second argument strips the retained
+      // operationId/requiresAuthorityCommit proof on guest-owned rewards and can make the owner apply a
+      // raw terminal without committing the RESULT, leaving the guest parked one interaction behind.
+      const terminal = realApply(...args);
       terminalApplied ||= terminal;
       return terminal;
     };
@@ -1579,13 +2705,32 @@ export async function driveGuestRewardWatch(
     const counter = getCoopRuntime()?.controller.interactionCounter();
     return counter != null && pinned >= 0 && counter > pinned;
   };
+  let mechanicalTerminalReached = false;
   for (let i = 0; i < REWARD_WATCH_MAX_IDLE; i++) {
     await drainLoopback();
     // Completed when EITHER the watcher left (coopWatcher cleared - e.g. a no-relay short-circuit) OR the
     // interaction counter advanced past the pinned one (the owner's terminal was mirrored + applied).
     if (!(guestPhase as unknown as { coopWatcher: boolean }).coopWatcher || advancedPastPinned() || terminalApplied) {
+      mechanicalTerminalReached = true;
+      break;
+    }
+  }
+  if (mechanicalTerminalReached) {
+    if (!drivesLiveQueuedPhase) {
       return;
     }
+    // A host watching a guest-owned retained intent has only consumed the INTENT here. Its current phase
+    // cannot exit until the guest materializes the host RESULT and the exact receipt returns. The caller
+    // must pump that peer causal leg, then use awaitRewardShopPhaseExit on both live phases. This is not a
+    // completed counter-only terminal: the local counter is deliberately still pinned.
+    if (terminalApplied && !advancedPastPinned()) {
+      return;
+    }
+    // Keep this client's complete context installed until the real async MESSAGE transition invokes
+    // super.end() and PhaseManager selects the next queued phase. This is event-driven in browsers; the
+    // bounded timer loop models Phaser's headless transition fallback without mutating the phase/counter.
+    await awaitRewardShopPhaseExit(guestPhase);
+    return;
   }
   // NO-PROGRESS STALL: after REWARD_WATCH_MAX_IDLE drains the watcher neither left NOR advanced the
   // interaction - the owner's terminal never arrived (a relay drop / owner hang / counter-parity mismatch).
@@ -1853,8 +2998,17 @@ export async function buildDuoForMe(
   // Headless best-effort UI: neutralize the host's achievement candy-bar UI (see neutralizeCoopCandyBar)
   // so a won wave's REALISTIC_FLASH candy grant on an evolved starter can't throw an unhandled rejection.
   neutralizeCoopCandyBar(hostScene);
-  const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
-  const guestRuntime = buildRuntime(pair.guest, "Guest", "authoritative");
+  const suppliedPair = pair as typeof pair & { flush?: (role: CoopRole, limit?: number) => number };
+  // Mystery encounters use the same retained operation carriers as ordinary battle/reward journeys.
+  // Give their legacy loopback rig the same destination-context adapter as buildDuo: otherwise an
+  // inbound ME/reward continuation can resume while the sender's process-global scene is installed,
+  // a state that cannot occur when the two players run in separate browsers.
+  const runtimePair: DestinationEnvelopePumpPair =
+    typeof suppliedPair.flush === "function"
+      ? (suppliedPair as DestinationEnvelopePumpPair)
+      : destinationPumpOperationEnvelopes(suppliedPair);
+  const hostRuntime = buildRuntime(runtimePair.host, "Host", "authoritative");
+  const guestRuntime = buildRuntime(runtimePair.guest, "Guest", "authoritative");
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
 
@@ -1873,11 +3027,14 @@ export async function buildDuoForMe(
     // #837: seed both ctxs from the host's current module-let state (the launch mirror), so each engine
     // starts identical and thereafter keeps its OWN money-streak / overstay / relic state.
     moduleLets: snapshotModuleLets(),
+    biomeState: snapshotBiomeModuleState(),
     mePins: { ...IDLE_ME_PINS },
+    pumpInbound: () => runtimePair.flush("host"),
   };
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
   const guestScene = buildGuestScene(hostGame);
+  installHeadlessCoopSemanticProjectionOracle(guestScene);
   const guestCtx: ClientCtx = {
     label: "guest",
     scene: guestScene,
@@ -1885,15 +3042,22 @@ export async function buildDuoForMe(
     rndState: Phaser.Math.RND.state(),
     ghost: emptyGhostSnapshot(),
     moduleLets: snapshotModuleLets(),
+    biomeState: structuredClone(hostCtx.biomeState!),
     mePins: { ...IDLE_ME_PINS },
+    pumpInbound: () => runtimePair.flush("guest"),
   };
   await withClient(guestCtx, () => {
     toCoopGameMode(guestScene);
     mirrorHostMeToGuest(hostScene, guestScene);
+    // Mystery rigs are a separate construction path from buildDuo. They still cross ordinary biome
+    // transitions after the embedded encounter, so install the same production-shaped renderer cache
+    // completion model before the first retained transition tail can run.
+    installHeadlessPlayerAtlasCompletionModel(guestScene);
     const gf = guestScene.getPlayerField();
     gf[0].coopOwner = "host";
     gf[1].coopOwner = "guest";
   });
+  registerRetainedWaveBoundaryBridge(hostGame, hostScene, guestScene, hostCtx);
 
   // Connect both controllers over the live loopback (exchange hello / runConfig).
   setCoopRuntimeFn(hostRuntime);
@@ -1902,7 +3066,9 @@ export async function buildDuoForMe(
   guestRuntime.controller.connect();
   await drainLoopback();
 
-  return { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair };
+  const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair: runtimePair };
+  liveDuoRigs.add(rig);
+  return rig;
 }
 
 /** Minimal phase-manager surface the guest ME replay pump needs (the guest scene satisfies it). */
@@ -1988,6 +3154,48 @@ export async function startGuestMeReplay(guestScene: MeReplayPumpScene): Promise
 }
 
 /**
+ * Cross the embedded host-owned ME reward shop with both real client engines present. The host caller
+ * remains on its live SelectModifierPhase while the guest starts its production CoopReplayMePhase,
+ * arrives at the reciprocal watcher boundary, and later consumes the owner's retained shop terminal.
+ * Returns the already-running guest replay so the caller can settle it after PostMysteryEncounter emits
+ * the comprehensive ME terminal. MUST be called while the host ClientCtx is installed.
+ */
+export async function driveHostMeRewardShopWithGuestReplay(
+  hostPhase: ShopPhaseSeam,
+  guestCtx: ClientCtx,
+  guestScene: MeReplayPumpScene,
+): Promise<Phase> {
+  let replay: Phase | null = null;
+  let guestShop: ShopPhaseSeam | null = null;
+  await driveHostRewardShopOwner(hostPhase, {
+    takeReward: false,
+    partnerReady: async () => {
+      replay = await withClient(guestCtx, () => startGuestMeReplay(guestScene));
+      // A browser cannot let the host commit a shop terminal until the guest's real queued shop has
+      // started and announced the reciprocal `shop:<wave>:<counter>` rendezvous. Merely starting the ME
+      // replay leaves that SelectModifierPhase queued: direct host-seam input could then bypass its own
+      // closed UI while the rendezvous recovery correctly remained armed. Start the production phase and
+      // wait for its authoritative option projection before allowing the owner driver to send LEAVE.
+      guestShop = await withClient(guestCtx, () => startGuestMeShopOwner(guestScene as BattleScene));
+    },
+    partnerSettle: async () => {
+      if (guestShop == null) {
+        throw new Error("host-owned ME reward shop never reached its guest watcher boundary");
+      }
+      const settledGuestShop = guestShop;
+      // Consume the owner's retained terminal through the watcher phase itself. This proves both the
+      // mechanical result and the real phase exit instead of leaving a hidden shop waiter behind while
+      // PostMysteryEncounterPhase advances to the terminal transaction.
+      await withClient(guestCtx, () => driveGuestRewardWatch(settledGuestShop, { alreadyStarted: true }));
+    },
+  });
+  if (replay == null) {
+    throw new Error("host-owned ME reward shop never started its guest replay partner");
+  }
+  return replay;
+}
+
+/**
  * Relay the GUEST's top-level ME option INDEX when the guest OWNS the ME (#633 BLOCK-3) - the SEND ONLY,
  * WITHOUT starting the guest's outcome/terminal race. This split is load-bearing for the duo harness's
  * bidirectional handshake:
@@ -1996,13 +3204,48 @@ export async function startGuestMeReplay(guestScene: MeReplayPumpScene): Promise
  *    host has buffered the meResync (8M) + LEAVE (9M) - else the race's awaits, being pending while the
  *    HOST drives (STEP C), resolve under the HOST globalScene (a cross-ctx continuation: applyCoopMeOutcome
  *    + leaveEncounterWithoutBattle would run against the HOST scene, and the guest never converges).
- * So this sends the EXACT wire {@linkcode CoopReplayMePhase.handleGuestOptionSelect} sends (an "me"
- * interactionChoice on the 8M pick seq), and {@linkcode startGuestMeOutcomeRace} starts the race in STEP D.
+ * This shared-process split cannot invoke {@linkcode CoopReplayMePhase.handleGuestOptionSelect} because that
+ * method also arms the outcome await immediately. It must nevertheless cross the SAME authoritative owner
+ * seam before sending the SAME addressed proposal: mint the retained ME_PICK intent, advance the replay's
+ * stable pick ordinal, then carry that ordinal in the "me" interactionChoice data. The browser lane drives
+ * the public UI method itself; this engine harness isolates its await only to preserve destination context.
+ * {@linkcode startGuestMeOutcomeRace} starts that await later in STEP D.
  * MUST be called inside `withClient(guestCtx, ...)`.
  */
 export function relayGuestMeOptionIndexOnly(replay: Phase, index: number): void {
-  const seq = (replay as unknown as { seq: number }).seq;
-  getCoopInteractionRelay()?.sendInteractionChoice(seq, "me", index);
+  const seam = replay as unknown as {
+    seq: number;
+    interactionCounter: number;
+    pickStep: number;
+    pickSent: boolean;
+  };
+  const relay = getCoopInteractionRelay();
+  if (relay == null) {
+    throw new Error("relayGuestMeOptionIndexOnly: no live interaction relay (call inside withClient(guestCtx))");
+  }
+  if (seam.pickSent) {
+    throw new Error(`relayGuestMeOptionIndexOnly: duplicate pick for Mystery ${seam.seq}`);
+  }
+  const step = seam.pickStep;
+  const operationId = commitMeOwnerIntent({
+    kind: "ME_PICK",
+    seq: seam.seq,
+    pinned: seam.interactionCounter,
+    step,
+    payload: { optionIndex: index },
+    localRole: getCoopRuntime()?.controller.role ?? "guest",
+    wave: globalScene.currentBattle?.waveIndex ?? -1,
+    turn: 0,
+    resend: isCoopMeOperationJournalActive()
+      ? () => relay.sendInteractionChoice(seam.seq, "me", index, [step])
+      : undefined,
+  });
+  if (operationId == null && isCoopMeOperationEnabled()) {
+    throw new Error(`relayGuestMeOptionIndexOnly: Mystery ${seam.seq}/${step} could not enter retained control`);
+  }
+  seam.pickStep = step + 1;
+  seam.pickSent = true;
+  relay.sendInteractionChoice(seam.seq, "me", index, [step]);
 }
 
 /**
@@ -2032,6 +3275,23 @@ export async function drainGuestMeReplayToSettle(replay: Phase): Promise<GuestMe
   for (let i = 0; i < 16; i++) {
     await drainLoopback();
     if (meReplaySettled(replay)) {
+      // Journal terminals settle the replay directly, so the losing legacy 8M outcome arm can remain parked
+      // until its long timeout. Retire that exact, now-dead waiter before this client scope exits; otherwise
+      // repeated MEs accumulate detached continuations which can later observe a restored stale boundary.
+      if (isCoopMeOperationJournalActive()) {
+        const relay = getCoopInteractionRelay();
+        if (relay == null) {
+          throw new Error("guest ME replay settled without a live interaction relay");
+        }
+        const seq = (replay as unknown as { seq: number }).seq;
+        relay.cancelWaiters(candidate => candidate === seq);
+        const outcomePending = (relay as unknown as { outcomePending: Map<number, unknown> }).outcomePending;
+        if (outcomePending.has(seq)) {
+          throw new Error(`guest ME replay ${seq} left its outcome waiter armed after settlement`);
+        }
+        // Join the cancellation continuation while the owning guest scene/runtime is still installed.
+        await drainLoopback();
+      }
       return { phase: replay, settled: true };
     }
   }
@@ -2097,25 +3357,36 @@ export async function drainGuestMeReplayNewRounds(replay: Phase, expected: numbe
 // ---------------------------------------------------------------------------
 
 /**
- * Build the GUEST's OWN embedded reward-shop {@linkcode SelectModifierPhase} and START it as the reward
- * pick OWNER (#828). Because the shop pins the (odd) ME interaction counter, its start() resolves the pick
- * to the ME owner (the guest) and, since the HOST is the reward OPTION owner, ADOPTS the host's streamed
- * option list (buffer-hit) before opening the interactive owner screen. Drains under the guest ctx until
- * the adopt lands (typeOptions filled). Returns the shop seam so the caller can assert `coopWatcher ===
- * false` (the guest DRIVES) and relay the leave/pick. MUST be called inside withClient(guestCtx) AFTER the
- * host's embedded shop has started + streamed its options (so the adopt buffer-hits). Does NOT end the
- * detached phase: the guest's live CoopReplayMePhase owns the ME terminal (leave + advance), so ending
- * this detached artifact would shiftPhase() that live phase off the queue.
+ * Obtain the GUEST's production-queued embedded reward shop after CoopReplayMePhase performs its real
+ * #821/#828 handoff. The old helper constructed and started a detached second SelectModifierPhase; that
+ * let a synthetic phase send the leave while the player's real current phase remained open, so the duo
+ * lane did not model a browser and could strand the host watcher. MUST be called inside withClient(guestCtx)
+ * after the host streams its options. Drains until the queued phase is current and its adopted options land.
  */
 export async function startGuestMeShopOwner(guestScene: BattleScene): Promise<ShopPhaseSeam> {
-  const shop = guestScene.phaseManager.create("SelectModifierPhase") as unknown as ShopPhaseSeam;
-  shop.start();
-  // The owner path is async (adopt the host's streamed options -> open the screen); drain until it lands.
-  for (let i = 0; i < 8; i++) {
+  let shop: ShopPhaseSeam | null = null;
+  let shopStarted = false;
+  for (let i = 0; i < 16; i++) {
     await drainLoopback();
-    if ((shop.typeOptions as unknown[]).length > 0) {
+    const current = guestScene.phaseManager.getCurrentPhase();
+    if (current?.phaseName === "SelectModifierPhase") {
+      shop = current as unknown as ShopPhaseSeam;
+      // The direct guest scene deliberately uses a manual phase manager. Production automatically starts
+      // an unshifted phase when it becomes current; reproduce that scheduler edge here on the REAL queued
+      // phase (once), then let startCoopWatch adopt the already-streamed authoritative option pool.
+      if (!shopStarted && shop.typeOptions == null) {
+        current.start();
+        shopStarted = true;
+      }
+    }
+    if (shop != null && Array.isArray(shop.typeOptions) && shop.typeOptions.length > 0) {
       break;
     }
+  }
+  if (shop == null) {
+    throw new Error(
+      `guest ME shop handoff FAILED: expected production SelectModifierPhase current, got ${guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}`,
+    );
   }
   return shop;
 }
@@ -2123,14 +3394,17 @@ export async function startGuestMeShopOwner(guestScene: BattleScene): Promise<Sh
 /**
  * Relay the GUEST reward-shop OWNER's LEAVE synchronously (#828) - the SEND ONLY, without flushing the
  * loopback, so the HOST's reward pick-WATCHER await resolves UNDER the host ctx on the next drain (the
- * cross-ctx footgun the top-level pick handshake also dodges). Mirrors the leave path of
- * {@linkcode driveHostRewardShopOwner} (coopEndMirror + coopRelaySend(LEAVE)) but deliberately does NOT
- * end() the detached guest shop (see {@linkcode startGuestMeShopOwner}) nor advance the counter (the ME
- * owns the single advance - MAJOR-3 no-ops it anyway). MUST be called inside withClientSync(guestCtx).
+ * cross-ctx footgun the top-level pick handshake also dodges). Mirrors the production leave path. A
+ * retained guest-owner intent parks this real phase until the host watcher returns its authoritative
+ * result; otherwise the phase ends immediately. The ME pin suppresses any extra interaction advance.
  */
 export function relayGuestMeShopLeaveSync(guestShop: ShopPhaseSeam): void {
   guestShop.coopEndMirror();
-  guestShop.coopRelaySend(/* COOP_INTERACTION_LEAVE */ -1, undefined, "skip");
+  const parkedForAuthority = guestShop.coopRelaySend(/* COOP_INTERACTION_LEAVE */ -1, undefined, "skip");
+  if (!parkedForAuthority) {
+    guestShop.end();
+    guestShop.coopAdvanceInteraction();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2397,12 +3671,20 @@ function restoreCoopReplayCheckpoint(scene: BattleScene, checkpoint: NonNullable
  * `game` is the host {@linkcode GameManager} (already constructed, with overrides stageable). `trace`
  * is validated first (a malformed trace THROWS with the precise reason). `resyncSpy` is an optional
  * counter (a vi spy's call count) the caller wires onto `CoopBattleStreamer.requestStateSync` so the
- * result can report the resync count.
+ * result can report the resync count. `pairFactory` and the two boundary hooks are test-only seams for
+ * a fully scheduled transport: boot/battle traffic may remain automatic, then the caller disables it
+ * immediately before each retained reward interaction and re-enables it only before the next battle.
+ * Their absence preserves the ordinary loopback path exactly.
  */
 export async function replayCoopTrace(
   game: ReplayGameManager,
   trace: ReplayTrace,
-  opts: { resyncCount?: () => number } = {},
+  opts: {
+    resyncCount?: () => number;
+    pairFactory?: () => { host: CoopTransport; guest: CoopTransport };
+    beforeRewardBoundary?: () => void;
+    afterRewardBoundary?: () => void;
+  } = {},
 ): Promise<ReplayResult> {
   const validation = validateReplayTrace(trace);
   if (!validation.ok) {
@@ -2447,7 +3729,7 @@ export async function replayCoopTrace(
 
   // ===== Flip to co-op + stand up the guest engine over one loopback pair (host owns EVEN interaction
   // counters, guest owns ODD - the production parity rule buildDuo wires). =====
-  const pair = createLoopbackPair();
+  const pair = opts.pairFactory?.() ?? createLoopbackPair();
   const rig = await buildDuo(game as unknown as Parameters<typeof buildDuo>[0], pair, setCoopRuntime, replayToCoop);
   if (checkpoint != null) {
     // `buildDuo` constructs a second scene while test overrides are live. Reassert the checkpoint on the
@@ -2491,7 +3773,7 @@ export async function replayCoopTrace(
           detail: `host slot command kind=${hostCmd?.command.kind ?? "none"} not replayable by the wave-loop drivers (FIGHT only)`,
         });
       }
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
 
     // ===== Guest replays the host's turn + applies the checkpoint (renders the host's outcome). =====
@@ -2505,6 +3787,7 @@ export async function replayCoopTrace(
 
     // ===== The reward shop interaction for this wave: the OWNER (by counter parity) drives, the WATCHER
     // mirrors. Apply the captured interaction for this wave's reward seq (a leave / non-party pick). =====
+    opts.beforeRewardBoundary?.();
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
     const waveInteraction = interactionEvents.find(e => e.seq === counterBefore);
@@ -2515,7 +3798,7 @@ export async function replayCoopTrace(
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     if (hostShop.phaseName === "SelectModifierPhase") {
-      const guestShop = withClientSync(rig.guestCtx, () => buildGuestShopPhase()) as unknown as ShopPhaseSeam;
+      const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
       if (hostOwns) {
         await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward }));
         await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
@@ -2523,6 +3806,7 @@ export async function replayCoopTrace(
         await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward }));
         await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
       }
+      await pumpDuoDestinations(rig);
       if (waveInteraction != null) {
         interactionsApplied++;
       }
@@ -2542,6 +3826,7 @@ export async function replayCoopTrace(
 
     // ===== Host crosses into the next wave's battle (real EncounterPhase rolls wave w+1). =====
     if (wavesReplayed < waves.length) {
+      opts.afterRewardBoundary?.();
       await arriveGuestCommandBoundary(rig, wave + 1);
       await withClient(rig.hostCtx, async () => {
         await game.phaseInterceptor.to("CommandPhase");
@@ -2558,11 +3843,6 @@ export async function replayCoopTrace(
     finalHostCounter: rig.hostRuntime.controller.interactionCounter(),
     finalGuestCounter: rig.guestRuntime.controller.interactionCounter(),
   };
-}
-
-/** Build a fresh guest-side SelectModifierPhase for the watcher (under withClientSync, globalScene=guest). */
-function buildGuestShopPhase(): Phase {
-  return globalScene.phaseManager.create("SelectModifierPhase");
 }
 
 // =============================================================================
@@ -2651,12 +3931,14 @@ export async function buildShowdownDuo(
     rndState: Phaser.Math.RND.state(),
     ghost: snapshotGhostState(),
     moduleLets: snapshotModuleLets(),
+    biomeState: snapshotBiomeModuleState(),
     mePins: { ...IDLE_ME_PINS },
     ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("host") } : {}),
   };
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
   const guestScene = buildGuestScene(hostGame);
+  installHeadlessCoopSemanticProjectionOracle(guestScene);
   const guestCtx: ClientCtx = {
     label: "guest",
     scene: guestScene,
@@ -2664,6 +3946,7 @@ export async function buildShowdownDuo(
     rndState: Phaser.Math.RND.state(),
     ghost: emptyGhostSnapshot(),
     moduleLets: snapshotModuleLets(),
+    biomeState: structuredClone(hostCtx.biomeState!),
     mePins: { ...IDLE_ME_PINS },
     ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("guest") } : {}),
   };
@@ -2708,5 +3991,11 @@ export async function buildShowdownDuo(
   guestRuntime.controller.connect();
   await drainLoopback();
 
-  return { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
+  const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
+  // Showdown rigs own the same two independently assembled runtimes as ordinary co-op rigs. Register
+  // them with the shared afterEach teardown too: clearing only the ambient (usually guest) runtime leaves
+  // the host battle stream's retained replacement timer alive, so a prior test can retransmit an old-epoch
+  // checkpoint into the next match and reopen CoopGuestFaintSwitchPhase after the new replacement settled.
+  liveDuoRigs.add(rig);
+  return rig;
 }

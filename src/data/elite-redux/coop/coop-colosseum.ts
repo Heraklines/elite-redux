@@ -55,32 +55,54 @@
 import { globalScene } from "#app/global-scene";
 import {
   armCoopColosseumDecisionResend,
+  type CoopColosseumOperationBinding,
+  captureCoopColosseumOperationBinding,
   commitColosseumBoard,
   commitColosseumDecision,
+  isCoopColosseumOperationEnabled,
 } from "#data/elite-redux/coop/coop-colosseum-operation";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
+import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
-import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
+import { adoptMeWatcherChoice, isCoopMeOperationEnabled } from "#data/elite-redux/coop/coop-me-operation";
 import {
+  coopMeInProgress,
+  coopMeInteractionStartValue,
+  setCoopMeActivePresentation,
+  setCoopMeColosseumControl,
+} from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  isCoopOperationJournalActive,
+  isCoopOperationJournalActiveFor,
+} from "#data/elite-redux/coop/coop-operation-journal";
+import {
+  coopSessionGeneration,
+  failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
+  getCoopRuntime,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
 import {
   COOP_COLO_CHOICE_KINDS,
   COOP_COLOSSEUM_SEQ_BASE,
-  COOP_ME_CHOICE_KINDS,
+  COOP_ME_TERM_SEQ_BASE,
+  COOP_ME_TERMINAL_CHOICE_KINDS,
 } from "#data/elite-redux/coop/coop-seq-registry";
-import type { CoopInteractionOutcome, CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopActiveMysteryEncounterSnapshotV1,
+  CoopInteractionOutcome,
+  CoopSerializedEnemy,
+} from "#data/elite-redux/coop/coop-transport";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { UiMode } from "#enums/ui-mode";
 import { leaveEncounterWithoutBattle } from "#mystery-encounters/encounter-phase-utils";
 import type { CoopMeBattleEndDelegate } from "#phases/coop-replay-me-phase";
-import { setCoopMeBattleEndDelegate } from "#phases/coop-replay-me-phase";
+import { setCoopMeBattleEndDelegate, setCoopMeSnapshotRebindDelegate } from "#phases/coop-replay-me-phase";
 import { COLOSSEUM_CASH_OUT, COLOSSEUM_CONTINUE } from "#ui/colosseum-ui-handler";
 import { hideCoopControllerTag, showCoopControllerTagFor } from "#ui/coop-controller-tag";
 import type { OptionSelectConfig } from "#ui/handlers/abstract-option-select-ui-handler";
@@ -101,6 +123,8 @@ export { COOP_COLOSSEUM_SEQ_BASE };
 const COOP_COLOSSEUM_BOARD_KIND = "coloBoard";
 /** #829: routing tag for the owner's relayed board decision index (choice inbox). */
 const COOP_COLOSSEUM_PICK_KIND = "coloPick";
+const COOP_COLOSSEUM_ROUND_TOKEN = "coopColosseumRound";
+const activeBoardRoundByPin = new Map<number, number>();
 
 /**
  * #829: the board seq for the pinned ME interaction counter. Both clients derive it from the
@@ -146,30 +170,52 @@ export function coopColosseumBoardOwnedLocally(): boolean {
  * between-rounds board wait (the deferred seam, see the header) reads these labels off the board
  * seq's OUTCOME inbox and opens a real local OPTION_SELECT capture (the proven template).
  */
-export function coopColosseumStreamBoard(labels: string[]): void {
+export function coopColosseumStreamBoard(labels: string[], roundOverride?: number): boolean {
   if (!coopColosseumActiveInMe() || getCoopController()?.role !== "host") {
-    return;
+    return true;
   }
-  const seq = coopColosseumSeq(coopMeInteractionStartValue());
+  const operationEnabled = isCoopColosseumOperationEnabled();
+  const operationBinding = operationEnabled ? captureCoopColosseumOperationBinding("host") : null;
+  const pinned = coopMeInteractionStartValue();
+  const seq = coopColosseumSeq(pinned);
+  const controller = getCoopController();
+  const committed =
+    controller == null
+      ? null
+      : commitColosseumBoard(
+          {
+            pinned,
+            round: roundOverride,
+            labels,
+            localRole: controller.role,
+            wave: globalScene?.currentBattle?.waveIndex ?? 0,
+            turn: globalScene?.currentBattle?.turn ?? 0,
+          },
+          operationBinding,
+        );
+  if (committed == null || (operationEnabled && committed.operationId == null)) {
+    failCoopSharedSession(`Colosseum board ${seq} could not enter authoritative control`);
+    return false;
+  }
+  activeBoardRoundByPin.set(pinned, committed.round);
+  if (!setCoopMeColosseumControl(pinned, { expectedRound: committed.round, boardRound: committed.round })) {
+    failCoopSharedSession(`Colosseum board ${seq}/${committed.round} could not retain recovery control`);
+    return false;
+  }
   const present: CoopInteractionOutcome = {
     k: "mePresent",
-    tokens: {},
+    tokens: { [COOP_COLOSSEUM_ROUND_TOKEN]: String(committed.round) },
     meetsReqs: [],
     labels: [],
     subPrompt: { kind: "secondary", labels },
   };
-  const controller = getCoopController();
-  if (controller != null) {
-    commitColosseumBoard({
-      pinned: coopMeInteractionStartValue(),
-      labels,
-      localRole: controller.role,
-      wave: globalScene?.currentBattle?.waveIndex ?? 0,
-      turn: globalScene?.currentBattle?.turn ?? 0,
-    });
-  }
   coopLog("me", "colosseum: host streams board present (#829)", { seq, labels: labels.length });
-  getCoopInteractionRelay()?.sendInteractionOutcome(seq, COOP_COLOSSEUM_BOARD_KIND, present);
+  if (operationEnabled && isCoopOperationJournalActiveFor(operationBinding?.durability ?? null)) {
+    setCoopMeActivePresentation(present, true);
+  } else {
+    getCoopInteractionRelay()?.sendInteractionOutcome(seq, COOP_COLOSSEUM_BOARD_KIND, present);
+  }
+  return true;
 }
 
 /**
@@ -180,31 +226,74 @@ export function coopColosseumStreamBoard(labels: string[]): void {
  * authoritative ME (solo byte-identical). `COLOSSEUM_CONTINUE` (0) / `COLOSSEUM_CASH_OUT` (1) are
  * the only in-range values the receiver maps back onto the board.
  */
-export function coopColosseumSendDecision(index: number): void {
+export function coopColosseumSendDecision(index: number, roundOverride?: number): boolean {
   if (!coopColosseumActiveInMe()) {
-    return;
+    return false;
   }
-  const seq = coopColosseumSeq(coopMeInteractionStartValue());
+  const pinned = coopMeInteractionStartValue();
+  const seq = coopColosseumSeq(pinned);
   const controller = getCoopController();
-  if (controller != null) {
-    commitColosseumDecision({
-      pinned: coopMeInteractionStartValue(),
-      index,
-      localRole: controller.role,
-      wave: globalScene?.currentBattle?.waveIndex ?? 0,
-      turn: globalScene?.currentBattle?.turn ?? 0,
-    });
+  const round = roundOverride ?? activeBoardRoundByPin.get(pinned);
+  if (controller == null || round == null) {
+    failCoopSharedSession(`Colosseum decision ${seq} has no committed board round`);
+    return false;
   }
-  coopLog("me", "colosseum: relay board decision (#829)", { seq, index });
-  getCoopInteractionRelay()?.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index);
-  if (controller?.role === "guest") {
-    const relay = getCoopInteractionRelay();
-    if (relay != null) {
-      armCoopColosseumDecisionResend(coopMeInteractionStartValue(), index, () => {
-        relay.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index);
-      });
+  const operationEnabled = isCoopColosseumOperationEnabled();
+  const operationBinding = operationEnabled ? captureCoopColosseumOperationBinding(controller.role) : null;
+  if (operationEnabled) {
+    const committed = commitColosseumDecision(
+      {
+        pinned,
+        round,
+        index,
+        localRole: controller.role,
+        wave: globalScene?.currentBattle?.waveIndex ?? 0,
+        turn: globalScene?.currentBattle?.turn ?? 0,
+      },
+      operationBinding,
+    );
+    if (committed.kind === "failed") {
+      failCoopSharedSession(`Colosseum decision ${seq}/${round} could not enter authoritative control`);
+      return false;
+    }
+    if (committed.kind === "duplicate") {
+      return true;
+    }
+    if (
+      controller.role === "host"
+      && !setCoopMeColosseumControl(pinned, {
+        expectedRound: round,
+        boardRound: round,
+        decision: { round, index, operationId: committed.operationId },
+      })
+    ) {
+      failCoopSharedSession(`Colosseum decision ${seq}/${round} could not retain recovery control`);
+      return false;
     }
   }
+  coopLog("me", "colosseum: relay board decision (#829)", { seq, index });
+  if (
+    controller.role === "guest"
+    || !operationEnabled
+    || !isCoopOperationJournalActiveFor(operationBinding?.durability ?? null)
+  ) {
+    getCoopInteractionRelay()?.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index, [round]);
+  }
+  if (controller.role === "guest") {
+    const relay = getCoopInteractionRelay();
+    if (relay != null) {
+      armCoopColosseumDecisionResend(
+        pinned,
+        round,
+        index,
+        () => {
+          relay.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index, [round]);
+        },
+        operationBinding,
+      );
+    }
+  }
+  return true;
 }
 
 /**
@@ -214,27 +303,96 @@ export function coopColosseumSendDecision(index: number): void {
  * board's streamed pick. Resolves to the index, or `null` on a genuinely disconnected partner (the
  * caller then falls back so neither client hangs). No relay (not in a session) resolves `null`.
  */
-export function coopColosseumAwaitDecision(timeoutMs?: number): Promise<number | null> {
-  const relay = getCoopInteractionRelay();
+export async function coopColosseumAwaitDecision(
+  timeoutMs?: number,
+  expectedRound?: number,
+  relayOverride?: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+): Promise<number | null> {
+  const relay = relayOverride ?? getCoopInteractionRelay();
   if (relay == null) {
-    return Promise.resolve(null);
+    return null;
   }
-  const seq = coopColosseumSeq(coopMeInteractionStartValue());
+  const pinned = coopMeInteractionStartValue();
+  const seq = coopColosseumSeq(pinned);
+  const round = expectedRound ?? activeBoardRoundByPin.get(pinned);
+  if (round == null) {
+    return null;
+  }
+  const operationEnabled = isCoopColosseumOperationEnabled();
+  const controller = getCoopController();
+  if (operationEnabled && controller == null) {
+    failCoopSharedSession(`Colosseum decision ${seq}/${round} has no bound controller`);
+    return null;
+  }
+  const operationBinding: CoopColosseumOperationBinding | null =
+    operationEnabled && controller != null ? captureCoopColosseumOperationBinding(controller.role) : null;
+  // This await can outlive the ambient scene/runtime in the two-engine harness and can outlive the whole
+  // production session after a disconnect. Address the retained decision from the scheduling boundary,
+  // never from whichever scene happens to be active when the relay promise resumes.
+  const generation = coopSessionGeneration();
+  const wave = globalScene?.currentBattle?.waveIndex ?? 0;
+  const turn = globalScene?.currentBattle?.turn ?? 0;
   coopLog("me", "colosseum: await board decision (#829)", { seq, timeoutMs: timeoutMs ?? "default" });
-  return relay.awaitInteractionChoice(seq, timeoutMs, COOP_COLO_CHOICE_KINDS).then(pick => {
-    const index = pick?.choice ?? null;
-    const controller = getCoopController();
-    if (index != null && controller?.role === "host") {
-      commitColosseumDecision({
-        pinned: coopMeInteractionStartValue(),
-        index,
-        localRole: controller.role,
-        wave: globalScene?.currentBattle?.waveIndex ?? 0,
-        turn: globalScene?.currentBattle?.turn ?? 0,
-      });
+  while (coopMeInteractionStartValue() === pinned) {
+    const pick = await relay.awaitInteractionChoice(seq, timeoutMs, COOP_COLO_CHOICE_KINDS);
+    if (pick == null) {
+      return null;
+    }
+    if (coopSessionGeneration() !== generation) {
+      return null;
+    }
+    const index = pick.choice;
+    if (operationEnabled) {
+      const carriedRound = pick.data?.[0];
+      if (!Number.isSafeInteger(carriedRound) || (carriedRound as number) < 0) {
+        failCoopSharedSession(`Colosseum decision ${seq} carried no exact round`);
+        return null;
+      }
+      if (controller?.role === "host") {
+        if ((carriedRound as number) > round) {
+          failCoopSharedSession(`Colosseum decision ${seq} carried future round ${String(carriedRound)}/${round}`);
+          return null;
+        }
+        const committed = commitColosseumDecision(
+          {
+            pinned,
+            round: carriedRound as number,
+            index,
+            localRole: controller.role,
+            wave,
+            turn,
+          },
+          operationBinding,
+        );
+        if (committed.kind === "duplicate") {
+          // A retransmitted exact-round decision is already authoritative and must unblock this waiter.
+          // Only an older round is noise that should keep the current-round wait alive.
+          if ((carriedRound as number) === round) {
+            return index;
+          }
+          continue;
+        }
+        if ((carriedRound as number) !== round) {
+          failCoopSharedSession(
+            `Colosseum decision ${seq} carried future/foreign round ${String(carriedRound)}/${round}`,
+          );
+          return null;
+        }
+        if (committed.kind !== "committed") {
+          failCoopSharedSession(`Colosseum decision ${seq}/${round} could not commit`);
+          return null;
+        }
+      } else if (
+        (carriedRound as number) !== round
+        || (isCoopOperationJournalActiveFor(operationBinding?.durability ?? null) && pick.operationId == null)
+      ) {
+        failCoopSharedSession(`Colosseum decision ${seq}/${round} was not journal-led`);
+        return null;
+      }
     }
     return index;
-  });
+  }
+  return null;
 }
 
 /**
@@ -287,13 +445,13 @@ export interface CoopColosseumRoundOps {
   /** Whether the LOCAL guest OWNS the board decision (drives it) vs watches it (pinned-counter parity). */
   boardOwnedLocally(): boolean;
   /** GUEST-OWNED board: open the local CONTINUE/CASH-OUT capture UI, relay the pick, resolve its index. */
-  driveBoard(labels: string[]): Promise<number>;
+  driveBoard(labels: string[], round: number): Promise<number>;
   /** Await the host's re-streamed boss party for the NEXT round (keyed `me:wave:counter`). */
   awaitBoss(timeoutMs: number): Promise<CoopSerializedEnemy[] | null>;
   /** CONTINUE: purge the stale battle loop, adopt the host's boss, boot the round's ME battle. */
-  bootRoundBattle(enemies: CoopSerializedEnemy[]): void;
+  bootRoundBattle(enemies: CoopSerializedEnemy[]): boolean;
   /** Terminal: leave the encounter locally + advance the alternation ONCE (leaveDefensive semantics). */
-  leaveAndAdvance(): void;
+  leaveAndAdvance(): boolean;
   /** Cosmetic controller tag: green (you drive this board) / amber (partner drives). */
   showTag(local: boolean): void;
   /** Drop the controller tag (at the terminal / while a round battle runs). */
@@ -303,6 +461,47 @@ export interface CoopColosseumRoundOps {
 /** #829: is THIS ME still the pinned one? (a wipe / true end clears the pin; the loop then bails.) */
 function coopColosseumStillPinned(counter: number): boolean {
   return coopMeInteractionStartValue() === counter;
+}
+
+export interface CoopColosseumLoopLease {
+  readonly accepted: boolean;
+  isLive(): boolean;
+  release(): void;
+}
+
+/** Replaceable lease keyed by the complete runtime/channel identity, not merely a reused ME counter. */
+export class CoopColosseumLoopLeaseRegistry {
+  private readonly active = new Map<number, { identity: readonly unknown[]; token: symbol }>();
+
+  public acquire(counter: number, identity: readonly unknown[]): CoopColosseumLoopLease {
+    const prior = this.active.get(counter);
+    if (
+      prior != null
+      && prior.identity.length === identity.length
+      && prior.identity.every((value, index) => Object.is(value, identity[index]))
+    ) {
+      return { accepted: false, isLive: () => this.active.get(counter) === prior, release: () => {} };
+    }
+    const entry = { identity: [...identity], token: Symbol(`colosseum:${counter}`) };
+    this.active.set(counter, entry);
+    return {
+      accepted: true,
+      isLive: () => this.active.get(counter) === entry,
+      release: () => {
+        if (this.active.get(counter) === entry) {
+          this.active.delete(counter);
+        }
+      },
+    };
+  }
+}
+
+/** A detached gauntlet remains resumable across its retained battle-handoff terminal. */
+export function canRebindColosseumGuestLoop(snapshot: CoopActiveMysteryEncounterSnapshotV1): boolean {
+  return (
+    (snapshot.terminal === "pending" || snapshot.terminal === "battle" || snapshot.terminal === "battle-settled")
+    && snapshot.colosseum != null
+  );
 }
 
 /**
@@ -316,6 +515,12 @@ export async function runColosseumGuestRoundLoop(
   seqTerm: number,
   relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
   ops: CoopColosseumRoundOps,
+  resume?: {
+    expectedRound: number;
+    presentation?: Extract<CoopInteractionOutcome, { k: "mePresent" }> | undefined;
+    decision?: { round: number; index: number; operationId: string } | undefined;
+  },
+  isLeaseLive: () => boolean = () => true,
 ): Promise<void> {
   const boardSeq = coopColosseumSeq(counter);
   coopLog("me", "colosseum guest ROUND LOOP armed (#829)", { counter, boardSeq, seqTerm });
@@ -323,24 +528,61 @@ export async function runColosseumGuestRoundLoop(
   // post-cash-out) must never be lost to a fresh await on an emptied 9M inbox (the #818/#831 latent-race
   // lesson). Created BEFORE the first board await so the waiter is registered the instant we claim.
   const terminalArm = relay
-    .awaitInteractionChoice(seqTerm, COOP_COLOSSEUM_WAIT_MS, COOP_ME_CHOICE_KINDS)
+    .awaitInteractionChoice(seqTerm, COOP_COLOSSEUM_WAIT_MS, COOP_ME_TERMINAL_CHOICE_KINDS)
     .then(action => ({ tag: "term" as const, action }));
 
-  while (coopColosseumStillPinned(counter)) {
+  let expectedRound: number | null = resume?.expectedRound ?? null;
+  let resumedPresentation = resume?.presentation;
+  let resumedDecision = resume?.decision;
+  const boundaryLive = (): boolean => isLeaseLive() && coopColosseumStillPinned(counter);
+  while (boundaryLive()) {
     // Race the next board present (an intermediate decision point) against the true ME-end LEAVE (the
     // final round streams NO board - it goes straight to endColosseum -> leave). Board present is raced
     // FIRST so it wins a (never-expected) both-buffered tie, exactly like awaitOutcomeThenTerminal.
-    const boardArm = relay
-      .awaitInteractionOutcome(boardSeq, COOP_COLOSSEUM_WAIT_MS)
-      .then(present => ({ tag: "board" as const, present }));
-    const winner = await Promise.race([boardArm, terminalArm]);
+    const winner =
+      resumedPresentation == null
+        ? await Promise.race([
+            relay
+              .awaitInteractionOutcome(boardSeq, COOP_COLOSSEUM_WAIT_MS)
+              .then(present => ({ tag: "board" as const, present })),
+            terminalArm,
+          ])
+        : ({ tag: "board" as const, present: resumedPresentation } as const);
+    if (!boundaryLive()) {
+      return;
+    }
+    resumedPresentation = undefined;
     if (winner.tag === "term") {
-      coopLog("me", "colosseum loop: true ME-end LEAVE won the race - leaving + advancing (#829)", {
-        counter,
-        action: winner.action == null ? "null" : winner.action.choice,
-      });
+      const rollbackCarrierAllowed = !isCoopMeOperationEnabled() || !isCoopOperationJournalActive();
+      const exactLeave =
+        winner.action?.choice === COOP_INTERACTION_LEAVE
+        && (rollbackCarrierAllowed
+          || (winner.action.operationId != null
+            && adoptMeWatcherChoice({
+              kind: "ME_TERMINAL",
+              seq: seqTerm,
+              pinned: counter,
+              step: 1,
+              res: {
+                choice: winner.action.choice,
+                data: winner.action.data,
+                operationId: winner.action.operationId,
+              },
+              terminal: "leave",
+              localRole: "guest",
+              wave: globalScene.currentBattle?.waveIndex ?? -1,
+              turn: 0,
+            }).adopt));
+      if (!exactLeave) {
+        getCoopRuntime()?.durability?.reconnect();
+        failCoopSharedSession(`Colosseum terminal ${seqTerm} was null, malformed, or not journal-led`);
+        return;
+      }
+      coopLog("me", "colosseum loop: exact journal-led ME leave accepted", { counter });
       ops.hideTag();
-      ops.leaveAndAdvance();
+      if (!ops.leaveAndAdvance()) {
+        failCoopSharedSession(`Colosseum terminal could not leave/advance for ${counter}`);
+      }
       return;
     }
 
@@ -349,26 +591,39 @@ export async function runColosseumGuestRoundLoop(
       present != null && present.k === "mePresent" && present.subPrompt?.kind === "secondary"
         ? present.subPrompt.labels
         : null;
-    if (labels == null) {
-      // A null / malformed board (a genuinely disconnected host on the bounded wait): defensively
-      // leave + advance so the guest never strands on a board that will never arrive.
-      coopWarn("me", "colosseum loop: board present null/malformed - defensive leave (#829)", { counter });
+    const round =
+      present?.k === "mePresent" && Number.isSafeInteger(Number(present.tokens[COOP_COLOSSEUM_ROUND_TOKEN]))
+        ? Number(present.tokens[COOP_COLOSSEUM_ROUND_TOKEN])
+        : -1;
+    if (
+      labels == null
+      || labels.length !== 2
+      || !labels.every(label => typeof label === "string")
+      || round < 0
+      || (expectedRound != null && round !== expectedRound)
+    ) {
+      coopWarn("me", "colosseum loop: board present null/malformed - retaining shared boundary", { counter });
       ops.hideTag();
-      ops.leaveAndAdvance();
+      getCoopRuntime()?.durability?.reconnect();
+      failCoopSharedSession(`Colosseum board ${boardSeq} unavailable or malformed`);
       return;
     }
 
     // Drive the decision: the OWNER drives its local capture UI + relays; the WATCHER adopts the host's
     // relayed pick. Either way `decision` is COLOSSEUM_CONTINUE (0) / COLOSSEUM_CASH_OUT (1) / null.
     let decision: number | null;
-    if (ops.boardOwnedLocally()) {
+    if (resumedDecision?.round === round) {
+      decision = resumedDecision.index;
+      resumedDecision = undefined;
+    } else if (ops.boardOwnedLocally()) {
       ops.showTag(true);
-      decision = await ops.driveBoard(labels);
+      decision = await ops.driveBoard(labels, round);
     } else {
       ops.showTag(false);
-      decision = await relay
-        .awaitInteractionChoice(boardSeq, COOP_COLOSSEUM_WAIT_MS, COOP_COLO_CHOICE_KINDS)
-        .then(p => p?.choice ?? null);
+      decision = await coopColosseumAwaitDecision(COOP_COLOSSEUM_WAIT_MS, round, relay);
+    }
+    if (!boundaryLive()) {
+      return;
     }
     coopLog("me", "colosseum loop: board decision resolved (#829)", {
       counter,
@@ -376,33 +631,87 @@ export async function runColosseumGuestRoundLoop(
       decision: decision ?? "null",
     });
 
-    if (decision == null) {
-      // Disconnected partner: leave + advance directly (do NOT wait on the terminal - it will not come).
+    if (decision !== COLOSSEUM_CONTINUE && decision !== COLOSSEUM_CASH_OUT) {
       ops.hideTag();
-      ops.leaveAndAdvance();
+      getCoopRuntime()?.durability?.reconnect();
+      failCoopSharedSession(`Colosseum decision ${String(decision)} is not an exact committed choice`);
       return;
     }
-    if (decision !== COLOSSEUM_CONTINUE) {
+    if (decision === COLOSSEUM_CASH_OUT) {
       // CASH OUT (or a cancel index): the host runs its reward flow, THEN sends the true 9M LEAVE. Wait
       // for it (the SAME reused terminal arm) so the guest advances IN STEP with the host, not early.
       coopLog("me", "colosseum loop: CASH OUT - awaiting the host's true ME-end LEAVE (#829)", { counter });
       ops.hideTag();
-      await terminalArm;
-      ops.leaveAndAdvance();
+      const terminal = await terminalArm;
+      if (!boundaryLive()) {
+        return;
+      }
+      const rollbackCarrierAllowed = !isCoopMeOperationEnabled() || !isCoopOperationJournalActive();
+      const exactLeave =
+        terminal.action?.choice === COOP_INTERACTION_LEAVE
+        && (rollbackCarrierAllowed
+          || (terminal.action.operationId != null
+            && adoptMeWatcherChoice({
+              kind: "ME_TERMINAL",
+              seq: seqTerm,
+              pinned: counter,
+              step: 1,
+              res: {
+                choice: terminal.action.choice,
+                data: terminal.action.data,
+                operationId: terminal.action.operationId,
+              },
+              terminal: "leave",
+              localRole: "guest",
+              wave: globalScene.currentBattle?.waveIndex ?? -1,
+              turn: 0,
+            }).adopt));
+      if (exactLeave) {
+        if (!ops.leaveAndAdvance()) {
+          failCoopSharedSession(`Colosseum cash-out could not leave/advance for ${counter}`);
+        }
+      } else {
+        failCoopSharedSession(`Colosseum cash-out terminal ${seqTerm} was not exact/journal-led`);
+      }
       return;
+    }
+    expectedRound = round + 1;
+
+    if (isCoopMeOperationEnabled() && isCoopOperationJournalActive()) {
+      // P33 carries every continued round as the next complete retained ME_TERMINAL battle transaction.
+      // Its live sink adopts the authoritative state and boots the exact battle directly; this detached
+      // board loop merely advances its recovery cursor and waits for the next board. Consuming the old
+      // boss side channel here would reintroduce the split state/control race P33 removes.
+      ops.hideTag();
+      if (coopColosseumStillPinned(counter) && !setCoopMeColosseumControl(counter, { expectedRound })) {
+        failCoopSharedSession(`Colosseum next-round retained control could not advance for ${counter}`);
+        return;
+      }
+      continue;
     }
 
     // CONTINUE: adopt the host's re-streamed boss for the next round and boot that round's battle. The
     // boss is streamed AFTER the decision (in startNextColosseumBattle), so we AWAIT it (a synchronous
-    // consume would race the host's still-in-flight stream). Null (host stall) -> defensive leave.
+    // consume would race the host's still-in-flight stream). Null retains/fails the shared boundary.
     ops.hideTag();
     const enemies = await ops.awaitBoss(COOP_COLOSSEUM_WAIT_MS);
-    if (enemies == null || enemies.length === 0) {
-      coopWarn("me", "colosseum loop: no re-streamed boss on CONTINUE - defensive leave (#829)", { counter });
-      ops.leaveAndAdvance();
+    if (!boundaryLive()) {
       return;
     }
-    ops.bootRoundBattle(enemies);
+    if (enemies == null || enemies.length === 0) {
+      coopWarn("me", "colosseum loop: no re-streamed boss on CONTINUE - retaining boundary", { counter });
+      getCoopRuntime()?.durability?.reconnect();
+      failCoopSharedSession(`Colosseum next-round boss missing for ${counter}`);
+      return;
+    }
+    if (!ops.bootRoundBattle(enemies)) {
+      failCoopSharedSession(`Colosseum next-round battle could not boot for ${counter}`);
+      return;
+    }
+    if (coopColosseumStillPinned(counter) && !setCoopMeColosseumControl(counter, { expectedRound })) {
+      failCoopSharedSession(`Colosseum next-round control could not advance for ${counter}`);
+      return;
+    }
     // Loop: the next `boardArm` parks until the host streams the board AFTER this round's battle.
   }
   // The pin cleared mid-loop (a wipe / the true end already tore it down): stop WITHOUT leaving - there
@@ -423,22 +732,41 @@ function makeRealColosseumRoundOps(counter: number): CoopColosseumRoundOps {
       return coopColosseumBoardOwnedLocally();
     },
 
-    driveBoard(labels: string[]): Promise<number> {
+    driveBoard(labels: string[], round: number): Promise<number> {
       // GUEST-OWNED board: the guest's own encounter.misc.gauntlet is empty (it never ran the engine), so
       // it cannot render the full COLOSSEUM standings board - it opens the SECONDARY-capture OPTION_SELECT
       // pattern (the ME sub-pick template) over the HOST-streamed labels, captures the index, and relays it
       // via coopColosseumSendDecision (the host adopts it). A CANCEL maps to CASH OUT (the safe exit).
+      const generation = coopSessionGeneration();
+      const runtime = getCoopRuntime();
+      const live = (): boolean =>
+        coopSessionGeneration() === generation
+        && getCoopRuntime() === runtime
+        && coopColosseumStillPinned(counter)
+        && isCoopAuthoritativeGuest();
       return new Promise<number>(resolve => {
+        let finished = false;
         const finish = (index: number): void => {
+          if (finished || !live()) {
+            return;
+          }
+          // UI handlers can fire twice in one frame (confirm + cancel, or a stale pointer callback). Claim
+          // this board before touching UI/transport so one round can publish at most one semantic choice.
+          finished = true;
           try {
             globalScene.ui.clearText();
           } catch {
             /* clearing the message box must not block the relay */
           }
-          coopColosseumSendDecision(index);
-          resolve(index);
+          if (coopColosseumSendDecision(index, round)) {
+            resolve(index);
+          }
         };
-        void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+        void globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, live).then(opened => {
+          if (opened === "superseded" || !live()) {
+            failCoopSharedSession(`Colosseum UI could not bind to live session ${counter}`);
+            return;
+          }
           const options = labels.map((label, idx) => ({
             label,
             handler: () => {
@@ -454,7 +782,11 @@ function makeRealColosseumRoundOps(counter: number): CoopColosseumRoundOps {
             },
           });
           const config: OptionSelectConfig = { options, maxOptions: 7, yOffset: 0 };
-          void globalScene.ui.setModeWithoutClear(UiMode.OPTION_SELECT, config, null, true);
+          void globalScene.ui.setModeBoundedWhen(UiMode.OPTION_SELECT, 2_000, live, config, null, true).then(ok => {
+            if (ok === "superseded" && live()) {
+              failCoopSharedSession(`Colosseum option UI could not bind to live session ${counter}`);
+            }
+          });
         });
       });
     },
@@ -468,7 +800,7 @@ function makeRealColosseumRoundOps(counter: number): CoopColosseumRoundOps {
       return streamer.awaitMeBattleEnemyParty(key, timeoutMs);
     },
 
-    bootRoundBattle(enemies: CoopSerializedEnemy[]): void {
+    bootRoundBattle(enemies: CoopSerializedEnemy[]): boolean {
       try {
         // #824 purge: the guest is stuck in the just-completed round's battle loop. Clear those stale
         // phases so booting the next round's MysteryEncounterBattlePhase drives a clean summon chain.
@@ -502,28 +834,32 @@ function makeRealColosseumRoundOps(counter: number): CoopColosseumRoundOps {
           purged,
           adopted: enemies.length,
         });
+        return true;
       } catch (e) {
-        coopWarn("me", "colosseum loop: round battle boot failed (guarded) (#829)", e);
+        coopWarn("me", "colosseum loop: round battle boot failed; shared session must stop (#829)", e);
+        return false;
       }
     },
 
-    leaveAndAdvance(): void {
+    leaveAndAdvance(): boolean {
       hideCoopControllerTag();
       // Leave the encounter locally (guarded on the pin, like the detached #822 listener) and advance the
       // single alternation turn idempotently (keyed to this ME's start counter). The host already resolved
       // the encounter + its rewards through its own streams; the next per-turn checksum re-syncs residual
       // numeric drift, so this never desyncs and never hangs.
-      if (coopColosseumStillPinned(counter)) {
-        try {
-          leaveEncounterWithoutBattle();
-        } catch {
-          coopWarn("me", "colosseum loop: leaveEncounterWithoutBattle threw (handled) (#829)", { counter });
-        }
-      }
       try {
-        getCoopController()?.advanceInteraction(counter);
-      } catch {
-        coopWarn("me", "colosseum loop: advanceInteraction threw (handled, idempotent) (#829)", { counter });
+        if (coopColosseumStillPinned(counter)) {
+          leaveEncounterWithoutBattle();
+        }
+        const controller = getCoopController();
+        if (controller == null) {
+          throw new Error("shared controller unavailable");
+        }
+        controller.advanceInteraction(counter);
+        return true;
+      } catch (error) {
+        coopWarn("me", "colosseum loop: leave/advance failed; shared session must stop (#829)", error);
+        return false;
       }
     },
 
@@ -546,6 +882,36 @@ function makeRealColosseumRoundOps(counter: number): CoopColosseumRoundOps {
  * leave+advance arm (which mid-gauntlet would never resolve). Returns FALSE for every non-colosseum ME,
  * leaving that phase's behaviour byte-identical.
  */
+const activeColosseumGuestLoops = new CoopColosseumLoopLeaseRegistry();
+
+function startColosseumGuestLoop(
+  interactionCounter: number,
+  seqTerm: number,
+  relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+  resume?: Parameters<typeof runColosseumGuestRoundLoop>[4],
+): void {
+  const runtime = getCoopRuntime();
+  const controller = getCoopController();
+  const generation = coopSessionGeneration();
+  const lease = activeColosseumGuestLoops.acquire(interactionCounter, [runtime, controller, generation, relay]);
+  if (!lease.accepted) {
+    return;
+  }
+  void runColosseumGuestRoundLoop(
+    interactionCounter,
+    seqTerm,
+    relay,
+    makeRealColosseumRoundOps(interactionCounter),
+    resume,
+    () =>
+      lease.isLive()
+      && getCoopRuntime() === runtime
+      && getCoopController() === controller
+      && coopSessionGeneration() === generation
+      && getCoopInteractionRelay() === relay,
+  ).finally(lease.release);
+}
+
 const coopColosseumBattleEndDelegate: CoopMeBattleEndDelegate = ({ interactionCounter, seqTerm, relay }) => {
   if (!isCoopAuthoritativeGuest()) {
     return false;
@@ -554,9 +920,34 @@ const coopColosseumBattleEndDelegate: CoopMeBattleEndDelegate = ({ interactionCo
     return false;
   }
   coopLog("me", "colosseum: guest claims the between-rounds terminal (#829)", { interactionCounter, seqTerm });
-  void runColosseumGuestRoundLoop(interactionCounter, seqTerm, relay, makeRealColosseumRoundOps(interactionCounter));
+  startColosseumGuestLoop(interactionCounter, seqTerm, relay);
   return true;
 };
+
+/** Re-arm an interrupted between-round loop from the checksum-verified host control statement. */
+function rebindColosseumGuestLoop(snapshot: CoopActiveMysteryEncounterSnapshotV1): boolean {
+  if (!isCoopAuthoritativeGuest() || !canRebindColosseumGuestLoop(snapshot)) {
+    return false;
+  }
+  const relay = getCoopInteractionRelay();
+  if (relay == null || coopMeInteractionStartValue() !== snapshot.interactionCounter) {
+    return false;
+  }
+  const colosseum = snapshot.colosseum;
+  if (colosseum == null) {
+    return false;
+  }
+  const presentation =
+    colosseum.boardRound === colosseum.expectedRound && snapshot.presentation?.subPrompt?.kind === "secondary"
+      ? snapshot.presentation
+      : undefined;
+  startColosseumGuestLoop(snapshot.interactionCounter, COOP_ME_TERM_SEQ_BASE + snapshot.interactionCounter, relay, {
+    expectedRound: colosseum.expectedRound,
+    presentation,
+    decision: colosseum.decision,
+  });
+  return true;
+}
 
 // #829 REGISTRATION: install the delegate once at module load. `coop-colosseum` is eagerly imported by
 // the phase registry (phase-manager -> ColosseumChoicePhase -> here), so this runs on BOTH clients at
@@ -569,3 +960,4 @@ const coopColosseumBattleEndDelegate: CoopMeBattleEndDelegate = ({ interactionCo
 // (it exits on the terminal / a cleared pin). Solo + every non-colosseum ME see the delegate return false,
 // so their behaviour is byte-identical.
 setCoopMeBattleEndDelegate(coopColosseumBattleEndDelegate);
+setCoopMeSnapshotRebindDelegate(rebindColosseumGuestLoop);

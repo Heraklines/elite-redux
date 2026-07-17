@@ -18,10 +18,13 @@
 // =============================================================================
 
 import {
+  COOP_BIOME_TRANSITION_SEQ_BASE,
+  COOP_CATCH_FULL_SEQ,
   COOP_LEARN_MOVE_SEQ,
   COOP_MAX_REACHABLE_COUNTER,
   COOP_ME_TERM_SEQ_BASE,
   COOP_SEQ_BANDS,
+  COOP_STORMGLASS_SEQ,
   type CoopSeqBand,
   coopSeqBandRange,
 } from "#data/elite-redux/coop/coop-seq-registry";
@@ -74,6 +77,11 @@ describe("#840 co-op seq-band registry (collision guard)", () => {
     const faint = COOP_SEQ_BANDS.find(b => b.key === "faintSwitch");
     expect(faint).toBeDefined();
     expect(COOP_MAX_REACHABLE_COUNTER).toBeLessThan(faint!.base);
+  });
+
+  it("the deterministic biome-transition band excludes Stormglass and stays below catch-full", () => {
+    expect(COOP_BIOME_TRANSITION_SEQ_BASE).toBe(COOP_STORMGLASS_SEQ + 1);
+    expect(COOP_BIOME_TRANSITION_SEQ_BASE + COOP_MAX_REACHABLE_COUNTER - 1).toBeLessThan(COOP_CATCH_FULL_SEQ);
   });
 
   it("bands are declared in ascending base order (readability + the disjointness scan)", () => {

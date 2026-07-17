@@ -23,6 +23,7 @@ import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
@@ -37,9 +38,11 @@ import {
   drainLoopback,
   emptyGhostSnapshot,
   installDuoLogCapture,
+  installHeadlessPlayerAtlasCompletionModel,
   mirrorHostBattleToGuest,
   withClient,
 } from "#test/tools/coop-duo-harness";
+import { installHeadlessCoopSemanticProjectionOracle } from "#test/tools/coop-semantic-presentation";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -49,6 +52,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
   let phaserGame: Phaser.Game;
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
+  let restoreProjection: (() => void) | undefined;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
@@ -56,6 +60,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
 
   beforeEach(() => {
     game = new GameManager(phaserGame);
+    restoreProjection = installHeadlessCoopSemanticProjectionOracle(game.scene);
     logs = installDuoLogCapture(`spike-${Date.now()}`);
     game.override
       .battleStyle("double")
@@ -68,6 +73,8 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
   });
 
   afterEach(() => {
+    restoreProjection?.();
+    restoreProjection = undefined;
     logs.dispose();
     clearCoopRuntime();
     // #710 harness-citizenship: buildGuestScene() constructs a 2nd BattleScene (the guest), whose
@@ -88,8 +95,14 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // --- Pair over the loopback; the HOST runtime sits on the `host` endpoint. ---
     const pair = createLoopbackPair();
     const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
+    hostRuntime.spoof = new SpoofGuest(pair.guest);
+    hostRuntime.spoof.connect();
     setCoopRuntime(hostRuntime);
     hostRuntime.controller.connect();
+    expect(
+      await hostRuntime.controller.awaitPartnerCompatibility(),
+      "the engine fixture negotiates a complete same-build peer before gameplay",
+    ).not.toBeNull();
     // Flip into co-op + tag field ownership, host role.
     hostScene.gameMode = getGameMode(GameModes.COOP);
     const field = hostScene.getPlayerField();
@@ -97,25 +110,12 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     field[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
     hostRuntime.controller.role = "host";
 
-    // A guest stub on the OTHER endpoint just to answer the host's commandRequest for the
-    // partner slot (so the host's turn resolves). It picks the first legal move. This is the
-    // ONLY faked part of THIS smoke test; the next test wires a real guest engine instead.
+    // Observe the OTHER endpoint. SpoofGuest is the representative negotiated local peer and
+    // answers the partner command through the production CoopBattleSync request path.
     const guestEnd = pair.guest;
     let emittedTurnResolution = false;
     let emittedAuthoritativeState: Record<string, unknown> | undefined;
     guestEnd.onMessage(msg => {
-      if (msg.t === "commandRequest") {
-        guestEnd.send({
-          t: "command",
-          fieldIndex: msg.fieldIndex,
-          turn: msg.turn,
-          // #851: echo the request's owner exactly as the real answerRequest does, so the host's
-          // owner-keyed pending request is matched (a stub that dropped it would strand the await).
-          ...(msg.owner == null ? {} : { owner: msg.owner }),
-          ...(msg.epoch == null ? {} : { epoch: msg.epoch, wave: msg.wave, pokemonId: msg.pokemonId }),
-          command: { command: Command.FIGHT, cursor: 0, moveId: MoveId.TACKLE, targets: [BattlerIndex.ENEMY] },
-        });
-      }
       if (msg.t === "turnResolution") {
         emittedTurnResolution = true;
         emittedAuthoritativeState = msg.authoritativeState as unknown as Record<string, unknown> | undefined;
@@ -126,7 +126,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
     game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
 
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
     await drainLoopback();
 
     expect(emittedTurnResolution, "host emitted a turnResolution over the loopback").toBe(true);
@@ -195,6 +195,9 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     };
     await withClient(guestCtx, () => {
       mirrorHostBattleToGuest(hostScene, guestScene);
+      // This older hand-assembled spike bypasses buildDuo, so wire the same HEADLESS-only Phaser cache/live
+      // key completion model explicitly. The production projection path below remains otherwise unchanged.
+      installHeadlessPlayerAtlasCompletionModel(guestScene);
       const gf = guestScene.getPlayerField();
       gf[COOP_HOST_FIELD_INDEX].coopOwner = "host";
       gf[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
@@ -230,12 +233,21 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     await withClient(hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     await drainLoopback();
 
     // The host EMITted + the guest RECVd the turnResolution over the loopback.
     expect(guestRecvTurnResolution, "the guest received the host's turnResolution").toBe(true);
+
+    // The spike predates buildDuo's sequential-boundary bridge. Finish the real host BattleEnd seam and its
+    // retained automatic-victory seal now so the COMPLETE post-victory WAVE_ADVANCE transaction exists
+    // before the winning guest replay consumes it. Stopping at BattleEnd alone is intentionally insufficient:
+    // trainer money, automatic modifiers, and biome/x0 state settle between BattleEnd and the seal.
+    await withClient(hostCtx, async () => {
+      await game.phaseInterceptor.to("CoopVictorySealPhase");
+    });
+    await withClient(guestCtx, () => drainLoopback());
 
     // ===== Pump the GUEST: run its REAL CoopReplayTurnPhase for the host's turn. The host won the
     // wave (it broadcast waveResolved "win"), so the guest's deferred CoopFinalizeTurnPhase consumes

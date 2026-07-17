@@ -10,6 +10,7 @@ import {
   SpeciesFormChangeLapseTeraTrigger,
   SpeciesFormChangeManualTrigger,
   SpeciesFormChangeMoveLearnedTrigger,
+  SpeciesFormChangePostMoveTrigger,
   SpeciesFormChangePreMoveTrigger,
   SpeciesFormChangeRevertWeatherFormTrigger,
   SpeciesFormChangeTeraTrigger,
@@ -502,7 +503,17 @@ export const pokemonFormChanges: PokemonFormChanges = {
     new SpeciesFormChange(SpeciesId.MINIOR, "indigo-meteor", "indigo", new SpeciesFormChangeAbilityTrigger(), true),
     new SpeciesFormChange(SpeciesId.MINIOR, "indigo", "indigo-meteor", new SpeciesFormChangeAbilityTrigger(), true),
     new SpeciesFormChange(SpeciesId.MINIOR, "violet-meteor", "violet", new SpeciesFormChangeAbilityTrigger(), true),
-    new SpeciesFormChange(SpeciesId.MINIOR, "violet", "violet-meteor", new SpeciesFormChangeAbilityTrigger(), true)
+    new SpeciesFormChange(SpeciesId.MINIOR, "violet", "violet-meteor", new SpeciesFormChangeAbilityTrigger(), true),
+    // ER (ability Shields Down): using Shell Smash immediately forces the Core
+    // Form (meteor -> core) regardless of HP. Paired with the no-revert latch in
+    // the SHIELDS_DOWN ability closures, the Minior then stays in Core Form.
+    new SpeciesFormChange(SpeciesId.MINIOR, "red-meteor", "red", new SpeciesFormChangePostMoveTrigger(MoveId.SHELL_SMASH), true),
+    new SpeciesFormChange(SpeciesId.MINIOR, "orange-meteor", "orange", new SpeciesFormChangePostMoveTrigger(MoveId.SHELL_SMASH), true),
+    new SpeciesFormChange(SpeciesId.MINIOR, "yellow-meteor", "yellow", new SpeciesFormChangePostMoveTrigger(MoveId.SHELL_SMASH), true),
+    new SpeciesFormChange(SpeciesId.MINIOR, "green-meteor", "green", new SpeciesFormChangePostMoveTrigger(MoveId.SHELL_SMASH), true),
+    new SpeciesFormChange(SpeciesId.MINIOR, "blue-meteor", "blue", new SpeciesFormChangePostMoveTrigger(MoveId.SHELL_SMASH), true),
+    new SpeciesFormChange(SpeciesId.MINIOR, "indigo-meteor", "indigo", new SpeciesFormChangePostMoveTrigger(MoveId.SHELL_SMASH), true),
+    new SpeciesFormChange(SpeciesId.MINIOR, "violet-meteor", "violet", new SpeciesFormChangePostMoveTrigger(MoveId.SHELL_SMASH), true)
   ],
   [SpeciesId.MIMIKYU]: [
     new SpeciesFormChange(SpeciesId.MIMIKYU, "disguised", "busted", new SpeciesFormChangeAbilityTrigger(), true),

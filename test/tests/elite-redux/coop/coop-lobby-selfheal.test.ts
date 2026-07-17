@@ -26,10 +26,24 @@
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { GameModes } from "#enums/game-modes";
 import { describe, expect, it } from "vitest";
 
 /** LoopbackTransport / the flap transport deliver on a microtask; flush before asserting. */
 const flush = () => new Promise<void>(resolve => queueMicrotask(resolve));
+
+const resumeCommitment = (wave: number, runId = `run-${"b".repeat(20)}`, checkpointRevision = wave) => ({
+  version: 1 as const,
+  digest: "0".repeat(64),
+  gameMode: GameModes.COOP,
+  wave,
+  revision: 0,
+  runId,
+  checkpointRevision,
+  timestamp: wave * 10,
+  participants: ["Guest", "Host"] as [string, string],
+  seats: { host: "Host", guest: "Guest" },
+});
 
 /**
  * A minimal controllable in-process transport used to REPRODUCE a channel FLAP: it delivers to the
@@ -45,6 +59,7 @@ class FlapTransport implements CoopTransport {
   private _state: CoopConnectionState = "connected";
   private readonly msgHandlers = new Set<(msg: CoopMessage) => void>();
   private readonly stateHandlers = new Set<(state: CoopConnectionState) => void>();
+  private dropNextMessageType: CoopMessage["t"] | null = null;
 
   constructor(role: CoopRole) {
     this.role = role;
@@ -72,6 +87,10 @@ class FlapTransport implements CoopTransport {
 
   send(msg: CoopMessage): void {
     this.sent.push(msg);
+    if (this.dropNextMessageType === msg.t) {
+      this.dropNextMessageType = null;
+      return;
+    }
     if (this._state !== "connected") {
       return; // dark: dropped at the source (like the real transport bailing on a closed channel)
     }
@@ -87,6 +106,10 @@ class FlapTransport implements CoopTransport {
         h(msg);
       }
     });
+  }
+
+  dropNext(type: CoopMessage["t"]): void {
+    this.dropNextMessageType = type;
   }
 
   /** Test-only delivery of a delayed frame that was retained by an old wire. */
@@ -172,30 +195,101 @@ describe("co-op lobby self-healing handshake (#868)", () => {
     g.connect();
     await flush();
 
-    g.armResumeOfferHandler(() => {});
-    const first = h.offerResume(10);
+    let surfacedOffers = 0;
+    g.armResumeOfferHandler(() => {
+      surfacedOffers++;
+    });
+    const first = h.offerResume(resumeCommitment(10));
     await flush();
+    expect(surfacedOffers).toBe(1);
     const firstFrame = host.sent.find(
-      (msg): msg is Extract<CoopMessage, { t: "resumeOffer" }> => msg.t === "resumeOffer" && msg.wave === 10,
+      (msg): msg is Extract<CoopMessage, { t: "resumeOffer" }> => msg.t === "resumeOffer" && msg.commitment.wave === 10,
     );
     expect(firstFrame).toBeDefined();
     await g.replyResume(false);
     await expect(first).resolves.toBe(false);
 
-    const second = h.offerResume(20);
+    const second = h.offerResume(resumeCommitment(20));
     await flush();
+    expect(surfacedOffers, "a settled decline allows the next host offer in the same lobby epoch").toBe(2);
     let secondSettled = false;
     void second.then(() => {
       secondSettled = true;
     });
 
     host.deliver({ t: "resumeReply", decisionId: firstFrame!.decisionId, accept: true });
+    guest.deliver(firstFrame!);
     await flush();
     expect(secondSettled, "stale reply was rejected by transaction id").toBe(false);
+    expect(surfacedOffers, "a delayed settled offer cannot replace the active offer").toBe(2);
 
     const committed = g.replyResume(true);
     await expect(second).resolves.toBe(true);
     await expect(committed, "guest receives the host's durable ACCEPT commit").resolves.toBe(true);
+  });
+
+  it("binds offers/start-new to an epoch so delayed launch decisions cannot replace the active run", async () => {
+    const { host, guest } = makeFlapPair();
+    const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
+    const g = new CoopSessionController(guest, { username: "Guest", tiebreak: 2 });
+    h.connect();
+    g.connect();
+    await flush();
+
+    guest.setConnected(false);
+    let offersSurfaced = 0;
+    g.armResumeOfferHandler(() => {
+      offersSurfaced++;
+    });
+    const abandonedOffer = h.offerResume(resumeCommitment(10), 60_000);
+    const delayedOffer = host.sent.find(
+      (msg): msg is Extract<CoopMessage, { t: "resumeOffer" }> => msg.t === "resumeOffer",
+    );
+    expect(delayedOffer).toBeDefined();
+
+    guest.setConnected(true);
+    let starts = 0;
+    g.armResumeStartNewHandler(() => {
+      starts++;
+    });
+    await expect(h.sendResumeStartNew(), "the newer atomic launch decision is ACKed").resolves.toBe(true);
+    const firstStart = host.sent.find(
+      (msg): msg is Extract<CoopMessage, { t: "resumeStartNew" }> => msg.t === "resumeStartNew",
+    );
+    expect(firstStart).toBeDefined();
+    const activeEpoch = g.sessionEpoch;
+    const activeRun = g.runId;
+    const offersBeforeDelayedReplay = offersSurfaced;
+
+    guest.deliver(delayedOffer!);
+    expect(offersSurfaced, "old proposal is not surfaced again after the epoch advanced").toBe(
+      offersBeforeDelayedReplay,
+    );
+    expect(g.sessionEpoch).toBe(activeEpoch);
+    expect(g.runId).toBe(activeRun);
+
+    g.armResumeStartNewHandler(() => {
+      starts++;
+    });
+    const newerRun = `newer-run-${"z".repeat(24)}`;
+    guest.deliver({
+      t: "resumeStartNew",
+      decisionId: "newer-launch-decision",
+      epoch: activeEpoch + 1,
+      runId: newerRun,
+      checkpointRevision: 0,
+    });
+    expect(starts).toBe(2);
+    expect(g.runId).toBe(newerRun);
+
+    guest.deliver(firstStart!);
+    expect(starts, "an older start-new frame cannot re-enter the UI").toBe(2);
+    expect(g.sessionEpoch).toBe(activeEpoch + 1);
+    expect(g.runId).toBe(newerRun);
+
+    h.dispose();
+    await expect(abandonedOffer).resolves.toBe(false);
+    g.dispose();
   });
 
   it("replays a lost ACCEPT reply after reconnect and waits for applied-state ACK", async () => {
@@ -207,29 +301,31 @@ describe("co-op lobby self-healing handshake (#868)", () => {
     await flush();
 
     g.armResumeOfferHandler(() => {});
-    const offered = h.offerResume(20);
+    const offered = h.offerResume(resumeCommitment(20));
     await flush();
 
-    host.setConnected(false);
-    guest.setConnected(false);
+    host.dropNext("resumeAccepted");
     const committed = g.replyResume(true);
     let guestCommitted = false;
     void committed.then(value => {
       guestCommitted = value;
     });
     await flush();
-    expect(guestCommitted, "a locally-sent reply is not mistaken for a host commit").toBe(false);
+    expect(guestCommitted, "a lost post-commit carrier leaves the guest behind the barrier").toBe(false);
+    await expect(offered, "the host committed the ACCEPT before its carrier was lost").resolves.toBe(true);
 
+    host.setConnected(false);
+    guest.setConnected(false);
     guest.setConnected(true);
     host.setConnected(true);
     await flush();
-    await expect(offered, "the retained reply heals after reconnect").resolves.toBe(true);
     await expect(committed, "the guest receives the matching resumeAccepted commit").resolves.toBe(true);
 
     const applied = h.awaitResumeApplied(1_000);
-    g.reportResumeApplied(true);
+    const delivered = g.reportResumeApplied(true);
     await flush();
     await expect(applied, "host observes actual snapshot materialization").resolves.toBe(true);
+    await expect(delivered, "guest observes the host apply ACK").resolves.toBe(true);
 
     const appliedFrames = guest.sent.filter(msg => msg.t === "resumeApplied").length;
     host.setConnected(false);
@@ -272,10 +368,7 @@ describe("co-op lobby self-healing handshake (#868)", () => {
     await flush();
 
     expect(released, "the durable start-new decision healed immediately on reconnect").toBe(1);
-    await expect(
-      committed,
-      "the host advances only after the guest applied and ACKed the release",
-    ).resolves.toBeUndefined();
+    await expect(committed, "the host advances only after the guest applied and ACKed the release").resolves.toBe(true);
   });
 
   it("parks the host until the guest UI applies the exact start-new decision", async () => {
@@ -298,13 +391,101 @@ describe("co-op lobby self-healing handshake (#868)", () => {
     g.armResumeStartNewHandler(() => {
       guestReleased++;
     });
-    await expect(committed).resolves.toBeUndefined();
+    await expect(committed).resolves.toBe(true);
     expect(guestReleased).toBe(1);
     expect(hostReleased).toBe(true);
 
     h.resyncLobbyState();
     await flush();
     expect(guestReleased, "a replayed committed decision re-ACKs without re-entering team select").toBe(1);
+  });
+
+  it("replays an exact host checkpoint when the guest persistence ACK is lost", async () => {
+    const { host, guest } = makeFlapPair();
+    const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
+    const g = new CoopSessionController(guest, { username: "Guest", tiebreak: 2 });
+    h.connect();
+    g.connect();
+    await flush();
+
+    let persisted = 0;
+    g.armResumeCheckpointHandler(async () => {
+      persisted++;
+      host.setConnected(false); // persistence succeeds, but its first ACK cannot reach the host.
+      return { success: true };
+    });
+    const mirrored = h.sendResumeCheckpoint(
+      '{"waveIndex":12}',
+      resumeCommitment(12, h.runId, h.checkpointRevision),
+      5_000,
+    );
+    await flush();
+    expect(persisted).toBe(1);
+
+    host.setConnected(true);
+    await flush();
+    await flush();
+    await expect(mirrored, "retained checkpoint is re-sent and duplicate persistence is re-ACKed").resolves.toBe(true);
+    expect(persisted, "same checkpoint id is persisted exactly once").toBe(1);
+  });
+
+  it("retires a timed-out checkpoint outbox when its reconnect ACK arrives without a live waiter", async () => {
+    const { host, guest } = makeFlapPair();
+    const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
+    const g = new CoopSessionController(guest, { username: "Guest", tiebreak: 2 });
+    h.connect();
+    g.connect();
+    await flush();
+
+    let persisted = 0;
+    g.armResumeCheckpointHandler(async () => {
+      persisted++;
+      host.setConnected(false); // local persistence succeeds, but the first ACK is dropped.
+      return { success: true };
+    });
+    await expect(
+      h.sendResumeCheckpoint('{"waveIndex":15}', resumeCommitment(15, h.runId, h.checkpointRevision), 5),
+    ).resolves.toBe(false);
+    expect(persisted).toBe(1);
+
+    host.setConnected(true);
+    await flush();
+    await flush();
+    const afterHealing = host.sent.filter(message => message.t === "resumeCheckpoint").length;
+    expect(afterHealing, "the timed-out durable frame was replayed once").toBe(2);
+
+    host.setConnected(false);
+    host.setConnected(true);
+    await flush();
+    await flush();
+    expect(
+      host.sent.filter(message => message.t === "resumeCheckpoint").length,
+      "the late successful ACK retired the outbox even though its waiter had timed out",
+    ).toBe(afterHealing);
+    expect(persisted, "duplicate replay never re-runs guest persistence").toBe(1);
+  });
+
+  it("carries failed cloud-mirror debt into the next complete checkpoint", async () => {
+    const { host, guest } = makeFlapPair();
+    const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
+    const g = new CoopSessionController(guest, { username: "Guest", tiebreak: 2 });
+    h.connect();
+    g.connect();
+    await flush();
+
+    const mirrorRequests: boolean[] = [];
+    g.armResumeCheckpointHandler(async (_session, _commitment, mirrorCloud) => {
+      mirrorRequests.push(mirrorCloud);
+      return mirrorRequests.length === 1 ? { success: false, reason: "cloud-failed" } : { success: true };
+    });
+    await expect(
+      h.sendResumeCheckpoint('{"waveIndex":20}', resumeCommitment(20, h.runId, h.checkpointRevision), 5_000, true),
+    ).resolves.toBe(false);
+    await expect(
+      h.sendResumeCheckpoint('{"waveIndex":21}', resumeCommitment(21, h.runId, h.checkpointRevision), 5_000, false),
+      "a newer full snapshot supersedes bytes but cannot erase outstanding guest-cloud durability",
+    ).resolves.toBe(true);
+    expect(mirrorRequests).toEqual([true, true]);
   });
 
   // -------------------------------------------------------------------------

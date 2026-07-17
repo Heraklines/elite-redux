@@ -41,6 +41,7 @@ import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { BattlerIndex } from "#enums/battler-index";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -54,6 +55,7 @@ import {
   CoopMoveAnimReplayPhase,
 } from "#phases/coop-replay-phases";
 import { GameManager } from "#test/framework/game-manager";
+import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -100,7 +102,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   /** Start a co-op authoritative double as the HOST and tag field ownership. */
   const startCoopHost = async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    startLocalCoopSession({ username: "Host", netcodeMode: "authoritative" });
+    const runtime = startLocalCoopSession({ username: "Host", netcodeMode: "authoritative" });
+    await negotiateLocalSpoofPeer(runtime);
     game.scene.gameMode = getGameMode(GameModes.COOP);
     expect(game.scene.gameMode.isCoop).toBe(true);
     const field = game.scene.getPlayerField();
@@ -112,7 +115,13 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   /** Start a co-op authoritative double, then flip the LOCAL engine into the GUEST role. */
   const startCoopGuest = async () => {
     const field = await startCoopHost();
+    const runtime = getCoopRuntime()!;
+    runtime.spoof?.dispose();
     getCoopController()!.role = "guest";
+    // Protocol 33 keys retained/durable operation cursors by runtime role as well as controller
+    // role. This legacy single-engine fixture changes seats after assembly, so move both
+    // identities together just as the guest-renderer fixture does.
+    (runtime.opState as { localRole: "host" | "guest" | null }).localRole = "guest";
     return field;
   };
 
@@ -225,7 +234,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     // Drive a REAL host turn: the human TACKLEs (single-target -> target select), the guest auto-resolves.
     game.move.select(MoveId.TACKLE, BattlerIndex.PLAYER, enemy0.getBattlerIndex());
-    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
     // Let the emit (sent on a microtask) land on the partner.
     await new Promise(r => setTimeout(r, 0));
 
@@ -246,6 +255,37 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     // The faint event names the KOd enemy's battler index.
     const faint = events.find(e => e.k === "faint");
     expect(faint?.k === "faint" ? faint.bi : -1).toBe(enemy0.getBattlerIndex());
+  });
+
+  it("(A) commits Yawn sleep only after the delayed TurnEnd status phase has settled", async () => {
+    const field = await startCoopHost();
+    const sleeper = field[COOP_GUEST_FIELD_INDEX];
+    expect(sleeper.addTag(BattlerTagType.DROWSY), "the test installed Yawn's real Drowsy tag").toBe(true);
+    // DrowsyTag deliberately owns its two-turn duration and ignores addTag's generic turnCount.
+    // Put that real tag on its final tick so this one turn proves the delayed status boundary.
+    const drowsy = sleeper.getTag(BattlerTagType.DROWSY);
+    expect(drowsy).toBeDefined();
+    drowsy!.turnCount = 1;
+
+    const emittedStates: ReturnType<typeof completeTurnCarrier>["authoritativeState"][] = [];
+    getCoopRuntime()!.partnerTransport!.onMessage(message => {
+      if (message.t === "turnResolution") {
+        emittedStates.push(message.authoritativeState);
+      }
+    });
+
+    game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
+    game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(sleeper.status?.effect, "the host materialized Yawn before the commit sentinel").toBe(StatusEffect.SLEEP);
+    const wireSleeper = emittedStates.at(-1)?.playerParty.find(pokemon => pokemon.id === sleeper.id);
+    const wireStatus = wireSleeper?.status as { effect?: StatusEffect; sleepTurnsRemaining?: number } | undefined;
+    expect(wireStatus?.effect, "turnResolution carries the settled sleep status").toBe(StatusEffect.SLEEP);
+    expect(wireStatus?.sleepTurnsRemaining, "turnResolution carries the authoritative sleep duration").toBe(
+      sleeper.status?.sleepTurnsRemaining,
+    );
   });
 
   it("(A) a StatStageChangePhase under an open recording records a statStage event with the NEW ABSOLUTE stage", async () => {
@@ -480,6 +520,12 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     // past it (like coop-guest-renderer's REPLAY_DRAIN_PHASES) so the loop reaches the Faint phase.
     for (let i = 0; i < 12 && game.scene.phaseManager.getCurrentPhase() != null; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();
+      // `end()` normally starts the next queued phase synchronously. On a slower runner the mocked Faint
+      // phase can therefore have already started Finalize before this manual drain observes it; invoking
+      // that same live phase again manufactures a second finalization that production never performs.
+      if (cur.is("CoopFinalizeTurnPhase") && finalizeSpy.mock.calls.length > 0) {
+        break;
+      }
       if (
         cur.is("MessagePhase")
         || cur.is("CoopMoveAnimReplayPhase")

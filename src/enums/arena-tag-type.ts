@@ -22,6 +22,21 @@ export enum ArenaTagType {
   TRICK_ROOM = "TRICK_ROOM",
   /** Elite Redux — Inverse Room: reverses type matchups field-wide for a few turns. */
   INVERSE_ROOM = "INVERSE_ROOM",
+  /**
+   * Elite Redux (move 478 Magic Room): suppresses the effects of ALL held items
+   * on BOTH sides of the field for 5 turns (consulted in
+   * {@linkcode PokemonHeldItemModifier.shouldApply}). Room-style: re-using Magic
+   * Room while it is active ends it. Field-wide.
+   */
+  MAGIC_ROOM = "MAGIC_ROOM",
+  /**
+   * Elite Redux (move 472 Wonder Room): for 5 turns, every Pokemon's Attack and
+   * Sp. Atk are swapped field-wide, and their stat stages ("buffs") are ignored
+   * (the swap reads the RAW base stats). Consulted in
+   * {@linkcode Pokemon.getEffectiveStat}. Room-style: re-using Wonder Room while
+   * it is active ends it. Field-wide.
+   */
+  WONDER_ROOM = "WONDER_ROOM",
   GRAVITY = "GRAVITY",
   REFLECT = "REFLECT",
   LIGHT_SCREEN = "LIGHT_SCREEN",

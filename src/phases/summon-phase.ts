@@ -4,6 +4,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { erApplyPendingRevives } from "#data/elite-redux/archetypes/post-faint-deferred-revive";
 import { erApplyPendingSwitchInBoost } from "#data/elite-redux/empower-switch-in";
+import { erApplyPendingSafePassage } from "#data/elite-redux/safe-passage";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
 import { BattleType } from "#enums/battle-type";
@@ -287,6 +288,11 @@ export class SummonPhase extends PartyMemberPokemonPhase {
     // latch (its user force-switched itself out via Ghastly Echo), the mon just
     // sent out gets a one-turn +50% move-power tag. No-op unless armed.
     erApplyPendingSwitchInBoost(pokemon);
+
+    // ER (979 Safe Passage): if this side armed the "protect the switch-in"
+    // latch (its user force-switched itself out via Safe Passage), the mon just
+    // sent out gets a one-turn -35% damage-taken tag. No-op unless armed.
+    erApplyPendingSafePassage(pokemon);
 
     if (pokemon.isShiny(true)) {
       globalScene.phaseManager.unshiftNew("ShinySparklePhase", pokemon.getBattlerIndex());

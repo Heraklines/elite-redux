@@ -48,6 +48,7 @@ export const TREASURE_FRAGMENTS_FOR_REWARD = 3;
 
 let revealedNodes: ErMapNode[] = [];
 let travelTarget: BiomeId | null = null;
+let authoritativeTravelClassification: { readonly wave: number; readonly target: BiomeId | null } | null = null;
 let fragmentCount = 0;
 /** ER (#486) The Storm: a WeatherType (numeric enum) the player chose to carry
  * into the NEXT biome, consumed once on that biome's first wave. null = none. */
@@ -60,6 +61,7 @@ let biomeHistory: BiomeId[] = [];
 export function resetErMapNodes(): void {
   revealedNodes = [];
   travelTarget = null;
+  authoritativeTravelClassification = null;
   fragmentCount = 0;
   biomeHistory = [];
   carriedWeather = null;
@@ -130,10 +132,52 @@ export function setMapTravelTarget(biome: BiomeId): void {
   travelTarget = biome;
 }
 
+/** Read the pending travel target without consuming authority-owned transition state. */
+export function getMapTravelTarget(): BiomeId | null {
+  return travelTarget;
+}
+
+/** Exact host-carrier classification for SelectBiome; local event writes cannot alter it. */
+export function setAuthoritativeMapTravelClassification(wave: number, target: BiomeId | null): void {
+  authoritativeTravelClassification = Number.isSafeInteger(wave) && wave >= 0 ? { wave, target } : null;
+}
+
+export function getAuthoritativeMapTravelClassification(wave: number): {
+  readonly ready: boolean;
+  readonly target: BiomeId | null;
+} {
+  return authoritativeTravelClassification?.wave === wave
+    ? { ready: true, target: authoritativeTravelClassification.target }
+    : { ready: false, target: null };
+}
+
+export function restoreAuthoritativeMapTravelClassification(
+  classification: { readonly wave: number; readonly target: BiomeId | null } | null,
+): void {
+  authoritativeTravelClassification = classification == null ? null : { ...classification };
+}
+
+export function snapshotAuthoritativeMapTravelClassification(): {
+  readonly wave: number;
+  readonly target: BiomeId | null;
+} | null {
+  return authoritativeTravelClassification == null ? null : { ...authoritativeTravelClassification };
+}
+
+/** Clear only the exact host-committed travel destination; stale/local mismatches remain fail-visible. */
+export function clearMapTravelTarget(expected: BiomeId): boolean {
+  if (travelTarget !== expected) {
+    return false;
+  }
+  travelTarget = null;
+  return true;
+}
+
 /** Take and clear the pending travel target, if any. */
 export function consumeMapTravelTarget(): BiomeId | null {
   const target = travelTarget;
   travelTarget = null;
+  authoritativeTravelClassification = null;
   return target;
 }
 

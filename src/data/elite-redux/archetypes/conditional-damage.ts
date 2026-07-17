@@ -46,6 +46,7 @@ import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { Command } from "#enums/command";
 import { BATTLE_STATS, type BattleStat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
@@ -249,15 +250,37 @@ export class ConditionalDamageAbAttr extends MovePowerBoostAbAttr {
       case "target-has-lowered-stat":
         return ConditionalDamageAbAttr.evalAnyStatLowered(target);
       case "any-active-asleep":
-        // Any active Pokemon (user/ally/opponent) that is asleep OR treated as
-        // asleep. A Comatose holder is "considered asleep" (Dreamscape 859 wraps
-        // Comatose + Dreamcatcher, so its own sleep-boost is effectively always
-        // on) — mirrors the SLEEP-or-Comatose test the engine uses everywhere
-        // else (move.ts, move-condition.ts, ab-attrs.ts).
+        // The dedicated switch-strike on a sleeping foe is 1x, NOT 2x: "Attacks
+        // hit sleeping foes who are switching out for 1x power instead." When the
+        // target is mid-switch (its deferred voluntary switch is still pending —
+        // TurnStartPhase held it back so this strike lands before it leaves), the
+        // any-asleep boost must NOT apply to THIS hit. All other hits keep the boost.
+        if (ConditionalDamageAbAttr.isTargetMidVoluntarySwitch(target)) {
+          return false;
+        }
+        // Any active Pokemon (user/ally/opponent) with real SLEEP status triggers
+        // the boost. COMATOSE ("considered asleep") only counts for the HOLDER
+        // itself: Dreamcatcher (305) "does not activate against Comatose" foes,
+        // but Dreamscape (859 = Comatose + Dreamcatcher) still self-triggers from
+        // its own Comatose. So a Comatose OPPONENT no longer wrongly grants 2x.
         return globalScene
           .getField(true)
-          .some(p => p.status?.effect === StatusEffect.SLEEP || p.hasAbility(AbilityId.COMATOSE));
+          .some(p => p.status?.effect === StatusEffect.SLEEP || (p === pokemon && p.hasAbility(AbilityId.COMATOSE)));
     }
+  }
+
+  /**
+   * Whether `target` is currently mid-voluntary-switch: it has an unexecuted
+   * `Command.POKEMON` queued this turn. In normal play a menu switch resolves
+   * BEFORE any move (so the switcher is off-field and untargetable); the only way
+   * a `POKEMON` command is still pending while the mon is on-field being struck is
+   * the ER switch-out interception in {@linkcode TurnStartPhase} (Dreamcatcher /
+   * Pursuit deferral). This is the transient "target is mid-switch" signal used to
+   * drop the any-asleep boost to 1x for the dedicated switch-strike.
+   */
+  public static isTargetMidVoluntarySwitch(target: Pokemon): boolean {
+    const command = globalScene.currentBattle.turnCommands[target.getBattlerIndex()];
+    return command?.command === Command.POKEMON && !command.skip;
   }
 
   /**

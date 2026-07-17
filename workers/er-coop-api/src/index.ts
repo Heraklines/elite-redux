@@ -5,6 +5,9 @@
  */
 
 // =============================================================================
+
+import { handleP33SignalingRequest, pruneP33Signaling } from "./p33-signaling";
+
 // Elite Redux - co-op signaling + run-relay API (Cloudflare Worker + D1). #633
 //
 // The co-op RUN is peer-to-peer (WebRTC DataChannel); this Worker is ONLY the
@@ -44,6 +47,12 @@ interface Env {
   CF_TURN_API_TOKEN?: string;
   /** TURN credential lifetime in seconds (default 86400). */
   TURN_TTL_SECONDS?: string;
+  /** Shared with er-save-api; verifies short-lived authenticated P33 identity tickets. */
+  COOP_IDENTITY_SECRET?: string;
+  /** Bounded P33 hot-rejoin grace before an abandoned pairing releases both accounts. */
+  P33_REJOIN_GRACE_MS?: string;
+  /** Exact Git source deployed by the staging promotion workflow. */
+  SOURCE_SHA?: string;
 }
 
 interface CoopRunRow {
@@ -98,7 +107,7 @@ function corsHeaders(env: Env): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization",
     "Access-Control-Max-Age": "86400",
   };
 }
@@ -635,6 +644,10 @@ async function handleIce(env: Env): Promise<Response> {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const p33 = await handleP33SignalingRequest(request, env);
+    if (p33 != null) {
+      return p33;
+    }
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders(env) });
     }
@@ -716,5 +729,6 @@ export default {
     await env.DB.prepare("DELETE FROM coop_lobby WHERE seen_at < ?")
       .bind(now - 5 * 60_000)
       .run();
+    await pruneP33Signaling(env, now, ttlMs);
   },
 };

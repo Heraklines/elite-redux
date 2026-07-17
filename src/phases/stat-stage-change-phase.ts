@@ -7,6 +7,7 @@ import { OctolockTag } from "#data/battler-tags";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementStatStage } from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { erTacticalAfterStatDrop, erTacticalGuardStatDrop } from "#data/elite-redux/er-tactical-items";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -143,7 +144,10 @@ export class StatStageChangePhase extends PokemonPhase {
     const filteredStats = this.stats.filter(stat => {
       const cancelled = new BooleanHolder(false);
 
-      if (!this.selfTarget && stages.value < 0) {
+      // ignoreAbilities also bypasses Mist / ProtectStat (Clear Body, Full Metal
+      // Body): ER Mirror Armor's reflected drop lands through the attacker's
+      // stat-drop immunities.
+      if (!this.ignoreAbilities && !this.selfTarget && stages.value < 0) {
         globalScene.arena.applyTagsForSide(
           ArenaTagType.MIST,
           pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY,
@@ -154,7 +158,7 @@ export class StatStageChangePhase extends PokemonPhase {
         );
       }
 
-      if (!cancelled.value && !this.selfTarget && stages.value < 0) {
+      if (!this.ignoreAbilities && !cancelled.value && !this.selfTarget && stages.value < 0) {
         const abAttrParams: PreStatStageChangeAbAttrParams & ConditionalUserFieldProtectStatAbAttrParams = {
           pokemon,
           stat,
@@ -186,6 +190,19 @@ export class StatStageChangePhase extends PokemonPhase {
             stages: this.stages,
           });
         }
+      }
+
+      // ER tactical items: Clear Amulet / Muscle Band / Wise Glasses block a
+      // FOE-inflicted drop (Adrenaline Orb also procs on a foe's Attack-lowering
+      // attempt here). Items are not abilities, so this is NOT gated on
+      // `ignoreAbilities` (Mold Breaker doesn't pierce a held item).
+      if (
+        !cancelled.value
+        && !this.selfTarget
+        && stages.value < 0
+        && erTacticalGuardStatDrop(pokemon, stat as Stat, opponentPokemon)
+      ) {
+        cancelled.value = true;
       }
 
       // Elite Redux: self-inflicted stat-drop immunity. The `!selfTarget` block
@@ -312,6 +329,11 @@ export class StatStageChangePhase extends PokemonPhase {
           globalScene.updateModifiers(this.player);
         }
       }
+
+      // ER Eject Pack: after a foe-inflicted drop actually applies, the holder
+      // switches out (consumed). Priority: Eject Pack over Adrenaline Orb / Red
+      // Card (Adrenaline is skipped in the guard when Eject Pack will fire).
+      erTacticalAfterStatDrop(pokemon, !this.selfTarget && stages.value < 0 && filteredStats.length > 0);
 
       pokemon.updateInfo();
 

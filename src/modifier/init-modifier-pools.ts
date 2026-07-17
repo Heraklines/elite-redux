@@ -7,6 +7,7 @@ import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
 import { Challenges } from "#enums/challenges";
 import { ModifierTier } from "#enums/modifier-tier";
+import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { PokeballType } from "#enums/pokeball";
 import { PokemonType } from "#enums/pokemon-type";
@@ -313,6 +314,23 @@ function initGreatModifierPool() {
     // ER Ability Capsule (#387): GREAT tier per maintainer (2026-06-12);
     // it is a once-per-mon utility, not a Rogue-class power spike.
     new WeightedModifierType(modifierTypes.ER_ABILITY_CAPSULE, 2),
+    // ER Eject Button: GREAT per maintainer (2026-07-16) - a cheap one-shot
+    // pivot tool (the struck holder switches out).
+    new WeightedModifierType(modifierTypes.ER_EJECT_BUTTON, 4),
+    // ER tactical held items - batch 2 GREAT-tier additions (2026-07-16).
+    new WeightedModifierType(modifierTypes.ER_EJECT_PACK, 4),
+    new WeightedModifierType(modifierTypes.ER_SHED_SHELL, 4),
+    new WeightedModifierType(modifierTypes.ER_ADRENALINE_ORB, 4),
+    new WeightedModifierType(modifierTypes.ER_ROOM_SERVICE, 4),
+    new WeightedModifierType(modifierTypes.ER_MENTAL_HERB, 4),
+    new WeightedModifierType(modifierTypes.ER_BLUNDER_POLICY, (party: Pokemon[]) =>
+      party.some(p => p.getHeldItems().some(i => i.type.id === "ER_BLUNDER_POLICY"))
+        ? 0
+        : erTacticalPartyGate(party, partyHasInaccurateMove, 4),
+    ),
+    new WeightedModifierType(modifierTypes.ER_STICKY_BARB, (party: Pokemon[]) =>
+      erTacticalPartyGate(party, p => p.hasUnlockedAbility(AbilityId.MAGIC_GUARD), 4),
+    ),
     new WeightedModifierType(modifierTypes.BASE_STAT_BOOSTER, 3),
     new WeightedModifierType(modifierTypes.TERA_SHARD, (party: Pokemon[]) =>
       party.filter(
@@ -627,6 +645,41 @@ function initUltraModifierPool() {
     // (permanently unlock one innate, or run-unlock two). Rarer than the GREAT-tier
     // normal capsule, so a lower weight.
     new WeightedModifierType(modifierTypes.ER_GREATER_ABILITY_CAPSULE, 2),
+    // ER Expert Belt: ULTRA per maintainer (2026-07-16) - x1.2 super-effective
+    // damage, single stack per mon (getMaxHeldItemCount 1).
+    new WeightedModifierType(modifierTypes.ER_EXPERT_BELT, 3),
+    // ER tactical held items - batch 2 (maintainer-approved 2026-07-16).
+    new WeightedModifierType(modifierTypes.ER_HEAVY_DUTY_BOOTS, (party: Pokemon[]) =>
+      erTacticalOnePerTeam(party, "ER_HEAVY_DUTY_BOOTS", 3),
+    ),
+    new WeightedModifierType(modifierTypes.ER_AIR_BALLOON, 4),
+    new WeightedModifierType(modifierTypes.ER_SAFETY_GOGGLES, 3),
+    new WeightedModifierType(modifierTypes.ER_COVERT_CLOAK, (party: Pokemon[]) =>
+      erTacticalOnePerTeam(party, "ER_COVERT_CLOAK", 2),
+    ),
+    new WeightedModifierType(modifierTypes.ER_CLEAR_AMULET, 2),
+    new WeightedModifierType(modifierTypes.ER_ABILITY_SHIELD, 2),
+    new WeightedModifierType(modifierTypes.ER_THROAT_SPRAY, (party: Pokemon[]) =>
+      erTacticalPartyGate(party, partyHasSoundMove, 3),
+    ),
+    new WeightedModifierType(modifierTypes.ER_PUNCHING_GLOVE, 3),
+    new WeightedModifierType(modifierTypes.ER_MUSCLE_BAND, (party: Pokemon[]) =>
+      erTacticalOnePerTeam(party, "ER_MUSCLE_BAND", 3),
+    ),
+    new WeightedModifierType(modifierTypes.ER_WISE_GLASSES, (party: Pokemon[]) =>
+      erTacticalOnePerTeam(party, "ER_WISE_GLASSES", 3),
+    ),
+    new WeightedModifierType(modifierTypes.ER_ZOOM_LENS, 3),
+    new WeightedModifierType(modifierTypes.ER_IRON_BALL, 2),
+    new WeightedModifierType(modifierTypes.ER_FLOAT_STONE, (party: Pokemon[]) =>
+      erTacticalOnePerTeam(party, "ER_FLOAT_STONE", 3),
+    ),
+    new WeightedModifierType(modifierTypes.ER_SMOKE_BALL, (party: Pokemon[]) =>
+      erTacticalOnePerTeam(party, "ER_SMOKE_BALL", 2),
+    ),
+    new WeightedModifierType(modifierTypes.ER_UTILITY_UMBRELLA, (party: Pokemon[]) =>
+      erTacticalOnePerTeam(party, "ER_UTILITY_UMBRELLA", 3),
+    ),
   ].map(m => {
     m.setTier(ModifierTier.ULTRA);
     return m;
@@ -650,6 +703,17 @@ function initRogueModifierPool() {
     new WeightedModifierType(modifierTypes.ABILITY_RANDOMIZER, 4),
     new WeightedModifierType(modifierTypes.MOVE_SLOT_EXPANDER, 4),
     new WeightedModifierType(modifierTypes.ER_OMNI_GEM, 3),
+    // ER tactical held items - batch 2 ROGUE-tier additions (2026-07-16).
+    new WeightedModifierType(modifierTypes.ER_METRONOME_ITEM, 3),
+    new WeightedModifierType(modifierTypes.ER_BOOSTER_ENERGY, (party: Pokemon[]) =>
+      party.some(p => p.getHeldItems().some(i => i.type.id === "ER_BOOSTER_ENERGY"))
+        ? 0
+        : erTacticalPartyGate(
+            party,
+            p => p.hasUnlockedAbility(AbilityId.PROTOSYNTHESIS) || p.hasUnlockedAbility(AbilityId.QUARK_DRIVE),
+            2,
+          ),
+    ),
     // ER: unlocks the Damage Calculator page in the in-battle Info screen (once).
     new WeightedModifierType(modifierTypes.DAMAGE_CALCULATOR, () => (hasDamageCalculator() ? 0 : 4), 4),
     new WeightedModifierType(modifierTypes.FOCUS_BAND, 5),
@@ -943,4 +1007,36 @@ function hasMaximumBalls(ballType: PokeballType): boolean {
 /** @returns whether the player already owns the ER Damage Calculator unlock. */
 function hasDamageCalculator(): boolean {
   return !!globalScene.findModifier(m => m instanceof DamageCalculatorModifier);
+}
+
+// --- ER tactical held items - reward-pool gates (batch 2, 2026-07-16) ----------
+
+/**
+ * "1 per team" gate for an ER tactical item: weight 0 while any party mon already
+ * holds one (mirrors {@linkcode hasMaximumBalls}). `typeId` is the pinned
+ * modifierTypeInitObj key (e.g. `ER_MUSCLE_BAND`).
+ */
+function erTacticalOnePerTeam(party: Pokemon[], typeId: string, weight: number): number {
+  return party.some(p => p.getHeldItems().some(i => i.type.id === typeId)) ? 0 : weight;
+}
+
+/** Weight-gate an ER tactical item: 0 unless `predicate` holds for some party mon. */
+function erTacticalPartyGate(party: Pokemon[], predicate: (p: Pokemon) => boolean, weight: number): number {
+  return party.some(predicate) ? weight : 0;
+}
+
+/** A party mon knows at least one sound-based move (Throat Spray gate). */
+function partyHasSoundMove(p: Pokemon): boolean {
+  return p.getMoveset(true).some(m => m != null && m.getMove().hasFlag(MoveFlags.SOUND_BASED));
+}
+
+/** A party mon has at least one move that can miss on an accuracy roll (Blunder Policy gate). */
+function partyHasInaccurateMove(p: Pokemon): boolean {
+  return p.getMoveset(true).some(m => {
+    if (m == null) {
+      return false;
+    }
+    const acc = m.getMove().accuracy;
+    return acc >= 0 && acc < 100; // -1 = always hits; 100 = never misses barring evasion
+  });
 }

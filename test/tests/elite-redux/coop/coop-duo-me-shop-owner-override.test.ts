@@ -34,11 +34,13 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattleType } from "#enums/battle-type";
+import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
 import { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
 import { GameManager } from "#test/framework/game-manager";
 import {
@@ -46,15 +48,12 @@ import {
   drainGuestMeReplayToSettle,
   drainLoopback,
   installDuoLogCapture,
-  relayGuestMeOptionIndexOnly,
-  relayGuestMeShopLeaveSync,
   type ShopPhaseSeam,
-  startGuestMeOutcomeRace,
   startGuestMeReplay,
   startGuestMeShopOwner,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -79,6 +78,7 @@ describe.skipIf(!RUN)(
     });
 
     beforeEach(() => {
+      resetCoopUiRelayTrace();
       game = new GameManager(phaserGame);
       logs = installDuoLogCapture(`me-shop-owner-override-${Date.now()}`);
       game.override
@@ -90,6 +90,7 @@ describe.skipIf(!RUN)(
     });
 
     afterEach(() => {
+      resetCoopUiRelayTrace();
       logs.dispose();
       clearCoopRuntime();
       // #710 harness-citizenship: buildDuoForMe builds a 2nd BattleScene (the guest); restore the host scene.
@@ -111,8 +112,9 @@ describe.skipIf(!RUN)(
         BattleType.MYSTERY_ENCOUNTER,
       );
 
-      const pair = createLoopbackPair();
+      const pair = createScheduledCoopPair({ automatic: true });
       const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+      const hostSend = vi.spyOn(pair.host, "send");
 
       // SEED the interaction counter to 1 (ODD -> the GUEST owns the ME + its embedded pick). Both controllers
       // advance 0->1 and drain (the broadcasts only set a deferred pendingRemote, so neither double-advances).
@@ -126,6 +128,12 @@ describe.skipIf(!RUN)(
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore, "the ME opens on interaction counter 1 (guest owns odd)").toBe(1);
       expect(rig.guestRuntime.controller.interactionCounter(), "guest also at counter 1").toBe(1);
+      // From this point every destination queue is delivered only while that client's complete scene/runtime
+      // context is installed. This lets the real public guest selector arm its retained outcome race without
+      // any continuation ever resuming under the host's process-global scene.
+      rig.hostCtx.pumpInbound = () => pair.flush("host");
+      rig.guestCtx.pumpInbound = () => pair.flush("guest");
+      pair.setAutomaticDelivery(false);
 
       const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
       const handleOptionSelectSpy = vi.spyOn(MysteryEncounterPhase.prototype, "handleOptionSelect");
@@ -140,9 +148,24 @@ describe.skipIf(!RUN)(
       expect(handleOptionSelectSpy, "host has NOT applied any option before the guest relays").not.toHaveBeenCalled();
 
       // STEP B (guest): start the divert -> CoopReplayMePhase (resolves ownsMe=TRUE at counter 1, opens the
-      // selector), then SEND option index 0 (the shop) SYNCHRONOUSLY (send only; outcome race deferred to D).
+      // selector), then choose option 0 through the public MYSTERY_ENCOUNTER handler. The public adapter
+      // mints the exact ME_PICK intent before its compatibility carrier and arms the retained outcome race.
       const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
+      await withClient(rig.guestCtx, async () => {
+        expect(rig.guestScene.ui.getMode(), "guest-owned Mystery selector is public and interactive").toBe(
+          UiMode.MYSTERY_ENCOUNTER,
+        );
+        const handler = rig.guestScene.ui.getHandler() as unknown as { unblockInput?: () => void };
+        handler.unblockInput?.();
+        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest commits ME option 0 through public UI").toBe(true);
+        await drainLoopback();
+      });
+      expect(
+        getCoopUiRelayEdges().some(
+          edge => edge.mode === UiMode.MYSTERY_ENCOUNTER && edge.carrier === "interactionChoice",
+        ),
+        "the public guest Mystery selector emitted its operation-backed proposal carrier",
+      ).toBe(true);
 
       // STEP C (host): flush the relayed index -> the host applies handleOptionSelect(0) programmatically and
       // runs the option chain to the embedded reward shop. START the host shop: on a guest-owned ME it is the
@@ -173,6 +196,16 @@ describe.skipIf(!RUN)(
         handleOptionSelectSpy,
         "host applied the guest's relayed option via handleOptionSelect",
       ).toHaveBeenCalled();
+      expect(
+        hostSend.mock.calls.some(
+          ([message]) =>
+            message.t === "envelope"
+            && message.envelope.pendingOperation?.kind === "ME_PICK"
+            && message.envelope.pendingOperation.status === "applied"
+            && message.envelope.pendingOperation.owner === 1,
+        ),
+        "the host validated the public guest proposal and retained the typed ME_PICK operation",
+      ).toBe(true);
       // MAJOR-3: the embedded ME reward shop suppresses its own advance mid-ME - still at the ME counter.
       expect(
         rig.hostRuntime.controller.interactionCounter(),
@@ -181,7 +214,8 @@ describe.skipIf(!RUN)(
 
       // STEP C2 (guest): the GUEST owns the ME -> it OWNS the reward PICK. Open its embedded shop as the pick
       // OWNER: it pins the same (odd) ME counter, ADOPTS the host's streamed options (never re-rolls its
-      // diverged pool), and drives. Relay the owner LEAVE synchronously (host applies it under host ctx in C3).
+      // diverged pool), and drives. Leave through its public cancel/confirmation UI; the guest-owned reward
+      // intent remains parked until the host watcher validates it and returns the retained authoritative result.
       const guestShop = await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
       // PROBE-4 DRIVER SPLIT (guest side): the guest's embedded shop DRIVES the pick (OWNER) - EXACTLY ONE
       // driver across the two engines, and it is the ME owner (guest), not the option owner (host).
@@ -202,10 +236,40 @@ describe.skipIf(!RUN)(
         hostShop.coopWatcher !== guestShop.coopWatcher,
         "exactly one engine drives the embedded ME pick (host watches, guest drives)",
       ).toBe(true);
-      withClientSync(rig.guestCtx, () => relayGuestMeShopLeaveSync(guestShop));
+      await withClient(rig.guestCtx, async () => {
+        expect(rig.guestScene.ui.getMode(), "guest embedded reward owner opened its public picker").toBe(
+          UiMode.MODIFIER_SELECT,
+        );
+        const handler = rig.guestScene.ui.getHandler() as unknown as { unblockInput?: () => void };
+        handler.unblockInput?.();
+        expect(rig.guestScene.ui.processInput(Button.CANCEL), "guest requests embedded reward leave via UI").toBe(true);
+        await drainLoopback();
+        expect(rig.guestScene.ui.getMode(), "embedded reward leave opened public confirmation").toBe(UiMode.CONFIRM);
+        (rig.guestScene.ui.getHandler() as unknown as { unblockInput?: () => void }).unblockInput?.();
+        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms embedded reward leave via UI").toBe(true);
+        await drainLoopback();
+      });
+      expect(
+        getCoopUiRelayEdges().some(
+          edge =>
+            (edge.mode === UiMode.MODIFIER_SELECT || edge.mode === UiMode.CONFIRM)
+            && edge.carrier === "interactionChoice",
+        ),
+        "the public guest reward UI emitted its operation-backed proposal carrier",
+      ).toBe(true);
 
-      // STEP C3 (host): flush the guest owner's LEAVE -> host watcher applies it, the shop ends, and the option
-      // chain runs to PostMysteryEncounterPhase (streams meResync + LEAVE into the guest's buffer; advances once).
+      // STEP C3: host commits the guest proposal, guest materializes the retained result and returns its
+      // proof, then host can release the reciprocal shop barrier and enter the ME terminal.
+      await withClient(rig.hostCtx, async () => {
+        for (let i = 0; i < 8; i++) {
+          await drainLoopback();
+        }
+      });
+      await withClient(rig.guestCtx, async () => {
+        for (let i = 0; i < 16; i++) {
+          await drainLoopback();
+        }
+      });
       await withClient(rig.hostCtx, async () => {
         for (let i = 0; i < 16; i++) {
           await drainLoopback();
@@ -215,6 +279,16 @@ describe.skipIf(!RUN)(
         }
         await game.phaseInterceptor.to("PostMysteryEncounterPhase");
       });
+      expect(
+        hostSend.mock.calls.some(
+          ([message]) =>
+            message.t === "envelope"
+            && message.envelope.pendingOperation?.kind === "REWARD"
+            && message.envelope.pendingOperation.status === "applied"
+            && message.envelope.pendingOperation.owner === 1,
+        ),
+        "the host validated the public guest reward proposal and retained the typed REWARD result",
+      ).toBe(true);
 
       // The host advanced the alternation counter EXACTLY ONCE for the whole ME (the embedded shop added none).
       expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once for the whole ME").toBe(
@@ -224,10 +298,9 @@ describe.skipIf(!RUN)(
       const hostSeed = hostScene.seed;
       const hostEncounteredEvents = JSON.stringify(hostScene.mysteryEncounterSaveData.encounteredEvents);
 
-      // STEP D (guest): start the outcome/terminal race (buffer-hits the host's meResync + LEAVE) and drain to
-      // the terminal - applyCoopMeOutcome + leave + advance all run against the GUEST scene (genuine converge).
+      // STEP D (guest): the public selector already armed the outcome/terminal race. Drain it now so the
+      // retained reward result, meResync, and terminal all apply under the GUEST scene (genuine converge).
       const guestReplay = await withClient(rig.guestCtx, async () => {
-        startGuestMeOutcomeRace(replay);
         return drainGuestMeReplayToSettle(replay);
       });
 

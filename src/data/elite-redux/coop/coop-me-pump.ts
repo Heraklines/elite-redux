@@ -132,7 +132,7 @@ export class CoopMePump {
    * path). Unlike {@linkcode endOwner}, this does NOT mean the ME is over - the battle + its
    * reward shop still run; the interaction-counter advance happens at the TRUE ME terminal.
    */
-  relayMeBattleHandoff(hostTurn?: number): void {
+  relayMeBattleHandoff(hostTurn?: number, sendRawTerminal = true): void {
     if (this.isSessionActive()) {
       coopLog("pump", "relay BATTLE-HANDOFF sentinel", {
         termSeq: this.termSeq,
@@ -144,18 +144,20 @@ export class CoopMePump {
       // current battle turn so the guest's ME-battle boot aligns its turn space (the host
       // numbers ME-battle turns continuing the wave's count; a guest booting at turn 1 awaits
       // resolutions the host will never emit under that number - the 18:05 strand).
-      this.relay.sendInteractionChoice(
-        this.termSeq,
-        ME_PUMP_KIND,
-        COOP_ME_BATTLE_HANDOFF,
-        hostTurn === undefined ? undefined : [hostTurn],
-      );
+      if (sendRawTerminal) {
+        this.relay.sendInteractionChoice(
+          this.termSeq,
+          ME_PUMP_KIND,
+          COOP_ME_BATTLE_HANDOFF,
+          hostTurn === undefined ? undefined : [hostTurn],
+        );
+      }
     }
     this.endSession();
   }
 
   /** OWNER: the ME reached its terminal - send the leave sentinel so the peer's ME wait ends. */
-  endOwner(): void {
+  endOwner(sendRawTerminal = true): void {
     if (this.isSessionActive()) {
       coopLog("pump", "OWNER terminal: relay LEAVE sentinel", {
         termSeq: this.termSeq,
@@ -163,7 +165,9 @@ export class CoopMePump {
       });
       // Terminal sentinel rides `termSeq` (#633 MAJOR-1 / B-1): the dedicated 9M terminal seq
       // the authoritative guest awaits (CoopReplayMePhase.awaitHostTerminal).
-      this.relay.sendInteractionChoice(this.termSeq, ME_PUMP_KIND, COOP_INTERACTION_LEAVE);
+      if (sendRawTerminal) {
+        this.relay.sendInteractionChoice(this.termSeq, ME_PUMP_KIND, COOP_INTERACTION_LEAVE);
+      }
     }
     this.endSession();
   }

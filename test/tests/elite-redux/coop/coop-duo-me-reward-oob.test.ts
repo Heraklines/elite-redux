@@ -37,21 +37,31 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { clearCoopRuntime, getCoopUiMirror, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REWARD_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { BattlerIndex } from "#enums/battler-index";
+import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  beginRewardShopOwnerUi,
+  beginRewardShopWatch,
   buildDuo,
+  type DuoRig,
   drainLoopback,
+  driveGuestReplayTurn,
   driveGuestRewardWatch,
-  driveHostRewardShopOwner,
+  driveRewardShopOwnerLeaveViaUi,
   installDuoLogCapture,
+  pumpDuoDestinations,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -60,6 +70,25 @@ const RUN = process.env.ER_SCENARIO === "1";
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+function wireGuestCommand(rig: DuoRig): void {
+  rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
+    command: Command.FIGHT,
+    cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
+    moveId: MoveId.TACKLE,
+    targets: [BattlerIndex.ENEMY_2],
+  }));
+}
+
+async function playOneAuthoritativeWave(game: GameManager, rig: DuoRig): Promise<void> {
+  const turn = rig.hostScene.currentBattle.turn;
+  await withClient(rig.hostCtx, async () => {
+    game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
+    game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+    await game.phaseInterceptor.to("CoopTurnCommitPhase");
+  });
+  await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
 }
 
 describe.skipIf(!RUN)(
@@ -76,7 +105,13 @@ describe.skipIf(!RUN)(
     beforeEach(() => {
       game = new GameManager(phaserGame);
       logs = installDuoLogCapture(`me-reward-oob-${Date.now()}`);
-      game.override.battleStyle("double").startingLevel(50).disableTrainerWaves();
+      game.override
+        .battleStyle("double")
+        .enemyLevel(1)
+        .enemyMoveset(MoveId.SPLASH)
+        .startingLevel(50)
+        .moveset([MoveId.TACKLE])
+        .disableTrainerWaves();
     });
 
     afterEach(() => {
@@ -89,21 +124,26 @@ describe.skipIf(!RUN)(
 
     it("WATCHER skips a STALE out-of-range relayed reward cursor, applies the owner's LEAVE, leaves in lockstep, mirror closed", async () => {
       // ===== Stand up the two-engine rig (host = sole authoritative engine, guest = renderer) over one
-      // loopback pair. The reward interaction opens on counter 0 -> host owns (even), guest WATCHES. =====
+      // scheduled pair. The reward interaction opens on counter 0 -> host owns (even), guest WATCHES. =====
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-      const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+      const pair = createScheduledCoopPair({ automatic: true });
+      const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+      wireGuestCommand(rig);
 
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore, "the reward shop opens on interaction counter 0 (host owns even -> guest watches)").toBe(0);
       const rewardSeq = COOP_REWARD_SEQ_BASE + counterBefore; // reward channel = base 0 + interaction counter
 
-      // ===== Build the HOST owner shop + the GUEST watcher shop (both REAL SelectModifierPhases). =====
-      const hostShop = withClientSync(rig.hostCtx, () =>
-        rig.hostScene.phaseManager.create("SelectModifierPhase"),
-      ) as unknown as ShopPhaseSeam;
-      const guestShop = withClientSync(rig.guestCtx, () =>
-        rig.guestScene.phaseManager.create("SelectModifierPhase"),
-      ) as unknown as ShopPhaseSeam;
+      // ===== Reach both REAL queued production shops. Detached phases are no longer a valid authority
+      // fixture: their terminal callback correctly detects that they do not own the live phase boundary. =====
+      await playOneAuthoritativeWave(game, rig);
+      // Bootstrap handshakes and the live command request/reply use ordinary automatic delivery. From the
+      // reward transition onward, resume each async continuation only while that destination client's
+      // complete context is installed.
+      pair.setAutomaticDelivery(false);
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectModifierPhase", false));
+      const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+      const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
 
       // ===== FAULT INJECTION (the live #854 phantom): a stale reward-channel pick with an OUT-OF-RANGE
       // cursor sits buffered on the reward seq BEFORE the owner's real terminal. In the capture, inbox[8]
@@ -115,15 +155,35 @@ describe.skipIf(!RUN)(
       withClientSync(rig.hostCtx, () =>
         rig.hostRuntime.interactionRelay.sendInteractionChoice(rewardSeq, "reward", OOB_CURSOR, [0]),
       );
-      await drainLoopback();
+      await withClient(rig.guestCtx, () => drainLoopback());
+
+      // Production opens the reciprocal watcher before the owner can cross the retained terminal. Park the
+      // guest now so the phantom remains first in its FIFO, then let the owner publish the real option pool
+      // and LEAVE. This preserves the original #854 fault while exercising the continuation-ready barrier.
+      await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
 
       // ===== Host OWNS + drives the shop: rolls + STREAMS its options, then LEAVEs (no reward taken). The
-      // LEAVE is relayed on the reward seq AFTER the phantom (FIFO), and advances the host counter once. =====
-      await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: false }));
-      expect(
-        rig.hostRuntime.controller.interactionCounter(),
-        "host advanced the interaction counter once at its shop LEAVE",
-      ).toBe(counterBefore + 1);
+      // LEAVE is relayed on the reward seq AFTER the phantom (FIFO). The owner remains parked until the
+      // watcher materializes that terminal and returns the retained acknowledgement. =====
+      // Start the host transition and keep the host context installed until its real handler is ready, then
+      // give the scheduled transport to the GUEST before driving any host key. The guest watcher was armed
+      // before the owner could stream its options, so its
+      // detached async continuation must adopt/open under the guest's complete client context. Keeping a
+      // single-process host context installed while that continuation resumes would overwrite the host's
+      // mirror role with `watcher` - an impossible two-browser state and a false CANCEL rejection.
+      await withClient(rig.hostCtx, () => beginRewardShopOwnerUi(hostShop));
+      await withClient(rig.guestCtx, async () => {
+        for (let attempt = 0; attempt < 100; attempt++) {
+          await drainLoopback();
+          if (rig.guestScene.ui.getMode() === UiMode.MODIFIER_SELECT && getCoopUiMirror()?.isWatcher() === true) {
+            return;
+          }
+        }
+        throw new Error(
+          `reward UI watcher did not become ready under guest context (mode=${UiMode[rig.guestScene.ui.getMode()]})`,
+        );
+      });
+      await withClient(rig.hostCtx, () => driveRewardShopOwnerLeaveViaUi(hostShop, { alreadyStarted: true }));
 
       // ===== Guest WATCHES: startCoopWatch adopts the host's streamed options, then drains the relayed
       // picks. It BUFFER-HITs the phantom FIRST.
@@ -132,7 +192,16 @@ describe.skipIf(!RUN)(
       //            driveGuestRewardWatch's no-progress detector THROWS (WATCH HANG) - fails-before.
       //   POST-FIX: the out-of-range cursor is IGNORED (kept waiting); the watcher then consumes the owner's
       //            LEAVE, ends its mirror, leaves, and advances once - passes-after. =====
-      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
+      for (
+        let attempt = 0;
+        attempt < 16
+        && (rig.hostRuntime.controller.interactionCounter() !== counterBefore + 1
+          || rig.guestRuntime.controller.interactionCounter() !== counterBefore + 1);
+        attempt++
+      ) {
+        await pumpDuoDestinations(rig);
+      }
 
       // ===== PASSES-AFTER assertions. =====
       // (b) The watcher left cleanly and the counters are LOCKSTEP (both advanced exactly once).

@@ -20,8 +20,21 @@
 // =============================================================================
 
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import {
+  announceToP33Lobby,
+  type CoopLobbyProtocol,
+  type CoopP33ClientDependencies,
+  CoopP33HttpError,
+  type CoopP33LobbyCredentialV1,
+  type CoopP33PairingV1,
+  fetchP33Lobby,
+  leaveP33Lobby,
+  leaveP33Run,
+  requestP33Player,
+  respondToP33Request,
+} from "#data/elite-redux/coop/coop-p33-client";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { connectCoopWithCode, coopServerBase } from "#data/elite-redux/coop/coop-webrtc-connect";
+import { connectCoopP33Pairing, connectCoopWithCode, coopServerBase } from "#data/elite-redux/coop/coop-webrtc-connect";
 
 /** A player currently waiting in the lobby (as seen by someone else). */
 export interface LobbyPlayer {
@@ -31,6 +44,8 @@ export interface LobbyPlayer {
   name: string;
   /** Milliseconds since this player's last poll (freshness). */
   age: number;
+  /** Immutable P33 identity, absent on the explicit legacy lobby. */
+  accountId?: string;
 }
 
 /** A completed match: the run code + this client's worker-assigned role. */
@@ -91,6 +106,7 @@ export async function announceToLobby(
 export interface LobbyRequest {
   id: string;
   name: string;
+  accountId?: string;
 }
 
 /** One full lobby poll result (lobby v2 adds `request` + the one-shot `declined`). */
@@ -188,6 +204,8 @@ export interface CoopLobbyCallbacks {
   onConnected: (runtime: CoopRuntime) => void;
   /** A fatal error (announce/connect failed). */
   onError: (message: string) => void;
+  /** A recoverable lobby race; keep the lobby open and rebuild its actionable panel. */
+  onTransientError?: (message: string) => void;
   /** Lobby v2: someone is asking to join ME - show Accept / Decline. */
   onRequest?: (from: LobbyRequest) => void;
   /** Lobby v2: the incoming request evaporated (requester left / was matched). */
@@ -200,11 +218,41 @@ export interface CoopLobbyCallbacks {
 
 /** The WebRTC connect signature - injectable so tests can stub the browser leg. */
 export type CoopConnectFn = (code: string, role: "host" | "guest", opts: { username: string }) => Promise<CoopRuntime>;
+export type CoopP33ConnectFn = (
+  credential: CoopP33LobbyCredentialV1,
+  pairing: CoopP33PairingV1,
+  opts: { p33Dependencies?: CoopP33ClientDependencies },
+) => Promise<CoopRuntime>;
 
 /** Extra controller options (mainly a connect override for headless tests). */
 export interface CoopLobbyOptions {
   /** Override the WebRTC connect (defaults to {@linkcode connectCoopWithCode}). */
   connect?: CoopConnectFn;
+  /** Explicit signaling protocol. P33 never falls back after selection. */
+  protocol?: CoopLobbyProtocol;
+  connectP33?: CoopP33ConnectFn;
+  p33Dependencies?: CoopP33ClientDependencies;
+}
+
+/** Staging selects P33 explicitly; legacy remains isolated until the Worker promotion is complete. */
+export function coopLobbyProtocolFromEnv(): CoopLobbyProtocol {
+  const selected = (import.meta.env as unknown as Record<string, string | undefined>).VITE_COOP_SIGNALING_PROTOCOL;
+  return selected === "p33" ? "p33" : "legacy";
+}
+
+/**
+ * Optional non-production lobby namespace used by the real-browser matrix.
+ * Production and ordinary staging players omit both build switches and remain in the shared room.
+ */
+export function coopLobbyRoomFromEnv(): string | undefined {
+  const env = import.meta.env as unknown as Record<string, string | undefined>;
+  const configured = env.VITE_COOP_LOBBY_ROOM?.trim();
+  const queryRoom =
+    env.VITE_COOP_LOBBY_ROOM_QUERY === "1" && typeof globalThis.location?.search === "string"
+      ? new URLSearchParams(globalThis.location.search).get("cooproom")?.trim()
+      : undefined;
+  const room = configured || queryRoom;
+  return room != null && room.length <= 64 && /^[A-Za-z0-9_-]+$/u.test(room) ? room : undefined;
 }
 
 const POLL_INTERVAL_MS = 1500;
@@ -225,6 +273,10 @@ export class CoopLobbyController {
   private stopped = false;
   private connecting = false;
   private readonly connectFn: CoopConnectFn;
+  private readonly connectP33Fn: CoopP33ConnectFn;
+  private readonly protocol: CoopLobbyProtocol;
+  private readonly p33Dependencies: CoopP33ClientDependencies;
+  private p33Credential: CoopP33LobbyCredentialV1 | null = null;
   /** Lobby v2: the presence id of the player currently asking to join ME (dedupe onRequest). */
   private incomingRequestId: string | null = null;
   /** Lobby v2: whether MY outgoing request is parked awaiting the other player's answer. */
@@ -236,12 +288,34 @@ export class CoopLobbyController {
     options: CoopLobbyOptions = {},
   ) {
     this.connectFn = options.connect ?? connectCoopWithCode;
+    this.connectP33Fn = options.connectP33 ?? connectCoopP33Pairing;
+    this.protocol = options.protocol ?? coopLobbyProtocolFromEnv();
+    const room = coopLobbyRoomFromEnv();
+    this.p33Dependencies = options.p33Dependencies ?? (room == null ? {} : { room });
   }
 
   /** Announce presence and begin polling. Connects immediately if already paired. */
   async start(): Promise<void> {
-    coopLog("lobby", `start announce name=${this.name}`);
+    coopLog("lobby", `start announce name=${this.name} protocol=${this.protocol}`);
     try {
+      if (this.protocol === "p33") {
+        const announced = await announceToP33Lobby(this.p33Dependencies);
+        if (this.stopped) {
+          return;
+        }
+        this.p33Credential = {
+          presenceId: announced.presenceId,
+          pairingToken: announced.pairingToken,
+          identity: announced.identity,
+        };
+        this.id = announced.presenceId;
+        if (announced.pairing != null) {
+          await this.connectP33(announced.pairing);
+          return;
+        }
+        this.scheduleNextPoll(0);
+        return;
+      }
       const { id, pairing } = await announceToLobby(this.name);
       if (this.stopped) {
         coopLog("lobby", "start: announced but already stopped -> abort");
@@ -270,6 +344,10 @@ export class CoopLobbyController {
       );
       return;
     }
+    if (this.protocol === "p33") {
+      this.callbacks.onError("Authenticated co-op requires the player to accept your request.");
+      return;
+    }
     coopLog("lobby", `pick target=${targetId} (self=${this.id})`);
     try {
       const pairing = await pickPlayer(this.id, targetId);
@@ -295,20 +373,34 @@ export class CoopLobbyController {
     }
     coopLog("lobby", `request target=${targetId} (self=${this.id})`);
     try {
+      if (this.protocol === "p33") {
+        if (this.p33Credential == null) {
+          throw new Error("authenticated co-op lobby credential is missing");
+        }
+        await requestP33Player(this.p33Credential, targetId, this.p33Dependencies);
+        this.outgoingPending = true;
+        this.callbacks.onRequestPending?.(targetName);
+        this.scheduleNextPoll(0);
+        return;
+      }
       await requestPlayer(this.id, targetId);
       this.outgoingPending = true;
       this.callbacks.onRequestPending?.(targetName);
       this.scheduleNextPoll(0);
     } catch (e) {
       const msg = message(e);
-      if (/not found/i.test(msg)) {
+      if (this.failClosedP33Credential(e)) {
+        return;
+      }
+      if (this.protocol === "legacy" && /not found/i.test(msg)) {
         // OLD worker (no request/respond endpoints): degrade to the instant pick.
         coopWarn("lobby", "request unsupported by worker -> falling back to instant pick");
         await this.pick(targetId);
         return;
       }
       coopWarn("lobby", `request failed (transient): ${msg} -> keep browsing`);
-      this.callbacks.onError(msg);
+      this.outgoingPending = false;
+      this.callbacks.onTransientError?.(msg);
       this.scheduleNextPoll(POLL_INTERVAL_MS);
     }
   }
@@ -325,6 +417,18 @@ export class CoopLobbyController {
     this.incomingRequestId = null;
     coopLog("lobby", `respond accept=${accept} from=${from} (self=${this.id})`);
     try {
+      if (this.protocol === "p33") {
+        if (this.p33Credential == null) {
+          throw new Error("authenticated co-op lobby credential is missing");
+        }
+        const pairing = await respondToP33Request(this.p33Credential, from, accept, this.p33Dependencies);
+        if (pairing != null) {
+          await this.connectP33(pairing);
+          return;
+        }
+        this.scheduleNextPoll(POLL_INTERVAL_MS);
+        return;
+      }
       const pairing = await respondToRequest(this.id, from, accept);
       if (pairing) {
         await this.connect(pairing);
@@ -332,8 +436,11 @@ export class CoopLobbyController {
       }
     } catch (e) {
       // The requester left / was matched while we decided: keep browsing.
+      if (this.failClosedP33Credential(e)) {
+        return;
+      }
       coopWarn("lobby", `respond failed (transient): ${message(e)} -> keep browsing`);
-      this.callbacks.onError(message(e));
+      this.callbacks.onTransientError?.(message(e));
     }
     this.scheduleNextPoll(POLL_INTERVAL_MS);
   }
@@ -343,7 +450,9 @@ export class CoopLobbyController {
     coopLog("lobby", `cancel (id=${this.id ?? "none"} connecting=${this.connecting})`);
     this.stopped = true;
     this.clearTimer();
-    if (this.id) {
+    if (this.protocol === "p33" && this.p33Credential != null) {
+      void leaveP33Lobby(this.p33Credential, this.p33Dependencies).catch(() => {});
+    } else if (this.id) {
       void leaveLobby(this.id);
     }
   }
@@ -353,6 +462,28 @@ export class CoopLobbyController {
       clearTimeout(this.timer);
       this.timer = null;
     }
+  }
+
+  private failClosedP33Credential(error: unknown): boolean {
+    if (this.protocol !== "p33" || !(error instanceof CoopP33HttpError)) {
+      return false;
+    }
+    // 409 means different things on different endpoints. On the authenticated lobby GET it
+    // means this presence/bearer binding was replaced and continuing would be unsafe. On
+    // request/respond it is an ordinary matchmaking race (the row expired, left, or paired)
+    // and must return to browsing. Treating every 409 as credential loss permanently stopped
+    // polling after one late Accept and turned a recoverable race into a real softlock.
+    const credentialFailure =
+      error.status === 401
+      || error.status === 403
+      || (error.status === 409 && error.path.startsWith("/coop/v3/lobby?"));
+    if (!credentialFailure) {
+      return false;
+    }
+    this.stopped = true;
+    this.clearTimer();
+    this.callbacks.onError(message(error));
+    return true;
   }
 
   private scheduleNextPoll(delayMs: number): void {
@@ -368,13 +499,27 @@ export class CoopLobbyController {
       return;
     }
     try {
-      const { players, pairing, request, declined } = await fetchLobby(this.id);
+      const snapshot =
+        this.protocol === "p33"
+          ? this.p33Credential == null
+            ? null
+            : await fetchP33Lobby(this.p33Credential, this.p33Dependencies)
+          : await fetchLobby(this.id);
+      if (snapshot == null) {
+        throw new Error("authenticated co-op lobby credential is missing");
+      }
+      const { players, pairing, request, declined } = snapshot;
       if (this.stopped || this.connecting) {
         return;
       }
       if (pairing) {
-        coopLog("lobby", `poll matched code=${pairing.code} role=${pairing.role} -> connect`);
-        await this.connect(pairing);
+        if ("transportRole" in pairing) {
+          coopLog("lobby", `poll matched code=${pairing.code} transportRole=${pairing.transportRole} -> connect`);
+          await this.connectP33(pairing);
+        } else {
+          coopLog("lobby", `poll matched code=${pairing.code} role=${pairing.role} -> connect`);
+          await this.connect(pairing);
+        }
         return;
       }
       // Lobby v2: my outgoing request was DECLINED (one-shot notice) - resume browsing.
@@ -395,7 +540,10 @@ export class CoopLobbyController {
       }
       coopLog("lobby", `poll players=${players.length}`);
       this.callbacks.onPlayers(players);
-    } catch {
+    } catch (error) {
+      if (this.failClosedP33Credential(error)) {
+        return;
+      }
       // transient network blip; keep polling
     }
     this.scheduleNextPoll(POLL_INTERVAL_MS);
@@ -426,6 +574,36 @@ export class CoopLobbyController {
     } catch (e) {
       coopWarn("launch", `lobby connect failed code=${pairing.code} role=${pairing.role}: ${message(e)}`);
       this.callbacks.onError(message(e));
+    }
+  }
+
+  private async connectP33(pairing: CoopP33PairingV1): Promise<void> {
+    if (this.connecting || this.p33Credential == null) {
+      return;
+    }
+    this.connecting = true;
+    this.clearTimer();
+    this.callbacks.onConnecting();
+    try {
+      const runtime = await this.connectP33Fn(this.p33Credential, pairing, {
+        p33Dependencies: this.p33Dependencies,
+      });
+      if (this.stopped) {
+        runtime.localTransport.close();
+        return;
+      }
+      this.callbacks.onConnected(runtime);
+    } catch (error) {
+      coopWarn(
+        "launch",
+        `P33 lobby connect failed pairing=${pairing.pairingId} transportRole=${pairing.transportRole}: ${message(error)}`,
+      );
+      try {
+        await leaveP33Run(this.p33Credential, pairing.code, this.p33Dependencies);
+      } catch {
+        // The credential may already be stale; the original error is the useful one.
+      }
+      this.callbacks.onError(message(error));
     }
   }
 }

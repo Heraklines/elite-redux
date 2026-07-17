@@ -123,6 +123,18 @@ describe.skipIf(!RUN)(
       scene.ui.processInput(Button.ACTION); // assign it over slot 0 -> learned, list empty -> finish/done
     }
 
+    /** Invert only the phase callback's runtime; public UI dispatch must still begin on its real owner. */
+    function invertRuntimeWhenPanelCommits(scene: BattleScene, runtime: Parameters<typeof setCoopRuntime>[0]): void {
+      const handler = scene.ui.getHandler() as unknown as { deps: { done: () => void } | null };
+      const deps = handler.deps;
+      expect(deps, "the live batch panel exposed its commit callback").not.toBeNull();
+      const done = deps!.done;
+      deps!.done = () => {
+        setCoopRuntime(runtime);
+        done();
+      };
+    }
+
     it("GUEST-owned mon: guest DRIVES the panel, host applies, BOTH panels close (the P0 fix)", async () => {
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
       const pair = createLoopbackPair();
@@ -156,7 +168,13 @@ describe.skipIf(!RUN)(
       // The guest human picks the replacement. withClientSync = SEND-ONLY: it clears the in-flight mark + relays
       // the terminal (queued) + closes the guest panel, all synchronously under the guest ctx; the host's await
       // then resolves under the HOST ctx in the next drain (not cross-ctx).
-      withClientSync(rig.guestCtx, () => driveOwnerPickFirstSlot(rig.guestScene));
+      withClientSync(rig.guestCtx, () => {
+        // Adversarial shared-process schedule: public input starts on the real guest owner, but the phase's
+        // production done callback resumes with the host runtime ambient. Its captured guest binding + relay
+        // must still arm/cancel only the guest's exact retry state.
+        invertRuntimeWhenPanelCommits(rig.guestScene, rig.hostRuntime);
+        driveOwnerPickFirstSlot(rig.guestScene);
+      });
       // THE P0: the OWNER (guest) signalled back + tore its picker down - it did NOT strand.
       expect(isCoopLearnMoveForwardInFlightEmpty(), "the guest released the picker (no strand - the P0 fix)").toBe(
         true,
@@ -206,7 +224,12 @@ describe.skipIf(!RUN)(
 
       // The HOST human picks (drives its own panel). withClientSync = SEND-ONLY: done() relays the terminal
       // (queued) + closes the host panel synchronously.
-      withClientSync(rig.hostCtx, () => driveOwnerPickFirstSlot(rig.hostScene));
+      withClientSync(rig.hostCtx, () => {
+        // Reciprocal callback schedule: public input starts on the real host owner, then the production done
+        // callback resumes with the guest runtime ambient. Retention must stay on the captured host ledger.
+        invertRuntimeWhenPanelCommits(rig.hostScene, rig.guestRuntime);
+        driveOwnerPickFirstSlot(rig.hostScene);
+      });
       expect(rig.hostScene.ui.getMode(), "the HOST owner's panel CLOSED").not.toBe(UiMode.LEARN_MOVE_BATCH);
 
       // GUEST: the relayed terminal (delivered under the guest ctx) force-closes the watcher panel.

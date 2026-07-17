@@ -9,18 +9,19 @@
 // host streams `waveResolved("win")` and parks as the reward WATCHER. When the host wins the wave in a
 // SINGLE turn, the guest consumes that pending wave-advance in the SAME finalize that runs the winning
 // turn - and `lastResolvedWave` is still behind, so `coopWaveAdvanceSignaledFor(wave)` reads false.
-// Pre-fix, finishTurn then fell into the turn-advance branch and called incrementTurn(), starting a
-// phantom turn N+1 the host already passed: the guest broadcast a command + awaited a turn-N+1 resolution
-// the host (now in the reward shop) never sent -> hard softlock right after the first battle.
+// Pre-fix, finishTurn then fell into the ordinary continuation branch: it advanced the cursor AND allowed
+// the queue to start TurnInit/Command for a turn the host already passed. The guest broadcast a command +
+// awaited a turn-N+1 resolution the host (now in the reward shop) never sent -> hard post-battle softlock.
 //
 // The fix peeks the still-PENDING advance (coopHasPendingWaveAdvance) and routes the single-turn win
-// through the TERMINAL branch: run the wave-advance tail (VictoryPhase), advance NO turn - exactly like a
-// multi-turn wave whose advance had already signaled. Protocol 32 has no gameplay fallback on a missing
+// through the TERMINAL branch: run the wave-advance tail (VictoryPhase), mirror the host's settled numeric
+// turn, but queue no TurnInit/Command. Protocol 32 has no gameplay fallback on a missing
 // commit; that condition terminates visibly instead of manufacturing a local turn.
 //
-// The pending advance is set through the REAL wired receive path: startLocalCoopSession exposes the
-// spoof partner's transport endpoint, so sending a genuine host->guest `waveResolved` over it fires the
-// runtime's own onWaveResolved handler (the production code that sets the module's pendingWaveAdvance).
+// The pending advance is set through the REAL wired receive path: a runtime assembled on the guest
+// transport endpoint receives a genuine host->guest `waveResolved`, firing the production handler that
+// sets the module's pendingWaveAdvance. The runtime's operation state therefore owns the guest role from
+// assembly onward; the test never mutates a host runtime into a synthetic guest after its bindings exist.
 // No test-only production surface is added. The scene is a minimal stub injected via the REAL
 // initGlobalScene, so no Phaser / GameManager boot is needed.
 
@@ -28,13 +29,20 @@ import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  assembleCoopRuntime,
   type CoopRuntime,
   clearCoopRuntime,
   coopHasPendingWaveAdvance,
   getCoopController,
-  startLocalCoopSession,
+  setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopAuthoritativeBattleStateV1, CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
+import {
+  type CoopAuthoritativeBattleStateV1,
+  type CoopBattleCheckpoint,
+  type CoopTransport,
+  createLoopbackPair,
+} from "#data/elite-redux/coop/coop-transport";
+import { getCoopWaveAdvanceOperationEpoch } from "#data/elite-redux/coop/coop-wave-operation";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -49,6 +57,8 @@ const rec = {
   incrementTurnCalls: 0,
   queueTurnEndCalls: 0,
   clearLastTurnOrderCalls: 0,
+  clearPhaseQueueCalls: 0,
+  queuedFuture: [] as string[],
   pushedPhases: [] as string[],
   turn: 1,
 };
@@ -77,6 +87,13 @@ function makeStubScene(): BattleScene {
     },
     phaseManager: {
       shiftPhase() {},
+      getQueuedPhaseNames() {
+        return [...rec.queuedFuture];
+      },
+      clearPhaseQueue() {
+        rec.clearPhaseQueueCalls++;
+        rec.queuedFuture = [];
+      },
       pushNew(name: string, ..._args: unknown[]) {
         rec.pushedPhases.push(name);
       },
@@ -94,25 +111,23 @@ function makeStubScene(): BattleScene {
 }
 
 /**
- * Start a REAL authoritative local session, flip the local controller to GUEST (so the production
- * isCoopAuthoritativeGuest() and the onWaveResolved guest-gate read true), and deliver a genuine
- * host->guest `waveResolved("win")` over the spoof partner's transport so the runtime's wired handler
+ * Start a REAL authoritative runtime on the pair's guest endpoint and deliver a genuine
+ * host->guest `waveResolved("win")` over its peer transport so the runtime's wired handler
  * sets the module's pendingWaveAdvance for THIS wave. Returns once the loopback has drained.
  */
 async function startGuestWithPendingWin(): Promise<CoopRuntime> {
-  const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
+  const { runtime, peer } = startGuestRuntime();
   const controller = getCoopController();
   if (controller == null) {
-    throw new Error("expected a live co-op controller after startLocalCoopSession");
+    throw new Error("expected a live guest co-op controller");
   }
-  controller.role = "guest";
-  if (runtime.partnerTransport == null) {
-    throw new Error("expected a spoof partner transport in a local session");
-  }
-  // The spoof (host end) sends both the compatibility cue and the authoritative committed envelope.
+  // The host endpoint sends both the compatibility cue and the authoritative committed envelope.
   // Under durability the raw cue alone must not advance; the envelope is the one mutation authority.
-  runtime.partnerTransport.send({ t: "waveResolved", wave: WAVE, outcome: "win" });
-  const epoch = controller.sessionEpoch;
+  peer.send({ t: "waveResolved", wave: WAVE, outcome: "win" });
+  // This engine-free fixture does not stand up a peer controller to negotiate a run epoch. Address the
+  // retained envelope to the owning operation runtime's valid epoch, never the controller's pre-handshake
+  // sentinel epoch 0.
+  const epoch = getCoopWaveAdvanceOperationEpoch(runtime.waveOperationBinding);
   const authoritativeState: CoopAuthoritativeBattleStateV1 = {
     version: 1,
     tick: 0,
@@ -131,7 +146,7 @@ async function startGuestWithPendingWin(): Promise<CoopRuntime> {
     playerModifiers: [],
     enemyModifiers: [],
   };
-  runtime.partnerTransport.send({
+  peer.send({
     t: "envelope",
     envelope: {
       version: 1,
@@ -154,6 +169,7 @@ async function startGuestWithPendingWin(): Promise<CoopRuntime> {
           eggLapse: false,
           meBoundary: "none",
           victoryKind: "wild",
+          settledStateTick: authoritativeState.tick,
         },
       },
       authoritativeState,
@@ -161,6 +177,19 @@ async function startGuestWithPendingWin(): Promise<CoopRuntime> {
   });
   await flush();
   return runtime;
+}
+
+let guestPeer: CoopTransport | null = null;
+
+/** Assemble with a genuinely guest-owned runtime state; mutating a host controller after assembly is invalid. */
+function startGuestRuntime(): { runtime: CoopRuntime; peer: CoopTransport } {
+  clearCoopRuntime();
+  const { host, guest } = createLoopbackPair();
+  const runtime = assembleCoopRuntime(guest, { username: "Guest", netcodeMode: "authoritative" });
+  setCoopRuntime(runtime);
+  runtime.controller.connect();
+  guestPeer = host;
+  return { runtime, peer: host };
 }
 
 /** Invoke a phase's private method by name without `as any` (cast through `unknown` to a callable). */
@@ -189,6 +218,8 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
     rec.incrementTurnCalls = 0;
     rec.queueTurnEndCalls = 0;
     rec.clearLastTurnOrderCalls = 0;
+    rec.clearPhaseQueueCalls = 0;
+    rec.queuedFuture = [];
     rec.pushedPhases = [];
     rec.turn = 1;
     initGlobalScene(makeStubScene());
@@ -196,6 +227,8 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
 
   afterEach(() => {
     clearCoopRuntime();
+    guestPeer?.close();
+    guestPeer = null;
     // Citizenship (#710): this engine-free file replaces globalScene with a reset-less stub. Restore
     // the prior scene so the NEXT ER_SCENARIO file's `new GameManager` reuses a real scene instead of
     // crashing on `stub.reset is not a function`. Order-robust: each stub file restores before the
@@ -210,18 +243,23 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
     expect(coopHasPendingWaveAdvance()).toBe(true);
   });
 
-  it("CoopFinalizeTurnPhase.finishTurn(): a same-turn win runs the wave-advance tail and advances NO turn", async () => {
+  it("CoopFinalizeTurnPhase.finishTurn(): a same-turn win mirrors the settled turn without queuing a phantom loop", async () => {
     await startGuestWithPendingWin();
+    // A delayed final carrier may arrive after local presentation speculatively queued the next encounter.
+    // The retained host transition must replace that future instead of appending Victory behind it.
+    rec.queuedFuture = ["NextEncounterPhase", "NewBattlePhase"];
 
     const phase = makeFinalizePhase(1);
     callPrivate(phase, "finishTurn");
 
-    // The phantom turn must NOT be created: no incrementTurn, no turn-order clear, turn stays put.
-    expect(rec.incrementTurnCalls).toBe(0);
-    expect(rec.clearLastTurnOrderCalls).toBe(0);
-    expect(rec.turn).toBe(1);
-    // The damaging turn-end engine must NOT run on the terminal branch either.
+    // Match the host's already-settled numeric turn boundary, but never queue the damaging turn-end engine
+    // or its TurnInit/Command continuation. A turn number alone is not a phantom playable turn.
+    expect(rec.incrementTurnCalls).toBe(1);
+    expect(rec.clearLastTurnOrderCalls).toBe(1);
+    expect(rec.turn).toBe(2);
     expect(rec.queueTurnEndCalls).toBe(0);
+    expect(rec.clearPhaseQueueCalls, "the retained transition fences speculative future phases").toBe(1);
+    expect(rec.queuedFuture, "the speculative local next-wave tail was discarded").toEqual([]);
     // Instead the wave-advance tail runs: the pending advance is consumed and a VictoryPhase is queued.
     expect(coopHasPendingWaveAdvance()).toBe(false);
     expect(rec.pushedPhases).toContain("VictoryPhase");
@@ -229,11 +267,7 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
 
   it("CoopFinalizeTurnPhase.finishTurn(): with NO pending advance the guest still advances the turn minimally (BUG1 path intact)", async () => {
     // Authoritative guest session but NO waveResolved delivered -> no pending advance.
-    startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
-    const controller = getCoopController();
-    if (controller != null) {
-      controller.role = "guest";
-    }
+    startGuestRuntime();
     expect(coopHasPendingWaveAdvance()).toBe(false);
 
     const phase = makeFinalizePhase(1);

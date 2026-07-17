@@ -9,9 +9,15 @@
 //   - host CoopSessionController <-> guest CoopSessionController (symmetry).
 // Pure logic over LoopbackTransport - no game engine.
 
+import {
+  COOP_CAP_DURABILITY_JOURNAL,
+  COOP_CAP_OP_BIOME,
+  clearNegotiatedCoopCapabilities,
+} from "#data/elite-redux/coop/coop-capabilities";
 import { computeErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { CoopSessionController, type CoopSessionSnapshot } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
+import { coopMachineWaitLabels } from "#data/elite-redux/coop/coop-stall-probe";
 import { COOP_PROTOCOL_VERSION, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { describe, expect, it } from "vitest";
@@ -20,21 +26,59 @@ import { describe, expect, it } from "vitest";
 const flush = () => new Promise<void>(resolve => queueMicrotask(resolve));
 
 describe("co-op session controller (#633, P1)", () => {
+  it("rolls an atomically staged interaction counter back to the exact prior value", () => {
+    const { host } = createLoopbackPair();
+    const controller = new CoopSessionController(host);
+    controller.restoreInteractionCounter(5);
+    expect(controller.interactionCounter()).toBe(5);
+    expect(controller.adoptAuthoritativeInteractionCounterForTransaction(9)).toBe(true);
+    expect(controller.interactionCounter()).toBe(9);
+
+    controller.restoreAuthoritativeInteractionCounterForTransaction(5);
+    expect(controller.interactionCounter(), "transaction rollback may move backward to its exact snapshot").toBe(5);
+    controller.dispose();
+  });
+
   describe("functional compatibility launch barrier", () => {
-    it("rejects an er-coop-31 peer that cannot carry retained protocol-32 authority", async () => {
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-32");
+    it("refuses protocol-33 launch when biome operations or durability do not survive negotiation", async () => {
+      clearNegotiatedCoopCapabilities();
+      const { host, guest } = createLoopbackPair();
+      const required = [COOP_CAP_OP_BIOME, COOP_CAP_DURABILITY_JOURNAL];
+      const h = new CoopSessionController(host, {
+        version: COOP_PROTOCOL_VERSION,
+        localCapabilities: required,
+        requiredCapabilities: required,
+      });
+      const g = new CoopSessionController(guest, {
+        version: COOP_PROTOCOL_VERSION,
+        localCapabilities: [COOP_CAP_OP_BIOME],
+        requiredCapabilities: required,
+      });
+      h.connect();
+      g.connect();
+      await flush();
+      expect(h.compatibilityAccepted).toBe(false);
+      expect(g.compatibilityAccepted).toBe(false);
+      h.dispose();
+      g.dispose();
+      clearNegotiatedCoopCapabilities();
+    });
+
+    it("rejects an er-coop-36 peer that cannot execute exact Mystery egg rewards", async () => {
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-37");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",
         version: COOP_PROTOCOL_VERSION,
       });
       controller.connect();
-      guest.send({ t: "hello", version: "er-coop-31", username: "Cached", role: "guest", epoch: 0 });
+      guest.send({ t: "hello", version: "er-coop-36", username: "Cached", role: "guest", epoch: 0 });
       await flush();
 
       expect(controller.versionMismatch).toBe(true);
       expect(controller.compatibilityAccepted).toBe(false);
       expect(controller.bothReady()).toBe(false);
+      controller.dispose();
     });
 
     async function readyAgainstFingerprint(kind: "functional" | "presentation"): Promise<CoopSessionController> {
@@ -84,6 +128,36 @@ describe("co-op session controller (#633, P1)", () => {
   });
 
   describe("host controller <-> spoofed guest (local-dev path)", () => {
+    it("negotiates protocol-33 capabilities, persistence identity, and functional fingerprint", async () => {
+      clearNegotiatedCoopCapabilities();
+      const { host, guest } = createLoopbackPair();
+      const required = [COOP_CAP_OP_BIOME, COOP_CAP_DURABILITY_JOURNAL];
+      const controller = new CoopSessionController(host, {
+        username: "Host",
+        version: COOP_PROTOCOL_VERSION,
+        localCapabilities: required,
+        requiredCapabilities: required,
+        requireFunctionalFingerprint: true,
+      });
+      const spoof = new SpoofGuest(guest);
+
+      try {
+        spoof.connect();
+        controller.connect();
+        const compatible = await controller.awaitPartnerCompatibility();
+
+        expect(compatible?.partnerName).toBe("Player 2 (CPU)");
+        expect(controller.partnerVersion).toBe(COOP_PROTOCOL_VERSION);
+        expect(controller.compatibilityAccepted).toBe(true);
+        expect(controller.sessionEpoch).toBeGreaterThan(0);
+        expect(controller.runId).not.toBe("");
+      } finally {
+        spoof.dispose();
+        controller.dispose();
+        clearNegotiatedCoopCapabilities();
+      }
+    });
+
     it("runs the full handshake: connect -> partner picks -> both ready -> merged party", async () => {
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, { username: "Ash" });
@@ -277,11 +351,7 @@ describe("co-op session controller (#633, P1)", () => {
       expect(h.interactionOwner()).toBe("guest"); // both converged
     });
 
-    it("a resume re-initializes the interaction counter identically on both clients (#833: no persisted restore)", () => {
-      // #833 dangler cleanup: the interaction counter is NOT persisted in SessionSaveData, and the
-      // production-dead `restoreInteractionCounter` seam was removed (nothing to restore). A real
-      // resume relies on BOTH clients re-initializing the counter identically from the fresh runtime
-      // assembly - which is exactly base 0 (host owns the first interaction). Assert that invariant.
+    it("a cold resume restores the persisted interaction counter identically on both clients", () => {
       const { host } = createLoopbackPair();
       const h = new CoopSessionController(host);
       h.advanceInteraction();
@@ -289,15 +359,15 @@ describe("co-op session controller (#633, P1)", () => {
       h.advanceInteraction(); // mid-run: counter = 3 -> owner guest
       expect(h.interactionCounter()).toBe(3);
 
-      // Post-reload: a fresh controller on EITHER role re-initializes to 0 (host owns interaction 0),
-      // so the even/odd ownership parity is preserved for a resume that re-enters from the top.
       const { host: host2, guest: guest2 } = createLoopbackPair();
       const resumedHost = new CoopSessionController(host2);
       const resumedGuest = new CoopSessionController(guest2);
-      expect(resumedHost.interactionCounter()).toBe(0);
-      expect(resumedGuest.interactionCounter()).toBe(0);
-      expect(resumedHost.interactionOwner()).toBe("host"); // fresh = 0 -> host owns the first interaction
-      expect(resumedGuest.interactionOwner()).toBe("host"); // both clients agree
+      resumedHost.restoreInteractionCounter(3);
+      resumedGuest.restoreInteractionCounter(3);
+      expect(resumedHost.interactionCounter()).toBe(3);
+      expect(resumedGuest.interactionCounter()).toBe(3);
+      expect(resumedHost.interactionOwner()).toBe("guest");
+      expect(resumedGuest.interactionOwner()).toBe("guest");
     });
 
     it("the snapshot carries the interaction owner + local-turn flag for the UI", () => {
@@ -328,6 +398,24 @@ describe("co-op session controller (#633, P1)", () => {
       ).resolves.toBe(true);
       expect(g.partnerInteractionCounterSeen()).toBe(1);
       expect(pair.counters.host.oneShotDropped).toBe(1);
+    });
+
+    it("an incompatible partner counter exhausts finitely and remains closed", async () => {
+      const pair = createLoopbackPair();
+      const failures: unknown[] = [];
+      // No controller is installed on pair.host: every replay request is delivered but can never be answered.
+      const g = new CoopSessionController(pair.guest, {
+        partnerInteractionRecoveryMaxAttempts: 2,
+        onPartnerInteractionRecoveryExhausted: failure => failures.push(failure),
+      });
+      g.advanceInteraction(0);
+
+      const wait = g.awaitPartnerInteraction(1);
+      expect(coopMachineWaitLabels().some(label => label.startsWith("coop-partner-interaction:1@"))).toBe(true);
+      await expect(wait).resolves.toBe(false);
+      expect(failures).toEqual([{ need: 1, peerSeen: 0, attempts: 2 }]);
+      expect(coopMachineWaitLabels().some(label => label.startsWith("coop-partner-interaction:1@"))).toBe(false);
+      g.dispose();
     });
   });
 

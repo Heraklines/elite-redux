@@ -11,7 +11,11 @@
 // the awaited rendezvous barrier, the interaction counter, and the transport's last-received-frame age.
 // =============================================================================
 
-import { COOP_CONTROL_PLANE_MARKER, formatCoopControlPlane } from "#data/elite-redux/coop/coop-diagnostics";
+import {
+  COOP_CONTROL_PLANE_MARKER,
+  captureCoopReportCorrelation,
+  formatCoopControlPlane,
+} from "#data/elite-redux/coop/coop-diagnostics";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { afterEach, describe, expect, it } from "vitest";
@@ -31,6 +35,30 @@ function stubRuntime(over: {
     controller: {
       role: "host",
       seat: 0,
+      localSeatId: 0,
+      authoritySeatId: 0,
+      sessionEpoch: 1234,
+      runId: "run_01K123456789ABCDEFGHJKMNPQ",
+      authenticatedBinding: {
+        version: 1,
+        bindingId: "p33-binding:pair:1234:seatmap",
+        sessionId: "p33-session:pair:1234",
+        runId: "run_01K123456789ABCDEFGHJKMNPQ",
+        sessionEpoch: 1234,
+        checkpointRevision: 0,
+        seatMap: {
+          version: 1,
+          revision: 1,
+          seatMapId: "a".repeat(64),
+          seats: [
+            { seatId: 0, accountId: "private-host-account" },
+            { seatId: 1, accountId: "private-guest-account" },
+          ],
+        },
+        authoritySeatId: 0,
+        membershipRevision: 1,
+        source: "fresh",
+      },
       versionMismatch: false,
       netcodeMode: "authoritative",
       interactionCounter: () => 4,
@@ -43,6 +71,17 @@ function stubRuntime(over: {
     rendezvous: {
       describeArrivals: () => ({ localArrived: ["waveStart:5"], partnerArrived: [], awaiting: ["waveStart:5"] }),
       dispose: noop,
+    },
+    membership: {
+      snapshot: () => ({
+        revision: 1,
+        state: "active",
+        connectionGeneration: 1,
+        members: [
+          { seatId: 0, role: "host", present: true },
+          { seatId: 1, role: "guest", present: true },
+        ],
+      }),
     },
     localTransport: {
       state: "connected",
@@ -79,6 +118,18 @@ describe("co-op control-plane report block (#diagnostics)", () => {
     expect(block).toContain("awaiting=[waveStart:5]");
     // The transport's last-received-frame age (the true heartbeat).
     expect(block).toContain("lastRx=3s");
+    expect(block).toContain("run=run_01K123456789ABCDEFGHJKMNPQ");
+
+    const correlation = captureCoopReportCorrelation();
+    expect(correlation).toMatchObject({
+      runId: "run_01K123456789ABCDEFGHJKMNPQ",
+      epoch: 1234,
+      local: { role: "host", seat: 0 },
+      partner: { role: "guest", seat: 1 },
+      binding: { bindingId: "p33-binding:pair:1234:seatmap", sessionId: "p33-session:pair:1234" },
+      membership: { revision: 1, connectionGeneration: 1 },
+    });
+    expect(JSON.stringify(correlation)).not.toMatch(/private-host-account|private-guest-account/u);
   });
 
   it("renders a never-received transport as lastRx=never (a suspended/dead tab signature)", () => {

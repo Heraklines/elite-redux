@@ -20,12 +20,18 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
-import { adoptBargainWatcherOutcome, commitBargainOwnerOutcome } from "#data/elite-redux/coop/coop-bargain-operation";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
+import {
+  adoptBargainWatcherOutcome,
+  commitBargainOwnerOutcome,
+  isCoopBargainOperationEnabled,
+} from "#data/elite-redux/coop/coop-bargain-operation";
 import { applyCoopMeOutcome, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_BARGAIN_SEQ_BASE, COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   advanceCoopInteractionForContinuation,
+  failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
@@ -119,13 +125,17 @@ export class TheBargainPhase extends Phase {
       const outcome = captureCoopMeOutcome();
       const controller = getCoopController();
       if (controller != null) {
-        commitBargainOwnerOutcome({
+        const retained = commitBargainOwnerOutcome({
           pinned: this.coopBargainStart,
           outcome,
           localRole: controller.role,
           wave: globalScene.currentBattle?.waveIndex ?? 0,
           turn: globalScene.currentBattle?.turn ?? 0,
         });
+        if (!retained) {
+          failCoopSharedSession(`Bargain terminal ${this.coopBargainStart} could not enter durable authority`);
+          return;
+        }
       }
       getCoopInteractionRelay()?.sendInteractionOutcome(
         COOP_BARGAIN_SEQ_BASE + this.coopBargainStart,
@@ -169,6 +179,10 @@ export class TheBargainPhase extends Phase {
         coopWarn("reward", "bargain WATCHER apply threw (handled - checksum resync heals residuals)");
       }
     } else {
+      if (controller?.role === "host" && outcome?.k === "meResync" && isCoopBargainOperationEnabled()) {
+        failCoopSharedSession(`Bargain proposal ${this.coopBargainStart} could not enter durable authority`);
+        return;
+      }
       coopWarn("reward", `bargain WATCHER: ${outcome == null ? "TIMEOUT" : "unexpected outcome kind"} -> move on`);
     }
     advanceCoopInteractionForContinuation(this.coopBargainStart);
@@ -298,7 +312,9 @@ export class TheBargainPhase extends Phase {
         }
         pokeName = mon.getNameToRender();
         globalScene.removePokemonFromPlayerParty(mon, true);
-        new Egg({ sourceType: EggSourceType.EVENT, tier: EggTier.LEGENDARY }).addEggToGameData();
+        coopAllowAccountWrite("bargain-egg-reward", () =>
+          new Egg({ sourceType: EggSourceType.EVENT, tier: EggTier.LEGENDARY }).addEggToGameData(),
+        );
         break;
       }
       case "pride": {

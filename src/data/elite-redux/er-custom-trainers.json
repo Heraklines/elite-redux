@@ -1482,5 +1482,482 @@
     "trainerClass": "GIOVANNI",
     "victoryDialogue": "Seems like you got full hard mode XD",
     "weight": 100
+  },
+  "TRAINER_70011": {
+    "battleBgm": "battle_bb_elite",
+    "battleType": "double",
+    "challenge": "none",
+    "defeatDialogue": "...",
+    "difficulties": [
+      "elite",
+      "hell"
+    ],
+    "endless": true,
+    "id": 70011,
+    "introDialogue": "...",
+    "maxWave": 180,
+    "minWave": 140,
+    "name": "Dagoza",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "HYPNOSIS",
+          "NIGHTMARE",
+          "DREAM_EATER",
+          "PROTECT"
+        ],
+        "species": 10568
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "SCOPE_LENS"
+          },
+          {
+            "count": 2,
+            "item": "SCOPE_LENS"
+          },
+          {
+            "count": 1,
+            "item": "SHELL_BELL"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          },
+          {
+            "count": 2,
+            "item": "IRON"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "DARK_VOID",
+          "DREAM_EATER",
+          "PROTECT",
+          "MOONLIGHT"
+        ],
+        "shiny": {
+          "palette": "obsidian"
+        },
+        "species": 10769
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "HELPING_HAND",
+          "BLUE_FLARE",
+          "DAZZLING_GLEAM",
+          "CONFUSE_RAY"
+        ],
+        "species": 10654
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "NEVER_MELT_ICE"
+          },
+          {
+            "count": 1,
+            "item": "ER_ICE_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BLIZZARD",
+          "CURSE",
+          "ICE_SPINNER",
+          "RLNA"
+        ],
+        "species": 10533
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "MYSTIC_WATER"
+          },
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          }
+        ],
+        "insanity": {
+          "ability": 5285,
+          "innates": [
+            5045,
+            301,
+            130
+          ]
+        },
+        "level": null,
+        "moves": [
+          "MATCHA_GOTCHA",
+          "SCALD",
+          "BERRY_SMASH",
+          "TORMENT"
+        ],
+        "shiny": {
+          "around": "outline",
+          "name": "Spiked",
+          "palette": "cursed"
+        },
+        "species": 1013
+      },
+      {
+        "abilitySlot": 0,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 10582
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FAIRY_FEATHER"
+          },
+          {
+            "count": 1,
+            "item": "ER_FAIRY_GEM"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FAKE_OUT",
+          "SUCKER_PUNCH",
+          "MOONBLAST",
+          "MISTY_EXPLOSION"
+        ],
+        "species": 683
+      }
+    ],
+    "trainerClass": "HEX_MANIAC",
+    "trainerEffect": "smoke",
+    "victoryDialogue": "...",
+    "weight": 50
+  },
+  "TRAINER_70012": {
+    "battleBgm": "battle_hoenn_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "Wahahahah! Well, I won! How was the battle? Thrilling, right?",
+    "difficulties": [
+      "hell"
+    ],
+    "endless": true,
+    "id": 70012,
+    "introDialogue": "You look like you have a lot of zip! That's a good thing. Wahahahaha!",
+    "maxWave": 199,
+    "minWave": 190,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "DRAGON_FANG"
+          },
+          {
+            "count": 1,
+            "item": "MAGNET"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SPACIAL_REND",
+          "VOLT_SWITCH",
+          "ELECTRO_DRIFT",
+          "OVERHEAT"
+        ],
+        "species": 1008
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "SHELL_BELL"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "THUNDER_PUNCH",
+          "SAPPY_SEED",
+          "METEOR_MASH",
+          "DRAIN_PUNCH"
+        ],
+        "sanityOff": true,
+        "species": 10452
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SALAC_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ER_PSYCHIC_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "LEAF_BLADE",
+          "PSYBLADE",
+          "SHOCKING_EDGE",
+          "BITTER_BLADE"
+        ],
+        "species": 1010
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "ER_GHOST_GEM"
+          },
+          {
+            "count": 1,
+            "item": "ER_ELECTRIC_GEM"
+          },
+          {
+            "count": 1,
+            "item": "ER_FIRE_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "MOONGEIST_BEAM",
+          "ZAP_CANNON",
+          "ARMOR_CANNON",
+          "SHOCK_WAVE"
+        ],
+        "species": 10747
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "MYSTICAL_ROCK"
+          },
+          {
+            "count": 2,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "ELECTRO_SHOT",
+          "FROST_BREATH",
+          "SPLISHY_SPLASH",
+          "AURA_SPHERE"
+        ],
+        "species": 243
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          },
+          {
+            "count": 1,
+            "item": "ER_ELECTRIC_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "KINETIC_BARRAGE",
+          "WEB_SHOT",
+          "VOLT_BOLT",
+          "FROST_BOLT"
+        ],
+        "sanityOff": true,
+        "species": 10762
+      }
+    ],
+    "trainerClass": "WATTSON",
+    "trainerEffect": "sparkstorm",
+    "victoryDialogue": "I swell with optimism, seeing a promising young Trainer like you!",
+    "weight": 5
+  },
+  "TRAINER_70013": {
+    "battleType": "double",
+    "challenge": "doubles",
+    "defeatDialogue": "You were only living a pipe dream.",
+    "difficulties": [
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70013,
+    "introDialogue": "We'll be your worst nightmare!",
+    "maxWave": 199,
+    "minWave": 150,
+    "name": "Sisters Baba and Yaga",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "VOLT_SWITCH",
+          "RAZOR_WIND",
+          "OMINOUS_WIND",
+          "ELECTRO_DRIFT"
+        ],
+        "sanityOff": true,
+        "species": 10238
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 3,
+            "item": "WIDE_LENS"
+          },
+          {
+            "count": 2,
+            "item": "MYSTICAL_ROCK"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "OMINOUS_WIND",
+          "EERIE_SPELL",
+          "HURRICANE",
+          "NASTY_PLOT"
+        ],
+        "species": 561
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "MYSTIC_WATER"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "AQUA_BASH",
+          "KNOCK_OFF",
+          "HORN_ATTACK",
+          "PROTECT"
+        ],
+        "species": 10854
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FAIRY_FEATHER"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "AQUA_CUTTER",
+          "PIXIE_SLASH",
+          "WATER_SHURIKEN",
+          "PROTECT"
+        ],
+        "species": 10855
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "STAR_CRASH",
+          "SUCKER_PUNCH",
+          "WICKED_BLOW",
+          "RECOVER"
+        ],
+        "species": 10712
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "ASTONISH",
+          "PLAY_ROUGH",
+          "SWORDS_DANCE",
+          "SPECTRAL_THIEF"
+        ],
+        "species": 778
+      }
+    ],
+    "trainerClass": "MYSTERIOUS_SISTERS",
+    "victoryDialogue": "I guess you were OUR worst nightmare...",
+    "weight": 5
   }
 }

@@ -756,6 +756,31 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
       if (mm.abilitySlot !== undefined && ![0, 1, 2].includes(mm.abilitySlot as number)) {
         return { ok: false, error: `${key}: abilitySlot must be 0/1/2` };
       }
+      if (mm.insanity !== undefined && mm.insanity !== null) {
+        if (!isPlainObject(mm.insanity)) {
+          return { ok: false, error: `${key}: insanity must be { ability?, innates? } or null` };
+        }
+        const insanity = mm.insanity as Record<string, unknown>;
+        if (Object.keys(insanity).some(field => field !== "ability" && field !== "innates")) {
+          return { ok: false, error: `${key}: insanity has an unknown field` };
+        }
+        if (
+          insanity.ability !== undefined
+          && !(Number.isInteger(insanity.ability) && (insanity.ability as number) > 0)
+        ) {
+          return { ok: false, error: `${key}: insanity.ability must be a positive AbilityId` };
+        }
+        if (
+          insanity.innates !== undefined
+          && (!Array.isArray(insanity.innates)
+            || insanity.innates.length > 3
+            || insanity.innates.some(
+              abilityId => abilityId !== null && !(Number.isInteger(abilityId) && (abilityId as number) > 0),
+            ))
+        ) {
+          return { ok: false, error: `${key}: insanity.innates must be up to 3 positive AbilityIds or nulls` };
+        }
+      }
       if (
         mm.moves !== undefined
         && (!Array.isArray(mm.moves) || mm.moves.length > 4 || mm.moves.some(v => !isName(v)))

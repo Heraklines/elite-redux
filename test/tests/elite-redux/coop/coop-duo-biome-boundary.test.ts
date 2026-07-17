@@ -144,6 +144,20 @@ describe.skipIf(!RUN)("co-op DUO wave-boundary barrier (#858): shop -> crossroad
     // best-effort
   });
 
+  function liveCrossroads(): ErCrossroadsPhase {
+    const phase = new ErCrossroadsPhase();
+    (phase as unknown as { boundaryStillLive(generation: number, wave: number): boolean }).boundaryStillLive = () =>
+      true;
+    return phase;
+  }
+
+  function liveSelectBiome(): SelectBiomePhase {
+    const phase = new SelectBiomePhase();
+    (phase as unknown as { boundaryStillLive(generation: number, wave: number): boolean }).boundaryStillLive = () =>
+      true;
+    return phase;
+  }
+
   // ===========================================================================================
   // A. The reciprocal xroads:<wave> barrier ORDERS the two clients: the racer (first to reach the
   // boundary) BLOCKS until the laggard arrives, then both proceed both-arrived (no timeout). Driven
@@ -219,7 +233,7 @@ describe.skipIf(!RUN)("co-op DUO wave-boundary barrier (#858): shop -> crossroad
     const restoreUi = stubUi(ownerCtx.scene);
     try {
       await withClient(ownerCtx, async () => {
-        new ErCrossroadsPhase().start();
+        liveCrossroads().start();
         // Drain enough for the lone-owner barrier to time out (setCoopRendezvousWaitMs(50)) and the phase to
         // FULLY settle under the UI stub before restoreUi() - do NOT break early on the arrive, or restoreUi
         // would fire while coopStart is still parked and its deferred real setMode(OPTION_SELECT) would leak
@@ -268,7 +282,7 @@ describe.skipIf(!RUN)("co-op DUO wave-boundary barrier (#858): shop -> crossroad
     try {
       await withClient(ownerCtx, async () => {
         // NOT chained (no setCoopBiomeInteractionStart) -> the natural-pick boundary barrier applies.
-        new SelectBiomePhase().start();
+        liveSelectBiome().start();
         // Fixed drain (no early break) so the phase settles under the UI stub before restoreUi() - see the
         // crossroads test above for why an early break leaks a menu into the next test.
         for (let i = 0; i < 120; i++) {

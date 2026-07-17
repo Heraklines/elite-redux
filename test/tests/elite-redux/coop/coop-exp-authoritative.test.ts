@@ -34,6 +34,10 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import {
+  resetCoopWaveAdvanceOperationFlag,
+  setCoopWaveAdvanceOperationEnabled,
+} from "#data/elite-redux/coop/coop-wave-operation";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -68,6 +72,9 @@ describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest conve
   });
 
   beforeEach(() => {
+    // This file pins the explicitly negotiated legacy raw compatibility arm. P33 production correctness is
+    // covered by the retained wave-transaction suites and deliberately ignores waveEndState.
+    setCoopWaveAdvanceOperationEnabled(false);
     setCoopWaveBarrierMs(50);
     setCoopRendezvousWaitMs(50);
     game = new GameManager(phaserGame);
@@ -84,6 +91,7 @@ describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest conve
   });
 
   afterEach(() => {
+    resetCoopWaveAdvanceOperationFlag();
     setCoopWaveBarrierMs(60_000);
     resetCoopRendezvousWaitMs();
     logs.dispose();
@@ -109,7 +117,7 @@ describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest conve
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
 
@@ -143,6 +151,9 @@ describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest conve
       broadcastCoopWaveEndState();
       await drainLoopback();
     });
+    // The two-engine harness now delivers state carriers only while their destination scene is installed,
+    // matching separate browser realms. Admit the pending wave-end image under the guest context first.
+    await withClient(rig.guestCtx, () => drainLoopback());
 
     // ===== GUEST BattleEndPhase branch: adopt the wave-end snapshot via the id-based full-state apply. This
     // is the exact production seam (consume the pending wave-end state, then applyCoopAuthoritativeBattleState)

@@ -1,0 +1,141 @@
+name: P33 Co-op Mutation Assurance
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    branches:
+      - "ci/coop/**"
+    paths:
+      - ".github/workflows/coop-mutation-assurance.yml"
+      - ".github/actions/setup-deps/**"
+      - ".nvmrc"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/run-coop-mutation-gate.mjs"
+      - "src/data/elite-redux/coop/coop-battle-stream.ts"
+      - "src/data/elite-redux/coop/coop-durability.ts"
+      - "src/data/elite-redux/coop/coop-presentation.ts"
+      - "src/data/elite-redux/coop/coop-ui-registry.ts"
+      - "test/tests/elite-redux/coop/coop-p33-mutation-victims.test.ts"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+
+jobs:
+  plan:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Plan exact P33 mutation inventory
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Verify six protections and assign each exactly once
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/run-coop-mutation-gate.mjs --check | tee coop-mutation-plan.log
+          node scripts/run-coop-mutation-gate.mjs --list --json > coop-mutation-plan.json
+          matrix="$(cat coop-mutation-plan.json)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+      - name: Upload compact mutation plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-mutation-plan-${{ github.sha }}
+          overwrite: true
+          path: coop-mutation-plan.json
+          retention-days: 7
+          if-no-files-found: error
+
+  mutate:
+    if: github.repository == 'Heraklines/elite-redux'
+    needs: plan
+    name: P33 mutation shard ${{ matrix.shard }}/${{ matrix.total }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Prove green baseline becomes expected red mutants
+        id: mutate
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          node scripts/run-coop-mutation-gate.mjs \
+            --shard "${{ matrix.shard }}/${{ matrix.total }}" \
+            --output-dir .coop-mutation-evidence \
+            2>&1 | tee coop-mutation-runner.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Require production sources restored after mutation
+        if: always()
+        shell: bash
+        run: >-
+          git diff --exit-code --
+          src/data/elite-redux/coop/coop-battle-stream.ts
+          src/data/elite-redux/coop/coop-durability.ts
+          src/data/elite-redux/coop/coop-presentation.ts
+          src/data/elite-redux/coop/coop-ui-registry.ts
+
+      - name: Upload compact successful mutation evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-mutation-${{ matrix.shard }}-of-${{ matrix.total }}-${{ github.sha }}
+          overwrite: true
+          path: |
+            .coop-mutation-evidence/summary.json
+            .coop-mutation-evidence/*.patch
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload mutation failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-mutation-${{ matrix.shard }}-of-${{ matrix.total }}-${{ github.sha }}-failure
+          overwrite: true
+          path: |
+            coop-mutation-runner.log
+            .coop-mutation-evidence/**
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
+
+  mutation-required:
+    name: P33 mutation assurance required
+    if: always()
+    needs: [plan, mutate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require inventory and every mutation shard
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          MUTATE_RESULT: ${{ needs.mutate.result }}
+        run: |
+          test "$PLAN_RESULT" = success
+          test "$MUTATE_RESULT" = success

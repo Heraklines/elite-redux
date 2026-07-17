@@ -6,6 +6,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
+import * as coopPresentation from "#data/elite-redux/coop/coop-presentation";
 import { clearCoopRuntime, getCoopBattleStreamer, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import type {
   CoopAuthoritativeBattleStateV1,
@@ -81,8 +82,13 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
   beforeEach(() => {
     priorScene = globalScene;
     coopEngine.resetCoopStateTicks();
+    vi.spyOn(coopPresentation, "settleCoopAuthoritativeProjection").mockResolvedValue(true);
     initGlobalScene({
-      currentBattle: { waveIndex: 4, turn: 2 },
+      currentBattle: { waveIndex: 4, turn: 2, turnCommands: [null, null] },
+      getPlayerField: () => [
+        { id: 100, coopOwner: "host", isActive: () => true },
+        { id: 101, coopOwner: "guest", isActive: () => true },
+      ],
       phaseManager: {
         getCurrentPhase: () => currentPhase,
         shiftPhase: () => {},
@@ -169,10 +175,17 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
       "the admitted authoritative tick uses the explicit reassert path",
     ).toHaveBeenCalledOnce();
     expect(authoritativeReapply).toHaveBeenCalledOnce();
+    const streamer = getCoopBattleStreamer();
     expect(
-      getCoopBattleStreamer()?.peekCheckpoint(),
-      "only the fully verified retry consumes the retained frame",
-    ).toBeNull();
+      streamer?.retainedAuthorityDiagnostics(),
+      "material/presentation proof moves the carrier into retained out-of-band storage while continuation waits",
+    ).toMatchObject({ bufferedAuthority: 1, waiters: 1 });
+    expect(streamer?.peekCheckpoint(), "the mechanically consumed inbox is no longer the retained owner").toBeNull();
+    expect(streamer?.notifyContinuationSurface("command"), "the addressed wave-4 turn-2 command releases it").toBe(1);
+    expect(
+      streamer?.retainedAuthorityDiagnostics(),
+      "continuationReady releases the waiter while the turn finalizer still owns out-of-band cleanup",
+    ).toMatchObject({ bufferedAuthority: 1, waiters: 0 });
     expect(phaseInternals.recoveryTickFloor, "successful verification commits the recovery floor").toBe(20);
   });
 

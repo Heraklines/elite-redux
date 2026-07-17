@@ -31,6 +31,7 @@ import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-myste
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { bypassLogin } from "#constants/app-constants";
+import { ER_GHOST_WAVE_WINDOW } from "#data/elite-redux/er-ghost-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ghostWavesForCurrentRun, isErGhostChallengeActive, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
 import {
@@ -163,7 +164,7 @@ const PREFETCH_LEAD_WAVES = 15;
  * far-deeper team that had to be devolved. A 40-wave band finds a wave-appropriate
  * team far more often.
  */
-export const ER_GHOST_WAVE_WINDOW = 40;
+export { ER_GHOST_WAVE_WINDOW } from "#data/elite-redux/er-ghost-constants";
 
 /**
  * At/after this wave a ghost drawn from a deeper run must NOT be devolved - it is only
@@ -874,7 +875,9 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
   // challenge into constant normal-trainer fallbacks - so under the challenge
   // we top up from the OTHER difficulties' pools too (current first, then the
   // deepest pools), de-duped by id.
-  if (isErGhostChallengeActive()) {
+  // Mystery Gauntlet uses its fixed scripted carrier and must not depend on an external fetch.
+  const immediateGhostPool = isErGhostChallengeActive();
+  if (immediateGhostPool) {
     prefetchStarted = true;
     void (async () => {
       const collected: GhostTeamSnapshot[] = [];
@@ -989,6 +992,33 @@ function pickGhost(candidates: GhostTeamSnapshot[], waveIndex: number): GhostTea
   return pool[h % pool.length];
 }
 
+/** Fixed carrier for the staging-only Mystery schedule; deliberately independent of network/account pools. */
+function mysteryGauntletGhost(): GhostTeamSnapshot {
+  const member = (speciesId: number): GhostMember => ({
+    speciesId,
+    formIndex: 0,
+    abilityIndex: 0,
+    ivs: [20, 20, 20, 20, 20, 20],
+    nature: 0,
+    level: 7,
+    gender: -1,
+    shiny: false,
+    variant: 0,
+    passive: false,
+    moves: [],
+  });
+  return {
+    id: "mystery-gauntlet-scripted-v1",
+    trainerName: "Mystery Challenger",
+    difficulty: "mystery",
+    mode: "classic",
+    waveReached: 7,
+    isVictory: false,
+    timestamp: 0,
+    party: [member(SpeciesId.RATTATA), member(SpeciesId.PIDGEY), member(SpeciesId.CATERPIE)],
+  };
+}
+
 /**
  * The ghost team to field on `waveIndex`, or `null` if none is available yet.
  * Stable within a run: the same wave always yields the same ghost.
@@ -1017,6 +1047,16 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
     console.log(`[er-ghost] wave ${waveIndex}: reusing cached ghost '${existing.trainerName}'`);
     return existing;
+  }
+  if (gauntletGhost) {
+    // This is a deterministic test fixture, not a sampled-player feature. Always use the same
+    // carrier so asymmetric fetch timing cannot make two real browsers cache different trainers.
+    const scripted = mysteryGauntletGhost();
+    usedGhostIds.add(scripted.id);
+    lastGhostUploader = scripted.trainerName ?? "";
+    ghostByWave.set(waveIndex, scripted);
+    console.log(`[er-ghost] wave ${waveIndex}: ghost '${scripted.trainerName}' (scripted gauntlet carrier)`);
+    return scripted;
   }
   const pool = prefetched ?? [];
   // A run that ended at wave W can only be fielded at waves <= W (its team is

@@ -1,4 +1,8 @@
 import { globalScene } from "#app/global-scene";
+import type {
+  CoopMeModifierRewardSurfaceProjection,
+  CoopMeRewardSurfaceProjection,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import type { BattlerIndex } from "#enums/battler-index";
 import type { Challenges } from "#enums/challenges";
 import type { EncounterAnim } from "#enums/encounter-anims";
@@ -12,6 +16,7 @@ import type { StatusEffect } from "#enums/status-effect";
 import type { MysteryEncounterSpriteConfig } from "#field/mystery-encounter-intro";
 import { MysteryEncounterIntroVisuals } from "#field/mystery-encounter-intro";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
+import type { CustomModifierSettings } from "#modifiers/modifier-type";
 import type { PokemonMove } from "#moves/pokemon-move";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounterDialogue, OptionTextDisplay } from "#mystery-encounters/mystery-encounter-dialogue";
@@ -35,6 +40,30 @@ export interface EncounterStartOfBattleEffect {
   targets: BattlerIndex[];
   move: PokemonMove;
   useMode: MoveUseMode; // TODO: This should always be ignore PP...
+}
+
+/** A standard, locally-rendered reward surface prepared by a Mystery Encounter. */
+export interface MysteryEncounterModifierRewardSurface extends CoopMeModifierRewardSurfaceProjection {
+  readonly ordinal: number;
+  readonly settings: CustomModifierSettings;
+}
+
+/** The only supported way for automatic reward preparation to add another interactive modifier surface. */
+export interface MysteryEncounterRewardPreparationContext {
+  readonly registerModifierSurface: (settings: CustomModifierSettings) => void;
+}
+
+/**
+ * Internal execution plan for the standard Mystery Encounter reward helper. Automatic mutations are
+ * deliberately separate from opening the interactive surface so co-op can capture authoritative state
+ * after preparation and before either client enters the picker.
+ */
+export interface MysteryEncounterRewardPlan {
+  readonly surfaces: readonly MysteryEncounterModifierRewardSurface[];
+  /** Wire-safe ordered view retained by the authoritative battle settlement. */
+  readonly rewardSurfaceProjections: readonly CoopMeRewardSurfaceProjection[];
+  readonly prepareAutomaticEffects: () => void | Promise<void>;
+  readonly openRewardSurfaces: () => boolean;
 }
 
 const DEFAULT_MAX_ALLOWED_ENCOUNTERS = 2;
@@ -181,6 +210,8 @@ export class MysteryEncounter implements IMysteryEncounter {
   doEncounterExp?: (() => boolean) | undefined;
   /** Will provide the player a rewards shop for that wave */
   doEncounterRewards?: (() => boolean) | undefined;
+  /** Typed internal plan installed by setEncounterRewards for standard modifier surfaces. */
+  rewardPlan?: MysteryEncounterRewardPlan | undefined;
   /** Will execute callback during VictoryPhase of a continuousEncounter */
   doContinueEncounter?: (() => Promise<void>) | undefined;
   /**

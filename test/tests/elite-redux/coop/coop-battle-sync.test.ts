@@ -95,6 +95,61 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     expect(cmd).toBeNull();
   });
 
+  it("fences an exact command timeout before its null continuation can choose AI", async () => {
+    const { host } = createLoopbackPair();
+    let expire: (() => void) | null = null;
+    const observed: unknown[] = [];
+    const hostSync = new CoopBattleSync(host, {
+      timeoutMs: 25,
+      schedule: cb => {
+        expire = cb;
+        return () => {
+          expire = null;
+        };
+      },
+      onCommandTimeout: timeout => {
+        observed.push({ timeout, frozenInsideCallback: hostSync.isTerminalFrozen() });
+      },
+    });
+    const awaited = hostSync.requestPartnerCommand(1, 9, [0, 1], "guest", legalOffer, {
+      epoch: 71,
+      wave: 20,
+      pokemonId: 8080,
+    });
+    let frozenAtContinuation = false;
+    const continued = awaited.then(command => {
+      frozenAtContinuation = hostSync.isTerminalFrozen();
+      return command;
+    });
+
+    expect(expire).not.toBeNull();
+    expire!();
+    await expect(continued).resolves.toBeNull();
+    expect(observed).toEqual([
+      {
+        timeout: {
+          epoch: 71,
+          wave: 20,
+          turn: 9,
+          owner: "guest",
+          pokemonId: 8080,
+          fieldIndex: 1,
+        },
+        frozenInsideCallback: true,
+      },
+    ]);
+    expect(frozenAtContinuation).toBe(true);
+    expect(hostSync.isTerminalFrozen()).toBe(true);
+    await expect(
+      hostSync.requestPartnerCommand(1, 10, [0], "guest", legalOffer, {
+        epoch: 71,
+        wave: 20,
+        pokemonId: 8080,
+      }),
+    ).resolves.toBeNull();
+    hostSync.dispose();
+  });
+
   it("the SpoofGuest answers the host's request end-to-end (loopback)", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);
@@ -143,9 +198,15 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     expect(cmd?.moveId).toBe(42);
   });
 
-  it("recovers a wave-1 broadcast-before-request when copied player Pokemon ids differ", async () => {
+  it("never lets a same-turn buffered command for another Pokemon satisfy the exact waiter", async () => {
     const { host, guest } = createLoopbackPair();
-    const hostSync = new CoopBattleSync(host);
+    const hostSync = new CoopBattleSync(host, {
+      timeoutMs: 5,
+      schedule: cb => {
+        const id = setTimeout(cb, 5);
+        return () => clearTimeout(id);
+      },
+    });
     const guestSync = new CoopBattleSync(guest);
     const guestAddress = { epoch: 17, wave: 1, pokemonId: 111 };
     const hostAddress = { epoch: 17, wave: 1, pokemonId: 999 };
@@ -159,23 +220,18 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     );
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    await expect(hostSync.requestPartnerCommand(1, 1, [1], "guest", legalOffer, hostAddress)).resolves.toMatchObject({
-      command: Command.FIGHT,
-      cursor: 1,
-      moveId: 55,
-      targets: [2],
-    });
+    await expect(hostSync.requestPartnerCommand(1, 1, [1], "guest", legalOffer, hostAddress)).resolves.toBeNull();
+    expect(hostSync.isTerminalFrozen(), "an actor-id mismatch exhausts the bounded exact wait fail-closed").toBe(true);
     hostSync.dispose();
     guestSync.dispose();
   });
 
-  it("replays a retained local command after a dropped first send despite copied Pokemon id skew", async () => {
+  it("replays a retained local command only for an exact actor address after a dropped first send", async () => {
     const pair = createLoopbackPair();
     const guestWire = new CoopFlapTransport(pair.guest);
-    const hostSync = new CoopBattleSync(pair.host);
     const guestSync = new CoopBattleSync(guestWire);
     const guestAddress = { epoch: 23, wave: 1, pokemonId: 321 };
-    const hostAddress = { epoch: 23, wave: 1, pokemonId: 654 };
+    const staleAddress = { epoch: 23, wave: 1, pokemonId: 654 };
 
     guestWire.setConnected(false);
     guestSync.broadcastLocalCommand(
@@ -187,19 +243,54 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     );
     guestWire.setConnected(true);
 
-    await expect(hostSync.requestPartnerCommand(1, 1, [1], "guest", legalOffer, hostAddress)).resolves.toMatchObject({
-      command: Command.FIGHT,
-      cursor: 1,
-      moveId: 55,
-      targets: [2],
+    const replies: Extract<Parameters<typeof pair.host.send>[0], { t: "command" }>[] = [];
+    const off = pair.host.onMessage(message => {
+      if (message.t === "command") {
+        replies.push(message);
+      }
     });
-    hostSync.dispose();
+    pair.host.send({
+      t: "commandRequest",
+      fieldIndex: 1,
+      turn: 1,
+      moveSlots: [1],
+      offer: legalOffer,
+      owner: "guest",
+      ...staleAddress,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(replies, "a stale actor address cannot consume or replay the retained intent").toEqual([]);
+
+    pair.host.send({
+      t: "commandRequest",
+      fieldIndex: 1,
+      turn: 1,
+      moveSlots: [1],
+      offer: legalOffer,
+      owner: "guest",
+      ...guestAddress,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(replies).toHaveLength(1);
+    expect(replies[0]).toMatchObject({
+      epoch: 23,
+      wave: 1,
+      pokemonId: 321,
+      command: { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+    });
+    off();
     guestSync.dispose();
   });
 
-  it("resolves an already-waiting request when the arriving command carries the copied Pokemon id", async () => {
+  it("never lets a live command for another Pokemon resolve an already-waiting exact request", async () => {
     const { host, guest } = createLoopbackPair();
-    const hostSync = new CoopBattleSync(host);
+    const hostSync = new CoopBattleSync(host, {
+      timeoutMs: 5,
+      schedule: cb => {
+        const id = setTimeout(cb, 5);
+        return () => clearTimeout(id);
+      },
+    });
     const guestSync = new CoopBattleSync(guest);
     const awaited = hostSync.requestPartnerCommand(1, 1, [1], "guest", legalOffer, {
       epoch: 31,
@@ -213,8 +304,58 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
       pokemonId: 701,
     });
 
-    await expect(awaited).resolves.toMatchObject({ command: Command.FIGHT, moveId: 55, targets: [2] });
+    await expect(awaited).resolves.toBeNull();
+    expect(hostSync.isTerminalFrozen(), "wrong-actor live traffic cannot advance the current command surface").toBe(
+      true,
+    );
     hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("keeps an exact retained intent after a stale actor-address rejection", async () => {
+    const pair = createLoopbackPair();
+    const guestSync = new CoopBattleSync(pair.guest);
+    const currentAddress = { epoch: 37, wave: 4, pokemonId: 700 };
+    guestSync.broadcastLocalCommand(
+      1,
+      3,
+      { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+      "guest",
+      currentAddress,
+    );
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const replies: Extract<Parameters<typeof pair.host.send>[0], { t: "command" }>[] = [];
+    const off = pair.host.onMessage(message => {
+      if (message.t === "command") {
+        replies.push(message);
+      }
+    });
+    pair.host.send({
+      t: "commandRejected",
+      fieldIndex: 1,
+      turn: 3,
+      reason: "stale actor mutation",
+      owner: "guest",
+      epoch: 37,
+      wave: 4,
+      pokemonId: 701,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    pair.host.send({
+      t: "commandRequest",
+      fieldIndex: 1,
+      turn: 3,
+      moveSlots: [1],
+      offer: legalOffer,
+      owner: "guest",
+      ...currentAddress,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(replies, "wrong-address rejection cannot delete the current actor's retained commit").toHaveLength(1);
+    expect(replies[0]).toMatchObject({ pokemonId: 700, command: { moveId: 55, targets: [2] } });
+    off();
     guestSync.dispose();
   });
 
@@ -330,6 +471,103 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     guestSync.dispose();
   });
 
+  it("snapshot recovery replays the retained local command only at the exact epoch/wave/entity address", async () => {
+    const { host, guest } = createLoopbackPair();
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => true);
+    const address = { epoch: 61, wave: 10, pokemonId: 404 };
+    const received: Array<{ epoch?: number | undefined; wave?: number | undefined; pokemonId?: number | undefined }> =
+      [];
+    const off = host.onMessage(message => {
+      if (message.t === "command") {
+        received.push({ epoch: message.epoch, wave: message.wave, pokemonId: message.pokemonId });
+      }
+    });
+    guestSync.broadcastLocalCommand(
+      1,
+      3,
+      { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+      "guest",
+      address,
+    );
+    await new Promise(resolve => setTimeout(resolve, 0));
+    received.length = 0;
+
+    expect(
+      guestSync.restorePeerPendingRequests(
+        [{ fieldIndex: 1, turn: 3, moveSlots: [1], offer: legalOffer, owner: "guest", address }],
+        61,
+        10,
+      ),
+    ).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(received).toEqual([{ epoch: 61, wave: 10, pokemonId: 404 }]);
+
+    expect(
+      guestSync.restorePeerPendingRequests(
+        [
+          {
+            fieldIndex: 1,
+            turn: 3,
+            moveSlots: [1],
+            offer: legalOffer,
+            owner: "guest",
+            address: { ...address, epoch: 60 },
+          },
+        ],
+        61,
+        10,
+      ),
+    ).toBe(false);
+    expect(
+      guestSync.restorePeerPendingRequests(
+        [{ fieldIndex: 1, turn: 3, moveSlots: [1], offer: legalOffer, owner: "host", address }],
+        61,
+        10,
+      ),
+    ).toBe(false);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(received, "stale/foreign surfaces must not emit another command").toHaveLength(1);
+    off();
+    guestSync.dispose();
+  });
+
+  it("snapshot recovery buffers an exact addressed request until the public command responder opens", async () => {
+    const { host, guest } = createLoopbackPair();
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => true);
+    const received: CoopBattleCommandOffer[] = [];
+    const commands: number[] = [];
+    const off = host.onMessage(message => {
+      if (message.t === "command") {
+        commands.push(message.command.cursor);
+      }
+    });
+    const address = { epoch: 62, wave: 20, pokemonId: 505 };
+
+    expect(
+      guestSync.restorePeerPendingRequests(
+        [{ fieldIndex: 1, turn: 4, moveSlots: [1], offer: legalOffer, owner: "guest", address }],
+        62,
+        20,
+      ),
+    ).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(commands).toEqual([]);
+
+    guestSync.onCommandRequest(request => {
+      if (request.offer != null) {
+        received.push(request.offer);
+      }
+      return { command: Command.FIGHT, cursor: request.moveSlots[0] };
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(received).toEqual([legalOffer]);
+    expect(commands).toEqual([1]);
+    off();
+    guestSync.dispose();
+  });
+
   it("keeps two same-owner active Pokemon on distinct epoch/wave/entity command addresses", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);
@@ -352,6 +590,71 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     await expect(second).resolves.toMatchObject({ command: Command.POKEMON, cursor: 4 });
     hostSync.dispose();
     guestSync.dispose();
+  });
+
+  it("buffers same-turn seat/entity commands independently and never lets a stale epoch unblock the live actor", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const firstAddress = { epoch: 8, wave: 3, pokemonId: 101 };
+    const secondAddress = { epoch: 8, wave: 3, pokemonId: 202 };
+
+    guest.send({
+      t: "command",
+      fieldIndex: 0,
+      turn: 5,
+      owner: "host",
+      ...firstAddress,
+      command: { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+    });
+    guest.send({
+      t: "command",
+      fieldIndex: 0,
+      turn: 5,
+      owner: "guest",
+      ...secondAddress,
+      command: { command: Command.POKEMON, cursor: 4 },
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    await expect(hostSync.requestPartnerCommand(0, 5, [1], "host", undefined, firstAddress)).resolves.toMatchObject({
+      command: Command.FIGHT,
+      moveId: 55,
+    });
+    await expect(hostSync.requestPartnerCommand(0, 5, [1], "guest", undefined, secondAddress)).resolves.toMatchObject({
+      command: Command.POKEMON,
+      cursor: 4,
+    });
+
+    const currentAddress = { epoch: 9, wave: 3, pokemonId: 303 };
+    guest.send({
+      t: "command",
+      fieldIndex: 1,
+      turn: 5,
+      owner: "guest",
+      epoch: 8,
+      wave: 3,
+      pokemonId: 303,
+      command: { command: Command.FIGHT, cursor: 0, moveId: 44, targets: [2] },
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    let settled = false;
+    const current = hostSync.requestPartnerCommand(1, 5, [1], "guest", legalOffer, currentAddress).then(command => {
+      settled = true;
+      return command;
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(settled, "same wave/turn/entity from a stale epoch cannot satisfy the current exact wait").toBe(false);
+
+    guest.send({
+      t: "command",
+      fieldIndex: 1,
+      turn: 5,
+      owner: "guest",
+      ...currentAddress,
+      command: { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+    });
+    await expect(current).resolves.toMatchObject({ command: Command.FIGHT, moveId: 55 });
+    hostSync.dispose();
   });
 
   it("rejects a live illegal reply and immediately commits the host-authored legal default", async () => {
@@ -502,7 +805,7 @@ describe("#812: pre-responder commandRequest buffering (the 'wrong move / didn't
     guestSync.dispose();
   });
 
-  it("a FOREIGN-slot request (the true #693 mutual-misresolve deadlock) still declines immediately", async () => {
+  it("an unaddressed FOREIGN-slot request retains the legacy immediate decline fallback", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);
     const guestSync = new CoopBattleSync(guest);
@@ -510,7 +813,150 @@ describe("#812: pre-responder commandRequest buffering (the 'wrong move / didn't
 
     const res = await hostSync.requestPartnerCommand(0, 1, [1]);
     expect(res, "declined -> null -> host AI fallback (deadlock broken)").toBeNull();
+    expect(hostSync.isTerminalFrozen()).toBe(false);
     hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("uses the addressed owner instead of a stale field-index probe after host recenter", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    // Reproduce the real turn-2 window: host compacted the guest mon to field 0, while the guest's
+    // previous-turn replay still sees field 0 as host-owned. The old probe falsely DECLINED here.
+    guestSync.setSlotOwnershipProbe(() => false);
+    const address = { epoch: 23, wave: 1, pokemonId: 707 };
+
+    const awaited = hostSync.requestPartnerCommand(0, 2, [0, 1, 2, 3], "guest", undefined, address);
+    // Production has no responder. Once replay reaches the real picker, its independent owner-keyed
+    // broadcast may use the guest's still-unreconciled field index and must satisfy the retained await.
+    guestSync.broadcastLocalCommand(
+      1,
+      2,
+      { command: Command.FIGHT, cursor: 0, moveId: 22, targets: [2] },
+      "guest",
+      address,
+    );
+
+    await expect(awaited).resolves.toMatchObject({ moveId: 22, targets: [2] });
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("fences an addressed ownership decline before its null continuation can choose AI", async () => {
+    const { host, guest } = createLoopbackPair();
+    const observed: unknown[] = [];
+    let hostSync: CoopBattleSync;
+    hostSync = new CoopBattleSync(host, {
+      onCommandTimeout: timeout => {
+        observed.push({ timeout, frozenInsideCallback: hostSync.isTerminalFrozen() });
+      },
+    });
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => true);
+    let frozenAtContinuation = false;
+
+    const continued = hostSync
+      .requestPartnerCommand(0, 2, [0], "host", undefined, {
+        epoch: 24,
+        wave: 1,
+        pokemonId: 808,
+      })
+      .then(command => {
+        frozenAtContinuation = hostSync.isTerminalFrozen();
+        return command;
+      });
+
+    await expect(continued).resolves.toBeNull();
+    expect(observed).toEqual([
+      {
+        timeout: {
+          epoch: 24,
+          wave: 1,
+          turn: 2,
+          owner: "host",
+          pokemonId: 808,
+          fieldIndex: 0,
+        },
+        frozenInsideCallback: true,
+      },
+    ]);
+    expect(frozenAtContinuation).toBe(true);
+    expect(hostSync.isTerminalFrozen()).toBe(true);
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("answers only the newest full-address request when a delayed prior-wave frame arrives before the UI", async () => {
+    const { host, guest } = createLoopbackPair();
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => true);
+    const replies: Extract<Parameters<typeof host.send>[0], { t: "command" }>[] = [];
+    const off = host.onMessage(message => {
+      if (message.t === "command") {
+        replies.push(message);
+      }
+    });
+    const oldRequest = {
+      t: "commandRequest" as const,
+      fieldIndex: 1,
+      turn: 1,
+      moveSlots: [0],
+      owner: "guest" as const,
+      epoch: 17,
+      wave: 9,
+      pokemonId: 101,
+    };
+    const currentRequest = { ...oldRequest, wave: 10, pokemonId: 202 };
+
+    host.send(oldRequest);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    host.send(currentRequest);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    host.send(oldRequest); // reordered retransmission from the obsolete wave
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    guestSync.onCommandRequest(() => ({ command: Command.FIGHT, cursor: 0, moveId: 55 }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(replies, "the reopened command UI must never answer the obsolete buffered boundary").toHaveLength(1);
+    expect(replies[0]).toMatchObject({ epoch: 17, wave: 10, turn: 1, pokemonId: 202, owner: "guest" });
+    off();
+    guestSync.dispose();
+  });
+
+  it("retains distinct same-boundary active slots while pruning obsolete command boundaries", async () => {
+    const { host, guest } = createLoopbackPair();
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => true);
+    const replyFields: number[] = [];
+    const off = host.onMessage(message => {
+      if (message.t === "command") {
+        replyFields.push(message.fieldIndex);
+      }
+    });
+
+    for (const [fieldIndex, pokemonId] of [
+      [0, 301],
+      [2, 302],
+    ] as const) {
+      host.send({
+        t: "commandRequest",
+        fieldIndex,
+        turn: 4,
+        moveSlots: [0],
+        owner: "guest",
+        epoch: 19,
+        wave: 20,
+        pokemonId,
+      });
+    }
+    await new Promise(resolve => setTimeout(resolve, 0));
+    guestSync.onCommandRequest(() => ({ command: Command.FIGHT, cursor: 0, moveId: 55 }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(replyFields.sort((left, right) => left - right)).toEqual([0, 2]);
+    off();
     guestSync.dispose();
   });
 });

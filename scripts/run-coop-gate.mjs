@@ -28,7 +28,8 @@
 //   - Lane C (soak-style): the coop-soak* driver runs - the heaviest per file (a full randomized run) - kept
 //     in their own sequential lane so a slow soak never shares a worker with anything else. These run in the
 //     driver's DEFAULT "harness" fidelity (the driver heals the guest through convenient seams to stay green).
-//   - Lane P (PRODUCTION-FIDELITY soak, #897): a SINGLE bounded soak run (coop-soak-fidelity-gate.test.ts)
+//   - Lane P (PRODUCTION-FIDELITY, #897/T2): the bounded soak plus every tracked dedicated public-UI
+//     transition journey present at this SHA (the pre-integration branch contains one; P33 contains two),
 //     with SOAK_FIDELITY=production - NO harness heals, guest commands sourced from the guest's OWN scene - so
 //     it catches the "guest replay drifted" divergence class lane C structurally cannot. It is GATING: the
 //     gate test does NOT swallow a hard LOCKSTEP/NO-PARK/TEARDOWN breach (unlike the non-gating evidence test
@@ -50,8 +51,9 @@
 // =============================================================================
 
 import { spawnSync } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -60,18 +62,30 @@ const COOP_DIR = join(REPO_ROOT, "test", "tests", "elite-redux", "coop");
 const COOP_DIR_REL = "test/tests/elite-redux/coop";
 
 /**
- * LANE P (#897): the GATING production-fidelity soak. The nightly soak (lane C) heals the guest through
+ * LANE P (#897/T2): GATING production-fidelity journeys. The nightly soak (lane C) heals the guest through
  * harness-only seams a live client never takes, so it CANNOT catch the "guest replay drifted" class the
  * prod path still hits; and the standing prod-fidelity *evidence* test (coop-soak-fidelity.test.ts) is
  * DELIBERATELY non-gating - it swallows a hard LOCKSTEP/NO-PARK/TEARDOWN breach into a green pass as long as
  * wave 1 ran (the reviewer's finding: "a hard invariant failure after wave 1 still passes"). LANE P closes
  * that hole: it runs a SEPARATE, BOUNDED prod-fidelity test (coop-soak-fidelity-gate.test.ts) that does NOT
  * catch SoakInvariantError, so any hard-invariant breach = a failed test = nonzero exit = GATE RED. It runs
- * only the ONE gate file (routed here, NOT into lane C) with SOAK_FIDELITY=production + a bounded wave count
- * so the gate stays wall-clock-bounded (the long nightly god soak stays in the evidence test / nightly job).
+ * every tracked file in the explicit set below (routed here, NOT into lane C) with
+ * SOAK_FIDELITY=production + a bounded wave count. Matrix generation caps P to discovered inventory.
  */
-const PROD_FIDELITY_GATE_FILE = "coop-soak-fidelity-gate.test.ts";
+const PROD_FIDELITY_GATE_FILES = new Set([
+  "coop-soak-fidelity-gate.test.ts",
+  // Dedicated P33 transition journeys. The standing P2 runner allocation is capped to discovered
+  // inventory and deterministically balances these files without a workflow edit.
+  "coop-transition-t2-biome.test.ts",
+  "coop-transition-t2-mystery.test.ts",
+]);
 const PROD_FIDELITY_GATE_WAVES = 12;
+
+/** Everyday external-runner target. Counts are capped to discovered inventory, so no shard is vacuous. */
+export const COOP_CI_TARGET_SHARDS = Object.freeze({ A: 1, B: 13, C: 5, P: 2, S: 8, T: 4 });
+const HEAVY_LANES = new Set(["B", "C", "P", "S", "T"]);
+const TIMING_MANIFEST_PATH = resolve(__dirname, "coop-gate-timings.json");
+const TIMING_MANIFEST = JSON.parse(readFileSync(TIMING_MANIFEST_PATH, "utf8"));
 
 /**
  * QUARANTINE (#879): files that fail PRE-EXISTINGLY - they exit non-zero even run SOLO on a clean parent
@@ -129,7 +143,7 @@ function trackedTests(...pathspecs) {
  * P (gating production-fidelity soak, #897), S (Showdown authoritative mode),
  * T (triple/topology), or Q (quarantine).
  */
-function categorize() {
+export function categorize() {
   const tracked = trackedTestBasenames();
   const nestedCoop = trackedTests("test/tests/elite-redux/coop/**/*.test.ts");
   if (nestedCoop.length > 0) {
@@ -147,8 +161,8 @@ function categorize() {
     if (QUARANTINE.has(f)) {
       // Pre-existing solo failure - run non-gating (see QUARANTINE).
       lanes.Q.push(rel);
-    } else if (f === PROD_FIDELITY_GATE_FILE) {
-      // #897: the GATING prod-fidelity soak - its OWN lane with SOAK_FIDELITY=production (see PROD_FIDELITY_GATE_FILE).
+    } else if (PROD_FIDELITY_GATE_FILES.has(f)) {
+      // #897/T2: GATING production-fidelity journeys - their OWN lane with SOAK_FIDELITY=production.
       // Routed here BEFORE the /soak/ match so it never lands in lane C (which runs harness-fidelity, no env).
       lanes.P.push(rel);
     } else if (/(^|[-_])soak/.test(f)) {
@@ -295,60 +309,322 @@ function parseShard(args) {
   return { index, total, label: `${index}/${total}` };
 }
 
-/**
- * Historical Lane-B wall times from green run 29177743451. Unlisted files use the measured median (27s).
- * Largest-processing-time assignment minimizes the slowest runner while remaining stable and exhaustive.
- */
-const LANE_B_SECONDS = new Map([
-  ["coop-duo-exploration.test.ts", 49.31],
-  ["coop-battle-control.test.ts", 43.97],
-  ["coop-duo-fault.test.ts", 43.42],
-  ["coop-savedata-digest.test.ts", 42.49],
-  ["coop-duo-reward-subpickers.test.ts", 41.15],
-  ["coop-determinism-contract.test.ts", 38.45],
-  ["coop-guest-renderer.test.ts", 38.26],
-  ["coop-duo-voluntary-switch-transposition.test.ts", 37.62],
-  ["coop-duo-mystery.test.ts", 35.77],
-  ["coop-duo-replay.test.ts", 35.72],
-  ["coop-duo-biome-choice.test.ts", 34.63],
-  ["coop-duo-multiwave.test.ts", 34.36],
-  ["coop-battle-checksum-engine.test.ts", 33.61],
-  ["coop-battle-events.test.ts", 33.14],
-  ["coop-duo-seating.test.ts", 31.95],
-]);
+function timingWeight(lane, file) {
+  const configured = TIMING_MANIFEST.lanes?.[lane]?.files?.[file];
+  const p90 = configured?.p90Seconds;
+  const historical = configured?.historicalSeconds;
+  if (Number.isFinite(p90) && p90 > 0) {
+    return { seconds: p90, source: "p90" };
+  }
+  if (Number.isFinite(historical) && historical > 0) {
+    return { seconds: historical, source: "historical" };
+  }
+  // Equal fallback weights are intentionally not fabricated timing data. LPT then distributes by file count
+  // with a lexical tie-break, producing a stable assignment until real observations are committed.
+  return { seconds: TIMING_MANIFEST.fallbackWeight ?? 1, source: "fallback" };
+}
 
-function selectWeightedShard(files, shard) {
-  const bins = Array.from({ length: shard.total }, () => ({ seconds: 0, files: [] }));
+/** Deterministic LPT assignment for every heavyweight lane, using p90 -> historical -> equal fallback. */
+export function weightedShardBins(files, total, lane) {
+  if (!Number.isSafeInteger(total) || total < 1 || total > Math.max(1, files.length)) {
+    throw new Error(`invalid ${lane} shard total ${total} for ${files.length} files`);
+  }
+  const bins = Array.from({ length: total }, (_, index) => ({ index: index + 1, seconds: 0, files: [] }));
   const weighted = files
-    .map(file => ({ file, seconds: LANE_B_SECONDS.get(basename(file)) ?? 27 }))
+    .map(file => ({ file, ...timingWeight(lane, file) }))
     .sort((a, b) => b.seconds - a.seconds || a.file.localeCompare(b.file));
   for (const item of weighted) {
-    let target = 0;
-    for (let i = 1; i < bins.length; i++) {
-      if (bins[i].seconds < bins[target].seconds) {
-        target = i;
-      }
-    }
-    bins[target].files.push(item.file);
-    bins[target].seconds += item.seconds;
+    const target = bins.reduce(lightestBin);
+    target.files.push(item.file);
+    target.seconds += item.seconds;
   }
-  return bins[shard.index - 1].files.sort();
+  for (const bin of bins) {
+    bin.files.sort();
+  }
+  return bins;
+}
+
+function lightestBin(best, candidate) {
+  if (candidate.seconds !== best.seconds) {
+    return candidate.seconds < best.seconds ? candidate : best;
+  }
+  if (candidate.files.length !== best.files.length) {
+    return candidate.files.length < best.files.length ? candidate : best;
+  }
+  return candidate.index < best.index ? candidate : best;
 }
 
 /** Deterministic partition. Every file appears in exactly one shard. */
-function selectShard(files, shard, lane) {
+export function selectShard(files, shard, lane) {
   if (shard == null) {
     return files;
   }
-  if (lane === "B") {
-    return selectWeightedShard(files, shard);
+  if (HEAVY_LANES.has(lane)) {
+    return weightedShardBins(files, shard.total, lane)[shard.index - 1].files;
   }
   return files.filter((_file, index) => index % shard.total === shard.index - 1);
 }
 
+function actualShardTotal(lane, files) {
+  const target = COOP_CI_TARGET_SHARDS[lane] ?? 1;
+  // A required empty lane still gets one runner, whose existing fail-closed empty-lane check turns it red.
+  return files.length === 0 ? 1 : Math.min(target, files.length);
+}
+
+export function createCiMatrix(lanes = categorize()) {
+  const include = [];
+  for (const lane of Object.keys(COOP_CI_TARGET_SHARDS)) {
+    const total = actualShardTotal(lane, lanes[lane]);
+    for (let shard = 1; shard <= total; shard++) {
+      include.push({ lane, shard, total });
+    }
+  }
+  verifyMatrixCoverage(lanes, include);
+  return { include };
+}
+
+export function verifyMatrixCoverage(lanes, include) {
+  for (const lane of Object.keys(COOP_CI_TARGET_SHARDS)) {
+    const expected = [...lanes[lane]].sort();
+    const seen = include
+      .filter(entry => entry.lane === lane)
+      .flatMap(entry => selectShard(lanes[lane], { index: entry.shard, total: entry.total }, lane))
+      .sort();
+    if (expected.length !== seen.length || expected.some((file, index) => file !== seen[index])) {
+      throw new Error(`CI matrix does not assign every Lane ${lane} file exactly once`);
+    }
+    if (new Set(seen).size !== seen.length) {
+      throw new Error(`CI matrix duplicates at least one Lane ${lane} file`);
+    }
+  }
+}
+
+function stableRank(seed, value) {
+  return createHash("sha256").update(`${seed}\0${value}`).digest("hex");
+}
+
+function gitLines(args) {
+  const result = spawnSync(process.platform === "win32" ? "git.exe" : "git", args, {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(" ")} failed: ${result.stderr ?? "unknown error"}`);
+  }
+  return result.stdout
+    .split(/\r?\n/)
+    .map(value => value.trim().replaceAll("\\", "/"))
+    .filter(Boolean);
+}
+
+const FOCUSED_IMPACT_RULES = [
+  { matches: file => file.includes("/showdown/") || file.includes("showdown-"), lanes: ["S"] },
+  { matches: file => /triple|battle-format/.test(file), lanes: ["T"] },
+  { matches: file => /(?:^|[-_/])soak/.test(file), lanes: ["C"] },
+  { matches: file => /production-fidelity|fidelity-gate|transition-t2/.test(file), lanes: ["P"] },
+  {
+    // These modules are shared by co-op, Showdown, long campaigns, and multi-seat presentation. A narrow
+    // A/B-only mapping would miss exactly the cross-surface regressions the expanded full gate added S/T for.
+    matches: file =>
+      /^src\/data\/elite-redux\/coop\/coop-(?:authoritative|battle-engine|battle-stream|field|presentation|runtime|session-controller|transport|webrtc)/.test(
+        file,
+      ),
+    lanes: ["C", "S", "T"],
+  },
+  {
+    matches: file =>
+      file.startsWith("src/field/")
+      || file === "src/data/battle-format.ts"
+      || /^src\/phases\/(?:battle|command|encounter|summon|switch|turn)/.test(file),
+    lanes: ["B", "T"],
+  },
+  {
+    matches: file => /(?:mystery|(?:^|[-_/])me[-_/]|biome|crossroads|colosseum)/i.test(file),
+    lanes: ["C", "P"],
+  },
+  {
+    matches: file =>
+      file.startsWith("src/") || file.startsWith("test/tests/elite-redux/coop/") || file.startsWith("test/tools/coop-"),
+    lanes: ["A", "B", "P"],
+  },
+  {
+    matches: file => /^(?:\.github|scripts|package\.json|pnpm-lock\.yaml|vite|vitest|tsconfig)/.test(file),
+    lanes: Object.keys(COOP_CI_TARGET_SHARDS),
+  },
+];
+const FOCUSED_LANE_PRIORITY = Object.freeze({ A: 0, B: 1, C: 2, S: 3, T: 4, P: 5 });
+
+function impactLanes(changedFiles) {
+  const lanes = new Set();
+  for (const file of changedFiles) {
+    for (const rule of FOCUSED_IMPACT_RULES) {
+      if (rule.matches(file)) {
+        for (const lane of rule.lanes) {
+          lanes.add(lane);
+        }
+      }
+    }
+  }
+  if (lanes.size === 0) {
+    lanes.add("B");
+  }
+  return lanes;
+}
+
+/** Select 1-5 directly affected or deterministic representative shards against an explicit integration base. */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: bounded planner keeps selection/proof in one auditable function.
+export function createFocusedMatrix(base, maxShards = 5, lanes = categorize(), priorityBase = null) {
+  if (!Number.isSafeInteger(maxShards) || maxShards < 1 || maxShards > 5) {
+    throw new Error("focused max-shards must be between 1 and 5");
+  }
+  // The workflow intentionally uses shallow checkouts. Comparing the two explicit endpoints does not require
+  // their merge base to be present locally, unlike three-dot diff, and still answers "what differs from the
+  // exact integration SHA fetched above?".
+  const changedFiles = gitLines(["diff", "--name-only", "--diff-filter=ACMR", base, "HEAD"]);
+  if (changedFiles.length === 0) {
+    throw new Error(`focused planner resolved zero changed files for ${base}..HEAD`);
+  }
+  const priorityChangedFiles =
+    priorityBase == null ? [] : gitLines(["diff", "--name-only", "--diff-filter=ACMR", priorityBase, "HEAD"]);
+  const full = createCiMatrix(lanes).include;
+  const assignment = new Map();
+  for (const entry of full) {
+    for (const file of selectShard(lanes[entry.lane], { index: entry.shard, total: entry.total }, entry.lane)) {
+      assignment.set(file, entry);
+    }
+  }
+  const direct = new Map();
+  for (const file of changedFiles) {
+    const entry = assignment.get(file);
+    if (entry != null) {
+      direct.set(`${entry.lane}:${entry.shard}/${entry.total}`, entry);
+    }
+  }
+  const priorityDirectKeys = new Set();
+  for (const file of priorityChangedFiles) {
+    const entry = assignment.get(file);
+    if (entry != null) {
+      priorityDirectKeys.add(`${entry.lane}:${entry.shard}/${entry.total}`);
+    }
+  }
+  const impacted = impactLanes(changedFiles);
+  const seed = `${base}\0${changedFiles.join("\0")}`;
+  const directLanes = new Set([...direct.values()].map(entry => entry.lane));
+  const representatives = [];
+  for (const lane of [...impacted].sort()) {
+    if (directLanes.has(lane)) {
+      continue;
+    }
+    const candidates = full.filter(entry => entry.lane === lane);
+    if (candidates.length === 0) {
+      continue;
+    }
+    representatives.push(
+      [...candidates].sort((left, right) =>
+        stableRank(seed, `${left.lane}:${left.shard}/${left.total}`).localeCompare(
+          stableRank(seed, `${right.lane}:${right.shard}/${right.total}`),
+        ),
+      )[0],
+    );
+  }
+  const chosen = new Map(direct);
+  for (const entry of representatives) {
+    chosen.set(`${entry.lane}:${entry.shard}/${entry.total}`, entry);
+  }
+  if (chosen.size === 0) {
+    const fallback = [...full].sort((left, right) =>
+      stableRank(seed, JSON.stringify(left)).localeCompare(stableRank(seed, JSON.stringify(right))),
+    )[0];
+    chosen.set(`${fallback.lane}:${fallback.shard}/${fallback.total}`, fallback);
+  }
+  const directKeys = new Set(direct.keys());
+  const include = [...chosen.entries()]
+    .sort(([leftKey], [rightKey]) => {
+      const priorityDelta = Number(priorityDirectKeys.has(rightKey)) - Number(priorityDirectKeys.has(leftKey));
+      const directDelta = Number(directKeys.has(rightKey)) - Number(directKeys.has(leftKey));
+      const leftLane = chosen.get(leftKey).lane;
+      const rightLane = chosen.get(rightKey).lane;
+      const laneDelta = FOCUSED_LANE_PRIORITY[leftLane] - FOCUSED_LANE_PRIORITY[rightLane];
+      return (
+        priorityDelta || directDelta || laneDelta || stableRank(seed, leftKey).localeCompare(stableRank(seed, rightKey))
+      );
+    })
+    .slice(0, maxShards)
+    .map(([, entry]) => entry);
+  return {
+    include,
+    base,
+    priorityBase,
+    changedFiles,
+    priorityChangedFiles,
+    impactedLanes: [...impacted].sort(),
+    candidateCount: chosen.size,
+  };
+}
+
+function argValue(args, name) {
+  const index = args.indexOf(name);
+  return index < 0 ? undefined : args[index + 1];
+}
+
+function emitPlannerResult(matrix, detail) {
+  const matrixJson = JSON.stringify({ include: matrix.include });
+  const outputPath = process.env.GITHUB_OUTPUT;
+  if (outputPath) {
+    writeFileSync(outputPath, `matrix=${matrixJson}\n`, { flag: "a" });
+  } else {
+    process.stdout.write(`${matrixJson}\n`);
+  }
+  const planPath = process.env.COOP_CI_PLAN_MANIFEST;
+  if (planPath) {
+    writeFileSync(
+      resolve(REPO_ROOT, planPath),
+      `${JSON.stringify(
+        {
+          version: 1,
+          sha: process.env.GITHUB_SHA ?? gitLines(["rev-parse", "HEAD"])[0],
+          timingManifestSha256: createHash("sha256").update(readFileSync(TIMING_MANIFEST_PATH)).digest("hex"),
+          ...detail,
+          matrix: { include: matrix.include },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  }
+}
+
+function writeGateManifest(path, data) {
+  if (!path) {
+    return;
+  }
+  writeFileSync(resolve(REPO_ROOT, path), `${JSON.stringify(data, null, 2)}\n`);
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: top-level CLI dispatch and summary orchestration.
 function main() {
   const args = process.argv.slice(2);
   const lanes = categorize();
+  if (args.includes("--ci-matrix")) {
+    const matrix = createCiMatrix(lanes);
+    emitPlannerResult(matrix, {
+      kind: "full",
+      targetShards: COOP_CI_TARGET_SHARDS,
+      inventory: Object.fromEntries(Object.entries(lanes).map(([lane, files]) => [lane, files.length])),
+    });
+    return;
+  }
+  if (args.includes("--focused-matrix")) {
+    const base = argValue(args, "--base");
+    if (!base) {
+      throw new Error("--focused-matrix requires --base <integration-sha>");
+    }
+    const maxShards = Number(argValue(args, "--max-shards") ?? 5);
+    const priorityBase = argValue(args, "--priority-base");
+    const focused = createFocusedMatrix(base, maxShards, lanes, priorityBase);
+    emitPlannerResult(focused, { kind: "focused", ...focused });
+    return;
+  }
   const laneArgIdx = args.indexOf("--lane");
   const only = laneArgIdx >= 0 ? args[laneArgIdx + 1]?.toUpperCase() : undefined;
   if (only != null && !lanes[only]) {
@@ -389,6 +665,25 @@ function main() {
   const runQuarantine = !only || only === "Q";
 
   const results = [];
+  const manifestPath = process.env.COOP_GATE_MANIFEST;
+  const manifest = {
+    version: 1,
+    sha: process.env.GITHUB_SHA ?? gitLines(["rev-parse", "HEAD"])[0],
+    startedAt: new Date().toISOString(),
+    state: "started",
+    timingManifestSha256: createHash("sha256").update(readFileSync(TIMING_MANIFEST_PATH)).digest("hex"),
+    assignments: [],
+  };
+  for (const name of gatingOrder) {
+    const files = selectShard(lanes[name], shard, name);
+    manifest.assignments.push({
+      lane: name,
+      shard: shard?.index ?? 1,
+      total: shard?.total ?? 1,
+      files: files.map(file => ({ file, ...timingWeight(name, file) })),
+    });
+  }
+  writeGateManifest(manifestPath, manifest);
   for (const name of gatingOrder) {
     const files = selectShard(lanes[name], shard, name);
     if (shard != null) {
@@ -429,7 +724,19 @@ function main() {
   console.log("  ------------------------------------------------------------------------");
   // eslint-disable-next-line no-console
   console.log(`  ${allOk ? "ALL GATING LANES GREEN" : "GATE RED"}  total ${fmtMs(total)}`);
+  manifest.state = allOk ? "passed" : "failed";
+  manifest.completedAt = new Date().toISOString();
+  manifest.durationMs = total;
+  manifest.results = results.map(result => ({
+    lane: result.name,
+    files: result.files,
+    status: result.ok ? "passed" : "failed",
+    durationMs: result.ms,
+  }));
+  writeGateManifest(manifestPath, manifest);
   process.exit(allOk ? 0 : 1);
 }
 
-main();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}

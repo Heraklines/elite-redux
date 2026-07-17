@@ -21,6 +21,7 @@ import { erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { ER_ASSAULT_VEST_TYPE, ER_LIFE_ORB_TYPE, ER_ROCKY_HELMET_TYPE } from "#data/elite-redux/er-recreated-items";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { hasErAilment } from "#data/elite-redux/er-status-cure";
+import { erTacticalItemType } from "#data/elite-redux/er-tactical-items";
 import { erSeedItemType } from "#data/elite-redux/er-terrain-seeds";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
@@ -2371,6 +2372,37 @@ const modifierTypeInitObj = Object.freeze({
   ER_SNOWBALL: () => erReactiveItemType("snowball"),
   ER_LUMINOUS_MOSS: () => erReactiveItemType("luminousMoss"),
   ER_WEAKNESS_POLICY: () => erReactiveItemType("weaknessPolicy"),
+
+  // ER tactical held items (Expert Belt / Covert Cloak / Red Card / Eject Button).
+  ER_EXPERT_BELT: () => erTacticalItemType("expertBelt"),
+  ER_COVERT_CLOAK: () => erTacticalItemType("covertCloak"),
+  ER_RED_CARD: () => erTacticalItemType("redCard"),
+  ER_EJECT_BUTTON: () => erTacticalItemType("ejectButton"),
+
+  // ER tactical held items - batch 2 (maintainer-approved 2026-07-16).
+  ER_HEAVY_DUTY_BOOTS: () => erTacticalItemType("heavyDutyBoots"),
+  ER_AIR_BALLOON: () => erTacticalItemType("airBalloon"),
+  ER_SAFETY_GOGGLES: () => erTacticalItemType("safetyGoggles"),
+  ER_CLEAR_AMULET: () => erTacticalItemType("clearAmulet"),
+  ER_ABILITY_SHIELD: () => erTacticalItemType("abilityShield"),
+  ER_BOOSTER_ENERGY: () => erTacticalItemType("boosterEnergy"),
+  ER_THROAT_SPRAY: () => erTacticalItemType("throatSpray"),
+  ER_BLUNDER_POLICY: () => erTacticalItemType("blunderPolicy"),
+  ER_PUNCHING_GLOVE: () => erTacticalItemType("punchingGlove"),
+  ER_MUSCLE_BAND: () => erTacticalItemType("muscleBand"),
+  ER_WISE_GLASSES: () => erTacticalItemType("wiseGlasses"),
+  ER_ZOOM_LENS: () => erTacticalItemType("zoomLens"),
+  ER_METRONOME_ITEM: () => erTacticalItemType("metronomeItem"),
+  ER_EJECT_PACK: () => erTacticalItemType("ejectPack"),
+  ER_SHED_SHELL: () => erTacticalItemType("shedShell"),
+  ER_ADRENALINE_ORB: () => erTacticalItemType("adrenalineOrb"),
+  ER_ROOM_SERVICE: () => erTacticalItemType("roomService"),
+  ER_IRON_BALL: () => erTacticalItemType("ironBall"),
+  ER_FLOAT_STONE: () => erTacticalItemType("floatStone"),
+  ER_STICKY_BARB: () => erTacticalItemType("stickyBarb"),
+  ER_SMOKE_BALL: () => erTacticalItemType("smokeBall"),
+  ER_MENTAL_HERB: () => erTacticalItemType("mentalHerb"),
+  ER_UTILITY_UMBRELLA: () => erTacticalItemType("utilityUmbrella"),
 
   // ER terrain seeds (Great-ball tier).
   ER_ELECTRIC_SEED: () => erSeedItemType("electricSeed"),

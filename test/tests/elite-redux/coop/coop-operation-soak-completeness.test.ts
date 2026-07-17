@@ -41,6 +41,9 @@ describe("co-op soak authoritative-operation completeness", () => {
     );
     expect(reviewedDebtKeys.filter(key => !expectedUiOperationKeys.includes(key))).toEqual([]);
     expect(reviewedDebtKeys.filter(key => !KNOWN_UNDRIVABLE.has(key))).toEqual([]);
+    expect(reviewedDebtKeys).not.toContain("uiOperation:CONFIRM->op:reward");
+    expect(guaranteedSurfaces("god")).toContain("uiOperation:CONFIRM->op:reward");
+    expect(guaranteedSurfaces("level")).toContain("uiOperation:CONFIRM->op:reward");
   });
 
   it("reds an observed UI -> operation edge that is absent from the declared contract even below the depth gate", () => {

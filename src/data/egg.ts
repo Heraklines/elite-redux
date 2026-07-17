@@ -22,6 +22,7 @@ import {
 } from "#balance/rates";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
+import { coopGateAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { erBalanceArr, erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { maybeUpgradeToErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { getErEggWeightDivisor } from "#data/elite-redux/init-elite-redux-egg-tiers";
@@ -368,7 +369,18 @@ export class Egg {
 
   // Doesn't need to be called if the egg got pulled by a gacha machiene
   public addEggToGameData(): void {
+    if (!coopGateAccountWrite(globalScene.gameMode?.isCoop === true, `addEgg id=${this.id}`)) {
+      return;
+    }
     globalScene.gameData.eggs.push(this);
+  }
+
+  /** Idempotent materialization for replayable authoritative account grants. */
+  public addEggToGameDataOnce(): void {
+    if (globalScene.gameData.eggs.some(egg => egg.id === this.id && egg.timestamp === this.timestamp)) {
+      return;
+    }
+    this.addEggToGameData();
   }
 
   public getEggDescriptor(): string {

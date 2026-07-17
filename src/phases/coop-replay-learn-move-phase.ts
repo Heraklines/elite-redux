@@ -8,9 +8,15 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { allMoves } from "#data/data-lists";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { armCoopLearnMoveIntentResend } from "#data/elite-redux/coop/coop-learn-move-operation";
+import type { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  armCoopLearnMoveIntentResend,
+  type CoopLearnMoveOperationBinding,
+  captureCoopLearnMoveOperationBinding,
+} from "#data/elite-redux/coop/coop-learn-move-operation";
 import {
   clearCoopLearnMoveForwardInFlight,
+  failCoopSharedSession,
   getCoopInteractionRelay,
   getCoopUiMirror,
   setCoopLearnMovePickerOpener,
@@ -42,6 +48,7 @@ export function openCoopLearnMovePickerInline(partySlot: number, moveId: number,
     clearCoopLearnMoveForwardInFlight(partySlot);
     return;
   }
+  const operationBinding = captureCoopLearnMoveOperationBinding("guest");
   coopLog("learnmove", "guest inline move-forget picker OPEN", { partySlot, moveId, maxMoveCount, seq });
   const move = allMoves[moveId];
   let settled = false;
@@ -53,13 +60,16 @@ export function openCoopLearnMovePickerInline(partySlot: number, moveId: number,
     getCoopUiMirror()?.endSession();
     clearCoopLearnMoveForwardInFlight(partySlot);
     coopLog("learnmove", "guest relays move-forget pick (inline)", { seq, kind: LEARN_MOVE_CHOICE_KIND, moveIndex });
-    getCoopInteractionRelay()?.sendInteractionChoice(seq, LEARN_MOVE_CHOICE_KIND, moveIndex);
-    armCoopLearnMoveIntentResend({
-      payload: { type: "decision", partySlot, moveId, forgetSlot: moveIndex, maxMoveCount },
-      wave: globalScene.currentBattle?.waveIndex ?? 0,
-      turn: globalScene.currentBattle?.turn ?? 0,
-      resend: () => getCoopInteractionRelay()?.sendInteractionChoice(seq, LEARN_MOVE_CHOICE_KIND, moveIndex),
-    });
+    relay.sendInteractionChoice(seq, LEARN_MOVE_CHOICE_KIND, moveIndex);
+    armCoopLearnMoveIntentResend(
+      {
+        payload: { type: "decision", partySlot, moveId, forgetSlot: moveIndex, maxMoveCount },
+        wave: globalScene.currentBattle?.waveIndex ?? 0,
+        turn: globalScene.currentBattle?.turn ?? 0,
+        resend: () => relay.sendInteractionChoice(seq, LEARN_MOVE_CHOICE_KIND, moveIndex),
+      },
+      operationBinding,
+    );
     // Restore whatever screen the picker overlaid (e.g. the parked shop watcher). #848: the picker is opened
     // with setModeWithoutClear WITHOUT chaining, so revertMode ONLY closes it when there IS a chained mode to
     // pop (the TM-Case parked shop). In a LEVEL-UP context (the batch-panel fallback) the modeChain is empty
@@ -109,6 +119,8 @@ export class CoopReplayLearnMovePhase extends Phase {
   private readonly seq: number;
   /** Set in {@linkcode relayAndEnd} so the picker resolves the forward EXACTLY once. */
   private settled = false;
+  private operationBinding: CoopLearnMoveOperationBinding | null = null;
+  private relay: CoopInteractionRelay | null = null;
 
   constructor(partySlot: number, moveId: number, maxMoveCount: number) {
     super();
@@ -140,6 +152,8 @@ export class CoopReplayLearnMovePhase extends Phase {
       this.end();
       return;
     }
+    this.operationBinding = captureCoopLearnMoveOperationBinding("guest");
+    this.relay = relay;
 
     const move = allMoves[this.moveId];
     // Open the REAL interactive move-forget picker (the same shared #563 screen the lockstep owner
@@ -167,19 +181,28 @@ export class CoopReplayLearnMovePhase extends Phase {
     getCoopUiMirror()?.endSession();
     clearCoopLearnMoveForwardInFlight(this.partySlot);
     coopLog("learnmove", "guest relays move-forget pick", { seq: this.seq, kind: LEARN_MOVE_CHOICE_KIND, moveIndex });
-    getCoopInteractionRelay()?.sendInteractionChoice(this.seq, LEARN_MOVE_CHOICE_KIND, moveIndex);
-    armCoopLearnMoveIntentResend({
-      payload: {
-        type: "decision",
-        partySlot: this.partySlot,
-        moveId: this.moveId,
-        forgetSlot: moveIndex,
-        maxMoveCount: this.maxMoveCount,
+    const relay = this.relay;
+    const operationBinding = this.operationBinding;
+    if (relay == null || operationBinding == null) {
+      failCoopSharedSession(`Learn-move replay callback for slot ${this.partySlot} lost its captured guest binding`);
+      return;
+    }
+    relay.sendInteractionChoice(this.seq, LEARN_MOVE_CHOICE_KIND, moveIndex);
+    armCoopLearnMoveIntentResend(
+      {
+        payload: {
+          type: "decision",
+          partySlot: this.partySlot,
+          moveId: this.moveId,
+          forgetSlot: moveIndex,
+          maxMoveCount: this.maxMoveCount,
+        },
+        wave: globalScene.currentBattle?.waveIndex ?? 0,
+        turn: globalScene.currentBattle?.turn ?? 0,
+        resend: () => relay.sendInteractionChoice(this.seq, LEARN_MOVE_CHOICE_KIND, moveIndex),
       },
-      wave: globalScene.currentBattle?.waveIndex ?? 0,
-      turn: globalScene.currentBattle?.turn ?? 0,
-      resend: () => getCoopInteractionRelay()?.sendInteractionChoice(this.seq, LEARN_MOVE_CHOICE_KIND, moveIndex),
-    });
+      operationBinding,
+    );
     void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
   }
 }

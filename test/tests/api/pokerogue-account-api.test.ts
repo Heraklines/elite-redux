@@ -29,6 +29,7 @@ describe("Pokerogue Account API", () => {
   describe("Get Info", () => {
     it("should return account-info & 200 on SUCCESS", async () => {
       const expectedAccountInfo: AccountInfoResponse = {
+        accountId: "er-account:17",
         username: "test",
         lastSessionSlot: -1,
         discordId: "23235353543535",
@@ -61,6 +62,30 @@ describe("Pokerogue Account API", () => {
       expect(accountInfo).toBeNull();
       expect(status).toBe(500);
       expect(console.warn).toHaveBeenCalledWith("Could not get account info!", expect.any(Error));
+    });
+  });
+
+  describe("Co-op identity ticket", () => {
+    it("returns the authenticated immutable identity ticket", async () => {
+      const expected = {
+        ticket: "body.signature",
+        identity: {
+          version: 1 as const,
+          accountId: "er-account:17",
+          displayName: "Test",
+          canonicalUsername: "test",
+        },
+        expiresAt: 123_456,
+      };
+      server.use(http.get(`${apiBase}/account/coop-ticket`, () => HttpResponse.json(expected)));
+
+      await expect(accountApi.getCoopIdentityTicket()).resolves.toEqual([expected, 200]);
+    });
+
+    it("fails closed when the identity service is unavailable", async () => {
+      server.use(http.get(`${apiBase}/account/coop-ticket`, () => new HttpResponse("", { status: 503 })));
+
+      await expect(accountApi.getCoopIdentityTicket()).resolves.toEqual([null, 503]);
     });
   });
 

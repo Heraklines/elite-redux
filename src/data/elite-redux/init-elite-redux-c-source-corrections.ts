@@ -24,13 +24,13 @@
 // =============================================================================
 
 import { allMoves } from "#data/data-lists";
-import { enMoveName } from "#data/elite-redux/er-canonical-names";
+import { enMoveNameForId } from "#data/elite-redux/er-canonical-names";
 import { ER_FLAG_NAMES_LIST, ER_FLAG_TO_MOVE_FLAG } from "#data/elite-redux/er-flag-mapping";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import type { Move } from "#data/moves/move";
 import { MoveFlags } from "#enums/move-flags";
-import type { MoveId } from "#enums/move-id";
+import { MoveId } from "#enums/move-id";
 
 // Embedded snapshot of the C-source-derived move stats — kept inline rather
 // than as a separate JSON import to keep this self-contained. Generated via
@@ -62,9 +62,6 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_KARATE_CHOP", { power: 90, accuracy: 100, pp: 10 }],
   ["MOVE_DOUBLE_SLAP", { chance: 0 }],
   ["MOVE_COMET_PUNCH", { power: 25, pp: 15 }],
-  ["MOVE_FIRE_PUNCH", { power: 75 }],
-  ["MOVE_ICE_PUNCH", { power: 75 }],
-  ["MOVE_THUNDER_PUNCH", { power: 75 }],
   ["MOVE_SCRATCH", { pp: 35 }],
   ["MOVE_VISE_GRIP", { power: 70, accuracy: 100, pp: 30 }],
   ["MOVE_GUILLOTINE", { chance: 0 }],
@@ -73,24 +70,17 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   // Nextdex is the canonical balance source (see MOVE_KARATE_CHOP above).
   ["MOVE_RAZOR_WIND", { power: 70, accuracy: 100, pp: 10 }],
   ["MOVE_CUT", { power: 60, accuracy: 100, pp: 20, chance: 10 }], // ER: 60BP/100%/20PP, always-crit + 10% bleed (attrs in move-patches)
-  ["MOVE_WING_ATTACK", { power: 80 }],
-  ["MOVE_WHIRLWIND", { pp: 20 }],
-  ["MOVE_BIND", { accuracy: 90 }],
   ["MOVE_SLAM", { power: 95, accuracy: 100, pp: 10 }],
   ["MOVE_VINE_WHIP", { power: 80, pp: 15, chance: 30 }],
   ["MOVE_DOUBLE_KICK", { power: 45, pp: 20 }],
   ["MOVE_ROLLING_KICK", { power: 60, accuracy: 85 }],
-  ["MOVE_HEADBUTT", { power: 70 }],
-  ["MOVE_HORN_ATTACK", { power: 80, pp: 25, chance: 0 }],
+  ["MOVE_HORN_ATTACK", { chance: 0 }],
   // ER 2.65 dex authority: regular 95 BP / 100 acc damaging move, not an OHKO.
   ["MOVE_HORN_DRILL", { power: 95, accuracy: 100, pp: 5, chance: 0 }],
   ["MOVE_TACKLE", { pp: 35 }],
-  ["MOVE_WRAP", { accuracy: 90 }],
-  ["MOVE_TAKE_DOWN", { power: 95, chance: 0 }],
-  ["MOVE_THRASH", { power: 120, pp: 10 }],
+  ["MOVE_TAKE_DOWN", { chance: 0 }],
   ["MOVE_DOUBLE_EDGE", { power: 130, pp: 10 }],
   ["MOVE_TAIL_WHIP", { pp: 30 }],
-  ["MOVE_POISON_STING", { chance: 30 }],
   ["MOVE_LEER", { pp: 30 }],
   ["MOVE_BITE", { pp: 25 }],
   // GROWL is rebalanced into a Special damaging move (see vanilla-move-patches)
@@ -98,56 +88,49 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   // ROM's secondaryEffectChance is 0 (the drop is its PRIMARY effect there), but
   // copying that 0 onto the converted damaging move would make the drop never
   // fire. ER's move data lists effectChance 100, so the drop is guaranteed.
-  ["MOVE_GROWL", { pp: 40, chance: 100 }],
-  ["MOVE_SING", { accuracy: 55 }],
-  ["MOVE_SUPERSONIC", { accuracy: 55 }],
-  ["MOVE_SONIC_BOOM", { power: 1, accuracy: 90 }],
+  ["MOVE_GROWL", { chance: 100 }],
   ["MOVE_ACID", { power: 70, pp: 20, chance: 30 }],
   ["MOVE_EMBER", { power: 20, pp: 20, chance: 100 }],
   ["MOVE_MIST", { pp: 30 }],
-  ["MOVE_WATER_GUN", { pp: 25, chance: 0 }],
-  ["MOVE_HYDRO_PUMP", { accuracy: 80, chance: 0 }],
+  ["MOVE_WATER_GUN", { chance: 0 }],
+  ["MOVE_HYDRO_PUMP", { chance: 0 }],
   ["MOVE_SURF", { chance: 0 }],
-  ["MOVE_BLIZZARD", { accuracy: 80, chance: 10 }],
+  ["MOVE_BLIZZARD", { chance: 10 }],
   ["MOVE_PSYBEAM", { chance: 10 }],
   // ER turns Bubble Beam into a 25-power Water pulse that hits 2–5 times
   // (Mega Launcher–boosted; PULSE_MOVE flag added below). The multi-hit attr +
   // removal of the vanilla Speed-drop are wired in the move-patch table.
   ["MOVE_BUBBLE_BEAM", { power: 25 }],
-  ["MOVE_HYPER_BEAM", { accuracy: 90 }],
   ["MOVE_DRILL_PECK", { chance: 0 }],
-  ["MOVE_SUBMISSION", { power: 150, accuracy: 80, pp: 15 }],
-  ["MOVE_SEISMIC_TOSS", { pp: 20 }],
+  // ER 2.65 dex (er-moves.ts id 66): power 120 / acc 100 / pp 10 / 33% recoil.
+  // The prior 150/80/15 pin was the stale C-source value that overrode the dex.
+  ["MOVE_SUBMISSION", { power: 120, accuracy: 100, pp: 10 }],
   ["MOVE_STRENGTH", { power: 110, pp: 5, chance: 100 }],
-  ["MOVE_ABSORB", { power: 35, pp: 25, chance: 0 }],
+  ["MOVE_ABSORB", { chance: 0 }],
   ["MOVE_MEGA_DRAIN", { power: 50, pp: 15 }],
-  ["MOVE_RAZOR_LEAF", { pp: 25, chance: 100 }],
+  // ER dex effectChance 10 (10% Bleed secondary), not 100 — the vanilla 100 here
+  // made the grafted ER_BLEED rider a guaranteed proc. pp 25 clamps to dex 20.
+  ["MOVE_RAZOR_LEAF", { pp: 25, chance: 10 }],
   ["MOVE_POISON_POWDER", { pp: 35 }],
-  ["MOVE_STUN_SPORE", { accuracy: 75, pp: 30 }],
   ["MOVE_PETAL_DANCE", { pp: 10 }],
-  ["MOVE_STRING_SHOT", { accuracy: 95, pp: 40 }],
   // Dragon Rage: ER (er-moves.ts id 82) is a regular 80-BP Dragon move — the
   // vanilla-move-patcher strips FixedDamageAttr and pins 80 BP via SetBasePowerAttr
   // (an attr, so this c-source scalar pass doesn't touch the actual damage). The
   // scalar was a stale `1` ROM dummy from the fixed-damage era, so the move-info
   // panel DISPLAYED "power 1" while the move hit for 80. Pin the scalar to 80 too
   // so the shown BP matches reality.
-  ["MOVE_DRAGON_RAGE", { power: 80, pp: 10 }],
+  ["MOVE_DRAGON_RAGE", { power: 80 }],
   // ER data (er-moves.ts id 84) lists Thunder Shock at 80 power; the prior
   // override value of 40 was a stale beta carry-over that under-powered it.
-  ["MOVE_THUNDER_SHOCK", { power: 80, pp: 30, chance: 10 }],
-  ["MOVE_THUNDER_WAVE", { pp: 20 }],
-  ["MOVE_THUNDER", { accuracy: 75, pp: 10 }],
-  ["MOVE_ROCK_THROW", { power: 50, pp: 15 }],
+  ["MOVE_THUNDER_SHOCK", { power: 80, chance: 10 }],
   // ER 2.65 dex authority: "causes confusion" / 100% effect chance.
   ["MOVE_CONFUSION", { pp: 20, chance: 100 }],
   ["MOVE_PSYCHIC", { chance: 10 }],
   ["MOVE_MEDITATE", { pp: 40 }],
   ["MOVE_AGILITY", { pp: 30 }],
   ["MOVE_QUICK_ATTACK", { pp: 30 }],
-  ["MOVE_RAGE", { power: 40, pp: 20, chance: 0 }],
+  ["MOVE_RAGE", { chance: 0 }],
   ["MOVE_SCREECH", { pp: 40 }],
-  ["MOVE_RECOVER", { pp: 10 }],
   ["MOVE_HARDEN", { pp: 30 }],
   ["MOVE_WITHDRAW", { pp: 40 }],
   ["MOVE_DEFENSE_CURL", { pp: 40 }],
@@ -156,21 +139,13 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_FOCUS_ENERGY", { pp: 30 }],
   ["MOVE_EGG_BOMB", { accuracy: 90, chance: 10 }],
   ["MOVE_LICK", { pp: 30 }],
-  ["MOVE_SLUDGE", { power: 65 }],
   ["MOVE_BONE_CLUB", { power: 75, accuracy: 95 }],
   ["MOVE_FIRE_BLAST", { chance: 20 }],
-  ["MOVE_SWIFT", { power: 60, pp: 20 }],
-  ["MOVE_SKULL_BASH", { power: 130 }],
   ["MOVE_CONSTRICT", { power: 55 }],
-  ["MOVE_KINESIS", { accuracy: 80, pp: 15 }],
   ["MOVE_SOFT_BOILED", { pp: 10 }],
   ["MOVE_GLARE", { pp: 30 }],
-  ["MOVE_POISON_GAS", { accuracy: 90, pp: 40, chance: 0 }],
-  ["MOVE_BARRAGE", { accuracy: 85, pp: 20 }],
-  ["MOVE_BUBBLE", { power: 60 }],
-  ["MOVE_DIZZY_PUNCH", { power: 70 }],
-  ["MOVE_PSYWAVE", { chance: 30 }],
-  ["MOVE_SPLASH", { pp: 40, chance: 0 }],
+  ["MOVE_POISON_GAS", { chance: 0 }],
+  ["MOVE_SPLASH", { chance: 0 }],
   ["MOVE_CRABHAMMER", { accuracy: 90, chance: 0 }],
   ["MOVE_FURY_SWIPES", { power: 25, accuracy: 100, pp: 15 }],
   ["MOVE_BONEMERANG", { power: 50 }],
@@ -180,7 +155,6 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_SLASH", { power: 60, accuracy: 100, pp: 10, chance: 20 }], // ER: 60BP/100%/10PP, always-crit + 20% bleed (attrs in move-patches)
   ["MOVE_TRIPLE_KICK", { power: 20 }], // ER dump + Nextdex: 20 BP (the 25 was a stale c-source divergence; ramps per strike)
   ["MOVE_THIEF", { pp: 25 }],
-  ["MOVE_MIND_READER", { pp: 5 }],
   // ER Nightmare is a 120-BP damaging Ghost move that ALSO applies the 1/4-HP
   // nightmare chip (dex: "makes them lose 1/4 HP each turn"). ER effectChance is
   // 100, so the chip is GUARANTEED — chance = -1 makes the AddBattlerTagAttr fire
@@ -189,81 +163,52 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   // in the NIGHTMARE move-patcher.
   ["MOVE_NIGHTMARE", { pp: 15, chance: -1 }],
   ["MOVE_FLAME_WHEEL", { power: 40, pp: 10, chance: 0 }],
-  ["MOVE_SNORE", { power: 50 }],
-  ["MOVE_FLAIL", { power: 1, pp: 15 }],
   ["MOVE_CONVERSION_2", { pp: 30 }],
-  ["MOVE_COTTON_SPORE", { pp: 40 }],
-  ["MOVE_REVERSAL", { power: 1, pp: 15 }],
-  ["MOVE_POWDER_SNOW", { power: 40, pp: 25, chance: 10 }],
-  ["MOVE_MACH_PUNCH", { pp: 30 }],
-  ["MOVE_FEINT_ATTACK", { power: 60, pp: 20 }],
+  // ER 2.65 dex (er-moves.ts id 181): power 80 / pp 20 / 30% frostbite. The prior
+  // 40/25/10 pin was the stale vanilla value; the FREEZE→ER_FROSTBITE swap is in
+  // the move-patch table (MOVE_POWDER_SNOW).
+  ["MOVE_POWDER_SNOW", { power: 80, pp: 20, chance: 30 }],
   ["MOVE_MUD_SLAP", { power: 25, accuracy: 100, pp: 10 }], // ER: 25BP/100%/10PP 2-5 hits, NO acc drop (attrs in move-patches)
   ["MOVE_OCTAZOOKA", { power: 100 }],
   ["MOVE_FORESIGHT", { pp: 40 }],
-  ["MOVE_DETECT", { pp: 5 }],
-  ["MOVE_OUTRAGE", { pp: 10 }],
-  ["MOVE_ENDURE", { pp: 10 }],
   ["MOVE_ROLLOUT", { power: 40, accuracy: 100, pp: 10 }],
-  ["MOVE_FALSE_SWIPE", { power: 80, pp: 40, chance: 0 }],
+  ["MOVE_FALSE_SWIPE", { chance: 0 }],
   ["MOVE_MILK_DRINK", { pp: 10 }],
   // ER (#360): Triple-Kick-style 3-strike ramp — see vanilla-move-patches.
   ["MOVE_FURY_CUTTER", { power: 20, accuracy: 90, pp: 10 }],
-  ["MOVE_RETURN", { power: 95 }],
   ["MOVE_PRESENT", { power: 1, accuracy: 90 }],
-  ["MOVE_FRUSTRATION", { power: 95, pp: 20 }],
-  ["MOVE_SAFEGUARD", { pp: 25 }],
   ["MOVE_MAGNITUDE", { pp: 30 }],
-  ["MOVE_DYNAMIC_PUNCH", { power: 100 }],
   ["MOVE_MEGAHORN", { chance: 0 }],
   // ER 2.65 dex authority: 20 BP, guaranteed burn.
   ["MOVE_DRAGON_BREATH", { power: 20, pp: 20, chance: 100 }],
-  ["MOVE_BATON_PASS", { pp: 40 }],
-  ["MOVE_RAPID_SPIN", { pp: 40, chance: 0 }],
-  ["MOVE_IRON_TAIL", { accuracy: 90, pp: 15, chance: 30 }],
+  ["MOVE_RAPID_SPIN", { chance: 0 }],
+  ["MOVE_IRON_TAIL", { chance: 30 }],
   ["MOVE_VITAL_THROW", { power: 70 }],
   ["MOVE_HIDDEN_POWER", { power: 80 }], // ER dump: 80BP (the old 70 was stale)
   // Cross Chop: the 2.65 dex (authoritative) is 40BP / 100% / 15PP, "double
   // chops" (2 hits) + high crit - NOT the vanilla 100/80/5. The old C-source
   // pin here was wrong; let the dump's 40/100/15 stand. The 2-hit attr lives in
   // move.ts (multi-hit is not a stat).
-  ["MOVE_TWISTER", { accuracy: 100, chance: 20 }],
-  ["MOVE_RAIN_DANCE", { pp: 5 }],
-  ["MOVE_SUNNY_DAY", { pp: 5 }],
-  ["MOVE_CRUNCH", { power: 80 }],
-  ["MOVE_SHADOW_BALL", { power: 85 }],
+  ["MOVE_TWISTER", { chance: 20 }],
   ["MOVE_WHIRLPOOL", { chance: 100 }],
-  ["MOVE_UPROAR", { power: 90, pp: 10 }],
-  ["MOVE_STOCKPILE", { pp: 20 }],
-  ["MOVE_SPIT_UP", { power: 1, pp: 10 }],
-  ["MOVE_SWALLOW", { pp: 10 }],
-  ["MOVE_WILL_O_WISP", { accuracy: 85, pp: 15 }],
   ["MOVE_SMELLING_SALTS", { power: 70 }],
   ["MOVE_NATURE_POWER", { pp: 20 }],
-  ["MOVE_RECYCLE", { pp: 10 }],
-  ["MOVE_REFRESH", { pp: 20 }],
   ["MOVE_SECRET_POWER", { power: 80, pp: 20 }], // ER: 80BP physical Hidden Power (type attr in move-patches)
   ["MOVE_DIVE", { chance: 0 }],
   ["MOVE_ARM_THRUST", { power: 20, pp: 20 }],
-  ["MOVE_CAMOUFLAGE", { accuracy: 100, pp: 20 }],
+  ["MOVE_CAMOUFLAGE", { accuracy: 100 }],
   ["MOVE_LUSTER_PURGE", { power: 95 }],
   ["MOVE_MIST_BALL", { power: 95 }],
-  ["MOVE_ICE_BALL", { power: 30, accuracy: 90, pp: 20 }],
   ["MOVE_NEEDLE_ARM", { power: 95, pp: 15, chance: 30 }],
-  ["MOVE_SLACK_OFF", { pp: 10 }],
-  ["MOVE_HYPER_VOICE", { power: 90 }],
   ["MOVE_BLAST_BURN", { power: 150, accuracy: 90 }],
   ["MOVE_HYDRO_CANNON", { power: 150, accuracy: 90 }],
-  ["MOVE_ASTONISH", { pp: 15, chance: 100 }], // ER: Ghost Fake Out — guaranteed first-turn flinch (#221)
-  ["MOVE_AIR_CUTTER", { power: 70, pp: 25 }],
+  ["MOVE_ASTONISH", { chance: 100 }], // ER: Ghost Fake Out — guaranteed first-turn flinch (#221)
   ["MOVE_ODOR_SLEUTH", { pp: 40 }],
-  ["MOVE_ROCK_TOMB", { power: 60 }],
   ["MOVE_METAL_SOUND", { pp: 40 }],
   ["MOVE_GRASS_WHISTLE", { accuracy: 55 }],
   ["MOVE_WATER_SPOUT", { chance: 0 }],
-  ["MOVE_SIGNAL_BEAM", { power: 75, chance: 10 }],
-  ["MOVE_EXTRASENSORY", { pp: 20 }],
+  ["MOVE_SIGNAL_BEAM", { chance: 10 }],
   ["MOVE_SKY_UPPERCUT", { power: 95 }],
-  ["MOVE_MUDDY_WATER", { power: 90 }],
   ["MOVE_BULLET_SEED", { pp: 30 }],
   ["MOVE_ICICLE_SPEAR", { pp: 30 }],
   ["MOVE_HOWL", { pp: 40 }],
@@ -273,110 +218,71 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   // canonical balance source per CLAUDE.md, so pin to it (keep chance:0).
   ["MOVE_DRAGON_CLAW", { power: 90, chance: 0 }],
   ["MOVE_FRENZY_PLANT", { power: 150, accuracy: 90 }],
-  ["MOVE_BOUNCE", { power: 85, accuracy: 90, pp: 5 }],
-  ["MOVE_POISON_TAIL", { power: 80, pp: 25, chance: 30 }],
+  ["MOVE_POISON_TAIL", { chance: 30 }],
   ["MOVE_COVET", { pp: 25 }],
-  ["MOVE_VOLT_TACKLE", { pp: 15 }],
-  ["MOVE_MAGICAL_LEAF", { power: 60 }],
   ["MOVE_LEAF_BLADE", { chance: 0 }],
-  ["MOVE_ROOST", { pp: 10 }],
   ["MOVE_MIRACLE_EYE", { pp: 40 }],
   ["MOVE_WAKE_UP_SLAP", { power: 80 }],
   // MANUAL Nextdex pin (community 2026-06-11, do NOT regenerate away): Brine
   // is 70 BP in ER (its super-effective-vs-Water override is wired
   // separately, see #374). The old c-source row had the stale 65.
-  ["MOVE_BRINE", { power: 70, pp: 15 }],
+  ["MOVE_BRINE", { power: 70 }],
   ["MOVE_NATURAL_GIFT", { chance: 0 }],
-  ["MOVE_FEINT", { power: 30 }],
   ["MOVE_ACUPRESSURE", { pp: 30 }],
-  ["MOVE_PAYBACK", { power: 50 }],
-  ["MOVE_ASSURANCE", { power: 60 }],
-  ["MOVE_FLING", { power: 1 }],
-  ["MOVE_TRUMP_CARD", { pp: 5 }],
-  ["MOVE_WRING_OUT", { pp: 5 }],
-  ["MOVE_LUCKY_CHANT", { pp: 30 }],
   ["MOVE_POWER_SWAP", { chance: 0 }],
   ["MOVE_GUARD_SWAP", { chance: 0 }],
-  ["MOVE_PUNISHMENT", { power: 60, pp: 5 }],
-  ["MOVE_FLARE_BLITZ", { pp: 15 }],
-  ["MOVE_FORCE_PALM", { power: 60, pp: 15, chance: 30 }],
-  ["MOVE_AURA_SPHERE", { power: 80 }],
-  ["MOVE_NIGHT_SLASH", { power: 70, chance: 0 }],
-  ["MOVE_AQUA_TAIL", { power: 95 }],
-  ["MOVE_AIR_SLASH", { power: 75 }],
+  ["MOVE_FORCE_PALM", { chance: 30 }],
+  ["MOVE_NIGHT_SLASH", { chance: 0 }],
   ["MOVE_X_SCISSOR", { chance: 0 }],
   ["MOVE_BUG_BUZZ", { chance: 10 }],
-  ["MOVE_DRAGON_RUSH", { power: 95, accuracy: 95 }],
   ["MOVE_VACUUM_WAVE", { pp: 30 }],
-  ["MOVE_FOCUS_BLAST", { accuracy: 70, chance: 10 }],
-  ["MOVE_BRAVE_BIRD", { pp: 15 }],
-  ["MOVE_GIGA_IMPACT", { accuracy: 90 }],
-  ["MOVE_BULLET_PUNCH", { pp: 30 }],
-  ["MOVE_AVALANCHE", { power: 60 }],
-  ["MOVE_ICE_SHARD", { pp: 30 }],
+  ["MOVE_FOCUS_BLAST", { chance: 10 }],
   ["MOVE_SHADOW_CLAW", { chance: 0 }],
   ["MOVE_THUNDER_FANG", { power: 80, pp: 15, chance: 10 }],
   ["MOVE_ICE_FANG", { power: 80, pp: 15, chance: 10 }],
   ["MOVE_FIRE_FANG", { power: 80, pp: 15, chance: 10 }],
-  ["MOVE_SHADOW_SNEAK", { pp: 30 }],
-  ["MOVE_MUD_BOMB", { power: 65, pp: 15, chance: 30 }],
-  ["MOVE_PSYCHO_CUT", { power: 70, chance: 0 }],
-  ["MOVE_ZEN_HEADBUTT", { accuracy: 95, chance: 20 }],
-  ["MOVE_MIRROR_SHOT", { accuracy: 85, chance: 30 }],
-  ["MOVE_ROCK_CLIMB", { power: 85, chance: 20 }],
-  ["MOVE_ROCK_WRECKER", { power: 150, accuracy: 90 }],
+  ["MOVE_MUD_BOMB", { chance: 30 }],
+  ["MOVE_PSYCHO_CUT", { chance: 0 }],
+  ["MOVE_ZEN_HEADBUTT", { chance: 20 }],
+  ["MOVE_MIRROR_SHOT", { chance: 30 }],
+  ["MOVE_ROCK_CLIMB", { chance: 20 }],
   // ER data (er-moves.ts id 440) lists Cross Poison at 40 power; it hits twice
   // (MultiHitType.TWO wired in init-elite-redux-vanilla-move-patches.ts), so the
   // prior override of 90 per-hit was wrong (would deal 180 total).
-  ["MOVE_CROSS_POISON", { power: 40, pp: 15 }],
+  ["MOVE_CROSS_POISON", { power: 40 }],
   ["MOVE_MAGNET_BOMB", { power: 60 }],
-  ["MOVE_STONE_EDGE", { accuracy: 85, pp: 5, chance: 0 }],
+  ["MOVE_STONE_EDGE", { chance: 0 }],
   ["MOVE_JUDGMENT", { power: 100, pp: 10 }],
   ["MOVE_WOOD_HAMMER", { pp: 10 }],
   ["MOVE_HEAL_ORDER", { pp: 10 }],
-  ["MOVE_DOUBLE_HIT", { power: 35 }],
   ["MOVE_CRUSH_GRIP", { power: 1 }],
   // ER 2.65 dex authority: 55 BP, doubled by fog through the mechanic patch.
   ["MOVE_OMINOUS_WIND", { power: 55 }],
   ["MOVE_SHADOW_FORCE", { chance: 0 }],
   ["MOVE_QUIVER_DANCE", { pp: 20 }],
   ["MOVE_SYNCHRONOISE", { power: 95, pp: 10 }],
-  ["MOVE_COIL", { pp: 20 }],
   ["MOVE_ROUND", { chance: 0 }],
   // ER (#360): Triple-Kick-style 3-strike ramp — see vanilla-move-patches.
   ["MOVE_ECHOED_VOICE", { power: 20, accuracy: 90, pp: 15 }],
   ["MOVE_CHIP_AWAY", { chance: 0 }],
-  ["MOVE_QUICK_GUARD", { pp: 15 }],
-  ["MOVE_SCALD", { power: 80 }],
-  ["MOVE_QUASH", { pp: 15 }],
-  ["MOVE_ACROBATICS", { power: 55 }],
-  ["MOVE_RETALIATE", { power: 75, pp: 5 }],
   ["MOVE_WATER_PLEDGE", { chance: 0 }],
   ["MOVE_FIRE_PLEDGE", { chance: 0 }],
   ["MOVE_GRASS_PLEDGE", { chance: 0 }],
   // ER (#367): 80 BP desperation attack — crit rider in vanilla-move-patches.
   ["MOVE_STRUGGLE_BUG", { power: 80, accuracy: 100, pp: 10 }],
-  ["MOVE_BULLDOZE", { power: 60 }],
-  ["MOVE_WORK_UP", { pp: 30 }],
-  ["MOVE_ELECTROWEB", { power: 55 }],
   ["MOVE_DRILL_RUN", { chance: 0 }],
   ["MOVE_HEART_STAMP", { power: 60, pp: 25 }],
   ["MOVE_LEAF_TORNADO", { chance: 50 }],
-  ["MOVE_STEAMROLLER", { power: 65, pp: 20 }],
   ["MOVE_NIGHT_DAZE", { chance: 0 }],
-  ["MOVE_HURRICANE", { accuracy: 75 }],
   ["MOVE_HEAD_CHARGE", { power: 120, pp: 15 }],
   ["MOVE_RELIC_SONG", { power: 85 }],
   ["MOVE_SNARL", { power: 60, pp: 15, chance: 100 }],
   ["MOVE_ICICLE_CRASH", { chance: 30 }],
-  ["MOVE_V_CREATE", { accuracy: 95 }],
-  ["MOVE_BELCH", { pp: 10 }],
   ["MOVE_FELL_STINGER", { pp: 25 }],
   ["MOVE_NOBLE_ROAR", { pp: 30 }],
   ["MOVE_ION_DELUGE", { pp: 25 }],
-  ["MOVE_PETAL_BLIZZARD", { power: 90 }],
   ["MOVE_ELECTRIFY", { pp: 20 }],
-  ["MOVE_MOONBLAST", { power: 95, chance: 30 }],
+  ["MOVE_MOONBLAST", { chance: 30 }],
   ["MOVE_STEAM_ERUPTION", { accuracy: 95 }],
   ["MOVE_WATER_SHURIKEN", { power: 15 }],
   ["MOVE_AROMATIC_MIST", { pp: 20 }],
@@ -389,10 +295,9 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_SHORE_UP", { pp: 10 }],
   // First Impression shares the Fake Out effect (effect 139): a guaranteed
   // flinch (dex effectChance 100). chance: 0 here made FlinchAttr never fire.
-  ["MOVE_FIRST_IMPRESSION", { power: 90, chance: 100 }],
+  ["MOVE_FIRST_IMPRESSION", { chance: 100 }],
   ["MOVE_SPIRIT_SHACKLE", { power: 90 }],
   ["MOVE_STRENGTH_SAP", { pp: 10 }],
-  ["MOVE_LEAFAGE", { pp: 40 }],
   ["MOVE_LASER_FOCUS", { pp: 30 }],
   ["MOVE_GEAR_UP", { pp: 20 }],
   // chance 100, NOT 0: THROAT_CHOPPED is applied by AddBattlerTagAttr, which is
@@ -401,11 +306,8 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   // pokerogue needs chance=100 or the tag never attaches and sound moves are never
   // blocked. Same situation as MOVE_GROWL above. (Verified via headless runner.)
   ["MOVE_THROAT_CHOP", { chance: 100 }],
-  ["MOVE_LUNGE", { power: 80 }],
-  ["MOVE_SMART_STRIKE", { power: 70 }],
   ["MOVE_BRUTAL_SWING", { power: 60 }],
   ["MOVE_PSYCHIC_FANGS", { power: 80 }],
-  ["MOVE_ACCELEROCK", { pp: 20 }],
   ["MOVE_PRISMATIC_LASER", { power: 160 }],
   ["MOVE_SUNSTEEL_STRIKE", { power: 100 }],
   ["MOVE_MOONGEIST_BEAM", { power: 100 }],
@@ -424,20 +326,15 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_METEOR_ASSAULT", { power: 150 }],
   ["MOVE_ETERNABEAM", { power: 160, accuracy: 90 }],
   ["MOVE_STEEL_ROLLER", { power: 80, pp: 15 }],
-  ["MOVE_MISTY_EXPLOSION", { power: 100 }],
-  ["MOVE_TERRAIN_PULSE", { pp: 10 }],
-  ["MOVE_SKITTER_SMACK", { power: 70, accuracy: 90, pp: 10 }],
   ["MOVE_BURNING_JEALOUSY", { chance: 50 }],
-  ["MOVE_LASH_OUT", { power: 75, pp: 5 }],
-  ["MOVE_CORROSIVE_GAS", { pp: 40, chance: 0 }],
-  ["MOVE_DUAL_WINGBEAT", { accuracy: 95 }],
+  ["MOVE_CORROSIVE_GAS", { chance: 0 }],
   ["MOVE_WICKED_BLOW", { power: 70 }],
   ["MOVE_GLACIAL_LANCE", { power: 130 }],
-  ["MOVE_EERIE_SPELL", { power: 80, accuracy: 100, pp: 5, chance: 0 }],
+  ["MOVE_EERIE_SPELL", { chance: 0 }],
   ["MOVE_DEATHROLL", { accuracy: 95 }],
   ["MOVE_EXCALIBUR", { chance: 0 }],
   ["MOVE_AQUA_FANG", { power: 80, chance: 10 }],
-  ["MOVE_WAVE_CRASH", { pp: 15, chance: 0 }],
+  ["MOVE_WAVE_CRASH", { chance: 0 }],
   ["MOVE_SMITE", { chance: 100 }],
 ]);
 
@@ -553,6 +450,20 @@ export interface CSourceCorrectionResult {
  */
 let erRemapCallCount = 0;
 
+export interface EliteReduxMoveRemapBootEvidence {
+  readonly changed: number;
+  readonly mapEntries: number;
+  readonly hashBefore: string;
+  readonly hashAfter: string;
+}
+
+let erMoveRemapBootEvidence: EliteReduxMoveRemapBootEvidence | null = null;
+
+/** Read-only proof captured from the first real boot remap call. */
+export function getEliteReduxMoveRemapBootEvidence(): EliteReduxMoveRemapBootEvidence | null {
+  return erMoveRemapBootEvidence;
+}
+
 /** Tiny inline FNV-1a 32-bit over a string, hex - a cheap stable fingerprint for the boot log. */
 function cheapFnv32Hex(s: string): string {
   let h = 0x811c9dc5;
@@ -573,11 +484,13 @@ function cheapFnv32Hex(s: string): string {
  *      (e.g. Kowtow Cleave -> Blood Moon, Axe Kick -> Trailblaze) — so the move
  *      silently received another move's rebalance + effects (#151).
  *
- * Both are repaired the same way: `allMoves` is correctly id-indexed, so we
- * resolve each ER move's real id by its display name and repoint the ER id when
- * it currently lands on a different move (or a hole). Only ER moves whose name
- * matches a built pokerogue move are touched; correctly-mapped moves and moves
- * with no name-match (e.g. ER-renamed) are left untouched. Idempotent.
+ * Both are repaired the same way: the static `MoveId` enum and bundled English
+ * catalog define a locale- and boot-order-invariant name-to-id table. We repoint
+ * the ER id when its static English name resolves to a different vanilla id (or
+ * a hole). Correct mappings and ER-renamed moves with no match stay untouched.
+ * Live `Move` objects are deliberately excluded from this lookup: their names
+ * and construction order are mutable initialization state and previously made
+ * this shared map differ between English and German clients. Idempotent.
  *
  * MUST run BEFORE {@linkcode initEliteReduxVanillaRebalance} / move-patches /
  * movesets so every downstream consumer sees the corrected id-map and applies
@@ -591,16 +504,31 @@ export function remapEliteReduxMoveIdsByName(): number {
   // Co-op desync diagnostic (#633): fingerprint the shared move id-map state on ENTRY so two
   // clients' boot logs can be compared (do they enter the remap with the same map?).
   const callNo = ++erRemapCallCount;
-  console.info(
-    `[er-remap] call#${callNo} mapEntries=${Object.keys(movesMap).length}`
-      + ` sampleHashBefore=${cheapFnv32Hex(JSON.stringify(movesMap))}`,
-  );
+  const mapEntries = Object.keys(movesMap).length;
+  const hashBefore = cheapFnv32Hex(JSON.stringify(movesMap));
+  console.info(`[er-remap] call#${callNo} mapEntries=${mapEntries} sampleHashBefore=${hashBefore}`);
+  const remapped = remapEliteReduxMoveIdsInMap(movesMap);
+  const hashAfter = cheapFnv32Hex(JSON.stringify(movesMap));
+  erMoveRemapBootEvidence ??= Object.freeze({ changed: remapped, mapEntries, hashBefore, hashAfter });
+  if (remapped > 0) {
+    console.info(`[er-csrc] remapped ${remapped} ER moves to their real MoveIds (by name)`);
+  }
+  // Co-op desync diagnostic (#633): fingerprint the map state on EXIT, with the change count,
+  // so we can see whether this call mutated the shared singleton (and how the two clients diverge).
+  console.info(`[er-remap] call#${callNo} changed=${remapped} sampleHashAfter=${hashAfter}`);
+  return remapped;
+}
+
+/**
+ * Pure production remap seam. The input map is the only mutable value read;
+ * canonical ids come exclusively from the static enum/catalog snapshot.
+ */
+export function remapEliteReduxMoveIdsInMap(movesMap: Record<number, number>): number {
   const idByName = new Map<string, number>();
-  for (const mv of allMoves) {
-    if (mv !== undefined) {
-      // #633: match on the locale-INVARIANT (forced-English) name so co-op
-      // clients in different languages build the same id-map (mv is a live Move).
-      idByName.set(enMoveName(mv).toLowerCase(), mv.id);
+  for (let moveId = MoveId.NONE + 1; moveId < 5000; moveId++) {
+    const canonicalName = enMoveNameForId(moveId);
+    if (canonicalName) {
+      idByName.set(canonicalName.toLowerCase(), moveId);
     }
   }
   let remapped = 0;
@@ -617,14 +545,6 @@ export function remapEliteReduxMoveIdsByName(): number {
       remapped++;
     }
   }
-  if (remapped > 0) {
-    console.info(`[er-csrc] remapped ${remapped} ER moves to their real MoveIds (by name)`);
-  }
-  // Co-op desync diagnostic (#633): fingerprint the map state on EXIT, with the change count,
-  // so we can see whether this call mutated the shared singleton (and how the two clients diverge).
-  console.info(
-    `[er-remap] call#${callNo} changed=${remapped} sampleHashAfter=${cheapFnv32Hex(JSON.stringify(movesMap))}`,
-  );
   return remapped;
 }
 
@@ -668,7 +588,7 @@ export function initEliteReduxCSourceCorrections(): CSourceCorrectionResult {
         continue;
       }
       let bits = 0;
-      for (const idx of (drf as { flags?: number[] }).flags ?? []) {
+      for (const idx of drf.flags) {
         const name = ER_FLAG_NAMES_LIST[idx];
         const mf = name === undefined ? undefined : ER_FLAG_TO_MOVE_FLAG[name];
         if (mf != null) {

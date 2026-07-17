@@ -570,6 +570,18 @@ export class CoopInteractionTurn {
     }
   }
 
+  /**
+   * Atomic CONTROL-transaction rollback only. Unlike cold-resume restore, rollback must be able to
+   * move the live counter backward to the exact pre-transaction value. The caller owns notification
+   * and restores the other CONTROL ledgers in the same rollback block.
+   */
+  restoreExactForTransaction(counter: number): void {
+    if (!Number.isSafeInteger(counter) || counter < 0) {
+      throw new Error(`Invalid transactional interaction counter ${counter}.`);
+    }
+    this.counter = counter;
+  }
+
   /** Restore from the persistent run record. */
   static fromJSON(counter: number): CoopInteractionTurn {
     const restored = Number.isInteger(counter) && counter >= 0 ? counter : 0;

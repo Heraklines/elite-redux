@@ -24,7 +24,7 @@
 // plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import type { CoopMembershipSnapshotV1 } from "#data/elite-redux/coop/coop-membership";
+import type { CoopFrozenAckQuorumV1, CoopMembershipSnapshotV1 } from "#data/elite-redux/coop/coop-membership";
 // TYPE-ONLY (erased at runtime, so this stays the lowest layer): the authoritative control-plane
 // envelope (Wave-2 run-state migration, §1.1). The envelope module in turn imports only the
 // CoopAuthoritativeBattleStateV1 TYPE from here, so the cycle is fully type-level (no runtime cycle).
@@ -32,6 +32,14 @@ import type {
   CoopAuthoritativeEnvelopeV1,
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
+import type {
+  CoopAccountIdentityV1,
+  CoopAuthorityRole,
+  CoopFrameContextV1,
+  CoopSeatId,
+  CoopSessionBindingV1,
+  CoopTransportRole,
+} from "#data/elite-redux/coop/coop-session-binding";
 import type { ErRouteNode } from "#data/elite-redux/er-biome-routing";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
@@ -70,12 +78,42 @@ export type CoopRole = "host" | "guest";
 // er-coop-30: authoritative field seats carry actual Phaser presentation membership and the guest settles
 // those seats through a pure no-RNG materializer. An older renderer would ignore the visibility boundary
 // and can reveal pre-intro/fainted seats, so cached mixed builds must refuse pairing instead of degrading.
-// er-coop-31: turn/replacement authority requires checkpoint + fullField + state + non-sentinel checksum;
-// replacement frames are retained and explicitly re-requestable before the guest can reopen control.
-// er-coop-32: battle events and authority commits are epoch/wave/turn addressed; complete turn and
-// replacement commits are retained until exact apply+checksum ACK, and fatal capture failures use an
-// acknowledged terminal handshake instead of leaving either peer in a local fallback.
-export const COOP_PROTOCOL_VERSION = "er-coop-32";
+// er-coop-31: cold-resume offers bind immutable SHA-256 snapshot bytes, participant seat ownership,
+// wave, and control revision; apply/start-new outcomes and host->guest checkpoint persistence use
+// bounded acknowledged transactions.
+// The same bump makes every deterministic biome destination an exact durable BIOME_PICK permit; a
+// WAVE_ADVANCE can enter SelectBiome but can no longer broadly authorize Switch/NewBiome by phase name.
+// er-coop-32: every persisted checkpoint is bound to a stable runId plus a host-monotonic checkpoint
+// revision; large logical frames use backpressured restartable chunk delivery and resume crosses a
+// symmetric final release barrier.
+// The parallel protocol-31 authority line additionally requires checkpoint + fullField + state + a
+// non-sentinel checksum; replacement frames are retained and re-requestable before control reopens.
+// The parallel protocol-32 authority line addresses battle events and commits by epoch/wave/turn and
+// retains complete turn/replacement commits through material apply, renderer projection, and exact public
+// continuation evidence. Fatal capture failures use an acknowledged terminal handshake instead of leaving
+// either peer in a local fallback.
+// er-coop-33 is the first compatibility stamp containing BOTH histories. A cached protocol-32 peer is
+// therefore rejected even when it implemented one of the two incompatible protocol-32 branches.
+// er-coop-34 adds the ordered retained ME battle settlement terminal and opSurface.me.v2. A protocol-33
+// peer cannot safely infer the post-BattleEnd reward/event tail and is deliberately incompatible.
+// er-coop-35 makes the settled reward surface mandatory. A protocol-34 renderer lacks that field and
+// would otherwise dereference or locally infer encounter reward mechanics after the retained BattleEnd.
+// er-coop-36 replaces the ambiguous one-shop/heal booleans with a bounded ordered modifier-surface plan.
+// A protocol-35 renderer cannot preserve multiple surfaces, stable identities, or explicit reroll policy.
+// er-coop-37 adds exact authority-materialized egg reward grants to that closed ordered plan. A
+// protocol-36 renderer would silently credit only the host account, so mixed builds must refuse pairing.
+export const COOP_PROTOCOL_VERSION = "er-coop-37";
+
+/**
+ * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
+ * a renderer has projected the state, and projection is not proof that the next public control surface is
+ * actually usable.  Every turn/replacement ACK carries exactly one mandatory stage; peers reject skips,
+ * regressions, and conflicting duplicates instead of silently treating an early ACK as commit release.
+ */
+export type CoopAuthorityAckStage = "materialApplied" | "presentationReady" | "continuationReady";
+
+/** Public shared-run surfaces that can prove an authoritative operation reached a usable continuation. */
+export type CoopOperationContinuationSurface = "command" | "sharedInput" | "terminal";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -102,6 +140,78 @@ export type CoopSessionKind = "coop" | "versus";
 
 /** Connection lifecycle of a transport. */
 export type CoopConnectionState = "connecting" | "connected" | "disconnected" | "closed";
+
+/** The control boundary whose failure forced every member out of shared gameplay. */
+export type CoopSharedTerminalBoundary =
+  | "authority"
+  | "recovery"
+  | "protocol"
+  | "persistence"
+  | "surface"
+  | "disconnect";
+
+/** Stable machine-readable causes; the bounded human detail is diagnostic only. */
+export type CoopSharedTerminalReasonCode =
+  | "capture-failed"
+  | "apply-failed"
+  | "recovery-exhausted"
+  | "peer-lost"
+  | "binding-mismatch"
+  | "persistence-failed"
+  | "continuation-failed"
+  | "invalid-authority";
+
+/**
+ * Immutable P33 shared-terminal transaction. The surrounding frame context is refreshed on retransmit
+ * after hot rejoin, while this addressed statement and its frozen ACK quorum remain byte-stable.
+ */
+export interface CoopSharedTerminalCommitV1 {
+  version: 1;
+  terminalId: string;
+  terminalRevision: number;
+  originSeatId: number;
+  epoch: number;
+  wave: number;
+  turn: number;
+  boundaryRevision: number;
+  boundary: CoopSharedTerminalBoundary;
+  reasonCode: CoopSharedTerminalReasonCode;
+  reason: string;
+  quorum: CoopFrozenAckQuorumV1;
+}
+
+export type CoopLaunchSnapshotAbortReason =
+  | "no-safe-slot"
+  | "slot-raced"
+  | "first-save-cas-failed"
+  | "guest-persistence-failed";
+
+/** Immutable discriminator for one exact cold-resume snapshot. */
+export interface CoopResumeCommitment {
+  version: 1;
+  digest: string;
+  gameMode: number;
+  wave: number;
+  revision: number;
+  /** Stable host-minted identity separating multiple runs owned by the same account pair. */
+  runId: string;
+  /** Host-monotonic persistence order, independent of wave and operation-journal revisions. */
+  checkpointRevision: number;
+  timestamp: number;
+  participants: [string, string];
+  seats: { host: string; guest: string };
+}
+
+export type CoopResumeBlockedReason = "unsafe-role-reversal" | "legacy-unmappable" | "replica-unavailable";
+
+export type CoopResumeCheckpointNackReason =
+  | "runtime-invalid"
+  | "invalid-checkpoint"
+  | "no-safe-slot"
+  | "slot-conflict"
+  | "storage-failed"
+  | "cloud-failed"
+  | "cloud-conflict";
 
 /** Lifecycle signals exchanged out of band of normal gameplay. */
 export type CoopLifecycleEvent = "ready" | "pause" | "resume" | "partner-left";
@@ -367,6 +477,16 @@ export interface CoopSerializedRewardOption {
 }
 
 /**
+ * Stable address of one ordered Mystery Encounter reward surface. The interaction counter still
+ * addresses the live shop session; this address prevents two surfaces reconstructed around the same
+ * retained boundary from sharing option caches or operation ordinals.
+ */
+export interface CoopRewardSurfaceIdentity {
+  readonly surfaceId: string;
+  readonly ordinal: number;
+}
+
+/**
  * One arena tag carried in the per-turn checkpoint (#633 GAP 1). Hazards / screens / tailwind
  * (Stealth Rock, Spikes, Reflect, Light Screen, Tailwind, ...) are set by host MoveEffectPhases
  * the guest never runs, so without carrying them the guest never gains them and the checksum -
@@ -575,6 +695,8 @@ export interface CoopFullBattleSnapshot {
   activeControl?: CoopActiveControlSnapshotV1 | undefined;
   /** Operation revisions whose effects this authoritative snapshot already subsumes (§4.4). */
   journalHighWater?: Record<string, number> | undefined;
+  /** Hash binding the DATA checksum to session/membership/control/high-water as one envelope. */
+  controlDigest?: string | undefined;
   /** Every occupied field mon's full state, by battler index. */
   field: CoopFullMonSnapshot[];
   /** `WeatherType` enum value (0 = none) + turns remaining. */
@@ -681,6 +803,12 @@ export interface CoopActiveControlSnapshotV1 {
   version: 1;
   phaseName: string;
   interactionCounter: number;
+  /**
+   * Durable Mystery-event control surface. A hot-rejoin snapshot carries the exact last host screen and
+   * terminal state so the guest can rebind its retained CoopReplayMePhase instead of locally inferring an
+   * exit from a cancelled/expired 8M or 9M wait. Optional for backward-compatible snapshot decoding.
+   */
+  activeMysteryEncounter?: CoopActiveMysteryEncounterSnapshotV1 | undefined;
   awaitedInteractions: { seq: number; expectedKinds: string[] }[];
   barriers: { localArrived: string[]; partnerArrived: string[]; awaiting: string[] };
   pendingCommands: {
@@ -689,7 +817,50 @@ export interface CoopActiveControlSnapshotV1 {
     moveSlots: number[];
     offer?: CoopBattleCommandOffer | undefined;
     owner?: CoopRole;
+    /** Immutable entity boundary. Required whenever a P33 snapshot carries an active command surface. */
+    address?: { epoch: number; wave: number; pokemonId: number } | undefined;
   }[];
+}
+
+/** Exact host-owned control statement for the current (or most recently resolved) Mystery encounter. */
+export interface CoopActiveMysteryEncounterSnapshotV1 {
+  version: 1;
+  interactionCounter: number;
+  /** Monotonic revision within this pinned interaction counter. */
+  revision: number;
+  /** Monotonic selector/sub-screen round (repeated Delve/Safari rounds never reuse one). */
+  round: number;
+  /** Next guest-owner top-level/repeated pick ordinal accepted by the host. */
+  nextPickStep?: number | undefined;
+  /** Next guest-owner party/secondary/catch-full ordinal accepted by the host. */
+  nextSubPickStep?: number | undefined;
+  /** Exact Colosseum between-round control, when this Mystery is the multi-battle gauntlet. */
+  colosseum?:
+    | {
+        /** Board round the guest loop must await or resume next. */
+        expectedRound: number;
+        /** Currently published board; omitted after its CONTINUE transition boots successfully. */
+        boardRound?: number | undefined;
+        /** Exact committed choice for boardRound, if the owner already decided. */
+        decision?: { round: number; index: number; operationId: string } | undefined;
+      }
+    | undefined;
+  /** `pending` means the exact terminal is not committed yet; the guest must remain in the event. */
+  terminal: "pending" | "leave" | "battle" | "battle-settled";
+  /** Exact committed ME_TERMINAL operation. Required for a non-pending terminal. */
+  terminalOperationId?: string | undefined;
+  /** Ordered ME_TERMINAL step (battle -> battle-settled -> next battle or final leave). */
+  terminalStep?: number | undefined;
+  /** Exact choice delivered by the journal materializer for this terminal. */
+  terminalChoice?: number | undefined;
+  /** Host turn carried by a battle-handoff terminal, when one has been committed. */
+  hostTurn?: number | undefined;
+  /** Wave-scoped battle handoff state, used to distinguish a selector from the spawned ME battle. */
+  handoffWave?: number | undefined;
+  /** Host phase at atomic capture; prevents an old selector from reopening after its choice was consumed. */
+  hostPhaseName?: string | undefined;
+  /** Last host-rendered event screen/sub-screen. Plain JSON; safe to replay after a channel replacement. */
+  presentation?: Extract<CoopInteractionOutcome, { k: "mePresent" }> | undefined;
 }
 
 /**
@@ -994,6 +1165,37 @@ export type CoopMessage =
       capabilities?: string[];
       /** Host-minted control-plane epoch; the guest adopts and echoes it before operations begin. */
       epoch: number;
+      /** Host-authored persistence identity; absent only from the guest before it adopts the host. */
+      runId?: string;
+      checkpointRevision?: number;
+    }
+  /** Authenticated public P33-architecture hello. The signaling bearer is intentionally never peer-visible. */
+  | {
+      t: "hello";
+      version: "er-coop-37";
+      pairingId: string;
+      account: CoopAccountIdentityV1;
+      transportRole: CoopTransportRole;
+      authorityClaim: CoopAuthorityRole;
+      capabilities: string[];
+      existingBinding?: {
+        sessionId: string;
+        runId?: string;
+        sessionEpoch: number;
+        seatMapId: string;
+        authoritySeatId: CoopSeatId;
+        membershipRevision: number;
+      };
+    }
+  /** Authority-authored immutable session binding. Retained and replayed until the exact peer ACKs. */
+  | { t: "sessionBinding"; binding: CoopSessionBindingV1 }
+  | {
+      t: "sessionBindingAck";
+      bindingId: string;
+      seatId: CoopSeatId;
+      accountId: string;
+      accepted: boolean;
+      reason?: "identity" | "seat-map" | "authority" | "stale" | "unsupported";
     }
   /** Keepalive / latency probe. */
   | { t: "ping"; ts: number }
@@ -1079,22 +1281,43 @@ export type CoopMessage =
   | { t: "catchFullPrompt"; pokemonName: string; speciesId: number; operationId?: string | undefined }
   /** #810 resume flow: host offers to resume the saved run with this partner at `wave`. */
   | { t: "meCursor"; index: number }
-  | { t: "resumeOffer"; decisionId: string; wave: number }
+  | { t: "resumeOffer"; decisionId: string; epoch: number; commitment: CoopResumeCommitment }
   /** #810 resume flow: guest's answer to the offer. */
   | { t: "resumeReply"; decisionId: string; accept: boolean }
   /** Host -> guest: the exact ACCEPT reply was committed and the cold-resume epoch is authoritative. */
-  | { t: "resumeAccepted"; decisionId: string; epoch: number }
+  | { t: "resumeAccepted"; decisionId: string; epoch: number; commitment: CoopResumeCommitment }
   /** Guest -> host: the committed resume snapshot finished materializing (or failed closed). */
   | { t: "resumeApplied"; decisionId: string; success: boolean }
   /** Host -> guest: the apply result is durably observed; guest may clear its reconnect outbox. */
   | { t: "resumeAppliedAck"; decisionId: string }
+  /** Host -> guest: both snapshots are materialized; guest may cross the final gameplay barrier. */
+  | { t: "resumeRelease"; decisionId: string }
+  | { t: "resumeReleaseAck"; decisionId: string }
+  /** Host -> guest: a discovered save exists but cannot be mapped safely; both remain out of gameplay. */
+  | { t: "resumeBlocked"; decisionId: string; reason: CoopResumeBlockedReason; wave: number }
+  | { t: "resumeBlockedAck"; decisionId: string }
+  /** Host persistence mirror: exact authoritative checkpoint bytes for the guest's own account/slot. */
+  | {
+      t: "resumeCheckpoint";
+      checkpointId: string;
+      commitment: CoopResumeCommitment;
+      session: string;
+      /** True only when this host save is also on the normal throttled cloud-checkpoint cadence. */
+      mirrorCloud: boolean;
+    }
+  | {
+      t: "resumeCheckpointAck";
+      checkpointId: string;
+      success: boolean;
+      reason?: CoopResumeCheckpointNackReason;
+    }
   /**
    * #810 resume flow (barrier): host tells the guest "no resume - proceed to a NEW game".
    * Sent whenever the host will NOT resume (no matching save, host picked New Game, guest
    * declined, or the offer timed out), so the guest never sits blocked waiting for an offer
    * that will never come. The guest treats it as the release signal for its wait barrier.
    */
-  | { t: "resumeStartNew"; decisionId: string }
+  | { t: "resumeStartNew"; decisionId: string; epoch: number; runId: string; checkpointRevision: number }
   /** Guest -> host: the exact start-new decision was applied to the lobby UI, so the host may enter team select. */
   | { t: "resumeDecisionAck"; decisionId: string }
   /** A forced/voluntary switch replacement: bring in party `partySlot` to `fieldIndex` (P2). */
@@ -1225,6 +1448,11 @@ export type CoopMessage =
    * (its EncounterPhase), replacing the narrow `enemyPartySync` + the `requestEnemyParty` poll.
    */
   | { t: "launchSnapshot"; wave: number; session: string }
+  | {
+      t: "launchSnapshotAbort";
+      wave: number;
+      reason: CoopLaunchSnapshotAbortReason;
+    }
   /** Guest -> host: re-send the cached authoritative launch/resume snapshot for this exact wave. */
   | { t: "requestLaunchSnapshot"; wave: number }
   /**
@@ -1320,7 +1548,7 @@ export type CoopMessage =
   /** Guest -> host: request the exact retained turn commit, or learn that the host is still resolving it. */
   | { t: "requestTurnCommit"; epoch: number; wave: number; turn: number; revision?: number }
   | { t: "turnCommitPending"; epoch: number; wave: number; turn: number }
-  /** Guest -> host: ACK only after the complete turn commit applied and checksum-converged. */
+  /** Guest -> host: one ordered protocol-33 evidence stage for an exact retained turn commit. */
   | {
       t: "turnCommitAck";
       epoch: number;
@@ -1330,6 +1558,7 @@ export type CoopMessage =
       checkpointTick: number;
       stateTick: number;
       checksum: string;
+      stage: CoopAuthorityAckStage;
       status: "applied" | "superseded";
       supersededByRevision?: number;
       supersededByChecksum?: string;
@@ -1345,7 +1574,7 @@ export type CoopMessage =
       checkpointTick: number;
       stateTick: number;
     }
-  /** Guest -> host: ACK only after the complete replacement applied and checksum-converged. */
+  /** Guest -> host: one ordered protocol-33 evidence stage for an exact retained replacement commit. */
   | {
       t: "battleCheckpointAck";
       reason: "replacement";
@@ -1356,6 +1585,7 @@ export type CoopMessage =
       checkpointTick: number;
       stateTick: number;
       checksum: string;
+      stage: CoopAuthorityAckStage;
     }
   /** Either peer -> peer: a control-critical authority boundary could not be produced/applied safely. */
   | {
@@ -1379,6 +1609,21 @@ export type CoopMessage =
       boundary: "turnResolution" | "replacement";
     }
   /**
+   * P33 retained terminal transaction. Receipt alone is insufficient: the receiver first freezes its
+   * gameplay/control plane in the addressed terminal state, then returns `sharedTerminalAck`. The immutable
+   * commit survives connection replacement; only `ctx` is refreshed for the authenticated live channel.
+   */
+  | { t: "sharedTerminal"; ctx: CoopFrameContextV1; commit: CoopSharedTerminalCommitV1 }
+  /** Exact evidence that one required seat entered the retained shared terminal transaction. */
+  | {
+      t: "sharedTerminalAck";
+      ctx: CoopFrameContextV1;
+      terminalId: string;
+      terminalRevision: number;
+      targetMembershipRevision: number;
+      stage: "terminalEntered";
+    }
+  /**
    * Owner -> watcher (#633): the owner's pick on an ALTERNATING-control interaction
    * screen (reward shop / biome shop / mystery encounter). Same seed -> both clients
    * generate the IDENTICAL option pool, so only the CHOICE crosses the wire: the
@@ -1388,7 +1633,14 @@ export type CoopMessage =
    *  - `choice` the picked option index, or a sentinel (-1 = leave/skip, -2 = reroll)
    *  - `data`   optional extra indices (e.g. party-target slot, ME sub-option)
    */
-  | { t: "interactionChoice"; seq: number; kind: string; choice: number; data?: number[] }
+  | {
+      t: "interactionChoice";
+      seq: number;
+      kind: string;
+      choice: number;
+      data?: number[];
+      rewardSurface?: CoopRewardSurfaceIdentity | undefined;
+    }
   /**
    * Owner -> watcher (#633, TRACK-2 Phase C): the HOST-resolved AUTHORITATIVE outcome of one
    * interaction pick (reward grant / reroll / leave). The watcher ADOPTS this verbatim instead
@@ -1420,9 +1672,20 @@ export type CoopMessage =
    * (party luck would otherwise make the two pools - and the shared RNG cursor - diverge).
    * `reroll` is the reroll round these options belong to (a fresh roll per reroll).
    */
-  | { t: "rewardOptions"; seq: number; reroll: number; options: CoopSerializedRewardOption[] }
+  | {
+      t: "rewardOptions";
+      seq: number;
+      reroll: number;
+      options: CoopSerializedRewardOption[];
+      rewardSurface?: CoopRewardSurfaceIdentity | undefined;
+    }
   /** Watcher -> option owner: replay the exact cached reward/market option payload for this key. */
-  | { t: "requestRewardOptions"; seq: number; reroll: number }
+  | {
+      t: "requestRewardOptions";
+      seq: number;
+      reroll: number;
+      rewardSurface?: CoopRewardSurfaceIdentity | undefined;
+    }
   /**
    * Owner -> watcher (#633): a COSMETIC live-cursor button on a shared interaction
    * screen. The watcher replays `button` into its identical screen so the partner
@@ -1520,7 +1783,34 @@ export type CoopMessage =
    * anything above is the resend tail. Cumulative (not per-frame) so it stays cheap on the 5s-keepalive
    * channel - the guest acks its last-applied revision, not every frame.
    */
-  | { t: "coopAck"; cls: string; seq: number }
+  | {
+      t: "coopAck";
+      cls: string;
+      seq: number;
+      /**
+       * Protocol-33 operation-envelope evidence. Absent only for non-operation durability classes and
+       * backwards-compatible synthetic durability users. Operation commits are never retired by an ACK
+       * without this ordered evidence.
+       */
+      stage?: CoopAuthorityAckStage;
+      operationId?: string;
+      epoch?: number;
+      wave?: number;
+      turn?: number;
+      /** The real public surface observed after material application (presentation/final stages only). */
+      surface?: CoopOperationContinuationSurface;
+      /** Exact authority address at which that public continuation was observed. */
+      continuationEpoch?: number;
+      continuationWave?: number;
+      continuationTurn?: number;
+    }
+  /**
+   * Receiver -> snapshot committer: the exact checksum-bound DATA+CONTROL snapshot has been materialized
+   * and its executable continuation surface has been restored. Unlike a normal cumulative ACK, this proof
+   * is bound to a host-retained `controlDigest` and may therefore retire journal revisions that have already
+   * fallen out of the bounded replay ring. Unknown, altered, or unregistered frontiers are fail-closed.
+   */
+  | { t: "coopSnapshotAck"; controlDigest: string; marks: Record<string, number> }
   /**
    * Receiver -> committer (§4.4, reconnect-from-revision): "resend class `cls`'s committed tail after
    * revision `from`". Sent on a #805 hot rejoin (carrying the last-applied revision instead of a turn, the
@@ -1663,6 +1953,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `wave=${msg.wave}`;
     case "launchSnapshot":
       return `wave=${msg.wave} session=${msg.session.length}b`;
+    case "launchSnapshotAbort":
+      return `wave=${msg.wave} reason=${msg.reason}`;
     case "requestLaunchSnapshot":
       return `wave=${msg.wave}`;
     case "meBattleEnemyPartySync":
@@ -1682,15 +1974,19 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "turnCommitPending":
       return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn}`;
     case "turnCommitAck":
-      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checksum=${msg.checksum}`;
+      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} stage=${msg.stage} checksum=${msg.checksum}`;
     case "requestBattleCheckpoint":
       return `reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checkpointTick=${msg.checkpointTick} stateTick=${msg.stateTick}`;
     case "battleCheckpointAck":
-      return `reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checksum=${msg.checksum}`;
+      return `reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} stage=${msg.stage} checksum=${msg.checksum}`;
     case "authorityFailure":
       return `id=${msg.failureId} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} boundary=${msg.boundary}`;
     case "authorityFailureAck":
       return `id=${msg.failureId} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} boundary=${msg.boundary}`;
+    case "sharedTerminal":
+      return `id=${msg.commit.terminalId} e=${msg.commit.epoch} wave=${msg.commit.wave} turn=${msg.commit.turn} rev=${msg.commit.terminalRevision} boundary=${msg.commit.boundary}`;
+    case "sharedTerminalAck":
+      return `id=${msg.terminalId} rev=${msg.terminalRevision} seat=${msg.ctx.fromSeatId} generation=${msg.ctx.connectionGeneration}`;
     case "interactionChoice":
       return `seq=${msg.seq} kind=${msg.kind} choice=${msg.choice}`;
     case "interactionOutcome":
@@ -1708,7 +2004,13 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "lifecycle":
       return `event=${msg.event}`;
     case "hello":
-      return `role=${msg.role} v=${msg.version} epoch=${msg.epoch} tiebreak=${msg.tiebreak ?? "(none)"}`;
+      return "pairingId" in msg
+        ? `pairing=${msg.pairingId} transport=${msg.transportRole} authority=${msg.authorityClaim} account=${msg.account.accountId}`
+        : `role=${msg.role} v=${msg.version} epoch=${msg.epoch} tiebreak=${msg.tiebreak ?? "(none)"}`;
+    case "sessionBinding":
+      return `id=${msg.binding.bindingId} session=${msg.binding.sessionId} epoch=${msg.binding.sessionEpoch} seatMap=${msg.binding.seatMap.seatMapId}`;
+    case "sessionBindingAck":
+      return `id=${msg.bindingId} seat=${msg.seatId} accepted=${msg.accepted}`;
     case "ping":
     case "pong":
       return `ts=${msg.ts}`;
@@ -1730,6 +2032,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `epoch=${msg.epoch} rev=${msg.revision}`;
     case "coopAck":
       return `cls=${msg.cls} seq=${msg.seq}`;
+    case "coopSnapshotAck":
+      return `control=${msg.controlDigest} classes=${Object.keys(msg.marks).length}`;
     case "coopResync":
       return `cls=${msg.cls} from=${msg.from}`;
     case "showdownStakeOffer":
@@ -1809,10 +2113,19 @@ class LoopbackTransport implements CoopTransport {
     if (isCoopDebug()) {
       coopLog("transport", `send ${this.role} t=${msg.t} ${summarizeCoopMessage(msg)}`);
     }
+    // A real RTC transport serializes the frame before the remote peer observes it. Mirror that
+    // ownership boundary here: the two in-process clients must never share nested message objects.
+    // Without this copy, a guest renderer normalizing its disposable working state could mutate the
+    // host's retained authority frame and make a later retry differ from the originally admitted wire
+    // commit -- a test-only alias that hid production-fidelity bugs and could create false conflicts.
+    const frame = structuredClone(msg);
     queueMicrotask(() => {
       if (peer._state !== "connected") {
         if (isCoopDebug()) {
-          coopLog("transport", `deliver DROP (peer not connected) ->${peer.role} t=${msg.t} peerState=${peer._state}`);
+          coopLog(
+            "transport",
+            `deliver DROP (peer not connected) ->${peer.role} t=${frame.t} peerState=${peer._state}`,
+          );
         }
         return;
       }
@@ -1821,18 +2134,18 @@ class LoopbackTransport implements CoopTransport {
       if (isCoopDebug()) {
         coopLog(
           "transport",
-          `recv ${peer.role} t=${msg.t} ${summarizeCoopMessage(msg)} handlers=${peer.msgHandlers.size}`,
+          `recv ${peer.role} t=${frame.t} ${summarizeCoopMessage(frame)} handlers=${peer.msgHandlers.size}`,
         );
       }
       for (const h of [...peer.msgHandlers]) {
         try {
-          h(msg);
+          h(frame);
         } catch (error) {
           // A transport is a fan-out bus: one optional observer failing must not starve the
           // command/recovery handlers registered after it. Keep the fault loud and continue.
           coopWarn(
             "transport",
-            `recv ${peer.role} t=${msg.t} handler threw (isolated): ${error instanceof Error ? error.message : String(error)}`,
+            `recv ${peer.role} t=${frame.t} handler threw (isolated): ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       }

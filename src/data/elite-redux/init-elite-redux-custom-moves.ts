@@ -41,7 +41,6 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import { ChargeAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { erArmSwitchInBoost } from "#data/elite-redux/empower-switch-in";
 import { ER_FLAG_NAMES_LIST } from "#data/elite-redux/er-flag-mapping";
@@ -77,10 +76,10 @@ import {
   MovePowerMultiplierAttr,
   MultiHitAttr,
   MultiHitPowerIncrementAttr,
+  PhotonGeyserCategoryAttr,
   PsychoShiftEffectAttr,
   RemoveArenaTrapAttr,
   RemoveScreensAttr,
-  ResetStatsAttr,
   SelfStatusMove,
   SemiInvulnerableAttr,
   SpDefDefAttr,
@@ -94,6 +93,7 @@ import { TerrainType } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { ChargeAnim } from "#enums/move-anims-common";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { MoveTarget } from "#enums/move-target";
@@ -245,7 +245,14 @@ function mapSplit(erSplit: number): MoveCategory {
       return MoveCategory.SPECIAL;
     case 2:
       return MoveCategory.STATUS;
-    // ER-only splits 3-6 — see TODO above.
+    // Split 3 = USE_HIGHEST_OFFENSE: base the move on SPECIAL, then attach a
+    // PhotonGeyserCategoryAttr (see buildCustomMove) that flips it to PHYSICAL
+    // when the user's Atk exceeds its Sp.Atk — i.e. the move strikes off the
+    // higher offensive stat (Black Magic #801, Spectral Serenade #963, Banished
+    // Power #990). Splits 4-6 (HITS_DEF/USE_HIGHEST_DAMAGE/HITS_SPDEF) still
+    // collapse to PHYSICAL — see TODO above.
+    case 3:
+      return MoveCategory.SPECIAL;
     default:
       return MoveCategory.PHYSICAL;
   }
@@ -521,6 +528,7 @@ function buildCustomMove(
     id: number;
     name: string;
     description: string;
+    longDescription: string;
     types: readonly number[];
     power: number;
     accuracy: number;
@@ -621,6 +629,15 @@ function buildCustomMove(
   // (Inverse Room) hit/affected ONE mon. Applied BEFORE the archetype/bespoke
   // wiring so any per-id override there still wins.
   applyErMoveTarget(move, (draft as { target?: number }).target ?? 0, category);
+
+  // USE_HIGHEST_OFFENSE (ER split 3): the move is built SPECIAL (see mapSplit),
+  // and PhotonGeyserCategoryAttr flips it to PHYSICAL at damage time when the
+  // user's effective Atk > Sp.Atk — so it always strikes off the higher
+  // offensive stat (Black Magic #801 on a Gengar deals off Sp.Atk; on a physical
+  // attacker it flips to Atk).
+  if (draft.split === 3 && category !== MoveCategory.STATUS) {
+    move.addAttr(new PhotonGeyserCategoryAttr());
+  }
 
   // Phase D4: wire archetype-classified flags + attrs via the dispatcher. We
   // look up the archetype row by the ER-side id (not the pokerogue id) since
@@ -979,16 +996,21 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       // AddBattlerTagAttr rolls (P(both) ~= 9%, often only one landed).
       move.attr(PitfallTrapAndAlwaysHitAttr);
       break;
-    // ---- Boost-drain (clears the target's stat stages) ----
-    case 950: // Eerie Fog — sets fog (WeatherChange wired) + drains foe boosts
-      move.attr(ResetStatsAttr, false);
-      break;
+    // Eerie Fog (950): the EERIE_FOG weather (wired in move-archetype-dispatcher)
+    // drains positive boosts each turn from non-Ghost/Psychic mons, honoring the
+    // Ghost/Psychic immunity. The old immediate ResetStatsAttr(false) rider full-
+    // reset only the single target and ignored that immunity, so it is removed —
+    // the weather's per-turn decay is the faithful mechanic.
     // ---- Break the target's screens (Light Screen / Reflect / Aurora Veil) ----
     case 762: // Iron Fangs
       move.attr(RemoveScreensAttr, (_user, target) => (target.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY));
       break;
     // ---- Sets Stealth Rock on the foe's field ----
     case 787: // Scatter Blast — scatters Stealth Rocks onto the foe's side
+      move.attr(AddArenaTrapTagAttr, ArenaTagType.STEALTH_ROCK);
+      break;
+    case 798: // Diamond Blade — "10% chance of Stealth Rocks" (Keen Edge boost is
+      // the SLICING flag from the archetype row; move.chance = 10 gates the hazard).
       move.attr(AddArenaTrapTagAttr, ArenaTagType.STEALTH_ROCK);
       break;
     // ---- Sets Sticky Web on the foe's field + high crit ----

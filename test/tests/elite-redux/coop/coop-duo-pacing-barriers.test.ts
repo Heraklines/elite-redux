@@ -30,8 +30,9 @@ import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
+import { MoveUseMode } from "#enums/move-use-mode";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
+import { CommandPhase } from "#phases/command-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
@@ -43,10 +44,10 @@ import {
   driveHostRewardShopOwner,
   forceItemRewards,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -139,6 +140,99 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
   }, 120_000);
 
   // ===========================================================================================
+  // A forced local action (recharge / two-turn continuation) is still a REAL command boundary.
+  // The production regression skipped the barrier because tryExecuteQueuedMove ran first: the guest
+  // shipped MoveId.NONE and entered replay while the host stayed sealed waiting for its arrival.
+  // ===========================================================================================
+  it("an owned queued recharge crosses the command barrier before it auto-commits", async () => {
+    setCoopRendezvousWaitMs(60_000);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    const wave = rig.guestScene.currentBattle.waveIndex;
+    const turn = rig.guestScene.currentBattle.turn;
+    const point = `cmd:${wave}:${turn}`;
+    await withClient(rig.hostCtx, () => {
+      rig.hostRuntime.rendezvous.arrive(point);
+    });
+    await drainLoopback();
+
+    const arriveSpy = vi.spyOn(rig.guestRuntime.rendezvous, "arrive");
+    const broadcastSpy = vi.spyOn(rig.guestRuntime.battleSync, "broadcastLocalCommand");
+    await withClient(rig.guestCtx, async () => {
+      const owned = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+      owned.summonData.moveQueue = [{ move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL }];
+      rig.guestScene.currentBattle.turnCommands = {};
+      new CommandPhase(COOP_GUEST_FIELD_INDEX).start();
+      // Keep the complete guest context installed through the buffered rendezvous continuation. A
+      // single microtask did not cover the rendezvous promise chain, allowing enterOwnCommandBoundary
+      // to resume after teardown against the next test's scene.
+      await drainLoopback();
+    });
+
+    expect(
+      arriveSpy.mock.calls.map(call => String(call[0])),
+      "the forced-action owner still announced arrival at the reciprocal command point",
+    ).toContain(point);
+    expect(
+      broadcastSpy.mock.calls.some(
+        ([fieldIndex, sentTurn, command]) =>
+          fieldIndex === COOP_GUEST_FIELD_INDEX
+          && sentTurn === turn
+          && command.command === Command.FIGHT
+          && command.cursor === -1
+          && command.moveId === MoveId.NONE,
+      ),
+      "the queued recharge committed only after the partner arrival was observed",
+    ).toBe(true);
+
+    logs.flush();
+  }, 120_000);
+
+  // ===========================================================================================
+  // A generated skip (Commander / trailing BALL or RUN slot) is also an OWNED command boundary.
+  // The old early return ended the phase before ownership classification, so a guest-owned
+  // Commander slot never announced its arrival and left the host sealed at cmd:<wave>:<turn>.
+  // ===========================================================================================
+  it("an owned Commander skip crosses the command barrier before it ends", async () => {
+    setCoopRendezvousWaitMs(60_000);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    const wave = rig.guestScene.currentBattle.waveIndex;
+    const turn = rig.guestScene.currentBattle.turn;
+    const point = `cmd:${wave}:${turn}`;
+    await withClient(rig.hostCtx, () => {
+      rig.hostRuntime.rendezvous.arrive(point);
+    });
+    await drainLoopback();
+
+    const arriveSpy = vi.spyOn(rig.guestRuntime.rendezvous, "arrive");
+    const broadcastSpy = vi.spyOn(rig.guestRuntime.battleSync, "broadcastLocalCommand");
+    await withClient(rig.guestCtx, async () => {
+      const owned = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+      const ally = owned.getAllies()[0];
+      vi.spyOn(ally, "getTag").mockReturnValue({ sourceId: owned.id, getSourcePokemon: () => owned } as never);
+      rig.guestScene.currentBattle.turnCommands = {};
+      new CommandPhase(COOP_GUEST_FIELD_INDEX).start();
+      await drainLoopback();
+    });
+
+    expect(
+      arriveSpy.mock.calls.map(call => String(call[0])),
+      "the Commander-owned skipped slot still announced the reciprocal command point",
+    ).toContain(point);
+    expect(
+      broadcastSpy,
+      "Commander is an inert skip, not a selectable or relayed MoveId.NONE command",
+    ).not.toHaveBeenCalled();
+
+    logs.flush();
+  }, 120_000);
+
+  // ===========================================================================================
   // A real host CommandPhase INVOKES the next-command barrier at cmd:<wave>:<turn> (proves the
   // wiring in command-phase.ts is live). The guest pre-arrives so the host's barrier buffer-hits
   // (no block), then the host's real turn opens its command as usual.
@@ -161,7 +255,7 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
 
@@ -170,7 +264,7 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: true }));
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
 
     await arriveGuestCommandBoundary(rig, 2);
@@ -210,7 +304,7 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
       game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
 
@@ -229,7 +323,7 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
     expect(awaitedPoints, `the owner shop AWAITED the partner at ${shopPoint} before committing`).toContain(shopPoint);
 
     // The watcher then mirrors + the interaction still advances exactly once (barrier did not desync it).
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counter + 1);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest lockstep with host").toBe(counter + 1);

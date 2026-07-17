@@ -1,5 +1,6 @@
 import type { Ability } from "#abilities/ability";
 import { PLAYER_PARTY_MAX_SIZE } from "#app/constants";
+import { getCoopBrowserCommanderFixtureStarters, getCoopBrowserFaintFixtureStarters } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { starterColors } from "#app/global-vars/starter-colors";
 import Overrides from "#app/overrides";
@@ -190,6 +191,11 @@ export interface ShowdownPresetBuildEntry {
   seedStarters?: Starter[];
   /** Grid top-level back-out handler: returns to the Team Menu, restores the borrowed gameMode. */
   onCancel?: () => void;
+}
+
+interface SeedTeamOptions {
+  /** Only the exact browser-fixture caller may render a locked starter in the visible team strip. */
+  allowUncaught?: boolean;
 }
 
 interface LanguageSetting {
@@ -1752,6 +1758,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           this.seedTeamFromStarters(showdownBuild.seedStarters);
         }
       }
+      const coopBrowserStarters = getCoopBrowserCommanderFixtureStarters() ?? getCoopBrowserFaintFixtureStarters();
+      if (globalScene.gameMode.isCoop && coopBrowserStarters != null) {
+        // CI checkpoint only: materialize the otherwise account-locked species in the NORMAL visible
+        // starter UI. The browser still submits and confirms this team through public keys, and the
+        // registry requires both the exact dedicated build flag and this client's exact URL fixture.
+        this.seedTeamFromStarters(coopBrowserStarters, { allowUncaught: true });
+      }
 
       // Roster-pick mode: hide the party point-budget label and paint the initial marks.
       this.valueLimitLabel.setVisible(!this.rosterPickMode);
@@ -2622,6 +2635,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           ) {
             options = [
               {
+                semanticId: "add-to-party",
                 label: i18next.t("starterSelectUiHandler:addToParty"),
                 handler: () => {
                   ui.setMode(UiMode.STARTER_SELECT);
@@ -2661,6 +2675,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             // if it already exists in your party, it will give you the option to remove from your party
             options = [
               {
+                semanticId: "remove-from-party",
                 label: i18next.t("starterSelectUiHandler:removeFromParty"),
                 handler: () => {
                   this.popStarter(removeIndex);
@@ -7142,22 +7157,23 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   /**
-   * Seed the party grid from a provided list of saved {@linkcode Starter}s. Two callers:
+   * Seed the party grid from a provided list of saved {@linkcode Starter}s. Callers:
    *   - "Use Last Team" ({@linkcode restoreLastTeam}) with the persisted last run team.
    *   - Showdown Team Menu EDIT (addendum): the preset's mons reconstructed via `manifestToStarter`,
    *     each carrying its saved stage/shiny/item/moves/nature/ability, so editing starts pre-populated.
+   *   - Build-gated co-op browser checkpoints, which alone may render their uncaught fixture starters.
    * Skips species not caught in this save + any the active challenge forbids, and stops adding once the
    * point-value limit would be exceeded (effectively unlimited in showdown). Returns false when nothing
    * could be added. Rules are NOT enforced here - Ready/Done re-validates as usual, so a now-illegal
    * preset still loads with its mons.
    */
-  seedTeamFromStarters(savedTeam: Starter[]): boolean {
+  seedTeamFromStarters(savedTeam: Starter[], options: SeedTeamOptions = {}): boolean {
     // Resolve which saved starters are usable (caught) and precompute their dex
     // attributes before mutating any selection state.
     const entries: { saved: Starter; species: PokemonSpecies; dexAttr: bigint }[] = [];
     for (const saved of savedTeam.slice(0, 6)) {
       const species = getPokemonSpecies(saved.speciesId);
-      if (!species || !this.getSpeciesData(saved.speciesId).dexEntry.caughtAttr) {
+      if (!species || (!options.allowUncaught && !this.getSpeciesData(saved.speciesId).dexEntry.caughtAttr)) {
         continue;
       }
       let dexAttr = saved.shiny ? DexAttr.SHINY : DexAttr.NON_SHINY;
@@ -7341,6 +7357,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             // before launching. Hovering a mode shows what it does (#368) in
             // the message box under the option list.
             const difficultyOption = (difficulty: ErDifficulty, key: string) => ({
+              semanticId: key.toLowerCase(),
               label: i18next.t(`starterSelectUiHandler:difficulty${key}`),
               onHover: () => {
                 // Show in THIS screen's message box. `ui.showText` would route

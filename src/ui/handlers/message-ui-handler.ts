@@ -7,6 +7,7 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
   protected textTimer: Phaser.Time.TimerEvent | null;
   protected textCallbackTimer: Phaser.Time.TimerEvent | null;
   public pendingPrompt: boolean;
+  private promptGeneration = 0;
 
   public message: Phaser.GameObjects.Text;
   public prompt: Phaser.GameObjects.Sprite;
@@ -257,6 +258,7 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
         }
       }
     };
+    this.promptGeneration += 1;
     this.awaitingActionInput = true;
     this.pendingPrompt = false;
   }
@@ -276,6 +278,15 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
    */
   isAwaitingPromptAction(): boolean {
     return this.awaitingActionInput === true && this.onActionInput != null;
+  }
+
+  /**
+   * Monotonic identity for human-action prompts published by this handler. A single battle phase can
+   * show more than one prompt, so phase object identity alone cannot safely deduplicate browser or
+   * co-op input drivers.
+   */
+  getPromptGeneration(): number {
+    return this.promptGeneration;
   }
 
   clearText() {

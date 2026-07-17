@@ -48,9 +48,8 @@ const bal = { current: {}, baseline: {} };
 // Factory SET overrides: const → [{moves: [names], abilitySlot}] (absent = shipped sets).
 const trSets = { current: {}, baseline: {} };
 const expandedFactory = new Set(); // species consts with an open set panel
-// Add-a-Mon: live er-custom-mons.json + ability name list for autocomplete.
+// Add-a-Mon: live er-custom-mons.json.
 let MONS_LIVE = {};
-let ABILITY_NAMES = [];
 
 // Custom Trainers: live er-custom-trainers.json + edit state. In the LIVE file
 // each team member's species (and fusion species) is a numeric pokerogue
@@ -118,6 +117,7 @@ let POKEDEX_SPECIES = []; // [{const, name, slug, id, dex}]
 let EVOS = {}; // speciesId → { to: number[], from: number[] }
 const moveById = new Map(); // moveId → rich move
 const abilById = new Map(); // abilityId → rich ability
+const abilIdByNormalizedName = new Map(); // lowercase display name → abilityId
 // Custom Trainers: sprite-bearing trainer classes (from trainer-classes.json),
 // with a NAME→entry lookup for the sprite preview. Falls back to the static
 // TRAINER_CLASS_OPTIONS list if the generated file is missing.
@@ -1840,6 +1840,7 @@ const CTR_MEMBER_FIELDS = [
   "level",
   "moves",
   "abilitySlot",
+  "insanity",
   "fusion",
   "heldItems",
   "shiny",
@@ -1852,6 +1853,36 @@ function ctrNormShiny(s) {
   const o = s && typeof s === "object" ? s : {};
   const str = v => (typeof v === "string" ? v : "");
   return { palette: str(o.palette), surface: str(o.surface), around: str(o.around), name: str(o.name) };
+}
+
+/** Normalize a saved numeric Insanity payload into editor-facing ability names. */
+function ctrNormInsanity(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const abilityName = raw => {
+    if (typeof raw === "string") {
+      return raw;
+    }
+    return Number.isInteger(raw) ? abilById.get(raw)?.name || "" : "";
+  };
+  const rawInnates = Array.isArray(value.innates) ? value.innates : [];
+  return {
+    ability: abilityName(value.ability),
+    innates: [abilityName(rawInnates[0]), abilityName(rawInnates[1]), abilityName(rawInnates[2])],
+  };
+}
+
+/** Resolve a typed ability display name to its authoritative numeric AbilityId. */
+function ctrAbilityId(name) {
+  const normalized = String(name || "")
+    .trim()
+    .toLowerCase();
+  return normalized ? (abilIdByNormalizedName.get(normalized) ?? null) : null;
+}
+
+function ctrAbilityInputBad(name) {
+  return String(name || "").trim() !== "" && ctrAbilityId(name) === null;
 }
 
 /** True when a shiny edit value carries at least one effect (empties = renders normally). */
@@ -1867,6 +1898,8 @@ function blankCtrMemberFields() {
     level: null,
     moves: ["", "", "", ""],
     abilitySlot: 0,
+    // Per-battle ability substitutions. null = Insanity off; blank slots = unchanged.
+    insanity: null,
     fusion: null,
     heldItems: [],
     // Shiny Lab visual effect the mon fields with (empty = none).
@@ -1885,6 +1918,7 @@ function ctrCopyMemberFields(src) {
     level: typeof src.level === "number" ? src.level : null,
     moves: [...(src.moves || []), "", "", "", ""].slice(0, 4),
     abilitySlot: [0, 1, 2].includes(src.abilitySlot) ? src.abilitySlot : 0,
+    insanity: ctrNormInsanity(src.insanity),
     fusion: src.fusion ? { ...src.fusion } : null,
     heldItems: (src.heldItems || []).map(h => ({ item: h.item || "", count: Number.isInteger(h.count) ? h.count : 1 })),
     shiny: ctrNormShiny(src.shiny),
@@ -2035,6 +2069,7 @@ function ctrLiveMemberFieldsToEdit(m) {
     level: typeof m.level === "number" ? m.level : null,
     moves: [...(m.moves || []), "", "", "", ""].slice(0, 4),
     abilitySlot: [0, 1, 2].includes(m.abilitySlot) ? m.abilitySlot : 0,
+    insanity: ctrNormInsanity(m.insanity),
     fusion:
       m.fusion && Number.isInteger(m.fusion.species)
         ? {
@@ -2638,7 +2673,7 @@ function ctrMemberHtml(m, i) {
   const varTag = m.weighted && m.variants.length > 1 ? ` · ${m.cur + 1}/${m.variants.length}` : "";
   const summary = `<span class="ctr-mem-sum" data-idx="${i}" role="button" title="Click to ${open ? "collapse" : "expand"}">
     <span class="ctr-mem-caret">${open ? "▾" : "▸"}</span> Slot ${i + 1}: <b>${esc(spName)}</b>
-    <small>${scale ? "wave-scaled" : `Lv ${m.level}`}${setTag}${varTag}${m.sanityOff ? " · sanity off" : ""}</small></span>`;
+    <small>${scale ? "wave-scaled" : `Lv ${m.level}`}${setTag}${varTag}${m.sanityOff ? " · sanity off" : ""}${m.insanity ? " · INSANITY" : ""}</small></span>`;
   const slotCtrls = ctrSlotControlsHtml(m, i);
   if (!open) {
     return `<fieldset class="ctr-member">
@@ -2695,6 +2730,13 @@ function ctrMemberHtml(m, i) {
     )
     .join("");
   const fus = m.fusion;
+  const insanity = ctrNormInsanity(m.insanity);
+  const insanityInput = (label, value, slot) => {
+    const bad = ctrAbilityInputBad(value);
+    const slotAttr = slot === null ? "" : ` data-slot="${slot}"`;
+    const cls = slot === null ? "ctr-insanity-ability" : "ctr-insanity-innate";
+    return `<label>${label} <input class="${cls}" list="abilities-list" data-idx="${i}"${slotAttr} value="${esc(value || "")}" placeholder="unchanged" spellcheck="false"${bad ? ` style="border-color:${ERR}"` : ""} /></label>`;
+  };
   return `<fieldset class="ctr-member open">
     <legend>${summary} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
     ${slotCtrls}
@@ -2703,6 +2745,18 @@ function ctrMemberHtml(m, i) {
     <label>Ability slot <select class="ctr-abil" data-idx="${i}">${ctrAbilOptions(m.species, m.abilitySlot)}</select></label>
     <label title="Uncheck to set an explicit level">Wave-scale level <input type="checkbox" class="ctr-scale" data-idx="${i}"${scale ? " checked" : ""} /></label>
     <label>Level <input type="number" class="ctr-level" data-idx="${i}" value="${scale ? "" : m.level}" min="1" max="200" ${scale ? "disabled" : ""} style="width:64px" /></label>
+    <div class="ctr-insanity${insanity ? " on" : ""}">
+      <label class="ctr-insanity-toggle" title="Override abilities only on this spawned Pokemon for this custom-trainer fight"><input type="checkbox" class="ctr-insanity-on" data-idx="${i}"${insanity ? " checked" : ""} /> Insanity</label>
+      ${
+        insanity
+          ? `<div class="ctr-insanity-fields">
+              ${insanityInput("Active", insanity.ability, null)}
+              ${insanity.innates.map((value, slot) => insanityInput(`Innate ${slot + 1}`, value, slot)).join("")}
+              <span class="hint">Search any game ability. Blank slots keep the Pokemon's normal ability for this fight.</span>
+            </div>`
+          : ""
+      }
+    </div>
     <div class="ctr-moves-head">
       <label>Use set <span>${setDropdown}</span></label>
       <label title="Skip move-legality checks for this member (saved as sanityOff)"><input type="checkbox" class="ctr-sanity" data-idx="${i}"${m.sanityOff ? " checked" : ""} /> Move sanity off</label>
@@ -3258,6 +3312,12 @@ function onCustomTrainerInput(el) {
     // error line + dropdown refresh on blur (onCustomTrainerChange -> render).
     const bad = v !== "" && !ctrIsMoveToken(v) && (!MOVE_SET.has(v) || ctrMoveIllegal(m, v));
     el.style.borderColor = bad ? ERR : "";
+  } else if (el.classList.contains("ctr-insanity-ability") && m && m.insanity) {
+    m.insanity.ability = el.value;
+    el.style.borderColor = ctrAbilityInputBad(el.value) ? ERR : "";
+  } else if (el.classList.contains("ctr-insanity-innate") && m && m.insanity) {
+    m.insanity.innates[Number(el.dataset.slot)] = el.value;
+    el.style.borderColor = ctrAbilityInputBad(el.value) ? ERR : "";
   } else if (el.classList.contains("ctr-held-item") && m) {
     const h = m.heldItems[Number(el.dataset.heldidx)];
     if (h) {
@@ -3419,6 +3479,27 @@ function onCustomTrainerChange(el) {
     return true;
   } else if (el.classList.contains("ctr-sanity") && m) {
     m.sanityOff = el.checked;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-insanity-on") && m) {
+    m.insanity = el.checked ? ctrNormInsanity({}) : null;
+    render();
+    return true;
+  } else if (
+    (el.classList.contains("ctr-insanity-ability") || el.classList.contains("ctr-insanity-innate"))
+    && m
+    && m.insanity
+  ) {
+    // Canonicalize a valid case-insensitive entry to the catalog display name.
+    const id = ctrAbilityId(el.value);
+    if (id !== null) {
+      const name = abilById.get(id)?.name || el.value.trim();
+      if (el.classList.contains("ctr-insanity-ability")) {
+        m.insanity.ability = name;
+      } else {
+        m.insanity.innates[Number(el.dataset.slot)] = name;
+      }
+    }
     render();
     return true;
   } else if (el.classList.contains("ctr-move") && m) {
@@ -4792,6 +4873,34 @@ function buildDeltas() {
           memberBad = true;
         }
       }
+      if (m.insanity) {
+        const ins = ctrNormInsanity(m.insanity);
+        const abilityName = ins.ability.trim();
+        const activeId = ctrAbilityId(abilityName);
+        if (abilityName && activeId === null) {
+          bad.push(`${t.name}: unknown Insanity ability "${abilityName}"`);
+          memberBad = true;
+        }
+        const innateIds = ins.innates.map((name, slot) => {
+          const trimmed = name.trim();
+          const abilityId = ctrAbilityId(trimmed);
+          if (trimmed && abilityId === null) {
+            bad.push(`${t.name}: unknown Insanity innate ${slot + 1} "${trimmed}"`);
+            memberBad = true;
+          }
+          return abilityId;
+        });
+        const saved = {};
+        if (activeId !== null) {
+          saved.ability = activeId;
+        }
+        if (innateIds.some(abilityId => abilityId !== null)) {
+          saved.innates = innateIds;
+        }
+        // Keep the empty object when the toggle is on so reopening the editor
+        // preserves that authored state; blank slots remain normal in battle.
+        out.insanity = saved;
+      }
       const held = (m.heldItems || [])
         .filter(h => h && h.item)
         .map(h => ({ item: h.item.trim().toUpperCase(), count: h.count || 1 }));
@@ -5112,7 +5221,6 @@ async function init() {
       items,
       trainers,
       knobs,
-      abilities,
       eggLive,
       spLive,
       itemLive,
@@ -5145,7 +5253,6 @@ async function init() {
       fetchJson("./data/items.json", []),
       fetchJson("./data/trainers.json", { frequencyDefaults: { elite: {}, hell: {} }, factorySpecies: [] }),
       fetchJson("./data/balance-knobs.json", []),
-      fetchJson("./data/abilities.json", []),
       // Live override files (resilient: missing on the branch → start empty).
       fetchJson(`${RAW_BASE}/er-egg-moves.json${bust}`, {}),
       fetchJson(`${RAW_BASE}/er-species-tuning.json${bust}`, {}),
@@ -5192,7 +5299,6 @@ async function init() {
     TRAINER_DEFAULTS = trainers.frequencyDefaults;
     FACTORY_SPECIES = trainers.factorySpecies;
     KNOBS = knobs;
-    ABILITY_NAMES = abilities;
     MONS_LIVE = monsLive;
 
     // Seed balance-knob overrides from the live tuning file (only keys that
@@ -5227,6 +5333,7 @@ async function init() {
     }
     for (const a of ABILS_RICH) {
       abilById.set(a.id, a);
+      abilIdByNormalizedName.set(a.name.trim().toLowerCase(), a.id);
     }
     for (const s of POKEDEX_SPECIES) {
       spByConst.set(s.const, s);
@@ -5420,7 +5527,7 @@ async function init() {
     // Ability names for the Add-a-Mon autocomplete.
     const adl = document.createElement("datalist");
     adl.id = "abilities-list";
-    adl.innerHTML = ABILITY_NAMES.map(a => `<option value="${esc(a)}"></option>`).join("");
+    adl.innerHTML = ABILS_RICH.map(a => `<option value="${esc(a.name)}"></option>`).join("");
     document.body.appendChild(adl);
     // Custom Trainers: species picker (full universe), trainer-class + held-item pickers.
     const sdl = document.createElement("datalist");

@@ -22,31 +22,31 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { BattlerIndex } from "#enums/battler-index";
 import { BerryType } from "#enums/berry-type";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { BerryModifier } from "#modifiers/modifier";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
-  arriveGuestCommandBoundary,
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
+  driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostPartyRewardOwner,
   forceItemRewards,
   installDuoLogCapture,
-  remirrorWave,
+  pumpDuoDestinations,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -91,29 +91,18 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
     // best-effort
   });
 
-  /** Wire the guest's OWN-slot command answer (the genuine production CoopBattleSync relay). */
-  function wireGuestCommand(rig: DuoRig): void {
-    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.TACKLE,
-      targets: [BattlerIndex.ENEMY_2],
-    }));
-  }
-
-  /** Drive ONE host wave to a win (both player slots FIGHT the frail enemies) under the host ctx. */
+  /** Drive ONE host wave to a win; the partner slot came through the guest's real public command UI. */
   async function hostPlayWave(rig: DuoRig): Promise<void> {
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
-      await game.phaseInterceptor.to("TurnEndPhase");
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
   }
 
-  /** Reach + drive ONE alternating reward interaction where the OWNER picks party-target SLOT. Drives
-   *  the owner FIRST (it FIFO-buffers its relayed pick), THEN the watcher (drains + re-applies). Returns
-   *  the engines' BEFORE/AFTER so the caller asserts convergence. No cross-wave (the candy's downstream
-   *  move-learn is a SEPARATE concern - see the test note). */
+  /** Reach + drive ONE alternating reward interaction where the OWNER picks party-target SLOT. Parks
+   *  the watcher first so the real reciprocal shop boundary opens, then drives the owner and drains the
+   *  retained result at its destination. No cross-wave (the candy's downstream move-learn is a SEPARATE
+   *  concern - see the test note). */
   async function driveOneSlotReward(rig: DuoRig, slot: number): Promise<{ counterBefore: number; hostOwns: boolean }> {
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
@@ -122,19 +111,28 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     // Slot must be the SAME mon on both engines for the convergence assertions to mean anything.
     expect(
       rig.guestScene.getPlayerParty()[slot]?.species.speciesId,
       `guest slot ${slot} is the same species as host`,
     ).toBe(rig.hostScene.getPlayerParty()[slot]?.species.speciesId);
     if (hostOwns) {
+      expect(
+        await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop)),
+        "guest watcher parked on the host-owned reward",
+      ).toBe(counterBefore);
       await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot }));
-      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
     } else {
+      expect(
+        await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop)),
+        "host watcher parked on the guest-owned reward",
+      ).toBe(counterBefore);
       await withClient(rig.guestCtx, () => driveHostPartyRewardOwner(guestShop, { slot }));
-      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
     }
+    await pumpDuoDestinations(rig);
     // The alternating-interaction counter advanced exactly once on BOTH engines (lockstep).
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counterBefore + 1);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the counter once").toBe(counterBefore + 1);
@@ -150,12 +148,17 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
     const SLOT = 0;
     forceItemRewards(game.override, [{ name: "LEFTOVERS" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    wireGuestCommand(rig);
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+    });
+    pair.setAutomaticDelivery(false);
 
     // ===== WAVE 1 (host-owned, even counter): a party-target HELD ITEM. =====
     {
+      await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
       const turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig);
       await withClient(rig.guestCtx, async () => {
@@ -175,12 +178,20 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
 
     // ===== Cross to wave 2 (LEFTOVERS triggers no level-up -> no LearnMovePhase -> clean cross). =====
     forceItemRewards(game.override, [{ name: "RARE_CANDY" }]);
-    await arriveGuestCommandBoundary(rig, 2);
     await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase");
+      // Run the real host transition first so NextEncounterPhase publishes the immutable wave-2
+      // enemy carrier. Stop before CommandPhase starts: neither peer may satisfy the reciprocal
+      // command rendezvous until the guest has consumed its own queued transition.
+      await game.phaseInterceptor.to("CommandPhase", false);
     });
     expect(rig.hostScene.currentBattle.waveIndex, "host advanced to wave 2").toBe(2);
-    await remirrorWave(rig);
+    await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "wave 2 CommandPhase", {
+        matches: phase => phase.phaseName === "CommandPhase" && rig.guestScene.currentBattle.waveIndex === 2,
+      }),
+    );
+    expect(rig.guestScene.currentBattle.waveIndex, "guest consumed the real wave-2 carrier").toBe(2);
+    await driveDuoGuestTackleThroughPublicUi(game, rig);
 
     // ===== WAVE 2 (guest-owned, odd counter): a party-target RARE_CANDY (the live desync). =====
     {
@@ -213,15 +224,20 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
     const SLOT = 1;
     forceItemRewards(game.override, [{ name: "BERRY" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    wireGuestCommand(rig);
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+    });
+    pair.setAutomaticDelivery(false);
 
     // Force the first reward interaction onto the guest-owned odd counter: this is the live direction that
     // produced one host-only berry on the guest lead while every earlier turn checksum still matched.
     await withClient(rig.hostCtx, () => rig.hostRuntime.controller.advanceInteraction());
     await withClient(rig.guestCtx, () => rig.guestRuntime.controller.advanceInteraction());
 
+    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
     const turn = rig.hostScene.currentBattle.turn;
     await hostPlayWave(rig);
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
