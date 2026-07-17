@@ -3336,6 +3336,21 @@ const pendingRuntimeActivations = new WeakMap<CoopRuntime, Set<() => void>>();
 /** Last scene installed alongside each runtime; direct engine-free tests intentionally share one scene. */
 const runtimeSceneBindings = new WeakMap<CoopRuntime, object>();
 
+/**
+ * HARNESS-ONLY seam: notified when a durability apply DEFERS because the destination runtime's bound
+ * scene is not the ambient scene. Production's second browser keeps its own event loop running, so a
+ * deferred apply there retries into a live destination within one 100ms tick; the one-process
+ * two-engine rig has no second loop, so a host-context await crossing a faint/replacement terminal
+ * starved the guest's deferred apply forever (the b59dba12 B-lane SwitchPhase hang class). The duo
+ * harness subscribes to schedule a destination-context retry pulse. Production and every
+ * single-runtime path never install it (null = zero behavior change), and the pulse only re-runs the
+ * SAME apply gate under the destination scene - it can never ACK or skip anything.
+ */
+let coopHarnessDeferredApplyObserver: ((runtime: CoopRuntime) => void) | null = null;
+export function setCoopHarnessDeferredApplyObserver(observer: ((runtime: CoopRuntime) => void) | null): void {
+  coopHarnessDeferredApplyObserver = observer;
+}
+
 export function runWhenCoopRuntimeActive(runtime: CoopRuntime, callback: () => void): () => void {
   let live = true;
   let queued: Set<() => void> | null = null;
@@ -5700,6 +5715,9 @@ export function assembleCoopRuntime(
               durability: null,
             });
           if (receiverScene != null && receiverScene !== globalScene && !sceneIndependentFaintTerminal) {
+            // In-process rig only (observer is null in production): ask the harness to pulse the
+            // destination context so this exact deferred entry retries under its own ambient scene.
+            coopHarnessDeferredApplyObserver?.(runtime);
             return "deferred";
           }
           return withActiveCoopRuntimeOpState(opState, () => operationDurabilityHooks.apply?.(entry));

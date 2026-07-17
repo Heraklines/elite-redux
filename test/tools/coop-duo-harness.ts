@@ -112,6 +112,7 @@ import {
   getCoopRuntime,
   installCoopRuntimeGhostHooks,
   installCoopRuntimeLiveEmitter,
+  setCoopHarnessDeferredApplyObserver,
   setCoopMeBattleInteractionCounter,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -1882,6 +1883,45 @@ afterEach(() => {
   for (const rig of [...liveDuoRigs]) {
     disposeDuoRig(rig);
   }
+});
+
+/**
+ * The one-process rig's stand-in for production's SECOND always-running browser event loop.
+ *
+ * A durability apply DEFERS when its destination scene is not ambient. In production the destination
+ * browser's own loop retries within one tick; in this rig, a host-context await that crosses a
+ * faint/replacement terminal never re-installs the guest, so the deferred apply - and with it the
+ * guest's materialApplied ACK the host's barrier waits on - starved forever (the b59dba12
+ * B1/B7/B8/B10/B12/S4 SwitchPhase hang class: every faint-crossing duo/showdown test stalled at a
+ * downstream phase). This observer generalizes the settleDuoPromise two-client settlement model to
+ * EVERY await, event-driven: on deferral, schedule one short pulse that SYNCHRONOUSLY installs the
+ * destination context, re-runs the durability manager's own retryDeferred() gate, and restores the
+ * previous context. The production ACK barrier is untouched - an entry still only ACKs after really
+ * applying under its own scene; a still-deferred entry re-notifies and stays bounded by the
+ * durability retry/deadline discipline. Engine-free/single-runtime tests match no live rig and keep
+ * exact production behavior.
+ */
+const pendingDeferredApplyPulses = new Set<CoopRuntime>();
+setCoopHarnessDeferredApplyObserver(runtime => {
+  if (pendingDeferredApplyPulses.has(runtime)) {
+    return;
+  }
+  const owningRig = [...liveDuoRigs].find(rig => rig.hostRuntime === runtime || rig.guestRuntime === runtime);
+  if (owningRig == null) {
+    return;
+  }
+  pendingDeferredApplyPulses.add(runtime);
+  setTimeout(() => {
+    pendingDeferredApplyPulses.delete(runtime);
+    const rig = [...liveDuoRigs].find(r => r.hostRuntime === runtime || r.guestRuntime === runtime);
+    if (rig == null) {
+      return; // torn down before the pulse fired
+    }
+    const ctx = rig.hostRuntime === runtime ? rig.hostCtx : rig.guestCtx;
+    withClientSync(ctx, () => {
+      runtime.durability?.retryDeferred();
+    });
+  }, 15);
 });
 
 interface RetainedWaveBoundaryBridge {
