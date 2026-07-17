@@ -71,6 +71,8 @@ export const COOP_WIRE_CHUNK_PAYLOAD_CHARS = COOP_WIRE_CHUNK_RAW_BYTES;
 export const COOP_WIRE_BUFFER_HIGH_BYTES = 256 * 1024;
 export const COOP_WIRE_BUFFER_LOW_BYTES = 64 * 1024;
 const COOP_WIRE_MAX_CHUNKS = 2_048;
+/** Cap on frames buffered for a not-yet-registered subscriber (early-rx); overflow drops NEWEST, loudly. */
+export const COOP_EARLY_RX_MAX_FRAMES = 64;
 const COOP_WIRE_MAX_REASSEMBLED_BYTES = 16 * 1024 * 1024;
 const COOP_LOGICAL_QUEUE_MAX_BYTES = 32 * 1024 * 1024;
 const COOP_LOGICAL_QUEUE_MAX_COUNT = 512;
@@ -203,6 +205,22 @@ export class WebRtcTransport implements CoopTransport {
   >();
   /** Recently completed chunk ids remain terminal so replaying an entire group cannot deliver twice. */
   private readonly completedInboundChunkIds = new Set<string>();
+  /**
+   * Frames that arrived BEFORE THE FIRST-EVER message handler registered (run 29551213918: the
+   * host's one-shot `dataFingerprint` reached the guest at `handlers=0` while its session
+   * controller was still constructing under CPU starvation, was dropped, and the compatibility
+   * barrier correctly-but-permanently kept the lobby closed). Bounded; replayed in arrival
+   * order on the first subscription. STRICTLY pre-first-subscription: once any handler has ever
+   * registered, a later zero-handler window keeps the legacy drop semantics (tests inject loss
+   * that way, and post-teardown frames must not leak into a successor subscriber). Delivery
+   * robustness only - a buffered frame is indistinguishable from a slow network to every
+   * consumer, so no protocol/determinism surface changes.
+   */
+  private readonly earlyRx: CoopMessage[] = [];
+  private earlyRxDropped = 0;
+  private earlyRxDraining = false;
+  private earlyRxDrainScheduled = false;
+  private hasEverSubscribed = false;
 
   constructor(role: CoopRole, wire: CoopWireChannel, initialConnectionGeneration = 0) {
     if (!Number.isSafeInteger(initialConnectionGeneration) || initialConnectionGeneration < 0) {
@@ -724,8 +742,59 @@ export class WebRtcTransport implements CoopTransport {
     }
   }
 
+  /** Isolated fan-out of one already-validated inbound frame to every registered handler. */
+  private dispatchInbound(msg: CoopMessage): void {
+    for (const h of [...this.msgHandlers]) {
+      try {
+        h(msg);
+      } catch (error) {
+        // Fan-out isolation is load-bearing: a diagnostics/UI observer must never prevent a
+        // later command or recovery consumer from receiving this already-validated frame.
+        coopWarn(
+          "webrtc",
+          `raw rx role=${this.role} t=${msg.t} handler threw (isolated): ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Replay early-buffered frames once a subscriber exists. Microtask-deferred (mirrors the
+   * loopback pair's delivery timing) so a session controller that registers its handler
+   * mid-construction finishes wiring before the backlog lands. Loops until the buffer is
+   * empty so frames arriving DURING the replay keep strict arrival order.
+   */
+  private scheduleEarlyRxDrain(): void {
+    if (this.earlyRxDrainScheduled || this.earlyRx.length === 0 || this.msgHandlers.size === 0) {
+      return;
+    }
+    this.earlyRxDrainScheduled = true;
+    queueMicrotask(() => {
+      this.earlyRxDrainScheduled = false;
+      if (this.msgHandlers.size === 0 || this._state === "closed") {
+        return; // subscriber vanished - keep the backlog for the next subscription
+      }
+      this.earlyRxDraining = true;
+      let drained = 0;
+      try {
+        while (this.earlyRx.length > 0) {
+          const queued = this.earlyRx.splice(0);
+          drained += queued.length;
+          for (const msg of queued) {
+            this.dispatchInbound(msg);
+          }
+        }
+      } finally {
+        this.earlyRxDraining = false;
+      }
+      coopLog("webrtc", `early-rx drain role=${this.role} n=${drained} dropped=${this.earlyRxDropped}`);
+    });
+  }
+
   onMessage(handler: (msg: CoopMessage) => void): () => void {
+    this.hasEverSubscribed = true;
     this.msgHandlers.add(handler);
+    this.scheduleEarlyRxDrain();
     return () => {
       this.msgHandlers.delete(handler);
     };
@@ -746,6 +815,7 @@ export class WebRtcTransport implements CoopTransport {
     this.wire.close();
     this.inboundChunks.clear();
     this.completedInboundChunkIds.clear();
+    this.earlyRx.length = 0;
     this.logicalOutbound.length = 0;
     this.logicalOutboundBytes = 0;
     this.blockedSendGeneration = null;
@@ -803,18 +873,26 @@ export class WebRtcTransport implements CoopTransport {
       if (isCoopDebug()) {
         coopLog("webrtc", `raw rx role=${this.role} t=${msg.t} bytes=${data.length} handlers=${this.msgHandlers.size}`);
       }
-      for (const h of [...this.msgHandlers]) {
-        try {
-          h(msg);
-        } catch (error) {
-          // Fan-out isolation is load-bearing: a diagnostics/UI observer must never prevent a
-          // later command or recovery consumer from receiving this already-validated frame.
+      // Early-rx buffering: no FIRST subscriber yet (or the buffered replay is still pending/
+      // running - appending preserves arrival order across the replay boundary). See `earlyRx`.
+      if ((!this.hasEverSubscribed && this.msgHandlers.size === 0) || this.earlyRx.length > 0 || this.earlyRxDraining) {
+        if (this.earlyRx.length >= COOP_EARLY_RX_MAX_FRAMES) {
+          this.earlyRxDropped += 1;
           coopWarn(
             "webrtc",
-            `raw rx role=${this.role} t=${msg.t} handler threw (isolated): ${error instanceof Error ? error.message : String(error)}`,
+            `raw rx early-buffer FULL role=${this.role} t=${msg.t} dropped=${this.earlyRxDropped} (no handler consumed ${COOP_EARLY_RX_MAX_FRAMES} frames)`,
           );
+          return;
         }
+        this.earlyRx.push(msg);
+        coopLog(
+          "webrtc",
+          `raw rx BUFFERED (no handlers yet) role=${this.role} t=${msg.t} queued=${this.earlyRx.length}`,
+        );
+        this.scheduleEarlyRxDrain();
+        return;
       }
+      this.dispatchInbound(msg);
     } else {
       coopWarn(
         "webrtc",

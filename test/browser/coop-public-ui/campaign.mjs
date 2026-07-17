@@ -184,6 +184,15 @@ class CampaignProgress {
 const SPEED_STEP_OBSERVATION_TIMEOUT_MS = 1500;
 
 /**
+ * How long a SINGLE-sided command frontier must survive (no reward / wipe / faint / two-sided
+ * frontier superseding it) before it is trusted as the next turn. The renderer seat's wave-end
+ * transient CommandPhase was superseded ~13s later under CI's ~3fps starvation (run
+ * 29551213918); the window must comfortably outlast that gap while staying far below the
+ * per-turn budget.
+ */
+const SINGLE_SIDED_COMMAND_CONFIRM_MS = 20_000;
+
+/**
  * Classify WHICH input layer dropped a key using the entry probe's diagnostics
  * (raw DOM keydown counter + Phaser frame counter + visibility/focus): run 29548390234
  * proved the blind walk can dispatch 12 keys with zero game reaction and no way to name
@@ -614,11 +623,13 @@ export async function waitForOutcomeBounded(
     stopOnOwnedCommandFrontier = false,
     advanceBattlePrompt = null,
     extendForAnimationProgress = false,
+    singleSidedConfirmMs = 0,
   } = {},
 ) {
   const clients = Object.values(rig.clients);
   const fixedDeadline = Date.now() + timeoutMs;
   const animationBudget = extendForAnimationProgress ? createAnimationProgressBudget(rig, from, timeoutMs) : null;
+  let singleSidedSinceMs = null;
   while (true) {
     const deadline = animationBudget?.observe() ?? fixedDeadline;
     // A mid-battle wipe / game-over is a real run END, not a driver softlock: classify it
@@ -649,7 +660,20 @@ export async function waitForOutcomeBounded(
     if (stopOnOwnedCommandFrontier) {
       const commandClient = clients.find(client => findOwnedCommandFrontier(client, from[client.label]) != null);
       if (commandClient != null) {
-        return { kind: "command", client: commandClient };
+        // A SINGLE-sided command frontier can be a wave-end transient: the pure-renderer seat
+        // locally opens its next CommandPhase for a few (starved) frames before the
+        // authoritative wave resolution supersedes it with the reward flow (run 29551213918,
+        // surface profile: transient command:command w1t4 4s before reward-shop, then a blind
+        // frontier-convergence timeout). Confirm it for a bounded window: if a reward / wipe /
+        // faint / TWO-sided frontier lands first, that outcome wins; only a frontier that
+        // SURVIVES the window is a real next turn. Zero window preserves legacy behavior.
+        if (singleSidedConfirmMs <= 0) {
+          return { kind: "command", client: commandClient };
+        }
+        singleSidedSinceMs ??= Date.now();
+        if (Date.now() - singleSidedSinceMs >= singleSidedConfirmMs) {
+          return { kind: "command", client: commandClient };
+        }
       }
     }
     if (stopOnTurnProgress && clientsAwaitingTurnProgress(rig, from).length === 0) {
@@ -661,6 +685,14 @@ export async function waitForOutcomeBounded(
     // Drain evidence once before honoring the deadline. Under severe event-loop dilation the timer callback
     // can resume after the immutable ceiling even though the commit/reward event was already buffered.
     if (Date.now() >= deadline) {
+      // A still-unconfirmed single-sided frontier at the deadline beats returning null (which
+      // would replay fallback keys onto a live command UI) - resolve it as the command outcome.
+      if (singleSidedSinceMs != null) {
+        const commandClient = clients.find(client => findOwnedCommandFrontier(client, from[client.label]) != null);
+        if (commandClient != null) {
+          return { kind: "command", client: commandClient };
+        }
+      }
       break;
     }
     await delay(100);
@@ -682,17 +714,64 @@ async function driveBattleWave(rig, policy, stats) {
   const fallbackWindow = Math.min(rig.config.timeoutMs, 15_000);
   for (let turn = 1; turn <= rig.config.maxTurns; turn++) {
     const purpose = `wave-${stats.wave}-turn-${turn}`;
+    if (pendingCommandProof != null) {
+      // The previous round's "next command" may have been a wave-end transient (renderer-local
+      // CommandPhase superseded by the authoritative reward flow). Probe the wave-end markers
+      // once BEFORE pressing more battle keys, so no key is ever driven into the reward shop.
+      const superseded = await waitForOutcomeBounded(rig, pendingCommandProof.cursors, 1, {});
+      if (superseded?.kind === "reward") {
+        await rig.assertSharedSurface(
+          "reward",
+          pendingCommandProof.cursors,
+          `${pendingCommandProof.name}-superseded-by-reward`,
+          {
+            expectedWave: rig.activeBattleWave,
+          },
+        );
+        await rig.assertRetainedContinuation(
+          pendingCommandProof.cursors,
+          `${pendingCommandProof.name}-superseded-by-reward`,
+        );
+        return "reward";
+      }
+      if (superseded?.kind === "wipe") {
+        return "wipe";
+      }
+    }
     const { outcomeCursors, expectedCommandAddress } = await rig.driveSequentialCommandRound(
       commandCursors,
       policy.keys.battle,
       `${purpose}-attack-first`,
     );
     if (pendingCommandProof != null) {
-      await rig.assertSharedCommandFrontier(pendingCommandProof.cursors, pendingCommandProof.name, {
-        expectedWave: rig.activeBattleWave,
-        expectedAddress: expectedCommandAddress,
-      });
-      await rig.assertRetainedContinuation(pendingCommandProof.cursors, pendingCommandProof.name);
+      try {
+        await rig.assertSharedCommandFrontier(pendingCommandProof.cursors, pendingCommandProof.name, {
+          expectedWave: rig.activeBattleWave,
+          expectedAddress: expectedCommandAddress,
+        });
+        await rig.assertRetainedContinuation(pendingCommandProof.cursors, pendingCommandProof.name);
+      } catch (error) {
+        // Belt-and-braces for the wave-end transient (see the pre-round probe above): if the
+        // frontier never converged because the wave actually ENDED, honor the real outcome.
+        const superseded = await waitForOutcomeBounded(rig, pendingCommandProof.cursors, 1, {});
+        if (superseded?.kind === "reward") {
+          await rig.assertSharedSurface(
+            "reward",
+            pendingCommandProof.cursors,
+            `${pendingCommandProof.name}-superseded-by-reward`,
+            { expectedWave: rig.activeBattleWave },
+          );
+          await rig.assertRetainedContinuation(
+            pendingCommandProof.cursors,
+            `${pendingCommandProof.name}-superseded-by-reward`,
+          );
+          return "reward";
+        }
+        if (superseded?.kind === "wipe") {
+          return "wipe";
+        }
+        throw error;
+      }
       pendingCommandProof = null;
     }
     stats.turns = turn;
@@ -703,6 +782,7 @@ async function driveBattleWave(rig, policy, stats) {
     let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow, {
       stopOnTurnProgress: true,
       stopOnOwnedCommandFrontier: true,
+      singleSidedConfirmMs: SINGLE_SIDED_COMMAND_CONFIRM_MS,
     });
     const fallbackClients = [];
     let turnProgressed = false;
@@ -718,6 +798,7 @@ async function driveBattleWave(rig, policy, stats) {
         advanceBattlePrompt,
         extendForAnimationProgress: true,
         stopOnOwnedCommandFrontier: true,
+        singleSidedConfirmMs: SINGLE_SIDED_COMMAND_CONFIRM_MS,
       });
     }
     if (!outcome && !turnProgressed) {
@@ -734,6 +815,7 @@ async function driveBattleWave(rig, policy, stats) {
         advanceBattlePrompt,
         extendForAnimationProgress: true,
         stopOnOwnedCommandFrontier: true,
+        singleSidedConfirmMs: SINGLE_SIDED_COMMAND_CONFIRM_MS,
       });
     }
     if (!outcome) {

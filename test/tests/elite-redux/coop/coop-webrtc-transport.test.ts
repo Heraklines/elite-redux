@@ -14,6 +14,7 @@ import { CoopSessionController } from "#data/elite-redux/coop/coop-session-contr
 import type { CoopConnectionState, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { COOP_PROTOCOL_VERSION, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import {
+  COOP_EARLY_RX_MAX_FRAMES,
   COOP_KEEPALIVE_MS,
   COOP_PC_DISCONNECTED_GRACE_MS,
   COOP_WIRE_BUFFER_HIGH_BYTES,
@@ -1396,5 +1397,98 @@ describe("#810: resume offer/reply protocol + marker", () => {
     expect(coopParticipantPairMatches(undefined, "Alice", "Bob")).toBe(false);
     expect(coopParticipantPairMatches(["Alice"], "Alice", "Bob")).toBe(false);
     expect(coopParticipantPairMatches(["Alice", 7], "Alice", "Bob")).toBe(false);
+  });
+});
+
+// Early-rx buffering: run 29551213918 (mystery profile) delivered the host's one-shot
+// `dataFingerprint` while the guest's session controller was still wiring up
+// (`raw rx role=guest t=dataFingerprint handlers=0`) - the frame was dropped, the
+// compatibility barrier never settled, and the lobby (correctly, fail-safe) never opened.
+// The transport now buffers frames that arrive before ANY handler is registered and
+// replays them in arrival order on first subscription - a bounded delivery-robustness
+// fix below the protocol layer; no message semantics change.
+describe("co-op WebRTC transport - early-rx buffering (pre-subscription frames)", () => {
+  const hello = (username: string): CoopMessage => ({
+    t: "hello",
+    version: "1",
+    username,
+    role: "host",
+    epoch: 1,
+  });
+
+  it("replays frames received before the first handler registers, in arrival order", async () => {
+    const { a, b } = linkedWires();
+    const host = new WebRtcTransport("host", a);
+    const guest = new WebRtcTransport("guest", b);
+    // The guest side has NO onMessage subscriber yet (session controller still constructing).
+    host.send(hello("first"));
+    host.send(hello("second"));
+    const received: CoopMessage[] = [];
+    guest.onMessage(message => received.push(message));
+    await Promise.resolve(); // buffered replay is microtask-deferred (matches loopback delivery)
+    expect(received.map(message => ("username" in message ? message.username : message.t))).toEqual([
+      "first",
+      "second",
+    ]);
+    guest.close();
+    host.close();
+  });
+
+  it("keeps arrival order when a live frame lands between subscription and the deferred replay", async () => {
+    const { a, b } = linkedWires();
+    const host = new WebRtcTransport("host", a);
+    const guest = new WebRtcTransport("guest", b);
+    host.send(hello("buffered"));
+    const received: CoopMessage[] = [];
+    guest.onMessage(message => received.push(message));
+    // Arrives synchronously AFTER subscription but BEFORE the microtask replay runs.
+    host.send(hello("late"));
+    await Promise.resolve();
+    expect(received.map(message => ("username" in message ? message.username : message.t))).toEqual([
+      "buffered",
+      "late",
+    ]);
+    guest.close();
+    host.close();
+  });
+
+  it("bounds the buffer and keeps the EARLIEST frames on overflow", async () => {
+    const { a, b } = linkedWires();
+    const host = new WebRtcTransport("host", a);
+    const guest = new WebRtcTransport("guest", b);
+    for (let i = 0; i < COOP_EARLY_RX_MAX_FRAMES + 8; i++) {
+      host.send(hello(`frame-${i}`));
+    }
+    const received: CoopMessage[] = [];
+    guest.onMessage(message => received.push(message));
+    await Promise.resolve();
+    expect(received).toHaveLength(COOP_EARLY_RX_MAX_FRAMES);
+    expect(received[0]).toMatchObject({ t: "hello", username: "frame-0" });
+    expect(received.at(-1)).toMatchObject({ t: "hello", username: `frame-${COOP_EARLY_RX_MAX_FRAMES - 1}` });
+    guest.close();
+    host.close();
+  });
+});
+
+// The buffer is STRICTLY pre-first-subscription: harness fault-injection simulates loss via
+// zero-handler windows, and post-teardown frames must never leak into a successor subscriber.
+describe("co-op WebRTC transport - early-rx stays scoped to the first subscription", () => {
+  it("drops frames arriving in a zero-handler window AFTER the first subscription", async () => {
+    const { a, b } = linkedWires();
+    const host = new WebRtcTransport("host", a);
+    const guest = new WebRtcTransport("guest", b);
+    const first: CoopMessage[] = [];
+    const unsubscribe = guest.onMessage(message => first.push(message));
+    host.send({ t: "hello", version: "1", username: "before", role: "host", epoch: 1 });
+    unsubscribe();
+    // Legacy loss semantics: nobody is listening and the first subscription already happened.
+    host.send({ t: "hello", version: "1", username: "lost", role: "host", epoch: 1 });
+    const second: CoopMessage[] = [];
+    guest.onMessage(message => second.push(message));
+    await Promise.resolve();
+    expect(first).toHaveLength(1);
+    expect(second, "the post-subscription gap frame stays dropped").toHaveLength(0);
+    guest.close();
+    host.close();
   });
 });

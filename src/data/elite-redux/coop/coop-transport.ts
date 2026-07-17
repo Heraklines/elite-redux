@@ -2133,11 +2133,20 @@ function summarizeCoopMessage(msg: CoopMessage): string {
  * observe its own send re-entrantly (mimics a real async channel). Powers tests
  * and the local hotseat path; no real network involved.
  */
+/** Early-rx cap (parity with COOP_EARLY_RX_MAX_FRAMES in coop-webrtc-transport.ts). */
+const COOP_EARLY_RX_MAX_FRAMES_LOOPBACK = 64;
+
 class LoopbackTransport implements CoopTransport {
   public readonly role: CoopRole;
   private _state: CoopConnectionState = "connecting";
   private peer: LoopbackTransport | null = null;
   private readonly msgHandlers = new Set<(msg: CoopMessage) => void>();
+  /** Early-rx parity with WebRtcTransport: STRICTLY pre-first-subscription frames only. A later
+   *  zero-handler window keeps the legacy drop semantics (harness loss-injection relies on it). */
+  private readonly earlyRx: CoopMessage[] = [];
+  private earlyRxDraining = false;
+  private earlyRxDrainScheduled = false;
+  private hasEverSubscribed = false;
   private readonly stateHandlers = new Set<(state: CoopConnectionState) => void>();
   /** #diagnostics: epoch-ms the last inbound frame was delivered to this endpoint (0 = none yet). */
   private lastRxAt = 0;
@@ -2205,17 +2214,57 @@ class LoopbackTransport implements CoopTransport {
           `recv ${peer.role} t=${frame.t} ${summarizeCoopMessage(frame)} handlers=${peer.msgHandlers.size}`,
         );
       }
-      for (const h of [...peer.msgHandlers]) {
-        try {
-          h(frame);
-        } catch (error) {
-          // A transport is a fan-out bus: one optional observer failing must not starve the
-          // command/recovery handlers registered after it. Keep the fault loud and continue.
-          coopWarn(
-            "transport",
-            `recv ${peer.role} t=${frame.t} handler threw (isolated): ${error instanceof Error ? error.message : String(error)}`,
-          );
+      // Early-rx parity with WebRtcTransport: a frame arriving before the peer registered any
+      // handler is buffered (bounded) and replayed in order on first subscription, never dropped.
+      if ((!peer.hasEverSubscribed && peer.msgHandlers.size === 0) || peer.earlyRx.length > 0 || peer.earlyRxDraining) {
+        if (peer.earlyRx.length >= COOP_EARLY_RX_MAX_FRAMES_LOOPBACK) {
+          coopWarn("transport", `recv ${peer.role} early-buffer FULL t=${frame.t} (dropped)`);
+          return;
         }
+        peer.earlyRx.push(frame);
+        peer.scheduleEarlyRxDrain();
+        return;
+      }
+      peer.dispatchInbound(frame);
+    });
+  }
+
+  /** Isolated fan-out of one inbound frame (see the WebRtcTransport counterpart). */
+  private dispatchInbound(frame: CoopMessage): void {
+    for (const h of [...this.msgHandlers]) {
+      try {
+        h(frame);
+      } catch (error) {
+        // A transport is a fan-out bus: one optional observer failing must not starve the
+        // command/recovery handlers registered after it. Keep the fault loud and continue.
+        coopWarn(
+          "transport",
+          `recv ${this.role} t=${frame.t} handler threw (isolated): ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  }
+
+  /** Replay early-buffered frames once a subscriber exists (order-preserving; microtask-deferred). */
+  private scheduleEarlyRxDrain(): void {
+    if (this.earlyRxDrainScheduled || this.earlyRx.length === 0 || this.msgHandlers.size === 0) {
+      return;
+    }
+    this.earlyRxDrainScheduled = true;
+    queueMicrotask(() => {
+      this.earlyRxDrainScheduled = false;
+      if (this.msgHandlers.size === 0 || this._state === "closed") {
+        return;
+      }
+      this.earlyRxDraining = true;
+      try {
+        while (this.earlyRx.length > 0) {
+          for (const frame of this.earlyRx.splice(0)) {
+            this.dispatchInbound(frame);
+          }
+        }
+      } finally {
+        this.earlyRxDraining = false;
       }
     });
   }
@@ -2226,7 +2275,9 @@ class LoopbackTransport implements CoopTransport {
   }
 
   onMessage(handler: (msg: CoopMessage) => void): () => void {
+    this.hasEverSubscribed = true;
     this.msgHandlers.add(handler);
+    this.scheduleEarlyRxDrain();
     return () => {
       this.msgHandlers.delete(handler);
     };
@@ -2249,6 +2300,7 @@ class LoopbackTransport implements CoopTransport {
     }
     this.msgHandlers.clear();
     this.stateHandlers.clear();
+    this.earlyRx.length = 0;
   }
 }
 
