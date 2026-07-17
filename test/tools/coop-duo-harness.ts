@@ -1876,7 +1876,10 @@ const liveDuoRigs = new Set<DuoRig>();
  *  - default-scheduled durability recovery/deferral timers fire under the ctx installed when they
  *    were scheduled (production wrapper is null - zero live impact).
  */
+const duoCtxPinDisposers = new WeakMap<DuoRig, (() => void)[]>();
+
 function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
+  const disposers: (() => void)[] = [];
   const pinClock = (scene: BattleScene, ctx: ClientCtx): void => {
     const clock = scene.time as unknown as {
       update: (time: number, delta: number) => void;
@@ -1891,6 +1894,9 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
       }
       withClientSync(ctx, () => originalUpdate(time, delta));
     };
+    disposers.push(() => {
+      clock.update = originalUpdate;
+    });
   };
   pinClock(rig.hostScene, rig.hostCtx);
   pinClock(rig.guestScene, rig.guestCtx);
@@ -1901,6 +1907,9 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
     activeClientLabel === rig.hostCtx.label
       ? originalRun(phase)
       : withClientSync(rig.hostCtx, () => originalRun(phase));
+  disposers.push(() => {
+    interceptor.run = originalRun;
+  });
 
   // Idempotent (re)install: capture the scheduling client at schedule time; passthrough when no duo
   // window is installed (single-engine tests in the same worker are untouched).
@@ -1917,6 +1926,9 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
       withClientSync(owner, callback);
     };
   });
+  disposers.push(() => setCoopDurabilityScheduleWrapperForTesting(null));
+
+  duoCtxPinDisposers.set(rig, disposers);
 }
 
 /**
@@ -1929,6 +1941,15 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
  */
 export function disposeDuoRig(rig: DuoRig): void {
   liveDuoRigs.delete(rig);
+  // Unwind the ctx-ownership pins FIRST: the scenes' MockClock setIntervals are eternal (never
+  // cleared across tests), and a still-pinned tick after this rig's teardown would keep doing full
+  // ctx swaps - whose install logging races vitest's console RPC at environment teardown
+  // (gate 29605676187: every shard's tests PASSED yet the worker died with
+  // "Closing rpc while onUserConsoleLog was pending").
+  for (const dispose of duoCtxPinDisposers.get(rig) ?? []) {
+    dispose();
+  }
+  duoCtxPinDisposers.delete(rig);
   for (const runtime of [rig.guestRuntime, rig.hostRuntime]) {
     if (runtime.localTransport.state === "closed") {
       continue;
