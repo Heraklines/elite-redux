@@ -299,7 +299,9 @@ jobs:
             artifact: mystery
             waves: "10"
             difficulty: mystery
-            difficulty_option: mystery-test
+            # The live difficulty picker renamed its option id "mystery-test" -> "mystery"
+            # (run 29586411356: selectOptionById target not in ["youngster","ace","elite","hell","mystery"]).
+            difficulty_option: mystery
             require_mystery: "1"
           # Account-state fidelity lane (harness post-mortem 2026-07-17): every other profile
           # registers PRISTINE accounts, which made the whole dirty-account bug class (full slots,

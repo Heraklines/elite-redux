@@ -94,9 +94,28 @@ export function soloSessionJson({ seed, timestamp, waveIndex }) {
   });
 }
 
-/** The unparseable divergent-remnant blob for slot 4 (quarantine + garbage-first reclaim class). */
+/**
+ * The divergent-remnant blob for slot 4 (quarantine + garbage-first reclaim class). It must be
+ * VALID JSON that classifies as a plain solo save server-side (the worker fail-closed-409s any
+ * body it cannot prove is not co-op - raw garbage is refused), while the CLIENT's
+ * parseSessionData reviver throws on it (`modifiers` is not iterable), which lands the slot in
+ * the isolated lobby snapshot's failures map - the exact quarantined class the reclaim ranking
+ * must consume first.
+ */
 export function divergentRemnantBlob() {
-  return "not-json{{divergent-coop-remnant##";
+  return JSON.stringify({
+    seed: "divergent-remnant",
+    playTime: 1,
+    gameMode: 0,
+    gameVersion: "1.9.0",
+    timestamp: 1,
+    waveIndex: 9,
+    party: [],
+    enemyParty: [],
+    modifiers: 7,
+    enemyModifiers: [],
+    arena: { biome: 0, tags: [] },
+  });
 }
 
 async function apiPost(apiOrigin, path, { token = null, form = null, body = null } = {}) {

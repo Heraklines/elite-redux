@@ -81,7 +81,8 @@ const allowedJourneys = new Set([
 const allowedSeats = new Set(["host-seat", "guest-seat"]);
 const allowedAccountModes = new Set(["login", "register"]);
 const allowedDifficulties = new Set(["youngster", "ace", "elite", "hell", "mystery"]);
-const allowedDifficultyOptions = new Set(["youngster", "ace", "elite", "hell", "mystery-test"]);
+// "mystery-test" retained for older dispatch inputs; the live picker's semantic id is "mystery".
+const allowedDifficultyOptions = new Set(["youngster", "ace", "elite", "hell", "mystery", "mystery-test"]);
 const allowedLocales = new Set([
   "en",
   "es-ES",
