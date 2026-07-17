@@ -812,6 +812,41 @@ export function setCoopGhostPool(pool: GhostTeamSnapshot[]): void {
   prefetchStarted = true;
 }
 
+// -----------------------------------------------------------------------------
+// Difficulty gating (#345/#difficulty-pools): a run must NEVER field a ghost of a
+// HARDER difficulty than its own tier. Youngster/Ace are pure vanilla and have NO
+// scheduled ghost waves (er-ghost-waves), so the only way they meet a ghost is the
+// explicit Ghost Trainers CHALLENGE opt-in - and even then the reported bug was a
+// Youngster run drawing Hell-scaled evolved rosters, because the challenge pool
+// topped up from the deepest (Hell/Elite) pools to avoid starvation. Constrain the
+// top-up to the run's tier and EASIER only, so an easy run never faces a harder team.
+// -----------------------------------------------------------------------------
+const GHOST_DIFFICULTY_RANK: Record<string, number> = {
+  youngster: 0,
+  ace: 1,
+  elite: 2,
+  hell: 3,
+  mystery: 3, // dev gauntlet, hell-equivalent (uses its own scripted carrier anyway)
+};
+
+/** Rank of a difficulty label; unknown/legacy snapshots default to Ace (the historical era). */
+function ghostDifficultyRank(d: string | undefined): number {
+  return GHOST_DIFFICULTY_RANK[d ?? ""] ?? GHOST_DIFFICULTY_RANK.ace;
+}
+
+/**
+ * The difficulty pools the Ghost Trainers CHALLENGE may draw from for a `run` tier:
+ * the run's own tier first (for pool depth), then progressively EASIER tiers to fight
+ * starvation - but NEVER a harder tier. So a Youngster challenge draws only Youngster
+ * teams, Ace draws Ace+Youngster, and only Hell draws the full ladder.
+ */
+export function ghostChallengePoolOrder(run: ErDifficulty): ErDifficulty[] {
+  const easierFirst: ErDifficulty[] = ["hell", "elite", "ace", "youngster"]; // descending rank
+  const runRank = ghostDifficultyRank(run);
+  const rest = easierFirst.filter(d => d !== run && ghostDifficultyRank(d) <= runRank);
+  return [run, ...rest];
+}
+
 function isValidSnapshot(s: unknown): s is GhostTeamSnapshot {
   return (
     !!s
@@ -851,7 +886,10 @@ async function fetchGhostTeams(difficulty: ErDifficulty, count: number, minWave:
   // (prefer the right difficulty), most-recent first.
   const local = loadLocalGhostTeams().filter(s => isValidSnapshot(s) && s.waveReached >= minWave);
   const matched = local.filter(s => s.difficulty === difficulty);
-  return (matched.length > 0 ? matched : local).slice().reverse();
+  // #difficulty-pools: when no exact-tier team exists, fall back only to teams that are
+  // NOT HARDER than the requested tier (never field a Hell roster on a Youngster run).
+  const notHarder = local.filter(s => ghostDifficultyRank(s.difficulty) <= ghostDifficultyRank(difficulty));
+  return (matched.length > 0 ? matched : notHarder).slice().reverse();
 }
 
 /**
@@ -873,15 +911,16 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
   // prefetch a full batch immediately (floor 1). The pool endpoint filters by
   // DIFFICULTY, and a difficulty with few stored runs (Ace!) starved the
   // challenge into constant normal-trainer fallbacks - so under the challenge
-  // we top up from the OTHER difficulties' pools too (current first, then the
-  // deepest pools), de-duped by id.
+  // we top up from EASIER difficulties' pools too (current first, then easier),
+  // de-duped by id. #difficulty-pools: the top-up is capped at the run's tier so
+  // an easy run never draws a HARDER (Hell/Elite) team - the Youngster-sees-Hell bug.
   // Mystery Gauntlet uses its fixed scripted carrier and must not depend on an external fetch.
   const immediateGhostPool = isErGhostChallengeActive();
   if (immediateGhostPool) {
     prefetchStarted = true;
     void (async () => {
       const collected: GhostTeamSnapshot[] = [];
-      const order: ErDifficulty[] = [getErDifficulty(), "hell", "elite", "ace", "youngster"];
+      const order: ErDifficulty[] = ghostChallengePoolOrder(getErDifficulty());
       const tried = new Set<string>();
       for (const diff of order) {
         if (tried.has(diff)) {
