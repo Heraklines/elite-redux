@@ -487,7 +487,7 @@ export class SummaryUiHandler extends UiHandler {
       this.omniformViewIndex,
       {
         x: rightEdgeX - omniformStripWidth(stripWindow, stripCell),
-        y: this.abilitiesTabText.y + 6, // vertically centred in the header row
+        y: this.abilitiesTabText.y + 3, // nudged a few px up within the header row
         windowSize: stripWindow,
         cellWidth: stripCell,
         iconScale: 0.5,

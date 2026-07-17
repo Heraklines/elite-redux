@@ -640,10 +640,13 @@ const RECIPES: Record<string, Recipe> = {
   // Eeveelution selected on its FRONT sprite with the per-type transform burst
   // playing. Coarse tolerance covers the Math.random-seeded burst particles (like
   // the shiny-lab animated-FX pages).
+  // Leading UPs park focus on the header "Effects" button (the first press or two is
+  // eaten by the shiny lab's 250ms open-input guard; extra UPs on the button are
+  // no-ops), then ACTION opens the effects section.
   "er-effects-lab": {
     mode: UiMode.ER_SHINY_LAB,
     prepare: () => [buildDemoConfig(SpeciesId.ARTICUNO)],
-    steps: [Button.UP, Button.ACTION],
+    steps: [Button.UP, Button.UP, Button.UP, Button.ACTION],
     diffTolerance: 200000,
   },
   // Same section, then U/D toggles the preview to the BACK sprite (how the transform
@@ -651,7 +654,7 @@ const RECIPES: Record<string, Recipe> = {
   "er-effects-lab-back": {
     mode: UiMode.ER_SHINY_LAB,
     prepare: () => [buildDemoConfig(SpeciesId.ARTICUNO)],
-    steps: [Button.UP, Button.ACTION, Button.DOWN],
+    steps: [Button.UP, Button.UP, Button.UP, Button.ACTION, Button.DOWN],
     diffTolerance: 200000,
   },
   // ER Community Challenges (P1): the populated browser, the ZERO-at-launch empty
@@ -1406,6 +1409,18 @@ const RECIPES: Record<string, Recipe> = {
       return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
     },
     diffTolerance: 40000, // live animated Eevee sprite in the summary box
+  },
+  // ER Omniform + MOVESET cycling: on the MOVES page, two CYCLE_FORM presses select
+  // the 2nd partner eeveelution and the move LIST re-renders to THAT evolution's
+  // moveset (the per-evolution model seam, base level-up fallback flagged "(base)").
+  "summary-multiform-moves-cycled": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithPartnerEeveeLead(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, 3 /* Page.MOVES */];
+    },
+    steps: [Button.CYCLE_FORM, Button.CYCLE_FORM],
+    diffTolerance: 40000, // live animated mon sprite in the summary box
   },
   // Bug #757: the ER money-streak mini-badge ("₽+N%", #348) on the summary name bar collides
   // with the level counter once the level reaches three digits. This recipe pins a level-120
