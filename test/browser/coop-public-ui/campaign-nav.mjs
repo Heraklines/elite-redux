@@ -33,6 +33,28 @@ export function isActionableSemanticObservation(observation, { requireExplicitUn
   return observation.ready.inputBlocked !== true && observation.ready.awaitingActionInput !== false;
 }
 
+/** A replacement surface owned by this browser and ready for a human-equivalent key. */
+export function findOwnedActionableReplacementSurface(client, fromCursor = 0) {
+  const event = client.evidence.findLastSemanticSurface(fromCursor, "party:replacement");
+  const observation = event?.observation;
+  return observation?.operationClass === "replacement"
+    && observation.ownerModel === "interaction"
+    && (observation.phase === "SwitchPhase" || observation.phase === "CoopGuestFaintSwitchPhase")
+    && observation.uiMode === "PARTY"
+    && observation.localSeat === client.publicSeat
+    && observation.ownerSeat === client.publicSeat
+    && observation.seatsWithInput?.includes(client.publicSeat)
+    && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
+    ? event
+    : null;
+}
+
+/** Pick the first observer-proven healthy reserve, never the currently fielded/fainted slot. */
+export function replacementTargetOptionId(observation) {
+  const target = observation?.partySlots?.find(slot => slot?.replacementEligible === true);
+  return Number.isSafeInteger(target?.slot) ? `party-slot:${target.slot}` : null;
+}
+
 /**
  * Decide the next navigation action from the current semantic observation.
  * Returns one of:

@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { findOwnedActionableReplacementSurface, replacementTargetOptionId } from "./campaign-nav.mjs";
 
 test("faint replacement waits for the owned actionable party surface before pressing", async () => {
   const [harness, browserEntry] = await Promise.all([
@@ -19,12 +20,39 @@ test("faint replacement waits for the owned actionable party surface before pres
     browserEntry,
     /semantic\.operationClass === "replacement" && uiMode === "PARTY"[\s\S]*?ownerSeat = localReplacementOwner/u,
   );
-  assert.match(harness, /findLastSemanticSurface\(from, "party:replacement"\)/u);
-  assert.match(harness, /semantic\.observation\.ownerSeat === client\.publicSeat/u);
-  assert.match(harness, /semantic\.observation\.seatsWithInput\?\.includes\(client\.publicSeat\)/u);
+  assert.match(harness, /findOwnedActionableReplacementSurface\(client, from\)/u);
+  assert.match(harness, /replacementTargetOptionId\(replacementSurface\.observation\)/u);
   assert.match(harness, /await this\.driveReplacement\(outcome\.client, outcomeCursors\)/u);
   assert.match(
     harness,
-    /createBattlePromptAdvancer\([\s\S]*?"faint-replacement-picker"[\s\S]*?findOwnedReadyReplacement\(owner,[\s\S]*?await owner\.sequence\(this\.config\.keys\.replacement/u,
+    /createBattlePromptAdvancer\([\s\S]*?"faint-replacement-picker"[\s\S]*?findOwnedReadyReplacement\(owner,[\s\S]*?targetId: "party-option:send-out"/u,
   );
 });
+
+for (const phase of ["SwitchPhase", "CoopGuestFaintSwitchPhase"]) {
+  test(`replacement consumer accepts the actionable ${phase} owner surface`, () => {
+    const event = {
+      observation: {
+        surfaceId: "party:replacement",
+        operationClass: "replacement",
+        ownerModel: "interaction",
+        phase,
+        uiMode: "PARTY",
+        localSeat: 1,
+        ownerSeat: 1,
+        seatsWithInput: [1],
+        ready: { handlerActive: true, inputBlocked: false },
+        partySlots: [
+          { slot: 0, fainted: true, active: true, replacementEligible: false },
+          { slot: 1, fainted: false, active: false, replacementEligible: true },
+        ],
+      },
+    };
+    const client = {
+      publicSeat: 1,
+      evidence: { findLastSemanticSurface: () => event },
+    };
+    assert.equal(findOwnedActionableReplacementSurface(client, 0), event);
+    assert.equal(replacementTargetOptionId(event.observation), "party-slot:1");
+  });
+}

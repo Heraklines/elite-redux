@@ -251,7 +251,7 @@ function classifyContinuationSurface(phase: string, uiMode: string): BrowserCont
   if (phase === "SelectModifierPhase" && uiMode === "MODIFIER_SELECT") {
     return "reward";
   }
-  if (phase === "SwitchPhase" && uiMode === "PARTY") {
+  if ((phase === "SwitchPhase" || phase === "CoopGuestFaintSwitchPhase") && uiMode === "PARTY") {
     return "replacement";
   }
   return null;
@@ -640,6 +640,17 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
         optionCount: optionIds.length,
       };
     }
+    const optionIds = globalScene.getPlayerParty().map((_pokemon, index) => `party-slot:${index}`);
+    return {
+      selectedOptionId:
+        selectedIndex != null && selectedIndex >= 0 && selectedIndex < optionIds.length
+          ? optionIds[selectedIndex]
+          : selectedIndex == null
+            ? null
+            : `cursor:${selectedIndex}`,
+      optionIds,
+      optionCount: optionIds.length,
+    };
   }
   const optionHandler = handler as unknown as {
     options?: Array<{ semanticId?: unknown }>;
@@ -1078,12 +1089,29 @@ function observeSemanticSurface(): void {
     }
 
     const selection = readSelection(handler, uiMode);
+    const partySlots =
+      uiMode === "PARTY"
+        ? globalScene.getPlayerParty().map((pokemon, slot) => {
+            const active = pokemon.isActive(true);
+            const fainted = pokemon.isFainted();
+            const allowedInBattle = pokemon.isAllowedInBattle();
+            const reserve = slot >= (battle?.getBattlerCount() ?? 1);
+            return {
+              slot,
+              speciesId: pokemon.species.speciesId,
+              active,
+              fainted,
+              allowedInBattle,
+              replacementEligible: reserve && !active && !fainted && allowedInBattle,
+            };
+          })
+        : null;
     const teamSpeciesIds =
       uiMode === "STARTER_SELECT"
         ? ((handler as unknown as { starterSpecies?: Array<{ speciesId: number }> }).starterSpecies?.map(
             species => species.speciesId,
           ) ?? null)
-        : null;
+        : (partySlots?.map(slot => slot.speciesId) ?? null);
     // Title/setup menus exist before a Battle object. Address 0:0 is an explicit non-battle
     // sentinel that lets the public driver wait for their real option surfaces instead of
     // racing repeated Action keys; gameplay surfaces still carry their actual wave/turn.
@@ -1130,6 +1158,7 @@ function observeSemanticSurface(): void {
       selection.selectedOptionId ?? "",
       selection.optionIds?.join(",") ?? "",
       teamSpeciesIds?.join(",") ?? "",
+      partySlots == null ? "" : JSON.stringify(partySlots),
       ownerSeat ?? "?",
       awaitingActionInput,
       inputBlocked,
@@ -1161,6 +1190,7 @@ function observeSemanticSurface(): void {
       optionIds: selection.optionIds,
       optionCount: selection.optionCount,
       teamSpeciesIds,
+      partySlots,
       ready: { handlerActive: true, awaitingActionInput, inputBlocked },
       phase,
       phaseInstance: semanticSurfaceInstance,

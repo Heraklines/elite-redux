@@ -8,6 +8,8 @@ import { createBattlePromptAdvancer } from "./campaign.mjs";
 import {
   confirmDefaultStarterTeam,
   confirmSeededStarterTeam,
+  findOwnedActionableReplacementSurface,
+  replacementTargetOptionId,
   selectOptionById,
   waitForSemanticSurface,
 } from "./campaign-nav.mjs";
@@ -293,18 +295,7 @@ function findOwnedReadyReward(client, from) {
 }
 
 function findOwnedReadyReplacement(client, from) {
-  const semantic = client.evidence.findLastSemanticSurface(from, "party:replacement");
-  return semantic?.observation.operationClass === "replacement"
-    && semantic.observation.ownerModel === "interaction"
-    && semantic.observation.phase === "SwitchPhase"
-    && semantic.observation.uiMode === "PARTY"
-    && semantic.observation.localSeat === client.publicSeat
-    && semantic.observation.ownerSeat === client.publicSeat
-    && semantic.observation.seatsWithInput?.includes(client.publicSeat)
-    && semantic.observation.ready?.handlerActive === true
-    && semantic.observation.ready.inputBlocked !== true
-    ? semantic
-    : null;
+  return findOwnedActionableReplacementSurface(client, from);
 }
 
 function sameAddress(left, right) {
@@ -2445,7 +2436,7 @@ export class DuoPublicUiRig {
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("resumed-command")));
   }
 
-  async driveWaveToReward({ allowFaint = false } = {}) {
+  async driveWaveToReward({ allowFaint = true } = {}) {
     this.lastWaveCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
@@ -2880,12 +2871,12 @@ export class DuoPublicUiRig {
         return { kind: "reward" };
       }
       for (const client of values) {
-        if (client.evidence.find(GUEST_FAINT_PICKER, from[client.label])) {
+        if (findOwnedReadyReplacement(client, from[client.label])) {
           return { kind: "faint", client };
         }
         if (
-          client.label === this.config.faintOwnerSeat
-          && client.evidence.find(HOST_SWITCH_PHASE, from[client.label])
+          client.evidence.find(GUEST_FAINT_PICKER, from[client.label])
+          || client.evidence.find(HOST_SWITCH_PHASE, from[client.label])
         ) {
           return { kind: "faint", client };
         }
@@ -2921,17 +2912,24 @@ export class DuoPublicUiRig {
         `Timed out waiting for both browsers to reach GameOver; terminal observed only on ${partialGameOver.join(", ")}`,
       );
     }
-    throw new Error("Timed out waiting for public post-turn command, faint, or reward evidence");
+    const surfaces = Object.values(this.clients).map(client => {
+      const event = client.evidence.findLastSemanticSurface(from[client.label] ?? 0);
+      const observation = event?.observation;
+      return (
+        `${client.label}=${observation?.surfaceId ?? "none"}`
+        + `/${observation?.phase ?? "none"}`
+        + `@${observation?.address?.epoch ?? "?"}:${observation?.address?.wave ?? "?"}:${observation?.address?.turn ?? "?"}`
+      );
+    });
+    throw new Error(
+      `Timed out waiting for public post-turn command, faint, or reward evidence; last surfaces ${surfaces.join(", ")}`,
+    );
   }
 
   async driveReplacement(client = null, from = null) {
     let owner = client;
     if (!owner) {
       owner = this.client(this.config.faintOwnerSeat);
-      await owner.evidence.waitFor(HOST_SWITCH_PHASE, {
-        timeoutMs: this.config.timeoutMs,
-        description: "configured owner SwitchPhase for faint replacement",
-      });
     }
     const replacementCursors =
       from ?? Object.fromEntries(Object.values(this.clients).map(value => [value.label, value.evidence.cursor()]));
@@ -2957,13 +2955,50 @@ export class DuoPublicUiRig {
     if (replacementSurface == null) {
       throw new Error(`${owner.label}: timed out waiting for an actionable owned replacement picker`);
     }
+    const targetOptionId = replacementTargetOptionId(replacementSurface.observation);
+    if (targetOptionId == null) {
+      throw new Error(
+        `${owner.label}: replacement picker exposed no observer-proven healthy reserve: `
+          + `${JSON.stringify(replacementSurface.observation.partySlots ?? null)}`,
+      );
+    }
     await owner.checkpoint("faint-replacement-picker");
     const replacementCursor = owner.evidence.cursor();
-    await owner.sequence(this.config.keys.replacement, "choose-first-legal-replacement");
+    await selectOptionById(owner, {
+      surfaceId: "party:replacement",
+      targetId: targetOptionId,
+      navKeys: ["ArrowDown", "ArrowUp"],
+      submitKey: "Space",
+      timeoutMs: this.config.timeoutMs,
+      fromCursor: replacementCursors[owner.label],
+    });
+    const sendOutSurface = await owner.evidence.waitForCondition(
+      sink => {
+        const event = sink.findLastSemanticSurface(replacementCursor, "party:replacement");
+        return event?.observation.optionIds?.includes("party-option:send-out") ? event : null;
+      },
+      {
+        timeoutMs: this.config.timeoutMs,
+        description: `replacement action menu for ${targetOptionId}`,
+      },
+    );
+    await selectOptionById(owner, {
+      surfaceId: "party:replacement",
+      targetId: "party-option:send-out",
+      navKeys: ["ArrowDown", "ArrowUp"],
+      submitKey: "Space",
+      timeoutMs: this.config.timeoutMs,
+      fromCursor: sendOutSurface.index,
+    });
     await owner.evidence.waitFor(/faint picker PICK|Start Phase SwitchSummonPhase/u, {
       from: replacementCursor,
       timeoutMs: this.config.timeoutMs,
       description: "replacement pick/summon evidence",
+    });
+    owner.evidence.record("replacement-selection-proof", {
+      targetOptionId,
+      phase: replacementSurface.observation.phase,
+      address: replacementSurface.observation.address,
     });
     this.replacementCount += 1;
     await Promise.all(Object.values(this.clients).map(value => value.checkpoint("replacement-applied")));

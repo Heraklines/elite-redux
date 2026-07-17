@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { clearNegotiatedCoopCapabilities } from "#data/elite-redux/coop/coop-capabilities";
 import { CoopLobbyController } from "#data/elite-redux/coop/coop-lobby";
 import {
   announceToP33Lobby,
@@ -92,6 +93,10 @@ const credential: CoopP33LobbyCredentialV1 = {
 };
 
 afterEach(() => {
+  // This file constructs bare session controllers instead of installing a CoopRuntime. Their
+  // capability handshake therefore has no runtime teardown wrapper to clear the realm-scoped
+  // negotiated set. Restore pre-session citizenship explicitly for the shared lane-A worker.
+  clearNegotiatedCoopCapabilities();
   vi.useRealTimers();
 });
 

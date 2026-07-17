@@ -6,7 +6,7 @@
 import { appendFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { loadCampaignLifecyclePolicy, withinDeadline } from "./campaign-lifecycle.mjs";
-import { isActionableSemanticObservation } from "./campaign-nav.mjs";
+import { findOwnedActionableReplacementSurface, isActionableSemanticObservation } from "./campaign-nav.mjs";
 import {
   buildDispatchTable,
   GAME_OVER_PHASE,
@@ -675,10 +675,13 @@ export async function waitForOutcomeBounded(
       return { kind: "reward" };
     }
     for (const client of clients) {
-      if (client.evidence.find(GUEST_FAINT_PICKER, from[client.label])) {
+      if (findOwnedActionableReplacementSurface(client, from[client.label])) {
         return { kind: "faint", client };
       }
-      if (client.label === rig.config.faintOwnerSeat && client.evidence.find(HOST_SWITCH_PHASE, from[client.label])) {
+      if (
+        client.evidence.find(GUEST_FAINT_PICKER, from[client.label])
+        || client.evidence.find(HOST_SWITCH_PHASE, from[client.label])
+      ) {
         return { kind: "faint", client };
       }
     }
@@ -886,7 +889,7 @@ async function driveBattleWave(rig, policy, stats) {
     }
     if (outcome.kind === "faint") {
       stats.faints += 1;
-      await rig.driveReplacement(outcome.client);
+      await rig.driveReplacement(outcome.client, from);
     }
     if (outcome.kind === "command") {
       // The next command owners open one at a time. The next sequential round proves and
