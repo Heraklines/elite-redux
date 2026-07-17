@@ -3096,42 +3096,63 @@ export class DuoPublicUiRig {
     }
     await owner.checkpoint("faint-replacement-picker");
     const replacementCursor = owner.evidence.cursor();
-    await selectOptionById(owner, {
-      surfaceId: "party:replacement",
-      targetId: targetOptionId,
-      navKeys: ["ArrowDown", "ArrowUp"],
-      submitKey: "Space",
-      timeoutMs: this.config.timeoutMs,
-      fromCursor: replacementCursors[owner.label],
-    });
-    const sendOutSurface = await owner.evidence.waitForCondition(
-      sink => {
-        const event = sink.findLastSemanticSurface(replacementCursor, "party:replacement");
-        return event?.observation.optionIds?.includes("party-option:send-out") ? event : null;
-      },
-      {
+    // The host's fallback (getCoopFaintSwitchWaitMs, 60s live) may COMMIT a replacement while this
+    // browser is still navigating the picker: the guest's picker then closes FROM COMMITTED
+    // AUTHORITY and adopts the host's pick - a designed anti-softlock outcome, not a desync
+    // (run 29600150702 depth lanes: selectOptionById raced the close and saw the torn-down
+    // submenu). Accept that outcome as a valid resolution wherever the drive loses the surface.
+    const supersededByAuthority = () =>
+      owner.evidence.find(/own-faint picker CLOSE from committed authority/u, replacementCursor);
+    try {
+      await selectOptionById(owner, {
+        surfaceId: "party:replacement",
+        targetId: targetOptionId,
+        navKeys: ["ArrowDown", "ArrowUp"],
+        submitKey: "Space",
         timeoutMs: this.config.timeoutMs,
-        description: `replacement action menu for ${targetOptionId}`,
-      },
-    );
-    await selectOptionById(owner, {
-      surfaceId: "party:replacement",
-      targetId: "party-option:send-out",
-      navKeys: ["ArrowDown", "ArrowUp"],
-      submitKey: "Space",
-      timeoutMs: this.config.timeoutMs,
-      fromCursor: sendOutSurface.index,
-    });
-    await owner.evidence.waitFor(/faint picker PICK|Start Phase SwitchSummonPhase/u, {
-      from: replacementCursor,
-      timeoutMs: this.config.timeoutMs,
-      description: "replacement pick/summon evidence",
-    });
-    owner.evidence.record("replacement-selection-proof", {
-      targetOptionId,
-      phase: replacementSurface.observation.phase,
-      address: replacementSurface.observation.address,
-    });
+        fromCursor: replacementCursors[owner.label],
+      });
+      const sendOutSurface = await owner.evidence.waitForCondition(
+        sink => {
+          const event = sink.findLastSemanticSurface(replacementCursor, "party:replacement");
+          return event?.observation.optionIds?.includes("party-option:send-out") ? event : null;
+        },
+        {
+          timeoutMs: this.config.timeoutMs,
+          description: `replacement action menu for ${targetOptionId}`,
+        },
+      );
+      await selectOptionById(owner, {
+        surfaceId: "party:replacement",
+        targetId: "party-option:send-out",
+        navKeys: ["ArrowDown", "ArrowUp"],
+        submitKey: "Space",
+        timeoutMs: this.config.timeoutMs,
+        fromCursor: sendOutSurface.index,
+      });
+      await owner.evidence.waitFor(/faint picker PICK|Start Phase SwitchSummonPhase/u, {
+        from: replacementCursor,
+        timeoutMs: this.config.timeoutMs,
+        description: "replacement pick/summon evidence",
+      });
+      owner.evidence.record("replacement-selection-proof", {
+        targetOptionId,
+        phase: replacementSurface.observation.phase,
+        address: replacementSurface.observation.address,
+      });
+    } catch (error) {
+      const superseded = supersededByAuthority();
+      if (superseded == null) {
+        throw error;
+      }
+      owner.evidence.record("replacement-superseded-by-authority", {
+        attemptedTargetOptionId: targetOptionId,
+        authorityClose: superseded.text ?? null,
+        phase: replacementSurface.observation.phase,
+        address: replacementSurface.observation.address,
+        driveError: error instanceof Error ? error.message : String(error),
+      });
+    }
     this.replacementCount += 1;
     await Promise.all(Object.values(this.clients).map(value => value.checkpoint("replacement-applied")));
   }
