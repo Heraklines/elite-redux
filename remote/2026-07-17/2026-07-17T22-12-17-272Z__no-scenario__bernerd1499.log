@@ -1,0 +1,694 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:aa6e37dd75a5a8b47561acbf94ff7a7580938d80:run-29614940111.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 OPR/133.0.0.0
+platform: Win32
+screen:   1536x864 @1.25x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@16057ms -> title-shown@19506ms
+lastSess: ok (reached title)
+mode:     4  wave:2
+seed:     yi2e4s2iXT6qAtSehI3mqEdn
+party:    Scyther(L5 23hp f0), Carvanha(L5 21hp f0), Scatterbug(L5 20hp f0), Gimmighoul(L5 23hp f0), Wiglett(L5 18hp f0), Clauncher(L5 23hp f0)
+enemy:    Panpour Redux(L2), Dunsparce(L2), Happiny(L2), Yungoos(L2), Poochyena(L2), Bellsprout(L2)
+
+----- COMMENT -----
+cannot save and quit
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:aa6e37dd75a5a8b47561acbf94ff7a7580938d80:run-29614940111.1","source":"github","sha":"aa6e37dd75a5a8b47561acbf94ff7a7580938d80","workflow":{"provider":"github-actions","runId":"29614940111","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[21:56:19.770] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[21:56:20.289] LOG: [ER] build {"version":1,"id":"github:aa6e37dd75a5a8b47561acbf94ff7a7580938d80:run-29614940111.1","source":"github","sha":"aa6e37dd75a5a8b47561acbf94ff7a7580938d80","workflow":{"provider":"github-actions","runId":"29614940111","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[21:56:20.362] LOG: [dev-tools] loaded — 642 scenarios + Send Logs button
+[21:56:34.132] DEBUG: Destroying loading scene
+[21:56:34.132] DEBUG: Destroyed loading scene
+[21:56:34.206] LOG: Seed: AQeR3bUv4kDrm99Ho0UF3NAW
+[21:56:34.207] LOG: Wave Seed: AQeR3bUv4kDrm99Ho0UF3NAW 0
+[21:56:36.492] LOG: %cStart Phase LoginPhase color:green;
+[21:56:36.932] LOG: Client Session: WQ5xSyS1CPY9MNBWXrGmKo8YVUq4nhTD
+[21:56:37.564] LOG: %cStart Phase TitlePhase color:green;
+[21:56:37.565] LOG: Getting Session Slot id: %d 0
+[21:56:37.588] LOG: use seasonal splash messages true
+[21:56:41.693] LOG: Getting Session Slot id: %d 0
+[21:56:41.706] LOG: Getting Session Slot id: %d 1
+[21:56:41.713] LOG: Getting Session Slot id: %d 2
+[21:56:41.717] LOG: Getting Session Slot id: %d 3
+[21:56:41.723] LOG: Getting Session Slot id: %d 4
+[21:56:41.864] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[21:56:41.898] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[21:56:41.898] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[21:56:41.924] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[21:56:41.924] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[21:56:44.452] WARN: Attempted to load save slot of -1 through load game menu!
+[21:56:44.475] LOG: use seasonal splash messages true
+[21:56:52.274] LOG: %cStart Phase SelectStarterPhase color:green;
+[21:56:59.172] LOG: %cStart Phase TitlePhase color:green;
+[21:56:59.174] LOG: Getting Session Slot id: %d 0
+[21:56:59.219] LOG: use seasonal splash messages true
+[21:59:32.429] LOG: %cStart Phase SelectChallengePhase color:green;
+[21:59:53.665] LOG: %cStart Phase SelectStarterPhase color:green;
+[22:00:01.406] WARN: cry/664 not found
+[22:00:49.048] LOG: %cSaving starter preferences color: blue
+[22:00:49.519] LOG: %cSaving starter preferences color: blue
+[22:00:51.594] LOG: Gimmighoul's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 0
+[22:01:05.895] WARN: cry/123 not found
+[22:01:06.898] WARN: cry/123 not found
+[22:01:15.300] WARN: cry/318 not found
+[22:01:52.011] WARN: cry/692 not found
+[22:01:55.885] LOG: %cSaving starter preferences color: blue
+[22:02:01.487] LOG: %cSaving starter preferences color: blue
+[22:02:07.828] LOG: %cSaving starter preferences color: blue
+[22:02:12.549] LOG: %cSaving starter preferences color: blue
+[22:02:17.786] LOG: %cSaving starter preferences color: blue
+[22:02:23.379] LOG: %cSaving starter preferences color: blue
+[22:02:26.199] LOG: %cSaving starter preferences color: blue
+[22:02:26.410] LOG: %cSaving starter preferences color: blue
+[22:02:27.698] LOG: %cSaving starter preferences color: blue
+[22:02:27.896] LOG: %cSaving starter preferences color: blue
+[22:02:29.885] LOG: %cSaving starter preferences color: blue
+[22:02:30.313] LOG: %cSaving starter preferences color: blue
+[22:02:30.802] LOG: %cSaving starter preferences color: blue
+[22:02:32.927] WARN: cry/123 not found
+[22:02:35.362] WARN: Missing animation: pkmn__er__scyther_mega
+[22:03:25.572] WARN: Missing animation: pkmn__900
+[22:03:30.012] WARN: Missing animation: pkmn__er__kleavor_mega
+[22:04:17.816] LOG: Getting Session Slot id: %d 0
+[22:04:17.829] LOG: Getting Session Slot id: %d 1
+[22:04:17.834] LOG: Getting Session Slot id: %d 2
+[22:04:17.838] LOG: Getting Session Slot id: %d 3
+[22:04:17.843] LOG: Getting Session Slot id: %d 4
+[22:04:17.958] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:17.987] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:17.988] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:18.009] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:18.009] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:21.739] ERROR: Local/cloud checkpoint bytes differ; refusing ambiguous delete.
+[22:04:21.740] LOG: Seed: 6yaiD1R1yR0to8X9rGkOcUlf
+[22:04:21.740] LOG: Wave Seed: 6yaiD1R1yR0to8X9rGkOcUlf 0
+[22:04:22.122] WARN: AnimationManager key already exists: prompt
+[22:04:22.122] WARN: AnimationManager key already exists: tera_sparkle
+[22:04:22.123] LOG: Seed: tpj9ZYQXNbIRLII3QjHZOcJh
+[22:04:22.123] LOG: Wave Seed: tpj9ZYQXNbIRLII3QjHZOcJh 0
+[22:04:24.489] LOG: %cStart Phase LoginPhase color:green;
+[22:04:25.003] LOG: Client Session: WQ5xSyS1CPY9MNBWXrGmKo8YVUq4nhTD
+[22:04:25.600] LOG: %cStart Phase TitlePhase color:green;
+[22:04:25.601] LOG: Getting Session Slot id: %d 0
+[22:04:25.615] LOG: use seasonal splash messages true
+[22:04:40.237] LOG: Getting Session Slot id: %d 0
+[22:04:40.248] LOG: Getting Session Slot id: %d 1
+[22:04:40.254] LOG: Getting Session Slot id: %d 2
+[22:04:40.257] LOG: Getting Session Slot id: %d 3
+[22:04:40.261] LOG: Getting Session Slot id: %d 4
+[22:04:40.371] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:40.399] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:40.399] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:40.419] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:40.419] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:43.442] ERROR: Local/cloud checkpoint bytes differ; refusing ambiguous delete.
+[22:04:43.443] LOG: Seed: KK2dSFoAFVciA6cRDh1dlwhw
+[22:04:43.443] LOG: Wave Seed: KK2dSFoAFVciA6cRDh1dlwhw 0
+[22:04:43.693] WARN: AnimationManager key already exists: prompt
+[22:04:43.693] WARN: AnimationManager key already exists: tera_sparkle
+[22:04:43.693] LOG: Seed: 4Xo1dcxuSyFQJgkjtt7XNzua
+[22:04:43.693] LOG: Wave Seed: 4Xo1dcxuSyFQJgkjtt7XNzua 0
+[22:04:45.925] LOG: %cStart Phase LoginPhase color:green;
+[22:04:46.411] LOG: Client Session: WQ5xSyS1CPY9MNBWXrGmKo8YVUq4nhTD
+[22:04:47.021] LOG: %cStart Phase TitlePhase color:green;
+[22:04:47.022] LOG: Getting Session Slot id: %d 0
+[22:04:47.032] LOG: use seasonal splash messages true
+[22:04:48.251] LOG: Getting Session Slot id: %d 0
+[22:04:48.258] LOG: Getting Session Slot id: %d 1
+[22:04:48.262] LOG: Getting Session Slot id: %d 2
+[22:04:48.265] LOG: Getting Session Slot id: %d 3
+[22:04:48.268] LOG: Getting Session Slot id: %d 4
+[22:04:48.372] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:48.400] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:48.400] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:48.420] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:48.421] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:04:52.454] ERROR: Local/cloud checkpoint bytes differ; refusing ambiguous delete.
+[22:04:52.454] LOG: Seed: WSjdYktFRhTR3g6oXivXP21N
+[22:04:52.454] LOG: Wave Seed: WSjdYktFRhTR3g6oXivXP21N 0
+[22:04:52.712] WARN: AnimationManager key already exists: prompt
+[22:04:52.712] WARN: AnimationManager key already exists: tera_sparkle
+[22:04:52.712] LOG: Seed: XIwLioMA0FICevQCg06Vczcp
+[22:04:52.712] LOG: Wave Seed: XIwLioMA0FICevQCg06Vczcp 0
+[22:04:54.899] LOG: %cStart Phase LoginPhase color:green;
+[22:04:55.420] LOG: Client Session: WQ5xSyS1CPY9MNBWXrGmKo8YVUq4nhTD
+[22:04:56.009] LOG: %cStart Phase TitlePhase color:green;
+[22:04:56.010] LOG: Getting Session Slot id: %d 0
+[22:04:56.020] LOG: use seasonal splash messages true
+[22:05:18.764] LOG: %cStart Phase TitlePhase color:green;
+[22:05:18.766] LOG: Getting Session Slot id: %d 0
+[22:05:18.781] LOG: use seasonal splash messages true
+[22:05:19.536] LOG: Getting Session Slot id: %d 0
+[22:05:19.543] LOG: Getting Session Slot id: %d 1
+[22:05:19.547] LOG: Getting Session Slot id: %d 2
+[22:05:19.551] LOG: Getting Session Slot id: %d 3
+[22:05:19.555] LOG: Getting Session Slot id: %d 4
+[22:05:19.681] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:05:19.711] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:05:19.712] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:05:19.733] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:05:19.733] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:05:49.409] WARN: Attempted to load save slot of -1 through load game menu!
+[22:05:49.445] LOG: use seasonal splash messages true
+[22:05:52.451] LOG: %cStart Phase SelectChallengePhase color:green;
+[22:05:53.524] LOG: %cStart Phase SelectStarterPhase color:green;
+[22:05:55.120] WARN: cry/664 not found
+[22:05:55.146] WARN: cry/999 not found
+[22:05:55.179] WARN: cry/318 not found
+[22:05:55.195] WARN: cry/960 not found
+[22:05:55.212] WARN: cry/692 not found
+[22:05:57.081] LOG: Getting Session Slot id: %d 0
+[22:05:57.086] LOG: Getting Session Slot id: %d 1
+[22:05:57.089] LOG: Getting Session Slot id: %d 2
+[22:05:57.092] LOG: Getting Session Slot id: %d 3
+[22:05:57.094] LOG: Getting Session Slot id: %d 4
+[22:05:57.198] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:05:57.226] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:05:57.226] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:05:57.246] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:05:57.246] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:05:59.830] ERROR: Local/cloud checkpoint bytes differ; refusing ambiguous delete.
+[22:05:59.831] LOG: Seed: XHNO5HWSXigOCkpjIZHNHeb4
+[22:05:59.831] LOG: Wave Seed: XHNO5HWSXigOCkpjIZHNHeb4 0
+[22:06:00.082] WARN: AnimationManager key already exists: prompt
+[22:06:00.082] WARN: AnimationManager key already exists: tera_sparkle
+[22:06:00.082] LOG: Seed: yi2e4s2iXT6qAtSehI3mqEdn
+[22:06:00.082] LOG: Wave Seed: yi2e4s2iXT6qAtSehI3mqEdn 0
+[22:06:02.271] LOG: %cStart Phase LoginPhase color:green;
+[22:06:02.796] LOG: Client Session: WQ5xSyS1CPY9MNBWXrGmKo8YVUq4nhTD
+[22:06:03.354] LOG: %cStart Phase TitlePhase color:green;
+[22:06:03.355] LOG: Getting Session Slot id: %d 0
+[22:06:03.366] LOG: use seasonal splash messages true
+[22:06:05.819] LOG: %cStart Phase SelectChallengePhase color:green;
+[22:06:06.635] LOG: %cStart Phase SelectStarterPhase color:green;
+[22:06:08.442] WARN: cry/664 not found
+[22:06:08.466] WARN: cry/999 not found
+[22:06:08.500] WARN: cry/318 not found
+[22:06:08.516] WARN: cry/960 not found
+[22:06:08.531] WARN: cry/692 not found
+[22:06:11.183] LOG: Getting Session Slot id: %d 0
+[22:06:11.188] LOG: Getting Session Slot id: %d 1
+[22:06:11.191] LOG: Getting Session Slot id: %d 2
+[22:06:11.194] LOG: Getting Session Slot id: %d 3
+[22:06:11.197] LOG: Getting Session Slot id: %d 4
+[22:06:11.303] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:06:11.332] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:06:11.332] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:06:11.352] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:06:11.353] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:06:14.985] DEBUG: %cSending a request to delete session in slot %d color: blue 4
+[22:06:18.046] WARN: Could not load animation file for move 'happy-hour' 404 
+[22:06:19.614] LOG: Wave Seed: zj3f5t3jYU7rBuTfiJ4nrFeo 1
+[22:06:19.619] LOG: %cStart Phase EncounterPhase color:green;
+[22:06:19.626] LOG: Starting species pool tier: COMMON
+[22:06:19.640] LOG: Pokemon: Wild Bidoof | Species ID: 399 | Level: 2 | Nature: Naughty (+Atk/-SpDef)
+[22:06:19.640] LOG: Stats (IVs): HP: 14 (7), Atk: 8 (14), Def: 8 (30), Spatk: 6 (17), Spdef: 5 (10), Spd: 6 (10)
+[22:06:19.640] LOG: Ability: Lumberjack | Passive Ability: Unaware 
+[22:06:19.640] LOG: Moveset: ["Hyper Fang","Defense Curl","Strength","Growl"]
+[22:06:19.640] LOG: Starting species pool tier: COMMON
+[22:06:19.648] LOG: Pokemon: Wild Caterpie | Species ID: 10 | Level: 2 | Nature: Impish (+Def/-SpAtk)
+[22:06:19.648] LOG: Stats (IVs): HP: 14 (31), Atk: 6 (15), Def: 7 (6), Spatk: 5 (26), Spdef: 6 (10), Spd: 7 (24)
+[22:06:19.648] LOG: Ability: Web Spinner | Passive Ability: Swarm 
+[22:06:19.648] LOG: Moveset: ["Skitter Smack","Tackle"]
+[22:06:20.204] LOG: [er-ghost] challenge prefetch: +20 from 'hell' pool
+[22:06:21.127] DEBUG: Session data saved to slot 4!
+[22:06:21.140] LOG: [er-ghost] challenge prefetch: +20 from 'elite' pool
+[22:06:21.141] LOG: [er-ghost] challenge pool ready: 40 team(s) of 40 fetched
+[22:06:22.973] LOG: Wave Seed: zj3f5t3jYU7rBuTfiJ4nrFeo 1
+[22:06:23.176] WARN: cry/10 not found
+[22:06:23.413] LOG: %cStart Phase SummonPhase color:green;
+[22:06:23.581] WARN: cry/664 not found
+[22:06:23.682] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:06:23.785] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[22:06:23.788] LOG: %cStart Phase SummonPhase color:green;
+[22:06:23.966] WARN: cry/999 not found
+[22:06:24.070] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:06:24.174] LOG: %cStart Phase CheckSwitchPhase color:green;
+[22:06:25.026] LOG: %cStart Phase SwitchPhase color:green;
+[22:06:26.398] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:06:26.716] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:06:26.814] LOG: %cStart Phase PostSummonPhase color:green;
+[22:06:26.814] LOG: Ran PSP for: Scyther
+[22:06:26.816] LOG: %cStart Phase PostSummonPhase color:green;
+[22:06:26.817] LOG: %cStart Phase PostSummonPhase color:green;
+[22:06:26.817] LOG: %cStart Phase CheckSwitchPhase color:green;
+[22:06:27.026] LOG: %cStart Phase SwitchPhase color:green;
+[22:06:27.845] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:06:28.057] WARN: cry/318 not found
+[22:06:28.170] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:06:28.265] LOG: %cStart Phase PostSummonPhase color:green;
+[22:06:28.265] LOG: Ran PSP for: Carvanha
+[22:06:28.266] LOG: %cStart Phase PostSummonPhase color:green;
+[22:06:28.266] LOG: %cStart Phase PostSummonPhase color:green;
+[22:06:28.266] LOG: %cStart Phase InitEncounterPhase color:green;
+[22:06:28.267] LOG: %cStart Phase PostSummonPhase color:green;
+[22:06:28.267] LOG: Ran PSP for: Caterpie
+[22:06:28.268] LOG: %cStart Phase PostSummonPhase color:green;
+[22:06:28.269] LOG: %cStart Phase MovePhase color:green;
+[22:06:28.270] LOG: %cUser: Caterpie
+Move: STRING_SHOT
+Use Mode: INDIRECT color:orchid
+[22:06:28.273] LOG: %cStart Phase MessagePhase color:green;
+[22:06:28.390] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:06:28.394] LOG: Battle Seed: MMdh16UDGawPSYGa
+[22:06:28.409] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:06:28.595] LOG: %cStart Phase MessagePhase color:green;
+[22:06:28.806] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:06:28.990] LOG: %cStart Phase MessagePhase color:green;
+[22:06:29.216] LOG: %cStart Phase MoveEndPhase color:green;
+[22:06:29.217] LOG: %cStart Phase PostSummonPhase color:green;
+[22:06:29.218] LOG: %cStart Phase PostSummonPhase color:green;
+[22:06:29.218] LOG: Ran PSP for: Bidoof
+[22:06:29.219] LOG: %cStart Phase PostSummonPhase color:green;
+[22:06:29.219] LOG: %cStart Phase PostSummonPhase color:green;
+[22:06:29.219] LOG: %cStart Phase TurnInitPhase color:green;
+[22:06:29.220] LOG: %cStart Phase CommandPhase color:green;
+[22:06:30.486] LOG: Move: QUICK_ATTACK Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Scyther
+[22:06:30.489] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:06:31.012] LOG: %cStart Phase CommandPhase color:green;
+[22:06:31.995] LOG: Move: FISHIOUS_REND Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Carvanha
+[22:06:31.998] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:06:32.283] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:06:32.311] LOG: Move Pool: ["Hyper Fang","Defense Curl","Strength","Growl"]
+[22:06:32.311] LOG: Move Scores: [28.5,2,216,2]
+[22:06:32.311] LOG: Sorted Move Pool: ["Strength","Hyper Fang","Defense Curl","Growl"]
+[22:06:32.311] LOG: Chosen Move: Strength
+[22:06:32.311] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:06:32.319] LOG: Move Pool: ["Skitter Smack","Tackle"]
+[22:06:32.319] LOG: Move Scores: [10.125,8]
+[22:06:32.319] LOG: Sorted Move Pool: ["Skitter Smack","Tackle"]
+[22:06:32.319] LOG: Chosen Move: Skitter Smack
+[22:06:32.319] LOG: %cStart Phase TurnStartPhase color:green;
+[22:06:32.328] LOG: %cStart Phase MovePhase color:green;
+[22:06:32.328] LOG: %cUser: Scyther
+Move: QUICK_ATTACK
+Use Mode: NORMAL color:orchid
+[22:06:32.335] LOG: %cStart Phase MessagePhase color:green;
+[22:06:32.403] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:06:32.545] LOG: crit stage: +1
+[22:06:32.547] LOG: Move: Quick Attack | Base damage: 12.258285714285714 | Power: 52.800000000000004 | Source attack: 17 | Target defense: 7
+[22:06:32.547] LOG: Move: Quick Attack | Attack damage: 36
+[22:06:32.552] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:06:32.560] LOG: %cStart Phase MessagePhase color:green;
+[22:06:32.764] LOG: %cStart Phase FaintPhase color:green;
+[22:06:32.774] WARN: cry/10 not found
+[22:06:32.834] LOG: %cStart Phase MessagePhase color:green;
+[22:06:33.130] LOG: %cStart Phase VictoryPhase color:green;
+[22:06:33.132] LOG: %cStart Phase ExpPhase color:green;
+[22:06:33.315] LOG: %cStart Phase ExpPhase color:green;
+[22:06:33.488] LOG: %cStart Phase MoveEndPhase color:green;
+[22:06:33.491] LOG: %cStart Phase MovePhase color:green;
+[22:06:33.491] LOG: %cStart Phase MoveEndPhase color:green;
+[22:06:33.492] LOG: %cStart Phase MovePhase color:green;
+[22:06:33.492] LOG: %cUser: Carvanha
+Move: FISHIOUS_REND
+Use Mode: NORMAL color:orchid
+[22:06:33.497] LOG: %cStart Phase MessagePhase color:green;
+[22:06:33.612] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:06:33.829] LOG: crit stage: +0
+[22:06:33.830] LOG: Move: Fishious Rend | Base damage: 35.15 | Power: 221 | Source attack: 15 | Target defense: 8
+[22:06:33.831] LOG: Move: Fishious Rend | Attack damage: 49
+[22:06:33.832] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:06:33.991] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:06:34.017] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:06:34.031] LOG: %cStart Phase MessagePhase color:green;
+[22:06:34.222] LOG: %cStart Phase FaintPhase color:green;
+[22:06:35.426] LOG: %cStart Phase MessagePhase color:green;
+[22:06:35.652] LOG: %cStart Phase VictoryPhase color:green;
+[22:06:35.655] LOG: %cStart Phase ExpPhase color:green;
+[22:06:35.856] LOG: %cStart Phase ExpPhase color:green;
+[22:06:36.065] LOG: %cStart Phase MoveEndPhase color:green;
+[22:06:36.065] LOG: %cStart Phase MovePhase color:green;
+[22:06:36.065] LOG: %cStart Phase MoveEndPhase color:green;
+[22:06:36.065] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:06:36.065] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:06:36.066] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:06:36.066] LOG: %cStart Phase BerryPhase color:green;
+[22:06:36.067] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:06:36.068] LOG: %cStart Phase TurnEndPhase color:green;
+[22:06:36.072] LOG: %cStart Phase BattleEndPhase color:green;
+[22:06:36.073] LOG: Battle Score: 19 (1 Turns x1)
+[22:06:36.073] LOG: Total Score: 19
+[22:06:36.083] LOG: %cStart Phase EggLapsePhase color:green;
+[22:06:36.139] LOG: %cStart Phase MessagePhase color:green;
+[22:06:36.244] LOG: %cStart Phase EggSummaryPhase color:green;
+[22:06:36.244] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.249] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.249] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.249] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.249] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.249] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.249] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.249] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.250] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.250] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.250] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.250] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.250] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:36.250] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[22:06:59.564] LOG: %cStart Phase SelectModifierPhase color:green;
+[22:06:59.564] LOG: Wave Seed: zj3f5t3jYU7rBuTfiJ4nrFeo 1
+[22:06:59.573] LOG: 9 5 [2,3,4,5,6]
+[22:06:59.573] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[22:06:59.573] LOG: 0 0 [1,10,11,12,13,14,23]
+[22:06:59.573] LOG: {"id":"ULTRA_BALL","localeKey":"","iconImage":"ub","group":"pb","soundName":"se/pb_bounce_1","tier":2,"pokeballType":2,"count":5} 
+[22:06:59.573] LOG: 8 5 [2,3,4,5,6]
+[22:06:59.573] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} 
+[22:07:27.115] LOG: %cStart Phase LearnMovePhase color:green;
+[22:07:28.066] WARN: cry/960 not found
+[22:07:31.037] LOG: [coop:reward] advanceCoopInteractionForContinuation SKIP (isCoop=false fromSeq=-1 meInProgress=false)
+[22:07:31.686] LOG: %cStart Phase NewBattlePhase color:green;
+[22:07:31.686] LOG: Wave Seed: {k4g6u4kZV8sCvUgjK5osGfp 2
+[22:07:31.688] LOG: [er-ghost] wave 2: ghost 'XS_Redux' (run ended at 14)
+[22:07:31.702] LOG: %cStart Phase ReturnPhase color:green;
+[22:07:31.808] LOG: %cStart Phase ReturnPhase color:green;
+[22:07:31.911] LOG: %cStart Phase ShowTrainerPhase color:green;
+[22:07:32.015] LOG: %cStart Phase NextEncounterPhase color:green;
+[22:07:32.030] LOG: Pokemon: Foe Panpour Redux | Species ID: 10702 | Level: 2 | Nature: Quiet (+SpAtk/-Spd)
+[22:07:32.030] LOG: Stats (IVs): HP: 14 (18), Atk: 8 (31), Def: 6 (31), Spatk: 8 (23), Spdef: 6 (22), Spd: 7 (31)
+[22:07:32.031] LOG: Ability: Trace | Passive Ability: Psychic Mind 
+[22:07:32.031] LOG: Moveset: ["Ice Beam","Shadow Ball","Aura Sphere","Play Nice"]
+[22:07:32.040] LOG: Pokemon: Foe Dunsparce | Species ID: 206 | Level: 2 | Nature: Calm (+SpDef/-Atk)
+[22:07:32.040] LOG: Stats (IVs): HP: 16 (29), Atk: 8 (30), Def: 7 (28), Spatk: 7 (31), Spdef: 8 (23), Spd: 7 (28)
+[22:07:32.040] LOG: Ability: Field Explorer | Passive Ability: Super Luck 
+[22:07:32.040] LOG: Moveset: ["Body Slam","Coil","Rollout (P)","Wicked Torque"]
+[22:07:32.048] LOG: Pokemon: Foe Happiny | Species ID: 440 | Level: 2 | Nature: Timid (+Spd/-Atk)
+[22:07:32.049] LOG: Stats (IVs): HP: 16 (17), Atk: 6 (31), Def: 4 (10), Spatk: 5 (19), Spdef: 8 (26), Spd: 6 (11)
+[22:07:32.049] LOG: Ability: Wimp Out | Passive Ability: Vital Spirit 
+[22:07:32.049] LOG: Moveset: ["Tackle","Tail Whip","Growl","Defense Curl"]
+[22:07:32.057] LOG: Pokemon: Foe Yungoos | Species ID: 734 | Level: 2 | Nature: Lonely (+Atk/-Def)
+[22:07:32.057] LOG: Stats (IVs): HP: 14 (30), Atk: 7 (30), Def: 7 (26), Spatk: 5 (28), Spdef: 6 (31), Spd: 6 (29)
+[22:07:32.057] LOG: Ability: Ambush | Passive Ability: Stakeout 
+[22:07:32.057] LOG: Moveset: ["Hyper Fang","Pounce","Super Fang","Fake Out"]
+[22:07:32.066] LOG: Pokemon: Foe Poochyena | Species ID: 261 | Level: 2 | Nature: Serious (-)
+[22:07:32.066] LOG: Stats (IVs): HP: 13 (20), Atk: 8 (27), Def: 6 (31), Spatk: 6 (29), Spdef: 8 (25), Spd: 7 (31)
+[22:07:32.066] LOG: Ability: Moxie | Passive Ability: Nocturnal 
+[22:07:32.066] LOG: Moveset: ["Howl","Hyper Fang","Knock Off","Dire Claw"]
+[22:07:32.077] LOG: Pokemon: Foe Bellsprout | Species ID: 69 | Level: 2 | Nature: Naive (+Spd/-SpDef)
+[22:07:32.077] LOG: Stats (IVs): HP: 15 (23), Atk: 8 (3), Def: 6 (0), Spatk: 9 (5), Spdef: 6 (12), Spd: 5 (5)
+[22:07:32.077] LOG: Ability: Solar Power | Passive Ability: Chlorophyll 
+[22:07:32.077] LOG: Moveset: ["Vine Whip","Growth","Wrap","Sweet Scent"]
+[22:07:39.372] LOG: Battle Seed: IA9RNcjySo3tFaae
+[22:07:39.375] LOG: Generated AI funcs
+[22:07:39.500] DEBUG: Session data saved to slot 4!
+[22:07:39.504] LOG: Wave Seed: {k4g6u4kZV8sCvUgjK5osGfp 2
+[22:07:39.710] LOG: Pokémon Ranger XS_Redux
+[22:07:40.026] LOG: Dialogue saved as seen: dialogue:ranger.encounter.2
+[22:07:40.059] LOG: Pokémon Ranger XS_Redux
+[22:07:40.461] LOG: %cStart Phase SummonPhase color:green;
+[22:07:40.461] LOG: XS_Redux
+[22:07:40.641] WARN: cry/10702 not found
+[22:07:40.745] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:07:40.848] LOG: %cStart Phase SummonPhase color:green;
+[22:07:40.849] LOG: XS_Redux
+[22:07:41.127] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:07:41.231] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:07:41.335] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:07:41.439] LOG: %cStart Phase SummonPhase color:green;
+[22:07:41.723] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:07:41.827] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[22:07:41.830] LOG: %cStart Phase SummonPhase color:green;
+[22:07:42.009] WARN: cry/318 not found
+[22:07:42.112] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:07:42.218] LOG: %cStart Phase InitEncounterPhase color:green;
+[22:07:42.224] LOG: %cStart Phase PostSummonPhase color:green;
+[22:07:42.224] LOG: Ran PSP for: Scyther
+[22:07:42.232] LOG: %cStart Phase PostSummonPhase color:green;
+[22:07:42.236] LOG: %cStart Phase PostSummonPhase color:green;
+[22:07:42.240] LOG: %cStart Phase PostSummonPhase color:green;
+[22:07:42.240] LOG: Ran PSP for: Carvanha
+[22:07:42.242] LOG: %cStart Phase PostSummonPhase color:green;
+[22:07:42.243] LOG: %cStart Phase PostSummonPhase color:green;
+[22:07:42.244] LOG: %cStart Phase PostSummonPhase color:green;
+[22:07:42.244] LOG: Ran PSP for: Panpour Redux
+[22:07:42.245] LOG: %cStart Phase PostSummonPhase color:green;
+[22:07:42.245] LOG: Ran PSP for: Dunsparce
+[22:07:42.247] LOG: %cStart Phase PostSummonPhase color:green;
+[22:07:42.248] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:07:42.408] LOG: %cStart Phase MessagePhase color:green;
+[22:07:42.675] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:07:42.701] LOG: %cStart Phase PostSummonPhase color:green;
+[22:07:42.702] LOG: %cStart Phase PostSummonPhase color:green;
+[22:07:42.703] LOG: %cStart Phase PostSummonPhase color:green;
+[22:07:42.703] LOG: %cStart Phase TurnInitPhase color:green;
+[22:07:42.704] LOG: %cStart Phase CommandPhase color:green;
+[22:07:44.444] WARN: cry/318 not found
+[22:07:44.568] WARN: cry/664 not found
+[22:07:44.811] WARN: cry/999 not found
+[22:07:44.939] WARN: cry/960 not found
+[22:07:45.132] WARN: cry/692 not found
+[22:07:45.574] WARN: cry/960 not found
+[22:07:46.019] WARN: cry/692 not found
+[22:07:46.829] WARN: cry/960 not found
+[22:07:47.205] WARN: cry/999 not found
+[22:07:47.511] WARN: cry/664 not found
+[22:07:48.056] WARN: cry/318 not found
+[22:07:49.104] WARN: cry/318 not found
+[22:07:50.621] WARN: cry/318 not found
+[22:07:54.483] WARN: cry/319 not found
+[22:07:54.483] WARN: Missing animation: pkmn__shiny__319
+[22:07:55.299] WARN: cry/318 not found
+[22:07:57.287] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'forms')
+TypeError: Cannot read properties of undefined (reading 'forms')
+    at new PokemonData (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:360960)
+    at Object.<anonymous> (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198312)
+    at JSON.parse (<anonymous>)
+    at GameData.parseSessionData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198221)
+    at GameData.saveAllImpl (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:200861)
+    at GameData.saveAll (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:199047)
+    at doSaveQuit (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:7789)
+    at MenuUiHandler.processInput (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:8209)
+    at UI.processInputInner (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26830)
+    at UI.processInputCoopAware (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26332)
+[22:11:42.853] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'forms')
+TypeError: Cannot read properties of undefined (reading 'forms')
+    at new PokemonData (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:360960)
+    at Object.<anonymous> (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198312)
+    at JSON.parse (<anonymous>)
+    at GameData.parseSessionData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198221)
+    at GameData.saveAllImpl (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:200861)
+    at GameData.saveAll (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:199047)
+    at doSaveQuit (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:7789)
+    at MenuUiHandler.processInput (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:8209)
+    at UI.processInputInner (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26830)
+    at UI.processInputCoopAware (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26332)
+[22:11:48.158] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'forms')
+TypeError: Cannot read properties of undefined (reading 'forms')
+    at new PokemonData (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:360960)
+    at Object.<anonymous> (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198312)
+    at JSON.parse (<anonymous>)
+    at GameData.parseSessionData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198221)
+    at GameData.saveAllImpl (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:200861)
+    at GameData.saveAll (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:199047)
+    at doSaveQuit (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:7789)
+    at MenuUiHandler.processInput (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:8209)
+    at UI.processInputInner (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26830)
+    at UI.processInputCoopAware (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26332)
+[22:11:48.351] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'forms')
+TypeError: Cannot read properties of undefined (reading 'forms')
+    at PokemonData (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:360960)
+    at Object.<anonymous> (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198312)
+    at JSON.parse (<anonymous>)
+    at GameData.parseSessionData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198221)
+    at GameData.saveAllImpl (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:200861)
+    at GameData.saveAll (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:199047)
+    at doSaveQuit (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:7789)
+    at MenuUiHandler.processInput (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:8209)
+    at UI.processInputInner (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26830)
+    at UI.processInputCoopAware (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26332)
+[22:11:48.515] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'forms')
+TypeError: Cannot read properties of undefined (reading 'forms')
+    at PokemonData (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:360960)
+    at Object.<anonymous> (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198312)
+    at JSON.parse (<anonymous>)
+    at GameData.parseSessionData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198221)
+    at GameData.saveAllImpl (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:200861)
+    at GameData.saveAll (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:199047)
+    at doSaveQuit (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:7789)
+    at MenuUiHandler.processInput (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:8209)
+    at UI.processInputInner (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26830)
+    at UI.processInputCoopAware (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26332)
+[22:12:01.410] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'forms')
+TypeError: Cannot read properties of undefined (reading 'forms')
+    at PokemonData (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:360960)
+    at Object.<anonymous> (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198312)
+    at JSON.parse (<anonymous>)
+    at GameData.parseSessionData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198221)
+    at GameData.saveAllImpl (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:200861)
+    at GameData.saveAll (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:199047)
+    at doSaveQuit (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:7789)
+    at MenuUiHandler.processInput (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:8209)
+    at UI.processInputInner (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26830)
+    at UI.processInputCoopAware (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26332)
+[22:12:01.591] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'forms')
+TypeError: Cannot read properties of undefined (reading 'forms')
+    at PokemonData (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:360960)
+    at Object.<anonymous> (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198312)
+    at JSON.parse (<anonymous>)
+    at GameData.parseSessionData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198221)
+    at GameData.saveAllImpl (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:200861)
+    at GameData.saveAll (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:199047)
+    at doSaveQuit (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:7789)
+    at MenuUiHandler.processInput (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:8209)
+    at UI.processInputInner (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26830)
+    at UI.processInputCoopAware (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26332)
+[22:12:08.863] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'forms')
+TypeError: Cannot read properties of undefined (reading 'forms')
+    at PokemonData (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:360960)
+    at Object.<anonymous> (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198312)
+    at JSON.parse (<anonymous>)
+    at GameData.parseSessionData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198221)
+    at GameData.saveAllImpl (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:200861)
+    at GameData.saveAll (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:199047)
+    at doSaveQuit (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:7789)
+    at MenuUiHandler.processInput (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:8209)
+    at UI.processInputInner (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26830)
+    at UI.processInputCoopAware (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1052:26332)
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"yi2e4s2iXT6qAtSehI3mqEdn","gameModeId":4,"difficulty":"youngster","challenges":[],"roster":[{"id":2861673808,"player":true,"species":664,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":20,"stats":[20,9,10,10,9,10],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":777,"ppUsed":0,"ppUp":0},{"moveId":411,"ppUsed":0,"ppUp":0},{"moveId":806,"ppUsed":0,"ppUp":0},{"moveId":78,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":664,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3152025320,"player":true,"species":999,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":-1,"hp":23,"stats":[23,8,13,13,13,8],"ivs":[31,31,31,27,30,30],"nature":10,"moveset":[{"moveId":825,"ppUsed":0,"ppUp":0},{"moveId":57,"ppUsed":0,"ppUp":0},{"moveId":425,"ppUsed":0,"ppUp":0},{"moveId":603,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":999,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":7,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":731321492,"player":true,"species":123,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":23,"stats":[23,17,14,10,14,19],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":910,"ppUsed":0,"ppUp":0},{"moveId":98,"ppUsed":0,"ppUp":0},{"moveId":742,"ppUsed":0,"ppUp":0},{"moveId":210,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":123,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[2],"fusionShiny":false,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2926304423,"player":true,"species":318,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":21,"stats":[21,15,8,11,8,15],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":755,"ppUsed":0,"ppUp":0},{"moveId":305,"ppUsed":0,"ppUp":0},{"moveId":422,"ppUsed":0,"ppUp":0},{"moveId":792,"ppUsed":0,"ppUp":0}],"status":null,"friendship":35,"metLevel":5,"metBiome":-1,"metSpecies":318,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[10],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1028848148,"player":true,"species":960,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":18,"stats":[18,14,9,9,10,16],"ivs":[31,31,31,31,31,30],"nature":3,"moveset":[{"moveId":453,"ppUsed":0,"ppUp":0},{"moveId":504,"ppUsed":0,"ppUp":0},{"moveId":556,"ppUsed":0,"ppUp":0},{"moveId":818,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":960,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":236925177,"player":true,"species":692,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":23,"stats":[23,9,13,17,13,10],"ivs":[31,31,31,31,31,30],"nature":15,"moveset":[{"moveId":412,"ppUsed":0,"ppUp":0},{"moveId":890,"ppUsed":0,"ppUp":0},{"moveId":61,"ppUsed":0,"ppUp":0},{"moveId":504,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":692,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":1,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":1,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"interaction","seq":0,"kind":"reward","choice":0},{"type":"interaction","seq":1,"kind":"learnMove","choice":3}],"endState":{"waveIndex":2,"money":1000,"party":[{"species":123,"level":5,"hp":23,"maxHp":23},{"species":318,"level":5,"hp":21,"maxHp":21},{"species":664,"level":5,"hp":20,"maxHp":20},{"species":999,"level":5,"hp":23,"maxHp":23},{"species":960,"level":5,"hp":18,"maxHp":18},{"species":692,"level":5,"hp":23,"maxHp":23}]},"checkpoint":{"wave":1,"seed":"yi2e4s2iXT6qAtSehI3mqEdn","party":[{"id":2861673808,"player":true,"species":664,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":20,"stats":[20,9,10,10,9,10],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":777,"ppUsed":0,"ppUp":0},{"moveId":411,"ppUsed":0,"ppUp":0},{"moveId":806,"ppUsed":0,"ppUp":0},{"moveId":78,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":664,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3152025320,"player":true,"species":999,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":-1,"hp":23,"stats":[23,8,13,13,13,8],"ivs":[31,31,31,27,30,30],"nature":10,"moveset":[{"moveId":825,"ppUsed":0,"ppUp":0},{"moveId":57,"ppUsed":0,"ppUp":0},{"moveId":425,"ppUsed":0,"ppUp":0},{"moveId":603,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":999,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":7,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":731321492,"player":true,"species":123,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":23,"stats":[23,17,14,10,14,19],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":910,"ppUsed":0,"ppUp":0},{"moveId":98,"ppUsed":0,"ppUp":0},{"moveId":742,"ppUsed":0,"ppUp":0},{"moveId":210,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":123,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[2],"fusionShiny":false,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2926304423,"player":true,"species":318,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":21,"stats":[21,15,8,11,8,15],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":755,"ppUsed":0,"ppUp":0},{"moveId":305,"ppUsed":0,"ppUp":0},{"moveId":422,"ppUsed":0,"ppUp":0},{"moveId":792,"ppUsed":0,"ppUp":0}],"status":null,"friendship":35,"metLevel":5,"metBiome":-1,"metSpecies":318,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[10],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1028848148,"player":true,"species":960,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":18,"stats":[18,14,9,9,10,16],"ivs":[31,31,31,31,31,30],"nature":3,"moveset":[{"moveId":453,"ppUsed":0,"ppUp":0},{"moveId":504,"ppUsed":0,"ppUp":0},{"moveId":556,"ppUsed":0,"ppUp":0},{"moveId":818,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":960,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":236925177,"player":true,"species":692,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":23,"stats":[23,9,13,17,13,10],"ivs":[31,31,31,31,31,30],"nature":15,"moveset":[{"moveId":412,"ppUsed":0,"ppUp":0},{"moveId":890,"ppUsed":0,"ppUp":0},{"moveId":61,"ppUsed":0,"ppUp":0},{"moveId":504,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":692,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"}],"money":1000,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":0}}}
