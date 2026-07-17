@@ -67,6 +67,16 @@ test("Mystery gauntlet policy is loud-fail and drives every projected encounter 
         ],
       );
       assert.equal(dispatch.find(driver => driver.name === "reward-target")?.semanticOnly, true);
+      assert.deepEqual(
+        dispatch
+          .filter(driver => driver.name.startsWith("learn-move-"))
+          .map(driver => [driver.name, driver.v2SurfaceId, driver.phase.source]),
+        [
+          ["learn-move-confirm", "learn-move:confirm", "Start Phase LearnMovePhase"],
+          ["learn-move-batch", "learn-move-batch", "Start Phase LearnMoveBatchPhase"],
+        ],
+        "single-move confirmation and batch learning must never share a semantic surface policy",
+      );
     },
   );
 });

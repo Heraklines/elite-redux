@@ -1397,6 +1397,7 @@ function destinationPumpOperationEnvelopes(pair: {
     "enemyPartySync",
     "stateSync",
     "rewardOptions",
+    "authorityFailure",
   ]);
 
   const wrap = (inner: CoopTransport): { transport: CoopTransport; deliverQueued(message: CoopMessage): void } => {

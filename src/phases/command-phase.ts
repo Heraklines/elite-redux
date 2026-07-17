@@ -895,6 +895,20 @@ export class CommandPhase extends FieldPhase {
         return null;
       }
       const point = `cmd:${globalScene.currentBattle.waveIndex}:${globalScene.currentBattle.turn}`;
+      // Classic's final boss deliberately starts as a single battle and promotes to double only
+      // when phase two materializes. The guest owns no field slot during stage one, so no guest
+      // CommandPhase can ever announce this point even when guest-owned bench mons are healthy.
+      // Treat only this exact product geometry as a one-owner boundary; a generic capacity-one
+      // exemption would incorrectly bypass real faint-replacement waits in ordinary co-op battles.
+      const singleOwnerFinalBossStage =
+        globalScene.currentBattle.isClassicFinalBoss
+        && globalScene.currentBattle.arrangement.playerCapacity === 1
+        && globalScene.currentBattle.arrangement.enemyCapacity === 1;
+      if (singleOwnerFinalBossStage) {
+        coopLog("rendezvous", `next-command barrier ${point} ARRIVE-ONLY (final-boss stage-one spectator)`);
+        rendezvous.arrive(point);
+        return null;
+      }
       // Asymmetric-field guard (#828 class): a partner whose HALF IS WIPED never reaches an own-slot
       // command point, so awaiting them would eat the full timeout EVERY TURN for the rest of the run.
       // If the partner owns no battle-legal mon, arrive (so any pending partner-side wait resolves) but

@@ -2131,10 +2131,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       let committedBiomeOperationId: string | null = null;
       let hostBiomeProjected = false;
       let guestBiomeBoundary: BiomeBoundarySeam | null = null;
-      withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.reannounce(point));
-      // The early guest arrival is now destination-scheduled; publish it to the host before its command
-      // boundary starts waiting. This is delivery, not a manufactured rendezvous or direct state mutation.
-      await withClient(rig.hostCtx, () => drainLoopback());
+      const hostArrangement = rig.hostScene.currentBattle.arrangement;
+      const guestArrangement = rig.guestScene.currentBattle.arrangement;
+      const finalBossStageOne =
+        rig.hostScene.currentBattle.isClassicFinalBoss
+        && rig.guestScene.currentBattle.isClassicFinalBoss
+        && hostArrangement.playerCapacity === 1
+        && hostArrangement.enemyCapacity === 1
+        && guestArrangement.playerCapacity === 1
+        && guestArrangement.enemyCapacity === 1;
       await withClient(rig.hostCtx, () => beforeHostCross?.());
       for (;;) {
         const boundary = restartAlreadyOpenHost
@@ -2354,6 +2359,34 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         }
         break;
       }
+      // A representative soak must exercise CommandPhase -> rendezvous wiring itself. Materialize and
+      // start the guest's real owned CommandPhase first; it announces its own arrival and legitimately
+      // parks until the host phase below arrives. Never pre-seed this boundary through reannounce().
+      let guestCommand: { readonly phaseName: string; start(): void } | null = null;
+      if (!finalBossStageOne) {
+        guestCommand = await withClient(rig.guestCtx, () =>
+          driveClientPhaseQueueTo(rig.guestScene, `guest command ${wave}:${turn}`, {
+            matches: phase =>
+              phase.phaseName === "CommandPhase"
+              && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX
+              && rig.guestScene.currentBattle.waveIndex === wave
+              && rig.guestScene.currentBattle.turn === turn,
+            drivePublicPhaseInput: phase => {
+              if (phase.phaseName !== "ScanIvsPhase" || rig.guestScene.ui.getMode() !== UiMode.CONFIRM) {
+                return false;
+              }
+              rig.guestScene.ui.processInput(Button.CANCEL);
+              actionScript.push(`wave ${transitionSourceWave}: guest declined IV Scanner through public UI`);
+              return true;
+            },
+          }),
+        );
+        await withClient(rig.guestCtx, async () => {
+          markRealGuestCommandBoundary(rig.guestScene, wave, turn);
+          guestCommand!.start();
+          await drainLoopback();
+        });
+      }
       // With a biome commit this resumes only after the renderer consumed its exact receipt. Without one it
       // starts the CommandPhase that toFirst deliberately left untouched, publishing the host's reciprocal
       // arrival in both cases.
@@ -2379,35 +2412,42 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         await game.phaseInterceptor.to("CommandPhase");
       });
       await pumpDuoDestinations(rig, 2);
-      // The old soak manufactured only the guest rendezvous arrival. That let the host proceed but never
-      // opened the guest's production UiMode.COMMAND surface, so retained reward operations could not emit
-      // their exact continuationReady proof and failed closed roughly 60 seconds later. Drive the guest's
-      // real queued CommandPhase for every boundary (ordinary and biome), then require its public handler.
-      const guestCommand = await withClient(rig.guestCtx, () =>
-        driveClientPhaseQueueTo(rig.guestScene, `guest command ${wave}:${turn}`, {
-          matches: phase =>
-            phase.phaseName === "CommandPhase"
-            && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX
-            && rig.guestScene.currentBattle.waveIndex === wave
-            && rig.guestScene.currentBattle.turn === turn,
-          drivePublicPhaseInput: phase => {
-            if (phase.phaseName !== "ScanIvsPhase" || rig.guestScene.ui.getMode() !== UiMode.CONFIRM) {
-              return false;
-            }
-            rig.guestScene.ui.processInput(Button.CANCEL);
-            actionScript.push(`wave ${transitionSourceWave}: guest declined IV Scanner through public UI`);
-            return true;
-          },
-        }),
-      );
-      await withClient(rig.guestCtx, async () => {
-        markRealGuestCommandBoundary(rig.guestScene, wave, turn);
-        guestCommand.start();
-        await drainLoopback();
-      });
+      // Classic wave 200 stage one is intentionally one player versus one boss. The renderer has no
+      // owned field slot or public CommandPhase until the boss's phase-two transition calls setDouble(true).
+      // Starting its CoopReplayTurnPhase here, before the authority submits slot 0, blocks waiting for a
+      // resolution that cannot exist yet (the former god-a/god-c wave-200 false softlock). A real second
+      // browser simply watches this turn. Preserve that exact behavior: verify both engines agree on the
+      // single geometry, leave the replay pump untouched, and let playWave start it only after host action.
+      const hostPlayerCapacity = rig.hostScene.currentBattle.arrangement.playerCapacity;
+      if (finalBossStageOne) {
+        const guestPlayerCapacity = rig.guestScene.currentBattle.arrangement.playerCapacity;
+        const hostPlayerField = rig.hostScene.getPlayerField();
+        const guestPlayerField = rig.guestScene.getPlayerField();
+        if (
+          guestPlayerCapacity !== 1
+          || hostPlayerField.length !== 1
+          || guestPlayerField.length !== 1
+          || hostPlayerField[COOP_GUEST_FIELD_INDEX] != null
+          || guestPlayerField[COOP_GUEST_FIELD_INDEX] != null
+        ) {
+          fail(
+            "desync",
+            wave,
+            `single-owner command geometry diverged hostCap=${hostPlayerCapacity}/field=${hostPlayerField.length} `
+              + `guestCap=${guestPlayerCapacity}/field=${guestPlayerField.length}`,
+          );
+        }
+        actionScript.push(
+          `wave ${wave} turn ${turn}: exact final-boss stage-one boundary crossed without a synthetic guest rendezvous; guest remained a replay spectator until host action`,
+        );
+        return;
+      }
+      if (guestCommand == null) {
+        fail("no-park", wave, `guest command ${wave}:${turn} was not materialized`);
+      }
       const guestCommandSurface = await waitForPublicModeOrPhaseExit(
         rig.guestCtx,
-        guestCommand,
+        guestCommand!,
         UiMode.COMMAND,
         `guest command ${wave}:${turn}`,
       );

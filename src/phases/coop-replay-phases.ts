@@ -57,8 +57,12 @@ import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksu
 import { collectCanonicalDiff, logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
+  COOP_FAINT_SWITCH_RESOLUTION_NONE,
+  type CoopFaintSourceAddress,
+  addressCoopFaintSwitchChoiceData,
   armCoopFaintSwitchIntentResend,
   captureCoopFaintSwitchOperationBinding,
+  markCoopFaintSwitchPickerSettled,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import { isCoopFaintSwitchSeq, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
@@ -608,22 +612,43 @@ export class CoopFaintReplayPhase extends PokemonPhase {
         // host's legality check rejects it instantly and runs auto-pick (which, with this side
         // truly empty, cleanly skips the summon: the lone-survivor flow). Zero wait either way.
         const relay = getCoopInteractionRelay();
-        const data = [0];
         const operationBinding = captureCoopFaintSwitchOperationBinding("guest");
+        const sourceAddress = this.faintSourceAddress ?? {
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+          occurrence: 0,
+        };
+        const { wave: sourceWave, turn: sourceTurn, occurrence } = sourceAddress;
+        // The renderer has now materially proved that no picker surface exists for this exact faint.
+        // Record that proof before relaying NONE; the retained terminal may ACK only this occurrence.
+        markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.battlerIndex, operationBinding, occurrence);
+        const data = addressCoopFaintSwitchChoiceData(
+          [0],
+          {
+            wave: sourceWave,
+            turn: sourceTurn,
+            occurrence,
+            fieldIndex: this.battlerIndex,
+            partySlot: -1,
+            resolution: COOP_FAINT_SWITCH_RESOLUTION_NONE,
+          },
+          operationBinding,
+        );
         sendCoopFaintSwitchChoice(relay, this.battlerIndex, -1, data);
         armCoopFaintSwitchIntentResend(
           {
             payload: { fieldIndex: this.battlerIndex, partySlot: -1, data },
             localRole: controller.role,
-            wave: globalScene.currentBattle?.waveIndex ?? 0,
-            turn: globalScene.currentBattle?.turn ?? 0,
+            wave: sourceWave,
+            turn: sourceTurn,
+            occurrence,
             resend: () => sendCoopFaintSwitchChoice(relay, this.battlerIndex, -1, data),
           },
           operationBinding,
         );
         return; // nothing to send out - the host's flow decides (wipe / lone survivor)
       }
-      globalScene.phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", this.battlerIndex);
+      globalScene.phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", this.battlerIndex, this.faintSourceAddress);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("[coop-op]")) {
         coopWarn("replay", `own-faint picker gate bi=${this.battlerIndex} lost its runtime binding`, error);
@@ -643,11 +668,13 @@ export class CoopFaintReplayPhase extends PokemonPhase {
    */
   private readonly narrate: boolean;
   private readonly sp: number | undefined;
+  private readonly faintSourceAddress: CoopFaintSourceAddress | undefined;
 
-  constructor(battlerIndex: number, narrate = false, sp?: number) {
+  constructor(battlerIndex: number, narrate = false, sp?: number, faintSourceAddress?: CoopFaintSourceAddress) {
     super(battlerIndex);
     this.narrate = narrate;
     this.sp = sp;
+    this.faintSourceAddress = faintSourceAddress;
   }
 
   public override start(): void {

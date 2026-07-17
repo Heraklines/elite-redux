@@ -8,6 +8,9 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  COOP_FAINT_SWITCH_RESOLUTION_OWNER,
+  type CoopFaintSourceAddress,
+  addressCoopFaintSwitchChoiceData,
   armCoopFaintSwitchIntentResend,
   captureCoopFaintSwitchOperationBinding,
   markCoopFaintSwitchPickerSettled,
@@ -19,7 +22,13 @@ import {
   endCoopFaintSwitchWindow,
   sendCoopFaintSwitchChoice,
 } from "#data/elite-redux/coop/coop-interaction-relay";
-import { failCoopSharedSession, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import {
+  coopSessionGeneration,
+  failCoopSharedSession,
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
 import { PartyUiHandler, PartyUiMode } from "#ui/handlers/party-ui-handler";
 
@@ -40,12 +49,14 @@ export class CoopGuestFaintSwitchPhase extends Phase {
   public readonly phaseName = "CoopGuestFaintSwitchPhase";
 
   private readonly fieldIndex: number;
+  private readonly faintSourceAddress: CoopFaintSourceAddress | undefined;
   /** Re-entrant guard: a drive loop may call start() again while the picker is open. */
   private opened = false;
 
-  constructor(fieldIndex: number) {
+  constructor(fieldIndex: number, faintSourceAddress?: CoopFaintSourceAddress) {
     super();
     this.fieldIndex = fieldIndex;
+    this.faintSourceAddress = faintSourceAddress;
   }
 
   public override start(): void {
@@ -74,8 +85,28 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       return;
     }
     const seq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
-    const sourceWave = scene.currentBattle?.waveIndex ?? 0;
-    const sourceTurn = scene.currentBattle?.turn ?? 0;
+    const sourceAddress = this.faintSourceAddress ?? {
+      wave: scene.currentBattle?.waveIndex ?? 0,
+      turn: scene.currentBattle?.turn ?? 0,
+      occurrence: 0,
+    };
+    const { wave: sourceWave, turn: sourceTurn, occurrence } = sourceAddress;
+    const runtime = getCoopRuntime();
+    const sourceGeneration = coopSessionGeneration();
+    const phaseBoundary = {
+      wave: scene.currentBattle?.waveIndex ?? 0,
+      turn: scene.currentBattle?.turn ?? 0,
+    };
+    if (runtime == null) {
+      failCoopSharedSession("The replacement picker lost its active runtime.");
+      return;
+    }
+    const boundaryStillLive = (): boolean =>
+      coopSessionGeneration() === sourceGeneration
+      && getCoopRuntime() === runtime
+      && scene.phaseManager.getCurrentPhase() === this
+      && (scene.currentBattle?.waveIndex ?? -1) === phaseBoundary.wave
+      && (scene.currentBattle?.turn ?? -1) === phaseBoundary.turn;
     coopLog("replay", `guest own-faint picker OPEN slot=${this.fieldIndex} seq=${seq} (choose your replacement)`);
     // Suppress the stall watchdog while THIS human's replacement picker is open: the guest's replay is
     // parked in a network wait for the host's next turn (which legitimately can't arrive until this pick),
@@ -84,15 +115,31 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     // failure (the catch) - exactly one of the two runs.
     beginCoopFaintSwitchWindow();
     let settled = false;
+    let materialized = false;
     let unregisterTerminal = () => {};
+    const closePicker = (): void => {
+      void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result => {
+        if (coopSessionGeneration() !== sourceGeneration) {
+          return;
+        }
+        if (result === "superseded" || !boundaryStillLive()) {
+          failCoopSharedSession("The replacement picker lost its exact material boundary while closing.");
+          return;
+        }
+        scene.phaseManager.shiftPhase();
+        materialized = true;
+        markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.fieldIndex, operationBinding, occurrence);
+      });
+    };
     unregisterTerminal = registerCoopFaintSwitchPickerTerminal(
       {
         wave: sourceWave,
         turn: sourceTurn,
+        occurrence,
         fieldIndex: this.fieldIndex,
         consume: (payload, operationId) => {
           if (settled) {
-            return true;
+            return materialized;
           }
           settled = true;
           endCoopFaintSwitchWindow();
@@ -101,8 +148,10 @@ export class CoopGuestFaintSwitchPhase extends Phase {
             `guest own-faint picker CLOSE from committed authority slot=${this.fieldIndex} `
               + `party[${payload.partySlot}] op=${operationId}`,
           );
-          void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(() => scene.phaseManager.shiftPhase());
-          return true;
+          // Keep the durability operation unacknowledged until the real modal transition and phase
+          // shift have completed. Its retry will observe the exact settled address and ACK then.
+          closePicker();
+          return false;
         },
       },
       operationBinding,
@@ -118,7 +167,6 @@ export class CoopGuestFaintSwitchPhase extends Phase {
           }
           settled = true;
           unregisterTerminal();
-          markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.fieldIndex, operationBinding);
           endCoopFaintSwitchWindow();
           const battlerCount = scene.currentBattle?.getBattlerCount() ?? 0;
           const picked = scene.getPlayerParty()[slotIndex];
@@ -137,14 +185,26 @@ export class CoopGuestFaintSwitchPhase extends Phase {
             // host can resolve the pick by IDENTITY when the two clients' party orders have
             // diverged (a blind slot index summons a DIFFERENT mon on the other engine).
             const pickedSpecies = picked.species?.speciesId ?? 0;
-            const data = [0, pickedSpecies];
+            const data = addressCoopFaintSwitchChoiceData(
+              [0, pickedSpecies],
+              {
+                wave: sourceWave,
+                turn: sourceTurn,
+                occurrence,
+                fieldIndex: this.fieldIndex,
+                partySlot: slotIndex,
+                resolution: COOP_FAINT_SWITCH_RESOLUTION_OWNER,
+              },
+              operationBinding,
+            );
             sendCoopFaintSwitchChoice(relay, this.fieldIndex, slotIndex, data);
             armCoopFaintSwitchIntentResend(
               {
                 payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data },
                 localRole: controller.role,
-                wave: scene.currentBattle?.waveIndex ?? 0,
-                turn: scene.currentBattle?.turn ?? 0,
+                wave: sourceWave,
+                turn: sourceTurn,
+                occurrence,
                 resend: () => sendCoopFaintSwitchChoice(relay, this.fieldIndex, slotIndex, data),
               },
               operationBinding,
@@ -156,7 +216,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
                 + `(hp=${picked?.hp ?? "-"}) -> NOT relayed, host auto-picks (guard)`,
             );
           }
-          void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(() => scene.phaseManager.shiftPhase());
+          closePicker();
         },
         PartyUiHandler.FilterNonFainted,
       );
@@ -164,9 +224,14 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       // A UI failure must never hang the guest's replay; the host auto-picks after its wait.
       endCoopFaintSwitchWindow();
       unregisterTerminal();
-      markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.fieldIndex, operationBinding);
       coopWarn("replay", `guest own-faint picker slot=${this.fieldIndex} failed to open (handled, host auto-picks)`);
+      if (!boundaryStillLive()) {
+        failCoopSharedSession("The replacement picker failed after losing its exact phase boundary.");
+        return;
+      }
       scene.phaseManager.shiftPhase();
+      materialized = true;
+      markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.fieldIndex, operationBinding, occurrence);
     }
   }
 }

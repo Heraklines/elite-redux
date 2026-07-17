@@ -34,6 +34,8 @@ interface CoopRecording {
   events: CoopBattleEvent[];
   /** Per-turn monotonic index stamped on each event as it is recorded (the LIVE emit ordering). */
   seq: number;
+  /** Recorded faint occurrences waiting for their corresponding host FaintPhase to bind. */
+  faintOccurrences: Map<number, number[]>;
 }
 
 let recording: CoopRecording | null = null;
@@ -102,7 +104,7 @@ export function beginCoopRecording(turn: number): void {
       `host recorder: begin turn=${turn} REPLACES open recording turn=${recording.turn} events=${recording.events.length} (prior turn never finalized)`,
     );
   }
-  recording = { turn, events: [], seq: 0 };
+  recording = { turn, events: [], seq: 0, faintOccurrences: new Map() };
 }
 
 /** Whether a recording is currently open (the queueMessage tap checks this - inert otherwise). */
@@ -131,11 +133,19 @@ export function recordCoopMessage(text: string): void {
  * failure never breaks the host's turn. INVARIANT: seq N == the index of this event in the batch (one
  * seq stamped per recorded event), so the guest de-dupes the batch against the live seqs exactly-once.
  */
-export function recordCoopEvent(event: CoopBattleEvent): void {
+export function recordCoopEvent(event: CoopBattleEvent): number | null {
   if (recording == null) {
-    return;
+    return null;
   }
   const seq = recording.seq++;
+  if (event.k === "faint") {
+    // The existing battleEvent/turnResolution sequence is already a per-turn, authority-issued
+    // occurrence identity. Queue it for the later host FaintPhase without extending the frozen P33
+    // event union; the renderer derives the same value from the event's existing batch position.
+    const occurrences = recording.faintOccurrences.get(event.bi) ?? [];
+    occurrences.push(seq);
+    recording.faintOccurrences.set(event.bi, occurrences);
+  }
   recording.events.push(event);
   // HOT PATH (per recorded battle event): build the trace string only when debug is on.
   if (isCoopDebug()) {
@@ -155,6 +165,23 @@ export function recordCoopEvent(event: CoopBattleEvent): void {
       );
     }
   }
+  return seq;
+}
+
+/**
+ * Bind the next recorded faint occurrence for one battler to its real host FaintPhase. A missing
+ * occurrence is normal outside authoritative recording and falls back to zero at the caller.
+ */
+export function consumeCoopRecordedFaintOccurrence(battlerIndex: number): number | null {
+  const occurrences = recording?.faintOccurrences.get(Math.trunc(battlerIndex));
+  if (occurrences == null || occurrences.length === 0) {
+    return null;
+  }
+  const occurrence = occurrences.shift() ?? null;
+  if (occurrences.length === 0) {
+    recording?.faintOccurrences.delete(Math.trunc(battlerIndex));
+  }
+  return occurrence;
 }
 
 /**
@@ -162,7 +189,7 @@ export function recordCoopEvent(event: CoopBattleEvent): void {
  * (empty + turn -1 when nothing was recorded, so the caller can decide whether to emit).
  */
 export function endCoopRecording(): CoopRecording {
-  const done = recording ?? { turn: -1, events: [], seq: 0 };
+  const done = recording ?? { turn: -1, events: [], seq: 0, faintOccurrences: new Map() };
   if (recording == null) {
     coopWarn("turn", "host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)");
   } else {

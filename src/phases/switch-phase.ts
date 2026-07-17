@@ -2,13 +2,18 @@ import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  COOP_FAINT_SWITCH_RESOLUTION_FALLBACK,
+  COOP_FAINT_SWITCH_RESOLUTION_NONE,
+  COOP_FAINT_SWITCH_RESOLUTION_OWNER,
+  type CoopFaintSourceAddress,
+  addressCoopFaintSwitchChoiceData,
+  awaitAddressedCoopFaintSwitchChoice,
   captureCoopFaintSwitchOperationBinding,
   commitFaintSwitchAuthorityIntent,
   commitFaintSwitchAuthorityResult,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   beginCoopFaintSwitchWindow,
-  COOP_FAINT_SWITCH_SEQ_BASE,
   endCoopFaintSwitchWindow,
   getCoopFaintSwitchWaitMs,
 } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -43,6 +48,7 @@ export class SwitchPhase extends BattlePhase {
   private readonly switchType: SwitchType;
   private readonly isModal: boolean;
   private readonly doReturn: boolean;
+  private readonly faintSourceAddress: CoopFaintSourceAddress | undefined;
 
   /**
    * Creates a new SwitchPhase
@@ -54,13 +60,20 @@ export class SwitchPhase extends BattlePhase {
    * recalled to ball or has already left the field. Passed to {@linkcode SwitchSummonPhase},
    * and is (ostensibly) only set to `false` from `FaintPhase`.
    */
-  constructor(switchType: SwitchType, fieldIndex: number, isModal: boolean, doReturn: boolean) {
+  constructor(
+    switchType: SwitchType,
+    fieldIndex: number,
+    isModal: boolean,
+    doReturn: boolean,
+    faintSourceAddress?: CoopFaintSourceAddress,
+  ) {
     super();
 
     this.switchType = switchType;
     this.fieldIndex = fieldIndex;
     this.isModal = isModal;
     this.doReturn = doReturn;
+    this.faintSourceAddress = faintSourceAddress;
   }
 
   start() {
@@ -112,9 +125,17 @@ export class SwitchPhase extends BattlePhase {
     // choice this belongs to. Solo / non-coop is byte-for-byte unchanged (skips this).
     const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
     const coopRelay = coopController == null ? null : getCoopInteractionRelay();
+    const authoritative = coopController != null && getCoopNetcodeMode() === "authoritative";
+    if (coopController != null && coopRelay == null) {
+      if (authoritative) {
+        failCoopSharedSession("The authoritative replacement flow lost its interaction relay.");
+        return;
+      }
+      failCoopSharedSession("The replacement flow lost its interaction relay.");
+      return;
+    }
     if (coopController != null && coopRelay != null) {
       const scene = globalScene;
-      const authoritative = getCoopNetcodeMode() === "authoritative";
       const operationBinding = (() => {
         if (!authoritative) {
           return null;
@@ -130,6 +151,11 @@ export class SwitchPhase extends BattlePhase {
       if (operationBinding === undefined) {
         return;
       }
+      const operationSourceAddress = this.faintSourceAddress ?? {
+        wave: scene.currentBattle.waveIndex,
+        turn: scene.currentBattle.turn ?? 0,
+        occurrence: 0,
+      };
       const seq = (globalScene.currentBattle.turn ?? 0) * 4 + this.fieldIndex;
       if (coopOwnerOfPlayerFieldSlot(this.fieldIndex) !== coopController.role) {
         // AUTHORITATIVE netcode (#633 partner-death sync, HALF B): the WATCHER here is the HOST
@@ -147,77 +173,126 @@ export class SwitchPhase extends BattlePhase {
           // when no (or an illegal) pick arrives in time - the run never stalls on a
           // disconnected or idle partner.
           scene.ui.showText("Waiting for your partner to choose their next Pokemon...");
-          const faintSeq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
-          // Freeze the boundary before a human/network await. TurnEnd or another async continuation may
-          // advance mutable scene.turn while the picker is open; the terminal still belongs to this wait.
-          const sourceAddress = {
+          // The protocol address belongs to the original faint event. This phase can start after TurnInit
+          // has advanced the ambient turn, so never reconstruct an addressed faint from currentBattle.turn.
+          const sourceAddress = operationSourceAddress;
+          // Separately freeze the phase's live boundary. Async callbacks fence against this later state,
+          // not against the older faint address.
+          const phaseBoundary = {
             wave: scene.currentBattle.waveIndex,
             turn: scene.currentBattle.turn ?? 0,
           };
           const sourceGeneration = coopSessionGeneration();
+          const runtime = getCoopRuntime();
+          if (runtime == null || runtime.controller !== coopController) {
+            failCoopSharedSession("The replacement flow lost its active host runtime.");
+            return;
+          }
+          const boundaryStillLive = (): boolean =>
+            coopSessionGeneration() === sourceGeneration
+            && getCoopRuntime() === runtime
+            && scene.phaseManager.getCurrentPhase() === this
+            && scene.currentBattle.waveIndex === phaseBoundary.wave
+            && (scene.currentBattle.turn ?? 0) === phaseBoundary.turn;
           // Suppress the stall watchdog while awaiting the partner's HUMAN pick (see
           // ShowdownEnemyFaintSwitchPhase for the rationale): a slow-but-alive partner must not be misread as
           // a deadlock. Paired 1:1 with endCoopFaintSwitchWindow in the .then (always runs).
           beginCoopFaintSwitchWindow();
-          void coopRelay
-            .awaitInteractionChoice(faintSeq, getCoopFaintSwitchWaitMs(), COOP_SWITCH_CHOICE_KINDS)
-            .then(res => {
-              endCoopFaintSwitchWindow();
-              const battlerCount = scene.currentBattle.getBattlerCount();
-              let slotIndex = res?.choice ?? -1;
-              // #799 (live Wingull/Chinchou wrong-mon summon): the pick carries the chosen mon's
-              // SPECIES (data[1]). If the two clients' party orders diverged, the blind slot index
-              // points at a DIFFERENT mon here - resolve by IDENTITY instead and log the drift.
-              const pickedSpecies = res?.data?.[1] ?? 0;
-              if (pickedSpecies > 0 && slotIndex >= 0) {
-                const atSlot = scene.getPlayerParty()[slotIndex];
-                if (atSlot?.species?.speciesId !== pickedSpecies) {
-                  const bySpecies = scene
-                    .getPlayerParty()
-                    .findIndex((p, i) => i >= battlerCount && i < 6 && p?.species?.speciesId === pickedSpecies);
-                  if (bySpecies >= 0) {
-                    coopWarn(
-                      "replay",
-                      `partner pick slot=${slotIndex} holds sp${atSlot?.species?.speciesId ?? 0} but partner picked sp${pickedSpecies} -> resolved by identity to slot=${bySpecies} (party-order drift)`,
-                    );
-                    slotIndex = bySpecies;
-                  }
+          void awaitAddressedCoopFaintSwitchChoice(
+            coopRelay,
+            {
+              ...sourceAddress,
+              fieldIndex: this.fieldIndex,
+              timeoutMs: getCoopFaintSwitchWaitMs(),
+            },
+            operationBinding,
+          ).then(res => {
+            endCoopFaintSwitchWindow();
+            if (coopSessionGeneration() !== sourceGeneration) {
+              return;
+            }
+            if (!boundaryStillLive()) {
+              failCoopSharedSession("The replacement flow lost its exact host boundary before committing.");
+              return;
+            }
+            const battlerCount = scene.currentBattle.getBattlerCount();
+            let slotIndex = res?.choice ?? -1;
+            // #799 (live Wingull/Chinchou wrong-mon summon): the pick carries the chosen mon's
+            // SPECIES (data[1]). If the two clients' party orders diverged, the blind slot index
+            // points at a DIFFERENT mon here - resolve by IDENTITY instead and log the drift.
+            const pickedSpecies = res?.data?.[1] ?? 0;
+            if (pickedSpecies > 0 && slotIndex >= 0) {
+              const atSlot = scene.getPlayerParty()[slotIndex];
+              if (atSlot?.species?.speciesId !== pickedSpecies) {
+                const bySpecies = scene
+                  .getPlayerParty()
+                  .findIndex((p, i) => i >= battlerCount && i < 6 && p?.species?.speciesId === pickedSpecies);
+                if (bySpecies >= 0) {
+                  coopWarn(
+                    "replay",
+                    `partner pick slot=${slotIndex} holds sp${atSlot?.species?.speciesId ?? 0} but partner picked sp${pickedSpecies} -> resolved by identity to slot=${bySpecies} (party-order drift)`,
+                  );
+                  slotIndex = bySpecies;
                 }
               }
-              const picked = scene.getPlayerParty()[slotIndex];
-              const legal =
-                slotIndex >= battlerCount
-                && slotIndex < 6
-                && picked?.isAllowedInBattle() === true
-                && !coopSwitchBlocksMonForOwner(coopOwnerOfPlayerFieldSlot(this.fieldIndex), picked.coopOwner);
-              if (!legal) {
-                coopLog(
-                  "replay",
-                  `partner replacement pick seq=${faintSeq} ${res == null ? "TIMED OUT" : `illegal (${slotIndex})`} -> auto-pick`,
-                );
-                slotIndex = this.coopAutoPickReplacement(scene);
-              }
-              const authoritativePick = scene.getPlayerParty()[slotIndex];
-              const receipt = commitFaintSwitchAuthorityResult(
-                {
-                  payload: {
-                    fieldIndex: this.fieldIndex,
-                    partySlot: slotIndex,
-                    data: [0, authoritativePick?.species?.speciesId ?? 0],
-                  },
-                  ownerRole: coopOwnerOfPlayerFieldSlot(this.fieldIndex),
-                  localRole: coopController.role,
-                  wave: sourceAddress.wave,
-                  turn: sourceAddress.turn,
-                },
-                operationBinding,
+            }
+            const picked = scene.getPlayerParty()[slotIndex];
+            const legal =
+              slotIndex >= battlerCount
+              && slotIndex < 6
+              && picked?.isAllowedInBattle() === true
+              && !coopSwitchBlocksMonForOwner(coopOwnerOfPlayerFieldSlot(this.fieldIndex), picked.coopOwner);
+            if (!legal) {
+              coopLog(
+                "replay",
+                `partner replacement pick field=${this.fieldIndex} ${
+                  res == null ? "TIMED OUT" : `illegal (${slotIndex})`
+                } -> auto-pick`,
               );
-              if (receipt == null) {
-                failCoopSharedSession("The authoritative replacement choice could not be retained.");
-                return;
-              }
-              const runtime = getCoopRuntime();
-              const releaseAfterPeerMaterial = (): void => {
+              slotIndex = this.coopAutoPickReplacement(scene);
+            }
+            const authoritativePick = scene.getPlayerParty()[slotIndex];
+            const noReplacement = slotIndex < 0 || authoritativePick == null;
+            const terminalData = addressCoopFaintSwitchChoiceData(
+              [0, authoritativePick?.species?.speciesId ?? 0],
+              {
+                ...sourceAddress,
+                fieldIndex: this.fieldIndex,
+                partySlot: slotIndex,
+                resolution: noReplacement
+                  ? COOP_FAINT_SWITCH_RESOLUTION_NONE
+                  : legal
+                    ? COOP_FAINT_SWITCH_RESOLUTION_OWNER
+                    : COOP_FAINT_SWITCH_RESOLUTION_FALLBACK,
+              },
+              operationBinding,
+            );
+            const receipt = commitFaintSwitchAuthorityResult(
+              {
+                payload: {
+                  fieldIndex: this.fieldIndex,
+                  partySlot: slotIndex,
+                  data: terminalData,
+                },
+                ownerRole: coopOwnerOfPlayerFieldSlot(this.fieldIndex),
+                localRole: coopController.role,
+                ...sourceAddress,
+              },
+              operationBinding,
+            );
+            if (receipt == null) {
+              failCoopSharedSession("The authoritative replacement choice could not be retained.");
+              return;
+            }
+            const releaseAfterPeerMaterial = (): void => {
+              void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result => {
+                if (coopSessionGeneration() !== sourceGeneration) {
+                  return;
+                }
+                if (result === "superseded" || !boundaryStillLive()) {
+                  failCoopSharedSession("The replacement flow lost its exact host boundary while closing.");
+                  return;
+                }
                 if (slotIndex >= battlerCount && slotIndex < 6) {
                   scene.phaseManager.unshiftNew(
                     "SwitchSummonPhase",
@@ -226,53 +301,54 @@ export class SwitchPhase extends BattlePhase {
                     slotIndex,
                     this.doReturn,
                   );
-                  // The checkpoint is queued only after the retained old-address terminal has materially
-                  // closed the peer picker. It may carry turn N+1, but can no longer race an N modal.
+                  // Queue the checkpoint only after the retained old-address terminal and this host
+                  // message surface have both materially closed. It may carry turn N+1, but can no
+                  // longer race an N modal or leak into a superseding phase.
                   scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
                 }
-                void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(() => scene.phaseManager.shiftPhase());
-              };
-              if (receipt.operationId == null) {
-                releaseAfterPeerMaterial();
+                scene.phaseManager.shiftPhase();
+              });
+            };
+            if (receipt.operationId == null) {
+              if (!legal) {
+                failCoopSharedSession("A replacement timeout cannot continue without a retained peer terminal.");
                 return;
               }
-              const durability = runtime?.durability;
-              if (runtime == null || durability == null || runtime.controller.role !== "host") {
-                failCoopSharedSession(`Replacement terminal ${receipt.operationId} has no host material barrier.`);
-                return;
-              }
-              const operationId = receipt.operationId;
-              void durability
-                .waitForOperationMaterialApplied(operationId)
-                .then(applied => {
-                  if (coopSessionGeneration() !== sourceGeneration) {
+              releaseAfterPeerMaterial();
+              return;
+            }
+            const durability = runtime.durability;
+            if (durability == null || runtime.controller.role !== "host") {
+              failCoopSharedSession(`Replacement terminal ${receipt.operationId} has no host material barrier.`);
+              return;
+            }
+            const operationId = receipt.operationId;
+            void durability
+              .waitForOperationMaterialApplied(operationId)
+              .then(applied => {
+                if (coopSessionGeneration() !== sourceGeneration) {
+                  return;
+                }
+                if (!applied) {
+                  failCoopSharedSession(`Replacement terminal ${operationId} exhausted before peer material apply.`);
+                  return;
+                }
+                runWhenCoopRuntimeActive(runtime, () => {
+                  if (!boundaryStillLive()) {
+                    failCoopSharedSession(`Replacement terminal ${operationId} lost its host phase boundary.`);
                     return;
                   }
-                  if (!applied) {
-                    failCoopSharedSession(`Replacement terminal ${operationId} exhausted before peer material apply.`);
-                    return;
-                  }
-                  runWhenCoopRuntimeActive(runtime, () => {
-                    if (
-                      coopSessionGeneration() !== sourceGeneration
-                      || getCoopRuntime() !== runtime
-                      || globalScene.phaseManager.getCurrentPhase() !== this
-                      || globalScene.currentBattle.waveIndex !== sourceAddress.wave
-                    ) {
-                      failCoopSharedSession(`Replacement terminal ${operationId} lost its host phase boundary.`);
-                      return;
-                    }
-                    releaseAfterPeerMaterial();
-                  });
-                })
-                .catch(error => {
-                  if (coopSessionGeneration() !== sourceGeneration) {
-                    return;
-                  }
-                  coopWarn("replay", `replacement terminal ${operationId} material barrier rejected`, error);
-                  failCoopSharedSession(`Replacement terminal ${operationId} material barrier failed.`);
+                  releaseAfterPeerMaterial();
                 });
-            });
+              })
+              .catch(error => {
+                if (coopSessionGeneration() !== sourceGeneration) {
+                  return;
+                }
+                coopWarn("replay", `replacement terminal ${operationId} material barrier rejected`, error);
+                failCoopSharedSession(`Replacement terminal ${operationId} material barrier failed.`);
+              });
+          });
           return;
         }
         // LOCKSTEP WATCHER: do not open the picker; apply the owner's relayed replacement.
@@ -303,13 +379,22 @@ export class SwitchPhase extends BattlePhase {
           `owner slot=${this.fieldIndex}: no legal same-owner replacement (half wiped) -> close picker, slot stays empty`,
         );
         if (authoritative) {
+          const data = addressCoopFaintSwitchChoiceData(
+            [0],
+            {
+              ...operationSourceAddress,
+              fieldIndex: this.fieldIndex,
+              partySlot: -1,
+              resolution: COOP_FAINT_SWITCH_RESOLUTION_NONE,
+            },
+            operationBinding,
+          );
           const retained = commitFaintSwitchAuthorityIntent(
             {
-              payload: { fieldIndex: this.fieldIndex, partySlot: -1, data: [0] },
+              payload: { fieldIndex: this.fieldIndex, partySlot: -1, data },
               ownerRole: coopController.role,
               localRole: coopController.role,
-              wave: scene.currentBattle.waveIndex,
-              turn: scene.currentBattle.turn ?? 0,
+              ...operationSourceAddress,
             },
             operationBinding,
           );
@@ -322,21 +407,52 @@ export class SwitchPhase extends BattlePhase {
         return super.end();
       }
       // OWNER: pick normally, and relay the chosen slot (+ baton flag) so the watcher mirrors it.
+      const ownerGeneration = coopSessionGeneration();
+      const ownerRuntime = authoritative ? getCoopRuntime() : null;
+      const ownerBoundary = {
+        wave: scene.currentBattle.waveIndex,
+        turn: scene.currentBattle.turn ?? 0,
+      };
+      if (authoritative && (ownerRuntime == null || ownerRuntime.controller !== coopController)) {
+        failCoopSharedSession("The owner replacement flow lost its active runtime.");
+        return;
+      }
+      const ownerBoundaryStillLive = (): boolean =>
+        !authoritative
+        || (ownerRuntime != null
+          && coopSessionGeneration() === ownerGeneration
+          && getCoopRuntime() === ownerRuntime
+          && scene.phaseManager.getCurrentPhase() === this
+          && scene.currentBattle.waveIndex === ownerBoundary.wave
+          && (scene.currentBattle.turn ?? 0) === ownerBoundary.turn);
       scene.ui.setMode(
         UiMode.PARTY,
         this.isModal ? PartyUiMode.FAINT_SWITCH : PartyUiMode.POST_BATTLE_SWITCH,
         fieldIndex,
         (slotIndex: number, option: PartyOption) => {
+          if (!ownerBoundaryStillLive()) {
+            failCoopSharedSession("The owner replacement flow lost its exact phase boundary before committing.");
+            return;
+          }
           const isBaton = option === PartyOption.PASS_BATON;
-          const data = isBaton ? [1] : [0];
+          let data = isBaton ? [1] : [0];
           if (authoritative) {
+            data = addressCoopFaintSwitchChoiceData(
+              data,
+              {
+                ...operationSourceAddress,
+                fieldIndex: this.fieldIndex,
+                partySlot: slotIndex,
+                resolution: COOP_FAINT_SWITCH_RESOLUTION_OWNER,
+              },
+              operationBinding,
+            );
             const retained = commitFaintSwitchAuthorityIntent(
               {
                 payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data },
                 ownerRole: coopController.role,
                 localRole: coopController.role,
-                wave: scene.currentBattle.waveIndex,
-                turn: scene.currentBattle.turn ?? 0,
+                ...operationSourceAddress,
               },
               operationBinding,
             );
@@ -346,26 +462,42 @@ export class SwitchPhase extends BattlePhase {
             }
           }
           coopRelay.sendInteractionChoice(seq, "switch", slotIndex, data);
-          if (slotIndex >= scene.currentBattle.getBattlerCount() && slotIndex < 6) {
-            const switchType = isBaton ? SwitchType.BATON_PASS : this.switchType;
-            scene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
-            // #836 (live wave-5 party-order transposition): the host's SwitchSummonPhase SWAPS the party
-            // array (`party[slotIndex] = fainted; party[fieldIndex] = replacement`), but the WATCHER (the
-            // guest) mirrors a HOST-OWNED faint only at the NEXT turn resolution - so between the faint and
-            // the next turn the guest keeps the STALE order (its fainted lead still at fieldIndex, the
-            // replacement still on the bench). If the wave ends (or the replacement levels) before that
-            // turn arrives, the guest's `getPlayerParty()` order is TRANSPOSED vs the host: the per-slot
-            // exp deltas SKIP (wrong species at the slot) and the field/switch presentation lands on the
-            // wrong mon. The GUEST-owned faint path already pushes this out-of-band checkpoint (HALF B) so
-            // the partner materializes the replacement + mirrors the array swap IMMEDIATELY; do the SAME for
-            // a HOST-owned faint so both engines' party order stays byte-identical from the moment of the
-            // swap. Authoritative-only (the pure-renderer guest never reaches this branch; lockstep both run
-            // their own SwitchSummonPhase); the phase itself is a host-role-gated no-op besides.
-            if (authoritative) {
-              scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+          const finishOwnerReplacement = (): void => {
+            if (slotIndex >= scene.currentBattle.getBattlerCount() && slotIndex < 6) {
+              const switchType = isBaton ? SwitchType.BATON_PASS : this.switchType;
+              scene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
+              // #836 (live wave-5 party-order transposition): the host's SwitchSummonPhase SWAPS the party
+              // array (`party[slotIndex] = fainted; party[fieldIndex] = replacement`), but the WATCHER (the
+              // guest) mirrors a HOST-OWNED faint only at the NEXT turn resolution - so between the faint and
+              // the next turn the guest keeps the STALE order (its fainted lead still at fieldIndex, the
+              // replacement still on the bench). If the wave ends (or the replacement levels) before that
+              // turn arrives, the guest's `getPlayerParty()` order is TRANSPOSED vs the host: the per-slot
+              // exp deltas SKIP (wrong species at the slot) and the field/switch presentation lands on the
+              // wrong mon. The GUEST-owned faint path already pushes this out-of-band checkpoint (HALF B) so
+              // the partner materializes the replacement + mirrors the array swap IMMEDIATELY; do the SAME for
+              // a HOST-owned faint so both engines' party order stays byte-identical from the moment of the
+              // swap. Authoritative-only (the pure-renderer guest never reaches this branch; lockstep both run
+              // their own SwitchSummonPhase); the phase itself is a host-role-gated no-op besides.
+              if (authoritative) {
+                scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+              }
             }
+            scene.phaseManager.shiftPhase();
+          };
+          if (authoritative) {
+            void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, ownerBoundaryStillLive).then(result => {
+              if (coopSessionGeneration() !== ownerGeneration) {
+                return;
+              }
+              if (result === "superseded" || !ownerBoundaryStillLive()) {
+                failCoopSharedSession("The owner replacement lost its exact phase boundary while closing.");
+                return;
+              }
+              finishOwnerReplacement();
+            });
+          } else {
+            scene.ui.setMode(UiMode.MESSAGE).then(finishOwnerReplacement);
           }
-          scene.ui.setMode(UiMode.MESSAGE).then(() => scene.phaseManager.shiftPhase());
         },
         PartyUiHandler.FilterNonFainted,
       );

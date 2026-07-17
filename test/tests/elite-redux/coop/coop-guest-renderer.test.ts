@@ -750,11 +750,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
 
   // (B) PLAYER REPLACEMENT (#633 partner-death sync, HALF B; reworked by #786): when the GUEST's
   // mon (bi1) faints, the host's SwitchPhase for that guest-owned slot now AWAITS the guest's OWN
-  // relayed replacement pick (its renderer opens a picker off the faint presentation - proven
-  // end-to-end in coop-duo-faint-switch.test.ts) and falls back to the AUTO-PICK when no pick
-  // arrives in time. This asserts the fallback: await fired, then a SwitchSummonPhase for the
-  // guest's bench mon.
-  it("PLAYER REPLACEMENT (#786): the host awaits the guest's pick, then auto-picks a guest bench replacement on timeout", async () => {
+  // relayed replacement pick. On timeout the host retains its concrete fallback, but must remain
+  // parked until the guest has materially closed the old picker. This single-engine fixture has no
+  // peer to ACK, so it proves the host cannot advance unilaterally.
+  it("PLAYER REPLACEMENT (#786): timeout parks behind the retained peer-material barrier", async () => {
     const field = await startCoopGuest();
     // This is the HOST simulating the turn (the watcher of the guest-owned slot 1). Flip local role.
     setFixtureRole("host");
@@ -781,6 +780,13 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const awaitSpy = vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice");
     const relay = getCoopInteractionRelay();
     expect(relay, "a live interaction relay exists").not.toBeNull();
+    const runtime = getCoopRuntime();
+    const durability = runtime?.durability;
+    expect(durability, "the authoritative runtime has a durability barrier").toBeDefined();
+    if (durability == null) {
+      throw new Error("missing co-op durability barrier");
+    }
+    const materialBarrierSpy = vi.spyOn(durability, "waitForOperationMaterialApplied");
     const unshiftSpy = vi.spyOn(globalScene.phaseManager, "unshiftNew");
 
     // Drive the host's SwitchPhase for the guest-owned slot 1 (exactly what FaintPhase queues).
@@ -802,13 +808,14 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
 
     // The host DID await the guest's pick first (#786) ...
     expect(awaitSpy, "the host awaits the guest's relayed replacement pick").toHaveBeenCalled();
-    // ... then (no pick arrived) auto-unshifted a SwitchSummonPhase for the guest's bench mon.
+    expect(
+      materialBarrierSpy,
+      "the timeout retained one exact terminal and entered its material barrier",
+    ).toHaveBeenCalledOnce();
+    // With no peer in this fixture the material ACK cannot arrive, so no summon/checkpoint or phase
+    // progression may leak past the barrier.
     const switchSummon = unshiftSpy.mock.calls.find(([name]) => name === "SwitchSummonPhase");
-    expect(switchSummon, "the host auto-picked a replacement (queued a SwitchSummonPhase)").toBeDefined();
-    // SwitchSummonPhase args: (switchType, fieldIndex, slotIndex, doReturn). The slotIndex is the
-    // guest's bench party slot; the fieldIndex is the guest's field slot (1).
-    expect(switchSummon?.[2], "the replacement fills the guest's field slot (1)").toBe(COOP_GUEST_FIELD_INDEX);
-    expect(switchSummon?.[3], "the auto-picked replacement is the guest's bench party slot").toBe(benchPartySlot);
+    expect(switchSummon, "the host must stay parked until the guest materially closes its picker").toBeUndefined();
   });
 
   // (B2) The auto-pick honors OWNERSHIP: it never pulls the HOST's bench into the guest's slot.

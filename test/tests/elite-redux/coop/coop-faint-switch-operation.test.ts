@@ -5,7 +5,11 @@
 
 import { clearNegotiatedCoopCapabilities } from "#data/elite-redux/coop/coop-capabilities";
 import {
+  COOP_FAINT_SWITCH_RESOLUTION_NONE,
+  COOP_FAINT_SWITCH_RESOLUTION_OWNER,
+  addressCoopFaintSwitchChoiceData,
   armCoopFaintSwitchIntentResend,
+  awaitAddressedCoopFaintSwitchChoice,
   captureCoopFaintSwitchOperationBinding,
   commitFaintSwitchAuthorityIntent,
   coopFaintSwitchOperationAddress,
@@ -44,9 +48,57 @@ describe("co-op faint-switch operation migration", () => {
     clearNegotiatedCoopCapabilities();
   });
 
-  it("addresses repeated same-turn replacements by the authoritative party slot", () => {
+  it("addresses repeated same-turn replacements by occurrence and authoritative result slot", () => {
     expect(coopFaintSwitchOperationAddress(7, 3, 1, 2)).not.toBe(coopFaintSwitchOperationAddress(7, 3, 1, 3));
     expect(coopFaintSwitchOperationAddress(7, 3, 1, -1)).not.toBe(coopFaintSwitchOperationAddress(7, 3, 1, 2));
+    expect(coopFaintSwitchOperationAddress(7, 3, 1, 2, 4)).not.toBe(coopFaintSwitchOperationAddress(7, 3, 1, 2, 5));
+    expect(
+      Number.isSafeInteger(coopFaintSwitchOperationAddress(90_000, 99_999, 3, 8, 9_999)),
+      "the documented maximum remains exactly representable",
+    ).toBe(true);
+    expect(
+      () => coopFaintSwitchOperationAddress(90_000, 100_000, 3, 8, 9_999),
+      "an out-of-budget turn fails closed instead of colliding",
+    ).toThrow(/invalid faint-switch turn/u);
+  });
+
+  it("acknowledges a no-picker terminal only after the exact no-surface occurrence was proved", () => {
+    const guestState = createCoopRuntimeOpState("guest");
+    setActiveCoopRuntimeOpState(guestState);
+    const binding = captureCoopFaintSwitchOperationBinding("guest");
+    const data = addressCoopFaintSwitchChoiceData(
+      [0],
+      {
+        wave: 8,
+        turn: 2,
+        occurrence: 17,
+        fieldIndex: COOP_GUEST_FIELD_INDEX,
+        partySlot: -1,
+        resolution: COOP_FAINT_SWITCH_RESOLUTION_NONE,
+      },
+      binding,
+    );
+    const envelope = {
+      sessionEpoch: 1,
+      wave: 8,
+      turn: 2,
+      pendingOperation: {
+        id: "1:1:FAINT_SWITCH:no-surface",
+        kind: "FAINT_SWITCH",
+        owner: 1,
+        status: "applied",
+        payload: { fieldIndex: COOP_GUEST_FIELD_INDEX, partySlot: -1, data },
+      },
+    } as unknown as CoopAuthoritativeEnvelopeV1;
+
+    expect(materializeCoopFaintSwitchPickerTerminal(envelope, binding)).toBe(false);
+    markCoopFaintSwitchPickerSettled(8, 2, COOP_GUEST_FIELD_INDEX, binding, 16);
+    expect(
+      materializeCoopFaintSwitchPickerTerminal(envelope, binding),
+      "another faint occurrence cannot prove this no-surface terminal",
+    ).toBe(false);
+    markCoopFaintSwitchPickerSettled(8, 2, COOP_GUEST_FIELD_INDEX, binding, 17);
+    expect(materializeCoopFaintSwitchPickerTerminal(envelope, binding)).toBe(true);
   });
 
   it("materializes only the exact old-address picker before acknowledging a timeout fallback", () => {
@@ -161,7 +213,51 @@ describe("co-op faint-switch operation migration", () => {
     expect(await awaited).toMatchObject({ choice: 2, data: [0, 131], kind: "switch" });
   });
 
-  it("INTENT RECOVERY: dropping the guest's replacement pick still delivers that exact pick to host authority", async () => {
+  it("rejects a buffered proposal from an older same-turn same-field occurrence", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostRuntime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopRuntime(hostRuntime);
+    const hostBinding = captureCoopFaintSwitchOperationBinding("host");
+    setCoopRuntime(guestRuntime);
+    const guestBinding = captureCoopFaintSwitchOperationBinding("guest");
+    const oldData = addressCoopFaintSwitchChoiceData(
+      [0, 6],
+      {
+        wave: 12,
+        turn: 5,
+        occurrence: 9,
+        fieldIndex: COOP_GUEST_FIELD_INDEX,
+        partySlot: 2,
+        resolution: COOP_FAINT_SWITCH_RESOLUTION_OWNER,
+      },
+      guestBinding,
+    );
+    const currentData = addressCoopFaintSwitchChoiceData(
+      [0, 25],
+      {
+        wave: 12,
+        turn: 5,
+        occurrence: 12,
+        fieldIndex: COOP_GUEST_FIELD_INDEX,
+        partySlot: 3,
+        resolution: COOP_FAINT_SWITCH_RESOLUTION_OWNER,
+      },
+      guestBinding,
+    );
+
+    sendCoopFaintSwitchChoice(guestRuntime.interactionRelay, COOP_GUEST_FIELD_INDEX, 2, oldData);
+    const awaited = awaitAddressedCoopFaintSwitchChoice(
+      hostRuntime.interactionRelay,
+      { wave: 12, turn: 5, occurrence: 12, fieldIndex: COOP_GUEST_FIELD_INDEX, timeoutMs: 100 },
+      hostBinding,
+    );
+    sendCoopFaintSwitchChoice(guestRuntime.interactionRelay, COOP_GUEST_FIELD_INDEX, 3, currentData);
+
+    expect(await awaited).toMatchObject({ choice: 3, data: currentData, kind: "switch" });
+  });
+
+  it("INTENT RECOVERY: a dropped guest pick recovers and a remapped terminal cancels its exact window", async () => {
     setCoopFaintSwitchRetryMs(10);
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
@@ -190,6 +286,9 @@ describe("co-op faint-switch operation migration", () => {
     pair.armNextDrop("interactionChoice", "guest");
     const hostAwait = hostRuntime.interactionRelay.awaitInteractionChoice(seq, 25);
 
+    // The real public picker closes its UI before sending the raw proposal. Model that exact material
+    // boundary so the later retained commit may ACK and cancel this proposal's retry.
+    markCoopFaintSwitchPickerSettled(1, 1, COOP_GUEST_FIELD_INDEX, guestBinding);
     sendCoopFaintSwitchChoice(
       guestRuntime.interactionRelay,
       COOP_GUEST_FIELD_INDEX,
@@ -225,7 +324,9 @@ describe("co-op faint-switch operation migration", () => {
         {
           payload: {
             fieldIndex: COOP_GUEST_FIELD_INDEX,
-            partySlot: action?.choice ?? -1,
+            // Model the legal identity-remap path: authority found the proposed species in a different
+            // local party slot. The terminal operation ID therefore differs from the proposal's slot.
+            partySlot: 4,
             data: [...(action?.data ?? [])],
           },
           ownerRole: "guest",
@@ -241,7 +342,7 @@ describe("co-op faint-switch operation migration", () => {
     offCount();
   });
 
-  it("stops a guest retry when authority commits the same field from a drifted turn counter", async () => {
+  it("does not let a different-turn authority terminal cancel an older same-field retry", async () => {
     setCoopFaintSwitchRetryMs(10);
     const { host, guest } = createLoopbackPair();
     const hostRuntime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
@@ -271,6 +372,7 @@ describe("co-op faint-switch operation migration", () => {
       },
       guestBinding,
     );
+    markCoopFaintSwitchPickerSettled(12, 5, COOP_GUEST_FIELD_INDEX, guestBinding);
     expect(
       commitFaintSwitchAuthorityIntent(
         {
@@ -285,7 +387,10 @@ describe("co-op faint-switch operation migration", () => {
     ).toBe(true);
     await new Promise(resolve => setTimeout(resolve, 35));
 
-    expect(deliveredGuestIntents, "no stale switch carrier may survive the authoritative commit").toBe(1);
+    expect(
+      deliveredGuestIntents,
+      "a terminal for turn 5 must not cancel the distinct turn-4 proposal retry",
+    ).toBeGreaterThan(1);
     offCount();
   });
 });

@@ -92,12 +92,15 @@ export class CoopReplayTurnPhase extends Phase {
   private ended = false;
   /** Read-only browser-observer seam: true only after the exact turn waiter has been installed. */
   private awaitingAuthority = false;
+  /** Immutable source wave for every event presented by this turn pump and its continuations. */
+  private readonly sourceWave: number;
 
-  constructor(turn: number, rendered = 0, hpChain?: [number, number][]) {
+  constructor(turn: number, rendered = 0, hpChain?: [number, number][], sourceWave?: number) {
     super();
     this.turn = turn;
     this.rendered = rendered;
     this.fromHpByBi = new Map(hpChain ?? []);
+    this.sourceWave = sourceWave ?? globalScene.currentBattle?.waveIndex ?? 0;
   }
 
   /**
@@ -212,9 +215,13 @@ export class CoopReplayTurnPhase extends Phase {
             `guest replay turn=${this.turn}: live increment seq=${this.rendered}..${this.rendered + increment.length - 1}`,
           );
           this.renderEvents(increment);
-          globalScene.phaseManager.unshiftNew("CoopReplayTurnPhase", this.turn, this.rendered + increment.length, [
-            ...this.fromHpByBi.entries(),
-          ]);
+          globalScene.phaseManager.unshiftNew(
+            "CoopReplayTurnPhase",
+            this.turn,
+            this.rendered + increment.length,
+            [...this.fromHpByBi.entries()],
+            this.sourceWave,
+          );
           this.end();
           return;
         }
@@ -364,9 +371,13 @@ export class CoopReplayTurnPhase extends Phase {
                 `guest replay turn=${this.turn}: replacement filled OUR slot ${ownSlot} -> opening own CommandPhase`,
               );
               globalScene.phaseManager.unshiftNew("CommandPhase", ownSlot);
-              globalScene.phaseManager.unshiftNew("CoopReplayTurnPhase", this.turn, this.rendered, [
-                ...this.fromHpByBi.entries(),
-              ]);
+              globalScene.phaseManager.unshiftNew(
+                "CoopReplayTurnPhase",
+                this.turn,
+                this.rendered,
+                [...this.fromHpByBi.entries()],
+                this.sourceWave,
+              );
               this.end();
               return;
             }
@@ -763,7 +774,7 @@ export class CoopReplayTurnPhase extends Phase {
     // Per-turn tally of the presentation phases unshifted, so the guest's log shows the exact
     // replay-phase sequence it ran for this turn (move/hp/stat/status/faint/message counts).
     const tally: Record<string, number> = {};
-    for (const event of events) {
+    for (const [eventOffset, event] of events.entries()) {
       tally[event.k] = (tally[event.k] ?? 0) + 1;
       try {
         // HOT LOOP (per battle event): build the per-event trace only when debug is on.
@@ -800,7 +811,13 @@ export class CoopReplayTurnPhase extends Phase {
             // #691 (host-language leak): pass the `narrate` flag so the faint phase regenerates the
             // "X fainted!" line in the GUEST'S language ONLY for KOs the host actually narrated (a real
             // FaintPhase ran, i.e. `!ignoreFaintPhase`). Older host (no `narrate`) -> falsy -> no line.
-            pm.unshiftNew("CoopFaintReplayPhase", event.bi, event.narrate === true, event.sp);
+            pm.unshiftNew("CoopFaintReplayPhase", event.bi, event.narrate === true, event.sp, {
+              wave: this.sourceWave,
+              turn: this.turn,
+              // The existing stream seq is identical to the event's turn-resolution batch index.
+              // `this.rendered` is this continuation's exact starting watermark.
+              occurrence: this.rendered + eventOffset,
+            });
             break;
           default:
             // weather / terrain / switch ride the authoritative checkpoint, not the animation pump.
