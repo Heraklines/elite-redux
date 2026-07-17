@@ -1408,10 +1408,12 @@ function applyJournaledBiomeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coo
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
-  if (applyCoopOperationEnvelope(g, "op:biome", envelope) !== "applied") {
-    // A transient non-applicable result (a gap the manager already guards against, or a fail-closed):
-    // leave it retriable (do NOT ACK). Never a permanent condition (a permanent one is a duplicate above).
-    return "rejected";
+  const biomeApply = applyCoopOperationEnvelope(g, "op:biome", envelope);
+  if (biomeApply !== "applied") {
+    // A transient non-applicable result (a gap the manager already guards against, a fail-closed, or a
+    // not-yet-ready live sink deferral): leave it retriable (do NOT ACK). Never a permanent condition
+    // (a permanent one is a duplicate above).
+    return biomeApply;
   }
   cancelCoopBiomeIntentResend(op.id);
   // Route the newly-consumed op into the production live sink. It feeds the committed choice into the

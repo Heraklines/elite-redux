@@ -73,8 +73,8 @@ import {
   installDuoLogCapture,
   materializeGuestInputAfterReplacement,
   presentedFieldMon,
-  settleDuoPromise,
   type ShowdownDuoRig,
+  settleDuoPromise,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";

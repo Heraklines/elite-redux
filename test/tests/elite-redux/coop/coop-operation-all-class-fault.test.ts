@@ -10,11 +10,13 @@ import type {
   CoopOperationKind,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  applyCoopOperationEnvelope,
   coopOperationDurabilityHooks,
   registerCoopOperationApplier,
   registerCoopOperationLiveSink,
   routeCoopOperationToLiveSink,
 } from "#data/elite-redux/coop/coop-operation-journal";
+import { CoopOperationGuest } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   COOP_OPERATION_SURFACES,
   type CoopOperationSurfaceClass,
@@ -178,5 +180,45 @@ describe("authoritative operation fault campaign: every registered class", () =>
       host.dispose();
       guest.dispose();
     }
+  });
+});
+
+describe("live-sink pacing: a valid in-order op whose materializer is not ready", () => {
+  it("DEFERS at the journal layer (parked + retriable) instead of rejecting into bounded recovery", () => {
+    // The live double-KO terminal class (fold gate 29596677056, B1/B7/B8/B10/B12): the guest received the
+    // host's committed FAINT_SWITCH op BEFORE its own picker/replay surface opened. Classifying that pacing
+    // gap as "rejected" burned bounded recovery (8 attempts) into a shared session terminal that closed the
+    // transport and stranded the host at SwitchPhase. The op is valid and in-order - it must DEFER.
+    const receiver = new CoopOperationGuest({ epoch: 1 });
+    const envelope: CoopAuthoritativeEnvelopeV1 = {
+      ...envelopeFor("op:faintSwitch", 1),
+      pendingOperation: {
+        id: "1:1:pacing-pin",
+        kind: "FAINT_SWITCH",
+        owner: 1,
+        status: "applied",
+        payload: { fieldIndex: 1, partySlot: 2, data: [0, 0, 1, 2] },
+      },
+    };
+
+    // No live sink installed yet (session assembly has not reached this surface): defer, never reject.
+    expect(
+      applyCoopOperationEnvelope(receiver, "op:faintSwitch", envelope),
+      "a missing materializer is engine pacing, not stream corruption",
+    ).toBe("deferred");
+    expect(receiver.getLastAppliedRevision(), "a deferred op must not advance the receive cursor").toBe(0);
+
+    // Sink installed but its destination surface (the guest picker) has not opened: still defer.
+    registerCoopOperationLiveSink("op:faintSwitch", () => false);
+    expect(
+      applyCoopOperationEnvelope(receiver, "op:faintSwitch", envelope),
+      "a not-yet-ready materializer is engine pacing, not stream corruption",
+    ).toBe("deferred");
+    expect(receiver.getLastAppliedRevision()).toBe(0);
+
+    // The surface opens: the exact same parked entry now applies and the cursor advances.
+    registerCoopOperationLiveSink("op:faintSwitch", () => true);
+    expect(applyCoopOperationEnvelope(receiver, "op:faintSwitch", envelope)).toBe("applied");
+    expect(receiver.getLastAppliedRevision()).toBe(1);
   });
 });

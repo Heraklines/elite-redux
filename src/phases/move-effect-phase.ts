@@ -1200,10 +1200,8 @@ function isMoveReflectableBy(move: Move, target: Pokemon, useMode: MoveUseMode):
   return (
     !isReflected(useMode)
     && !target.getTag(SemiInvulnerableTag)
-    && move.hasFlag(MoveFlags.REFLECTABLE) // Elite Redux: several vanilla REFLECTABLE status moves are reworked into
-    && // DAMAGING moves (Growl/Poison Gas/Flash/Captivate -> Special/Physical),
-    // but the runtime category patch does not clear the stale REFLECTABLE flag.
-    // Magic Coat / Magic Bounce only ever bounce STATUS moves, so gate on the
+    && move.hasFlag(MoveFlags.REFLECTABLE) // Elite Redux: several vanilla REFLECTABLE status moves are reworked into // DAMAGING moves (Growl/Poison Gas/Flash/Captivate -> Special/Physical), // but the runtime category patch does not clear the stale REFLECTABLE flag.
+    && // Magic Coat / Magic Bounce only ever bounce STATUS moves, so gate on the
     // move's EFFECTIVE (ER-overridden) category to stop a damaging Growl being
     // reflected. Every genuinely-reflectable vanilla move is STATUS, so this is
     // a no-op for vanilla.

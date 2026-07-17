@@ -644,7 +644,9 @@ function applyJournaledFaintSwitchEnvelope(envelope: CoopAuthoritativeEnvelopeV1
   }
   const result = applyCoopOperationEnvelope(g, "op:faintSwitch", envelope);
   if (result !== "applied") {
-    return "rejected";
+    // "deferred" here is the guest picker/watcher not being open yet (engine pacing): the entry parks
+    // and re-applies locally instead of exhausting bounded recovery into a shared session terminal.
+    return result;
   }
   cancelRetry(
     s,

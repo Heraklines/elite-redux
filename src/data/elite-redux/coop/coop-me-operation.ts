@@ -1224,8 +1224,9 @@ function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopAp
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
-  if (applyCoopOperationEnvelope(g, "op:me", envelope) !== "applied") {
-    return "rejected"; // transient non-applicable (retriable); never a permanent condition (that is a duplicate above).
+  const meApply = applyCoopOperationEnvelope(g, "op:me", envelope);
+  if (meApply !== "applied") {
+    return meApply; // transient non-applicable (retriable/deferred); never a permanent condition (that is a duplicate above).
   }
   adoptCoopMeCommittedOwnerOrdinal(op);
   // Route newly-consumed ME operations into the production live sink. A terminal sink applies its complete

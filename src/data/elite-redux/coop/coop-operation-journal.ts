@@ -377,7 +377,11 @@ export function applyCoopOperationEnvelope(
     return "rejected";
   }
   if (!routeCoopOperationToLiveSink(cls, envelope)) {
-    return "rejected";
+    // Valid and in-order, but the live materializer is not ready yet (the destination surface/picker
+    // has not opened, or no sink is installed yet). That is engine pacing, not stream corruption:
+    // defer (parked local retry + deferred-deadline backstop) instead of burning bounded recovery,
+    // whose exhaustion escalates a transient ordering race into a shared session terminal.
+    return "deferred";
   }
   return guest.applyEnvelope(envelope).kind === "applied" ? "applied" : "rejected";
 }

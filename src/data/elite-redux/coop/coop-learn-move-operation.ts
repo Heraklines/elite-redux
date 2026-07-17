@@ -416,8 +416,9 @@ function applyEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome 
   if (g.hasApplied(op.id)) {
     return "duplicate";
   }
-  if (applyCoopOperationEnvelope(g, "op:learnMove", envelope) !== "applied") {
-    return "rejected";
+  const learnMoveApply = applyCoopOperationEnvelope(g, "op:learnMove", envelope);
+  if (learnMoveApply !== "applied") {
+    return learnMoveApply;
   }
   if (op.payload.type === "decision") {
     cancel(s, op.payload, envelope.wave, envelope.turn);

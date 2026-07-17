@@ -414,7 +414,7 @@ function applyJournaledRevivalEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
   }
   const result = applyCoopOperationEnvelope(g, "op:revival", envelope);
   if (result !== "applied") {
-    return "rejected";
+    return result;
   }
   if (operation.payload.type !== "prompt") {
     cancelRetry(s, operation.payload, envelope.wave, envelope.turn);
