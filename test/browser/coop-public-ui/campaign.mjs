@@ -1631,6 +1631,27 @@ export async function runCampaign(rig) {
     await progress.note("public lobby pairing complete");
     await rig.startFreshRun();
     await progress.note("fresh co-op run reached its first shared command surface");
+    if (rig.config.expectReclaim) {
+      // Dirty-account fidelity: the pre-seeded full accounts force the reclaim path, and the
+      // ranking must consume the divergent slot-4 remnant BEFORE any healthy save. Assert from
+      // the HOST's own console evidence (the guest may reclaim via its checkpoint persist).
+      const reclaims = rig.host.evidence.events
+        .filter(event => /reclaiming least-recent (save|slot)/u.test(event.text ?? ""))
+        .map(event => event.text);
+      if (reclaims.length === 0) {
+        throw new Error(
+          "[campaign-dirty-account] the seeded-full host launched WITHOUT any visible reclaim - "
+            + "the dirty-account fixture did not exercise the reclaim path",
+        );
+      }
+      if (!/slot=4/u.test(reclaims[0])) {
+        throw new Error(
+          `[campaign-dirty-account] first reclaim did not target the divergent slot-4 remnant: ${reclaims[0]}`,
+        );
+      }
+      rig.host.evidence.record("campaign-dirty-account-reclaim-proof", { reclaims });
+      await progress.note("dirty-account reclaim proven (divergent remnant consumed first)", { reclaims });
+    }
   })();
   try {
     await withinDeadline(setup, lifecycle.setupTimeoutMs, "public setup through first shared command surface");

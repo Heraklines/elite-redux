@@ -3550,36 +3550,37 @@ export class GameData {
     if (empty != null) {
       return { slot: empty, overwrote: null };
     }
-    const accountIdentity = this.currentPersistenceAccount();
-    // Divergent/quarantined replicas (readable locally but conflicting with their cloud copy - the
-    // live slot-4 class) are unresumable garbage and must be reclaimed BEFORE any healthy save.
-    // The isolated lobby snapshot already classifies them without aborting on one.
-    let quarantinedSlots = new Set<number>();
+    // Rank candidates from the ISOLATED lobby snapshot, not raw localStorage: the reconciled view
+    // covers cloud-only occupancy (a fresh device with a full cloud account has empty localStorage
+    // but zero claimable slots), and its failures map names the divergent/quarantined replicas -
+    // the live slot-4 class - which are unresumable garbage and must be reclaimed BEFORE any
+    // healthy save.
+    let snapshot: CoopResumeLobbySnapshot;
     try {
-      quarantinedSlots = new Set((await this.getCoopResumeLobbySnapshot()).failures.keys());
+      snapshot = await this.getCoopResumeLobbySnapshot();
     } catch (error) {
-      coopWarn("launch", "reclaim ranking could not classify quarantined slots", error);
+      coopWarn("launch", "reclaim ranking could not classify occupied slots", error);
+      return null;
     }
     const candidates: { slot: number; garbage: boolean; timestamp: number; wave: number | null }[] = [];
     for (let slot = 0; slot < 5; slot++) {
-      const raw = localStorage.getItem(this.sessionStorageKeyForAccount(slot, accountIdentity));
-      if (raw == null) {
-        // Locally empty but cloud/lineage-unverifiable: there is nothing here the player chose to
-        // keep, but deleting cloud state we cannot classify is exactly the overwrite class the
-        // verified path exists to prevent. Skip; a later candidate's reclamation may still verify.
+      if (snapshot.failures.has(slot)) {
+        candidates.push({ slot, garbage: true, timestamp: 0, wave: null });
         continue;
       }
-      try {
-        const session = this.parseSessionData(decrypt(raw, bypassLogin));
-        candidates.push({
-          slot,
-          garbage: quarantinedSlots.has(slot),
-          timestamp: session.timestamp ?? 0,
-          wave: session.waveIndex ?? null,
-        });
-      } catch {
-        candidates.push({ slot, garbage: true, timestamp: 0, wave: null });
+      const loaded = snapshot.sessions.get(slot);
+      if (loaded == null) {
+        // Reconciled as empty yet not claimable by the verified scan (e.g. lineage-unproven):
+        // there is nothing here the player chose to keep, but deleting state we cannot classify
+        // is exactly the overwrite class the verified path exists to prevent. Skip.
+        continue;
       }
+      candidates.push({
+        slot,
+        garbage: false,
+        timestamp: loaded.session.timestamp ?? 0,
+        wave: loaded.session.waveIndex ?? null,
+      });
     }
     candidates.sort((a, b) => Number(b.garbage) - Number(a.garbage) || a.timestamp - b.timestamp);
     for (const candidate of candidates) {

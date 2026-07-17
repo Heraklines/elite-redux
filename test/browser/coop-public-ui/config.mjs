@@ -167,6 +167,9 @@ export function loadConfig() {
     artifactDir: resolve(ROOT, "dev-logs", "coop-public-ui", runId),
     headless: boolean("COOP_UI_HEADLESS", true),
     chromeTrace: boolean("COOP_UI_CHROME_TRACE", true),
+    // Dirty-account fidelity lane: the accounts were pre-seeded full (4 solo saves + 1 divergent
+    // remnant in slot 4), so the launch MUST visibly reclaim - and reclaim the remnant FIRST.
+    expectReclaim: boolean("COOP_UI_EXPECT_RECLAIM", false),
     bootTimeoutMs: integer("COOP_UI_BOOT_TIMEOUT_MS", 300_000),
     timeoutMs: integer("COOP_UI_TIMEOUT_MS", 120_000),
     actionDelayMs: integer("COOP_UI_ACTION_DELAY_MS", 180),

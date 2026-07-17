@@ -301,6 +301,19 @@ jobs:
             difficulty: mystery
             difficulty_option: mystery-test
             require_mystery: "1"
+          # Account-state fidelity lane (harness post-mortem 2026-07-17): every other profile
+          # registers PRISTINE accounts, which made the whole dirty-account bug class (full slots,
+          # divergent co-op remnants, reclaim ranking, guest checkpoint no-safe-slot) invisible to
+          # CI while it broke four live pairs in one evening. This lane pre-seeds BOTH accounts
+          # full (4 solo saves + 1 divergent remnant), logs in visibly, and proves the launch
+          # reclaims the remnant FIRST and still reaches real waves.
+          - profile: animations-skipped-depth
+            artifact: dirty
+            waves: "3"
+            difficulty: ace
+            difficulty_option: ace
+            require_mystery: "0"
+            dirty_accounts: "1"
     steps:
       - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
@@ -345,6 +358,14 @@ jobs:
       - name: Prepare an isolated account pair for visible registration
         run: node test/browser/coop-public-ui/provision-accounts.mjs
 
+      # Account-state fidelity: registers a FRESH pair via the API, seeds both accounts full
+      # (4 solo saves + 1 divergent slot-4 remnant), and switches the run to visible LOGIN. The
+      # browser login is deliberately the LAST login so its clientSessionId is the active one
+      # (a later node-side login would invalidate the browser session - "session out of date").
+      - name: Seed dirty account state (account-state fidelity lane)
+        if: matrix.dirty_accounts == '1'
+        run: node test/browser/coop-public-ui/account-seeder.mjs --api-origin "$COOP_UI_API_ORIGIN" --emit-env >> "$GITHUB_ENV"
+
       - name: Drive two isolated built clients through the ${{ matrix.profile }} campaign
         env:
           COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
@@ -352,7 +373,7 @@ jobs:
           COOP_UI_ASSET_DIR: .coop-no-local-asset-fallback
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          COOP_UI_ACCOUNT_MODE: register
+          COOP_UI_ACCOUNT_MODE: ${{ matrix.dirty_accounts == '1' && 'login' || 'register' }}
           COOP_UI_LOBBY_ROOM: campaign-${{ github.run_id }}-${{ matrix.artifact }}-${{ github.run_attempt }}
           # The surface lane keeps real move animations on for a short breadth proof. The depth lane
           # visibly selects Move Animations OFF and spends its runner budget on more waves instead.
