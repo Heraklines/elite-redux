@@ -2,6 +2,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { initializeGame } from "#app/init/init";
 import { SceneBase } from "#app/scene-base";
 import { isMobile } from "#app/touch-controls";
+import { markBootMilestone } from "#data/elite-redux/er-boot-diagnostics";
 import { ER_NEWCOMER_FRONT_ICON_SLUGS, ER_NEWCOMER_ICON_SLUGS } from "#data/elite-redux/er-newcomer-species";
 import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import { BiomeId } from "#enums/biome-id";
@@ -673,6 +674,9 @@ export class LoadingScene extends SceneBase {
         }
       })
       .on(this.LOAD_EVENTS.COMPLETE, () => {
+        // #ios-stability: the boot preload reached 100%. A session that records this but never
+        // `title-shown` died between the loading screen and the title (the GPU/decode window).
+        markBootMilestone("loading-complete");
         for (const g of loadingGraphics) {
           g.destroy();
         }

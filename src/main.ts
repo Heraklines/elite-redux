@@ -5,12 +5,17 @@ import "#app/i18n"; // Initializes i18n on import
 
 import { InvertPostFX } from "#app/pipelines/invert";
 import { isBeta, isDev } from "#constants/app-constants";
+import { initBootDiagnostics } from "#data/elite-redux/er-boot-diagnostics";
 import { version } from "#package.json";
 import Phaser from "phaser";
 import BBCodeTextPlugin from "phaser3-rex-plugins/plugins/bbcodetext-plugin";
 import InputTextPlugin from "phaser3-rex-plugins/plugins/inputtext-plugin";
 import TransitionImagePackPlugin from "phaser3-rex-plugins/templates/transitionimagepack/transitionimagepack-plugin";
 import UIPlugin from "phaser3-rex-plugins/templates/ui/ui-plugin";
+
+// #ios-stability: record the earliest boot breadcrumb and capture the PREVIOUS session's
+// verdict (a crash-before-title leaves a persisted trail the next report reads back). Guarded.
+initBootDiagnostics();
 
 if (isBeta || isDev) {
   document.title += " (Beta)";

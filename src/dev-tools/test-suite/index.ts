@@ -58,6 +58,7 @@ import {
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { formatCoopControlPlane, formatLiveCoopReportCorrelation } from "#data/elite-redux/coop/coop-diagnostics";
+import { formatBootDiagnostics } from "#data/elite-redux/er-boot-diagnostics";
 import { DEVLOG_REPLAY_TRACE_MARKER } from "#data/elite-redux/er-bug-report";
 import {
   type ErCustomTrainerResolved,
@@ -113,9 +114,20 @@ function captureStateHeader(): string {
     // triage - if a logged build differs from the latest deploy, the report
     // is from old code, not a live bug.
     const build = getErBuildIdentity().id;
+    // #ios-stability: device fingerprint + boot-milestone breadcrumb (+ last-session crash verdict).
+    // Parity with the in-game "Report a bug" header, so a tester's mobile capture is diagnosable.
+    const bootDiag = (() => {
+      try {
+        return formatBootDiagnostics();
+      } catch {
+        return "";
+      }
+    })();
     return [
       `url:      ${location.href}`,
       `build:    ${build}`,
+      `ua:       ${typeof navigator === "undefined" ? "?" : navigator.userAgent}`,
+      ...(bootDiag ? [bootDiag] : []),
       `mode:     ${s?.gameMode?.modeId ?? "?"}  wave:${s?.currentBattle?.waveIndex ?? "?"}`,
       `seed:     ${s?.seed ?? "?"}`,
       `party:    ${party}`,

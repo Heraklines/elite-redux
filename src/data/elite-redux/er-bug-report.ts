@@ -28,6 +28,7 @@ import {
   formatCoopReportCorrelation,
   type CoopReportCorrelationV1,
 } from "#data/elite-redux/coop/coop-report-correlation";
+import { captureDeviceInfo, formatBootDiagnostics } from "#data/elite-redux/er-boot-diagnostics";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getReplayTrace } from "#data/elite-redux/replay-recorder";
 import {
@@ -41,6 +42,14 @@ interface BugReportState {
   version: string;
   url: string;
   userAgent: string;
+  /** #ios-stability: device fingerprint fields for mobile crash triage. */
+  platform: string;
+  screen: string;
+  devicePixelRatio: number;
+  deviceMemory: number | null;
+  /** #ios-stability: boot-milestone breadcrumb + previous-session verdict (crash-then-reload). */
+  bootMilestones: string;
+  lastSession: string;
   timestamp: string;
   gameModeId: number | null;
   waveIndex: number | null;
@@ -99,10 +108,19 @@ function captureState(): BugReportState {
       }))
       .slice(0, 6) ?? [];
 
+  const device = captureDeviceInfo();
+  const milestones = getBootMilestonesText();
+
   return {
     version,
     url: typeof location !== "undefined" ? location.href : "",
-    userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+    userAgent: device.userAgent,
+    platform: device.platform,
+    screen: `${device.screenWidth}x${device.screenHeight} @${device.devicePixelRatio}x`,
+    devicePixelRatio: device.devicePixelRatio,
+    deviceMemory: device.deviceMemory,
+    bootMilestones: milestones.trail,
+    lastSession: milestones.lastSession,
     timestamp: new Date().toISOString(),
     gameModeId: globalScene?.gameMode?.modeId ?? null,
     waveIndex: globalScene?.currentBattle?.waveIndex ?? null,
@@ -110,6 +128,24 @@ function captureState(): BugReportState {
     seed: globalScene?.seed ?? null,
     party,
   };
+}
+
+/**
+ * #ios-stability: split the boot-diagnostics block into the milestone trail + last-session verdict
+ * for the structured JSON state. Falls back to safe strings; never throws.
+ */
+function getBootMilestonesText(): { trail: string; lastSession: string } {
+  try {
+    const text = formatBootDiagnostics();
+    const bootLine = text.split("\n").find(l => l.startsWith("boot:")) ?? "";
+    const lastLine = text.split("\n").find(l => l.startsWith("lastSess:")) ?? "";
+    return {
+      trail: bootLine.replace(/^boot:\s*/, ""),
+      lastSession: lastLine.replace(/^lastSess:\s*/, ""),
+    };
+  } catch {
+    return { trail: "", lastSession: "" };
+  }
 }
 
 /**
@@ -253,6 +289,12 @@ export function buildDevLogText(report: BugReport): string {
     `build:    ${report.buildIdentity.id}`,
     `url:      ${s.url}`,
     `ua:       ${s.userAgent}`,
+    // #ios-stability: device fingerprint + boot breadcrumb (a crash-then-reload reports where the
+    // previous session died) — the fields an iOS crash report needs and previously lacked.
+    `platform: ${s.platform}`,
+    `screen:   ${s.screen}  devmem:${s.deviceMemory != null ? `${s.deviceMemory} GB` : "?"}`,
+    `boot:     ${s.bootMilestones || "(none)"}`,
+    `lastSess: ${s.lastSession || "n/a"}`,
     `mode:     ${s.gameModeId}  wave:${s.waveIndex}  difficulty:${s.erDifficulty}`,
     `seed:     ${s.seed}`,
     `party:    ${party}`,
