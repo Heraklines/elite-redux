@@ -73,6 +73,16 @@ export class Trainer extends Phaser.GameObjects.Container {
   public erGhostFxSpeed?: number | undefined;
   public erGhostFxIntensity?: number | undefined;
 
+  /**
+   * ER (#419 follow-up): true when this trainer is a cross-player GHOST (its party is
+   * an uploader's stored roster fielded VERBATIM). Set by `markTrainerAsGhost`. Read by
+   * the universal BST power gate (`enforceErEliteBstCurve`) to exempt the whole ghost
+   * battle - a ghost's fairness is the +40-wave eligibility window, NOT species mutation,
+   * so the wave-ladder cap must not devolve/swap its mons. A plain field keeps the gate
+   * import-free (avoids the ghost module's circular-init hazard).
+   */
+  public erIsGhost?: boolean | undefined;
+
   private erAuraFx: ErTrainerAuraFx | null = null;
   /** Per-instance counter used to namespace generated aura-FX texture keys. */
   private static erAuraFxSeq = 0;
