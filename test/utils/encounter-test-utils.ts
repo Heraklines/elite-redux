@@ -162,6 +162,11 @@ export async function skipBattleRunMysteryEncounterRewardsPhase(game: GameManage
   game.scene.phaseManager.pushPhase(new VictoryPhase(0));
   game.endPhase();
   game.setMode(UiMode.MESSAGE);
+  // We just cleared the phase queue and forced a victory, so any prompt still queued from the
+  // battle path is now moot. Drop them: the PromptHandler only ever inspects the FIRST queued
+  // prompt, so a leftover whose expireFn only fires at the (now-skipped) Battle/Rewards phase
+  // would head-block the LearnMoveBatch dismissals below and hang the interceptor at the panel.
+  game.promptHandler.clearPrompts();
   // Post-victory EXP can level mons into the ER batch learn-move panel, which
   // waits on real input; dismiss it (Cancel -> confirm "Yes") or the interceptor
   // parks at LearnMoveBatchPhase forever. Prompts are one-shot and EVERY mon
