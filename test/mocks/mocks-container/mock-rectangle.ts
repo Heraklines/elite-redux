@@ -125,6 +125,18 @@ export class MockRectangle implements MockGameObject {
     return this;
   }
 
+  setDepth(_value?: number): this {
+    // Real Phaser shapes expose this; stubbed so FX that layer shapes above the
+    // field (e.g. the ER transform burst) don't crash the headless scene.
+    return this;
+  }
+
+  setBlendMode(_mode?: number | string): this {
+    // Real Phaser shapes expose this; stubbed so additive-blend FX shapes don't
+    // crash the headless scene (nothing is drawn headlessly).
+    return this;
+  }
+
   setDisplaySize(_width: number, _height: number): this {
     return this;
   }
@@ -134,6 +146,23 @@ export class MockRectangle implements MockGameObject {
   }
 
   off(): this {
+    return this;
+  }
+
+  on(): this {
+    // Real Phaser shapes are EventEmitters; stubbed so handlers that wire a
+    // pointer handler on an interactive shape in setup() don't crash the scene.
+    return this;
+  }
+
+  setInteractive(): this {
+    // Real Phaser GameObjects expose this; stubbed so handlers that make a shape
+    // clickable in setup() (e.g. the Shiny Lab effects button) don't crash the
+    // headless scene (nothing is hit-tested headlessly).
+    return this;
+  }
+
+  disableInteractive(): this {
     return this;
   }
 

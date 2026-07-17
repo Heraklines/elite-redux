@@ -527,3 +527,222 @@ footer {
   border-top: 1px solid var(--line);
   padding-top: 18px;
 }
+
+/* ---- effects lab: top-level nav button (above the shiny options) ---- */
+.labnav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.labnav-btn {
+  background: linear-gradient(180deg, #211a34, #14112094);
+  border: 1px solid #4a3a70;
+  color: var(--ink);
+  padding: 11px 20px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  transition:
+    transform 0.12s,
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+.labnav-btn:hover {
+  transform: translateY(-2px);
+  border-color: #b78aff;
+  box-shadow: 0 8px 22px rgba(183, 138, 255, 0.2);
+}
+.labnav-hint {
+  color: var(--dim);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* ---- effects lab view ---- */
+.effects-lab {
+  margin-top: 22px;
+}
+.fx-head .fxback {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 9px 15px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.fx-head .fxback:hover {
+  border-color: var(--pal);
+}
+.fx-head h2 {
+  font-size: clamp(24px, 3vw, 34px);
+}
+.fx-sub {
+  color: var(--dim);
+  margin-top: 8px;
+  max-width: 900px;
+  line-height: 1.55;
+  font-size: 14.5px;
+}
+.fx-sub b {
+  color: var(--ink);
+}
+.fx-cats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 22px 0 18px;
+}
+.fx-cats button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--dim);
+  padding: 9px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.fx-cats button.on {
+  color: var(--ink);
+  border-color: #b78aff;
+  background: #1a1430;
+}
+.fx-cats button:hover {
+  border-color: #b78aff;
+}
+
+.fx-stage-wrap {
+  display: grid;
+  grid-template-columns: minmax(300px, 460px) 1fr;
+  gap: 26px;
+  background: linear-gradient(180deg, var(--panel2), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 24px;
+}
+@media (max-width: 820px) {
+  .fx-stage-wrap {
+    grid-template-columns: 1fr;
+  }
+}
+.fx-stage {
+  position: relative;
+  border-radius: 14px;
+  min-height: 430px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 42%, #1b2236, #070810 72%);
+}
+#fxLabCanvas {
+  image-rendering: pixelated;
+  width: min(330px, 78%);
+  height: auto;
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.55));
+}
+.fx-status {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: var(--dim);
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.fx-mon-name {
+  font-size: 26px;
+  font-weight: 600;
+}
+.fx-type {
+  margin-top: 6px;
+  color: var(--dim);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.fx-typedot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+.fx-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+.fx-side-label {
+  width: 60px;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+.fxplay {
+  background: linear-gradient(180deg, #211a34, #141120);
+  border: 1px solid #4a3a70;
+  color: var(--ink);
+  padding: 11px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.fxplay:hover {
+  border-color: #b78aff;
+  box-shadow: 0 8px 20px rgba(183, 138, 255, 0.16);
+}
+.fx-note {
+  margin-top: 18px;
+  color: var(--dim);
+  line-height: 1.55;
+  font-size: 13.5px;
+  border-left: 3px solid var(--line);
+  padding-left: 12px;
+}
+.fx-mons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+.fx-mon {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: #cfd6e6;
+  border-radius: 12px;
+  padding: 13px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  transition:
+    transform 0.12s,
+    border-color 0.12s;
+}
+.fx-mon:hover {
+  transform: translateY(-2px);
+  border-color: #b78aff;
+}
+.fx-mon.active {
+  border-color: var(--ink);
+  background: #1a1430;
+}
+.fx-mon-dot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex: none;
+}

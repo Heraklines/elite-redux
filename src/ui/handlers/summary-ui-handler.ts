@@ -4,7 +4,7 @@ import { globalScene } from "#app/global-scene";
 import { starterColors } from "#app/global-vars/starter-colors";
 import { isSlotEnabled, isSlotUnlocked, type PassiveSlot } from "#app/ui/handlers/starter-select-ui-handler";
 import { getStarterValueFriendshipCap, speciesStarterCosts } from "#balance/starters";
-import { allAbilities } from "#data/data-lists";
+import { allAbilities, allMoves } from "#data/data-lists";
 import {
   getErAbilityDescription,
   getErAbilityRomDescription,
@@ -38,7 +38,6 @@ import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { modifierSortFunc, PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { Move } from "#moves/move";
-import type { PokemonMove } from "#moves/pokemon-move";
 import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
 import {
   ErShinyLabSpriteFxOverlay,
@@ -53,6 +52,14 @@ import {
 import type { Variant } from "#sprites/variant";
 import { getVariantTint } from "#sprites/variant";
 import { achvs } from "#system/achv";
+import { OmniformEvolutionStrip, omniformStripWidth } from "#ui/omniform-evolution-strip";
+import {
+  currentEvolutionIndex,
+  getEvolutionAbilities,
+  getEvolutionMoveset,
+  getOmniformEvolutions,
+  type OmniformEvolutionEntry,
+} from "#ui/omniform-evolution-view";
 import { addBBCodeTextObject, addTextObject, getBBCodeFrag, getTextColor, updateCandyCountTextStyle } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
@@ -212,6 +219,17 @@ export class SummaryUiHandler extends UiHandler {
   private moveDetailPageLabel: Phaser.GameObjects.Text | null = null;
   /** ER: right-hand column for the property pages (fixed x → clean alignment under the variable-width font). */
   private moveDetailCol2Text: Phaser.GameObjects.Text | null = null;
+
+  /**
+   * ER Omniform mons (#partner-eevee): the evolution browser strip. Present only
+   * while the shown mon is an Omniform mon (a normal mon leaves this null so the
+   * strip never renders). The dedicated cycle button ({@link Button.CYCLE_FORM})
+   * advances {@link omniformViewIndex}; the ABILITIES + MOVES pages then render
+   * the SELECTED evolution's kit view-only (no gameplay effect).
+   */
+  private omniformStrip: OmniformEvolutionStrip | null = null;
+  private omniformEvolutions: OmniformEvolutionEntry[] = [];
+  private omniformViewIndex = 0;
 
   constructor() {
     super(UiMode.SUMMARY);
@@ -441,6 +459,70 @@ export class SummaryUiHandler extends UiHandler {
     return `summary_${Page[page].toLowerCase()}`;
   }
 
+  /**
+   * ER Omniform mons: (re)build the evolution browser strip for the current mon.
+   * Only DEFAULT-mode summaries get it; a normal (non-Omniform) mon clears it so
+   * the strip never renders. Selection defaults to the current battle-active form.
+   */
+  private buildOmniformStrip(): void {
+    this.destroyOmniformStrip();
+    const mon = this.pokemon;
+    this.omniformEvolutions = this.summaryUiMode === SummaryUiMode.DEFAULT ? getOmniformEvolutions(mon) : [];
+    if (!mon || this.omniformEvolutions.length <= 1) {
+      this.omniformEvolutions = [];
+      this.omniformViewIndex = 0;
+      return;
+    }
+    this.omniformViewIndex = currentEvolutionIndex(this.omniformEvolutions);
+    // Place the strip in the empty TOP HEADER bar (the row that holds "Pokemon
+    // Info" and the page-tab title), right-aligned, so it takes ZERO vertical
+    // space from the content panel below - which also means a 5-ability screen
+    // (a black shiny with the switchable 5th slot) can never overlap it.
+    const stripWindow = 5;
+    const stripCell = 16;
+    const rightEdgeX = 315;
+    this.omniformStrip = new OmniformEvolutionStrip(
+      this.summaryContainer,
+      this.omniformEvolutions,
+      this.omniformViewIndex,
+      {
+        x: rightEdgeX - omniformStripWidth(stripWindow, stripCell),
+        y: this.abilitiesTabText.y + 3, // nudged a few px up within the header row
+        windowSize: stripWindow,
+        cellWidth: stripCell,
+        iconScale: 0.5,
+        onChange: index => this.onOmniformSelectionChange(index),
+      },
+    );
+    this.updateOmniformStripVisibility();
+  }
+
+  private destroyOmniformStrip(): void {
+    this.omniformStrip?.destroy();
+    this.omniformStrip = null;
+  }
+
+  /** Selection changed on the strip: re-render the live page for the new form. */
+  private onOmniformSelectionChange(index: number): void {
+    this.omniformViewIndex = index;
+    this.populatePageContainer(this.summaryPageContainer);
+  }
+
+  /** The strip shows only on the ABILITIES + MOVES pages (the ones it drives). */
+  private updateOmniformStripVisibility(): void {
+    const show = this.omniformStrip != null && (this.cursor === Page.ABILITIES || this.cursor === Page.MOVES);
+    this.omniformStrip?.setVisible(show);
+  }
+
+  /**
+   * The evolution being VIEWED when it differs from the current battle-active
+   * form; `null` when the current form is selected (render the live mon as usual).
+   */
+  private getOmniformViewEntry(): OmniformEvolutionEntry | null {
+    const entry = this.omniformEvolutions[this.omniformViewIndex];
+    return entry && !entry.isCurrent ? entry : null;
+  }
+
   show(
     args: [
       pokemon: PlayerPokemon,
@@ -484,6 +566,10 @@ export class SummaryUiHandler extends UiHandler {
 
     this.summaryContainer.setVisible(true);
     this.cursor = -1;
+
+    // ER Omniform mons: build the evolution browser strip before the first page
+    // populates, so the ABILITIES/MOVES pages honour its offset + selection.
+    this.buildOmniformStrip();
 
     this.shinyOverlay.setVisible(this.pokemon.isShiny());
 
@@ -764,6 +850,17 @@ export class SummaryUiHandler extends UiHandler {
             break;
         }
       }
+    } else if (
+      button === Button.CYCLE_FORM
+      && this.omniformStrip != null
+      && (this.cursor === Page.ABILITIES || this.cursor === Page.MOVES)
+    ) {
+      // ER Omniform mons: the dedicated cycle button (F / controller LB / the
+      // on-screen apad button) advances which evolution's abilities + moveset are
+      // shown. View-only - it re-renders the panel, never touches the live mon.
+      // Routed here via buttonCycleOption (SummaryUiHandler is whitelisted).
+      this.omniformStrip.cycle();
+      success = true;
     } else if (button === Button.CYCLE_SHINY && this.cursor === Page.ABILITIES) {
       // ER Black Shinies (#349): R cycles the GIFT between its 3 choices for the
       // player's own black shiny, re-rendering the page in place - but ONLY out of
@@ -800,8 +897,14 @@ export class SummaryUiHandler extends UiHandler {
         }
         success = true;
       } else if (this.cursor === Page.MOVES) {
-        this.showMoveSelect();
-        success = true;
+        // ER Omniform: while PREVIEWING another evolution's moveset (view-only),
+        // move-select/reorder is disabled - it would edit the live mon's moves.
+        if (this.getOmniformViewEntry()) {
+          error = true;
+        } else {
+          this.showMoveSelect();
+          success = true;
+        }
       } else if (this.cursor === Page.PROFILE && this.pokemon?.hasPassive()) {
         // ER 3-passive: cycle through ability → passive[0] → passive[1] → passive[2] → ability.
         // For vanilla species (1 passive) this collapses to the legacy 2-step toggle.
@@ -983,6 +1086,9 @@ export class SummaryUiHandler extends UiHandler {
         this.abilitiesSelectMode = false;
         const forward = this.cursor < cursor;
         this.cursor = cursor;
+
+        // ER Omniform: the strip only shows on the pages it drives (ABILITIES/MOVES).
+        this.updateOmniformStripVisibility();
 
         // Tab visual mapping. The 3 vanilla pages use baked tab sprites
         // (1=STATUS, 2=STATS, 3=MOVES). ER's ABILITIES page has no baked
@@ -1447,6 +1553,11 @@ export class SummaryUiHandler extends UiHandler {
         break;
       }
       case Page.MOVES: {
+        // ER Omniform: when an evolution is being previewed (header strip), its
+        // (view-only) moveset replaces the live moveset. The strip lives in the
+        // header, so the moves panel keeps its full layout.
+        const movesViewEntry = this.getOmniformViewEntry();
+        const movesViewSet = movesViewEntry ? getEvolutionMoveset(this.pokemon!, movesViewEntry, 5) : null;
         this.movesContainer = globalScene.add.container(5, -pageBg.height + 26);
         pageContainer.add(this.movesContainer);
 
@@ -1512,20 +1623,40 @@ export class SummaryUiHandler extends UiHandler {
         this.movesContainer.add(this.moveRowsContainer);
 
         for (let m = 0; m < maxMoveRows; m++) {
-          const move: PokemonMove | null =
-            this.pokemon && this.pokemon.moveset.length > m ? this.pokemon?.moveset[m] : null;
           const moveRowContainer = globalScene.add.container(0, 16 * m);
           this.moveRowsContainer.add(moveRowContainer);
 
-          if (move && this.pokemon) {
+          // Resolve this row's move + type + PP text. In preview mode the move is
+          // an evolution's Move (full PP, own type); otherwise the live PokemonMove.
+          let moveName = "-";
+          let moveType: PokemonType | null = null;
+          let ppLabel = "--/--";
+          if (movesViewSet) {
+            const previewId = movesViewSet.moveIds[m];
+            const previewMove = previewId == null ? null : allMoves[previewId];
+            if (previewMove) {
+              moveName = previewMove.name;
+              moveType = previewMove.type;
+              ppLabel = `${padInt(previewMove.pp, 2, "  ")}/${padInt(previewMove.pp, 2, "  ")}`;
+            }
+          } else {
+            const move = this.pokemon && this.pokemon.moveset.length > m ? this.pokemon.moveset[m] : null;
+            if (move && this.pokemon) {
+              moveName = move.getName();
+              moveType = this.pokemon.getMoveType(move.getMove());
+              const maxPP = move.getMovePp();
+              ppLabel = `${padInt(maxPP - move.ppUsed, 2, "  ")}/${padInt(maxPP, 2, "  ")}`;
+            }
+          }
+
+          if (moveType != null) {
             const spriteKey = getLocalizedSpriteKey("types");
-            const moveType = this.pokemon.getMoveType(move.getMove());
             const typeIcon = globalScene.add.sprite(0, 0, spriteKey, PokemonType[moveType].toLowerCase());
             typeIcon.setOrigin(0, 1);
             moveRowContainer.add(typeIcon);
           }
 
-          const moveText = addTextObject(35, 0, move ? move.getName() : "-", TextStyle.SUMMARY);
+          const moveText = addTextObject(35, 0, moveName, TextStyle.SUMMARY);
           moveText.setOrigin(0, 1);
           moveRowContainer.add(moveText);
 
@@ -1533,20 +1664,30 @@ export class SummaryUiHandler extends UiHandler {
           ppOverlay.setOrigin(1, 0.5);
           moveRowContainer.add(ppOverlay);
 
-          const ppText = addTextObject(178, 1, "--/--", TextStyle.WINDOW);
+          const ppText = addTextObject(178, 1, ppLabel, TextStyle.WINDOW);
           ppText.setOrigin(0, 1);
-
-          if (move) {
-            const maxPP = move.getMovePp();
-            const pp = maxPP - move.ppUsed;
-            ppText.setText(`${padInt(pp, 2, "  ")}/${padInt(maxPP, 2, "  ")}`);
-          }
-
           moveRowContainer.add(ppText);
         }
 
         this.moveDescriptionText = addTextObject(2, 84, "", TextStyle.WINDOW_ALT, { wordWrap: { width: 1212 } });
         this.movesContainer.add(this.moveDescriptionText);
+
+        // ER Omniform preview: label the previewed moveset. The fallback set (no
+        // per-evolution moveset model yet) is flagged "(base)" so it reads as a
+        // level-up approximation rather than a curated kit.
+        if (movesViewEntry && movesViewSet) {
+          this.moveDescriptionText.setText(
+            movesViewSet.isBaseFallback
+              ? i18next.t("pokemonSummary:omniformMovesetBasePreview", {
+                  name: movesViewEntry.name,
+                  defaultValue: `Previewing ${movesViewEntry.name} (base level-up moves).`,
+                })
+              : i18next.t("pokemonSummary:omniformMovesetPreview", {
+                  name: movesViewEntry.name,
+                  defaultValue: `Previewing ${movesViewEntry.name} moveset.`,
+                }),
+          );
+        }
 
         // ER: second column for the property pages. Fixed x so the right column
         // lines up cleanly (the pixel font is variable-width, so space-padding the
@@ -1771,6 +1912,15 @@ export class SummaryUiHandler extends UiHandler {
     pageContainer: Phaser.GameObjects.Container,
     pageBg: Phaser.GameObjects.Sprite,
   ): void {
+    // ER Omniform: when a NON-current evolution is selected in the header strip,
+    // source the panel's abilities from THAT evolution's registration (view-only).
+    // `viewOnly` suppresses candy/level lock chrome (it is the browsed mon's,
+    // meaningless for a previewed evolution). The strip lives in the top header
+    // bar, so it reserves NO space here (a 5-ability screen never overlaps it).
+    const viewEntry = this.getOmniformViewEntry();
+    const viewOnly = viewEntry != null;
+    const viewAbilities = viewEntry ? getEvolutionAbilities(viewEntry) : null;
+
     const container = globalScene.add.container(0, -pageBg.height);
     pageContainer.add(container);
 
@@ -1804,7 +1954,7 @@ export class SummaryUiHandler extends UiHandler {
     }
     const rows: Row[] = [];
 
-    const mainAbility = mon.getAbility(true);
+    const mainAbility = viewAbilities ? viewAbilities.active : mon.getAbility(true);
     if (mainAbility) {
       rows.push({ label: i18next.t("pokemonSummary:abilityLabel"), ability: mainAbility });
     }
@@ -1813,7 +1963,8 @@ export class SummaryUiHandler extends UiHandler {
     // one): it honors per-Pokémon overrides written by the Ability Randomizer
     // (`customPokemonData.passive/passive2/passive3`) and transform overrides,
     // so the page reflects runtime ability changes rather than static species data.
-    const innateAbilities = mon.getPassiveAbilities();
+    // When previewing an evolution, source its registered innate triple instead.
+    const innateAbilities = viewAbilities ? viewAbilities.innates : mon.getPassiveAbilities();
     for (let slot = 0; slot < 3; slot++) {
       const ability = innateAbilities[slot];
       if (ability == null || ability.id === AbilityId.NONE) {
@@ -1828,8 +1979,9 @@ export class SummaryUiHandler extends UiHandler {
 
     // ER Black Shinies (#349): the GIFT row — the 5th, switchable ability.
     // Shown ONLY for black shinies (conditional UI per the maintainer spec),
-    // rendered in a distinct bold-italic style and never candy-locked.
-    if (isErBlackShiny(mon)) {
+    // rendered in a distinct bold-italic style and never candy-locked. Skipped
+    // while previewing an evolution (the gift belongs to the live mon).
+    if (!viewOnly && isErBlackShiny(mon)) {
       const giftId = getErActiveGiftAbilityId(mon);
       const gift = giftId === null ? null : allAbilities[giftId];
       if (gift) {
@@ -1867,8 +2019,11 @@ export class SummaryUiHandler extends UiHandler {
       let locked = false;
       let lockIconKey: string | null = null;
       let reason = "";
-      // Curiosity-sealed slots win over every candy/level state: dead this run.
-      if (runLocked(row.slot === undefined ? 0 : row.slot + 1)) {
+      // ER Omniform preview: a browsed evolution's kit is view-only, so no
+      // candy/level/seal lock chrome applies (it is the live mon's state).
+      if (viewOnly) {
+        // no lock — fall through to the neutral render below
+      } else if (runLocked(row.slot === undefined ? 0 : row.slot + 1)) {
         locked = true;
         lockIconKey = "icon_lock";
         reason = i18next.t("pokemonSummary:abilitySealedRun");
@@ -2247,6 +2402,10 @@ export class SummaryUiHandler extends UiHandler {
     this.shinyLabFxOverlay?.hide(false);
     this.nameFx?.destroy();
     this.nameFx = undefined;
+    // ER Omniform: tear down the evolution strip + reset its view state.
+    this.destroyOmniformStrip();
+    this.omniformEvolutions = [];
+    this.omniformViewIndex = 0;
     this.summaryContainer.setVisible(false);
     this.summaryPageContainer.setVisible(false);
   }

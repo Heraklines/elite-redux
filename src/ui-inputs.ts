@@ -6,6 +6,7 @@ import { UiMode } from "#enums/ui-mode";
 import { Setting, SettingKeys, settingIndex } from "#system/settings";
 import { CommandUiHandler } from "#ui/command-ui-handler";
 import { FightUiHandler } from "#ui/fight-ui-handler";
+import { LearnMoveBatchUiHandler } from "#ui/learn-move-batch-ui-handler";
 import type { MessageUiHandler } from "#ui/message-ui-handler";
 import { PartyUiHandler } from "#ui/party-ui-handler";
 import { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";
@@ -256,6 +257,11 @@ export class UiInputs {
       // cycles its 3 gift choices on R (CYCLE_SHINY). Same swallow - without this the
       // gift-cycle handler in SummaryUiHandler.processInput was unreachable dead code.
       SummaryUiHandler,
+      // ER Omniform (#partner-eevee): the level-up batch Move Learn panel cycles which
+      // evolution's moveset it teaches on CYCLE_FORM (F / controller LB / mobile apad),
+      // mirroring the summary strip. Without this whitelist the button is swallowed
+      // here and never reaches LearnMoveBatchUiHandler.processInput.
+      LearnMoveBatchUiHandler,
       StarterSelectUiHandler,
       // Showdown (Team Menu): the hotkey bar's R (rename) / N (delete) / E (edit) are CYCLE_SHINY /
       // CYCLE_NATURE / CYCLE_ABILITY. Without this entry buttonCycleOption swallowed them here and the

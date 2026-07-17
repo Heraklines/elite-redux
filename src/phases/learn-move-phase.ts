@@ -30,6 +30,14 @@ import {
 } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementLearnMove } from "#data/elite-redux/er-achievement-tracker";
+import {
+  getOrRollFormMoveset,
+  isErOmniformMon,
+  learnMoveForEvolution,
+  listOmniformEvolutionsForMove,
+  type OmniformTarget,
+  omniformBaseIdentity,
+} from "#data/elite-redux/omniform-movesets";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { LearnMoveType } from "#enums/learn-move-type";
@@ -38,7 +46,9 @@ import { UiMode } from "#enums/ui-mode";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 import { PlayerPartyMemberPokemonPhase } from "#phases/player-party-member-pokemon-phase";
+import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
+import { omniformEntriesForTargets } from "#ui/omniform-evolution-view";
 import { SummaryUiMode } from "#ui/summary-ui-handler";
 import i18next from "i18next";
 
@@ -96,6 +106,18 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     // the just-learned level-up move -> LevelUpPhase re-queued it forever (the
     // run-blocking infinite move-learn loop, e.g. Latios past lv 37).
     const currentMoveset = pokemon.getMoveset(true);
+
+    // ER Omniform (#partner-eevee): a Partner Eevee can be taught a move (TM Case,
+    // Learner's Shroom, Memory Mushroom, relearner, ... - "anything that can teach")
+    // onto ANY of its evolutions. Offer an evolution picker first, then route: the
+    // BASE form takes the normal learn flow (mon.moveset, banner, TM tracking); a
+    // non-base evolution learns into its OWN stored moveset via learnMoveForEvolution.
+    // Solo-only (co-op is out of scope) + gated on isErOmniformMon, so every
+    // non-Omniform + co-op flow is byte-identical.
+    if (!globalScene.gameMode.isCoop && isErOmniformMon(pokemon)) {
+      this.omniformLearnMove(pokemon, move);
+      return;
+    }
 
     // The game first checks if the Pokemon already has the move and ends the phase if it does.
     const hasMoveAlready = currentMoveset.some(m => m.moveId === move.id) && this.moveId !== MoveId.SKETCH;
@@ -566,6 +588,156 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       .then(() => {
         mirror?.beginSession("owner", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
       });
+  }
+
+  /**
+   * ER Omniform (#partner-eevee): offer an evolution picker for a taught move, then
+   * route the learn per the chosen evolution. Every family evolution that can LEGALLY
+   * take the move and does not already know it is listed (base first); illegal /
+   * already-known evolutions are omitted. Picking the BASE form runs the normal learn
+   * flow; picking a non-base evolution teaches into its own stored moveset. If NO
+   * evolution can take it (all already know it / illegal), it ends as a no-op (the
+   * vanilla "already knows" behavior).
+   */
+  private omniformLearnMove(pokemon: Pokemon, move: Move): void {
+    this.messageMode =
+      globalScene.ui.getHandler() instanceof EvolutionSceneUiHandler ? UiMode.EVOLUTION_SCENE : UiMode.MESSAGE;
+    const offers = listOmniformEvolutionsForMove(pokemon, this.moveId).filter(o => o.canLearn);
+    if (offers.length === 0) {
+      // No evolution can take it (all already know it / illegal) - mirror the vanilla no-op end.
+      this.end();
+      return;
+    }
+    const base = omniformBaseIdentity(pokemon);
+    const entries = omniformEntriesForTargets(
+      pokemon,
+      offers.map(o => o.form),
+    );
+    const options: OptionSelectItem[] = offers.map((offer, i) => ({
+      label: entries[i]?.name ?? String(offer.form.speciesId),
+      handler: () => {
+        if (offer.form.speciesId === base.speciesId && offer.form.formIndex === base.formIndex) {
+          this.omniformLearnBase(pokemon, move);
+        } else {
+          this.omniformTeachEvolution(pokemon, move, offer.form, entries[i]?.name ?? move.name);
+        }
+        return true;
+      },
+    }));
+    options.push({
+      label: i18next.t("menu:cancel"),
+      handler: () => {
+        this.rejectMoveAndEnd(move, pokemon);
+        return true;
+      },
+    });
+    globalScene.ui.setMode(this.messageMode).then(() =>
+      globalScene.ui.showText(
+        i18next.t("battle:learnMovePrompt", {
+          pokemonName: getPokemonNameWithAffix(pokemon),
+          moveName: move.name,
+        }),
+        null,
+        () => globalScene.ui.setModeWithoutClear(UiMode.OPTION_SELECT, { options }),
+      ),
+    );
+  }
+
+  /** ER Omniform: the BASE form was chosen - run the normal solo learn flow (mon.moveset). */
+  private omniformLearnBase(pokemon: Pokemon, move: Move): void {
+    const currentMoveset = pokemon.getMoveset(true);
+    globalScene.ui.setMode(this.messageMode);
+    // Co-op is excluded by the omniform gate, so this is the plain solo learn path:
+    // an empty slot auto-learns; a full moveset asks which move to replace.
+    if (currentMoveset.length < pokemon.getMaxMoveCount()) {
+      this.learnMove(currentMoveset.length, move, pokemon);
+    } else {
+      this.replaceMoveCheck(move, pokemon);
+    }
+  }
+
+  /**
+   * ER Omniform: teach the move into a NON-base evolution's OWN stored moveset via the
+   * core teach API. A free slot learns directly; a full stored moveset presents a
+   * compact "which move to forget" picker over THAT evolution's moves (OPTION_SELECT,
+   * no new screen). 5th-move-slot aware through getMaxMoveCount().
+   */
+  private omniformTeachEvolution(pokemon: Pokemon, move: Move, form: OmniformTarget, evoName: string): void {
+    const stored = getOrRollFormMoveset(pokemon, form);
+    const max = pokemon.getMaxMoveCount();
+    const filled = stored.filter(([m]) => m !== MoveId.NONE).length;
+    if (filled < max) {
+      const res = learnMoveForEvolution(pokemon, form, this.moveId, filled);
+      this.omniformFinishEvolution(pokemon, move, evoName, res.ok);
+      return;
+    }
+    // Full: pick which of the evolution's moves to overwrite.
+    const options: OptionSelectItem[] = [];
+    for (let i = 0; i < max; i++) {
+      const pair = stored[i];
+      const name = pair && pair[0] !== MoveId.NONE ? allMoves[pair[0]].name : "(empty)";
+      const slot = i;
+      options.push({
+        label: name,
+        handler: () => {
+          const res = learnMoveForEvolution(pokemon, form, this.moveId, slot);
+          this.omniformFinishEvolution(pokemon, move, evoName, res.ok);
+          return true;
+        },
+      });
+    }
+    options.push({
+      label: i18next.t("menu:cancel"),
+      handler: () => {
+        this.rejectMoveAndEnd(move, pokemon);
+        return true;
+      },
+    });
+    globalScene.ui
+      .setMode(this.messageMode)
+      .then(() =>
+        globalScene.ui.showText(i18next.t("battle:learnMoveForgetQuestion"), null, () =>
+          globalScene.ui.setModeWithoutClear(UiMode.OPTION_SELECT, { options }),
+        ),
+      );
+  }
+
+  /**
+   * ER Omniform: finish a non-base evolution teach - run the same TM / free-Memory
+   * continuation cleanup the vanilla {@linkcode learnMove} does (record the TM, drop
+   * the reward-shop back-out copy), then confirm and end. Never softlocks on a failed
+   * teach (the offer was pre-validated, but stay safe).
+   */
+  private omniformFinishEvolution(pokemon: Pokemon, move: Move, evoName: string, ok: boolean): void {
+    globalScene.ui.setMode(this.messageMode);
+    if (!ok) {
+      this.end();
+      return;
+    }
+    // Mirror learnMove's continuation cleanup so a TM Case / free Memory Mushroom does
+    // not orphan its reward-screen back-out SelectModifierPhase copy (#698).
+    if (this.learnMoveType === LearnMoveType.TM) {
+      if (!pokemon.usedTMs) {
+        pokemon.usedTMs = [];
+      }
+      pokemon.usedTMs.push(this.moveId);
+      globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    } else if (this.learnMoveType === LearnMoveType.MEMORY && this.cost === -1) {
+      globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    }
+    erRecordAchievementLearnMove(pokemon, this.moveId);
+    initMoveAnim(this.moveId).then(() => loadMoveAnimAssets([this.moveId], true));
+    globalScene.playSound("level_up_fanfare");
+    globalScene.ui.showText(
+      i18next.t("battle:learnMove", {
+        pokemonName: `${getPokemonNameWithAffix(pokemon)} (${evoName})`,
+        moveName: move.name,
+      }),
+      null,
+      () => this.end(),
+      this.messageMode === UiMode.EVOLUTION_SCENE ? 1000 : undefined,
+      true,
+    );
   }
 
   /**

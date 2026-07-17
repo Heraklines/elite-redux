@@ -8,6 +8,47 @@
 mega-expansion doubled every catalog; v7.1 quality pass reworked the weak ones after
 zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review tool).
 
+## Effects lab (2026-07-17) - in-game effect previews, category based
+
+A SECOND view sits behind the **Effects** button above the shiny options (top of the
+page). It is a category based lab for previewing in-game effects, kept separate from the
+shiny palette/surface/around tools. The categories live in a small registry
+(`FX_CATEGORIES` in `site/effects.mjs`), so adding a future category (ability effects,
+move effects) is ONE new entry, not a new page.
+
+- **Transformation Effects** (first category): previews the FULL in-game transform
+  SEQUENCE from one partner Eeveelution into another. A **From** picker and a **To**
+  picker (both over Partner Eevee base + the 8 partner eeveelutions), a FRONT / BACK
+  toggle that applies to both sprites, and a Replay button. It auto-plays on any change.
+  The three stages:
+  1. **Fill** (~480ms): the source form floods with the TARGET type's light until the
+     whole body is a solid glowing silhouette (schooling-flash style, but type coloured).
+  2. **Morph** (~760ms): that glowing silhouette's SHAPE flows from the source outline
+     into the target outline via a signed-distance-field interpolation (a real shape
+     morph, not a crossfade).
+  3. **Reveal + burst** (~950ms): the per-type burst fires as the fill drains and the
+     real target sprite is revealed underneath. Total sequence ~2.2s; the burst portion
+     keeps its snappy in-game length.
+- **SDF morph** (`fxSignedDT` / `fxChamfer`): both sprites' alpha masks are rasterised
+  on a common, centroid-aligned grid, then each is turned into a SIGNED distance field
+  (`outsideDist - insideDist`, each a two-pass (1, sqrt2) chamfer sweep - the SAME
+  technique `computeDist` in `fx.mjs` uses for the around-FX silhouette fields). The two
+  SDFs are linearly interpolated and thresholded at 0, so the outline smoothly flows from
+  one shape to the other. The morphed silhouette is drawn solid in the target colour with
+  a bright rim + a blurred additive glow.
+- The burst is a faithful canvas-2D port of `src/sprites/er-form-transform-fx.ts`: the
+  same per-type tint colours (`getTypeRgb`), shape/motion vocabulary (grass/bug leaves,
+  fire embers, water droplets, ice/rock/steel/ground shards, electric sparks, motes
+  fallback), <=20 particle cap, the tinted flash (core + halo + ring) plus the on-sprite
+  type tint. The burst always types from the **TARGET** form (Eevee to Jolteon =
+  electric), matching the in-game rule.
+- Partner sprites alias their base eeveelution's vanilla art (numeric dex stem, or the
+  Eevee `partner` form stem for the family head), streamed from the er-assets CDN exactly
+  like the shiny tools. No new assets. Source: `ER_PARTNER_FAMILY` in
+  `src/data/elite-redux/er-newcomer-species.ts`.
+- Files: `site/effects.mjs` (registry + SDF morph + FX port + sequence view), styles
+  appended to `site/style.css`, wired into the bundle by `build-site.mjs`.
+
 ## v7.2 - Psiell's feedback round (2026-07-06)
 - **Box-edge falloff**: around FX no longer hard-clip at the sprite-box edge - every
   off-sprite aura fades out over the last ~9px (`edgeFalloff` in fx.mjs; fixes fog /

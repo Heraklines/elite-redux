@@ -902,6 +902,92 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Partner Eevee - Omniform per-evolution movesets + Normal-status revert
+  // ===========================================================================
+  {
+    label: "Partner: Eevee Omniform movesets",
+    description:
+      "Partner Eevee (the 'partner' Eevee form with the Fluffy + Omniform composite)\n"
+      + "adapts mid-battle into a partner eeveelution based on the move TYPE it uses, and\n"
+      + "EACH evolution carries its OWN moveset (rolled from that evolution's learnset).\n"
+      + "A Normal-type STATUS move reverts it to the base Eevee form.\n"
+      + "DO: turn 1, use Water Gun. Turn 2, open Fight and LOOK at the moves - the set is\n"
+      + "now Partner Vaporeon's OWN moveset (not Eevee's). Turn 2, use Ember (chains into\n"
+      + "Partner Flareon, again with Flareon's own moveset). Turn 3, use Swords Dance (a\n"
+      + "Normal status move).\n"
+      + "EXPECT: Water Gun turns Eevee into Partner Vaporeon ('adapted into Partner\n"
+      + "Vaporeon!') and its 3 other moves are replaced by Vaporeon's own set; Ember\n"
+      + "chains it into Partner Flareon with Flareon's own set; Swords Dance (Normal\n"
+      + "status) reverts it to the base Eevee form ('reverted to Eevee!') with Eevee's\n"
+      + "original moves back. Each form's moveset is independent and persists across the\n"
+      + "run (and a save/reload).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5946), // [Fluffy + Omniform] Partner Eevee composite
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY, // tanky, survives so the test can run
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.EEVEE, {
+          formIndex: formIndexByKey(SpeciesId.EEVEE, "partner"),
+          moveset: [MoveId.WATER_GUN, MoveId.EMBER, MoveId.SWORDS_DANCE, MoveId.TACKLE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Partner Eevee - per-evolution move learning (level-up batch panel + TM/Shroom)
+  // ===========================================================================
+  {
+    label: "Partner: Eevee learn moves per evolution",
+    description:
+      "Partner Eevee learns offered moves onto ANY of its evolutions, not just Eevee\n"
+      + "(expanded per evolution, not in total). Two flows to check.\n"
+      + "\n"
+      + "LEVEL-UP BATCH PANEL:\n"
+      + "DO: win the opening battle. Eevee (level 4) levels up and the Move Learn panel\n"
+      + "opens listing the new move(s). Look at the TOP of the panel: an evolution STRIP\n"
+      + "(Eevee + the partner eeveelutions) with the selected evolution's name and an (F)\n"
+      + "button badge. Learn an offered move onto Eevee. Then press F (keyboard) / LB\n"
+      + "(controller) / the on-screen cycle button (mobile) to select Vaporeon (or another\n"
+      + "evolution) and learn the SAME move onto it too.\n"
+      + "EXPECT: the strip cycles the selected evolution; the CURRENT column switches to\n"
+      + "THAT evolution's own moveset; a move already learned on an evolution shows dimmed\n"
+      + "for it but stays learnable on the others; you can teach one offered move onto\n"
+      + "Eevee AND, independently, onto each evolution (never the same move twice on one).\n"
+      + "\n"
+      + "TM CASE / LEARNER'S SHROOM:\n"
+      + "DO: after the battle, in the first shop, take the Learner's Shroom or TM Case and\n"
+      + "use it on Eevee, then pick a move. An evolution picker appears.\n"
+      + "EXPECT: choose an evolution (e.g. Flareon) and the move is taught to THAT\n"
+      + "evolution's stored moveset (a full moveset asks which move to forget); a move an\n"
+      + "evolution cannot learn is not offered for it. Base Eevee learns through the normal\n"
+      + "flow. The per-evolution movesets persist across the run and a save/reload.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 4, // low so the opening win levels Eevee into new moves
+        ABILITY_OVERRIDE: erAbility(5946), // [Fluffy + Omniform] Partner Eevee composite
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP, // easy opening win -> level-up
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.EEVEE, {
+          formIndex: formIndexByKey(SpeciesId.EEVEE, "partner"),
+          moveset: [MoveId.TACKLE, MoveId.GROWL, MoveId.HELPING_HAND, MoveId.COVET],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_LEARNERS_SHROOM, modifierTypes.TM_CASE, modifierTypes.RARE_CANDY],
+  },
+  // ===========================================================================
   // Move: Tangling Husk (2.65 dex 955) — Fire-exempt protect
   // ===========================================================================
   {
@@ -18440,6 +18526,46 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.CLEFABLE, {
           moveset: [MoveId.MOONBLAST, MoveId.MOONLIGHT, MoveId.THUNDERBOLT, MoveId.SOFT_BOILED],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // FX - Partner Eevee (Omniform) per-type TRANSFORM burst
+  // ===========================================================================
+  {
+    label: "FX: Partner Eevee transform burst (per-type)",
+    description:
+      "Partner Eevee's Omniform adapts into the partner eeveelution matching the\n"
+      + "TYPE of the move it uses, and the transform now plays a per-type burst FX: a\n"
+      + "flash tinted by the target evolution's primary type colour plus small\n"
+      + "type-themed particles (grass = green light and drifting leaves, water =\n"
+      + "falling droplets, fire = rising embers, electric = spark jitter). It is\n"
+      + "generic, so every current and future evolution gets it from its primary type.\n"
+      + "DO: attack with Magical Leaf. Eevee adapts into Leafeon.\n"
+      + "EXPECT: a brief (about 1 second) GREEN light flash on Eevee plus a few small\n"
+      + "green leaf particles, then the Leafeon sprite. The starting moveset also has\n"
+      + "Water Gun / Ember / Thunder Shock, so a fresh run of this scenario can show\n"
+      + "the blue (Vaporeon), orange (Flareon) and yellow (Jolteon) variants. Testers\n"
+      + "eyeball the FX; unit config coverage is in\n"
+      + "test/tests/elite-redux/er-form-transform-fx.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        // Force active Omniform so the transform fires regardless of the innate
+        // candy-unlock gate (player innates are inactive in a scenario).
+        ABILITY_OVERRIDE: erAbility(5929), // Omniform (ER_OMNIFORM_ABILITY_ID)
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY, // tanky, won't KO you mid-test
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.EEVEE, {
+          formIndex: formIndexByKey(SpeciesId.EEVEE, "partner"),
+          moveset: [MoveId.MAGICAL_LEAF, MoveId.WATER_GUN, MoveId.EMBER, MoveId.THUNDER_SHOCK],
         }),
       ];
     },

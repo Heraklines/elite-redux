@@ -25,9 +25,10 @@
 // =============================================================================
 
 import { getGameMode } from "#app/game-mode";
-import { allAbilities, modifierTypes } from "#data/data-lists";
+import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
+import { ER_PARTNER_EEVEE_ABILITY_ID } from "#data/elite-redux/abilities/composite-newcomers";
 import { startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { bargainAbilityDescription } from "#data/elite-redux/er-bargain-sins";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
@@ -45,6 +46,12 @@ import {
   setErShinyLabOwnedBit,
   unlockErShinyLabNameFx,
 } from "#data/elite-redux/er-shiny-lab-effects";
+import {
+  ensureOmniformFormMovesets,
+  omniformFamilyForms,
+  omniformFormKey,
+  omniformFormLearnableMoves,
+} from "#data/elite-redux/omniform-movesets";
 import { listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
 import { manifestToStarter } from "#data/elite-redux/showdown/showdown-manifest";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
@@ -58,6 +65,7 @@ import { EggTier } from "#enums/egg-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
@@ -66,7 +74,9 @@ import {
   getPlayerShopModifierTypeOptionsForWave,
   ModifierTypeOption,
 } from "#modifiers/modifier-type";
+import { PokemonMove } from "#moves/pokemon-move";
 import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
+import { playErTransformFx } from "#sprites/er-form-transform-fx";
 import { achvs } from "#system/achv";
 import { VoucherType } from "#system/voucher";
 import type { GameManager } from "#test/framework/game-manager";
@@ -236,6 +246,88 @@ async function startBattleWithBlackShinyLead(game: GameManager) {
   mon.customPokemonData.erGiftAbilities = [...GIFT_CHOICES];
   mon.customPokemonData.erGiftIndex = 0;
   return mon;
+}
+
+/**
+ * ER Omniform (#partner-eevee): start a battle with a Partner Eevee lead - the
+ * vanilla Eevee "partner" FORM carrying the [Fluffy + Omniform] composite. It is
+ * an Omniform mon, so the summary shows the evolution browser strip (Eevee +
+ * the 8 partner eeveelutions). The composite is forced ACTIVE (a player innate is
+ * inert until candy-unlocked). Returns that PlayerPokemon.
+ */
+async function startBattleWithPartnerEeveeLead(game: GameManager) {
+  const partnerFormIndex = getPokemonSpecies(SpeciesId.EEVEE).forms.findIndex(f => f.formKey === "partner");
+  game.override.starterForms({ [SpeciesId.EEVEE]: partnerFormIndex }).ability(ER_PARTNER_EEVEE_ABILITY_ID as AbilityId);
+  await game.classicMode.startBattle(SpeciesId.EEVEE);
+  const mon = game.scene.getPlayerPokemon();
+  if (!mon) {
+    throw new Error("summary-multiform recipe: no player pokemon after startBattle");
+  }
+  return mon;
+}
+
+/**
+ * ER Omniform + 5 ability rows: a BLACK-SHINY Partner Eevee. Its abilities page
+ * shows Ability + 3 Innates + the switchable GIFT row (5 rows total) - the worst
+ * case for vertical space. Proves the header-placed strip never overlaps content.
+ */
+async function startBattleWithBlackShinyPartnerEeveeLead(game: GameManager) {
+  const mon = await startBattleWithPartnerEeveeLead(game);
+  applyErBlackShinyKit(mon); // flips customPokemonData.erBlackShiny = true
+  mon.customPokemonData.erBlackShiny = true;
+  mon.customPokemonData.erGiftAbilities = [...GIFT_CHOICES];
+  mon.customPokemonData.erGiftIndex = 0;
+  return mon;
+}
+
+/**
+ * ER Omniform batch level-up panel (#partner-eevee): build the LearnMoveBatchDeps
+ * for a Partner Eevee, with `omniform: true` so the panel shows the evolution strip
+ * and expands each offered move PER evolution. `learnableIds[0]` is chosen to be a
+ * move the SECOND family form (index 1, e.g. Partner Vaporeon) can legally learn but
+ * does not already know, so `[CYCLE_FORM, ACTION]` reaches that evolution's
+ * replace-a-move flow deterministically. The remaining offers are broadly-known
+ * eeveelution moves. `assign` writes the base form's live moveset (the batch panel's
+ * base path); non-base learns route through learnMoveForEvolution inside the handler.
+ */
+async function partnerEeveeBatchDeps(game: GameManager) {
+  const mon = await startBattleWithPartnerEeveeLead(game);
+  ensureOmniformFormMovesets(mon);
+  // Pin the BASE moveset (the rolled starter set is RNG-dependent) for a stable golden.
+  mon.moveset.splice(0, mon.moveset.length, new PokemonMove(MoveId.TACKLE), new PokemonMove(MoveId.QUICK_ATTACK));
+  const forms = omniformFamilyForms(mon);
+  const secondForm = forms[1];
+  // Pin the 2nd evolution's stored moveset (4 moves = FULL) so its CURRENT column +
+  // the replace-a-move flow are deterministic.
+  const store = (mon.customPokemonData.erOmniformMovesets ??= {});
+  const pinned: [number, number][] = [
+    [MoveId.SURF, 0],
+    [MoveId.WISH, 0],
+    [MoveId.SHADOW_BALL, 0],
+    [MoveId.HEAL_BELL, 0],
+  ];
+  store[omniformFormKey(secondForm.speciesId, secondForm.formIndex)] = pinned;
+  // First offered move: legal for the 2nd evolution AND not in its pinned set (so
+  // [CYCLE_FORM, ACTION] reaches the replace flow). Deterministic (both the learnable
+  // set and the pinned set are static).
+  const pinnedIds = new Set(pinned.map(([m]) => m));
+  const legalForSecond = [...omniformFormLearnableMoves(secondForm)].find(
+    m => m !== MoveId.NONE && !pinnedIds.has(m) && allMoves[m] != null,
+  );
+  const learnableIds = [
+    ...new Set(
+      [legalForSecond, MoveId.PROTECT, MoveId.REST, MoveId.SHADOW_BALL].filter((id): id is MoveId => id != null),
+    ),
+  ];
+  return {
+    pokemon: mon,
+    learnableIds,
+    omniform: true,
+    assign: (moveId: MoveId, slotIndex: number) => mon.setMove(slotIndex, moveId),
+    revert: () => {},
+    done: () => {},
+    fallback: () => {},
+  };
 }
 
 async function startBattleWithShinyLabLead(game: GameManager, id: SpeciesId = SpeciesId.BULBASAUR) {
@@ -525,6 +617,42 @@ function showdownWagerArgs(): [ShowdownWagerArgs] {
 }
 
 const RECIPES: Record<string, Recipe> = {
+  // ER partner / Omniform TRANSFORM burst FX (per-type). Not a screen but a field
+  // overlay, rendered in isolation so `frames:` gives a flip-book SMOKE CHECK that
+  // the type-themed particles + tinted light draw non-blank and step without
+  // crashing. Faithful ANIMATION is out of scope here (the harness auto-completes
+  // tweens - CLAUDE.md "animation/timing"); the tween mock never APPLIES values,
+  // so the burst renders at its SPAWN state, which is what we want to eyeball.
+  // Math.random + the teardown timer are pinned so the render is deterministic
+  // (golden-stable) and the burst survives every captured frame.
+  "er-transform-fx": {
+    frames: 4,
+    diffTolerance: 4000,
+    render: (game, ctx) => {
+      const gs: any = game.scene;
+      // A field-scale (x6) host container centred on screen for the burst shapes.
+      const host = gs.add.container(0, 0).setScale(6).setPosition(960, 620);
+      ctx.fieldRoot.add(host);
+      const anchor = gs.add.rectangle(0, 0, 1, 1, 0x000000, 0).setVisible(false);
+      host.add(anchor);
+      // fakePokemon.y offsets the FX's internal -26 body nudge back to the origin.
+      const fakePokemon: any = { x: 0, y: 26, getSprite: () => anchor };
+
+      const realRandom = Math.random;
+      const realDelayed = gs.time.delayedCall?.bind(gs.time);
+      Math.random = () => 0.5; // deterministic spread
+      gs.time.delayedCall = () => ({ remove() {} }); // keep the burst alive across frames
+      try {
+        const prevField = gs.field;
+        gs.field = host; // the FX parents its shapes into globalScene.field
+        playErTransformFx(fakePokemon, PokemonType.GRASS);
+        gs.field = prevField;
+      } finally {
+        Math.random = realRandom;
+        gs.time.delayedCall = realDelayed;
+      }
+    },
+  },
   bargain: {
     mode: UiMode.ER_BARGAIN,
     prepare: () => bargainArgs(),
@@ -562,6 +690,29 @@ const RECIPES: Record<string, Recipe> = {
     // (tab switching + slider adjust) with no crash.
     steps: [Button.RIGHT, Button.RIGHT, Button.RIGHT, Button.DOWN, Button.DOWN, Button.RIGHT],
     diffTolerance: 180000, // animated exact FX advances during the six-step navigation tour
+  },
+  // The EFFECTS LAB section (a separate lab reached by the header "Effects" button,
+  // above the shiny option area). UP parks on the button, ACTION opens the effects
+  // section: the category column ("Transformation Effects") + the first (partner)
+  // Eeveelution selected on its FRONT sprite with the per-type transform burst
+  // playing. Coarse tolerance covers the Math.random-seeded burst particles (like
+  // the shiny-lab animated-FX pages).
+  // Leading UPs park focus on the header "Effects" button (the first press or two is
+  // eaten by the shiny lab's 250ms open-input guard; extra UPs on the button are
+  // no-ops), then ACTION opens the effects section.
+  "er-effects-lab": {
+    mode: UiMode.ER_SHINY_LAB,
+    prepare: () => [buildDemoConfig(SpeciesId.ARTICUNO)],
+    steps: [Button.UP, Button.UP, Button.UP, Button.ACTION],
+    diffTolerance: 200000,
+  },
+  // Same section, then U/D toggles the preview to the BACK sprite (how the transform
+  // looks back and forth). Proves the front/back control + a re-triggered burst.
+  "er-effects-lab-back": {
+    mode: UiMode.ER_SHINY_LAB,
+    prepare: () => [buildDemoConfig(SpeciesId.ARTICUNO)],
+    steps: [Button.UP, Button.UP, Button.UP, Button.ACTION, Button.DOWN],
+    diffTolerance: 200000,
   },
   // ER Community Challenges (P1): the populated browser, the ZERO-at-launch empty
   // state ("vacant standards"), and a directional-nav tour. Static (no live anim) -> exact diff.
@@ -1278,6 +1429,56 @@ const RECIPES: Record<string, Recipe> = {
     steps: [Button.CYCLE_SHINY],
     diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
   },
+  // ER Omniform mons (#partner-eevee): a Partner Eevee lead shows the evolution
+  // browser STRIP in the TOP HEADER bar (bare icons, no box) - Eevee + the 8
+  // partner eeveelutions, the current battle-active form gold-underlined, the
+  // selected icon bright while the rest are dimmed, the < / > overflow arrows
+  // (9 entries > the 5-icon window), and the (F) key-badge. Content area is
+  // untouched. The plain `summary` recipe above (a single-form mon) proves the
+  // strip does NOT render there.
+  "summary-multiform": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithPartnerEeveeLead(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    diffTolerance: 40000, // live animated Eevee sprite in the summary box
+  },
+  // ER Omniform mons: after two CYCLE_FORM presses the header strip selects the
+  // 2nd partner eeveelution (bright icon, window scrolled) and the ABILITIES panel
+  // re-renders THAT evolution's kit (view-only).
+  "summary-multiform-cycled": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithPartnerEeveeLead(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    steps: [Button.CYCLE_FORM, Button.CYCLE_FORM],
+    diffTolerance: 40000, // live animated mon sprite in the summary box
+  },
+  // ER Omniform + FIVE ability rows: a black-shiny Partner Eevee (Ability + 3
+  // Innates + the switchable GIFT row). Proves the header-placed strip never
+  // overlaps the content, even on the tallest ability layout.
+  "summary-multiform-5ability": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithBlackShinyPartnerEeveeLead(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    diffTolerance: 40000, // live animated Eevee sprite in the summary box
+  },
+  // ER Omniform + MOVESET cycling: on the MOVES page, two CYCLE_FORM presses select
+  // the 2nd partner eeveelution and the move LIST re-renders to THAT evolution's
+  // moveset (the per-evolution model seam, base level-up fallback flagged "(base)").
+  "summary-multiform-moves-cycled": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithPartnerEeveeLead(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, 3 /* Page.MOVES */];
+    },
+    steps: [Button.CYCLE_FORM, Button.CYCLE_FORM],
+    diffTolerance: 40000, // live animated mon sprite in the summary box
+  },
   // Bug #757: the ER money-streak mini-badge ("₽+N%", #348) on the summary name bar collides
   // with the level counter once the level reaches three digits. This recipe pins a level-120
   // lead with a maxed streak so "Lv.120" (3 digits) and "₽+10%" both draw; before the fix the
@@ -1894,6 +2095,35 @@ const RECIPES: Record<string, Recipe> = {
         },
       ];
     },
+    diffTolerance: 0,
+  },
+  // ER Omniform (#partner-eevee): the level-up batch panel for a Partner Eevee. The
+  // top band shows the selected-evolution name + the evolution STRIP (Eevee + the 8
+  // partner eeveelutions, base selected, (F) key-badge); the LEARNABLE column offers
+  // the moves annotated for the BASE form (illegal / already-known ones dimmed), the
+  // CURRENT column shows the base moveset. Static -> exact diff.
+  "learn-move-batch-omniform": {
+    mode: UiMode.LEARN_MOVE_BATCH,
+    prepare: async game => [await partnerEeveeBatchDeps(game)],
+    diffTolerance: 0,
+  },
+  // ER Omniform: one CYCLE_FORM press selects the 2nd family form (Partner Vaporeon);
+  // the name label + the CURRENT column re-render to THAT evolution's OWN stored
+  // moveset, and the LEARNABLE column re-annotates the offers for it.
+  "learn-move-batch-omniform-cycled": {
+    mode: UiMode.LEARN_MOVE_BATCH,
+    prepare: async game => [await partnerEeveeBatchDeps(game)],
+    steps: [Button.CYCLE_FORM],
+    diffTolerance: 0,
+  },
+  // ER Omniform: CYCLE_FORM to the 2nd evolution then ACTION on the first offered
+  // move (chosen so that evolution can legally take it) opens the replace-a-move flow
+  // AGAINST that evolution's own full stored moveset (the CURRENT column is the slot
+  // picker). Static -> exact diff.
+  "learn-move-batch-omniform-replace": {
+    mode: UiMode.LEARN_MOVE_BATCH,
+    prepare: async game => [await partnerEeveeBatchDeps(game)],
+    steps: [Button.CYCLE_FORM, Button.ACTION],
     diffTolerance: 0,
   },
   // NOTE: TITLE (UiMode.TITLE) is intentionally NOT a recipe - it is animation-tier. Its
