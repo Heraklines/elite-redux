@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { isCoopAuthoritativeGuest } from "#data/elite-redux/coop/coop-runtime";
+import { isErOmniformMon, omniformUnionLevelMoves } from "#data/elite-redux/omniform-movesets";
 import { ExpNotification } from "#enums/exp-notification";
 import type { PlayerPokemon } from "#field/pokemon";
 import { PlayerPartyMemberPokemonPhase } from "#phases/player-party-member-pokemon-phase";
@@ -79,18 +80,28 @@ export class LevelUpPhase extends PlayerPartyMemberPokemonPhase {
   public override end() {
     if (this.lastLevel < 100) {
       // this feels like an unnecessary optimization
-      const levelMoves = this.getPokemon().getLevelMoves(this.lastLevel + 1);
-      if (levelMoves.length > 0) {
+      const pokemon = this.getPokemon();
+      // ER Omniform (#partner-eevee): a partner mon switches between eeveelution forms
+      // via Omniform and can be in ANY form when it levels up, so its level-up OFFER is
+      // the pooled UNION of every family member's level-up learnset (each move at its
+      // minimum level), NOT just the current form's kit — otherwise a move only one
+      // eeveelution learns would be missed whenever the mon is in a different form. The
+      // batch panel then expands each offered move per evolution. Co-op is out of scope
+      // (the shared batch path is untouched). Gated on `isErOmniformMon`, so a normal
+      // mon's candidate set is byte-identical to `getLevelMoves`.
+      const candidateMoveIds =
+        !globalScene.gameMode.isCoop && isErOmniformMon(pokemon)
+          ? omniformUnionLevelMoves(pokemon)
+              .filter(([lvl]) => lvl >= this.lastLevel + 1 && lvl <= pokemon.level)
+              .map(([, moveId]) => moveId)
+          : pokemon.getLevelMoves(this.lastLevel + 1).map(lm => lm[1]);
+      if (candidateMoveIds.length > 0) {
         // ER QoL: ONE interactive Move Learn panel for the whole level-up instead of
         // the per-move text barrage. The panel is FAIL-SAFE - any error opening or
         // operating it falls back to the per-move LearnMovePhase flow, so it can never
         // softlock. TMs, the egg/Memory tutor, the relearner and evolution moves still
         // use LearnMovePhase directly.
-        globalScene.phaseManager.unshiftNew(
-          "LearnMoveBatchPhase",
-          this.partyMemberIndex,
-          levelMoves.map(lm => lm[1]),
-        );
+        globalScene.phaseManager.unshiftNew("LearnMoveBatchPhase", this.partyMemberIndex, candidateMoveIds);
       }
     }
     // Co-op authoritative (#633 B6): the GUEST is a pure renderer; the HOST owns evolution. A

@@ -108,6 +108,54 @@ export function erOmniformFamilyForms(speciesId: number, formIndex: number): Omn
   return out;
 }
 
+/**
+ * The UNDIRECTED connected component of `(speciesId, formIndex)` in the Omniform
+ * registry: every form reachable by following mappings in EITHER direction (forward
+ * targets AND holders that map INTO a reachable form). Unlike
+ * {@linkcode erOmniformFamilyForms} (a directed forward closure, base-first, used for
+ * the ORDERED evolution list), this resolves the WHOLE family from ANY member — a
+ * partner eeveelution reaches the Partner Eevee head even though no mapping points
+ * back to it. The pooled level-up learn union needs this so every family member
+ * (queried by its own form) sees the same complete pool. Order is not significant.
+ */
+export function erOmniformConnectedForms(speciesId: number, formIndex: number): OmniformTarget[] {
+  const seen = new Set<string>();
+  const out: OmniformTarget[] = [];
+  const queue: OmniformTarget[] = [{ speciesId: speciesId as SpeciesId, formIndex }];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    const key = identityKey(cur.speciesId, cur.formIndex);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    out.push(cur);
+    // Forward edges: cur's own transform targets.
+    const byType = OMNIFORM_REGISTRY.get(key);
+    if (byType) {
+      for (const target of byType.values()) {
+        if (!seen.has(identityKey(target.speciesId, target.formIndex))) {
+          queue.push({ speciesId: target.speciesId, formIndex: target.formIndex });
+        }
+      }
+    }
+    // Reverse edges: any holder that maps INTO cur (so an eeveelution reaches the head).
+    for (const [holderKey, holderMap] of OMNIFORM_REGISTRY.entries()) {
+      if (seen.has(holderKey)) {
+        continue;
+      }
+      for (const target of holderMap.values()) {
+        if (identityKey(target.speciesId, target.formIndex) === key) {
+          const [sid, fidx] = holderKey.split(":").map(Number);
+          queue.push({ speciesId: sid as SpeciesId, formIndex: fidx });
+          break;
+        }
+      }
+    }
+  }
+  return out;
+}
+
 /** The holder's pre-transform identity, snapshotted on its FIRST transform in a battle. */
 interface OmniformOriginal {
   wave: number;
