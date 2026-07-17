@@ -69,19 +69,53 @@ export function encrypt(data: string, bypassLogin: boolean): string {
   return AES.encrypt(payload, saveKey).toString();
 }
 
-export function decrypt(data: string, bypassLogin: boolean): string {
-  if (bypassLogin) {
-    // New (compressed) guest saves are stored as the bare marked payload; legacy
-    // guest saves are btoa(encodeURIComponent(json)).
-    return data.startsWith(SAVE_COMPRESS_PREFIX)
-      ? (decompressFromBase64(data.slice(SAVE_COMPRESS_PREFIX.length)) ?? "")
-      : decodeURIComponent(atob(data));
+/**
+ * Thrown when a stored save payload cannot be DECODED - a corrupt or truncated
+ * localStorage blob, a wrong-codec guest/AES mix, or a failed decompression.
+ *
+ * The underlying codecs raise BARE, unclassifiable errors: crypto-js throws
+ * `Error: Malformed UTF-8 data` when an AES blob decrypts to invalid UTF-8 bytes
+ * (the exact error a live save-loss report showed ESCAPING UNCAUGHT during
+ * save-load, attributed to the dynamically-imported chunk that happens to bundle
+ * crypto-js), and the guest path's `atob`/`decodeURIComponent` throw
+ * `URIError: URI malformed`. Wrapping both at this single decode boundary means
+ * callers can tell "these bytes are corrupt" from any other failure, and the raw
+ * codec error is LOGGED here instead of surfacing alone with no context.
+ */
+export class SaveDecodeError extends Error {
+  constructor(cause: unknown) {
+    super(`Save data could not be decoded: ${cause instanceof Error ? cause.message : String(cause)}`);
+    this.name = "SaveDecodeError";
+    // Preserve the original codec error for anyone inspecting the chain.
+    (this as { cause?: unknown }).cause = cause;
   }
-  const plain = AES.decrypt(data, saveKey).toString(enc.Utf8);
-  // Legacy AES saves decrypt straight to JSON; new ones to the marked payload.
-  return plain.startsWith(SAVE_COMPRESS_PREFIX)
-    ? (decompressFromBase64(plain.slice(SAVE_COMPRESS_PREFIX.length)) ?? "")
-    : plain;
+}
+
+export function decrypt(data: string, bypassLogin: boolean): string {
+  try {
+    if (bypassLogin) {
+      // New (compressed) guest saves are stored as the bare marked payload; legacy
+      // guest saves are btoa(encodeURIComponent(json)).
+      return data.startsWith(SAVE_COMPRESS_PREFIX)
+        ? (decompressFromBase64(data.slice(SAVE_COMPRESS_PREFIX.length)) ?? "")
+        : decodeURIComponent(atob(data));
+    }
+    const plain = AES.decrypt(data, saveKey).toString(enc.Utf8);
+    // Legacy AES saves decrypt straight to JSON; new ones to the marked payload.
+    return plain.startsWith(SAVE_COMPRESS_PREFIX)
+      ? (decompressFromBase64(plain.slice(SAVE_COMPRESS_PREFIX.length)) ?? "")
+      : plain;
+  } catch (err) {
+    // A corrupt / truncated / wrong-codec blob makes crypto-js throw "Malformed
+    // UTF-8 data" (AES path) or atob/decodeURIComponent throw "URI malformed"
+    // (guest path). Classify + LOG the corruption here so no raw, unattributable
+    // codec error escapes the save/boot path, then rethrow a TYPED error so every
+    // caller keeps the SAME throw-contract. We deliberately do NOT swallow this
+    // and return "" - a caller that mistook empty for "no save" could overwrite
+    // good local data. Preserving the throw keeps corrupt bytes untouched.
+    console.error("[save] decrypt failed - corrupt or wrong-codec save payload:", err);
+    throw new SaveDecodeError(err);
+  }
 }
 
 /**
