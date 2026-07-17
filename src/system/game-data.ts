@@ -3733,338 +3733,206 @@ export class GameData {
         coopWarn("launch", "guest resume checkpoint discriminator failed");
         return { success: false, reason: "invalid-checkpoint" };
       }
-      const result = await this.withCoopResumePersistenceLease(async () => {
-        type StoredCheckpoint = {
-          session: SessionSaveData;
-          sessionJson: string;
-          commitment: CoopResumeCommitment;
-        };
-        type ResumeSlotInspection =
-          | { kind: "empty"; slot: number; localRaw: string | null; cloudCas: CoopResumeCloudCas | null }
-          | {
-              kind: "occupied";
-              slot: number;
-              localRaw: string | null;
-              stored: StoredCheckpoint;
-              cloudCas: CoopResumeCloudCas | null;
-            }
-          | { kind: "unavailable"; slot: number; localRaw: string | null };
+      // Maintainer directive (2026-07-17): when the leased inspection finds no safe slot it records
+      // the least valuable reclaim candidate; the delete then runs HERE, outside the lease (it takes
+      // the same er-coop-resume Web Lock), and the leased persist re-runs exactly once.
+      const checkpointReclaimBox: { candidate: { slot: number; kind: string } | null } = { candidate: null };
+      const runLeasedPersist = async (): Promise<CoopResumeCheckpointPersistenceAck | null> =>
+        await this.withCoopResumePersistenceLease(async () => {
+          type StoredCheckpoint = {
+            session: SessionSaveData;
+            sessionJson: string;
+            commitment: CoopResumeCommitment;
+          };
+          type ResumeSlotInspection =
+            | { kind: "empty"; slot: number; localRaw: string | null; cloudCas: CoopResumeCloudCas | null }
+            | {
+                kind: "occupied";
+                slot: number;
+                localRaw: string | null;
+                stored: StoredCheckpoint;
+                cloudCas: CoopResumeCloudCas | null;
+              }
+            | { kind: "unavailable"; slot: number; localRaw: string | null };
 
-        const parseStored = async (json: string): Promise<StoredCheckpoint | null> => {
-          try {
-            const parsed = this.parseSessionData(json);
-            const parsedCommitment = await deriveCoopResumeCommitment(json, parsed);
-            return parsedCommitment == null
-              ? null
-              : { session: parsed, sessionJson: json, commitment: parsedCommitment };
-          } catch {
-            return null;
-          }
-        };
-        const inspectSlot = async (slot: number): Promise<ResumeSlotInspection> => {
-          const localRaw = localStorage.getItem(this.sessionStorageKeyForAccount(slot, accountIdentity));
-          const localJson = (() => {
-            if (localRaw == null) {
+          const parseStored = async (json: string): Promise<StoredCheckpoint | null> => {
+            try {
+              const parsed = this.parseSessionData(json);
+              const parsedCommitment = await deriveCoopResumeCommitment(json, parsed);
+              return parsedCommitment == null
+                ? null
+                : { session: parsed, sessionJson: json, commitment: parsedCommitment };
+            } catch {
               return null;
             }
-            try {
-              return decrypt(localRaw, bypassLogin);
-            } catch {
-              return;
+          };
+          const inspectSlot = async (slot: number): Promise<ResumeSlotInspection> => {
+            const localRaw = localStorage.getItem(this.sessionStorageKeyForAccount(slot, accountIdentity));
+            const localJson = (() => {
+              if (localRaw == null) {
+                return null;
+              }
+              try {
+                return decrypt(localRaw, bypassLogin);
+              } catch {
+                return;
+              }
+            })();
+            if (localJson === undefined) {
+              return { kind: "unavailable", slot, localRaw };
             }
-          })();
-          if (localJson === undefined) {
-            return { kind: "unavailable", slot, localRaw };
-          }
-          const localStored = localJson == null ? null : await parseStored(localJson);
-          if (localJson != null && localStored == null) {
-            return { kind: "unavailable", slot, localRaw };
-          }
-          if (bypassLogin) {
-            return localStored == null
-              ? { kind: "empty", slot, localRaw, cloudCas: null }
-              : { kind: "occupied", slot, localRaw, stored: localStored, cloudCas: null };
-          }
+            const localStored = localJson == null ? null : await parseStored(localJson);
+            if (localJson != null && localStored == null) {
+              return { kind: "unavailable", slot, localRaw };
+            }
+            if (bypassLogin) {
+              return localStored == null
+                ? { kind: "empty", slot, localRaw, cloudCas: null }
+                : { kind: "occupied", slot, localRaw, stored: localStored, cloudCas: null };
+            }
 
-          const cloudRead = await this.readCoopCas(slot);
-          const cloudEmpty = !cloudRead.ok && cloudRead.failureKind === "missing";
-          if (!cloudRead.ok && !cloudEmpty) {
-            return { kind: "unavailable", slot, localRaw };
-          }
-          const cloudStored = cloudEmpty ? null : await parseStored(cloudRead.ok ? cloudRead.rawSavedata : "");
-          if (!cloudEmpty && cloudStored == null) {
-            return { kind: "unavailable", slot, localRaw };
-          }
-          const cloudCas: CoopResumeCloudCas =
-            cloudStored == null
-              ? { mode: "empty" }
-              : {
-                  mode: "existing",
-                  runId: cloudStored.commitment.runId,
-                  checkpointRevision: cloudStored.commitment.checkpointRevision,
-                  digest: cloudStored.commitment.digest,
-                };
-          if (localStored == null && cloudStored == null) {
-            return { kind: "empty", slot, localRaw, cloudCas };
-          }
-          if (localStored == null || cloudStored == null) {
+            const cloudRead = await this.readCoopCas(slot);
+            const cloudEmpty = !cloudRead.ok && cloudRead.failureKind === "missing";
+            if (!cloudRead.ok && !cloudEmpty) {
+              return { kind: "unavailable", slot, localRaw };
+            }
+            const cloudStored = cloudEmpty ? null : await parseStored(cloudRead.ok ? cloudRead.rawSavedata : "");
+            if (!cloudEmpty && cloudStored == null) {
+              return { kind: "unavailable", slot, localRaw };
+            }
+            const cloudCas: CoopResumeCloudCas =
+              cloudStored == null
+                ? { mode: "empty" }
+                : {
+                    mode: "existing",
+                    runId: cloudStored.commitment.runId,
+                    checkpointRevision: cloudStored.commitment.checkpointRevision,
+                    digest: cloudStored.commitment.digest,
+                  };
+            if (localStored == null && cloudStored == null) {
+              return { kind: "empty", slot, localRaw, cloudCas };
+            }
+            if (localStored == null || cloudStored == null) {
+              return {
+                kind: "occupied",
+                slot,
+                localRaw,
+                stored: localStored ?? cloudStored!,
+                cloudCas,
+              };
+            }
+            if (localStored.commitment.runId !== cloudStored.commitment.runId) {
+              return { kind: "unavailable", slot, localRaw };
+            }
+            if (localStored.commitment.checkpointRevision === cloudStored.commitment.checkpointRevision) {
+              if (localStored.commitment.digest !== cloudStored.commitment.digest) {
+                return { kind: "unavailable", slot, localRaw };
+              }
+              return { kind: "occupied", slot, localRaw, stored: cloudStored, cloudCas };
+            }
             return {
               kind: "occupied",
               slot,
               localRaw,
-              stored: localStored ?? cloudStored!,
+              stored:
+                localStored.commitment.checkpointRevision > cloudStored.commitment.checkpointRevision
+                  ? localStored
+                  : cloudStored,
               cloudCas,
             };
-          }
-          if (localStored.commitment.runId !== cloudStored.commitment.runId) {
-            return { kind: "unavailable", slot, localRaw };
-          }
-          if (localStored.commitment.checkpointRevision === cloudStored.commitment.checkpointRevision) {
-            if (localStored.commitment.digest !== cloudStored.commitment.digest) {
-              return { kind: "unavailable", slot, localRaw };
-            }
-            return { kind: "occupied", slot, localRaw, stored: cloudStored, cloudCas };
-          }
-          return {
-            kind: "occupied",
-            slot,
-            localRaw,
-            stored:
-              localStored.commitment.checkpointRevision > cloudStored.commitment.checkpointRevision
-                ? localStored
-                : cloudStored,
-            cloudCas,
           };
-        };
-        const exactRunSlot = (
-          inspection: ResumeSlotInspection,
-        ): inspection is Extract<ResumeSlotInspection, { kind: "occupied" }> =>
-          inspection.kind === "occupied"
-          && inspection.stored.commitment.runId === commitment.runId
-          && coopSeatMapMatches(
-            inspection.stored.session.coopParticipants,
-            controller.localName(),
-            partner,
-            controller.role,
-          );
-        const cloudBackedExactRunSlot = (
-          inspection: ResumeSlotInspection,
-        ): inspection is Extract<ResumeSlotInspection, { kind: "occupied" }> =>
-          exactRunSlot(inspection)
-          && (bypassLogin
-            || (inspection.cloudCas?.mode === "existing" && inspection.cloudCas.runId === commitment.runId));
+          const exactRunSlot = (
+            inspection: ResumeSlotInspection,
+          ): inspection is Extract<ResumeSlotInspection, { kind: "occupied" }> =>
+            inspection.kind === "occupied"
+            && inspection.stored.commitment.runId === commitment.runId
+            && coopSeatMapMatches(
+              inspection.stored.session.coopParticipants,
+              controller.localName(),
+              partner,
+              controller.role,
+            );
+          const cloudBackedExactRunSlot = (
+            inspection: ResumeSlotInspection,
+          ): inspection is Extract<ResumeSlotInspection, { kind: "occupied" }> =>
+            exactRunSlot(inspection)
+            && (bypassLogin
+              || (inspection.cloudCas?.mode === "existing" && inspection.cloudCas.runId === commitment.runId));
 
-        // Maintainer directive (2026-07-17): the GUEST's checkpoint copy reclaims a slot like the
-        // host's fresh launch - at most ONCE per persist so a mis-ranked account cannot cascade.
-        let reclaimedForCheckpoint = false;
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const marker = readCoopResumeMarker(controller.localName(), partner);
-          const markerMatchesRun = marker?.runId === commitment.runId;
-          const markerInspection = markerMatchesRun && marker?.slot != null ? await inspectSlot(marker.slot) : null;
-          const markerIsCloudBackedExactRun = markerInspection != null && cloudBackedExactRunSlot(markerInspection);
-          // A marker-local same-run row with a missing cloud parent is not authority. Scan for an
-          // exact cloud-backed survivor elsewhere; if none exists, fail closed instead of ACKing an
-          // orphan or manufacturing a fresh empty-slot lineage.
-          const remainingInspections = markerIsCloudBackedExactRun
-            ? []
-            : await Promise.all(
-                [0, 1, 2, 3, 4].filter(slot => slot !== (markerMatchesRun ? marker?.slot : undefined)).map(inspectSlot),
-              );
-          const allInspections =
-            markerInspection == null ? remainingInspections : [markerInspection, ...remainingInspections];
-          const cloudBackedSurvivor = allInspections
-            .filter(cloudBackedExactRunSlot)
-            .sort((left, right) =>
-              left.kind === "occupied" && right.kind === "occupied"
-                ? right.stored.commitment.checkpointRevision - left.stored.commitment.checkpointRevision
-                : 0,
-            )[0];
-          const orphanedSameRunExists = allInspections.some(
-            inspection => exactRunSlot(inspection) && !cloudBackedExactRunSlot(inspection),
-          );
-          const selected = markerIsCloudBackedExactRun
-            ? markerInspection
-            : (cloudBackedSurvivor
-              ?? (orphanedSameRunExists
-                ? null
-                : ((markerInspection?.kind === "empty" ? markerInspection : null)
-                  ?? remainingInspections.find(inspection => inspection.kind === "empty"))));
-          if (
-            (selected as ResumeSlotInspection | null)?.kind === "empty"
-            && allInspections.some(inspection => inspection.kind === "occupied")
-          ) {
-            const summary = allInspections
-              .map(inspection => {
-                if (inspection.kind !== "occupied") {
-                  return `${inspection.slot}:${inspection.kind}`;
-                }
-                return (
-                  `${inspection.slot}:occupied`
-                  + `:run=${inspection.stored.commitment.runId === commitment.runId}`
-                  + `:seats=${coopSeatMapMatches(inspection.stored.session.coopParticipants, controller.localName(), partner, controller.role)}`
-                  + `:cloud=${inspection.cloudCas?.mode ?? "none"}`
-                  + `:cloudRun=${inspection.cloudCas?.mode === "existing" ? inspection.cloudCas.runId === commitment.runId : false}`
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const marker = readCoopResumeMarker(controller.localName(), partner);
+            const markerMatchesRun = marker?.runId === commitment.runId;
+            const markerInspection = markerMatchesRun && marker?.slot != null ? await inspectSlot(marker.slot) : null;
+            const markerIsCloudBackedExactRun = markerInspection != null && cloudBackedExactRunSlot(markerInspection);
+            // A marker-local same-run row with a missing cloud parent is not authority. Scan for an
+            // exact cloud-backed survivor elsewhere; if none exists, fail closed instead of ACKing an
+            // orphan or manufacturing a fresh empty-slot lineage.
+            const remainingInspections = markerIsCloudBackedExactRun
+              ? []
+              : await Promise.all(
+                  [0, 1, 2, 3, 4]
+                    .filter(slot => slot !== (markerMatchesRun ? marker?.slot : undefined))
+                    .map(inspectSlot),
                 );
-              })
-              .join(",");
-            coopWarn("launch", `guest checkpoint selected empty slot=${selected.slot} inspections=[${summary}]`);
-          }
-          if (selected == null || !exactRuntimeIsCurrent()) {
-            // Maintainer directive (2026-07-17, live report test4/Heraklines1): a guest whose five
-            // slots are all occupied or unavailable must not NACK the launch checkpoint into a
-            // shared terminal. Reclaim the least valuable slot ONCE - divergent/unreadable replicas
-            // first (they are unresumable), then the OLDEST occupied save that is NOT this run's
-            // slot - through the full cloud-safe delete, then re-run the same inspection.
-            if (exactRuntimeIsCurrent() && !reclaimedForCheckpoint) {
-              reclaimedForCheckpoint = true;
-              const reclaim =
-                allInspections.find(inspection => inspection.kind === "unavailable")
-                ?? allInspections
-                  .filter(
-                    (inspection): inspection is Extract<ResumeSlotInspection, { kind: "occupied" }> =>
-                      inspection.kind === "occupied" && !exactRunSlot(inspection),
-                  )
-                  .sort((a, b) => (a.stored.session.timestamp ?? 0) - (b.stored.session.timestamp ?? 0))[0];
-              if (reclaim != null) {
-                coopWarn(
-                  "launch",
-                  `guest checkpoint has no safe slot; reclaiming least-recent slot=${reclaim.slot} kind=${reclaim.kind}`,
-                );
-                if (await this.deleteSession(reclaim.slot)) {
-                  continue;
-                }
-                coopWarn("launch", `guest checkpoint reclamation delete failed slot=${reclaim.slot}`);
-              }
-            }
-            if (exactRuntimeIsCurrent()) {
-              recordCoopResumeUnavailableEvidence(
-                controller.localName(),
-                partner,
-                commitment.wave,
-                commitment.runId,
-                commitment.checkpointRevision,
-                commitment.seats,
-              );
-            }
-            return { success: false, reason: "no-safe-slot" } as const;
-          }
-
-          // Final local TOCTOU check after every digest/cloud await. No yield is permitted between
-          // this comparison and the local write/decision below.
-          const storageKey = this.sessionStorageKeyForAccount(selected.slot, accountIdentity);
-          if (localStorage.getItem(storageKey) !== selected.localRaw) {
-            coopWarn("launch", `guest resume slot=${selected.slot} mutated during validation; retry=${attempt}`);
-            continue;
-          }
-
-          const persistIncomingReplica = async (): Promise<CoopResumeCheckpointPersistenceAck> => {
-            let selectedHead =
-              accountIdentity == null
-                ? ({ kind: "absent" } as const)
-                : this.readKnownCoopCloudHead(selected.slot, accountIdentity);
-            if (selectedHead.kind === "invalid") {
-              coopWarn("launch", `guest checkpoint ancestry invalid slot=${selected.slot}`);
-              return { success: false, reason: "cloud-conflict" };
-            }
+            const allInspections =
+              markerInspection == null ? remainingInspections : [markerInspection, ...remainingInspections];
+            const cloudBackedSurvivor = allInspections
+              .filter(cloudBackedExactRunSlot)
+              .sort((left, right) =>
+                left.kind === "occupied" && right.kind === "occupied"
+                  ? right.stored.commitment.checkpointRevision - left.stored.commitment.checkpointRevision
+                  : 0,
+              )[0];
+            const orphanedSameRunExists = allInspections.some(
+              inspection => exactRunSlot(inspection) && !cloudBackedExactRunSlot(inspection),
+            );
+            const selected = markerIsCloudBackedExactRun
+              ? markerInspection
+              : (cloudBackedSurvivor
+                ?? (orphanedSameRunExists
+                  ? null
+                  : ((markerInspection?.kind === "empty" ? markerInspection : null)
+                    ?? remainingInspections.find(inspection => inspection.kind === "empty"))));
             if (
-              selectedHead.kind === "valid"
-              && selectedHead.head.runId !== commitment.runId
-              && accountIdentity != null
+              (selected as ResumeSlotInspection | null)?.kind === "empty"
+              && allInspections.some(inspection => inspection.kind === "occupied")
             ) {
-              const displacedHead = selectedHead;
-              const displacedStatus = await this.readCoopRunStatus({
-                clientSessionId,
-                coopRunId: displacedHead.head.runId,
-                slot: selected.slot,
-              });
-              if (
-                !exactRuntimeIsCurrent()
-                || localStorage.getItem(storageKey) !== selected.localRaw
-                || !this.coopCloudHeadStateMatches(
-                  this.readKnownCoopCloudHead(selected.slot, accountIdentity),
-                  displacedHead,
-                )
-                || !displacedStatus.ok
-                || displacedStatus.value.state !== "tombstoned"
-                || !recordCoopDeletedRun(accountIdentity, displacedHead.head.runId)
-                || !this.clearKnownCoopCloudHead(selected.slot, accountIdentity, displacedHead.head.runId)
-              ) {
-                coopWarn("launch", `guest checkpoint displaced ancestry not tombstoned slot=${selected.slot}`);
-                return { success: false, reason: "cloud-conflict" };
-              }
-              selectedHead = { kind: "absent" };
+              const summary = allInspections
+                .map(inspection => {
+                  if (inspection.kind !== "occupied") {
+                    return `${inspection.slot}:${inspection.kind}`;
+                  }
+                  return (
+                    `${inspection.slot}:occupied`
+                    + `:run=${inspection.stored.commitment.runId === commitment.runId}`
+                    + `:seats=${coopSeatMapMatches(inspection.stored.session.coopParticipants, controller.localName(), partner, controller.role)}`
+                    + `:cloud=${inspection.cloudCas?.mode ?? "none"}`
+                    + `:cloudRun=${inspection.cloudCas?.mode === "existing" ? inspection.cloudCas.runId === commitment.runId : false}`
+                  );
+                })
+                .join(",");
+              coopWarn("launch", `guest checkpoint selected empty slot=${selected.slot} inspections=[${summary}]`);
             }
-            if (!bypassLogin && selected.cloudCas?.mode === "empty") {
-              // Empty CAS is valid only for an initial cloud-mirrored checkpoint. Retire an exactly
-              // tombstoned displaced lineage above first; a non-cloud cadence message still may not ACK
-              // a physically empty/orphan slot as durable state.
-              if (!mirrorCloud || accountIdentity == null || selectedHead.kind !== "absent") {
-                coopWarn(
-                  "launch",
-                  `guest checkpoint empty ancestry rejected slot=${selected.slot} mirror=${mirrorCloud} head=${selectedHead.kind}`,
-                );
-                return { success: false, reason: "cloud-conflict" };
-              }
-              const incomingStatus = await this.readCoopRunStatus({
-                clientSessionId,
-                coopRunId: commitment.runId,
-                slot: selected.slot,
-              });
-              if (
-                !exactRuntimeIsCurrent()
-                || localStorage.getItem(storageKey) !== selected.localRaw
-                || !incomingStatus.ok
-                || incomingStatus.value.state !== "missing"
-              ) {
-                coopWarn("launch", `guest checkpoint empty ancestry status changed slot=${selected.slot}`);
-                return { success: false, reason: "cloud-conflict" };
-              }
-            }
-            if (selected.cloudCas?.mode === "existing" && accountIdentity != null) {
-              const observedCloudHead = {
-                runId: selected.cloudCas.runId!,
-                checkpointRevision: selected.cloudCas.checkpointRevision!,
-                digest: selected.cloudCas.digest!,
-              };
-              if (
-                observedCloudHead.runId !== commitment.runId
-                || (selectedHead.kind === "valid"
-                  && (selectedHead.head.runId !== observedCloudHead.runId
-                    || selectedHead.head.checkpointRevision > observedCloudHead.checkpointRevision
-                    || (selectedHead.head.checkpointRevision === observedCloudHead.checkpointRevision
-                      && selectedHead.head.digest !== observedCloudHead.digest)))
-              ) {
-                coopWarn(
-                  "launch",
-                  `guest checkpoint observed ancestry mismatch slot=${selected.slot} observed=${observedCloudHead.checkpointRevision} known=${selectedHead.kind === "valid" ? selectedHead.head.checkpointRevision : "absent"}`,
-                );
-                return { success: false, reason: "cloud-conflict" };
-              }
-              if (
-                (selectedHead.kind === "absent"
-                  || selectedHead.head.checkpointRevision < observedCloudHead.checkpointRevision)
-                && !this.recordKnownCoopCloudHead(selected.slot, accountIdentity, observedCloudHead, selectedHead)
-              ) {
-                coopWarn("launch", `guest checkpoint could not freeze observed ancestry slot=${selected.slot}`);
-                return { success: false, reason: "cloud-conflict" };
-              }
-              selectedHead = this.readKnownCoopCloudHead(selected.slot, accountIdentity);
-            }
-            let localAlreadyExact = false;
-            if (selected.localRaw != null) {
-              try {
-                localAlreadyExact = decrypt(selected.localRaw, bypassLogin) === sessionJson;
-              } catch {
-                return { success: false, reason: "slot-conflict" };
-              }
-            }
-
-            const evidenceBefore = captureCoopResumeEvidence();
-            let writtenRaw: string | null = null;
-            if (!localAlreadyExact) {
-              writtenRaw = encrypt(sessionJson, bypassLogin);
-              if (!trySetLocalStorageItem(storageKey, writtenRaw)) {
-                this.warnLocalStorageFull();
+            if (selected == null || !exactRuntimeIsCurrent()) {
+              // Maintainer directive (2026-07-17, live report test4/Heraklines1): a guest whose five
+              // slots are all occupied or unavailable must not NACK the launch checkpoint into a
+              // shared terminal. Record the least valuable reclaim candidate - divergent/unreadable
+              // replicas first (they are unresumable), then the OLDEST occupied save that is NOT this
+              // run's slot. The DELETE runs in the caller, OUTSIDE this exclusive persistence lease:
+              // deleteSession acquires the same er-coop-resume Web Lock, so an in-lease delete
+              // self-deadlocks until the acquisition timeout and NACKs anyway (second live report).
+              if (exactRuntimeIsCurrent()) {
+                const reclaim =
+                  allInspections.find(inspection => inspection.kind === "unavailable")
+                  ?? allInspections
+                    .filter(
+                      (inspection): inspection is Extract<ResumeSlotInspection, { kind: "occupied" }> =>
+                        inspection.kind === "occupied" && !exactRunSlot(inspection),
+                    )
+                    .sort((a, b) => (a.stored.session.timestamp ?? 0) - (b.stored.session.timestamp ?? 0))[0];
+                if (reclaim != null) {
+                  checkpointReclaimBox.candidate = { slot: reclaim.slot, kind: reclaim.kind };
+                }
                 recordCoopResumeUnavailableEvidence(
                   controller.localName(),
                   partner,
@@ -4073,103 +3941,245 @@ export class GameData {
                   commitment.checkpointRevision,
                   commitment.seats,
                 );
-                return { success: false, reason: "storage-failed" };
               }
-            }
-            recordCoopResumeMarker(
-              selected.slot,
-              controller.localName(),
-              partner,
-              commitment.wave,
-              commitment.runId,
-              commitment.checkpointRevision,
-            );
-            const evidenceAfter = captureCoopResumeEvidence();
-            if (!mirrorCloud) {
-              return { success: true };
+              return { success: false, reason: "no-safe-slot" } as const;
             }
 
-            const cloud = await this.enqueueCoopResumeCloudMirror(
-              selected.slot,
-              sessionJson,
-              selected.cloudCas,
-              accountIdentity,
-              runtime,
-              controller,
-              generation,
-            );
-            if (cloud.success || writtenRaw == null || !cloud.rollbackSafe) {
-              if (!cloud.success && writtenRaw != null && !cloud.rollbackSafe) {
-                coopWarn(
-                  "launch",
-                  `guest resume checkpoint cloud outcome is ambiguous slot=${selected.slot}; retaining local bytes for idempotent retry`,
-                );
-              }
-              return cloud;
+            // Final local TOCTOU check after every digest/cloud await. No yield is permitted between
+            // this comparison and the local write/decision below.
+            const storageKey = this.sessionStorageKeyForAccount(selected.slot, accountIdentity);
+            if (localStorage.getItem(storageKey) !== selected.localRaw) {
+              coopWarn("launch", `guest resume slot=${selected.slot} mutated during validation; retry=${attempt}`);
+              continue;
             }
 
-            // The checkpoint ACK promises a coherent local+cloud transaction at cloud cadence. If
-            // the conditional cloud write loses, put the exact prior local bytes and marker/evidence
-            // back. Both halves are compare-and-swap guarded so a newer callback/tab is never
-            // overwritten while this cloud request was awaiting the network.
-            let localRestored = false;
-            try {
-              if (localStorage.getItem(storageKey) === writtenRaw) {
-                if (selected.localRaw == null) {
-                  localStorage.removeItem(storageKey);
-                } else {
-                  localStorage.setItem(storageKey, selected.localRaw);
-                }
-                localRestored = localStorage.getItem(storageKey) === selected.localRaw;
+            const persistIncomingReplica = async (): Promise<CoopResumeCheckpointPersistenceAck> => {
+              let selectedHead =
+                accountIdentity == null
+                  ? ({ kind: "absent" } as const)
+                  : this.readKnownCoopCloudHead(selected.slot, accountIdentity);
+              if (selectedHead.kind === "invalid") {
+                coopWarn("launch", `guest checkpoint ancestry invalid slot=${selected.slot}`);
+                return { success: false, reason: "cloud-conflict" };
               }
-            } catch (error) {
-              coopWarn("launch", `guest resume checkpoint local rollback failed slot=${selected.slot}`, error);
-            }
-            const evidenceRestored =
-              localRestored && restoreCoopResumeEvidenceIfUnchanged(evidenceAfter, evidenceBefore);
-            if (!localRestored || !evidenceRestored) {
-              coopWarn(
-                "launch",
-                `guest resume checkpoint rollback lost exact guard slot=${selected.slot} local=${localRestored} evidence=${evidenceRestored}`,
-              );
-            }
-            return cloud;
-          };
-
-          if (selected.kind === "occupied") {
-            const existing = selected.stored.commitment;
-            if (existing.checkpointRevision > commitment.checkpointRevision) {
               if (
-                selected.stored.sessionJson !== sessionJson
-                && !trySetLocalStorageItem(storageKey, encrypt(selected.stored.sessionJson, bypassLogin))
+                selectedHead.kind === "valid"
+                && selectedHead.head.runId !== commitment.runId
+                && accountIdentity != null
               ) {
-                return { success: false, reason: "storage-failed" } as const;
+                const displacedHead = selectedHead;
+                const displacedStatus = await this.readCoopRunStatus({
+                  clientSessionId,
+                  coopRunId: displacedHead.head.runId,
+                  slot: selected.slot,
+                });
+                if (
+                  !exactRuntimeIsCurrent()
+                  || localStorage.getItem(storageKey) !== selected.localRaw
+                  || !this.coopCloudHeadStateMatches(
+                    this.readKnownCoopCloudHead(selected.slot, accountIdentity),
+                    displacedHead,
+                  )
+                  || !displacedStatus.ok
+                  || displacedStatus.value.state !== "tombstoned"
+                  || !recordCoopDeletedRun(accountIdentity, displacedHead.head.runId)
+                  || !this.clearKnownCoopCloudHead(selected.slot, accountIdentity, displacedHead.head.runId)
+                ) {
+                  coopWarn("launch", `guest checkpoint displaced ancestry not tombstoned slot=${selected.slot}`);
+                  return { success: false, reason: "cloud-conflict" };
+                }
+                selectedHead = { kind: "absent" };
+              }
+              if (!bypassLogin && selected.cloudCas?.mode === "empty") {
+                // Empty CAS is valid only for an initial cloud-mirrored checkpoint. Retire an exactly
+                // tombstoned displaced lineage above first; a non-cloud cadence message still may not ACK
+                // a physically empty/orphan slot as durable state.
+                if (!mirrorCloud || accountIdentity == null || selectedHead.kind !== "absent") {
+                  coopWarn(
+                    "launch",
+                    `guest checkpoint empty ancestry rejected slot=${selected.slot} mirror=${mirrorCloud} head=${selectedHead.kind}`,
+                  );
+                  return { success: false, reason: "cloud-conflict" };
+                }
+                const incomingStatus = await this.readCoopRunStatus({
+                  clientSessionId,
+                  coopRunId: commitment.runId,
+                  slot: selected.slot,
+                });
+                if (
+                  !exactRuntimeIsCurrent()
+                  || localStorage.getItem(storageKey) !== selected.localRaw
+                  || !incomingStatus.ok
+                  || incomingStatus.value.state !== "missing"
+                ) {
+                  coopWarn("launch", `guest checkpoint empty ancestry status changed slot=${selected.slot}`);
+                  return { success: false, reason: "cloud-conflict" };
+                }
+              }
+              if (selected.cloudCas?.mode === "existing" && accountIdentity != null) {
+                const observedCloudHead = {
+                  runId: selected.cloudCas.runId!,
+                  checkpointRevision: selected.cloudCas.checkpointRevision!,
+                  digest: selected.cloudCas.digest!,
+                };
+                if (
+                  observedCloudHead.runId !== commitment.runId
+                  || (selectedHead.kind === "valid"
+                    && (selectedHead.head.runId !== observedCloudHead.runId
+                      || selectedHead.head.checkpointRevision > observedCloudHead.checkpointRevision
+                      || (selectedHead.head.checkpointRevision === observedCloudHead.checkpointRevision
+                        && selectedHead.head.digest !== observedCloudHead.digest)))
+                ) {
+                  coopWarn(
+                    "launch",
+                    `guest checkpoint observed ancestry mismatch slot=${selected.slot} observed=${observedCloudHead.checkpointRevision} known=${selectedHead.kind === "valid" ? selectedHead.head.checkpointRevision : "absent"}`,
+                  );
+                  return { success: false, reason: "cloud-conflict" };
+                }
+                if (
+                  (selectedHead.kind === "absent"
+                    || selectedHead.head.checkpointRevision < observedCloudHead.checkpointRevision)
+                  && !this.recordKnownCoopCloudHead(selected.slot, accountIdentity, observedCloudHead, selectedHead)
+                ) {
+                  coopWarn("launch", `guest checkpoint could not freeze observed ancestry slot=${selected.slot}`);
+                  return { success: false, reason: "cloud-conflict" };
+                }
+                selectedHead = this.readKnownCoopCloudHead(selected.slot, accountIdentity);
+              }
+              let localAlreadyExact = false;
+              if (selected.localRaw != null) {
+                try {
+                  localAlreadyExact = decrypt(selected.localRaw, bypassLogin) === sessionJson;
+                } catch {
+                  return { success: false, reason: "slot-conflict" };
+                }
+              }
+
+              const evidenceBefore = captureCoopResumeEvidence();
+              let writtenRaw: string | null = null;
+              if (!localAlreadyExact) {
+                writtenRaw = encrypt(sessionJson, bypassLogin);
+                if (!trySetLocalStorageItem(storageKey, writtenRaw)) {
+                  this.warnLocalStorageFull();
+                  recordCoopResumeUnavailableEvidence(
+                    controller.localName(),
+                    partner,
+                    commitment.wave,
+                    commitment.runId,
+                    commitment.checkpointRevision,
+                    commitment.seats,
+                  );
+                  return { success: false, reason: "storage-failed" };
+                }
               }
               recordCoopResumeMarker(
                 selected.slot,
                 controller.localName(),
                 partner,
-                existing.wave,
-                existing.runId,
-                existing.checkpointRevision,
+                commitment.wave,
+                commitment.runId,
+                commitment.checkpointRevision,
               );
-              return { success: false, reason: "cloud-conflict" } as const;
-            }
-            if (existing.checkpointRevision === commitment.checkpointRevision) {
-              if (existing.digest !== commitment.digest) {
-                return { success: false, reason: "slot-conflict" } as const;
+              const evidenceAfter = captureCoopResumeEvidence();
+              if (!mirrorCloud) {
+                return { success: true };
               }
-              if (selected.stored.sessionJson !== sessionJson) {
-                return { success: false, reason: "slot-conflict" } as const;
-              }
-              return persistIncomingReplica();
-            }
-          }
 
-          return persistIncomingReplica();
+              const cloud = await this.enqueueCoopResumeCloudMirror(
+                selected.slot,
+                sessionJson,
+                selected.cloudCas,
+                accountIdentity,
+                runtime,
+                controller,
+                generation,
+              );
+              if (cloud.success || writtenRaw == null || !cloud.rollbackSafe) {
+                if (!cloud.success && writtenRaw != null && !cloud.rollbackSafe) {
+                  coopWarn(
+                    "launch",
+                    `guest resume checkpoint cloud outcome is ambiguous slot=${selected.slot}; retaining local bytes for idempotent retry`,
+                  );
+                }
+                return cloud;
+              }
+
+              // The checkpoint ACK promises a coherent local+cloud transaction at cloud cadence. If
+              // the conditional cloud write loses, put the exact prior local bytes and marker/evidence
+              // back. Both halves are compare-and-swap guarded so a newer callback/tab is never
+              // overwritten while this cloud request was awaiting the network.
+              let localRestored = false;
+              try {
+                if (localStorage.getItem(storageKey) === writtenRaw) {
+                  if (selected.localRaw == null) {
+                    localStorage.removeItem(storageKey);
+                  } else {
+                    localStorage.setItem(storageKey, selected.localRaw);
+                  }
+                  localRestored = localStorage.getItem(storageKey) === selected.localRaw;
+                }
+              } catch (error) {
+                coopWarn("launch", `guest resume checkpoint local rollback failed slot=${selected.slot}`, error);
+              }
+              const evidenceRestored =
+                localRestored && restoreCoopResumeEvidenceIfUnchanged(evidenceAfter, evidenceBefore);
+              if (!localRestored || !evidenceRestored) {
+                coopWarn(
+                  "launch",
+                  `guest resume checkpoint rollback lost exact guard slot=${selected.slot} local=${localRestored} evidence=${evidenceRestored}`,
+                );
+              }
+              return cloud;
+            };
+
+            if (selected.kind === "occupied") {
+              const existing = selected.stored.commitment;
+              if (existing.checkpointRevision > commitment.checkpointRevision) {
+                if (
+                  selected.stored.sessionJson !== sessionJson
+                  && !trySetLocalStorageItem(storageKey, encrypt(selected.stored.sessionJson, bypassLogin))
+                ) {
+                  return { success: false, reason: "storage-failed" } as const;
+                }
+                recordCoopResumeMarker(
+                  selected.slot,
+                  controller.localName(),
+                  partner,
+                  existing.wave,
+                  existing.runId,
+                  existing.checkpointRevision,
+                );
+                return { success: false, reason: "cloud-conflict" } as const;
+              }
+              if (existing.checkpointRevision === commitment.checkpointRevision) {
+                if (existing.digest !== commitment.digest) {
+                  return { success: false, reason: "slot-conflict" } as const;
+                }
+                if (selected.stored.sessionJson !== sessionJson) {
+                  return { success: false, reason: "slot-conflict" } as const;
+                }
+                return persistIncomingReplica();
+              }
+            }
+
+            return persistIncomingReplica();
+          }
+          return { success: false, reason: "slot-conflict" } as const;
+        }, accountIdentity);
+      let result = await runLeasedPersist();
+      if (result?.reason === "no-safe-slot" && checkpointReclaimBox.candidate != null) {
+        const reclaim = checkpointReclaimBox.candidate;
+        checkpointReclaimBox.candidate = null;
+        coopWarn(
+          "launch",
+          `guest checkpoint has no safe slot; reclaiming least-recent slot=${reclaim.slot} kind=${reclaim.kind}`,
+        );
+        if (await this.deleteSession(reclaim.slot)) {
+          result = await runLeasedPersist();
+        } else {
+          coopWarn("launch", `guest checkpoint reclamation delete failed slot=${reclaim.slot}`);
         }
-        return { success: false, reason: "slot-conflict" } as const;
-      }, accountIdentity);
+      }
       return result ?? { success: false, reason: "slot-conflict" };
     };
     this.coopResumeCheckpointPersistence = {
