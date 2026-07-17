@@ -42,6 +42,7 @@ import {
   drainLoopback,
   driveGuestReplayTurn,
   installDuoLogCapture,
+  settleDuoPromise,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -206,12 +207,20 @@ describe.skipIf(!RUN)(
       // that BOTH replacements always drive (the guard); the live wave-66 strand additionally needed the
       // shipped soak coverage-floor's emergent multi-mon timing, which this deterministic 2-faint setup does
       // not recreate - so it exercises + guards the path rather than reproducing the exact pre-fix hang.
+      // The crossing settles under BOTH destination contexts: the FAINT_SWITCH operation envelopes
+      // park in the destination pump until the guest context runs, and the host's material-ACK
+      // barrier cannot resolve until the guest applies + ACKs them (the b59dba12 B-lane hang class:
+      // "operation delivery RETRY attempt=8/8" -> stuck at SwitchPhase).
+      let hostAdvance: Promise<void> | undefined;
       await withClient(rig.hostCtx, async () => {
         if (hostOwnedFaintPending(rig)) {
           registerHostFaintAutoPick(game, rig);
         }
-        await game.phaseInterceptor.to("CommandPhase");
+        hostAdvance = game.phaseInterceptor.to("CommandPhase", false) as Promise<void>;
+        await drainLoopback();
       });
+      expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+      await settleDuoPromise(rig, hostAdvance!, "double-KO replacement host crossing");
       await drainLoopback();
       const guestBoundary = await withClient(rig.guestCtx, () =>
         rig.guestRuntime.rendezvous.awaitPartner(commandPoint),

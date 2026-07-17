@@ -54,11 +54,13 @@ import {
   buildDuo,
   type CoopResyncProbe,
   type DuoRig,
+  drainLoopback,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
   presentedFieldMon,
   setCoopHarnessLiveEvents,
+  settleDuoPromise,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -191,10 +193,16 @@ describe.skipIf(!RUN)(
       });
 
       // HOST: drive past its SwitchPhase - it awaits the guest's relayed pick and summons CHARIZARD, then
-      // pushes the OUT-OF-BAND replacement checkpoint (tick N+1, bi1 ALIVE).
+      // pushes the OUT-OF-BAND replacement checkpoint (tick N+1, bi1 ALIVE). The crossing settles
+      // under BOTH destination contexts (the b59dba12 B-lane hang class: parked FAINT_SWITCH
+      // envelopes starve the host's material-ACK barrier when only the host context runs).
+      let hostAdvance: Promise<void> | undefined;
       await withClient(rig.hostCtx, async () => {
-        await game.phaseInterceptor.to("CommandPhase", false);
+        hostAdvance = game.phaseInterceptor.to("CommandPhase", false) as Promise<void>;
+        await drainLoopback();
       });
+      expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+      await settleDuoPromise(rig, hostAdvance!, "guest-faint replacement host crossing");
       const hostReplacement = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
       expect(hostReplacement?.species.speciesId, "the HOST summoned the guest's pick (CHARIZARD)").toBe(
         SpeciesId.CHARIZARD,

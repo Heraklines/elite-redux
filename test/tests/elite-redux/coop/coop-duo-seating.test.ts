@@ -40,8 +40,10 @@ import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
   type DuoRig,
+  drainLoopback,
   driveGuestReplayTurn,
   installDuoLogCapture,
+  settleDuoPromise,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -215,10 +217,16 @@ describe.skipIf(!RUN)("co-op DUO field seating: strict same-owner switch/replace
       }
     });
 
-    // HOST: drive past its SwitchPhase - it AWAITS the guest's relayed pick and summons it into the GUEST's slot.
+    // HOST: drive past its SwitchPhase - it AWAITS the guest's relayed pick and summons it into the
+    // GUEST's slot. The crossing settles under BOTH destination contexts (the b59dba12 B-lane hang
+    // class: parked FAINT_SWITCH envelopes starve the host's material-ACK barrier host-only).
+    let hostAdvance: Promise<void> | undefined;
     await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase", false);
+      hostAdvance = game.phaseInterceptor.to("CommandPhase", false) as Promise<void>;
+      await drainLoopback();
     });
+    expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+    await settleDuoPromise(rig, hostAdvance!, "guest-owned seating host crossing");
 
     // The HOST seated the guest's pick (CHARIZARD) into the GUEST's field slot (1), guest-owned. Methods
     // such as getBattlerIndex resolve through globalScene, so every presentation assertion must run in the

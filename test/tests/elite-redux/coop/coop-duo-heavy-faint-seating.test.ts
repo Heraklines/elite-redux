@@ -44,11 +44,13 @@ import {
   buildDuo,
   type CoopResyncProbe,
   type DuoRig,
+  drainLoopback,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
   presentedFieldMon,
   setCoopHarnessLiveEvents,
+  settleDuoPromise,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -198,12 +200,18 @@ describe.skipIf(!RUN)(
       // CLOSES (issue 3). The GUEST-owned slot summons CHARIZARD; PRE-FIX the solo override collapses the seat
       // to slot 0, POST-FIX it seats in the GUEST's own slot (1). Register the host auto-picker in case any
       // host-owned faint remains pending (it will not here, but the guard is harness-standard).
+      // The crossing settles under BOTH destination contexts (the b59dba12 B-lane hang class:
+      // parked FAINT_SWITCH envelopes starve the host's material-ACK barrier host-only).
+      let hostAdvance: Promise<void> | undefined;
       await withClient(rig.hostCtx, async () => {
         if (hostOwnedFaintPending(rig)) {
           registerHostFaintAutoPick(game, rig);
         }
-        await game.phaseInterceptor.to("CommandPhase", false);
+        hostAdvance = game.phaseInterceptor.to("CommandPhase", false) as Promise<void>;
+        await drainLoopback();
       });
+      expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+      await settleDuoPromise(rig, hostAdvance!, "heavy-faint seating host crossing");
 
       // THE DISCRIMINATING ASSERTION: the host seated the guest's pick in the GUEST's field slot (1), NOT
       // collapsed to slot 0. Pre-fix slot 1 is ABSENT (the pick landed at slot 0) - the live `guest=<absent>`.
