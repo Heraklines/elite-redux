@@ -236,9 +236,9 @@ ${css}
   <div class="fx-head">
     <button id="fxBack" class="fxback">&#8592;&nbsp; Back to Shiny Tools</button>
     <h2><span class="ar">Effects</span> Lab</h2>
-    <p class="fx-sub">Category based previews of the in-game effect bursts. First category: <b>Transformation Effects</b> -
-      the per-type transform burst shown on each partner Eeveelution's front and back sprite. More categories
-      (ability effects, move effects) plug in here later.</p>
+    <p class="fx-sub">Category based previews of the in-game effects. First category: <b>Transformation Effects</b> -
+      the full transform sequence between partner Eeveelutions (fill, silhouette shape morph, then the per-type
+      burst on reveal), front and back. More categories (ability effects, move effects) plug in here later.</p>
   </div>
   <div class="fx-cats" id="fxCats"></div>
   <div class="fx-body" id="fxBody"></div>

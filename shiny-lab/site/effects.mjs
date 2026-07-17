@@ -3,17 +3,28 @@
  * A SEPARATE view from the shiny tools: a top-level "Effects" button opens a
  * category-based lab. Categories live in a small REGISTRY (FX_CATEGORIES) so a
  * future category (ability effects, move effects) is ONE new entry, not a new
- * page. The only category today is Transformation Effects: it previews the
- * in-game per-type transform burst (a faithful canvas-2D port of
- * src/sprites/er-form-transform-fx.ts) on each partner Eeveelution's FRONT and
- * BACK sprite.
+ * page. The only category today is Transformation Effects: it previews the FULL
+ * in-game transform SEQUENCE from one partner Eeveelution into another -
+ *   1) FILL   - the source form floods with the TARGET type's light until the
+ *               whole body is a solid glowing silhouette (schooling-flash style,
+ *               but in the target type's colour).
+ *   2) MORPH  - that glowing silhouette's SHAPE flows from the source form's
+ *               outline into the target form's outline via a signed-distance-field
+ *               interpolation (a real shape morph, NOT a crossfade). The SDF is
+ *               built with the same two-pass chamfer technique fx.mjs computeDist
+ *               uses for the around-FX silhouette fields.
+ *   3) REVEAL - the per-type burst (a faithful canvas-2D port of
+ *               src/sprites/er-form-transform-fx.ts) fires as the fill drains and
+ *               the target form's real sprite is revealed underneath.
+ * The burst always types from the TARGET form (Eevee -> Jolteon = electric),
+ * matching the in-game rule.
  *
  * Runs in the same concatenated <script> as fx.mjs / exotic.mjs / app.js, so it
  * reuses CDN / loadImg / parseFrames defined in app.js. All names here are fx-
  * prefixed to avoid clashing with the shiny renderer's globals. */
 
 // ---- per-type config (ported verbatim from er-form-transform-fx.ts) ----------
-const FX_TOTAL_MS = 950; // ER_TRANSFORM_FX_TOTAL_MS
+const FX_TOTAL_MS = 950; // ER_TRANSFORM_FX_TOTAL_MS (the snappy burst portion)
 const FX_MAX_PARTICLES = 20; // ER_TRANSFORM_FX_MAX_PARTICLES
 
 // getTypeRgb(type) from src/data/type.ts - the canonical type light tint.
@@ -99,6 +110,7 @@ const FX_EASE = {
   sineOut: t => Math.sin((t * Math.PI) / 2),
   quadIn: t => t * t,
 };
+const fxSmooth = t => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 const fxRgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
 
@@ -177,9 +189,113 @@ function fxTintSprite(spriteCv, color) {
   return cv;
 }
 
-// ---- burst build + draw (port of ErFormTransformFx) --------------------------
+// ---- signed distance field morph (reuses fx.mjs computeDist's chamfer) --------
 const FX_PAD = 72; // room around the sprite so particles never clip the canvas
 
+// Two-pass chamfer distance transform (the SAME (1, sqrt2) sweep computeDist runs
+// in fx.mjs). Seeds are 0 / INF; result is the px distance to the nearest seed.
+function fxChamfer(d, W, H) {
+  const A = 1;
+  const B = Math.SQRT2;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let v = d[y * W + x];
+      if (x > 0) {
+        v = Math.min(v, d[y * W + x - 1] + A);
+      }
+      if (y > 0) {
+        v = Math.min(v, d[(y - 1) * W + x] + A);
+      }
+      if (x > 0 && y > 0) {
+        v = Math.min(v, d[(y - 1) * W + x - 1] + B);
+      }
+      if (x < W - 1 && y > 0) {
+        v = Math.min(v, d[(y - 1) * W + x + 1] + B);
+      }
+      d[y * W + x] = v;
+    }
+  }
+  for (let y = H - 1; y >= 0; y--) {
+    for (let x = W - 1; x >= 0; x--) {
+      let v = d[y * W + x];
+      if (x < W - 1) {
+        v = Math.min(v, d[y * W + x + 1] + A);
+      }
+      if (y < H - 1) {
+        v = Math.min(v, d[(y + 1) * W + x] + A);
+      }
+      if (x < W - 1 && y < H - 1) {
+        v = Math.min(v, d[(y + 1) * W + x + 1] + B);
+      }
+      if (x > 0 && y < H - 1) {
+        v = Math.min(v, d[(y + 1) * W + x - 1] + B);
+      }
+      d[y * W + x] = v;
+    }
+  }
+}
+
+// Signed distance field of a boolean mask: negative INSIDE the silhouette,
+// positive OUTSIDE (0 on the edge). signed = outsideDist - insideDist, each of
+// which is one chamfer pass (on the mask and on its inverse). Interpolating two
+// SDFs and thresholding at 0 is a true shape morph, not a crossfade.
+function fxSignedDT(mask, W, H) {
+  const INF = 1e6;
+  const N = W * H;
+  const dOut = new Float32Array(N); // distance to nearest foreground (0 inside)
+  const dIn = new Float32Array(N); // distance to nearest background (0 outside)
+  for (let i = 0; i < N; i++) {
+    dOut[i] = mask[i] ? 0 : INF;
+    dIn[i] = mask[i] ? INF : 0;
+  }
+  fxChamfer(dOut, W, H);
+  fxChamfer(dIn, W, H);
+  const sdf = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    sdf[i] = dOut[i] - dIn[i];
+  }
+  return sdf;
+}
+
+// Build a boolean silhouette mask of a sprite canvas on a common W x H grid,
+// centred by its centroid so both forms overlap (the morph masses line up).
+// Returns the mask plus the offset the real sprite must be drawn at to match.
+function fxBuildMask(cv, W, H) {
+  const w = cv.width;
+  const h = cv.height;
+  const data = cv.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, w, h).data;
+  let sx = 0;
+  let sy = 0;
+  let c = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] > 40) {
+        sx += x;
+        sy += y;
+        c++;
+      }
+    }
+  }
+  const cxs = c ? sx / c : w / 2;
+  const cys = c ? sy / c : h / 2;
+  const offX = Math.round(W / 2 - cxs);
+  const offY = Math.round(H / 2 - cys);
+  const mask = new Uint8Array(W * H);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] > 40) {
+        const X = x + offX;
+        const Y = y + offY;
+        if (X >= 0 && Y >= 0 && X < W && Y < H) {
+          mask[Y * W + X] = 1;
+        }
+      }
+    }
+  }
+  return { mask, offX, offY };
+}
+
+// ---- burst build + draw (port of ErFormTransformFx) --------------------------
 // Build the declarative particle list once at spawn (no per-frame alloc), the
 // way ErFormTransformFx.buildParticles / animateParticle compute it.
 function fxBuildParticles(cfg) {
@@ -337,19 +453,38 @@ function fxDrawSpriteTint(ctx, spriteCv, sx, sy, color, elapsed) {
   ctx.restore();
 }
 
-// ---- transform category view -------------------------------------------------
+// ---- transform SEQUENCE state + timeline -------------------------------------
+// FILL -> MORPH -> REVEAL+BURST. The burst portion keeps its snappy in-game
+// length (FX_TOTAL_MS); the fill + morph make the whole thing breathe (~2.2s).
+const FX_FILL_MS = 480;
+const FX_MORPH_MS = 760;
+const FX_DRAIN_MS = 360; // how long the solid fill drains to reveal the target
+const FX_REVEAL_T = FX_FILL_MS + FX_MORPH_MS; // burst fires here (1240ms)
+const FX_SEQ_TOTAL = FX_REVEAL_T + FX_TOTAL_MS; // ~2190ms
+
 const fxState = {
-  partnerIdx: 3, // default Partner Flareon (a bright fire burst)
+  fromIdx: 0, // default From = Partner Eevee base
+  toIdx: 2, // default To = Partner Jolteon (electric, the maintainer's example)
   back: false,
-  sprite: null,
+  ready: false,
   playStart: -1,
-  parts: [],
+  fromCv: null,
+  toCv: null,
+  offFrom: { x: 0, y: 0 },
+  offTo: { x: 0, y: 0 },
+  MW: 0,
+  MH: 0,
+  sdfSrc: null,
+  sdfTgt: null,
+  morphCv: null,
+  morphCtx: null,
+  morphImg: null,
   cfg: null,
   color: [255, 255, 255],
+  parts: [],
+  anchor: { x: 0, y: 0 },
   canvas: null,
   ctx: null,
-  PW: 0,
-  PH: 0,
 };
 
 function fxSetStatus(msg) {
@@ -360,82 +495,177 @@ function fxSetStatus(msg) {
   }
 }
 
-function fxPlay() {
-  if (fxState.sprite) {
+// Rasterise the morphed silhouette at interpolation p into fxState.morphImg:
+// solid target-type colour inside, a brighter rim near the edge, a soft coloured
+// glow just outside. (Threshold of the interpolated SDF at 0 = the morphed shape.)
+function fxRenderMorphImg(p) {
+  const { sdfSrc, sdfTgt, MW, MH, color, morphImg } = fxState;
+  const d = morphImg.data;
+  const r = color[0];
+  const g = color[1];
+  const b = color[2];
+  const rim = 2.6;
+  const glowW = rim * 2.2;
+  const N = MW * MH;
+  for (let i = 0; i < N; i++) {
+    const s = sdfSrc[i] + (sdfTgt[i] - sdfSrc[i]) * p;
+    const k = i * 4;
+    if (s <= 0) {
+      const rimGlow = Math.max(0, 1 - -s / rim); // 1 at the edge, 0 deeper in
+      const boost = 0.45 * rimGlow;
+      d[k] = r + (255 - r) * boost;
+      d[k + 1] = g + (255 - g) * boost;
+      d[k + 2] = b + (255 - b) * boost;
+      d[k + 3] = 255;
+    } else if (s < glowW) {
+      const a = 1 - s / glowW;
+      d[k] = r;
+      d[k + 1] = g;
+      d[k + 2] = b;
+      d[k + 3] = (a * a * 200) | 0;
+    } else {
+      d[k + 3] = 0;
+    }
+  }
+}
+
+// Draw the morphed silhouette at interpolation p with an overall opacity (used to
+// fade the fill in during FILL and drain it out during REVEAL). A blurred additive
+// pass gives the "glowing" look, then the crisp silhouette on top.
+function fxDrawMorphSilhouette(p, overallAlpha) {
+  if (overallAlpha <= 0 || !fxState.sdfSrc) {
+    return;
+  }
+  fxRenderMorphImg(p);
+  fxState.morphCtx.putImageData(fxState.morphImg, 0, 0);
+  const ctx = fxState.ctx;
+  const cv = fxState.morphCv;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = overallAlpha * 0.7;
+  ctx.filter = "blur(4px)";
+  ctx.drawImage(cv, 0, 0);
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = overallAlpha;
+  ctx.drawImage(cv, 0, 0);
+  ctx.restore();
+}
+
+function fxPlaySeq() {
+  if (fxState.ready) {
     fxState.playStart = performance.now();
   }
 }
-
-async function fxSelectPartner(idx, opts) {
-  const partner = FX_PARTNERS[idx];
-  if (!partner) {
-    return;
-  }
-  fxState.partnerIdx = idx;
-  fxState.cfg = fxTypeConfig(partner.type);
-  fxState.color = fxState.cfg.rgb;
-  const nameEl = document.getElementById("fxMonName");
-  if (nameEl) {
-    nameEl.textContent = partner.name;
-  }
-  const typeEl = document.getElementById("fxMonType");
-  if (typeEl) {
-    typeEl.innerHTML = `<span class="fx-typedot" style="background:${fxRgba(partner.type === "NORMAL" ? [168, 168, 120] : fxState.color, 1)}"></span>${partner.type[0] + partner.type.slice(1).toLowerCase()}-type burst`;
-  }
-  document.querySelectorAll("#fxMons .fx-mon").forEach(el => el.classList.toggle("active", +el.dataset.idx === idx));
-  fxSetStatus("loading " + partner.name + " ...");
-  try {
-    const rec = await fxLoadSprite(partner.stem, fxState.back);
-    fxState.sprite = rec;
-    fxState.PW = rec.w + 2 * FX_PAD;
-    fxState.PH = rec.h + 2 * FX_PAD;
-    if (fxState.canvas) {
-      fxState.canvas.width = fxState.PW;
-      fxState.canvas.height = fxState.PH;
-    }
-    fxSetStatus("");
-    // rebuild particles for this type and auto-play (unless suppressed)
-    fxState.parts = fxBuildParticles(fxState.cfg);
-    if (!opts || opts.play !== false) {
-      fxPlay();
-    }
-  } catch {
-    fxSetStatus(partner.name + " sprite not found");
+function fxReplaySeq() {
+  if (fxState.ready) {
+    fxState.parts = fxBuildParticles(fxState.cfg); // fresh purely-visual randomness
+    fxPlaySeq();
   }
 }
 
-function fxReplay() {
-  if (fxState.cfg) {
-    fxState.parts = fxBuildParticles(fxState.cfg); // fresh purely-visual randomness
-    fxPlay();
+async function fxSelectFromTo(opts) {
+  const from = FX_PARTNERS[fxState.fromIdx];
+  const to = FX_PARTNERS[fxState.toIdx];
+  if (!from || !to) {
+    return;
+  }
+  fxState.ready = false;
+  fxState.cfg = fxTypeConfig(to.type);
+  fxState.color = fxState.cfg.rgb;
+  const nameEl = document.getElementById("fxMonName");
+  if (nameEl) {
+    nameEl.textContent = `${from.name}  →  ${to.name}`;
+  }
+  const typeEl = document.getElementById("fxMonType");
+  if (typeEl) {
+    const dot = to.type === "NORMAL" ? [168, 168, 120] : fxState.color;
+    typeEl.innerHTML = `<span class="fx-typedot" style="background:${fxRgba(dot, 1)}"></span>${to.type[0] + to.type.slice(1).toLowerCase()}-type burst (from the target form)`;
+  }
+  fxSetStatus("loading sprites ...");
+  try {
+    const [fromRec, toRec] = await Promise.all([fxLoadSprite(from.stem, fxState.back), fxLoadSprite(to.stem, fxState.back)]);
+    fxState.fromCv = fromRec.cv;
+    fxState.toCv = toRec.cv;
+    const MW = Math.max(fromRec.w, toRec.w) + 2 * FX_PAD;
+    const MH = Math.max(fromRec.h, toRec.h) + 2 * FX_PAD;
+    fxState.MW = MW;
+    fxState.MH = MH;
+    const fm = fxBuildMask(fromRec.cv, MW, MH);
+    const tm = fxBuildMask(toRec.cv, MW, MH);
+    fxState.offFrom = { x: fm.offX, y: fm.offY };
+    fxState.offTo = { x: tm.offX, y: tm.offY };
+    fxState.sdfSrc = fxSignedDT(fm.mask, MW, MH);
+    fxState.sdfTgt = fxSignedDT(tm.mask, MW, MH);
+    if (fxState.canvas) {
+      fxState.canvas.width = MW;
+      fxState.canvas.height = MH;
+    }
+    fxState.morphCv = document.createElement("canvas");
+    fxState.morphCv.width = MW;
+    fxState.morphCv.height = MH;
+    fxState.morphCtx = fxState.morphCv.getContext("2d", { willReadFrequently: true });
+    fxState.morphImg = fxState.morphCtx.createImageData(MW, MH);
+    fxState.anchor = { x: MW / 2, y: MH / 2 - toRec.h * 0.12 };
+    fxState.parts = fxBuildParticles(fxState.cfg);
+    fxState.ready = true;
+    fxSetStatus("");
+    if (!opts || opts.play !== false) {
+      fxPlaySeq();
+    }
+  } catch {
+    fxSetStatus("sprites not found");
   }
 }
 
 function fxRenderFrame(now) {
   const ctx = fxState.ctx;
-  if (!ctx || !fxState.sprite) {
+  if (!ctx || !fxState.ready) {
     return;
   }
-  const { PW, PH } = fxState;
-  ctx.clearRect(0, 0, PW, PH);
-  const sx = (PW - fxState.sprite.w) / 2;
-  const sy = (PH - fxState.sprite.h) / 2;
-  // idle sprite
+  const { MW, MH } = fxState;
+  ctx.clearRect(0, 0, MW, MH);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(fxState.sprite.cv, sx, sy);
   const started = fxState.playStart >= 0;
-  const elapsed = started ? now - fxState.playStart : Infinity;
-  if (started && elapsed <= FX_TOTAL_MS) {
-    // anchor: centred on the body, nudged toward the upper torso like in-game
-    const ax = sx + fxState.sprite.w / 2;
-    const ay = sy + fxState.sprite.h * 0.42;
-    fxDrawSpriteTint(ctx, fxState.sprite.cv, sx, sy, fxState.color, elapsed);
-    fxDrawFlash(ctx, ax, ay, fxState.color, elapsed);
-    for (const p of fxState.parts) {
-      fxDrawParticle(ctx, p, ax, ay, fxState.color, elapsed);
+  const el = started ? now - fxState.playStart : -1;
+
+  if (!started) {
+    ctx.drawImage(fxState.fromCv, fxState.offFrom.x, fxState.offFrom.y); // idle on source
+    return;
+  }
+  if (el >= FX_SEQ_TOTAL) {
+    ctx.drawImage(fxState.toCv, fxState.offTo.x, fxState.offTo.y); // rest on target
+    fxState.playStart = -1;
+    return;
+  }
+
+  if (el < FX_FILL_MS) {
+    // FILL: the source sprite dims as the target-colour silhouette floods in.
+    const f = FX_EASE.quadOut(el / FX_FILL_MS);
+    ctx.save();
+    ctx.globalAlpha = 1 - f;
+    ctx.drawImage(fxState.fromCv, fxState.offFrom.x, fxState.offFrom.y);
+    ctx.restore();
+    fxDrawMorphSilhouette(0, f);
+  } else if (el < FX_REVEAL_T) {
+    // MORPH: the solid glowing silhouette flows source shape -> target shape.
+    const p = fxSmooth((el - FX_FILL_MS) / FX_MORPH_MS);
+    fxDrawMorphSilhouette(p, 1);
+  } else {
+    // REVEAL + BURST: burst fires, fill drains, target sprite revealed underneath.
+    const be = el - FX_REVEAL_T;
+    ctx.drawImage(fxState.toCv, fxState.offTo.x, fxState.offTo.y);
+    const drain = Math.max(0, 1 - be / FX_DRAIN_MS);
+    if (drain > 0) {
+      fxDrawMorphSilhouette(1, drain);
     }
-  } else if (started) {
-    fxState.playStart = -1; // burst finished; rest on the idle sprite
+    fxDrawSpriteTint(ctx, fxState.toCv, fxState.offTo.x, fxState.offTo.y, fxState.color, be);
+    const ax = fxState.anchor.x;
+    const ay = fxState.anchor.y;
+    fxDrawFlash(ctx, ax, ay, fxState.color, be);
+    for (const pt of fxState.parts) {
+      fxDrawParticle(ctx, pt, ax, ay, fxState.color, be);
+    }
   }
 }
 
@@ -449,34 +679,42 @@ function fxMountTransform(body) {
         <div id="fxStatus" class="fx-status"></div>
       </div>
       <div class="fx-side">
-        <div class="fx-mon-name" id="fxMonName">Partner Flareon</div>
+        <div class="fx-mon-name" id="fxMonName"></div>
         <div class="fx-type" id="fxMonType"></div>
+        <div class="fx-row"><label class="fx-side-label">From</label><select id="fxFrom" class="sel"></select></div>
+        <div class="fx-row"><label class="fx-side-label">To</label><select id="fxTo" class="sel"></select></div>
         <div class="fx-row"><span class="fx-side-label">Sprite</span>
           <div class="seg" id="fxSideSeg">
             <button class="on" data-side="front">Front</button>
             <button data-side="back">Back</button>
           </div>
         </div>
-        <div class="fx-row"><button id="fxReplay" class="fxplay">&#9654;&nbsp; Replay burst</button></div>
-        <p class="fx-note">Each partner Eeveelution previews with its OWN type's transform burst - the same
-          per-type colours, shapes and motions as the in-game effect (Flareon fire embers, Leafeon grass
-          leaves, Vaporeon water droplets, and so on). Pick a partner or flip the sprite to replay.</p>
+        <div class="fx-row"><button id="fxReplay" class="fxplay">&#9654;&nbsp; Replay sequence</button></div>
+        <p class="fx-note">The source form floods with the target type's light, its silhouette morphs shape into the
+          target form (a signed-distance-field morph, not a crossfade), then the per-type burst fires as the real
+          target sprite is revealed. The burst always types from the TARGET form (Eevee to Jolteon = electric).
+          Front / back applies to both sprites. Change From, To or the sprite side to auto-play; Replay re-runs it.</p>
       </div>
-    </div>
-    <div class="fx-mons" id="fxMons"></div>`;
+    </div>`;
 
   fxState.canvas = document.getElementById("fxLabCanvas");
   fxState.ctx = fxState.canvas.getContext("2d", { willReadFrequently: true });
 
-  const mons = document.getElementById("fxMons");
+  const fromSel = document.getElementById("fxFrom");
+  const toSel = document.getElementById("fxTo");
   FX_PARTNERS.forEach((p, i) => {
-    const dot = p.type === "NORMAL" ? [168, 168, 120] : FX_TYPE_RGB[p.type];
-    const el = document.createElement("button");
-    el.className = "fx-mon";
-    el.dataset.idx = i;
-    el.innerHTML = `<span class="fx-mon-dot" style="background:${fxRgba(dot, 1)};box-shadow:0 0 8px ${fxRgba(dot, 1)}"></span>${p.name.replace("Partner ", "")}`;
-    el.addEventListener("click", () => fxSelectPartner(i));
-    mons.appendChild(el);
+    fromSel.appendChild(new Option(p.name, i));
+    toSel.appendChild(new Option(p.name, i));
+  });
+  fromSel.value = fxState.fromIdx;
+  toSel.value = fxState.toIdx;
+  fromSel.addEventListener("change", e => {
+    fxState.fromIdx = +e.target.value;
+    fxSelectFromTo();
+  });
+  toSel.addEventListener("change", e => {
+    fxState.toIdx = +e.target.value;
+    fxSelectFromTo();
   });
 
   document.querySelectorAll("#fxSideSeg button").forEach(b =>
@@ -484,12 +722,12 @@ function fxMountTransform(body) {
       document.querySelectorAll("#fxSideSeg button").forEach(x => x.classList.remove("on"));
       b.classList.add("on");
       fxState.back = b.dataset.side === "back";
-      fxSelectPartner(fxState.partnerIdx);
+      fxSelectFromTo();
     }),
   );
-  document.getElementById("fxReplay").addEventListener("click", fxReplay);
+  document.getElementById("fxReplay").addEventListener("click", fxReplaySeq);
 
-  fxSelectPartner(fxState.partnerIdx);
+  fxSelectFromTo();
 }
 
 // ---- category registry (extensible: add ONE entry per new category) ----------
@@ -497,7 +735,7 @@ const FX_CATEGORIES = [
   {
     id: "transform",
     label: "Transformation Effects",
-    blurb: "The in-game per-type transform burst on each partner Eeveelution.",
+    blurb: "The full in-game transform sequence (fill, shape morph, per-type burst) between partner Eeveelutions.",
     mount: fxMountTransform,
   },
   // Future: { id: "ability", label: "Ability Effects", ... }, { id: "move", ... }
@@ -511,7 +749,7 @@ function fxSelectCategory(id) {
   const body = document.getElementById("fxBody");
   fxState.canvas = null;
   fxState.ctx = null;
-  fxState.sprite = null;
+  fxState.ready = false;
   fxState.playStart = -1;
   cat.mount(body);
 }
@@ -554,5 +792,12 @@ document.getElementById("openEffects").addEventListener("click", () => fxShowEff
 document.getElementById("fxBack").addEventListener("click", () => fxShowEffects(false));
 requestAnimationFrame(fxLoop);
 
-// Small hook for the review-screenshot harness (deterministic mid-burst capture).
-window.__fxLab = { state: fxState, replay: fxReplay, select: fxSelectPartner, show: fxShowEffects, categories: FX_CATEGORIES };
+// Small hook for the review-screenshot harness (deterministic frozen-frame capture).
+window.__fxLab = {
+  state: fxState,
+  replay: fxReplaySeq,
+  selectFromTo: fxSelectFromTo,
+  show: fxShowEffects,
+  categories: FX_CATEGORIES,
+  timings: { FILL: FX_FILL_MS, MORPH: FX_MORPH_MS, REVEAL_T: FX_REVEAL_T, DRAIN: FX_DRAIN_MS, TOTAL: FX_SEQ_TOTAL },
+};
