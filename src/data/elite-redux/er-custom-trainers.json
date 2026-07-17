@@ -1959,5 +1959,128 @@
     "trainerClass": "MYSTERIOUS_SISTERS",
     "victoryDialogue": "I guess you were OUR worst nightmare...",
     "weight": 5
+  },
+  "TRAINER_70014": {
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": true,
+    "id": 70014,
+    "introDialogue": "Serves up bro",
+    "maxWave": 175,
+    "minWave": 100,
+    "name": "Blutleer",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "BLACK_GLASSES"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "RLA",
+          "RLNA",
+          "EXTREME_SPEED",
+          "CRUNCH"
+        ],
+        "species": 10358
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "ER_WATER_GEM"
+          },
+          {
+            "count": 1,
+            "item": "MYSTIC_WATER"
+          }
+        ],
+        "insanity": {
+          "ability": 149,
+          "innates": [
+            203,
+            209,
+            23
+          ]
+        },
+        "level": null,
+        "moves": [
+          "PROTECT",
+          "DARK_PULSE",
+          "WATER_SHURIKEN",
+          "FLASH_FREEZE"
+        ],
+        "species": 10280
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "EXTREME_SPEED",
+          "EXPANDING_FORCE",
+          "BELLY_DRUM",
+          "FAKE_OUT"
+        ],
+        "species": 2026
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "MIRACLE_SEED"
+          },
+          {
+            "count": 1,
+            "item": "REVIVER_SEED"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "DRAIN_BRAIN",
+          "BREAKING_SWIPE",
+          "SPORE",
+          "FERTILE_FANGS"
+        ],
+        "species": 986
+      }
+    ],
+    "trainerClass": "WAITER",
+    "weight": 100
   }
 }
