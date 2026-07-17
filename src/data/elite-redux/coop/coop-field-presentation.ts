@@ -185,9 +185,25 @@ function settleInfoImmediately(pokemon: Pokemon): void {
  * info children.  Presentation recovery must materialize those children itself; merely toggling the container
  * leaves the exact live symptom this adapter exists to repair (the mon and its UI bar are both absent).
  */
+/** A presentation child that was DESTROYED keeps its reference but loses its scene; treating it as
+ *  "present" is worse than missing: destruction removed it from the container, shifting the
+ *  getAt()-based sprite accessors so every later visibility toggle lands on the WRONG node (live
+ *  report 2026-07-17: the guest's own back sprite read spriteVisible=false immediately after the
+ *  launch settle set it visible - the settle was toggling a shifted child). */
+function presentationNodeAlive(node: { scene?: unknown } | null | undefined): boolean {
+  return node != null && node.scene != null;
+}
+
 export function ensureCoopPokemonPresentationNodes(pokemon: Pokemon): boolean {
-  if (pokemon.getSprite() != null && pokemon.getBattleInfo() != null) {
+  if (presentationNodeAlive(pokemon.getSprite()) && presentationNodeAlive(pokemon.getBattleInfo())) {
     return false;
+  }
+  // Clear any destroyed leftovers back to the documented empty-container precondition before the
+  // rebuild, so the fresh children take the canonical indexes the sprite accessors address.
+  try {
+    pokemon.removeAll(true);
+  } catch {
+    /* a torn/headless container must not block the rebuild */
   }
   pokemon.init();
   return true;
