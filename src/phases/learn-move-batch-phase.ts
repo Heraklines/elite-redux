@@ -21,6 +21,7 @@ import {
 } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementLearnMove } from "#data/elite-redux/er-achievement-tracker";
+import { isErOmniformMon, listOmniformEvolutionsForMove } from "#data/elite-redux/omniform-movesets";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { MoveId } from "#enums/move-id";
@@ -103,6 +104,17 @@ export interface LearnMoveBatchDeps {
   /** Panic exit: if the panel fails to open/operate, fall back to the per-move
    * LearnMovePhase flow so the player still learns moves and never softlocks. */
   fallback: () => void;
+  /**
+   * ER Omniform (#partner-eevee): when true, `pokemon` is an Omniform mon (Partner
+   * Eevee), so the panel shows the evolution strip and offers each move PER
+   * evolution (base first). The BASE form learns through {@linkcode assign} (the
+   * vanilla `mon.moveset` path); every non-base evolution learns into its own
+   * stored moveset via `learnMoveForEvolution` (the handler calls the core API
+   * directly). `learnableIds` here is the RAW offered set (not base-known-filtered),
+   * because a move the base already knows may still be teachable to an evolution.
+   * Unset for a normal mon, so the vanilla single-moveset panel is byte-identical.
+   */
+  omniform?: boolean;
 }
 
 /**
@@ -134,8 +146,26 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
     // Also drop any id that doesn't resolve to a real Move - a bad/custom id must
     // never throw inside the panel (the level-up softlock class).
     const learnable = filterLearnableMoves(this.candidateMoveIds, known).filter(id => allMoves[id] != null);
-    // "Only on levels that teach something new" - nothing offerable -> no panel.
-    if (learnable.length === 0) {
+
+    // ER Omniform (#partner-eevee): a Partner Eevee's level-up offers are expanded
+    // PER evolution (not in total) - each offered move can be learned onto the base
+    // form AND, independently, onto any evolution that can legally take it. The
+    // panel shows the evolution strip; the offered pool is the RAW moves (only
+    // NONE / duplicates / unresolvable dropped), NOT base-known-filtered, since a
+    // move the base already knows may still be teachable to an evolution. Co-op is
+    // out of scope (this branch is the solo path only), so the co-op panel above is
+    // untouched. Gated on `isErOmniformMon`, so a normal mon is byte-identical.
+    const omniform = !globalScene.gameMode.isCoop && isErOmniformMon(pokemon);
+    const offered = omniform
+      ? [...new Set(this.candidateMoveIds)].filter(id => id !== MoveId.NONE && allMoves[id] != null)
+      : learnable;
+    // "Only on levels that teach something new" - nothing offerable -> no panel. For
+    // an Omniform mon, "offerable" means SOME evolution can still legally take SOME
+    // offered move (base already knowing them all is not enough to skip the panel).
+    const hasOffer = omniform
+      ? offered.some(id => listOmniformEvolutionsForMove(pokemon, id).some(o => o.canLearn))
+      : learnable.length > 0;
+    if (!hasOffer) {
       this.end();
       return;
     }
@@ -173,7 +203,8 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
 
     const deps: LearnMoveBatchDeps = {
       pokemon,
-      learnableIds: learnable,
+      learnableIds: offered,
+      omniform,
       assign: (moveId, slotIndex) => {
         // Silent write - no banner, just place the move. Mirrors the data half of
         // LearnMovePhase.learnMove (setMove + load the move's animation assets).

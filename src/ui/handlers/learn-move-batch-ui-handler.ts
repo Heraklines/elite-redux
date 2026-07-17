@@ -1,12 +1,23 @@
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
+import {
+  getOrRollFormMoveset,
+  isErOmniformMon,
+  learnMoveForEvolution,
+  listOmniformEvolutionsForMove,
+  type OmniformTarget,
+  omniformFamilyForms,
+  type SerializedOmniformMove,
+} from "#data/elite-redux/omniform-movesets";
 import { Button } from "#enums/buttons";
-import type { MoveId } from "#enums/move-id";
+import { MoveId } from "#enums/move-id";
 import { getShortenedStatKey, PERMANENT_STATS } from "#enums/stat";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { LearnMoveBatchDeps } from "#phases/learn-move-batch-phase";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
+import { OmniformEvolutionStrip, omniformStripWidth } from "#ui/omniform-evolution-strip";
+import { type OmniformEvolutionEntry, omniformEntriesForTargets } from "#ui/omniform-evolution-view";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -25,6 +36,10 @@ const ROW_H = 14;
 const ROW_TOP = 44;
 /** How many list rows show at once per column before the column scrolls. */
 const VISIBLE_ROWS = 5;
+/** ER Omniform: extra height reserved at the top of the panel for the evolution strip band. */
+const OMNIFORM_BAND_H = 16;
+/** ER Omniform: visible rows per column when the strip band is present (keeps the list inside the panel). */
+const OMNIFORM_VISIBLE_ROWS = 4;
 /** Left side panel (learning mon's icon + base stats), drawn just left of the main window. */
 const LEFT_W = 56;
 const LEFT_GAP = 0; // flush against the main panel (touching, not overlapping)
@@ -82,6 +97,21 @@ export class LearnMoveBatchUiHandler extends UiHandler {
   private learnedAny = false;
   /** The full learnable list when the panel opened, so Undo can restore it. */
   private originalLearnable: MoveId[] = [];
+
+  // ER Omniform (#partner-eevee): the per-evolution teach dimension. When active the
+  // panel shows an evolution strip (F / controller LB / mobile apad cycles it); each
+  // offered move can be learned onto EVERY evolution independently (base first), and
+  // the CURRENT column + slot-replace flow operate on the SELECTED evolution's own
+  // stored moveset. Inactive (all fields empty) for a normal single-form mon.
+  private omniformActive = false;
+  private omniformStrip: OmniformEvolutionStrip | null = null;
+  private omniformEntries: OmniformEvolutionEntry[] = [];
+  /** Teach targets, parallel to {@link omniformEntries}; base first (index 0). */
+  private omniformTargets: OmniformTarget[] = [];
+  private omniformSel = 0;
+  private omniformNameText: Phaser.GameObjects.Text | null = null;
+  /** Deep copies of each NON-base evolution's stored moveset at show(), so Undo restores them. */
+  private omniformSnapshots: SerializedOmniformMove[][] = [];
 
   constructor() {
     super(UiMode.LEARN_MOVE_BATCH);
@@ -170,6 +200,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       this.pendingMoveId = null;
       this.learnedAny = false;
       this.originalLearnable = [...this.deps.learnableIds];
+      this.setupOmniform();
       this.buildSidePanel();
       this.container.setVisible(true);
       this.active = true;
@@ -195,10 +226,153 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     PERMANENT_STATS.forEach((stat, i) => this.statValues[i].setText(`${baseStats[stat]}`));
   }
 
-  /** Free slots available on the mon right now. */
+  // ---------------------------------------------------------------------------
+  // ER Omniform (#partner-eevee): per-evolution teach dimension.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Build (or clear) the evolution strip + per-evolution state for the current mon.
+   * Active only when the phase flagged `deps.omniform` AND the mon really is an
+   * Omniform holder with > 1 family form; otherwise the panel behaves exactly like
+   * the vanilla single-moveset panel (the strip never renders).
+   */
+  private setupOmniform(): void {
+    this.destroyOmniform();
+    const deps = this.deps;
+    if (!deps?.omniform || !isErOmniformMon(deps.pokemon)) {
+      this.repositionRows();
+      return;
+    }
+    const targets = omniformFamilyForms(deps.pokemon);
+    if (targets.length <= 1) {
+      this.repositionRows();
+      return;
+    }
+    this.omniformActive = true;
+    this.omniformTargets = targets;
+    this.omniformEntries = omniformEntriesForTargets(deps.pokemon, targets);
+    // A level-up happens on the base form, so default the selection to base (index 0).
+    this.omniformSel = 0;
+    // Deep-snapshot each NON-base evolution's stored moveset so Undo can restore it
+    // (the base form's moveset is restored by deps.revert). getOrRollFormMoveset
+    // returns the live stored array, so copy each [moveId, ppUsed] pair.
+    this.omniformSnapshots = targets.map((form, i) =>
+      i === 0 ? [] : getOrRollFormMoveset(deps.pokemon, form).map(([m, pp]) => [m, pp] as SerializedOmniformMove),
+    );
+    // Selected-evolution name label in the top band (left), strip right-aligned.
+    this.omniformNameText = addTextObject(PANEL_X + 6, PANEL_Y + 9, "", TextStyle.WINDOW_ALT).setOrigin(0, 0.5);
+    this.container.add(this.omniformNameText);
+    const stripWindow = 5;
+    const stripCell = 15;
+    const rightEdgeX = PANEL_X + PANEL_W - 6;
+    this.omniformStrip = new OmniformEvolutionStrip(this.container, this.omniformEntries, this.omniformSel, {
+      x: rightEdgeX - omniformStripWidth(stripWindow, stripCell),
+      y: PANEL_Y + 9,
+      windowSize: stripWindow,
+      cellWidth: stripCell,
+      iconScale: 0.45,
+      onChange: index => this.onOmniformSelect(index),
+    });
+    this.repositionRows();
+    this.updateOmniformName();
+  }
+
+  private destroyOmniform(): void {
+    this.omniformStrip?.destroy();
+    this.omniformStrip = null;
+    this.omniformNameText?.destroy();
+    this.omniformNameText = null;
+    this.omniformEntries = [];
+    this.omniformTargets = [];
+    this.omniformSnapshots = [];
+    this.omniformActive = false;
+    this.omniformSel = 0;
+  }
+
+  /** Reposition the column headers + scroll arrows for the (optional) top strip band. */
+  private repositionRows(): void {
+    const band = this.omniformActive ? OMNIFORM_BAND_H : 0;
+    this.learnableHeader.y = ROW_TOP - 18 + band;
+    this.currentHeader.y = ROW_TOP - 18 + band;
+    this.learnUp.y = ROW_TOP - 9 + band;
+    this.currentUp.y = ROW_TOP - 9 + band;
+    const botY = ROW_TOP + this.visibleRows() * ROW_H + band;
+    this.learnDown.y = botY;
+    this.currentDown.y = botY;
+  }
+
+  /** Top Y of the first list row (shifted down by the strip band when Omniform). */
+  private listTop(): number {
+    return ROW_TOP + (this.omniformActive ? OMNIFORM_BAND_H : 0);
+  }
+
+  /** Visible rows per column (fewer when the strip band eats vertical space). */
+  private visibleRows(): number {
+    return this.omniformActive ? OMNIFORM_VISIBLE_ROWS : VISIBLE_ROWS;
+  }
+
+  /** The selected evolution's teach target, or null when not Omniform. */
+  private selectedTarget(): OmniformTarget | null {
+    return this.omniformActive ? (this.omniformTargets[this.omniformSel] ?? null) : null;
+  }
+
+  /** Whether the selected evolution is the base form (index 0 of the base-first family). */
+  private selectedIsBase(): boolean {
+    return this.omniformSel === 0;
+  }
+
+  /** Strip selection changed (F / apad): re-target the CURRENT column + offers. */
+  private onOmniformSelect(index: number): void {
+    this.omniformSel = index;
+    if (this.state === "pickSlot") {
+      // Switching evolutions aborts an in-progress overwrite pick.
+      this.state = "pickNew";
+      this.pendingMoveId = null;
+    }
+    this.clampScroll();
+    this.updateOmniformName();
+    globalScene.ui.playSelect();
+    this.render();
+  }
+
+  private updateOmniformName(): void {
+    const entry = this.omniformEntries[this.omniformSel];
+    // A COMPACT label: the bare species name minus the "Partner " family prefix
+    // ("Eevee", "Vaporeon", ...). The full "Eevee (Partner)" / "Partner Vaporeon"
+    // collides with the strip in the narrow top band.
+    this.omniformNameText?.setText(entry ? entry.species.getName().replace(/^Partner\s+/i, "") : "");
+  }
+
+  /**
+   * The offered moves annotated for the SELECTED evolution: `disabled` when this
+   * evolution cannot legally take the move OR already knows it (illegal targets are
+   * shown dimmed + non-selectable per the maintainer spec). Order matches
+   * {@link LearnMoveBatchDeps.learnableIds}.
+   */
+  private omniformOffers(): { name: string; moveId: MoveId; disabled: boolean }[] {
+    const deps = this.deps!;
+    const form = this.selectedTarget();
+    return deps.learnableIds.map(id => {
+      const offer = form
+        ? listOmniformEvolutionsForMove(deps.pokemon, id).find(
+            o => o.form.speciesId === form.speciesId && o.form.formIndex === form.formIndex,
+          )
+        : undefined;
+      return { name: allMoves[id].name, moveId: id, disabled: !offer || !offer.canLearn };
+    });
+  }
+
+  /** Free slots available on the SELECTED evolution (base = live moveset, else its stored set). */
   private freeSlotIndex(): number {
-    const moveset = this.deps!.pokemon.getMoveset(true);
-    return moveset.length < this.deps!.pokemon.getMaxMoveCount() ? moveset.length : -1;
+    const pokemon = this.deps!.pokemon;
+    const max = pokemon.getMaxMoveCount();
+    if (this.omniformActive && !this.selectedIsBase()) {
+      const stored = getOrRollFormMoveset(pokemon, this.selectedTarget()!);
+      const filled = stored.filter(([m]) => m !== MoveId.NONE).length;
+      return filled < max ? filled : -1;
+    }
+    const moveset = pokemon.getMoveset(true);
+    return moveset.length < max ? moveset.length : -1;
   }
 
   /** LEARNABLE rows: the learnable moves, then Undo (if anything's been learned) then Cancel. */
@@ -211,11 +385,22 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     return rows;
   }
 
-  /** CURRENT rows: the live moveset, padded with "(empty)" up to the max slots. */
+  /** CURRENT rows: the selected form's moveset, padded with "(empty)" up to the max slots. */
   private currentRows(): string[] {
-    const moveset = this.deps!.pokemon.getMoveset(true);
-    const max = this.deps!.pokemon.getMaxMoveCount();
+    const pokemon = this.deps!.pokemon;
+    const max = pokemon.getMaxMoveCount();
     const rows: string[] = [];
+    // ER Omniform: a non-base evolution shows ITS OWN stored moveset (the set the
+    // replace flow edits), not the live Eevee moveset.
+    if (this.omniformActive && !this.selectedIsBase()) {
+      const stored = getOrRollFormMoveset(pokemon, this.selectedTarget()!);
+      for (let i = 0; i < max; i++) {
+        const pair = stored[i];
+        rows.push(pair && pair[0] !== MoveId.NONE ? allMoves[pair[0]].name : "(empty)");
+      }
+      return rows;
+    }
+    const moveset = pokemon.getMoveset(true);
     for (let i = 0; i < max; i++) {
       rows.push(i < moveset.length ? moveset[i].getName() : "(empty)");
     }
@@ -232,6 +417,8 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     for (const t of [this.learnableHeader, this.currentHeader]) {
       t.setVisible(!confirming);
     }
+    this.omniformStrip?.setVisible(this.omniformActive && !confirming);
+    this.omniformNameText?.setVisible(this.omniformActive && !confirming);
 
     if (confirming) {
       // Hide the move lists + arrows + cursor so only the confirm prompt shows.
@@ -249,13 +436,38 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       return;
     }
 
+    // ER Omniform: the LEARNABLE column shows the offered moves annotated for the
+    // SELECTED evolution (illegal / already-known ones dimmed + non-selectable),
+    // then the Undo / Cancel rows. The vanilla panel thins the list as moves are
+    // learned; the Omniform panel keeps every offered move (expanded per evolution).
+    let learnRows: string[];
+    let learnDisabled: boolean[] | null = null;
+    if (this.omniformActive) {
+      const offers = this.omniformOffers();
+      learnRows = offers.map(o => o.name);
+      learnDisabled = offers.map(o => o.disabled);
+      if (this.learnedAny) {
+        learnRows.push("Undo");
+        learnDisabled.push(false);
+      }
+      learnRows.push("Cancel");
+      learnDisabled.push(false);
+    } else {
+      learnRows = this.learnableRows();
+    }
+
+    const top = this.listTop();
+    const vis = this.visibleRows();
     this.learnableTexts = this.renderColumn(
       this.learnableTexts,
-      this.learnableRows(),
+      learnRows,
       this.newScroll,
       PANEL_X + 12,
       this.learnUp,
       this.learnDown,
+      top,
+      vis,
+      learnDisabled,
     );
     this.currentTexts = this.renderColumn(
       this.currentTexts,
@@ -264,6 +476,9 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       PANEL_X + 12 + COL_GAP,
       this.currentUp,
       this.currentDown,
+      top,
+      vis,
+      null,
     );
 
     this.positionCursor();
@@ -271,8 +486,9 @@ export class LearnMoveBatchUiHandler extends UiHandler {
   }
 
   /**
-   * Render one column's VISIBLE_ROWS-tall window of `rows` starting at `scroll`,
-   * reusing/destroying the old text objects, and toggle its up/down arrows.
+   * Render one column's `visRows`-tall window of `rows` starting at `scroll`,
+   * reusing/destroying the old text objects, and toggle its up/down arrows. Rows
+   * flagged in `disabled` are dimmed (illegal / already-known Omniform offers).
    */
   private renderColumn(
     old: Phaser.GameObjects.Text[],
@@ -281,19 +497,25 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     x: number,
     upArrow: Phaser.GameObjects.Text,
     downArrow: Phaser.GameObjects.Text,
+    top: number,
+    visRows: number,
+    disabled: boolean[] | null,
   ): Phaser.GameObjects.Text[] {
     for (const t of old) {
       t.destroy();
     }
     const out: Phaser.GameObjects.Text[] = [];
-    const end = Math.min(scroll + VISIBLE_ROWS, rows.length);
+    const end = Math.min(scroll + visRows, rows.length);
     for (let i = scroll; i < end; i++) {
-      const t = addTextObject(x, ROW_TOP + (i - scroll) * ROW_H, rows[i], TextStyle.WINDOW);
+      const t = addTextObject(x, top + (i - scroll) * ROW_H, rows[i], TextStyle.WINDOW);
+      if (disabled?.[i]) {
+        t.setAlpha(0.5);
+      }
       this.container.add(t);
       out.push(t);
     }
     upArrow.setVisible(scroll > 0);
-    downArrow.setVisible(scroll + VISIBLE_ROWS < rows.length);
+    downArrow.setVisible(scroll + visRows < rows.length);
     return out;
   }
 
@@ -307,22 +529,23 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     const scroll = isSlot ? this.slotScroll : this.newScroll;
     // Origin (0, 0.5): x = arrow's left edge (just left of the column text at
     // PANEL_X + 12), y = vertical centre of the cursor's VISIBLE row.
-    const cy = ROW_TOP + (cursor - scroll) * ROW_H + Math.floor(ROW_H / 2);
+    const cy = this.listTop() + (cursor - scroll) * ROW_H + Math.floor(ROW_H / 2);
     this.cursorObj.setPosition(PANEL_X + 4 + (isSlot ? COL_GAP : 0), cy);
   }
 
   /** Keep the active column's cursor inside its visible window (scroll if needed). */
   private clampScroll(): void {
+    const vis = this.visibleRows();
     if (this.state === "pickSlot") {
       if (this.slotCursor < this.slotScroll) {
         this.slotScroll = this.slotCursor;
-      } else if (this.slotCursor >= this.slotScroll + VISIBLE_ROWS) {
-        this.slotScroll = this.slotCursor - VISIBLE_ROWS + 1;
+      } else if (this.slotCursor >= this.slotScroll + vis) {
+        this.slotScroll = this.slotCursor - vis + 1;
       }
     } else if (this.newCursor < this.newScroll) {
       this.newScroll = this.newCursor;
-    } else if (this.newCursor >= this.newScroll + VISIBLE_ROWS) {
-      this.newScroll = this.newCursor - VISIBLE_ROWS + 1;
+    } else if (this.newCursor >= this.newScroll + vis) {
+      this.newScroll = this.newCursor - vis + 1;
     }
   }
 
@@ -333,6 +556,13 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       return;
     }
     if (this.state === "pickSlot") {
+      // ER Omniform: a non-base evolution's slots come from ITS stored moveset.
+      if (this.omniformActive && !this.selectedIsBase()) {
+        const stored = getOrRollFormMoveset(deps.pokemon, this.selectedTarget()!);
+        const pair = stored[this.slotCursor];
+        this.moveInfoOverlay.show(pair && pair[0] !== MoveId.NONE ? allMoves[pair[0]] : allMoves[this.pendingMoveId!]);
+        return;
+      }
       const moveset = deps.pokemon.getMoveset(true);
       const m = moveset[this.slotCursor];
       this.moveInfoOverlay.show(m ? m.getMove() : allMoves[this.pendingMoveId!]);
@@ -363,6 +593,15 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       return false;
     }
     let success = false;
+
+    // ER Omniform: the dedicated cycle button (F / controller LB / mobile apad)
+    // switches which evolution's moveset the panel is teaching. Routed here via
+    // buttonCycleOption (LearnMoveBatchUiHandler is whitelisted, mirroring the
+    // summary strip). Blocked only on the confirm-cancel sub-prompt.
+    if (this.omniformActive && button === Button.CYCLE_FORM && this.state !== "confirmCancel") {
+      this.omniformStrip?.cycle();
+      return true;
+    }
 
     if (this.state === "confirmCancel") {
       switch (button) {
@@ -460,6 +699,20 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       return this.requestCancel(); // the Cancel row
     }
     const moveId = deps.learnableIds[this.newCursor];
+    // ER Omniform: block a move the SELECTED evolution can't legally take or already
+    // knows (rendered dimmed) - it is offered but not selectable for this evolution.
+    if (this.omniformActive) {
+      const form = this.selectedTarget();
+      const offer = form
+        ? listOmniformEvolutionsForMove(deps.pokemon, moveId).find(
+            o => o.form.speciesId === form.speciesId && o.form.formIndex === form.formIndex,
+          )
+        : undefined;
+      if (!offer || !offer.canLearn) {
+        globalScene.ui.playError();
+        return true;
+      }
+    }
     const free = this.freeSlotIndex();
     if (free >= 0) {
       this.commitLearn(moveId, free);
@@ -486,13 +739,35 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     return true;
   }
 
-  /** Silently assign the move (via the phase's assign callback), drop it from the
-   * LEARNABLE list, and thin the panel down. Closes when nothing's left to learn. */
+  /**
+   * Silently assign the move. Vanilla: via the phase's assign callback (the live
+   * moveset), then drop it from the LEARNABLE list + thin the panel; closes when
+   * nothing's left. ER Omniform: the BASE form learns through the same assign
+   * callback (the `mon.moveset` path - not double-routed); every non-base evolution
+   * learns into its OWN stored moveset via `learnMoveForEvolution`. The offered move
+   * is NOT removed (it stays teachable to other evolutions), so the panel closes
+   * only via Cancel.
+   */
   private commitLearn(moveId: MoveId, slotIndex: number): void {
-    this.deps!.assign(moveId, slotIndex);
+    if (this.omniformActive && !this.selectedIsBase()) {
+      const res = learnMoveForEvolution(this.deps!.pokemon, this.selectedTarget()!, moveId, slotIndex);
+      if (!res.ok) {
+        globalScene.ui.playError();
+        return;
+      }
+    } else {
+      this.deps!.assign(moveId, slotIndex);
+    }
     this.learnedAny = true;
-    this.deps!.learnableIds = this.deps!.learnableIds.filter(id => id !== moveId);
     globalScene.ui.playSelect();
+    if (this.omniformActive) {
+      // Keep the offered move (expanded per evolution, not in total); it now reads
+      // as already-known (dimmed) for THIS evolution but stays open to others.
+      this.clampScroll();
+      this.render();
+      return;
+    }
+    this.deps!.learnableIds = this.deps!.learnableIds.filter(id => id !== moveId);
     if (this.deps!.learnableIds.length === 0) {
       this.finish();
       return;
@@ -523,6 +798,20 @@ export class LearnMoveBatchUiHandler extends UiHandler {
    */
   private undoAll(): void {
     this.deps!.revert();
+    // ER Omniform: also restore every non-base evolution's stored moveset from the
+    // pre-panel snapshot (revert() only restores the base form's live moveset). Each
+    // stored array is mutated in place by learnMoveForEvolution, so splice it back.
+    if (this.omniformActive) {
+      for (let i = 1; i < this.omniformTargets.length; i++) {
+        const live = getOrRollFormMoveset(this.deps!.pokemon, this.omniformTargets[i]);
+        live.splice(0, live.length, ...this.omniformSnapshots[i].map(([m, pp]) => [m, pp] as SerializedOmniformMove));
+      }
+      this.learnedAny = false;
+      this.clampScroll();
+      globalScene.ui.playSelect();
+      this.render();
+      return;
+    }
     this.deps!.learnableIds = [...this.originalLearnable];
     this.learnedAny = false;
     // The Undo row just disappeared; the Cancel row is now last - keep cursor in range.
@@ -561,6 +850,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     this.learnableTexts = [];
     this.currentTexts = [];
     this.destroySideIcon();
+    this.destroyOmniform();
     this.deps = null;
   }
 }

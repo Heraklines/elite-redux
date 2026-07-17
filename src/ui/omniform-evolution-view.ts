@@ -165,6 +165,32 @@ function makeEntry(
   };
 }
 
+/**
+ * Build strip entries for an EXPLICIT list of core-model family targets, in the
+ * caller's order (base first, NO current-first reordering / dedupe). This is what
+ * the level-up batch panel + TM/Shroom teach flows use so `entries[i]` maps 1:1 to
+ * `targets[i]` - the same `(speciesId, formIndex)` the core teach API
+ * ({@link learnMoveForEvolution}) validates against. `getOmniformEvolutions` above
+ * is the VIEW-only, current-first browser list; this is the teach-aligned list.
+ */
+export function omniformEntriesForTargets(
+  pokemon: Pokemon,
+  targets: readonly { speciesId: number; formIndex: number }[],
+): OmniformEvolutionEntry[] {
+  const sf = pokemon.getSpeciesForm();
+  const current = { speciesId: sf.speciesId, formIndex: pokemon.formIndex };
+  const entries: OmniformEvolutionEntry[] = [];
+  for (const t of targets) {
+    const species = getPokemonSpecies(t.speciesId as SpeciesId);
+    if (!species) {
+      continue;
+    }
+    const form = species.forms[t.formIndex] ?? species;
+    entries.push(makeEntry(species, form, t.formIndex, i18nName(species, t.formIndex), current));
+  }
+  return entries;
+}
+
 /** The partner-family evolution entries (registration-derived, order preserved). */
 function partnerFamilyEntries(current: { speciesId: number; formIndex: number }): OmniformEvolutionEntry[] {
   const entries: OmniformEvolutionEntry[] = [];

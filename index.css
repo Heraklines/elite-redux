@@ -203,9 +203,10 @@ input:-internal-autofill-selected {
   display: none;
 }
 
-/* ER Omniform: show the #apadOmniform "cycle evolution" button ONLY on the
-   Pokémon summary (mobile), where CYCLE_FORM switches the evolution being viewed. */
-#touchControls:not(.config-mode):not([data-ui-mode="SUMMARY"]) #apadOmniform {
+/* ER Omniform: show the #apadOmniform "cycle evolution" button on the Pokémon
+   summary (CYCLE_FORM switches the evolution being viewed) AND on the level-up
+   batch Move Learn panel (CYCLE_FORM switches which evolution is being taught). */
+#touchControls:not(.config-mode):not([data-ui-mode="SUMMARY"]):not([data-ui-mode="LEARN_MOVE_BATCH"]) #apadOmniform {
   display: none;
 }
 
