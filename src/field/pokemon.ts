@@ -1652,6 +1652,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     this.tintSprite?.setTexture(sprite.texture.key, sprite.frame?.name).setOrigin(sprite.originX, sprite.originY);
   }
 
+  /**
+   * ER Shiny Lab: whether the FX overlay sprite is currently the VISIBLE render surface for this
+   * mon. When it is, {@linkcode refreshErShinyLabBattleFx} deliberately hides the BASE sprite (the
+   * overlay covers it), so presentation-readiness checks must treat the overlay - not the base
+   * sprite - as the thing the player sees (live 2026-07-17: the co-op launch gate read the hidden
+   * base sprite of a shiny-lab battler and failed the whole shared session closed).
+   */
+  public isErShinyLabFxOverlayVisible(): boolean {
+    return this.erShinyLabFxOverlay?.isVisible() === true;
+  }
+
   private refreshErShinyLabBattleFx(): void {
     const look = getErShinyLabSpriteFxLookForPokemon(this);
     if (!this.erShinyLabFxOverlay || !hasErShinyLabExactSpriteFx(look)) {

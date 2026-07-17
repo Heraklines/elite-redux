@@ -219,6 +219,8 @@ interface CoopPokemonPresentationReadiness {
   spritePresent: boolean;
   spriteVisible: boolean;
   spriteAlpha: number | null;
+  /** ER Shiny Lab: the FX overlay is the visible render surface (base sprite deliberately hidden). */
+  fxOverlayVisible: boolean;
   infoPresent: boolean;
   infoVisible: boolean;
   infoAlpha: number | null;
@@ -251,6 +253,11 @@ function inspectCoopPokemonPresentationReadiness(pokemon: Pokemon): CoopPokemonP
       : currentAnimationKey === key);
   const textureCached = textures?.exists == null || textures.exists(key);
   const animationCached = anims?.exists == null || anims.exists(key);
+  // ER Shiny Lab (live 2026-07-17, five identical reports): when the FX overlay is the visible
+  // render surface, refreshErShinyLabBattleFx DELIBERATELY hides the base sprite - the battler is
+  // fully visible on screen through the overlay. Reading only the base sprite failed the whole
+  // shared session closed on every launch of a shiny-lab-skinned starter.
+  const fxOverlayVisible = pokemon.isErShinyLabFxOverlayVisible();
   const readiness = {
     pokemonId: pokemon.id,
     expectedKey: key,
@@ -260,6 +267,7 @@ function inspectCoopPokemonPresentationReadiness(pokemon: Pokemon): CoopPokemonP
     spritePresent: sprite != null,
     spriteVisible: sprite?.visible ?? false,
     spriteAlpha: sprite?.alpha ?? null,
+    fxOverlayVisible,
     infoPresent: info != null,
     infoVisible: info?.visible ?? false,
     infoAlpha: info?.alpha ?? null,
@@ -276,8 +284,8 @@ function inspectCoopPokemonPresentationReadiness(pokemon: Pokemon): CoopPokemonP
       && readiness.pokemonVisible
       && readiness.pokemonAlpha > 0
       && readiness.spritePresent
-      && readiness.spriteVisible
-      && (readiness.spriteAlpha ?? 0) > 0
+      && (readiness.spriteVisible || readiness.fxOverlayVisible)
+      && ((readiness.spriteAlpha ?? 0) > 0 || readiness.fxOverlayVisible)
       && readiness.infoPresent
       && readiness.infoVisible
       && (readiness.infoAlpha ?? 0) > 0
