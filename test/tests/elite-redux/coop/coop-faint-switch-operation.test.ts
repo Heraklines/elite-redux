@@ -22,8 +22,8 @@ import {
   setCoopFaintSwitchOperationEnabled,
   setCoopFaintSwitchRetryMs,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
-import type { CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { COOP_FAINT_SWITCH_SEQ_BASE, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
+import type { CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { setCoopOperationDurability } from "#data/elite-redux/coop/coop-operation-journal";
 import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";

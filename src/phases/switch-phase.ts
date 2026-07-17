@@ -2,12 +2,12 @@ import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  addressCoopFaintSwitchChoiceData,
+  awaitAddressedCoopFaintSwitchChoice,
   COOP_FAINT_SWITCH_RESOLUTION_FALLBACK,
   COOP_FAINT_SWITCH_RESOLUTION_NONE,
   COOP_FAINT_SWITCH_RESOLUTION_OWNER,
   type CoopFaintSourceAddress,
-  addressCoopFaintSwitchChoiceData,
-  awaitAddressedCoopFaintSwitchChoice,
   captureCoopFaintSwitchOperationBinding,
   commitFaintSwitchAuthorityIntent,
   commitFaintSwitchAuthorityResult,

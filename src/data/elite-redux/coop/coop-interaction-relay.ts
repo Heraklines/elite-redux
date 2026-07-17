@@ -49,6 +49,7 @@ import type {
   CoopInteractionOutcome,
   CoopMessage,
   CoopRewardSurfaceIdentity,
+  CoopRole,
   CoopSerializedRewardOption,
   CoopTransport,
 } from "#data/elite-redux/coop/coop-transport";
@@ -240,6 +241,12 @@ export interface CoopInteractionRelayOptions {
    * guest, whose kind flips from "coop" to "versus" only on `runConfig` receipt). Defaults to co-op.
    */
   isVersus?: () => boolean;
+  /**
+   * Resolve the current owner of a player field slot. Production injects the live mon-tag resolver,
+   * because party compaction/recentering can move the guest's survivor from slot 1 to slot 0. The
+   * engine-free fixed launch map remains the default for relay-only tests.
+   */
+  resolveFieldSlotOwner?: (fieldIndex: number) => CoopRole;
 }
 
 // The owner is a human shopping / reading an ME, so the watcher's wait must comfortably
@@ -358,6 +365,7 @@ export class CoopInteractionRelay {
   private readonly timeoutMs: number;
   private readonly schedule: (cb: () => void, ms: number) => () => void;
   private readonly isVersus: () => boolean;
+  private readonly resolveFieldSlotOwner: (fieldIndex: number) => CoopRole;
   private readonly offMessage: () => void;
   private readonly offState: () => void;
   /** Raw outcomes awaiting their matching journal carrier; keyed by seq + exact JSON payload. */
@@ -411,6 +419,7 @@ export class CoopInteractionRelay {
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.schedule = opts.schedule ?? defaultSchedule;
     this.isVersus = opts.isVersus ?? (() => false);
+    this.resolveFieldSlotOwner = opts.resolveFieldSlotOwner ?? coopOwnerOfFieldIndex;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offState = transport.onStateChange(state => {
       if (state !== "connected") {
@@ -1076,7 +1085,7 @@ export class CoopInteractionRelay {
     if (this.isVersus()) {
       return false;
     }
-    const slotOwner = coopOwnerOfFieldIndex(faintSwitchSlot);
+    const slotOwner = this.resolveFieldSlotOwner(faintSwitchSlot);
     if (slotOwner !== this.transport.role) {
       return false; // the addressed slot is the PEER's own seat -> a legitimate cross-owner pick.
     }

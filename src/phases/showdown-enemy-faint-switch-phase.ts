@@ -8,11 +8,11 @@ import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
+  addressCoopFaintSwitchChoiceData,
+  awaitAddressedCoopFaintSwitchChoice,
   COOP_FAINT_SWITCH_RESOLUTION_FALLBACK,
   COOP_FAINT_SWITCH_RESOLUTION_OWNER,
   type CoopFaintSourceAddress,
-  addressCoopFaintSwitchChoiceData,
-  awaitAddressedCoopFaintSwitchChoice,
   captureCoopFaintSwitchOperationBinding,
   commitFaintSwitchAuthorityResult,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
@@ -174,17 +174,17 @@ export class ShowdownEnemyFaintSwitchPhase extends BattlePhase {
         failCoopSharedSession("The opponent replacement fallback could not resolve a legal concrete slot.");
         return;
       }
-      if (!usedFallback) {
-        coopLog(
-          "replay",
-          `versus host applies opponent replacement slot=${this.fieldIndex} -> enemyParty[${slotIndex}]`,
-        );
-      } else {
+      if (usedFallback) {
         coopLog(
           "replay",
           `versus opponent replacement pick field=${this.fieldIndex} ${
             res == null ? "TIMED OUT" : "illegal"
           } -> concrete AI slot=${slotIndex}`,
+        );
+      } else {
+        coopLog(
+          "replay",
+          `versus host applies opponent replacement slot=${this.fieldIndex} -> enemyParty[${slotIndex}]`,
         );
       }
       const terminalData = addressCoopFaintSwitchChoiceData(

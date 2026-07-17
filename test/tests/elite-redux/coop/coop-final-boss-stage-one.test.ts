@@ -3,15 +3,15 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { GameModes } from "#enums/game-modes";
-import { UiMode } from "#enums/ui-mode";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerSlot } from "#enums/trainer-slot";
+import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, drainLoopback, withClient } from "#test/tools/coop-duo-harness";
 import { getPokemonSpecies } from "#utils/pokemon-utils";

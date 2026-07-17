@@ -8,10 +8,10 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
-  COOP_FAINT_SWITCH_RESOLUTION_OWNER,
-  type CoopFaintSourceAddress,
   addressCoopFaintSwitchChoiceData,
   armCoopFaintSwitchIntentResend,
+  COOP_FAINT_SWITCH_RESOLUTION_OWNER,
+  type CoopFaintSourceAddress,
   captureCoopFaintSwitchOperationBinding,
   markCoopFaintSwitchPickerSettled,
   registerCoopFaintSwitchPickerTerminal,

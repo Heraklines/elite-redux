@@ -1885,8 +1885,12 @@ export async function buildDuo(
   // Flip the host engine into co-op + tag the field leads host/guest.
   toCoopGameMode(hostScene);
   const hostField = hostScene.getPlayerField();
-  hostField[0].coopOwner = "host";
-  hostField[1].coopOwner = "guest";
+  if (hostField[0] != null) {
+    hostField[0].coopOwner = "host";
+  }
+  if (hostField[1] != null) {
+    hostField[1].coopOwner = "guest";
+  }
 
   const hostCtx: ClientCtx = {
     label: "host",
@@ -3020,8 +3024,12 @@ export async function buildDuoForMe(
   // Flip the host engine into co-op + tag the field leads host/guest.
   toCoopGameMode(hostScene);
   const hostField = hostScene.getPlayerField();
-  hostField[0].coopOwner = "host";
-  hostField[1].coopOwner = "guest";
+  if (hostField[0] != null) {
+    hostField[0].coopOwner = "host";
+  }
+  if (hostField[1] != null) {
+    hostField[1].coopOwner = "guest";
+  }
 
   const hostCtx: ClientCtx = {
     label: "host",

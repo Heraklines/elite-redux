@@ -57,10 +57,10 @@ import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksu
 import { collectCanonicalDiff, logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
-  COOP_FAINT_SWITCH_RESOLUTION_NONE,
-  type CoopFaintSourceAddress,
   addressCoopFaintSwitchChoiceData,
   armCoopFaintSwitchIntentResend,
+  COOP_FAINT_SWITCH_RESOLUTION_NONE,
+  type CoopFaintSourceAddress,
   captureCoopFaintSwitchOperationBinding,
   markCoopFaintSwitchPickerSettled,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";

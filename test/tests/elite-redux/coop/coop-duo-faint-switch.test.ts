@@ -38,13 +38,15 @@ import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
   type CoopResyncProbe,
+  type DuoRig,
   drainLoopback,
   driveClientPhaseQueueTo,
-  type DuoRig,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
+  materializeMirroredGuestInputTurn,
   presentedFieldMon,
+  pumpDuoDestinations,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -191,10 +193,19 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       }
     });
 
-    // HOST: drive past its SwitchPhase - it AWAITS the guest's relayed pick (already buffered
-    // over the loopback) and summons it, then pushes the out-of-band replacement checkpoint.
+    // HOST: begin crossing its SwitchPhase. The retained result must first be applied under the
+    // guest's complete destination context and materially ACKed; alternating the two contexts is
+    // the in-process equivalent of two independent browser event loops.
+    let hostAdvance: Promise<void> | undefined;
     await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase", false);
+      hostAdvance = game.phaseInterceptor.to("CommandPhase", false);
+      await drainLoopback();
+    });
+    await pumpDuoDestinations(rig, 4);
+    await withClient(rig.hostCtx, async () => {
+      await drainLoopback();
+      expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+      await hostAdvance;
     });
     const hostReplacement = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
     expect(pair.faultsInjected(), "the guest's first replacement intent was actually dropped").toBe(1);
@@ -204,11 +215,18 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     ).toBe(SpeciesId.CHARIZARD);
     expect(hostReplacement?.isFainted(), "the replacement is battle-ready on the host").toBe(false);
 
-    // GUEST turn 2 pump: consumes the out-of-band replacement checkpoint mid-park - the
-    // replacement MATERIALIZES on the guest and its own CommandPhase opens for the refilled
-    // slot (the drive returns at the CommandPhase boundary; the apply already happened).
+    // Deliver the replacement checkpoint under the guest context, then restore the omitted
+    // production TurnInit tail of this directly-mirrored headless scene. The resulting real
+    // guest-owned CommandPhase is the public surface a browser would open for the refilled slot.
+    await pumpDuoDestinations(rig, 2);
     await withClient(rig.guestCtx, async () => {
-      await driveGuestReplayTurn(rig.guestScene, turn + 1);
+      materializeMirroredGuestInputTurn(rig.guestScene);
+      await driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase after replacement", {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+        perPhaseTimeoutMs: 5_000,
+      });
     });
     withClientSync(rig.guestCtx, () => {
       // PRE-HEAL presented state on the chooser: the summoned replacement is the CHOSEN species + ALIVE.
@@ -414,14 +432,18 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
         "the host used the deterministic first-legal fallback after the idle timeout",
       ).toBe(SpeciesId.LAPRAS);
 
-      // Drain the queued turn-N presentation tail and finalize into the real N+1 replay pump.
-      // That pump must consume the replacement checkpoint at its exact address, materialize it,
-      // and expose the same next command address as the host.
+      // The detached headless replay has no production NewBattle/TurnInit tail. Recreate exactly
+      // that omitted input boundary through the real phase manager, then require the guest-owned
+      // public CommandPhase. The replacement checkpoint was already consumed while the retained
+      // fallback closed the picker.
       await withClient(rig.guestCtx, async () => {
-        await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase", {
+        materializeMirroredGuestInputTurn(rig.guestScene);
+        await driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase after timeout replacement", {
+          matches: phase =>
+            phase.phaseName === "CommandPhase"
+            && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
           perPhaseTimeoutMs: 5_000,
         });
-        await driveGuestReplayTurn(rig.guestScene, turn + 1);
       });
       withClientSync(rig.guestCtx, () => {
         expect(

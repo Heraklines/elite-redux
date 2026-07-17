@@ -45,8 +45,8 @@ import {
   flushCoopWaveResolvedAfterTurnCommit,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import * as waveOp from "#data/elite-redux/coop/coop-wave-operation";
 import {
   isCoopWaveAdvanceTransactionComplete,

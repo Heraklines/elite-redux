@@ -5634,6 +5634,7 @@ export function assembleCoopRuntime(
   // guest - whose kind flips "coop" -> "versus" only on runConfig receipt - is correct after adoption.
   const interactionRelay = new CoopInteractionRelay(transport, {
     isVersus: () => controller.isVersusSession(),
+    resolveFieldSlotOwner: coopOwnerOfPlayerFieldSlot,
   });
   const uiMirror = new CoopUiMirror(transport);
   const mePump = new CoopMePump(interactionRelay);

@@ -2409,6 +2409,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           await drainLoopback();
           return;
         }
+        // The guest's real CommandPhase above has already sent its reciprocal arrival. With full
+        // destination-context scheduling that frame is intentionally parked in the HOST inbox until
+        // this exact scope is installed. Pump it before phaseInterceptor.to(): CommandPhase itself
+        // awaits that arrival, so pumping only after `to()` returns creates a harness-only circular
+        // wait (guest arrival queued -> host phase awaits -> caller cannot reach the later pump).
+        await drainLoopback();
         await game.phaseInterceptor.to("CommandPhase");
       });
       await pumpDuoDestinations(rig, 2);
