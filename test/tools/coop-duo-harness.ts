@@ -623,47 +623,6 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   }
 }
 
-/**
- * The one-process rig's stand-in for production's SECOND always-running browser event loop, scoped to
- * the exact windows that starve it: while ONE client's withClient scope is awaiting, its peer's
- * destination-parked frames (ordinary {@linkcode destinationPumpOperationEnvelopes} adapter only)
- * are flushed under the peer's own ambient context on a short interval.
- *
- * Evidence chain: run 29579096347 proved an ENQUEUE-time auto-pulse both heals the faint-crossing
- * hang class (B7/B12 went green) and breaks the surfaces whose drivers deliberately alternate
- * explicit pumps (B3/6/9/11 + every C soak + P1 went red) - delivery timing is a contract there.
- * This variant pulses ONLY while a withClient await is actually in flight (the exact
- * phaseInterceptor crossings that hang: "operation delivery RETRY attempt=8/8" -> stuck at
- * SwitchPhase), skips whenever a nested scope owns the ambient context, and never touches
- * scheduled pairs (C/P soak fidelity drivers own their delivery). withClientSync keeps each flush
- * interleave-free; the production ACK barrier is untouched (frames still apply only under their
- * destination's own scene, through the real handlers).
- */
-function startPeerInboxPulseDuringAwait(ctx: ClientCtx): () => void {
-  const timer = setInterval(() => {
-    if (activeClientLabel !== ctx.label) {
-      return; // a nested scope owns the ambient context; its own pulse covers its window
-    }
-    const rig = [...liveDuoRigs].find(candidate => candidate.hostCtx === ctx || candidate.guestCtx === ctx);
-    if (rig == null) {
-      return;
-    }
-    const pair = rig.pair as DestinationEnvelopePumpPair;
-    if (pair.ordinaryDestinationPump !== true) {
-      return; // scheduled pairs own destination delivery
-    }
-    const peerRole: CoopRole = rig.hostCtx === ctx ? "guest" : "host";
-    if ((pair.pendingCount?.(peerRole) ?? 0) === 0) {
-      return;
-    }
-    const peerCtx = peerRole === "guest" ? rig.guestCtx : rig.hostCtx;
-    withClientSync(peerCtx, () => {
-      pair.flush(peerRole);
-    });
-  }, 25);
-  return () => clearInterval(timer);
-}
-
 export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<T> {
   // Async scopes may overlap and finish out of entry order. Claim ME-pin save ownership before installing
   // this browser; a later scope (or an explicit persistInstalledClientMePins) invalidates this claim.
@@ -700,11 +659,9 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   // destination continuation observe the previous client's pins/RNG/module state.
   setCoopRuntime(ctx.runtime);
   installCoopHooksForActive(ctx.runtime);
-  const stopPeerInboxPulse = startPeerInboxPulseDuringAwait(ctx);
   try {
     return await fn();
   } finally {
-    stopPeerInboxPulse();
     ctx.rndState = Phaser.Math.RND.state();
     ctx.ghost = snapshotGhostState();
     if (coopHarnessModuleLetIsolation) {
@@ -1403,10 +1360,6 @@ interface DestinationEnvelopePumpPair {
    * outside production-transition surfaces so legacy request/response helpers retain automatic loopback.
    */
   setDestinationContextDelivery?(enabled: boolean): void;
-  /** Frames currently parked for `role` (ordinary wrapper only; used by the withClient peer pulse). */
-  pendingCount?(role: CoopRole): number;
-  /** True for the ordinary adapter below; scheduled pairs own their delivery and are never auto-pulsed. */
-  ordinaryDestinationPump?: boolean;
 }
 
 /**
@@ -1519,10 +1472,6 @@ function destinationPumpOperationEnvelopes(pair: {
     setDestinationContextDelivery(enabled): void {
       destinationContextDelivery = enabled;
     },
-    pendingCount(role): number {
-      return queues[role].length;
-    },
-    ordinaryDestinationPump: true,
   };
   return wrapped;
 }
