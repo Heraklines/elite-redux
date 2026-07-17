@@ -546,6 +546,31 @@ let activeClientInboundPump: (() => number) | undefined;
 /** The complete ClientCtx currently installed (null between windows). Timer-ownership pins consult it. */
 let activeClientCtx: ClientCtx | null = null;
 
+/**
+ * PREEMPTION SAVE (the gate-6 29606450565 stale-snapshot class): a ctx object is ordinarily persisted
+ * only when its window EXITS, so while a client's async window is OPEN its ctx object lags live state.
+ * A pinned timer callback (or any nested cross-client window) that installs the OTHER client mid-window
+ * would then re-install that client's stale exit-time snapshot: the B9 mystery logs show the host's
+ * IDLE (pre-ME) pins stomping the LIVE mid-ME pins ("interaction-counter 0 -> -1 (ME end)" toggling),
+ * which un-suppressed the embedded shop's MAJOR-3 counter advance - and the same hazard re-installs a
+ * stale RND cursor. Persist the preempted client's live state into its ctx BEFORE installing another,
+ * so every cross-client install always reads the freshest snapshot.
+ */
+function persistPreemptedClientState(outgoing: ClientCtx): void {
+  outgoing.rndState = Phaser.Math.RND.state();
+  outgoing.ghost = snapshotGhostState();
+  if (coopHarnessModuleLetIsolation) {
+    outgoing.moduleLets = snapshotModuleLets();
+  }
+  if (outgoing.biomeState !== undefined) {
+    outgoing.biomeState = snapshotBiomeModuleState();
+  }
+  // Claim the ME-pin save like persistInstalledClientMePins: this snapshot is definitionally newer
+  // than every already-entered window of this client, so their exit saves must not clobber it.
+  outgoing.mePinsSaveGeneration = (outgoing.mePinsSaveGeneration ?? 0) + 1;
+  outgoing.mePins = readMePins();
+}
+
 let meBoundaryGeneration = 0;
 
 function restoreScopedMePins(pins: MePins, capturedBoundaryGeneration: number): void {
@@ -569,6 +594,11 @@ function restoreScopedMePins(pins: MePins, capturedBoundaryGeneration: number): 
  * after the restore); use {@linkcode withClient} for that.
  */
 export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
+  if (activeClientCtx != null && activeClientCtx !== ctx) {
+    persistPreemptedClientState(activeClientCtx);
+  }
+  const mePinsSaveGeneration = (ctx.mePinsSaveGeneration ?? 0) + 1;
+  ctx.mePinsSaveGeneration = mePinsSaveGeneration;
   const prev = captureLiveCtx();
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
@@ -607,6 +637,11 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     if (ctx.biomeState !== undefined) {
       ctx.biomeState = snapshotBiomeModuleState();
     }
+    // Symmetric with withClient: a sync window (incl. a pinned timer callback) that legitimately
+    // mutates the ME pins must persist them, or the mutation dies with the prev-restore below.
+    if (ctx.mePinsSaveGeneration === mePinsSaveGeneration) {
+      ctx.mePins = readMePins();
+    }
     initGlobalScene(prev.scene);
     Phaser.Math.RND.state(prev.rndState);
     restoreGhostState(prev.ghost);
@@ -629,6 +664,9 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
 }
 
 export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<T> {
+  if (activeClientCtx != null && activeClientCtx !== ctx) {
+    persistPreemptedClientState(activeClientCtx);
+  }
   // Async scopes may overlap and finish out of entry order. Claim ME-pin save ownership before installing
   // this browser; a later scope (or an explicit persistInstalledClientMePins) invalidates this claim.
   const mePinsSaveGeneration = (ctx.mePinsSaveGeneration ?? 0) + 1;

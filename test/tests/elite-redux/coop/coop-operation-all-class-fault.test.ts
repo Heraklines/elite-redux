@@ -193,7 +193,9 @@ describe("live-sink pacing: a valid in-order op whose materializer is not ready"
     const envelope: CoopAuthoritativeEnvelopeV1 = {
       ...envelopeFor("op:faintSwitch", 1),
       pendingOperation: {
-        id: "1:1:pacing-pin",
+        // A WELL-FORMED id (epoch:owner:KIND:pinnedSeq) - a malformed id fails inspect's identity
+        // guard BEFORE the sink and must stay "rejected"; this pin targets the sink layer only.
+        id: "1:1:FAINT_SWITCH:100001000203",
         kind: "FAINT_SWITCH",
         owner: 1,
         status: "applied",
