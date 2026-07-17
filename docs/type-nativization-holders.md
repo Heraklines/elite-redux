@@ -157,24 +157,24 @@ Counts: 63 type-grant holders swept across 11 categories; 25 NEEDS-MAINTAINER; 2
   Kleavor R Mega -> Komodo**, **Falinks Mega -> Voltron**, **Mega Krookodile -> Steely
   Spirit**, **Crobat Mega -> Ominous Shroud**: mega forms not present as type-grant
   holders at sweep time; the abilities ARE built and ready. Applied when the mons land.
-  - **Maintainer 2026-07-17 constituent corrections** (the MANUAL composites in
-    `abilities/composite-newcomers.ts` already encode these; the correction was the
-    stale *display description*, resolved by ability NAME from
-    `er-ability-rom-descriptions.ts` / the draft `er-abilities.ts` entry):
-    Waterborne = **Hydrate** + Adaptability (was displayed "Aquatic + Adaptability"),
-    Dragonfruit = **Draconize** + Rough Skin (was "Half Drake + Rough Skin"),
-    Komodo = **Draconize** + Envenom (was "adds Dragon-type ..." / Half-Drake text),
-    Ominous Shroud = Shadow Shield + **Foggy Eye** (was "adds Ghost-type ..." / Phantom
-    text). Description surfaces fixed; the manual composites already invoke the correct
-    constituents (verified via attr probe).
-  - **FOLLOW-UP (not part of these 7 corrections):** the mega forms currently still
-    carry the OLD DRAFT abilities in their innate slots (Heracreus Mega innate = draft
-    Dragonfruit id 918/live 5619; Scizor/Scyther/Kleavor R Mega innate = draft Komodo
-    id 851/live 5552; Crobat Mega = draft Ominous Shroud 822/5523), whose BEHAVIOR still
-    grants the old type (Half-Drake/Phantom). Switching those innate slots to the
-    nativized MANUAL composites (5955/5956/5957/5961) is the "apply when the mons land"
-    step and is deferred; the maintainer's 2026-07-17 note corrected the ability
-    definitions/descriptions, not the mega slot assignments.
+  - **Maintainer 2026-07-17 constituent corrections (BEHAVIOR + description, DONE).**
+    The mega forms carry the DRAFT composite abilities in their innate slots (Heracreus
+    Mega = draft Dragonfruit id 918/live 5619; Scizor/Scyther/Kleavor R Mega = draft
+    Komodo id 851/live 5552; Crobat Mega = draft Ominous Shroud 822/5523; Dragalge Mega
+    = draft Waterborne 990/5689). Those draft composites still type-granted (Aquatic/
+    Half-Drake/Phantom) at the ATTR level, which violated the epic. Nativized in place so
+    every holder is fixed uniformly:
+    - `er-composite-parts.ts` `composite-vanilla-mashup` rows: 990 Aquatic(294)->Hydrate(315),
+      918 Half-Drake(310)->Draconize(413), 822 Phantom(324)->Foggy Eye(967).
+    - `archetype-dispatcher.ts` bespoke case 851 (Komodo): the `EntryEffectAbAttr`
+      `add-self-type DRAGON` (Half-Drake) replaced by Draconize's TypeConversion + Dragon
+      STAB + Dragon-vs-Fairy override; the poison kept (aligned to regular Poison/Envenom).
+    Final composition (behavior AND display now match): Waterborne = **Hydrate** +
+    Adaptability, Dragonfruit = **Draconize** + Rough Skin, Komodo = **Draconize** +
+    Envenom, Ominous Shroud = **Foggy Eye** + Shadow Shield. Verified via attr probe:
+    NO `add-self-type` `EntryEffectAbAttr` is reachable from any of the six live mega
+    holders (Dragalge/Heracreus/Scizor/Scyther/Kleavor/Crobat Mega). The separate MANUAL
+    composites (5955/5956/5957/5961) already encoded the same and remain as ready spares.
 - **Cacjack -> Ominous Shroud**: Cacjack carries NO type-grant in current data; tracked.
 - **Marowak: Ill Will -> Alluring Skull**: Marowak carries "Bone Zone" (5091), NOT "Ill Will" (5285)
   in current data - the named ability is absent, so NOT applied (tracked pending maintainer clarification).

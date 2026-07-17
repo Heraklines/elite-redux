@@ -162,7 +162,8 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   811: { erAbilityId: 811, parts: [{ kind: "pokerogue", abilityId: 110 }, { kind: "er", erAbilityId: 275 }], hasRider: false },
   818: { erAbilityId: 818, parts: [{ kind: "er", erAbilityId: 523 }, { kind: "er", erAbilityId: 819 }], hasRider: false },
   821: { erAbilityId: 821, parts: [{ kind: "er", erAbilityId: 329 }, { kind: "er", erAbilityId: 334 }], hasRider: false },
-  822: { erAbilityId: 822, parts: [{ kind: "er", erAbilityId: 324 }, { kind: "pokerogue", abilityId: 231 }], hasRider: false },
+  // Ominous Shroud. Maintainer 2026-07-17: nativized — Phantom (324, type-grant) -> Foggy Eye (967).
+  822: { erAbilityId: 822, parts: [{ kind: "er", erAbilityId: 967 }, { kind: "pokerogue", abilityId: 231 }], hasRider: false },
   825: { erAbilityId: 825, parts: [{ kind: "pokerogue", abilityId: 202 }, { kind: "pokerogue", abilityId: 81 }], hasRider: false },
   826: { erAbilityId: 826, parts: [{ kind: "pokerogue", abilityId: 56 }], unresolvedParts: ["Fairy STAB"], hasRider: true },
   827: { erAbilityId: 827, parts: [{ kind: "pokerogue", abilityId: 61 }, { kind: "pokerogue", abilityId: 147 }], hasRider: false },
@@ -201,7 +202,8 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   901: { erAbilityId: 901, parts: [{ kind: "pokerogue", abilityId: 221 }, { kind: "pokerogue", abilityId: 192 }], hasRider: false },
   902: { erAbilityId: 902, parts: [{ kind: "er", erAbilityId: 360 }, { kind: "pokerogue", abilityId: 35 }], hasRider: false },
   903: { erAbilityId: 903, parts: [{ kind: "er", erAbilityId: 412 }, { kind: "er", erAbilityId: 307 }], hasRider: false },
-  918: { erAbilityId: 918, parts: [{ kind: "er", erAbilityId: 310 }, { kind: "pokerogue", abilityId: 24 }], hasRider: false },
+  // Dragonfruit. Maintainer 2026-07-17: nativized — Half Drake (310, type-grant) -> Draconize (413).
+  918: { erAbilityId: 918, parts: [{ kind: "er", erAbilityId: 413 }, { kind: "pokerogue", abilityId: 24 }], hasRider: false },
   919: { erAbilityId: 919, parts: [{ kind: "pokerogue", abilityId: 181 }, { kind: "er", erAbilityId: 404 }], hasRider: false },
   922: { erAbilityId: 922, parts: [{ kind: "pokerogue", abilityId: 214 }, { kind: "pokerogue", abilityId: 79 }], hasRider: false },
   925: { erAbilityId: 925, parts: [{ kind: "er", erAbilityId: 571 }, { kind: "er", erAbilityId: 924 }], hasRider: false },
@@ -234,7 +236,8 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   986: { erAbilityId: 986, parts: [{ kind: "pokerogue", abilityId: 183 }], unresolvedParts: ["Takes 30% less damage from attacks"], hasRider: true },
   964: { erAbilityId: 964, parts: [{ kind: "pokerogue", abilityId: 219 }, { kind: "pokerogue", abilityId: 128 }], hasRider: false },
   988: { erAbilityId: 988, parts: [{ kind: "er", erAbilityId: 293 }, { kind: "er", erAbilityId: 302 }], hasRider: false },
-  990: { erAbilityId: 990, parts: [{ kind: "er", erAbilityId: 294 }, { kind: "pokerogue", abilityId: 91 }], hasRider: false },
+  // Waterborne. Maintainer 2026-07-17: nativized — Aquatic (294, type-grant) -> Hydrate (315).
+  990: { erAbilityId: 990, parts: [{ kind: "er", erAbilityId: 315 }, { kind: "pokerogue", abilityId: 91 }], hasRider: false },
   992: { erAbilityId: 992, parts: [{ kind: "pokerogue", abilityId: 201 }, { kind: "er", erAbilityId: 275 }], hasRider: false },
   997: { erAbilityId: 997, parts: [{ kind: "pokerogue", abilityId: 4 }, { kind: "er", erAbilityId: 400 }], hasRider: false },
   999: { erAbilityId: 999, parts: [{ kind: "er", erAbilityId: 358 }, { kind: "er", erAbilityId: 331 }], hasRider: false },

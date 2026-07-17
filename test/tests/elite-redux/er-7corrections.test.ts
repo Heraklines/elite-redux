@@ -56,6 +56,38 @@ function abilityNamesOf(constName: string): string[] {
   return ids.map(a => allAbilities[a]?.name ?? `?${a}`);
 }
 
+/** Attr constructor names for a live ability id. */
+function attrNames(abilityId: number): string[] {
+  return (allAbilities[abilityId]?.attrs ?? []).map(a => a.constructor.name);
+}
+
+/** Whether an ability carries a type-granting entry effect (`add-self-type`). */
+function grantsTypeOnEntry(abilityId: number): boolean {
+  return (allAbilities[abilityId]?.attrs ?? []).some(
+    a =>
+      a.constructor.name === "EntryEffectAbAttr"
+      && (a as unknown as { getEffect?: () => { kind: string } }).getEffect?.().kind === "add-self-type",
+  );
+}
+
+/** All ability ids a species (form 0) carries that still type-grant on entry. */
+function holderTypeGrants(constName: string): string[] {
+  const id = resolveErSpeciesConstId(constName);
+  const sp = id === undefined ? undefined : speciesById(id);
+  if (!sp) {
+    return [];
+  }
+  const s = sp as unknown as PokemonSpeciesForm;
+  const ids = [s.ability1, s.ability2, s.abilityHidden, ...sp.getPassiveAbilities(0)];
+  return ids.filter(a => grantsTypeOnEntry(a)).map(a => allAbilities[a]?.name ?? `?${a}`);
+}
+
+// Live ability ids of the draft composite abilities the megas actually carry.
+const DRAFT_WATERBORNE = 5689;
+const DRAFT_DRAGONFRUIT = 5619;
+const DRAFT_KOMODO = 5552;
+const DRAFT_OMINOUS_SHROUD = 5523;
+
 describe.skipIf(!RUN)("ER type-nativization maintainer corrections (2026-07-17)", () => {
   let phaserGame: Phaser.Game;
 
@@ -135,5 +167,38 @@ describe.skipIf(!RUN)("ER type-nativization maintainer corrections (2026-07-17)"
     expect(ominous).not.toContain("phantom");
     expect(ominous).not.toContain("adds ghost");
     expect(ominous).toContain("fog");
+  });
+
+  it("4-7. Draft composite abilities are nativized in BEHAVIOR (no type-grant, correct constituent)", () => {
+    // None of the four draft composite abilities the megas carry still grants a
+    // type on entry (Aquatic/Half-Drake/Phantom removed).
+    expect(grantsTypeOnEntry(DRAFT_WATERBORNE), "Waterborne still type-grants").toBe(false);
+    expect(grantsTypeOnEntry(DRAFT_DRAGONFRUIT), "Dragonfruit still type-grants").toBe(false);
+    expect(grantsTypeOnEntry(DRAFT_KOMODO), "Komodo still type-grants").toBe(false);
+    expect(grantsTypeOnEntry(DRAFT_OMINOUS_SHROUD), "Ominous Shroud still type-grants").toBe(false);
+
+    // Each carries the nativized constituent's signature attr.
+    // Waterborne -> Hydrate (Normal->Water conversion via MoveTypeChangeAbAttr).
+    expect(attrNames(DRAFT_WATERBORNE)).toContain("MoveTypeChangeAbAttr");
+    // Dragonfruit -> Draconize (Normal->Dragon conversion via TypeConversionAbAttr).
+    expect(attrNames(DRAFT_DRAGONFRUIT)).toContain("TypeConversionAbAttr");
+    // Komodo -> Draconize (+ Envenom poison).
+    expect(attrNames(DRAFT_KOMODO)).toContain("TypeConversionAbAttr");
+    expect(attrNames(DRAFT_KOMODO)).toContain("PostAttackApplyStatusEffectAbAttr");
+    // Ominous Shroud -> Foggy Eye (fog move-power boost) + Shadow Shield.
+    expect(attrNames(DRAFT_OMINOUS_SHROUD)).toContain("MovePowerBoostAbAttr");
+  });
+
+  it("4-7. No live mega holder still type-grants (Aquatic/Half-Drake/Phantom removed from holders)", () => {
+    for (const constName of [
+      "SPECIES_DRAGALGE_MEGA",
+      "SPECIES_HERACREUS_MEGA",
+      "SPECIES_SCIZOR_REDUX_MEGA",
+      "SPECIES_SCYTHER_REDUX_MEGA",
+      "SPECIES_KLEAVOR_REDUX_MEGA",
+      "SPECIES_CROBAT_MEGA",
+    ]) {
+      expect(holderTypeGrants(constName), `${constName} still type-grants`).toEqual([]);
+    }
   });
 });
