@@ -3987,11 +3987,13 @@ export class CoopBattleStreamer {
               return;
             }
           } else {
+            // Fail closed on the mis-addressed STATE only (it is never stored/peekable). The party-list
+            // carrier itself still resolves a parked awaitEnemyParty below - returning here left the
+            // guest's wave build parked forever behind one corrupt state field (lane A stream:319).
             coopWarn(
               "stream",
               `guest rejected enemyParty state address carrierWave=${msg.wave} stateWave=${msg.authoritativeState.wave}`,
             );
-            return;
           }
           while (this.enemyPartyStateByWave.size > 4) {
             const oldestWave = Math.min(...this.enemyPartyStateByWave.keys());
