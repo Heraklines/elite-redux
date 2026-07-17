@@ -1330,6 +1330,17 @@ export function hasErGhostOverride(trainer: Trainer): boolean {
 }
 
 /**
+ * The full ghost snapshot backing this trainer, or `null` when it is not an ER ghost.
+ * The ghost identity lives ONLY in the in-memory {@linkcode GHOST_BY_TRAINER} WeakMap,
+ * which a save/reload wipes - so {@linkcode TrainerData} persists this snapshot and
+ * re-applies it via {@linkcode markTrainerAsGhost} on reconstruction, restoring the
+ * ghost's name, BGM, and authored presentation mid-battle (#ghost-identity).
+ */
+export function getErGhostSnapshot(trainer: Trainer): GhostTeamSnapshot | null {
+  return GHOST_BY_TRAINER.get(trainer) ?? null;
+}
+
+/**
  * The species ids on this ghost trainer's snapshot team, or null when the trainer is
  * not an ER ghost. Used by the achievement layer (IDENTITY_THEFT) to check whether the
  * player fields a species that also appears on the ghost's team. Read-only accessor over
