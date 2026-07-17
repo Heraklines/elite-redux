@@ -71,7 +71,9 @@ import {
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
+  materializeGuestInputAfterReplacement,
   presentedFieldMon,
+  settleDuoPromise,
   type ShowdownDuoRig,
   withClient,
   withClientSync,
@@ -260,9 +262,13 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
 
     // HOST crosses to the next CommandPhase: its ShowdownEnemyFaintSwitchPhase consumes the buffered pick
     // and summons THE GUEST'S CHOICE (not the AI's), then the duel continues (no stall).
+    let hostAdvance: Promise<void> | undefined;
     await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase");
+      hostAdvance = game.phaseInterceptor.to("CommandPhase");
+      await drainLoopback();
     });
+    expect(hostAdvance, "the host replacement crossing was started").toBeDefined();
+    await settleDuoPromise(rig, hostAdvance!, "Showdown single-faint host crossing");
     expect(
       rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
       "the host reached the next CommandPhase - the match continues a turn after (no stall)",
@@ -324,9 +330,13 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
 
     // HOST crosses to turn N+1 CommandPhase: summons THE GUEST'S pick + streams the out-of-band replacement
     // checkpoint the guest's pump consumes.
+    let hostAdvance: Promise<void> | undefined;
     await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase");
+      hostAdvance = game.phaseInterceptor.to("CommandPhase");
+      await drainLoopback();
     });
+    expect(hostAdvance, "the host replacement crossing was started").toBeDefined();
+    await settleDuoPromise(rig, hostAdvance!, "Showdown next-command replacement crossing");
     expect(
       rig.hostScene.getEnemyField()[0]?.species.speciesId,
       "the host summoned the guest's picked replacement (GYARADOS)",
@@ -465,9 +475,13 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
     // HOST crosses: BOTH replacement flows run in the SAME crossing - the host's OWN vanilla picker (driven
     // here) AND the ShowdownEnemyFaintSwitchPhase awaiting the guest's buffered pick. Neither deadlocks.
     driveHostOwnFaintPicker();
+    let hostAdvance: Promise<void> | undefined;
     await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase");
+      hostAdvance = game.phaseInterceptor.to("CommandPhase");
+      await drainLoopback();
     });
+    expect(hostAdvance, "the host double-faint crossing was started").toBeDefined();
+    await settleDuoPromise(rig, hostAdvance!, "Showdown double-faint host crossing");
     expect(
       rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
       "the host crossed to the next CommandPhase - the double KO did not deadlock",
@@ -722,11 +736,11 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
         "the first legal concrete enemy fallback was summoned only after material closure",
       ).toBe(GUEST_BENCH_1);
       await withClient(rig.guestCtx, async () => {
-        await driveClientPhaseQueueTo(rig.guestScene, "Showdown replacement replay", {
-          matches: phase => phase.phaseName === "CoopReplayTurnPhase",
+        await materializeGuestInputAfterReplacement(rig.guestScene);
+        await driveClientPhaseQueueTo(rig.guestScene, "Showdown replacement CommandPhase", {
+          matches: phase => phase.phaseName === "CommandPhase",
           perPhaseTimeoutMs: 5_000,
         });
-        await driveGuestReplayTurn(rig.guestScene, turn + 1);
       });
       expect(
         rig.guestScene.getPlayerField()[0]?.species.speciesId,

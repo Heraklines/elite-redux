@@ -28,6 +28,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
+  runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
 import { PartyUiHandler, PartyUiMode } from "#ui/handlers/party-ui-handler";
@@ -117,6 +118,17 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     let settled = false;
     let materialized = false;
     let unregisterTerminal = () => {};
+    const markPickerMaterialized = (): void => {
+      materialized = true;
+      markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.fieldIndex, operationBinding, occurrence);
+      unregisterTerminal();
+      // A committed result can arrive after the human selection callback but before the bounded MESSAGE
+      // close resolves. Its first materialization correctly defers; wake that exact retained entry now
+      // instead of relying on another host resend after the real UI boundary is already complete.
+      runWhenCoopRuntimeActive(runtime, () => {
+        runtime.durability?.retryDeferred("op:faintSwitch");
+      });
+    };
     const closePicker = (): void => {
       void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result => {
         if (coopSessionGeneration() !== sourceGeneration) {
@@ -127,8 +139,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
           return;
         }
         scene.phaseManager.shiftPhase();
-        materialized = true;
-        markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.fieldIndex, operationBinding, occurrence);
+        markPickerMaterialized();
       });
     };
     unregisterTerminal = registerCoopFaintSwitchPickerTerminal(
@@ -166,7 +177,6 @@ export class CoopGuestFaintSwitchPhase extends Phase {
             return;
           }
           settled = true;
-          unregisterTerminal();
           endCoopFaintSwitchWindow();
           const battlerCount = scene.currentBattle?.getBattlerCount() ?? 0;
           const picked = scene.getPlayerParty()[slotIndex];
@@ -230,8 +240,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
         return;
       }
       scene.phaseManager.shiftPhase();
-      materialized = true;
-      markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.fieldIndex, operationBinding, occurrence);
+      markPickerMaterialized();
     }
   }
 }

@@ -965,13 +965,19 @@ export class CoopBattleStreamer {
    */
   private readonly appliedOutOfBandCheckpoints = new Map<string, CoopCheckpointEnvelope>();
   /** Latest enemy party the guest has not yet adopted (consumed at the wave's first turn). */
-  private lastEnemyParty: { wave: number; enemies: CoopSerializedEnemy[] } | null = null;
+  private lastEnemyParty: { wave: number; enemies: CoopSerializedEnemy[]; stateTick?: number } | null = null;
   /** HOST: exact wave-boundary carriers retained for loss/reconnect replay. */
   private readonly sentEnemyParties = new Map<number, Extract<CoopMessage, { t: "enemyPartySync" }>>();
   /** New-wave state paired with enemyPartySync; consumed after the guest has built the streamed enemies. */
   private readonly enemyPartyStateByWave = new Map<number, CoopAuthoritativeBattleStateV1>();
   /** Complete encounter identity paired with the replayable wave carrier; consumed atomically at adopt. */
   private readonly enemyPartyEncounterByWave = new Map<number, CoopEncounterAuthority>();
+  /**
+   * Guest causal floor for wave-keyed enemy-party authority. Mystery selection and its spawned battle can
+   * share one wave number; once the retained ME terminal applies a newer full state, an older selector
+   * carrier must never repopulate the party/encounter inbox merely because its wave still matches.
+   */
+  private readonly enemyPartyAuthorityFloorByWave = new Map<number, number>();
   /** wave -> resolver for an in-flight {@linkcode awaitLaunchSnapshot} (#633 M4 push-snapshot launch). */
   private readonly launchSnapshotWaiters = new Map<number, (res: string | null) => void>();
   /** Latest launch snapshot that arrived before its waiter (race buffer, keyed by wave). */
@@ -1891,6 +1897,54 @@ export class CoopBattleStreamer {
     const encounter = this.enemyPartyEncounterByWave.get(wave);
     this.enemyPartyEncounterByWave.delete(wave);
     return encounter;
+  }
+
+  /**
+   * GUEST: consume the three projections of one wave-keyed enemy-party carrier together.
+   *
+   * Callers may inspect the returned state tick before mutating encounter/party state, which prevents an
+   * obsolete party image from clearing a newer live battle before its stale state twin is rejected.
+   */
+  consumeEnemyPartyAuthority(wave: number): {
+    enemies: CoopSerializedEnemy[] | null;
+    encounter: CoopEncounterAuthority | undefined;
+    state: CoopAuthoritativeBattleStateV1 | undefined;
+  } {
+    return {
+      enemies: this.consumeEnemyParty(wave),
+      encounter: this.consumeEnemyPartyEncounter(wave),
+      state: this.consumeEnemyPartyState(wave),
+    };
+  }
+
+  /**
+   * GUEST: retire every wave-keyed enemy-party carrier causally dominated by a newer material state.
+   * A later post-summon carrier with a strictly newer tick remains admissible.
+   */
+  retireEnemyPartyAuthorityThrough(wave: number, tick: number): void {
+    if (!Number.isSafeInteger(wave) || wave < 0 || !Number.isSafeInteger(tick) || tick < 0) {
+      return;
+    }
+    const floor = Math.max(this.enemyPartyAuthorityFloorByWave.get(wave) ?? -1, tick);
+    this.enemyPartyAuthorityFloorByWave.set(wave, floor);
+    if (
+      this.lastEnemyParty?.wave === wave
+      && (this.lastEnemyParty.stateTick === undefined || this.lastEnemyParty.stateTick <= floor)
+    ) {
+      this.lastEnemyParty = null;
+    }
+    const retainedState = this.enemyPartyStateByWave.get(wave);
+    if (retainedState == null || retainedState.tick <= floor) {
+      this.enemyPartyStateByWave.delete(wave);
+      this.enemyPartyEncounterByWave.delete(wave);
+      this.meTypeByWave.delete(wave);
+      this.battleTypeByWave.delete(wave);
+    }
+    while (this.enemyPartyAuthorityFloorByWave.size > 4) {
+      const oldestWave = Math.min(...this.enemyPartyAuthorityFloorByWave.keys());
+      this.enemyPartyAuthorityFloorByWave.delete(oldestWave);
+    }
+    coopLog("stream", `guest retired enemyParty authority wave=${wave} through tick=${floor}`);
   }
 
   /**
@@ -3739,6 +3793,7 @@ export class CoopBattleStreamer {
       + this.meBattlePartyInbox.size
       + this.enemyPartyStateByWave.size
       + this.enemyPartyEncounterByWave.size
+      + this.enemyPartyAuthorityFloorByWave.size
       + this.meTypeByWave.size
       + this.battleTypeByWave.size
       + Number(this.lastEnemyParty != null)
@@ -3761,6 +3816,7 @@ export class CoopBattleStreamer {
     this.lastEnemyParty = null;
     this.enemyPartyStateByWave.clear();
     this.enemyPartyEncounterByWave.clear();
+    this.enemyPartyAuthorityFloorByWave.clear();
     this.meTypeByWave.clear();
     this.battleTypeByWave.clear();
     this.lastLaunchSnapshot = null;
@@ -3867,6 +3923,7 @@ export class CoopBattleStreamer {
     this.sentEnemyParties.clear();
     this.enemyPartyStateByWave.clear();
     this.enemyPartyEncounterByWave.clear();
+    this.enemyPartyAuthorityFloorByWave.clear();
     this.meTypeByWave.clear();
     this.battleTypeByWave.clear();
     this.lastLaunchSnapshot = null;
@@ -3891,6 +3948,17 @@ export class CoopBattleStreamer {
   private handle(msg: CoopMessage): void {
     switch (msg.t) {
       case "enemyPartySync": {
+        const floor = this.enemyPartyAuthorityFloorByWave.get(msg.wave);
+        if (
+          floor != null
+          && (msg.authoritativeState === undefined || msg.authoritativeState.tick <= floor)
+        ) {
+          coopLog(
+            "stream",
+            `guest ignored retired enemyParty carrier wave=${msg.wave} tick=${msg.authoritativeState?.tick ?? "-"} floor=${floor}`,
+          );
+          return;
+        }
         if (msg.authoritativeState !== undefined) {
           if (msg.authoritativeState.wave === msg.wave) {
             const prior = this.enemyPartyStateByWave.get(msg.wave);
@@ -3901,6 +3969,7 @@ export class CoopBattleStreamer {
                 "stream",
                 `guest ignored regressed enemyParty state wave=${msg.wave} tick=${msg.authoritativeState.tick} retained=${prior.tick}`,
               );
+              return;
             } else if (canonicalize(prior) !== canonicalize(msg.authoritativeState)) {
               const current = this.currentAuthorityAddress(msg.authoritativeState.turn);
               const reason = `Enemy-party authority changed at immutable wave/tick ${msg.wave}/${prior.tick}.`;
@@ -3918,12 +3987,14 @@ export class CoopBattleStreamer {
                   reason,
                 );
               }
+              return;
             }
           } else {
             coopWarn(
               "stream",
               `guest rejected enemyParty state address carrierWave=${msg.wave} stateWave=${msg.authoritativeState.wave}`,
             );
+            return;
           }
           while (this.enemyPartyStateByWave.size > 4) {
             const oldestWave = Math.min(...this.enemyPartyStateByWave.keys());
@@ -3957,7 +4028,11 @@ export class CoopBattleStreamer {
           waiter(msg.enemies);
           return;
         }
-        this.lastEnemyParty = { wave: msg.wave, enemies: msg.enemies };
+        this.lastEnemyParty = {
+          wave: msg.wave,
+          enemies: msg.enemies,
+          ...(msg.authoritativeState === undefined ? {} : { stateTick: msg.authoritativeState.tick }),
+        };
         this.enemyPartyHandler?.(msg.wave, msg.enemies);
         return;
       }

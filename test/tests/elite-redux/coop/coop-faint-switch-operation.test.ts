@@ -5,11 +5,11 @@
 
 import { clearNegotiatedCoopCapabilities } from "#data/elite-redux/coop/coop-capabilities";
 import {
-  COOP_FAINT_SWITCH_RESOLUTION_NONE,
-  COOP_FAINT_SWITCH_RESOLUTION_OWNER,
   addressCoopFaintSwitchChoiceData,
   armCoopFaintSwitchIntentResend,
   awaitAddressedCoopFaintSwitchChoice,
+  COOP_FAINT_SWITCH_RESOLUTION_NONE,
+  COOP_FAINT_SWITCH_RESOLUTION_OWNER,
   captureCoopFaintSwitchOperationBinding,
   commitFaintSwitchAuthorityIntent,
   coopFaintSwitchOperationAddress,
@@ -25,7 +25,11 @@ import {
 import { COOP_FAINT_SWITCH_SEQ_BASE, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import type { CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { setCoopOperationDurability } from "#data/elite-redux/coop/coop-operation-journal";
-import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
+import {
+  createCoopRuntimeOpState,
+  resetCoopGlobalOperationOrder,
+  setActiveCoopRuntimeOpState,
+} from "#data/elite-redux/coop/coop-operation-runtime";
 import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -35,6 +39,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 describe("co-op faint-switch operation migration", () => {
   beforeEach(() => {
     clearNegotiatedCoopCapabilities();
+    resetCoopGlobalOperationOrder();
     setCoopFaintSwitchOperationEnabled(true);
   });
 
@@ -45,6 +50,7 @@ describe("co-op faint-switch operation migration", () => {
     clearCoopRuntime();
     setCoopOperationDurability(null);
     setActiveCoopRuntimeOpState(null);
+    resetCoopGlobalOperationOrder();
     clearNegotiatedCoopCapabilities();
   });
 

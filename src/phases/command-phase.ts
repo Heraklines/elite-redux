@@ -7,6 +7,7 @@ import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import {
   applyCoopAuthoritativeBattleState,
+  coopAppliedStateTick,
   reapplyAcceptedCoopAuthoritativeBattleState,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -602,15 +603,28 @@ export class CommandPhase extends FieldPhase {
     // authoritative state (checkpoint + checksum) streams via emitTurn at TurnEnd (TRACK-2
     // Phase B) / CoopReplayTurnPhase; only the wave-start enemy-party belt-and-suspenders stays.
     if (controller.role !== "host" && turn === 1) {
+      const carrier = streamer.consumeEnemyPartyAuthority(waveIndex);
+      if (carrier.state !== undefined && carrier.state.tick < coopAppliedStateTick()) {
+        // Selector MEs and their spawned battle share a wave. A replayed pre-terminal selector carrier is
+        // obsolete as one atomic unit: never clear the live enemies/descriptor and only then discover its
+        // state twin is stale.
+        coopLog(
+          "stream",
+          `guest discarded stale enemyParty carrier before command wave=${waveIndex} `
+            + `tick=${carrier.state.tick} applied=${coopAppliedStateTick()}`,
+        );
+        ensureCoopAuthoritativeCommandPresentation();
+        return true;
+      }
       // Guest: at the wave's first turn, adopt the host's exact enemy party (a belt-and-
       // suspenders for the encounter-phase adopt; one-shot). The per-turn checkpoint +
       // checksum verification is owned by CoopReplayTurnPhase now (Phase B), not here.
-      const enemies = streamer.consumeEnemyParty(waveIndex);
+      const { enemies } = carrier;
       if (enemies != null) {
         // enemyPartySync is one authoritative carrier split across party, encounter identity, and state
         // inboxes. A blocked NextEncounterPhase can leave all three for this final pre-input fallback.
         // Never adopt only the party: trainer victory/reward routing depends on the exact descriptor.
-        const encounter = streamer.consumeEnemyPartyEncounter(waveIndex);
+        const { encounter } = carrier;
         if (encounter == null) {
           failCoopSharedSession(
             `Wave ${waveIndex} authoritative encounter descriptor was unavailable at command input`,
@@ -626,7 +640,7 @@ export class CommandPhase extends FieldPhase {
       // can consume the repeated party first while a newer post-PostSummon carrier is delivered afterward;
       // gating the state read on `enemies != null` then strands that newer state until checksum repair. Always
       // consume/apply the latest state at this final pre-input funnel. `undefined` remains a guarded no-op.
-      const waveStartState = streamer.consumeEnemyPartyState(waveIndex);
+      const waveStartState = carrier.state;
       if (
         waveStartState !== undefined
         && !applyCoopAuthoritativeBattleState(waveStartState, true)

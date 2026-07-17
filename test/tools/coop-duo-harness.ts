@@ -1684,6 +1684,100 @@ export async function pumpDuoDestinations(rig: DuoRig, rounds = 2): Promise<void
 }
 
 /**
+ * Settle one asynchronous two-engine crossing while alternately installing each browser's complete
+ * destination context.
+ *
+ * A fixed number of transport pumps is not a valid substitute for two independent event loops: a retained
+ * result can close a guest UI, schedule a durability retry, and emit its material ACK only after several
+ * microtask/timer turns. Waiting on the authority promise while only the host context is installed then
+ * manufactures a soft-lock that cannot happen in two real browsers. This helper keeps both clients alive
+ * until the exact promise settles, or throws a bounded diagnostic with both phase queues.
+ */
+export async function settleDuoPromise<T>(
+  rig: DuoRig,
+  pending: Promise<T>,
+  label: string,
+  options: { timeoutMs?: number; intervalMs?: number } = {},
+): Promise<T> {
+  const timeoutMs = options.timeoutMs ?? 20_000;
+  const intervalMs = options.intervalMs ?? 10;
+  let settled = false;
+  let rejected = false;
+  let failure: unknown;
+  pending.then(
+    () => {
+      settled = true;
+    },
+    error => {
+      rejected = true;
+      failure = error;
+      settled = true;
+    },
+  );
+
+  const deadline = Date.now() + timeoutMs;
+  while (!settled && Date.now() < deadline) {
+    await withClient(rig.hostCtx, async () => {
+      await drainLoopback();
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    });
+    await withClient(rig.guestCtx, async () => {
+      await drainLoopback();
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    });
+    if (!settled) {
+      await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
+    }
+  }
+
+  if (!settled) {
+    const hostCurrent = rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "(none)";
+    const guestCurrent = rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "(none)";
+    const hostQueued = rig.hostScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+    const guestQueued = rig.guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+    throw new Error(
+      `${label} did not settle while both destination contexts were pumped; `
+        + `host=${hostCurrent} queued=[${hostQueued.join(",")}], `
+        + `guest=${guestCurrent} queued=[${guestQueued.join(",")}]`,
+    );
+  }
+  if (rejected) {
+    throw failure;
+  }
+  return await pending;
+}
+
+/**
+ * Finish the real replay/finalize tail left by a replacement picker, then recreate the one omitted
+ * TurnInit boundary of a directly mirrored headless guest.
+ *
+ * The helper is deliberately strict: it only accepts the replay tail or untouched boot shape produced by
+ * the duo builders. It never clears an arbitrary live queue to make a test green.
+ */
+export async function materializeGuestInputAfterReplacement(scene: BattleScene): Promise<void> {
+  const current = scene.phaseManager.getCurrentPhase();
+  const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+  if (current?.phaseName === "CoopFinalizeTurnPhase" || queued.includes("CoopFinalizeTurnPhase")) {
+    const finalize =
+      current?.phaseName === "CoopFinalizeTurnPhase"
+        ? current
+        : await driveClientPhaseQueueTo(scene, "replacement CoopFinalizeTurnPhase", {
+            matches: phase => phase.phaseName === "CoopFinalizeTurnPhase",
+            perPhaseTimeoutMs: 5_000,
+          });
+    finalize.start();
+    const deadline = Date.now() + 5_000;
+    while (scene.phaseManager.getCurrentPhase() === finalize) {
+      await drainLoopback();
+      if (Date.now() >= deadline) {
+        throw new Error("replacement CoopFinalizeTurnPhase did not finish");
+      }
+    }
+  }
+  materializeMirroredGuestInputTurn(scene);
+}
+
+/**
  * Bring both real clients to the reciprocal command boundary and submit Tackle for the guest-owned
  * battler exclusively through the production Command/Fight/TargetSelect UI handlers.
  *
@@ -1931,8 +2025,12 @@ export async function buildDuo(
     // two-engine rig, rather than relying on individual tests to remember a non-gameplay wiring step.
     installHeadlessPlayerAtlasCompletionModel(guestScene);
     const gf = guestScene.getPlayerField();
-    gf[0].coopOwner = "host";
-    gf[1].coopOwner = "guest";
+    if (gf[0] != null) {
+      gf[0].coopOwner = "host";
+    }
+    if (gf[1] != null) {
+      gf[1].coopOwner = "guest";
+    }
   });
   registerRetainedWaveBoundaryBridge(hostGame, hostScene, guestScene, hostCtx);
 
@@ -3067,8 +3165,12 @@ export async function buildDuoForMe(
     // completion model before the first retained transition tail can run.
     installHeadlessPlayerAtlasCompletionModel(guestScene);
     const gf = guestScene.getPlayerField();
-    gf[0].coopOwner = "host";
-    gf[1].coopOwner = "guest";
+    if (gf[0] != null) {
+      gf[0].coopOwner = "host";
+    }
+    if (gf[1] != null) {
+      gf[1].coopOwner = "guest";
+    }
   });
   registerRetainedWaveBoundaryBridge(hostGame, hostScene, guestScene, hostCtx);
 

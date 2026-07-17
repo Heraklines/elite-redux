@@ -265,6 +265,37 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     await flushWire();
 
     expect(guestStream.peekEnemyPartyState(9), "a delayed lower tick cannot replace the command seal").toEqual(newer);
+    expect(
+      guestStream.consumeEnemyParty(9),
+      "a delayed lower tick cannot repopulate the party half of the same carrier",
+    ).toBeNull();
+  });
+
+  it("retires a mystery selector carrier without blocking a newer same-wave battle carrier", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+    const selector = emptyAuthoritativeState(32, 1, 193);
+
+    hostStream.sendEnemyParty(32, [], 4, 3, selector);
+    await flushWire();
+    guestStream.retireEnemyPartyAuthorityThrough(32, 197);
+
+    expect(guestStream.consumeEnemyParty(32), "the buffered selector party is retired").toBeNull();
+    expect(guestStream.consumeEnemyPartyState(32), "the buffered selector state is retired").toBeUndefined();
+    expect(guestStream.meTypeForWave(32), "the buffered selector descriptor is retired").toBeUndefined();
+
+    hostStream.sendEnemyParty(32, [], 4, 3, selector);
+    await flushWire();
+    expect(guestStream.consumeEnemyParty(32), "a delayed selector replay stays retired").toBeNull();
+    expect(guestStream.consumeEnemyPartyState(32)).toBeUndefined();
+
+    const spawnedBattle = { ...emptyAuthoritativeState(32, 1, 198), enemyParty: [{ id: 77 }] };
+    hostStream.sendEnemyParty(32, [{ fieldIndex: 2, data: { speciesId: 77 } }], 4, 0, spawnedBattle);
+    await flushWire();
+    const admitted = guestStream.consumeEnemyPartyAuthority(32);
+    expect(admitted.enemies?.[0]?.data.speciesId, "a causally newer same-wave battle party is admitted").toBe(77);
+    expect(admitted.state, "the newer state stays paired with its party").toEqual(spawnedBattle);
   });
 
   it("bounds unconsumed event-only wave states to the latest four waves", async () => {

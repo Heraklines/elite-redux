@@ -3701,9 +3701,15 @@ export function isCoopRuntimeActive(): boolean {
  * `getPlayerField()` is index-aligned with field slots (the party's first `playerCapacity`
  * entries, unfiltered), so this is the single place engine code turns a slot into its owner -
  * every command / switch routing gate keys off it instead of assuming the launch layout.
+ *
+ * Runtime assembly can precede BattleScene construction in protocol-only/headless boots. In that
+ * pre-scene window use the session module's fixed launch map (the same fallback used for an empty
+ * field) instead of throwing from an inbound security predicate and silently turning a valid frame
+ * into a timeout. Once a field exists its persistent owner tags remain authoritative.
  */
 export function coopOwnerOfPlayerFieldSlot(fieldIndex: number): CoopRole {
-  return coopOwnerOfFieldSlot(globalScene.getPlayerField(), fieldIndex);
+  const scene = globalScene as typeof globalScene | undefined;
+  return coopOwnerOfFieldSlot(scene?.getPlayerField?.() ?? [], fieldIndex);
 }
 
 /**
@@ -4611,6 +4617,10 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
   ) {
     return false;
   }
+  const outcomeState = payload.outcome.authoritativeState;
+  if (outcomeState == null) {
+    return false;
+  }
   const transaction = { operationId: op.id, pinned, step, payload };
   // Besides making a late replay phase retriable, this fences the two-engine harness's shared module
   // graph: an envelope delivered while the other client's scene is installed must not apply to it.
@@ -4620,6 +4630,7 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
   const receive = receiveCoopMeTerminalTransactionFor(runtime.opState, transaction, {
     applyMaterial: () => {
       if (applyCoopMeOutcome(payload.outcome)) {
+        runtime.battleStream.retireEnemyPartyAuthorityThrough(outcomeState.wave, outcomeState.tick);
         return true;
       }
       coopWarn("me", `journaled Mystery transaction DATA apply failed id=${op.id}`);

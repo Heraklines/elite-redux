@@ -44,9 +44,9 @@ import {
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
-  materializeMirroredGuestInputTurn,
+  materializeGuestInputAfterReplacement,
   presentedFieldMon,
-  pumpDuoDestinations,
+  settleDuoPromise,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -201,12 +201,8 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       hostAdvance = game.phaseInterceptor.to("CommandPhase", false);
       await drainLoopback();
     });
-    await pumpDuoDestinations(rig, 4);
-    await withClient(rig.hostCtx, async () => {
-      await drainLoopback();
-      expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
-      await hostAdvance;
-    });
+    expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+    await settleDuoPromise(rig, hostAdvance!, "guest-picked faint replacement host crossing");
     const hostReplacement = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
     expect(pair.faultsInjected(), "the guest's first replacement intent was actually dropped").toBe(1);
     expect(
@@ -218,9 +214,8 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     // Deliver the replacement checkpoint under the guest context, then restore the omitted
     // production TurnInit tail of this directly-mirrored headless scene. The resulting real
     // guest-owned CommandPhase is the public surface a browser would open for the refilled slot.
-    await pumpDuoDestinations(rig, 2);
     await withClient(rig.guestCtx, async () => {
-      materializeMirroredGuestInputTurn(rig.guestScene);
+      await materializeGuestInputAfterReplacement(rig.guestScene);
       await driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase after replacement", {
         matches: phase =>
           phase.phaseName === "CommandPhase"
@@ -414,11 +409,8 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
 
       // Reactivating the host flushes the exact runWhenCoopRuntimeActive continuation. Only now may
       // it queue one summon plus one replacement checkpoint and finish the crossing to CommandPhase.
-      await withClient(rig.hostCtx, async () => {
-        await drainLoopback();
-        expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
-        await hostAdvance;
-      });
+      expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+      await settleDuoPromise(rig, hostAdvance!, "idle faint fallback host crossing");
       expect(
         unshiftSpy.mock.calls.filter(([name]) => name === "SwitchSummonPhase"),
         "the material barrier releases exactly one authoritative summon",
@@ -437,7 +429,7 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       // public CommandPhase. The replacement checkpoint was already consumed while the retained
       // fallback closed the picker.
       await withClient(rig.guestCtx, async () => {
-        materializeMirroredGuestInputTurn(rig.guestScene);
+        await materializeGuestInputAfterReplacement(rig.guestScene);
         await driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase after timeout replacement", {
           matches: phase =>
             phase.phaseName === "CommandPhase"

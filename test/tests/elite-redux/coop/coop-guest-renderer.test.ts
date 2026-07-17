@@ -800,6 +800,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
         true,
         false,
       );
+      // Install the phase into the real tree before starting it. The retained material barrier's
+      // boundaryStillLive fence intentionally rejects a detached phase object that is not current.
+      game.scene.phaseManager.unshiftPhase(switchPhase);
+      game.scene.phaseManager.shiftPhase();
       switchPhase.start();
       await new Promise(r => setTimeout(r, 120));
     } finally {
