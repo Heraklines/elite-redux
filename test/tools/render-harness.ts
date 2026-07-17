@@ -25,6 +25,7 @@
 // args); the asset wiring configures itself. See PAGE_RECIPES below.
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import { ER_NEWCOMER_FRONT_ICON_SLUGS } from "#data/elite-redux/er-newcomer-species";
 import { UiTheme } from "#enums/ui-theme";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -1191,6 +1192,17 @@ export function findSuspectSprites(ctx: RenderContext): string[] {
 }
 
 /**
+ * Purge every pending timer event on the GameManager scene's clock. Handlers that own an
+ * ErShinyLabNameFx schedule a LOOPING frame-swap timer there; the harness renders throwaway
+ * handlers it never destroy()s, so those timers leak and keep firing (the MockClock's setInterval
+ * never stops) - crashing once their overlay sprite is destroyed. A static snapshot needs no
+ * running timer, so clearing them is safe and renders nothing.
+ */
+export function purgeSceneTimers(): void {
+  (globalScene as any)?.time?.removeAllEvents?.();
+}
+
+/**
  * Render a handler page in two passes: pass 1 records the texture keys it asks
  * for, we inject them, pass 2 renders for real. `run` should (re)build the page:
  * call handler.setup() + handler.show(args) against the re-pointed globalScene.
@@ -1200,6 +1212,7 @@ export async function renderTwoPass(
   run: () => void | Promise<void>,
 ): Promise<{ injected: string[]; unresolved: string[] }> {
   // Pass 1: collect requested texture keys.
+  purgeSceneTimers();
   ctx.uiInner.removeAll(true);
   ctx.fieldRoot.removeAll(true);
   ctx.missing.clear();
@@ -1209,6 +1222,12 @@ export async function renderTwoPass(
   // Inject everything pass 1 asked for that we can resolve locally.
   const { injected, unresolved } = await injectMissing(ctx);
   // Pass 2: rebuild now that textures exist (clear pass-1 objects first), then settle.
+  // Purge the GameManager scene's clock BEFORE destroying pass-1's display objects: a page that
+  // owns an ErShinyLabNameFx scheduled a LOOPING timer there (never destroy()'d - the harness
+  // abandons pass-1's throwaway handler), and once removeAll(true) destroys the FX overlay sprite,
+  // the orphaned timer's next tick() would setTexture on a destroyed sprite (scene undefined) and
+  // throw. No render depends on that timer (the snapshot is a frozen still), so this changes no pixels.
+  purgeSceneTimers();
   ctx.uiInner.removeAll(true);
   ctx.fieldRoot.removeAll(true);
   ctx.missing.clear();
