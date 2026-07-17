@@ -5,6 +5,11 @@
  */
 {
   "compilerOptions": {
+    // Optimization brief R7: warm-start repeat typechecks. tsc still checks everything;
+    // only the dependency-graph state is reused (CI caches this file with a branch
+    // restore-keys prefix; locally it makes back-to-back typechecks fast).
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
     "target": "ES2022",
     "module": "ES2022",
     // Modifying this option requires all values to be set manually because the defaults get overridden

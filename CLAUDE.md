@@ -477,6 +477,25 @@ ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-duo-multiwave.test
 Both clients' `coop:*` + phase lines stream to `dev-logs/coop-duo/<run>/{host,guest}.log` (gitignored),
 flushed even on failure - read these to triage a desync.
 
+### 🔴 Test-speed dev loop (optimization brief, 2026-07-17)
+
+- **Iterating on ONE test file? Use WATCH MODE, not repeated `vitest run`.** The config
+  sets `watch: false`, so the flag is required:
+  `ER_SCENARIO=1 npx vitest --watch <file>` — the ~50s boot (jsdom + Phaser + ER init +
+  module-graph transform) is paid ONCE; each save re-runs in ~2-5s for leaf changes
+  (shared-setup edits invalidate more; that is expected). Every one-shot `vitest run`
+  re-pays the full boot.
+- **Pure-logic tests go in the NODE-ONLY project** (`test/node/`, run via
+  `pnpm test:node`): environment `node`, no setup files, no jsdom/Phaser/globalScene —
+  the whole project runs in <1s (pilot: 439ms vs ~57s in the main project). A test
+  belongs there ONLY if its full import graph is engine/DOM-free (the pilot module,
+  `coop-battle-checksum.ts`, has zero imports). Prefer landing new protocol/reducer/
+  resolver tests there.
+- The browser-lane speed work (per-seat displays, event-acked input, evidence
+  batching, caching) is specced in
+  `docs/plans/2026-07-17-browser-test-optimization-brief.md` — read it before touching
+  the public-UI harness; its budgets + stage-timing baselines are the acceptance gate.
+
 **Add a new co-op repro (recipe, from the harness header):**
 1. In a fresh `it(...)`, boot the host (`game.classicMode.startBattle(...)`) + `buildDuo(game,
    createLoopbackPair(), setCoopRuntime, toCoop)` to stand up the guest engine + both runtimes over one

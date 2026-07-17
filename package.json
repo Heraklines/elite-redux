@@ -18,6 +18,7 @@
     "test:profile": "node scripts/profiling/profiling.js",
     "test:cov": "vitest run --silent='passed-only' --coverage",
     "test:watch": "vitest watch --silent='passed-only'",
+    "test:node": "vitest run --config test/node/vitest.config.ts",
     "test:silent": "vitest run --silent='passed-only'",
     "test:merge-reports": "MERGE_REPORTS=1 vitest run --merge-reports=test-results --silent='passed-only' --configLoader runner",
     "test:create": "node scripts/create-test/create-test.js",
