@@ -1058,12 +1058,32 @@ export class PublicUiClient {
         `${this.label}: fresh-account MessagePhase did not open TitlePhase or SelectGenderPhase after ${attempt} public retries`,
       );
     }
-    return this.evidence.waitForCondition(
-      sink => sink.find(TITLE_PHASE, this.pageCursor) ?? sink.find(SELECT_GENDER_PHASE, this.pageCursor),
-      {
-        timeoutMs: this.config.timeoutMs,
-        description: "TitlePhase or visible first-login gender prompt after authentication",
-      },
+    // LOGIN-mode accounts provisioned through the API (the dirty-account fidelity lane) have
+    // never completed first-login onboarding: the system savedata 404s and the fresh welcome
+    // MessagePhase needs real presses exactly like register-mode. Detect that from the LIVE 404
+    // (never the account mode) and drive the same public A-button loop; a returning account with
+    // real system data sees zero extra presses and the plain Title/gender wait.
+    const loginOnboardingDeadline = Date.now() + this.config.bootTimeoutMs;
+    let loginOnboardingAttempt = 0;
+    while (Date.now() < loginOnboardingDeadline) {
+      const phase =
+        this.evidence.find(TITLE_PHASE, this.pageCursor) ?? this.evidence.find(SELECT_GENDER_PHASE, this.pageCursor);
+      if (phase) {
+        return phase;
+      }
+      const missingSystem = this.evidence.events
+        .slice(this.pageCursor)
+        .find(event => event.kind === "response" && event.status === 404 && event.url.endsWith("/savedata/system/get"));
+      if (missingSystem) {
+        loginOnboardingAttempt += 1;
+        await this.press("Space", `dismiss-new-account-message:login-mode-attempt-${loginOnboardingAttempt}`);
+        await delay(Math.max(this.config.settleDelayMs, 5_000));
+        continue;
+      }
+      await delay(250);
+    }
+    throw new Error(
+      `${this.label}: timed out waiting for TitlePhase or visible first-login gender prompt after authentication`,
     );
   }
 
