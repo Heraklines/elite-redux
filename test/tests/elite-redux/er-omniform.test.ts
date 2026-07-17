@@ -12,7 +12,7 @@ import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 const OMNIFORM = ER_OMNIFORM_ABILITY_ID as AbilityId;
@@ -152,5 +152,48 @@ describe.skipIf(!RUN)("ER Omniform (5929)", () => {
     // Normal-type Tackle has no mapping for Eevee.
     erOmniformOnMoveStart(holder, allMoves[MoveId.TACKLE]);
     expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+  });
+
+  it("is a TOTAL no-op when the mapped target IS the holder's current form (already that form)", async () => {
+    // Jolteon mapping Electric -> Jolteon: using an Electric move while ALREADY
+    // Jolteon must not re-adapt (the maintainer's report). No message, no FX/wait
+    // phase, no moveset re-derive - the move just plays.
+    registerOmniformMapping(SpeciesId.JOLTEON, 0, PokemonType.ELECTRIC, SpeciesId.JOLTEON);
+    await game.classicMode.startBattle(SpeciesId.JOLTEON);
+    const holder = game.field.getPlayerPokemon();
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.JOLTEON);
+
+    const movesBefore = holder.getMoveset().map(m => m?.moveId);
+    const queueMessage = vi.spyOn(game.scene.phaseManager, "queueMessage");
+    const unshiftNew = vi.spyOn(game.scene.phaseManager, "unshiftNew");
+
+    // Thunder Shock is Electric; Jolteon maps Electric -> Jolteon (itself).
+    erOmniformOnMoveStart(holder, allMoves[MoveId.THUNDER_SHOCK]);
+
+    // Still Jolteon, moveset byte-identical, and NOTHING was queued.
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.JOLTEON);
+    expect(holder.getMoveset().map(m => m?.moveId)).toEqual(movesBefore);
+    expect(queueMessage).not.toHaveBeenCalled();
+    expect(unshiftNew.mock.calls.some(call => call[0] === "ErOmniformTransformWaitPhase")).toBe(false);
+  });
+
+  it("a Normal STATUS move while ALREADY on base is a no-op (the revert seam)", async () => {
+    // Never transformed => on base. A Normal status move routes through the revert
+    // path, which must be inert (no snapshot to revert to): no message, no wait phase.
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const holder = game.field.getPlayerPokemon();
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+
+    const movesBefore = holder.getMoveset().map(m => m?.moveId);
+    const queueMessage = vi.spyOn(game.scene.phaseManager, "queueMessage");
+    const unshiftNew = vi.spyOn(game.scene.phaseManager, "unshiftNew");
+
+    // Growl is a Normal-type status move.
+    erOmniformOnMoveStart(holder, allMoves[MoveId.GROWL]);
+
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+    expect(holder.getMoveset().map(m => m?.moveId)).toEqual(movesBefore);
+    expect(queueMessage).not.toHaveBeenCalled();
+    expect(unshiftNew.mock.calls.some(call => call[0] === "ErOmniformTransformWaitPhase")).toBe(false);
   });
 });

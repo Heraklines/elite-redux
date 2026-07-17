@@ -239,6 +239,18 @@ export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
   if (!target) {
     return;
   }
+
+  // SAME-FORM NO-OP: the mapped target IS the holder's current species+form (e.g.
+  // Jolteon using an Electric move maps Jolteon -> Jolteon). It is already that
+  // form, so there is nothing to adapt: no message, no FX, no moveset re-derive,
+  // no wait phase, and no snapshot bookkeeping - the move just plays. Returning
+  // here BEFORE `snapshotOmniformOriginal` / the per-form PP snapshot leaves all
+  // chain-transform bookkeeping untouched.
+  const currentForm = user.getSpeciesForm();
+  if (target.speciesId === currentForm.speciesId && target.formIndex === currentForm.formIndex) {
+    return;
+  }
+
   const speciesForm = resolveSpeciesForm(target);
   const targetSpecies = getPokemonSpecies(target.speciesId);
 
