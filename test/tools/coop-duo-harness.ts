@@ -1385,6 +1385,43 @@ function destinationPumpOperationEnvelopes(pair: {
   const queues: Record<CoopRole, CoopMessage[]> = { host: [], guest: [] };
   let destinationContextDelivery = false;
 
+  // The one-process rig's stand-in for production's SECOND always-running browser event loop, at the
+  // DELIVERY layer. Destination-scoped frames (envelope / turnResolution / ...) park here until their
+  // destination ClientCtx pumps - but a test that awaits a long host-context crossing (e.g.
+  // phaseInterceptor.to across faint-replacement SwitchPhases) never pumps the guest, so the parked
+  // FAINT_SWITCH envelopes starve, the guest never op-ACKs, and the host's durability resend loop
+  // exhausts into the b59dba12/aeaf8382 B-lane hang class ("operation delivery RETRY attempt=8/8",
+  // stuck at SwitchPhase). Production's destination browser keeps consuming its own inbox, so this
+  // pulse is a FIDELITY fix: on enqueue, schedule one short pulse that SYNCHRONOUSLY installs the
+  // destination context (withClientSync - interleave-free), flushes this queue through the real
+  // handlers under the destination's own ambient scene, and restores. Deduped per role; a pair whose
+  // rig is not yet assembled (or already torn down) keeps the explicit-pump-only status quo.
+  const destinationPulsePending: Record<CoopRole, boolean> = { host: false, guest: false };
+  const scheduleDestinationPulse = (role: CoopRole): void => {
+    if (destinationPulsePending[role]) {
+      return;
+    }
+    destinationPulsePending[role] = true;
+    setTimeout(() => {
+      destinationPulsePending[role] = false;
+      if (queues[role].length === 0) {
+        return;
+      }
+      const rig = [...liveDuoRigs].find(candidate => candidate.pair === wrapped);
+      if (rig == null) {
+        return;
+      }
+      const ctx = role === "host" ? rig.hostCtx : rig.guestCtx;
+      withClientSync(ctx, () => {
+        wrapped.flush(role);
+      });
+      // Delivery under the destination scene may enqueue reciprocal frames for the peer.
+      if (queues[role === "host" ? "guest" : "host"].length > 0) {
+        scheduleDestinationPulse(role === "host" ? "guest" : "host");
+      }
+    }, 15);
+  };
+
   // These carriers either validate/apply against globalScene immediately or resume a continuation which
   // does. Delivering them synchronously while the sender's ClientCtx is installed can make a valid guest
   // turn inspect the host preimage (and be rejected as malformed), or mutate the host scene through the
@@ -1406,6 +1443,7 @@ function destinationPumpOperationEnvelopes(pair: {
     const unsubscribe = inner.onMessage(message => {
       if (requiresDestinationScene.has(message.t) || destinationContextDelivery) {
         queues[inner.role].push(message);
+        scheduleDestinationPulse(inner.role);
         return;
       }
       for (const handler of [...handlers]) {
