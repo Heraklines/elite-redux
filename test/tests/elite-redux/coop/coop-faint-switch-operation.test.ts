@@ -68,6 +68,33 @@ describe("co-op faint-switch operation migration", () => {
     ).toThrow(/invalid faint-switch turn/u);
   });
 
+  it("stamps a DENSE all-finite payload from a short legacy base (the host-owned replacement wire shape)", () => {
+    // The live faint-stall class (gate 29598888047 B1/B7/B8/B10/B12 + S4): the host's SwitchPhase
+    // builds its choice from the legacy base `[0]` / `[1]`, and the address stamp wrote only
+    // indices 2..5 - leaving index 1 a HOLE that survives JSON as null. The guest applier's
+    // validPayload (`data.every(Number.isFinite)`) then permanently rejected every host-owned
+    // committed replacement op, exhausting bounded recovery into a shared session terminal.
+    const guestState = createCoopRuntimeOpState("guest");
+    setActiveCoopRuntimeOpState(guestState);
+    const binding = captureCoopFaintSwitchOperationBinding("guest");
+    for (const base of [[0], [1]]) {
+      const data = addressCoopFaintSwitchChoiceData(
+        base,
+        { wave: 1, turn: 1, fieldIndex: 0, partySlot: 2, resolution: COOP_FAINT_SWITCH_RESOLUTION_NONE },
+        binding,
+      );
+      expect(data.length, "the stamp covers the full metadata block").toBeGreaterThan(5);
+      for (let i = 0; i < data.length; i++) {
+        expect(Number.isFinite(data[i]), `index ${i} must be finite (no holes) for base [${base}]`).toBe(true);
+      }
+      const roundTripped = JSON.parse(JSON.stringify(data)) as unknown[];
+      expect(
+        roundTripped.every(Number.isFinite),
+        "the wire round-trip must stay admissible to the guest applier's validPayload",
+      ).toBe(true);
+    }
+  });
+
   it("acknowledges a no-picker terminal only after the exact no-surface occurrence was proved", () => {
     const guestState = createCoopRuntimeOpState("guest");
     setActiveCoopRuntimeOpState(guestState);

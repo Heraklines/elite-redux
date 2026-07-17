@@ -323,6 +323,17 @@ export function addressCoopFaintSwitchChoiceData(
   binding?: CoopFaintSwitchOperationBinding | null,
 ): number[] {
   const addressed = [...data];
+  // Densify the legacy metadata block below the address stamp. A short legacy base (`[0]` /
+  // `[1]`) leaves index 1 a HOLE after the indexed writes below; the hole survives the JSON
+  // round-trip as null, and the guest applier's validPayload (`data.every(Number.isFinite)`)
+  // then hard-rejects the whole committed operation - so every HOST-owned replacement op was
+  // permanently rejected by every guest (the live faint-stall class; gate 29598888047
+  // B1/B7/B8/B10/B12 + S4: bounded recovery exhausted -> shared session terminal at faints).
+  for (let i = 0; i < COOP_FAINT_SWITCH_ID_EPOCH_INDEX; i++) {
+    if (!Number.isFinite(addressed[i])) {
+      addressed[i] = 0;
+    }
+  }
   addressed[COOP_FAINT_SWITCH_ID_EPOCH_INDEX] = state(binding).epoch;
   addressed[COOP_FAINT_SWITCH_ID_ADDRESS_INDEX] = coopFaintSwitchOperationAddress(
     params.wave,

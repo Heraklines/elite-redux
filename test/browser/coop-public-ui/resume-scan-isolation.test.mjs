@@ -71,6 +71,10 @@ test("lobby quarantines one save-slot failure and releases a fresh run only thro
   assert.match(gameData, /deleteSession\(candidate\.slot\)/u);
   assert.match(starter, /confirmPendingFreshCoopSessionSlot\(slot\)/u);
   assert.match(starter, /fresh co-op launch has no verified empty local\+cloud save slot/u);
+  // 2026-07-17 dirty-lane: transient availability failures (lease contention, cloud fetch) must
+  // never rank a slot as reclaimable garbage - only proven-unresumable CONTENT may be deleted first.
+  assert.match(gameData, /failure instanceof CoopResumeReplicaUnavailableError && failure\.contentGarbage/u);
+  assert.match(gameData, /transient availability failure, not content garbage/u);
 
   assert.match(config, /"resume-scan-isolation"/u);
   assert.match(journeys, /async function resumeScanIsolation\(rig\)/u);

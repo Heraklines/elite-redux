@@ -3949,10 +3949,7 @@ export class CoopBattleStreamer {
     switch (msg.t) {
       case "enemyPartySync": {
         const floor = this.enemyPartyAuthorityFloorByWave.get(msg.wave);
-        if (
-          floor != null
-          && (msg.authoritativeState === undefined || msg.authoritativeState.tick <= floor)
-        ) {
+        if (floor != null && (msg.authoritativeState === undefined || msg.authoritativeState.tick <= floor)) {
           coopLog(
             "stream",
             `guest ignored retired enemyParty carrier wave=${msg.wave} tick=${msg.authoritativeState?.tick ?? "-"} floor=${floor}`,

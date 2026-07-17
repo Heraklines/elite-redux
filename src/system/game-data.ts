@@ -209,7 +209,12 @@ const systemShortKeys = {
 const CLOUD_SYNC_MIN_INTERVAL_MS = 20 * 60 * 1000;
 const CLOUD_SYNC_BACKOFF_BASE_MS = 20 * 60 * 1000;
 const CLOUD_SYNC_BACKOFF_MAX_MS = 6 * 60 * 60 * 1000;
-const COOP_PERSISTENCE_LOCK_ACQUIRE_TIMEOUT_MS = 2_000;
+// The acquire timeout is a DEADLOCK backstop, not a pacing constraint: legitimate holders perform
+// network I/O (cloud replica caching, run-status proofs) that exceeds 2s on a cold/CPU-starved
+// client, and a spurious expiry fails a healthy persistence operation closed (2026-07-17 dirty-lane:
+// three sequential resume-scan slot loads timed out behind one slow holder and marked healthy cloud
+// saves as snapshot failures). Real deadlocks still fail, just later.
+const COOP_PERSISTENCE_LOCK_ACQUIRE_TIMEOUT_MS = 15_000;
 // Ordinary persistence operations fail closed quickly so a wedged tab cannot stall gameplay. Once an
 // exact backend tombstone has committed, however, returning early leaves the browser advertising stale
 // local bytes even though the authoritative row is already gone. Give that final compare-delete enough
@@ -340,9 +345,19 @@ export type CoopFreshLaunchConsumption =
   | { kind: "invalid" };
 
 class CoopResumeReplicaUnavailableError extends Error {
-  constructor(message: string) {
+  /**
+   * True only when the replica CONTENT itself is proven unresumable (opaque/unparseable/divergent
+   * savedata) - the class the launch reclaim may delete first. False for AVAILABILITY failures
+   * (lease contention, cloud fetch, mid-inspection races): those slots may hold a healthy save that
+   * simply could not be read right now, so reclaim must never rank them as garbage (2026-07-17
+   * dirty-lane: three lock-acquire timeouts marked healthy cloud saves as snapshot failures).
+   */
+  public readonly contentGarbage: boolean;
+
+  constructor(message: string, contentGarbage = false) {
     super(message);
     this.name = "CoopResumeReplicaUnavailableError";
+    this.contentGarbage = contentGarbage;
   }
 }
 
@@ -1937,7 +1952,7 @@ export class GameData {
       try {
         local = await this.classifyCoopReplica(slotId, decrypt(localRaw, bypassLogin));
       } catch (error) {
-        throw new CoopResumeReplicaUnavailableError(`local slot ${slotId} is unreadable: ${String(error)}`);
+        throw new CoopResumeReplicaUnavailableError(`local slot ${slotId} is unreadable: ${String(error)}`, true);
       }
     }
     if (!this.persistenceAccountIsCurrent(accountIdentity) || localStorage.getItem(storageKey) !== localRaw) {
@@ -1990,20 +2005,23 @@ export class GameData {
       localRaw = null;
     }
     if (local?.protection === "unknown" || cloud?.protection === "unknown") {
-      throw new CoopResumeReplicaUnavailableError(`local/cloud slot ${slotId} contains opaque savedata`);
+      throw new CoopResumeReplicaUnavailableError(`local/cloud slot ${slotId} contains opaque savedata`, true);
     }
     if (local != null && cloud != null && local.protection !== cloud.protection) {
-      throw new CoopResumeReplicaUnavailableError(`local/cloud slot ${slotId} has conflicting protection classes`);
+      throw new CoopResumeReplicaUnavailableError(
+        `local/cloud slot ${slotId} has conflicting protection classes`,
+        true,
+      );
     }
 
     const selectedLegacy =
       local?.protection === "coop-invalid" ? local : cloud?.protection === "coop-invalid" ? cloud : null;
     if (selectedLegacy != null) {
       if (local != null && cloud != null && local.raw !== cloud.raw) {
-        throw new CoopResumeReplicaUnavailableError(`legacy co-op replicas differ in slot ${slotId}`);
+        throw new CoopResumeReplicaUnavailableError(`legacy co-op replicas differ in slot ${slotId}`, true);
       }
       if (selectedLegacy.session == null) {
-        throw new CoopResumeReplicaUnavailableError(`legacy co-op slot ${slotId} cannot be parsed safely`);
+        throw new CoopResumeReplicaUnavailableError(`legacy co-op slot ${slotId} cannot be parsed safely`, true);
       }
       if (local == null) {
         const encryptedCloud = encrypt(selectedLegacy.raw, bypassLogin);
@@ -2025,7 +2043,7 @@ export class GameData {
     const selectedSolo = local?.protection === "solo" ? local : cloud?.protection === "solo" ? cloud : null;
     if (selectedSolo != null) {
       if (selectedSolo.session == null) {
-        throw new CoopResumeReplicaUnavailableError(`solo slot ${slotId} could not be parsed`);
+        throw new CoopResumeReplicaUnavailableError(`solo slot ${slotId} could not be parsed`, true);
       }
       if (local == null) {
         const encryptedCloud = encrypt(selectedSolo.raw, bypassLogin);
@@ -2193,14 +2211,14 @@ export class GameData {
         } catch (error) {
           recordSlotFailure(
             slot,
-            new CoopResumeReplicaUnavailableError(`local slot ${slot} is unreadable: ${String(error)}`),
+            new CoopResumeReplicaUnavailableError(`local slot ${slot} is unreadable: ${String(error)}`, true),
           );
           continue;
         }
         try {
           const replica = await this.classifyCoopReplica(slot, json);
           if (replica.session == null) {
-            throw new CoopResumeReplicaUnavailableError(`local slot ${slot} could not be classified`);
+            throw new CoopResumeReplicaUnavailableError(`local slot ${slot} could not be classified`, true);
           }
           sessions.set(slot, { session: replica.session, sessionJson: replica.raw });
         } catch (error) {
@@ -3595,8 +3613,20 @@ export class GameData {
     }
     const candidates: { slot: number; garbage: boolean; timestamp: number; wave: number | null }[] = [];
     for (let slot = 0; slot < 5; slot++) {
-      if (snapshot.failures.has(slot)) {
-        candidates.push({ slot, garbage: true, timestamp: 0, wave: null });
+      const failure = snapshot.failures.get(slot);
+      if (failure != null) {
+        // Only PROVEN-unresumable content (opaque/unparseable/divergent savedata) is reclaimable
+        // garbage. An availability failure (lease contention, cloud fetch, mid-inspection race) may
+        // hide a perfectly healthy save - deleting on it is the overwrite class this path must never
+        // commit (2026-07-17 dirty-lane: lock-acquire timeouts marked healthy cloud slots as failures).
+        if (failure instanceof CoopResumeReplicaUnavailableError && failure.contentGarbage) {
+          candidates.push({ slot, garbage: true, timestamp: 0, wave: null });
+        } else {
+          coopLog(
+            "launch",
+            `reclaim skipping slot=${slot}: transient availability failure, not content garbage (${failure.message})`,
+          );
+        }
         continue;
       }
       const loaded = snapshot.sessions.get(slot);
