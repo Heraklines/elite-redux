@@ -37,17 +37,21 @@ export function isActionableSemanticObservation(observation, { requireExplicitUn
 export function findOwnedActionableReplacementSurface(client, fromCursor = 0) {
   const event = client.evidence.findLastSemanticSurface(fromCursor, "party:replacement");
   const observation = event?.observation;
+  // SLOT-LIST form only: a surface exposing the mon action SUBMENU (party-option:* ids) is the
+  // picker mid-descent - driving party-slot:* keys at it throws "target not in options"
+  // (run 29613070126: an errant Space had opened the fainted FIELD slot's submenu, which
+  // correctly lacks send-out). The driver must wait for / recover to the slot list.
+  const slotListForm = !(
+    Array.isArray(observation?.optionIds) && observation.optionIds.some(id => /^party-option:/u.test(id))
+  );
   return observation?.operationClass === "replacement"
     && observation.ownerModel === "interaction"
     && (observation.phase === "SwitchPhase" || observation.phase === "CoopGuestFaintSwitchPhase")
     && observation.uiMode === "PARTY"
     && observation.localSeat === client.publicSeat
     && observation.ownerSeat === client.publicSeat
-    && observation.seatsWithInput?.includes(client.publicSeat) // SLOT-LIST form only: a surface exposing the mon action SUBMENU (party-option:* ids) is the
-    && // picker mid-descent - driving party-slot:* keys at it throws "target not in options"
-    // (run 29613070126: an errant Space had opened the fainted FIELD slot's submenu, which
-    // correctly lacks send-out). The driver must wait for / recover to the slot list.
-    !(Array.isArray(observation.optionIds) && observation.optionIds.some(id => /^party-option:/u.test(id)))
+    && observation.seatsWithInput?.includes(client.publicSeat)
+    && slotListForm
     && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
     ? event
     : null;
