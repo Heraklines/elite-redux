@@ -1,0 +1,57 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: fixed
+run_mode: calibrated-release
+calibration_id: me-host-guest-plus-asym-six-turn
+target_sha: 4026bf6ca7d4f8095cb9cf7a0008d303b88479d5
+checked_out_sha: 4026bf6ca7d4f8095cb9cf7a0008d303b88479d5
+base_seed: 20260717
+campaign_seed: fixed-in-test (matrix candidate 20260717 not consumed)
+run: 29565689975 (workflow source 4026bf6ca7d4f8095cb9cf7a0008d303b88479d5)
+timestamp: 2026-07-17T08-16-07Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[33m[coop:heal] heldItems monId=2358948657 bi=0 removed=[LEFTOVERS] added=[LEFTOVERS] -> applied[39m
+[33m[coop:heal] heldItems bi=0 host=[LEFTOVERS] -> applied (rewrote to host set)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:84:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a DEPARTMENT_STORE_SALE ME inline at wave 15 (host-owned), the guest replays in lockstep, findings=0
+[22m[39m[coop:transport] send guest t=turnCommitAck e=1827098793550593 wave=1 turn=1 rev=3 stage=presentationReady checksum=93e01fccb30d6597
+[coop:stream] guest ACK turn stage=presentationReady e=1827098793550593 wave=1 turn=1 rev=3
+[coop:checksum] guest finalize presentationReady e=1827098793550593 wave=1 turn=1 rev=3
+[coop:replay] guest finalize turn=1: END (checkpoint applied, turn-end queued)
+[coop:transport] recv host t=turnCommitAck e=1827098793550593 wave=1 turn=1 rev=3 stage=presentationReady checksum=93e01fccb30d6597 handlers=1
+[coop:stream] host ACCEPT turn ACK stage=presentationReady key=1827098793550593:1:1:3
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts[2m:219:3[22m[2m[2m > [22m[2mco-op SOAK asymmetric continuation: host half out, guest plays on solo (#828)[2m > [22m[2mSUSTAINED guest-solo: each post-exhaustion turn issues EXACTLY ONE partner request and resolves, no timeout, geometry converged, lockstep
+[22m[39m[32mStart Phase: MovePhase[39m
+[38;2;0;0;0mUser: Snorlax[39m
+[38;2;0;0;0mMove: DEFENSE_CURL[39m
+[38;2;0;0;0mUse Mode: FOLLOW_UP[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts[2m:219:3[22m[2m[2m > [22m[2mco-op SOAK asymmetric continuation: host half out, guest plays on solo (#828)[2m > [22m[2mSUSTAINED guest-solo: each post-exhaustion turn issues EXACTLY ONE partner request and resolves, no timeout, geometry converged, lockstep
+[22m[39m[32mStart Phase: MessagePhase[39m
+[34mSnorlax used Defense Curl![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts[2m:219:3[22m[2m[2m > [22m[2mco-op SOAK asymmetric continuation: host half out, guest plays on solo (#828)[2m > [22m[2mSUSTAINED guest-solo: each post-exhaustion turn issues EXACTLY ONE partner request and resolves, no timeout, geometry converged, lockstep
+[22m[39m[32mStart Phase: MoveEffectPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:84:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a DEPARTMENT_STORE_SALE ME inline at wave 15 (host-owned), the guest replays in lockstep, findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:84:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a DEPARTMENT_STORE_SALE ME inline at wave 15 (host-owned), the guest replays in lockstep, findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:84:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a DEPARTMENT_STORE_SALE ME inline at wave 15 (host-owned), the guest replays in lockstep, findings=0
+[22m[39m[coop:interaction] interactionCounter() read -> 0 (role=host)
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[32mStart Phase: EggLapsePhase[39m
+
