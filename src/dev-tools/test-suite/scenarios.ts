@@ -18542,11 +18542,18 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "(Eevee fully becomes Leafeon), and ONLY THEN does the move animation play as\n"
       + "Leafeon - the transform must NOT happen on top of / after the move. After the\n"
       + "reveal the mon RESTS cleanly on the new Leafeon form (correct sprite, fully\n"
-      + "visible, no snap-back to Eevee, no glow remnant). The starting moveset also has\n"
-      + "Water Gun / Ember / Thunder Shock, so a fresh run of this scenario can show\n"
-      + "the blue (Vaporeon), orange (Flareon) and yellow (Jolteon) variants. Testers\n"
-      + "eyeball the FX; unit config coverage is in\n"
-      + "test/tests/elite-redux/er-form-transform-fx.test.ts.",
+      + "visible, no snap-back to Eevee, no glow remnant). On a SLOW connection the\n"
+      + "glow HOLDS (stretches) until the new sprite has finished loading, then morphs\n"
+      + "and reveals onto it - the glow must never end and leave the sprite to pop in\n"
+      + "visibly late. The starting moveset also has Water Gun / Ember / Thunder Shock,\n"
+      + "so a fresh run of this scenario can show the blue (Vaporeon), orange (Flareon)\n"
+      + "and yellow (Jolteon) variants.\n"
+      + "ALSO DO: once you have adapted to a form, use that SAME form's own type again\n"
+      + "(e.g. adapt to Jolteon with Thunder Shock, then use Thunder Shock a second\n"
+      + "time). EXPECT: NO adapt message and NO transform FX the second time - it is\n"
+      + "already that form, so the move just plays. Testers eyeball the FX; unit\n"
+      + "coverage is in test/tests/elite-redux/er-form-transform-fx.test.ts and\n"
+      + "er-omniform.test.ts.",
     setup: () => {
       resetDevOverrides();
       setOverrides({

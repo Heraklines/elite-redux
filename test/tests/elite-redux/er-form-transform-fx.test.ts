@@ -2,11 +2,17 @@ import { getTypeRgb } from "#data/type";
 import { PokemonType } from "#enums/pokemon-type";
 import {
   ER_TRANSFORM_FX_MAX_PARTICLES,
+  ER_TRANSFORM_MORPH_DRAIN_MS,
+  ER_TRANSFORM_MORPH_FILL_MS,
+  ER_TRANSFORM_MORPH_HOLD_CAP_MS,
+  ER_TRANSFORM_MORPH_MORPH_MS,
+  type ErMorphStage,
   type ErTransformParticleMotion,
   type ErTransformParticleShape,
   erTransformBuildMask,
   erTransformSignedDt,
   getErTransformTypeFx,
+  planErMorphTick,
 } from "#sprites/er-form-transform-fx";
 import { describe, expect, it } from "vitest";
 
@@ -206,6 +212,164 @@ describe("ER transform FX - SDF shape morph math", () => {
     // A cell OUTSIDE even the target stays empty throughout.
     for (const p of [0, 0.5, 1]) {
       expect(inside(p, 27, 16)).toBe(false);
+    }
+  });
+});
+
+/**
+ * The DEFERRED-target-mask timing state machine ({@linkcode planErMorphTick}) - the
+ * maintainer-reported staging (cold-CDN) late-swap fix. The animated render itself
+ * is animation-tier (out of scope for the headless harness per CLAUDE.md), but the
+ * decision of WHAT to render each tick is a pure function of timing + readiness, so
+ * every path the staging bug exercised is unit-testable here:
+ *   - the target mask arriving LATE (still within the stretched fill) -> the true
+ *     source->target morph STILL runs;
+ *   - the mask NEVER arriving within the bound -> graceful degrade (drain-only,
+ *     no shape morph) that STILL settles;
+ *   - the "no late pop" invariant: the glow is NEVER ended (reveal) before the
+ *     target sprite swap has actually landed under it.
+ */
+describe("ER transform FX - deferred target-mask timing (planErMorphTick)", () => {
+  const FILL = ER_TRANSFORM_MORPH_FILL_MS;
+  const HOLD = ER_TRANSFORM_MORPH_HOLD_CAP_MS;
+  const MORPH = ER_TRANSFORM_MORPH_MORPH_MS;
+  const DRAIN = ER_TRANSFORM_MORPH_DRAIN_MS;
+
+  interface DriveResult {
+    stages: Set<ErMorphStage>;
+    burstCount: number;
+    doneAt: number | null;
+    /** True if the glow ever ENDED (reveal) before the target swap landed (a late pop). */
+    revealedBeforeSwap: boolean;
+  }
+
+  /** Step the pure planner tick-by-tick, threading its own persisted `revealStart`. */
+  function drive(opts: { maskReadyAt: number | null; swapAt: number | null; end: number }): DriveResult {
+    const { maskReadyAt, swapAt, end } = opts;
+    const stages = new Set<ErMorphStage>();
+    let revealStart = -1;
+    let burstCount = 0;
+    let doneAt: number | null = null;
+    let revealedBeforeSwap = false;
+    for (let el = 0; el <= end; el += 16) {
+      const swapDone = swapAt !== null && el >= swapAt;
+      const maskReady = maskReadyAt !== null && el >= maskReadyAt;
+      const plan = planErMorphTick({
+        elapsed: el,
+        fillMs: FILL,
+        holdCapMs: HOLD,
+        morphMs: MORPH,
+        drainMs: DRAIN,
+        swapDone,
+        maskReady,
+        readyAtMs: maskReadyAt ?? 0,
+        revealStart,
+      });
+      stages.add(plan.stage);
+      if (plan.fireBurst) {
+        burstCount++;
+      }
+      if (plan.stage === "reveal" && !swapDone) {
+        revealedBeforeSwap = true;
+      }
+      if (plan.revealStart >= 0) {
+        revealStart = plan.revealStart;
+      }
+      if (plan.done) {
+        doneAt = el;
+        break;
+      }
+    }
+    return { stages, burstCount, doneAt, revealedBeforeSwap };
+  }
+
+  it("plays the FILL from t=0 with no target asset (fades the source out, floods the glow in)", () => {
+    const early = planErMorphTick({
+      elapsed: 200,
+      fillMs: FILL,
+      holdCapMs: HOLD,
+      morphMs: MORPH,
+      drainMs: DRAIN,
+      swapDone: false,
+      maskReady: false,
+      readyAtMs: 0,
+      revealStart: -1,
+    });
+    expect(early.stage).toBe("fill");
+    // Source partly faded, glow partly flooded.
+    expect(early.spriteAlpha).toBeGreaterThan(0);
+    expect(early.spriteAlpha).toBeLessThan(1);
+    expect(early.overallAlpha).toBeGreaterThan(0);
+    expect(early.fireBurst).toBe(false);
+  });
+
+  it("HOLDS the glow (never reveals) while the target swap is still in flight past fill", () => {
+    for (const el of [FILL + 1, 1000, FILL + HOLD, FILL + HOLD + 800]) {
+      const plan = planErMorphTick({
+        elapsed: el,
+        fillMs: FILL,
+        holdCapMs: HOLD,
+        morphMs: MORPH,
+        drainMs: DRAIN,
+        swapDone: false,
+        maskReady: false,
+        readyAtMs: 0,
+        revealStart: -1,
+      });
+      expect(plan.stage).toBe("hold");
+      // Sprite hidden under the solid glow; nothing revealed.
+      expect(plan.spriteAlpha).toBe(0);
+      expect(plan.overallAlpha).toBeGreaterThan(0);
+      expect(plan.done).toBe(false);
+    }
+  });
+
+  it("runs the REAL source->target morph when the mask arrives late but within the stretch", () => {
+    // Cold CDN: swap + mask land at 1200ms (< fill + hold = 1980), so the morph runs.
+    const res = drive({ maskReadyAt: 1200, swapAt: 1200, end: 4000 });
+    expect(res.stages.has("morph")).toBe(true);
+    expect(res.stages.has("reveal")).toBe(true);
+    expect(res.burstCount).toBe(1);
+    expect(res.revealedBeforeSwap).toBe(false);
+    expect(res.doneAt).not.toBeNull();
+  });
+
+  it("runs the morph when the target is ready early (warm assets - the local-dev path)", () => {
+    const res = drive({ maskReadyAt: 300, swapAt: 300, end: 3000 });
+    expect(res.stages.has("morph")).toBe(true);
+    expect(res.burstCount).toBe(1);
+    expect(res.revealedBeforeSwap).toBe(false);
+    expect(res.doneAt).not.toBeNull();
+  });
+
+  it("degrades gracefully (drain, NO morph) when the mask never arrives - and still settles", () => {
+    // Mask never builds; the swap lands slowly at 2500ms (past the stretch).
+    const res = drive({ maskReadyAt: null, swapAt: 2500, end: 5000 });
+    expect(res.stages.has("morph")).toBe(false);
+    expect(res.stages.has("hold")).toBe(true);
+    expect(res.stages.has("reveal")).toBe(true);
+    expect(res.burstCount).toBe(1);
+    // The reveal only ever happened AFTER the swap landed - no "glow ends, sprite pops late".
+    expect(res.revealedBeforeSwap).toBe(false);
+    expect(res.doneAt).not.toBeNull();
+    expect(res.doneAt!).toBeGreaterThanOrEqual(2500);
+  });
+
+  it("commits to the degrade path when the mask only arrives AFTER the stretch bound", () => {
+    // Mask + swap both land at 2100ms (> fill + hold = 1980): bounded, so NO morph.
+    const res = drive({ maskReadyAt: 2100, swapAt: 2100, end: 5000 });
+    expect(res.stages.has("morph")).toBe(false);
+    expect(res.stages.has("reveal")).toBe(true);
+    expect(res.revealedBeforeSwap).toBe(false);
+    expect(res.doneAt).not.toBeNull();
+  });
+
+  it("NEVER reveals before the swap lands, across a sweep of swap latencies (the no-late-pop invariant)", () => {
+    for (const swapAt of [600, 1000, 1480, 1980, 2400, 3200]) {
+      const res = drive({ maskReadyAt: null, swapAt, end: 6000 });
+      expect(res.revealedBeforeSwap).toBe(false);
+      expect(res.burstCount).toBe(1);
+      expect(res.doneAt).not.toBeNull();
     }
   });
 });
