@@ -240,6 +240,17 @@ jobs:
       - name: Install isolated Chrome runtime
         run: pnpm exec puppeteer browsers install chrome
 
+      # Optimization brief R6 tier-1: the MINIMAL transport checkpoint - the production
+      # connector factory (real signaling/SDP/chunker/rejoin over native WebRTC) without
+      # the game. Builds in ~2s, test body budgeted < 60s. Tier-2 (the sealed full-app
+      # checkpoint below) proves src/main wires the SAME factory - both are required.
+      - name: Build and run minimal transport checkpoint (tier-1)
+        env:
+          VITE_COOP_SERVER_URL: http://127.0.0.1:4174
+        run: |
+          pnpm exec vite build --mode production --config scripts/vite.coop-transport-min.config.mjs
+          node scripts/run-coop-transport-min.mjs
+
       - name: Run two-context sealed-production transport checkpoint
         id: browser
         env:

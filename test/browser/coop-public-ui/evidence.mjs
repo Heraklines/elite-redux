@@ -1459,24 +1459,41 @@ export class EvidenceSink {
     }
   }
 
-  async checkpoint(page, context, name) {
+  async checkpoint(page, context, name, { full } = {}) {
     const step = cleanSegment(name);
     const checkpointStartedMs = performance.now();
-    // WebGL canvases in a background Chromium page can capture as mostly black/partial tiles even
-    // while the game is healthy. Each player owns an isolated Chrome process, so foreground both
-    // independently, allow two real render frames plus a short bounded settle, then capture.
-    const capture = await serializeCheckpointCapture(() =>
-      captureCheckpointPngWithFallback(page, {
-        step,
-        dir: this.dir,
-        label: this.label,
-        record: (kind, payload) => this.record(kind, payload),
-      }),
-    );
-    const { pixelIntegrity } = capture;
-    this.record("checkpoint-pixel-integrity", { name: step, ...pixelIntegrity });
-    if (capture.attempt > 1) {
-      this.record("checkpoint-pixel-recovered", { name: step, cleanAttempt: capture.attempt });
+    // Optimization brief R3: screenshots are no longer ordinary checkpoints. The FIRST
+    // occurrence of each distinct surface shape (step name with run-variant digits
+    // normalized) captures a full pixel-inspected PNG; repeats of the same shape (the
+    // per-wave loop) are SEMANTIC checkpoints - the sanitized DOM/cookie metadata and the
+    // canvas assertion below always run (isolation proof stays), only the globally
+    // serialized PNG capture + in-renderer pixel decode are skipped. Callers force
+    // `full: true` on failure paths; COOP_UI_CHECKPOINT_MODE=full restores the legacy
+    // capture-everything diagnostic behavior.
+    const surfaceKey = step.replaceAll(/\d+/gu, "N");
+    this.fullCheckpointSurfaces ??= new Set();
+    const captureFull =
+      full === true || process.env.COOP_UI_CHECKPOINT_MODE === "full" || !this.fullCheckpointSurfaces.has(surfaceKey);
+    if (captureFull) {
+      this.fullCheckpointSurfaces.add(surfaceKey);
+      // WebGL canvases in a background Chromium page can capture as mostly black/partial tiles even
+      // while the game is healthy. Each player owns an isolated Chrome process, so foreground both
+      // independently, allow two real render frames plus a short bounded settle, then capture.
+      const capture = await serializeCheckpointCapture(() =>
+        captureCheckpointPngWithFallback(page, {
+          step,
+          dir: this.dir,
+          label: this.label,
+          record: (kind, payload) => this.record(kind, payload),
+        }),
+      );
+      const { pixelIntegrity } = capture;
+      this.record("checkpoint-pixel-integrity", { name: step, ...pixelIntegrity });
+      if (capture.attempt > 1) {
+        this.record("checkpoint-pixel-recovered", { name: step, cleanAttempt: capture.attempt });
+      }
+    } else {
+      this.record("checkpoint-semantic", { name: step, surfaceKey });
     }
     const dom = await page.evaluate(() => ({
       title: document.title,

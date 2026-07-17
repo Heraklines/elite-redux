@@ -93,3 +93,6 @@ stats/_stats_deploy/
 # agent scratch - ROM extraction workspace (never commit)
 tmp-pmd-extract/
 progress.md
+
+# Tier-1 minimal transport bundle output
+dist-coop-transport-min/

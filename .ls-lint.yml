@@ -38,6 +38,8 @@ ignore:
    - assets
    - locales
    - dist
+   # Tier-1 minimal transport bundle output (hashed chunk names).
+   - dist-coop-transport-min
    - .devcontainer
    - .wrangler
    - workers

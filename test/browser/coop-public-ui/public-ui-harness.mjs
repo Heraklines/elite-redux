@@ -1072,16 +1072,29 @@ export class PublicUiClient {
       fields: ["username", "password", "confirm-password"],
       values: "<redacted>",
     });
-    // Credential entry is setup, not gameplay cadence. CDP still emits public DOM key events,
-    // but an artificial per-character timer dilated 20 ms into minutes on a saturated runner.
-    await usernameInput.click({ clickCount: 3 });
-    await this.page.keyboard.type(this.credentials.username);
+    // Optimization brief R1c/R5 (frozen input boundary): credential entry is public-visible
+    // input with no scene mutation, so a visibly focused DOM field takes HUMAN-EQUIVALENT
+    // BULK INSERTION (one CDP Input.insertText - the IME/paste shape) instead of per-char
+    // key events that dilate into minutes on a saturated runner. Field length is verified
+    // without recording values; submission stays a real Enter key.
+    await this.insertCredential(usernameInput, this.credentials.username, "username");
     for (const passwordInput of passwordInputs.slice(0, 2)) {
-      await passwordInput.click({ clickCount: 3 });
-      await this.page.keyboard.type(this.credentials.password);
+      await this.insertCredential(passwordInput, this.credentials.password, "password");
     }
     await this.press("Enter", "submit-registration-form");
     await this.clearDomInputFocus();
+  }
+
+  /** Bulk-insert one credential into a VISIBLY FOCUSED field and verify its length only. */
+  async insertCredential(inputHandle, text, field) {
+    await inputHandle.click({ clickCount: 3 });
+    await this.selectAllFocusedText();
+    await this.page.keyboard.insertText(text);
+    const length = await inputHandle.evaluate(element => element.value.length);
+    if (length !== text.length) {
+      throw new Error(`${this.label}: ${field} field length ${length} != expected ${text.length} after insertion`);
+    }
+    this.evidence.record("credential-insert", { field, length, values: "<redacted>" });
   }
 
   async fillLoginForm() {
@@ -1091,12 +1104,8 @@ export class PublicUiClient {
       throw new Error(`${this.label}: visible login inputs were not present`);
     }
     this.evidence.record("fill-login-form", { fields: ["username", "password"], values: "<redacted>" });
-    await usernameInput.click({ clickCount: 3 });
-    await this.selectAllFocusedText();
-    await this.page.keyboard.type(this.credentials.username);
-    await passwordInput.click({ clickCount: 3 });
-    await this.selectAllFocusedText();
-    await this.page.keyboard.type(this.credentials.password);
+    await this.insertCredential(usernameInput, this.credentials.username, "username");
+    await this.insertCredential(passwordInput, this.credentials.password, "password");
     await this.press("Enter", "submit-login-form");
     await this.clearDomInputFocus();
   }
@@ -1218,8 +1227,8 @@ export class PublicUiClient {
     }
   }
 
-  async checkpoint(name) {
-    return this.evidence.checkpoint(this.page, this.context, `page-${this.pageGeneration}-${name}`);
+  async checkpoint(name, opts = {}) {
+    return this.evidence.checkpoint(this.page, this.context, `page-${this.pageGeneration}-${name}`, opts);
   }
 
   async enterCoopLobby() {
@@ -2802,7 +2811,8 @@ export class DuoPublicUiRig {
   async close() {
     await this.stopChromeTrace().catch(() => {});
     for (const client of Object.values(this.clients)) {
-      await client.checkpoint("final").catch(() => {});
+      // R3: the final-save boundary is always a FULL capture from both seats.
+      await client.checkpoint("final", { full: true }).catch(() => {});
       // Stage-timing instrumentation (optimization brief step 1): one aggregate record per
       // seat (input arbitration + checkpoint capture totals) so baselines never re-parse
       // the per-press trace.

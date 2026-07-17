@@ -39,7 +39,19 @@ import {
   rejoinP33Run,
 } from "#data/elite-redux/coop/coop-p33-client";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { connectCoopSession } from "#data/elite-redux/coop/coop-runtime";
+
+// Optimization brief R6: the game-coupled session attach is loaded LAZILY so the
+// TRANSPORT half of this module (signaling, SDP exchange, fingerprint binding,
+// chunker, reconnection) is a UI-independent production connector factory. A
+// minimal transport bundle that never attaches a session never loads the game
+// graph; src/main's wiring uses the exact same functions (tier-2 canary).
+async function connectCoopSession(
+  ...args: Parameters<typeof import("#data/elite-redux/coop/coop-runtime").connectCoopSession>
+): Promise<CoopRuntime> {
+  const runtimeModule = await import("#data/elite-redux/coop/coop-runtime");
+  return runtimeModule.connectCoopSession(...args);
+}
+
 import {
   type CoopP33AuthenticatedContextV1,
   canAdoptCoopP33Rejoin,
@@ -452,7 +464,7 @@ export async function connectCoopP33Pairing(
   const gameplayRole = coopP33GameplayRole(context);
   const { channel, pc } = await exchangeAndOpenP33Channel(activeCredential, activePairing, dependencies, opts.ice);
   const transport = webRtcTransportFromChannel(gameplayRole, channel, pc, activePairing.connectionGeneration);
-  const runtime = connectCoopSession(transport, {
+  const runtime = await connectCoopSession(transport, {
     username: activePairing.account.displayName,
     p33: context,
   });
@@ -582,20 +594,37 @@ export async function connectCoopP33Pairing(
   return runtime;
 }
 
+/**
+ * Optimization brief R6: the UI-independent PRODUCTION CONNECTOR FACTORY - the exact
+ * signaling/SDP/transport/reconnect path {@linkcode connectCoopWithCode} uses, WITHOUT the
+ * game-session attach. The tier-1 minimal transport bundle drives this directly; the tier-2
+ * full-app canary proves src/main wires the same factory (it calls connectCoopWithCode,
+ * which delegates here), so the extracted primitive can never drift from production wiring.
+ */
+export async function establishCoopTransportWithCode(
+  code: string,
+  role: CoopRole,
+  opts: CoopConnectOptions = {},
+): Promise<{ transport: WebRtcTransport; rejoin: () => Promise<boolean> }> {
+  if (!isCoopNetworkingConfigured()) {
+    coopWarn("launch", "establishCoopTransportWithCode aborted: coop networking not configured");
+    throw new Error("coop networking is not configured (VITE_COOP_SERVER_URL unset)");
+  }
+  coopLog("launch", `establishCoopTransportWithCode code=${code} role=${role}`);
+  const { channel, pc } = await exchangeAndOpenChannel(code, role, opts.ice);
+  const transport = webRtcTransportFromChannel(role, channel, pc);
+  return { transport, rejoin: makeCoopRejoinDriver(code, role, transport, opts.ice) };
+}
+
 export async function connectCoopWithCode(
   code: string,
   role: CoopRole,
   opts: CoopConnectOptions = {},
 ): Promise<CoopRuntime> {
-  if (!isCoopNetworkingConfigured()) {
-    coopWarn("launch", "connectCoopWithCode aborted: coop networking not configured");
-    throw new Error("coop networking is not configured (VITE_COOP_SERVER_URL unset)");
-  }
   coopLog("launch", `connectCoopWithCode code=${code} role=${role} username=${opts.username ?? "(default)"}`);
-  const { channel, pc } = await exchangeAndOpenChannel(code, role, opts.ice);
-  const transport = webRtcTransportFromChannel(role, channel, pc);
-  const runtime = connectCoopSession(transport, { username: opts.username });
-  runtime.rejoinDriver = makeCoopRejoinDriver(code, role, transport, opts.ice);
+  const { transport, rejoin } = await establishCoopTransportWithCode(code, role, opts);
+  const runtime = await connectCoopSession(transport, { username: opts.username });
+  runtime.rejoinDriver = rejoin;
   return runtime;
 }
 
@@ -622,7 +651,7 @@ export async function connectCoopAsHost(
 
   const { channel, pc } = await exchangeAndOpenChannel(code, "host", opts.ice);
   const transport = webRtcTransportFromChannel("host", channel, pc);
-  const runtime = connectCoopSession(transport, { username: opts.username });
+  const runtime = await connectCoopSession(transport, { username: opts.username });
   runtime.rejoinDriver = makeCoopRejoinDriver(code, "host", transport, opts.ice);
   coopLog("launch", `host session live code=${code}`);
   return { code, runtime };
@@ -642,7 +671,7 @@ export async function connectCoopAsGuest(code: string, opts: CoopConnectOptions 
   await postJson("/coop/join", { code, guest: opts.username ?? "Player 2" });
   const { channel, pc } = await exchangeAndOpenChannel(code, "guest", opts.ice);
   const transport = webRtcTransportFromChannel("guest", channel, pc);
-  const runtime = connectCoopSession(transport, { username: opts.username });
+  const runtime = await connectCoopSession(transport, { username: opts.username });
   runtime.rejoinDriver = makeCoopRejoinDriver(code, "guest", transport, opts.ice);
   return runtime;
 }
