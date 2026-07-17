@@ -25,7 +25,7 @@
 // =============================================================================
 
 import { getGameMode } from "#app/game-mode";
-import { allAbilities, modifierTypes } from "#data/data-lists";
+import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
 import { ER_PARTNER_EEVEE_ABILITY_ID } from "#data/elite-redux/abilities/composite-newcomers";
@@ -46,6 +46,12 @@ import {
   setErShinyLabOwnedBit,
   unlockErShinyLabNameFx,
 } from "#data/elite-redux/er-shiny-lab-effects";
+import {
+  ensureOmniformFormMovesets,
+  omniformFamilyForms,
+  omniformFormKey,
+  omniformFormLearnableMoves,
+} from "#data/elite-redux/omniform-movesets";
 import { listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
 import { manifestToStarter } from "#data/elite-redux/showdown/showdown-manifest";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
@@ -68,6 +74,7 @@ import {
   getPlayerShopModifierTypeOptionsForWave,
   ModifierTypeOption,
 } from "#modifiers/modifier-type";
+import { PokemonMove } from "#moves/pokemon-move";
 import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
 import { playErTransformFx } from "#sprites/er-form-transform-fx";
 import { achvs } from "#system/achv";
@@ -271,6 +278,56 @@ async function startBattleWithBlackShinyPartnerEeveeLead(game: GameManager) {
   mon.customPokemonData.erGiftAbilities = [...GIFT_CHOICES];
   mon.customPokemonData.erGiftIndex = 0;
   return mon;
+}
+
+/**
+ * ER Omniform batch level-up panel (#partner-eevee): build the LearnMoveBatchDeps
+ * for a Partner Eevee, with `omniform: true` so the panel shows the evolution strip
+ * and expands each offered move PER evolution. `learnableIds[0]` is chosen to be a
+ * move the SECOND family form (index 1, e.g. Partner Vaporeon) can legally learn but
+ * does not already know, so `[CYCLE_FORM, ACTION]` reaches that evolution's
+ * replace-a-move flow deterministically. The remaining offers are broadly-known
+ * eeveelution moves. `assign` writes the base form's live moveset (the batch panel's
+ * base path); non-base learns route through learnMoveForEvolution inside the handler.
+ */
+async function partnerEeveeBatchDeps(game: GameManager) {
+  const mon = await startBattleWithPartnerEeveeLead(game);
+  ensureOmniformFormMovesets(mon);
+  // Pin the BASE moveset (the rolled starter set is RNG-dependent) for a stable golden.
+  mon.moveset.splice(0, mon.moveset.length, new PokemonMove(MoveId.TACKLE), new PokemonMove(MoveId.QUICK_ATTACK));
+  const forms = omniformFamilyForms(mon);
+  const secondForm = forms[1];
+  // Pin the 2nd evolution's stored moveset (4 moves = FULL) so its CURRENT column +
+  // the replace-a-move flow are deterministic.
+  const store = (mon.customPokemonData.erOmniformMovesets ??= {});
+  const pinned: [number, number][] = [
+    [MoveId.SURF, 0],
+    [MoveId.WISH, 0],
+    [MoveId.SHADOW_BALL, 0],
+    [MoveId.HEAL_BELL, 0],
+  ];
+  store[omniformFormKey(secondForm.speciesId, secondForm.formIndex)] = pinned;
+  // First offered move: legal for the 2nd evolution AND not in its pinned set (so
+  // [CYCLE_FORM, ACTION] reaches the replace flow). Deterministic (both the learnable
+  // set and the pinned set are static).
+  const pinnedIds = new Set(pinned.map(([m]) => m));
+  const legalForSecond = [...omniformFormLearnableMoves(secondForm)].find(
+    m => m !== MoveId.NONE && !pinnedIds.has(m) && allMoves[m] != null,
+  );
+  const learnableIds = [
+    ...new Set(
+      [legalForSecond, MoveId.PROTECT, MoveId.REST, MoveId.SHADOW_BALL].filter((id): id is MoveId => id != null),
+    ),
+  ];
+  return {
+    pokemon: mon,
+    learnableIds,
+    omniform: true,
+    assign: (moveId: MoveId, slotIndex: number) => mon.setMove(slotIndex, moveId),
+    revert: () => {},
+    done: () => {},
+    fallback: () => {},
+  };
 }
 
 async function startBattleWithShinyLabLead(game: GameManager, id: SpeciesId = SpeciesId.BULBASAUR) {
@@ -2038,6 +2095,35 @@ const RECIPES: Record<string, Recipe> = {
         },
       ];
     },
+    diffTolerance: 0,
+  },
+  // ER Omniform (#partner-eevee): the level-up batch panel for a Partner Eevee. The
+  // top band shows the selected-evolution name + the evolution STRIP (Eevee + the 8
+  // partner eeveelutions, base selected, (F) key-badge); the LEARNABLE column offers
+  // the moves annotated for the BASE form (illegal / already-known ones dimmed), the
+  // CURRENT column shows the base moveset. Static -> exact diff.
+  "learn-move-batch-omniform": {
+    mode: UiMode.LEARN_MOVE_BATCH,
+    prepare: async game => [await partnerEeveeBatchDeps(game)],
+    diffTolerance: 0,
+  },
+  // ER Omniform: one CYCLE_FORM press selects the 2nd family form (Partner Vaporeon);
+  // the name label + the CURRENT column re-render to THAT evolution's OWN stored
+  // moveset, and the LEARNABLE column re-annotates the offers for it.
+  "learn-move-batch-omniform-cycled": {
+    mode: UiMode.LEARN_MOVE_BATCH,
+    prepare: async game => [await partnerEeveeBatchDeps(game)],
+    steps: [Button.CYCLE_FORM],
+    diffTolerance: 0,
+  },
+  // ER Omniform: CYCLE_FORM to the 2nd evolution then ACTION on the first offered
+  // move (chosen so that evolution can legally take it) opens the replace-a-move flow
+  // AGAINST that evolution's own full stored moveset (the CURRENT column is the slot
+  // picker). Static -> exact diff.
+  "learn-move-batch-omniform-replace": {
+    mode: UiMode.LEARN_MOVE_BATCH,
+    prepare: async game => [await partnerEeveeBatchDeps(game)],
+    steps: [Button.CYCLE_FORM, Button.ACTION],
     diffTolerance: 0,
   },
   // NOTE: TITLE (UiMode.TITLE) is intentionally NOT a recipe - it is animation-tier. Its
