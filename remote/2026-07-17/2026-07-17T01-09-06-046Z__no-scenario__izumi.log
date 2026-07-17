@@ -1,0 +1,593 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:a8f0a659b18fe650c9bd33a32746357030d2af6a:run-29545170798.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
+platform: Win32
+screen:   1920x1080 @1x  devmem:8 GB
+boot:     boot-start@0ms -> loading-complete@28747ms -> title-shown@32812ms
+lastSess: ok (reached title)
+mode:     4  wave:71
+seed:     MCmFEcjTxuM9sEot23qgOr2Y
+party:    Samurott(L56 278hp f2), Oricorio(L56 163hp f1), Kaiosea(L56 184hp f0), Talonflame(L56 170hp f1), Volcanion(L56 171hp f0), Discupid(L56 183hp f0)
+enemy:    Wormadam(L48), Clauncher(L48)
+
+----- COMMENT -----
+Run crashes when transition to the Beach Biome
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:a8f0a659b18fe650c9bd33a32746357030d2af6a:run-29545170798.1","source":"github","sha":"a8f0a659b18fe650c9bd33a32746357030d2af6a","workflow":{"provider":"github-actions","runId":"29545170798","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[01:07:05.497] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[01:07:06.501] LOG: [ER] build {"version":1,"id":"github:a8f0a659b18fe650c9bd33a32746357030d2af6a:run-29545170798.1","source":"github","sha":"a8f0a659b18fe650c9bd33a32746357030d2af6a","workflow":{"provider":"github-actions","runId":"29545170798","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[01:07:06.969] LOG: [dev-tools] loaded — 625 scenarios + Send Logs button
+[01:07:32.286] DEBUG: Destroying loading scene
+[01:07:32.286] DEBUG: Destroyed loading scene
+[01:07:32.392] LOG: Seed: 48xFA0wW94FQ4pwXhG1EciNt
+[01:07:32.393] LOG: Wave Seed: 48xFA0wW94FQ4pwXhG1EciNt 0
+[01:07:34.967] LOG: %cStart Phase LoginPhase color:green;
+[01:07:35.584] LOG: Client Session: 9xpCLzZDyLVJJUF6gtWg2naEH8nhS35G
+[01:07:36.134] DEBUG: Using cached system data
+[01:07:36.312] LOG: %cStart Phase TitlePhase color:green;
+[01:07:36.315] LOG: Getting Session Slot id: %d 0
+[01:07:36.348] LOG: use seasonal splash messages true
+[01:08:23.278] LOG: Getting Session Slot id: %d 0
+[01:08:24.444] WARN: [asset-retry] load error key=cry/503-mega - retry 1/2 with cache-buster
+[01:08:24.483] WARN: [asset-retry] load error key=cry/663-mega - retry 1/2 with cache-buster
+[01:08:24.674] WARN: [asset-retry] load error key=cry/503-mega - retry 2/2 via fastly mirror + cache-buster
+[01:08:24.682] WARN: [asset-retry] load error key=cry/663-mega - retry 2/2 via fastly mirror + cache-buster
+[01:08:25.375] ERROR: [asset-retry] PERMANENT load failure key=cry/663-mega url=audio/cry/663-mega.m4a
+[01:08:25.478] ERROR: [asset-retry] PERMANENT load failure key=cry/503-mega url=audio/cry/503-mega.m4a
+[01:08:25.483] LOG: Wave Seed: MCmFEcjTxuM9sEot23qgOr2Y 0
+[01:08:25.483] LOG: Seed: MCmFEcjTxuM9sEot23qgOr2Y
+[01:08:25.485] LOG: Wave Seed: ³©°¾»¹µºxy·­¸x 70
+[01:08:25.496] LOG: Applied Protein 
+[01:08:25.496] LOG: Applied Macho Brace 
+[01:08:25.497] LOG: Applied Macho Brace 
+[01:08:25.497] LOG: Applied Macho Brace 
+[01:08:25.497] LOG: Applied Macho Brace 
+[01:08:25.497] LOG: Applied Macho Brace 
+[01:08:25.497] LOG: Applied Macho Brace 
+[01:08:25.500] LOG: Applied Iron 
+[01:08:25.500] LOG: Applied Carbos 
+[01:08:25.500] LOG: Applied Calcium 
+[01:08:25.503] LOG: Applied Protein 
+[01:08:25.504] LOG: Applied Macho Brace 
+[01:08:25.504] LOG: Applied Macho Brace 
+[01:08:25.504] LOG: Applied Macho Brace 
+[01:08:25.504] LOG: Applied Macho Brace 
+[01:08:25.504] LOG: Applied Macho Brace 
+[01:08:25.504] LOG: Applied Macho Brace 
+[01:08:25.506] LOG: Applied Iron 
+[01:08:25.506] LOG: Applied Carbos 
+[01:08:25.506] LOG: Applied Calcium 
+[01:08:25.509] LOG: Applied Protein 
+[01:08:25.509] LOG: Applied Macho Brace 
+[01:08:25.509] LOG: Applied Macho Brace 
+[01:08:25.509] LOG: Applied Macho Brace 
+[01:08:25.509] LOG: Applied Macho Brace 
+[01:08:25.509] LOG: Applied Macho Brace 
+[01:08:25.509] LOG: Applied Macho Brace 
+[01:08:25.511] LOG: Applied Iron 
+[01:08:25.511] LOG: Applied Carbos 
+[01:08:25.511] LOG: Applied Calcium 
+[01:08:25.513] LOG: Applied Carbos (enemy)
+[01:08:25.613] LOG: %cStart Phase EncounterPhase color:green;
+[01:08:25.620] LOG: Pokemon: Wild Lurantis | Species ID: 754 | Level: 53 | Nature: Calm (+SpDef/-Atk)
+[01:08:25.621] LOG: Stats (IVs): HP: 167 (18), Atk: 110 (24), Def: 117 (22), Spatk: 75 (15), Spdef: 125 (25), Spd: 124 (15)
+[01:08:25.621] LOG: Ability: Tinted Lens | Passive Ability: Predator | Boss Bars: 2
+[01:08:25.621] LOG: Moveset: ["Yggdrasil Force","Fell Stinger","Growth","Hammer Arm"]
+[01:08:25.621] LOG: Pokemon: Wild Pangoro | Species ID: 675 | Level: 61 | Nature: Bold (+Def/-Atk)
+[01:08:25.621] LOG: Stats (IVs): HP: 191 (7), Atk: 151 (20), Def: 114 (5), Spatk: 101 (20), Spdef: 106 (25), Spd: 76 (2)
+[01:08:25.622] LOG: Ability: Iron Fist | Passive Ability: Scrappy | Boss Bars: 1
+[01:08:25.622] LOG: Moveset: ["Sucker Punch","Parting Shot","Revenge","Dizzy Punch"]
+[01:08:26.955] LOG: Applied Carbos (enemy)
+[01:08:26.959] LOG: Wave Seed: ³©°¾»¹µºxy·­¸x 70
+[01:08:27.607] LOG: %cStart Phase SummonPhase color:green;
+[01:08:27.872] LOG: Applied Protein 
+[01:08:27.872] LOG: Applied Macho Brace 
+[01:08:27.873] LOG: Applied Macho Brace 
+[01:08:27.873] LOG: Applied Macho Brace 
+[01:08:27.873] LOG: Applied Macho Brace 
+[01:08:27.873] LOG: Applied Macho Brace 
+[01:08:27.873] LOG: Applied Macho Brace 
+[01:08:27.875] LOG: Applied Iron 
+[01:08:27.875] LOG: Applied Carbos 
+[01:08:27.875] LOG: Applied Calcium 
+[01:08:27.953] WARN: cry/503-mega not found
+[01:08:28.112] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:08:28.252] LOG: %cStart Phase SummonPhase color:green;
+[01:08:28.539] LOG: Applied Protein 
+[01:08:28.539] LOG: Applied Macho Brace 
+[01:08:28.539] LOG: Applied Macho Brace 
+[01:08:28.540] LOG: Applied Macho Brace 
+[01:08:28.541] LOG: Applied Macho Brace 
+[01:08:28.541] LOG: Applied Macho Brace 
+[01:08:28.541] LOG: Applied Macho Brace 
+[01:08:28.543] LOG: Applied Iron 
+[01:08:28.543] LOG: Applied Carbos 
+[01:08:28.543] LOG: Applied Calcium 
+[01:08:28.739] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:08:34.898] LOG: %cStart Phase SwitchPhase color:green;
+[01:08:36.126] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:08:37.183] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:08:37.185] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:37.185] LOG: Ran PSP for: Lurantis
+[01:08:37.189] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:37.190] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:37.191] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:37.191] LOG: Ran PSP for: Pangoro
+[01:08:37.192] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:37.192] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:37.192] LOG: %cStart Phase TurnInitPhase color:green;
+[01:08:37.193] LOG: %cStart Phase CommandPhase color:green;
+[01:08:39.295] LOG: Move: AQUA_CUTTER Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Samurott
+[01:08:39.308] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:08:40.476] LOG: %cStart Phase CommandPhase color:green;
+[01:08:42.656] LOG: Move: AERIAL_ACE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Oricorio
+[01:08:42.667] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:08:43.414] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:08:43.440] LOG: Applied Black Belt (enemy)
+[01:08:43.445] LOG: Applied Black Belt (enemy)
+[01:08:43.453] LOG: Battle Seed: wtHh0J7B1FUQQhpQ
+[01:08:43.464] LOG: Move Pool: ["Yggdrasil Force","Fell Stinger","Growth","Hammer Arm"]
+[01:08:43.464] LOG: Move Scores: [14.25,32,12,8.5]
+[01:08:43.464] LOG: Sorted Move Pool: ["Fell Stinger","Yggdrasil Force","Growth","Hammer Arm"]
+[01:08:43.464] LOG: Chosen Move: Fell Stinger
+[01:08:43.464] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:08:43.525] LOG: Move Pool: ["Sucker Punch","Parting Shot","Revenge","Dizzy Punch"]
+[01:08:43.525] LOG: Move Scores: [21,-20,8.25,18]
+[01:08:43.525] LOG: Sorted Move Pool: ["Sucker Punch","Dizzy Punch","Revenge","Parting Shot"]
+[01:08:43.525] LOG: Chosen Move: Sucker Punch
+[01:08:43.525] LOG: %cStart Phase TurnStartPhase color:green;
+[01:08:43.547] LOG: %cStart Phase MovePhase color:green;
+[01:08:43.547] LOG: %cUser: Pangoro
+Move: SUCKER_PUNCH
+Use Mode: NORMAL color:orchid
+[01:08:43.573] LOG: %cStart Phase MessagePhase color:green;
+[01:08:43.767] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:08:43.774] LOG: crit stage: +0
+[01:08:43.776] LOG: Move: Sucker Punch | Base damage: 64.70741573033709 | Power: 70 | Source attack: 151 | Target defense: 89
+[01:08:43.777] LOG: Move: Sucker Punch | Attack damage: 82
+[01:08:43.781] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:08:43.992] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:08:44.118] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:08:44.258] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:08:44.262] LOG: crit stage: +0
+[01:08:44.265] LOG: Move: Sucker Punch | Base damage: 64.70741573033709 | Power: 70 | Source attack: 151 | Target defense: 89
+[01:08:44.266] LOG: Move: Sucker Punch | Attack damage: 21
+[01:08:44.268] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:08:44.392] LOG: %cStart Phase MessagePhase color:green;
+[01:08:44.714] LOG: %cStart Phase MoveEndPhase color:green;
+[01:08:44.718] LOG: %cStart Phase MovePhase color:green;
+[01:08:44.718] LOG: %cUser: Samurott
+Move: AQUA_CUTTER
+Use Mode: NORMAL color:orchid
+[01:08:44.727] LOG: %cStart Phase MessagePhase color:green;
+[01:08:44.930] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:08:44.934] LOG: crit stage: +1
+[01:08:44.937] LOG: Move: Aqua Cutter | Base damage: 102.85333333333334 | Power: 97.5 | Source attack: 248 | Target defense: 117
+[01:08:44.939] LOG: Move: Aqua Cutter | Attack damage: 51
+[01:08:44.944] LOG: crit stage: +1
+[01:08:44.946] LOG: Move: Aqua Cutter | Base damage: 105.50736842105263 | Power: 97.5 | Source attack: 248 | Target defense: 114
+[01:08:44.947] LOG: Move: Aqua Cutter | Attack damage: 109
+[01:08:44.951] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:08:45.094] LOG: %cStart Phase MessagePhase color:green;
+[01:08:45.450] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:08:45.590] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:08:45.898] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:08:45.906] LOG: %cStart Phase MessagePhase color:green;
+[01:08:46.228] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:08:46.296] LOG: %cStart Phase MoveEndPhase color:green;
+[01:08:46.299] LOG: %cStart Phase MovePhase color:green;
+[01:08:46.300] LOG: %cUser: Lurantis
+Move: FELL_STINGER
+Use Mode: NORMAL color:orchid
+[01:08:46.318] LOG: %cStart Phase MessagePhase color:green;
+[01:08:46.501] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:08:46.504] LOG: crit stage: +1
+[01:08:46.507] LOG: Move: Fell Stinger | Base damage: 20.228571428571428 | Power: 60 | Source attack: 110 | Target defense: 168
+[01:08:46.509] LOG: Move: Fell Stinger | Attack damage: 27
+[01:08:46.510] LOG: Applied Protein 
+[01:08:46.510] LOG: Applied Macho Brace 
+[01:08:46.511] LOG: Applied Macho Brace 
+[01:08:46.511] LOG: Applied Macho Brace 
+[01:08:46.511] LOG: Applied Macho Brace 
+[01:08:46.511] LOG: Applied Macho Brace 
+[01:08:46.511] LOG: Applied Macho Brace 
+[01:08:46.512] LOG: Applied Iron 
+[01:08:46.513] LOG: Applied Carbos 
+[01:08:46.513] LOG: Applied Calcium 
+[01:08:46.517] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:08:46.654] LOG: %cStart Phase MessagePhase color:green;
+[01:08:46.973] LOG: %cStart Phase MessagePhase color:green;
+[01:08:47.385] LOG: %cStart Phase MoveEndPhase color:green;
+[01:08:47.385] LOG: %cStart Phase MovePhase color:green;
+[01:08:47.385] LOG: %cUser: Oricorio
+Move: AERIAL_ACE
+Use Mode: NORMAL color:orchid
+[01:08:47.402] LOG: %cStart Phase MessagePhase color:green;
+[01:08:47.601] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:08:47.604] LOG: crit stage: +0
+[01:08:47.606] LOG: Move: Aerial Ace | Base damage: 28.12676923076923 | Power: 72 | Source attack: 87 | Target defense: 117
+[01:08:47.606] LOG: Move: Aerial Ace | Attack damage: 122
+[01:08:47.608] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:08:47.747] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:08:47.751] LOG: %cStart Phase MessagePhase color:green;
+[01:08:48.099] LOG: %cStart Phase MessagePhase color:green;
+[01:08:48.435] LOG: %cStart Phase MessagePhase color:green;
+[01:08:48.806] LOG: %cStart Phase MoveEndPhase color:green;
+[01:08:48.806] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:08:48.806] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:08:48.995] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:08:48.995] LOG: %cStart Phase BerryPhase color:green;
+[01:08:49.004] LOG: Applied Sitrus Berry 
+[01:08:49.004] LOG: Applied Protein 
+[01:08:49.004] LOG: Applied Macho Brace 
+[01:08:49.004] LOG: Applied Macho Brace 
+[01:08:49.004] LOG: Applied Macho Brace 
+[01:08:49.004] LOG: Applied Macho Brace 
+[01:08:49.005] LOG: Applied Macho Brace 
+[01:08:49.005] LOG: Applied Macho Brace 
+[01:08:49.006] LOG: Applied Iron 
+[01:08:49.006] LOG: Applied Carbos 
+[01:08:49.006] LOG: Applied Calcium 
+[01:08:49.013] LOG: Applied Sitrus Berry (enemy)
+[01:08:49.013] LOG: Applied Carbos (enemy)
+[01:08:49.017] LOG: %cStart Phase CommonAnimPhase color:green;
+[01:08:49.017] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:08:49.028] LOG: %cStart Phase MessagePhase color:green;
+[01:08:49.382] LOG: %cStart Phase CommonAnimPhase color:green;
+[01:08:49.382] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:08:49.383] LOG: %cStart Phase MessagePhase color:green;
+[01:08:49.666] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:08:49.675] LOG: %cStart Phase TurnEndPhase color:green;
+[01:08:49.686] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:08:49.697] LOG: %cStart Phase MessagePhase color:green;
+[01:08:50.022] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:08:50.030] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:08:50.032] LOG: %cStart Phase MessagePhase color:green;
+[01:08:50.431] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:08:50.439] LOG: %cStart Phase MessagePhase color:green;
+[01:08:50.799] LOG: %cStart Phase TurnInitPhase color:green;
+[01:08:50.800] LOG: %cStart Phase CommandPhase color:green;
+[01:08:54.290] LOG: Move: FROST_BRAND Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Samurott
+[01:08:54.298] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:08:54.809] LOG: %cStart Phase CommandPhase color:green;
+[01:08:59.610] LOG: Move: ZAP_JIVE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Oricorio
+[01:08:59.618] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:09:00.563] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:09:00.586] LOG: Applied Black Belt (enemy)
+[01:09:00.589] LOG: Applied Black Belt (enemy)
+[01:09:00.596] LOG: Battle Seed: wtHh0J7B1FUQQhpQ
+[01:09:00.597] LOG: Move Pool: ["Yggdrasil Force"]
+[01:09:00.597] LOG: Move Scores: [14.25]
+[01:09:00.597] LOG: Sorted Move Pool: ["Yggdrasil Force"]
+[01:09:00.597] LOG: Chosen Move: Yggdrasil Force
+[01:09:00.597] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:09:00.650] LOG: Move Pool: ["Sucker Punch","Parting Shot","Revenge","Dizzy Punch"]
+[01:09:00.650] LOG: Move Scores: [21,-20,48,18]
+[01:09:00.650] LOG: Sorted Move Pool: ["Revenge","Sucker Punch","Dizzy Punch","Parting Shot"]
+[01:09:00.650] LOG: Chosen Move: Dizzy Punch
+[01:09:00.650] LOG: %cStart Phase TurnStartPhase color:green;
+[01:09:00.671] LOG: %cStart Phase MovePhase color:green;
+[01:09:00.672] LOG: %cUser: Samurott
+Move: FROST_BRAND
+Use Mode: NORMAL color:orchid
+[01:09:00.679] LOG: %cStart Phase MessagePhase color:green;
+[01:09:00.870] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:09:00.874] LOG: crit stage: +0
+[01:09:00.876] LOG: Move: Frost Brand | Base damage: 141.84995555555554 | Power: 135.20000000000002 | Source attack: 248 | Target defense: 117
+[01:09:00.876] LOG: Move: Frost Brand | Attack damage: 210
+[01:09:00.878] LOG: crit stage: +0
+[01:09:00.880] LOG: Move: Frost Brand | Base damage: 145.53021754385966 | Power: 135.20000000000002 | Source attack: 248 | Target defense: 114
+[01:09:00.881] LOG: Move: Frost Brand | Attack damage: 141
+[01:09:00.881] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:09:01.012] LOG: %cStart Phase MessagePhase color:green;
+[01:09:01.278] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:09:01.412] LOG: %cStart Phase FaintPhase color:green;
+[01:09:02.846] LOG: %cStart Phase MessagePhase color:green;
+[01:09:05.654] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:09:05.909] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:09:05.916] LOG: %cStart Phase MessagePhase color:green;
+[01:09:06.295] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:09:06.361] LOG: %cStart Phase VictoryPhase color:green;
+[01:09:06.367] LOG: Applied Protein 
+[01:09:06.367] LOG: Applied Macho Brace 
+[01:09:06.367] LOG: Applied Macho Brace 
+[01:09:06.367] LOG: Applied Macho Brace 
+[01:09:06.367] LOG: Applied Macho Brace 
+[01:09:06.367] LOG: Applied Macho Brace 
+[01:09:06.367] LOG: Applied Macho Brace 
+[01:09:06.370] LOG: Applied Iron 
+[01:09:06.371] LOG: Applied Carbos 
+[01:09:06.371] LOG: Applied Calcium 
+[01:09:06.411] LOG: %cStart Phase FaintPhase color:green;
+[01:09:07.710] LOG: %cStart Phase MessagePhase color:green;
+[01:09:07.857] LOG: %cStart Phase VictoryPhase color:green;
+[01:09:07.858] LOG: Applied Protein 
+[01:09:07.858] LOG: Applied Macho Brace 
+[01:09:07.858] LOG: Applied Macho Brace 
+[01:09:07.858] LOG: Applied Macho Brace 
+[01:09:07.858] LOG: Applied Macho Brace 
+[01:09:07.858] LOG: Applied Macho Brace 
+[01:09:07.858] LOG: Applied Macho Brace 
+[01:09:07.860] LOG: Applied Iron 
+[01:09:07.862] LOG: Applied Carbos 
+[01:09:07.863] LOG: Applied Calcium 
+[01:09:07.875] LOG: %cStart Phase MoveEndPhase color:green;
+[01:09:07.878] LOG: %cStart Phase MovePhase color:green;
+[01:09:07.878] LOG: %cStart Phase MoveEndPhase color:green;
+[01:09:07.879] LOG: %cStart Phase MovePhase color:green;
+[01:09:07.879] LOG: %cUser: Oricorio
+Move: ZAP_JIVE
+Use Mode: NORMAL color:orchid
+[01:09:07.881] LOG: %cStart Phase MessagePhase color:green;
+[01:09:08.066] LOG: %cStart Phase MessagePhase color:green;
+[01:09:08.366] LOG: %cStart Phase MoveEndPhase color:green;
+[01:09:08.366] LOG: %cStart Phase MovePhase color:green;
+[01:09:08.366] LOG: %cStart Phase MoveEndPhase color:green;
+[01:09:08.366] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:09:08.366] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:09:08.366] LOG: %cStart Phase TurnEndPhase color:green;
+[01:09:08.367] LOG: %cStart Phase BattleEndPhase color:green;
+[01:09:08.368] LOG: Battle Score: 175 (2 Turns x0.35)
+[01:09:08.368] LOG: Total Score: 12693
+[01:09:08.373] LOG: Applied Protein 
+[01:09:08.373] LOG: Applied Macho Brace 
+[01:09:08.373] LOG: Applied Macho Brace 
+[01:09:08.374] LOG: Applied Macho Brace 
+[01:09:08.374] LOG: Applied Macho Brace 
+[01:09:08.374] LOG: Applied Macho Brace 
+[01:09:08.374] LOG: Applied Macho Brace 
+[01:09:08.376] LOG: Applied Iron 
+[01:09:08.376] LOG: Applied Carbos 
+[01:09:08.376] LOG: Applied Calcium 
+[01:09:08.386] LOG: %cStart Phase EggLapsePhase color:green;
+[01:09:11.070] LOG: %cStart Phase EggSummaryPhase color:green;
+[01:09:11.071] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.076] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.076] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.076] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.077] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.077] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.077] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.077] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.077] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.077] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.077] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.077] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.078] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.078] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.078] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.078] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.078] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.078] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.078] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.078] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.079] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.079] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.079] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.079] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.079] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.079] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.079] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.079] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.079] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.080] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.080] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.080] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.080] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.080] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.080] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.080] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.080] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.081] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.082] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.083] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.084] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.084] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.084] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.084] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.084] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.084] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.084] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.084] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.084] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.084] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.084] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.084] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.085] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.085] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.085] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.085] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.085] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.085] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.085] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.085] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.085] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.085] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.085] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.085] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.086] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.087] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.088] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.088] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.088] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.088] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.088] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.088] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.088] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.088] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.088] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.088] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.088] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.089] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.089] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.089] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.089] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.089] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.089] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.089] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.090] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.091] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.091] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.091] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.091] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.091] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.091] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.091] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.091] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.092] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.092] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.092] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.092] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.092] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.092] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.092] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:11.092] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[01:09:12.942] LOG: %cStart Phase ModifierRewardPhase color:green;
+[01:09:12.942] LOG: Applied Protein 
+[01:09:12.942] LOG: Applied Macho Brace 
+[01:09:12.943] LOG: Applied Macho Brace 
+[01:09:12.943] LOG: Applied Macho Brace 
+[01:09:12.943] LOG: Applied Macho Brace 
+[01:09:12.943] LOG: Applied Macho Brace 
+[01:09:12.943] LOG: Applied Macho Brace 
+[01:09:12.945] LOG: Applied Iron 
+[01:09:12.946] LOG: Applied Carbos 
+[01:09:12.946] LOG: Applied Calcium 
+[01:09:14.016] LOG: %cStart Phase PartyHealPhase color:green;
+[01:09:16.567] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:09:16.571] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:09:16.571] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:09:16.572] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:09:16.572] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:09:16.573] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:09:16.573] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:09:25.901] LOG: Applied Protein 
+[01:09:25.901] LOG: Applied Macho Brace 
+[01:09:25.901] LOG: Applied Macho Brace 
+[01:09:25.901] LOG: Applied Macho Brace 
+[01:09:25.901] LOG: Applied Macho Brace 
+[01:09:25.901] LOG: Applied Macho Brace 
+[01:09:25.901] LOG: Applied Macho Brace 
+[01:09:25.904] LOG: Applied Iron 
+[01:09:25.904] LOG: Applied Carbos 
+[01:09:25.957] LOG: Applied Calcium 
+[01:09:28.060] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[01:09:31.033] LOG: %cStart Phase SelectBiomePhase color:green;
+[01:09:31.033] LOG: Wave Seed: ³©°¾»¹µºxy·­¸x 70
+[01:09:33.116] LOG: %cStart Phase PartyHealPhase color:green;
+[01:09:35.673] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:09:35.678] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:09:35.678] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:09:35.679] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:09:35.679] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:09:35.680] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:09:35.680] LOG: %cStart Phase SwitchBiomePhase color:green;
+[01:09:36.168] LOG: %cStart Phase NewBattlePhase color:green;
+[01:09:36.168] LOG: Wave Seed: ´ª±¿¼º¶»yz¸®¹y  71
+[01:09:36.177] LOG: %cStart Phase ReturnPhase color:green;
+[01:09:36.339] LOG: %cStart Phase ReturnPhase color:green;
+[01:09:36.496] LOG: %cStart Phase ShowTrainerPhase color:green;
+[01:09:36.630] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[01:09:36.633] LOG: Starting species pool tier: UNCOMMON
+[01:09:36.634] LOG: Replaced BURMY with WORMADAM
+[01:09:36.653] LOG: Pokemon: Wild Wormadam | Species ID: 413 | Level: 48 | Nature: Careful (+SpDef/-SpAtk)
+[01:09:36.653] LOG: Stats (IVs): HP: 128 (26), Atk: 85 (10), Def: 109 (7), Spatk: 57 (6), Spdef: 103 (14), Spd: 44 (11)
+[01:09:36.653] LOG: Ability: Anticipation | Passive Ability: Adaptability 
+[01:09:36.653] LOG: Moveset: ["String Shot","Flail","Quiver Dance","Attract"]
+[01:09:36.653] LOG: Starting species pool tier: UNCOMMON
+[01:09:36.653] LOG: ER #479: vanilla-difficulty wild kept as CLAUNCHER - skipped custom evolution Clawtificer
+[01:09:36.665] LOG: Pokemon: Wild Clauncher | Species ID: 692 | Level: 48 | Nature: Hasty (+Spd/-Def)
+[01:09:36.665] LOG: Stats (IVs): HP: 131 (12), Atk: 64 (17), Def: 67 (8), Spatk: 96 (14), Spdef: 72 (1), Spd: 57 (9)
+[01:09:36.666] LOG: Ability: Scavenger | Passive Ability: Multiscale 
+[01:09:36.666] LOG: Moveset: ["Chilling Water","Sonic Boom","Crabhammer","Water Sport"]
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"MCmFEcjTxuM9sEot23qgOr2Y","gameModeId":4,"difficulty":"youngster","challenges":[],"roster":[{"id":729278388,"player":true,"species":6503,"formIndex":2,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":56,"exp":173517,"levelExp":0,"gender":0,"hp":257,"stats":[278,250,170,187,153,209],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":389,"ppUsed":3,"ppUp":0},{"moveId":224,"ppUsed":0,"ppUp":0},{"moveId":5019,"ppUsed":6,"ppUp":0},{"moveId":895,"ppUsed":3,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":501,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[6,14,10],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[5399,5297],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":224,"targets":[2],"result":1,"useMode":1},{"move":224,"targets":[2],"result":1,"useMode":1},{"move":5019,"targets":[2],"result":1,"useMode":1},{"move":895,"targets":[2,3],"result":1,"useMode":1},{"move":5019,"targets":[2,3],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":5399,"passive2":-1,"passive3":-1,"nature":13,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":409571731,"player":true,"species":741,"formIndex":1,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":3,"level":56,"exp":175616,"levelExp":0,"gender":1,"hp":163,"stats":[163,87,89,139,105,122],"ivs":[24,25,11,25,21,3],"nature":20,"moveset":[{"moveId":5138,"ppUsed":0,"ppUp":0},{"moveId":332,"ppUsed":1,"ppUp":0},{"moveId":226,"ppUsed":0,"ppUp":0},{"moveId":837,"ppUsed":0,"ppUp":0}],"status":null,"friendship":229,"metLevel":13,"metBiome":4,"metSpecies":741,"metWave":23,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[85],"teraType":12,"isTerastallized":false,"stellarTypesBoosted":[2],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":332,"targets":[2],"result":1,"useMode":1},{"move":5138,"targets":[3],"useMode":1,"result":2}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[0],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2130987245,"player":true,"species":10026,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":56,"exp":175616,"levelExp":0,"gender":0,"hp":146,"stats":[184,175,100,85,145,143],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":32,"ppUsed":0,"ppUp":0},{"moveId":799,"ppUsed":0,"ppUp":0},{"moveId":834,"ppUsed":4,"ppUp":0},{"moveId":61,"ppUsed":2,"ppUp":0}],"status":null,"friendship":97,"metLevel":5,"metBiome":-1,"metSpecies":118,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":5187,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2112849684,"player":true,"species":663,"formIndex":1,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":3,"level":56,"exp":173517,"levelExp":0,"gender":1,"hp":170,"stats":[170,157,124,105,123,157],"ivs":[30,30,31,1,24,20],"nature":18,"moveset":[{"moveId":5064,"ppUsed":0,"ppUp":0},{"moveId":552,"ppUsed":0,"ppUp":0},{"moveId":5023,"ppUsed":0,"ppUp":0},{"moveId":5068,"ppUsed":0,"ppUp":0}],"status":null,"friendship":99,"metLevel":26,"metBiome":1,"metSpecies":662,"metWave":42,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":2,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2739364107,"player":true,"species":721,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":56,"exp":189884,"levelExp":0,"gender":-1,"hp":171,"stats":[171,160,183,167,119,89],"ivs":[29,31,31,31,24,29],"nature":2,"moveset":[{"moveId":61,"ppUsed":0,"ppUp":0},{"moveId":87,"ppUsed":0,"ppUp":0},{"moveId":5068,"ppUsed":0,"ppUp":0},{"moveId":908,"ppUsed":0,"ppUp":0}],"status":null,"friendship":169,"metLevel":5,"metBiome":-1,"metSpecies":721,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[87],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1156321334,"player":true,"species":70003,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":56,"exp":175616,"levelExp":0,"gender":0,"hp":91,"stats":[183,100,99,147,106,172],"ivs":[30,31,31,31,31,31],"nature":11,"moveset":[{"moveId":376,"ppUsed":0,"ppUp":0},{"moveId":503,"ppUsed":2,"ppUp":0},{"moveId":790,"ppUsed":4,"ppUp":0},{"moveId":266,"ppUsed":4,"ppUp":0}],"status":null,"friendship":237,"metLevel":5,"metBiome":-1,"metSpecies":370,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":16,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":70,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"command","wave":70,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":70,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":70,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"interaction","seq":0,"kind":"crossroads","choice":1},{"type":"interaction","seq":1,"kind":"biome","choice":8}],"endState":{"waveIndex":71,"money":6029,"party":[{"species":6503,"level":56,"hp":278,"maxHp":278},{"species":741,"level":56,"hp":163,"maxHp":163},{"species":10026,"level":56,"hp":184,"maxHp":184},{"species":663,"level":56,"hp":170,"maxHp":170},{"species":721,"level":56,"hp":171,"maxHp":171},{"species":70003,"level":56,"hp":183,"maxHp":183}]},"checkpoint":{"wave":70,"seed":"MCmFEcjTxuM9sEot23qgOr2Y","party":[{"id":729278388,"player":true,"species":6503,"formIndex":2,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":56,"exp":173517,"levelExp":0,"gender":0,"hp":257,"stats":[278,250,170,187,153,209],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":389,"ppUsed":3,"ppUp":0},{"moveId":224,"ppUsed":0,"ppUp":0},{"moveId":5019,"ppUsed":6,"ppUp":0},{"moveId":895,"ppUsed":3,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":501,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[6,14,10],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[5399,5297],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":224,"targets":[2],"result":1,"useMode":1},{"move":224,"targets":[2],"result":1,"useMode":1},{"move":5019,"targets":[2],"result":1,"useMode":1},{"move":895,"targets":[2,3],"result":1,"useMode":1},{"move":5019,"targets":[2,3],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":5399,"passive2":-1,"passive3":-1,"nature":13,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":409571731,"player":true,"species":741,"formIndex":1,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":3,"level":56,"exp":175616,"levelExp":0,"gender":1,"hp":163,"stats":[163,87,89,139,105,122],"ivs":[24,25,11,25,21,3],"nature":20,"moveset":[{"moveId":5138,"ppUsed":0,"ppUp":0},{"moveId":332,"ppUsed":1,"ppUp":0},{"moveId":226,"ppUsed":0,"ppUp":0},{"moveId":837,"ppUsed":0,"ppUp":0}],"status":null,"friendship":229,"metLevel":13,"metBiome":4,"metSpecies":741,"metWave":23,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[85],"teraType":12,"isTerastallized":false,"stellarTypesBoosted":[2],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":332,"targets":[2],"result":1,"useMode":1},{"move":5138,"targets":[3],"useMode":1,"result":2}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[0],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2130987245,"player":true,"species":10026,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":56,"exp":175616,"levelExp":0,"gender":0,"hp":146,"stats":[184,175,100,85,145,143],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":32,"ppUsed":0,"ppUp":0},{"moveId":799,"ppUsed":0,"ppUp":0},{"moveId":834,"ppUsed":4,"ppUp":0},{"moveId":61,"ppUsed":2,"ppUp":0}],"status":null,"friendship":97,"metLevel":5,"metBiome":-1,"metSpecies":118,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":5187,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2112849684,"player":true,"species":663,"formIndex":1,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":3,"level":56,"exp":173517,"levelExp":0,"gender":1,"hp":170,"stats":[170,157,124,105,123,157],"ivs":[30,30,31,1,24,20],"nature":18,"moveset":[{"moveId":5064,"ppUsed":0,"ppUp":0},{"moveId":552,"ppUsed":0,"ppUp":0},{"moveId":5023,"ppUsed":0,"ppUp":0},{"moveId":5068,"ppUsed":0,"ppUp":0}],"status":null,"friendship":99,"metLevel":26,"metBiome":1,"metSpecies":662,"metWave":42,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":2,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2739364107,"player":true,"species":721,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":56,"exp":189884,"levelExp":0,"gender":-1,"hp":171,"stats":[171,160,183,167,119,89],"ivs":[29,31,31,31,24,29],"nature":2,"moveset":[{"moveId":61,"ppUsed":0,"ppUp":0},{"moveId":87,"ppUsed":0,"ppUp":0},{"moveId":5068,"ppUsed":0,"ppUp":0},{"moveId":908,"ppUsed":0,"ppUp":0}],"status":null,"friendship":169,"metLevel":5,"metBiome":-1,"metSpecies":721,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[87],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1156321334,"player":true,"species":70003,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":56,"exp":175616,"levelExp":0,"gender":0,"hp":91,"stats":[183,100,99,147,106,172],"ivs":[30,31,31,31,31,31],"nature":11,"moveset":[{"moveId":376,"ppUsed":0,"ppUp":0},{"moveId":503,"ppUsed":2,"ppUp":0},{"moveId":790,"ppUsed":4,"ppUp":0},{"moveId":266,"ppUsed":4,"ppUp":0}],"status":null,"friendship":237,"metLevel":5,"metBiome":-1,"metSpecies":370,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":16,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[5],"args":[1156321334,5],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[2],"args":[2739364107,2],"stackCount":2,"className":"BaseStatModifier"},{"player":true,"typeId":"GOLDEN_PUNCH","args":[2739364107],"stackCount":1,"className":"DamageMoneyRewardModifier"},{"player":true,"typeId":"SUPER_EXP_CHARM","args":[60],"stackCount":3,"className":"ExpBoosterModifier"},{"player":true,"typeId":"EXP_SHARE","args":[],"stackCount":4,"className":"ExpShareModifier"},{"player":true,"typeId":"EXP_CHARM","args":[25],"stackCount":6,"className":"ExpBoosterModifier"},{"player":true,"typeId":"ER_COPPER_ROD","args":[729278388,"copperRod",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"ER_LOADED_DICE","args":[2739364107,"loadedDice",2,0],"stackCount":2,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[1],"args":[729278388,1],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"MEGA_BRACELET","args":[],"stackCount":1,"className":"MegaEvolutionAccessModifier"},{"player":true,"typeId":"BATON","args":[409571731],"stackCount":1,"className":"SwitchEffectTransferModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[10],"args":[409571731,10],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[3],"args":[1156321334,3],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"ER_UPGRADED_MAP","args":[],"stackCount":1,"className":"MapModifier"},{"player":true,"typeId":"GOLDEN_POKEBALL","args":[],"stackCount":1,"className":"ExtraModifierModifier"},{"player":true,"typeId":"FORM_CHANGE_ITEM","typePregenArgs":[315],"args":[729278388,315,true],"stackCount":1,"className":"PokemonFormChangeItemModifier"},{"player":true,"typeId":"MYSTERY_ENCOUNTER_MACHO_BRACE","args":[729278388],"stackCount":45,"className":"PokemonIncrementingStatModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[5],"args":[729278388,5],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[3],"args":[729278388,3],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[0],"args":[729278388,0],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"FORM_CHANGE_ITEM","typePregenArgs":[344],"args":[2112849684,344,true],"stackCount":1,"className":"PokemonFormChangeItemModifier"},{"player":true,"typeId":"ER_STICKY_BARB","args":[729278388,"stickyBarb",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[0],"args":[409571731,0],"stackCount":1,"className":"BerryModifier"}],"money":15599,"pokeballCounts":{"0":29,"1":0,"2":0,"3":5,"4":0}}}
