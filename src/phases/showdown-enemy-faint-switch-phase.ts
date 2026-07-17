@@ -125,145 +125,149 @@ export class ShowdownEnemyFaintSwitchPhase extends BattlePhase {
     ).then(res => {
       endCoopFaintSwitchWindow();
       // Transport delivery and promise resumption can occur while another in-process client is active.
-      // This continuation owns the scene whose host phase opened the waiter; a stale phase never mutates a
-      // later battle, while a valid completion uses only that captured scene/phase manager.
-      if (coopSessionGeneration() !== sourceGeneration) {
-        return;
-      }
-      if (!boundaryStillLive()) {
-        failCoopSharedSession("The opponent replacement lost its exact host boundary before committing.");
-        return;
-      }
-      let slotIndex = res?.choice ?? -1;
-      const party = scene.getEnemyParty();
-      // #799 identity resolution: the pick carries the chosen mon's SPECIES (data[1]); if the two
-      // clients' party orders diverged, the blind slot index points at a DIFFERENT mon here - re-find
-      // the picked species among the benched enemy mons and log the drift.
-      const pickedSpecies = res?.data?.[1] ?? 0;
-      if (pickedSpecies > 0 && slotIndex >= 0) {
-        const atSlot = party[slotIndex];
-        if (atSlot?.species?.speciesId !== pickedSpecies) {
-          const bySpecies = party.findIndex(
-            (p, i) => i < 6 && p != null && !p.isOnField() && p.species?.speciesId === pickedSpecies,
-          );
-          if (bySpecies >= 0) {
-            coopLog(
-              "replay",
-              `versus opponent pick slot=${slotIndex} holds sp${atSlot?.species?.speciesId ?? 0} but picked sp${pickedSpecies} -> resolved by identity to slot=${bySpecies}`,
+      // Resolve + commit under THIS runtime (boundaryStillLive reads the ACTIVE runtime); a stale phase
+      // never mutates a later battle, while a valid completion uses only that captured scene/manager.
+      runWhenCoopRuntimeActive(runtime, () => {
+        if (coopSessionGeneration() !== sourceGeneration) {
+          return;
+        }
+        if (!boundaryStillLive()) {
+          failCoopSharedSession("The opponent replacement lost its exact host boundary before committing.");
+          return;
+        }
+        let slotIndex = res?.choice ?? -1;
+        const party = scene.getEnemyParty();
+        // #799 identity resolution: the pick carries the chosen mon's SPECIES (data[1]); if the two
+        // clients' party orders diverged, the blind slot index points at a DIFFERENT mon here - re-find
+        // the picked species among the benched enemy mons and log the drift.
+        const pickedSpecies = res?.data?.[1] ?? 0;
+        if (pickedSpecies > 0 && slotIndex >= 0) {
+          const atSlot = party[slotIndex];
+          if (atSlot?.species?.speciesId !== pickedSpecies) {
+            const bySpecies = party.findIndex(
+              (p, i) => i < 6 && p != null && !p.isOnField() && p.species?.speciesId === pickedSpecies,
             );
-            slotIndex = bySpecies;
+            if (bySpecies >= 0) {
+              coopLog(
+                "replay",
+                `versus opponent pick slot=${slotIndex} holds sp${atSlot?.species?.speciesId ?? 0} but picked sp${pickedSpecies} -> resolved by identity to slot=${bySpecies}`,
+              );
+              slotIndex = bySpecies;
+            }
           }
         }
-      }
-      const picked = party[slotIndex];
-      // Host-authoritative legality: a real, non-fainted, benched enemy party member. An out-of-range
-      // / fainted / on-field / no-reply (-1 sentinel) pick AI-falls-back so a hostile or benchless peer
-      // can never strand the enemy slot.
-      const legal = slotIndex >= 0 && slotIndex < 6 && picked != null && !picked.isFainted() && !picked.isOnField();
-      const usedFallback = !legal;
-      if (!legal) {
-        slotIndex = this.resolveFallbackSlot(scene);
-      }
-      const authoritativePick = party[slotIndex];
-      if (
-        slotIndex < 0
-        || authoritativePick == null
-        || authoritativePick.isFainted()
-        || authoritativePick.isOnField()
-      ) {
-        failCoopSharedSession("The opponent replacement fallback could not resolve a legal concrete slot.");
-        return;
-      }
-      if (usedFallback) {
-        coopLog(
-          "replay",
-          `versus opponent replacement pick field=${this.fieldIndex} ${
-            res == null ? "TIMED OUT" : "illegal"
-          } -> concrete AI slot=${slotIndex}`,
+        const picked = party[slotIndex];
+        // Host-authoritative legality: a real, non-fainted, benched enemy party member. An out-of-range
+        // / fainted / on-field / no-reply (-1 sentinel) pick AI-falls-back so a hostile or benchless peer
+        // can never strand the enemy slot.
+        const legal = slotIndex >= 0 && slotIndex < 6 && picked != null && !picked.isFainted() && !picked.isOnField();
+        const usedFallback = !legal;
+        if (!legal) {
+          slotIndex = this.resolveFallbackSlot(scene);
+        }
+        const authoritativePick = party[slotIndex];
+        if (
+          slotIndex < 0
+          || authoritativePick == null
+          || authoritativePick.isFainted()
+          || authoritativePick.isOnField()
+        ) {
+          failCoopSharedSession("The opponent replacement fallback could not resolve a legal concrete slot.");
+          return;
+        }
+        if (usedFallback) {
+          coopLog(
+            "replay",
+            `versus opponent replacement pick field=${this.fieldIndex} ${
+              res == null ? "TIMED OUT" : "illegal"
+            } -> concrete AI slot=${slotIndex}`,
+          );
+        } else {
+          coopLog(
+            "replay",
+            `versus host applies opponent replacement slot=${this.fieldIndex} -> enemyParty[${slotIndex}]`,
+          );
+        }
+        const terminalData = addressCoopFaintSwitchChoiceData(
+          [0, authoritativePick.species?.speciesId ?? 0],
+          {
+            ...sourceAddress,
+            fieldIndex: this.fieldIndex,
+            partySlot: slotIndex,
+            resolution: usedFallback ? COOP_FAINT_SWITCH_RESOLUTION_FALLBACK : COOP_FAINT_SWITCH_RESOLUTION_OWNER,
+          },
+          operationBinding,
         );
-      } else {
-        coopLog(
-          "replay",
-          `versus host applies opponent replacement slot=${this.fieldIndex} -> enemyParty[${slotIndex}]`,
+        const receipt = commitFaintSwitchAuthorityResult(
+          {
+            payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data: terminalData },
+            ownerRole: "guest",
+            localRole: "host",
+            ...sourceAddress,
+          },
+          operationBinding,
         );
-      }
-      const terminalData = addressCoopFaintSwitchChoiceData(
-        [0, authoritativePick.species?.speciesId ?? 0],
-        {
-          ...sourceAddress,
-          fieldIndex: this.fieldIndex,
-          partySlot: slotIndex,
-          resolution: usedFallback ? COOP_FAINT_SWITCH_RESOLUTION_FALLBACK : COOP_FAINT_SWITCH_RESOLUTION_OWNER,
-        },
-        operationBinding,
-      );
-      const receipt = commitFaintSwitchAuthorityResult(
-        {
-          payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data: terminalData },
-          ownerRole: "guest",
-          localRole: "host",
-          ...sourceAddress,
-        },
-        operationBinding,
-      );
-      if (receipt == null) {
-        failCoopSharedSession("The authoritative opponent replacement could not be retained.");
-        return;
-      }
-      const releaseAfterPeerMaterial = (): void => {
-        // Judge the close verdict under THIS runtime (see SwitchPhase's non-owner branch): the .then
-        // resumes on the shared microtask queue and boundaryStillLive reads the ACTIVE runtime.
-        void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result =>
-          runWhenCoopRuntimeActive(runtime, () => {
+        if (receipt == null) {
+          failCoopSharedSession("The authoritative opponent replacement could not be retained.");
+          return;
+        }
+        const releaseAfterPeerMaterial = (): void => {
+          // Judge the close verdict under THIS runtime (see SwitchPhase's non-owner branch): the .then
+          // resumes on the shared microtask queue and boundaryStillLive reads the ACTIVE runtime.
+          void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result =>
+            runWhenCoopRuntimeActive(runtime, () => {
+              if (coopSessionGeneration() !== sourceGeneration) {
+                return;
+              }
+              if (result === "superseded" || !boundaryStillLive()) {
+                failCoopSharedSession("The opponent replacement lost its exact host boundary while closing.");
+                return;
+              }
+              this.unshiftSummon(scene, slotIndex);
+              scene.phaseManager.shiftPhase();
+            }),
+          );
+        };
+        if (receipt.operationId == null) {
+          if (usedFallback) {
+            failCoopSharedSession("An opponent replacement timeout cannot continue without a retained peer terminal.");
+            return;
+          }
+          releaseAfterPeerMaterial();
+          return;
+        }
+        const durability = runtime.durability;
+        if (durability == null) {
+          failCoopSharedSession(`Opponent replacement terminal ${receipt.operationId} has no host material barrier.`);
+          return;
+        }
+        const operationId = receipt.operationId;
+        void durability
+          .waitForOperationMaterialApplied(operationId)
+          .then(applied => {
             if (coopSessionGeneration() !== sourceGeneration) {
               return;
             }
-            if (result === "superseded" || !boundaryStillLive()) {
-              failCoopSharedSession("The opponent replacement lost its exact host boundary while closing.");
+            if (!applied) {
+              failCoopSharedSession(
+                `Opponent replacement terminal ${operationId} exhausted before peer material apply.`,
+              );
               return;
             }
-            this.unshiftSummon(scene, slotIndex);
-            scene.phaseManager.shiftPhase();
-          }),
-        );
-      };
-      if (receipt.operationId == null) {
-        if (usedFallback) {
-          failCoopSharedSession("An opponent replacement timeout cannot continue without a retained peer terminal.");
-          return;
-        }
-        releaseAfterPeerMaterial();
-        return;
-      }
-      const durability = runtime.durability;
-      if (durability == null) {
-        failCoopSharedSession(`Opponent replacement terminal ${receipt.operationId} has no host material barrier.`);
-        return;
-      }
-      const operationId = receipt.operationId;
-      void durability
-        .waitForOperationMaterialApplied(operationId)
-        .then(applied => {
-          if (coopSessionGeneration() !== sourceGeneration) {
-            return;
-          }
-          if (!applied) {
-            failCoopSharedSession(`Opponent replacement terminal ${operationId} exhausted before peer material apply.`);
-            return;
-          }
-          runWhenCoopRuntimeActive(runtime, () => {
-            if (!boundaryStillLive()) {
-              failCoopSharedSession(`Opponent replacement terminal ${operationId} lost its host phase boundary.`);
-              return;
+            runWhenCoopRuntimeActive(runtime, () => {
+              if (!boundaryStillLive()) {
+                failCoopSharedSession(`Opponent replacement terminal ${operationId} lost its host phase boundary.`);
+                return;
+              }
+              releaseAfterPeerMaterial();
+            });
+          })
+          .catch(() => {
+            if (coopSessionGeneration() === sourceGeneration) {
+              failCoopSharedSession(`Opponent replacement terminal ${operationId} material barrier failed.`);
             }
-            releaseAfterPeerMaterial();
           });
-        })
-        .catch(() => {
-          if (coopSessionGeneration() === sourceGeneration) {
-            failCoopSharedSession(`Opponent replacement terminal ${operationId} material barrier failed.`);
-          }
-        });
+      });
     });
   }
 

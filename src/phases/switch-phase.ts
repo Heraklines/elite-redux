@@ -208,152 +208,156 @@ export class SwitchPhase extends BattlePhase {
             operationBinding,
           ).then(res => {
             endCoopFaintSwitchWindow();
-            if (coopSessionGeneration() !== sourceGeneration) {
-              return;
-            }
-            if (!boundaryStillLive()) {
-              failCoopSharedSession("The replacement flow lost its exact host boundary before committing.");
-              return;
-            }
-            const battlerCount = scene.currentBattle.getBattlerCount();
-            let slotIndex = res?.choice ?? -1;
-            // #799 (live Wingull/Chinchou wrong-mon summon): the pick carries the chosen mon's
-            // SPECIES (data[1]). If the two clients' party orders diverged, the blind slot index
-            // points at a DIFFERENT mon here - resolve by IDENTITY instead and log the drift.
-            const pickedSpecies = res?.data?.[1] ?? 0;
-            if (pickedSpecies > 0 && slotIndex >= 0) {
-              const atSlot = scene.getPlayerParty()[slotIndex];
-              if (atSlot?.species?.speciesId !== pickedSpecies) {
-                const bySpecies = scene
-                  .getPlayerParty()
-                  .findIndex((p, i) => i >= battlerCount && i < 6 && p?.species?.speciesId === pickedSpecies);
-                if (bySpecies >= 0) {
-                  coopWarn(
-                    "replay",
-                    `partner pick slot=${slotIndex} holds sp${atSlot?.species?.speciesId ?? 0} but partner picked sp${pickedSpecies} -> resolved by identity to slot=${bySpecies} (party-order drift)`,
-                  );
-                  slotIndex = bySpecies;
+            // Resolve + commit under THIS runtime (see the close verdict below): the continuation
+            // resumes on the shared microtask queue, and boundaryStillLive reads the ACTIVE runtime.
+            runWhenCoopRuntimeActive(runtime, () => {
+              if (coopSessionGeneration() !== sourceGeneration) {
+                return;
+              }
+              if (!boundaryStillLive()) {
+                failCoopSharedSession("The replacement flow lost its exact host boundary before committing.");
+                return;
+              }
+              const battlerCount = scene.currentBattle.getBattlerCount();
+              let slotIndex = res?.choice ?? -1;
+              // #799 (live Wingull/Chinchou wrong-mon summon): the pick carries the chosen mon's
+              // SPECIES (data[1]). If the two clients' party orders diverged, the blind slot index
+              // points at a DIFFERENT mon here - resolve by IDENTITY instead and log the drift.
+              const pickedSpecies = res?.data?.[1] ?? 0;
+              if (pickedSpecies > 0 && slotIndex >= 0) {
+                const atSlot = scene.getPlayerParty()[slotIndex];
+                if (atSlot?.species?.speciesId !== pickedSpecies) {
+                  const bySpecies = scene
+                    .getPlayerParty()
+                    .findIndex((p, i) => i >= battlerCount && i < 6 && p?.species?.speciesId === pickedSpecies);
+                  if (bySpecies >= 0) {
+                    coopWarn(
+                      "replay",
+                      `partner pick slot=${slotIndex} holds sp${atSlot?.species?.speciesId ?? 0} but partner picked sp${pickedSpecies} -> resolved by identity to slot=${bySpecies} (party-order drift)`,
+                    );
+                    slotIndex = bySpecies;
+                  }
                 }
               }
-            }
-            const picked = scene.getPlayerParty()[slotIndex];
-            const legal =
-              slotIndex >= battlerCount
-              && slotIndex < 6
-              && picked?.isAllowedInBattle() === true
-              && !coopSwitchBlocksMonForOwner(coopOwnerOfPlayerFieldSlot(this.fieldIndex), picked.coopOwner);
-            if (!legal) {
-              coopLog(
-                "replay",
-                `partner replacement pick field=${this.fieldIndex} ${
-                  res == null ? "TIMED OUT" : `illegal (${slotIndex})`
-                } -> auto-pick`,
-              );
-              slotIndex = this.coopAutoPickReplacement(scene);
-            }
-            const authoritativePick = scene.getPlayerParty()[slotIndex];
-            const noReplacement = slotIndex < 0 || authoritativePick == null;
-            const terminalData = addressCoopFaintSwitchChoiceData(
-              [0, authoritativePick?.species?.speciesId ?? 0],
-              {
-                ...sourceAddress,
-                fieldIndex: this.fieldIndex,
-                partySlot: slotIndex,
-                resolution: noReplacement
-                  ? COOP_FAINT_SWITCH_RESOLUTION_NONE
-                  : legal
-                    ? COOP_FAINT_SWITCH_RESOLUTION_OWNER
-                    : COOP_FAINT_SWITCH_RESOLUTION_FALLBACK,
-              },
-              operationBinding,
-            );
-            const receipt = commitFaintSwitchAuthorityResult(
-              {
-                payload: {
+              const picked = scene.getPlayerParty()[slotIndex];
+              const legal =
+                slotIndex >= battlerCount
+                && slotIndex < 6
+                && picked?.isAllowedInBattle() === true
+                && !coopSwitchBlocksMonForOwner(coopOwnerOfPlayerFieldSlot(this.fieldIndex), picked.coopOwner);
+              if (!legal) {
+                coopLog(
+                  "replay",
+                  `partner replacement pick field=${this.fieldIndex} ${
+                    res == null ? "TIMED OUT" : `illegal (${slotIndex})`
+                  } -> auto-pick`,
+                );
+                slotIndex = this.coopAutoPickReplacement(scene);
+              }
+              const authoritativePick = scene.getPlayerParty()[slotIndex];
+              const noReplacement = slotIndex < 0 || authoritativePick == null;
+              const terminalData = addressCoopFaintSwitchChoiceData(
+                [0, authoritativePick?.species?.speciesId ?? 0],
+                {
+                  ...sourceAddress,
                   fieldIndex: this.fieldIndex,
                   partySlot: slotIndex,
-                  data: terminalData,
+                  resolution: noReplacement
+                    ? COOP_FAINT_SWITCH_RESOLUTION_NONE
+                    : legal
+                      ? COOP_FAINT_SWITCH_RESOLUTION_OWNER
+                      : COOP_FAINT_SWITCH_RESOLUTION_FALLBACK,
                 },
-                ownerRole: coopOwnerOfPlayerFieldSlot(this.fieldIndex),
-                localRole: coopController.role,
-                ...sourceAddress,
-              },
-              operationBinding,
-            );
-            if (receipt == null) {
-              failCoopSharedSession("The authoritative replacement choice could not be retained.");
-              return;
-            }
-            const releaseAfterPeerMaterial = (): void => {
-              // The close verdict must be judged under THIS runtime: the .then continuation resumes on
-              // the shared microtask queue, and boundaryStillLive reads the ACTIVE runtime - ambient
-              // state a two-engine test process legitimately points elsewhere between pumps. In a real
-              // browser the runtime is always active, so this defers nothing live.
-              void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result =>
-                runWhenCoopRuntimeActive(runtime, () => {
+                operationBinding,
+              );
+              const receipt = commitFaintSwitchAuthorityResult(
+                {
+                  payload: {
+                    fieldIndex: this.fieldIndex,
+                    partySlot: slotIndex,
+                    data: terminalData,
+                  },
+                  ownerRole: coopOwnerOfPlayerFieldSlot(this.fieldIndex),
+                  localRole: coopController.role,
+                  ...sourceAddress,
+                },
+                operationBinding,
+              );
+              if (receipt == null) {
+                failCoopSharedSession("The authoritative replacement choice could not be retained.");
+                return;
+              }
+              const releaseAfterPeerMaterial = (): void => {
+                // The close verdict must be judged under THIS runtime: the .then continuation resumes on
+                // the shared microtask queue, and boundaryStillLive reads the ACTIVE runtime - ambient
+                // state a two-engine test process legitimately points elsewhere between pumps. In a real
+                // browser the runtime is always active, so this defers nothing live.
+                void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result =>
+                  runWhenCoopRuntimeActive(runtime, () => {
+                    if (coopSessionGeneration() !== sourceGeneration) {
+                      return;
+                    }
+                    if (result === "superseded" || !boundaryStillLive()) {
+                      failCoopSharedSession("The replacement flow lost its exact host boundary while closing.");
+                      return;
+                    }
+                    if (slotIndex >= battlerCount && slotIndex < 6) {
+                      scene.phaseManager.unshiftNew(
+                        "SwitchSummonPhase",
+                        this.switchType,
+                        fieldIndex,
+                        slotIndex,
+                        this.doReturn,
+                      );
+                      // Queue the checkpoint only after the retained old-address terminal and this host
+                      // message surface have both materially closed. It may carry turn N+1, but can no
+                      // longer race an N modal or leak into a superseding phase.
+                      scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+                    }
+                    scene.phaseManager.shiftPhase();
+                  }),
+                );
+              };
+              if (receipt.operationId == null) {
+                if (!legal) {
+                  failCoopSharedSession("A replacement timeout cannot continue without a retained peer terminal.");
+                  return;
+                }
+                releaseAfterPeerMaterial();
+                return;
+              }
+              const durability = runtime.durability;
+              if (durability == null || runtime.controller.role !== "host") {
+                failCoopSharedSession(`Replacement terminal ${receipt.operationId} has no host material barrier.`);
+                return;
+              }
+              const operationId = receipt.operationId;
+              void durability
+                .waitForOperationMaterialApplied(operationId)
+                .then(applied => {
                   if (coopSessionGeneration() !== sourceGeneration) {
                     return;
                   }
-                  if (result === "superseded" || !boundaryStillLive()) {
-                    failCoopSharedSession("The replacement flow lost its exact host boundary while closing.");
+                  if (!applied) {
+                    failCoopSharedSession(`Replacement terminal ${operationId} exhausted before peer material apply.`);
                     return;
                   }
-                  if (slotIndex >= battlerCount && slotIndex < 6) {
-                    scene.phaseManager.unshiftNew(
-                      "SwitchSummonPhase",
-                      this.switchType,
-                      fieldIndex,
-                      slotIndex,
-                      this.doReturn,
-                    );
-                    // Queue the checkpoint only after the retained old-address terminal and this host
-                    // message surface have both materially closed. It may carry turn N+1, but can no
-                    // longer race an N modal or leak into a superseding phase.
-                    scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
-                  }
-                  scene.phaseManager.shiftPhase();
-                }),
-              );
-            };
-            if (receipt.operationId == null) {
-              if (!legal) {
-                failCoopSharedSession("A replacement timeout cannot continue without a retained peer terminal.");
-                return;
-              }
-              releaseAfterPeerMaterial();
-              return;
-            }
-            const durability = runtime.durability;
-            if (durability == null || runtime.controller.role !== "host") {
-              failCoopSharedSession(`Replacement terminal ${receipt.operationId} has no host material barrier.`);
-              return;
-            }
-            const operationId = receipt.operationId;
-            void durability
-              .waitForOperationMaterialApplied(operationId)
-              .then(applied => {
-                if (coopSessionGeneration() !== sourceGeneration) {
-                  return;
-                }
-                if (!applied) {
-                  failCoopSharedSession(`Replacement terminal ${operationId} exhausted before peer material apply.`);
-                  return;
-                }
-                runWhenCoopRuntimeActive(runtime, () => {
-                  if (!boundaryStillLive()) {
-                    failCoopSharedSession(`Replacement terminal ${operationId} lost its host phase boundary.`);
+                  runWhenCoopRuntimeActive(runtime, () => {
+                    if (!boundaryStillLive()) {
+                      failCoopSharedSession(`Replacement terminal ${operationId} lost its host phase boundary.`);
+                      return;
+                    }
+                    releaseAfterPeerMaterial();
+                  });
+                })
+                .catch(error => {
+                  if (coopSessionGeneration() !== sourceGeneration) {
                     return;
                   }
-                  releaseAfterPeerMaterial();
+                  coopWarn("replay", `replacement terminal ${operationId} material barrier rejected`, error);
+                  failCoopSharedSession(`Replacement terminal ${operationId} material barrier failed.`);
                 });
-              })
-              .catch(error => {
-                if (coopSessionGeneration() !== sourceGeneration) {
-                  return;
-                }
-                coopWarn("replay", `replacement terminal ${operationId} material barrier rejected`, error);
-                failCoopSharedSession(`Replacement terminal ${operationId} material barrier failed.`);
-              });
+            });
           });
           return;
         }
