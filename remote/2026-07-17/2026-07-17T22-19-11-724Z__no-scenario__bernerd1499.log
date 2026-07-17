@@ -1,0 +1,98 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:aa6e37dd75a5a8b47561acbf94ff7a7580938d80:run-29614940111.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 OPR/133.0.0.0
+platform: Win32
+screen:   1536x864 @1.25x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@17132ms -> title-shown@20685ms
+lastSess: ok (reached title)
+mode:     4  wave:?
+seed:     3DUyJ6wMrY3quxqyOF7cCHXx
+party:    
+enemy:    
+
+----- COMMENT -----
+session corrupted and cannot be loaded
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:aa6e37dd75a5a8b47561acbf94ff7a7580938d80:run-29614940111.1","source":"github","sha":"aa6e37dd75a5a8b47561acbf94ff7a7580938d80","workflow":{"provider":"github-actions","runId":"29614940111","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[22:12:28.230] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[22:12:28.761] LOG: [ER] build {"version":1,"id":"github:aa6e37dd75a5a8b47561acbf94ff7a7580938d80:run-29614940111.1","source":"github","sha":"aa6e37dd75a5a8b47561acbf94ff7a7580938d80","workflow":{"provider":"github-actions","runId":"29614940111","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[22:12:28.851] LOG: [dev-tools] loaded — 642 scenarios + Send Logs button
+[22:12:43.669] DEBUG: Destroying loading scene
+[22:12:43.669] DEBUG: Destroyed loading scene
+[22:12:43.752] LOG: Seed: 3DUyJ6wMrY3quxqyOF7cCHXx
+[22:12:43.752] LOG: Wave Seed: 3DUyJ6wMrY3quxqyOF7cCHXx 0
+[22:12:46.110] LOG: %cStart Phase LoginPhase color:green;
+[22:12:46.562] LOG: Client Session: aBdlZcRP2uoYizhvhdgyKpehzfTd4tgB
+[22:12:47.074] DEBUG: Using cached system data
+[22:12:47.203] LOG: %cStart Phase TitlePhase color:green;
+[22:12:47.204] LOG: Getting Session Slot id: %d 4
+[22:12:47.214] ERROR: TypeError: Cannot read properties of undefined (reading 'forms')
+TypeError: Cannot read properties of undefined (reading 'forms')
+    at new PokemonData (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:360960)
+    at Object.<anonymous> (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198312)
+    at JSON.parse (<anonymous>)
+    at GameData.parseSessionData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198221)
+    at GameData.getSession (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:135764)
+    at TitlePhase.checkLastSaveSlot (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:460:155362)
+    at TitlePhase.start (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:460:155241)
+    at PhaseManager.startCurrentPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:462:30370)
+    at PhaseManager.shiftPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:462:30237)
+    at LoginPhase.end (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:18:11881)
+[22:12:47.224] LOG: use seasonal splash messages true
+[22:12:52.126] LOG: %cStart Phase SelectChallengePhase color:green;
+[22:12:53.472] LOG: %cStart Phase SelectStarterPhase color:green;
+[22:13:09.628] WARN: cry/664 not found
+[22:13:09.661] WARN: cry/999 not found
+[22:13:09.682] WARN: cry/123 not found
+[22:13:09.705] WARN: cry/318 not found
+[22:13:09.724] WARN: cry/960 not found
+[22:13:09.742] WARN: cry/692 not found
+[22:13:13.648] LOG: %cSaving starter preferences color: blue
+[22:18:05.271] LOG: Getting Session Slot id: %d 0
+[22:18:05.292] LOG: Getting Session Slot id: %d 1
+[22:18:05.301] LOG: Getting Session Slot id: %d 2
+[22:18:05.307] LOG: Getting Session Slot id: %d 3
+[22:18:05.313] LOG: Getting Session Slot id: %d 4
+[22:18:05.440] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:18:05.470] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:18:05.470] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:18:05.493] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:18:05.493] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:357868)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3455)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3816
+[22:18:05.493] WARN: Failed to load session slot #4: TypeError: Cannot read properties of undefined (reading 'forms')
+TypeError: Cannot read properties of undefined (reading 'forms')
+    at PokemonData (https://elite-redux-staging.pages.dev/assets/coop-runtime-xcJcu7oh.js:3:360960)
+    at Object.<anonymous> (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198312)
+    at JSON.parse (<anonymous>)
+    at GameData.parseSessionData (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:198221)
+    at GameData.getSession (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1012:135764)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3639
+    at new Promise (<anonymous>)
+    at SessionSlot.load (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1050:3612)
+    at SaveSlotSelectUiHandler.populateSessionSlots (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:34723)
+    at SaveSlotSelectUiHandler.show (https://elite-redux-staging.pages.dev/assets/battle-scene-BRegbyu3.js:1049:31379)
+
+----- REPLAY TRACE (JSON) -----
+(none)
