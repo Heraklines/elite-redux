@@ -252,11 +252,11 @@ async function configurePage(page, label, browserErrors, sourceAssetMisses) {
         browserErrors.push(`[${label}:console] ${text}${source}`);
       }
     }
-    if (/\[coop:(?:launch|webrtc|session)\]/.test(text)) {
+    if (/\[coop:(?:launch|webrtc|session|runtime|resync)\]/.test(text)) {
       process.stdout.write(`[${label}] ${text}\n`);
     }
   });
-  await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 90_000 });
+  await page.goto(`${origin}/?coopdebug=1`, { waitUntil: "domcontentloaded", timeout: 90_000 });
   await page.waitForFunction(() => globalThis.__coopBrowserBridge?.ready?.() === true, {
     timeout: 180_000,
     polling: 250,
@@ -269,6 +269,7 @@ async function browserStatus(page) {
     return {
       transport: runtime?.localTransport?.state,
       generation: runtime?.localTransport?.connectionGeneration?.(),
+      wireReadyState: runtime?.localTransport?.wire?.readyState,
       snapshot: runtime?.controller?.snapshot?.(),
       versionMismatch: runtime?.controller?.versionMismatch,
       fingerprintMismatch: runtime?.controller?.functionalFingerprintMismatch,
@@ -277,6 +278,36 @@ async function browserStatus(page) {
       checkpointRevision: runtime?.controller?.checkpointRevision,
     };
   });
+}
+
+/**
+ * A replacement DataChannel being momentarily `open` is not yet evidence of a usable recovered carrier.
+ * Under runner/network pressure ICE can invalidate that candidate pair immediately and the production
+ * runtime correctly enters another hot-rejoin generation. Require both real endpoints to remain open for
+ * two keepalive intervals; a transient replacement is then observed as recovery-in-progress instead of
+ * being mistaken for the final frontier and making the one-shot continuation probe a false failure.
+ */
+async function waitForStableConnectedPair(hostPage, guestPage, { minGeneration, timeoutMs = 120_000 }) {
+  const deadline = Date.now() + timeoutMs;
+  const stableMs = 10_000;
+  let candidate = null;
+  let last = null;
+  while (Date.now() < deadline) {
+    last = await Promise.all([browserStatus(hostPage), browserStatus(guestPage)]);
+    const ready = last.every(
+      state => state.transport === "connected" && state.wireReadyState === "open" && state.generation >= minGeneration,
+    );
+    const identity = ready ? last.map(state => state.generation).join(":") : null;
+    if (identity == null) {
+      candidate = null;
+    } else if (candidate?.identity !== identity) {
+      candidate = { identity, since: Date.now() };
+    } else if (Date.now() - candidate.since >= stableMs) {
+      return last;
+    }
+    await delay(250);
+  }
+  throw new Error(`native WebRTC pair never held one open replacement for ${stableMs}ms: ${JSON.stringify(last)}`);
 }
 
 async function installLifecycleProbe(page) {
@@ -551,6 +582,10 @@ try {
     throw new Error(`mid-chunk checkpoint was not byte-exact/exactly-once: ${JSON.stringify(exactCheckpoint)}`);
   }
 
+  const firstRejoin = await waitForStableConnectedPair(hostPage, guestPage, { minGeneration: 1 });
+  if (firstRejoin.some(state => state.transport !== "connected" || state.generation < 1)) {
+    throw new Error(`mid-chunk hot rejoin failed: ${JSON.stringify(firstRejoin)}`);
+  }
   await hostPage.evaluate(() => {
     globalThis.__coopBrowserRuntime.localTransport.send({ t: "stallBeat", waitingMs: 424_242 });
   });
@@ -558,11 +593,6 @@ try {
     timeout: 15_000,
     polling: 50,
   });
-
-  const firstRejoin = await Promise.all([browserStatus(hostPage), browserStatus(guestPage)]);
-  if (firstRejoin.some(state => state.transport !== "connected" || state.generation < 1)) {
-    throw new Error(`mid-chunk hot rejoin failed: ${JSON.stringify(firstRejoin)}`);
-  }
 
   // Observe the production runtime's public lifecycle seam without replacing it. Every terminal carrier
   // below must produce one disconnect and one rejoin-driver call on EACH endpoint, even though close/error/

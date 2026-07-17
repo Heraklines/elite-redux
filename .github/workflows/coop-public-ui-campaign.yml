@@ -299,7 +299,7 @@ jobs:
             artifact: mystery
             waves: "10"
             difficulty: mystery
-            difficulty_option: mystery-test
+            difficulty_option: mystery
             require_mystery: "1"
     steps:
       - name: Check out exact implementation SHA (harness only)

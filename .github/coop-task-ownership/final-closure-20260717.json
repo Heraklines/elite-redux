@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "taskId": "final-closure-20260717",
+  "branch": "ci/coop/final-closure-20260717",
+  "trainRef": "ci/coop/final-closure-20260717",
+  "baseSha": "099af732395fb209b88ea15aa75946e10c8b56a1",
+  "allowedFiles": [
+    ".github/coop-task-ownership/final-closure-20260717.json",
+    ".github/coop-task-ownership/p33-gameover-public-ui.json",
+    ".github/workflows/coop-public-ui-campaign.yml",
+    "scripts/run-coop-browser-transport.mjs",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "test/browser/coop-public-ui/config.mjs",
+    "test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs",
+    "test/browser/coop-public-ui/solo-classic.mjs",
+    "test/tests/elite-redux/coop/coop-rejoin-recovery-boundary.test.ts"
+  ]
+}

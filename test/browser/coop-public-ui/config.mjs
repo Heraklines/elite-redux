@@ -83,7 +83,7 @@ const allowedJourneys = new Set([
 const allowedSeats = new Set(["host-seat", "guest-seat"]);
 const allowedAccountModes = new Set(["login", "register"]);
 const allowedDifficulties = new Set(["youngster", "ace", "elite", "hell", "mystery"]);
-const allowedDifficultyOptions = new Set(["youngster", "ace", "elite", "hell", "mystery-test"]);
+const allowedDifficultyOptions = new Set(["youngster", "ace", "elite", "hell", "mystery"]);
 const allowedLocales = new Set([
   "en",
   "es-ES",

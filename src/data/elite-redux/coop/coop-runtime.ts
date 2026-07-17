@@ -2828,6 +2828,21 @@ export async function runCoopStateRecovery(
   return "terminal";
 }
 
+interface CoopBattleRecoveryScene {
+  currentBattle?: unknown | null;
+  gameMode?: { isCoop?: boolean; isShowdown?: boolean } | null;
+}
+
+/**
+ * A hot rejoin always restores the authenticated carrier and durability tail, but a full battle snapshot
+ * exists only after an authoritative battle has started. Title/lobby, starter selection, save selection,
+ * and showdown wager setup all legitimately have a runtime with no `currentBattle`; demanding a snapshot
+ * there turns a successful rejoin into an impossible recovery and closes the healthy replacement channel.
+ */
+export function hasCoopBattleRecoverySurface(scene: CoopBattleRecoveryScene = globalScene): boolean {
+  return scene.currentBattle != null && ((scene.gameMode?.isCoop ?? false) || (scene.gameMode?.isShowdown ?? false));
+}
+
 function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRuntime): void {
   let rejoining = false;
   const terminateSharedSession = (recoveryId: string): void => {
@@ -2985,7 +3000,7 @@ function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRunti
           // The GUEST missed DATA while dark: pull the host's full authoritative snapshot. A hot rejoin
           // keeps the SAME epoch and live surface, so do not purge its current arrivals/waiters; the WebRTC
           // transport's connection generation already rejects delayed frames from the superseded channel.
-          if (runtime.controller.role === "guest") {
+          if (runtime.controller.role === "guest" && hasCoopBattleRecoverySurface()) {
             // Same epoch: pre-drop operation ids stay valid and de-dupe. The atomic full snapshot is the
             // DATA backstop after retained surface waits and the durability control tail resume.
             const seq = COOP_REJOIN_SYNC_SEQ_BASE + (Date.now() % 100_000);
@@ -3038,6 +3053,8 @@ function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRunti
                 );
               },
             });
+          } else if (runtime.controller.role === "guest") {
+            coopLog("resync", "post-rejoin battle snapshot skipped (no authoritative battle surface yet)");
           }
         })
         .catch(() => {

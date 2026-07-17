@@ -75,7 +75,7 @@ test("workflow builds the staging-only fifth difficulty and fans a fixed ten-wav
   assert.match(workflow, /VITE_DEV_TOOLS: 1/u);
   assert.match(
     workflow,
-    /profile: mystery-gauntlet\s+artifact: mystery\s+waves: "10"\s+difficulty: mystery\s+difficulty_option: mystery-test\s+require_mystery: "1"/u,
+    /profile: mystery-gauntlet\s+artifact: mystery\s+waves: "10"\s+difficulty: mystery\s+difficulty_option: mystery\s+require_mystery: "1"/u,
   );
   assert.match(workflow, /COOP_UI_DIFFICULTY_ID: \$\{\{ matrix\.difficulty \}\}/u);
   assert.match(workflow, /COOP_UI_DIFFICULTY_OPTION_ID: \$\{\{ matrix\.difficulty_option \}\}/u);

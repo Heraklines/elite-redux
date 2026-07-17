@@ -10,9 +10,9 @@
     "docs/plans/2026-07-13-coop-p33-protocol-contract.md",
     "progress.md",
     "src/data/elite-redux/coop/coop-durability.ts",
+    "src/data/elite-redux/coop/coop-runtime.ts",
     "src/data/elite-redux/coop/coop-transport.ts",
     "src/data/elite-redux/coop/coop-webrtc-transport.ts",
-    "src/data/elite-redux/coop/coop-runtime.ts",
     "src/dev-tools/registry.ts",
     "src/phases/coop-replay-turn-phase.ts",
     "src/ui/handlers/starter-select-ui-handler.ts",
@@ -25,10 +25,10 @@
     "test/browser/coop-public-ui/journeys.mjs",
     "test/browser/coop-public-ui/public-ui-harness.mjs",
     "test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs",
+    "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts",
     "test/tests/elite-redux/coop/coop-guest-renderer.test.ts",
     "test/tests/elite-redux/coop/coop-p33-client.test.ts",
     "test/tests/elite-redux/coop/coop-session-controller.test.ts",
-    "test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts",
-    "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts"
+    "test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts"
   ]
 }
