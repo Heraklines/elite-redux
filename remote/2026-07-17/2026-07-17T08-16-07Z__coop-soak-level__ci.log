@@ -1,0 +1,57 @@
+===== COOP SOAK RESULT =====
+profile: level
+verdict: FAIL
+waves_requested: 55
+run_mode: calibrated-release
+calibration_id: level-55-faint
+target_sha: 4026bf6ca7d4f8095cb9cf7a0008d303b88479d5
+checked_out_sha: 4026bf6ca7d4f8095cb9cf7a0008d303b88479d5
+base_seed: 20260717
+campaign_seed: 20260717
+run: 29565689975 (workflow source 4026bf6ca7d4f8095cb9cf7a0008d303b88479d5)
+timestamp: 2026-07-17T08-16-07Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260717 WAVES=55 - replay this run with:  SOAK_SEED=20260717 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[22m[39m[32mStart Phase: SelectTargetPhase[39m
+[38;2;0;60;189mUI mode changed from MESSAGE (=0) to TARGET_SELECT (=5)![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[38;2;0;60;189mUI mode changed from TARGET_SELECT (=5) to MESSAGE (=0)![39m
+[coop:owner] broadcast own-slot fi=0 turn=1 role=host cmd=0
+[coop:relay] broadcastLocalCommand SEND fieldIndex=0 owner=host turn=1 command=0 cursor=2 moveId=53 targets=[2]
+[coop:transport] send host t=command fi=0 owner=host turn=1 cmd=0 cursor=2 move=53
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[coop:transport] recv guest t=command fi=0 owner=host turn=1 cmd=0 cursor=2 move=53 handlers=1
+[coop:relay] recv command fieldIndex=0 turn=1 command=0 -> BUFFERED (no awaiter yet)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: CommandPhase[39m
+[coop:battle] CommandPhase slot=1 turn=1 owner=guest role=host -> partner path
+[38;2;0;60;189mUI mode changed from MESSAGE (=0) to MESSAGE (=0)![39m
+[34mYour partner is choosing a move...[39m
+[coop:relay] host requestPartnerCommand SEND fieldIndex=1 turn=1 moveSlots=[0,1,2,3] (awaiting peer)
+[coop:transport] send host t=commandRequest fi=1 owner=guest turn=1 slots=4
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[coop:transport] recv guest t=commandRequest fi=1 owner=guest turn=1 slots=4 handlers=1
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[coop:relay] peer recv commandRequest fieldIndex=1 owner=guest turn=1 moveSlots=[0,1,2,3] -> reply command=0 cursor=2 moveId=53
+[coop:transport] send guest t=command fi=1 owner=guest turn=1 cmd=0 cursor=2 move=53
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[coop:transport] recv host t=command fi=1 owner=guest turn=1 cmd=0 cursor=2 move=53 handlers=1
+[coop:relay] recv command fieldIndex=1 turn=1 command=0 -> resolved awaiting request
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[coop:ai] applyWiredPartnerCommand partner=94 wiredMoveId=53 cursor=2 -> moveId=53 moveIndex=2 tera=false targets=[3] targetsFrom=wire-verbatim useMode=1
+Move: FLAMETHROWER Move targets: { multiple: false, targets: [ 3 ] } 
+Player Pokemon: Gengar
+[38;2;0;60;189mUI mode changed from MESSAGE (=0) to MESSAGE (=0)![39m
+
