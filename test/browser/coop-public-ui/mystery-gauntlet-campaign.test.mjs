@@ -62,9 +62,12 @@ test("Mystery gauntlet policy is loud-fail and drives every projected encounter 
 test("workflow builds the staging-only fifth difficulty and fans a fixed ten-wave profile", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8");
   assert.match(workflow, /VITE_DEV_TOOLS: 1/u);
+  // The live difficulty picker's semantic id renamed "mystery-test" -> "mystery"
+  // (run 29586411356 failed loudly on the stale id); a comment line now sits between
+  // the difficulty and option keys, so match the keys individually in order.
   assert.match(
     workflow,
-    /profile: mystery-gauntlet\s+artifact: mystery\s+waves: "10"\s+difficulty: mystery\s+difficulty_option: mystery-test\s+require_mystery: "1"/u,
+    /profile: mystery-gauntlet\s+artifact: mystery\s+waves: "10"\s+difficulty: mystery\s+[\s\S]{0,400}?difficulty_option: mystery\s+require_mystery: "1"/u,
   );
   assert.match(workflow, /COOP_UI_DIFFICULTY_ID: \$\{\{ matrix\.difficulty \}\}/u);
   assert.match(workflow, /COOP_UI_DIFFICULTY_OPTION_ID: \$\{\{ matrix\.difficulty_option \}\}/u);
