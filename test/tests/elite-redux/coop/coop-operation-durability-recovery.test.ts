@@ -24,6 +24,7 @@ import {
   type CoopApplyOutcome,
   type CoopDurabilityHooks,
   CoopDurabilityManager,
+  type CoopDurabilityRecoveryFailure,
   type CoopJournalEntry,
   setCoopDurabilityEnabled,
 } from "#data/elite-redux/coop/coop-durability";
@@ -214,7 +215,10 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     const hostMgr = new CoopDurabilityManager(
       hostGate,
       {
-        sendFullSnapshot: (cls, head, marks) => snapshots.push({ cls, head, marks }),
+        sendFullSnapshot: (cls, head, marks) => {
+          snapshots.push({ cls, head, marks });
+          return true;
+        },
       },
       3,
     );
@@ -247,10 +251,51 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     guestMgr.dispose();
   });
 
+  it("I3a call chain: an overflowed gap whose required snapshot cannot be sent terminalizes recovery", async () => {
+    const pair = createLoopbackPair();
+    const hostGate = new ChannelGate(pair.host);
+    const failures: CoopDurabilityRecoveryFailure[] = [];
+    const hostMgr = new CoopDurabilityManager(
+      hostGate,
+      {
+        sendFullSnapshot: () => false,
+        onRecoveryExhausted: failure => failures.push(failure),
+      },
+      3,
+    );
+    const guestMgr = new CoopDurabilityManager(pair.guest);
+
+    for (let revision = 1; revision <= 6; revision++) {
+      hostMgr.commit("wave", revision, waveMsg(revision));
+    }
+    await flush();
+    hostGate.sentTypes.length = 0;
+
+    pair.guest.send({ t: "coopResyncAll" });
+    await flush();
+
+    expect(failures).toEqual([
+      {
+        cls: "wave",
+        from: 0,
+        blockedSeq: 6,
+        attempts: 1,
+        reason: "snapshot-unavailable",
+      },
+    ]);
+    expect(
+      hostGate.sentTypes.filter(t => t === "waveResolved"),
+      "failed heavy recovery must not fall through to an unusable partial replay",
+    ).toEqual([]);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
   it("I3b production carrier: a deep-gap snapshot crosses the live stream and fast-forwards the guest", async () => {
     const pair = createLoopbackPair();
-    const hostStream = new CoopBattleStreamer(pair.host);
-    const guestStream = new CoopBattleStreamer(pair.guest);
+    const current = { epoch: 1, wave: 1, turn: 1 };
+    const hostStream = new CoopBattleStreamer(pair.host, { authorityContext: () => current });
+    const guestStream = new CoopBattleStreamer(pair.guest, { authorityContext: () => current });
     const guestMgr = new CoopDurabilityManager(pair.guest);
     let liveSnapshotHead = 0;
     let hostMgr!: CoopDurabilityManager;
@@ -261,12 +306,17 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
           const marks = { [cls]: head };
           const controlDigest = `deep-gap-${cls}-${head}`;
           expect(hostMgr.retainSnapshotFrontier(controlDigest, marks)).toBe(true);
-          hostStream.sendDurabilitySnapshot(JSON.stringify({ controlDigest, journalHighWater: marks }));
+          return hostStream.sendDurabilitySnapshot(JSON.stringify({ controlDigest, journalHighWater: marks }), {
+            wave: current.wave,
+            turn: current.turn,
+            stateTick: head,
+            controlDigest,
+          });
         },
       },
       3,
     );
-    guestStream.onDurabilitySnapshot(blob => {
+    guestStream.onDurabilitySnapshot(({ blob }) => {
       const snapshot = JSON.parse(blob) as { controlDigest: string; journalHighWater: Record<string, number> };
       liveSnapshotHead = snapshot.journalHighWater.wave ?? 0;
       guestMgr.adoptSnapshotMarksForTransaction(snapshot.journalHighWater);
@@ -432,7 +482,12 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     const hostGate = new ChannelGate(pair.host);
     const snapshots: number[] = [];
     const applied: number[] = [];
-    const hostMgr = new CoopDurabilityManager(hostGate, { sendFullSnapshot: (_cls, head) => snapshots.push(head) });
+    const hostMgr = new CoopDurabilityManager(hostGate, {
+      sendFullSnapshot: (_cls, head) => {
+        snapshots.push(head);
+        return true;
+      },
+    });
     const guestMgr = new CoopDurabilityManager(pair.guest, recordingWaveHooks(applied));
 
     hostMgr.restore({ wave: N }, { wave: N });

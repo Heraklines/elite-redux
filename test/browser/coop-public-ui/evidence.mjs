@@ -50,8 +50,6 @@ const MARKET_PREFIX = "[coop-browser:market] ";
 const COMMANDER_PREFIX = "[coop-browser:commander] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 const CHECKSUM_SENTINEL = "0000000000000000";
-const POST_REJOIN_RESYNC_REQUEST = /^\[coop:resync\] post-rejoin full resync request seq=(\d+)/u;
-const STATE_SYNC_START = /^\[coop:resync\] guest requestStateSync turn=(\d+) seq=(\d+) START\b/u;
 /** The client's own fail-closed handling of a post-terminal signaling beat (see assertClean). */
 const HEARTBEAT_OWNERSHIP_LOSS = /P33 heartbeat lost authenticated ownership status=(?:401|403)/u;
 /** The browser's automatic resource-error twin of that same handled beat. */
@@ -59,6 +57,8 @@ const HEARTBEAT_RESOURCE_ERROR = /Failed to load resource:.*(?:401|403)/u;
 const HEARTBEAT_PATHNAME = /\/coop\/v3\/heartbeat$/u;
 const COMPATIBLE_PRESENTATION_MISMATCH =
   /^\[coop:checksum\] PRESENTATION MISMATCH sections=[^\n]+ - simulation compatible - /u;
+const STATE_SYNC_START =
+  /^\[coop:resync\] guest requestStateSync id=\S+ reason=([a-z-]+) e=(\d+) wave=(\d+) turn=(\d+) START\b/u;
 const FATAL_COOP_CONSOLE_RULES = Object.freeze([
   [/^\[coop:ASSERT\].*\bCHECKSUM MISMATCH\b/iu, "checksum assertion"],
   [
@@ -145,6 +145,19 @@ function parsedUrl(value) {
   } catch {
     return null;
   }
+}
+
+export function coopCasUpdateRequestView(value) {
+  const url = value instanceof URL ? value : parsedUrl(value);
+  if (url == null || url.pathname !== "/savedata/session/coop-cas-update") {
+    return null;
+  }
+  const slot = Number(url.searchParams.get("slot"));
+  const mode = url.searchParams.get("coopCasMode");
+  if (!Number.isSafeInteger(slot) || slot < 0 || slot > 4 || (mode !== "empty" && mode !== "existing")) {
+    return null;
+  }
+  return Object.freeze({ slot, mode });
 }
 
 // Diagnostic request/response body capture is scoped to the co-op save + signal workers ONLY
@@ -826,7 +839,7 @@ export function semanticSurfaceView(text) {
     || !value.address
     || typeof value.address !== "object"
     || !Number.isSafeInteger(value.address.epoch)
-    || value.address.epoch < (value.coop ? 1 : 0)
+    || value.address.epoch < 0
     || !Number.isSafeInteger(value.address.wave)
     || value.address.wave < 0
     || !Number.isSafeInteger(value.address.turn)
@@ -849,7 +862,7 @@ export function semanticSurfaceView(text) {
     || !nullablePositiveInteger(value.surfaceGeneration)
     || !nullableMysteryEncounterType(value.mysteryEncounterType)
     || !nullableStateDigest(value.stateDigest)
-    || (value.coop && value.address.wave > 0 && value.stateDigest === null)
+    || (value.coop && value.address.wave > 0 && (value.address.epoch < 1 || value.stateDigest === null))
     || (value.coop
       && (value.localSeat === null
         || value.localRole === null
@@ -876,7 +889,7 @@ export class EvidenceSink {
     this.expectedMissingSystemSaveErrors = expectedMissingSystemSaveErrors;
     this.events = [];
     this.failures = [];
-    this.benignRejoinStateSyncTurns = new Set();
+    this.expectedSharedTerminalAfterGameOver = null;
     this.heartbeatOwnershipLossObserved = false;
     this.networkState = { account: null, lobby: null, coopRunStatus: null, apiFailure: null };
     this.writeTail = Promise.resolve();
@@ -1041,6 +1054,20 @@ export class EvidenceSink {
     }
   }
 
+  /**
+   * Arm the one legitimate shared-session teardown: this same browser has already exposed GameOver and the
+   * duo driver has proven the paired retained terminal. Every earlier or unrelated shared terminal remains
+   * fatal. The exact evidence index prevents a blanket console allowlist.
+   */
+  expectSharedTerminalAfterPairedGameOver(gameOverIndex) {
+    const event = this.events[gameOverIndex];
+    if (!event || !/Start Phase GameOverPhase/u.test(event.text ?? "")) {
+      throw new Error(`${this.label}: cannot arm expected shared terminal without exact GameOver evidence`);
+    }
+    this.expectedSharedTerminalAfterGameOver = gameOverIndex;
+    this.record("expected-shared-terminal-armed", { gameOverIndex });
+  }
+
   find(pattern, from = 0) {
     for (let i = Math.max(0, from); i < this.events.length; i++) {
       if (pattern.test(this.events[i].text ?? "")) {
@@ -1074,7 +1101,7 @@ export class EvidenceSink {
     return this.events.slice(from).find(event => event.kind === "browser-binding");
   }
 
-  findResponse(pathname, { from = 0, status = null, method = null } = {}) {
+  findResponse(pathname, { from = 0, status = null, method = null, slot = null, mode = null } = {}) {
     return this.events
       .slice(from)
       .find(
@@ -1082,7 +1109,20 @@ export class EvidenceSink {
           event.kind === "response"
           && event.url.endsWith(pathname)
           && (status == null || event.status === status)
-          && (method == null || event.method === method),
+          && (method == null || event.method === method)
+          && (slot == null || event.slot === slot)
+          && (mode == null || event.mode === mode),
+      );
+  }
+
+  findCoopCasUpdateRequest({ from = 0, slot = null, mode = null } = {}) {
+    return this.events
+      .slice(from)
+      .find(
+        event =>
+          event.kind === "coop-cas-update-request"
+          && (slot == null || event.slot === slot)
+          && (mode == null || event.mode === mode),
       );
   }
 
@@ -1283,10 +1323,6 @@ export class EvidenceSink {
         text,
         source,
       });
-      const postRejoinRequest = POST_REJOIN_RESYNC_REQUEST.exec(text);
-      if (postRejoinRequest != null) {
-        this.benignRejoinStateSyncTurns.add(postRejoinRequest[1]);
-      }
       // The signaling heartbeat is FAIL-CLOSED by design: after the peer (or a game-over
       // teardown) ends the authenticated run on the Worker, this seat's next beat reads
       // 401/403 once and the client stops + closes the channel, logging this exact line.
@@ -1297,9 +1333,13 @@ export class EvidenceSink {
       }
       const stateSyncStart = STATE_SYNC_START.exec(text);
       const fatalCoopReason = fatalCoopConsoleReason(text, {
-        benignRejoinStateSync: stateSyncStart != null && this.benignRejoinStateSyncTurns.has(stateSyncStart[1]),
+        benignRejoinStateSync: stateSyncStart?.[1] === "rejoin",
       });
-      if (fatalCoopReason != null) {
+      const expectedSharedTerminal =
+        fatalCoopReason === "shared session terminated"
+        && this.expectedSharedTerminalAfterGameOver != null
+        && event.index > this.expectedSharedTerminalAfterGameOver;
+      if (fatalCoopReason != null && !expectedSharedTerminal) {
         const fatal = this.record("coop-fatal-console", {
           level: message.type(),
           text,
@@ -1308,6 +1348,13 @@ export class EvidenceSink {
           consoleEventIndex: event.index,
         });
         this.failures.push(fatal);
+      } else if (expectedSharedTerminal) {
+        this.record("expected-shared-terminal", {
+          text,
+          source,
+          consoleEventIndex: event.index,
+          gameOverIndex: this.expectedSharedTerminalAfterGameOver,
+        });
       }
       const expectedMissingSystemSave = isExpectedMissingSystemSaveError(
         message.type(),
@@ -1379,6 +1426,15 @@ export class EvidenceSink {
           this.record("coop-cas-delete-request", commitment);
         }
       }
+      if (url.pathname === "/savedata/session/coop-cas-update") {
+        const commitment = coopCasUpdateRequestView(url);
+        if (commitment == null) {
+          const invalid = this.record("coop-cas-update-request-invalid", { url: safeUrl(request.url()) });
+          this.failures.push(invalid);
+        } else {
+          this.record("coop-cas-update-request", commitment);
+        }
+      }
       const body = request.postData();
       if (body == null) {
         return;
@@ -1427,12 +1483,14 @@ export class EvidenceSink {
     page.on("response", response => {
       const status = response.status();
       const method = response.request().method();
-      const url = parsedUrl(response.url());
+      const responseUrl = parsedUrl(response.url());
+      const coopCas =
+        responseUrl?.pathname === "/savedata/session/coop-cas-update" ? coopCasUpdateRequestView(responseUrl) : null;
       // Optimization brief R2: a SUCCESSFUL static GET becomes an aggregate + inventory
       // entry instead of a full per-response event (~45k such events per journey went
       // through one serialized appendFile each). API hosts, non-GETs, and error statuses
       // keep complete individual records below.
-      const isApi = url != null && isCapturedApiHost(url.hostname);
+      const isApi = responseUrl != null && isCapturedApiHost(responseUrl.hostname);
       if (method === "GET" && status < 400 && !isApi) {
         const cls =
           status === 304
@@ -1444,8 +1502,8 @@ export class EvidenceSink {
                 : "network";
         this.staticTraffic.total += 1;
         this.staticTraffic.byClass[cls] += 1;
-        if (url != null) {
-          this.staticTraffic.inventory.add(url.pathname);
+        if (responseUrl != null) {
+          this.staticTraffic.inventory.add(responseUrl.pathname);
         }
       } else {
         this.record("response", {
@@ -1453,6 +1511,7 @@ export class EvidenceSink {
           method,
           url: safeUrl(response.url()),
           fromCache: response.fromCache(),
+          ...(coopCas ?? {}),
         });
       }
       this.capturePublicResponse(response).catch(error => {
@@ -1464,7 +1523,7 @@ export class EvidenceSink {
       // Capture the response BODY for a non-2xx status on the co-op workers only, so the exact
       // error text (e.g. the first-save CAS 409 message) is in the artifact. Bodies carry no
       // credentials on these routes; auth error bodies are advisory, so this is safe.
-      if (url != null && isCapturedApiHost(url.hostname) && (status < 200 || status >= 300)) {
+      if (responseUrl != null && isCapturedApiHost(responseUrl.hostname) && (status < 200 || status >= 300)) {
         response
           .text()
           .then(text => {
@@ -1566,26 +1625,39 @@ export class EvidenceSink {
     } else {
       this.record("checkpoint-semantic", { name: step, surfaceKey });
     }
-    const dom = await page.evaluate(() => ({
-      title: document.title,
-      url: location.href,
-      bodyText: document.body.innerText,
-      canvases: [...document.querySelectorAll("canvas")].map(canvas => ({
-        width: canvas.width,
-        height: canvas.height,
-        clientWidth: canvas.clientWidth,
-        clientHeight: canvas.clientHeight,
-      })),
-      inputs: [...document.querySelectorAll("input,textarea")].map(input => ({
-        tag: input.tagName.toLowerCase(),
-        type: input.getAttribute("type"),
-        disabled: input.disabled,
-        visible: input.getClientRects().length > 0,
-      })),
-      storage: Object.keys(localStorage)
-        .sort()
-        .map(key => ({ key, length: localStorage.getItem(key)?.length ?? 0 })),
-    }));
+    const dom = await page.evaluate(async () => {
+      const storage = await Promise.all(
+        Object.keys(localStorage)
+          .sort()
+          .map(async key => {
+            const value = localStorage.getItem(key) ?? "";
+            const sha256 = /^sessionData(?:\d*)_/u.test(key)
+              ? [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
+                  .map(byte => byte.toString(16).padStart(2, "0"))
+                  .join("")
+              : null;
+            return { key, length: value.length, sha256 };
+          }),
+      );
+      return {
+        title: document.title,
+        url: location.href,
+        bodyText: document.body.innerText,
+        canvases: [...document.querySelectorAll("canvas")].map(canvas => ({
+          width: canvas.width,
+          height: canvas.height,
+          clientWidth: canvas.clientWidth,
+          clientHeight: canvas.clientHeight,
+        })),
+        inputs: [...document.querySelectorAll("input,textarea")].map(input => ({
+          tag: input.tagName.toLowerCase(),
+          type: input.getAttribute("type"),
+          disabled: input.disabled,
+          visible: input.getClientRects().length > 0,
+        })),
+        storage,
+      };
+    });
     if (dom.canvases.length === 0 || dom.canvases.some(canvas => canvas.width <= 0 || canvas.height <= 0)) {
       throw new Error(`${this.label}: checkpoint ${step} had no non-zero game canvas`);
     }

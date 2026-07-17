@@ -57,8 +57,12 @@ import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksu
 import { collectCanonicalDiff, logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
+  addressCoopFaintSwitchChoiceData,
   armCoopFaintSwitchIntentResend,
+  COOP_FAINT_SWITCH_RESOLUTION_NONE,
+  type CoopFaintSourceAddress,
   captureCoopFaintSwitchOperationBinding,
+  markCoopFaintSwitchPickerSettled,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import { isCoopFaintSwitchSeq, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
@@ -84,6 +88,7 @@ import {
   queueCoopMeBattleVictoryTail,
   registerCoopWaveAdvanceBoundaryWakeFactory,
   resolveCoopPendingWaveTransition,
+  runCoopStateRecovery,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
 import { beginCoopMachineWait } from "#data/elite-redux/coop/coop-stall-probe";
@@ -93,6 +98,7 @@ import type {
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
+  CoopRecoveryAdmissionV1,
 } from "#data/elite-redux/coop/coop-transport";
 import {
   adoptWaveAdvanceWatcherChoice,
@@ -606,22 +612,43 @@ export class CoopFaintReplayPhase extends PokemonPhase {
         // host's legality check rejects it instantly and runs auto-pick (which, with this side
         // truly empty, cleanly skips the summon: the lone-survivor flow). Zero wait either way.
         const relay = getCoopInteractionRelay();
-        const data = [0];
         const operationBinding = captureCoopFaintSwitchOperationBinding("guest");
+        const sourceAddress = this.faintSourceAddress ?? {
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+          occurrence: 0,
+        };
+        const { wave: sourceWave, turn: sourceTurn, occurrence } = sourceAddress;
+        // The renderer has now materially proved that no picker surface exists for this exact faint.
+        // Record that proof before relaying NONE; the retained terminal may ACK only this occurrence.
+        markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.battlerIndex, operationBinding, occurrence);
+        const data = addressCoopFaintSwitchChoiceData(
+          [0],
+          {
+            wave: sourceWave,
+            turn: sourceTurn,
+            occurrence,
+            fieldIndex: this.battlerIndex,
+            partySlot: -1,
+            resolution: COOP_FAINT_SWITCH_RESOLUTION_NONE,
+          },
+          operationBinding,
+        );
         sendCoopFaintSwitchChoice(relay, this.battlerIndex, -1, data);
         armCoopFaintSwitchIntentResend(
           {
             payload: { fieldIndex: this.battlerIndex, partySlot: -1, data },
             localRole: controller.role,
-            wave: globalScene.currentBattle?.waveIndex ?? 0,
-            turn: globalScene.currentBattle?.turn ?? 0,
+            wave: sourceWave,
+            turn: sourceTurn,
+            occurrence,
             resend: () => sendCoopFaintSwitchChoice(relay, this.battlerIndex, -1, data),
           },
           operationBinding,
         );
         return; // nothing to send out - the host's flow decides (wipe / lone survivor)
       }
-      globalScene.phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", this.battlerIndex);
+      globalScene.phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", this.battlerIndex, this.faintSourceAddress);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("[coop-op]")) {
         coopWarn("replay", `own-faint picker gate bi=${this.battlerIndex} lost its runtime binding`, error);
@@ -641,11 +668,13 @@ export class CoopFaintReplayPhase extends PokemonPhase {
    */
   private readonly narrate: boolean;
   private readonly sp: number | undefined;
+  private readonly faintSourceAddress: CoopFaintSourceAddress | undefined;
 
-  constructor(battlerIndex: number, narrate = false, sp?: number) {
+  constructor(battlerIndex: number, narrate = false, sp?: number, faintSourceAddress?: CoopFaintSourceAddress) {
     super(battlerIndex);
     this.narrate = narrate;
     this.sp = sp;
+    this.faintSourceAddress = faintSourceAddress;
   }
 
   public override start(): void {
@@ -1468,20 +1497,22 @@ export class CoopFinalizeTurnPhase extends Phase {
         + "-> heal-once safety net (stateSync)",
     );
     const resyncGen = coopSessionGeneration(); // #808
-    void streamer.requestStateSync(this.turn).then(blob => {
-      if (blob == null) {
-        coopWarn(
-          "resync",
-          `turn=${this.turn} no snapshot received (timeout) -> keep current state, re-check next turn`,
-        );
-        return;
-      }
-      try {
+    const recoveryRuntime = getCoopRuntime();
+    if (recoveryRuntime == null) {
+      failCoopSharedSession(`Turn ${this.turn} checksum recovery had no live runtime.`);
+      return;
+    }
+    void runCoopStateRecovery({
+      runtime: recoveryRuntime,
+      reason: "turn-checksum",
+      label: `Turn ${this.turn} checksum`,
+      isCurrent: () => resyncGen === coopSessionGeneration() && getCoopRuntime() === recoveryRuntime,
+      onSnapshot: ({ blob, admission }) => {
         // #808: a reply landing after session teardown must never queue a phase into the
         // NEXT session's queue (the generation moved on teardown).
         if (resyncGen !== coopSessionGeneration()) {
           coopWarn("resync", `turn=${this.turn} stateSync reply arrived AFTER session teardown -> dropped (#808)`);
-          return;
+          return false;
         }
         const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
         coopLog("resync", `turn=${this.turn} queueing full snapshot apply (blobLen=${blob.length})`);
@@ -1500,12 +1531,10 @@ export class CoopFinalizeTurnPhase extends Phase {
         // while a CoopHpDrainReplayPhase animates against it. Route it through a queued one-shot phase
         // so the heavy rebuild lands at a real inter-phase boundary, never mid-drain. The heal-check +
         // UNHEALED diagnostics moved INTO the phase (they must run AFTER the deferred apply).
-        const runtime = getCoopRuntime();
-        if (runtime == null) {
-          return;
-        }
-        if (!queueCoopAtomicSnapshotApply(runtime, snapshot, `turn=${this.turn} checksum safety-net`)) {
-          return;
+        if (
+          !queueCoopAtomicSnapshotApply(recoveryRuntime, snapshot, admission, `turn=${this.turn} checksum safety-net`)
+        ) {
+          return false;
         }
         const interactionController = getCoopController();
         // Cancellation occurs only AFTER the atomic envelope passed central preflight. A malformed
@@ -1515,10 +1544,8 @@ export class CoopFinalizeTurnPhase extends Phase {
             !isCoopFaintSwitchSeq(seq)
             && (interactionController == null ? true : interactionController.peerAdvancedPastInteraction(seq)),
         );
-      } catch {
-        /* a malformed resync blob must never crash the guest's battle */
-        coopWarn("resync", `turn=${this.turn} malformed snapshot blob (handled)`);
-      }
+        return true;
+      },
     });
   }
 
@@ -1883,7 +1910,7 @@ function parseCoopCanonical(canonical: string | undefined): unknown {
  * GUEST (#633, BLOCKING-1 - async resync race guard): a one-shot phase that applies a full
  * authoritative resync snapshot at a REAL inter-phase boundary, verifies it healed, then ends. The
  * resync blob arrives via a genuine network round-trip ({@linkcode CoopFinalizeTurnPhase.verifyChecksum}'s
- * `requestStateSync(...).then(...)`), so by the time it resolves the guest is very likely mid-way
+ * centralized `runCoopStateRecovery(...)` request), so by the time it resolves the guest is very likely mid-way
  * through the NEXT turn's replay, pumping `CoopMoveAnimReplayPhase` / `CoopHpDrainReplayPhase` against
  * the live field. The comprehensive snapshot apply re-summons field mons, vacates slots, and rebuilds
  * boss bars ({@linkcode applyCoopFullSnapshot}) - running THAT inline in a bare `.then` could teardown
@@ -1891,7 +1918,7 @@ function parseCoopCanonical(canonical: string | undefined): unknown {
  *
  * Routing the apply through this queued phase lands the heavy re-summon/boss-rebuild at an
  * inter-phase boundary, never interleaved with a half-drained HP bar. The heal-check + UNHEALED
- * diagnostics live here (they must run AFTER the deferred apply, not in the `.then` that enqueues it).
+ * diagnostics live here (they must run AFTER the deferred apply, not in the promise callback that enqueues it).
  *
  * MINOR-1 converge-or-hold: after {@linkcode COOP_RESYNC_RESUMMON_GIVE_UP} consecutive UNHEALED
  * resyncs on the SAME host checksum, the heavy field/boss re-summon is suppressed so a genuinely
@@ -1921,6 +1948,7 @@ export class CoopApplyResyncPhase extends Phase {
     private readonly turn: number,
     private readonly hostChecksum: string,
     private readonly hostObj: unknown,
+    private readonly recoveryAdmission: CoopRecoveryAdmissionV1,
     private readonly onSettled?: ((healed: boolean) => boolean | void) | undefined,
   ) {
     super();
@@ -2269,6 +2297,13 @@ export class CoopApplyResyncPhase extends Phase {
     super.start();
     let rollback: CoopFullBattleSnapshot | null = null;
     try {
+      const streamer = getCoopBattleStreamer();
+      if (streamer == null || !streamer.recoveryAdmissionIsCurrent(this.recoveryAdmission, this.snapshot)) {
+        coopWarn("resync", `turn=${this.turn} DROP snapshot whose immutable recovery ticket is no longer current`);
+        this.settle(false);
+        failCoopSharedSession(`Turn ${this.turn} recovery ticket was superseded before atomic apply.`);
+        return;
+      }
       // #790-class STALE GUARD for resyncs (live faint softlock, 00:47 logs): a resync REQUESTED
       // at turn N can be answered + queued while turn N+1 already finalized. Applying that OLD
       // snapshot then REGRESSES fresh state (the party.1/party.5 transposition warnings) and -
@@ -2284,7 +2319,7 @@ export class CoopApplyResyncPhase extends Phase {
             + "-> DROPPED (newer checkpoint supersedes)",
         );
         this.settle(false);
-        this.end();
+        failCoopSharedSession(`Turn ${this.turn} recovery snapshot no longer matches the live frontier.`);
         return;
       }
       // MINOR-1: if we've already failed to heal THIS divergence twice in a row, skip the heavy
@@ -2300,6 +2335,7 @@ export class CoopApplyResyncPhase extends Phase {
       if (rollback == null) {
         coopWarn("resync", `turn=${this.turn} snapshot refused: no transactional rollback image`);
         this.settle(false);
+        failCoopSharedSession(`Turn ${this.turn} recovery could not capture a rollback image.`);
         return;
       }
       // Pass the isCoopAuthoritativeGuest() gate from here (cycle-free) so the engine's level/exp +
@@ -2316,6 +2352,7 @@ export class CoopApplyResyncPhase extends Phase {
           applyCoopFullSnapshot(rollback, isCoopAuthoritativeGuest(), true);
           this.settle(false);
           coopWarn("resync", `turn=${this.turn} control commit failed; DATA rolled back atomically`);
+          failCoopSharedSession(`Turn ${this.turn} recovery control commit failed after material convergence.`);
           return;
         }
       } else {
@@ -2388,6 +2425,7 @@ export class CoopApplyResyncPhase extends Phase {
         } catch {
           coopWarn("resync", `turn=${this.turn} rollback failed; shared session cannot safely continue`);
           failCoopSharedSession(`turn=${this.turn} atomic DATA rollback failed`);
+          return;
         }
       }
       // Stay fail-closed, but do not become an un-wakeable queue tombstone: a later complete authority
@@ -2402,10 +2440,8 @@ export class CoopApplyResyncPhase extends Phase {
 }
 
 /**
- * A stateSync request is correlated to the turn that detected drift, but the host captures its snapshot when
- * the request ARRIVES. The host may already be on the next turn, making the returned snapshot newer than the
- * request. Judge staleness by that authoritative snapshot turn when available; falling back to the request
- * turn preserves the legacy-host guard.
+ * Protocol 38 admits only an exact recovery frontier. This scalar guard is a final defense behind the full
+ * ticket check above: both older and future turns are invalid for the live battle shell.
  */
 export function coopResyncSnapshotIsStale(
   requestTurn: number,
@@ -2413,7 +2449,7 @@ export function coopResyncSnapshotIsStale(
   liveTurn: number,
 ): boolean {
   const capturedTurn = snapshotTurn ?? requestTurn;
-  return capturedTurn > 0 && liveTurn > capturedTurn;
+  return capturedTurn !== liveTurn;
 }
 
 /** A modern wire state tick is a positive, finite, losslessly representable integer. */

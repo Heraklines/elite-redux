@@ -71,6 +71,61 @@ test("semantic evidence accepts an exact non-actionable replay watcher", () => {
   assert.deepEqual(parsed.seatsWithInput, []);
 });
 
+test("semantic evidence accepts an exact locally owned battle target surface", () => {
+  const parsed = semanticSurfaceView(
+    `${PREFIX}${JSON.stringify(
+      valid({
+        surfaceId: "command:target",
+        operationClass: "command",
+        ownerModel: "local",
+        ownerSeat: null,
+        seatsWithInput: [1],
+        localSeat: 1,
+        localRole: "guest",
+        selectedOptionId: "battle-target:2",
+        optionIds: ["battle-target:2", "battle-target:3"],
+        optionCount: 2,
+        ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+        phase: "SelectTargetPhase",
+        surfaceGeneration: null,
+        uiMode: "TARGET_SELECT",
+      }),
+    )}`,
+  );
+  assert.equal(parsed.surfaceId, "command:target");
+  assert.equal(parsed.selectedOptionId, "battle-target:2");
+});
+
+test("semantic evidence accepts the paired pre-battle title surface without weakening gameplay epochs", () => {
+  const parsed = semanticSurfaceView(
+    `${PREFIX}${JSON.stringify(
+      valid({
+        surfaceId: "confirm:TitlePhase",
+        operationClass: "confirm",
+        address: { epoch: 0, wave: 0, turn: 0 },
+        selectedOptionId: "yes",
+        optionIds: ["yes", "no"],
+        optionCount: 2,
+        phase: "TitlePhase",
+        stateDigest: null,
+        uiMode: "CONFIRM",
+      }),
+    )}`,
+  );
+  assert.deepEqual(parsed.address, { epoch: 0, wave: 0, turn: 0 });
+  assert.throws(
+    () =>
+      semanticSurfaceView(
+        `${PREFIX}${JSON.stringify(
+          valid({
+            address: { epoch: 0, wave: 1, turn: 1 },
+          }),
+        )}`,
+      ),
+    /invalid semantic surface observation/u,
+  );
+});
+
 test("semantic evidence rejects every malformed claimed proof", () => {
   assert.throws(() => semanticSurfaceView(`${PREFIX}{`), /invalid semantic surface JSON/u);
   assert.throws(

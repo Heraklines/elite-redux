@@ -20,12 +20,12 @@ export class PokerogueSavedataApi extends ApiBase {
    * @param bodyData The {@linkcode UpdateAllSavedataRequest | request data} to send
    * @returns An error message if something went wrong
    */
-  public async updateAll(bodyData: UpdateAllSavedataRequest): Promise<string> {
+  public async updateAll(bodyData: UpdateAllSavedataRequest, signal?: AbortSignal): Promise<string> {
     try {
       const rawBodyData = JSON.stringify(bodyData, (_k: any, v: any) =>
         typeof v === "bigint" ? (v <= MAX_INT_ATTR_VALUE ? Number(v) : v.toString()) : v,
       );
-      const response = await this.doPost("/savedata/updateall", rawBodyData);
+      const response = await this.doPost("/savedata/updateall", rawBodyData, "json", signal);
       return await response.text();
     } catch (err) {
       console.warn("Could not update all savedata!", err);

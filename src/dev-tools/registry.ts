@@ -102,6 +102,12 @@ export function isCoopBrowserFaintFixtureBuild(): boolean {
   return env?.VITE_COOP_BROWSER_FIXTURE === "faint-replacement";
 }
 
+/** Whether this exact bundle was built for the retained GameOver public-browser journey. */
+export function isCoopBrowserGameOverFixtureBuild(): boolean {
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  return env?.VITE_COOP_BROWSER_FIXTURE === "game-over";
+}
+
 /**
  * Return the single starter to pre-populate in the normal co-op starter UI for the
  * Commander browser checkpoint. Both the dedicated build flag and an exact per-client
@@ -171,6 +177,37 @@ export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
     pokerus: false,
     ivs: new Array(6).fill(31),
   }));
+}
+
+/**
+ * Materialize a deterministic public party wipe in the normal co-op starter UI.
+ *
+ * Both players visibly submit one Magikarp whose only move is Memento. The two real command
+ * surfaces therefore collect ordinary player choices, then the production battle and faint
+ * call chains end the run without depending on a random enemy roll. As with every public-browser
+ * fixture, both the exact bundle identity and exact per-page query must agree.
+ */
+export function getCoopBrowserGameOverFixtureStarters(): Starter[] | null {
+  if (!isCoopBrowserGameOverFixtureBuild() || typeof location === "undefined") {
+    return null;
+  }
+  if (new URLSearchParams(location.search).get("coopfixture") !== "game-over") {
+    return null;
+  }
+  return [
+    {
+      speciesId: SpeciesId.MAGIKARP,
+      shiny: false,
+      variant: 0,
+      formIndex: 0,
+      abilityIndex: 0,
+      passive: false,
+      nature: Nature.HARDY,
+      moveset: [MoveId.MEMENTO] as StarterMoveset,
+      pokerus: false,
+      ivs: new Array(6).fill(31),
+    },
+  ];
 }
 
 let pendingDevStarterLevels: number[] | null = null;

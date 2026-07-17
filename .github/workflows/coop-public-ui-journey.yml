@@ -8,9 +8,14 @@ on:
       - ".github/workflows/coop-public-ui-journey.yml"
       - "scripts/coop-browser-entry.ts"
       - "scripts/prepare-coop-browser-artifact.mjs"
+      - "src/data/elite-redux/coop/coop-runtime.ts"
+      - "src/data/elite-redux/coop/coop-webrtc-transport.ts"
       - "src/dev-tools/registry.ts"
+      - "src/phases/coop-replay-turn-phase.ts"
       - "src/ui/handlers/starter-select-ui-handler.ts"
       - "test/browser/coop-public-ui/**"
+      - "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts"
+      - "test/tests/elite-redux/coop/coop-guest-renderer.test.ts"
       - "workers/er-save-api/**"
       - "workers/er-coop-api/**"
   workflow_dispatch:
@@ -27,6 +32,8 @@ on:
           - reverse-resume
           - faint-replacement
           - commander-skip
+          - game-over
+          - resume-scan-isolation
           - save-mutations
           - market-wide-lens
       requester_seat:
@@ -89,10 +96,10 @@ env:
   # Previously the signal origin defaulted to the PROD worker (er-coop-api, no -staging) while the
   # save-API defaulted to staging - a stale/unset repo var split the ticket-issuer from the signal
   # origin, so the staging-minted ticket failed to validate on the prod signal worker and pairing
-  # never completed (the audit's journey-run pairing failure). Both stay paired. `save-mutations`
-  # instead seals localhost origins and starts fresh in-memory instances of the real Worker modules.
-  COOP_UI_SIGNAL_ORIGIN: ${{ inputs.journey == 'save-mutations' && 'http://127.0.0.1:8789' || 'https://er-coop-api-staging.heraklines.workers.dev' }}
-  COOP_UI_API_ORIGIN: ${{ inputs.journey == 'save-mutations' && 'http://127.0.0.1:8788' || 'https://er-save-api-staging.heraklines.workers.dev' }}
+  # never completed (the audit's journey-run pairing failure). Both stay paired. Save mutation and
+  # resume-scan isolation journeys instead seal localhost origins and run fresh in-memory real Workers.
+  COOP_UI_SIGNAL_ORIGIN: ${{ (inputs.journey == 'save-mutations' || inputs.journey == 'resume-scan-isolation') && 'http://127.0.0.1:8789' || 'https://er-coop-api-staging.heraklines.workers.dev' }}
+  COOP_UI_API_ORIGIN: ${{ (inputs.journey == 'save-mutations' || inputs.journey == 'resume-scan-isolation') && 'http://127.0.0.1:8788' || 'https://er-save-api-staging.heraklines.workers.dev' }}
 
 jobs:
   browser-build:
@@ -113,7 +120,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          SHA="$(gh api repos/Heraklines/er-assets/commits/main --jq .sha)"
+          SHA=""
+          for attempt in 1 2 3; do
+            SHA="$(gh api repos/Heraklines/er-assets/commits/main --jq .sha 2>/dev/null || true)"
+            echo "$SHA" | grep -Eq '^[0-9a-f]{40}$' && break
+            echo "er-assets API lookup attempt $attempt failed; retrying exact main ref"
+            sleep "$((attempt * 2))"
+          done
+          if ! echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            SHA="$(git ls-remote https://github.com/Heraklines/er-assets.git refs/heads/main | awk 'NR == 1 { print $1 }')"
+          fi
           echo "$SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "Invalid er-assets SHA: $SHA"; exit 1; }
           echo "COOP_BROWSER_ASSET_SHA=$SHA" >> "$GITHUB_ENV"
           echo "Sealing er-assets pin $SHA into the public-UI bundle"
@@ -126,7 +142,7 @@ jobs:
           status=$?
           set -e
           diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
-          owned="$(grep -E '^(scripts/coop-browser-entry|src/dev-tools/registry|src/system/game-data|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-webrtc-transport|src/dev-tools/registry|src/phases/coop-replay-turn-phase|src/system/game-data|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
           if [ -n "$owned" ]; then
             printf '%s\n' "$owned"
             exit 1
@@ -141,7 +157,12 @@ jobs:
             .github/workflows/coop-public-ui-journey.yml \
             scripts/coop-browser-entry.ts \
             scripts/prepare-coop-browser-artifact.mjs \
+            src/data/elite-redux/coop/coop-durability.ts \
+            src/data/elite-redux/coop/coop-runtime.ts \
+            src/data/elite-redux/coop/coop-transport.ts \
+            src/data/elite-redux/coop/coop-webrtc-transport.ts \
             src/dev-tools/registry.ts \
+            src/phases/coop-replay-turn-phase.ts \
             src/ui/handlers/save-slot-select-ui-handler.ts \
             src/ui/handlers/starter-select-ui-handler.ts \
             test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
@@ -153,6 +174,8 @@ jobs:
             test/browser/coop-public-ui/commander-evidence.test.mjs \
             test/browser/coop-public-ui/config.mjs \
             test/browser/coop-public-ui/evidence.mjs \
+            test/browser/coop-public-ui/fatal-console-evidence.test.mjs \
+            test/browser/coop-public-ui/game-over-evidence.test.mjs \
             test/browser/coop-public-ui/journeys.mjs \
             test/browser/coop-public-ui/local-worker-server.ts \
             test/browser/coop-public-ui/local-worker-vite.config.mjs \
@@ -167,7 +190,26 @@ jobs:
             test/browser/coop-public-ui/save-mutation-evidence.test.mjs \
             test/browser/coop-public-ui/semantic-surface-evidence.test.mjs \
             test/browser/coop-public-ui/terminal-watchdog.mjs \
-            test/browser/coop-public-ui/vite.config.mjs
+            test/browser/coop-public-ui/vite.config.mjs \
+            test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts \
+            test/tests/elite-redux/coop/coop-guest-renderer.test.ts \
+            test/tests/elite-redux/coop/coop-p33-client.test.ts \
+            test/tests/elite-redux/coop/coop-session-controller.test.ts \
+            test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts
+
+      - name: Verify retained GameOver two-engine operation regression
+        if: inputs.journey == 'game-over'
+        env:
+          ER_SCENARIO: "1"
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: >-
+          npx vitest run
+          test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts
+          test/tests/elite-redux/coop/coop-guest-renderer.test.ts
+          test/tests/elite-redux/coop/coop-p33-client.test.ts
+          test/tests/elite-redux/coop/coop-session-controller.test.ts
+          test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts
+          --reporter=dot
 
       - name: Enforce public-driver boundary
         run: node test/browser/coop-public-ui/check-public-boundary.mjs
@@ -190,6 +232,12 @@ jobs:
       - name: Verify strict semantic surface evidence contracts
         run: node --test test/browser/coop-public-ui/semantic-surface-evidence.test.mjs
 
+      - name: Verify exact retained GameOver browser contracts
+        run: >-
+          node --test
+          test/browser/coop-public-ui/fatal-console-evidence.test.mjs
+          test/browser/coop-public-ui/game-over-evidence.test.mjs
+
       - name: Verify exact save mutation browser evidence contracts
         run: node --test test/browser/coop-public-ui/save-mutation-evidence.test.mjs
 
@@ -200,7 +248,7 @@ jobs:
           VITE_BYPASS_TUTORIAL: 0
           VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || 'off' }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_SERVER_URL: ${{ env.COOP_UI_API_ORIGIN }}
         run: pnpm exec vite build --mode beta --config test/browser/coop-public-ui/vite.config.mjs
@@ -225,7 +273,7 @@ jobs:
     name: ${{ inputs.journey || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / ${{ inputs.journey == 'commander-skip' && matrix.commander_owner_seat || 'primary accounts' }}
     needs: browser-build
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.journey == 'market-wide-lens' && 55 || inputs.journey == 'save-mutations' && 50 || inputs.journey == 'commander-skip' && 45 || 35 }}
+    timeout-minutes: ${{ inputs.journey == 'market-wide-lens' && 55 || (inputs.journey == 'save-mutations' || inputs.journey == 'resume-scan-isolation') && 50 || inputs.journey == 'commander-skip' && 45 || 35 }}
     strategy:
       fail-fast: false
       matrix:
@@ -248,8 +296,8 @@ jobs:
       - name: Install isolated Chrome runtime
         run: pnpm exec puppeteer browsers install chrome
 
-      - name: Start isolated in-memory Worker fixtures for save mutation coverage
-        if: inputs.journey == 'save-mutations'
+      - name: Start isolated in-memory Worker fixtures for persistence coverage
+        if: inputs.journey == 'save-mutations' || inputs.journey == 'resume-scan-isolation'
         shell: bash
         run: |
           pnpm exec vite build --config test/browser/coop-public-ui/local-worker-vite.config.mjs
@@ -293,7 +341,9 @@ jobs:
           COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat || 'guest-seat' }}
           COOP_UI_COMMANDER_OWNER_SEAT: ${{ matrix.commander_owner_seat }}
           COOP_UI_HOST_LOCALE: en
-          COOP_UI_GUEST_LOCALE: de
+          # The retained GameOver oracle isolates terminal ordering from the separately-gated
+          # cross-locale fingerprint contract. All other public journeys keep the EN/DE lane.
+          COOP_UI_GUEST_LOCALE: ${{ inputs.journey == 'game-over' && 'en' || 'de' }}
           COOP_UI_HOST_TITLE_NEW_GAME_KEYS: ${{ inputs.host_title_keys || '[]' }}
           COOP_UI_GUEST_TITLE_NEW_GAME_KEYS: ${{ inputs.guest_title_keys || '[]' }}
           COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'fast' && '70') || (inputs.cadence == 'slow' && '420') || '180' }}
@@ -352,7 +402,7 @@ jobs:
           if-no-files-found: warn
 
   reverse-journey:
-    if: github.event_name == 'workflow_dispatch' && inputs.fan_out_reverse && inputs.journey != 'save-mutations'
+    if: github.event_name == 'workflow_dispatch' && inputs.fan_out_reverse && inputs.journey != 'save-mutations' && inputs.journey != 'resume-scan-isolation'
     name: reverse-resume / slow / alternate accounts
     needs: browser-build
     runs-on: ubuntu-latest

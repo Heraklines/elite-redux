@@ -23,6 +23,7 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
 import {
   coopLocalOwnedPlayerFieldSlot,
+  coopRetainedGameOverSupersedesReplay,
   coopSessionGeneration,
   getCoopBattleStreamer,
   getCoopController,
@@ -91,12 +92,15 @@ export class CoopReplayTurnPhase extends Phase {
   private ended = false;
   /** Read-only browser-observer seam: true only after the exact turn waiter has been installed. */
   private awaitingAuthority = false;
+  /** Immutable source wave for every event presented by this turn pump and its continuations. */
+  private readonly sourceWave: number;
 
-  constructor(turn: number, rendered = 0, hpChain?: [number, number][]) {
+  constructor(turn: number, rendered = 0, hpChain?: [number, number][], sourceWave?: number) {
     super();
     this.turn = turn;
     this.rendered = rendered;
     this.fromHpByBi = new Map(hpChain ?? []);
+    this.sourceWave = sourceWave ?? globalScene.currentBattle?.waveIndex ?? 0;
   }
 
   /**
@@ -121,9 +125,16 @@ export class CoopReplayTurnPhase extends Phase {
     return true;
   }
 
-  /** A retained terminal may dissolve only a speculative turn beyond its settled authority address. */
-  public abortIfPastSettledTurn(settledTurn: number, reason: string): boolean {
-    return this.turn > settledTurn && this.abortPhantom(reason);
+  /**
+   * A retained terminal may always dissolve a speculative later turn. It may dissolve the settled turn
+   * itself only after this pump has drained every ordered live event and installed its authority wait:
+   * GameOver never emits that normal turn-resolution carrier, so this exact wait is otherwise impossible.
+   */
+  public abortIfRetainedTerminalSuperseded(settledTurn: number, reason: string): boolean {
+    return (
+      (this.turn > settledTurn || (this.turn === settledTurn && this.isAwaitingAuthority()))
+      && this.abortPhantom(reason)
+    );
   }
 
   public override end(): void {
@@ -204,9 +215,27 @@ export class CoopReplayTurnPhase extends Phase {
             `guest replay turn=${this.turn}: live increment seq=${this.rendered}..${this.rendered + increment.length - 1}`,
           );
           this.renderEvents(increment);
-          globalScene.phaseManager.unshiftNew("CoopReplayTurnPhase", this.turn, this.rendered + increment.length, [
-            ...this.fromHpByBi.entries(),
-          ]);
+          globalScene.phaseManager.unshiftNew(
+            "CoopReplayTurnPhase",
+            this.turn,
+            this.rendered + increment.length,
+            [...this.fromHpByBi.entries()],
+            this.sourceWave,
+          );
+          this.end();
+          return;
+        }
+        // GameOver interrupts the host before its normal turn-finalization carrier is emitted. A retained
+        // WAVE_ADVANCE can therefore arrive while this SAME-turn continuation is still queued behind the
+        // final presentation phase. Once every ordered live event has drained, that exact admitted terminal
+        // is the completion fence: waiting for a turnResolution here can never succeed. End into the
+        // already-appended CoopWaveAdvanceBoundaryPhase; do not synthesize a finalize or advance a turn.
+        const wave = globalScene.currentBattle?.waveIndex ?? 0;
+        if (coopRetainedGameOverSupersedesReplay(wave, this.turn)) {
+          coopWarn(
+            "replay",
+            `guest replay turn=${this.turn}: retained gameOver terminal supersedes unresolved replay at safe event boundary -> end`,
+          );
           this.end();
           return;
         }
@@ -238,7 +267,7 @@ export class CoopReplayTurnPhase extends Phase {
           // until we send that command.
           // Peek first. Consumption is the transaction COMMIT and is allowed only after every modern
           // companion applies with zero structured failures and its exact checksum converges.
-          const envelope = streamer.peekCheckpoint();
+          const envelope = streamer.peekCheckpointForTurn(this.turn);
           if (envelope != null) {
             const currentWave = globalScene.currentBattle?.waveIndex ?? 0;
             const checkpointWave = envelope.authoritativeState?.wave;
@@ -265,8 +294,8 @@ export class CoopReplayTurnPhase extends Phase {
                 `guest discard OUT-OF-BAND checkpoint reason=${envelope.reason} wave=${checkpointWave} `
                   + `turn=${envelope.turn} while replaying wave=${currentWave} turn=${this.turn}`,
               );
-              if (streamer.peekCheckpoint() === envelope) {
-                streamer.consumeCheckpoint();
+              if (streamer.peekCheckpointForTurn(this.turn) === envelope) {
+                streamer.consumeCheckpointForTurn(this.turn);
               }
               continue;
             }
@@ -294,7 +323,7 @@ export class CoopReplayTurnPhase extends Phase {
             if (!streamer.acknowledgeReplacement(envelope, "presentationReady")) {
               return;
             }
-            if (streamer.peekCheckpoint() !== envelope) {
+            if (streamer.peekCheckpointForTurn(this.turn) !== envelope) {
               coopWarn(
                 "checkpoint",
                 `guest replacement converged but retained carrier changed before commit turn=${this.turn} -> remain held`,
@@ -302,7 +331,7 @@ export class CoopReplayTurnPhase extends Phase {
               this.parkForReplacementRetry(streamer, envelope);
               return;
             }
-            streamer.consumeCheckpoint();
+            streamer.consumeCheckpointForTurn(this.turn);
             streamer.retainAppliedOutOfBandCheckpoint(envelope);
             // Showdown versus (Task F1): the versus guest owns its ENTIRE player field (a 1v1 -> field
             // slot 0). The co-op seat map used by coopLocalOwnedPlayerFieldSlot() resolves the fixed
@@ -342,9 +371,13 @@ export class CoopReplayTurnPhase extends Phase {
                 `guest replay turn=${this.turn}: replacement filled OUR slot ${ownSlot} -> opening own CommandPhase`,
               );
               globalScene.phaseManager.unshiftNew("CommandPhase", ownSlot);
-              globalScene.phaseManager.unshiftNew("CoopReplayTurnPhase", this.turn, this.rendered, [
-                ...this.fromHpByBi.entries(),
-              ]);
+              globalScene.phaseManager.unshiftNew(
+                "CoopReplayTurnPhase",
+                this.turn,
+                this.rendered,
+                [...this.fromHpByBi.entries()],
+                this.sourceWave,
+              );
               this.end();
               return;
             }
@@ -741,7 +774,7 @@ export class CoopReplayTurnPhase extends Phase {
     // Per-turn tally of the presentation phases unshifted, so the guest's log shows the exact
     // replay-phase sequence it ran for this turn (move/hp/stat/status/faint/message counts).
     const tally: Record<string, number> = {};
-    for (const event of events) {
+    for (const [eventOffset, event] of events.entries()) {
       tally[event.k] = (tally[event.k] ?? 0) + 1;
       try {
         // HOT LOOP (per battle event): build the per-event trace only when debug is on.
@@ -778,7 +811,13 @@ export class CoopReplayTurnPhase extends Phase {
             // #691 (host-language leak): pass the `narrate` flag so the faint phase regenerates the
             // "X fainted!" line in the GUEST'S language ONLY for KOs the host actually narrated (a real
             // FaintPhase ran, i.e. `!ignoreFaintPhase`). Older host (no `narrate`) -> falsy -> no line.
-            pm.unshiftNew("CoopFaintReplayPhase", event.bi, event.narrate === true, event.sp);
+            pm.unshiftNew("CoopFaintReplayPhase", event.bi, event.narrate === true, event.sp, {
+              wave: this.sourceWave,
+              turn: this.turn,
+              // The existing stream seq is identical to the event's turn-resolution batch index.
+              // `this.rendered` is this continuation's exact starting watermark.
+              occurrence: this.rendered + eventOffset,
+            });
             break;
           default:
             // weather / terrain / switch ride the authoritative checkpoint, not the animation pump.
@@ -797,5 +836,5 @@ export class CoopReplayTurnPhase extends Phase {
 }
 
 registerCoopActiveReplayTurnAborter(
-  (reason, settledTurn) => activeCoopReplayTurnPhase?.abortIfPastSettledTurn(settledTurn, reason) ?? false,
+  (reason, settledTurn) => activeCoopReplayTurnPhase?.abortIfRetainedTerminalSuperseded(settledTurn, reason) ?? false,
 );

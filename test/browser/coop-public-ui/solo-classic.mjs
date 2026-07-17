@@ -24,6 +24,7 @@ const CHALLENGE_PHASE = /Start Phase SelectChallengePhase/u;
 const GAME_MODE_SURFACE = "option-select:TitlePhase";
 const COMMAND_SURFACE = "command:command";
 const FIGHT_SURFACE = "command:fight";
+const CHECK_SWITCH_SURFACE = "check-switch";
 
 async function waitForSemantic(client, surfaceId, timeoutMs, from = 0) {
   return client.evidence.waitForCondition(sink => sink.findLastSemanticSurface(from, surfaceId), {
@@ -48,6 +49,60 @@ async function assertMirrorReactsToInput(client) {
     await delay(80);
   }
   throw new Error(`${client.label}: v2 command mirror did not react to a nav keypress (was ${beforeId})`);
+}
+
+/**
+ * A multi-starter solo party opens the ordinary "Will you switch?" prompt before its
+ * first command. The one-starter campaign used to bypass this real public surface and
+ * falsely made the navigation probe look complete. Decline every visible initial prompt
+ * by semantic option id, then return only from the live command surface.
+ */
+export async function reachFirstCommand(client, from) {
+  // Animations-on startup can legitimately spend more than the ordinary interaction timeout walking
+  // summon/ability/stat narration on a heavily contended browser runner. Run 29556668290 reached the exact
+  // healthy wave-1 CommandPhase at 123s, three seconds after the old 120s deadline. Keep this bounded, but
+  // give the initial engine setup its own honest budget instead of reporting a real late command as a lock.
+  const setupTimeoutMs = Math.max(client.config.timeoutMs, 180_000);
+  let evidenceFloor = from;
+  for (let prompts = 0; prompts < 3; prompts++) {
+    const surface = await client.evidence.waitForCondition(
+      sink => {
+        const latest = sink.findLastSemanticSurface(evidenceFloor);
+        if (latest?.observation.surfaceId === COMMAND_SURFACE) {
+          return latest;
+        }
+        if (
+          latest?.observation.surfaceId === CHECK_SWITCH_SURFACE
+          && latest.observation.ready?.handlerActive === true
+          && latest.observation.optionIds?.includes("no")
+        ) {
+          return latest;
+        }
+        return null;
+      },
+      {
+        timeoutMs: setupTimeoutMs,
+        description: "first command or initial check-switch surface",
+      },
+    );
+    if (surface.observation.surfaceId === COMMAND_SURFACE) {
+      return surface;
+    }
+    const declined = await selectOptionById(client, {
+      surfaceId: CHECK_SWITCH_SURFACE,
+      targetId: "no",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      fromCursor: evidenceFloor,
+      timeoutMs: client.config.timeoutMs,
+    });
+    // `press()` can return before the observer publishes the next surface. Retire the exact
+    // prompt instance that authorized this submit; otherwise its still-actionable mirror can
+    // be admitted again and the duplicate Space lands on Command -> Fight -> move selection.
+    // Advancing to the pre-submit sink cursor would be unsafe because a legitimately newer
+    // prompt can arrive while the key is being processed.
+    evidenceFloor = declined.surfaceEventIndex + 1;
+  }
+  return waitForSemantic(client, COMMAND_SURFACE, setupTimeoutMs, evidenceFloor);
 }
 
 export async function runSoloClassic(client) {
@@ -100,7 +155,7 @@ export async function runSoloClassic(client) {
     fromCursor: launchCursor,
     timeoutMs: client.config.timeoutMs,
   });
-  await waitForSemantic(client, COMMAND_SURFACE, client.config.timeoutMs);
+  await reachFirstCommand(client, launchCursor);
   await client.checkpoint("solo-wave1-command");
 
   // Validate the primitive against the LIVE mirror:

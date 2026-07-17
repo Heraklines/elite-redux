@@ -7,13 +7,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
-import { selectOptionById } from "./campaign-nav.mjs";
+import { chooseAffordableStarterPair, selectOptionById } from "./campaign-nav.mjs";
 import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
 import {
   captureCheckpointPngWithFallback,
   checkpointPixelIntegrityFailure,
   checkpointRequiresGameplayCoverage,
 } from "./evidence.mjs";
+import { reachFirstCommand } from "./solo-classic.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 
@@ -48,12 +49,33 @@ test("Mystery gauntlet policy is loud-fail and drives every projected encounter 
       assert.deepEqual(policy.mysteryGauntlet, { required: true, minSurfaces: 6 });
       assert.equal(policy.maxBattleLoops, 90);
       assert.equal(policy.moveAnimationsExpected, false);
-      const surfaces = buildDispatchTable(policy).map(driver => driver.v2SurfaceId);
+      const dispatch = buildDispatchTable(policy);
+      const surfaces = dispatch.map(driver => driver.v2SurfaceId);
       assert.deepEqual(
         ["mystery-encounter", "mystery-encounter:prompt", "quiz", "bargain", "colosseum"].filter(
           surface => !surfaces.includes(surface),
         ),
         [],
+      );
+      assert.deepEqual(
+        dispatch
+          .filter(driver => ["reward-target", "biome-pick"].includes(driver.name))
+          .map(driver => [driver.name, driver.v2SurfaceId]),
+        [
+          ["reward-target", "party:reward-target"],
+          ["biome-pick", "world-map"],
+        ],
+      );
+      assert.equal(dispatch.find(driver => driver.name === "reward-target")?.semanticOnly, true);
+      assert.deepEqual(
+        dispatch
+          .filter(driver => driver.name.startsWith("learn-move-"))
+          .map(driver => [driver.name, driver.v2SurfaceId, driver.phase.source]),
+        [
+          ["learn-move-confirm", "learn-move:confirm", "Start Phase LearnMovePhase"],
+          ["learn-move-batch", "learn-move-batch", "Start Phase LearnMoveBatchPhase"],
+        ],
+        "single-move confirmation and batch learning must never share a semantic surface policy",
       );
     },
   );
@@ -86,6 +108,16 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /owner\.waitForOwnedRewardConfirm\(/u);
   assert.match(campaign, /watcher\.waitForAddressedRewardWatcher\(/u);
   assert.match(campaign, /campaign-semantic-confirmation-barrier/u);
+  assert.match(campaign, /async function checkpointRewardPartyTarget\(/u);
+  assert.match(campaign, /watcherSurfaceId: "reward-shop"/u);
+  assert.match(campaign, /async function driveRewardPartyTarget\(/u);
+  assert.match(
+    campaign,
+    /selectedCursor = \(\) => \/\^party-slot:\(\\d\+\)\$\/u[\s\S]*selectedOptionId === `party-slot:\$\{nextCursor\}`/u,
+  );
+  assert.doesNotMatch(campaign, /\^cursor:\(\\d\+\)\$/u);
+  assert.match(campaign, /selected\.startsWith\("party-option:"\)/u);
+  assert.match(campaign, /campaign-reward-target-action/u);
   assert.match(campaign, /await driveConfirmedLeave\(rig, driver, client, mechanicalBoundary\.authority\)/u);
   assert.match(campaign, /event\.terminal\.wave === wave \+ 1/u);
   assert.match(campaign, /if \(nextBoundary\.wave <= event\.wave\)/u);
@@ -128,6 +160,108 @@ test("the companion solo lane publicly selects a readiness-proven empty save slo
   assert.match(navigation, /event\.observation\.selectedOptionId === "empty-slot:0"/u);
   assert.match(navigation, /await client\.press\("Space", "fresh-save-slot-0"\)/u);
   assert.match(solo, /await selectFirstEmptySaveSlot\(client,/u);
+});
+
+function soloCommandProgressClient(promptCount) {
+  const events = [
+    {
+      index: 0,
+      kind: "browser-surface2",
+      observation: {
+        surfaceId: "check-switch",
+        optionIds: ["yes", "no"],
+        selectedOptionId: "no",
+        ready: { handlerActive: true, inputBlocked: false },
+      },
+    },
+  ];
+  const presses = [];
+  const evidence = {
+    events,
+    findLastSemanticSurface(fromCursor = 0, surfaceId = null) {
+      return events
+        .filter(
+          event =>
+            event.index >= fromCursor
+            && event.kind === "browser-surface2"
+            && (surfaceId == null || event.observation.surfaceId === surfaceId),
+        )
+        .at(-1);
+    },
+    async waitForCondition(predicate, { timeoutMs = 500, description = "condition" } = {}) {
+      const deadline = Date.now() + Math.min(timeoutMs, 500);
+      while (Date.now() < deadline) {
+        const result = predicate(this);
+        if (result) {
+          return result;
+        }
+        await new Promise(resolveDelay => setTimeout(resolveDelay, 2));
+      }
+      throw new Error(`timed out waiting for ${description}`);
+    },
+    record() {},
+  };
+  return {
+    label: "solo-seat",
+    config: { timeoutMs: 500 },
+    evidence,
+    presses,
+    async press(key, purpose) {
+      presses.push({ key, purpose });
+      const submittedPrompts = presses.filter(entry => entry.purpose === "nav-submit-check-switch->no").length;
+      setTimeout(() => {
+        const observation =
+          submittedPrompts < promptCount
+            ? {
+                surfaceId: "check-switch",
+                optionIds: ["yes", "no"],
+                selectedOptionId: "no",
+                ready: { handlerActive: true, inputBlocked: false },
+              }
+            : {
+                surfaceId: "command:command",
+                ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+              };
+        events.push({ index: events.length, kind: "browser-surface2", observation });
+      }, 10);
+    },
+  };
+}
+
+test("solo command setup retires a lingering switch prompt after exactly one submit", async () => {
+  const client = soloCommandProgressClient(1);
+  const command = await reachFirstCommand(client, 0);
+  assert.equal(command.observation.surfaceId, "command:command");
+  assert.deepEqual(client.presses, [{ key: "Space", purpose: "nav-submit-check-switch->no" }]);
+});
+
+test("solo command setup submits each distinct switch prompt exactly once", async () => {
+  const client = soloCommandProgressClient(2);
+  const command = await reachFirstCommand(client, 0);
+  assert.equal(command.observation.surfaceId, "command:command");
+  assert.deepEqual(client.presses, [
+    { key: "Space", purpose: "nav-submit-check-switch->no" },
+    { key: "Space", purpose: "nav-submit-check-switch->no" },
+  ]);
+});
+
+test("the high-frequency semantic observer caches only its expensive digest on a fixed SLA", async () => {
+  const observer = await readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8");
+  assert.match(observer, /function semanticMechanicalDigest\(key: string\)/u);
+  assert.match(
+    observer,
+    /key === semanticDigestCacheKey && now - semanticDigestCacheAt < 1_000[\s\S]*return semanticDigestCache/u,
+  );
+  assert.match(
+    observer,
+    /semanticMechanicalDigest\(\s*`watcher:\$\{runtime\.controller\.sessionEpoch\}:/u,
+    "the replay-waiter path that previously digested at 10 Hz must use the cache",
+  );
+  assert.doesNotMatch(
+    observer,
+    /rendererWaitReady === true[\s\S]{0,700}computeMechanicalDigest\(\)/u,
+    "a parked replay waiter must not walk the full state on every 100 ms observer poll",
+  );
 });
 
 test("parallel lobby pairing reselects the exact visible username before every request", async () => {
@@ -201,13 +335,15 @@ test("parallel lobby pairing reselects the exact visible username before every r
 });
 
 test("semantic option identity is independent of every presentation language", async () => {
-  const [observer, optionType, gender, confirm, title, starter] = await Promise.all([
+  const [observer, optionType, gender, confirm, title, starter, party, campaignNav] = await Promise.all([
     readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
     readFile(resolve(root, "src/ui/handlers/abstract-option-select-ui-handler.ts"), "utf8"),
     readFile(resolve(root, "src/phases/select-gender-phase.ts"), "utf8"),
     readFile(resolve(root, "src/ui/handlers/confirm-ui-handler.ts"), "utf8"),
     readFile(resolve(root, "src/phases/title-phase.ts"), "utf8"),
     readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/party-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign-nav.mjs"), "utf8"),
   ]);
 
   assert.match(optionType, /semanticId\?: string/u);
@@ -220,6 +356,32 @@ test("semantic option identity is independent of every presentation language", a
   assert.match(title, /semanticId: `accept:\$\{from\.name\}`/u);
   assert.match(starter, /semanticId: "add-to-party"/u);
   assert.match(starter, /semanticId: key\.toLowerCase\(\)/u);
+  assert.match(observer, /selectedOptionId: "starter-action:random"/u);
+  assert.match(observer, /selectedOptionId: `starter-team:\$\{starterHandler\.starterIconsCursorIndex\}`/u);
+  assert.match(observer, /starterGridCandidates/u);
+  assert.match(campaignNav, /chooseAffordableStarterPair/u);
+  assert.match(campaignNav, /starter-grid-add-proof/u);
+  assert.match(campaignNav, /targetId: "add-to-party"/u);
+  assert.match(party, /export enum PartyOption/u);
+  assert.match(observer, /partyOptionSemanticId\(/u);
+  assert.match(observer, /party-option:\$\{enumName\.toLowerCase\(\)\.replaceAll\("_", "-"\)\}/u);
+  assert.match(observer, /partyHandler\.optionsMode === true/u);
+  assert.match(observer, /uiMode === "PARTY"\s*\? null/u);
+});
+
+test("representative starter selection is deterministic and stays within the co-op budget", () => {
+  const pair = chooseAffordableStarterPair({
+    starterGridCandidates: [
+      { index: 11, speciesId: 728, cost: 4 },
+      { index: 3, speciesId: 152, cost: 2 },
+      { index: 7, speciesId: 155, cost: 3 },
+      { index: 1, speciesId: 906, cost: 4 },
+    ],
+  });
+  assert.deepEqual(pair, [
+    { index: 3, speciesId: 152, cost: 2 },
+    { index: 7, speciesId: 155, cost: 3 },
+  ]);
 });
 
 test("paired Chromium runs headful at an explicit player-sized viewport", async () => {

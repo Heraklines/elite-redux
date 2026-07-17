@@ -232,11 +232,57 @@ test("phase presence waits for its declared semantic UI before judging owner evi
     kind: "browser-surface2",
     observation: { surfaceId: "egg:lapse", localSeat: 0, ownerSeat: 1 },
   });
+  assert.equal(
+    resolveSurfaceOwner(rig, driver, cursors, new Map(), true),
+    null,
+    "a watcher may publish the addressed surface before the reciprocal owner projection",
+  );
+  renderer.evidence.events.push({
+    index: renderer.evidence.events.length,
+    kind: "browser-surface2",
+    observation: { surfaceId: "egg:lapse", localSeat: 1, ownerSeat: 0 },
+  });
   assert.throws(
     () => resolveSurfaceOwner(rig, driver, cursors, new Map(), true),
     /never reported an owner/u,
-    "once the semantic surface exists, malformed owner evidence still fails loudly",
+    "once both semantic mirrors exist, malformed owner evidence still fails loudly",
   );
+});
+
+test("a delayed reciprocal semantic owner supersedes the provisional watcher surface", () => {
+  const watcher = fakeClient("watcher");
+  const owner = fakeClient("owner");
+  const rig = { host: watcher, clients: { watcher, owner } };
+  const driver = {
+    name: "mystery-encounter",
+    present: /Start Phase MysteryEncounterPhase/u,
+    v2SurfaceId: "mystery-encounter",
+    owner: { role: "host" },
+  };
+  const cursors = { watcher: 0, owner: 0 };
+  watcher.evidence.events.push({
+    index: watcher.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "mystery-encounter",
+      localSeat: 0,
+      ownerSeat: 1,
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+    },
+  });
+  assert.equal(resolveSurfaceOwner(rig, driver, cursors, new Map(), true), null);
+
+  owner.evidence.events.push({
+    index: owner.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "mystery-encounter",
+      localSeat: 1,
+      ownerSeat: 1,
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+    },
+  });
+  assert.equal(resolveSurfaceOwner(rig, driver, cursors, new Map(), true)?.client, owner);
 });
 
 test("semantic owner remains driveable when its earlier legacy OWNER line is outside the cursor", () => {
@@ -369,7 +415,7 @@ test("registered surfaces deduplicate re-emissions by semantic identity, not evi
     owner: { marker: /OWNER drives reward screen/u },
   };
   const address = { epoch: 7, wave: 1, turn: 4 };
-  const pushReward = phaseInstance => {
+  const pushReward = (phaseInstance, surfaceGeneration = null) => {
     authority.evidence.events.push({
       index: authority.evidence.events.length,
       kind: "browser-surface2",
@@ -377,6 +423,7 @@ test("registered surfaces deduplicate re-emissions by semantic identity, not evi
         surfaceId: "reward-shop",
         address,
         phaseInstance,
+        surfaceGeneration,
         localSeat: 0,
         ownerSeat: 0,
         ready: { handlerActive: true, awaitingActionInput: false },
@@ -384,12 +431,22 @@ test("registered surfaces deduplicate re-emissions by semantic identity, not evi
     });
   };
   pushReward(11);
-  const handled = new Map([["reward:authority", JSON.stringify(["reward-shop", 7, 1, 4, 11])]]);
+  const handled = new Map([["reward:authority", JSON.stringify(["reward-shop", 7, 1, 4, 11, null])]]);
   pushReward(11);
   assert.equal(findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }, handled), null);
 
   pushReward(12);
   assert.equal(findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }, handled), driver);
+
+  const generationHandled = new Map([["reward:authority", JSON.stringify(["reward-shop", 7, 1, 4, 12, 1])]]);
+  pushReward(12, 1);
+  assert.equal(findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }, generationHandled), null);
+  pushReward(12, 2);
+  assert.equal(
+    findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }, generationHandled),
+    driver,
+    "a new UI generation inside one phase object is a new actionable appearance",
+  );
 });
 
 test("only ready active local battle narration and EXP instances advance once on each public client", async () => {
@@ -610,6 +667,55 @@ test("the campaign outcome wait accepts the first owned command frontier without
       stopOnOwnedCommandFrontier: true,
     }),
     { kind: "command", client: authority },
+  );
+});
+
+test("a newer semantic surface supersedes a transient command frontier and its legacy console line", async () => {
+  const authority = fakeClient("authority", ["CommandPhase regression -> LOCAL UI"]);
+  authority.publicSeat = 0;
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:command",
+      phase: "CommandPhase",
+      phaseInstance: 17,
+      uiMode: "COMMAND",
+      localSeat: 0,
+      seatsWithInput: [0],
+      ready: { handlerActive: true },
+      address: { epoch: 7, wave: 1, turn: 4 },
+    },
+  });
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "battle:message",
+      phase: "NextEncounterPhase",
+      phaseInstance: 18,
+      uiMode: "MESSAGE",
+      localSeat: 0,
+      seatsWithInput: [0],
+      ready: { handlerActive: true, awaitingActionInput: true },
+      address: { epoch: 7, wave: 2, turn: 1 },
+    },
+  });
+  const renderer = fakeClient("renderer");
+  renderer.publicSeat = 1;
+  const rig = {
+    host: authority,
+    clients: { authority, renderer },
+    config: { faintOwnerSeat: "renderer" },
+  };
+
+  assert.equal(
+    await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 0, {
+      stopOnOwnedCommandFrontier: true,
+      singleSidedConfirmMs: 1,
+    }),
+    null,
+    "a historical command must not become actionable after the visible UI advanced",
   );
 });
 

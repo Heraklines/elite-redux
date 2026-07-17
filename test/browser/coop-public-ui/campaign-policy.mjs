@@ -38,7 +38,8 @@ export const GAME_OVER_PHASE = /Start Phase GameOverPhase/u;
 const BIOME_PICK_PHASE = /Start Phase SelectBiomePhase/u;
 const CROSSROADS_PHASE = /Start Phase ErCrossroadsPhase/u;
 const MYSTERY_PHASE = /Start Phase MysteryEncounterPhase/u;
-const LEARN_MOVE_PHASE = /Start Phase (?:LearnMovePhase|LearnMoveBatchPhase)/u;
+const LEARN_MOVE_CONFIRM_PHASE = /Start Phase LearnMovePhase/u;
+const LEARN_MOVE_BATCH_PHASE = /Start Phase LearnMoveBatchPhase/u;
 const EGG_LAPSE_PHASE = /Start Phase EggLapsePhase/u;
 const ATTEMPT_CAPTURE_PHASE = /Start Phase AttemptCapturePhase/u;
 
@@ -158,6 +159,7 @@ export function loadCampaignPolicy() {
     autoFirst: autoFirstRequested && mode === "shakedown",
     stallMs: envInteger("COOP_UI_CAMPAIGN_STALL_MS", 8_000),
     rewardMode,
+    rewardTargetSlot: envInteger("COOP_UI_REWARD_PARTY_SLOT", 0),
     market: {
       mode: marketMode,
       targetId: marketTargetId,
@@ -274,6 +276,16 @@ export function buildDispatchTable(policy) {
       confirmSurfaceId: policy.rewardMode === "pick-first" ? null : "reward:confirm",
     },
     {
+      name: "reward-target",
+      phase: REWARD_PHASE,
+      present: REWARD_PHASE,
+      v2SurfaceId: "party:reward-target",
+      semanticOnly: true,
+      owner: { marker: REWARD_OWNER },
+      keys: [],
+      partySlot: policy.rewardTargetSlot,
+    },
+    {
       name: "biome-shop",
       phase: BIOME_SHOP_ROLES,
       present: BIOME_SHOP_ROLES,
@@ -295,7 +307,7 @@ export function buildDispatchTable(policy) {
       name: "biome-pick",
       phase: BIOME_PICK_PHASE,
       present: BIOME_PICK_OWNER,
-      v2SurfaceId: "biome-select",
+      v2SurfaceId: "world-map",
       owner: { marker: BIOME_PICK_OWNER },
       keys: policy.keys.biomePick,
     },
@@ -351,9 +363,17 @@ export function buildDispatchTable(policy) {
       keys: policy.keys.catchSkip,
     },
     {
-      name: "learn-move",
-      phase: LEARN_MOVE_PHASE,
-      present: LEARN_MOVE_PHASE,
+      name: "learn-move-confirm",
+      phase: LEARN_MOVE_CONFIRM_PHASE,
+      present: LEARN_MOVE_CONFIRM_PHASE,
+      v2SurfaceId: "learn-move:confirm",
+      owner: { guestMarker: LEARN_MOVE_GUEST_OWNER, role: "host" },
+      keys: policy.keys.learnMove,
+    },
+    {
+      name: "learn-move-batch",
+      phase: LEARN_MOVE_BATCH_PHASE,
+      present: LEARN_MOVE_BATCH_PHASE,
       v2SurfaceId: "learn-move-batch",
       owner: { guestMarker: LEARN_MOVE_GUEST_OWNER, role: "host" },
       keys: policy.keys.learnMove,

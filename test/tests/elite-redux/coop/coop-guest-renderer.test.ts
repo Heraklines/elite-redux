@@ -255,8 +255,19 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
    */
   const driveReplayTurn = async (turn: number): Promise<void> => {
     const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
+    // Drive the same phase-tree topology production uses. Starting a detached replay object makes
+    // Phase.end() shift whatever unrelated harness phase happens to be current; a retained terminal
+    // wake already appended to the real queue can then remain stranded behind that fixture state.
+    // The test PhaseInterceptor deliberately suppresses automatic starts, so install the replay as
+    // the next phase, select it, and then start it explicitly.
+    game.scene.phaseManager.unshiftPhase(replay);
+    game.scene.phaseManager.shiftPhase();
     replay.start();
-    await new Promise(r => setTimeout(r, 0));
+    // The replay pump is async. A single timer turn is not a causal completion proof and raced the
+    // retained GameOver path on remote runners: the helper observed replay as current, exited, then
+    // the pump shifted into the terminal boundary milliseconds later. Wait for the real phase-tree
+    // transition with a finite budget instead.
+    await vi.waitUntil(() => game.scene.phaseManager.getCurrentPhase() !== replay, { interval: 1, timeout: 5_000 });
     for (let i = 0; i < 32; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();
       if (cur == null || !REPLAY_DRAIN_PHASES.some(name => cur.is(name as Parameters<typeof cur.is>[0]))) {
@@ -264,7 +275,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       }
       const wasFinalize = cur.is("CoopFinalizeTurnPhase");
       cur.start();
-      await new Promise(r => setTimeout(r, 0));
+      await vi.waitUntil(() => game.scene.phaseManager.getCurrentPhase() !== cur, { interval: 1, timeout: 5_000 });
       if (wasFinalize) {
         break;
       }
@@ -739,11 +750,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
 
   // (B) PLAYER REPLACEMENT (#633 partner-death sync, HALF B; reworked by #786): when the GUEST's
   // mon (bi1) faints, the host's SwitchPhase for that guest-owned slot now AWAITS the guest's OWN
-  // relayed replacement pick (its renderer opens a picker off the faint presentation - proven
-  // end-to-end in coop-duo-faint-switch.test.ts) and falls back to the AUTO-PICK when no pick
-  // arrives in time. This asserts the fallback: await fired, then a SwitchSummonPhase for the
-  // guest's bench mon.
-  it("PLAYER REPLACEMENT (#786): the host awaits the guest's pick, then auto-picks a guest bench replacement on timeout", async () => {
+  // relayed replacement pick. On timeout the host retains its concrete fallback, but must remain
+  // parked until the guest has materially closed the old picker. This single-engine fixture has no
+  // peer to ACK, so it proves the host cannot advance unilaterally.
+  it("PLAYER REPLACEMENT (#786): timeout parks behind the retained peer-material barrier", async () => {
     const field = await startCoopGuest();
     // This is the HOST simulating the turn (the watcher of the guest-owned slot 1). Flip local role.
     setFixtureRole("host");
@@ -770,6 +780,13 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const awaitSpy = vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice");
     const relay = getCoopInteractionRelay();
     expect(relay, "a live interaction relay exists").not.toBeNull();
+    const runtime = getCoopRuntime();
+    const durability = runtime?.durability;
+    expect(durability, "the authoritative runtime has a durability barrier").toBeDefined();
+    if (durability == null) {
+      throw new Error("missing co-op durability barrier");
+    }
+    const materialBarrierSpy = vi.spyOn(durability, "waitForOperationMaterialApplied");
     const unshiftSpy = vi.spyOn(globalScene.phaseManager, "unshiftNew");
 
     // Drive the host's SwitchPhase for the guest-owned slot 1 (exactly what FaintPhase queues).
@@ -783,6 +800,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
         true,
         false,
       );
+      // Install the phase into the real tree before starting it. The retained material barrier's
+      // boundaryStillLive fence intentionally rejects a detached phase object that is not current.
+      game.scene.phaseManager.unshiftPhase(switchPhase);
+      game.scene.phaseManager.shiftPhase();
       switchPhase.start();
       await new Promise(r => setTimeout(r, 120));
     } finally {
@@ -791,13 +812,14 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
 
     // The host DID await the guest's pick first (#786) ...
     expect(awaitSpy, "the host awaits the guest's relayed replacement pick").toHaveBeenCalled();
-    // ... then (no pick arrived) auto-unshifted a SwitchSummonPhase for the guest's bench mon.
+    expect(
+      materialBarrierSpy,
+      "the timeout retained one exact terminal and entered its material barrier",
+    ).toHaveBeenCalledOnce();
+    // With no peer in this fixture the material ACK cannot arrive, so no summon/checkpoint or phase
+    // progression may leak past the barrier.
     const switchSummon = unshiftSpy.mock.calls.find(([name]) => name === "SwitchSummonPhase");
-    expect(switchSummon, "the host auto-picked a replacement (queued a SwitchSummonPhase)").toBeDefined();
-    // SwitchSummonPhase args: (switchType, fieldIndex, slotIndex, doReturn). The slotIndex is the
-    // guest's bench party slot; the fieldIndex is the guest's field slot (1).
-    expect(switchSummon?.[2], "the replacement fills the guest's field slot (1)").toBe(COOP_GUEST_FIELD_INDEX);
-    expect(switchSummon?.[3], "the auto-picked replacement is the guest's bench party slot").toBe(benchPartySlot);
+    expect(switchSummon, "the host must stay parked until the guest materially closes its picker").toBeUndefined();
   });
 
   // (B2) The auto-pick honors OWNERSHIP: it never pulls the HOST's bench into the guest's slot.
@@ -1145,19 +1167,28 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   });
 
   // (E) GAME-OVER RENDER (#633 GAP 6): the host's run ended; the guest renderer must show the
-  // game-over screen instead of hanging the lost wave. waveResolved("gameOver") now queues the
-  // guest's GameOverPhase (isVictory=false) - the coop-safe render path (no per-client retry prompt).
-  it('GAME-OVER RENDER (#633 GAP 6): waveResolved("gameOver") makes the guest queue GameOverPhase', async () => {
+  // game-over screen instead of hanging the lost wave. The retained WAVE_ADVANCE transaction (not
+  // the legacy raw cue) queues the guest's GameOverPhase (isVictory=false) at a safe phase boundary -
+  // the coop-safe render path (no per-client retry prompt).
+  it("GAME-OVER RENDER (#633 GAP 6): retained gameOver transaction makes the guest queue GameOverPhase", async () => {
     await startCoopGuest();
     const turn = globalScene.currentBattle.turn;
     const partner = getCoopRuntime()!.partnerTransport!;
 
     const carrier = completeTurnCarrier(turn);
+    // This test drives the replay phase manually rather than advancing the whole battle fixture.
+    // Remove setup's unrelated static tail first so the retained transaction's safe-boundary wake is
+    // the only continuation behind replay, matching the production ordering under test.
+    globalScene.phaseManager.clearPhaseQueue();
     sendWaveAdvance(partner, "gameOver", {
       ...carrier.authoritativeState,
       tick: carrier.authoritativeState.tick + 1,
     });
     await new Promise(r => setTimeout(r, 0));
+    expect(
+      globalScene.phaseManager.getQueuedPhaseNames(),
+      "the retained terminal appends exactly one safe-boundary continuation",
+    ).toEqual(["CoopFinalizeTurnPhase"]);
     partner.send({
       t: "turnResolution",
       turn,
@@ -1167,7 +1198,8 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     await new Promise(r => setTimeout(r, 0));
 
     const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
-    // Drive the replay turn + drain the deferred finalize, which consumes the pending gameOver outcome.
+    // Drive the replay through the real phase queue. The retained terminal supersedes the impossible
+    // resolution wait and the already-appended boundary consumes the pending gameOver outcome.
     await driveReplayTurn(turn);
 
     // The guest queued the game-over render (so a lost run shows the screen, not a hang), and NOT a
@@ -1641,5 +1673,39 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(sameSpecies.stats, "same-species correction adopts all six authoritative stats").toEqual(correctedStats);
     expect(rebuiltNonBoss!.bossSegments, "a non-boss remains at canonical zero segments after correction").toBe(0);
     expect(rebuiltNonBoss!.bossSegmentIndex, "a non-boss remains at canonical zero index after correction").toBe(0);
+  });
+
+  it("keeps the carrier's exact boss segment index when HP-derived state is one shield behind", async () => {
+    await startCoopGuest();
+    const boss = globalScene.getEnemyField(false)[0];
+    boss.setBoss(true, 2);
+    boss.hp = Math.ceil(boss.getMaxHp() * 0.75);
+    boss.bossSegmentIndex = 0;
+    expect(
+      boss.getBossSegmentIndex(),
+      "fixture reproduces the deep-soak boundary where deriving from HP would restore a broken shield",
+    ).toBe(1);
+
+    const carrier = coopEngine.captureCoopAuthoritativeCarrier(1, "turnResolution");
+    expect(carrier, "the exact turn carrier is complete").not.toBeNull();
+    const captured = carrier!;
+    const fieldBoss = captured.fullField.find(mon => mon.bi === BattlerIndex.ENEMY);
+    const seatBoss = captured.authoritativeState.field.find(
+      seat => seat.side === "enemy" && seat.bi === BattlerIndex.ENEMY,
+    );
+    expect(fieldBoss?.bossSegmentIndex, "rich companion carries the live host index").toBe(0);
+    expect(seatBoss?.bossSegmentIndex, "id-keyed state carries the same live host index").toBe(0);
+
+    boss.bossSegmentIndex = 1;
+    expect(
+      coopEngine.applyCoopAuthoritativeBattleState(captured.authoritativeState, true),
+      "id-keyed authority applies before the rich companion",
+    ).toBe(true);
+    expect(boss.bossSegmentIndex, "id-keyed authority restores the exact host index").toBe(0);
+    coopEngine.applyCoopFieldSnapshot(captured.fullField, true);
+    expect(
+      boss.bossSegmentIndex,
+      "the later rich companion must not overwrite exact authority with an HP-derived index",
+    ).toBe(0);
   });
 });

@@ -423,6 +423,15 @@ const FOCUSED_IMPACT_RULES = [
   { matches: file => /(?:^|[-_/])soak/.test(file), lanes: ["C"] },
   { matches: file => /production-fidelity|fidelity-gate|transition-t2/.test(file), lanes: ["P"] },
   {
+    // Faint replacement crosses the authoritative long-run, Showdown, and topology paths even when a
+    // changed implementation file lives under generic src/phases rather than a lane-named test directory.
+    matches: file =>
+      /coop-faint-switch|coop-guest-faint-switch|coop-replay-phases|coop-replay-turn-phase|showdown-enemy-faint-switch|(?:^|\/)faint-phase|(?:^|\/)switch-phase/.test(
+        file,
+      ),
+    lanes: ["C", "S", "T"],
+  },
+  {
     // These modules are shared by co-op, Showdown, long campaigns, and multi-seat presentation. A narrow
     // A/B-only mapping would miss exactly the cross-surface regressions the expanded full gate added S/T for.
     matches: file =>
@@ -454,7 +463,7 @@ const FOCUSED_IMPACT_RULES = [
 ];
 const FOCUSED_LANE_PRIORITY = Object.freeze({ A: 0, B: 1, C: 2, S: 3, T: 4, P: 5 });
 
-function impactLanes(changedFiles) {
+export function impactLanes(changedFiles) {
   const lanes = new Set();
   for (const file of changedFiles) {
     for (const rule of FOCUSED_IMPACT_RULES) {
@@ -469,6 +478,18 @@ function impactLanes(changedFiles) {
     lanes.add("B");
   }
   return lanes;
+}
+
+/** Fail closed before focused ordering can discard any directly affected or representative shard. */
+export function assertFocusedCandidateLimit(candidateKeys, maxShards) {
+  const candidates = [...new Set(candidateKeys)].sort();
+  if (candidates.length > maxShards) {
+    throw new Error(
+      `focused planner found ${candidates.length} affected shard candidates, exceeding the ${maxShards}-shard safety cap: `
+        + `${candidates.join(", ")}. Run the complete sharded co-op gate; refusing to silently omit coverage.`,
+    );
+  }
+  return candidates;
 }
 
 /** Select 1-5 directly affected or deterministic representative shards against an explicit integration base. */
@@ -537,6 +558,7 @@ export function createFocusedMatrix(base, maxShards = 5, lanes = categorize(), p
     )[0];
     chosen.set(`${fallback.lane}:${fallback.shard}/${fallback.total}`, fallback);
   }
+  assertFocusedCandidateLimit(chosen.keys(), maxShards);
   const directKeys = new Set(direct.keys());
   const include = [...chosen.entries()]
     .sort(([leftKey], [rightKey]) => {
@@ -549,7 +571,6 @@ export function createFocusedMatrix(base, maxShards = 5, lanes = categorize(), p
         priorityDelta || directDelta || laneDelta || stableRank(seed, leftKey).localeCompare(stableRank(seed, rightKey))
       );
     })
-    .slice(0, maxShards)
     .map(([, entry]) => entry);
   return {
     include,

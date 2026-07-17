@@ -64,7 +64,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
     const enemy = game.field.getEnemyPokemon();
     const player = game.field.getPlayerPokemon();
@@ -95,7 +95,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
     const player = game.field.getPlayerPokemon();
     const playerHp0 = player.hp;
@@ -119,7 +119,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
     const player = game.field.getPlayerPokemon();
 
@@ -158,7 +158,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
     const enemy = game.field.getEnemyPokemon();
     const player = game.field.getPlayerPokemon();
@@ -196,7 +196,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
     const enemy = game.field.getEnemyPokemon();
     const player = game.field.getPlayerPokemon();
@@ -231,7 +231,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const enemy = game.field.getEnemyPokemon();
     game.move.use(MoveId.SLASH);
     await game.toEndOfTurn();
@@ -253,7 +253,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const enemy = game.field.getEnemyPokemon();
     game.move.use(MoveId.TACKLE);
     await game.toEndOfTurn();
@@ -280,7 +280,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]); // Normal-type base
+    await game.classicMode.startBattle(SpeciesId.SNORLAX); // Normal-type base
     const player = game.field.getPlayerPokemon();
     expect(player.getTypes()).not.toContain(PokemonType.DRAGON);
   });
@@ -300,7 +300,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]); // Normal-type base
+    await game.classicMode.startBattle(SpeciesId.SNORLAX); // Normal-type base
     const player = game.field.getPlayerPokemon();
     expect(player.getTypes()).toContain(PokemonType.FIRE);
   });
@@ -320,7 +320,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const player = game.field.getPlayerPokemon();
     game.move.use(MoveId.SPLASH);
     await game.toEndOfTurn();
@@ -343,7 +343,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     game.move.use(MoveId.SPLASH);
     await game.toEndOfTurn();
     expect(game.scene.arena.weather?.weatherType).toBe(WeatherType.HAIL);
@@ -364,7 +364,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const player = game.field.getPlayerPokemon();
     player.hp = Math.floor(player.getMaxHp() / 2); // below max so the absorb-heal is observable
     const hpBefore = player.hp;
@@ -389,7 +389,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const player = game.field.getPlayerPokemon();
     // The composite wires Suction-Cups-style force-switch immunity.
     expect(player.hasAbilityWithAttr("ForceSwitchOutImmunityAbAttr")).toBe(true);
@@ -410,7 +410,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const player = game.field.getPlayerPokemon();
     // The runtime named-rider resolver maps "Sword of Ruin" → vanilla
     // SWORD_OF_RUIN and copies its FieldMultiplyStatAbAttr (Def x0.75).
@@ -432,7 +432,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const enemy = game.field.getEnemyPokemon();
     const hp0 = enemy.hp;
     game.move.use(MoveId.TACKLE);
@@ -456,7 +456,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
     const enemy = game.field.getEnemyPokemon();
     const player = game.field.getPlayerPokemon();
@@ -493,7 +493,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
     const enemy = game.field.getEnemyPokemon();
     const player = game.field.getPlayerPokemon();
@@ -527,7 +527,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const enemy = game.field.getEnemyPokemon();
     game.move.use(MoveId.SPLASH);
     await game.toEndOfTurn();
@@ -550,7 +550,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const player = game.field.getPlayerPokemon();
     player.hp = Math.floor(player.getMaxHp() / 2);
     const hpBefore = player.hp;

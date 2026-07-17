@@ -6,7 +6,7 @@
 import { appendFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { loadCampaignLifecyclePolicy, withinDeadline } from "./campaign-lifecycle.mjs";
-import { isActionableSemanticObservation } from "./campaign-nav.mjs";
+import { findOwnedActionableReplacementSurface, isActionableSemanticObservation } from "./campaign-nav.mjs";
 import {
   buildDispatchTable,
   GAME_OVER_PHASE,
@@ -412,9 +412,10 @@ export function clientsAwaitingTurnProgress(rig, from) {
 }
 
 export function findOwnedCommandFrontier(client, from) {
-  const semantic = client.evidence.findLastSemanticSurface(from, "command:command");
+  const semantic = client.evidence.findLastSemanticSurface(from);
   if (
-    semantic?.observation.ready?.handlerActive === true
+    semantic?.observation.surfaceId === "command:command"
+    && semantic.observation.ready?.handlerActive === true
     && semantic.observation.phase === "CommandPhase"
     && semantic.observation.uiMode === "COMMAND"
     && semantic.observation.localSeat === client.publicSeat
@@ -422,7 +423,32 @@ export function findOwnedCommandFrontier(client, from) {
   ) {
     return semantic;
   }
+  // Once this browser exposes semantic surface evidence, its latest observation is the
+  // current public UI. Never resurrect a historical command (or its legacy console line)
+  // after a reward, narration, party picker, or other surface has superseded it.
+  if (semantic != null) {
+    return null;
+  }
   return client.evidence.find(LOCAL_COMMAND, from);
+}
+
+function commandFrontierIdentity(client, event) {
+  const observation = event.observation;
+  if (observation == null) {
+    return JSON.stringify([client.label, "legacy", event.index]);
+  }
+  const address = observation.address;
+  const hasStableGeneration =
+    address != null || observation.phaseInstance != null || observation.surfaceGeneration != null;
+  return JSON.stringify([
+    client.label,
+    address?.epoch ?? null,
+    address?.wave ?? null,
+    address?.turn ?? null,
+    observation.phaseInstance ?? null,
+    observation.surfaceGeneration ?? null,
+    hasStableGeneration ? null : event.index,
+  ]);
 }
 
 /** Every player has reached its own actionable command UI, using semantic evidence first. */
@@ -629,7 +655,9 @@ export async function waitForOutcomeBounded(
   const clients = Object.values(rig.clients);
   const fixedDeadline = Date.now() + timeoutMs;
   const animationBudget = extendForAnimationProgress ? createAnimationProgressBudget(rig, from, timeoutMs) : null;
-  let singleSidedSinceMs = null;
+  const confirmationHardDeadline =
+    (animationBudget?.hardDeadline() ?? fixedDeadline) + Math.max(0, singleSidedConfirmMs);
+  let singleSidedCandidate = null;
   while (true) {
     const deadline = animationBudget?.observe() ?? fixedDeadline;
     // A mid-battle wipe / game-over is a real run END, not a driver softlock: classify it
@@ -647,10 +675,13 @@ export async function waitForOutcomeBounded(
       return { kind: "reward" };
     }
     for (const client of clients) {
-      if (client.evidence.find(GUEST_FAINT_PICKER, from[client.label])) {
+      if (findOwnedActionableReplacementSurface(client, from[client.label])) {
         return { kind: "faint", client };
       }
-      if (client.label === rig.config.faintOwnerSeat && client.evidence.find(HOST_SWITCH_PHASE, from[client.label])) {
+      if (
+        client.evidence.find(GUEST_FAINT_PICKER, from[client.label])
+        || client.evidence.find(HOST_SWITCH_PHASE, from[client.label])
+      ) {
         return { kind: "faint", client };
       }
     }
@@ -658,8 +689,15 @@ export async function waitForOutcomeBounded(
       return { kind: "command" };
     }
     if (stopOnOwnedCommandFrontier) {
-      const commandClient = clients.find(client => findOwnedCommandFrontier(client, from[client.label]) != null);
-      if (commandClient != null) {
+      const commandCandidate = clients
+        .map(client => ({
+          client,
+          event: findOwnedCommandFrontier(client, from[client.label]),
+        }))
+        .find(candidate => candidate.event != null);
+      if (commandCandidate == null) {
+        singleSidedCandidate = null;
+      } else {
         // A SINGLE-sided command frontier can be a wave-end transient: the pure-renderer seat
         // locally opens its next CommandPhase for a few (starved) frames before the
         // authoritative wave resolution supersedes it with the reward flow (run 29551213918,
@@ -668,11 +706,18 @@ export async function waitForOutcomeBounded(
         // faint / TWO-sided frontier lands first, that outcome wins; only a frontier that
         // SURVIVES the window is a real next turn. Zero window preserves legacy behavior.
         if (singleSidedConfirmMs <= 0) {
-          return { kind: "command", client: commandClient };
+          return { kind: "command", client: commandCandidate.client };
         }
-        singleSidedSinceMs ??= Date.now();
-        if (Date.now() - singleSidedSinceMs >= singleSidedConfirmMs) {
-          return { kind: "command", client: commandClient };
+        const identity = commandFrontierIdentity(commandCandidate.client, commandCandidate.event);
+        if (singleSidedCandidate?.identity !== identity) {
+          singleSidedCandidate = {
+            identity,
+            client: commandCandidate.client,
+            sinceMs: Date.now(),
+          };
+        }
+        if (Date.now() - singleSidedCandidate.sinceMs >= singleSidedConfirmMs) {
+          return { kind: "command", client: commandCandidate.client };
         }
       }
     }
@@ -685,13 +730,16 @@ export async function waitForOutcomeBounded(
     // Drain evidence once before honoring the deadline. Under severe event-loop dilation the timer callback
     // can resume after the immutable ceiling even though the commit/reward event was already buffered.
     if (Date.now() >= deadline) {
-      // A still-unconfirmed single-sided frontier at the deadline beats returning null (which
-      // would replay fallback keys onto a live command UI) - resolve it as the command outcome.
-      if (singleSidedSinceMs != null) {
-        const commandClient = clients.find(client => findOwnedCommandFrontier(client, from[client.label]) != null);
-        if (commandClient != null) {
-          return { kind: "command", client: commandClient };
-        }
+      // A provisional frontier may first appear near the ordinary fallback deadline. Give that
+      // exact identity its full confirmation window so fallback keys never smear across a live
+      // command UI, but cap all replacements at one immutable extra window.
+      const candidateDeadline =
+        singleSidedCandidate == null
+          ? deadline
+          : Math.min(singleSidedCandidate.sinceMs + singleSidedConfirmMs, confirmationHardDeadline);
+      if (Date.now() < candidateDeadline) {
+        await delay(Math.min(100, candidateDeadline - Date.now()));
+        continue;
       }
       break;
     }
@@ -841,7 +889,7 @@ async function driveBattleWave(rig, policy, stats) {
     }
     if (outcome.kind === "faint") {
       stats.faints += 1;
-      await rig.driveReplacement(outcome.client);
+      await rig.driveReplacement(outcome.client, from);
     }
     if (outcome.kind === "command") {
       // The next command owners open one at a time. The next sequential round proves and
@@ -891,6 +939,7 @@ function semanticAppearanceIdentity(event) {
     observation.address?.wave,
     observation.address?.turn,
     observation.phaseInstance,
+    observation.surfaceGeneration,
   ]);
 }
 
@@ -919,6 +968,9 @@ export function findRegisteredSurface(rig, dispatch, cursors, handledIndex = new
           const event = client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, driver.v2SurfaceId);
           return semanticAppearanceIsNew(event, handledIndex.get(`${driver.name}:${client.label}`));
         });
+      }
+      if (driver.semanticOnly) {
+        return false;
       }
       return Object.values(rig.clients).some(client => {
         const event = client.evidence.find(driver.present, cursors[client.label] ?? 0);
@@ -964,16 +1016,28 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
       }
       return null;
     }
-    if (!hasSemanticSurface(rig, driver.v2SurfaceId, cursors)) {
+    const semanticEvents = clients.map(client =>
+      client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, driver.v2SurfaceId),
+    );
+    if (semanticEvents.every(event => event == null)) {
       return null;
     }
-    if (strict) {
+    // Watchers can publish the addressed semantic surface before the owning browser finishes the
+    // preceding narration/phase transition. Treat that one-sided projection as provisional: the Mystery
+    // browser campaign otherwise fails in the few seconds between the watcher's ownerSeat=partner marker
+    // and the partner's own ownerSeat===localSeat mirror. Once every browser has published this surface,
+    // a missing self-owner is genuinely malformed and still fails loudly.
+    if (strict && semanticEvents.every(event => event != null)) {
       throw new Error(
         `[campaign-owner-evidence] surface "${driver.name}" is up but its v2 semantic mirror `
           + `(${driver.v2SurfaceId}) never reported an owner (ownerSeat === localSeat); refusing to `
           + "assume the role default. Fix the surface's marker or run the explicit shakedown opt-in.",
       );
     }
+    // A watcher projection proves only that the surface exists somewhere. Do
+    // not fall through to the legacy role heuristic until the authoritative
+    // owner has projected its own actionable surface.
+    return null;
   }
 
   if (driver.owner.marker) {
@@ -1284,6 +1348,121 @@ async function checkpointPairedMechanicalSurface(rig, surfaceId, cursors, owner)
 }
 
 /**
+ * A party-target reward is intentionally asymmetric while the owner chooses: the owner
+ * opens PARTY and the watcher stays parked on its read-only reward replica. Prove that
+ * both projections carry one address, owner and mechanical digest before sending input.
+ */
+async function checkpointRewardPartyTarget(rig, cursors, owner) {
+  const ownerEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(cursors[owner.label] ?? 0, "party:reward-target");
+      return candidate != null && isActionableSemanticObservation(candidate.observation) ? candidate : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "actionable reward party-target owner" },
+  );
+  const authority = ownerEvent.observation;
+  if (authority.stateDigest == null) {
+    throw new Error("[campaign-convergence] party:reward-target omitted its mechanical state digest");
+  }
+  const watcher = Object.values(rig.clients).find(client => client !== owner);
+  if (watcher == null) {
+    throw new Error("[campaign-convergence] party:reward-target has no paired watcher");
+  }
+  const watcherEvent = await watcher.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(cursors[watcher.label] ?? 0, "reward-shop");
+      const observation = candidate?.observation;
+      return observation != null
+        && observation.ready?.handlerActive === true
+        && observation.ownerSeat === owner.publicSeat
+        && observation.seatsWithInput?.includes(owner.publicSeat)
+        && !observation.seatsWithInput?.includes(watcher.publicSeat)
+        && JSON.stringify(observation.address) === JSON.stringify(authority.address)
+        && observation.stateDigest === authority.stateDigest
+        ? candidate
+        : null;
+    },
+    {
+      timeoutMs: rig.config.timeoutMs,
+      description: `reward watcher parked at party-target address on ${watcher.label}`,
+    },
+  );
+  const proof = {
+    surfaceId: "party:reward-target",
+    watcherSurfaceId: "reward-shop",
+    address: authority.address,
+    stateDigest: authority.stateDigest,
+    ownerSeat: owner.publicSeat,
+    watcherSeat: watcher.publicSeat,
+  };
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-semantic-convergence", proof);
+  }
+  return { authority, ownerEvent, peerEvents: [watcherEvent] };
+}
+
+async function driveRewardPartyTarget(rig, driver, owner, boundary) {
+  const targetSlot = driver.partySlot ?? 0;
+  let event = boundary.ownerEvent;
+  const selectedCursor = () => /^party-slot:(\d+)$/u.exec(event.observation.selectedOptionId ?? "");
+  const match = selectedCursor();
+  if (match == null) {
+    throw new Error(`[campaign-reward-target] ${owner.label} exposed no stable party cursor before target selection`);
+  }
+  let cursor = Number(match[1]);
+  for (let attempt = 0; cursor !== targetSlot && attempt < 12; attempt++) {
+    const key = cursor < targetSlot ? "ArrowDown" : "ArrowUp";
+    const nextCursor = cursor + (key === "ArrowDown" ? 1 : -1);
+    const priorIndex = event.index;
+    await owner.press(key, `campaign-reward-target-slot-${targetSlot}`);
+    event = await owner.evidence.waitForCondition(
+      sink => {
+        const candidate = sink.findLastSemanticSurface(priorIndex + 1, "party:reward-target");
+        return candidate?.observation.selectedOptionId === `party-slot:${nextCursor}` ? candidate : null;
+      },
+      { timeoutMs: rig.config.timeoutMs, description: `reward party cursor ${targetSlot}` },
+    );
+    cursor = nextCursor;
+  }
+  if (cursor !== targetSlot) {
+    throw new Error(`[campaign-reward-target] could not reach party slot ${targetSlot} from ${cursor}`);
+  }
+
+  const optionCursor = owner.evidence.cursor();
+  await owner.press("Space", "campaign-reward-target-open-action");
+  const optionEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(optionCursor, "party:reward-target");
+      const observation = candidate?.observation;
+      const selected = observation?.selectedOptionId;
+      return observation != null
+        && JSON.stringify(observation.address) === JSON.stringify(boundary.authority.address)
+        && observation.stateDigest === boundary.authority.stateDigest
+        && Array.isArray(observation.optionIds)
+        && observation.optionIds.length > 0
+        && typeof selected === "string"
+        && selected.startsWith("party-option:")
+        && selected !== "party-option:cancel"
+        && isActionableSemanticObservation(observation)
+        ? candidate
+        : null;
+    },
+    {
+      timeoutMs: rig.config.timeoutMs,
+      description: `semantic reward action for party slot ${targetSlot}`,
+    },
+  );
+  owner.evidence.record("campaign-reward-target-action", {
+    address: boundary.authority.address,
+    ownerSeat: owner.publicSeat,
+    partySlot: targetSlot,
+    selectedOptionId: optionEvent.observation.selectedOptionId,
+    optionIds: optionEvent.observation.optionIds,
+  });
+  await owner.press("Space", `campaign-reward-target-apply-${optionEvent.observation.selectedOptionId}`);
+}
+
+/**
  * A leave action is two separate public surfaces, not a timing-based key macro. Open
  * the confirmation, prove that exact addressed handler is actionable, and only then
  * submit the remaining key(s). This is load-bearing on throttled remote Chromium.
@@ -1371,12 +1550,16 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       if (targetReached) {
         return "target-reached";
       }
+    } else if (driver.name === "reward-target") {
+      mechanicalBoundary = await checkpointRewardPartyTarget(rig, cursors, client);
     } else if (driver.v2SurfaceId) {
       mechanicalBoundary = await checkpointPairedMechanicalSurface(rig, driver.v2SurfaceId, cursors, client);
     }
     await client.checkpoint(`wave-${stats.wave}-${driver.name}-owner`);
     if (driver.name === "biome-shop" && driver.market?.mode === "target-held") {
       stats.market = await driveTargetedMarket(rig, cursors, driver.market);
+    } else if (driver.name === "reward-target" && mechanicalBoundary != null) {
+      await driveRewardPartyTarget(rig, driver, client, mechanicalBoundary);
     } else if (driver.confirmSurfaceId && mechanicalBoundary != null) {
       await driveConfirmedLeave(rig, driver, client, mechanicalBoundary.authority);
     } else {

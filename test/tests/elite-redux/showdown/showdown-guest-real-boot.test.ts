@@ -264,7 +264,7 @@ describe.skipIf(!RUN)("Showdown versus - guest REAL launch pipeline (regression 
       game.scene.phaseManager.pushNew("EncounterPhase", false);
       new SelectStarterPhase().initBattle(starters);
     });
-    await game.phaseInterceptor.to("CommandPhase");
+    await game.phaseInterceptor.to("CommandPhase", false);
     // Bake THUNDERBOLT into the host's own Pikachu DIRECTLY (rides the mirror into the guest's ENEMY
     // Pikachu; does not corrupt the guest's own manifest moveset). Not load-bearing for THIS test (no
     // turn is played) - kept parallel to showdown-duo so the fielded host team is a coherent battler.

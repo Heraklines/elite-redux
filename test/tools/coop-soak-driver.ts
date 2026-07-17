@@ -495,7 +495,14 @@ export interface SoakResult {
    * transition and stops instead of hanging a phaseInterceptor.to() against a run that is over. Undefined =
    * the run surveyed every requested wave.
    */
-  runEnded?: { wave: number; reason: string } | undefined;
+  runEnded?:
+    | {
+        wave: number;
+        kind: "verified-terminal";
+        phase: "GameOverPhase" | "TitlePhase";
+        reason: string;
+      }
+    | undefined;
   /**
    * How many surveyed waves were TRAINER battles (#846) - fixed rival/evil-team AND random rolled trainers.
    * Reported so a run's trainer coverage is visible (a seed that rolls zero random trainers still logs the
@@ -901,7 +908,7 @@ function tagCoopPartyOwnership(rig: DuoRig): void {
  * it, and both engines spun. Returning -1 when no same-owner bench exists is CORRECT: a voluntary switch
  * then declines (falls through to a move), a guest faint replacement defers to production's own strict
  * auto-pick ({@linkcode coopAutoPickReplacement}, which leaves the slot empty), and a host faint with no
- * host bench is a host-half-exhaustion terminal ({@linkcode hostRunEndReason}), never a seating swap.
+ * host bench leaves that half exhausted while the partner continues, never a seating swap.
  */
 export function firstLegalBenchSlot(scene: BattleScene, owner: "host" | "guest"): number {
   const party = scene.getPlayerParty();
@@ -942,32 +949,35 @@ export function hostOwnedFaintPending(rig: DuoRig): boolean {
   return rig.hostScene.getPlayerField().some(m => m.isFainted() && m.coopOwner === "host");
 }
 
-/** Terminal host phases: the run has ENDED (a wipe -> GameOver -> Title), so no battle can be driven. */
-const HOST_RUN_END_PHASES = new Set(["GameOverPhase", "TitlePhase"]);
+/** Terminal host phases: the run has ENDED (GameOver -> Title), so no battle can be driven. */
+const HOST_RUN_END_PHASES = new Set<"GameOverPhase" | "TitlePhase">(["GameOverPhase", "TitlePhase"]);
+
+export interface VerifiedHostRunEnd {
+  kind: "verified-terminal";
+  phase: "GameOverPhase" | "TitlePhase";
+  reason: string;
+}
 
 /**
- * DETECT a mid-soak host RUN-END (#846): the host party WIPED (all mons fainted), or the host has
- * transitioned to a terminal phase (GameOverPhase -> TitlePhase), or its currentBattle is gone. When true
- * the soak must STOP surveying and record a terminal outcome - never drive another phaseInterceptor.to()
- * (which would hang against a run that is over and mis-surface as a NO-PARK strand). Reads rig.hostScene
- * directly, so it is owner-ctx-independent. Returns a reason string (for the terminal outcome) or null.
+ * DETECT a verified mid-soak host RUN-END (#846): the host has transitioned to GameOverPhase or
+ * TitlePhase. A fainted party, a missing battle, or an exhausted half is not sufficient evidence: each can
+ * also be observed during a live continuation or a broken teardown. Those states must remain NO-PARK
+ * failures unless the renderer exposes the explicit terminal phase.
  *
  * The evil-team fixed-trainer gauntlet (waves 62/64/66) at the soak's level edge with NO shop healing was
  * the concrete wipe class this closes (CI run 28710818213, seed 20260704, wave 66). A wipe is EXPECTED to
  * be rare (the soak's premise is a winnable level edge + the real every-10-wave PartyHealPhase firing on
  * the host's wave crossings); when it happens it is reported LOUDLY with the wave, not hidden as a strand.
  */
-export function hostRunEndReason(rig: DuoRig): string | null {
+export function hostRunEndReason(rig: DuoRig): VerifiedHostRunEnd | null {
   const phaseName = rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "";
-  if (HOST_RUN_END_PHASES.has(phaseName)) {
-    return `host at terminal phase ${phaseName}`;
-  }
-  if (rig.hostScene.currentBattle == null) {
-    return "host currentBattle is null (run torn down)";
-  }
-  const party = rig.hostScene.getPlayerParty();
-  if (party.length > 0 && party.every(m => m.isFainted())) {
-    return "host player party WIPED (all mons fainted)";
+  if (HOST_RUN_END_PHASES.has(phaseName as "GameOverPhase" | "TitlePhase")) {
+    const phase = phaseName as "GameOverPhase" | "TitlePhase";
+    return {
+      kind: "verified-terminal",
+      phase,
+      reason: `host at terminal phase ${phase}`,
+    };
   }
   // #848 HOST-HALF EXHAUSTION is NO LONGER a terminal here (#828 ASYMMETRIC CONTINUATION, BUILD 2). A
   // host-owned field slot fainted with no legal host-owned bench does NOT end the run: production's real
@@ -975,8 +985,8 @@ export function hostRunEndReason(rig: DuoRig): string | null {
   // empty; command-phase.ts:468-481 arrives-only on the reciprocal barrier so the survivor plays on
   // unthrottled) keeps the GUEST half playing waves SOLO to the wave end. The soak now DRIVES that path
   // instead of stopping at it - see {@linkcode hostHalfExhausted} + the wave loop's guest-solo continuation.
-  // Only a TRUE terminal (a FULL party wipe / GameOver / Title / torn-down battle, handled above) ends the
-  // survey.
+  // Only the renderer's explicit terminal phase ends the survey. A wipe or torn-down battle without that
+  // phase is ambiguous and therefore remains a fail-closed NO-PARK outcome.
   return null;
 }
 
@@ -988,7 +998,7 @@ export function hostRunEndReason(rig: DuoRig): string | null {
  * player's whole half dies before the other's); the driver detects it to (a) skip arming the host faint
  * auto-picker (the modal picker self-closes, there is no pick to drive) and (b) record the `hostHalfExhausted`
  * surface + keep surveying. Reads rig.hostScene directly (owner-ctx-independent). Returns false once the guest
- * half is ALSO down (that is a full wipe - {@linkcode hostRunEndReason} classifies that terminal).
+ * half is ALSO down; only a later explicit GameOverPhase/TitlePhase is a verified terminal.
  */
 export function hostHalfExhausted(rig: DuoRig): boolean {
   if (!(hostOwnedFaintPending(rig) && firstLegalBenchSlot(rig.hostScene, "host") < 0)) {
@@ -1047,7 +1057,8 @@ export function registerHostFaintAutoPick(game: GameManager, rig: DuoRig): void 
       // wave). RE-ARM while a host-owned faint is STILL pending (the summon this pick queued has not fielded
       // yet, so the slot still reads fainted here) and a legal host bench remains - so the picker DRAINS
       // EVERY host-owned SwitchPhase in the crossing. The bench guard stops a no-replacement host PARTY (the
-      // run is wiping) from re-arming into an infinite loop; hostRunEndReason then classifies that terminal.
+      // run may be wiping) from re-arming into an infinite loop; only a later explicit renderer terminal is
+      // accepted as a clean run end.
       if (hostOwnedFaintPending(rig) && firstLegalBenchSlot(rig.hostScene, "host") >= 0) {
         registerHostFaintAutoPick(game, rig);
       }
@@ -2120,10 +2131,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       let committedBiomeOperationId: string | null = null;
       let hostBiomeProjected = false;
       let guestBiomeBoundary: BiomeBoundarySeam | null = null;
-      withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.reannounce(point));
-      // The early guest arrival is now destination-scheduled; publish it to the host before its command
-      // boundary starts waiting. This is delivery, not a manufactured rendezvous or direct state mutation.
-      await withClient(rig.hostCtx, () => drainLoopback());
+      const hostArrangement = rig.hostScene.currentBattle.arrangement;
+      const guestArrangement = rig.guestScene.currentBattle.arrangement;
+      const finalBossStageOne =
+        rig.hostScene.currentBattle.isClassicFinalBoss
+        && rig.guestScene.currentBattle.isClassicFinalBoss
+        && hostArrangement.playerCapacity === 1
+        && hostArrangement.enemyCapacity === 1
+        && guestArrangement.playerCapacity === 1
+        && guestArrangement.enemyCapacity === 1;
       await withClient(rig.hostCtx, () => beforeHostCross?.());
       for (;;) {
         const boundary = restartAlreadyOpenHost
@@ -2343,6 +2359,34 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         }
         break;
       }
+      // A representative soak must exercise CommandPhase -> rendezvous wiring itself. Materialize and
+      // start the guest's real owned CommandPhase first; it announces its own arrival and legitimately
+      // parks until the host phase below arrives. Never pre-seed this boundary through reannounce().
+      let guestCommand: { readonly phaseName: string; start(): void } | null = null;
+      if (!finalBossStageOne) {
+        guestCommand = await withClient(rig.guestCtx, () =>
+          driveClientPhaseQueueTo(rig.guestScene, `guest command ${wave}:${turn}`, {
+            matches: phase =>
+              phase.phaseName === "CommandPhase"
+              && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX
+              && rig.guestScene.currentBattle.waveIndex === wave
+              && rig.guestScene.currentBattle.turn === turn,
+            drivePublicPhaseInput: phase => {
+              if (phase.phaseName !== "ScanIvsPhase" || rig.guestScene.ui.getMode() !== UiMode.CONFIRM) {
+                return false;
+              }
+              rig.guestScene.ui.processInput(Button.CANCEL);
+              actionScript.push(`wave ${transitionSourceWave}: guest declined IV Scanner through public UI`);
+              return true;
+            },
+          }),
+        );
+        await withClient(rig.guestCtx, async () => {
+          markRealGuestCommandBoundary(rig.guestScene, wave, turn);
+          guestCommand!.start();
+          await drainLoopback();
+        });
+      }
       // With a biome commit this resumes only after the renderer consumed its exact receipt. Without one it
       // starts the CommandPhase that toFirst deliberately left untouched, publishing the host's reciprocal
       // arrival in both cases.
@@ -2365,38 +2409,51 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           await drainLoopback();
           return;
         }
+        // The guest's real CommandPhase above has already sent its reciprocal arrival. With full
+        // destination-context scheduling that frame is intentionally parked in the HOST inbox until
+        // this exact scope is installed. Pump it before phaseInterceptor.to(): CommandPhase itself
+        // awaits that arrival, so pumping only after `to()` returns creates a harness-only circular
+        // wait (guest arrival queued -> host phase awaits -> caller cannot reach the later pump).
+        await drainLoopback();
         await game.phaseInterceptor.to("CommandPhase");
       });
       await pumpDuoDestinations(rig, 2);
-      // The old soak manufactured only the guest rendezvous arrival. That let the host proceed but never
-      // opened the guest's production UiMode.COMMAND surface, so retained reward operations could not emit
-      // their exact continuationReady proof and failed closed roughly 60 seconds later. Drive the guest's
-      // real queued CommandPhase for every boundary (ordinary and biome), then require its public handler.
-      const guestCommand = await withClient(rig.guestCtx, () =>
-        driveClientPhaseQueueTo(rig.guestScene, `guest command ${wave}:${turn}`, {
-          matches: phase =>
-            phase.phaseName === "CommandPhase"
-            && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX
-            && rig.guestScene.currentBattle.waveIndex === wave
-            && rig.guestScene.currentBattle.turn === turn,
-          drivePublicPhaseInput: phase => {
-            if (phase.phaseName !== "ScanIvsPhase" || rig.guestScene.ui.getMode() !== UiMode.CONFIRM) {
-              return false;
-            }
-            rig.guestScene.ui.processInput(Button.CANCEL);
-            actionScript.push(`wave ${transitionSourceWave}: guest declined IV Scanner through public UI`);
-            return true;
-          },
-        }),
-      );
-      await withClient(rig.guestCtx, async () => {
-        markRealGuestCommandBoundary(rig.guestScene, wave, turn);
-        guestCommand.start();
-        await drainLoopback();
-      });
+      // Classic wave 200 stage one is intentionally one player versus one boss. The renderer has no
+      // owned field slot or public CommandPhase until the boss's phase-two transition calls setDouble(true).
+      // Starting its CoopReplayTurnPhase here, before the authority submits slot 0, blocks waiting for a
+      // resolution that cannot exist yet (the former god-a/god-c wave-200 false softlock). A real second
+      // browser simply watches this turn. Preserve that exact behavior: verify both engines agree on the
+      // single geometry, leave the replay pump untouched, and let playWave start it only after host action.
+      const hostPlayerCapacity = rig.hostScene.currentBattle.arrangement.playerCapacity;
+      if (finalBossStageOne) {
+        const guestPlayerCapacity = rig.guestScene.currentBattle.arrangement.playerCapacity;
+        const hostPlayerField = rig.hostScene.getPlayerField();
+        const guestPlayerField = rig.guestScene.getPlayerField();
+        if (
+          guestPlayerCapacity !== 1
+          || hostPlayerField.length !== 1
+          || guestPlayerField.length !== 1
+          || hostPlayerField[COOP_GUEST_FIELD_INDEX] != null
+          || guestPlayerField[COOP_GUEST_FIELD_INDEX] != null
+        ) {
+          fail(
+            "desync",
+            wave,
+            `single-owner command geometry diverged hostCap=${hostPlayerCapacity}/field=${hostPlayerField.length} `
+              + `guestCap=${guestPlayerCapacity}/field=${guestPlayerField.length}`,
+          );
+        }
+        actionScript.push(
+          `wave ${wave} turn ${turn}: exact final-boss stage-one boundary crossed without a synthetic guest rendezvous; guest remained a replay spectator until host action`,
+        );
+        return;
+      }
+      if (guestCommand == null) {
+        fail("no-park", wave, `guest command ${wave}:${turn} was not materialized`);
+      }
       const guestCommandSurface = await waitForPublicModeOrPhaseExit(
         rig.guestCtx,
-        guestCommand,
+        guestCommand!,
         UiMode.COMMAND,
         `guest command ${wave}:${turn}`,
       );
@@ -4155,7 +4212,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
   // TERMINAL run-end (#846): set the FIRST time the host run ends (a wipe / GameOver / Title). Recorded +
   // reported LOUDLY; the survey ends honestly at that wave (never a NO-PARK strand). See hostRunEndReason.
-  let runEnded: { wave: number; reason: string } | undefined;
+  let runEnded: SoakResult["runEnded"];
 
   // ===== The wave loop. =====
   const captureOperationHits = (): void => {
@@ -4345,33 +4402,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // wave (counted, reported), instead of writing a misleading no-park artifact.
       const endReason = hostRunEndReason(rig);
       if (endReason != null) {
-        runEnded = { wave, reason: endReason };
+        runEnded = { wave, ...endReason };
         // eslint-disable-next-line no-console
-        console.log(`[coop-soak] RUN ENDED at wave ${wave} (seed ${seed}): ${endReason}. Survey stops here.`);
-        actionScript.push(`RUN-END wave ${wave}: ${endReason}`);
-        break;
-      }
-      // #828/#851 ASYMMETRIC CONTINUATION SAFE-DEGRADE (BUILD 2): a stall that surfaced WHILE the host half is
-      // exhausted is treated as an exhaustion terminal rather than a fresh NO-PARK regression. NB (#851): the old
-      // "vacated host slot's REDIRECTED CommandPhase re-issues a duplicate partner request that eats the timeout"
-      // explanation is WRONG - VERIFIED in coop-soak-asymmetric.test.ts's SUSTAINED guest-solo test: the party
-      // compacts the survivor to slot 0, turn-init queues EXACTLY ONE CommandPhase (the inactive vacated slot gets
-      // none, so there is no redirect and no duplicate), and every guest-SOLO TURN resolves with exactly one
-      // requestPartnerCommand and no timeout. The single-battle guest-solo TURN is therefore driven cleanly and
-      // this in-wave degrade is effectively dormant for it. This backstop REMAINS only for the multi-WAVE
-      // guest-solo crossing (winning a wave solo -> the owner/watcher reward shop -> the next wave with an
-      // exhausted host half), which the continuous harness does not yet drive; that + the true live-desync class
-      // (the relay keys the partner command by fieldIndex, which can skew if the guest's post-recenter geometry
-      // ever disagrees with the host's - see the #851 report) is the remaining follow-up.
-      if (hostHalfExhausted(rig)) {
-        hitSituation(COOP_SOAK_SITUATIONS.hostHalfExhausted);
-        runEnded = { wave, reason: "host HALF exhausted (guest-solo continuation hit the harness field-collapse gap)" };
-        // eslint-disable-next-line no-console
-        console.log(
-          `[coop-soak] HOST-HALF EXHAUSTED at wave ${wave} (seed ${seed}): guest-solo continuation reached the two-engine `
-            + "harness field-collapse gap; ending as the exhaustion terminal (no NO-PARK regression). Finding reported.",
-        );
-        actionScript.push(`RUN-END wave ${wave}: host half exhausted (harness field-collapse gap in guest-solo drive)`);
+        console.log(`[coop-soak] RUN ENDED at wave ${wave} (seed ${seed}): ${endReason.reason}. Survey stops here.`);
+        actionScript.push(`RUN-END wave ${wave}: ${endReason.reason}`);
         break;
       }
       // A genuine driver stall (driveGuestReplayTurn / driveGuestRewardWatch / phaseInterceptor timeout in a
@@ -4440,45 +4474,30 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // between-wave game-over). Same rule: a terminal host state is a counted run-end, not a strand.
         const endReason = hostRunEndReason(rig);
         if (endReason == null) {
-          // #828/#851 SAFE-DEGRADE (BUILD 2): a crossing stall while the host half is exhausted ends as the
-          // exhaustion terminal (no NO-PARK regression), records the surface, reports the finding. This is the
-          // multi-WAVE crossing the in-wave catch above notes as the remaining follow-up (reward shop + next-wave
-          // start with an exhausted host half); the guest-solo TURN itself is driven cleanly (verified - see the
-          // in-wave note + coop-soak-asymmetric.test.ts). NOT the debunked "duplicate partner request" gap.
-          if (hostHalfExhausted(rig)) {
-            hitSituation(COOP_SOAK_SITUATIONS.hostHalfExhausted);
-            runEnded = {
-              wave: wave + 1,
-              reason:
-                "host HALF exhausted (guest-solo continuation hit the harness field-collapse gap at the crossing)",
-            };
-            // eslint-disable-next-line no-console
-            console.log(
-              `[coop-soak] HOST-HALF EXHAUSTED crossing into wave ${wave + 1} (seed ${seed}): guest-solo continuation `
-                + "reached the harness field-collapse gap; ending as the exhaustion terminal. Finding reported.",
-            );
-            actionScript.push(`RUN-END crossing wave ${wave + 1}: host half exhausted (harness field-collapse gap)`);
-            break;
-          }
-          throw e;
+          fail(
+            "no-park",
+            wave + 1,
+            `wave crossing threw (strand/stall): ${e instanceof Error ? e.message : String(e)}`,
+          );
+        } else {
+          runEnded = { wave: wave + 1, ...endReason };
+          // eslint-disable-next-line no-console
+          console.log(
+            `[coop-soak] RUN ENDED crossing into wave ${wave + 1} (seed ${seed}): ${endReason.reason}. Survey stops here.`,
+          );
+          actionScript.push(`RUN-END crossing wave ${wave + 1}: ${endReason.reason}`);
+          break;
         }
-        runEnded = { wave: wave + 1, reason: endReason };
-        // eslint-disable-next-line no-console
-        console.log(
-          `[coop-soak] RUN ENDED crossing into wave ${wave + 1} (seed ${seed}): ${endReason}. Survey stops here.`,
-        );
-        actionScript.push(`RUN-END crossing wave ${wave + 1}: ${endReason}`);
-        break;
       }
       // A clean crossing can still land on a terminal host state without throwing (defensive): stop LOUDLY.
       const endReason = hostRunEndReason(rig);
       if (endReason != null) {
-        runEnded = { wave: wave + 1, reason: endReason };
+        runEnded = { wave: wave + 1, ...endReason };
         // eslint-disable-next-line no-console
         console.log(
-          `[coop-soak] RUN ENDED after crossing into wave ${wave + 1} (seed ${seed}): ${endReason}. Survey stops.`,
+          `[coop-soak] RUN ENDED after crossing into wave ${wave + 1} (seed ${seed}): ${endReason.reason}. Survey stops.`,
         );
-        actionScript.push(`RUN-END post-crossing wave ${wave + 1}: ${endReason}`);
+        actionScript.push(`RUN-END post-crossing wave ${wave + 1}: ${endReason.reason}`);
         break;
       }
     }

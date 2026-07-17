@@ -33,6 +33,61 @@ export function isActionableSemanticObservation(observation, { requireExplicitUn
   return observation.ready.inputBlocked !== true && observation.ready.awaitingActionInput !== false;
 }
 
+/** A replacement surface owned by this browser and ready for a human-equivalent key. */
+export function findOwnedActionableReplacementSurface(client, fromCursor = 0) {
+  const event = client.evidence.findLastSemanticSurface(fromCursor, "party:replacement");
+  const observation = event?.observation;
+  return observation?.operationClass === "replacement"
+    && observation.ownerModel === "interaction"
+    && (observation.phase === "SwitchPhase" || observation.phase === "CoopGuestFaintSwitchPhase")
+    && observation.uiMode === "PARTY"
+    && observation.localSeat === client.publicSeat
+    && observation.ownerSeat === client.publicSeat
+    && observation.seatsWithInput?.includes(client.publicSeat)
+    && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
+    ? event
+    : null;
+}
+
+/**
+ * The currently rendered target picker for this stable seat.
+ *
+ * Looking up only the last matching `command:target` event is insufficient: after ACTION
+ * closes the picker that event remains in the trace. Requiring it to also be the client's
+ * latest semantic surface prevents a delayed poll from spending a second key on the next UI.
+ */
+export function findOwnedActionableTargetSurface(client, fromCursor = 0, expectedAddress = null) {
+  const event = client.evidence.findLastSemanticSurface(fromCursor, "command:target");
+  const latest = client.evidence.findLastSemanticSurface(fromCursor);
+  const observation = event?.observation;
+  const address = observation?.address;
+  const addressKey =
+    Number.isSafeInteger(address?.epoch) && Number.isSafeInteger(address?.wave) && Number.isSafeInteger(address?.turn)
+      ? `${address.epoch}:${address.wave}:${address.turn}`
+      : null;
+  return event != null
+    && latest?.index === event.index
+    && observation?.operationClass === "command"
+    && observation.ownerModel === "local"
+    && observation.phase === "SelectTargetPhase"
+    && observation.uiMode === "TARGET_SELECT"
+    && observation.localSeat === client.publicSeat
+    && observation.seatsWithInput?.includes(client.publicSeat)
+    && (expectedAddress == null || addressKey === expectedAddress)
+    && Array.isArray(observation.optionIds)
+    && observation.optionIds.length > 0
+    && observation.optionIds.includes(observation.selectedOptionId)
+    && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
+    ? event
+    : null;
+}
+
+/** Pick the first observer-proven healthy reserve, never the currently fielded/fainted slot. */
+export function replacementTargetOptionId(observation) {
+  const target = observation?.partySlots?.find(slot => slot?.replacementEligible === true);
+  return Number.isSafeInteger(target?.slot) ? `party-slot:${target.slot}` : null;
+}
+
 /**
  * Decide the next navigation action from the current semantic observation.
  * Returns one of:
@@ -148,33 +203,170 @@ export async function selectFirstEmptySaveSlot(client, { fromCursor = 0, timeout
   await client.press("Space", "fresh-save-slot-0");
 }
 
-/**
- * Select the visible starter, add it through its option menu, submit the team, and confirm.
- * Every transition is observed before the next public key is sent, so text animation or a slow
- * browser cannot reinterpret a later key on the previous screen.
- *
- * REVERTED to single-starter (2026-07-17): the 3-starter loop broke the solo-nav lane (grid moves
- * land on unaffordable/locked slots and stall the flow) while helping NOTHING in co-op - the co-op
- * campaign drives starter select through its own keys, not this helper. Multi-starter fielding
- * belongs to the closure train's budget-valid implementation and arrives with that fold.
- */
-export async function confirmDefaultStarterTeam(client, { fromCursor = client.pageCursor, timeoutMs = 15_000 } = {}) {
-  await waitForActionableSemanticSurface(client, "starter-select", { fromCursor, timeoutMs });
+/** One starter per seat could not survive wave 2 after the enemy-kit rebalance.
+ * Two per seat is the largest fresh-account team the real five-point co-op budget
+ * guarantees and exercises faint-replacement sync. */
+const MIN_STARTERS_PER_SEAT = 2;
+const COOP_STARTER_BUDGET = 5;
+const STARTER_GRID_COLUMNS = 9;
+
+/** The party size the visible starter bar last showed in this evidence sink (observer-read). */
+function visibleTeamSize(sink, fromCursor) {
+  const team = sink.findLastSemanticSurface(fromCursor, "starter-select")?.observation.teamSpeciesIds;
+  return Array.isArray(team) ? team.length : 0;
+}
+
+function requireRepresentativeStarterTeam(client, fielded) {
+  if (fielded < MIN_STARTERS_PER_SEAT) {
+    throw new Error(
+      `${client.label}: fielded ${fielded}/${MIN_STARTERS_PER_SEAT} minimum starters through the public UI; `
+        + "the campaign would not represent survivability or faint-replacement sync",
+    );
+  }
+}
+
+async function waitForVisibleTeamGrowth(client, fromCursor, fielded, timeoutMs) {
+  return client.evidence
+    .waitForCondition(
+      sink => {
+        const size = visibleTeamSize(sink, fromCursor);
+        return size > fielded ? size : null;
+      },
+      {
+        timeoutMs,
+        description: `visible starter team grew past ${fielded}`,
+      },
+    )
+    .then(
+      size => size,
+      () => null,
+    );
+}
+
+/** Pick the strongest affordable pair from the observer's read-only visible/caught grid projection. */
+export function chooseAffordableStarterPair(observation, budget = COOP_STARTER_BUDGET) {
+  const candidates = Array.isArray(observation?.starterGridCandidates)
+    ? observation.starterGridCandidates.filter(
+        candidate =>
+          Number.isSafeInteger(candidate?.index)
+          && Number.isSafeInteger(candidate?.speciesId)
+          && typeof candidate?.cost === "number"
+          && candidate.cost > 0,
+      )
+    : [];
+  let best = null;
+  for (let left = 0; left < candidates.length; left++) {
+    for (let right = left + 1; right < candidates.length; right++) {
+      const pair = [candidates[left], candidates[right]];
+      const total = pair[0].cost + pair[1].cost;
+      if (total > budget) {
+        continue;
+      }
+      const score = [total, -Math.max(pair[0].index, pair[1].index)];
+      if (best == null || score[0] > best.score[0] || (score[0] === best.score[0] && score[1] > best.score[1])) {
+        best = { pair, score };
+      }
+    }
+  }
+  return best?.pair ?? null;
+}
+
+async function waitForStarterGridMove(client, fromIndex, selectedOptionId, timeoutMs) {
+  return client.evidence.waitForCondition(
+    sink => {
+      const event = sink.findLastSemanticSurface(0, "starter-select");
+      return event?.index > fromIndex
+        && event.observation.selectedOptionId?.startsWith("starter-grid:")
+        && event.observation.selectedOptionId !== selectedOptionId
+        ? event
+        : null;
+    },
+    { timeoutMs, description: `starter grid moved from ${selectedOptionId}` },
+  );
+}
+
+async function moveStarterGridTo(client, target, timeoutMs) {
+  let event = client.evidence.findLastSemanticSurface(0, "starter-select");
+  if (!event?.observation.selectedOptionId?.startsWith("starter-grid:")) {
+    const enterCursor = client.evidence.cursor();
+    await client.press("ArrowRight", "starter-enter-grid");
+    event = await client.evidence.waitForCondition(
+      sink => {
+        const next = sink.findLastSemanticSurface(enterCursor, "starter-select");
+        return next?.observation.selectedOptionId?.startsWith("starter-grid:") ? next : null;
+      },
+      { timeoutMs, description: "starter grid cursor after entering from side controls" },
+    );
+  }
+
+  for (let step = 0; step < 64; step++) {
+    const current = Number(event.observation.selectedOptionId.slice("starter-grid:".length));
+    if (current === target.index) {
+      return event;
+    }
+    const currentRow = Math.floor(current / STARTER_GRID_COLUMNS);
+    const targetRow = Math.floor(target.index / STARTER_GRID_COLUMNS);
+    const key =
+      currentRow < targetRow
+        ? "ArrowDown"
+        : currentRow > targetRow
+          ? "ArrowUp"
+          : current < target.index
+            ? "ArrowRight"
+            : "ArrowLeft";
+    const beforeIndex = event.index;
+    const beforeId = event.observation.selectedOptionId;
+    await client.press(key, `starter-grid-to-${target.speciesId}:step-${step}`);
+    event = await waitForStarterGridMove(client, beforeIndex, beforeId, timeoutMs);
+  }
+  throw new Error(`${client.label}: starter grid did not reach species ${target.speciesId} at index ${target.index}`);
+}
+
+async function addStarterGridCandidate(client, target, fielded, timeoutMs) {
+  await moveStarterGridTo(client, target, timeoutMs);
   const optionCursor = client.evidence.cursor();
-  await client.press("Space", "starter-open-selected-options");
+  await client.press("Space", `starter-open-${target.speciesId}`);
   await waitForSemanticSurface(client, "option-select:SelectStarterPhase", {
     fromCursor: optionCursor,
     timeoutMs,
   });
-  const starterCursor = client.evidence.cursor();
+  const addCursor = client.evidence.cursor();
   await selectOptionById(client, {
     surfaceId: "option-select:SelectStarterPhase",
     targetId: "add-to-party",
-    navKeys: ["ArrowUp", "ArrowDown"],
+    navKeys: ["ArrowDown", "ArrowUp"],
+    fromCursor: optionCursor,
     timeoutMs,
   });
+  const grownSize = await waitForVisibleTeamGrowth(client, addCursor, fielded, timeoutMs);
+  if (grownSize == null) {
+    throw new Error(`${client.label}: visible team did not accept starter species ${target.speciesId}`);
+  }
+  client.evidence.record("starter-grid-add-proof", { target, fielded: grownSize });
+  return grownSize;
+}
 
-  await waitForSemanticSurface(client, "starter-select", { fromCursor: starterCursor, timeoutMs });
+/**
+ * Build a representative team through deterministic public grid navigation. Random selection can
+ * legally choose a cost-4 lead three times in a row and leave no room for a second mon, making a
+ * release gate probabilistic. The observer only reports the visible/caught grid and costs; every
+ * state change remains a real human keyboard action against the production UI.
+ */
+export async function confirmDefaultStarterTeam(client, { fromCursor = client.pageCursor, timeoutMs = 15_000 } = {}) {
+  const starterSurface = await waitForActionableSemanticSurface(client, "starter-select", { fromCursor, timeoutMs });
+  const targets = chooseAffordableStarterPair(starterSurface.observation);
+  if (targets == null) {
+    throw new Error(
+      `${client.label}: visible starter grid exposed no two-mon team within the ${COOP_STARTER_BUDGET}-point budget`,
+    );
+  }
+
+  let fielded = visibleTeamSize(client.evidence, fromCursor);
+  for (const target of targets) {
+    fielded = await addStarterGridCandidate(client, target, fielded, timeoutMs);
+  }
+  requireRepresentativeStarterTeam(client, fielded);
+  client.evidence.record("starter-team-fielded", { fielded, target: MIN_STARTERS_PER_SEAT });
   const confirmCursor = client.evidence.cursor();
   await client.press("Enter", "starter-submit-team");
   await waitForSemanticSurface(client, "confirm:SelectStarterPhase", {
@@ -268,7 +460,7 @@ export async function selectOptionById(
         action: submit ? "submit" : "selected",
         steps: step,
       });
-      return { steps: step };
+      return { steps: step, surfaceEventIndex: event.index };
     }
     if (plan.kind === "unavailable") {
       throw new Error(

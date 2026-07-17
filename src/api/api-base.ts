@@ -35,8 +35,8 @@ export abstract class ApiBase {
    * Send an HTTP GET request.
    * @param path - The path to send the request to
    */
-  protected async doGet(path: string): Promise<Response> {
-    return this.doFetch(path, { method: "GET" });
+  protected async doGet(path: string, signal?: AbortSignal): Promise<Response> {
+    return this.doFetch(path, { method: "GET", signal });
   }
 
   /**
@@ -45,17 +45,32 @@ export abstract class ApiBase {
    * @param bodyData - The body-data to send; will be stringified if needed
    * @param dataType - (Default `"json"`) The type of data to send
    */
-  protected async doPost(path: string, bodyData?: Record<string, any> | string, dataType?: "json"): Promise<Response>;
+  protected async doPost(
+    path: string,
+    bodyData?: Record<string, any> | string,
+    dataType?: "json",
+    signal?: AbortSignal,
+  ): Promise<Response>;
   /**
    * Send an HTTP POST request.
    * @param path - The path to send the request to
    * @param bodyData - The body-data to send; will be stringified if needed
    * @param dataType - (Default `"json"`) The type of data to send
    */
-  protected async doPost(path: string, bodyData: Record<string, any>, dataType: "form-urlencoded"): Promise<Response>;
-  protected async doPost(path: string, bodyData?: Record<string, any>, dataType: DataType = "json"): Promise<Response> {
+  protected async doPost(
+    path: string,
+    bodyData: Record<string, any>,
+    dataType: "form-urlencoded",
+    signal?: AbortSignal,
+  ): Promise<Response>;
+  protected async doPost(
+    path: string,
+    bodyData?: Record<string, any> | string,
+    dataType: DataType = "json",
+    signal?: AbortSignal,
+  ): Promise<Response> {
     if (bodyData === undefined) {
-      return this.doFetch(path, { method: "POST" });
+      return this.doFetch(path, { method: "POST", signal });
     }
 
     let body: string;
@@ -81,7 +96,7 @@ export abstract class ApiBase {
         headers["Content-Type"] = "text/plain";
         break;
     }
-    return await this.doFetch(path, { method: "POST", body, headers });
+    return await this.doFetch(path, { method: "POST", body, headers, signal });
   }
 
   /**

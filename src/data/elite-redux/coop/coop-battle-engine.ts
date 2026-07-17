@@ -33,6 +33,7 @@ import {
   buildCheckpoint,
   type CoopArenaView,
   type CoopFieldMonView,
+  isResolvableCoopFormIndex,
   monStateByIndex,
   normalizeMonState,
 } from "#data/elite-redux/coop/coop-battle-checkpoint";
@@ -1031,6 +1032,30 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
       }
       const state = normalizeMonState(raw);
       try {
+        // A battler index is a field coordinate, not a Pokemon identity. Reconciliation can fail to find
+        // a switched-in party member temporarily; the companion full state then rebuilds it. Applying this
+        // row to the stale occupant corrupts the wrong mon (and an out-of-range form starts rejected async
+        // work whose error appears much later). Bind the complete scalar row to species before any mutation.
+        const localSpeciesId = mon.species?.speciesId ?? 0;
+        if (state.speciesId > 0 && localSpeciesId !== state.speciesId) {
+          coopWarn(
+            "checkpoint",
+            `mon bi=${mon.getBattlerIndex()} identity mismatch hostSpecies=${state.speciesId} `
+              + `guestSpecies=${localSpeciesId}; skipped slot scalars pending full-state adoption`,
+          );
+          continue;
+        }
+        if (
+          state.formIndex !== undefined
+          && !isResolvableCoopFormIndex(mon.species?.forms?.length ?? 0, state.formIndex)
+        ) {
+          coopWarn(
+            "checkpoint",
+            `mon bi=${mon.getBattlerIndex()} rejected unresolved formIndex=${state.formIndex} `
+              + `species=${localSpeciesId} forms=${mon.species?.forms?.length ?? 0}; no scalar mutation applied`,
+          );
+          continue;
+        }
         // A reconstructed authoritative mon can enter the logical field before any summon phase creates its
         // sprite/battle-info children. Numeric correction calls updateInfo/loadAssets below, so initialize
         // those presentation nodes first instead of silently abandoning the rest of this mon's checkpoint.
@@ -1086,11 +1111,12 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
               `mon bi=${mon.getBattlerIndex()} formIndex ${mon.formIndex} -> ${state.formIndex} (#809)`,
             );
             mon.formIndex = state.formIndex;
-            try {
-              void mon.loadAssets(false);
-            } catch {
-              /* sprite refresh is cosmetic; state is what must converge */
-            }
+            void mon.loadAssets(false).catch(error => {
+              coopWarn(
+                "checkpoint",
+                `mon bi=${mon.getBattlerIndex()} form presentation refresh failed after valid adoption: ${String(error)}`,
+              );
+            });
           }
           if (state.isTerastallized !== undefined) {
             mon.isTerastallized = state.isTerastallized;
@@ -1129,7 +1155,12 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
               }
             }
           }
-          void mon.updateInfo();
+          void mon.updateInfo().catch(error => {
+            coopWarn(
+              "checkpoint",
+              `mon bi=${mon.getBattlerIndex()} info refresh failed after scalar adoption: ${String(error)}`,
+            );
+          });
         }
       } catch (error) {
         // Checkpoint apply is the hot recovery boundary. A silent partial apply makes a persistent
@@ -4107,12 +4138,12 @@ function applyFullMon(
       coopWarn("heal", `hp bi=${snap.bi} host=${wantHp} guest=${prevHp} (maxHp=${mon.getMaxHp()}) -> applied`);
     }
     mon.hp = wantHp;
-    // Boss re-assert (#633, A/BLOCKING-2), AFTER hp so the index derives from the correct hp. The host
-    // decrements bossSegmentIndex as shields break, but the guest sets hp by direct assignment (never
-    // via damage()), so its index would freeze and the dividers render wrong + the dimension loops
-    // forever. Re-assert the EXPLICIT host segment COUNT (never the diverged-RNG getEncounterBossSegments
-    // fallback), then DERIVE the index from the now-correct hp via getBossSegmentIndex() so the boss
-    // dimension STOPS diverging each apply instead of looping. Gated authoritative; enemy-only.
+    // Boss re-assert (#633, A/BLOCKING-2), AFTER hp. Re-assert the EXPLICIT host segment count and index
+    // carried by this same immutable authority frame. The live host decrements bossSegmentIndex when a
+    // shield boundary is actually processed; deriving it again from HP can disagree around a just-crossed
+    // boundary (for example host index=0 at HP 160/285 while getBossSegmentIndex() still returns 1). Since
+    // the checksum hashes the host's live index, recomputing it made every retry deterministically fail and
+    // eventually terminated the guest. Older carriers without the index retain the HP-derived fallback.
     if (authoritativeGuest && mon instanceof EnemyPokemon && typeof snap.bossSegments === "number") {
       const want = snap.bossSegments;
       // A freshly reconstructed guest EnemyPokemon (addEnemyPokemon) leaves `bossSegments`
@@ -4128,8 +4159,11 @@ function applyFullMon(
       }
       mon.setBoss(want > 0, want > 0 ? want : undefined);
       if (want > 0) {
-        // Derive the index from hp (self-correcting), not the host's raw index (which can lag a turn).
-        mon.bossSegmentIndex = mon.getBossSegmentIndex();
+        const carriedIndex = snap.bossSegmentIndex;
+        mon.bossSegmentIndex =
+          typeof carriedIndex === "number" && Number.isFinite(carriedIndex)
+            ? Math.max(0, Math.min(want - 1, Math.trunc(carriedIndex)))
+            : mon.getBossSegmentIndex();
         // Re-render the segmented bar UNLESS we're in give-up mode (a persistent divergence shouldn't
         // re-render every turn). initBattleInfo() on an existing bar dispatches to updateBossSegments.
         if (!suppressResummon) {

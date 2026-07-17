@@ -123,7 +123,7 @@ describe.skipIf(!RUN)("Showdown fairness — nature + forced-IV parity across tw
       // exactly as launchShowdownBattle does for the real host launch.
       new SelectStarterPhase().initBattle(starters, true, undefined, own);
     });
-    await game.phaseInterceptor.to("CommandPhase");
+    await game.phaseInterceptor.to("CommandPhase", false);
   }
 
   it("forces [31 x6] IVs + fields the manifest nature on both the host's own and enemy parties, and the guest matches", async () => {

@@ -57,13 +57,29 @@ describe.runIf(process.env.ER_SCENARIO === "1")("co-op launch presentation with 
       hide: () => {},
       destroy: () => {},
     };
-    // The live sequence: the settle sets the sprite visible, then playAnim's FX refresh
-    // hides the base sprite because the overlay now covers it (pokemon.ts, the
-    // getSprite().setVisible(false) branch of refreshErShinyLabBattleFx).
-    const realPlayAnim = carrier.playAnim.bind(pokemon);
+    // Headless cannot load the real atlas (the sprite keeps its "pkmn__back__sub" placeholder and
+    // the texture/anim caches read empty), so model the REAL browser's post-load state directly:
+    // caches satisfied and the sprite carrying the exact live key. The gate logic under test is
+    // untouched - only the environment-shaped inputs are.
+    const key = pokemon.getBattleSpriteKey();
+    const texturesCarrier = game.scene.textures as unknown as { exists?: (value: string) => boolean };
+    const animsCarrier = game.scene.anims as unknown as { exists?: (value: string) => boolean };
+    const realTextureExists = texturesCarrier.exists?.bind(game.scene.textures);
+    texturesCarrier.exists = (value: string) => value === key || realTextureExists?.(value) === true;
+    const realAnimExists = animsCarrier.exists?.bind(game.scene.anims);
+    animsCarrier.exists = (value: string) => value === key || realAnimExists?.(value) === true;
+    // The live sequence: the settle sets the sprite visible, then playAnim's FX refresh hides the
+    // base sprite because the overlay now covers it (pokemon.ts, the getSprite().setVisible(false)
+    // branch of refreshErShinyLabBattleFx) - while the sprite already carries the exact live key.
     carrier.playAnim = () => {
-      realPlayAnim();
-      pokemon.getSprite()?.setVisible(false);
+      const spriteCarrier = pokemon.getSprite() as unknown as {
+        texture: { key: string };
+        anims?: { currentAnim?: { key: string } };
+        setVisible: (visible: boolean) => void;
+      };
+      spriteCarrier.texture = { key };
+      spriteCarrier.anims = { currentAnim: { key } };
+      spriteCarrier.setVisible(false);
     };
 
     const battle = game.scene.currentBattle;

@@ -8,17 +8,28 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  addressCoopFaintSwitchChoiceData,
   armCoopFaintSwitchIntentResend,
+  COOP_FAINT_SWITCH_RESOLUTION_OWNER,
+  type CoopFaintSourceAddress,
   captureCoopFaintSwitchOperationBinding,
+  markCoopFaintSwitchPickerSettled,
+  registerCoopFaintSwitchPickerTerminal,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   beginCoopFaintSwitchWindow,
   COOP_FAINT_SWITCH_SEQ_BASE,
   endCoopFaintSwitchWindow,
-  getCoopFaintSwitchWaitMs,
   sendCoopFaintSwitchChoice,
 } from "#data/elite-redux/coop/coop-interaction-relay";
-import { failCoopSharedSession, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import {
+  coopSessionGeneration,
+  failCoopSharedSession,
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopRuntime,
+  runWhenCoopRuntimeActive,
+} from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
 import { PartyUiHandler, PartyUiMode } from "#ui/handlers/party-ui-handler";
 
@@ -32,19 +43,21 @@ import { PartyUiHandler, PartyUiMode } from "#ui/handlers/party-ui-handler";
  * host's out-of-band replacement checkpoint (CoopPushReplacementCheckpointPhase) is what
  * materializes the mon on the guest, keeping the renderer mutation-free.
  *
- * If the player idles past the host's wait ({@linkcode getCoopFaintSwitchWaitMs}), the host
- * auto-picks and the late pick is simply ignored (stale seq) - the run never stalls.
+ * If the player idles past the host's bounded wait, the retained
+ * FAINT_SWITCH terminal closes this picker before the host's authoritative replacement projects.
  */
 export class CoopGuestFaintSwitchPhase extends Phase {
   public readonly phaseName = "CoopGuestFaintSwitchPhase";
 
   private readonly fieldIndex: number;
+  private readonly faintSourceAddress: CoopFaintSourceAddress | undefined;
   /** Re-entrant guard: a drive loop may call start() again while the picker is open. */
   private opened = false;
 
-  constructor(fieldIndex: number) {
+  constructor(fieldIndex: number, faintSourceAddress?: CoopFaintSourceAddress) {
     super();
     this.fieldIndex = fieldIndex;
+    this.faintSourceAddress = faintSourceAddress;
   }
 
   public override start(): void {
@@ -73,6 +86,28 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       return;
     }
     const seq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
+    const sourceAddress = this.faintSourceAddress ?? {
+      wave: scene.currentBattle?.waveIndex ?? 0,
+      turn: scene.currentBattle?.turn ?? 0,
+      occurrence: 0,
+    };
+    const { wave: sourceWave, turn: sourceTurn, occurrence } = sourceAddress;
+    const runtime = getCoopRuntime();
+    const sourceGeneration = coopSessionGeneration();
+    const phaseBoundary = {
+      wave: scene.currentBattle?.waveIndex ?? 0,
+      turn: scene.currentBattle?.turn ?? 0,
+    };
+    if (runtime == null) {
+      failCoopSharedSession("The replacement picker lost its active runtime.");
+      return;
+    }
+    const boundaryStillLive = (): boolean =>
+      coopSessionGeneration() === sourceGeneration
+      && getCoopRuntime() === runtime
+      && scene.phaseManager.getCurrentPhase() === this
+      && (scene.currentBattle?.waveIndex ?? -1) === phaseBoundary.wave
+      && (scene.currentBattle?.turn ?? -1) === phaseBoundary.turn;
     coopLog("replay", `guest own-faint picker OPEN slot=${this.fieldIndex} seq=${seq} (choose your replacement)`);
     // Suppress the stall watchdog while THIS human's replacement picker is open: the guest's replay is
     // parked in a network wait for the host's next turn (which legitimately can't arrive until this pick),
@@ -80,12 +115,68 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     // stateSync. Paired 1:1 with endCoopFaintSwitchWindow on pick (the select callback) or on an open
     // failure (the catch) - exactly one of the two runs.
     beginCoopFaintSwitchWindow();
+    let settled = false;
+    let materialized = false;
+    let unregisterTerminal = () => {};
+    const markPickerMaterialized = (): void => {
+      materialized = true;
+      markCoopFaintSwitchPickerSettled(sourceWave, sourceTurn, this.fieldIndex, operationBinding, occurrence);
+      unregisterTerminal();
+      // A committed result can arrive after the human selection callback but before the bounded MESSAGE
+      // close resolves. Its first materialization correctly defers; wake that exact retained entry now
+      // instead of relying on another host resend after the real UI boundary is already complete.
+      runWhenCoopRuntimeActive(runtime, () => {
+        runtime.durability?.retryDeferred("op:faintSwitch");
+      });
+    };
+    const closePicker = (): void => {
+      void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result => {
+        if (coopSessionGeneration() !== sourceGeneration) {
+          return;
+        }
+        if (result === "superseded" || !boundaryStillLive()) {
+          failCoopSharedSession("The replacement picker lost its exact material boundary while closing.");
+          return;
+        }
+        scene.phaseManager.shiftPhase();
+        markPickerMaterialized();
+      });
+    };
+    unregisterTerminal = registerCoopFaintSwitchPickerTerminal(
+      {
+        wave: sourceWave,
+        turn: sourceTurn,
+        occurrence,
+        fieldIndex: this.fieldIndex,
+        consume: (payload, operationId) => {
+          if (settled) {
+            return materialized;
+          }
+          settled = true;
+          endCoopFaintSwitchWindow();
+          coopLog(
+            "replay",
+            `guest own-faint picker CLOSE from committed authority slot=${this.fieldIndex} `
+              + `party[${payload.partySlot}] op=${operationId}`,
+          );
+          // Keep the durability operation unacknowledged until the real modal transition and phase
+          // shift have completed. Its retry will observe the exact settled address and ACK then.
+          closePicker();
+          return false;
+        },
+      },
+      operationBinding,
+    );
     try {
       scene.ui.setMode(
         UiMode.PARTY,
         PartyUiMode.FAINT_SWITCH,
         this.fieldIndex,
         (slotIndex: number) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
           endCoopFaintSwitchWindow();
           const battlerCount = scene.currentBattle?.getBattlerCount() ?? 0;
           const picked = scene.getPlayerParty()[slotIndex];
@@ -104,14 +195,26 @@ export class CoopGuestFaintSwitchPhase extends Phase {
             // host can resolve the pick by IDENTITY when the two clients' party orders have
             // diverged (a blind slot index summons a DIFFERENT mon on the other engine).
             const pickedSpecies = picked.species?.speciesId ?? 0;
-            const data = [0, pickedSpecies];
+            const data = addressCoopFaintSwitchChoiceData(
+              [0, pickedSpecies],
+              {
+                wave: sourceWave,
+                turn: sourceTurn,
+                occurrence,
+                fieldIndex: this.fieldIndex,
+                partySlot: slotIndex,
+                resolution: COOP_FAINT_SWITCH_RESOLUTION_OWNER,
+              },
+              operationBinding,
+            );
             sendCoopFaintSwitchChoice(relay, this.fieldIndex, slotIndex, data);
             armCoopFaintSwitchIntentResend(
               {
                 payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data },
                 localRole: controller.role,
-                wave: scene.currentBattle?.waveIndex ?? 0,
-                turn: scene.currentBattle?.turn ?? 0,
+                wave: sourceWave,
+                turn: sourceTurn,
+                occurrence,
                 resend: () => sendCoopFaintSwitchChoice(relay, this.fieldIndex, slotIndex, data),
               },
               operationBinding,
@@ -123,15 +226,21 @@ export class CoopGuestFaintSwitchPhase extends Phase {
                 + `(hp=${picked?.hp ?? "-"}) -> NOT relayed, host auto-picks (guard)`,
             );
           }
-          void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(() => scene.phaseManager.shiftPhase());
+          closePicker();
         },
         PartyUiHandler.FilterNonFainted,
       );
     } catch {
       // A UI failure must never hang the guest's replay; the host auto-picks after its wait.
       endCoopFaintSwitchWindow();
+      unregisterTerminal();
       coopWarn("replay", `guest own-faint picker slot=${this.fieldIndex} failed to open (handled, host auto-picks)`);
+      if (!boundaryStillLive()) {
+        failCoopSharedSession("The replacement picker failed after losing its exact phase boundary.");
+        return;
+      }
       scene.phaseManager.shiftPhase();
+      markPickerMaterialized();
     }
   }
 }

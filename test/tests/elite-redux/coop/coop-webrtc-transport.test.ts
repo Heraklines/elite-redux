@@ -1452,19 +1452,28 @@ describe("co-op WebRTC transport - early-rx buffering (pre-subscription frames)"
     host.close();
   });
 
-  it("bounds the buffer and keeps the EARLIEST frames on overflow", async () => {
+  it("fails both WebRTC endpoints closed instead of dropping a handshake frame on overflow", async () => {
     const { a, b } = linkedWires();
     const host = new WebRtcTransport("host", a);
     const guest = new WebRtcTransport("guest", b);
-    for (let i = 0; i < COOP_EARLY_RX_MAX_FRAMES + 8; i++) {
+    for (let i = 0; i < COOP_EARLY_RX_MAX_FRAMES + 1; i++) {
       host.send(hello(`frame-${i}`));
     }
-    const received: CoopMessage[] = [];
-    guest.onMessage(message => received.push(message));
+    expect(guest.state).toBe("disconnected");
+    expect(host.state).toBe("disconnected");
+    expect(guest.disconnectReason()).toContain("early receive buffer overflow before first subscriber");
+    guest.close();
+    host.close();
+  });
+
+  it("keeps loopback parity by disconnecting both endpoints on pre-subscription overflow", async () => {
+    const { host, guest } = createLoopbackPair();
+    for (let i = 0; i < COOP_EARLY_RX_MAX_FRAMES + 1; i++) {
+      host.send(hello(`frame-${i}`));
+    }
     await Promise.resolve();
-    expect(received).toHaveLength(COOP_EARLY_RX_MAX_FRAMES);
-    expect(received[0]).toMatchObject({ t: "hello", username: "frame-0" });
-    expect(received.at(-1)).toMatchObject({ t: "hello", username: `frame-${COOP_EARLY_RX_MAX_FRAMES - 1}` });
+    expect(guest.state).toBe("disconnected");
+    expect(host.state).toBe("disconnected");
     guest.close();
     host.close();
   });

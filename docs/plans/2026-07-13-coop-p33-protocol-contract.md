@@ -1,6 +1,6 @@
-# Co-op protocol 37 contract (P33 authority architecture)
+# Co-op protocol 38 contract (P33 authority architecture)
 
-Status: **frozen for implementation**. Wire version: `er-coop-37`.
+Status: **frozen for implementation**. Wire version: `er-coop-38`.
 
 This contract reconciles the two incompatible protocol-32 development lines and closes the identity model
 that made invitation direction, authority, gameplay ownership, and transport setup all look like one
@@ -121,7 +121,7 @@ pairing record returned by the Worker.
 ```ts
 type CoopHelloV2 = {
   t: "hello";
-  version: "er-coop-37";
+  version: "er-coop-38";
   pairingId: string;
   account: CoopAccountIdentityV1;
   transportRole: CoopTransportRole;
@@ -199,6 +199,7 @@ Every material/control transaction follows:
 ```text
 unseen
   -> received
+  -> journalAdmitted
   -> materialApplying
   -> materialApplied
   -> presentationReady
@@ -206,11 +207,15 @@ unseen
   -> committed
 ```
 
-`materialApplied` proves detached reconstruction, atomic commit, and checksum. `presentationReady` proves the
+`journalAdmitted` proves the exact canonical durable-operation envelope entered the receiver ledger. It stops
+delivery retransmission only; it cannot resolve a material barrier or retire authority. `materialApplied`
+proves detached reconstruction, atomic commit, and checksum. `presentationReady` proves the
 required sprite/UI projection exists. `continuationReady` proves the next registered public input or terminal
 surface is open with the correct owner seat and operation address. The authority retains the transaction until
-every frozen required seat ACKs `continuationReady`. A material-only ACK may suppress redundant reconstruction
-but cannot clear retention or let the authority cross the next shared boundary.
+every frozen required seat ACKs `continuationReady`. Admission/material-only ACKs cannot clear retention or let
+the authority cross the next shared boundary. Retained `WAVE_ADVANCE` republishes exact admission on an
+incomplete duplicate, then publishes `materialApplied -> presentationReady -> continuationReady` only after
+its immutable DATA image and addressed destination surface are proven.
 
 ### Retained Mystery battle settlement (protocol 37)
 

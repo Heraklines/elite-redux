@@ -78,6 +78,7 @@ import {
   reconcileArenaTags,
   reconcileCoopPlayerModifiers,
 } from "#data/elite-redux/coop/coop-battle-engine";
+import type { CoopStateSyncOutcome } from "#data/elite-redux/coop/coop-battle-stream";
 import {
   clearCoopBiomeInteractionStart,
   coopBiomeInteractionInProgress,
@@ -119,6 +120,7 @@ import { captureCoopTrainerVictoryBoundary } from "#data/elite-redux/coop/coop-t
 import {
   type CoopActiveMysteryEncounterSnapshotV1,
   type CoopMessage,
+  type CoopRecoveryReason,
   type CoopRole,
   type CoopTransport,
   createLoopbackPair,
@@ -1395,6 +1397,7 @@ function destinationPumpOperationEnvelopes(pair: {
     "enemyPartySync",
     "stateSync",
     "rewardOptions",
+    "authorityFailure",
   ]);
 
   const wrap = (inner: CoopTransport): { transport: CoopTransport; deliverQueued(message: CoopMessage): void } => {
@@ -1681,6 +1684,100 @@ export async function pumpDuoDestinations(rig: DuoRig, rounds = 2): Promise<void
 }
 
 /**
+ * Settle one asynchronous two-engine crossing while alternately installing each browser's complete
+ * destination context.
+ *
+ * A fixed number of transport pumps is not a valid substitute for two independent event loops: a retained
+ * result can close a guest UI, schedule a durability retry, and emit its material ACK only after several
+ * microtask/timer turns. Waiting on the authority promise while only the host context is installed then
+ * manufactures a soft-lock that cannot happen in two real browsers. This helper keeps both clients alive
+ * until the exact promise settles, or throws a bounded diagnostic with both phase queues.
+ */
+export async function settleDuoPromise<T>(
+  rig: DuoRig,
+  pending: Promise<T>,
+  label: string,
+  options: { timeoutMs?: number; intervalMs?: number } = {},
+): Promise<T> {
+  const timeoutMs = options.timeoutMs ?? 20_000;
+  const intervalMs = options.intervalMs ?? 10;
+  let settled = false;
+  let rejected = false;
+  let failure: unknown;
+  pending.then(
+    () => {
+      settled = true;
+    },
+    error => {
+      rejected = true;
+      failure = error;
+      settled = true;
+    },
+  );
+
+  const deadline = Date.now() + timeoutMs;
+  while (!settled && Date.now() < deadline) {
+    await withClient(rig.hostCtx, async () => {
+      await drainLoopback();
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    });
+    await withClient(rig.guestCtx, async () => {
+      await drainLoopback();
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    });
+    if (!settled) {
+      await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
+    }
+  }
+
+  if (!settled) {
+    const hostCurrent = rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "(none)";
+    const guestCurrent = rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "(none)";
+    const hostQueued = rig.hostScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+    const guestQueued = rig.guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+    throw new Error(
+      `${label} did not settle while both destination contexts were pumped; `
+        + `host=${hostCurrent} queued=[${hostQueued.join(",")}], `
+        + `guest=${guestCurrent} queued=[${guestQueued.join(",")}]`,
+    );
+  }
+  if (rejected) {
+    throw failure;
+  }
+  return await pending;
+}
+
+/**
+ * Finish the real replay/finalize tail left by a replacement picker, then recreate the one omitted
+ * TurnInit boundary of a directly mirrored headless guest.
+ *
+ * The helper is deliberately strict: it only accepts the replay tail or untouched boot shape produced by
+ * the duo builders. It never clears an arbitrary live queue to make a test green.
+ */
+export async function materializeGuestInputAfterReplacement(scene: BattleScene): Promise<void> {
+  const current = scene.phaseManager.getCurrentPhase();
+  const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+  if (current?.phaseName === "CoopFinalizeTurnPhase" || queued.includes("CoopFinalizeTurnPhase")) {
+    const finalize =
+      current?.phaseName === "CoopFinalizeTurnPhase"
+        ? current
+        : await driveClientPhaseQueueTo(scene, "replacement CoopFinalizeTurnPhase", {
+            matches: phase => phase.phaseName === "CoopFinalizeTurnPhase",
+            perPhaseTimeoutMs: 5_000,
+          });
+    finalize.start();
+    const deadline = Date.now() + 5_000;
+    while (scene.phaseManager.getCurrentPhase() === finalize) {
+      await drainLoopback();
+      if (Date.now() >= deadline) {
+        throw new Error("replacement CoopFinalizeTurnPhase did not finish");
+      }
+    }
+  }
+  materializeMirroredGuestInputTurn(scene);
+}
+
+/**
  * Bring both real clients to the reciprocal command boundary and submit Tackle for the guest-owned
  * battler exclusively through the production Command/Fight/TargetSelect UI handlers.
  *
@@ -1882,8 +1979,12 @@ export async function buildDuo(
   // Flip the host engine into co-op + tag the field leads host/guest.
   toCoopGameMode(hostScene);
   const hostField = hostScene.getPlayerField();
-  hostField[0].coopOwner = "host";
-  hostField[1].coopOwner = "guest";
+  if (hostField[0] != null) {
+    hostField[0].coopOwner = "host";
+  }
+  if (hostField[1] != null) {
+    hostField[1].coopOwner = "guest";
+  }
 
   const hostCtx: ClientCtx = {
     label: "host",
@@ -1924,8 +2025,12 @@ export async function buildDuo(
     // two-engine rig, rather than relying on individual tests to remember a non-gameplay wiring step.
     installHeadlessPlayerAtlasCompletionModel(guestScene);
     const gf = guestScene.getPlayerField();
-    gf[0].coopOwner = "host";
-    gf[1].coopOwner = "guest";
+    if (gf[0] != null) {
+      gf[0].coopOwner = "host";
+    }
+    if (gf[1] != null) {
+      gf[1].coopOwner = "guest";
+    }
   });
   registerRetainedWaveBoundaryBridge(hostGame, hostScene, guestScene, hostCtx);
 
@@ -2232,13 +2337,15 @@ export interface CoopResyncProbe {
  */
 export function installCoopResyncProbe(runtime: CoopRuntime): CoopResyncProbe {
   const streamer = runtime.battleStream as unknown as {
-    requestStateSync: (turn: number) => Promise<string | null>;
+    requestStateSync: (reason: Exclude<CoopRecoveryReason, "durability-gap">) => Promise<CoopStateSyncOutcome>;
   };
   const original = streamer.requestStateSync.bind(streamer);
   let n = 0;
-  streamer.requestStateSync = (turn: number): Promise<string | null> => {
+  streamer.requestStateSync = (
+    reason: Exclude<CoopRecoveryReason, "durability-gap">,
+  ): Promise<CoopStateSyncOutcome> => {
     n += 1;
-    return original(turn);
+    return original(reason);
   };
   return {
     count: () => n,
@@ -3015,8 +3122,12 @@ export async function buildDuoForMe(
   // Flip the host engine into co-op + tag the field leads host/guest.
   toCoopGameMode(hostScene);
   const hostField = hostScene.getPlayerField();
-  hostField[0].coopOwner = "host";
-  hostField[1].coopOwner = "guest";
+  if (hostField[0] != null) {
+    hostField[0].coopOwner = "host";
+  }
+  if (hostField[1] != null) {
+    hostField[1].coopOwner = "guest";
+  }
 
   const hostCtx: ClientCtx = {
     label: "host",
@@ -3054,8 +3165,12 @@ export async function buildDuoForMe(
     // completion model before the first retained transition tail can run.
     installHeadlessPlayerAtlasCompletionModel(guestScene);
     const gf = guestScene.getPlayerField();
-    gf[0].coopOwner = "host";
-    gf[1].coopOwner = "guest";
+    if (gf[0] != null) {
+      gf[0].coopOwner = "host";
+    }
+    if (gf[1] != null) {
+      gf[1].coopOwner = "guest";
+    }
   });
   registerRetainedWaveBoundaryBridge(hostGame, hostScene, guestScene, hostCtx);
 
@@ -3990,6 +4105,11 @@ export async function buildShowdownDuo(
   setCoopRuntimeFn(guestRuntime);
   guestRuntime.controller.connect();
   await drainLoopback();
+
+  // Production installs both versus runtimes before CommandPhase accepts input. Showdown fixtures
+  // deliberately stop at the pre-command boundary so the orphan-runtime guard remains meaningful;
+  // open the host command surface only after the authoritative pair has connected.
+  await withClient(hostCtx, () => hostGame.phaseInterceptor.to("CommandPhase"));
 
   const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
   // Showdown rigs own the same two independently assembled runtimes as ordinary co-op rigs. Register

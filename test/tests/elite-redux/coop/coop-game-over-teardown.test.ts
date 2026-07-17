@@ -19,6 +19,11 @@
 
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
+import {
+  COOP_CAP_OP_ME,
+  getNegotiatedCoopCapabilities,
+  setNegotiatedCoopCapabilities,
+} from "#data/elite-redux/coop/coop-capabilities";
 import { coopMeInteractionStartValue, setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   clearCoopRuntime,
@@ -92,6 +97,7 @@ describe.skipIf(!RUN)("co-op game-over teardown (#842)", () => {
     expect(getCoopRuntime(), "the co-op runtime is torn down at game-over").toBeNull();
     expect(coopMeInteractionStartValue(), "coopMeInteractionStart pin zeroed").toBe(-1);
     expect(getCoopMeBattleInteractionCounter(), "coopMeBattleInteractionCounter pin zeroed").toBe(-1);
+    expect(getNegotiatedCoopCapabilities(), "the departed peer's capability mask is torn down too").toBeNull();
 
     // A fresh session on the same client starts a CLEAN alternation: interaction 0 is the host's, so
     // the first interaction of the new run alternates correctly (host owns 0 / guest owns 1).
@@ -100,5 +106,15 @@ describe.skipIf(!RUN)("co-op game-over teardown (#842)", () => {
     expect(fresh.controller.interactionOwner()).toBe("host");
     expect(fresh.controller.isLocalOwnerAtCounter(0)).toBe(true);
     expect(fresh.controller.isLocalOwnerAtCounter(1)).toBe(false);
+  });
+
+  it("an idempotent teardown clears a frozen capability mask even after the runtime is already absent", () => {
+    clearCoopRuntime();
+    setNegotiatedCoopCapabilities([COOP_CAP_OP_ME], []);
+    expect(getNegotiatedCoopCapabilities()).not.toBeNull();
+
+    clearCoopRuntime();
+
+    expect(getNegotiatedCoopCapabilities()).toBeNull();
   });
 });
