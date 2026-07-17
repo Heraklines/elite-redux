@@ -143,11 +143,9 @@ async function analyzeAtlas(atlasPath: string): Promise<AtlasAnalysis> {
  * distinct from Primal Mew, whose complete shiny set the maintainer HAS published.
  */
 const KNOWN_MISSING_SHINY_ART: Record<string, readonly string[]> = {
-  parasect_mega: ["shiny", "shiny-2", "shiny-3", "shiny-back", "shiny-back-2", "shiny-back-3"],
-  jumpluff_mega: ["shiny", "shiny-2", "shiny-3", "shiny-back", "shiny-back-2", "shiny-back-3"],
-  skarmory_mega_z: ["shiny", "shiny-2", "shiny-3", "shiny-back", "shiny-back-2", "shiny-back-3"],
-  dragonite_mega_z: ["shiny", "shiny-2", "shiny-3", "shiny-back", "shiny-back-2", "shiny-back-3"],
-  electivire_mega_x: ["shiny", "shiny-2", "shiny-3", "shiny-back-2", "shiny-back-3"],
+  // (empty) — the five mega slugs' generated shiny sets (parasect_mega, jumpluff_mega,
+  // skarmory_mega_z, dragonite_mega_z, electivire_mega_x) landed on er-assets, so the
+  // hard shiny gate below now covers them.
 };
 
 /** A form's shiny-variant atlases (tiers 0/1/2 x front/back) partitioned by health. */
