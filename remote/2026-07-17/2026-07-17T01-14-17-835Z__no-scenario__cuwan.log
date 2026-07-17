@@ -1,0 +1,244 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:a8f0a659b18fe650c9bd33a32746357030d2af6a:run-29545170798.1
+ua:       Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Mobile/15E148 Safari/604.1
+platform: iPhone
+screen:   393x852 @3x  devmem:?
+boot:     boot-start@0ms -> loading-complete@10751ms -> title-shown@20782ms
+lastSess: ok (reached title)
+mode:     0  wave:2
+seed:     o0OKIYIP7Pi4JxrWgc4JRnjN
+party:    Flygon Redux B(L5 25hp f0), Deino(L5 21hp f0), Dratini(L5 20hp f0), Gible(L5 22hp f0)
+enemy:    Rookidee(L2)
+
+----- COMMENT -----
+Covert cloak has a black hole looking Sprite
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:a8f0a659b18fe650c9bd33a32746357030d2af6a:run-29545170798.1","source":"github","sha":"a8f0a659b18fe650c9bd33a32746357030d2af6a","workflow":{"provider":"github-actions","runId":"29545170798","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[01:12:27.698] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[01:12:28.072] LOG: [ER] build {"version":1,"id":"github:a8f0a659b18fe650c9bd33a32746357030d2af6a:run-29545170798.1","source":"github","sha":"a8f0a659b18fe650c9bd33a32746357030d2af6a","workflow":{"provider":"github-actions","runId":"29545170798","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[01:12:28.087] LOG: [dev-tools] loaded — 625 scenarios + Send Logs button
+[01:12:37.383] DEBUG: Destroying loading scene
+[01:12:37.383] DEBUG: Destroyed loading scene
+[01:12:37.521] LOG: Seed: o0OKIYIP7Pi4JxrWgc4JRnjN
+[01:12:37.521] LOG: Wave Seed: o0OKIYIP7Pi4JxrWgc4JRnjN 0
+[01:12:46.982] LOG: %cStart Phase LoginPhase color:green;
+[01:12:47.093] WARN: Could not load animation file for move 'tackle' AbortError: Fetch is aborted
+json@[native code]
+[01:12:47.093] WARN: Could not load animation file for move 'tail-whip' AbortError: Fetch is aborted
+json@[native code]
+[01:12:47.093] WARN: Could not load animation file for move 'focus-energy' AbortError: Fetch is aborted
+json@[native code]
+[01:12:47.094] WARN: Could not load animation file for move 'struggle' AbortError: Fetch is aborted
+json@[native code]
+[01:12:47.095] ERROR: [unhandledrejection] Error: Unexpected error during BattleScene preLoad!
+Reason: AbortError: Fetch is aborted
+@https://elite-redux-staging.pages.dev/assets/battle-scene-DLdiVOzG.js:1053:10308
+[01:12:47.095] ERROR: [unhandledrejection] AbortError: Fetch is aborted
+json@[native code]
+initExpSprites@https://elite-redux-staging.pages.dev/assets/battle-scene-DLdiVOzG.js:1053:16079
+[01:12:47.165] LOG: Client Session: LadiXLYSaIHBYAT2zwn0CXKJSfBMYb4Q
+[01:12:47.338] DEBUG: Using cached system data
+[01:12:47.403] LOG: %cStart Phase TitlePhase color:green;
+[01:12:47.406] LOG: Getting Session Slot id: %d 0
+[01:12:47.434] LOG: use seasonal splash messages true
+[01:12:59.299] LOG: %cStart Phase TitlePhase color:green;
+[01:12:59.303] LOG: Getting Session Slot id: %d 0
+[01:12:59.369] LOG: use seasonal splash messages true
+[01:13:01.290] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:13:05.284] WARN: cry/759 not found
+[01:13:07.076] LOG: Flygon Redux B's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[01:13:10.091] LOG: Getting Session Slot id: %d 0
+[01:13:10.169] LOG: Getting Session Slot id: %d 1
+[01:13:10.183] LOG: Getting Session Slot id: %d 2
+[01:13:10.187] LOG: Getting Session Slot id: %d 3
+[01:13:10.190] LOG: Getting Session Slot id: %d 4
+[01:13:10.291] ERROR: TypeError: Reflect.construct requires the first argument be a constructor
+construct@[native code]
+toModifier@https://elite-redux-staging.pages.dev/assets/coop-runtime-CaPyUtJz.js:3:338992
+setupWithData@https://elite-redux-staging.pages.dev/assets/battle-scene-DLdiVOzG.js:1050:3465
+@https://elite-redux-staging.pages.dev/assets/battle-scene-DLdiVOzG.js:1050:3829
+[01:13:10.367] ERROR: Session read failed (missing).
+[01:13:10.390] ERROR: Session read failed (missing).
+[01:13:10.390] ERROR: Session read failed (missing).
+[01:13:10.391] ERROR: Session read failed (missing).
+[01:13:12.652] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 1/2 with cache-buster
+[01:13:12.759] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 2/2 via fastly mirror + cache-buster
+[01:13:13.195] ERROR: [asset-retry] PERMANENT load failure key=PRAS-Dragon Dance BG url=images/battle_anims/PRAS-Dragon Dance BG.png
+[01:13:13.226] LOG: Wave Seed: p1PLJZJQ8Qj5KysXhd5KSokO 1
+[01:13:13.228] LOG: %cStart Phase EncounterPhase color:green;
+[01:13:13.236] LOG: Starting species pool tier: RARE
+[01:13:13.275] LOG: Pokemon: Wild Happiny | Species ID: 440 | Level: 2 | Nature: Sassy (+SpDef/-Spd)
+[01:13:13.275] LOG: Stats (IVs): HP: 16 (13), Atk: 5 (8), Def: 5 (12), Spatk: 5 (12), Spdef: 8 (15), Spd: 5 (15)
+[01:13:13.275] LOG: Ability: Serene Grace | Passive Ability: Cute Charm 
+[01:13:13.275] LOG: Moveset: ["Growl","Defense Curl","Tackle","Tail Whip"]
+[01:13:14.081] DEBUG: Session data saved to slot 1!
+[01:13:14.923] LOG: Wave Seed: p1PLJZJQ8Qj5KysXhd5KSokO 1
+[01:13:15.961] LOG: %cStart Phase SummonPhase color:green;
+[01:13:16.678] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:13:16.679] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:13:16.977] LOG: %cStart Phase SwitchPhase color:green;
+[01:13:18.397] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:13:18.963] WARN: cry/759 not found
+[01:13:19.101] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:13:19.328] LOG: %cStart Phase PostSummonPhase color:green;
+[01:13:19.329] LOG: Ran PSP for: Flygon Redux B
+[01:13:19.329] LOG: %cStart Phase PostSummonPhase color:green;
+[01:13:19.369] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:13:19.786] LOG: %cStart Phase CommonAnimPhase color:green;
+[01:13:19.786] LOG: %cStart Phase MessagePhase color:green;
+[01:13:20.767] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:13:20.767] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:13:20.827] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:13:21.273] LOG: %cStart Phase MessagePhase color:green;
+[01:13:22.018] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:13:22.084] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:13:22.168] LOG: %cStart Phase PostSummonPhase color:green;
+[01:13:22.168] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:13:22.168] LOG: %cStart Phase PostSummonPhase color:green;
+[01:13:22.168] LOG: Ran PSP for: Happiny
+[01:13:22.168] LOG: %cStart Phase PostSummonPhase color:green;
+[01:13:22.168] LOG: %cStart Phase PostSummonPhase color:green;
+[01:13:22.169] LOG: %cStart Phase TurnInitPhase color:green;
+[01:13:22.169] LOG: %cStart Phase CommandPhase color:green;
+[01:13:24.603] LOG: Move: AURA_SPHERE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Flygon Redux B
+[01:13:24.607] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:13:24.613] LOG: Battle Seed: 782tNX2bkvMwycB7
+[01:13:24.615] LOG: Move Pool: ["Growl","Defense Curl","Tackle","Tail Whip"]
+[01:13:24.617] LOG: Move Scores: [2,2,12,2]
+[01:13:24.617] LOG: Sorted Move Pool: ["Tackle","Growl","Defense Curl","Tail Whip"]
+[01:13:24.617] LOG: Chosen Move: Tackle
+[01:13:24.617] LOG: %cStart Phase TurnStartPhase color:green;
+[01:13:24.619] LOG: %cStart Phase MovePhase color:green;
+[01:13:24.619] LOG: %cUser: Flygon Redux B
+Move: AURA_SPHERE
+Use Mode: NORMAL color:orchid
+[01:13:24.622] LOG: %cStart Phase MessagePhase color:green;
+[01:13:25.296] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:13:25.298] LOG: crit stage: +0
+[01:13:25.298] LOG: Move: Aura Sphere | Base damage: 17.3 | Power: 85 | Source attack: 18 | Target defense: 8
+[01:13:25.298] LOG: Move: Aura Sphere | Attack damage: 29
+[01:13:25.300] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:13:25.447] LOG: %cStart Phase MessagePhase color:green;
+[01:13:25.822] LOG: %cStart Phase FaintPhase color:green;
+[01:13:26.705] LOG: %cStart Phase MessagePhase color:green;
+[01:13:27.016] LOG: %cStart Phase VictoryPhase color:green;
+[01:13:27.020] LOG: %cStart Phase ExpPhase color:green;
+[01:13:27.437] LOG: %cStart Phase MoveEndPhase color:green;
+[01:13:27.437] LOG: %cStart Phase MovePhase color:green;
+[01:13:27.437] LOG: %cStart Phase MoveEndPhase color:green;
+[01:13:27.437] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:13:27.437] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:13:27.438] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:13:27.438] LOG: %cStart Phase BerryPhase color:green;
+[01:13:27.438] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:13:27.438] LOG: %cStart Phase TurnEndPhase color:green;
+[01:13:27.444] LOG: %cStart Phase BattleEndPhase color:green;
+[01:13:27.444] LOG: Battle Score: 22 (1 Turns x1)
+[01:13:27.444] LOG: Total Score: 22
+[01:13:27.465] LOG: %cStart Phase EggLapsePhase color:green;
+[01:13:27.465] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:13:27.465] LOG: Wave Seed: p1PLJZJQ8Qj5KysXhd5KSokO 1
+[01:13:27.471] LOG: 9 4 [2,3,4,5]
+[01:13:27.471] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[01:13:27.471] LOG: 12 9 [2,3,4,5,6,7,8,9,10,27,30]
+[01:13:27.471] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[01:13:27.471] LOG: 16 2 [9,15,19]
+[01:13:27.471] LOG: {"id":"DAMAGE_CALCULATOR","localeKey":"","iconImage":"scanner","soundName":"se/restore","tier":3} 
+[01:13:27.471] LOG: 10 1 [9,15,19]
+[01:13:27.471] LOG: {"id":"ABILITY_CHARM","localeKey":"modifierType:ModifierType.ABILITY_CHARM","iconImage":"ability_charm","soundName":"se/restore","tier":3} 
+[01:13:27.471] LOG: 14 1 [9,15,19]
+[01:13:27.472] LOG: {"id":"ER_METRONOME_ITEM","localeKey":"","iconImage":"er_metronome","soundName":"se/restore","tier":3} 
+[01:13:27.472] LOG: 23 3 [9,15,19]
+[01:13:27.472] LOG: {"id":"DYNAMAX_BAND","localeKey":"modifierType:ModifierType.DYNAMAX_BAND","iconImage":"dynamax_band","soundName":"se/restore","tier":3} 
+[01:13:27.472] LOG: 6 0 [9,15,19]
+[01:13:27.472] LOG: {"id":"SCOPE_LENS","localeKey":"modifierType:ModifierType.SCOPE_LENS","iconImage":"scope_lens","soundName":"se/restore","tier":3} 
+[01:13:27.472] LOG: 1 0 [9,15,19]
+[01:13:27.472] LOG: {"id":"RELIC_GOLD","localeKey":"modifierType:ModifierType.RELIC_GOLD","iconImage":"relic_gold","group":"money","soundName":"se/buy","tier":3,"moneyMultiplier":10,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.large"} 
+[01:13:29.605] LOG: %cStart Phase NewBattlePhase color:green;
+[01:13:29.605] LOG: Wave Seed: q2QMK[KR9Rk6LztYie6LTplP 2
+[01:13:29.610] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:13:29.615] LOG: Starting species pool tier: RARE
+[01:13:29.677] LOG: Pokemon: Wild Rookidee | Species ID: 821 | Level: 2 | Nature: Adamant (+Atk/-SpAtk)
+[01:13:29.677] LOG: Stats (IVs): HP: 13 (5), Atk: 7 (10), Def: 6 (14), Spatk: 6 (27), Spdef: 6 (15), Spd: 7 (24)
+[01:13:29.677] LOG: Ability: Scare | Passive Ability: Flock 
+[01:13:29.677] LOG: Moveset: ["Peck","Leer","Power Trip","Gust"]
+[01:13:31.517] DEBUG: Session data saved to slot 1!
+[01:13:31.524] LOG: Wave Seed: q2QMK[KR9Rk6LztYie6LTplP 2
+[01:13:32.579] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:13:32.579] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:13:32.899] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:13:32.900] LOG: %cStart Phase PostSummonPhase color:green;
+[01:13:32.900] LOG: Ran PSP for: Rookidee
+[01:13:32.900] LOG: %cStart Phase PostSummonPhase color:green;
+[01:13:32.901] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:13:33.302] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:13:33.312] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:13:33.313] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:13:33.391] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:13:33.791] LOG: %cStart Phase MessagePhase color:green;
+[01:13:34.471] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:13:34.533] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:13:34.616] LOG: %cStart Phase PostSummonPhase color:green;
+[01:13:34.616] LOG: %cStart Phase TurnInitPhase color:green;
+[01:13:34.616] LOG: %cStart Phase CommandPhase color:green;
+[01:13:40.029] LOG: Move: PARABOLIC_CHARGE Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Flygon Redux B
+[01:13:40.033] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:13:40.042] LOG: Battle Seed: GaSC8DfSn4h6UoVt
+[01:13:40.044] LOG: Move Pool: ["Peck","Leer","Power Trip","Gust"]
+[01:13:40.044] LOG: Move Scores: [14.4375,2,4,5.625]
+[01:13:40.044] LOG: Sorted Move Pool: ["Peck","Gust","Power Trip","Leer"]
+[01:13:40.044] LOG: Chosen Move: Peck
+[01:13:40.045] LOG: %cStart Phase TurnStartPhase color:green;
+[01:13:40.046] LOG: %cStart Phase MovePhase color:green;
+[01:13:40.046] LOG: %cUser: Flygon Redux B
+Move: PARABOLIC_CHARGE
+Use Mode: NORMAL color:orchid
+[01:13:40.047] LOG: %cStart Phase MessagePhase color:green;
+[01:13:40.338] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:13:40.341] LOG: crit stage: +0
+[01:13:40.342] LOG: Move: Parabolic Charge | Base damage: 45.2 | Power: 180 | Source attack: 18 | Target defense: 6
+[01:13:40.342] LOG: Move: Parabolic Charge | Attack damage: 170
+[01:13:40.344] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:13:40.379] LOG: %cStart Phase MessagePhase color:green;
+[01:13:40.887] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:13:40.888] LOG: %cStart Phase MessagePhase color:green;
+[01:13:41.468] LOG: %cStart Phase FaintPhase color:green;
+[01:13:43.465] LOG: %cStart Phase MessagePhase color:green;
+[01:13:43.706] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:13:44.105] LOG: %cStart Phase MessagePhase color:green;
+[01:13:44.764] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:13:44.816] LOG: %cStart Phase VictoryPhase color:green;
+[01:13:44.818] LOG: %cStart Phase ExpPhase color:green;
+[01:13:45.179] LOG: %cStart Phase MoveEndPhase color:green;
+[01:13:45.179] LOG: %cStart Phase MovePhase color:green;
+[01:13:45.179] LOG: %cStart Phase MoveEndPhase color:green;
+[01:13:45.179] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:13:45.179] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:13:45.179] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:13:45.179] LOG: %cStart Phase BerryPhase color:green;
+[01:13:45.179] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:13:45.179] LOG: %cStart Phase TurnEndPhase color:green;
+[01:13:45.184] LOG: %cStart Phase BattleEndPhase color:green;
+[01:13:45.184] LOG: Battle Score: 10 (1 Turns x1)
+[01:13:45.184] LOG: Total Score: 32
+[01:13:45.203] LOG: %cStart Phase EggLapsePhase color:green;
+[01:13:45.203] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:13:45.204] LOG: Wave Seed: q2QMK[KR9Rk6LztYie6LTplP 2
+[01:13:45.207] LOG: 5 0 [10,14,23]
+[01:13:45.207] LOG: ULTRA 0
+[01:13:45.207] LOG: 40 3 [10,14,23]
+[01:13:45.207] LOG: {"id":"ER_COVERT_CLOAK","localeKey":"","iconImage":"er_covert_cloak","soundName":"se/restore","tier":2} 
+[01:13:45.207] LOG: 6 4 [2,3,4,5]
+[01:13:45.207] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[01:13:45.207] LOG: 0 0 [2,3,4,5]
+[01:13:45.207] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:13:45.211] WARN: Texture "%s" has no frame "%s" items er_covert_cloak
+[01:13:45.211] WARN: Texture "%s" has no frame "%s" items er_covert_cloak
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"o0OKIYIP7Pi4JxrWgc4JRnjN","gameModeId":0,"difficulty":"youngster","challenges":[],"roster":[{"id":1453010121,"player":true,"species":147,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":20,"stats":[20,12,11,11,11,11],"ivs":[30,31,31,27,30,29],"nature":0,"moveset":[{"moveId":34,"ppUsed":0,"ppUp":0},{"moveId":239,"ppUsed":0,"ppUp":0},{"moveId":55,"ppUsed":0,"ppUp":0},{"moveId":35,"ppUsed":0,"ppUp":0}],"status":null,"friendship":35,"metLevel":5,"metBiome":-1,"metSpecies":147,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":131101631,"player":true,"species":633,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":21,"stats":[21,11,11,13,11,10],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":907,"ppUsed":0,"ppUp":0},{"moveId":822,"ppUsed":0,"ppUp":0},{"moveId":840,"ppUsed":0,"ppUp":0},{"moveId":188,"ppUsed":0,"ppUp":0}],"status":null,"friendship":35,"metLevel":5,"metBiome":-1,"metSpecies":633,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":16,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1484550100,"player":true,"species":10759,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":25,"stats":[25,16,14,18,14,20],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":570,"ppUsed":0,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":417,"ppUsed":0,"ppUp":0},{"moveId":396,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":10759,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":12,"isTerastallized":false,"stellarTypesBoosted":[1,12],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":259431192,"player":true,"species":443,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":22,"stats":[22,13,11,10,11,10],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":431,"ppUsed":0,"ppUp":0},{"moveId":349,"ppUsed":0,"ppUp":0},{"moveId":616,"ppUsed":0,"ppUp":0},{"moveId":891,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":443,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":1,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"interaction","seq":0,"kind":"reward","choice":2},{"type":"command","wave":2,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}}],"endState":{"waveIndex":2,"money":2850,"party":[{"species":10759,"level":5,"hp":25,"maxHp":25},{"species":633,"level":5,"hp":21,"maxHp":21},{"species":147,"level":5,"hp":20,"maxHp":20},{"species":443,"level":5,"hp":22,"maxHp":22}]},"checkpoint":{"wave":1,"seed":"o0OKIYIP7Pi4JxrWgc4JRnjN","party":[{"id":1453010121,"player":true,"species":147,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":20,"stats":[20,12,11,11,11,11],"ivs":[30,31,31,27,30,29],"nature":0,"moveset":[{"moveId":34,"ppUsed":0,"ppUp":0},{"moveId":239,"ppUsed":0,"ppUp":0},{"moveId":55,"ppUsed":0,"ppUp":0},{"moveId":35,"ppUsed":0,"ppUp":0}],"status":null,"friendship":35,"metLevel":5,"metBiome":-1,"metSpecies":147,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":131101631,"player":true,"species":633,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":21,"stats":[21,11,11,13,11,10],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":907,"ppUsed":0,"ppUp":0},{"moveId":822,"ppUsed":0,"ppUp":0},{"moveId":840,"ppUsed":0,"ppUp":0},{"moveId":188,"ppUsed":0,"ppUp":0}],"status":null,"friendship":35,"metLevel":5,"metBiome":-1,"metSpecies":633,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":16,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1484550100,"player":true,"species":10759,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":25,"stats":[25,16,14,18,14,20],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":570,"ppUsed":0,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":417,"ppUsed":0,"ppUp":0},{"moveId":396,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":10759,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":12,"isTerastallized":false,"stellarTypesBoosted":[1,12],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":259431192,"player":true,"species":443,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":22,"stats":[22,13,11,10,11,10],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":431,"ppUsed":0,"ppUp":0},{"moveId":349,"ppUsed":0,"ppUp":0},{"moveId":616,"ppUsed":0,"ppUp":0},{"moveId":891,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":443,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"}],"money":1000,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":0}}}
