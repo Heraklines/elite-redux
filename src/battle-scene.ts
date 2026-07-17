@@ -72,6 +72,7 @@ import {
   maybePrefetchGhostTeams,
   takeGhostForWave,
 } from "#data/elite-redux/er-ghost-teams";
+import { ER_IOS_DEFERRED_BGM_FILES, isIOSDevice } from "#data/elite-redux/er-ios";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
 import { erGauntletActive, erGauntletPickMeType, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
@@ -3146,7 +3147,16 @@ export class BattleScene extends SceneBase {
       fadeOut = false;
     }
     this.bgmCache.add(bgmName);
-    this.loadBgm(bgmName);
+    // #ios-stability: a track deferred off the iOS boot preload (victory/evolution BGM)
+    // lives under `bw/`, so the default `${key}.mp3` on-demand fetch would 404. Look its
+    // real filename up so this first play load-then-plays seamlessly. Desktop preloads every
+    // track (deferredBgmFile is undefined), so the load call is byte-identical there.
+    const deferredBgmFile = isIOSDevice() ? ER_IOS_DEFERRED_BGM_FILES.get(bgmName) : undefined;
+    if (deferredBgmFile) {
+      this.loadBgm(bgmName, deferredBgmFile);
+    } else {
+      this.loadBgm(bgmName);
+    }
     let loopPoint = 0;
     loopPoint = bgmName === this.arena.bgm ? this.arena.bgmLoopPoint : this.getBgmLoopPoint(bgmName);
     let loaded = false;
@@ -3311,6 +3321,21 @@ export class BattleScene extends SceneBase {
 
   playSoundWithoutBgm(soundName: string, pauseDuration?: number): AnySound | null {
     this.bgmCache.add(soundName);
+    // #ios-stability: a track deferred off the iOS boot preload (e.g. "evolution") may not be
+    // cached the first time it's requested here as an SE-style sound. Load-then-play it instead
+    // of failing silently (which would also strand the just-paused BGM). Once cached, the retry
+    // takes the normal path below. Desktop preloads every track, so this branch never runs there.
+    const deferredBgmFile = isIOSDevice() ? ER_IOS_DEFERRED_BGM_FILES.get(soundName) : undefined;
+    if (deferredBgmFile && !this.cache.audio.exists(soundName)) {
+      this.loadBgm(soundName, deferredBgmFile);
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        this.playSoundWithoutBgm(soundName, pauseDuration);
+      });
+      if (!this.load.isLoading()) {
+        this.load.start();
+      }
+      return null;
+    }
     const resumeBgm = this.pauseBgm();
     this.playSound(soundName);
     const sound = this.sound.get(soundName);
