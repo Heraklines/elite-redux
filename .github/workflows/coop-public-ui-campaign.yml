@@ -403,9 +403,23 @@ jobs:
         # normally fails first and writes summary.json; SIGINT leaves two minutes for bounded
         # evidence cleanup before SIGKILL. The normal Node deadline preserves seven upload minutes;
         # even the forced-kill path retains four minutes before the job deadline.
-        run: >-
-          timeout --signal=INT --kill-after=3m 48m xvfb-run -a -s "-screen 0 1440x900x24" node
-          test/browser/coop-public-ui/run-campaign.mjs
+        #
+        # Optimization brief R1: ONE Xvfb DISPLAY PER SEAT (two players use two devices).
+        # The harness detects COOP_UI_DISPLAY_HOST/GUEST and switches to per-seat input
+        # queues with no cross-seat focus arbitration; each Chromium is alone on its display.
+        run: |
+          Xvfb :98 -screen 0 1440x900x24 > /dev/null 2>&1 &
+          Xvfb :99 -screen 0 1440x900x24 > /dev/null 2>&1 &
+          for socket in /tmp/.X11-unix/X98 /tmp/.X11-unix/X99; do
+            for _ in $(seq 1 50); do
+              [ -S "$socket" ] && break
+              sleep 0.1
+            done
+            [ -S "$socket" ] || { echo "Xvfb for $socket failed to start" >&2; exit 1; }
+          done
+          COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99 \
+            timeout --signal=INT --kill-after=3m 48m node \
+            test/browser/coop-public-ui/run-campaign.mjs
 
       # The environment seal is small, decisive audit evidence - upload it as its own artifact
       # (always, even if the run fails/times out before the evidence uploads below) so audit #920

@@ -63,6 +63,39 @@ const SURFACE_PREFIX = "[coop-browser:surface] ";
 const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
 const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
+
+// =============================================================================
+// Optimization brief R4: digest-cost SLA. Detection latency is FIXED (1s parked
+// watchdog + immediate on-change); digest COST is budgeted instead. Durations
+// are ring-buffered; a p95 above the budget is a loud PERFORMANCE FAILURE via
+// console.error (the EvidenceSink treats observer errors as fatal), never a
+// silent widening of the detection interval.
+// =============================================================================
+const DIGEST_BUDGET_MS = Number(
+  (globalThis as { process?: { env?: Record<string, string> } }).process?.env?.COOP_OBSERVER_DIGEST_BUDGET_MS ?? 50,
+);
+const digestDurationsMs: number[] = [];
+let digestBudgetReported = false;
+
+function recordDigestDuration(durationMs: number): void {
+  digestDurationsMs.push(durationMs);
+  if (digestDurationsMs.length > 200) {
+    digestDurationsMs.shift();
+  }
+  if (digestBudgetReported || digestDurationsMs.length < 20) {
+    return;
+  }
+  const sorted = [...digestDurationsMs].sort((a, b) => a - b);
+  const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+  if (p95 > DIGEST_BUDGET_MS) {
+    digestBudgetReported = true;
+    console.error(
+      `[coop-browser:semantic-observer-error] mechanical digest p95 ${p95.toFixed(1)}ms exceeds the `
+        + `${DIGEST_BUDGET_MS}ms budget over ${sorted.length} samples - optimize or offload the digest; `
+        + "the 1s detection SLA may not be widened",
+    );
+  }
+}
 const RENDER_PROFILE_PREFIX = "[coop-browser:render-profile] ";
 const MARKET_PREFIX = "[coop-browser:market] ";
 const COMMANDER_PREFIX = "[coop-browser:commander] ";
@@ -292,12 +325,20 @@ function observeContinuationSurface(): void {
       uiMode,
     ].join(":");
     const now = Date.now();
-    if (addressKey === lastProbedAddress && now - lastProbeAt < 500) {
+    // Optimization brief R4: four-trigger digest with a FIXED detection SLA. A CHANGED
+    // addressKey (surface/phase/uiMode/wave/turn/epoch/membership revision - i.e. every
+    // boundary, tracked change, and acked-input consequence) digests IMMEDIATELY by
+    // bypassing this guard; while PARKED on one stable interactive surface the watchdog
+    // re-digests at a fixed 1s. Adaptive widening is forbidden - a slow runner must not
+    // receive weaker desync detection.
+    if (addressKey === lastProbedAddress && now - lastProbeAt < 1_000) {
       return;
     }
     lastProbedAddress = addressKey;
     lastProbeAt = now;
+    const digestStartedMs = performance.now();
     const { digest: stateDigest, parts: digestParts, innates, stages } = computeMechanicalDigest();
+    recordDigestDuration(performance.now() - digestStartedMs);
     const observationKey = `${addressKey}:${stateDigest}`;
     if (observationKey === lastObservedSurface) {
       return;

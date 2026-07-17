@@ -50,9 +50,13 @@ for (const file of files) {
 const harness = sources.get("public-ui-harness.mjs");
 const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
 if (
-  !harness?.includes('launchBrowser(config.locales["host-seat"])')
-  || !harness.includes('launchBrowser(config.locales["guest-seat"])')
-  || (harness.match(/launchBrowser\(config\.locales\["(?:host|guest)-seat"\]\)/gu)?.length ?? 0) !== 2
+  // Optimization brief R1: launchBrowser carries the seat so each Chromium process is
+  // pinned to its OWN Xvfb display (COOP_UI_DISPLAY_HOST/GUEST). Still exactly two
+  // independent processes, one per seat - the boundary this rule exists to protect.
+  !harness?.includes('launchBrowser(config.locales["host-seat"], "host-seat")')
+  || !harness.includes('launchBrowser(config.locales["guest-seat"], "guest-seat")')
+  || (harness.match(/launchBrowser\(config\.locales\["(?:host|guest)-seat"\], "(?:host|guest)-seat"\)/gu)?.length ?? 0)
+    !== 2
   || !harness.includes("hostBrowser.createBrowserContext()")
   || !harness.includes("guestBrowser.createBrowserContext()")
   || !harness.includes("if (launchFailure)")

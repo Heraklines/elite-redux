@@ -3,8 +3,42 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { appendFileSync, closeSync, fdatasyncSync, openSync, renameSync, writeFileSync } from "node:fs";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+
+// =============================================================================
+// Optimization brief R2: emergency-flush registry. Buffered evidence batches are
+// drained synchronously on SIGINT/SIGTERM/uncaught exception so the trace tail
+// survives everything except a hard SIGKILL (bounded loss: the final sub-second
+// batch). Signal handlers re-raise after draining so process semantics hold.
+// =============================================================================
+const EMERGENCY_FLUSH_SINKS = new Set();
+let emergencyHooksInstalled = false;
+
+function registerEmergencyFlushSink(sink) {
+  EMERGENCY_FLUSH_SINKS.add(sink);
+  if (emergencyHooksInstalled) {
+    return;
+  }
+  emergencyHooksInstalled = true;
+  const drainAll = () => {
+    for (const s of EMERGENCY_FLUSH_SINKS) {
+      s.emergencyFlushSync();
+      s.writeCurrentWaitsSync?.();
+    }
+  };
+  // Monitor hook: observes without altering crash semantics.
+  process.on("uncaughtExceptionMonitor", drainAll);
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    process.once(signal, () => {
+      drainAll();
+      // Re-raise so the default termination behavior (and the campaign's outer
+      // timeout wrapper) still applies - the hook must never swallow the signal.
+      process.kill(process.pid, signal);
+    });
+  }
+}
 
 export const delay = ms => new Promise(resolveDelay => setTimeout(resolveDelay, ms));
 
@@ -817,6 +851,25 @@ export class EvidenceSink {
     this.benignRejoinStateSyncTurns = new Set();
     this.networkState = { account: null, lobby: null, coopRunStatus: null, apiFailure: null };
     this.writeTail = Promise.resolve();
+    // Optimization brief R2: batched-write + waiter + telemetry state.
+    this.tracePath = resolve(this.dir, "public-ui-trace.jsonl");
+    this.pendingLines = [];
+    this.pendingBytes = 0;
+    this.flushTimer = null;
+    this.pendingWaiters = new Set();
+    this.waiterPassScheduled = false;
+    this.activeWaits = new Map();
+    this.nextWaitId = 1;
+    // Aggregate successful-static telemetry (network / disk-cache / revalidated /
+    // service-worker) + transferred-byte telemetry via CDP encodedDataLength.
+    this.staticTraffic = {
+      total: 0,
+      byClass: { network: 0, "disk-cache": 0, revalidated: 0, "service-worker": 0 },
+      inventory: new Set(),
+      encodedBytes: 0,
+      encodedResponses: 0,
+    };
+    registerEmergencyFlushSink(this);
   }
 
   async init() {
@@ -852,9 +905,27 @@ export class EvidenceSink {
   }
 
   stageTimingSummary() {
+    // Deterministic static inventory digest (sorted pathnames, FNV-1a 32-bit) + aggregate
+    // counts: the R2 replacement for ~45k individual successful-response events.
+    const inventory = [...this.staticTraffic.inventory].sort();
+    let digest = 0x811c9dc5;
+    for (const path of inventory) {
+      for (let i = 0; i < path.length; i++) {
+        digest = Math.imul(digest ^ path.charCodeAt(i), 0x01000193) >>> 0;
+      }
+      digest = Math.imul(digest ^ 0x0a, 0x01000193) >>> 0;
+    }
     return {
       input: this.inputStats ?? { presses: 0, queueWaitMs: 0, bringToFrontMs: 0, fronts: 0 },
       checkpoints: this.checkpointStats ?? { captures: 0, totalMs: 0, maxMs: 0 },
+      staticTraffic: {
+        total: this.staticTraffic.total,
+        byClass: this.staticTraffic.byClass,
+        distinctAssets: inventory.length,
+        inventoryDigest: digest.toString(16).padStart(8, "0"),
+        encodedBytes: this.staticTraffic.encodedBytes,
+        encodedResponses: this.staticTraffic.encodedResponses,
+      },
       events: this.events.length,
     };
   }
@@ -869,14 +940,75 @@ export class EvidenceSink {
       ...detail,
     };
     this.events.push(event);
-    this.writeTail = this.writeTail.then(() =>
-      appendFile(resolve(this.dir, "public-ui-trace.jsonl"), `${JSON.stringify(event)}\n`),
-    );
+    // Optimization brief R2: batched bounded-loss writes. One serialized appendFile PER
+    // EVENT (~48k syscalls per journey) is replaced by a buffer flushed every 150ms or
+    // 64KiB, drained at transitions/checkpoints via flush(), and emergency-flushed
+    // synchronously on SIGINT/SIGTERM/uncaught exception. Only the final sub-second
+    // batch is vulnerable to a hard SIGKILL - the documented bound.
+    const line = `${JSON.stringify(event)}\n`;
+    this.pendingLines.push(line);
+    this.pendingBytes += line.length;
+    if (this.pendingBytes >= 65_536) {
+      this.flushBatch();
+    } else if (this.flushTimer == null) {
+      this.flushTimer = setTimeout(() => this.flushBatch(), 150);
+      this.flushTimer.unref?.();
+    }
+    // Event-driven waiter wake (replaces 100ms polling): coalesce bursts into one
+    // microtask pass over the (few) active waiters.
+    if (this.pendingWaiters.size > 0 && !this.waiterPassScheduled) {
+      this.waiterPassScheduled = true;
+      queueMicrotask(() => {
+        this.waiterPassScheduled = false;
+        for (const waiter of [...this.pendingWaiters]) {
+          waiter.tryResolve();
+        }
+      });
+    }
     return event;
   }
 
+  flushBatch() {
+    if (this.flushTimer != null) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    if (this.pendingLines.length === 0) {
+      return;
+    }
+    const batch = this.pendingLines.join("");
+    this.pendingLines = [];
+    this.pendingBytes = 0;
+    this.writeTail = this.writeTail.then(() => appendFile(this.tracePath, batch));
+  }
+
+  /** Best-effort synchronous drain for signal/uncaught-exception paths (no async allowed there). */
+  emergencyFlushSync() {
+    try {
+      if (this.pendingLines.length > 0) {
+        const batch = this.pendingLines.join("");
+        this.pendingLines = [];
+        this.pendingBytes = 0;
+        appendFileSync(this.tracePath, batch);
+      }
+      const fd = openSync(this.tracePath, "a");
+      try {
+        fdatasyncSync(fd);
+      } finally {
+        closeSync(fd);
+      }
+    } catch {
+      /* emergency flush must never throw */
+    }
+  }
+
   find(pattern, from = 0) {
-    return this.events.slice(from).find(event => pattern.test(event.text ?? ""));
+    for (let i = Math.max(0, from); i < this.events.length; i++) {
+      if (pattern.test(this.events[i].text ?? "")) {
+        return this.events[i];
+      }
+    }
+    return;
   }
 
   findLast(pattern, from = 0) {
@@ -965,28 +1097,118 @@ export class EvidenceSink {
     });
   }
 
-  async waitFor(pattern, { from = 0, timeoutMs = 120_000, description = String(pattern) } = {}) {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      const event = this.find(pattern, from);
-      if (event) {
-        return event;
-      }
-      await delay(100);
+  /**
+   * Optimization brief R2: atomic bounded active-wait map. Overwritten (temp + rename, so a
+   * kill mid-truncation can never leave torn evidence) on wait start/completion. Survives
+   * SIGKILL and preserves the "AWAIT -> network-wait" fingerprint even when the final
+   * buffered trace batch is lost. No credentials or request bodies - descriptions only.
+   */
+  writeCurrentWaitsSync() {
+    try {
+      const path = resolve(this.dir, "current-waits.json");
+      const tmp = `${path}.tmp`;
+      const waits = [...this.activeWaits.values()];
+      writeFileSync(tmp, `${JSON.stringify({ seat: this.label, at: new Date().toISOString(), waits }, null, 2)}\n`);
+      renameSync(tmp, path);
+    } catch {
+      /* wait telemetry must never fail a run */
     }
-    throw new Error(`${this.label}: timed out waiting for ${description}`);
+  }
+
+  registerWait(description, timeoutMs) {
+    const id = `${this.label}-${this.nextWaitId++}`;
+    this.activeWaits.set(id, {
+      id,
+      seat: this.label,
+      description,
+      startCursor: this.events.length,
+      startedAt: new Date().toISOString(),
+      deadline: new Date(Date.now() + timeoutMs).toISOString(),
+    });
+    this.writeCurrentWaitsSync();
+    return id;
+  }
+
+  completeWait(id) {
+    if (this.activeWaits.delete(id)) {
+      this.writeCurrentWaitsSync();
+    }
+  }
+
+  /**
+   * Event-driven wait core (replaces 100ms polling): the check runs when new evidence
+   * arrives (microtask-coalesced) plus a 500ms fallback tick for state mutated outside
+   * record(). Latency drops from up-to-100ms to sub-millisecond and idle polling stops.
+   */
+  async waitViaEvents(check, { timeoutMs, description }) {
+    const waitId = this.registerWait(description, timeoutMs);
+    try {
+      const immediate = check();
+      if (immediate) {
+        return immediate;
+      }
+      return await new Promise((resolvePromise, rejectPromise) => {
+        let fallbackTimer = null;
+        let deadlineTimer = null;
+        const waiter = {
+          tryResolve: () => {
+            let result;
+            try {
+              result = check();
+            } catch (error) {
+              cleanup();
+              rejectPromise(error);
+              return;
+            }
+            if (result) {
+              cleanup();
+              resolvePromise(result);
+            }
+          },
+        };
+        const cleanup = () => {
+          this.pendingWaiters.delete(waiter);
+          if (fallbackTimer != null) {
+            clearInterval(fallbackTimer);
+          }
+          if (deadlineTimer != null) {
+            clearTimeout(deadlineTimer);
+          }
+        };
+        this.pendingWaiters.add(waiter);
+        fallbackTimer = setInterval(() => waiter.tryResolve(), 500);
+        fallbackTimer.unref?.();
+        deadlineTimer = setTimeout(() => {
+          cleanup();
+          rejectPromise(new Error(`${this.label}: timed out waiting for ${description}`));
+        }, timeoutMs);
+        deadlineTimer.unref?.();
+      });
+    } finally {
+      this.completeWait(waitId);
+    }
+  }
+
+  async waitFor(pattern, { from = 0, timeoutMs = 120_000, description = String(pattern) } = {}) {
+    // Cursor-advancing scan: each check resumes where the last one stopped instead of
+    // rescanning the growing event array from `from` every poll.
+    let scanned = Math.max(0, from);
+    return this.waitViaEvents(
+      () => {
+        for (let i = scanned; i < this.events.length; i++) {
+          if (pattern.test(this.events[i].text ?? "")) {
+            return this.events[i];
+          }
+        }
+        scanned = this.events.length;
+        return;
+      },
+      { timeoutMs, description },
+    );
   }
 
   async waitForCondition(predicate, { timeoutMs = 120_000, description = "condition" } = {}) {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      const result = predicate(this);
-      if (result) {
-        return result;
-      }
-      await delay(100);
-    }
-    throw new Error(`${this.label}: timed out waiting for ${description}`);
+    return this.waitViaEvents(() => predicate(this), { timeoutMs, description });
   }
 
   attach(page) {
@@ -1112,13 +1334,56 @@ export class EvidenceSink {
         this.failures.push(event);
       }
     });
+    // Optimization brief R2: transferred-byte telemetry. Puppeteer's response object cannot
+    // report encoded transfer size, so sum CDP Network.loadingFinished encodedDataLength -
+    // the actual bytes on the wire (0 for pure cache hits). Read-only observation.
+    if (typeof page.createCDPSession === "function") {
+      page
+        .createCDPSession()
+        .then(async session => {
+          await session.send("Network.enable");
+          session.on("Network.loadingFinished", event => {
+            this.staticTraffic.encodedBytes += event.encodedDataLength ?? 0;
+            this.staticTraffic.encodedResponses += 1;
+          });
+        })
+        .catch(error => {
+          this.record("network-telemetry-unavailable", {
+            text: error instanceof Error ? error.message : String(error),
+          });
+        });
+    }
     page.on("response", response => {
       const status = response.status();
-      this.record("response", {
-        status,
-        method: response.request().method(),
-        url: safeUrl(response.url()),
-      });
+      const method = response.request().method();
+      const url = parsedUrl(response.url());
+      // Optimization brief R2: a SUCCESSFUL static GET becomes an aggregate + inventory
+      // entry instead of a full per-response event (~45k such events per journey went
+      // through one serialized appendFile each). API hosts, non-GETs, and error statuses
+      // keep complete individual records below.
+      const isApi = url != null && isCapturedApiHost(url.hostname);
+      if (method === "GET" && status < 400 && !isApi) {
+        const cls =
+          status === 304
+            ? "revalidated"
+            : response.fromServiceWorker()
+              ? "service-worker"
+              : response.fromCache()
+                ? "disk-cache"
+                : "network";
+        this.staticTraffic.total += 1;
+        this.staticTraffic.byClass[cls] += 1;
+        if (url != null) {
+          this.staticTraffic.inventory.add(url.pathname);
+        }
+      } else {
+        this.record("response", {
+          status,
+          method,
+          url: safeUrl(response.url()),
+          fromCache: response.fromCache(),
+        });
+      }
       this.capturePublicResponse(response).catch(error => {
         this.record("response-observation-error", {
           text: error instanceof Error ? error.message : String(error),
@@ -1128,7 +1393,6 @@ export class EvidenceSink {
       // Capture the response BODY for a non-2xx status on the co-op workers only, so the exact
       // error text (e.g. the first-save CAS 409 message) is in the artifact. Bodies carry no
       // credentials on these routes; auth error bodies are advisory, so this is safe.
-      const url = parsedUrl(response.url());
       if (url != null && isCapturedApiHost(url.hostname) && (status < 200 || status >= 300)) {
         response
           .text()
@@ -1261,6 +1525,7 @@ export class EvidenceSink {
   }
 
   async flush() {
+    this.flushBatch();
     await this.writeTail;
   }
 }

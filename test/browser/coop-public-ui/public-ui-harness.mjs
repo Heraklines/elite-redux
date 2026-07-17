@@ -420,11 +420,56 @@ function clearRetryableLobbyRaceFailures(clients) {
 let publicKeyInputTail = Promise.resolve();
 // The Puppeteer page most recently brought to the front, so consecutive same-page presses can
 // skip a redundant bringToFront (see withFocusedPublicKeyInput). Module-scoped because the front
-// tab is a single browser-wide state shared across both clients.
+// tab is a single browser-wide state shared across both clients ON A SHARED DISPLAY.
 let lastFrontedPublicPage = null;
+
+// Optimization brief R1: with one Xvfb display PER SEAT (provisioned by the workflow and
+// detected at launch), the two Chromium processes no longer compete for focus, so input
+// queues and fronting go PER SEAT with NO global arbitration: each page fronts once after
+// open/replace (its process is alone on its display) and both seats press in parallel.
+// On a shared display (local runs) the legacy global serialization stays in force.
+let perSeatInputIsolation = false;
+const perSeatInputState = new WeakMap();
+
+function setPerSeatInputIsolation(enabled) {
+  perSeatInputIsolation = enabled;
+}
 
 function withFocusedPublicKeyInput(page, action) {
   const enqueuedAt = Date.now();
+  if (perSeatInputIsolation) {
+    let state = perSeatInputState.get(page);
+    if (state == null) {
+      // A NEW page object (open or replacement) starts un-fronted; per-seat focus
+      // establishment happens on its first press, then holds (nothing else on the display).
+      state = { tail: Promise.resolve(), fronted: false };
+      perSeatInputState.set(page, state);
+    }
+    const focused = state.tail.then(async () => {
+      const queueWaitMs = Date.now() - enqueuedAt;
+      let bringToFrontMs = 0;
+      let didFront = false;
+      if (!state.fronted) {
+        const startedAt = Date.now();
+        await page.bringToFront();
+        bringToFrontMs = Date.now() - startedAt;
+        state.fronted = true;
+        didFront = true;
+      }
+      const forceFront = async () => {
+        const startedAt = Date.now();
+        await page.bringToFront();
+        state.fronted = true;
+        return Date.now() - startedAt;
+      };
+      return action({ queueWaitMs, bringToFrontMs, didFront, forceFront });
+    });
+    state.tail = focused.then(
+      () => undefined,
+      () => undefined,
+    );
+    return focused;
+  }
   const focused = publicKeyInputTail.then(async () => {
     const queueWaitMs = Date.now() - enqueuedAt;
     // bringToFront is load-bearing (the game gates input on document.hasFocus()) but it runs on
@@ -1616,10 +1661,24 @@ export class DuoPublicUiRig {
   }
 
   static async launch(config) {
-    const launchBrowser = locale =>
+    // Optimization brief R1: one Xvfb DISPLAY per seat when the runner provisions them
+    // (COOP_UI_DISPLAY_HOST/COOP_UI_DISPLAY_GUEST). Two players use two devices - separate
+    // displays remove CROSS-SEAT focus competition entirely, letting input queues go
+    // per-seat. Without the env (local runs, single display) the legacy shared-display
+    // global arbitration stays in force.
+    const seatDisplays = {
+      "host-seat": process.env.COOP_UI_DISPLAY_HOST?.trim() || null,
+      "guest-seat": process.env.COOP_UI_DISPLAY_GUEST?.trim() || null,
+    };
+    const perSeatDisplays =
+      seatDisplays["host-seat"] != null
+      && seatDisplays["guest-seat"] != null
+      && seatDisplays["host-seat"] !== seatDisplays["guest-seat"];
+    const launchBrowser = (locale, seat) =>
       puppeteer.launch({
         headless: config.headless,
         defaultViewport: config.viewport,
+        ...(perSeatDisplays ? { env: { ...process.env, DISPLAY: seatDisplays[seat] } } : {}),
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
@@ -1648,9 +1707,10 @@ export class DuoPublicUiRig {
           `--window-size=${config.viewport.width},${config.viewport.height}`,
         ],
       });
+    setPerSeatInputIsolation(perSeatDisplays);
     const launchResults = await Promise.allSettled([
-      launchBrowser(config.locales["host-seat"]),
-      launchBrowser(config.locales["guest-seat"]),
+      launchBrowser(config.locales["host-seat"], "host-seat"),
+      launchBrowser(config.locales["guest-seat"], "guest-seat"),
     ]);
     const browsers = launchResults.flatMap(result => (result.status === "fulfilled" ? [result.value] : []));
     const launchFailure = launchResults.find(result => result.status === "rejected");

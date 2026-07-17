@@ -223,7 +223,12 @@ test("paired Chromium runs headful at an explicit player-sized viewport", async 
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8");
   const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");
   assert.match(workflow, /COOP_UI_HEADLESS: "0"/u);
-  assert.match(workflow, /xvfb-run -a -s "-screen 0 1440x900x24" node/u);
+  // Optimization brief R1: one player-sized Xvfb display PER SEAT (two players, two
+  // devices) - the harness pins each Chromium to its own display and drops cross-seat
+  // focus arbitration. The headful + 1440x900 contract this test protects is unchanged.
+  assert.match(workflow, /Xvfb :98 -screen 0 1440x900x24/u);
+  assert.match(workflow, /Xvfb :99 -screen 0 1440x900x24/u);
+  assert.match(workflow, /COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99/u);
   assert.match(harness, /defaultViewport: config\.viewport/u);
   assert.match(harness, /"--disable-dev-shm-usage"/u);
   assert.match(harness, /"--use-gl=angle"/u);
