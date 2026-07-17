@@ -1248,6 +1248,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Shiny Lab: EFFECTS LAB section previews transform FX",
+    description:
+      "UI FEATURE (no battle behavior to watch here) - the Shiny Lab has a new EFFECTS LAB\n"
+      + "section for previewing effects the maintainer introduces, structured by CATEGORY. One\n"
+      + "category ships today: Transformation Effects.\n"
+      + "DO: from Starter Select open the SHINY LAB. Above the shiny option area there is an\n"
+      + "'EFFECTS >' button (tap it, or press Up from the top of the list then A). It switches to\n"
+      + "the EFFECTS LAB section. Pick 'Transformation Effects'; use Left/Right to select any\n"
+      + "(partner) Eeveelution, Up/Down to flip its FRONT / BACK sprite, and A to REPLAY the burst.\n"
+      + "EXPECT: the per-type transform burst plays on the selected evolution's sprite, tinted by\n"
+      + "that evolution's primary type (Vaporeon water, Flareon fire, ...), on both front and back.\n"
+      + "'< SHINY' (or B) returns to the shiny section unchanged. The evolution list is derived from\n"
+      + "the Omniform registration, so every partner evolution appears automatically. Data-tier\n"
+      + "unit-tested in test/tests/elite-redux/er-effects-lab.test.ts; rendered by the\n"
+      + "er-effects-lab / er-effects-lab-back render-harness recipes.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.EEVEE, {
+          formIndex: formIndexContaining(SpeciesId.EEVEE, "partner"),
+          moveset: [MoveId.WATER_GUN, MoveId.EMBER, MoveId.QUICK_ATTACK, MoveId.SWIFT],
+        }),
+      ];
+    },
+  },
   // ===========================================================================
   // UI — reward shop soft-lock
   // ===========================================================================

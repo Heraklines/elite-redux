@@ -61,6 +61,30 @@ export type ErTransformParticleShape = "leaf" | "droplet" | "ember" | "mote" | "
 /** How a particle travels over its lifetime. */
 export type ErTransformParticleMotion = "rise" | "fall" | "burst" | "sway";
 
+/**
+ * The minimal anchor the burst needs: a field-local position plus the sprite it
+ * centres on. A full {@linkcode Pokemon} satisfies this structurally (it has
+ * `x`/`y` and `getSprite()`), so the battle callers are unchanged; a non-field
+ * surface (e.g. the Effects Lab preview) can pass a bare anchor instead of faking
+ * a whole Pokemon.
+ */
+export interface ErTransformFxAnchor {
+  x: number;
+  y: number;
+  /** The sprite the burst centres on; only its `x`/`y` offset are read. */
+  getSprite(): { x?: number; y?: number } | null | undefined;
+}
+
+/** Optional host overrides for a burst (where it parents its objects). */
+export interface ErTransformFxOptions {
+  /**
+   * Container the burst objects are parented into (default `globalScene.field`).
+   * Lets a non-field surface host the burst over its OWN sprite (the Effects Lab
+   * preview) instead of the live battle field.
+   */
+  parent?: Phaser.GameObjects.Container;
+}
+
 /** A resolved, renderable per-type transform-FX config. */
 export interface ErTransformTypeFx {
   /** Light + particle tint (canonical type colour). */
@@ -154,19 +178,24 @@ function rgbToInt([r, g, b]: [number, number, number]): number {
  */
 export class ErFormTransformFx {
   private readonly objects: Phaser.GameObjects.GameObject[] = [];
+  private readonly parent: Phaser.GameObjects.Container;
   private teardown: Phaser.Time.TimerEvent | null = null;
   private destroyed = false;
 
-  constructor(pokemon: Pokemon, type: PokemonType) {
+  constructor(anchor: Pokemon | ErTransformFxAnchor, type: PokemonType, options?: ErTransformFxOptions) {
     const config = getErTransformTypeFx(type);
     const color = rgbToInt(config.rgb);
 
-    const sprite = pokemon.getSprite();
+    // Default host is the battle field; a non-field surface can pass its own
+    // container so the burst draws over that sprite instead of the live field.
+    this.parent = options?.parent ?? globalScene.field;
+
+    const sprite = anchor.getSprite();
     // Field-local anchor: the same basis QuietFormChangePhase uses for its tint
     // sprites (pokemon position + the sprite's in-container offset). Nudge up
     // toward the body centre so the burst is centred on the mon, not its feet.
-    const anchorX = pokemon.x + (sprite?.x ?? 0);
-    const anchorY = pokemon.y + (sprite?.y ?? 0) - 26;
+    const anchorX = anchor.x + (sprite?.x ?? 0);
+    const anchorY = anchor.y + (sprite?.y ?? 0) - 26;
 
     this.buildFlash(anchorX, anchorY, color);
     this.buildParticles(anchorX, anchorY, color, config);
@@ -180,7 +209,7 @@ export class ErFormTransformFx {
   /** Register a freshly-created object under this burst and parent it to the field. */
   private track<T extends Phaser.GameObjects.GameObject>(obj: T): T {
     (obj as unknown as { setDepth?: (d: number) => unknown }).setDepth?.(ER_TRANSFORM_FX_DEPTH);
-    globalScene.field.add(obj);
+    this.parent.add(obj);
     this.objects.push(obj);
     return obj;
   }
@@ -345,15 +374,22 @@ export class ErFormTransformFx {
 }
 
 /**
- * Play the per-type transform burst on `pokemon`, themed by `targetType` (the
- * primary type of the evolution it is becoming). Fire-and-forget: the returned
- * instance self-destructs after {@linkcode ER_TRANSFORM_FX_TOTAL_MS}; callers may
- * hold it to force an earlier {@linkcode ErFormTransformFx.destroy}. Never
- * throws (visual-only, fail-closed) so it is safe on the transform hot path.
+ * Play the per-type transform burst on `anchor`, themed by `targetType` (the
+ * primary type of the evolution it is becoming). `anchor` is normally the
+ * transforming {@linkcode Pokemon}; a non-field surface may pass a bare
+ * {@linkcode ErTransformFxAnchor} plus an `options.parent` container so the burst
+ * hosts over its own sprite. Fire-and-forget: the returned instance self-destructs
+ * after {@linkcode ER_TRANSFORM_FX_TOTAL_MS}; callers may hold it to force an
+ * earlier {@linkcode ErFormTransformFx.destroy}. Never throws (visual-only,
+ * fail-closed) so it is safe on the transform hot path.
  */
-export function playErTransformFx(pokemon: Pokemon, targetType: PokemonType): ErFormTransformFx | null {
+export function playErTransformFx(
+  anchor: Pokemon | ErTransformFxAnchor,
+  targetType: PokemonType,
+  options?: ErTransformFxOptions,
+): ErFormTransformFx | null {
   try {
-    return new ErFormTransformFx(pokemon, targetType);
+    return new ErFormTransformFx(anchor, targetType, options);
   } catch (err: unknown) {
     console.error("Failed to play ER transform FX", err);
     return null;
