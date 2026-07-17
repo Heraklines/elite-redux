@@ -2575,17 +2575,29 @@ function prepareCoopSharedTerminal(runtime: CoopRuntime, reason: string): boolea
       coopWarn("runtime", "shared terminal could not freeze phase progression", error);
     }
     try {
-      globalScene.ui.showText(
-        "The shared battle could not be synchronized safely. Both players are leaving shared play safely.",
-        null,
-        undefined,
-        6000,
-      );
+      globalScene.ui.showText(coopSharedTerminalPlayerMessage(reason), null, undefined, 6000);
     } catch {
       /* cosmetic */
     }
   }
   return prepared;
+}
+
+/**
+ * Player-facing text for a shared-terminal reason that has a CONCRETE player remedy. Live report
+ * 2026-07-17 (coop-save/anon): a host whose five save slots were all occupied or unverifiable hit the
+ * correct no-overwrite fail-closed abort, but only saw the generic "could not be synchronized" text
+ * with no way to know the remedy was simply freeing a save slot. Presentation only - every terminal
+ * decision and the fail-closed behavior itself are unchanged.
+ */
+function coopSharedTerminalPlayerMessage(reason: string): string {
+  if (reason.includes("no verified empty local+cloud save slot")) {
+    return (
+      "A new co-op run needs one free save slot on the host's account, and none of the five slots "
+      + "could be verified free. Free a save slot (Load Game, delete an old run), then reconnect and try again."
+    );
+  }
+  return "The shared battle could not be synchronized safely. Both players are leaving shared play safely.";
 }
 
 /** Exactly-once terminal UI/control-plane teardown after quorum or the supervisor's absolute deadline. */

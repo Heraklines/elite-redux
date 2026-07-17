@@ -19,7 +19,7 @@ import { coopGateAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { classifySessionProtection, enqueueSessionCloudMutation } from "#data/elite-redux/coop/coop-cloud-save-tail";
 import { isCoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-control-plane";
-import { coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   type CoopResumeLoadedSession,
   captureCoopResumeEvidence,
@@ -3486,6 +3486,10 @@ export class GameData {
       }
     }
 
+    // Per-slot verdicts so a live "no verified empty slot" abort names each slot's exact blocker in
+    // the captured console (local-occupied vs cloud-occupied vs lineage-unproven), instead of leaving
+    // the report with only the aggregate refusal (2026-07-17 coop-save/anon captures).
+    const verdicts: string[] = [];
     for (let slot = 0; slot < 5; slot++) {
       if (!claimIsCurrent()) {
         return null;
@@ -3498,12 +3502,15 @@ export class GameData {
           || accountIdentity == null
           || !(await this.retireTombstonedLocalReplica(slot, localRaw, accountIdentity)))
       ) {
+        verdicts.push(`${slot}:local-occupied`);
         continue;
       }
-      if (
-        (!bypassLogin && cloudReplicas?.get(slot) != null)
-        || (!bypassLogin && accountIdentity != null && !(await this.proveEmptySlotLineage(slot, accountIdentity)))
-      ) {
+      if (!bypassLogin && cloudReplicas?.get(slot) != null) {
+        verdicts.push(`${slot}:cloud-occupied`);
+        continue;
+      }
+      if (!bypassLogin && accountIdentity != null && !(await this.proveEmptySlotLineage(slot, accountIdentity))) {
+        verdicts.push(`${slot}:lineage-unproven`);
         continue;
       }
       // Close the local read-vs-cloud-await window. A same-context/cross-tab mutation loses the slot.
@@ -3515,9 +3522,12 @@ export class GameData {
           accountIdentity,
           controller,
         };
+        coopLog("launch", `fresh co-op slot scan verified slot ${slot} [${verdicts.join(" ")}]`);
         return slot;
       }
+      verdicts.push(`${slot}:raced`);
     }
+    coopWarn("launch", `fresh co-op slot scan found NO verified slot [${verdicts.join(" ")}]`);
     return null;
   }
 

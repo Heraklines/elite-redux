@@ -3459,6 +3459,12 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "select a DIFFERENT slot proven empty in both browser and cloud storage, recheck it before starter\n"
       + "materialization, and win backend empty-slot CAS. The conflicting local and cloud bytes must remain\n"
       + "unchanged. If no verified empty slot exists, both clients fail closed instead of overwriting a save.\n"
+      + "\n"
+      + "FOLLOW-UP (2026-07-17 live report): when NO slot verifies free (all five occupied or unverifiable),\n"
+      + "both clients must now see the ACTIONABLE message naming the remedy ('free a save slot, then\n"
+      + "reconnect'), not the generic 'could not be synchronized' text, and the console logs one\n"
+      + "per-slot verdict line ('fresh co-op slot scan found NO verified slot [0:local-occupied ...]').\n"
+      + "Freeing any slot via Load Game and reconnecting must then launch normally.\n"
       + "Covered by coop-duo-resume.test.ts and resume-scan-isolation.test.mjs.",
     setup: () => {
       resetDevOverrides();
