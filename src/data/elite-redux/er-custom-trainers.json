@@ -1833,7 +1833,7 @@
       "elite",
       "hell"
     ],
-    "endless": false,
+    "endless": true,
     "id": 70013,
     "introDialogue": "We'll be your worst nightmare!",
     "maxWave": 199,
