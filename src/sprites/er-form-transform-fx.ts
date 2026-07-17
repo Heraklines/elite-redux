@@ -563,6 +563,18 @@ export interface ErTransformMorphOptions {
 export interface ErTransformSequence {
   /** `"morph"` = the full fill/morph/reveal engaged; `"burst"` = fail-closed burst-only. */
   readonly mode: "morph" | "burst";
+  /**
+   * Resolves once the sequence has fully settled onto the target form (the reveal
+   * completed and the real sprite rests at alpha 1) OR failed open. The phase flow
+   * awaits this (behind its own hard timeout) to hold the move animation until the
+   * morph visually finishes, so the transform lands BEFORE the move plays. Bounded
+   * by the instance's own absolute-lifetime backstop, so it can never hang.
+   *
+   * On the fail-closed burst-only path this is already resolved: the burst is a
+   * fire-and-forget overlay, so the phase flow does not wait on it (its behaviour
+   * is unchanged from before sequencing was added).
+   */
+  readonly whenSettled: Promise<void>;
   /** Idempotent teardown; safe to call at any time (scene/sprite teardown). */
   destroy(): void;
 }
@@ -583,6 +595,12 @@ interface CanvasTextureLike {
  */
 class ErFormTransformMorph implements ErTransformSequence {
   readonly mode = "morph" as const;
+
+  /** Resolves when the silhouette visual has fully torn down (rest on target / fail open). */
+  readonly whenSettled: Promise<void>;
+  private settleResolve: (() => void) | null = null;
+  /** Guards {@linkcode teardownVisual} against re-running (reveal + safety backstop + destroy). */
+  private visualTornDown = false;
 
   private readonly pokemon: Pokemon;
   private readonly type: PokemonType;
@@ -646,6 +664,9 @@ class ErFormTransformMorph implements ErTransformSequence {
     this.morphCtx = build.morphCtx;
     this.morphImg = build.morphImg;
     this.startNow = globalScene.time.now;
+    this.whenSettled = new Promise<void>(resolve => {
+      this.settleResolve = resolve;
+    });
 
     // Kick the sprite swap immediately; it resolves UNDER the glow. Its result
     // (or failure) only gates the reveal - the phase flow never awaits it.
@@ -934,8 +955,19 @@ class ErFormTransformMorph implements ErTransformSequence {
     this.tex.refresh();
   }
 
-  /** Tear down the SILHOUETTE visual only (leaves any in-flight burst to self-destruct). */
+  /**
+   * Tear down the SILHOUETTE visual only (leaves any in-flight burst to
+   * self-destruct). Guarded so the reveal completion, the absolute-lifetime
+   * safety backstop, and {@linkcode destroy} can each call it without redoing the
+   * work or double-restoring the sprite. The LAST action is to restore the real
+   * sprite to alpha 1 (the reveal rests on the swapped target form) and settle
+   * {@linkcode whenSettled}, so the phase flow releases the move animation.
+   */
   private teardownVisual(): void {
+    if (this.visualTornDown) {
+      return;
+    }
+    this.visualTornDown = true;
     if (this.loop) {
       this.loop.remove(false);
       this.loop = null;
@@ -944,7 +976,6 @@ class ErFormTransformMorph implements ErTransformSequence {
       this.safety.remove(false);
       this.safety = null;
     }
-    this.setSpriteAlpha(1);
     try {
       this.image.destroy();
     } catch {
@@ -957,6 +988,19 @@ class ErFormTransformMorph implements ErTransformSequence {
       }
     } catch {
       // Texture cleanup is best-effort; a stale generated key must not throw.
+    }
+    // Restore the real sprite AFTER the overlay is gone so nothing draws over the
+    // revealed target form, then release the phase flow.
+    this.setSpriteAlpha(1);
+    this.resolveSettled();
+  }
+
+  /** Resolve {@linkcode whenSettled} exactly once (idempotent). */
+  private resolveSettled(): void {
+    const resolve = this.settleResolve;
+    if (resolve) {
+      this.settleResolve = null;
+      resolve();
     }
   }
 
@@ -1016,6 +1060,9 @@ export function playErTransformMorph(
   const burst = playErTransformFx(pokemon, targetType);
   return {
     mode: "burst",
+    // Fire-and-forget: the burst overlay does not gate the move flow, so the
+    // phase flow never waits on it (already-resolved = the pre-sequencing path).
+    whenSettled: Promise.resolve(),
     destroy: () => burst?.destroy(),
   };
 }
