@@ -1165,11 +1165,19 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const partner = getCoopRuntime()!.partnerTransport!;
 
     const carrier = completeTurnCarrier(turn);
+    // This test drives the replay phase manually rather than advancing the whole battle fixture.
+    // Remove setup's unrelated static tail first so the retained transaction's safe-boundary wake is
+    // the only continuation behind replay, matching the production ordering under test.
+    globalScene.phaseManager.clearPhaseQueue();
     sendWaveAdvance(partner, "gameOver", {
       ...carrier.authoritativeState,
       tick: carrier.authoritativeState.tick + 1,
     });
     await new Promise(r => setTimeout(r, 0));
+    expect(
+      globalScene.phaseManager.getQueuedPhaseNames(),
+      "the retained terminal appends exactly one safe-boundary continuation",
+    ).toEqual(["CoopFinalizeTurnPhase"]);
     partner.send({
       t: "turnResolution",
       turn,
