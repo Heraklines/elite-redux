@@ -3,7 +3,7 @@
   "taskId": "final-closure-20260717",
   "branch": "ci/coop/final-closure-20260717",
   "trainRef": "ci/coop/final-closure-20260717",
-  "baseSha": "d5ec0d345d41c1767817023e9d81528f6b8e1d29",
+  "baseSha": "653f25efe5b16369b805b6bf0244814ce5a75704",
   "allowedFiles": [
     ".github/coop-task-ownership/final-closure-20260717.json",
     ".github/coop-task-ownership/p33-gameover-public-ui.json",

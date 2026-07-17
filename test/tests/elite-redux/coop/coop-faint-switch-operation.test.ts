@@ -8,6 +8,7 @@ import {
   addressCoopFaintSwitchChoiceData,
   armCoopFaintSwitchIntentResend,
   awaitAddressedCoopFaintSwitchChoice,
+  canMaterializeCoopFaintSwitchWithoutActiveScene,
   COOP_FAINT_SWITCH_RESOLUTION_NONE,
   COOP_FAINT_SWITCH_RESOLUTION_OWNER,
   captureCoopFaintSwitchOperationBinding,
@@ -105,6 +106,42 @@ describe("co-op faint-switch operation migration", () => {
     ).toBe(false);
     markCoopFaintSwitchPickerSettled(8, 2, COOP_GUEST_FIELD_INDEX, binding, 17);
     expect(materializeCoopFaintSwitchPickerTerminal(envelope, binding)).toBe(true);
+  });
+
+  it("applies only scene-independent faint terminals while the receiver browser is not ambient", () => {
+    const guestState = createCoopRuntimeOpState("guest");
+    setActiveCoopRuntimeOpState(guestState);
+    const binding = captureCoopFaintSwitchOperationBinding("guest");
+    const guestOwned = {
+      sessionEpoch: 1,
+      wave: 8,
+      turn: 2,
+      pendingOperation: {
+        id: "1:1:FAINT_SWITCH:guest-owned",
+        kind: "FAINT_SWITCH",
+        owner: 1,
+        status: "applied",
+        payload: { fieldIndex: COOP_GUEST_FIELD_INDEX, partySlot: 3, data: [0, 6] },
+      },
+    } as unknown as CoopAuthoritativeEnvelopeV1;
+    const hostOwned = {
+      ...guestOwned,
+      pendingOperation: { ...guestOwned.pendingOperation, id: "1:0:FAINT_SWITCH:host-owned", owner: 0 },
+    } as CoopAuthoritativeEnvelopeV1;
+
+    expect(
+      canMaterializeCoopFaintSwitchWithoutActiveScene(guestOwned, binding),
+      "an unmaterialized guest modal still needs the guest scene",
+    ).toBe(false);
+    expect(
+      canMaterializeCoopFaintSwitchWithoutActiveScene(hostOwned, binding),
+      "a host-owned replacement has no guest modal",
+    ).toBe(true);
+    markCoopFaintSwitchPickerSettled(8, 2, COOP_GUEST_FIELD_INDEX, binding);
+    expect(
+      canMaterializeCoopFaintSwitchWithoutActiveScene(guestOwned, binding),
+      "the exact already-closed guest picker has no remaining scene work",
+    ).toBe(true);
   });
 
   it("materializes only the exact old-address picker before acknowledging a timeout fallback", () => {

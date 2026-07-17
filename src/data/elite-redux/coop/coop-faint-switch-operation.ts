@@ -498,6 +498,30 @@ export function markCoopFaintSwitchPickerSettled(
 }
 
 /**
+ * Whether a faint terminal can be applied while this receiver's scene is not the ambient scene.
+ *
+ * The two-engine harness shares process globals, unlike two real browsers. A host-owned replacement has
+ * no guest modal at all, and an already-settled guest picker has finished its only scene mutation; both
+ * are therefore safe to journal/ACK under the receiver's explicit operation state. An open or not-yet-
+ * created guest picker still requires its own scene and must remain deferred.
+ */
+export function canMaterializeCoopFaintSwitchWithoutActiveScene(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  binding?: CoopFaintSwitchOperationBinding | null,
+): boolean {
+  const operation = envelope.pendingOperation;
+  const payload = operation?.payload as CoopFaintSwitchPayload | undefined;
+  if (operation?.kind !== "FAINT_SWITCH" || payload == null) {
+    return false;
+  }
+  if (operation.owner !== coopSeatOfRole("guest")) {
+    return true;
+  }
+  const occurrence = payload.data[COOP_FAINT_SWITCH_OCCURRENCE_INDEX] ?? 0;
+  return state(binding).settledPickers.has(pickerKey(envelope.wave, envelope.turn, occurrence, payload.fieldIndex));
+}
+
+/**
  * Guest live-sink terminal. True means the exact picker was already closed locally or was synchronously
  * settled now; false keeps the retained operation unacknowledged and retriable.
  */

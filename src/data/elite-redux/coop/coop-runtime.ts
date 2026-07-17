@@ -110,6 +110,7 @@ import { type CoopControlPlaneSaveData, isCoopControlPlaneSaveData } from "#data
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopDurabilityManager, isCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import {
+  canMaterializeCoopFaintSwitchWithoutActiveScene,
   isCoopFaintSwitchOperationEnabled,
   materializeCoopFaintSwitchPickerTerminal,
   resetCoopFaintSwitchOperationState,
@@ -5689,8 +5690,16 @@ export function assembleCoopRuntime(
           const receiverScene = runtimeSceneBindings.get(runtime);
           // The in-process engine harness owns distinct scenes, so a known destination scene mismatch is a
           // valid deferred boundary. Engine-free operation tests intentionally share one scene (or never
-          // install a receiver scene); their stable runtime bindings remain safe and synchronous.
-          if (receiverScene != null && receiverScene !== globalScene) {
+          // install a receiver scene); their stable runtime bindings remain safe and synchronous. A faint
+          // terminal whose guest modal already closed (or never exists because the host owns that slot)
+          // has no remaining scene work and can safely ACK under the receiver's explicit op-state.
+          const sceneIndependentFaintTerminal =
+            entry.msg.t === "envelope"
+            && canMaterializeCoopFaintSwitchWithoutActiveScene(entry.msg.envelope, {
+              opState,
+              durability: null,
+            });
+          if (receiverScene != null && receiverScene !== globalScene && !sceneIndependentFaintTerminal) {
             return "deferred";
           }
           return withActiveCoopRuntimeOpState(opState, () => operationDurabilityHooks.apply?.(entry));
