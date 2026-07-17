@@ -970,20 +970,56 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
  * fielding the same player twice in a row when alternatives exist (#422). */
 let lastGhostUploader: string | null = null;
 
+/** How many recently-fielded ghost waves the picker avoids re-fielding the same
+ * uploader from (the "same ghost N waves in a row" report, #ghost-repeat). */
+const GHOST_RECENT_UPLOADER_WINDOW = 3;
+
 /**
- * Seeded-random pick among candidate snapshots, preferring an uploader other
- * than the previous ghost's. Deterministic per (run seed, wave) so reloading
- * the same wave fields the same ghost - but DIFFERENT waves and different
- * runs spread across the pool. Replaces the old shallowest-first sort, which
- * deterministically handed every early wave to whichever single player owned
- * the shallow end of the sample ("why is it always Arctic Flame?").
+ * The uploaders fielded in the {@linkcode GHOST_RECENT_UPLOADER_WINDOW} waves just
+ * before `waveIndex`, read from the already-recorded {@linkcode ghostByWave} cache
+ * (so this needs no new per-run state and stays co-op-deterministic + save/restore
+ * safe). Most-recent first, `lastGhostUploader` folded in so the immediately previous
+ * pick counts even on a non-contiguous ghost-wave schedule.
+ */
+function recentGhostUploaders(waveIndex: number): string[] {
+  const out: string[] = [];
+  if (lastGhostUploader) {
+    out.push(lastGhostUploader);
+  }
+  for (let w = waveIndex - 1; w >= waveIndex - GHOST_RECENT_UPLOADER_WINDOW && w >= 0; w--) {
+    const name = ghostByWave.get(w)?.trainerName;
+    if (name && !out.includes(name)) {
+      out.push(name);
+    }
+  }
+  return out;
+}
+
+/**
+ * Seeded-random pick among candidate snapshots, preferring an uploader NOT fielded in
+ * the recent-wave window - so the same player's ghost can't appear several waves in a
+ * row (the "same ghost 4x in a row" report). The window relaxes step by step when a
+ * strict filter would empty the pool, so a one-uploader-dominated sample still fields
+ * something rather than nothing. Deterministic per (run seed, wave) so reloading the
+ * same wave fields the same ghost - but DIFFERENT waves and different runs spread across
+ * the pool. Replaces the old shallowest-first sort, which deterministically handed every
+ * early wave to whichever single player owned the shallow end of the sample.
  */
 function pickGhost(candidates: GhostTeamSnapshot[], waveIndex: number): GhostTeamSnapshot | undefined {
   if (candidates.length === 0) {
     return undefined;
   }
-  const fresh = candidates.filter(s => (s.trainerName ?? "") !== lastGhostUploader);
-  const pool = fresh.length > 0 ? fresh : candidates;
+  const recent = recentGhostUploaders(waveIndex);
+  // Relax the recent window one uploader at a time until some candidate survives.
+  let pool = candidates;
+  for (let depth = recent.length; depth >= 1; depth--) {
+    const banned = new Set(recent.slice(0, depth));
+    const filtered = candidates.filter(s => !banned.has(s.trainerName ?? ""));
+    if (filtered.length > 0) {
+      pool = filtered;
+      break;
+    }
+  }
   const key = `${globalScene.seed}:ghostpick:${waveIndex}`;
   let h = 0;
   for (let i = 0; i < key.length; i++) {

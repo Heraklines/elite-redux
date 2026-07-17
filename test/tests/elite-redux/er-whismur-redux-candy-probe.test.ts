@@ -38,11 +38,12 @@ describe("Whismur Redux candy bucket (#410 / item 3)", () => {
   });
 
   it("WHISMUR_REDUX is its OWN candy-line root (candy never rolls up to vanilla)", () => {
-    const wr = allSpecies.find(s => s.speciesId === ErSpeciesId.WHISMUR_REDUX);
+    const whismurReduxId = ErSpeciesId.WHISMUR_REDUX as number;
+    const wr = allSpecies.find(s => (s.speciesId as number) === whismurReduxId);
     expect(wr).toBeDefined();
     // No prevolution edge -> getRootSpeciesId returns itself -> addStarterCandy
     // (which routes through getRootStarterSpeciesId) lands on this bucket, not vanilla.
     expect(pokemonPrevolutions[ErSpeciesId.WHISMUR_REDUX as unknown as SpeciesId]).toBeUndefined();
-    expect(wr?.getRootSpeciesId()).toBe(ErSpeciesId.WHISMUR_REDUX);
+    expect(wr?.getRootSpeciesId() as number).toBe(whismurReduxId);
   });
 });
