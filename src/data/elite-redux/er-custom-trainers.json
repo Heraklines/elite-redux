@@ -2208,5 +2208,106 @@
     "trainerClass": "WAITER",
     "victoryDialogue": "Very good sir have a reward on me.",
     "weight": 100
+  },
+  "TRAINER_70015": {
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": true,
+    "id": 70015,
+    "maxWave": 180,
+    "minWave": 100,
+    "name": "Horrid Dreadsden",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 10120
+        },
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "SCOPE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BANEFUL_BUNKER",
+          "HYPNOSIS",
+          "CURSE",
+          "POLTERGEIST"
+        ],
+        "species": 10101
+      },
+      {
+        "abilitySlot": 1,
+        "fusion": {
+          "abilitySlot": 1,
+          "formIndex": 0,
+          "species": 469
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          },
+          {
+            "count": 1,
+            "item": "ER_GHOST_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "HEX",
+          "SONIC_BOOM",
+          "THUNDER_WAVE",
+          "NASTY_PLOT"
+        ],
+        "species": 354
+      },
+      {
+        "abilitySlot": 1,
+        "fusion": {
+          "abilitySlot": 1,
+          "formIndex": 0,
+          "species": 10693
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "CHARCOAL"
+          },
+          {
+            "count": 1,
+            "item": "ER_GHOST_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SHADOW_FANGS",
+          "EERIE_FOG",
+          "FLAMETHROWER",
+          "RLNA"
+        ],
+        "species": 10539
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "species": 201
+      }
+    ],
+    "trainerClass": "ALLISTER",
+    "weight": 100
   }
 }
