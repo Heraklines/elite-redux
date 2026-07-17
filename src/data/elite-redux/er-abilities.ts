@@ -4947,7 +4947,7 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
   {
     "id": 822,
     "name": "Ominous Shroud",
-    "description": "Phantom + Shadow Shield.",
+    "description": "Foggy Eye + Shadow Shield.",
     "archetype": "unknown"
   },
   {
@@ -5121,7 +5121,7 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
   {
     "id": 851,
     "name": "Komodo",
-    "description": "Adds Dragon-type + moves have 30% Bad Poison chance.",
+    "description": "Draconize + Envenom.",
     "archetype": "unknown"
   },
   {
@@ -5523,7 +5523,7 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
   {
     "id": 918,
     "name": "Dragonfruit",
-    "description": "Half Drake + Rough Skin.",
+    "description": "Draconize + Rough Skin.",
     "archetype": "unknown"
   },
   {
@@ -5943,7 +5943,7 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
   {
     "id": 990,
     "name": "Waterborne",
-    "description": "Aquatic + Adaptability",
+    "description": "Hydrate + Adaptability",
     "archetype": "unknown"
   },
   {

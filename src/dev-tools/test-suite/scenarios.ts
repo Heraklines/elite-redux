@@ -1077,6 +1077,46 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Type-nativization ability corrections (maintainer 2026-07-17)",
+    description:
+      "PURE DATA CHECK (no battle behavior to watch here) for seven maintainer-dictated\n"
+      + "ability corrections. Party = Sneasler (Mega), Volcarona Redux, Selenumbra. Open\n"
+      + "SUMMARY on each and read the ability + innates:\n"
+      + "1. Sneasler Mega: Free Climb should read 'Unburden + Mountaineer' (not Hyper\n"
+      + "   Aggressive); innate 3 should now be Hyper Aggressive.\n"
+      + "2. Volcarona Redux: the Ghost-nativized innate slot should be Serene Grace (was\n"
+      + "   Flame Body).\n"
+      + "3. Selenumbra: the Ghost-nativized innate slot should be Lunar Affinity (was\n"
+      + "   Serene Grace; Selenumbra already has Sheer Force, which conflicts with it).\n"
+      + "4-7. Ability DESCRIPTIONS (check via any ability list / capsule screen): Waterborne\n"
+      + "   reads 'Hydrate + Adaptability' (not Aquatic); Dragonfruit 'Draconize + Rough\n"
+      + "   Skin' (not Half Drake); Komodo 'Draconize + Envenom' (not Half-Drake / adds\n"
+      + "   Dragon); Ominous Shroud references Foggy Eye + Shadow Shield (not Phantom).\n"
+      + "Unit-tested in test/tests/elite-redux/er-7corrections.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 20,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(erSpecies(ErSpeciesId.SNEASLER_MEGA), {
+          moveset: [MoveId.CLOSE_COMBAT, MoveId.GUNK_SHOT, MoveId.SWORDS_DANCE, MoveId.U_TURN],
+        }),
+        makeStarter(erSpecies(ErSpeciesId.VOLCARONA_REDUX), {
+          moveset: [MoveId.QUIVER_DANCE, MoveId.FIERY_DANCE, MoveId.BUG_BUZZ, MoveId.MOONBLAST],
+        }),
+        makeStarter(erSpecies(ErSpeciesId.SELENUMBRA), {
+          moveset: [MoveId.MOONBLAST, MoveId.DARK_PULSE, MoveId.PSYCHIC, MoveId.CALM_MIND],
+        }),
+      ];
+    },
+  },
   // ===========================================================================
   // UI — reward shop soft-lock
   // ===========================================================================
@@ -12303,6 +12343,48 @@ export const DEV_SCENARIOS: DevScenario[] = [
           shiny: true,
           variant: 0,
           moveset: [MoveId.VINE_WHIP, MoveId.TACKLE, MoveId.LEECH_SEED, MoveId.SLEEP_POWDER],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Primal Mew: shiny back + front sprites render",
+    description:
+      "Live report 2026-07-16 (mode 4, wave 52): 'no primal mew sprites'. A SHINY\n"
+      + "variant-2 Primal Mew requested back sprite key back__er__mew_primal_shiny2\n"
+      + "(atlas elite-redux/mew_primal/shiny-back-2), which was not published yet, so\n"
+      + "the player's own Primal Mew showed NO back sprite in battle. The tiered shiny\n"
+      + "variant art (shiny-2/-3 + shiny-back-2/-3) has since been added on er-assets.\n"
+      + "DO: look at YOUR lead Primal Mew (back sprite) and the enemy Primal Mew\n"
+      + "(front sprite). EXPECT: BOTH draw a real, animated Primal Mew shiny sprite -\n"
+      + "no blank/missing sprite, no substitute doll, no console 'Missing animation:\n"
+      + "pkmn__back__er__mew_primal_shiny2'. Both are forced shiny variant 2 (the\n"
+      + "reported tier). Regression gate: er-newcomer-render-sweep.test.ts now checks\n"
+      + "the shiny front + back tiers for every ER-custom newcomer form.",
+    setup: () => {
+      resetDevOverrides();
+      const primalIdx = formIndexByKey(SpeciesId.MEW, "primal");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 52,
+        SHINY_OVERRIDE: true,
+        VARIANT_OVERRIDE: 1, // variant index 1 = shiny tier 2 -> shiny-back-2 (the reported key)
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MEW,
+        ENEMY_FORM_OVERRIDES: { [SpeciesId.MEW]: primalIdx },
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_SHINY_OVERRIDE: true,
+        ENEMY_VARIANT_OVERRIDE: 1, // enemy front sprite -> er__mew_primal_shiny2 (shiny-2)
+        ENEMY_MOVESET_OVERRIDE: [MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.RECOVER, MoveId.AURA_SPHERE],
+      });
+      return [
+        makeStarter(SpeciesId.MEW, {
+          formIndex: primalIdx,
+          shiny: true,
+          variant: 1,
+          moveset: [MoveId.PSYCHIC, MoveId.AURA_SPHERE, MoveId.SHADOW_BALL, MoveId.RECOVER],
+        }),
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.EARTHQUAKE],
         }),
       ];
     },

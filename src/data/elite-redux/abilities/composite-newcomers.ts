@@ -138,7 +138,7 @@ const HYDRATE = 5053; // ER custom (Normal moves become Water, Water empowered)
 const DRACONIZE = 5149; // ER custom (Normal moves become Dragon, Dragon empowered)
 const ENVENOM = 5553; // ER custom (poison-on-attack)
 const FOGGY_EYE = 5666; // ER custom
-const HYPER_AGGRESSIVE = 5096; // ER custom (all moves hit twice, 2nd at 25%)
+const MOUNTAINEER = 5052; // ER custom (immune to Rock moves + Stealth Rock)
 
 /**
  * The manual-composite registry, keyed by pokerogue ability id. This is the
@@ -324,8 +324,8 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
   [ER_FREE_CLIMB_ABILITY_ID]: {
     id: ER_FREE_CLIMB_ABILITY_ID,
     name: "Free Climb",
-    description: "Unburden + Hyper Aggressive.",
-    constituents: [AbilityId.UNBURDEN, HYPER_AGGRESSIVE],
+    description: "Unburden + Mountaineer.",
+    constituents: [AbilityId.UNBURDEN, MOUNTAINEER],
   },
 };
 

@@ -23,7 +23,7 @@
 //     5959 Grievous Spear = Grim Jab + Savage Spear
 //     5960 Spectacle      = Levitate + Illuminate
 //     5961 Ominous Shroud = Shadow Shield + Foggy Eye
-//     5962 Free Climb     = Unburden + Hyper Aggressive
+//     5962 Free Climb     = Unburden + Mountaineer
 //
 //   Bespokes (wired from existing attr primitives in
 //   init-elite-redux-custom-abilities.ts `buildCustomAbility`):

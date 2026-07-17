@@ -85,7 +85,7 @@ Counts: 63 type-grant holders swept across 11 categories; 25 NEEDS-MAINTAINER; 2
 | `SPECIES_PARASECT` | Ghost | Jumpscare | [spec]  |
 | `SPECIES_GARDEVOIR_REDUX` | Ghost | Grim Jab (NEW) | [spec] Gardevoir R. |
 | `SPECIES_GARDEVOIR_REDUX_MEGA` (mega form) | Ghost | Grievous Spear (NEW) | [spec] Gardevoir R Mega. |
-| `SPECIES_SELENUMBRA` | Ghost | Serene Grace | [spec] Also Levitate -> Spectacle. |
+| `SPECIES_SELENUMBRA` | Ghost | Lunar Affinity | [spec] Maintainer 2026-07-17: Lunar Affinity (was Serene Grace; Selenumbra already carries Sheer Force, which conflicts with Serene Grace). Also Levitate -> Spectacle. |
 | `SPECIES_TOXTRICITY_REDUX_FUZZ` | Ghost | Heavy Metal | [spec] Toxtricity R Female. |
 | `SPECIES_TOXTRICITY_REDUX_FUZZ_MEGA` (mega form) | Ghost | Heavy Metal | [spec] Mega of Toxtricity R Female. |
 | `SPECIES_PHANFERNAL` | Ghost | Alluring Skull (NEW) | [spec]  |
@@ -96,7 +96,7 @@ Counts: 63 type-grant holders swept across 11 categories; 25 NEEDS-MAINTAINER; 2
 | `SPECIES_ROTOM_MOW` | Ghost | Overcharge | [spec] Rotom appliance form. |
 | `SPECIES_SOLROCK_SYSTEM` | Ghost | Levitate | [NM] Solrock signature. |
 | `SPECIES_LARVESTA_REDUX` | Ghost | Flame Body | [NM] Larvesta line. |
-| `SPECIES_VOLCARONA_REDUX` | Ghost | Flame Body | [NM] Volcarona line. |
+| `SPECIES_VOLCARONA_REDUX` | Ghost | Serene Grace | [spec] Maintainer 2026-07-17: Serene Grace (was Flame Body). |
 | `SPECIES_BELLSPROUT_REDUX` | Ghost | Chlorophyll | [NM] Bellsprout line. |
 
 ## Fairy Tale  (grant `FAIRY_TALE` -> native `FAIRY`)
@@ -122,7 +122,7 @@ Counts: 63 type-grant holders swept across 11 categories; 25 NEEDS-MAINTAINER; 2
 
 | Species / form | Native type | Replacement | Source |
 |---|---|---|---|
-| `SPECIES_SNEASLER_MEGA` (mega form) | Rock | Free Climb (NEW) | [spec]  |
+| `SPECIES_SNEASLER_MEGA` (mega form) | Rock | Free Climb (NEW) | [spec] Maintainer 2026-07-17: Free Climb ("Free Form") = Unburden + Mountaineer (was Unburden + Hyper Aggressive); the freed Mountaineer innate slot (innate 3) becomes Hyper Aggressive. Net: Mountaineer and Hyper Aggressive swap between the composite and innate 3. |
 | `SPECIES_EXCADRILL_REDUX` | Rock | Prickly Armor (NEW) | [NM] Excadrill Redux (distinct from Rexcadrill; carries Rocky Exterior); Prickly Armor to match rework. Position-remap parse initially missed it - found by the sweep-integrity test. |
 
 ## Rock Armor rework  (grant `ROCK_ARMOR` -> native `ROCK`)
@@ -157,6 +157,24 @@ Counts: 63 type-grant holders swept across 11 categories; 25 NEEDS-MAINTAINER; 2
   Kleavor R Mega -> Komodo**, **Falinks Mega -> Voltron**, **Mega Krookodile -> Steely
   Spirit**, **Crobat Mega -> Ominous Shroud**: mega forms not present as type-grant
   holders at sweep time; the abilities ARE built and ready. Applied when the mons land.
+  - **Maintainer 2026-07-17 constituent corrections** (the MANUAL composites in
+    `abilities/composite-newcomers.ts` already encode these; the correction was the
+    stale *display description*, resolved by ability NAME from
+    `er-ability-rom-descriptions.ts` / the draft `er-abilities.ts` entry):
+    Waterborne = **Hydrate** + Adaptability (was displayed "Aquatic + Adaptability"),
+    Dragonfruit = **Draconize** + Rough Skin (was "Half Drake + Rough Skin"),
+    Komodo = **Draconize** + Envenom (was "adds Dragon-type ..." / Half-Drake text),
+    Ominous Shroud = Shadow Shield + **Foggy Eye** (was "adds Ghost-type ..." / Phantom
+    text). Description surfaces fixed; the manual composites already invoke the correct
+    constituents (verified via attr probe).
+  - **FOLLOW-UP (not part of these 7 corrections):** the mega forms currently still
+    carry the OLD DRAFT abilities in their innate slots (Heracreus Mega innate = draft
+    Dragonfruit id 918/live 5619; Scizor/Scyther/Kleavor R Mega innate = draft Komodo
+    id 851/live 5552; Crobat Mega = draft Ominous Shroud 822/5523), whose BEHAVIOR still
+    grants the old type (Half-Drake/Phantom). Switching those innate slots to the
+    nativized MANUAL composites (5955/5956/5957/5961) is the "apply when the mons land"
+    step and is deferred; the maintainer's 2026-07-17 note corrected the ability
+    definitions/descriptions, not the mega slot assignments.
 - **Cacjack -> Ominous Shroud**: Cacjack carries NO type-grant in current data; tracked.
 - **Marowak: Ill Will -> Alluring Skull**: Marowak carries "Bone Zone" (5091), NOT "Ill Will" (5285)
   in current data - the named ability is absent, so NOT applied (tracked pending maintainer clarification).
