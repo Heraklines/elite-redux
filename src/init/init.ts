@@ -58,7 +58,21 @@ import { initAchievements } from "#system/achv";
 import { initVouchers } from "#system/voucher";
 import { initStatsKeys } from "#ui/game-stats-ui-handler";
 
-export function initializeGame() {
+// =============================================================================
+// #ios-stability (mitigation P4): `initializeGame()` runs a long, strictly-ordered
+// block of synchronous init work. On desktop it runs in one pass (unchanged). On iOS
+// the same work is driven by `initializeGameYielding()`, which awaits a macrotask
+// between the ordered PHASES below so the main thread yields - avoiding iOS's
+// kill-the-tab boot watchdog. The phases are contiguous slices of the original body:
+// init ORDER and SEMANTICS are identical on both paths; only the orchestration yields.
+// =============================================================================
+
+/** Yield to the event loop (macrotask) so a long iOS boot init doesn't trip the watchdog. */
+function yieldToEventLoop(): Promise<void> {
+  return new Promise<void>(resolve => setTimeout(resolve, 0));
+}
+
+function initPhaseVanillaCore(): void {
   initBiomeBgmLoopPoints();
   initModifierTypes();
   initModifierPools();
@@ -77,6 +91,9 @@ export function initializeGame() {
   initAbilities();
   initChallenges();
   initMysteryEncounters();
+}
+
+function initPhaseErSpecies(): void {
   // Elite Redux Phase B1a: install ER 3-passive triples on vanilla species.
   // Must run AFTER initSpecies() (needs allSpecies populated) and AFTER
   // initAbilities() (so ability ids resolve cleanly when activated later).
@@ -106,6 +123,9 @@ export function initializeGame() {
   console.info(
     `[er-newcomer-species] registered ${newcomerSpeciesResult.speciesRegistered} species (skipped ${newcomerSpeciesResult.speciesAlreadyPresent}), ${newcomerSpeciesResult.evolutionEdges} evo edges, ${newcomerSpeciesResult.omniformMappings} Omniform mappings`,
   );
+}
+
+function initPhaseErForms(): void {
   // Elite Redux Phase B1c: data-driven mega/primal/origin FORM injection for
   // every ER mega — including ER-custom (Redux) megas, which B1a skips. Must run
   // AFTER initEliteReduxCustomSpecies() so custom bases exist in allSpecies, and
@@ -131,6 +151,9 @@ export function initializeGame() {
   console.info(
     `[er-newcomer-forms] injected ${newcomerFormResult.injected} forms (skipped ${newcomerFormResult.skippedExisting}), ${newcomerFormResult.edgesRegistered} stone edges`,
   );
+}
+
+function initPhaseErAbilitiesMoves(): void {
   // Elite Redux Phase B2: register ER-custom abilities + moves (ids ≥ 5000).
   // Must run AFTER initAbilities() / initMoves() so the vanilla baselines
   // are in place.
@@ -177,6 +200,9 @@ export function initializeGame() {
   console.info(
     `[er-custom-forms] injected ${erCustomFormResult.formsInjected} battle forms, registered ${erCustomFormResult.formChangesRegistered} form-change edges`,
   );
+}
+
+function initPhaseErSpritesRebalance(): void {
   // Elite Redux: point EVERY ER mega/primal form at its `elite-redux/{slug}` art.
   // injectAllErMegaForms() only redirects the forms it freshly injects; megas
   // whose form already existed (skipped as "already present") otherwise keep the
@@ -234,6 +260,9 @@ export function initializeGame() {
   console.info(
     `[er-manual-composite] wired ${manualCompositeResult.wired} newcomer composites${manualCompositeResult.emptyConstituents.length > 0 ? ` (${manualCompositeResult.emptyConstituents.length} empty constituents: ${manualCompositeResult.emptyConstituents.map(e => `${e.compositeId}<-${e.constituentId}`).join(", ")})` : ""}`,
   );
+}
+
+function initPhaseErTrainersForms(): void {
   // Elite Redux Phase B4: populate the ER trainer registry. Must run AFTER
   // initEliteReduxCustomSpecies() and initEliteReduxCustomMoves() so the
   // species/move ids the registry references are guaranteed-resolvable
@@ -276,6 +305,9 @@ export function initializeGame() {
   // megas" bug). The generator is idempotent (it skips forwards that already
   // have a matching reverse), so re-running only fills in the ER additions.
   initPokemonForms();
+}
+
+function initPhaseErMovesetsEvos(): void {
   // Elite Redux Phase B6: wire ER per-species level-up movesets into
   // pokerogue's `pokemonSpeciesLevelMoves` table. Must run AFTER
   // initEliteReduxCustomMoves() (so ER-custom move ids ≥ 5000 are valid)
@@ -310,7 +342,9 @@ export function initializeGame() {
   console.info(
     `[er-b6] patched ${evoResult.speciesPatched} species' evolution tables (${evoResult.evolutionEdgesApplied} level edges; skipped ${evoResult.speciesSkippedNoLevelEvos} no-level-evos + ${evoResult.formChangeEdgesSkipped} form-change edges + ${evoResult.speciesSkippedNoMapping} no-mapping; dropped ${evoResult.edgesDroppedMissingTarget} missing-target + ${evoResult.edgesDroppedBadLevel} bad-level)`,
   );
+}
 
+function initPhaseErTiersFinal(): void {
   // Elite Redux: register ER customs as egg-hatchable. Must run AFTER
   // initEliteReduxEvolutions() because the skip-prevolution gate reads
   // `pokemonPrevolutions` which evolution-init populates.
@@ -400,4 +434,40 @@ export function initializeGame() {
       + `${nativization.unresolved.length > 0 ? `; unresolved: ${nativization.unresolved.join(", ")}` : ""}`
       + `${nativization.notFound.length > 0 ? `; grant-not-found: ${nativization.notFound.join(", ")}` : ""}`,
   );
+}
+
+/** The ordered init phases. Order is authoritative and must never change (see phase comments). */
+const INIT_PHASES: ReadonlyArray<() => void> = [
+  initPhaseVanillaCore,
+  initPhaseErSpecies,
+  initPhaseErForms,
+  initPhaseErAbilitiesMoves,
+  initPhaseErSpritesRebalance,
+  initPhaseErTrainersForms,
+  initPhaseErMovesetsEvos,
+  initPhaseErTiersFinal,
+];
+
+/**
+ * Synchronous game init (the desktop / non-iOS path). Runs every phase in order in one
+ * blocking pass - behaviourally identical to the original single-function body.
+ */
+export function initializeGame(): void {
+  for (const phase of INIT_PHASES) {
+    phase();
+  }
+}
+
+/**
+ * #ios-stability (mitigation P4): the SAME init, in the SAME order, but yielding the main
+ * thread between phases so a slow iOS device's boot watchdog doesn't kill the tab mid-init.
+ * Only the orchestration differs - every phase and its ordering is identical to
+ * {@linkcode initializeGame}. Awaited by the loading scene before it hands off to the battle
+ * scene, so all data is fully registered before the game runs.
+ */
+export async function initializeGameYielding(): Promise<void> {
+  for (const phase of INIT_PHASES) {
+    phase();
+    await yieldToEventLoop();
+  }
 }
