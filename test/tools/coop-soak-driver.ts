@@ -4358,9 +4358,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       if (endReason != null) {
         runEnded = { wave, ...endReason };
         // eslint-disable-next-line no-console
-        console.log(
-          `[coop-soak] RUN ENDED at wave ${wave} (seed ${seed}): ${endReason.reason}. Survey stops here.`,
-        );
+        console.log(`[coop-soak] RUN ENDED at wave ${wave} (seed ${seed}): ${endReason.reason}. Survey stops here.`);
         actionScript.push(`RUN-END wave ${wave}: ${endReason.reason}`);
         break;
       }

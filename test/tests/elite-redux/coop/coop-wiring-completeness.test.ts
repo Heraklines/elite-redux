@@ -451,18 +451,7 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
 
   it("retires late replacement authority only after the retained wave continuation is durably released", () => {
     const source = readFileSync(
-      join(
-        __dirname,
-        "..",
-        "..",
-        "..",
-        "..",
-        "src",
-        "data",
-        "elite-redux",
-        "coop",
-        "coop-runtime.ts",
-      ),
+      join(__dirname, "..", "..", "..", "..", "src", "data", "elite-redux", "coop", "coop-runtime.ts"),
       "utf8",
     );
     const start = source.indexOf("function maybeMarkCoopWaveContinuationReady(");

@@ -27,10 +27,7 @@ test("nightly planner freezes one checkpoint SHA and base seed before matrix fan
   assert.match(workflow, /run_mode:[\s\S]*calibrated-release[\s\S]*diagnostic/u);
   assert.match(workflow, /checkpoint_sha:[\s\S]*exact 40-character checkpoint SHA/u);
   assert.match(workflow, /base_seed:[\s\S]*matrix base seed/u);
-  assert.match(
-    workflow,
-    /calibrated-release forbids soak_waves overrides; use run_mode=diagnostic/u,
-  );
+  assert.match(workflow, /calibrated-release forbids soak_waves overrides; use run_mode=diagnostic/u);
 
   const plan = job("plan", "soak");
   assert.match(plan, /candidate="\$GITHUB_SHA"/u);
@@ -105,10 +102,7 @@ test("each matrix leg emits a structured SHA-bound attestation", () => {
   }
   assert.match(soak, /name: coop-soak-attestation-\$\{\{ matrix\.profile \}\}-\$\{\{ github\.run_id \}\}/u);
   assert.match(soak, /if-no-files-found: error/u);
-  assert.equal(
-    [...soak.matchAll(/coverage_ledger: dev-logs\/coop-soak\/coverage-ledger\.json/gu)].length,
-    3,
-  );
+  assert.equal([...soak.matchAll(/coverage_ledger: dev-logs\/coop-soak\/coverage-ledger\.json/gu)].length, 3);
   assert.match(soak, /coverage_ledger: dev-logs\/coop-soak\/coverage-ledger-level\.json/u);
   assert.match(soak, /name: Upload required checkpoint coverage ledger/u);
   assert.match(soak, /name: coop-soak-coverage-\$\{\{ matrix\.profile \}\}-\$\{\{ github\.run_id \}\}/u);

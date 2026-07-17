@@ -2378,11 +2378,7 @@ export class CoopBattleStreamer {
       const prior = this.ackedReplacementCommits.get(key);
       const firstStage =
         prior == null ? 0 : prior.stage === "materialApplied" ? 1 : prior.stage === "presentationReady" ? 2 : 3;
-      const stages: readonly CoopAuthorityAckStage[] = [
-        "materialApplied",
-        "presentationReady",
-        "continuationReady",
-      ];
+      const stages: readonly CoopAuthorityAckStage[] = ["materialApplied", "presentationReady", "continuationReady"];
       for (let index = firstStage; index < stages.length; index++) {
         if (!this.acknowledgeReplacement(envelope, stages[index])) {
           return completed;
