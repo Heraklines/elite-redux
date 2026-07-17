@@ -358,9 +358,9 @@ export class SummaryUiHandler extends UiHandler {
     // ER money streak (#348): small gold ribbon on the name bar — sits in the
     // free gap between "Lv." and the gender symbol (the ER summary's left panel
     // is narrow; anything past the gender symbol at x=96 gets clipped, which is
-    // why the first placement at x=108 was invisible). Nudged to x=60 so a
-    // triple-digit level ("Lv.123+", which grows right from x=24 to ~x=54)
-    // no longer overlaps the ribbon.
+    // why the first placement at x=108 was invisible). Base placement is x=60 for
+    // 1-2 digit levels; updateInfo() shrinks + nudges it right for 3-digit levels
+    // ("Lv.100"+), which are 34px wide and would otherwise collide with it (#757).
     this.erStreakText = addTextObject(60, -17, "", TextStyle.SUMMARY_GOLD);
     this.erStreakText.setOrigin(0, 1);
     this.summaryContainer.add(this.erStreakText);
@@ -644,6 +644,15 @@ export class SummaryUiHandler extends UiHandler {
     // ER money streak ribbon (#348): show this mon's current money bonus.
     const erStreakBonus = erStreakBonusPercent(this.pokemon.id);
     this.erStreakText.setText(erStreakBonus > 0 ? `₽+${erStreakBonus}%` : "");
+    // #757: a THREE-digit level ("Lv.100"+) is 34px wide and reaches x=58, leaving only a
+    // 2px gap before the badge's default x=60 - so the level number and the badge collide.
+    // The row is packed tight (the gender symbol sits at x=96), so simply shifting the badge
+    // right would push it into the gender symbol. For 3-digit levels only, render the badge a
+    // touch smaller and nudge it right so it clears the level number AND still ends before the
+    // gender symbol. One- and two-digit levels keep the original size/position untouched.
+    const threeDigitLevel = this.pokemon.level >= 100;
+    this.erStreakText.setFontSize(threeDigitLevel ? "76px" : "96px");
+    this.erStreakText.setX(threeDigitLevel ? 62 : 60);
 
     switch (this.summaryUiMode) {
       case SummaryUiMode.DEFAULT: {

@@ -35,6 +35,7 @@ import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-infer
 import { buildDemoChallengesConfig } from "#data/elite-redux/er-community-challenges";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
+import { advanceErMoneyStreaks, erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
 import {
   ER_SHINY_LAB_DEFAULT_PARAMS,
@@ -247,6 +248,28 @@ async function startBattleWithShinyLabLead(game: GameManager, id: SpeciesId = Sp
   mon.shiny = true;
   mon.variant = 0;
   await mon.loadAssets();
+  return mon;
+}
+
+/**
+ * Bug #757 repro helper: a player lead at an explicit LEVEL carrying a maxed money
+ * streak (so the summary name bar shows the "₽+N%" mini-badge next to "Lv.<level>").
+ * The streak is advanced by replaying the real per-wave advance (each call = +1 faint-free
+ * wave for every party mon) until the lead's badge bonus caps, so the badge text is the
+ * widest it ever renders ("₽+10%"). At level >= 100 the level counter is three digits, which
+ * is the collision the fix addresses; a 2-digit level keeps the badge clear.
+ */
+async function startBattleWithMoneyStreakLead(game: GameManager, level: number) {
+  game.override.startingLevel(level);
+  await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+  const mon = game.scene.getPlayerPokemon();
+  if (!mon) {
+    throw new Error("money-streak summary recipe: no player pokemon after startBattle");
+  }
+  // Replay enough won waves to cap this mon's per-mon money bonus (widest badge text).
+  for (let i = 0; i < 40 && erStreakBonusPercent(mon.id) < 10; i++) {
+    advanceErMoneyStreaks();
+  }
   return mon;
 }
 
@@ -1253,6 +1276,29 @@ const RECIPES: Record<string, Recipe> = {
       return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
     },
     steps: [Button.CYCLE_SHINY],
+    diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
+  },
+  // Bug #757: the ER money-streak mini-badge ("₽+N%", #348) on the summary name bar collides
+  // with the level counter once the level reaches three digits. This recipe pins a level-120
+  // lead with a maxed streak so "Lv.120" (3 digits) and "₽+10%" both draw; before the fix the
+  // badge (x=60) sits under the tail of the level number, after the fix it clears it.
+  "summary-money-streak-3digit": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithMoneyStreakLead(game, 120);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
+  },
+  // The 2-digit control for #757: same maxed streak badge, but a level-55 lead ("Lv.55"). The
+  // badge must render exactly as before (no collision at 1-2 digit levels) - this recipe guards
+  // that the fix does not shift the badge for the common case.
+  "summary-money-streak-2digit": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithMoneyStreakLead(game, 55);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
     diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
   },
   // Regression for Shiny Lab equipped looks in the party SUMMARY view. The lead owns
