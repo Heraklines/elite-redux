@@ -166,6 +166,19 @@ export class PromptHandler extends GameManagerHelper {
   }
 
   /**
+   * Discard every pending prompt without executing its callback.
+   *
+   * {@linkcode doPromptCheck} only ever inspects the FIRST queued prompt, so a stale prompt whose
+   * `expireFn` never fires (because the run took a branch that skips the phase it waits on) will
+   * head-block every prompt queued behind it. Callers that force the phase queue onto a new path
+   * (e.g. skipping a battle straight to its rewards) can use this to drop those now-moot prompts
+   * before queueing the ones the new path needs.
+   */
+  public clearPrompts(): void {
+    this.prompts.length = 0;
+  }
+
+  /**
    * Wrapper function to add coloration to phase logs.
    * @param args - Arguments to original logging function
    */

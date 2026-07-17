@@ -34,6 +34,7 @@
 import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { speciesTmMoves } from "#balance/tms";
 import {
+  erOmniformConnectedForms,
   erOmniformFamilyForms,
   erOmniformOriginalIdentity,
   type OmniformTarget,
@@ -42,6 +43,7 @@ import type { PokemonSpeciesForm } from "#data/pokemon-species";
 import { MoveId } from "#enums/move-id";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
+import type { LevelMoves } from "#types/pokemon-level-moves";
 import { getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
 
 /** One stored move: `[moveId, ppUsed]`. Compact on purpose (save-size sensitive). */
@@ -174,7 +176,54 @@ export function rollOmniformMoveset(
 }
 
 // -----------------------------------------------------------------------------
-// Learnability (each evolution species' OWN learnable set)
+// Pooled level-up union (every family member learns any member's level-up move)
+// -----------------------------------------------------------------------------
+
+/**
+ * Pool the level-up learnsets of `forms` into ONE `[level, moveId]` table, each move
+ * kept at the MINIMUM learn level across all contributors. Because an Omniform mon
+ * switches between evolution forms via Omniform and can be in ANY form when it levels
+ * up, every family member must be able to learn the whole family's level-up pool — so
+ * no move is missed just because the current form is not the one that "owns" it (e.g.
+ * a Jolteon-only Electric move at level 30 is offered even while in base/other form).
+ */
+function familyUnionLevelMoves(forms: readonly OmniformTarget[]): LevelMoves {
+  const minLevel = new Map<number, number>();
+  for (const form of forms) {
+    for (const [level, moveId] of resolveForm(form).getLevelMoves()) {
+      if (moveId === MoveId.NONE) {
+        continue;
+      }
+      const existing = minLevel.get(moveId);
+      if (existing === undefined || level < existing) {
+        minLevel.set(moveId, level);
+      }
+    }
+  }
+  const out: LevelMoves = [];
+  for (const [moveId, level] of minLevel.entries()) {
+    out.push([level, moveId as MoveId]);
+  }
+  out.sort((a, b) => a[0] - b[0]);
+  return out;
+}
+
+/**
+ * The pooled level-up learn set for `mon`'s WHOLE Omniform family, each move at its
+ * minimum level across the family (base first, resolved from the mon's persistent
+ * base identity). Empty for a non-Omniform mon. This is what the level-up offer path
+ * feeds a partner mon so leveling any form can learn any pooled move; the per-evolution
+ * stored movesets + seeded roll are untouched (each evolution still rolls its OWN kit).
+ */
+export function omniformUnionLevelMoves(mon: Pokemon): LevelMoves {
+  if (!isErOmniformMon(mon)) {
+    return [];
+  }
+  return familyUnionLevelMoves(omniformFamilyForms(mon));
+}
+
+// -----------------------------------------------------------------------------
+// Learnability (each evolution species' OWN learnable set + the family union)
 // -----------------------------------------------------------------------------
 
 /**
@@ -211,6 +260,15 @@ export function omniformFormLearnableMoves(form: OmniformTarget): Set<MoveId> {
   }
   const rootId = getPokemonSpecies(form.speciesId).getRootSpeciesId(true);
   for (const moveId of speciesEggMoves[rootId] ?? []) {
+    out.add(moveId);
+  }
+  // Pool the WHOLE Omniform family's level-up moves so every member can learn any
+  // move ANY family member learns on level-up (the requirement: a form does not have
+  // to BE Jolteon to learn a Jolteon-only level-up move). Resolved from the undirected
+  // family component so a partner eeveelution (queried by its own form) also reaches
+  // the Partner Eevee head. A non-Omniform form's component is just itself, so its
+  // own level-up moves are re-added (a no-op) and vanilla learnability is unchanged.
+  for (const [, moveId] of familyUnionLevelMoves(erOmniformConnectedForms(form.speciesId, form.formIndex))) {
     out.add(moveId);
   }
   return out;

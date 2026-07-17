@@ -66,7 +66,7 @@ import {
   ER_PARTNER_VAPOREON_ABILITY_ID,
 } from "#data/elite-redux/abilities/composite-newcomers";
 import { registerOmniformMapping } from "#data/elite-redux/abilities/omniform-registry";
-import { ErCustomSpecies, registerErEditorMon } from "#data/elite-redux/init-elite-redux-custom-species";
+import { registerErEditorMon } from "#data/elite-redux/init-elite-redux-custom-species";
 import { EggTier } from "#enums/egg-type";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -256,8 +256,12 @@ export const ER_NEWCOMER_ICON_SLUGS: readonly string[] = [
  * bespoke `icon` atlas (front-only art; see `ErCustomSpecies.registerIconFromFront`).
  * STATIC because `loadEliteReduxCustomIcons` runs before ER init, when the runtime
  * registry is still empty. Keep in sync with the `registerIconFromFront` calls.
+ *
+ * Currently empty: Regitube (the sole former member) now ships a valid bespoke
+ * `icon.png` atlas and loads its mini icon from that like every other newcomer,
+ * so nothing derives its icon from the front sprite anymore.
  */
-export const ER_NEWCOMER_FRONT_ICON_SLUGS: ReadonlySet<string> = new Set(["regitube"]);
+export const ER_NEWCOMER_FRONT_ICON_SLUGS: ReadonlySet<string> = new Set<string>();
 
 /**
  * Regitube — standalone Water "Inflatable Pokemon". Egg-obtainable base-of-line
@@ -469,10 +473,12 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
     }
     (speciesEggTiers as Record<number, EggTier>)[ER_REGITUBE_SPECIES_ID] = REGITUBE_EGG_TIER;
     (speciesStarterCosts as Record<number, number>)[ER_REGITUBE_SPECIES_ID] = REGITUBE_STARTER_COST;
-    // Regitube ships front-only art; the published icon atlas lacks the 0001.png
-    // frame, so its icon key would render a missing/black box. Maintainer decision:
-    // derive the icon from the downscaled front sprite (front atlas @ 0.5 scale).
-    ErCustomSpecies.registerIconFromFront(ER_REGITUBE_SPECIES_ID);
+    // Regitube uses its bespoke `icon.png` atlas (a valid 2-frame 32x32 mini icon,
+    // same shape as the other newcomers). It formerly derived its icon from the
+    // downscaled front sprite because the published icon atlas was missing its
+    // 0001.png frame; that atlas has since been regenerated with a valid frame, so
+    // the front-icon workaround (which rendered oversized on egg-hatch/party/
+    // summary) is no longer needed. See ER_NEWCOMER_FRONT_ICON_SLUGS.
   }
 
   // --- 3. Partner EEVEELUTIONS (8 transform-target species). Exact clone of the

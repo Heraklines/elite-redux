@@ -62,6 +62,7 @@ import {
   ER_REGITUBE_SPECIES_ID,
   ER_TENTALECT_SPECIES_ID,
 } from "#data/elite-redux/er-newcomer-species";
+import { ErCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
 import type { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -299,5 +300,28 @@ describe.skipIf(!RUN)("ER newcomer render sweep (non-empty sprite on every surfa
       const shinyFailures = [...shiny.missing, ...shiny.broken];
       expect(shinyFailures, `${entry.label} (shiny variants):\n${shinyFailures.join("\n")}`).toEqual([]);
     }
+  });
+
+  // --- MINI-ICON surface (the front-frame-as-icon oversize class) --------------
+  // The atlas sweep above exercises front/back/dex/summary/evolution but NOT the
+  // per-slug menu-icon atlas. Regitube formerly derived its mini icon from the
+  // 64x64 FRONT sprite (registerIconFromFront), so it rendered ~2x oversized on
+  // egg-hatch / party / summary. Its `icon.png` now ships a valid 32x32 frame, so
+  // it must route through the bespoke icon atlas like every other newcomer.
+  it("Regitube's mini icon routes to the bespoke icon atlas at icon size, not the oversized front sprite", async () => {
+    // No custom species may still derive its icon from the front sprite.
+    expect(ErCustomSpecies.usesIconFromFront(ER_REGITUBE_SPECIES_ID), "Regitube uses front-as-icon").toBe(false);
+
+    // Regitube resolves to its bespoke icon atlas, exactly like a known-good newcomer.
+    const regitubeIcon = ErCustomSpecies.getIconAtlasSourcePath(ER_REGITUBE_SPECIES_ID);
+    expect(regitubeIcon).toBe("elite-redux/regitube/icon");
+    expect(ErCustomSpecies.getIconAtlasSourcePath(ER_TENTALECT_SPECIES_ID)).toBe("elite-redux/tentalect/icon");
+
+    // The resolved icon atlas decodes a real, icon-sized (32x32) frame - the front
+    // atlas would decode a 64x64 frame (the oversize) or the whole packed sheet.
+    const a = await analyzeAtlas(regitubeIcon as string);
+    expect(a.exists, `icon atlas "${regitubeIcon}" has a file`).toBe(true);
+    expect(a.dims, "Regitube icon frame is icon-sized").toBe("32x32");
+    expect(a.transparentPct, "Regitube icon frame is non-empty").toBeLessThan(99);
   });
 });
