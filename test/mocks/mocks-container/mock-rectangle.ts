@@ -149,6 +149,23 @@ export class MockRectangle implements MockGameObject {
     return this;
   }
 
+  on(): this {
+    // Real Phaser shapes are EventEmitters; stubbed so handlers that wire a
+    // pointer handler on an interactive shape in setup() don't crash the scene.
+    return this;
+  }
+
+  setInteractive(): this {
+    // Real Phaser GameObjects expose this; stubbed so handlers that make a shape
+    // clickable in setup() (e.g. the Shiny Lab effects button) don't crash the
+    // headless scene (nothing is hit-tested headlessly).
+    return this;
+  }
+
+  disableInteractive(): this {
+    return this;
+  }
+
   setActive(active: boolean): this {
     this.active = active;
     return this;

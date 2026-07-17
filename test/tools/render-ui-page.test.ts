@@ -259,6 +259,20 @@ async function startBattleWithPartnerEeveeLead(game: GameManager) {
   return mon;
 }
 
+/**
+ * ER Omniform + 5 ability rows: a BLACK-SHINY Partner Eevee. Its abilities page
+ * shows Ability + 3 Innates + the switchable GIFT row (5 rows total) - the worst
+ * case for vertical space. Proves the header-placed strip never overlaps content.
+ */
+async function startBattleWithBlackShinyPartnerEeveeLead(game: GameManager) {
+  const mon = await startBattleWithPartnerEeveeLead(game);
+  applyErBlackShinyKit(mon); // flips customPokemonData.erBlackShiny = true
+  mon.customPokemonData.erBlackShiny = true;
+  mon.customPokemonData.erGiftAbilities = [...GIFT_CHOICES];
+  mon.customPokemonData.erGiftIndex = 0;
+  return mon;
+}
+
 async function startBattleWithShinyLabLead(game: GameManager, id: SpeciesId = SpeciesId.BULBASAUR) {
   caughtShinyLabSpecies(game, id);
   await game.classicMode.startBattle(id);
@@ -619,6 +633,26 @@ const RECIPES: Record<string, Recipe> = {
     // (tab switching + slider adjust) with no crash.
     steps: [Button.RIGHT, Button.RIGHT, Button.RIGHT, Button.DOWN, Button.DOWN, Button.RIGHT],
     diffTolerance: 180000, // animated exact FX advances during the six-step navigation tour
+  },
+  // The EFFECTS LAB section (a separate lab reached by the header "Effects" button,
+  // above the shiny option area). UP parks on the button, ACTION opens the effects
+  // section: the category column ("Transformation Effects") + the first (partner)
+  // Eeveelution selected on its FRONT sprite with the per-type transform burst
+  // playing. Coarse tolerance covers the Math.random-seeded burst particles (like
+  // the shiny-lab animated-FX pages).
+  "er-effects-lab": {
+    mode: UiMode.ER_SHINY_LAB,
+    prepare: () => [buildDemoConfig(SpeciesId.ARTICUNO)],
+    steps: [Button.UP, Button.ACTION],
+    diffTolerance: 200000,
+  },
+  // Same section, then U/D toggles the preview to the BACK sprite (how the transform
+  // looks back and forth). Proves the front/back control + a re-triggered burst.
+  "er-effects-lab-back": {
+    mode: UiMode.ER_SHINY_LAB,
+    prepare: () => [buildDemoConfig(SpeciesId.ARTICUNO)],
+    steps: [Button.UP, Button.ACTION, Button.DOWN],
+    diffTolerance: 200000,
   },
   // ER Community Challenges (P1): the populated browser, the ZERO-at-launch empty
   // state ("vacant standards"), and a directional-nav tour. Static (no live anim) -> exact diff.
@@ -1336,11 +1370,12 @@ const RECIPES: Record<string, Recipe> = {
     diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
   },
   // ER Omniform mons (#partner-eevee): a Partner Eevee lead shows the evolution
-  // browser STRIP on the ABILITIES page (Eevee + the 8 partner eeveelutions), the
-  // current battle-active form marked with a gold underline and boxed as selected.
-  // The < / > overflow arrows appear because 9 entries exceed the 5-icon window.
-  // This golden proves the strip renders for a multi-form Omniform mon; the plain
-  // `summary` recipe above (a single-form mon) proves it does NOT render there.
+  // browser STRIP in the TOP HEADER bar (bare icons, no box) - Eevee + the 8
+  // partner eeveelutions, the current battle-active form gold-underlined, the
+  // selected icon bright while the rest are dimmed, the < / > overflow arrows
+  // (9 entries > the 5-icon window), and the (F) key-badge. Content area is
+  // untouched. The plain `summary` recipe above (a single-form mon) proves the
+  // strip does NOT render there.
   "summary-multiform": {
     mode: UiMode.SUMMARY,
     prepare: async game => {
@@ -1349,9 +1384,9 @@ const RECIPES: Record<string, Recipe> = {
     },
     diffTolerance: 40000, // live animated Eevee sprite in the summary box
   },
-  // ER Omniform mons: after two CYCLE_FORM presses the strip selects the 2nd
-  // partner eeveelution and the ABILITIES panel re-renders THAT evolution's kit
-  // (view-only), the window scrolled to keep the selection in view.
+  // ER Omniform mons: after two CYCLE_FORM presses the header strip selects the
+  // 2nd partner eeveelution (bright icon, window scrolled) and the ABILITIES panel
+  // re-renders THAT evolution's kit (view-only).
   "summary-multiform-cycled": {
     mode: UiMode.SUMMARY,
     prepare: async game => {
@@ -1360,6 +1395,17 @@ const RECIPES: Record<string, Recipe> = {
     },
     steps: [Button.CYCLE_FORM, Button.CYCLE_FORM],
     diffTolerance: 40000, // live animated mon sprite in the summary box
+  },
+  // ER Omniform + FIVE ability rows: a black-shiny Partner Eevee (Ability + 3
+  // Innates + the switchable GIFT row). Proves the header-placed strip never
+  // overlaps the content, even on the tallest ability layout.
+  "summary-multiform-5ability": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithBlackShinyPartnerEeveeLead(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    diffTolerance: 40000, // live animated Eevee sprite in the summary box
   },
   // Bug #757: the ER money-streak mini-badge ("₽+N%", #348) on the summary name bar collides
   // with the level counter once the level reaches three digits. This recipe pins a level-120
