@@ -48,13 +48,24 @@ test("Mystery gauntlet policy is loud-fail and drives every projected encounter 
       assert.deepEqual(policy.mysteryGauntlet, { required: true, minSurfaces: 6 });
       assert.equal(policy.maxBattleLoops, 90);
       assert.equal(policy.moveAnimationsExpected, false);
-      const surfaces = buildDispatchTable(policy).map(driver => driver.v2SurfaceId);
+      const dispatch = buildDispatchTable(policy);
+      const surfaces = dispatch.map(driver => driver.v2SurfaceId);
       assert.deepEqual(
         ["mystery-encounter", "mystery-encounter:prompt", "quiz", "bargain", "colosseum"].filter(
           surface => !surfaces.includes(surface),
         ),
         [],
       );
+      assert.deepEqual(
+        dispatch
+          .filter(driver => ["reward-target", "biome-pick"].includes(driver.name))
+          .map(driver => [driver.name, driver.v2SurfaceId]),
+        [
+          ["reward-target", "party:reward-target"],
+          ["biome-pick", "world-map"],
+        ],
+      );
+      assert.equal(dispatch.find(driver => driver.name === "reward-target")?.semanticOnly, true);
     },
   );
 });
@@ -62,12 +73,9 @@ test("Mystery gauntlet policy is loud-fail and drives every projected encounter 
 test("workflow builds the staging-only fifth difficulty and fans a fixed ten-wave profile", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8");
   assert.match(workflow, /VITE_DEV_TOOLS: 1/u);
-  // The live difficulty picker's semantic id renamed "mystery-test" -> "mystery"
-  // (run 29586411356 failed loudly on the stale id); a comment line now sits between
-  // the difficulty and option keys, so match the keys individually in order.
   assert.match(
     workflow,
-    /profile: mystery-gauntlet\s+artifact: mystery\s+waves: "10"\s+difficulty: mystery\s+[\s\S]{0,400}?difficulty_option: mystery\s+require_mystery: "1"/u,
+    /profile: mystery-gauntlet\s+artifact: mystery\s+waves: "10"\s+difficulty: mystery\s+difficulty_option: mystery-test\s+require_mystery: "1"/u,
   );
   assert.match(workflow, /COOP_UI_DIFFICULTY_ID: \$\{\{ matrix\.difficulty \}\}/u);
   assert.match(workflow, /COOP_UI_DIFFICULTY_OPTION_ID: \$\{\{ matrix\.difficulty_option \}\}/u);
@@ -86,6 +94,11 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /owner\.waitForOwnedRewardConfirm\(/u);
   assert.match(campaign, /watcher\.waitForAddressedRewardWatcher\(/u);
   assert.match(campaign, /campaign-semantic-confirmation-barrier/u);
+  assert.match(campaign, /async function checkpointRewardPartyTarget\(/u);
+  assert.match(campaign, /watcherSurfaceId: "reward-shop"/u);
+  assert.match(campaign, /async function driveRewardPartyTarget\(/u);
+  assert.match(campaign, /selected\.startsWith\("party-option:"\)/u);
+  assert.match(campaign, /campaign-reward-target-action/u);
   assert.match(campaign, /await driveConfirmedLeave\(rig, driver, client, mechanicalBoundary\.authority\)/u);
   assert.match(campaign, /event\.terminal\.wave === wave \+ 1/u);
   assert.match(campaign, /if \(nextBoundary\.wave <= event\.wave\)/u);
@@ -201,13 +214,15 @@ test("parallel lobby pairing reselects the exact visible username before every r
 });
 
 test("semantic option identity is independent of every presentation language", async () => {
-  const [observer, optionType, gender, confirm, title, starter] = await Promise.all([
+  const [observer, optionType, gender, confirm, title, starter, party, campaignNav] = await Promise.all([
     readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
     readFile(resolve(root, "src/ui/handlers/abstract-option-select-ui-handler.ts"), "utf8"),
     readFile(resolve(root, "src/phases/select-gender-phase.ts"), "utf8"),
     readFile(resolve(root, "src/ui/handlers/confirm-ui-handler.ts"), "utf8"),
     readFile(resolve(root, "src/phases/title-phase.ts"), "utf8"),
     readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/party-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign-nav.mjs"), "utf8"),
   ]);
 
   assert.match(optionType, /semanticId\?: string/u);
@@ -220,6 +235,17 @@ test("semantic option identity is independent of every presentation language", a
   assert.match(title, /semanticId: `accept:\$\{from\.name\}`/u);
   assert.match(starter, /semanticId: "add-to-party"/u);
   assert.match(starter, /semanticId: key\.toLowerCase\(\)/u);
+  assert.match(observer, /selectedOptionId: "starter-action:random"/u);
+  assert.match(observer, /selectedOptionId: `starter-team:\$\{starterHandler\.starterIconsCursorIndex\}`/u);
+  assert.match(campaignNav, /starter-grid-to-random/u);
+  assert.match(campaignNav, /starter-random-add-proof/u);
+  assert.match(campaignNav, /first random pick left no affordable second starter/u);
+  assert.match(campaignNav, /targetId: "remove-from-party"/u);
+  assert.match(party, /export enum PartyOption/u);
+  assert.match(observer, /partyOptionSemanticId\(/u);
+  assert.match(observer, /party-option:\$\{enumName\.toLowerCase\(\)\.replaceAll\("_", "-"\)\}/u);
+  assert.match(observer, /partyHandler\.optionsMode === true/u);
+  assert.match(observer, /uiMode === "PARTY"\s*\? null/u);
 });
 
 test("paired Chromium runs headful at an explicit player-sized viewport", async () => {

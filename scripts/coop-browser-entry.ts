@@ -531,6 +531,51 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
   } catch {
     selectedIndex = null;
   }
+  if (uiMode === "STARTER_SELECT") {
+    const starterHandler = handler as unknown as {
+      randomCursorObj?: { visible?: boolean };
+      lastTeamCursorObj?: { visible?: boolean };
+      startCursorObj?: { visible?: boolean };
+      starterIconsCursorObj?: { visible?: boolean };
+      starterIconsCursorIndex?: number;
+    };
+    if (starterHandler.randomCursorObj?.visible === true) {
+      return {
+        selectedOptionId: "starter-action:random",
+        optionIds: null,
+        optionCount: null,
+      };
+    }
+    if (starterHandler.lastTeamCursorObj?.visible === true) {
+      return {
+        selectedOptionId: "starter-action:last-team",
+        optionIds: null,
+        optionCount: null,
+      };
+    }
+    if (starterHandler.startCursorObj?.visible === true) {
+      return {
+        selectedOptionId: "starter-action:start",
+        optionIds: null,
+        optionCount: null,
+      };
+    }
+    if (
+      starterHandler.starterIconsCursorObj?.visible === true
+      && Number.isSafeInteger(starterHandler.starterIconsCursorIndex)
+    ) {
+      return {
+        selectedOptionId: `starter-team:${starterHandler.starterIconsCursorIndex}`,
+        optionIds: null,
+        optionCount: null,
+      };
+    }
+    return {
+      selectedOptionId: selectedIndex == null ? null : `starter-grid:${selectedIndex}`,
+      optionIds: null,
+      optionCount: null,
+    };
+  }
   if (uiMode === "SAVE_SLOT") {
     const selection = (handler as SaveSlotSelectUiHandler).getSelectedSlotSemanticSelection?.();
     const selectedOptionId = selection?.loaded ? `${selection.state}-slot:${selection.slotId}` : null;
