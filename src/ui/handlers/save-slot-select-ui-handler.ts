@@ -1,5 +1,6 @@
 import { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
+import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { TextStyle } from "#enums/text-style";
@@ -612,25 +613,38 @@ class SessionSlot extends Phaser.GameObjects.Container {
 
     const pokemonIconsContainer = globalScene.add.container(144, 16);
     data.party.forEach((p: PokemonData, i: number) => {
-      const iconContainer = globalScene.add.container(26 * i, 0);
-      iconContainer.setScale(0.75);
+      // Fail SOFT per mon: a single party member whose icon cannot be built (e.g.
+      // a species/form that no longer resolves) must NOT throw out of the preview
+      // and strand the whole slot (which then reads as malformed and blocks Load).
+      // Skip the bad icon + log; the rest of the preview still renders and the
+      // slot stays fully actionable (Load / Delete).
+      try {
+        const iconContainer = globalScene.add.container(26 * i, 0);
+        iconContainer.setScale(0.75);
 
-      const pokemon = p.toPokemon();
-      const icon = globalScene.addPokemonIcon(pokemon, 0, 0, 0, 0);
+        const pokemon = p.toPokemon();
+        const icon = globalScene.addPokemonIcon(pokemon, 0, 0, 0, 0);
 
-      const text = addTextObject(
-        32,
-        20,
-        `${i18next.t("saveSlotSelectUiHandler:lv")}${formatLargeNumber(pokemon.level, 1000)}`,
-        TextStyle.PARTY,
-        { fontSize: "54px", color: "#f8f8f8" },
-      );
-      text.setShadow(0, 0, undefined).setStroke("#424242", 14).setOrigin(1, 0);
+        const text = addTextObject(
+          32,
+          20,
+          `${i18next.t("saveSlotSelectUiHandler:lv")}${formatLargeNumber(pokemon.level, 1000)}`,
+          TextStyle.PARTY,
+          { fontSize: "54px", color: "#f8f8f8" },
+        );
+        text.setShadow(0, 0, undefined).setStroke("#424242", 14).setOrigin(1, 0);
 
-      iconContainer.add([icon, text]);
-      pokemonIconsContainer.add(iconContainer);
+        iconContainer.add([icon, text]);
+        pokemonIconsContainer.add(iconContainer);
 
-      pokemon.destroy();
+        pokemon.destroy();
+      } catch (err) {
+        console.error(
+          `[save-slot] skipped an unrenderable party preview icon (species ${p?.species}): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
     });
 
     this.add(pokemonIconsContainer);
@@ -639,7 +653,13 @@ class SessionSlot extends Phaser.GameObjects.Container {
     modifierIconsContainer.setScale(0.5);
     let visibleModifierIndex = 0;
     for (const m of data.modifiers) {
-      const modifier = m.toModifier(Modifier[m.className]);
+      // Resolve ER custom held-item classes too (ErGemModifier / ErSeedModifier /
+      // ErTacticalItemModifier / ...). They live OUTSIDE #modifiers/modifier, so a
+      // bare `Modifier[className]` lookup is undefined -> `Reflect.construct(undefined)`
+      // throws "undefined is not a constructor" inside toModifier (caught + logged),
+      // and the ER item silently vanished from this slot's preview. Mirror the
+      // resolver the live load path (GameData.loadSession) already uses.
+      const modifier = m.toModifier(Modifier[m.className] ?? resolveErModifierClass(m.className));
       if (modifier instanceof Modifier.PokemonHeldItemModifier) {
         continue;
       }

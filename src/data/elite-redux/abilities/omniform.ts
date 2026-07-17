@@ -60,7 +60,7 @@ import { UiMode } from "#enums/ui-mode";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 import { PokemonMove } from "#moves/pokemon-move";
-import { playErTransformMorph } from "#sprites/er-form-transform-fx";
+import { type ErTransformSequence, playErTransformMorph } from "#sprites/er-form-transform-fx";
 import type { AbAttrBaseParams } from "#types/ability-types";
 import type { FightUiHandler } from "#ui/handlers/fight-ui-handler";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -78,6 +78,22 @@ export class OmniformAbAttr extends PostSummonAbAttr {
   }
 
   override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
+ * Hold the move flow until the transform sequence has visually landed, so the mon
+ * becomes the new form BEFORE the move animation plays (the maintainer-reported
+ * ordering fix). Only the full "morph" path is gated: the fail-closed burst-only
+ * path resolves immediately, so it adds no wait (unchanged behaviour). Unshifted
+ * AFTER the "adapted/reverted" message so the flow reads: message -> transform
+ * completes -> "used <move>!" + move animation. The wait phase is hard-bounded and
+ * fails open, so it can never softlock (see `ErOmniformTransformWaitPhase`).
+ */
+function erOmniformHoldForTransform(sequence: ErTransformSequence): void {
+  if (sequence.mode !== "morph") {
+    return;
+  }
+  globalScene.phaseManager.unshiftNew("ErOmniformTransformWaitPhase", sequence.whenSettled);
 }
 
 /** Whether `pokemon` carries an unsuppressed, active Omniform. */
@@ -141,6 +157,9 @@ export function erOmniformRevertToBase(holder: Pokemon): void {
   );
 
   deleteOmniformOriginal(holder);
+  // Capture the display name BEFORE the species swap, or the message reads
+  // "Partner Eevee reverted to Partner Eevee".
+  const preRevertName = getPokemonNameWithAffix(holder);
   const base = { speciesId: original.species.speciesId, formIndex: original.formIndex };
   holder.species = original.species;
   holder.formIndex = original.formIndex;
@@ -156,17 +175,17 @@ export function erOmniformRevertToBase(holder: Pokemon): void {
   (globalScene.ui?.handlers?.[UiMode.FIGHT] as FightUiHandler | undefined)?.refreshMoves();
   // Full transform SEQUENCE (fill -> shape morph -> reveal + burst). The sprite +
   // info swap runs INSIDE `onSwap`, awaited under the glow, so the reveal drains
-  // onto the already-swapped base-form sprite (the late-swap fix). Fire-and-forget:
-  // the phase flow never awaits it (fail-closed = the old burst-only behaviour).
-  playErTransformMorph(holder, holder.getSpeciesForm().type1, {
+  // onto the already-swapped base-form sprite (the late-swap fix). The move flow is
+  // then HELD (bounded, fail-open) until the sequence lands, so the revert plays out
+  // BEFORE the move animation; the fail-closed burst-only path adds no wait.
+  const revertSeq = playErTransformMorph(holder, holder.getSpeciesForm().type1, {
     onSwap: async () => {
       await holder.loadAssets(false);
       await holder.updateInfo();
     },
   });
-  globalScene.phaseManager.queueMessage(
-    `${getPokemonNameWithAffix(holder)} reverted to ${original.species.getName()}!`,
-  );
+  globalScene.phaseManager.queueMessage(`${preRevertName} reverted to ${original.species.getName()}!`);
+  erOmniformHoldForTransform(revertSeq);
 }
 
 /**
@@ -220,6 +239,18 @@ export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
   if (!target) {
     return;
   }
+
+  // SAME-FORM NO-OP: the mapped target IS the holder's current species+form (e.g.
+  // Jolteon using an Electric move maps Jolteon -> Jolteon). It is already that
+  // form, so there is nothing to adapt: no message, no FX, no moveset re-derive,
+  // no wait phase, and no snapshot bookkeeping - the move just plays. Returning
+  // here BEFORE `snapshotOmniformOriginal` / the per-form PP snapshot leaves all
+  // chain-transform bookkeeping untouched.
+  const currentForm = user.getSpeciesForm();
+  if (target.speciesId === currentForm.speciesId && target.formIndex === currentForm.formIndex) {
+    return;
+  }
+
   const speciesForm = resolveSpeciesForm(target);
   const targetSpecies = getPokemonSpecies(target.speciesId);
 
@@ -241,6 +272,8 @@ export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
   // (which reads `getSpeciesForm(true)` — ignoring summon-data overrides) picks
   // up the TARGET form's base stats, exactly like a mega changing `formIndex`.
   // The new species also drives typing / sprite / name. Reverts on leaveField.
+  // Capture the display name BEFORE the swap for the "adapted into" message.
+  const preTransformName = getPokemonNameWithAffix(user);
   user.species = targetSpecies;
   user.formIndex = target.formIndex;
   // Pin Omniform so it persists across the transform and can chain again.
@@ -292,15 +325,18 @@ export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
   // so OTHER form changes keep their existing presentation. The real sprite + info
   // swap runs INSIDE `onSwap`, awaited UNDER the glow so the reveal drains onto the
   // already-swapped target sprite (the late-swap fix). Purely visual + fail-closed
-  // (never throws; degrades to the burst-only reveal). Fire-and-forget: the phase
-  // flow is never awaited on it.
-  playErTransformMorph(user, speciesForm.type1, {
+  // (never throws; degrades to the burst-only reveal).
+  const seq = playErTransformMorph(user, speciesForm.type1, {
     onSwap: async () => {
       await user.loadAssets(false);
       await user.updateInfo();
     },
   });
   globalScene.phaseManager.queueMessage(
-    `${getPokemonNameWithAffix(user)} adapted into ${getPokemonSpecies(target.speciesId).getName()}!`,
+    `${preTransformName} adapted into ${getPokemonSpecies(target.speciesId).getName()}!`,
   );
+  // HOLD the move flow (bounded, fail-open) until the sequence visually lands, so
+  // the transform completes BEFORE the move animation plays as the new form. The
+  // fail-closed burst-only path resolves immediately and adds no wait.
+  erOmniformHoldForTransform(seq);
 }

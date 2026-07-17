@@ -1187,6 +1187,40 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Held-item icons align in the summary items row (vanilla + ER)",
+    description:
+      "UI ALIGNMENT fix (not a battle behavior) - the ER-custom held items (tactical / reactive /\n"
+      + "elemental-gem / terrain-seed) drew their summary icon ~6px BELOW the vanilla items in the\n"
+      + "'ITEMS' strip. Their forSummary icon scaled the SPRITE while vanilla scales the whole\n"
+      + "CONTAINER, so the (0,12) anchor stayed at full size instead of halving to 6. Now every icon\n"
+      + "centres on the same line.\n"
+      + "DO: this scenario grants a mix of vanilla + ER held items (Leftovers + Utility Umbrella + Iron\n"
+      + "Ball + Weakness Policy + a Fire gem + an Electric Seed). Open the mon's SUMMARY and switch to\n"
+      + "the STATS page - look at the 'ITEMS' strip at the top.\n"
+      + "EXPECT: all item icons sit on ONE baseline - no ER icon sags below its vanilla neighbours.\n"
+      + "Render-tested via test/tools/render-ui-page.test.ts (page 'summary-items-row').",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_HELD_ITEMS_OVERRIDE: [
+          { name: "LEFTOVERS" },
+          { name: "ER_UTILITY_UMBRELLA" },
+          { name: "ER_IRON_BALL" },
+          { name: "ER_WEAKNESS_POLICY" },
+          { name: "ER_FIRE_GEM" },
+          { name: "ER_ELECTRIC_SEED" },
+        ],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Trainers never field an already-Busted Mimikyu",
     description:
       "GENERATION guard (not a battle behavior) - 'Busted' is a battle-RESULT form (Mimikyu's\n"
@@ -18544,12 +18578,22 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "falling droplets, fire = rising embers, electric = spark jitter). It is\n"
       + "generic, so every current and future evolution gets it from its primary type.\n"
       + "DO: attack with Magical Leaf. Eevee adapts into Leafeon.\n"
-      + "EXPECT: a brief (about 1 second) GREEN light flash on Eevee plus a few small\n"
-      + "green leaf particles, then the Leafeon sprite. The starting moveset also has\n"
-      + "Water Gun / Ember / Thunder Shock, so a fresh run of this scenario can show\n"
-      + "the blue (Vaporeon), orange (Flareon) and yellow (Jolteon) variants. Testers\n"
-      + "eyeball the FX; unit config coverage is in\n"
-      + "test/tests/elite-redux/er-form-transform-fx.test.ts.",
+      + "EXPECT: the fill/morph/reveal transform sequence plays and FINISHES FIRST\n"
+      + "(Eevee fully becomes Leafeon), and ONLY THEN does the move animation play as\n"
+      + "Leafeon - the transform must NOT happen on top of / after the move. After the\n"
+      + "reveal the mon RESTS cleanly on the new Leafeon form (correct sprite, fully\n"
+      + "visible, no snap-back to Eevee, no glow remnant). On a SLOW connection the\n"
+      + "glow HOLDS (stretches) until the new sprite has finished loading, then morphs\n"
+      + "and reveals onto it - the glow must never end and leave the sprite to pop in\n"
+      + "visibly late. The starting moveset also has Water Gun / Ember / Thunder Shock,\n"
+      + "so a fresh run of this scenario can show the blue (Vaporeon), orange (Flareon)\n"
+      + "and yellow (Jolteon) variants.\n"
+      + "ALSO DO: once you have adapted to a form, use that SAME form's own type again\n"
+      + "(e.g. adapt to Jolteon with Thunder Shock, then use Thunder Shock a second\n"
+      + "time). EXPECT: NO adapt message and NO transform FX the second time - it is\n"
+      + "already that form, so the move just plays. Testers eyeball the FX; unit\n"
+      + "coverage is in test/tests/elite-redux/er-form-transform-fx.test.ts and\n"
+      + "er-omniform.test.ts.",
     setup: () => {
       resetDevOverrides();
       setOverrides({

@@ -116,15 +116,19 @@ export class ErSeedModifier extends PokemonHeldItemModifier {
     if (forSummary) {
       // Standalone er-assets texture - super would render a blank "items"-atlas
       // frame in the summary/party view (the "item disappeared" report class).
+      // Scale the CONTAINER (not the sprite), matching vanilla PokemonHeldItem-
+      // Modifier.getIcon: it halves the local (0,12) anchor to 6. Scaling the sprite
+      // alone left the anchor at 12, dropping ER icons 6px below vanilla neighbours
+      // in the items row (live report 2026-07-17).
       const summary = globalScene.add.container(0, 0);
       const summaryItem = globalScene.add.sprite(0, 12, ER_SEED_CONFIG[this.kind].icon);
-      summaryItem.setScale(0.5);
       summaryItem.setOrigin(0, 0.5);
       summary.add(summaryItem);
       const summaryStack = this.getIconStackText();
       if (summaryStack) {
         summary.add(summaryStack);
       }
+      summary.setScale(0.5);
       return summary;
     }
     // Mirror the base held-item item-bar layout so the seed shows WHOSE it is: the

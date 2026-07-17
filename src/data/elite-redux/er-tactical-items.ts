@@ -351,15 +351,21 @@ export class ErTacticalItemModifier extends PokemonHeldItemModifier {
       // so that rendered an invisible blank (live report 2026-07-16: "Floaty
       // Stone... disappeared from my pokemon hold items"). Draw the standalone
       // texture directly at the same (0,12) anchor the vanilla summary icon uses.
+      // Scale the CONTAINER (not the sprite) exactly as vanilla PokemonHeldItem-
+      // Modifier.getIcon does: vanilla builds the sprite at local (0,12) then does
+      // container.setScale(0.5), which halves the 12px anchor to 6. Scaling the
+      // sprite alone left the anchor at 12, so ER icons sat 6px BELOW their vanilla
+      // neighbours in the items row (live report 2026-07-17). Container-scale aligns
+      // every icon on the same centre line and matches the vanilla stack-text size.
       const summary = globalScene.add.container(0, 0);
       const summaryItem = globalScene.add.sprite(0, 12, ER_TACTICAL_CONFIG[this.kind].icon);
-      summaryItem.setScale(0.5);
       summaryItem.setOrigin(0, 0.5);
       summary.add(summaryItem);
       const summaryStack = this.getIconStackText();
       if (summaryStack) {
         summary.add(summaryStack);
       }
+      summary.setScale(0.5);
       return summary;
     }
     // Item-bar layout matching the elemental gems / reactive items: the HOLDER's

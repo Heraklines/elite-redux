@@ -403,8 +403,18 @@ export const ER_TRANSFORM_MORPH_FILL_MS = 480;
 export const ER_TRANSFORM_MORPH_MORPH_MS = 760;
 /** DRAIN duration: how long the solid glow drains to reveal the target sprite. */
 export const ER_TRANSFORM_MORPH_DRAIN_MS = 360;
-/** Max EXTRA time the silhouette holds waiting on `onSwap` before failing open. */
-export const ER_TRANSFORM_MORPH_HOLD_CAP_MS = 1000;
+/**
+ * Max EXTRA time the glow STRETCHES past the base fill waiting for the target
+ * MASK before it commits to the no-morph degrade. Sized to cover a cold-CDN atlas
+ * download on staging (the maintainer's late-swap report): the local dev server
+ * has warm assets so `onSwap` resolved in ~0ms and the old 1s cap was never hit,
+ * but on staging the target atlas downloads DURING the sequence, so the mask was
+ * never ready in time and the morph silently degraded (and worse, revealed the
+ * pre-swap source). +1.5s gives the download room to land and the real
+ * source->target morph to run. Past this the sequence still holds the glow until
+ * the swap lands (never a late pop) and degrades to drain-only.
+ */
+export const ER_TRANSFORM_MORPH_HOLD_CAP_MS = 1500;
 /** Padding (px) around the sprite grid so the glow rim never clips the texture. */
 const ER_TRANSFORM_MORPH_PAD = 72;
 /** Depth of the morph silhouette: above the field sprites, below the burst. */
@@ -549,6 +559,145 @@ export function erTransformBuildMask(
   return { mask, offX, offY, count: c };
 }
 
+/** Which stage of the fill/morph/reveal arc a tick is rendering. */
+export type ErMorphStage = "fill" | "hold" | "morph" | "reveal";
+
+/**
+ * Immutable per-tick inputs to {@linkcode planErMorphTick}. Pure data - no scene,
+ * no canvas - so the whole timing state machine (including the deferred / never-
+ * arriving target-mask paths) is unit-testable without a real Phaser clock.
+ */
+export interface ErMorphTickInput {
+  /** ms elapsed since the sequence began. */
+  elapsed: number;
+  /** FILL stage length: source fades out, glow floods in. */
+  fillMs: number;
+  /** Max EXTRA ms the glow stretches past fill waiting for the target mask. */
+  holdCapMs: number;
+  /** MORPH stage length once the target mask is available. */
+  morphMs: number;
+  /** DRAIN (reveal) stage length. */
+  drainMs: number;
+  /** The target sprite swap (`onSwap`/loadAssets) has resolved - target is in place. */
+  swapDone: boolean;
+  /** The target silhouette SDF is built and usable. */
+  maskReady: boolean;
+  /** ms at which the target mask became ready (only meaningful when `maskReady`). */
+  readyAtMs: number;
+  /** ms at which the reveal/drain began, or < 0 if it has not started yet. */
+  revealStart: number;
+}
+
+/** The pure render decision for one tick. */
+export interface ErMorphTickPlan {
+  stage: ErMorphStage;
+  /** Alpha to apply to the REAL sprite this tick. */
+  spriteAlpha: number;
+  /** Shape interpolation 0 (source) .. 1 (target) for the silhouette. */
+  morphP: number;
+  /** Opacity of the glow overlay (0 => clear / draw nothing). */
+  overallAlpha: number;
+  /** True on the SINGLE tick the reveal begins (fire the burst exactly once). */
+  fireBurst: boolean;
+  /** The reveal-start to persist for the next tick (echoes input until reveal begins). */
+  revealStart: number;
+  /** True once the sequence has fully settled (tear the visual down). */
+  done: boolean;
+}
+
+/**
+ * Decide what one morph tick renders, PURELY from timing + readiness state. This
+ * is the maintainer-reported late-swap fix expressed as a state machine:
+ *
+ *  - FILL (0..fill): the source sprite fades out as the type-coloured glowing
+ *    silhouette floods in. Needs no target asset, so it always plays on time.
+ *  - The glow then STRETCHES (up to `holdCapMs` past fill) waiting for the target
+ *    MASK. If the mask arrives within that window the true source->target SDF
+ *    MORPH runs, then reveals.
+ *  - If the mask does NOT arrive in time (cold-CDN atlas still downloading) the
+ *    sequence DEGRADES: it keeps HOLDING the glow until the swap actually lands
+ *    (so the target sprite is already in place UNDER the glow), then drains with
+ *    no shape morph. It NEVER ends the glow before the swap, so the reported
+ *    "glow ends, then the sprite changes visibly later" can't happen.
+ *  - REVEAL (drain): the glow drains onto the swapped target sprite; the burst
+ *    fires once on entry.
+ *
+ * Bounded by construction: every branch is a function of `elapsed`, and the owning
+ * instance carries an absolute-lifetime backstop, so it can never hang.
+ */
+export function planErMorphTick(input: ErMorphTickInput): ErMorphTickPlan {
+  const { elapsed: el, fillMs: FILL, holdCapMs: HOLD, morphMs: MORPH, drainMs: DRAIN } = input;
+
+  // FILL: source fades out, the solid glowing silhouette floods in.
+  if (el < FILL) {
+    const f = erTransformQuadOut(el / FILL);
+    return {
+      stage: "fill",
+      spriteAlpha: 1 - f,
+      morphP: 0,
+      overallAlpha: f,
+      fireBurst: false,
+      revealStart: -1,
+      done: false,
+    };
+  }
+
+  const revealActive = input.revealStart >= 0;
+  // Morph only when the mask is ready AND arrived within the stretched fill window;
+  // a mask that lands after the stretch commits us to the bounded degrade path.
+  const canMorph = input.maskReady && input.readyAtMs <= FILL + HOLD;
+
+  if (!revealActive) {
+    if (canMorph) {
+      // MORPH: flow the silhouette from the source shape to the target shape.
+      const morphStart = Math.max(FILL, input.readyAtMs);
+      if (el < morphStart + MORPH) {
+        const p = el <= morphStart ? 0 : erTransformSmooth((el - morphStart) / MORPH);
+        return {
+          stage: "morph",
+          spriteAlpha: 0,
+          morphP: p,
+          overallAlpha: 1,
+          fireBurst: false,
+          revealStart: -1,
+          done: false,
+        };
+      }
+      // Morph complete -> fall through to reveal.
+    } else if (!input.swapDone) {
+      // HOLD the glow: still waiting for the mask within the stretch window, or
+      // (degrade) waiting for the swap to land UNDER the glow. Never reveal before
+      // the target sprite is in place - that is the "no late pop" guarantee.
+      return {
+        stage: "hold",
+        spriteAlpha: 0,
+        morphP: 0,
+        overallAlpha: 1,
+        fireBurst: false,
+        revealStart: -1,
+        done: false,
+      };
+    }
+    // swapDone but no usable mask -> degrade: drain-reveal with no shape morph.
+  }
+
+  // REVEAL (+ burst): drain the glow onto the already-swapped target sprite.
+  const startingReveal = input.revealStart < 0;
+  const revealStart = startingReveal ? el : input.revealStart;
+  const drainEl = el - revealStart;
+  const done = drainEl >= DRAIN;
+  const drain = Math.max(0, 1 - drainEl / DRAIN);
+  return {
+    stage: "reveal",
+    spriteAlpha: done ? 1 : Math.min(1, drainEl / DRAIN),
+    morphP: canMorph ? 1 : 0,
+    overallAlpha: done ? 0 : drain,
+    fireBurst: startingReveal,
+    revealStart,
+    done,
+  };
+}
+
 /** A caller hook that swaps the real sprite/info to the target form under the glow. */
 export interface ErTransformMorphOptions {
   /**
@@ -563,6 +712,18 @@ export interface ErTransformMorphOptions {
 export interface ErTransformSequence {
   /** `"morph"` = the full fill/morph/reveal engaged; `"burst"` = fail-closed burst-only. */
   readonly mode: "morph" | "burst";
+  /**
+   * Resolves once the sequence has fully settled onto the target form (the reveal
+   * completed and the real sprite rests at alpha 1) OR failed open. The phase flow
+   * awaits this (behind its own hard timeout) to hold the move animation until the
+   * morph visually finishes, so the transform lands BEFORE the move plays. Bounded
+   * by the instance's own absolute-lifetime backstop, so it can never hang.
+   *
+   * On the fail-closed burst-only path this is already resolved: the burst is a
+   * fire-and-forget overlay, so the phase flow does not wait on it (its behaviour
+   * is unchanged from before sequencing was added).
+   */
+  readonly whenSettled: Promise<void>;
   /** Idempotent teardown; safe to call at any time (scene/sprite teardown). */
   destroy(): void;
 }
@@ -583,6 +744,12 @@ interface CanvasTextureLike {
  */
 class ErFormTransformMorph implements ErTransformSequence {
   readonly mode = "morph" as const;
+
+  /** Resolves when the silhouette visual has fully torn down (rest on target / fail open). */
+  readonly whenSettled: Promise<void>;
+  private settleResolve: (() => void) | null = null;
+  /** Guards {@linkcode teardownVisual} against re-running (reveal + safety backstop + destroy). */
+  private visualTornDown = false;
 
   private readonly pokemon: Pokemon;
   private readonly type: PokemonType;
@@ -607,7 +774,8 @@ class ErFormTransformMorph implements ErTransformSequence {
   private safety: Phaser.Time.TimerEvent | null = null;
 
   private ready = false;
-  private readyFailed = false;
+  /** The `onSwap` (loadAssets) has resolved: the real sprite now shows the target form. */
+  private swapDone = false;
   private readyAtMs = 0;
   private burst: ErFormTransformFx | null = null;
   private burstFired = false;
@@ -646,15 +814,25 @@ class ErFormTransformMorph implements ErTransformSequence {
     this.morphCtx = build.morphCtx;
     this.morphImg = build.morphImg;
     this.startNow = globalScene.time.now;
+    this.whenSettled = new Promise<void>(resolve => {
+      this.settleResolve = resolve;
+    });
 
-    // Kick the sprite swap immediately; it resolves UNDER the glow. Its result
-    // (or failure) only gates the reveal - the phase flow never awaits it.
+    // Kick the target form's asset load IMMEDIATELY (fill start), so the atlas
+    // download and the source fade overlap instead of running back-to-back. It
+    // resolves UNDER the glow; its result only gates the reveal - the phase flow
+    // never awaits it. On success we mark the swap landed and capture the target
+    // mask; on failure we still mark it landed so the sequence degrades (drains)
+    // rather than holding the glow to the absolute backstop.
     Promise.resolve()
       .then(() => this.onSwap())
-      .then(() => this.onSwapResolved())
+      .then(() => {
+        this.swapDone = true;
+        this.captureTarget();
+      })
       .catch((err: unknown) => {
         console.error("ER transform morph onSwap failed", err);
-        this.readyFailed = true;
+        this.swapDone = true;
       });
 
     this.loop = globalScene.time.addEvent({
@@ -662,13 +840,16 @@ class ErFormTransformMorph implements ErTransformSequence {
       loop: true,
       callback: () => this.tick(),
     });
-    // Absolute backstop so the visual always tears down even if the loop stops.
+    // Absolute backstop so the visual always tears down even if the loop stops or
+    // a catastrophically slow swap never lands. Sized to cover the fully stretched
+    // fill + morph + drain with headroom, and always < the wait phase's own hard
+    // timeout, so the morph settles first on every normal path.
     const maxLife =
       ER_TRANSFORM_MORPH_FILL_MS
       + ER_TRANSFORM_MORPH_HOLD_CAP_MS
       + ER_TRANSFORM_MORPH_MORPH_MS
       + ER_TRANSFORM_MORPH_DRAIN_MS
-      + 400;
+      + 900;
     this.safety = globalScene.time.delayedCall(maxLife, () => this.teardownVisual());
   }
 
@@ -763,8 +944,14 @@ class ErFormTransformMorph implements ErTransformSequence {
     }
   }
 
-  /** Capture the (now-swapped) target silhouette; gate the reveal on success. */
-  private onSwapResolved(): void {
+  /**
+   * Build the TARGET silhouette mask as soon as its texture is available (right
+   * after the swap lands). Sets {@linkcode ready} + {@linkcode readyAtMs} on
+   * success so the tick planner can run the true source->target morph. On any
+   * failure `ready` stays false; the swap has still landed (`swapDone`), so the
+   * planner degrades to a drain-only reveal onto the target sprite (no shape morph).
+   */
+  private captureTarget(): void {
     if (this.destroyed) {
       return;
     }
@@ -772,17 +959,14 @@ class ErFormTransformMorph implements ErTransformSequence {
       const sprite = this.pokemon.getSprite?.();
       const targetKey = sprite?.texture?.key;
       if (!sprite || !targetKey) {
-        this.readyFailed = true;
         return;
       }
       const tgtPix = readErShinyLabSpriteSourcePixels({ key: targetKey, frame: sprite.frame?.name });
       if (!tgtPix) {
-        this.readyFailed = true;
         return;
       }
       const tm = erTransformBuildMask(tgtPix.data, tgtPix.width, tgtPix.height, this.MW, this.MH);
       if (tm.count === 0) {
-        this.readyFailed = true;
         return;
       }
       this.sdfTgt = erTransformSignedDt(tm.mask, this.MW, this.MH);
@@ -790,7 +974,6 @@ class ErFormTransformMorph implements ErTransformSequence {
       this.ready = true;
     } catch (err: unknown) {
       console.error("ER transform morph target capture failed", err);
-      this.readyFailed = true;
     }
   }
 
@@ -808,71 +991,35 @@ class ErFormTransformMorph implements ErTransformSequence {
     if (this.destroyed) {
       return;
     }
-    const el = this.elapsed();
-    const FILL = ER_TRANSFORM_MORPH_FILL_MS;
-    const MORPH = ER_TRANSFORM_MORPH_MORPH_MS;
-    const DRAIN = ER_TRANSFORM_MORPH_DRAIN_MS;
-    const holdCapEnd = FILL + ER_TRANSFORM_MORPH_HOLD_CAP_MS;
+    const plan = planErMorphTick({
+      elapsed: this.elapsed(),
+      fillMs: ER_TRANSFORM_MORPH_FILL_MS,
+      holdCapMs: ER_TRANSFORM_MORPH_HOLD_CAP_MS,
+      morphMs: ER_TRANSFORM_MORPH_MORPH_MS,
+      drainMs: ER_TRANSFORM_MORPH_DRAIN_MS,
+      swapDone: this.swapDone,
+      maskReady: this.ready && !!this.sdfTgt,
+      readyAtMs: this.readyAtMs,
+      revealStart: this.burstFired ? this.revealStart : -1,
+    });
 
     this.texCtx.clearRect(0, 0, this.MW, this.MH);
+    this.setSpriteAlpha(plan.spriteAlpha);
 
-    // FILL: source sprite fades out, the solid glowing silhouette floods in.
-    if (el < FILL) {
-      const f = erTransformQuadOut(el / FILL);
-      this.setSpriteAlpha(1 - f);
-      this.renderMorphFrame(0, f);
-      return;
-    }
-
-    // Decide whether we can morph yet, must fail open, or must keep holding.
-    const canMorph = this.ready && !!this.sdfTgt;
-    const mustFailOpen = !canMorph && (this.readyFailed || el >= holdCapEnd);
-
-    if (!canMorph && !mustFailOpen) {
-      // HOLD: solid source-shape silhouette while `onSwap` is still in flight.
-      this.setSpriteAlpha(0);
-      this.renderMorphFrame(0, 1);
-      return;
-    }
-
-    if (canMorph) {
-      const morphStart = Math.max(FILL, this.readyAtMs);
-      if (el < morphStart) {
-        this.setSpriteAlpha(0);
-        this.renderMorphFrame(0, 1);
-        return;
-      }
-      if (el < morphStart + MORPH) {
-        // MORPH: the silhouette flows from the source shape to the target shape.
-        const p = erTransformSmooth((el - morphStart) / MORPH);
-        this.setSpriteAlpha(0);
-        this.renderMorphFrame(p, 1);
-        return;
-      }
-    }
-
-    // REVEAL (+ burst). Fire the burst once; drain the glow onto the real sprite.
-    if (!this.burstFired) {
+    // Fire the per-type burst exactly once, on the tick the reveal begins.
+    if (plan.fireBurst && !this.burstFired) {
       this.burstFired = true;
-      this.revealStart = el;
+      this.revealStart = plan.revealStart;
       this.burst = playErTransformFx(this.pokemon, this.type);
     }
-    const drainEl = el - this.revealStart;
 
-    if (mustFailOpen || !this.sdfTgt) {
-      // Fail open: no drain - snap the real sprite in and let the burst carry it.
-      this.setSpriteAlpha(1);
-      this.teardownVisual();
-      return;
+    if (plan.overallAlpha > 0) {
+      this.renderMorphFrame(plan.morphP, plan.overallAlpha);
+    } else {
+      this.tex.refresh();
     }
 
-    const drain = Math.max(0, 1 - drainEl / DRAIN);
-    this.setSpriteAlpha(Math.min(1, drainEl / DRAIN));
-    if (drain > 0) {
-      this.renderMorphFrame(1, drain);
-    }
-    if (drainEl >= DRAIN) {
-      this.setSpriteAlpha(1);
+    if (plan.done) {
       this.teardownVisual();
     }
   }
@@ -934,8 +1081,19 @@ class ErFormTransformMorph implements ErTransformSequence {
     this.tex.refresh();
   }
 
-  /** Tear down the SILHOUETTE visual only (leaves any in-flight burst to self-destruct). */
+  /**
+   * Tear down the SILHOUETTE visual only (leaves any in-flight burst to
+   * self-destruct). Guarded so the reveal completion, the absolute-lifetime
+   * safety backstop, and {@linkcode destroy} can each call it without redoing the
+   * work or double-restoring the sprite. The LAST action is to restore the real
+   * sprite to alpha 1 (the reveal rests on the swapped target form) and settle
+   * {@linkcode whenSettled}, so the phase flow releases the move animation.
+   */
   private teardownVisual(): void {
+    if (this.visualTornDown) {
+      return;
+    }
+    this.visualTornDown = true;
     if (this.loop) {
       this.loop.remove(false);
       this.loop = null;
@@ -944,7 +1102,6 @@ class ErFormTransformMorph implements ErTransformSequence {
       this.safety.remove(false);
       this.safety = null;
     }
-    this.setSpriteAlpha(1);
     try {
       this.image.destroy();
     } catch {
@@ -957,6 +1114,19 @@ class ErFormTransformMorph implements ErTransformSequence {
       }
     } catch {
       // Texture cleanup is best-effort; a stale generated key must not throw.
+    }
+    // Restore the real sprite AFTER the overlay is gone so nothing draws over the
+    // revealed target form, then release the phase flow.
+    this.setSpriteAlpha(1);
+    this.resolveSettled();
+  }
+
+  /** Resolve {@linkcode whenSettled} exactly once (idempotent). */
+  private resolveSettled(): void {
+    const resolve = this.settleResolve;
+    if (resolve) {
+      this.settleResolve = null;
+      resolve();
     }
   }
 
@@ -1016,6 +1186,9 @@ export function playErTransformMorph(
   const burst = playErTransformFx(pokemon, targetType);
   return {
     mode: "burst",
+    // Fire-and-forget: the burst overlay does not gate the move flow, so the
+    // phase flow never waits on it (already-resolved = the pre-sequencing path).
+    whenSettled: Promise.resolve(),
     destroy: () => burst?.destroy(),
   };
 }

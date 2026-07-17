@@ -7,6 +7,7 @@ import type { Battle } from "#app/battle";
 import type { BattleScene } from "#app/battle-scene";
 import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import { BattleType } from "#enums/battle-type";
+import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { TrainerType } from "#enums/trainer-type";
 import type { ModifierTypeFunc } from "#types/modifier-types";
@@ -51,7 +52,14 @@ export function snapshotCoopTrainerVictoryBoundary(
   battle: Battle,
 ): CoopTrainerVictoryBoundary | null {
   const trainer = battle.trainer;
-  if (battle.battleType !== BattleType.TRAINER || trainer == null || !Number.isInteger(battle.waveIndex)) {
+  // Mystery-encounter trainer battles keep battleType MYSTERY_ENCOUNTER and mark
+  // trainer-ness via encounterMode (see Battle#getBgmOverride) - they reach
+  // TrainerVictoryPhase too, so the snapshot must accept them or solo ME trainer
+  // victories throw "TrainerVictoryPhase started without a trainer battle".
+  const isTrainerBattle =
+    battle.battleType === BattleType.TRAINER
+    || battle.mysteryEncounter?.encounterMode === MysteryEncounterMode.TRAINER_BATTLE;
+  if (!isTrainerBattle || trainer == null || !Number.isInteger(battle.waveIndex)) {
     return null;
   }
   const config = trainer.config;
