@@ -148,10 +148,11 @@ free.
 
 ## Transform + revert integration (`omniform.ts`)
 
-- On a mapped-type move, a real per-evolution Omniform mon (`isErOmniformMon`) now loads
-  the TARGET evolution's OWN stored moveset as the live moveset (PP preserved per form),
-  instead of the legacy random-derive. The legacy seeded-derive path is kept as the
-  fallback for harness-forced mappings on non-Omniform mons (byte-identical to before).
+- On a mapped-type move, a real per-evolution Omniform mon (`isErOmniformMon`) fills the
+  live moveset from the TARGET evolution's OWN stored moveset (PP preserved per form),
+  instead of the legacy random-derive. Both paths keep the move currently being used in
+  its ORIGINAL slot (the documented mid-cast contract) and source the OTHER slots from the
+  target form's moves (stored set for partners, seeded derive for harness-forced mappings).
 - **Normal-type STATUS move => revert to the BASE evolution form**
   (`erOmniformRevertToBase`), via the same transform pathway so the transform VFX hook
   fires. A no-op when already on base.

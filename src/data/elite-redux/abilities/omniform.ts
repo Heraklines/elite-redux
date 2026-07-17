@@ -39,17 +39,23 @@ import { PostSummonAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import {
+  deleteOmniformOriginal,
+  getOmniformOriginal,
+  lookupOmniformTarget,
+  type OmniformTarget,
+  snapshotOmniformOriginal,
+} from "#data/elite-redux/abilities/omniform-registry";
+import {
   clearOmniformBattleMovesets,
   ensureOmniformFormMovesets,
   isErOmniformMon,
   loadOmniformBattleMoveset,
   snapshotOmniformBattleMoveset,
 } from "#data/elite-redux/omniform-movesets";
-import type { PokemonSpecies, PokemonSpeciesForm } from "#data/pokemon-species";
+import type { PokemonSpeciesForm } from "#data/pokemon-species";
 import type { AbilityId } from "#enums/ability-id";
 import { MoveCategory } from "#enums/move-category";
 import { PokemonType } from "#enums/pokemon-type";
-import type { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
@@ -64,91 +70,6 @@ export const ER_OMNIFORM_ABILITY_ID = 5929;
 
 /** Number of moves auto-derived from the target form's learnset (DEFAULT). */
 export const OMNIFORM_DERIVED_MOVE_COUNT = 3;
-
-/** A resolved transform target: a species and (optional) form index. */
-export interface OmniformTarget {
-  speciesId: SpeciesId;
-  formIndex: number;
-}
-
-/** Registry key for a (species, form) pair. */
-function identityKey(speciesId: number, formIndex: number): string {
-  return `${speciesId}:${formIndex}`;
-}
-
-/**
- * The configurable registry: (holder species/form) -> (moveType -> target).
- * Empty in production; populated by the test harness. Exposed only through the
- * register/clear helpers so callers can't hold a mutable reference.
- */
-const OMNIFORM_REGISTRY = new Map<string, Map<PokemonType, OmniformTarget>>();
-
-/**
- * Register a mapping: a holder in form `(fromSpeciesId, fromFormIndex)` using a
- * move of type `moveType` transforms into `(toSpeciesId, toFormIndex)`.
- */
-export function registerOmniformMapping(
-  fromSpeciesId: SpeciesId,
-  fromFormIndex: number,
-  moveType: PokemonType,
-  toSpeciesId: SpeciesId,
-  toFormIndex = 0,
-): void {
-  const key = identityKey(fromSpeciesId, fromFormIndex);
-  let byType = OMNIFORM_REGISTRY.get(key);
-  if (!byType) {
-    byType = new Map();
-    OMNIFORM_REGISTRY.set(key, byType);
-  }
-  byType.set(moveType, { speciesId: toSpeciesId, formIndex: toFormIndex });
-}
-
-/** Remove every registered mapping (test isolation). */
-export function clearOmniformRegistry(): void {
-  OMNIFORM_REGISTRY.clear();
-}
-
-/** The mapped target for `pokemon`'s CURRENT form and `moveType`, or `undefined`. */
-function lookupTarget(pokemon: Pokemon, moveType: PokemonType): OmniformTarget | undefined {
-  const sf = pokemon.getSpeciesForm();
-  return OMNIFORM_REGISTRY.get(identityKey(sf.speciesId, sf.formIndex))?.get(moveType);
-}
-
-/** Whether `(speciesId, formIndex)` is a registered Omniform HOLDER (has at least one mapping). */
-export function erOmniformIsHolderIdentity(speciesId: number, formIndex: number): boolean {
-  return OMNIFORM_REGISTRY.has(identityKey(speciesId, formIndex));
-}
-
-/**
- * The ORDERED set of forms in `(speciesId, formIndex)`'s Omniform "family": the base
- * identity itself, followed by the transitive closure of every form reachable through
- * its type mappings (deduped, discovery order). For a non-holder identity the result is
- * just `[{speciesId, formIndex}]` (length 1). This is the generic "all evolutions of a
- * multi-form / Omniform mon" list every per-evolution moveset consumer iterates.
- */
-export function erOmniformFamilyForms(speciesId: number, formIndex: number): OmniformTarget[] {
-  const seen = new Set<string>();
-  const out: OmniformTarget[] = [];
-  const queue: OmniformTarget[] = [{ speciesId: speciesId as SpeciesId, formIndex }];
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
-    const key = identityKey(cur.speciesId, cur.formIndex);
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    out.push(cur);
-    const byType = OMNIFORM_REGISTRY.get(key);
-    if (byType) {
-      for (const target of byType.values()) {
-        if (!seen.has(identityKey(target.speciesId, target.formIndex))) {
-          queue.push({ speciesId: target.speciesId, formIndex: target.formIndex });
-        }
-      }
-    }
-  }
-  return out;
-}
 
 /** Pure marker: Omniform is driven by the pre-move seam below. */
 export class OmniformAbAttr extends PostSummonAbAttr {
@@ -176,61 +97,6 @@ function resolveSpeciesForm(target: OmniformTarget): PokemonSpeciesForm {
   return species;
 }
 
-/** The holder's pre-transform identity, snapshotted on its FIRST transform in a battle. */
-interface OmniformOriginal {
-  wave: number;
-  species: PokemonSpecies;
-  formIndex: number;
-}
-
-const OMNIFORM_ORIGINAL = new WeakMap<Pokemon, OmniformOriginal>();
-
-/**
- * Snapshot the holder's pre-battle species/form on its FIRST transform and NOT
- * again until the entry is cleared on `leaveField` (switch-out / faint / wave end).
- *
- * The snapshot MUST be captured once per BATTLE, not once per wave: a chained
- * transform (Eevee -> Jolteon -> Umbreon) whose links land on different wave
- * indices would, under a per-wave guard, re-snapshot the INTERMEDIATE form
- * (Jolteon) as the "original" and revert there instead of all the way back to
- * Eevee. Guarding purely on presence captures the true pre-battle identity once
- * and preserves it across the whole chain; `erOmniformRevertOnLeaveField` deletes
- * the entry when the holder leaves the field, so the next battle re-snapshots
- * from the reverted base.
- */
-function snapshotOriginal(user: Pokemon): void {
-  if (!OMNIFORM_ORIGINAL.has(user)) {
-    const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    OMNIFORM_ORIGINAL.set(user, { wave, species: user.species, formIndex: user.formIndex });
-  }
-}
-
-/**
- * The holder's PRE-TRANSFORM (source) species, or `undefined` if it has not
- * Omniform-transformed this battle. Used by the innate-unlock gate so a
- * transformed holder reads its innate candy-unlock state from the SOURCE species
- * (e.g. Partner Eevee) instead of the transform TARGET species (a partner
- * eeveelution, id 70012+), which the player never candy-unlocked. This carries the
- * source's unlocked-innate set to every mid-battle form it adapts into (maintainer
- * directive), and — because the snapshot is captured once per BATTLE and cleared on
- * `leaveField` — it survives a chain (Eevee -> Jolteon -> Umbreon) and reverts
- * exactly on switch-out / wave end.
- */
-export function erOmniformOriginalSpecies(holder: Pokemon): PokemonSpecies | undefined {
-  return OMNIFORM_ORIGINAL.get(holder)?.species;
-}
-
-/**
- * The holder's PRE-TRANSFORM (source) identity — species id + form index — or
- * `undefined` if it has not Omniform-transformed this battle. The per-evolution
- * moveset model reads this to anchor a transformed holder's persistent "base" form
- * (e.g. Partner Eevee) instead of the transient transform target it is wearing.
- */
-export function erOmniformOriginalIdentity(holder: Pokemon): { speciesId: SpeciesId; formIndex: number } | undefined {
-  const original = OMNIFORM_ORIGINAL.get(holder);
-  return original ? { speciesId: original.species.speciesId, formIndex: original.formIndex } : undefined;
-}
-
 /**
  * Revert an Omniform holder to its pre-battle species/form + stats. Driven from
  * `Pokemon.leaveField` (switch-out / faint / wave end — the mega-revert
@@ -242,11 +108,11 @@ export function erOmniformRevertOnLeaveField(holder: Pokemon): void {
   // Battle-scoped per-form PP cache: cleared unconditionally on leaveField so the
   // next send-out starts every evolution's moveset from its stored resting PP.
   clearOmniformBattleMovesets(holder);
-  const original = OMNIFORM_ORIGINAL.get(holder);
+  const original = getOmniformOriginal(holder);
   if (!original) {
     return;
   }
-  OMNIFORM_ORIGINAL.delete(holder);
+  deleteOmniformOriginal(holder);
   holder.species = original.species;
   holder.formIndex = original.formIndex;
   holder.calculateStats();
@@ -263,7 +129,7 @@ export function erOmniformRevertOnLeaveField(holder: Pokemon): void {
  * (already on base) — a Normal status move then simply keeps it on base.
  */
 export function erOmniformRevertToBase(holder: Pokemon): void {
-  const original = OMNIFORM_ORIGINAL.get(holder);
+  const original = getOmniformOriginal(holder);
   if (!original) {
     return;
   }
@@ -274,7 +140,7 @@ export function erOmniformRevertToBase(holder: Pokemon): void {
     holder.getMoveset(),
   );
 
-  OMNIFORM_ORIGINAL.delete(holder);
+  deleteOmniformOriginal(holder);
   const base = { speciesId: original.species.speciesId, formIndex: original.formIndex };
   holder.species = original.species;
   holder.formIndex = original.formIndex;
@@ -342,7 +208,7 @@ export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
     return;
   }
 
-  const target = lookupTarget(user, moveType);
+  const target = lookupOmniformTarget(user, moveType);
   if (!target) {
     return;
   }
@@ -359,9 +225,9 @@ export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
     snapshotOmniformBattleMoveset(user, fromForm, user.getMoveset());
   }
 
-  // Snapshot the pre-battle identity (once per wave) so revert is exact even
+  // Snapshot the pre-battle identity (once per battle) so revert is exact even
   // after a chain of transforms.
-  snapshotOriginal(user);
+  snapshotOmniformOriginal(user);
 
   // Mega-style form change: swap the holder's species/form so `calculateStats`
   // (which reads `getSpeciesForm(true)` — ignoring summon-data overrides) picks
@@ -376,34 +242,35 @@ export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
   user.calculateStats();
   user.generateName();
 
-  if (perEvolution) {
-    // Swap the live moveset to the TARGET evolution's OWN stored moveset (PP
-    // preserved per form within the battle via the battle cache).
-    user.summonData.moveset = loadOmniformBattleMoveset(user, target);
-  } else {
-    // Legacy / harness-forced mapping (no per-evolution store): the documented
-    // seeded-derive default, keeping the used move in its original slot.
-    const currentMoveset = user.getMoveset();
-    const usedIndex = currentMoveset.findIndex(m => m?.moveId === move.id);
-    const derived = deriveMoveset(speciesForm, user.level, move.id);
-    let derivedCursor = 0;
-    const newMoveset = currentMoveset.map((slot, index) => {
-      if (index === usedIndex) {
-        return slot ?? new PokemonMove(move.id);
-      }
-      if (derivedCursor < derived.length) {
-        return new PokemonMove(derived[derivedCursor++]);
-      }
+  // Build the post-transform live moveset. Both paths keep the move currently being
+  // used in its ORIGINAL slot (mid-cast, documented contract) and fill the OTHER slots
+  // from the target form's moves. The only difference is the SOURCE of those moves:
+  //   - per-evolution mon: the TARGET evolution's OWN stored moveset (PP preserved per
+  //     form within the battle via the battle cache);
+  //   - legacy / harness-forced mapping: a seeded derive from the target's learnset.
+  const currentMoveset = user.getMoveset();
+  const usedIndex = currentMoveset.findIndex(m => m?.moveId === move.id);
+  const fillMoves: PokemonMove[] = perEvolution
+    ? loadOmniformBattleMoveset(user, target)
+    : deriveMoveset(speciesForm, user.level, move.id).map(id => new PokemonMove(id));
+  let cursor = 0;
+  const newMoveset = currentMoveset.map((slot, index) => {
+    if (index === usedIndex) {
       return slot ?? new PokemonMove(move.id);
-    });
-    // If the used move was not in the moveset (a cast/called move), still keep it
-    // by prepending, capped at the max move count.
-    if (usedIndex < 0) {
-      newMoveset.unshift(new PokemonMove(move.id));
-      newMoveset.length = Math.min(newMoveset.length, user.getMaxMoveCount());
     }
-    user.summonData.moveset = newMoveset;
+    // Skip any copy of the used move so it is never duplicated across slots.
+    while (cursor < fillMoves.length && fillMoves[cursor].moveId === move.id) {
+      cursor++;
+    }
+    return cursor < fillMoves.length ? fillMoves[cursor++] : (slot ?? new PokemonMove(move.id));
+  });
+  // If the used move was not in the moveset (a cast/called move), still keep it by
+  // prepending, capped at the max move count.
+  if (usedIndex < 0) {
+    newMoveset.unshift(new PokemonMove(move.id));
+    newMoveset.length = Math.min(newMoveset.length, user.getMaxMoveCount());
   }
+  user.summonData.moveset = newMoveset;
 
   // If the fight menu is currently on screen for this holder, its cached move list
   // is now stale (old names/types/PP/detail). Force a rebuild from the swapped

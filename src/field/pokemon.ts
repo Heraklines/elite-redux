@@ -67,7 +67,8 @@ import {
 import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { erLibraryCastIsSpecial, erLibraryDamageMultiplier } from "#data/elite-redux/abilities/library";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
-import { erOmniformOriginalSpecies, erOmniformRevertOnLeaveField } from "#data/elite-redux/abilities/omniform";
+import { erOmniformRevertOnLeaveField } from "#data/elite-redux/abilities/omniform";
+import { erOmniformOriginalSpecies } from "#data/elite-redux/abilities/omniform-registry";
 import { erShatteredPsycheOnLeaveField } from "#data/elite-redux/abilities/shattered-psyche";
 import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
 import { getGraftedTypes } from "#data/elite-redux/abilities/type-graft";

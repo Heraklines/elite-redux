@@ -121,17 +121,19 @@ describe.skipIf(!RUN)("ER Omniform per-evolution moveset model", () => {
     await game.classicMode.startBattle(SpeciesId.EEVEE);
     const holder = game.field.getPlayerPokemon();
 
-    // Pick a move Partner Vaporeon can legally learn (from its own learnable set).
-    const learnable = [...omniformFormLearnableMoves(VAPOREON_FORM)];
-    expect(learnable.length).toBeGreaterThan(0);
-    const legalMove = learnable[0];
+    // Pick a move Partner Vaporeon can legally learn but does NOT already have in its
+    // rolled base moveset (both draw from its learnset, so an arbitrary learnable move
+    // may already be known).
+    const alreadyKnown = new Set(getOrRollFormMoveset(holder, VAPOREON_FORM).map(([m]) => m));
+    const legalMove = [...omniformFormLearnableMoves(VAPOREON_FORM)].find(m => !alreadyKnown.has(m));
+    expect(legalMove).toBeDefined();
 
-    const first = learnMoveForEvolution(holder, VAPOREON_FORM, legalMove, 0);
+    const first = learnMoveForEvolution(holder, VAPOREON_FORM, legalMove!, 0);
     expect(first.ok).toBe(true);
     expect(getOrRollFormMoveset(holder, VAPOREON_FORM)[0][0]).toBe(legalMove);
 
     // Same move again on the same evolution => rejected (once per evolution).
-    const dup = learnMoveForEvolution(holder, VAPOREON_FORM, legalMove, 1);
+    const dup = learnMoveForEvolution(holder, VAPOREON_FORM, legalMove!, 1);
     expect(dup.ok).toBe(false);
     expect(dup.reason).toBe("already-known");
 
@@ -172,12 +174,23 @@ describe.skipIf(!RUN)("ER Omniform per-evolution moveset model", () => {
     activateOmniform();
     ensureOmniformFormMovesets(holder);
 
+    const waterSlot = holder.getMoveset().findIndex(m => m.moveId === MoveId.WATER_GUN);
+    expect(waterSlot).toBeGreaterThanOrEqual(0);
     const storedIds = getOrRollFormMoveset(holder, VAPOREON_FORM).map(([m]) => m);
     erOmniformOnMoveStart(holder, allMoves[MoveId.WATER_GUN]);
 
     expect(holder.getSpeciesForm().speciesId).toBe(ER_PARTNER_VAPOREON_SPECIES_ID);
-    const liveIds = holder.getMoveset().map(m => m.moveId);
-    expect(liveIds).toEqual(storedIds);
+    const live = holder.getMoveset();
+    // The move being used stays in its original slot (mid-cast contract)...
+    expect(live[waterSlot].moveId).toBe(MoveId.WATER_GUN);
+    // ...and every OTHER slot is drawn from Partner Vaporeon's OWN stored moveset.
+    live.forEach((m, i) => {
+      if (i !== waterSlot) {
+        expect(storedIds).toContain(m.moveId);
+      }
+    });
+    // The kit genuinely changed away from Eevee's non-used moves.
+    expect(live.some(m => m.moveId !== MoveId.WATER_GUN && storedIds.includes(m.moveId))).toBe(true);
   });
 
   it("a NORMAL-type status move reverts a transformed holder to the base evolution form", async () => {
@@ -215,9 +228,15 @@ describe.skipIf(!RUN)("ER Omniform per-evolution moveset model", () => {
     await game.toEndOfTurn();
 
     // The real MovePhase drove the Omniform transform: the mon is Partner Vaporeon and
-    // its live moveset is Vaporeon's own stored moveset.
+    // its live moveset is the used move (kept mid-cast) plus Vaporeon's own stored moves.
     expect(holder.getSpeciesForm().speciesId).toBe(ER_PARTNER_VAPOREON_SPECIES_ID);
-    expect(holder.getMoveset().map(m => m.moveId)).toEqual(storedIds);
+    const live = holder.getMoveset();
+    expect(live.some(m => m.moveId === MoveId.WATER_GUN)).toBe(true);
+    live.forEach(m => {
+      if (m.moveId !== MoveId.WATER_GUN) {
+        expect(storedIds).toContain(m.moveId);
+      }
+    });
   });
 
   it("leaveField clears the per-battle form-PP cache and reverts to base", async () => {

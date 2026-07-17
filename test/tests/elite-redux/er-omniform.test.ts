@@ -1,11 +1,10 @@
 import { allMoves } from "#data/data-lists";
 import {
-  clearOmniformRegistry,
   ER_OMNIFORM_ABILITY_ID,
   erOmniformOnMoveStart,
   erOmniformRevertOnLeaveField,
-  registerOmniformMapping,
 } from "#data/elite-redux/abilities/omniform";
+import { clearOmniformRegistry, registerOmniformMapping } from "#data/elite-redux/abilities/omniform-registry";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";

@@ -65,7 +65,7 @@ import {
   ER_PARTNER_UMBREON_ABILITY_ID,
   ER_PARTNER_VAPOREON_ABILITY_ID,
 } from "#data/elite-redux/abilities/composite-newcomers";
-import { registerOmniformMapping } from "#data/elite-redux/abilities/omniform";
+import { registerOmniformMapping } from "#data/elite-redux/abilities/omniform-registry";
 import { ErCustomSpecies, registerErEditorMon } from "#data/elite-redux/init-elite-redux-custom-species";
 import { EggTier } from "#enums/egg-type";
 import { MoveId } from "#enums/move-id";

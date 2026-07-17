@@ -37,7 +37,7 @@ import {
   erOmniformFamilyForms,
   erOmniformOriginalIdentity,
   type OmniformTarget,
-} from "#data/elite-redux/abilities/omniform";
+} from "#data/elite-redux/abilities/omniform-registry";
 import type { PokemonSpeciesForm } from "#data/pokemon-species";
 import { MoveId } from "#enums/move-id";
 import type { Pokemon } from "#field/pokemon";
@@ -227,7 +227,8 @@ export function canFormLearnMove(form: OmniformTarget, moveId: MoveId): boolean 
 
 /** The mon's live store, creating the empty object on first access (Omniform mons only). */
 function getStore(mon: Pokemon): ErOmniformMovesetStore {
-  return (mon.customPokemonData.erOmniformMovesets ??= {});
+  mon.customPokemonData.erOmniformMovesets ??= {};
+  return mon.customPokemonData.erOmniformMovesets;
 }
 
 /**
