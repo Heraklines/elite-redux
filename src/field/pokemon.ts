@@ -1649,6 +1649,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   private restoreErShinyLabTintSprite(): void {
     const sprite = this.getSprite();
+    // `getSprite()` can return undefined while the sprite is being (re)built - e.g.
+    // a fire-and-forget `loadAssets` after an Omniform transform resolving during a
+    // scene teardown/reload. Bail rather than dereference a missing sprite's texture.
+    if (!sprite) {
+      return;
+    }
     this.tintSprite?.setTexture(sprite.texture.key, sprite.frame?.name).setOrigin(sprite.originX, sprite.originY);
   }
 

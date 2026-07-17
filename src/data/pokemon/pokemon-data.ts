@@ -5,6 +5,7 @@ import {
   normalizeErShinyLabSavedLook,
   sanitizeErShinyLabPresetName,
 } from "#data/elite-redux/er-shiny-lab-effects";
+import type { ErOmniformMovesetStore } from "#data/elite-redux/omniform-movesets";
 import type { Gender } from "#data/gender";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import type { PokemonSpeciesForm } from "#data/pokemon-species";
@@ -150,6 +151,16 @@ export class CustomPokemonData {
    * deriving the partner mon's luck from ITS OWN dex unlocks. `undefined` => not snapshotted.
    */
   public coopLuck?: number | undefined;
+  /**
+   * ER Omniform per-evolution movesets (Partner Eevee). A compact map of form
+   * identity (`"speciesId:formIndex"`) -> that evolution's own moveset, each move
+   * stored as `[moveId, ppUsed]`. Only NON-base evolution forms are stored (the base
+   * form uses the mon's normal `moveset`). `undefined` for every non-Omniform mon, so
+   * the serialized shape of a vanilla mon is byte-identical. Rolled seeded-randomly on
+   * first unlock and edited through the teach-path API in
+   * {@linkcode ErOmniformMovesetStore | omniform-movesets.ts}.
+   */
+  public erOmniformMovesets?: ErOmniformMovesetStore | undefined;
 
   constructor(data?: CustomPokemonData | Partial<CustomPokemonData>) {
     this.spriteScale = data?.spriteScale ?? -1;
@@ -174,6 +185,7 @@ export class CustomPokemonData {
     this.erRunUnlockedAbilitySlots = data?.erRunUnlockedAbilitySlots ?? [];
     this.coopPassiveAttr = data?.coopPassiveAttr ?? undefined;
     this.coopLuck = data?.coopLuck ?? undefined;
+    this.erOmniformMovesets = data?.erOmniformMovesets ?? undefined;
   }
 }
 

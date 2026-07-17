@@ -902,6 +902,45 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Partner Eevee - Omniform per-evolution movesets + Normal-status revert
+  // ===========================================================================
+  {
+    label: "Partner: Eevee Omniform movesets",
+    description:
+      "Partner Eevee (the 'partner' Eevee form with the Fluffy + Omniform composite)\n"
+      + "adapts mid-battle into a partner eeveelution based on the move TYPE it uses, and\n"
+      + "EACH evolution carries its OWN moveset (rolled from that evolution's learnset).\n"
+      + "A Normal-type STATUS move reverts it to the base Eevee form.\n"
+      + "DO: turn 1, use Water Gun. Turn 2, open Fight and LOOK at the moves - the set is\n"
+      + "now Partner Vaporeon's OWN moveset (not Eevee's). Turn 2, use Ember (chains into\n"
+      + "Partner Flareon, again with Flareon's own moveset). Turn 3, use Swords Dance (a\n"
+      + "Normal status move).\n"
+      + "EXPECT: Water Gun turns Eevee into Partner Vaporeon ('adapted into Partner\n"
+      + "Vaporeon!') and its 3 other moves are replaced by Vaporeon's own set; Ember\n"
+      + "chains it into Partner Flareon with Flareon's own set; Swords Dance (Normal\n"
+      + "status) reverts it to the base Eevee form ('reverted to Eevee!') with Eevee's\n"
+      + "original moves back. Each form's moveset is independent and persists across the\n"
+      + "run (and a save/reload).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5946), // [Fluffy + Omniform] Partner Eevee composite
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY, // tanky, survives so the test can run
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.EEVEE, {
+          formIndex: formIndexByKey(SpeciesId.EEVEE, "partner"),
+          moveset: [MoveId.WATER_GUN, MoveId.EMBER, MoveId.SWORDS_DANCE, MoveId.TACKLE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Move: Tangling Husk (2.65 dex 955) — Fire-exempt protect
   // ===========================================================================
   {
