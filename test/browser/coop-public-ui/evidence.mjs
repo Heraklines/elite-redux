@@ -52,6 +52,11 @@ const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 const CHECKSUM_SENTINEL = "0000000000000000";
 const POST_REJOIN_RESYNC_REQUEST = /^\[coop:resync\] post-rejoin full resync request seq=(\d+)/u;
 const STATE_SYNC_START = /^\[coop:resync\] guest requestStateSync turn=(\d+) seq=(\d+) START\b/u;
+/** The client's own fail-closed handling of a post-terminal signaling beat (see assertClean). */
+const HEARTBEAT_OWNERSHIP_LOSS = /P33 heartbeat lost authenticated ownership status=(?:401|403)/u;
+/** The browser's automatic resource-error twin of that same handled beat. */
+const HEARTBEAT_RESOURCE_ERROR = /Failed to load resource:.*(?:401|403)/u;
+const HEARTBEAT_PATHNAME = /\/coop\/v3\/heartbeat$/u;
 const COMPATIBLE_PRESENTATION_MISMATCH =
   /^\[coop:checksum\] PRESENTATION MISMATCH sections=[^\n]+ - simulation compatible - /u;
 const FATAL_COOP_CONSOLE_RULES = Object.freeze([
@@ -872,6 +877,7 @@ export class EvidenceSink {
     this.events = [];
     this.failures = [];
     this.benignRejoinStateSyncTurns = new Set();
+    this.heartbeatOwnershipLossObserved = false;
     this.networkState = { account: null, lobby: null, coopRunStatus: null, apiFailure: null };
     this.writeTail = Promise.resolve();
     // Optimization brief R2: batched-write + waiter + telemetry state.
@@ -1281,6 +1287,14 @@ export class EvidenceSink {
       if (postRejoinRequest != null) {
         this.benignRejoinStateSyncTurns.add(postRejoinRequest[1]);
       }
+      // The signaling heartbeat is FAIL-CLOSED by design: after the peer (or a game-over
+      // teardown) ends the authenticated run on the Worker, this seat's next beat reads
+      // 401/403 once and the client stops + closes the channel, logging this exact line.
+      // Observing it licenses excusing the browser's automatic "Failed to load resource:
+      // 401" twin for /coop/v3/heartbeat at assertClean() (order-independent).
+      if (HEARTBEAT_OWNERSHIP_LOSS.test(text)) {
+        this.heartbeatOwnershipLossObserved = true;
+      }
       const stateSyncStart = STATE_SYNC_START.exec(text);
       const fatalCoopReason = fatalCoopConsoleReason(text, {
         benignRejoinStateSync: stateSyncStart != null && this.benignRejoinStateSyncTurns.has(stateSyncStart[1]),
@@ -1593,8 +1607,30 @@ export class EvidenceSink {
   }
 
   assertClean() {
-    if (this.failures.length > 0) {
-      throw new Error(`${this.label}: ${this.failures.length} fatal browser event(s); inspect ${this.dir}`);
+    // A post-terminal signaling beat 401/403 is the fail-closed design working: the peer (or a
+    // game-over teardown) ended the authenticated run on the Worker, this seat's next beat is
+    // refused ONCE, and the client stops + closes the channel. The browser's automatic
+    // resource-error console line for that handled request is not a run failure. Excused ONLY
+    // when the client's own ownership-loss handling line was observed in this same trace, and
+    // bounded (a repeating 401 means the stop did NOT hold - that stays fatal).
+    let excusableHeartbeatErrors = this.heartbeatOwnershipLossObserved ? 2 : 0;
+    const remaining = this.failures.filter(event => {
+      const isHandledHeartbeatRefusal =
+        event?.kind === "console"
+        && HEARTBEAT_RESOURCE_ERROR.test(event.text ?? "")
+        && HEARTBEAT_PATHNAME.test(event.source ?? "");
+      if (isHandledHeartbeatRefusal && excusableHeartbeatErrors > 0) {
+        excusableHeartbeatErrors -= 1;
+        this.record("console-error-expected", {
+          source: event.source,
+          reason: "post-terminal signaling heartbeat refusal handled by the fail-closed ownership-loss path",
+        });
+        return false;
+      }
+      return true;
+    });
+    if (remaining.length > 0) {
+      throw new Error(`${this.label}: ${remaining.length} fatal browser event(s); inspect ${this.dir}`);
     }
   }
 

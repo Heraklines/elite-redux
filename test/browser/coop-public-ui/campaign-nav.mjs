@@ -148,28 +148,84 @@ export async function selectFirstEmptySaveSlot(client, { fromCursor = 0, timeout
   await client.press("Space", "fresh-save-slot-0");
 }
 
+/** How many starters each seat tries to field. One starter per seat could not survive wave 2
+ *  after the enemy-kit rebalance (run 29551213918 depth: a lone Bulbasaur wiped to a bug double)
+ *  - a two-player party of six is the representative real-play shape AND exercises the co-op
+ *  faint-replacement sync paths the single-mon party never reached. */
+const STARTERS_PER_SEAT = 3;
+
+/** The party size the visible starter bar last showed in this evidence sink (observer-read). */
+function visibleTeamSize(sink, fromCursor) {
+  const team = sink.findLastSemanticSurface(fromCursor, "starter-select")?.observation.teamSpeciesIds;
+  return Array.isArray(team) ? team.length : 0;
+}
+
 /**
- * Select the visible starter, add it through its option menu, submit the team, and confirm.
+ * Field up to {@linkcode STARTERS_PER_SEAT} starters, submit the team, and confirm.
  * Every transition is observed before the next public key is sent, so text animation or a slow
- * browser cannot reinterpret a later key on the previous screen.
+ * browser cannot reinterpret a later key on the previous screen. Each ADD is verified against
+ * the visible team bar (`teamSpeciesIds` growth); an add the game refuses (starter-point cap)
+ * closes the option menu and stops adding - at least ONE fielded starter stays mandatory.
  */
 export async function confirmDefaultStarterTeam(client, { fromCursor = client.pageCursor, timeoutMs = 15_000 } = {}) {
   await waitForActionableSemanticSurface(client, "starter-select", { fromCursor, timeoutMs });
-  const optionCursor = client.evidence.cursor();
-  await client.press("Space", "starter-open-selected-options");
-  await waitForSemanticSurface(client, "option-select:SelectStarterPhase", {
-    fromCursor: optionCursor,
-    timeoutMs,
-  });
-  const starterCursor = client.evidence.cursor();
-  await selectOptionById(client, {
-    surfaceId: "option-select:SelectStarterPhase",
-    targetId: "add-to-party",
-    navKeys: ["ArrowUp", "ArrowDown"],
-    timeoutMs,
-  });
-
-  await waitForSemanticSurface(client, "starter-select", { fromCursor: starterCursor, timeoutMs });
+  let fielded = 0;
+  for (let slot = 0; slot < STARTERS_PER_SEAT; slot++) {
+    if (slot > 0) {
+      // Move the grid cursor to the next starter. The move itself is best-effort (the grid
+      // cursor is not semantically labeled); the ADD below is the verified step either way.
+      await client.press("ArrowRight", `starter-move-to-slot-${slot}`);
+    }
+    const optionCursor = client.evidence.cursor();
+    await client.press("Space", `starter-open-selected-options:slot-${slot}`);
+    try {
+      await waitForSemanticSurface(client, "option-select:SelectStarterPhase", {
+        fromCursor: optionCursor,
+        timeoutMs: slot === 0 ? timeoutMs : 5_000,
+      });
+    } catch (error) {
+      if (slot === 0) {
+        throw error; // the first starter's menu MUST open - that path was always mandatory
+      }
+      // A locked/unaffordable grid slot opens no menu: field what we have.
+      client.evidence.record("starter-add-stopped", { slot, fielded, reason: "starter option menu did not open" });
+      break;
+    }
+    const starterCursor = client.evidence.cursor();
+    try {
+      await selectOptionById(client, {
+        surfaceId: "option-select:SelectStarterPhase",
+        targetId: "add-to-party",
+        navKeys: ["ArrowUp", "ArrowDown"],
+        timeoutMs,
+      });
+    } catch (error) {
+      // No visible add-to-party option (cap reached / not addable): close the menu and field
+      // what we have. A zero-starter team is still a hard failure below.
+      client.evidence.record("starter-add-stopped", { slot, fielded, reason: String(error?.message ?? error) });
+      await client.press("Backspace", `starter-close-options:slot-${slot}`);
+      break;
+    }
+    await waitForSemanticSurface(client, "starter-select", { fromCursor: starterCursor, timeoutMs });
+    const grown = await client.evidence
+      .waitForCondition(sink => (visibleTeamSize(sink, starterCursor) > fielded ? true : null), {
+        timeoutMs: 5_000,
+        description: `visible starter team grew past ${fielded}`,
+      })
+      .then(
+        () => true,
+        () => false,
+      );
+    if (!grown) {
+      client.evidence.record("starter-add-stopped", { slot, fielded, reason: "team bar did not grow (cap)" });
+      break;
+    }
+    fielded += 1;
+  }
+  if (fielded === 0) {
+    throw new Error(`${client.label}: could not field a single starter through the public UI`);
+  }
+  client.evidence.record("starter-team-fielded", { fielded, target: STARTERS_PER_SEAT });
   const confirmCursor = client.evidence.cursor();
   await client.press("Enter", "starter-submit-team");
   await waitForSemanticSurface(client, "confirm:SelectStarterPhase", {
