@@ -525,6 +525,10 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     } else if (button === Button.CANCEL) {
       if (this.player) {
         success = true;
+        // #613: leaving the shop opens the "skip taking an item?" CONFIRM prompt over this
+        // screen. The dedicated item-description box stays put unless cleared, so a long
+        // description drew underneath the confirm prompt. Hide it before the prompt opens.
+        this.hideItemDescription();
         if (this.onActionInput) {
           const originalOnActionInput = this.onActionInput;
           this.awaitingActionInput = false;

@@ -1605,6 +1605,67 @@ const RECIPES: Record<string, Recipe> = {
     },
     diffTolerance: 2000,
   },
+  // Bug #613: in the reward shop, a long item DESCRIPTION overlaps the leave-confirmation
+  // prompt. Repro: focus a long-description item (Eviolite, 116 chars) so its dedicated
+  // description box is shown, then press CANCEL - the leave path opens the CONFIRM overlay
+  // (the "skip taking an item?" Yes/No prompt) WITHOUT clearing the description box, so the
+  // wrapped description text draws under the confirm prompt. The onActionInput callback here
+  // mirrors SelectModifierPhase's real leave handler (showText + setOverlayMode(CONFIRM)). The
+  // fix hides the description on CANCEL, so post-fix the confirm prompt renders clean.
+  "modifier-select-leave-confirm": {
+    mode: UiMode.MODIFIER_SELECT,
+    field: true,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.PIKACHU);
+      return [];
+    },
+    render: game => {
+      const ui: any = game.scene.ui;
+      const registered: any = ui.handlers[UiMode.MODIFIER_SELECT];
+      let handler: any = registered;
+      try {
+        handler = new registered.constructor();
+      } catch {
+        handler = registered;
+      }
+      handler.setup();
+      const options = [
+        new ModifierTypeOption(modifierTypes.EVIOLITE(), 0),
+        new ModifierTypeOption(modifierTypes.FLAME_ORB(), 0),
+        new ModifierTypeOption(modifierTypes.SUPER_POTION(), 0),
+      ];
+      // The leave handler, mirroring SelectModifierPhase's modifierSelectCallback for (-1,-1):
+      // show the skip question in the message box, then open the CONFIRM overlay.
+      const leaveConfirmCallback = (rowCursor: number, cursor: number): boolean => {
+        if (rowCursor < 0 || cursor < 0) {
+          ui.showText(i18next.t("battle:skipItemQuestion"));
+          ui.setOverlayMode(
+            UiMode.CONFIRM,
+            () => {},
+            () => {},
+          );
+          return true;
+        }
+        return false;
+      };
+      handler.show([true, options, leaveConfirmCallback, 0]);
+      for (const opt of handler.options ?? []) {
+        opt.revealInstant?.();
+      }
+      // Focus the long-description item (row 1, cursor 0 = Eviolite) so its description box shows.
+      handler.setRowCursor(1);
+      handler.setCursor(0);
+      // The animation-gated input flag is set asynchronously in show(); set it directly so the
+      // CANCEL step routes into the leave handler.
+      handler.awaitingActionInput = true;
+      handler.onActionInput = leaveConfirmCallback;
+      ui.setActiveHandler?.(handler);
+    },
+    // CANCEL triggers the leave path -> the CONFIRM overlay opens over the (pre-fix) still-visible
+    // item description. The main PNG ends on that final state.
+    steps: [Button.CANCEL],
+    diffTolerance: 2000,
+  },
   // The in-battle FIGHT move-select (UiMode.FIGHT): the 4 moves + PP + type/effectiveness bar,
   // OVER the live battlefield (field: true draws the arena + mon sprites + HP bars beneath the
   // menu). The mode path builds the real FightUiHandler and calls show([fieldIndex]) while the
