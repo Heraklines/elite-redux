@@ -123,11 +123,12 @@ async function main() {
 
   const establish = (page, role) =>
     page.evaluate(async localRole => {
-      // The single Cloudflare STUN mirror of tier-2: an empty list falls back to the
-      // TWO-server default and non-trickle ICE then waits out the slower server's
-      // gathering (measured 43s/side on a GH runner - the budget breach).
+      // Loopback pages on ONE machine: host candidates suffice; ANY STUN server makes
+      // non-trickle gathering wait out the browser's ~40s timeout on runners with UDP
+      // blocked (measured 42s/side on GH Actions with cloudflare STUN). noStun is the
+      // explicit loopback/CI escape hatch; production keeps real STUN.
       const { transport, rejoin } = await globalThis.__coopTransportMinBridge.establish("BROWSER", localRole, {
-        ice: { stunUrls: ["stun:stun.cloudflare.com:3478"] },
+        ice: { noStun: true },
       });
       globalThis.__minTransport = transport;
       globalThis.__minRejoin = rejoin;

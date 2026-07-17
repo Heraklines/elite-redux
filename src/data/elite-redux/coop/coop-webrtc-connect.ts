@@ -74,6 +74,13 @@ export const COOP_DEFAULT_STUN = ["stun:stun.cloudflare.com:3478", "stun:stun.l.
 export interface CoopIceConfig {
   /** STUN urls; defaults to {@linkcode COOP_DEFAULT_STUN} when omitted/empty. */
   stunUrls?: string[];
+  /**
+   * LOOPBACK/CI ONLY: no ICE servers at all (host candidates suffice on one machine).
+   * Non-trickle gathering otherwise waits out the browser's ~40s STUN timeout on
+   * runners with UDP blocked (measured 42s/side on GH Actions). Production paths never
+   * set this - real peers need STUN reflection.
+   */
+  noStun?: boolean;
   /** Optional TURN relay (only needed for peers behind symmetric NAT). */
   turn?: { urls: string | string[]; username?: string | undefined; credential?: string | undefined };
 }
@@ -84,6 +91,9 @@ export interface CoopIceConfig {
  * STUN-default / optional-TURN policy.
  */
 export function buildIceServers(config: CoopIceConfig = {}): RTCIceServer[] {
+  if (config.noStun) {
+    return [];
+  }
   const stun = config.stunUrls && config.stunUrls.length > 0 ? config.stunUrls : COOP_DEFAULT_STUN;
   const servers: RTCIceServer[] = [{ urls: stun }];
   if (config.turn?.urls) {

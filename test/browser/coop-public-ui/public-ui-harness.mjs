@@ -1254,7 +1254,10 @@ export class PublicUiClient {
           await this.evidence.waitForCondition(
             sink => {
               for (let i = echoCursor; i < sink.events.length; i++) {
-                if (sink.events[i].kind === "browser-input-echo") {
+                // Only an ACTIVE-handler echo acknowledges the press: an echo emitted
+                // mid-transition (handler not yet accepting input) must NOT release the
+                // next key - that outran the Settings submenu on CI and dropped keys.
+                if (sink.events[i].kind === "browser-input-echo" && sink.events[i].observation?.active === true) {
                   return sink.events[i];
                 }
               }
