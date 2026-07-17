@@ -412,9 +412,10 @@ export function clientsAwaitingTurnProgress(rig, from) {
 }
 
 export function findOwnedCommandFrontier(client, from) {
-  const semantic = client.evidence.findLastSemanticSurface(from, "command:command");
+  const semantic = client.evidence.findLastSemanticSurface(from);
   if (
-    semantic?.observation.ready?.handlerActive === true
+    semantic?.observation.surfaceId === "command:command"
+    && semantic.observation.ready?.handlerActive === true
     && semantic.observation.phase === "CommandPhase"
     && semantic.observation.uiMode === "COMMAND"
     && semantic.observation.localSeat === client.publicSeat
@@ -422,7 +423,32 @@ export function findOwnedCommandFrontier(client, from) {
   ) {
     return semantic;
   }
+  // Once this browser exposes semantic surface evidence, its latest observation is the
+  // current public UI. Never resurrect a historical command (or its legacy console line)
+  // after a reward, narration, party picker, or other surface has superseded it.
+  if (semantic != null) {
+    return null;
+  }
   return client.evidence.find(LOCAL_COMMAND, from);
+}
+
+function commandFrontierIdentity(client, event) {
+  const observation = event.observation;
+  if (observation == null) {
+    return JSON.stringify([client.label, "legacy", event.index]);
+  }
+  const address = observation.address;
+  const hasStableGeneration =
+    address != null || observation.phaseInstance != null || observation.surfaceGeneration != null;
+  return JSON.stringify([
+    client.label,
+    address?.epoch ?? null,
+    address?.wave ?? null,
+    address?.turn ?? null,
+    observation.phaseInstance ?? null,
+    observation.surfaceGeneration ?? null,
+    hasStableGeneration ? null : event.index,
+  ]);
 }
 
 /** Every player has reached its own actionable command UI, using semantic evidence first. */
@@ -629,7 +655,9 @@ export async function waitForOutcomeBounded(
   const clients = Object.values(rig.clients);
   const fixedDeadline = Date.now() + timeoutMs;
   const animationBudget = extendForAnimationProgress ? createAnimationProgressBudget(rig, from, timeoutMs) : null;
-  let singleSidedSinceMs = null;
+  const confirmationHardDeadline =
+    (animationBudget?.hardDeadline() ?? fixedDeadline) + Math.max(0, singleSidedConfirmMs);
+  let singleSidedCandidate = null;
   while (true) {
     const deadline = animationBudget?.observe() ?? fixedDeadline;
     // A mid-battle wipe / game-over is a real run END, not a driver softlock: classify it
@@ -658,8 +686,15 @@ export async function waitForOutcomeBounded(
       return { kind: "command" };
     }
     if (stopOnOwnedCommandFrontier) {
-      const commandClient = clients.find(client => findOwnedCommandFrontier(client, from[client.label]) != null);
-      if (commandClient != null) {
+      const commandCandidate = clients
+        .map(client => ({
+          client,
+          event: findOwnedCommandFrontier(client, from[client.label]),
+        }))
+        .find(candidate => candidate.event != null);
+      if (commandCandidate == null) {
+        singleSidedCandidate = null;
+      } else {
         // A SINGLE-sided command frontier can be a wave-end transient: the pure-renderer seat
         // locally opens its next CommandPhase for a few (starved) frames before the
         // authoritative wave resolution supersedes it with the reward flow (run 29551213918,
@@ -668,11 +703,18 @@ export async function waitForOutcomeBounded(
         // faint / TWO-sided frontier lands first, that outcome wins; only a frontier that
         // SURVIVES the window is a real next turn. Zero window preserves legacy behavior.
         if (singleSidedConfirmMs <= 0) {
-          return { kind: "command", client: commandClient };
+          return { kind: "command", client: commandCandidate.client };
         }
-        singleSidedSinceMs ??= Date.now();
-        if (Date.now() - singleSidedSinceMs >= singleSidedConfirmMs) {
-          return { kind: "command", client: commandClient };
+        const identity = commandFrontierIdentity(commandCandidate.client, commandCandidate.event);
+        if (singleSidedCandidate?.identity !== identity) {
+          singleSidedCandidate = {
+            identity,
+            client: commandCandidate.client,
+            sinceMs: Date.now(),
+          };
+        }
+        if (Date.now() - singleSidedCandidate.sinceMs >= singleSidedConfirmMs) {
+          return { kind: "command", client: commandCandidate.client };
         }
       }
     }
@@ -685,13 +727,16 @@ export async function waitForOutcomeBounded(
     // Drain evidence once before honoring the deadline. Under severe event-loop dilation the timer callback
     // can resume after the immutable ceiling even though the commit/reward event was already buffered.
     if (Date.now() >= deadline) {
-      // A still-unconfirmed single-sided frontier at the deadline beats returning null (which
-      // would replay fallback keys onto a live command UI) - resolve it as the command outcome.
-      if (singleSidedSinceMs != null) {
-        const commandClient = clients.find(client => findOwnedCommandFrontier(client, from[client.label]) != null);
-        if (commandClient != null) {
-          return { kind: "command", client: commandClient };
-        }
+      // A provisional frontier may first appear near the ordinary fallback deadline. Give that
+      // exact identity its full confirmation window so fallback keys never smear across a live
+      // command UI, but cap all replacements at one immutable extra window.
+      const candidateDeadline =
+        singleSidedCandidate == null
+          ? deadline
+          : Math.min(singleSidedCandidate.sinceMs + singleSidedConfirmMs, confirmationHardDeadline);
+      if (Date.now() < candidateDeadline) {
+        await delay(Math.min(100, candidateDeadline - Date.now()));
+        continue;
       }
       break;
     }

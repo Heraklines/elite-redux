@@ -71,7 +71,7 @@ export const COOP_WIRE_CHUNK_PAYLOAD_CHARS = COOP_WIRE_CHUNK_RAW_BYTES;
 export const COOP_WIRE_BUFFER_HIGH_BYTES = 256 * 1024;
 export const COOP_WIRE_BUFFER_LOW_BYTES = 64 * 1024;
 const COOP_WIRE_MAX_CHUNKS = 2_048;
-/** Cap on frames buffered for a not-yet-registered subscriber (early-rx); overflow drops NEWEST, loudly. */
+/** Cap on frames buffered for a not-yet-registered subscriber (early-rx); overflow fails the channel closed. */
 export const COOP_EARLY_RX_MAX_FRAMES = 64;
 const COOP_WIRE_MAX_REASSEMBLED_BYTES = 16 * 1024 * 1024;
 const COOP_LOGICAL_QUEUE_MAX_BYTES = 32 * 1024 * 1024;
@@ -217,7 +217,6 @@ export class WebRtcTransport implements CoopTransport {
    * consumer, so no protocol/determinism surface changes.
    */
   private readonly earlyRx: CoopMessage[] = [];
-  private earlyRxDropped = 0;
   private earlyRxDraining = false;
   private earlyRxDrainScheduled = false;
   private hasEverSubscribed = false;
@@ -787,8 +786,23 @@ export class WebRtcTransport implements CoopTransport {
       } finally {
         this.earlyRxDraining = false;
       }
-      coopLog("webrtc", `early-rx drain role=${this.role} n=${drained} dropped=${this.earlyRxDropped}`);
+      coopLog("webrtc", `early-rx drain role=${this.role} n=${drained}`);
     });
+  }
+
+  /**
+   * More than a full bounded handshake backlog before the first consumer exists is not a slow
+   * subscriber any more. Silently dropping a later frame can lose the sole hello/fingerprint
+   * and strand the compatibility barrier forever, so retire this generation and let the normal
+   * connection-loss/rejoin path produce a deterministic terminal or a fresh exact handshake.
+   */
+  private failEarlyRxOverflow(msg: CoopMessage): void {
+    const reason =
+      "early receive buffer overflow before first subscriber "
+      + `(role=${this.role} cap=${COOP_EARLY_RX_MAX_FRAMES} next=${msg.t})`;
+    this.earlyRx.length = 0;
+    coopWarn("webrtc", reason);
+    this.handleConnectionLost(this.wire, this.wireGeneration, reason, true);
   }
 
   onMessage(handler: (msg: CoopMessage) => void): () => void {
@@ -877,11 +891,7 @@ export class WebRtcTransport implements CoopTransport {
       // running - appending preserves arrival order across the replay boundary). See `earlyRx`.
       if ((!this.hasEverSubscribed && this.msgHandlers.size === 0) || this.earlyRx.length > 0 || this.earlyRxDraining) {
         if (this.earlyRx.length >= COOP_EARLY_RX_MAX_FRAMES) {
-          this.earlyRxDropped += 1;
-          coopWarn(
-            "webrtc",
-            `raw rx early-buffer FULL role=${this.role} t=${msg.t} dropped=${this.earlyRxDropped} (no handler consumed ${COOP_EARLY_RX_MAX_FRAMES} frames)`,
-          );
+          this.failEarlyRxOverflow(msg);
           return;
         }
         this.earlyRx.push(msg);

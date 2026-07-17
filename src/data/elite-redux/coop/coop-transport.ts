@@ -2218,7 +2218,7 @@ class LoopbackTransport implements CoopTransport {
       // handler is buffered (bounded) and replayed in order on first subscription, never dropped.
       if ((!peer.hasEverSubscribed && peer.msgHandlers.size === 0) || peer.earlyRx.length > 0 || peer.earlyRxDraining) {
         if (peer.earlyRx.length >= COOP_EARLY_RX_MAX_FRAMES_LOOPBACK) {
-          coopWarn("transport", `recv ${peer.role} early-buffer FULL t=${frame.t} (dropped)`);
+          peer.failEarlyRxOverflow(frame);
           return;
         }
         peer.earlyRx.push(frame);
@@ -2267,6 +2267,26 @@ class LoopbackTransport implements CoopTransport {
         this.earlyRxDraining = false;
       }
     });
+  }
+
+  /**
+   * Preserve loopback/WebRTC parity: overflow is a connection failure, never a lossy queue.
+   * Both endpoints are detached and notified so a harness cannot falsely continue after losing
+   * a one-shot protocol frame that production would need for its compatibility barrier.
+   */
+  private failEarlyRxOverflow(next: CoopMessage): void {
+    const linkedPeer = this.peer;
+    this.earlyRx.length = 0;
+    this.peer = null;
+    coopWarn(
+      "transport",
+      `recv ${this.role} early-buffer overflow cap=${COOP_EARLY_RX_MAX_FRAMES_LOOPBACK} next=${next.t}`,
+    );
+    this.setState("disconnected");
+    if (linkedPeer != null && linkedPeer.peer === this) {
+      linkedPeer.peer = null;
+      linkedPeer.setState("disconnected");
+    }
   }
 
   /** #diagnostics: age (ms) of the last inbound frame, or undefined if none received yet. */

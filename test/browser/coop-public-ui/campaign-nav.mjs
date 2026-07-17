@@ -153,6 +153,7 @@ export async function selectFirstEmptySaveSlot(client, { fromCursor = 0, timeout
  *  - a two-player party of six is the representative real-play shape AND exercises the co-op
  *  faint-replacement sync paths the single-mon party never reached. */
 const STARTERS_PER_SEAT = 3;
+const MIN_STARTERS_PER_SEAT = 2;
 
 /** The party size the visible starter bar last showed in this evidence sink (observer-read). */
 function visibleTeamSize(sink, fromCursor) {
@@ -160,12 +161,22 @@ function visibleTeamSize(sink, fromCursor) {
   return Array.isArray(team) ? team.length : 0;
 }
 
+function requireRepresentativeStarterTeam(client, fielded) {
+  if (fielded < MIN_STARTERS_PER_SEAT) {
+    throw new Error(
+      `${client.label}: fielded ${fielded}/${MIN_STARTERS_PER_SEAT} minimum starters through the public UI; `
+        + "the campaign would not represent survivability or faint-replacement sync",
+    );
+  }
+}
+
 /**
  * Field up to {@linkcode STARTERS_PER_SEAT} starters, submit the team, and confirm.
  * Every transition is observed before the next public key is sent, so text animation or a slow
  * browser cannot reinterpret a later key on the previous screen. Each ADD is verified against
  * the visible team bar (`teamSpeciesIds` growth); an add the game refuses (starter-point cap)
- * closes the option menu and stops adding - at least ONE fielded starter stays mandatory.
+ * closes the option menu and stops adding. At least two fielded starters stay mandatory:
+ * fewer cannot exercise faint replacement and already proved non-representative after rebalance.
  */
 export async function confirmDefaultStarterTeam(client, { fromCursor = client.pageCursor, timeoutMs = 15_000 } = {}) {
   await waitForActionableSemanticSurface(client, "starter-select", { fromCursor, timeoutMs });
@@ -222,9 +233,7 @@ export async function confirmDefaultStarterTeam(client, { fromCursor = client.pa
     }
     fielded += 1;
   }
-  if (fielded === 0) {
-    throw new Error(`${client.label}: could not field a single starter through the public UI`);
-  }
+  requireRepresentativeStarterTeam(client, fielded);
   client.evidence.record("starter-team-fielded", { fielded, target: STARTERS_PER_SEAT });
   const confirmCursor = client.evidence.cursor();
   await client.press("Enter", "starter-submit-team");

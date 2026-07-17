@@ -613,6 +613,55 @@ test("the campaign outcome wait accepts the first owned command frontier without
   );
 });
 
+test("a newer semantic surface supersedes a transient command frontier and its legacy console line", async () => {
+  const authority = fakeClient("authority", ["CommandPhase regression -> LOCAL UI"]);
+  authority.publicSeat = 0;
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:command",
+      phase: "CommandPhase",
+      phaseInstance: 17,
+      uiMode: "COMMAND",
+      localSeat: 0,
+      seatsWithInput: [0],
+      ready: { handlerActive: true },
+      address: { epoch: 7, wave: 1, turn: 4 },
+    },
+  });
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "battle:message",
+      phase: "NextEncounterPhase",
+      phaseInstance: 18,
+      uiMode: "MESSAGE",
+      localSeat: 0,
+      seatsWithInput: [0],
+      ready: { handlerActive: true, awaitingActionInput: true },
+      address: { epoch: 7, wave: 2, turn: 1 },
+    },
+  });
+  const renderer = fakeClient("renderer");
+  renderer.publicSeat = 1;
+  const rig = {
+    host: authority,
+    clients: { authority, renderer },
+    config: { faintOwnerSeat: "renderer" },
+  };
+
+  assert.equal(
+    await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 0, {
+      stopOnOwnedCommandFrontier: true,
+      singleSidedConfirmMs: 1,
+    }),
+    null,
+    "a historical command must not become actionable after the visible UI advanced",
+  );
+});
+
 test("fallback input is sent only to the client whose command never entered the turn", async () => {
   const authority = fakeClient("authority", ["[coop:turn] host recorder: begin turn=1"]);
   const renderer = fakeClient("renderer");
