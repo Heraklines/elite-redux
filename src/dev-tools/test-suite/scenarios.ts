@@ -18404,4 +18404,44 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // ===========================================================================
+  // FX - Partner Eevee (Omniform) per-type TRANSFORM burst
+  // ===========================================================================
+  {
+    label: "FX: Partner Eevee transform burst (per-type)",
+    description:
+      "Partner Eevee's Omniform adapts into the partner eeveelution matching the\n"
+      + "TYPE of the move it uses, and the transform now plays a per-type burst FX: a\n"
+      + "flash tinted by the target evolution's primary type colour plus small\n"
+      + "type-themed particles (grass = green light and drifting leaves, water =\n"
+      + "falling droplets, fire = rising embers, electric = spark jitter). It is\n"
+      + "generic, so every current and future evolution gets it from its primary type.\n"
+      + "DO: attack with Magical Leaf. Eevee adapts into Leafeon.\n"
+      + "EXPECT: a brief (about 1 second) GREEN light flash on Eevee plus a few small\n"
+      + "green leaf particles, then the Leafeon sprite. The starting moveset also has\n"
+      + "Water Gun / Ember / Thunder Shock, so a fresh run of this scenario can show\n"
+      + "the blue (Vaporeon), orange (Flareon) and yellow (Jolteon) variants. Testers\n"
+      + "eyeball the FX; unit config coverage is in\n"
+      + "test/tests/elite-redux/er-form-transform-fx.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        // Force active Omniform so the transform fires regardless of the innate
+        // candy-unlock gate (player innates are inactive in a scenario).
+        ABILITY_OVERRIDE: erAbility(5929), // Omniform (ER_OMNIFORM_ABILITY_ID)
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY, // tanky, won't KO you mid-test
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.EEVEE, {
+          formIndex: formIndexByKey(SpeciesId.EEVEE, "partner"),
+          moveset: [MoveId.MAGICAL_LEAF, MoveId.WATER_GUN, MoveId.EMBER, MoveId.THUNDER_SHOCK],
+        }),
+      ];
+    },
+  },
 ];
