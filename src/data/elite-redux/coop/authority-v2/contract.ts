@@ -115,6 +115,13 @@ export interface CoopFrameContextV2 {
   readonly connectionGeneration: number;
 }
 
+// ADJUDICATION (integration owner, 2026-07-18, Lane 5 change request): `seatMapId` and
+// `connectionGeneration` are NOT fields of the immutable per-session CoopRuntimeContext -
+// connectionGeneration increments per channel replacement (reconnect) without a new session
+// context. The CANONICAL construction is frame-context.ts's two-parameter
+// `bindFrameContext(ctx, connection: CoopFrameConnectionBindingV2)`; a hardcoded generation
+// would mis-route frames across reconnects.
+
 // ---------------------------------------------------------------------------
 // The authoritative log
 // ---------------------------------------------------------------------------
