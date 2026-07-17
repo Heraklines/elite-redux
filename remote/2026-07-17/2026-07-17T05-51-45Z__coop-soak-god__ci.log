@@ -1,0 +1,52 @@
+===== COOP SOAK RESULT =====
+profile: god
+verdict: FAIL
+waves_requested: 150
+run: 29558208047 (main)
+timestamp: 2026-07-17T05-51-45Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260717 WAVES=150 - replay this run with:  SOAK_SEED=20260717 SOAK_WAVES=150 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 126 (seed 20260717): wave driving threw (strand/stall): client phase drive to guest command 126:2 HANG on TitlePhase; queued=[], ui=TITLE. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-17T05-51-34-433Z__seed-20260717__wave-126. Replay: SOAK_SEED=20260717[39m
+
+----- vitest result tail -----
+[90m [2m❯[22m driveGuestReplayTurn test/tools/coop-duo-harness.ts:[2m2174:11[22m[39m
+[90m [2m❯[22m runNextTicks node:internal/process/task_queues:[2m65:5[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+
+[31m⎯⎯⎯⎯[39m[1m[41m Unhandled Rejection [49m[22m[31m⎯⎯⎯⎯⎯[39m
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'loadAssets')[39m
+[36m [2m❯[22m EnemyPokemon.loadAssets src/field/pokemon.ts:[2m924:46[22m[39m
+    [90m922|[39m     const formIndex = useIllusion ? illusion!.formIndex : this.formInd…
+    [90m923|[39m     loadPromises.push(
+    [90m924|[39m       this.getSpeciesForm(false, useIllusion).loadAssets(
+    [90m   |[39m                                              [31m^[39m
+    [90m925|[39m         this.getGender(useIllusion) === Gender.FEMALE,
+    [90m926|[39m         formIndex,
+[90m [2m❯[22m EnemyPokemon.pokemon.loadAssets test/tools/coop-duo-harness.ts:[2m1316:13[22m[39m
+[90m [2m❯[22m applyCoopCheckpoint src/data/elite-redux/coop/coop-battle-engine.ts:[2m1090:24[22m[39m
+[90m [2m❯[22m CoopFinalizeTurnPhase.applyModernTurnCommit src/phases/coop-replay-phases.ts:[2m1204:61[22m[39m
+[90m [2m❯[22m CoopFinalizeTurnPhase.startModernTurnCommit src/phases/coop-replay-phases.ts:[2m1094:14[22m[39m
+[90m [2m❯[22m CoopFinalizeTurnPhase.start src/phases/coop-replay-phases.ts:[2m919:12[22m[39m
+[90m [2m❯[22m driveGuestReplayTurn test/tools/coop-duo-harness.ts:[2m2174:11[22m[39m
+[90m [2m❯[22m runNextTicks node:internal/process/task_queues:[2m65:5[22m[39m
+[90m [2m❯[22m listOnTimeout node:internal/timers:[2m569:9[22m[39m
+[90m [2m❯[22m processTimers node:internal/timers:[2m543:7[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m     Errors [22m [1m[31m2 errors[39m[22m
+[2m   Start at [22m 05:47:05
+[2m   Duration [22m 279.01s[2m (transform 20.03s, setup 24.32s, import 281ms, tests 253.55s, environment 696ms)[22m
+
