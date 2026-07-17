@@ -18,6 +18,7 @@ import {
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopNetcodeMode, CoopSessionKind } from "#data/elite-redux/coop/coop-transport";
+import { markBootMilestone } from "#data/elite-redux/er-boot-diagnostics";
 import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-challenge-launch";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
@@ -73,6 +74,10 @@ export class TitlePhase extends Phase {
 
   async start(): Promise<void> {
     super.start();
+
+    // #ios-stability: we reached the title — boot completed cleanly. This is the milestone whose
+    // ABSENCE (in a persisted trail read back after a reload) means the previous session crashed on boot.
+    markBootMilestone("title-shown");
 
     // ER Community Challenge: clear any forced difficulty / species whitelist a
     // previous community card may have set, so returning to the title never leaks
