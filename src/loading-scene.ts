@@ -1,10 +1,10 @@
 import { timedEventManager } from "#app/global-event-manager";
-import { initializeGame } from "#app/init/init";
+import { initializeGame, initializeGameYielding } from "#app/init/init";
 import { SceneBase } from "#app/scene-base";
 import { isMobile } from "#app/touch-controls";
 import { markBootMilestone } from "#data/elite-redux/er-boot-diagnostics";
-import { ER_NEWCOMER_FRONT_ICON_SLUGS, ER_NEWCOMER_ICON_SLUGS } from "#data/elite-redux/er-newcomer-species";
-import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
+import { isIOSDevice } from "#data/elite-redux/er-ios";
+import { getEliteReduxCustomIconLoads } from "#data/elite-redux/er-ios-icon-preload";
 import { BiomeId } from "#enums/biome-id";
 import { GachaType } from "#enums/gacha-types";
 import { BG_VARIANT_SUFFIXES, biomeHasBgVariants, getBiomeHasProps } from "#field/arena";
@@ -20,6 +20,13 @@ export class LoadingScene extends SceneBase {
   public static readonly KEY = "loading";
 
   readonly LOAD_EVENTS = Phaser.Loader.Events;
+
+  /**
+   * #ios-stability: on iOS the game-data init runs yielding (see preload). create() awaits
+   * this before starting the battle scene so all data is registered first. Null on desktop
+   * (init already ran synchronously in preload).
+   */
+  private erInitPromise: Promise<void> | null = null;
 
   constructor() {
     super(LoadingScene.KEY);
@@ -502,17 +509,35 @@ export class LoadingScene extends SceneBase {
       .loadBgm("level_up_fanfare", "bw/level_up_fanfare.mp3")
       .loadBgm("item_fanfare", "bw/item_fanfare.mp3")
       .loadBgm("minor_fanfare", "bw/minor_fanfare.mp3")
-      .loadBgm("heal", "bw/heal.mp3")
-      .loadBgm("victory_trainer", "bw/victory_trainer.mp3")
-      .loadBgm("victory_team_plasma", "bw/victory_team_plasma.mp3")
-      .loadBgm("victory_gym", "bw/victory_gym.mp3")
-      .loadBgm("victory_champion", "bw/victory_champion.mp3")
-      .loadBgm("evolution", "bw/evolution.mp3")
-      .loadBgm("evolution_fanfare", "bw/evolution_fanfare.mp3");
+      .loadBgm("heal", "bw/heal.mp3");
+
+    // #ios-stability (P1): the 5 heavy non-title BGM tracks (~146 MB of decoded PCM,
+    // the #1 suspected WKWebView jetsam trigger) are NOT preloaded/decoded at boot on iOS.
+    // Each is loaded on demand at first play - playBgm / playSoundWithoutBgm look its `bw/`
+    // filename up in ER_IOS_DEFERRED_BGM_FILES so the on-demand fetch resolves seamlessly.
+    // Desktop keeps the eager path (identical set + load order).
+    if (isIOSDevice()) {
+      markBootMilestone("ios-bgm-deferred");
+    } else {
+      this.loadBgm("victory_trainer", "bw/victory_trainer.mp3")
+        .loadBgm("victory_team_plasma", "bw/victory_team_plasma.mp3")
+        .loadBgm("victory_gym", "bw/victory_gym.mp3")
+        .loadBgm("victory_champion", "bw/victory_champion.mp3")
+        .loadBgm("evolution", "bw/evolution.mp3");
+    }
+    this.loadBgm("evolution_fanfare", "bw/evolution_fanfare.mp3");
 
     this.loadLoadingScreen();
 
-    initializeGame();
+    // #ios-stability (P4): the long, synchronous game-data init blocks the main thread
+    // during boot - on a slow iOS device that can trip the kill-the-tab watchdog. On iOS
+    // run it yielding between phases and await it in create() before the battle scene starts
+    // (init order/semantics are identical). Desktop keeps the single synchronous pass.
+    if (isIOSDevice()) {
+      this.erInitPromise = initializeGameYielding();
+    } else {
+      initializeGame();
+    }
   }
 
   private loadLoadingScreen() {
@@ -686,6 +711,12 @@ export class LoadingScene extends SceneBase {
 
   async create() {
     this.events.once(Phaser.Scenes.Events.DESTROY, () => this.handleDestroy());
+    // #ios-stability: ensure the yielding iOS init has fully completed before the battle
+    // scene (and its title phase) run, so every species/move/ability is registered. No-op
+    // on desktop, where init already ran synchronously in preload.
+    if (this.erInitPromise) {
+      await this.erInitPromise;
+    }
     this.scene.start("battle");
   }
 
@@ -772,7 +803,15 @@ export class LoadingScene extends SceneBase {
         this.loadAtlas(`pokemon_icons_${i}v`, "");
       }
     }
-    this.loadEliteReduxCustomIcons();
+    // #ios-stability (P3): the ~1,850 ER-custom icon requests are pulled OUT of the
+    // blocking iOS boot preload and streamed at the title instead (title-phase.ts ->
+    // loadEliteReduxCustomIconsInBackground), so the fetch fan can't stall the WKWebView
+    // connection pool during the pre-title crash window. Desktop keeps the eager preload.
+    if (isIOSDevice()) {
+      markBootMilestone("ios-icons-deferred");
+    } else {
+      this.loadEliteReduxCustomIcons();
+    }
     return this;
   }
 
@@ -781,29 +820,12 @@ export class LoadingScene extends SceneBase {
    * starter-select grid doesn't flash blank slots while atlases stream
    * in lazily. Each ER custom has its own per-slug atlas
    * (`er_icon__{slug}`) — pokerogue's vanilla bundled `pokemon_icons_N`
-   * has no frames for id >= 10000.
+   * has no frames for id >= 10000. The load list is the single source of
+   * truth shared with the iOS background streamer (er-ios-icon-preload.ts).
    */
   private loadEliteReduxCustomIcons(): void {
-    for (const entry of ER_SPRITE_MANIFEST) {
-      // ER species id >= 1026 → custom (Phantowl onward). Vanilla species ids
-      // 1..1025 share pokerogue's bundled icons; we only need icons for the
-      // ER customs the runtime hasn't otherwise loaded.
-      if (entry.speciesId < 1026) {
-        continue;
-      }
-      this.loadAtlas(`er_icon__${entry.slug}`, `pokemon/elite-redux/${entry.slug}`, "icon");
-    }
-    // Hand-authored newcomer species (70000+ band) are NOT in ER_SPRITE_MANIFEST
-    // (which is auto-generated from the ER dump), so their per-slug icon atlases
-    // would only stream in lazily during a battle. Preload them here too so
-    // title-screen surfaces (save-slot preview, party) render their mini icon
-    // instead of an error box (live tester report; same class as #308).
-    for (const slug of ER_NEWCOMER_ICON_SLUGS) {
-      // Icon-from-front species (Regitube) load their FRONT atlas under the icon
-      // key so the icon never depends on a bespoke icon.png (which may lack the
-      // 0001.png frame). The species-level getIconScale downscales it on display.
-      const file = ER_NEWCOMER_FRONT_ICON_SLUGS.has(slug) ? "front" : "icon";
-      this.loadAtlas(`er_icon__${slug}`, `pokemon/elite-redux/${slug}`, file);
+    for (const load of getEliteReduxCustomIconLoads()) {
+      this.loadAtlas(load.key, `pokemon/elite-redux/${load.slug}`, load.file);
     }
   }
 }

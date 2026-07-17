@@ -1907,6 +1907,41 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) ER-added mega with no cry falls back to the base cry (no cry/663-mega 404)",
+    description:
+      "Asset fix (live 2026-07-16 cry/663-mega + cry/503-mega 404 spam). ER adds mega\n"
+      + "forms the official games never had (Mega Talonflame, Mega Samurott). Their sprite\n"
+      + "art ships on the er-assets CDN but NO cry recording does, so the vanilla cry scheme\n"
+      + "requested cry/663-mega (Talonflame) / cry/503-mega (Samurott) - files that are not\n"
+      + "on the CDN - and 404'd PERMANENTLY, spamming every tester's console on each summon.\n"
+      + "Fix: getCryKey now falls back to the base species cry (cry/663) when the mega cry is\n"
+      + "not in the shipped set, so a real cry plays and nothing 404s. A mega that DOES ship a\n"
+      + "cry (Mega Garchomp cry/445-mega, see the scenario above) is untouched.\n"
+      + "\n"
+      + "DO: start the battle and watch your Mega Talonflame lead get sent out (free-win\n"
+      + "Magikarp).\n"
+      + "EXPECT: a CRY plays on send-out (the base Talonflame cry) and the console shows NO\n"
+      + "'cry/663-mega not found'. CI coverage: er-mega-cry-fallback.test.ts asserts the\n"
+      + "fallback key for 663/503 and that no reachable mega form ever resolves to a missing\n"
+      + "cry file.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        // Mega Talonflame (dex 663): an ER-added mega with sprite art but no shipped cry.
+        makeStarter(SpeciesId.TALONFLAME, {
+          formIndex: formIndexContaining(SpeciesId.TALONFLAME, "mega"),
+          moveset: [MoveId.BRAVE_BIRD, MoveId.FLARE_BLITZ, MoveId.ROOST, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
   // ===========================================================================
   // Combat — Terapagos Terastallizes into its PERMANENT Primal form
   // ===========================================================================

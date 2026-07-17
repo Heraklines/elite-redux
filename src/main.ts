@@ -6,6 +6,7 @@ import "#app/i18n"; // Initializes i18n on import
 import { InvertPostFX } from "#app/pipelines/invert";
 import { isBeta, isDev } from "#constants/app-constants";
 import { initBootDiagnostics } from "#data/elite-redux/er-boot-diagnostics";
+import { isIOSDevice } from "#data/elite-redux/er-ios";
 import { version } from "#package.json";
 import Phaser from "phaser";
 import BBCodeTextPlugin from "phaser3-rex-plugins/plugins/bbcodetext-plugin";
@@ -24,7 +25,7 @@ if (isBeta || isDev) {
 async function startGame(): Promise<void> {
   const LoadingScene = (await import("./loading-scene")).LoadingScene;
   const BattleScene = (await import("./battle-scene")).BattleScene;
-  const game = new Phaser.Game({
+  const gameConfig: Phaser.Types.Core.GameConfig = {
     type: Phaser.WEBGL,
     parent: "app",
     scale: {
@@ -82,7 +83,22 @@ async function startGame(): Promise<void> {
     pipeline: [InvertPostFX] as unknown as Phaser.Types.Core.PipelineConfig,
     scene: [LoadingScene, BattleScene],
     version,
-  });
+  };
+
+  // #ios-stability (P5): on iOS request a conservative WebGL context so a GPU-poor /
+  // backgrounded tab degrades instead of refusing the context and dying. `low-power`
+  // biases toward the integrated GPU, and NOT failing on a major performance caveat lets
+  // the software/limited path start rather than throw. Renderer stays WEBGL (canvas
+  // fallback would be unplayably slow - see investigation P5). Desktop config is untouched.
+  if (isIOSDevice()) {
+    gameConfig.render = {
+      ...(gameConfig.render ?? {}),
+      powerPreference: "low-power",
+      failIfMajorPerformanceCaveat: false,
+    };
+  }
+
+  const game = new Phaser.Game(gameConfig);
   game.sound.pauseOnBlur = false;
 }
 
