@@ -42,6 +42,7 @@ import {
   drainLoopback,
   driveGuestReplayTurn,
   installDuoLogCapture,
+  settleDuoPromise,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -161,7 +162,11 @@ describe.skipIf(!RUN)(
       // Drive to TurnEndPhase - both replacement SwitchPhases open after, guest-owned first then host-owned.
       // The focused harness drives only the host's real phase queue. Materialize the replay guest reaching
       // the same post-replacement command boundary; production gets this from its own CommandPhase.
-      const commandPoint = `cmd:${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}`;
+      // The POST-REPLACEMENT boundary: the double-KO turn (currently `turn`, pre-resolution) ends with
+      // incrementTurn(), so the reciprocal command point both engines meet at is the NEXT turn. Awaiting
+      // the current turn's point (`cmd:1:1`) waits on a boundary the host passed pre-pairing and will
+      // never re-announce (gate-10 B7: RENDEZVOUS RECOVERY EXHAUSTED point=cmd:1:1).
+      const commandPoint = `cmd:${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn + 1}`;
       withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.arrive(commandPoint));
       await drainLoopback();
       await withClient(rig.hostCtx, async () => {
@@ -206,16 +211,34 @@ describe.skipIf(!RUN)(
       // that BOTH replacements always drive (the guard); the live wave-66 strand additionally needed the
       // shipped soak coverage-floor's emergent multi-mon timing, which this deterministic 2-faint setup does
       // not recreate - so it exercises + guards the path rather than reproducing the exact pre-fix hang.
+      // The crossing settles under BOTH destination contexts: the FAINT_SWITCH operation envelopes
+      // park in the destination pump until the guest context runs, and the host's material-ACK
+      // barrier cannot resolve until the guest applies + ACKs them (the b59dba12 B-lane hang class:
+      // "operation delivery RETRY attempt=8/8" -> stuck at SwitchPhase).
+      let hostAdvance: Promise<void> | undefined;
       await withClient(rig.hostCtx, async () => {
         if (hostOwnedFaintPending(rig)) {
           registerHostFaintAutoPick(game, rig);
         }
-        await game.phaseInterceptor.to("CommandPhase");
+        // Run the target (no `false`): the host's next-command rendezvous barrier lives in
+        // CommandPhase.start() (coopNextCommandBarrier) - parking the phase unrun means the host
+        // never announces its post-replacement arrival and any reciprocity await times out.
+        hostAdvance = game.phaseInterceptor.to("CommandPhase") as Promise<void>;
+        await drainLoopback();
       });
-      await drainLoopback();
-      const guestBoundary = await withClient(rig.guestCtx, () =>
-        rig.guestRuntime.rendezvous.awaitPartner(commandPoint),
-      );
+      expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+      await settleDuoPromise(rig, hostAdvance!, "double-KO replacement host crossing");
+      // The reciprocity proof is itself a two-engine crossing: the host's arrival frame reaches the
+      // guest only while the guest's inbox pumps, so the awaitPartner promise must settle under BOTH
+      // destination contexts (a guest-only await with the vitest 50ms rendezvous budget times out
+      // before the arrival is ever consumed - the gate-9 B7 red).
+      let boundaryPending: Promise<{ timedOut: boolean }> | undefined;
+      await withClient(rig.guestCtx, async () => {
+        boundaryPending = rig.guestRuntime.rendezvous.awaitPartner(commandPoint) as Promise<{ timedOut: boolean }>;
+        await drainLoopback();
+      });
+      expect(boundaryPending, "the guest reciprocity wait was started").toBeDefined();
+      const guestBoundary = await settleDuoPromise(rig, boundaryPending!, "post-replacement reciprocal boundary");
       expect(guestBoundary.timedOut, "post-replacement command boundary was reciprocal").toBe(false);
 
       // No strand: the host reached the next CommandPhase.

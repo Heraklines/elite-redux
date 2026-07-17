@@ -565,8 +565,9 @@ function applyJournaledColosseumEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
     if (!controlRetained) {
       return "rejected";
     }
-    if (applyCoopOperationEnvelope(g, "op:colosseum", envelope) !== "applied") {
-      return "rejected";
+    const colosseumApply = applyCoopOperationEnvelope(g, "op:colosseum", envelope);
+    if (colosseumApply !== "applied") {
+      return colosseumApply;
     }
     applied = true;
   } finally {

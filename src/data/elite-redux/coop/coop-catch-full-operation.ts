@@ -358,7 +358,7 @@ function applyJournaledCatchFullEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
   }
   const result = applyCoopOperationEnvelope(g, "op:catchFull", envelope);
   if (result !== "applied") {
-    return "rejected";
+    return result;
   }
   if (operation.payload.type !== "prompt") {
     cancelRetry(s, operation.payload);

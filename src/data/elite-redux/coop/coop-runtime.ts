@@ -60,7 +60,12 @@ import {
   reapplyAcceptedCoopAuthoritativeBattleState,
   resetCoopStateTicks,
 } from "#data/elite-redux/coop/coop-battle-engine";
-import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
+import {
+  CoopBattleStreamer,
+  type CoopStateSyncFailure,
+  type CoopStateSyncOutcome,
+  type CoopStateSyncResult,
+} from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync, type CoopCommandTimeout } from "#data/elite-redux/coop/coop-battle-sync";
 import {
   isCoopBiomeOperationEnabled,
@@ -106,6 +111,7 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import { CoopDurabilityManager, isCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import {
   isCoopFaintSwitchOperationEnabled,
+  materializeCoopFaintSwitchPickerTerminal,
   resetCoopFaintSwitchOperationState,
   setCoopFaintSwitchOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
@@ -260,6 +266,8 @@ import type {
   CoopInteractionOutcome,
   CoopMessage,
   CoopNetcodeMode,
+  CoopRecoveryAdmissionV1,
+  CoopRecoveryReason,
   CoopRole,
   CoopSerializedEnemy,
   CoopSessionKind,
@@ -273,7 +281,7 @@ import {
   createLoopbackPair,
   type SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
-import { setCoopLiveEmitter } from "#data/elite-redux/coop/coop-turn-recorder";
+import { isCoopRecording, setCoopLiveEmitter } from "#data/elite-redux/coop/coop-turn-recorder";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { coopAuthorityContinuationSurface } from "#data/elite-redux/coop/coop-ui-registry";
 import { resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
@@ -489,16 +497,17 @@ function preflightCoopAtomicSnapshot(runtime: CoopRuntime, snapshot: CoopFullBat
 }
 
 function wireCoopResyncResponder(runtime: CoopRuntime): void {
-  runtime.battleStream.onStateSyncRequest((_turn, seq) => {
-    coopLog("resync", `recv requestStateSync turn=${_turn} seq=${seq} role=${runtime.controller.role}`);
+  runtime.battleStream.onStateSyncRequest(ticket => {
+    coopLog("resync", `recv requestStateSync id=${ticket.requestId} role=${runtime.controller.role}`);
     if (runtime.controller.role !== "host") {
-      coopLog("resync", `ignore requestStateSync seq=${seq} (not host, role=${runtime.controller.role})`);
+      coopLog("resync", `ignore requestStateSync id=${ticket.requestId} (not host, role=${runtime.controller.role})`);
       return;
     }
     try {
       const snapshot = captureCoopFullSnapshot();
       if (snapshot == null) {
-        coopWarn("resync", `host has no live snapshot for requestStateSync seq=${seq} -> no reply`);
+        coopWarn("resync", `host has no live snapshot for requestStateSync id=${ticket.requestId}`);
+        runtime.battleStream.sendStateSyncUnavailable(ticket, "unavailable");
         return;
       }
       const stamped = bindCoopSnapshotControl({
@@ -513,15 +522,27 @@ function wireCoopResyncResponder(runtime: CoopRuntime): void {
         runtime.durability != null
         && !runtime.durability.retainSnapshotFrontier(stamped.controlDigest!, stamped.journalHighWater ?? {})
       ) {
-        coopWarn("resync", `host refused unretained stateSync frontier seq=${seq}`);
+        coopWarn("resync", `host refused unretained stateSync frontier id=${ticket.requestId}`);
+        runtime.battleStream.sendStateSyncUnavailable(ticket, "unavailable");
+        return;
+      }
+      const state = stamped.authoritativeState;
+      if (state == null || stamped.controlDigest == null) {
+        runtime.battleStream.sendStateSyncUnavailable(ticket, "unavailable");
         return;
       }
       const blob = compressToBase64(JSON.stringify(stamped));
-      coopLog("resync", `send stateSync seq=${seq} blob=${blob.length}b`);
-      runtime.battleStream.sendStateSync(blob, seq);
+      coopLog("resync", `send stateSync id=${ticket.requestId} blob=${blob.length}b`);
+      runtime.battleStream.sendStateSync(blob, ticket, {
+        wave: state.wave,
+        turn: state.turn,
+        stateTick: state.tick,
+        controlDigest: stamped.controlDigest,
+      });
     } catch (e) {
       /* a resync serialize/send failure must never break the host's turn */
-      coopWarn("resync", `host stateSync send failed seq=${seq}`, e);
+      runtime.battleStream.sendStateSyncUnavailable(ticket, "unavailable");
+      coopWarn("resync", `host stateSync send failed id=${ticket.requestId}`, e);
     }
   });
 }
@@ -797,6 +818,7 @@ export function adoptCoopActiveMysterySnapshot(snapshot: Pick<CoopFullBattleSnap
 function tryApplyCoopActiveMysterySnapshotInline(
   runtime: CoopRuntime,
   snapshot: CoopFullBattleSnapshot,
+  admission: CoopRecoveryAdmissionV1,
   label: string,
   onHealed?: (() => void) | undefined,
 ): boolean | null {
@@ -814,7 +836,10 @@ function tryApplyCoopActiveMysterySnapshotInline(
   ) {
     return null;
   }
-  if (!preflightCoopAtomicSnapshot(runtime, snapshot)) {
+  if (
+    !preflightCoopAtomicSnapshot(runtime, snapshot)
+    || !runtime.battleStream.recoveryAdmissionIsCurrent(admission, snapshot)
+  ) {
     return false;
   }
   const rollback = captureCoopFullSnapshot();
@@ -866,11 +891,15 @@ function tryApplyCoopActiveMysterySnapshotInline(
 export function queueCoopAtomicSnapshotApply(
   runtime: CoopRuntime,
   snapshot: CoopFullBattleSnapshot,
+  admission: CoopRecoveryAdmissionV1,
   label: string,
   onHealed?: (() => void) | undefined,
 ): boolean {
   const snapshotId = `snapshot:e${snapshot.sessionEpoch ?? 0}:tick${snapshot.authoritativeState?.tick ?? snapshot.tick ?? 0}:${snapshot.checksum ?? "missing"}`;
-  if (!preflightCoopAtomicSnapshot(runtime, snapshot)) {
+  if (
+    !preflightCoopAtomicSnapshot(runtime, snapshot)
+    || !runtime.battleStream.recoveryAdmissionIsCurrent(admission, snapshot)
+  ) {
     recordCoopCausalEvent({
       domain: "snapshot",
       stage: "refused",
@@ -889,7 +918,7 @@ export function queueCoopAtomicSnapshotApply(
     );
     return false;
   }
-  const inlineMysteryApply = tryApplyCoopActiveMysterySnapshotInline(runtime, snapshot, label, onHealed);
+  const inlineMysteryApply = tryApplyCoopActiveMysterySnapshotInline(runtime, snapshot, admission, label, onHealed);
   if (inlineMysteryApply != null) {
     return inlineMysteryApply;
   }
@@ -910,6 +939,7 @@ export function queueCoopAtomicSnapshotApply(
     snapshotTurn,
     snapshot.checksum ?? "",
     undefined,
+    admission,
     healed => {
       if (!healed) {
         recordCoopCausalEvent({
@@ -967,15 +997,16 @@ function sendCoopDurabilitySnapshot(
   cls: string,
   headRevision: number,
   controlHighWater: Record<string, number>,
-): void {
+): boolean {
   if (runtime.controller.role !== "host") {
-    return;
+    coopWarn("resync", `durability snapshot sender invoked on ${runtime.controller.role} cls=${cls}`);
+    return false;
   }
   try {
     const snapshot = captureCoopFullSnapshot();
     if (snapshot == null) {
       coopWarn("resync", `durability snapshot unavailable cls=${cls} head=${headRevision}`);
-      return;
+      return false;
     }
     const stamped = bindCoopSnapshotControl({
       ...snapshot,
@@ -993,25 +1024,42 @@ function sendCoopDurabilitySnapshot(
       && !runtime.durability.retainSnapshotFrontier(stamped.controlDigest!, stamped.journalHighWater ?? {})
     ) {
       coopWarn("resync", `durability snapshot frontier refused cls=${cls} head=${headRevision}`);
-      return;
+      return false;
     }
-    runtime.battleStream.sendDurabilitySnapshot(compressToBase64(JSON.stringify(stamped)));
+    const state = stamped.authoritativeState;
+    if (state == null || stamped.controlDigest == null) {
+      coopWarn("resync", `durability snapshot missing modern capture proof cls=${cls} head=${headRevision}`);
+      return false;
+    }
+    return runtime.battleStream.sendDurabilitySnapshot(compressToBase64(JSON.stringify(stamped)), {
+      wave: state.wave,
+      turn: state.turn,
+      stateTick: state.tick,
+      controlDigest: stamped.controlDigest,
+    });
   } catch (e) {
     coopWarn("resync", `durability snapshot send failed cls=${cls} head=${headRevision}`, e);
+    return false;
   }
 }
 
 /** Guest-side deep-gap application: mutate live state, then ACK exactly the revisions it subsumed. */
 function wireCoopDurabilitySnapshotReceiver(runtime: CoopRuntime): void {
-  runtime.battleStream.onDurabilitySnapshot(blob => {
+  runtime.battleStream.onDurabilitySnapshot(({ blob, admission }) => {
     if (runtime.controller.role !== "guest") {
+      failCoopRuntimeSharedSession(runtime, "A durability recovery snapshot reached the non-renderer peer.");
       return;
     }
     try {
       const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
-      queueCoopAtomicSnapshotApply(runtime, snapshot, `durability deep-gap snapshot blob=${blob.length}b`);
+      if (
+        !queueCoopAtomicSnapshotApply(runtime, snapshot, admission, `durability deep-gap snapshot blob=${blob.length}b`)
+      ) {
+        failCoopRuntimeSharedSession(runtime, "Durability deep-gap snapshot was not admissible at the live frontier.");
+      }
     } catch (e) {
       coopWarn("resync", "durability deep-gap snapshot apply failed", e);
+      failCoopRuntimeSharedSession(runtime, "Durability deep-gap snapshot could not be decoded or queued.");
     }
   });
 }
@@ -1046,6 +1094,8 @@ function wireCoopEnemyPartyResponder(controller: CoopSessionController, battleSt
 interface CoopPendingWaveAdvance {
   wave: number;
   outcome: CoopWaveOutcome;
+  /** Authority turn whose terminal commit causally follows every live event for this wave. */
+  settledTurn?: number | undefined;
   captureParty?: string[] | undefined;
   capturePresentation?: CoopCapturePresentation | undefined;
   /** The host's complete control statement. Present on current peers and journal recovery. */
@@ -1081,6 +1131,20 @@ let lastWaveEndStateWave = -1;
 const pendingHostWaveTransitions = new Map<number, CoopWaveAdvancePayload>();
 /** Settled host transactions retained by wave, including a terminal victory that supersedes GameOver's echo. */
 const settledHostWaveTransitions = new Map<number, CoopWaveAdvancePayload>();
+/**
+ * A normal victory observed while its material battle turn is still recording. The transition is staged
+ * immediately so BattleEnd can freeze its identity, but its raw compatibility hint cannot leave the host
+ * until the immutable turn commit has been accepted for retention.
+ */
+const deferredHostWaveResolved = new Map<
+  number,
+  {
+    outcome: CoopWaveOutcome;
+    captureParty?: string[] | undefined;
+    presentation?: CoopCapturePresentation | undefined;
+    transition: CoopWaveAdvancePayload;
+  }
+>();
 /**
  * One normal victory whose BattleEnd cleanup has completed but whose automatic post-victory children have
  * not drained yet. Runtime-keying is load-bearing in the two-engine harness: the host and guest coexist in
@@ -1477,6 +1541,7 @@ function retainedWaveContinuationAckProof(
 function maybeMarkCoopWaveContinuationReady(
   wave: number,
   binding: CoopWaveAdvanceOperationBinding,
+  runtime: CoopRuntime,
   phaseOwnedSurface?: CoopPhaseOwnedWaveContinuationSurface,
 ): boolean {
   const staged = getCoopStagedWaveAdvanceTransaction(wave, binding);
@@ -1495,7 +1560,14 @@ function maybeMarkCoopWaveContinuationReady(
   if (complete) {
     const proof = retainedWaveContinuationAckProof(staged, phaseOwnedSurface);
     if (proof != null) {
-      binding.durability?.completeRetainedWaveAdvance(staged.envelope, proof.surface, proof.address);
+      const released =
+        binding.durability?.completeRetainedWaveAdvance(staged.envelope, proof.surface, proof.address) === true;
+      if (released) {
+        // Replacement and WAVE_ADVANCE are independent retained transports. A replacement checkpoint can
+        // arrive after the guest has already rendered that switch and admitted the later post-battle DATA.
+        // The completed wave proof is then the only safe authority capable of retiring that late checkpoint.
+        runtime.battleStream.acknowledgeReplacementsSubsumedByOperation(staged.envelope);
+      }
     }
   }
   return complete;
@@ -1598,7 +1670,7 @@ export function notifyCoopWaveContinuationSurfaceReady(
   if (!Number.isSafeInteger(wave) || wave < 0) {
     return false;
   }
-  const ready = maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding, phaseOwnedSurface);
+  const ready = maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding, runtime, phaseOwnedSurface);
   if (ready) {
     // Biome-market watchers and other phase-owned continuations deliberately do not open a normal
     // registry-backed UI mode. Their executable public/terminal loop is still the exact continuation
@@ -1623,6 +1695,21 @@ export function notifyCoopWaveContinuationSurfaceReady(
  */
 export function coopHasPendingWaveAdvance(): boolean {
   return pendingWaveAdvance != null && pendingWaveAdvance.wave > lastResolvedWave;
+}
+
+/**
+ * A retained GameOver commit replaces the turn-resolution frame the host never emits after entering
+ * {@linkcode GameOverPhase}. The renderer may use this only after its ordered live-event buffer is empty:
+ * the envelope is carried by the same ordered channel after those events, so admission is the causal fence
+ * that makes an otherwise-permanent same-turn replay wait impossible rather than merely slow.
+ */
+export function coopRetainedGameOverSupersedesReplay(wave: number, turn: number): boolean {
+  return (
+    pendingWaveAdvance?.wave === wave
+    && pendingWaveAdvance.outcome === "gameOver"
+    && pendingWaveAdvance.settledTurn != null
+    && turn >= pendingWaveAdvance.settledTurn
+  );
 }
 
 /**
@@ -1731,6 +1818,7 @@ export function mergeCoopPendingWaveAdvance(
   captureParty: string[] | undefined,
   capturePresentation?: CoopCapturePresentation | undefined,
   transition?: CoopWaveAdvancePayload | undefined,
+  settledTurn?: number | undefined,
 ): CoopPendingWaveAdvance | null {
   if (prev != null && wave < prev.wave) {
     return null; // a stale earlier-wave signal: keep the existing later-wave pending.
@@ -1751,12 +1839,15 @@ export function mergeCoopPendingWaveAdvance(
   const carriedTransition =
     receivedTransition
     ?? (prev != null && prev.wave === wave && prev.outcome === outcome ? prev.transition : undefined);
+  const carriedSettledTurn =
+    settledTurn ?? (prev != null && prev.wave === wave && prev.outcome === outcome ? prev.settledTurn : undefined);
   return {
     wave,
     outcome,
     captureParty: carriedCapture,
     capturePresentation: carriedPresentation,
     ...(carriedTransition === undefined ? {} : { transition: carriedTransition }),
+    ...(carriedSettledTurn === undefined ? {} : { settledTurn: carriedSettledTurn }),
   };
 }
 
@@ -1960,40 +2051,37 @@ function wireCoopMeChecksumCheck(runtime: CoopRuntime, battleStream: CoopBattleS
         );
         coopLog("resync", `await stateSync start seq=${seq}`);
         const gen = coopSessionGeneration(); // #808: die if the session ends before the reply
-        void battleStream.requestStateSync(seq).then(blob => {
-          if (gen !== coopSessionGeneration()) {
-            coopWarn("resync", `stateSync reply seq=${seq} arrived AFTER session teardown -> dropped (#808)`);
-            return;
-          }
-          if (blob == null) {
-            coopWarn("resync", `await stateSync TIMEOUT/null seq=${seq}`);
-            return;
-          }
-          coopLog("resync", `await stateSync resolve seq=${seq} blob=${blob.length}b -> applying`);
-          try {
+        void runCoopStateRecovery({
+          runtime,
+          reason: "mystery-checksum",
+          label: `Mystery checksum seq=${seq}`,
+          isCurrent: () => gen === coopSessionGeneration() && getCoopRuntime() === runtime,
+          onSnapshot: ({ blob, admission }) => {
+            coopLog("resync", `await stateSync resolve seq=${seq} blob=${blob.length}b -> applying`);
             // #839: this heal fires MID-DIVERT - the stateSync reply resolves while the guest is diverting
             // into (or parked in) CoopReplayMePhase for this same ME. Run it with `suppressResummon=true` so
             // it stays a SAFE, advisory best-effort heal: it applies only the cheap per-mon scalar +
             // module-let state writes and NEVER runs the heavy field COMPOSITION re-summon
             // (reconcileCoopEnemyField / reconcileCoopPlayerField + per-mon initBattleInfo), which would tear
             // down and rebuild the field sprites out from under the in-flight ME presentation. applyCoopFullSnapshot
-            // touches no phase queue and never cancels a relay waiter, so the ME divert proceeds regardless of
-            // whether this early heal converges - the AUTHORITATIVE convergence is the ME terminal's
-            // comprehensive meResync (applyCoopMeOutcome), which the guest still adopts. The still-diverged
-            // path below is advisory by design (#839): it must never disrupt the encounter.
+            // touches no phase queue and never cancels a relay waiter. Protocol 38 still requires this
+            // requested recovery to admit exactly; failure enters the shared terminal instead of letting an
+            // already-proven divergence continue into the later ME terminal.
             const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
             const liveRuntime = getCoopRuntime();
             if (liveRuntime == null) {
-              return;
+              return false;
             }
             // One central preflight enforces epoch, checksum/sentinel, membership, control digest, monotonic
             // interaction counter, and Mystery revision before DATA is touched. Active replay applies inline
             // transactionally; every other phase queues the same atomic apply at a safe boundary.
-            queueCoopAtomicSnapshotApply(liveRuntime, snapshot, `me-entry seq=${seq} comprehensive snapshot`);
-          } catch (e) {
-            /* a malformed resync blob must never crash the ME flow */
-            coopWarn("resync", `me-entry seq=${seq} malformed resync blob (ignored)`, e);
-          }
+            return queueCoopAtomicSnapshotApply(
+              liveRuntime,
+              snapshot,
+              admission,
+              `me-entry seq=${seq} comprehensive snapshot`,
+            );
+          },
         });
       }),
     );
@@ -2375,22 +2463,22 @@ export function wireCoopStallWatchdog(
             wave: globalScene.currentBattle?.waveIndex ?? 0,
             turn: globalScene.currentBattle?.turn ?? 0,
           });
-          void battleStream.requestStateSync(seq).then(blob => {
-            if (gen !== coopSessionGeneration()) {
-              return;
-            }
-            if (blob == null) {
+          void runCoopStateRecovery({
+            runtime,
+            reason: "stall",
+            label: `Stall at wave ${point.wave} turn ${point.turn}`,
+            isCurrent: () => gen === coopSessionGeneration() && getCoopRuntime() === runtime,
+            onFailure: result => {
               recordCoopCausalEvent({
                 domain: "snapshot",
-                stage: "timed-out",
+                stage: "refused",
                 causalId: `${recoveryId}:snapshot:${seq}`,
                 parentId: recoveryId,
                 role: "guest",
+                detail: result.kind,
               });
-              coopWarn("resync", `stall-recovery stateSync TIMEOUT/null seq=${seq}`);
-              return;
-            }
-            try {
+            },
+            onSnapshot: ({ blob, admission }) => {
               const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
               recordCoopCausalEvent({
                 domain: "snapshot",
@@ -2403,21 +2491,13 @@ export function wireCoopStallWatchdog(
                 turn: readCoopBattlePoint().turn,
                 detail: `${blob.length}b`,
               });
-              queueCoopAtomicSnapshotApply(
+              return queueCoopAtomicSnapshotApply(
                 runtime,
                 snapshot,
+                admission,
                 `stall-recovery snapshot seq=${seq} blob=${blob.length}b`,
               );
-            } catch {
-              recordCoopCausalEvent({
-                domain: "snapshot",
-                stage: "parse-failed",
-                causalId: `${recoveryId}:snapshot:${seq}`,
-                parentId: recoveryId,
-                role: "guest",
-              });
-              coopWarn("resync", `stall-recovery snapshot apply FAILED seq=${seq}`);
-            }
+            },
           });
         }
       }
@@ -2697,7 +2777,125 @@ export function failCoopSharedSession(reason: string, failure: CoopSharedSession
   const runtime = getCoopRuntime();
   if (runtime != null) {
     failCoopRuntimeSharedSession(runtime, reason, failure);
+    return;
   }
+
+  // A phase can outlive an asynchronously torn-down runtime. That is still a fatal shared-session
+  // boundary: silently returning here lets the orphaned phase resume through its solo/local path and
+  // mutate mechanics without a peer. There is no authenticated control plane left with which to retain
+  // or ACK a terminal, so use the same immediate local fallback as an unbound legacy session and install
+  // exactly one title continuation. This is deliberately best-effort for engine-free tests/pre-scene
+  // failures, but the caller must still return/park after invoking us.
+  const safeReason = terminalReason(reason);
+  coopWarn("runtime", `orphaned shared session terminal requested: ${safeReason}`);
+  try {
+    releaseCoopTerminalPhaseProgression();
+    globalScene.reset();
+    (globalScene.phaseManager as unknown as CoopTerminalPhaseManagerBridge).clearAllPhases?.();
+    globalScene.phaseManager.unshiftNew("TitlePhase");
+    globalScene.phaseManager.shiftPhase();
+  } catch {
+    // With no runtime there is no remaining control plane to dispose. The public-input caller still
+    // refuses to advance, which preserves fail-closed mechanics in narrow harness/pre-scene contexts.
+  }
+}
+
+/**
+ * Close a recovery request that did not yield an exactly admitted snapshot. This helper is deliberately
+ * side-effectful: callers must return when it reports a failure, and the synchronous shared-terminal
+ * preparation freezes membership, battle commands, retained UI waits, and phase progression before any
+ * released promise continuation can resume mechanics.
+ */
+export function failCoopRecoveryOutcome(
+  runtime: CoopRuntime,
+  outcome: CoopStateSyncOutcome,
+  label: string,
+): outcome is CoopStateSyncFailure {
+  if (outcome.kind === "snapshot") {
+    return false;
+  }
+  const point = readCoopBattlePoint();
+  failCoopRuntimeSharedSession(
+    runtime,
+    `${label} recovery ended with ${outcome.kind} before an exact authoritative snapshot was admitted.`,
+    {
+      boundary: "recovery",
+      reasonCode: "recovery-exhausted",
+      wave: point.wave,
+      turn: point.turn,
+    },
+  );
+  return true;
+}
+
+export interface CoopStateRecoveryRequest {
+  runtime: CoopRuntime;
+  reason: Exclude<CoopRecoveryReason, "durability-gap">;
+  label: string;
+  /** A late result from a replaced session is stale evidence, not a failure of the new session. */
+  isCurrent: () => boolean;
+  /** Return true only after the exact snapshot was decoded and admitted to its atomic apply boundary. */
+  onSnapshot: (result: CoopStateSyncResult) => boolean | Promise<boolean>;
+  /** Optional evidence hook for the explicit non-snapshot outcome, before terminal preparation. */
+  onFailure?: (failure: CoopStateSyncFailure) => void;
+}
+
+/**
+ * Execute the complete machine-recovery call chain. Every live-session outcome is binary: an exact snapshot
+ * is admitted, or the runtime enters the shared terminal synchronously. Call sites cannot accidentally log
+ * a timeout/unavailable result and continue mechanics.
+ */
+export async function runCoopStateRecovery(
+  request: CoopStateRecoveryRequest,
+): Promise<"accepted" | "stale" | "terminal"> {
+  const { runtime, reason, label, isCurrent, onSnapshot, onFailure } = request;
+  let outcome: CoopStateSyncOutcome;
+  try {
+    outcome = await runtime.battleStream.requestStateSync(reason);
+  } catch (error) {
+    if (!isCurrent()) {
+      return "stale";
+    }
+    coopWarn("resync", `${label} recovery request threw`, error);
+    failCoopRuntimeSharedSession(runtime, `${label} recovery request failed before an exact snapshot arrived.`);
+    return "terminal";
+  }
+  if (!isCurrent()) {
+    return "stale";
+  }
+  if (outcome.kind !== "snapshot") {
+    try {
+      onFailure?.(outcome);
+    } catch (error) {
+      coopWarn("resync", `${label} failure evidence hook threw`, error);
+    }
+    failCoopRecoveryOutcome(runtime, outcome, label);
+    return "terminal";
+  }
+  try {
+    if (await onSnapshot(outcome)) {
+      return "accepted";
+    }
+  } catch (error) {
+    coopWarn("resync", `${label} snapshot decode/admission threw`, error);
+  }
+  failCoopRuntimeSharedSession(runtime, `${label} snapshot could not be decoded and admitted atomically.`);
+  return "terminal";
+}
+
+interface CoopBattleRecoveryScene {
+  currentBattle?: unknown | null;
+  gameMode?: { isCoop?: boolean; isShowdown?: boolean } | null;
+}
+
+/**
+ * A hot rejoin always restores the authenticated carrier and durability tail, but a full battle snapshot
+ * exists only after an authoritative battle has started. Title/lobby, starter selection, save selection,
+ * and showdown wager setup all legitimately have a runtime with no `currentBattle`; demanding a snapshot
+ * there turns a successful rejoin into an impossible recovery and closes the healthy replacement channel.
+ */
+export function hasCoopBattleRecoverySurface(scene: CoopBattleRecoveryScene = globalScene): boolean {
+  return scene.currentBattle != null && ((scene.gameMode?.isCoop ?? false) || (scene.gameMode?.isShowdown ?? false));
 }
 
 function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRuntime): void {
@@ -2857,7 +3055,7 @@ function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRunti
           // The GUEST missed DATA while dark: pull the host's full authoritative snapshot. A hot rejoin
           // keeps the SAME epoch and live surface, so do not purge its current arrivals/waiters; the WebRTC
           // transport's connection generation already rejects delayed frames from the superseded channel.
-          if (runtime.controller.role === "guest") {
+          if (runtime.controller.role === "guest" && hasCoopBattleRecoverySurface()) {
             // Same epoch: pre-drop operation ids stay valid and de-dupe. The atomic full snapshot is the
             // DATA backstop after retained surface waits and the durability control tail resume.
             const seq = COOP_REJOIN_SYNC_SEQ_BASE + (Date.now() % 100_000);
@@ -2874,22 +3072,22 @@ function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRunti
               wave: globalScene.currentBattle?.waveIndex ?? 0,
               turn: globalScene.currentBattle?.turn ?? 0,
             });
-            void runtime.battleStream.requestStateSync(seq).then(blob => {
-              if (gen !== coopSessionGeneration()) {
-                return;
-              }
-              if (blob == null) {
+            void runCoopStateRecovery({
+              runtime,
+              reason: "rejoin",
+              label: "Post-rejoin wave recovery",
+              isCurrent: () => gen === coopSessionGeneration() && getCoopRuntime() === runtime,
+              onFailure: result => {
                 recordCoopCausalEvent({
                   domain: "snapshot",
-                  stage: "timed-out",
+                  stage: "refused",
                   causalId: snapshotId,
                   parentId: recoveryId,
                   role: "guest",
+                  detail: result.kind,
                 });
-                coopWarn("resync", `post-rejoin stateSync TIMEOUT/null seq=${seq} (checksum backstop heals next turn)`);
-                return;
-              }
-              try {
+              },
+              onSnapshot: ({ blob, admission }) => {
                 const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
                 recordCoopCausalEvent({
                   domain: "snapshot",
@@ -2902,18 +3100,16 @@ function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRunti
                   turn: globalScene.currentBattle?.turn ?? 0,
                   detail: `${blob.length}b`,
                 });
-                queueCoopAtomicSnapshotApply(runtime, snapshot, `post-rejoin snapshot seq=${seq} blob=${blob.length}b`);
-              } catch {
-                recordCoopCausalEvent({
-                  domain: "snapshot",
-                  stage: "parse-failed",
-                  causalId: snapshotId,
-                  parentId: recoveryId,
-                  role: "guest",
-                });
-                coopWarn("resync", `post-rejoin snapshot apply FAILED seq=${seq} (checksum backstop heals next turn)`);
-              }
+                return queueCoopAtomicSnapshotApply(
+                  runtime,
+                  snapshot,
+                  admission,
+                  `post-rejoin snapshot seq=${seq} blob=${blob.length}b`,
+                );
+              },
             });
+          } else if (runtime.controller.role === "guest") {
+            coopLog("resync", "post-rejoin battle snapshot skipped (no authoritative battle surface yet)");
           }
         })
         .catch(() => {
@@ -3517,9 +3713,15 @@ export function isCoopRuntimeActive(): boolean {
  * `getPlayerField()` is index-aligned with field slots (the party's first `playerCapacity`
  * entries, unfiltered), so this is the single place engine code turns a slot into its owner -
  * every command / switch routing gate keys off it instead of assuming the launch layout.
+ *
+ * Runtime assembly can precede BattleScene construction in protocol-only/headless boots. In that
+ * pre-scene window use the session module's fixed launch map (the same fallback used for an empty
+ * field) instead of throwing from an inbound security predicate and silently turning a valid frame
+ * into a timeout. Once a field exists its persistent owner tags remain authoritative.
  */
 export function coopOwnerOfPlayerFieldSlot(fieldIndex: number): CoopRole {
-  return coopOwnerOfFieldSlot(globalScene.getPlayerField(), fieldIndex);
+  const scene = globalScene as typeof globalScene | undefined;
+  return coopOwnerOfFieldSlot(scene?.getPlayerField?.() ?? [], fieldIndex);
 }
 
 /**
@@ -3760,11 +3962,32 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
   if (outcome === "gameOver") {
     commitCoopSettledWaveAdvance(wave, transition);
   }
+  const captureParty = outcome === "capture" ? captureCoopCaptureParty() : undefined;
+  if (outcome === "win" && isCoopRecording()) {
+    deferredHostWaveResolved.set(wave, { outcome, captureParty, presentation, transition });
+    coopLog(
+      "runtime",
+      `defer raw waveResolved wave=${wave} outcome=${outcome} until its material turnResolution is retained`,
+    );
+    return;
+  }
+  sendCoopWaveResolvedCompatibility(wave, outcome, captureParty, presentation, transition);
+}
+
+function sendCoopWaveResolvedCompatibility(
+  wave: number,
+  outcome: CoopWaveOutcome,
+  captureParty: string[] | undefined,
+  presentation: CoopCapturePresentation | undefined,
+  transition: CoopWaveAdvancePayload,
+): void {
+  if (active == null || active.controller.role !== "host") {
+    return;
+  }
   try {
     // Co-op (#633 B1/B2/B3): a CAPTURE grows/edits the host's party (the caught mon, and a party-full
     // release) that the guest's pure-renderer tail never reproduces. Carry the full post-catch party
     // so the guest can reconcile its bench + credit the catch. Other outcomes carry nothing (no-op).
-    const captureParty = outcome === "capture" ? captureCoopCaptureParty() : undefined;
     coopLog(
       "runtime",
       `send waveResolved wave=${wave} outcome=${outcome}${captureParty == null ? "" : ` captureParty=${captureParty.length}`}${presentation == null ? "" : ` cap=sp${presentation.speciesId}`} (host)`,
@@ -3774,6 +3997,38 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
     /* a wave-resolved send failure must never break the host's post-battle flow */
     coopWarn("runtime", `send waveResolved failed wave=${wave} outcome=${outcome}`, e);
   }
+}
+
+/**
+ * Publish a staged normal-victory compatibility hint only after the exact final material turn has entered
+ * immutable retention. If turn sealing fails, this is never called: both peers remain at the failing turn
+ * address and the retained authorityFailure can terminate them symmetrically.
+ */
+export function flushCoopWaveResolvedAfterTurnCommit(wave: number): boolean {
+  const deferred = deferredHostWaveResolved.get(wave);
+  if (deferred == null) {
+    return true;
+  }
+  const staged = pendingHostWaveTransitions.get(wave);
+  if (
+    active == null
+    || active.controller.role !== "host"
+    || staged == null
+    || staged !== deferred.transition
+    || staged.outcome !== deferred.outcome
+  ) {
+    failCoopSharedSession(`The deferred waveResolved compatibility hint for wave ${wave} lost its turn boundary.`);
+    return false;
+  }
+  deferredHostWaveResolved.delete(wave);
+  sendCoopWaveResolvedCompatibility(
+    wave,
+    deferred.outcome,
+    deferred.captureParty,
+    deferred.presentation,
+    deferred.transition,
+  );
+  return true;
 }
 
 /**
@@ -3819,6 +4074,7 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
         undefined,
         pendingRawWavePresentations.get(payload.wave),
         payload,
+        envelope.turn,
       );
       if (merged == null || !markCoopWaveAdvanceBootstrapProjected(payload.wave, binding)) {
         return false;
@@ -3836,7 +4092,7 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
     ) {
       return false;
     }
-    const continuationReady = maybeMarkCoopWaveContinuationReady(payload.wave, binding);
+    const continuationReady = maybeMarkCoopWaveContinuationReady(payload.wave, binding, runtime);
     if (!continuationReady && coopHasPendingWaveAdvance() && coopWaveAdvanceBoundaryWakeFactory != null) {
       // The retained op may land AFTER CoopFinalizeTurnPhase already inspected pendingWaveAdvance. Appending
       // (never unshifting) a tail-only finalizer wake preserves presentation -> checkpoint ordering while ensuring
@@ -4133,17 +4389,19 @@ function materializeCoopFaintSwitchFromOp(runtime: CoopRuntime, envelope: CoopAu
   ) {
     return false;
   }
-  // Guest-owned picks were already materialized by the local picker. Host-owned replacements are fed into
-  // the same committed-choice FIFO used by the replacement phase, with the operation id for dedupe.
-  if (operation.owner === 0) {
-    runtime.interactionRelay.materializeCommittedInteractionChoice(
-      COOP_FAINT_SWITCH_SEQ_BASE + payload.fieldIndex,
-      "switch",
-      payload.partySlot,
-      [...payload.data],
-      operation.id,
-    );
+  if (operation.owner === 1) {
+    // This synchronous consumer is the material boundary: a timeout fallback cannot ACK until the
+    // exact old-address guest picker has been settled and its late callback disabled.
+    return materializeCoopFaintSwitchPickerTerminal(envelope);
   }
+  // Host-owned replacements are fed into the existing committed-choice watcher.
+  runtime.interactionRelay.materializeCommittedInteractionChoice(
+    COOP_FAINT_SWITCH_SEQ_BASE + payload.fieldIndex,
+    "switch",
+    payload.partySlot,
+    [...payload.data],
+    operation.id,
+  );
   return true;
 }
 
@@ -4371,6 +4629,10 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
   ) {
     return false;
   }
+  const outcomeState = payload.outcome.authoritativeState;
+  if (outcomeState == null) {
+    return false;
+  }
   const transaction = { operationId: op.id, pinned, step, payload };
   // Besides making a late replay phase retriable, this fences the two-engine harness's shared module
   // graph: an envelope delivered while the other client's scene is installed must not apply to it.
@@ -4380,6 +4642,7 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
   const receive = receiveCoopMeTerminalTransactionFor(runtime.opState, transaction, {
     applyMaterial: () => {
       if (applyCoopMeOutcome(payload.outcome)) {
+        runtime.battleStream.retireEnemyPartyAuthorityThrough(outcomeState.wave, outcomeState.tick);
         return true;
       }
       coopWarn("me", `journaled Mystery transaction DATA apply failed id=${op.id}`);
@@ -5284,6 +5547,7 @@ export function assembleCoopRuntime(
   // here would erase whichever peer the two-engine harness most recently installed, not the runtime below.
   pendingHostWaveTransitions.clear();
   settledHostWaveTransitions.clear();
+  deferredHostWaveResolved.clear();
   pendingRawWavePresentations.clear();
   pendingSettledWaveBoundary = null;
   // #896 W2e-R2: a fresh assembly is a genuine RE-PAIR (new control plane), so drop any prior session's
@@ -5357,13 +5621,43 @@ export function assembleCoopRuntime(
       wave: globalScene.currentBattle?.waveIndex ?? 0,
       turn: globalScene.currentBattle?.turn ?? 0,
     }),
+    recoveryBinding: () => {
+      if (controller.hasAuthenticatedPairing) {
+        return controller.p33FrameContext();
+      }
+      const runId = controller.runId || `epoch-${controller.sessionEpoch}`;
+      return {
+        sessionId: `legacy-recovery:${runId}`,
+        sessionEpoch: controller.sessionEpoch,
+        seatMapId: `legacy-seat-map:${runId}`,
+        membershipRevision: runtime?.membership?.snapshot().revision ?? 0,
+        fromSeatId: controller.localSeatId,
+        connectionGeneration: transport.connectionGeneration?.() ?? 0,
+      };
+    },
+    validatePeerRecoveryBinding: binding => {
+      if (controller.hasAuthenticatedPairing) {
+        return controller.validateP33PeerFrameContext(binding, binding.membershipRevision);
+      }
+      const runId = controller.runId || `epoch-${controller.sessionEpoch}`;
+      return (
+        binding.sessionId === `legacy-recovery:${runId}`
+        && binding.sessionEpoch === controller.sessionEpoch
+        && binding.seatMapId === `legacy-seat-map:${runId}`
+        && binding.membershipRevision === (runtime?.membership?.snapshot().revision ?? 0)
+        && binding.fromSeatId !== controller.localSeatId
+        && binding.connectionGeneration === (transport.connectionGeneration?.() ?? 0)
+      );
+    },
     onAuthorityTerminal: reason => failCoopSharedSession(reason),
+    onRecoveryTerminal: reason => failCoopRuntimeSharedSession(runtime, reason),
   });
   // Showdown 1v1: the interaction relay disables its #829 seat-map forged-switch check in versus (the
   // guest legitimately relays faint-replacement picks for the host's enemy side). Live predicate so the
   // guest - whose kind flips "coop" -> "versus" only on runConfig receipt - is correct after adoption.
   const interactionRelay = new CoopInteractionRelay(transport, {
     isVersus: () => controller.isVersusSession(),
+    resolveFieldSlotOwner: coopOwnerOfPlayerFieldSlot,
   });
   const uiMirror = new CoopUiMirror(transport);
   const mePump = new CoopMePump(interactionRelay);
@@ -5416,7 +5710,8 @@ export function assembleCoopRuntime(
         sendFullSnapshot: (cls, headRevision, controlHighWater) =>
           sendCoopDurabilitySnapshot(runtime, cls, headRevision, controlHighWater),
         onRecoveryExhausted: failure =>
-          failCoopSharedSession(
+          failCoopRuntimeSharedSession(
+            runtime,
             `Durable operation recovery exhausted for ${failure.cls} at ${failure.from} `
               + `(blocked ${failure.blockedSeq}, ${failure.attempts} attempts, ${failure.reason}).`,
           ),
@@ -5493,7 +5788,7 @@ export function assembleCoopRuntime(
     ) {
       const retainedWave = getCoopPendingWaveContinuationBoundary(runtime.waveOperationBinding);
       if (retainedWave != null) {
-        maybeMarkCoopWaveContinuationReady(retainedWave.wave, runtime.waveOperationBinding);
+        maybeMarkCoopWaveContinuationReady(retainedWave.wave, runtime.waveOperationBinding, runtime);
       }
     }
     durability?.retryDeferred("op:global");
@@ -5644,6 +5939,10 @@ export function clearCoopRuntime(): void {
   // every production start/connect path clears first, so a fresh pairing must never inherit prior-run edges.
   resetCoopUiRelayTrace();
   if (active == null) {
+    // Capability negotiation belongs to the runtime/control plane, not the process. A full teardown
+    // (unlike a hot rejoin, which never calls this function) must remove the frozen intersection even
+    // when another terminal path already cleared the active runtime.
+    clearNegotiatedCoopCapabilities();
     return;
   }
   try {
@@ -5734,6 +6033,7 @@ export function clearCoopRuntime(): void {
   lastWaveEndStateWave = -1;
   pendingHostWaveTransitions.clear();
   settledHostWaveTransitions.clear();
+  deferredHostWaveResolved.clear();
   pendingRawWavePresentations.clear();
   pendingSettledWaveBoundary = null;
   // Reset the ME battle handoff counter so a subsequent run starts clean (#633).
@@ -5747,4 +6047,8 @@ export function clearCoopRuntime(): void {
   // (never silently falls back to a stale/global cursor).
   setActiveCoopRuntimeOpState(null);
   active = null;
+  // Clear only after the old runtime and transport are fully disposed: close handlers still execute during
+  // teardown and must observe the session's frozen capability set, not pre-handshake local-flag semantics.
+  // Without this reset, the next solo/pre-handshake surface can inherit the departed peer's capability mask.
+  clearNegotiatedCoopCapabilities();
 }

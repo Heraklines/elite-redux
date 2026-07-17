@@ -314,6 +314,10 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
 
   it("keeps an exact retained intent after a stale actor-address rejection", async () => {
     const pair = createLoopbackPair();
+    // Model an actual post-construction loss window. Frames before the first-ever
+    // subscription are now intentionally retained for controller construction races.
+    const closeInitialHostSubscription = pair.host.onMessage(() => {});
+    closeInitialHostSubscription();
     const guestSync = new CoopBattleSync(pair.guest);
     const currentAddress = { epoch: 37, wave: 4, pokemonId: 700 };
     guestSync.broadcastLocalCommand(

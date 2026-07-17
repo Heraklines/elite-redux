@@ -1153,8 +1153,9 @@ function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Co
     // same immutable result. It never executes the reward/shop action locally a second time.
     return "rejected";
   }
-  if (applyCoopOperationEnvelope(g, "op:reward", envelope) !== "applied") {
-    return "rejected"; // transient non-applicable (retriable); never a permanent condition (that is a duplicate above).
+  const rewardApply = applyCoopOperationEnvelope(g, "op:reward", envelope);
+  if (rewardApply !== "applied") {
+    return rewardApply; // transient non-applicable (retriable/deferred); never a permanent condition (that is a duplicate above).
   }
   // Route the newly-consumed action into the production sink. It feeds the tagged committed choice into the
   // receiver's existing reward/market FIFO; the phase remains the sole safe mutation site.

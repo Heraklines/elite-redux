@@ -8,6 +8,9 @@ import { createBattlePromptAdvancer } from "./campaign.mjs";
 import {
   confirmDefaultStarterTeam,
   confirmSeededStarterTeam,
+  findOwnedActionableReplacementSurface,
+  findOwnedActionableTargetSurface,
+  replacementTargetOptionId,
   selectOptionById,
   waitForSemanticSurface,
 } from "./campaign-nav.mjs";
@@ -21,6 +24,7 @@ const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
 const LOCAL_COMMAND = /CommandPhase .*-> LOCAL UI/u;
 const REWARD_PHASE = /Start Phase SelectModifierPhase/u;
 const GAME_OVER_PHASE = /Start Phase GameOverPhase/u;
+const POST_GAME_OVER_PHASE = /Start Phase PostGameOverPhase/u;
 const REWARD_OWNER = /OWNER drives reward screen/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
@@ -46,6 +50,8 @@ const BULBASAUR_SPECIES_ID = 1;
 const SEEL_SPECIES_ID = 86;
 const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;
 const POST_TURN_HARD_CEILING_MS = 360_000;
+const GAME_OVER_POST_TURN_PROGRESS_ALLOWANCE_MS = 180_000;
+const GAME_OVER_POST_TURN_HARD_CEILING_MS = 900_000;
 const COLD_REJOIN_RELEASE_MS = 160_000;
 // Trace-enabled four-core run 29405818635 reached the matching cmd:1:1 observations 0.45s and
 // 1.05s after the ordinary ceiling across the two owner parities, with causal Phaser progress.
@@ -244,6 +250,35 @@ function findAddressedCommandCollectionClosed(client, from, expectedAddress) {
   });
 }
 
+function findRoundSupersedingOutcome(client, from) {
+  return client.evidence.find(REWARD_PHASE, from) ?? client.evidence.find(GAME_OVER_PHASE, from) ?? null;
+}
+
+async function driveOwnedTargetSelection(client, from, expectedAddress, consumedInstances, purpose) {
+  const event = findOwnedActionableTargetSurface(client, from, expectedAddress);
+  if (event == null) {
+    return false;
+  }
+  const observation = event.observation;
+  const instance =
+    `${client.label}:${observation.address.epoch}:${observation.address.wave}:`
+    + `${observation.address.turn}:${observation.phaseInstance}`;
+  if (consumedInstances.has(instance)) {
+    return false;
+  }
+  consumedInstances.add(instance);
+  client.evidence.record("semantic-target-selection-proof", {
+    purpose,
+    surfaceEventIndex: event.index,
+    selectedOptionId: observation.selectedOptionId,
+    optionIds: observation.optionIds,
+    address: observation.address,
+    phaseInstance: observation.phaseInstance,
+  });
+  await client.press("Space", `${purpose}-${client.label}-${observation.selectedOptionId}`);
+  return true;
+}
+
 /**
  * SelectGenderPhase first exposes its preceding MESSAGE projection, then replaces it with the
  * actionable option picker. Do not spend the one public confirm key until that picker proves its
@@ -290,18 +325,7 @@ function findOwnedReadyReward(client, from) {
 }
 
 function findOwnedReadyReplacement(client, from) {
-  const semantic = client.evidence.findLastSemanticSurface(from, "party:replacement");
-  return semantic?.observation.operationClass === "replacement"
-    && semantic.observation.ownerModel === "interaction"
-    && semantic.observation.phase === "SwitchPhase"
-    && semantic.observation.uiMode === "PARTY"
-    && semantic.observation.localSeat === client.publicSeat
-    && semantic.observation.ownerSeat === client.publicSeat
-    && semantic.observation.seatsWithInput?.includes(client.publicSeat)
-    && semantic.observation.ready?.handlerActive === true
-    && semantic.observation.ready.inputBlocked !== true
-    ? semantic
-    : null;
+  return findOwnedActionableReplacementSurface(client, from);
 }
 
 function sameAddress(left, right) {
@@ -860,6 +884,8 @@ export class PublicUiClient {
         "coopfixture",
         this.label === this.config.faintOwnerSeat ? "faint-owner" : "faint-partner",
       );
+    } else if (this.config.journey === "game-over") {
+      entryUrl.searchParams.set("coopfixture", "game-over");
     }
     this.evidence.record("navigate", { url: entryUrl.origin });
     await this.page.goto(entryUrl, { waitUntil: "domcontentloaded", timeout: this.config.bootTimeoutMs });
@@ -1032,12 +1058,32 @@ export class PublicUiClient {
         `${this.label}: fresh-account MessagePhase did not open TitlePhase or SelectGenderPhase after ${attempt} public retries`,
       );
     }
-    return this.evidence.waitForCondition(
-      sink => sink.find(TITLE_PHASE, this.pageCursor) ?? sink.find(SELECT_GENDER_PHASE, this.pageCursor),
-      {
-        timeoutMs: this.config.timeoutMs,
-        description: "TitlePhase or visible first-login gender prompt after authentication",
-      },
+    // LOGIN-mode accounts provisioned through the API (the dirty-account fidelity lane) have
+    // never completed first-login onboarding: the system savedata 404s and the fresh welcome
+    // MessagePhase needs real presses exactly like register-mode. Detect that from the LIVE 404
+    // (never the account mode) and drive the same public A-button loop; a returning account with
+    // real system data sees zero extra presses and the plain Title/gender wait.
+    const loginOnboardingDeadline = Date.now() + this.config.bootTimeoutMs;
+    let loginOnboardingAttempt = 0;
+    while (Date.now() < loginOnboardingDeadline) {
+      const phase =
+        this.evidence.find(TITLE_PHASE, this.pageCursor) ?? this.evidence.find(SELECT_GENDER_PHASE, this.pageCursor);
+      if (phase) {
+        return phase;
+      }
+      const missingSystem = this.evidence.events
+        .slice(this.pageCursor)
+        .find(event => event.kind === "response" && event.status === 404 && event.url.endsWith("/savedata/system/get"));
+      if (missingSystem) {
+        loginOnboardingAttempt += 1;
+        await this.press("Space", `dismiss-new-account-message:login-mode-attempt-${loginOnboardingAttempt}`);
+        await delay(Math.max(this.config.settleDelayMs, 5_000));
+        continue;
+      }
+      await delay(250);
+    }
+    throw new Error(
+      `${this.label}: timed out waiting for TitlePhase or visible first-login gender prompt after authentication`,
     );
   }
 
@@ -1292,8 +1338,17 @@ export class PublicUiClient {
       timeoutMs: this.config.timeoutMs,
       description: "TitlePhase before opening co-op",
     });
-    await this.sequence(this.titleNewGameKeys, "title-select-new-game");
-    await this.press("Space", "title-open-new-game");
+    // Continue is inserted above New Game after the first persisted wave. A fixed key
+    // sequence therefore selects a different action after a cold reopen. Drive the same
+    // stable semantic option id that the real title UI exposes, then submit it through the
+    // readiness-aware keyboard navigator.
+    await selectOptionById(this, {
+      surfaceId: "title-menu",
+      targetId: "new-game",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      timeoutMs: this.config.timeoutMs,
+      fromCursor: this.pageCursor,
+    });
     await this.press("ArrowDown", "mode-select-coop-below-classic");
     this.lobbySurfaceCursor = this.evidence.cursor();
     const announceCursor = this.evidence.cursor();
@@ -2270,7 +2325,7 @@ export class DuoPublicUiRig {
     return proof;
   }
 
-  async startFreshRun({ commanderFixture = false, faintFixture = false } = {}) {
+  async startFreshRun({ commanderFixture = false, faintFixture = false, gameOverFixture = false } = {}) {
     if (!this.host) {
       throw new Error("startFreshRun requires a paired public host (call pair() first)");
     }
@@ -2313,7 +2368,9 @@ export class DuoPublicUiRig {
               ? client.label === this.config.faintOwnerSeat
                 ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
                 : [BULBASAUR_SPECIES_ID]
-              : null;
+              : gameOverFixture
+                ? [MAGIKARP_SPECIES_ID]
+                : null;
           const result =
             expectedSeededSpecies == null
               ? await confirmDefaultStarterTeam(client, {
@@ -2429,7 +2486,7 @@ export class DuoPublicUiRig {
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("resumed-command")));
   }
 
-  async driveWaveToReward({ allowFaint = false } = {}) {
+  async driveWaveToReward({ allowFaint = true } = {}) {
     this.lastWaveCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
@@ -2468,6 +2525,14 @@ export class DuoPublicUiRig {
           throw new Error("Unexpected faint picker in the wave-1 journey; use faint-replacement with prepared saves");
         }
         await this.driveReplacement(outcome.client, outcomeCursors);
+        // The cursors which found the faint necessarily precede the just-consumed PARTY
+        // picker and the original turn's command surfaces. Starting the next owner wait
+        // there can re-admit those stale commands. A real player resumes from the completed
+        // replacement boundary, so establish the same fresh public evidence floor.
+        commandCursors = Object.fromEntries(
+          Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
+        );
+        continue;
       }
       if (outcome.kind === "command") {
         // Command ownership opens sequentially: submitting the first owner's next-turn command is
@@ -2478,6 +2543,179 @@ export class DuoPublicUiRig {
       commandCursors = outcomeCursors;
     }
     throw new Error(`Battle did not reach rewards in ${this.config.maxTurns} public command rounds`);
+  }
+
+  /**
+   * Drive one real reciprocal command round into the exact retained terminal race.
+   *
+   * The dedicated build seeds each visible starter screen with a lone Memento user and delays
+   * only the retained game-over envelope. This method remains a public driver: it submits the
+   * ordinary command keys, then proves the production logs from RTC receipt through replay unpark,
+   * terminal continuation ACK, host release and both rendered GameOver phases.
+   */
+  async driveWaveToGameOver() {
+    if (!this.host || !this.guest) {
+      throw new Error("driveWaveToGameOver requires a fully bound host and guest");
+    }
+    const commandCursors = Object.fromEntries(
+      Object.values(this.clients).map(client => [client.label, client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0]),
+    );
+    const { outcomeCursors, expectedCommandAddress } = await this.driveSequentialCommandRound(
+      commandCursors,
+      this.config.keys.battle,
+      "game-over-memento-round",
+    );
+    const outcome = await this.waitForPostTurnOutcome(outcomeCursors, {
+      expectedCommandAddress,
+      progressBudgetOptions: {
+        progressAllowanceMs: GAME_OVER_POST_TURN_PROGRESS_ALLOWANCE_MS,
+        hardCeilingMs: GAME_OVER_POST_TURN_HARD_CEILING_MS,
+      },
+    });
+    if (outcome.kind !== "gameOver") {
+      throw new Error(`Memento terminal fixture reached ${outcome.kind} instead of paired GameOver`);
+    }
+
+    const hostCommit = await this.host.evidence.waitFor(
+      /wave-advance op HOST commit wave=1 outcome=gameOver next=GAME_OVER rev=(\d+) id=([^\s]+)/u,
+      {
+        from: outcomeCursors[this.host.label],
+        timeoutMs: this.config.timeoutMs,
+        description: "host retained game-over operation commit",
+      },
+    );
+    const commitMatch = hostCommit.text.match(
+      /wave-advance op HOST commit wave=1 outcome=gameOver next=GAME_OVER rev=(\d+) id=([^\s]+)/u,
+    );
+    if (!commitMatch) {
+      throw new Error("Host game-over commit evidence lost its exact revision or operation id");
+    }
+    const revision = Number(commitMatch[1]);
+    const operationId = commitMatch[2];
+    const [hostSettled, hostRaw, guestRaw, guestBootstrap, guestBoundaryQueued, guestReplayReleased, guestWaveReady] =
+      await Promise.all([
+        this.host.evidence.waitFor(/settled WAVE_ADVANCE committed wave=1 tick=\d+ next=GAME_OVER\/wave1/u, {
+          from: outcomeCursors[this.host.label],
+          timeoutMs: this.config.timeoutMs,
+          description: "host settled terminal DATA",
+        }),
+        this.host.evidence.waitFor(/send waveResolved wave=1 outcome=gameOver/u, {
+          from: outcomeCursors[this.host.label],
+          timeoutMs: this.config.timeoutMs,
+          description: "host raw game-over compatibility hint",
+        }),
+        this.guest.evidence.waitFor(
+          /ignore raw waveResolved for correctness wave=1 outcome=gameOver; awaiting retained transaction/u,
+          {
+            from: outcomeCursors[this.guest.label],
+            timeoutMs: this.config.timeoutMs,
+            description: "guest rejects raw game-over correctness",
+          },
+        ),
+        this.guest.evidence.waitFor(/wave-advance JOURNAL bootstrap wave=1 outcome=gameOver \(ACK withheld\)/u, {
+          from: outcomeCursors[this.guest.label],
+          timeoutMs: this.config.timeoutMs,
+          description: "guest retained terminal journal bootstrap",
+        }),
+        this.guest.evidence.waitFor(
+          /wave-advance JOURNAL (?:queued|retained) safe-boundary wake wave=1 unparkedReplay=([01])/u,
+          {
+            from: outcomeCursors[this.guest.label],
+            timeoutMs: this.config.timeoutMs,
+            description: "guest queued retained terminal behind same-turn presentation",
+          },
+        ),
+        this.guest.evidence.waitFor(
+          /guest replay turn=1: (?:ABORT phantom turn \(retained gameOver WAVE_ADVANCE wave=1 settledTurn=1\) - dissolving parked pump|retained gameOver terminal supersedes unresolved replay at safe event boundary -> end)/u,
+          {
+            from: outcomeCursors[this.guest.label],
+            timeoutMs: this.config.timeoutMs,
+            description: "guest released same-turn replay after ordered live events drained",
+          },
+        ),
+        this.guest.evidence.waitFor(/retained WAVE_ADVANCE continuationReady wave=1/u, {
+          from: outcomeCursors[this.guest.label],
+          timeoutMs: this.config.timeoutMs,
+          description: "guest retained terminal continuation proof",
+        }),
+      ]);
+
+    const hostRelease = await this.host.evidence.waitFor(
+      new RegExp(`host RELEASE contiguous acknowledged authority cls=op:global seq=${revision}`, "u"),
+      {
+        from: outcomeCursors[this.host.label],
+        timeoutMs: this.config.timeoutMs,
+        description: `host release of exact retained game-over revision ${revision}`,
+      },
+    );
+    const hostGameOver = this.host.evidence.find(GAME_OVER_PHASE, outcomeCursors[this.host.label]);
+    const guestGameOver = this.guest.evidence.find(GAME_OVER_PHASE, outcomeCursors[this.guest.label]);
+    const unparkMatch = guestBoundaryQueued.text.match(/unparkedReplay=([01])/u);
+    const activeReplayUnparked = unparkMatch?.[1] === "1";
+    if (!hostGameOver || !guestGameOver || guestGameOver.index <= guestReplayReleased.index) {
+      throw new Error("Paired GameOver phases did not follow the guest's exact terminal replay-release evidence");
+    }
+    if (
+      hostCommit.index >= hostSettled.index
+      || hostSettled.index >= hostRaw.index
+      || guestRaw.index >= guestBootstrap.index
+      || guestBootstrap.index >= Math.min(guestBoundaryQueued.index, guestReplayReleased.index)
+      || Math.max(guestBoundaryQueued.index, guestReplayReleased.index) >= guestWaveReady.index
+      || (activeReplayUnparked && guestReplayReleased.index >= guestBoundaryQueued.index)
+      || (!activeReplayUnparked && guestBoundaryQueued.index >= guestReplayReleased.index)
+      || hostCommit.index >= hostRelease.index
+    ) {
+      throw new Error("Retained GameOver causal evidence arrived out of order");
+    }
+    const proof = {
+      wave: 1,
+      operationId,
+      revision,
+      expectedCommandAddress,
+      host: {
+        settledIndex: hostSettled.index,
+        operationCommitIndex: hostCommit.index,
+        rawHintIndex: hostRaw.index,
+        gameOverIndex: hostGameOver.index,
+        releaseIndex: hostRelease.index,
+      },
+      guest: {
+        rawHintRejectedIndex: guestRaw.index,
+        journalBootstrapIndex: guestBootstrap.index,
+        boundaryQueuedIndex: guestBoundaryQueued.index,
+        replayReleasedIndex: guestReplayReleased.index,
+        continuationReadyIndex: guestWaveReady.index,
+        gameOverIndex: guestGameOver.index,
+      },
+    };
+    this.host.evidence.record("retained-game-over-race-proof", { ...proof, side: "authority" });
+    this.guest.evidence.record("retained-game-over-race-proof", { ...proof, side: "renderer" });
+    this.host.evidence.expectSharedTerminalAfterPairedGameOver(hostGameOver.index);
+    this.guest.evidence.expectSharedTerminalAfterPairedGameOver(guestGameOver.index);
+    this.assertNoFatalRecoverySince(outcomeCursors, "retained GameOver terminal");
+    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("paired-game-over-terminal")));
+    const stableTerminals = await Promise.all(
+      Object.values(this.clients).map(client =>
+        client.evidence.waitFor(POST_GAME_OVER_PHASE, {
+          from: client === this.host ? hostGameOver.index : guestGameOver.index,
+          timeoutMs: this.config.timeoutMs,
+          description: `${client.label} stable post-GameOver visual boundary`,
+        }),
+      ),
+    );
+    for (let index = 0; index < stableTerminals.length; index++) {
+      const client = Object.values(this.clients)[index];
+      client.evidence.record("stable-post-game-over-visual-proof", {
+        gameOverIndex: client === this.host ? hostGameOver.index : guestGameOver.index,
+        postGameOverIndex: stableTerminals[index].index,
+      });
+    }
+    // PostGameOver starts only after GameOver's fade promise completes. One frame lets its stable dark/title
+    // projection paint before the screenshot, so the final artifact is not the transient faint narration.
+    await delay(250);
+    this.assertNoFatalRecoverySince(outcomeCursors, "stable post-GameOver terminal");
+    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("paired-post-game-over-stable")));
+    return proof;
   }
 
   /**
@@ -2561,8 +2799,61 @@ export class DuoPublicUiRig {
     let submittedCommandAddress = null;
     let postSubmissionCursors = null;
     let commandCollectionClosed = null;
+    let supersedingOutcome = null;
+    const consumedTargetInstances = new Set();
 
     while (pending.size > 0 && Date.now() < progressBudget.observe()) {
+      const structuralOutcomes = clients.map(client => ({
+        client,
+        event: findRoundSupersedingOutcome(client, from[client.label] ?? 0),
+      }));
+      if (structuralOutcomes.some(candidate => candidate.event != null)) {
+        if (structuralOutcomes.every(candidate => candidate.event != null)) {
+          supersedingOutcome = structuralOutcomes[0].event.text?.includes("GameOverPhase") ? "gameOver" : "reward";
+          for (const label of pending) {
+            outcomeCursors[label] = from[label] ?? 0;
+          }
+          pending.clear();
+          break;
+        }
+        // A structural terminal on either browser proves no new command owner can open at
+        // this address. Drain only readiness-proven narration until the peer converges.
+        advanceBattlePrompt ??= createBattlePromptAdvancer(
+          this,
+          from,
+          {},
+          `${purpose}-structural-frontier`,
+          promptCommandAddress == null ? undefined : { expectedCommandAddress: promptCommandAddress },
+        );
+        if (await advanceBattlePrompt()) {
+          continue;
+        }
+        await delay(100);
+        continue;
+      }
+
+      let droveTarget = false;
+      for (const client of clients) {
+        if (
+          await driveOwnedTargetSelection(
+            client,
+            from[client.label] ?? 0,
+            promptCommandAddress,
+            consumedTargetInstances,
+            `${purpose}-target`,
+          )
+        ) {
+          // Exclude the consumed target surface from the following post-turn scan. The
+          // key event itself is recorded synchronously before Phaser handles the action.
+          outcomeCursors[client.label] = client.evidence.cursor();
+          droveTarget = true;
+          break;
+        }
+      }
+      if (droveTarget) {
+        continue;
+      }
+
       let droveCommand = false;
       for (const client of clients) {
         if (!pending.has(client.label)) {
@@ -2650,9 +2941,11 @@ export class DuoPublicUiRig {
       client.evidence.record("sequential-command-proof", {
         purpose,
         commandEventIndex: commandEvents[client.label]?.index ?? null,
-        skippedAfterCollectionClosed: commandEvents[client.label] == null && commandCollectionClosed != null,
+        skippedAfterCollectionClosed:
+          commandEvents[client.label] == null && (commandCollectionClosed != null || supersedingOutcome != null),
         collectionClosedEventIndex: commandCollectionClosed?.event.index ?? null,
         collectionClosedObservedBy: commandCollectionClosed?.client.label ?? null,
+        supersededBy: supersedingOutcome,
         outcomeCursor: outcomeCursors[client.label],
       });
     }
@@ -2665,6 +2958,7 @@ export class DuoPublicUiRig {
 
   async waitForPostTurnOutcome(from, { expectedCommandAddress = null, progressBudgetOptions = {} } = {}) {
     let advanceBattlePrompt = null;
+    const consumedTargetInstances = new Set();
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs, progressBudgetOptions);
     let partialGameOver = [];
     while (Date.now() < progressBudget.observe()) {
@@ -2691,15 +2985,33 @@ export class DuoPublicUiRig {
         return { kind: "reward" };
       }
       for (const client of values) {
-        if (client.evidence.find(GUEST_FAINT_PICKER, from[client.label])) {
+        if (findOwnedReadyReplacement(client, from[client.label])) {
           return { kind: "faint", client };
         }
         if (
-          client.label === this.config.faintOwnerSeat
-          && client.evidence.find(HOST_SWITCH_PHASE, from[client.label])
+          client.evidence.find(GUEST_FAINT_PICKER, from[client.label])
+          || client.evidence.find(HOST_SWITCH_PHASE, from[client.label])
         ) {
           return { kind: "faint", client };
         }
+      }
+      let droveTarget = false;
+      for (const client of values) {
+        if (
+          await driveOwnedTargetSelection(
+            client,
+            from[client.label] ?? 0,
+            expectedCommandAddress,
+            consumedTargetInstances,
+            "public-ui-post-turn-target",
+          )
+        ) {
+          droveTarget = true;
+          break;
+        }
+      }
+      if (droveTarget) {
+        continue;
       }
       // A renderer can still be parked on an exact, readiness-proven narration prompt
       // after the authority has opened the next command frontier. Drain that human input
@@ -2732,17 +3044,24 @@ export class DuoPublicUiRig {
         `Timed out waiting for both browsers to reach GameOver; terminal observed only on ${partialGameOver.join(", ")}`,
       );
     }
-    throw new Error("Timed out waiting for public post-turn command, faint, or reward evidence");
+    const surfaces = Object.values(this.clients).map(client => {
+      const event = client.evidence.findLastSemanticSurface(from[client.label] ?? 0);
+      const observation = event?.observation;
+      return (
+        `${client.label}=${observation?.surfaceId ?? "none"}`
+        + `/${observation?.phase ?? "none"}`
+        + `@${observation?.address?.epoch ?? "?"}:${observation?.address?.wave ?? "?"}:${observation?.address?.turn ?? "?"}`
+      );
+    });
+    throw new Error(
+      `Timed out waiting for public post-turn command, faint, or reward evidence; last surfaces ${surfaces.join(", ")}`,
+    );
   }
 
   async driveReplacement(client = null, from = null) {
     let owner = client;
     if (!owner) {
       owner = this.client(this.config.faintOwnerSeat);
-      await owner.evidence.waitFor(HOST_SWITCH_PHASE, {
-        timeoutMs: this.config.timeoutMs,
-        description: "configured owner SwitchPhase for faint replacement",
-      });
     }
     const replacementCursors =
       from ?? Object.fromEntries(Object.values(this.clients).map(value => [value.label, value.evidence.cursor()]));
@@ -2760,6 +3079,19 @@ export class DuoPublicUiRig {
       if (terminal != null) {
         throw new Error(`${owner.label}: shared session terminated before the replacement picker: ${terminal.text}`);
       }
+      // RECOVERY: if the picker is stuck in the mon action SUBMENU (party-option:* ids - e.g. an
+      // errant message-dismiss Space selected the fainted FIELD slot, run 29613070126), back out to
+      // the slot list; the finder above only accepts the slot-list form.
+      const rawSurface = owner.evidence.findLastSemanticSurface(replacementCursors[owner.label], "party:replacement");
+      if (
+        rawSurface?.observation.uiMode === "PARTY"
+        && Array.isArray(rawSurface.observation.optionIds)
+        && rawSurface.observation.optionIds.some(id => /^party-option:/u.test(id))
+      ) {
+        await owner.press("Backspace", "replacement-submenu-backout");
+        await delay(200);
+        continue;
+      }
       if (await advanceBattlePrompt()) {
         continue;
       }
@@ -2768,14 +3100,74 @@ export class DuoPublicUiRig {
     if (replacementSurface == null) {
       throw new Error(`${owner.label}: timed out waiting for an actionable owned replacement picker`);
     }
+    const targetOptionId = replacementTargetOptionId(replacementSurface.observation);
+    if (targetOptionId == null) {
+      throw new Error(
+        `${owner.label}: replacement picker exposed no observer-proven healthy reserve: `
+          + `${JSON.stringify(replacementSurface.observation.partySlots ?? null)}`,
+      );
+    }
     await owner.checkpoint("faint-replacement-picker");
     const replacementCursor = owner.evidence.cursor();
-    await owner.sequence(this.config.keys.replacement, "choose-first-legal-replacement");
-    await owner.evidence.waitFor(/faint picker PICK|Start Phase SwitchSummonPhase/u, {
-      from: replacementCursor,
-      timeoutMs: this.config.timeoutMs,
-      description: "replacement pick/summon evidence",
-    });
+    // The host's fallback (getCoopFaintSwitchWaitMs, 60s live) may COMMIT a replacement while this
+    // browser is still navigating the picker: the guest's picker then closes FROM COMMITTED
+    // AUTHORITY and adopts the host's pick - a designed anti-softlock outcome, not a desync
+    // (run 29600150702 depth lanes: selectOptionById raced the close and saw the torn-down
+    // submenu). Accept that outcome as a valid resolution wherever the drive loses the surface.
+    const supersededByAuthority = () =>
+      // Probe from the drive's ORIGIN cursor: the authority can commit while the driver is still
+      // polling for an actionable surface, i.e. BEFORE replacementCursor was even taken.
+      owner.evidence.find(/own-faint picker CLOSE from committed authority/u, replacementCursors[owner.label]);
+    try {
+      await selectOptionById(owner, {
+        surfaceId: "party:replacement",
+        targetId: targetOptionId,
+        navKeys: ["ArrowDown", "ArrowUp"],
+        submitKey: "Space",
+        timeoutMs: this.config.timeoutMs,
+        fromCursor: replacementCursors[owner.label],
+      });
+      const sendOutSurface = await owner.evidence.waitForCondition(
+        sink => {
+          const event = sink.findLastSemanticSurface(replacementCursor, "party:replacement");
+          return event?.observation.optionIds?.includes("party-option:send-out") ? event : null;
+        },
+        {
+          timeoutMs: this.config.timeoutMs,
+          description: `replacement action menu for ${targetOptionId}`,
+        },
+      );
+      await selectOptionById(owner, {
+        surfaceId: "party:replacement",
+        targetId: "party-option:send-out",
+        navKeys: ["ArrowDown", "ArrowUp"],
+        submitKey: "Space",
+        timeoutMs: this.config.timeoutMs,
+        fromCursor: sendOutSurface.index,
+      });
+      await owner.evidence.waitFor(/faint picker PICK|Start Phase SwitchSummonPhase/u, {
+        from: replacementCursor,
+        timeoutMs: this.config.timeoutMs,
+        description: "replacement pick/summon evidence",
+      });
+      owner.evidence.record("replacement-selection-proof", {
+        targetOptionId,
+        phase: replacementSurface.observation.phase,
+        address: replacementSurface.observation.address,
+      });
+    } catch (error) {
+      const superseded = supersededByAuthority();
+      if (superseded == null) {
+        throw error;
+      }
+      owner.evidence.record("replacement-superseded-by-authority", {
+        attemptedTargetOptionId: targetOptionId,
+        authorityClose: superseded.text ?? null,
+        phase: replacementSurface.observation.phase,
+        address: replacementSurface.observation.address,
+        driveError: error instanceof Error ? error.message : String(error),
+      });
+    }
     this.replacementCount += 1;
     await Promise.all(Object.values(this.clients).map(value => value.checkpoint("replacement-applied")));
   }

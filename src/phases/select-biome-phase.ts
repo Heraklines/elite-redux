@@ -1099,8 +1099,21 @@ export class SelectBiomePhase extends BattlePhase {
     // here, so the throw froze every SOLO endless run at the wave-10 map pick (the picker's
     // onSelect died uncaught and the phase never ended). Solo needs none of the relay/commit
     // machinery - apply the biome directly, exactly the pre-P33 behavior.
-    if (!globalScene.gameMode.isCoop || getCoopController() == null) {
+    if (!globalScene.gameMode.isCoop) {
       return this.applyNextBiomeAndEnd(nextBiome);
+    }
+    // Runtime loss during a genuine shared run is categorically different from solo. Applying this
+    // choice locally would create a one-sided biome transition and defer the visible failure until a
+    // later wave. The retained terminal cannot be signalled after the runtime is gone, so the shared
+    // terminal helper performs its immediate orphan fallback and this phase stays parked.
+    if (getCoopController() == null) {
+      failCoopSharedSession("A shared World Map choice lost its authoritative runtime.", {
+        boundary: "recovery",
+        reasonCode: "recovery-exhausted",
+        wave: globalScene.currentBattle?.waveIndex,
+        turn: globalScene.currentBattle?.turn,
+      });
+      return false;
     }
     // The owner sends only an intent here. A guest-owned choice must not mutate interest/heal/map/arena or
     // advance the interaction until the host's committed journal envelope returns and arms the exact tail.

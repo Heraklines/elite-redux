@@ -9,7 +9,12 @@ import { Phase } from "#app/phase";
 import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { captureCoopAuthoritativeCarrier } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { coopSessionGeneration, getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import {
+  coopSessionGeneration,
+  flushCoopWaveResolvedAfterTurnCommit,
+  getCoopBattleStreamer,
+  getCoopController,
+} from "#data/elite-redux/coop/coop-runtime";
 import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { StatusEffect } from "#enums/status-effect";
 
@@ -93,7 +98,7 @@ export class CoopTurnCommitPhase extends Phase {
         fatal(`Host could not capture complete turn authority for wave ${wave}, turn ${recording.turn}.`);
         return;
       }
-      streamer.emitTurn(
+      const retained = streamer.emitTurn(
         controller.sessionEpoch,
         carrier.authoritativeState.wave,
         recording.turn,
@@ -104,6 +109,13 @@ export class CoopTurnCommitPhase extends Phase {
         carrier.fullField,
         carrier.authoritativeState,
       );
+      if (!retained) {
+        fatal(`Host could not retain complete turn authority for wave ${wave}, turn ${recording.turn}.`);
+        return;
+      }
+      if (!flushCoopWaveResolvedAfterTurnCommit(carrier.authoritativeState.wave)) {
+        return;
+      }
     } catch (error) {
       coopWarn("checkpoint", `host failed to emit turnResolution turn=${recording.turn}`, error);
       fatal(`Host could not publish complete turn authority for wave ${wave}, turn ${recording.turn}.`);

@@ -8,6 +8,8 @@ import { confirmDefaultStarterTeam, selectOptionById, waitForSemanticSurface } f
 const TITLE_PHASE = /Start Phase TitlePhase/u;
 const CHALLENGE_PHASE = /Start Phase SelectChallengePhase/u;
 const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
+const SLOT_ZERO_FORK_QUARANTINE =
+  /resume scan slot=0 load failed \(ignored\) CoopResumeReplicaUnavailableError: (?:equal-revision co-op fork in slot 0|cloud head ancestry conflict for run [0-9a-f-]{36})/u;
 
 function sessionStorageKeys(dom) {
   return dom.storage.map(item => item.key).filter(key => /^sessionData(?:\d*)_/u.test(key));
@@ -282,6 +284,13 @@ async function commanderSkip(rig) {
   await rig.leaveRewardsAndReachWave2({ commanderFixture: true });
 }
 
+async function gameOver(rig) {
+  await rig.loginBoth();
+  await rig.pair(rig.config.requesterSeat);
+  await rig.startFreshRun({ gameOverFixture: true });
+  await rig.driveWaveToGameOver();
+}
+
 async function saveMutations(rig) {
   await rig.loginBoth();
   await rig.pair(rig.config.requesterSeat);
@@ -290,6 +299,8 @@ async function saveMutations(rig) {
     const firstSave = client.evidence.findResponse("/savedata/session/coop-cas-update", {
       status: 200,
       method: "POST",
+      slot: 0,
+      mode: "empty",
     });
     if (firstSave == null) {
       throw new Error(`${client.label}: shared wave-1 command never produced a successful exact co-op CAS save`);
@@ -348,6 +359,138 @@ async function saveMutations(rig) {
   });
 }
 
+async function forkIsolatedCloudReplica(rig, client, slot) {
+  const origin = new URL(rig.config.expectedApiOrigin ?? "");
+  if (origin.protocol !== "http:" || origin.hostname !== "127.0.0.1" || origin.port !== "8788") {
+    throw new Error(`resume-scan-isolation fixture refuses non-loopback save origin ${origin.href}`);
+  }
+  const response = await fetch(new URL("/__coop-fixture/fork-session", origin), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username: client.credentials.username, slot }),
+  });
+  const result = await response.json();
+  if (!response.ok || result?.ok !== true || result.slot !== slot) {
+    throw new Error(
+      `${client.label}: isolated cloud-replica fork failed: ${response.status} ${JSON.stringify(result)}`,
+    );
+  }
+  client.evidence.record("isolated-cloud-replica-fork", result);
+  return result;
+}
+
+async function isolatedCloudReplicaStatus(rig, client, slot) {
+  const origin = new URL(rig.config.expectedApiOrigin ?? "");
+  if (origin.protocol !== "http:" || origin.hostname !== "127.0.0.1" || origin.port !== "8788") {
+    throw new Error(`resume-scan-isolation fixture refuses non-loopback save origin ${origin.href}`);
+  }
+  const response = await fetch(new URL("/__coop-fixture/session-status", origin), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username: client.credentials.username, slot }),
+  });
+  const result = await response.json();
+  if (!response.ok || result?.ok !== true || result.slot !== slot || !/^[0-9a-f]{64}$/u.test(result.sha256)) {
+    throw new Error(
+      `${client.label}: isolated cloud-replica status failed: ${response.status} ${JSON.stringify(result)}`,
+    );
+  }
+  return result;
+}
+
+async function resumeScanIsolation(rig) {
+  await rig.loginBoth();
+  await rig.pair(rig.config.requesterSeat);
+  await rig.startFreshRun();
+  for (const client of Object.values(rig.clients)) {
+    const firstRequest = client.evidence.findCoopCasUpdateRequest({ slot: 0, mode: "empty" });
+    const firstSave = client.evidence.findResponse("/savedata/session/coop-cas-update", {
+      status: 200,
+      method: "POST",
+    });
+    if (firstRequest == null || firstSave == null || firstRequest.index >= firstSave.index) {
+      throw new Error(`${client.label}: wave-1 command did not empty-CAS slot zero for the isolation fixture`);
+    }
+  }
+
+  const forkedCloud = new Map(
+    await Promise.all(
+      Object.values(rig.clients).map(async client => [client.label, await forkIsolatedCloudReplica(rig, client, 0)]),
+    ),
+  );
+  await rig.coldReopenAndPair(rig.config.requesterSeat);
+  await rig.host.evidence.waitFor(SLOT_ZERO_FORK_QUARANTINE, {
+    from: rig.host.pageCursor,
+    timeoutMs: rig.config.timeoutMs,
+    description: "slot-scoped co-op fork quarantine",
+  });
+  const localBefore = new Map(
+    await Promise.all(
+      Object.values(rig.clients).map(async client => {
+        const checkpoint = await client.checkpoint("resume-conflict-isolated-before-launch");
+        const sessions = checkpoint.storage.filter(item => /^sessionData(?:\d*)_/u.test(item.key));
+        if (sessions.length !== 1 || !/^[0-9a-f]{64}$/u.test(sessions[0].sha256)) {
+          throw new Error(`${client.label}: expected one exact quarantined local slot before launch`);
+        }
+        return [client.label, sessions[0]];
+      }),
+    ),
+  );
+
+  const clientLaunchCursors = new Map(
+    Object.values(rig.clients).map(client => [client.label, client.evidence.cursor()]),
+  );
+  await rig.startFreshRun();
+  const localAfter = await Promise.all(
+    Object.values(rig.clients).map(async client => {
+      const after = await client.checkpoint("resume-conflict-isolated-fresh-command");
+      const sessions = after.storage.filter(item => /^sessionData(?:\d*)_/u.test(item.key));
+      const before = localBefore.get(client.label);
+      const preserved = sessions.find(item => item.key === before?.key);
+      if (sessions.length < 2 || preserved?.sha256 !== before?.sha256) {
+        throw new Error(`${client.label}: fresh run changed or removed the exact quarantined local slot`);
+      }
+      const cursor = clientLaunchCursors.get(client.label);
+      const freshRequest = client.evidence.events
+        .slice(cursor)
+        .find(event => event.kind === "coop-cas-update-request" && event.mode === "empty" && event.slot !== 0);
+      const freshResponse =
+        freshRequest == null
+          ? null
+          : client.evidence.findResponse("/savedata/session/coop-cas-update", {
+              from: cursor,
+              status: 200,
+              method: "POST",
+              slot: freshRequest.slot,
+              mode: "empty",
+            });
+      if (freshRequest == null || freshResponse == null || freshRequest.index >= freshResponse.index) {
+        throw new Error(`${client.label}: isolated launch did not empty-CAS a different fresh slot`);
+      }
+      return { client, sessions, freshRequest, freshResponse };
+    }),
+  );
+  const hostFresh = localAfter.find(proof => proof.client === rig.host);
+  if (hostFresh == null) {
+    throw new Error(`${rig.host.label}: isolated host proof was not captured`);
+  }
+  const cloudAfter = await Promise.all(
+    Object.values(rig.clients).map(async client => [client, await isolatedCloudReplicaStatus(rig, client, 0)]),
+  );
+  for (const [client, status] of cloudAfter) {
+    if (status.sha256 !== forkedCloud.get(client.label)?.sha256) {
+      throw new Error(`${client.label}: fresh launch mutated quarantined cloud slot zero`);
+    }
+  }
+  rig.host.evidence.record("resume-scan-isolation-proof", {
+    quarantinedSlot: 0,
+    preservedSessionKeys: hostFresh.sessions.map(item => item.key),
+    freshSlot: hostFresh.freshRequest.slot,
+    freshWriteResponseIndex: hostFresh.freshResponse.index,
+    quarantinedCloudSha256: cloudAfter.map(([client, status]) => ({ client: client.label, sha256: status.sha256 })),
+  });
+}
+
 const journeys = {
   probe,
   "fresh-wave2": freshWave2,
@@ -355,6 +498,8 @@ const journeys = {
   "reverse-resume": reverseResume,
   "faint-replacement": faintReplacement,
   "commander-skip": commanderSkip,
+  "game-over": gameOver,
+  "resume-scan-isolation": resumeScanIsolation,
   "save-mutations": saveMutations,
 };
 

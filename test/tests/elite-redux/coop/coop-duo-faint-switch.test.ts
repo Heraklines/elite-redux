@@ -39,16 +39,20 @@ import {
   buildDuo,
   type CoopResyncProbe,
   type DuoRig,
+  drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
+  materializeGuestInputAfterReplacement,
   presentedFieldMon,
+  settleDuoPromise,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -189,11 +193,16 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       }
     });
 
-    // HOST: drive past its SwitchPhase - it AWAITS the guest's relayed pick (already buffered
-    // over the loopback) and summons it, then pushes the out-of-band replacement checkpoint.
+    // HOST: begin crossing its SwitchPhase. The retained result must first be applied under the
+    // guest's complete destination context and materially ACKed; alternating the two contexts is
+    // the in-process equivalent of two independent browser event loops.
+    let hostAdvance: Promise<void> | undefined;
     await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase", false);
+      hostAdvance = game.phaseInterceptor.to("CommandPhase", false);
+      await drainLoopback();
     });
+    expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+    await settleDuoPromise(rig, hostAdvance!, "guest-picked faint replacement host crossing");
     const hostReplacement = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
     expect(pair.faultsInjected(), "the guest's first replacement intent was actually dropped").toBe(1);
     expect(
@@ -202,11 +211,17 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     ).toBe(SpeciesId.CHARIZARD);
     expect(hostReplacement?.isFainted(), "the replacement is battle-ready on the host").toBe(false);
 
-    // GUEST turn 2 pump: consumes the out-of-band replacement checkpoint mid-park - the
-    // replacement MATERIALIZES on the guest and its own CommandPhase opens for the refilled
-    // slot (the drive returns at the CommandPhase boundary; the apply already happened).
+    // Deliver the replacement checkpoint under the guest context, then restore the omitted
+    // production TurnInit tail of this directly-mirrored headless scene. The resulting real
+    // guest-owned CommandPhase is the public surface a browser would open for the refilled slot.
     await withClient(rig.guestCtx, async () => {
-      await driveGuestReplayTurn(rig.guestScene, turn + 1);
+      await materializeGuestInputAfterReplacement(rig.guestScene);
+      await driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase after replacement", {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+        perPhaseTimeoutMs: 5_000,
+      });
     });
     withClientSync(rig.guestCtx, () => {
       // PRE-HEAL presented state on the chooser: the summoned replacement is the CHOSEN species + ALIVE.
@@ -235,5 +250,224 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     expect(guestOrder, "guest party ARRAY ORDER matches the host after the replacement").toEqual(hostOrder);
 
     logs.flush();
+  }, 240_000);
+
+  it("idle guest picker closes from the retained fallback before the host summons and both engines reach the next command", async () => {
+    setCoopFaintSwitchWaitMs(30);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    // LAPRAS is the first legal guest-owned bench mon. The test deliberately never invokes the
+    // guest's real PARTY callback, so the authoritative timeout must select this exact fallback.
+    for (const scene of [rig.hostScene, rig.guestScene]) {
+      scene.getPlayerParty()[2].coopOwner = "guest";
+      scene.getPlayerParty()[3].coopOwner = "guest";
+    }
+    rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
+    withClientSync(rig.guestCtx, () => {
+      rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
+    });
+
+    const turn = rig.hostScene.currentBattle.turn;
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
+      game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
+    });
+
+    let pickerOpens = 0;
+    let pickerCloses = 0;
+    let idlePickerCallback: ((slotIndex: number, option: number) => void) | undefined;
+    let restoreGuestUi = () => {};
+    let offHostAck = () => {};
+    let materialAckOperationId: string | undefined;
+    const hostDurability = rig.hostRuntime.durability;
+    expect(hostDurability, "the authoritative runtime has a durability barrier").toBeDefined();
+    if (hostDurability == null) {
+      throw new Error("missing authoritative co-op durability barrier");
+    }
+    const materialBarrierSpy = vi.spyOn(hostDurability, "waitForOperationMaterialApplied");
+    const unshiftSpy = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew");
+    let hostAdvance: Promise<void> | undefined;
+
+    try {
+      // Install the real replay phase, drain its real presentation queue up to the guest-owned
+      // replacement phase, then open the actual picker without invoking its public callback.
+      await withClient(rig.guestCtx, async () => {
+        const ui = rig.guestScene.ui as unknown as {
+          setMode: (...args: unknown[]) => unknown;
+          setModeBoundedWhen: (...args: unknown[]) => Promise<"completed" | "forced" | "superseded">;
+        };
+        const realSetMode = ui.setMode.bind(ui);
+        const realSetModeBoundedWhen = ui.setModeBoundedWhen.bind(ui);
+        restoreGuestUi = () => {
+          ui.setMode = realSetMode;
+          ui.setModeBoundedWhen = realSetModeBoundedWhen;
+        };
+        ui.setMode = (...args: unknown[]): unknown => {
+          if (args[0] === UiMode.PARTY) {
+            pickerOpens++;
+            idlePickerCallback = args[3] as (slotIndex: number, option: number) => void;
+            return;
+          }
+          if (args[0] === UiMode.MESSAGE && pickerOpens > 0) {
+            pickerCloses++;
+            return;
+          }
+          return realSetMode(...args);
+        };
+        ui.setModeBoundedWhen = async (...args): Promise<"completed" | "forced" | "superseded"> => {
+          if (args[0] === UiMode.MESSAGE && pickerOpens > 0) {
+            pickerCloses++;
+            return "completed";
+          }
+          return realSetModeBoundedWhen(...args);
+        };
+
+        const replay = rig.guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
+        // Reproduce the live me-asym race exactly: TurnInit has already advanced ambient scene.turn
+        // before the delayed faint presentation opens its picker. The proposal and retained terminal
+        // must still use the immutable streamed faint turn, never this later mutable value.
+        rig.guestScene.currentBattle.turn = turn + 1;
+        replay.start();
+        await drainLoopback();
+        const picker = await driveClientPhaseQueueTo(rig.guestScene, "CoopGuestFaintSwitchPhase", {
+          perPhaseTimeoutMs: 5_000,
+        });
+        picker.start();
+        await drainLoopback();
+
+        expect(pickerOpens, "the real guest-owned PARTY picker opened exactly once").toBe(1);
+        expect(idlePickerCallback, "the real picker exposed its human selection callback").toBeTypeOf("function");
+        expect(
+          rig.guestScene.phaseManager.getCurrentPhase(),
+          "the guest remains parked on the live picker while the human is idle",
+        ).toBe(picker);
+      });
+
+      const materialAcks: Array<{ operationId?: string; wave?: number; turn?: number }> = [];
+      offHostAck = rig.pair.host.onMessage(msg => {
+        if (msg.t === "coopAck" && msg.stage === "materialApplied" && msg.operationId?.includes(":FAINT_SWITCH:")) {
+          materialAcks.push(msg);
+          materialAckOperationId = msg.operationId;
+        }
+      });
+
+      // Start the host's real post-turn phase crossing. It times out the idle guest and retains a
+      // concrete fallback, but the promise cannot reach CommandPhase until peer material settlement.
+      await withClient(rig.hostCtx, async () => {
+        hostAdvance = game.phaseInterceptor.to("CommandPhase", false);
+        await vi.waitUntil(() => materialBarrierSpy.mock.calls.length === 1, {
+          timeout: 5_000,
+          interval: 10,
+        });
+
+        expect(
+          unshiftSpy.mock.calls.filter(([name]) => name === "SwitchSummonPhase"),
+          "the host cannot summon before the guest materially closes the old picker",
+        ).toHaveLength(0);
+        expect(
+          unshiftSpy.mock.calls.filter(([name]) => name === "CoopPushReplacementCheckpointPhase"),
+          "the host cannot publish a replacement checkpoint before peer material settlement",
+        ).toHaveLength(0);
+      });
+      const retainedOperationId = materialBarrierSpy.mock.calls[0]?.[0];
+      expect(retainedOperationId, "the timeout entered one exact retained-operation barrier").toMatch(
+        /:FAINT_SWITCH:/u,
+      );
+      expect(pickerCloses, "the retained envelope has not yet been pumped into the guest engine").toBe(0);
+
+      // Pump the retained envelope only under the guest context. Its first application closes the
+      // modal and shifts the phase but stays unacknowledged; the durability deferred retry can ACK
+      // only after that asynchronous material boundary has completed.
+      await withClient(rig.guestCtx, async () => {
+        for (let attempt = 0; attempt < 100 && materialAcks.length === 0; attempt++) {
+          await drainLoopback();
+          await new Promise<void>(resolve => setTimeout(resolve, 10));
+        }
+        expect(pickerCloses, "authority closed the idle picker through its real MESSAGE transition").toBe(1);
+        expect(
+          rig.guestScene.phaseManager.getCurrentPhase()?.phaseName,
+          "the material ACK cannot precede leaving the guest picker phase",
+        ).not.toBe("CoopGuestFaintSwitchPhase");
+      });
+      expect(
+        materialAcks.length,
+        "the guest emitted at least one material ACK after closing the picker",
+      ).toBeGreaterThanOrEqual(1);
+      expect(materialAckOperationId, "the ACK belongs to the exact retained fallback").toBe(retainedOperationId);
+      expect(
+        materialAcks.every(ack => ack.operationId === retainedOperationId),
+        "any idempotent material ACK replay stays scoped to the exact retained fallback",
+      ).toBe(true);
+      expect(materialAcks[0]).toMatchObject({
+        operationId: retainedOperationId,
+        wave: rig.hostScene.currentBattle.waveIndex,
+        turn,
+      });
+
+      // Reactivating the host flushes the exact runWhenCoopRuntimeActive continuation. Only now may
+      // it queue one summon plus one replacement checkpoint and finish the crossing to CommandPhase.
+      expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+      await settleDuoPromise(rig, hostAdvance!, "idle faint fallback host crossing");
+      expect(
+        unshiftSpy.mock.calls.filter(([name]) => name === "SwitchSummonPhase"),
+        "the material barrier releases exactly one authoritative summon",
+      ).toHaveLength(1);
+      expect(
+        unshiftSpy.mock.calls.filter(([name]) => name === "CoopPushReplacementCheckpointPhase"),
+        "the material barrier releases exactly one replacement checkpoint",
+      ).toHaveLength(1);
+      expect(
+        rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX]?.species.speciesId,
+        "the host used the deterministic first-legal fallback after the idle timeout",
+      ).toBe(SpeciesId.LAPRAS);
+
+      // The detached headless replay has no production NewBattle/TurnInit tail. Recreate exactly
+      // that omitted input boundary through the real phase manager, then require the guest-owned
+      // public CommandPhase. The replacement checkpoint was already consumed while the retained
+      // fallback closed the picker.
+      await withClient(rig.guestCtx, async () => {
+        await materializeGuestInputAfterReplacement(rig.guestScene);
+        await driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase after timeout replacement", {
+          matches: phase =>
+            phase.phaseName === "CommandPhase"
+            && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+          perPhaseTimeoutMs: 5_000,
+        });
+      });
+      withClientSync(rig.guestCtx, () => {
+        expect(
+          presentedFieldMon(rig.guestScene, COOP_GUEST_FIELD_INDEX)?.speciesId,
+          "the guest materialized the host's exact timeout fallback",
+        ).toBe(SpeciesId.LAPRAS);
+        expect(
+          rig.guestScene.phaseManager.getCurrentPhase()?.phaseName,
+          "the guest reached the next public command surface",
+        ).toBe("CommandPhase");
+      });
+      expect(
+        {
+          wave: rig.guestScene.currentBattle.waveIndex,
+          turn: rig.guestScene.currentBattle.turn,
+        },
+        "host and guest converged on the same next command address",
+      ).toEqual({
+        wave: rig.hostScene.currentBattle.waveIndex,
+        turn: rig.hostScene.currentBattle.turn,
+      });
+      expect(
+        rig.guestScene.getPlayerParty().map(mon => mon?.species?.speciesId ?? 0),
+        "the timeout crossing preserved authoritative party order",
+      ).toEqual(rig.hostScene.getPlayerParty().map(mon => mon?.species?.speciesId ?? 0));
+
+      logs.flush();
+    } finally {
+      offHostAck();
+      restoreGuestUi();
+      materialBarrierSpy.mockRestore();
+      unshiftSpy.mockRestore();
+    }
   }, 240_000);
 });

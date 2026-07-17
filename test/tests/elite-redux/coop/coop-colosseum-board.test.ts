@@ -385,11 +385,13 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     registerCoopOperationLiveSink("op:colosseum", sink);
 
     try {
-      expect(apply(entry)).toBe("rejected");
+      // A not-ready sink is engine pacing: the entry DEFERS (parked local retry) instead of burning
+      // bounded recovery toward a session terminal; the complete before-image rollback is unchanged.
+      expect(apply(entry)).toBe("deferred");
       expect(sink).toHaveBeenCalledTimes(1);
       expect(
         captureCoopMeControlTransactionState(),
-        "a rejected sink cannot expose a board cursor to recovery or a concurrent snapshot",
+        "a not-yet-materialized sink cannot expose a board cursor to recovery or a concurrent snapshot",
       ).toEqual(before);
 
       registerCoopOperationLiveSink("op:colosseum", () => true);

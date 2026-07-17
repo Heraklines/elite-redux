@@ -41,9 +41,12 @@ import {
   broadcastCoopWaveEndState,
   broadcastCoopWaveResolved,
   clearCoopRuntime,
+  coopRetainedGameOverSupersedesReplay,
+  flushCoopWaveResolvedAfterTurnCommit,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import * as waveOp from "#data/elite-redux/coop/coop-wave-operation";
 import {
   isCoopWaveAdvanceTransactionComplete,
@@ -191,6 +194,23 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       routed.map(payload => payload.wave),
       "the guest advances from the envelope alone",
     ).toContain(2);
+    logs.flush();
+  }, 300_000);
+
+  it("withholds the raw victory hint until the material final-turn commit boundary", async () => {
+    const rig = await bootDuo();
+    const raw = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved");
+
+    await withClient(rig.hostCtx, () => {
+      rig.hostScene.currentBattle.waveIndex = 3;
+      beginCoopRecording(rig.hostScene.currentBattle.turn);
+      broadcastCoopWaveResolved("win");
+      expect(raw, "Victory may stage its transition but cannot publish ahead of turn authority").not.toHaveBeenCalled();
+      endCoopRecording();
+      expect(flushCoopWaveResolvedAfterTurnCommit(3)).toBe(true);
+    });
+
+    expect(raw, "the compatibility hint publishes exactly once after successful turn retention").toHaveBeenCalledOnce();
     logs.flush();
   }, 300_000);
 
@@ -451,8 +471,8 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
 
     await withClient(rig.guestCtx, async () => {
       rig.guestScene.currentBattle.waveIndex = 7;
-      rig.guestScene.currentBattle.turn = 2;
-      const replay = new CoopReplayTurnPhase(2);
+      rig.guestScene.currentBattle.turn = 1;
+      const replay = new CoopReplayTurnPhase(1);
       rig.guestScene.phaseManager.clearPhaseQueue();
       rig.guestScene.phaseManager.unshiftPhase(replay);
       rig.guestScene.phaseManager.shiftPhase();
@@ -461,8 +481,8 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       await new Promise(resolve => setTimeout(resolve, 5));
       expect(replay.isAwaitingAuthority(), "the guest has opened the phantom next-turn waiter").toBe(true);
       expect(
-        replay.abortIfPastSettledTurn(2, "same-turn retained terminal must not abort (test)"),
-        "a retained terminal cannot truncate presentation for its own settled turn",
+        replay.abortIfRetainedTerminalSuperseded(2, "a future terminal must not abort an earlier replay (test)"),
+        "a terminal from a later settled turn cannot truncate this replay",
       ).toBe(false);
       expect(replay.isAwaitingAuthority()).toBe(true);
     });
@@ -485,6 +505,13 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       expect(boundary, "the retained terminal unparks replay into the appended safe boundary").toBeInstanceOf(
         CoopWaveAdvanceBoundaryPhase,
       );
+      expect(
+        coopRetainedGameOverSupersedesReplay(7, 1),
+        "the same-turn replay is terminal-superseded once ordered live events have drained",
+      ).toBe(true);
+      expect(coopRetainedGameOverSupersedesReplay(7, 2), "a queued phantom next turn is also superseded").toBe(true);
+      expect(coopRetainedGameOverSupersedesReplay(6, 1), "a replay from another wave is unrelated").toBe(false);
+      expect(coopRetainedGameOverSupersedesReplay(7, 0), "a replay before the settled turn is unrelated").toBe(false);
       boundary.start();
       const guestTerminal = rig.guestScene.phaseManager.getCurrentPhase();
       expect(guestTerminal, "terminal DATA application exposes the guest GameOver continuation").toBeInstanceOf(

@@ -318,6 +318,20 @@ export class SelectModifierPhase extends BattlePhase {
       return false;
     }
 
+    // A co-op reward surface is a mechanical commit boundary, never a local UI fallback. If an
+    // asynchronous teardown removed the runtime before this phase opened, continuing through the solo
+    // path would roll/apply rewards on one client only. Terminate locally (the peer control plane is
+    // already gone) and keep this phase parked instead.
+    if (globalScene.gameMode.isCoop && getCoopController() == null) {
+      failCoopSharedSession("A shared reward surface opened without its authoritative runtime.", {
+        boundary: "recovery",
+        reasonCode: "recovery-exhausted",
+        wave: globalScene.currentBattle?.waveIndex,
+        turn: globalScene.currentBattle?.turn,
+      });
+      return false;
+    }
+
     // Co-op (#633): the reward screen ALTERNATES full control - the player whose turn
     // it is drives it; the partner WATCHES and mirrors the relayed picks against its
     // own identical pool (same seed -> identical options/prices/money). Resolved once

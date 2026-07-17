@@ -108,7 +108,7 @@ describe.skipIf(!RUN)("Showdown versus - two-engine end-to-end proof (C6v2d)", (
       game.scene.phaseManager.pushNew("EncounterPhase", false);
       new SelectStarterPhase().initBattle(starters);
     });
-    await game.phaseInterceptor.to("CommandPhase");
+    await game.phaseInterceptor.to("CommandPhase", false);
     // The host OHKOs the guest's frail team: PIKACHU + THUNDERBOLT is 4x on Magikarp (Water/Flying).
     // Bake THUNDERBOLT into the host's own Pikachu DIRECTLY (not a global Overrides.MOVESET_OVERRIDE):
     // the override overlays the PLAYER lead's slot 0, but on the flipped guest the local player is the

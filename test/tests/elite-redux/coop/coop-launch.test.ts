@@ -200,11 +200,14 @@ describe.skipIf(!RUN)("co-op launch (#633) - real phase launch decision (hang fi
     }
   });
 
-  it("the HOST fails closed instead of overwriting when no local+cloud slot is verified empty", async () => {
+  // Maintainer directive (2026-07-17): with no verified-empty slot the launch first RECLAIMS the
+  // least-recent save (findCoopLaunchSlotWithOverride). The fail-closed no-overwrite invariant now
+  // guards the case where reclamation ALSO cannot produce a verified slot.
+  it("the HOST fails closed instead of overwriting when no slot verifies empty and none can be reclaimed", async () => {
     const phase = new SelectStarterPhase();
     const initSpy = vi.spyOn(phase, "initBattle").mockImplementation(() => {});
     const setModeSpy = vi.spyOn(globalScene.ui, "setMode").mockImplementation(() => Promise.resolve());
-    vi.spyOn(globalScene.gameData, "findVerifiedEmptyCoopSessionSlot").mockResolvedValue(null);
+    vi.spyOn(globalScene.gameData, "findCoopLaunchSlotWithOverride").mockResolvedValue(null);
     const confirmedSlot = vi.spyOn(globalScene.gameData, "confirmPendingFreshCoopSessionSlot");
 
     for (let s = 0; s < 5; s++) {

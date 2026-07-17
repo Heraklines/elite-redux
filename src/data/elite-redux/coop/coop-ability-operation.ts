@@ -401,7 +401,7 @@ function applyJournaledAbilityEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
   }
   const result = applyCoopOperationEnvelope(g, "op:ability", envelope);
   if (result !== "applied") {
-    return "rejected";
+    return result;
   }
   const parsed = parseCoopOperationId(operation.id);
   if (parsed != null) {

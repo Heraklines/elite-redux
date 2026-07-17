@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { PokemonSpecies } from "../src/data/pokemon-species";
 import type { Pokemon } from "../src/field/pokemon";
 import type { SaveSlotSelectUiHandler } from "../src/ui/handlers/save-slot-select-ui-handler";
 
@@ -22,6 +23,7 @@ const [
   { Command },
   { MoveId },
   { PokemonModifierType },
+  { PartyOption, PartyUiMode },
   { StatusEffect },
   { UiMode },
 ] = await Promise.all([
@@ -34,6 +36,7 @@ const [
   import("../src/enums/command"),
   import("../src/enums/move-id"),
   import("../src/modifier/modifier-type"),
+  import("../src/ui/handlers/party-ui-handler"),
   import("../src/enums/status-effect"),
   import("../src/enums/ui-mode"),
 ]);
@@ -249,7 +252,7 @@ function classifyContinuationSurface(phase: string, uiMode: string): BrowserCont
   if (phase === "SelectModifierPhase" && uiMode === "MODIFIER_SELECT") {
     return "reward";
   }
-  if (phase === "SwitchPhase" && uiMode === "PARTY") {
+  if ((phase === "SwitchPhase" || phase === "CoopGuestFaintSwitchPhase") && uiMode === "PARTY") {
     return "replacement";
   }
   return null;
@@ -410,9 +413,14 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
     case "COMMAND":
     case "FIGHT":
     case "BALL":
-    case "TARGET_SELECT":
       return phase === "CommandPhase"
         ? { surfaceId: `command:${uiMode.toLowerCase()}`, operationClass: "command", ownerModel: "local" }
+        : null;
+    // The resolved target belongs to the same local command, but production deliberately
+    // commits it from its own phase after the human chooses the concrete battler index.
+    case "TARGET_SELECT":
+      return phase === "SelectTargetPhase"
+        ? { surfaceId: "command:target", operationClass: "command", ownerModel: "local" }
         : null;
     case "STARTER_SELECT":
       return { surfaceId: "starter-select", operationClass: "starter", ownerModel: "local" };
@@ -519,6 +527,53 @@ interface SelectionReadout {
   readonly optionCount: number | null;
 }
 
+function partyOptionSemanticId(partyUiMode: number | undefined, option: number, index: number): string {
+  if (
+    partyUiMode === PartyUiMode.REMEMBER_MOVE_MODIFIER
+    || partyUiMode === PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER
+    || partyUiMode === PartyUiMode.ER_TM_CASE_MODIFIER
+  ) {
+    return `party-option:move-index:${option}`;
+  }
+  if (
+    (partyUiMode === PartyUiMode.MODIFIER_TRANSFER || partyUiMode === PartyUiMode.DISCARD)
+    && option >= 0
+    && option < PartyOption.SCROLL_UP
+  ) {
+    return `party-option:item-index:${option}`;
+  }
+  const enumName = PartyOption[option];
+  return typeof enumName === "string"
+    ? `party-option:${enumName.toLowerCase().replaceAll("_", "-")}`
+    : `party-option:slot:${index}`;
+}
+
+function readStarterGridCandidates(handler: unknown) {
+  const containers = (
+    handler as {
+      filteredStarterContainers?: Array<{ cost?: unknown; species?: PokemonSpecies }>;
+    }
+  ).filteredStarterContainers;
+  if (!Array.isArray(containers)) {
+    return null;
+  }
+  return containers
+    .map((container, index) => {
+      const speciesId = container.species?.speciesId;
+      const cost = container.cost;
+      return Number.isSafeInteger(speciesId)
+        && container.species != null
+        && globalScene.gameData.isRootSpeciesUnlocked(container.species)
+        && typeof cost === "number"
+        && Number.isFinite(cost)
+        ? { index, speciesId: speciesId as number, cost }
+        : null;
+    })
+    .filter(candidate => candidate != null)
+    .sort((left, right) => left.cost - right.cost || left.index - right.index)
+    .slice(0, 32);
+}
+
 /**
  * The visible options + selected id, where the handler exposes them publicly. Reward
  * options carry a stable modifier-type id; option-select menus expose their explicit semantic id.
@@ -531,6 +586,51 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
   } catch {
     selectedIndex = null;
   }
+  if (uiMode === "STARTER_SELECT") {
+    const starterHandler = handler as unknown as {
+      randomCursorObj?: { visible?: boolean };
+      lastTeamCursorObj?: { visible?: boolean };
+      startCursorObj?: { visible?: boolean };
+      starterIconsCursorObj?: { visible?: boolean };
+      starterIconsCursorIndex?: number;
+    };
+    if (starterHandler.randomCursorObj?.visible === true) {
+      return {
+        selectedOptionId: "starter-action:random",
+        optionIds: null,
+        optionCount: null,
+      };
+    }
+    if (starterHandler.lastTeamCursorObj?.visible === true) {
+      return {
+        selectedOptionId: "starter-action:last-team",
+        optionIds: null,
+        optionCount: null,
+      };
+    }
+    if (starterHandler.startCursorObj?.visible === true) {
+      return {
+        selectedOptionId: "starter-action:start",
+        optionIds: null,
+        optionCount: null,
+      };
+    }
+    if (
+      starterHandler.starterIconsCursorObj?.visible === true
+      && Number.isSafeInteger(starterHandler.starterIconsCursorIndex)
+    ) {
+      return {
+        selectedOptionId: `starter-team:${starterHandler.starterIconsCursorIndex}`,
+        optionIds: null,
+        optionCount: null,
+      };
+    }
+    return {
+      selectedOptionId: selectedIndex == null ? null : `starter-grid:${selectedIndex}`,
+      optionIds: null,
+      optionCount: null,
+    };
+  }
   if (uiMode === "SAVE_SLOT") {
     const selection = (handler as SaveSlotSelectUiHandler).getSelectedSlotSemanticSelection?.();
     const selectedOptionId = selection?.loaded ? `${selection.state}-slot:${selection.slotId}` : null;
@@ -538,6 +638,23 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       selectedOptionId,
       optionIds: null,
       optionCount: null,
+    };
+  }
+  if (uiMode === "TARGET_SELECT") {
+    const targets = (handler as unknown as { targets?: unknown }).targets;
+    const optionIds = Array.isArray(targets)
+      ? targets
+          .filter((target): target is number => Number.isSafeInteger(target))
+          .map(target => `battle-target:${target}`)
+      : null;
+    const selectedOptionId =
+      selectedIndex != null && optionIds?.includes(`battle-target:${selectedIndex}`)
+        ? `battle-target:${selectedIndex}`
+        : null;
+    return {
+      selectedOptionId,
+      optionIds,
+      optionCount: optionIds?.length ?? null,
     };
   }
   if (uiMode === "MODIFIER_SELECT") {
@@ -551,6 +668,38 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
         optionCount: optionIds.length,
       };
     }
+  }
+  if (uiMode === "PARTY") {
+    const partyHandler = handler as unknown as {
+      optionsMode?: boolean;
+      optionsCursor?: number;
+      options?: number[];
+      partyUiMode?: number;
+    };
+    if (partyHandler.optionsMode === true && Array.isArray(partyHandler.options) && partyHandler.options.length > 0) {
+      const optionIds = partyHandler.options.map((option, index) =>
+        partyOptionSemanticId(partyHandler.partyUiMode, option, index),
+      );
+      const optionsCursor = Number.isSafeInteger(partyHandler.optionsCursor)
+        ? (partyHandler.optionsCursor as number)
+        : null;
+      return {
+        selectedOptionId: optionsCursor == null ? null : (optionIds[optionsCursor] ?? `cursor:${optionsCursor}`),
+        optionIds,
+        optionCount: optionIds.length,
+      };
+    }
+    const optionIds = globalScene.getPlayerParty().map((_pokemon, index) => `party-slot:${index}`);
+    return {
+      selectedOptionId:
+        selectedIndex != null && selectedIndex >= 0 && selectedIndex < optionIds.length
+          ? optionIds[selectedIndex]
+          : selectedIndex == null
+            ? null
+            : `cursor:${selectedIndex}`,
+      optionIds,
+      optionCount: optionIds.length,
+    };
   }
   const optionHandler = handler as unknown as {
     options?: Array<{ semanticId?: unknown }>;
@@ -577,12 +726,33 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
 let lastSemanticObservation = "";
 let lastSemanticProbe = "";
 let lastSemanticProbeAt = 0;
+let semanticDigestCacheKey = "";
+let semanticDigestCacheAt = 0;
+let semanticDigestCache: ReturnType<typeof computeMechanicalDigest> | null = null;
 let lastSemanticPhase: object | null = null;
 let semanticPhaseInstance = 0;
 let lastSemanticObserverError = "";
 let lastObservedRenderProfile = "";
 let lastObservedMarket = "";
 let lastObservedCommander = "";
+
+/**
+ * The semantic observer ticks at 10 Hz so it can notice handler/readiness changes quickly, but the broad
+ * mechanical digest walks both parties, modifiers, arena state, and save substrates. Recomputing that full
+ * projection on every 100 ms poll consumed most of a constrained Chromium runner and reduced the real game
+ * loop below one frame per second. Cache only the digest—not the semantic/readiness reads—for a fixed 1 s
+ * SLA, and invalidate immediately at every phase/surface/address/selection transition supplied by `key`.
+ */
+function semanticMechanicalDigest(key: string): ReturnType<typeof computeMechanicalDigest> {
+  const now = Date.now();
+  if (semanticDigestCache != null && key === semanticDigestCacheKey && now - semanticDigestCacheAt < 1_000) {
+    return semanticDigestCache;
+  }
+  semanticDigestCacheKey = key;
+  semanticDigestCacheAt = now;
+  semanticDigestCache = computeMechanicalDigest();
+  return semanticDigestCache;
+}
 
 interface MarketOptionProjection {
   readonly index: number;
@@ -864,7 +1034,9 @@ function observeSemanticSurface(): void {
       if (membership.state !== "active" || runtime.controller.sessionEpoch <= 0) {
         return;
       }
-      const { digest: stateDigest } = computeMechanicalDigest();
+      const { digest: stateDigest } = semanticMechanicalDigest(
+        `watcher:${runtime.controller.sessionEpoch}:${battle.waveIndex}:${battle.turn}:${phase}:${semanticPhaseInstance}`,
+      );
       const observation = {
         version: 2,
         surfaceId: "command:watcher",
@@ -911,7 +1083,12 @@ function observeSemanticSurface(): void {
         return;
       }
       const { wave, turn } = semanticBattleAddress(battle);
-      const stateDigest = battle == null ? null : computeMechanicalDigest().digest;
+      const stateDigest =
+        battle == null
+          ? null
+          : semanticMechanicalDigest(
+              `unclassified:${runtime.controller.sessionEpoch}:${wave}:${turn}:${phase}:${semanticPhaseInstance}:${uiMode}`,
+            ).digest;
       const observation = {
         version: 2,
         surfaceId: "unclassified",
@@ -989,12 +1166,34 @@ function observeSemanticSurface(): void {
     }
 
     const selection = readSelection(handler, uiMode);
+    const starterGridCandidates = uiMode === "STARTER_SELECT" ? readStarterGridCandidates(handler) : null;
+    const partySlots =
+      uiMode === "PARTY"
+        ? globalScene.getPlayerParty().map((pokemon, slot) => {
+            const active = pokemon.isActive(true);
+            const fainted = pokemon.isFainted();
+            const allowedInBattle = pokemon.isAllowedInBattle();
+            const reserve = slot >= (battle?.getBattlerCount() ?? 1);
+            const coopOwner = pokemon.coopOwner ?? null;
+            const ownedReplacement =
+              runtime?.controller.isVersusSession() === true || (localRole != null && coopOwner === localRole);
+            return {
+              slot,
+              speciesId: pokemon.species.speciesId,
+              coopOwner,
+              active,
+              fainted,
+              allowedInBattle,
+              replacementEligible: reserve && !active && !fainted && allowedInBattle && ownedReplacement,
+            };
+          })
+        : null;
     const teamSpeciesIds =
       uiMode === "STARTER_SELECT"
         ? ((handler as unknown as { starterSpecies?: Array<{ speciesId: number }> }).starterSpecies?.map(
             species => species.speciesId,
           ) ?? null)
-        : null;
+        : (partySlots?.map(slot => slot.speciesId) ?? null);
     // Title/setup menus exist before a Battle object. Address 0:0 is an explicit non-battle
     // sentinel that lets the public driver wait for their real option surfaces instead of
     // racing repeated Action keys; gameplay surfaces still carry their actual wave/turn.
@@ -1011,11 +1210,13 @@ function observeSemanticSurface(): void {
     // therefore prevents a read-only browser observer from publishing a stale ready=true between
     // repeated ExpPhase prompts. Non-message handlers keep the established raw-field projection.
     const awaitingActionInput =
-      typeof promptReady === "function"
-        ? promptReady.call(handler)
-        : typeof awaitingRaw === "boolean"
-          ? awaitingRaw
-          : null;
+      uiMode === "PARTY"
+        ? null
+        : typeof promptReady === "function"
+          ? promptReady.call(handler)
+          : typeof awaitingRaw === "boolean"
+            ? awaitingRaw
+            : null;
     const promptGeneration =
       uiMode === "MESSAGE" && typeof readPromptGeneration === "function" ? readPromptGeneration.call(handler) : null;
     const inputBlocked =
@@ -1025,28 +1226,34 @@ function observeSemanticSurface(): void {
           ? inputBlockedRaw
           : null;
     const surfaceGeneration = typeof readSurfaceGeneration === "function" ? readSurfaceGeneration.call(handler) : null;
-    const stateDigest = coop && battle != null ? computeMechanicalDigest().digest : null;
     const semanticSurfaceInstance =
       Number.isSafeInteger(promptGeneration) && (promptGeneration ?? 0) > 0
         ? (promptGeneration as number)
         : semanticPhaseInstance;
-
-    const probeKey = [
+    const semanticDigestKey = [
       semantic.surfaceId,
       uiMode,
       semanticSurfaceInstance,
       `${epoch}:${wave}:${turn}`,
       selection.selectedOptionId ?? "",
-      teamSpeciesIds?.join(",") ?? "",
+      selection.optionIds?.join(",") ?? "",
       ownerSeat ?? "?",
       awaitingActionInput,
       inputBlocked,
       surfaceGeneration,
       mysteryEncounterType,
+    ].join("|");
+    const stateDigest = coop && battle != null ? semanticMechanicalDigest(semanticDigestKey).digest : null;
+
+    const probeKey = [
+      semanticDigestKey,
+      teamSpeciesIds?.join(",") ?? "",
+      starterGridCandidates == null ? "" : JSON.stringify(starterGridCandidates),
+      partySlots == null ? "" : JSON.stringify(partySlots),
       stateDigest,
     ].join("|");
     const now = Date.now();
-    if (probeKey === lastSemanticProbe && now - lastSemanticProbeAt < 300) {
+    if (probeKey === lastSemanticProbe && now - lastSemanticProbeAt < 1_000) {
       return;
     }
     lastSemanticProbe = probeKey;
@@ -1069,6 +1276,8 @@ function observeSemanticSurface(): void {
       optionIds: selection.optionIds,
       optionCount: selection.optionCount,
       teamSpeciesIds,
+      starterGridCandidates,
+      partySlots,
       ready: { handlerActive: true, awaitingActionInput, inputBlocked },
       phase,
       phaseInstance: semanticSurfaceInstance,

@@ -74,11 +74,12 @@ function replacementEnvelope(checkpointTick = 19, stateTick = 20): CoopCheckpoin
 }
 
 describe("co-op resync snapshot ordering", () => {
-  it("applies a next-turn snapshot returned for a prior-turn mismatch", () => {
+  it("accepts only the live turn after the full recovery ticket validates the requested frontier", () => {
     expect(
       coopResyncSnapshotIsStale(2, 3, 3),
-      "the host captured turn 3 after receiving the turn-2 request; this is current authority, not stale",
+      "the scalar backstop sees an exact live turn; the protocol-38 ticket separately proves the request frontier",
     ).toBe(false);
+    expect(coopResyncSnapshotIsStale(2, 3, 2), "a future snapshot cannot enter the current turn-2 shell").toBe(true);
   });
 
   it("still rejects a genuinely old snapshot and preserves the legacy request-turn fallback", () => {

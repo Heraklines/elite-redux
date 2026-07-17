@@ -200,9 +200,17 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
         // No terminal: the run surveyed every requested wave (no hard strand short-circuited it).
         expect(result.wavesCompleted, "soak surveyed every requested wave").toBe(waves);
       } else {
+        expect(result.runEnded.kind, "early completion requires an explicit renderer terminal").toBe(
+          "verified-terminal",
+        );
+        expect(
+          ["GameOverPhase", "TitlePhase"],
+          "only GameOver/Title may terminate a soak without a NO-PARK failure",
+        ).toContain(result.runEnded.phase);
         // eslint-disable-next-line no-console
         console.log(
-          `[coop-soak] RUN ENDED at wave ${result.runEnded.wave} (seed ${seed}): ${result.runEnded.reason}. `
+          `[coop-soak] RUN ENDED at wave ${result.runEnded.wave} (seed ${seed}) `
+            + `[${result.runEnded.phase}]: ${result.runEnded.reason}. `
             + `Surveyed ${result.wavesCompleted}/${waves} waves under all invariants before the terminal.`,
         );
         // The survey ended EARLY at a real terminal - it must have stopped before the last wave.

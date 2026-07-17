@@ -83,6 +83,49 @@ describe("co-op malicious-peer switch hardening (#829)", () => {
     }
   });
 
+  it("uses the live field owner after party compaction instead of the launch-slot map", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { host, guest } = createLoopbackPair();
+      // Reproduce the host-half-wipe geometry: the guest survivor has been recentered into slot 0.
+      const liveOwners = new Map<number, "host" | "guest">([
+        [COOP_HOST_FIELD_INDEX, "guest"],
+        [COOP_GUEST_FIELD_INDEX, "host"],
+      ]);
+      const hostRelay = new CoopInteractionRelay(host, {
+        resolveFieldSlotOwner: fieldIndex => liveOwners.get(fieldIndex) ?? "host",
+      });
+      const guestRelay = new CoopInteractionRelay(guest);
+
+      const recenteredGuestSeq = COOP_FAINT_SWITCH_SEQ_BASE + COOP_HOST_FIELD_INDEX;
+      const legitimate = hostRelay.awaitInteractionChoice(recenteredGuestSeq);
+      guestRelay.sendInteractionChoice(recenteredGuestSeq, "switch", 3, [0, 999]);
+
+      expect((await legitimate)?.choice, "the recentered guest can replace its own slot 0 mon").toBe(3);
+      expect(warnedSecurity(warnSpy)).toBe(false);
+      hostRelay.dispose();
+
+      const nowHostOwnedSeq = COOP_FAINT_SWITCH_SEQ_BASE + COOP_GUEST_FIELD_INDEX;
+      const timer: { fire?: () => void } = {};
+      const guardedHostRelay = new CoopInteractionRelay(host, {
+        resolveFieldSlotOwner: fieldIndex => liveOwners.get(fieldIndex) ?? "host",
+        schedule: cb => {
+          timer.fire = cb;
+          return () => {};
+        },
+      });
+      const forged = guardedHostRelay.awaitInteractionChoice(nowHostOwnedSeq, 1000);
+      guestRelay.sendInteractionChoice(nowHostOwnedSeq, "switch", 2, [0, 999]);
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(warnedSecurity(warnSpy)).toBe(true);
+      timer.fire?.();
+      expect(await forged, "the guest still cannot replace the host-owned recentered slot").toBeNull();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it("leaves NON-switch interaction seqs (reward/shop/ME) untouched by the ownership check", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {

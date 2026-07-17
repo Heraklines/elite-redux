@@ -203,7 +203,7 @@ function applyJournaledStormglassEnvelope(envelope: CoopAuthoritativeEnvelopeV1)
   }
   const result = applyCoopOperationEnvelope(g, "op:stormglass", envelope);
   if (result !== "applied") {
-    return "rejected";
+    return result;
   }
   return "applied";
 }

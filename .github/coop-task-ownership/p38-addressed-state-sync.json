@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "taskId": "p38-addressed-state-sync",
+  "branch": "ci/coop/p38-addressed-state-sync",
+  "trainRef": "ci/coop/p33-closure-integrated",
+  "baseSha": "c8d8dda43d34a1ab48358f83d1c082b9c3d52d53",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p38-addressed-state-sync.json",
+    "src/data/elite-redux/coop/coop-battle-stream.ts",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/data/elite-redux/coop/coop-session-controller.ts",
+    "src/data/elite-redux/coop/coop-transport.ts",
+    "src/phases/coop-replay-phases.ts",
+    "test/browser/coop-public-ui/evidence.mjs",
+    "test/browser/coop-public-ui/fatal-console-evidence.test.mjs",
+    "test/tests/elite-redux/coop/coop-battle-state-sync-addressing.test.ts",
+    "test/tests/elite-redux/coop/coop-battle-stream.test.ts",
+    "test/tests/elite-redux/coop/coop-durability.test.ts",
+    "test/tests/elite-redux/coop/coop-operation-durability-recovery.test.ts",
+    "test/tests/elite-redux/coop/coop-p33-client.test.ts",
+    "test/tests/elite-redux/coop/coop-recovery-outcome-terminal.test.ts",
+    "test/tests/elite-redux/coop/coop-resync-checkpoint-wake.test.ts",
+    "test/tests/elite-redux/coop/coop-resync-snapshot-ordering.test.ts",
+    "test/tests/elite-redux/coop/coop-session-controller.test.ts",
+    "test/tests/elite-redux/coop/coop-wire-chunking-adversarial.test.ts",
+    "test/tools/coop-duo-harness.ts"
+  ]
+}

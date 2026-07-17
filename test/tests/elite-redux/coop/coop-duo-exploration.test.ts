@@ -55,6 +55,7 @@ import {
   pumpDuoDestinations,
   reachQueuedRewardShop,
   type ShopPhaseSeam,
+  settleDuoPromise,
   stubBattleInfo,
   withClient,
   withClientSync,
@@ -685,10 +686,18 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
 
       // HOST: both SwitchPhases resolve (own pick already stubbed; the guest's pick is
       // buffered on the relay) -> both replacements summoned + OOB checkpoints pushed.
+      // The crossing settles under BOTH destination contexts: the FAINT_SWITCH operation
+      // envelopes park in the destination pump until the guest context runs, and the host's
+      // material-ACK barrier cannot resolve until the guest applies + ACKs them (the b59dba12
+      // B-lane hang class).
       try {
+        let hostAdvance: Promise<void> | undefined;
         await withClient(rig.hostCtx, async () => {
-          await game.phaseInterceptor.to("CommandPhase", false);
+          hostAdvance = game.phaseInterceptor.to("CommandPhase", false) as Promise<void>;
+          await drainLoopback();
         });
+        expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
+        await settleDuoPromise(rig, hostAdvance!, "exploration double-KO host crossing");
       } finally {
         hostUi.setMode = realHostSetMode;
       }

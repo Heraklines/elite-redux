@@ -84,6 +84,22 @@ function clampStage(v: number): number {
   return v < -6 ? -6 : v > 6 ? 6 : Math.trunc(v);
 }
 
+/**
+ * Whether a numeric wire form can resolve on a species with `formCount` indexed forms.
+ *
+ * Species without an explicit forms array use index zero for their base species object. Species
+ * with forms must resolve through that array. Receive code uses this before mutating a live mon.
+ */
+export function isResolvableCoopFormIndex(formCount: number, formIndex: number): boolean {
+  return (
+    Number.isSafeInteger(formCount)
+    && formCount >= 0
+    && Number.isSafeInteger(formIndex)
+    && formIndex >= 0
+    && (formCount === 0 ? formIndex === 0 : formIndex < formCount)
+  );
+}
+
 /** Normalize a field mon's mutable state into the wire shape (clamped, cloned, safe). */
 export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState {
   const maxHp = Math.max(1, Math.trunc(mon.maxHp));
@@ -104,8 +120,8 @@ export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState
     // A 0-hp mon is fainted regardless of the source flag (the authoritative invariant).
     fainted: mon.fainted || hp === 0,
   };
-  if (mon.formIndex !== undefined) {
-    state.formIndex = mon.formIndex;
+  if (mon.formIndex !== undefined && Number.isSafeInteger(mon.formIndex) && mon.formIndex >= 0) {
+    state.formIndex = Math.trunc(mon.formIndex);
   }
   if (mon.abilityId !== undefined) {
     state.abilityId = mon.abilityId;

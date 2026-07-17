@@ -9,6 +9,7 @@
 // LoopbackTransport (the same "test via spoofing" path the rest of the suite uses).
 
 import { CoopBattleStreamer, type CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
+import type { CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopBattleCheckpoint,
@@ -264,6 +265,37 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     await flushWire();
 
     expect(guestStream.peekEnemyPartyState(9), "a delayed lower tick cannot replace the command seal").toEqual(newer);
+    expect(
+      guestStream.consumeEnemyParty(9),
+      "a delayed lower tick cannot repopulate the party half of the same carrier",
+    ).toBeNull();
+  });
+
+  it("retires a mystery selector carrier without blocking a newer same-wave battle carrier", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+    const selector = emptyAuthoritativeState(32, 1, 193);
+
+    hostStream.sendEnemyParty(32, [], 4, 3, selector);
+    await flushWire();
+    guestStream.retireEnemyPartyAuthorityThrough(32, 197);
+
+    expect(guestStream.consumeEnemyParty(32), "the buffered selector party is retired").toBeNull();
+    expect(guestStream.consumeEnemyPartyState(32), "the buffered selector state is retired").toBeUndefined();
+    expect(guestStream.meTypeForWave(32), "the buffered selector descriptor is retired").toBeUndefined();
+
+    hostStream.sendEnemyParty(32, [], 4, 3, selector);
+    await flushWire();
+    expect(guestStream.consumeEnemyParty(32), "a delayed selector replay stays retired").toBeNull();
+    expect(guestStream.consumeEnemyPartyState(32)).toBeUndefined();
+
+    const spawnedBattle = { ...emptyAuthoritativeState(32, 1, 198), enemyParty: [{ id: 77 }] };
+    hostStream.sendEnemyParty(32, [{ fieldIndex: 2, data: { speciesId: 77 } }], 4, 0, spawnedBattle);
+    await flushWire();
+    const admitted = guestStream.consumeEnemyPartyAuthority(32);
+    expect(admitted.enemies?.[0]?.data.speciesId, "a causally newer same-wave battle party is admitted").toBe(77);
+    expect(admitted.state, "the newer state stays paired with its party").toEqual(spawnedBattle);
   });
 
   it("bounds unconsumed event-only wave states to the latest four waves", async () => {
@@ -1495,13 +1527,17 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
 
     it("wakes a turn-N replay parked before the exact N+1 replacement arrives", async () => {
       const { host, guest } = createLoopbackPair();
-      const current = { epoch: 7, wave: 4, turn: 2 };
-      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
-      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+      const hostCurrent = { epoch: 7, wave: 4, turn: 2 };
+      const guestCurrent = { epoch: 7, wave: 4, turn: 2 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => hostCurrent });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => guestCurrent });
       const parked = guestStream.awaitTurnOrLiveEvent(2, 0);
       await flushWire();
 
-      current.turn = 3;
+      // Production asymmetry: TurnEnd already incremented the authority while the renderer remains in
+      // its turn-2 owner picker. The old test advanced one shared context to 3 on BOTH sides and therefore
+      // never exercised the cross-address admission that stranded the real browser.
+      hostCurrent.turn = 3;
       const replacement = checkpointEnvelope(
         "replacement",
         { ...emptyCheckpoint(), tick: 21 },
@@ -1520,7 +1556,11 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       );
 
       expect(await parked).toEqual({ kind: "checkpoint" });
-      expect(guestStream.peekCheckpoint()).toEqual(replacement);
+      expect(guestCurrent.turn, "the renderer is still parked at the old picker address").toBe(2);
+      expect(guestStream.peekCheckpoint(), "ambient consumers cannot steal future-address authority").toBeNull();
+      expect(guestStream.peekCheckpointForTurn(2)).toEqual(replacement);
+      expect(guestStream.consumeCheckpointForTurn(2)).toEqual(replacement);
+      expect(guestStream.peekCheckpointForTurn(2)).toBeNull();
       guestStream.dispose();
       hostStream.dispose();
     });
@@ -1797,6 +1837,94 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.requestReplacementCheckpoint(envelope);
       await flushWire();
       expect(opened, "the successful re-ACK cleared host retention").toBe(1);
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
+    it("retires a late replacement through the completed newer wave transaction", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 4, turn: 2 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+      const replacement = checkpointEnvelope();
+      const ackStages: string[] = [];
+      let opened = 0;
+      host.onMessage(message => {
+        if (message.t === "battleCheckpointAck") {
+          ackStages.push(message.stage);
+        }
+      });
+      guestStream.onCheckpointEnvelope(() => opened++);
+      hostStream.sendCheckpoint(
+        replacement.reason,
+        replacement.epoch,
+        replacement.wave,
+        replacement.turn,
+        replacement.checkpoint,
+        replacement.checksum,
+        replacement.fullField,
+        replacement.authoritativeState,
+      );
+      await flushWire();
+
+      const waveAuthority: CoopAuthoritativeEnvelopeV1 = {
+        version: 1,
+        sessionEpoch: 7,
+        revision: 2,
+        wave: 4,
+        turn: 2,
+        logicalPhase: "WAVE_VICTORY",
+        pendingOperation: {
+          id: "7:0:WAVE_ADVANCE:4",
+          kind: "WAVE_ADVANCE",
+          owner: 0,
+          status: "applied",
+          payload: {},
+        },
+        authoritativeState: emptyAuthoritativeState(4, 2, 21),
+      };
+      expect(
+        guestStream.acknowledgeReplacementsSubsumedByOperation({
+          ...waveAuthority,
+          sessionEpoch: 8,
+        }),
+        "another session cannot retire replacement authority",
+      ).toBe(0);
+      expect(
+        guestStream.acknowledgeReplacementsSubsumedByOperation({
+          ...waveAuthority,
+          authoritativeState: emptyAuthoritativeState(4, 2, replacement.authoritativeState.tick),
+        }),
+        "an equal state tick is not stronger authority",
+      ).toBe(0);
+      expect(
+        guestStream.acknowledgeReplacementsSubsumedByOperation({
+          ...waveAuthority,
+          turn: 1,
+          authoritativeState: emptyAuthoritativeState(4, 1, 21),
+        }),
+        "an older battle address cannot retire a future replacement",
+      ).toBe(0);
+      expect(hostStream.retainedAuthorityDiagnostics().replacementCommits).toBe(1);
+      expect(guestStream.peekCheckpoint()).toEqual(replacement);
+
+      expect(guestStream.acknowledgeReplacementsSubsumedByOperation(waveAuthority)).toBe(1);
+      await flushWire();
+      expect(ackStages).toEqual(["materialApplied", "presentationReady", "continuationReady"]);
+      expect(hostStream.retainedAuthorityDiagnostics().replacementCommits).toBe(0);
+      expect(guestStream.peekCheckpoint(), "the late checkpoint cannot reopen after the newer DATA applied").toBeNull();
+      expect(opened, "causal retirement emits no second apply/presentation wake").toBe(1);
+
+      expect(guestStream.acknowledgeReplacementsSubsumedByOperation(waveAuthority)).toBe(1);
+      await flushWire();
+      expect(ackStages, "a repeated wave proof republishes only final retained evidence").toEqual([
+        "materialApplied",
+        "presentationReady",
+        "continuationReady",
+        "continuationReady",
+      ]);
+      expect(hostStream.retainedAuthorityDiagnostics().terminal).toBe(false);
+      expect(guestStream.retainedAuthorityDiagnostics().terminal).toBe(false);
       hostStream.dispose();
       guestStream.dispose();
     });
@@ -2185,6 +2313,68 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       await expect(expired).resolves.toBe(false);
       unackedHost.dispose();
     });
+
+    it("accepts a delayed fatal for an exact retained address after ambient wave state advances", async () => {
+      const pair = createLoopbackPair();
+      const current = { epoch: 7, wave: 190, turn: 3 };
+      const hostStream = new CoopBattleStreamer(pair.host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(pair.guest, { authorityContext: () => current });
+      let routed = 0;
+      guestStream.onAuthorityFailure(() => routed++);
+
+      const awaited = guestStream.awaitTurn(3);
+      hostStream.emitTurn(
+        7,
+        190,
+        3,
+        [],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        emptyAuthoritativeState(190, 3),
+      );
+      expect(await awaited, "the guest admitted immutable authority at the failing address").not.toBeNull();
+
+      // A raw compatibility hint/speculative next battle may update this mutable context first.
+      current.wave = 191;
+      current.turn = 1;
+      await hostStream.broadcastAuthorityFailure({
+        epoch: 7,
+        wave: 190,
+        turn: 3,
+        boundary: "turnResolution",
+        reason: "late final-turn settlement failure",
+      });
+      await flushWire();
+
+      expect(routed, "exact retained evidence outranks the speculative ambient successor").toBe(1);
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
+    it("rejects a cross-wave fatal when no exact authority evidence binds that old address", async () => {
+      const pair = createLoopbackPair();
+      const current = { epoch: 7, wave: 191, turn: 1 };
+      const guestStream = new CoopBattleStreamer(pair.guest, { authorityContext: () => current });
+      let routed = 0;
+      guestStream.onAuthorityFailure(() => routed++);
+
+      pair.host.send({
+        t: "authorityFailure",
+        failureId: "unbound-old-wave",
+        epoch: 7,
+        wave: 190,
+        turn: 3,
+        revision: 1,
+        boundary: "turnResolution",
+        reason: "unbound old failure",
+      });
+      await flushWire();
+
+      expect(routed, "an address jump without immutable evidence remains fail-closed").toBe(0);
+      guestStream.dispose();
+    });
   });
 
   it("dispose fails an in-flight await and stops listening", async () => {
@@ -2265,58 +2455,81 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
 
     it("a guest requestStateSync round-trips to the host and back as a stateSync blob", async () => {
       const { host, guest } = createLoopbackPair();
-      const hostStream = new CoopBattleStreamer(host);
-      const guestStream = new CoopBattleStreamer(guest);
+      const current = { epoch: 1, wave: 1, turn: 7 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
 
-      // Host answers the guest's resync request with a blob (echoing the seq).
+      // Host answers the guest's exact immutable recovery ticket.
       let sawTurn = -1;
-      hostStream.onStateSyncRequest((turn, seq) => {
-        sawTurn = turn;
-        hostStream.sendStateSync(`blob-for-turn-${turn}`, seq);
+      hostStream.onStateSyncRequest(ticket => {
+        sawTurn = ticket.frontier.turn;
+        hostStream.sendStateSync(`blob-for-turn-${sawTurn}`, ticket, {
+          wave: current.wave,
+          turn: current.turn,
+          stateTick: 1,
+          controlDigest: "digest",
+        });
       });
 
-      const blob = await guestStream.requestStateSync(7);
+      const result = await guestStream.requestStateSync("turn-checksum");
       expect(sawTurn).toBe(7);
-      expect(blob).toBe("blob-for-turn-7");
+      expect(result).toMatchObject({ kind: "snapshot", blob: "blob-for-turn-7" });
     });
 
-    it("a stale stateSync (older seq) never satisfies the newest resync request", async () => {
+    it("a stale addressed stateSync never satisfies the newest resync request", async () => {
       const { host, guest } = createLoopbackPair();
-      const hostStream = new CoopBattleStreamer(host);
-      const guestStream = new CoopBattleStreamer(guest);
+      const current = { epoch: 1, wave: 1, turn: 2 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
 
       // The host answers the FIRST request late + the SECOND promptly. The first request
       // is superseded by the second (one in flight at a time), so the late seq-1 reply is
       // dropped and only the seq-2 reply satisfies the live await.
       const seqs: number[] = [];
-      hostStream.onStateSyncRequest((_turn, seq) => {
-        seqs.push(seq);
-        if (seq === 2) {
-          hostStream.sendStateSync("fresh", seq);
+      let staleTicket: Parameters<typeof hostStream.sendStateSync>[1] | undefined;
+      hostStream.onStateSyncRequest(ticket => {
+        seqs.push(ticket.seq);
+        if (ticket.seq === 1) {
+          staleTicket = ticket;
+        } else {
+          hostStream.sendStateSync("fresh", ticket, {
+            wave: current.wave,
+            turn: current.turn,
+            stateTick: 2,
+            controlDigest: "digest-2",
+          });
         }
       });
 
-      const first = guestStream.requestStateSync(1); // seq 1 - superseded
-      const second = guestStream.requestStateSync(2); // seq 2 - the live one
+      const first = guestStream.requestStateSync("turn-checksum"); // seq 1 - superseded
+      await new Promise<void>(resolve => queueMicrotask(resolve));
+      const second = guestStream.requestStateSync("stall"); // seq 2 - the live one
       // The stale seq-1 reply, were it to arrive, must not satisfy `second`.
-      hostStream.sendStateSync("stale", 1);
+      hostStream.sendStateSync("stale", staleTicket!, {
+        wave: current.wave,
+        turn: current.turn,
+        stateTick: 1,
+        controlDigest: "digest-1",
+      });
 
-      expect(await first).toBeNull();
-      expect(await second).toBe("fresh");
+      expect(await first).toEqual({ kind: "superseded" });
+      expect(await second).toMatchObject({ kind: "snapshot", blob: "fresh" });
       expect(seqs).toEqual([1, 2]);
     });
 
-    it("a resync that never gets answered times out to null (degraded, never hung)", async () => {
-      const { host, guest } = createLoopbackPair();
-      new CoopBattleStreamer(host); // host installs no responder
+    it("a resync that never gets answered resolves with an explicit timeout", async () => {
+      const { guest } = createLoopbackPair();
+      const current = { epoch: 1, wave: 1, turn: 3 };
+      // Deliberately install no host streamer/listener, so no explicit unavailable can return.
       const guestStream = new CoopBattleStreamer(guest, {
-        timeoutMs: 1,
+        authorityContext: () => current,
+        recoveryTimeoutMs: 1,
         schedule: cb => {
           cb();
           return () => {};
         },
       });
-      expect(await guestStream.requestStateSync(3)).toBeNull();
+      expect(await guestStream.requestStateSync("turn-checksum")).toEqual({ kind: "timeout" });
     });
 
     it("the owner's ME-boundary checksum reaches the watcher's handler (#633 Phase C)", async () => {

@@ -76,6 +76,8 @@ const allowedJourneys = new Set([
   "reverse-resume",
   "faint-replacement",
   "commander-skip",
+  "game-over",
+  "resume-scan-isolation",
   "save-mutations",
 ]);
 const allowedSeats = new Set(["host-seat", "guest-seat"]);

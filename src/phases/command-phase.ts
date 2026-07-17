@@ -7,6 +7,7 @@ import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import {
   applyCoopAuthoritativeBattleState,
+  coopAppliedStateTick,
   reapplyAcceptedCoopAuthoritativeBattleState,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -580,13 +581,21 @@ export class CommandPhase extends FieldPhase {
    * wrapped so a sync hiccup can never break the turn.
    */
   private tryCoopCheckpointSync(): boolean {
-    if (!globalScene.gameMode.isCoop) {
+    // Read the scene mode directly: isVersusSession() is runtime-backed and therefore becomes false
+    // in the exact orphaned-runtime condition this boundary must catch.
+    if (!globalScene.gameMode.isCoop && !globalScene.gameMode.isShowdown) {
       return true;
     }
     const controller = getCoopController();
     const streamer = getCoopBattleStreamer();
     if (controller == null || streamer == null) {
-      return true;
+      failCoopSharedSession("A shared battle reached command input without its authoritative runtime.", {
+        boundary: "recovery",
+        reasonCode: "recovery-exhausted",
+        wave: globalScene.currentBattle?.waveIndex,
+        turn: globalScene.currentBattle?.turn,
+      });
+      return false;
     }
     const { turn, waveIndex } = globalScene.currentBattle;
     // M6c (#633): the LOCKSTEP per-turn checkpoint broadcast/adopt that used to live here was
@@ -594,15 +603,28 @@ export class CommandPhase extends FieldPhase {
     // authoritative state (checkpoint + checksum) streams via emitTurn at TurnEnd (TRACK-2
     // Phase B) / CoopReplayTurnPhase; only the wave-start enemy-party belt-and-suspenders stays.
     if (controller.role !== "host" && turn === 1) {
+      const carrier = streamer.consumeEnemyPartyAuthority(waveIndex);
+      if (carrier.state !== undefined && carrier.state.tick < coopAppliedStateTick()) {
+        // Selector MEs and their spawned battle share a wave. A replayed pre-terminal selector carrier is
+        // obsolete as one atomic unit: never clear the live enemies/descriptor and only then discover its
+        // state twin is stale.
+        coopLog(
+          "stream",
+          `guest discarded stale enemyParty carrier before command wave=${waveIndex} `
+            + `tick=${carrier.state.tick} applied=${coopAppliedStateTick()}`,
+        );
+        ensureCoopAuthoritativeCommandPresentation();
+        return true;
+      }
       // Guest: at the wave's first turn, adopt the host's exact enemy party (a belt-and-
       // suspenders for the encounter-phase adopt; one-shot). The per-turn checkpoint +
       // checksum verification is owned by CoopReplayTurnPhase now (Phase B), not here.
-      const enemies = streamer.consumeEnemyParty(waveIndex);
+      const { enemies } = carrier;
       if (enemies != null) {
         // enemyPartySync is one authoritative carrier split across party, encounter identity, and state
         // inboxes. A blocked NextEncounterPhase can leave all three for this final pre-input fallback.
         // Never adopt only the party: trainer victory/reward routing depends on the exact descriptor.
-        const encounter = streamer.consumeEnemyPartyEncounter(waveIndex);
+        const { encounter } = carrier;
         if (encounter == null) {
           failCoopSharedSession(
             `Wave ${waveIndex} authoritative encounter descriptor was unavailable at command input`,
@@ -618,7 +640,7 @@ export class CommandPhase extends FieldPhase {
       // can consume the repeated party first while a newer post-PostSummon carrier is delivered afterward;
       // gating the state read on `enemies != null` then strands that newer state until checksum repair. Always
       // consume/apply the latest state at this final pre-input funnel. `undefined` remains a guarded no-op.
-      const waveStartState = streamer.consumeEnemyPartyState(waveIndex);
+      const waveStartState = carrier.state;
       if (
         waveStartState !== undefined
         && !applyCoopAuthoritativeBattleState(waveStartState, true)
@@ -887,6 +909,20 @@ export class CommandPhase extends FieldPhase {
         return null;
       }
       const point = `cmd:${globalScene.currentBattle.waveIndex}:${globalScene.currentBattle.turn}`;
+      // Classic's final boss deliberately starts as a single battle and promotes to double only
+      // when phase two materializes. The guest owns no field slot during stage one, so no guest
+      // CommandPhase can ever announce this point even when guest-owned bench mons are healthy.
+      // Treat only this exact product geometry as a one-owner boundary; a generic capacity-one
+      // exemption would incorrectly bypass real faint-replacement waits in ordinary co-op battles.
+      const singleOwnerFinalBossStage =
+        globalScene.currentBattle.isClassicFinalBoss
+        && globalScene.currentBattle.arrangement.playerCapacity === 1
+        && globalScene.currentBattle.arrangement.enemyCapacity === 1;
+      if (singleOwnerFinalBossStage) {
+        coopLog("rendezvous", `next-command barrier ${point} ARRIVE-ONLY (final-boss stage-one spectator)`);
+        rendezvous.arrive(point);
+        return null;
+      }
       // Asymmetric-field guard (#828 class): a partner whose HALF IS WIPED never reaches an own-slot
       // command point, so awaiting them would eat the full timeout EVERY TURN for the rest of the run.
       // If the partner owns no battle-legal mon, arrive (so any pending partner-side wait resolves) but

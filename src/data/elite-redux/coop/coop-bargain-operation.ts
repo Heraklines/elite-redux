@@ -266,7 +266,7 @@ function applyJournaledBargainEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
   }
   const result = applyCoopOperationEnvelope(g, "op:bargain", envelope);
   if (result !== "applied") {
-    return "rejected";
+    return result;
   }
   return "applied";
 }

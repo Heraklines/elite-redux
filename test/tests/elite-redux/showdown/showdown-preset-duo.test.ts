@@ -116,7 +116,7 @@ describe.skipIf(!RUN)("Showdown Team Menu - pre-built preset -> two-engine battl
       game.scene.phaseManager.pushNew("EncounterPhase", false);
       new SelectStarterPhase().initBattle(hostStarters, true, undefined, hostManifests);
     });
-    await game.phaseInterceptor.to("CommandPhase");
+    await game.phaseInterceptor.to("CommandPhase", false);
 
     // Stand up the GUEST engine over one loopback pair and reach its battle.
     const pair = createLoopbackPair();

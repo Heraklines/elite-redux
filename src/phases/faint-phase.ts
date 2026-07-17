@@ -4,8 +4,13 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { allMoves } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erHeartbreakOnAllyFaint } from "#data/elite-redux/abilities/heartbreak";
+import type { CoopFaintSourceAddress } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import { getCoopController, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
-import { isCoopRecording, withCoopMessageRecordingSuppressed } from "#data/elite-redux/coop/coop-turn-recorder";
+import {
+  consumeCoopRecordedFaintOccurrence,
+  isCoopRecording,
+  withCoopMessageRecordingSuppressed,
+} from "#data/elite-redux/coop/coop-turn-recorder";
 import {
   erRecordAchievementEnemyFaint,
   erRecordAchievementPlayerFaint,
@@ -45,6 +50,8 @@ export class FaintPhase extends PokemonPhase {
    */
   // TODO: This should be handled by a move in flight object/similar
   private readonly source?: Pokemon | undefined;
+  /** Immutable authoritative event identity captured before any delayed/re-entrant faint work. */
+  private faintSourceAddress: CoopFaintSourceAddress | undefined;
 
   constructor(battlerIndex: BattlerIndex, preventInstantRevive = false, source?: Pokemon) {
     super(battlerIndex);
@@ -57,6 +64,11 @@ export class FaintPhase extends PokemonPhase {
     super.start();
 
     const faintPokemon = this.getPokemon();
+    this.faintSourceAddress = {
+      wave: globalScene.currentBattle.waveIndex,
+      turn: globalScene.currentBattle.turn,
+      occurrence: consumeCoopRecordedFaintOccurrence(this.battlerIndex) ?? 0,
+    };
 
     if (this.source) {
       faintPokemon.getTag(BattlerTagType.DESTINY_BOND)?.lapse(this.source, BattlerTagLapseType.CUSTOM);
@@ -101,6 +113,14 @@ export class FaintPhase extends PokemonPhase {
 
   private doFaint(): void {
     const pokemon = this.getPokemon();
+    // A replacement phase may not run until TurnInit has already advanced the mutable battle turn.
+    // Capture the faint's immutable protocol address here, at the event source, and carry it through
+    // every later host/renderer phase instead of reconstructing it from ambient scene state.
+    const faintSourceAddress = this.faintSourceAddress ?? {
+      wave: globalScene.currentBattle.waveIndex,
+      turn: globalScene.currentBattle.turn,
+      occurrence: 0,
+    };
 
     // ER Heartbreak (ability 5920): if this fainting Pokemon was linked to a
     // living Heartbreak holder, that holder gains +1 Speed / +1 higher attacking
@@ -164,12 +184,20 @@ export class FaintPhase extends PokemonPhase {
         null,
         true,
       );
-    if (isCoopRecording()) {
+    const coopRecording = isCoopRecording();
+    if (coopRecording) {
       withCoopMessageRecordingSuppressed(narrate);
     } else {
       narrate();
     }
-    globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeActiveTrigger, true);
+    // An off-field enemy's delayed active-form revert is a proven no-op in QuietFormChangePhase. During
+    // authoritative recording, queuing it after TurnEnd only trips the unresolved-mutation sentinel and
+    // terminates an otherwise valid turn (Xerneas wave-190 soak). Omit that inert enemy phase. A player
+    // revert is material, so run it in this faint subtree before CoopTurnCommit captures the checkpoint.
+    // Solo and lockstep preserve the original delayed ordering byte-for-byte.
+    if (!coopRecording || pokemon.isPlayer()) {
+      globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeActiveTrigger, !coopRecording);
+    }
 
     pokemon.resetTera();
 
@@ -233,7 +261,14 @@ export class FaintPhase extends PokemonPhase {
          * If previous conditions weren't met, and the player has at least 1 legal Pokemon off the field,
          * push a phase that prompts the player to summon a Pokemon from their party.
          */
-        globalScene.phaseManager.pushNew("SwitchPhase", SwitchType.SWITCH, this.fieldIndex, true, false);
+        globalScene.phaseManager.pushNew(
+          "SwitchPhase",
+          SwitchType.SWITCH,
+          this.fieldIndex,
+          true,
+          false,
+          faintSourceAddress,
+        );
       }
     } else {
       globalScene.phaseManager.unshiftNew("VictoryPhase", this.battlerIndex);
@@ -261,7 +296,7 @@ export class FaintPhase extends PokemonPhase {
           // a timeout/illegal pick so the duel never stalls. A co-op host (its enemy is AI) or any
           // non-versus trainer keeps the vanilla inline auto-pick below.
           if (isVersusSession() && getCoopController()?.role === "host") {
-            globalScene.phaseManager.pushNew("ShowdownEnemyFaintSwitchPhase", this.fieldIndex);
+            globalScene.phaseManager.pushNew("ShowdownEnemyFaintSwitchPhase", this.fieldIndex, faintSourceAddress);
           } else {
             globalScene.phaseManager.pushNew("SwitchSummonPhase", SwitchType.SWITCH, this.fieldIndex, -1, false, false);
           }

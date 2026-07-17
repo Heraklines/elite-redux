@@ -360,6 +360,62 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     );
   });
 
+  it("forbids orphaned shared input surfaces from falling through to local mechanics", () => {
+    const root = join(__dirname, "..", "..", "..", "..", "src");
+    const runtime = readFileSync(join(root, "data", "elite-redux", "coop", "coop-runtime.ts"), "utf8");
+    const command = readFileSync(join(root, "phases", "command-phase.ts"), "utf8");
+    const reward = readFileSync(join(root, "phases", "select-modifier-phase.ts"), "utf8");
+    const biome = readFileSync(join(root, "phases", "select-biome-phase.ts"), "utf8");
+
+    const sharedFailureStart = runtime.indexOf("export function failCoopSharedSession(");
+    const sharedFailureEnd = runtime.indexOf("export interface CoopStateRecoveryRequest", sharedFailureStart);
+    const sharedFailure = runtime.slice(sharedFailureStart, sharedFailureEnd);
+    expect(sharedFailureStart, "the shared terminal helper exists").toBeGreaterThanOrEqual(0);
+    expect(sharedFailure, "runtime loss has an immediate local terminal fallback").toContain(
+      "orphaned shared session terminal requested",
+    );
+    expect(sharedFailure, "the orphan fallback installs a title continuation").toContain(
+      'globalScene.phaseManager.unshiftNew("TitlePhase")',
+    );
+
+    const commandStart = command.indexOf("private tryCoopCheckpointSync(): boolean");
+    const commandEnd = command.indexOf("public override start(): void", commandStart);
+    const commandBoundary = command.slice(commandStart, commandEnd);
+    expect(commandBoundary, "the orphan guard uses scene mode rather than a runtime-backed predicate").toContain(
+      "!globalScene.gameMode.isCoop && !globalScene.gameMode.isShowdown",
+    );
+    expect(commandBoundary, "command input requires both controller and authoritative streamer").toContain(
+      "if (controller == null || streamer == null)",
+    );
+    expect(commandBoundary, "missing command authority terminates the session").toContain(
+      'failCoopSharedSession("A shared battle reached command input without its authoritative runtime."',
+    );
+    expect(commandBoundary, "missing command authority cannot report a successful checkpoint").not.toContain(
+      "if (controller == null || streamer == null) {\n      return true;",
+    );
+
+    const rewardStart = reward.indexOf("start() {");
+    const rewardEnd = reward.indexOf("// Co-op (#633): the reward screen", rewardStart);
+    const rewardBoundary = reward.slice(rewardStart, rewardEnd);
+    expect(rewardBoundary, "a co-op reward cannot enter the solo roll/apply path without a runtime").toContain(
+      "if (globalScene.gameMode.isCoop && getCoopController() == null)",
+    );
+    expect(rewardBoundary).toContain(
+      'failCoopSharedSession("A shared reward surface opened without its authoritative runtime."',
+    );
+
+    const biomeStart = biome.indexOf("private setNextBiomeAndEnd(nextBiome: BiomeId): boolean");
+    const biomeEnd = biome.indexOf("private async finishGuestOwnedBiomeAfterCommit", biomeStart);
+    const biomeBoundary = biome.slice(biomeStart, biomeEnd);
+    expect(biomeBoundary, "only actual solo play may use the direct World Map path").toContain(
+      "if (!globalScene.gameMode.isCoop)",
+    );
+    expect(biomeBoundary, "a co-op World Map cannot apply locally after runtime loss").toContain(
+      'failCoopSharedSession("A shared World Map choice lost its authoritative runtime."',
+    );
+    expect(biomeBoundary).not.toContain("!globalScene.gameMode.isCoop || getCoopController() == null");
+  });
+
   it("publishes retained SelectBiome readiness only after each real ER_MAP surface opens", () => {
     const source = readFileSync(
       join(__dirname, "..", "..", "..", "..", "src", "phases", "select-biome-phase.ts"),
@@ -391,5 +447,32 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
         mirrorOpen,
       );
     }
+  });
+
+  it("retires late replacement authority only after the retained wave continuation is durably released", () => {
+    const source = readFileSync(
+      join(__dirname, "..", "..", "..", "..", "src", "data", "elite-redux", "coop", "coop-runtime.ts"),
+      "utf8",
+    );
+    const start = source.indexOf("function maybeMarkCoopWaveContinuationReady(");
+    const end = source.indexOf("export function notifyCoopWaveContinuationSurfaceReady(", start);
+    expect(start, "the retained wave readiness seam exists").toBeGreaterThanOrEqual(0);
+    expect(end, "the retained wave readiness seam has a bounded source section").toBeGreaterThan(start);
+
+    const body = source.slice(start, end);
+    const durableRelease = body.indexOf("completeRetainedWaveAdvance(");
+    const releaseGuard = body.indexOf("if (released)", durableRelease);
+    const replacementRetirement = body.indexOf(
+      "runtime.battleStream.acknowledgeReplacementsSubsumedByOperation(staged.envelope)",
+      releaseGuard,
+    );
+    expect(durableRelease, "the exact WAVE_ADVANCE transaction must release first").toBeGreaterThanOrEqual(0);
+    expect(releaseGuard, "a rejected/duplicate durability proof cannot retire replacement authority").toBeGreaterThan(
+      durableRelease,
+    );
+    expect(
+      replacementRetirement,
+      "the applied WAVE_ADVANCE DATA image retires an older late replacement only after release",
+    ).toBeGreaterThan(releaseGuard);
   });
 });
