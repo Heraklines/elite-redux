@@ -435,6 +435,30 @@ function setPerSeatInputIsolation(enabled) {
   perSeatInputIsolation = enabled;
 }
 
+/**
+ * Optimization brief R5: sanitize a persistent seat profile's ACCOUNT/SITE storage
+ * (cookies, local/session storage, IndexedDB, service workers) for the app origin while
+ * KEEPING the HTTP disk cache, then hand back the default context that owns that cache.
+ * Sanitation runs via a throwaway page's CDP session (read-only observation boundary is
+ * untouched - this is rig SETUP, before any journey drives input).
+ */
+async function sanitizeSeatProfileStorage(browser, config) {
+  const context = browser.defaultBrowserContext();
+  const page = await browser.newPage();
+  try {
+    const origin = new URL(config.baseUrl).origin;
+    const session = await page.createCDPSession();
+    await session.send("Storage.clearDataForOrigin", {
+      origin,
+      storageTypes: "cookies,local_storage,session_storage,indexeddb,websql,service_workers",
+    });
+    await session.detach().catch(() => {});
+  } finally {
+    await page.close().catch(() => {});
+  }
+  return context;
+}
+
 function withFocusedPublicKeyInput(page, action) {
   const enqueuedAt = Date.now();
   if (perSeatInputIsolation) {
@@ -1089,7 +1113,9 @@ export class PublicUiClient {
   async insertCredential(inputHandle, text, field) {
     await inputHandle.click({ clickCount: 3 });
     await this.selectAllFocusedText();
-    await this.page.keyboard.insertText(text);
+    // Puppeteer's whole-string bulk insertion (one CDP Input.insertText - the IME/paste
+    // shape). NOT Playwright's keyboard.insertText, which does not exist here.
+    await this.page.keyboard.sendCharacter(text);
     const length = await inputHandle.evaluate(element => element.value.length);
     if (length !== text.length) {
       throw new Error(`${this.label}: ${field} field length ${length} != expected ${text.length} after insertion`);
@@ -1216,8 +1242,34 @@ export class PublicUiClient {
         throw new Error(`${this.label}: public key target did not acquire browser focus for ${purpose}`);
       }
       this.evidence.record("key", { key, purpose });
+      const echoCursor = this.evidence.cursor();
       await this.page.keyboard.press(key, { delay: Math.min(this.config.actionDelayMs, 100) });
-      await delay(this.config.actionDelayMs);
+      // Optimization brief R1c: per-input acknowledgment. Wait for the game's OWN
+      // input-echo (uiMode/cursor/phase change observed AFTER this press) instead of a
+      // fixed sleep. A press that legitimately changes nothing (menu-edge arrow) falls
+      // back to the legacy fixed delay - robustness floor, not speed ceiling.
+      if (this.config.inputAcks) {
+        const ackStartedMs = Date.now();
+        try {
+          await this.evidence.waitForCondition(
+            sink => {
+              for (let i = echoCursor; i < sink.events.length; i++) {
+                if (sink.events[i].kind === "browser-input-echo") {
+                  return sink.events[i];
+                }
+              }
+              return;
+            },
+            { timeoutMs: Math.max(150, this.config.actionDelayMs * 2), description: `input echo for ${purpose}` },
+          );
+          this.evidence.recordInputAck(Date.now() - ackStartedMs, false);
+        } catch {
+          // No visible change within the window: legacy-pace this press and move on.
+          this.evidence.recordInputAck(Date.now() - ackStartedMs, true);
+        }
+      } else {
+        await delay(this.config.actionDelayMs);
+      }
     });
   }
 
@@ -1688,6 +1740,12 @@ export class DuoPublicUiRig {
         headless: config.headless,
         defaultViewport: config.viewport,
         ...(perSeatDisplays ? { env: { ...process.env, DISPLAY: seatDisplays[seat] } } : {}),
+        // Optimization brief R5: a persistent per-seat profile gives a DISK-backed HTTP
+        // cache that survives page replacement within the job (immutable hashed chunks +
+        // exact-SHA CDN redirects then stay warm). Account/site storage is sanitized at
+        // rig start below WITHOUT touching that cache. Seat isolation is provided by the
+        // separate browser PROCESSES, never by sharing a profile.
+        ...(config.seatProfileBaseDir ? { userDataDir: `${config.seatProfileBaseDir}/${seat}` } : {}),
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
@@ -1730,10 +1788,18 @@ export class DuoPublicUiRig {
     const [hostBrowser, guestBrowser] = browsers;
     const rig = new DuoPublicUiRig(browsers, config);
     try {
-      const [hostContext, guestContext] = await Promise.all([
-        hostBrowser.createBrowserContext(),
-        guestBrowser.createBrowserContext(),
-      ]);
+      // R5: with persistent seat profiles the DEFAULT context is used (it owns the
+      // disk-backed cache; each seat is a separate browser process, so isolation holds)
+      // after sanitizing account/site storage WITHOUT clearing the HTTP cache. Journeys
+      // that PROVE context replacement (save-mutations) still call
+      // replaceWithEmptyContext(), which keeps its brand-new incognito context + visible
+      // re-login semantics untouched.
+      const [hostContext, guestContext] = config.seatProfileBaseDir
+        ? await Promise.all([
+            sanitizeSeatProfileStorage(hostBrowser, config),
+            sanitizeSeatProfileStorage(guestBrowser, config),
+          ])
+        : await Promise.all([hostBrowser.createBrowserContext(), guestBrowser.createBrowserContext()]);
       if (hostBrowser === guestBrowser || hostContext === guestContext) {
         throw new Error("Puppeteer did not isolate both players into distinct browser processes and contexts");
       }

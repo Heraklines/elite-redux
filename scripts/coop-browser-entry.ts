@@ -1108,6 +1108,39 @@ setInterval(() => {
   observeCommanderBoundary();
 }, 100);
 
+// =============================================================================
+// Optimization brief R1c: INPUT ECHO. A tiny read-only high-frequency probe of
+// (uiMode, handler cursor, phase) so the harness can pace public key input on
+// the game's OWN acknowledgment - "selected option changed / surface changed /
+// phase opened" - instead of fixed per-key sleeps. Two field reads per tick;
+// emits ONLY on change, so an idle screen logs nothing.
+// =============================================================================
+let lastInputEchoKey = "";
+let inputEchoSeq = 0;
+setInterval(() => {
+  try {
+    const ui = globalScene?.ui;
+    if (ui == null) {
+      return;
+    }
+    const handler = ui.getHandler() as unknown as { cursor?: number; getCursor?: () => number; active?: boolean };
+    const cursor = handler?.getCursor?.() ?? handler?.cursor ?? -1;
+    const uiMode = UiMode[ui.getMode()];
+    const phase = globalScene?.phaseManager?.getCurrentPhase()?.phaseName ?? "";
+    const echoKey = `${uiMode}:${cursor}:${phase}:${handler?.active === true}`;
+    if (echoKey === lastInputEchoKey) {
+      return;
+    }
+    lastInputEchoKey = echoKey;
+    inputEchoSeq += 1;
+    console.info(
+      `[coop-browser:input-echo] ${JSON.stringify({ seq: inputEchoSeq, uiMode, cursor, phase, active: handler?.active === true })}`,
+    );
+  } catch {
+    /* the echo is best-effort pacing telemetry; never fail the observer */
+  }
+}, 25);
+
 // Strictly read-only observer bridge. `ready` is a non-mutating probe; the former
 // `connect: connectCoopWithCode` seam was removed so no code path can drive pairing from
 // the page - the gameplay journeys pair exclusively through visible lobby keyboard input.

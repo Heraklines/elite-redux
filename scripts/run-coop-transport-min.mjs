@@ -123,8 +123,11 @@ async function main() {
 
   const establish = (page, role) =>
     page.evaluate(async localRole => {
+      // The single Cloudflare STUN mirror of tier-2: an empty list falls back to the
+      // TWO-server default and non-trickle ICE then waits out the slower server's
+      // gathering (measured 43s/side on a GH runner - the budget breach).
       const { transport, rejoin } = await globalThis.__coopTransportMinBridge.establish("BROWSER", localRole, {
-        ice: { stunUrls: [] },
+        ice: { stunUrls: ["stun:stun.cloudflare.com:3478"] },
       });
       globalThis.__minTransport = transport;
       globalThis.__minRejoin = rejoin;

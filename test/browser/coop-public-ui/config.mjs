@@ -171,6 +171,17 @@ export function loadConfig() {
     timeoutMs: integer("COOP_UI_TIMEOUT_MS", 120_000),
     actionDelayMs: integer("COOP_UI_ACTION_DELAY_MS", 180),
     settleDelayMs: integer("COOP_UI_SETTLE_DELAY_MS", 750),
+    // Optimization brief R1c: pace key input on the game's own input-echo acknowledgment
+    // (uiMode/cursor/phase change) instead of the fixed actionDelayMs sleep. When no echo
+    // arrives the press falls back to the fixed delay, so the legacy cadence is the floor
+    // of robustness, not the ceiling of speed. COOP_UI_INPUT_ACKS=0 restores pure fixed
+    // cadence for triage.
+    inputAcks: boolean("COOP_UI_INPUT_ACKS", true),
+    // Optimization brief R5: per-seat persistent Chromium profile base dir. When set, each
+    // seat launches with its own userDataDir under this base (disk-backed HTTP cache that
+    // survives page replacement within a job) and account/site storage is sanitized at
+    // rig start WITHOUT clearing the HTTP cache. Empty = legacy per-launch temp profile.
+    seatProfileBaseDir: process.env.COOP_UI_SEAT_PROFILE_DIR?.trim() || null,
     maxTurns: integer("COOP_UI_MAX_TURNS", 12),
     viewport: {
       width: integer("COOP_UI_VIEWPORT_WIDTH", 1440),

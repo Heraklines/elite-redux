@@ -398,6 +398,9 @@ jobs:
           COOP_UI_HEADLESS: "0"
           COOP_UI_VIEWPORT_WIDTH: "1440"
           COOP_UI_VIEWPORT_HEIGHT: "900"
+          # Optimization brief R5: persistent per-seat Chromium profiles (disk-backed HTTP
+          # cache survives page replacement; storage sanitized at rig start, cache kept).
+          COOP_UI_SEAT_PROFILE_DIR: ${{ runner.temp }}/coop-seat-profiles
           NODE_OPTIONS: --max-old-space-size=4096
         # GNU timeout is the non-cooperative process-group backstop. The Node deadline above
         # normally fails first and writes summary.json; SIGINT leaves two minutes for bounded

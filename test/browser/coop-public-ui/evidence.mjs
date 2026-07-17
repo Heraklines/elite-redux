@@ -732,7 +732,19 @@ export function commanderObservationView(text) {
   return Object.freeze({ ...value });
 }
 
+const INPUT_ECHO_PREFIX = "[coop-browser:input-echo] ";
+
 function recordBrowserObservations(sink, text) {
+  // Optimization brief R1c: the game's own input acknowledgment (uiMode/cursor/phase
+  // change). Pacing signal only - never a proof surface.
+  if (text.startsWith(INPUT_ECHO_PREFIX)) {
+    try {
+      sink.record("browser-input-echo", { observation: JSON.parse(text.slice(INPUT_ECHO_PREFIX.length)) });
+    } catch {
+      /* malformed echo lines are ignored; pacing falls back to the fixed delay */
+    }
+    return;
+  }
   const commander = commanderObservationView(text);
   if (commander != null) {
     sink.record("browser-commander", { observation: commander });
@@ -893,6 +905,16 @@ export class EvidenceSink {
     stats.bringToFrontMs += Math.max(0, Math.round(bringToFrontMs));
     if (didFront) {
       stats.fronts += 1;
+    }
+  }
+
+  /** R1c pacing counters: echo-acked presses vs fixed-delay fallbacks (+ total wait). */
+  recordInputAck(waitMs, fellBack) {
+    const stats = (this.inputStats ??= { presses: 0, queueWaitMs: 0, bringToFrontMs: 0, fronts: 0 });
+    stats.ackWaits = (stats.ackWaits ?? 0) + 1;
+    stats.ackWaitMs = (stats.ackWaitMs ?? 0) + Math.max(0, Math.round(waitMs));
+    if (fellBack) {
+      stats.ackFallbacks = (stats.ackFallbacks ?? 0) + 1;
     }
   }
 
