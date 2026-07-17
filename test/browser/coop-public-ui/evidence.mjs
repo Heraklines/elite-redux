@@ -733,6 +733,7 @@ export function commanderObservationView(text) {
 }
 
 const INPUT_ECHO_PREFIX = "[coop-browser:input-echo] ";
+const INPUT_HEALTH_PREFIX = "[coop-browser:input-health] ";
 
 function recordBrowserObservations(sink, text) {
   // Optimization brief R1c: the game's own input acknowledgment (uiMode/cursor/phase
@@ -742,6 +743,16 @@ function recordBrowserObservations(sink, text) {
       sink.record("browser-input-echo", { observation: JSON.parse(text.slice(INPUT_ECHO_PREFIX.length)) });
     } catch {
       /* malformed echo lines are ignored; pacing falls back to the fixed delay */
+    }
+    return;
+  }
+  // Input-LAYER heartbeat (raw DOM keydown count + Phaser frame counter + visibility/focus).
+  // Diagnostics only - classifies WHICH layer dropped input when the game shows no reaction.
+  if (text.startsWith(INPUT_HEALTH_PREFIX)) {
+    try {
+      sink.record("browser-input-health", { observation: JSON.parse(text.slice(INPUT_HEALTH_PREFIX.length)) });
+    } catch {
+      /* malformed health lines are ignored - the classification just stays unavailable */
     }
     return;
   }
@@ -1084,6 +1095,30 @@ export class EvidenceSink {
     return this.events
       .slice(from)
       .find(event => event.kind === "browser-render-profile" && event.observation.gameSpeed === gameSpeed);
+  }
+
+  /** Latest render-profile observation regardless of value (proves the Settings menu is open). */
+  findLastRenderProfileObservation(from = 0) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(event => event.kind === "browser-render-profile");
+  }
+
+  /** Latest input-layer heartbeat (DOM keydown count / Phaser frame / visibility / focus). */
+  findLastInputHealth(from = 0) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(event => event.kind === "browser-input-health");
+  }
+
+  /** Latest input echo (any activity), used to quote the game-side view in failure diagnostics. */
+  findLastInputEcho(from = 0) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(event => event.kind === "browser-input-echo");
   }
 
   /** Latest strict market projection, optionally filtered by a predicate. */

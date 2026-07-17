@@ -179,6 +179,11 @@ export function loadCampaignPolicy() {
       //   ArrowDown x3 -> Settings ; Space -> open ; ArrowRight x4 -> 10x ; Backspace -> close
       //   ; ArrowUp x3 -> reset the Title cursor to New Game for pairing.
       // Override with COOP_UI_SPEED_KEYS (e.g. "[]" to keep the account's speed unchanged).
+      // NB: when the env is UNSET the campaign now navigates observation-gated (each press
+      // verified against the surface observer with bounded retries) and this default list
+      // is only the key VOCABULARY reference; a NON-EMPTY env override replays that exact
+      // sequence blind (maintainer escape hatch), "[]" still skips the speed raise.
+      speedKeysFromEnv: (process.env.COOP_UI_SPEED_KEYS ?? "").trim().length > 0,
       speed: envKeys("COOP_UI_SPEED_KEYS", [
         "ArrowDown",
         "ArrowDown",

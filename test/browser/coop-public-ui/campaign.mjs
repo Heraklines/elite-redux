@@ -180,13 +180,90 @@ class CampaignProgress {
   }
 }
 
+/** Bounded per-step observation window for the state-aware Settings walk. */
+const SPEED_STEP_OBSERVATION_TIMEOUT_MS = 1500;
+
 /**
- * Best-effort early speed raise through the visible Settings UI. The exact Title ->
- * Settings -> Game Speed navigation cannot be verified blind, so a run drives it only
- * when the maintainer supplies a verified `COOP_UI_SPEED_KEYS` sequence; otherwise it
- * records a skip and leans on the workflow's fast input cadence. Bounded and never
- * hangs: any residual submenu is closed with Cancel presses, and the subsequent lobby
- * pairing re-asserts Title, so a wrong sequence fails loudly at pairing rather than here.
+ * Classify WHICH input layer dropped a key using the entry probe's diagnostics
+ * (raw DOM keydown counter + Phaser frame counter + visibility/focus): run 29548390234
+ * proved the blind walk can dispatch 12 keys with zero game reaction and no way to name
+ * the broken layer. Diagnostics only - quoted in the step-exhaustion error.
+ */
+function inputLayerDiagnosis(client, from) {
+  const health = client.evidence.findLastInputHealth(from)?.observation ?? null;
+  const echo = client.evidence.findLastInputEcho(from)?.observation ?? null;
+  if (health == null) {
+    return "no input-health heartbeat since the step began: raw DOM keydowns never arrived - input was lost at the browser/CDP dispatch layer";
+  }
+  const layer =
+    health.frameAdvancing === false
+      ? "DOM keydowns arrived but the Phaser frame counter is FROZEN - the game loop is stalled (visibility/RAF)"
+      : "DOM keydowns arrived and the game loop is stepping - the key was dropped inside the game's input pipeline";
+  const echoSuffix = echo == null ? "" : ` lastEcho=${echo.uiMode}:${echo.cursor}:${echo.phase}`;
+  return `${layer} (domKeys=${health.domKeys} lastKey=${health.lastKey} frame=${health.frame} vis=${health.vis} foc=${health.foc}${echoSuffix})`;
+}
+
+/**
+ * Press `key` until `readObservation` reports `target`, one observed reaction per press.
+ * Every press waits for the game's OWN emitted observation (bounded), so a swallowed key
+ * is retried instead of silently desynchronizing the rest of a blind sequence. At the
+ * midpoint of a dead run, one `recoveryKey` nudge models a real player's reaction to an
+ * unresponsive menu. Exhaustion throws with the input-layer diagnosis.
+ */
+async function pressUntilObserved(
+  client,
+  key,
+  purpose,
+  readObservation,
+  target,
+  { attempts = 8, recoveryKey = null } = {},
+) {
+  const stepStart = client.evidence.cursor();
+  if (readObservation(client.evidence, 0) === target) {
+    return;
+  }
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const pressCursor = client.evidence.cursor();
+    await client.press(key, `${purpose}:attempt-${attempt}`);
+    try {
+      const observed = await client.evidence.waitForCondition(sink => readObservation(sink, pressCursor), {
+        timeoutMs: SPEED_STEP_OBSERVATION_TIMEOUT_MS,
+        description: `${purpose} observed reaction`,
+      });
+      if (observed === target) {
+        return;
+      }
+    } catch {
+      if (recoveryKey != null && attempt === Math.ceil(attempts / 2)) {
+        await client.press(recoveryKey, `${purpose}:recovery`);
+      }
+    }
+  }
+  throw new Error(
+    `${client.label}: ${purpose} - no expected reaction after ${attempts} attempts; ${inputLayerDiagnosis(client, stepStart)}`,
+  );
+}
+
+/** Latest observed Title-menu selection (semanticId) at/after `from`. */
+function titleSelection(sink, from) {
+  return sink.findLastSemanticSurface(from, "title-menu")?.observation.selectedOptionId;
+}
+
+/** Latest observed Settings Game Speed value at/after `from` (present only while Settings is open). */
+function observedGameSpeed(sink, from) {
+  return sink.findLastRenderProfileObservation(from)?.observation.gameSpeed;
+}
+
+/**
+ * Early Game Speed 10x raise through the visible Settings UI. Default path is
+ * OBSERVATION-GATED: each public key press is verified against the game's own surface
+ * observations (Title selection semanticIds / the Settings render-profile attestation)
+ * with bounded retries - the former blind 12-key replay dispatched keys with no
+ * verification and desynchronized wholesale when a single key was swallowed
+ * (run 29548390234: 12 keys, zero observed reactions, blind 120s timeout). A NON-EMPTY
+ * `COOP_UI_SPEED_KEYS` still replays that exact sequence blind (maintainer escape
+ * hatch), and `[]` still skips the raise entirely. Public keyboard input only - no
+ * game-state seams, no coop-runtime surface.
  */
 async function raiseGameSpeed(rig, policy, progress) {
   const clients = Object.values(rig.clients);
@@ -202,12 +279,37 @@ async function raiseGameSpeed(rig, policy, progress) {
   }
   for (const client of clients) {
     const speedCursor = client.evidence.cursor();
-    // Drive Title -> Settings -> Game Speed 10x -> back through the real menus. The sequence
-    // itself resets the Title cursor to New Game; Settings is an overlay so TitlePhase does
-    // not re-log, and a wrong sequence fails loudly at the subsequent pairing (which re-waits
-    // Title). A trailing settle lets the last menu transition land before pairing.
-    await client.sequence(keys, "raise-game-speed-to-10x");
-    await delay(client.config.settleDelayMs);
+    if (policy.keys.speedKeysFromEnv) {
+      // Maintainer-supplied sequence: replay verbatim (blind), as before.
+      await client.sequence(keys, "raise-game-speed-to-10x");
+      await delay(client.config.settleDelayMs);
+    } else {
+      // 1) Title menu -> the Settings row, selection-verified per press.
+      await pressUntilObserved(client, "ArrowDown", "speed-walk-title-to-settings", titleSelection, "settings");
+      // 2) Open Settings: ANY render-profile observation proves the General menu is open.
+      const openCursor = client.evidence.cursor();
+      await pressUntilObserved(
+        client,
+        "Space",
+        "speed-walk-open-settings",
+        (sink, from) =>
+          sink.findLastRenderProfileObservation(Math.max(from, openCursor)) == null ? undefined : "open",
+        "open",
+        { attempts: 3 },
+      );
+      // 3) Game Speed is the first row; step RIGHT until the observer attests 10x. The row
+      //    WRAPS ([2,3,4,5,7,10] -> 2), so allow a full second lap if a double-step overshoots.
+      await pressUntilObserved(client, "ArrowRight", "speed-walk-raise-to-10x", observedGameSpeed, 10, {
+        attempts: 12,
+      });
+      // 4) Close Settings and park the Title cursor back on New Game for pairing. If the
+      //    Backspace was swallowed the ArrowUps move the (still open) Settings cursor and
+      //    the Title selection never changes - the midpoint recovery Backspace re-closes.
+      await client.press("Backspace", "speed-walk-close-settings");
+      await pressUntilObserved(client, "ArrowUp", "speed-walk-title-to-new-game", titleSelection, "new-game", {
+        recoveryKey: "Backspace",
+      });
+    }
     const attestation = await client.evidence.waitForCondition(sink => sink.findGameSpeed(10, speedCursor), {
       timeoutMs: client.config.timeoutMs,
       description: "visible Settings Game Speed=10 attestation",
@@ -215,11 +317,11 @@ async function raiseGameSpeed(rig, policy, progress) {
     client.evidence.record("campaign-speed", {
       status: "attested",
       gameSpeed: attestation.observation.gameSpeed,
-      keys,
+      keys: policy.keys.speedKeysFromEnv ? keys : "observation-gated",
     });
     await client.checkpoint("speed-raised");
   }
-  await progress.note("speed-raise observer-attested (Game Speed -> 10x via Settings UI)", { keys });
+  await progress.note("speed-raise observer-attested (Game Speed -> 10x via Settings UI)");
 }
 
 /**

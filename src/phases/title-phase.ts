@@ -380,6 +380,10 @@ export class TitlePhase extends Phase {
       {
         // ER Profile hub: replaces the old top-level Run History entry. Run History now
         // lives as a tab INSIDE the Profile hub (alongside the Ghost Trainer Editor).
+        // semanticId is OBSERVER METADATA ONLY (read by the browser-harness surface
+        // observer so public-input navigation can be selection-verified instead of
+        // blind index math) - it has zero gameplay/coop effect.
+        semanticId: "profile",
         label: "Profile",
         handler: () => {
           this.openProfileHub();
@@ -387,6 +391,7 @@ export class TitlePhase extends Phase {
         },
       },
       {
+        semanticId: "settings",
         label: i18next.t("menu:settings"),
         handler: () => {
           globalScene.ui.setOverlayMode(UiMode.SETTINGS);

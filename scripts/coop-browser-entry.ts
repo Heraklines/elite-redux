@@ -1117,6 +1117,35 @@ setInterval(() => {
 // =============================================================================
 let lastInputEchoKey = "";
 let inputEchoSeq = 0;
+
+// Input-LAYER diagnostics (read-only). The Game Speed attestation failure (run 29548390234)
+// showed 12 dispatched keys with ZERO observed game reaction and could not tell WHICH layer
+// dropped them: CDP -> DOM, DOM -> Phaser (paused/stalled loop), or Phaser -> game handler.
+// A capture-phase window listener counts raw DOM keydowns (nothing can stop capture on
+// window), and the Phaser loop frame counter proves whether the game loop is stepping.
+let domKeydownCount = 0;
+let lastDomKey = "";
+if (typeof window !== "undefined") {
+  window.addEventListener(
+    "keydown",
+    event => {
+      domKeydownCount += 1;
+      lastDomKey = event.key;
+    },
+    { capture: true, passive: true },
+  );
+}
+
+function inputLayerSnapshot() {
+  return {
+    domKeys: domKeydownCount,
+    lastKey: lastDomKey,
+    frame: globalScene?.game?.loop?.frame ?? -1,
+    vis: typeof document === "undefined" ? "?" : document.visibilityState,
+    foc: typeof document !== "undefined" && document.hasFocus(),
+  } as const;
+}
+
 setInterval(() => {
   try {
     const ui = globalScene?.ui;
@@ -1134,12 +1163,43 @@ setInterval(() => {
     lastInputEchoKey = echoKey;
     inputEchoSeq += 1;
     console.info(
-      `[coop-browser:input-echo] ${JSON.stringify({ seq: inputEchoSeq, uiMode, cursor, phase, active: handler?.active === true })}`,
+      `[coop-browser:input-echo] ${JSON.stringify({
+        seq: inputEchoSeq,
+        uiMode,
+        cursor,
+        phase,
+        active: handler?.active === true,
+        ...inputLayerSnapshot(),
+      })}`,
     );
   } catch {
     /* the echo is best-effort pacing telemetry; never fail the observer */
   }
 }, 25);
+
+// Input-health heartbeat: at most one line per second, and ONLY while raw DOM keydowns are
+// arriving. During a healthy walk every key also produces an input-echo; during a dead-key
+// window this line alone classifies the failure: domKeys advancing + frame frozen = Phaser
+// loop stalled (RAF/visibility); domKeys advancing + frame advancing = game-side input drop;
+// domKeys NOT advancing while the harness logs key events = CDP/dispatch-layer loss.
+let lastHealthDomKeys = 0;
+let lastHealthFrame = -1;
+let inputHealthSeq = 0;
+setInterval(() => {
+  try {
+    const snapshot = inputLayerSnapshot();
+    const frameAdvancing = snapshot.frame !== lastHealthFrame;
+    lastHealthFrame = snapshot.frame;
+    if (snapshot.domKeys === lastHealthDomKeys) {
+      return;
+    }
+    lastHealthDomKeys = snapshot.domKeys;
+    inputHealthSeq += 1;
+    console.info(`[coop-browser:input-health] ${JSON.stringify({ seq: inputHealthSeq, ...snapshot, frameAdvancing })}`);
+  } catch {
+    /* diagnostics only - never fail the observer */
+  }
+}, 1000);
 
 // Strictly read-only observer bridge. `ready` is a non-mutating probe; the former
 // `connect: connectCoopWithCode` seam was removed so no code path can drive pairing from
