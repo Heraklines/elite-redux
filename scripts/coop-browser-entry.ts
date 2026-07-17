@@ -1239,8 +1239,7 @@ function observeSemanticSurface(): void {
       surfaceGeneration,
       mysteryEncounterType,
     ].join("|");
-    const stateDigest =
-      coop && battle != null ? semanticMechanicalDigest(semanticDigestKey).digest : null;
+    const stateDigest = coop && battle != null ? semanticMechanicalDigest(semanticDigestKey).digest : null;
 
     const probeKey = [
       semanticDigestKey,
