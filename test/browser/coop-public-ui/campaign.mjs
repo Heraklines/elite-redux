@@ -4,7 +4,7 @@
  */
 
 import { appendFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { loadCampaignLifecyclePolicy, withinDeadline } from "./campaign-lifecycle.mjs";
 import { isActionableSemanticObservation } from "./campaign-nav.mjs";
 import {
@@ -114,12 +114,53 @@ class CampaignProgress {
   constructor(artifactDir) {
     this.path = resolve(artifactDir, "campaign-progress.jsonl");
     this.tail = Promise.resolve();
+    // Stage-timing instrumentation (optimization brief step 1): every row carries its
+    // delta since the previous row and since run start, so each existing note/wave
+    // boundary doubles as a measured stage with NO new call sites. `rows` mirrors the
+    // file for the end-of-run rollup.
+    this.startedMs = performance.now();
+    this.lastRowMs = this.startedMs;
+    this.rows = [];
   }
 
   append(row) {
-    const line = `${JSON.stringify({ at: new Date().toISOString(), ...row })}\n`;
+    const nowMs = performance.now();
+    const timed = {
+      at: new Date().toISOString(),
+      sinceLastMs: Math.round(nowMs - this.lastRowMs),
+      sinceStartMs: Math.round(nowMs - this.startedMs),
+      ...row,
+    };
+    this.lastRowMs = nowMs;
+    this.rows.push(timed);
+    const line = `${JSON.stringify(timed)}\n`;
     this.tail = this.tail.then(() => appendFile(this.path, line));
     return this.tail;
+  }
+
+  /**
+   * Ordered stage rollup for the acceptance budgets: every note/wave/summary row with
+   * its delta. Written as ONE small machine-readable file at run end so before/after
+   * comparisons never re-parse the whole trace.
+   */
+  stageRollup() {
+    return {
+      totalMs: Math.round(performance.now() - this.startedMs),
+      stages: this.rows.map(r => ({
+        kind: r.kind,
+        message: r.message ?? r.wave ?? null,
+        sinceLastMs: r.sinceLastMs,
+        sinceStartMs: r.sinceStartMs,
+      })),
+    };
+  }
+
+  async writeStageRollup() {
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(
+      resolve(dirname(this.path), "stage-timing.json"),
+      `${JSON.stringify(this.stageRollup(), null, 2)}\n`,
+    );
   }
 
   note(message, detail = {}) {
@@ -1414,6 +1455,7 @@ export async function runCampaign(rig) {
       setupTimeoutMs: lifecycle.setupTimeoutMs,
       error: error instanceof Error ? error.message : String(error),
     });
+    await progress.writeStageRollup().catch(() => {});
     await progress.flush();
     throw error;
   }
@@ -1584,6 +1626,7 @@ export async function runCampaign(rig) {
       marketCoverage,
       mysteryCoverage,
     });
+    await progress.writeStageRollup().catch(() => {});
     await progress.flush();
   }
 

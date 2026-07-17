@@ -827,6 +827,38 @@ export class EvidenceSink {
     return this.events.length;
   }
 
+  /**
+   * Stage-timing instrumentation (optimization brief step 1): aggregate counters for the
+   * two costs the harness rework is budgeted against - input focus arbitration and
+   * checkpoint capture. Counters only (no per-press events); surfaced by
+   * {@link stageTimingSummary} and recorded once at teardown.
+   */
+  recordInputTiming({ queueWaitMs = 0, bringToFrontMs = 0, didFront = false } = {}) {
+    const stats = (this.inputStats ??= { presses: 0, queueWaitMs: 0, bringToFrontMs: 0, fronts: 0 });
+    stats.presses += 1;
+    stats.queueWaitMs += Math.max(0, Math.round(queueWaitMs));
+    stats.bringToFrontMs += Math.max(0, Math.round(bringToFrontMs));
+    if (didFront) {
+      stats.fronts += 1;
+    }
+  }
+
+  recordCheckpointTiming(step, durationMs) {
+    const stats = (this.checkpointStats ??= { captures: 0, totalMs: 0, maxMs: 0 });
+    stats.captures += 1;
+    stats.totalMs += Math.max(0, Math.round(durationMs));
+    stats.maxMs = Math.max(stats.maxMs, Math.round(durationMs));
+    this.record("checkpoint-timing", { step, durationMs: Math.round(durationMs) });
+  }
+
+  stageTimingSummary() {
+    return {
+      input: this.inputStats ?? { presses: 0, queueWaitMs: 0, bringToFrontMs: 0, fronts: 0 },
+      checkpoints: this.checkpointStats ?? { captures: 0, totalMs: 0, maxMs: 0 },
+      events: this.events.length,
+    };
+  }
+
   record(kind, detail = {}) {
     const event = {
       index: this.events.length,
@@ -1165,6 +1197,7 @@ export class EvidenceSink {
 
   async checkpoint(page, context, name) {
     const step = cleanSegment(name);
+    const checkpointStartedMs = performance.now();
     // WebGL canvases in a background Chromium page can capture as mostly black/partial tiles even
     // while the game is healthy. Each player owns an isolated Chrome process, so foreground both
     // independently, allow two real render frames plus a short bounded settle, then capture.
@@ -1217,6 +1250,7 @@ export class EvidenceSink {
       writeFile(resolve(this.dir, `${step}.cookies.json`), `${JSON.stringify(cookies, null, 2)}\n`),
     ]);
     this.record("checkpoint", { name: step });
+    this.recordCheckpointTiming(step, performance.now() - checkpointStartedMs);
     return dom;
   }
 

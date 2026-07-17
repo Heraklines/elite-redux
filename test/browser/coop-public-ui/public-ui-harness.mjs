@@ -1155,6 +1155,9 @@ export class PublicUiClient {
         refrontMs,
         didFront,
       });
+      // Aggregate counters (optimization brief step 1): the run-level focus-arbitration
+      // baseline without re-parsing per-press events from the trace.
+      this.evidence.recordInputTiming({ queueWaitMs, bringToFrontMs: bringToFrontMs + refrontMs, didFront });
       if (!focused) {
         throw new Error(`${this.label}: public key target did not acquire browser focus for ${purpose}`);
       }
@@ -2740,6 +2743,14 @@ export class DuoPublicUiRig {
     await this.stopChromeTrace().catch(() => {});
     for (const client of Object.values(this.clients)) {
       await client.checkpoint("final").catch(() => {});
+      // Stage-timing instrumentation (optimization brief step 1): one aggregate record per
+      // seat (input arbitration + checkpoint capture totals) so baselines never re-parse
+      // the per-press trace.
+      try {
+        client.evidence.record("stage-timing-summary", client.evidence.stageTimingSummary());
+      } catch {
+        /* instrumentation must never fail a run */
+      }
       await client.evidence.flush().catch(() => {});
     }
     await Promise.allSettled(this.browsers.map(browser => browser.close()));
