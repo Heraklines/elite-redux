@@ -12,6 +12,7 @@ import {
   pokemonSpeciesLevelMoves,
 } from "#balance/pokemon-level-moves";
 import { speciesStarterCosts } from "#balance/starters";
+import { isMegaFamilyFormCry, megaFormCryExists } from "#data/elite-redux/er-mega-cry-manifest";
 import { applyErAtlasFrameRate } from "#data/elite-redux/er-sprite-anim";
 import type { GrowthRate } from "#data/exp";
 import { Gender } from "#data/gender";
@@ -812,6 +813,16 @@ export abstract class PokemonSpeciesForm {
             ret += `-${formKey}`;
           }
           break;
+      }
+      // ER (live 2026-07-16): ER-added mega/primal forms (Mega Talonflame
+      // `663-mega`, Mega Samurott `503-mega`, ...) ship sprite art but no cry
+      // recording, so `cry/<id>-mega` 404s PERMANENTLY and spams the console on
+      // every summon. When the built mega/primal cry is not in the shipped set,
+      // fall back to the base species cry (which always exists) so a real cry
+      // plays and nothing 404s. Only the mega/primal family is gated; every
+      // other form key keeps its exact prior key.
+      if (isMegaFamilyFormCry(ret) && !megaFormCryExists(ret)) {
+        ret = speciesId.toString();
       }
     }
     return `cry/${ret}`;
