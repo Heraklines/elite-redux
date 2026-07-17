@@ -1078,6 +1078,28 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Eternal Floette shows its ER kit (Energy Tap + 3 innates)",
+    description:
+      "KIT fix (starter / summary / battle surface) - Eternal Floette (the vanilla ETERNAL_FLOETTE\n"
+      + "the game actually fields) must carry the ER 2.65 'Floette Eternal Flower' kit: ACTIVES Energy\n"
+      + "Tap / Grassy Surge / Fairy Aura, INNATES Pastel Veil / Magic Guard / Mystic Power. The ability\n"
+      + "override's innate triple was wrong (Magic Guard / Mega Launcher / Reckless). Corrected to Pastel\n"
+      + "Veil / Magic Guard / Mystic Power.\n"
+      + "DO: open Eternal Floette on the starter grid / summary and read its ability + innates.\n"
+      + "EXPECT: active Energy Tap (cycles to Grassy Surge / Fairy Aura); innates Pastel Veil, Magic\n"
+      + "Guard, Mystic Power - NOT Flower Veil, NOT Mega Launcher/Reckless. Unit-tested in\n"
+      + "test/tests/elite-redux/er-eternal-floette-kit.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.ETERNAL_FLOETTE, {
+          moveset: [MoveId.MOONBLAST, MoveId.GIGA_DRAIN, MoveId.PSYCHIC, MoveId.QUIVER_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Enamorus is female-only (no male from hatch/catch)",
     description:
       "GENERATION fix (not a battle behavior) - Enamorus is a female-only species (malePercent 0).\n"
@@ -1094,6 +1116,32 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.ENAMORUS, {
           moveset: [MoveId.MOONBLAST, MoveId.AIR_SLASH, MoveId.EARTH_POWER, MoveId.QUIVER_DANCE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Zacian/Zamazenta Crowned uses the ER level-up learnset (not vanilla)",
+    description:
+      "DATA fix (#606 follow-up). The Crowned form's LEVEL-UP learnset was VANILLA (Behemoth\n"
+      + "Blade + Bite/Quick Attack/Metal Claw...), not ER's. Cause: vanilla ships a\n"
+      + "pokemonFormLevelMoves[ZACIAN][crowned] entry which PokemonSpeciesForm.getLevelMoves\n"
+      + "PREFERS over ER's species-level override, so the ER learnset never reached the Crowned\n"
+      + "form (same shadowing bug the redux forms hit). #606 fixed the Crowned abilities/stats/\n"
+      + "types; the learnset was missed. Fix: installCrownedFormLevelMoves mirrors the ER Crowned\n"
+      + "form species (SPECIES_ZACIAN_CROWNED_SWORD / _ZAMAZENTA_CROWNED_SHIELD) learnset onto the\n"
+      + "vanilla Crowned form index.\n"
+      + "DO: field the Zacian below (already in its Crowned form), open the SUMMARY, and view its\n"
+      + "level-up moves (or level it up). EXPECT: the ER Zacian kit (Play Rough / Sacred Sword /\n"
+      + "Swords Dance ... per the ER 2.65 dex), NOT the vanilla Behemoth-Blade list. Unit-tested in\n"
+      + "test/data/elite-redux/init-elite-redux-movesets.test.ts (Crowned form learnset override).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 60 });
+      return [
+        makeStarter(SpeciesId.ZACIAN, {
+          formIndex: formIndexContaining(SpeciesId.ZACIAN, "crowned"),
+          moveset: [MoveId.BEHEMOTH_BLADE, MoveId.PLAY_ROUGH, MoveId.SACRED_SWORD, MoveId.SWORDS_DANCE],
         }),
       ];
     },

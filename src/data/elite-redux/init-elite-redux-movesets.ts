@@ -159,6 +159,9 @@ export function initEliteReduxMovesets(): InitEliteReduxMovesetsResult {
   // which PokemonSpeciesForm.getLevelMoves prefers over the species table.
   installReduxFormLevelMoves(table);
 
+  // #606 follow-up: same shadowing bug for Zacian/Zamazenta's CROWNED form.
+  installCrownedFormLevelMoves(table);
+
   return result;
 }
 
@@ -207,5 +210,55 @@ function installReduxFormLevelMoves(table: Record<number, LevelMoves>): void {
       continue;
     }
     formTable[sp.speciesId] = { ...formTable[sp.speciesId], [reduxFormIndex]: moves };
+  }
+}
+
+/**
+ * Zacian/Zamazenta's Crowned form: vanilla ships a
+ * `pokemonFormLevelMoves[ZACIAN][crownedIndex]` entry (Behemoth Blade, ...)
+ * which `PokemonSpeciesForm.getLevelMoves` PREFERS over the ER species-level
+ * override, so the Crowned form showed the VANILLA level-up learnset instead of
+ * ER's (the same shadowing bug the redux forms hit). ER ships the Crowned form
+ * as its own species record (SPECIES_ZACIAN_CROWNED_SWORD /
+ * SPECIES_ZAMAZENTA_CROWNED_SHIELD, id-mapped to custom species >= 10000, whose
+ * ER learnset the main loop already wrote to `table`). Mirror that learnset onto
+ * the vanilla Crowned FORM index so the form matches the ER 2.65 dex. #606 fixed
+ * the Crowned abilities/stats/types; the learnset was missed. Idempotent - plain
+ * assignment; self-limiting to species that actually ship a "crowned" form AND an
+ * ER Crowned form draft.
+ */
+function installCrownedFormLevelMoves(table: Record<number, LevelMoves>): void {
+  const draftByConst = new Map<string, (typeof ER_SPECIES)[number]>();
+  for (const draft of ER_SPECIES) {
+    draftByConst.set(draft.speciesConst, draft);
+  }
+  const speciesById = new Map<number, (typeof allSpecies)[number]>();
+  for (const sp of allSpecies) {
+    speciesById.set(sp.speciesId, sp);
+  }
+  const formTable = pokemonFormLevelMoves as Record<number, Record<number, LevelMoves>>;
+  for (const crownedDraft of ER_SPECIES) {
+    const match = crownedDraft.speciesConst.match(/^(SPECIES_.+)_CROWNED_(?:SWORD|SHIELD)$/);
+    if (!match) {
+      continue;
+    }
+    const baseDraft = draftByConst.get(match[1]);
+    if (!baseDraft) {
+      continue;
+    }
+    const baseSpeciesId = ER_ID_MAP.species[baseDraft.id];
+    const crownedSpeciesId = ER_ID_MAP.species[crownedDraft.id];
+    if (baseSpeciesId === undefined || crownedSpeciesId === undefined) {
+      continue;
+    }
+    const crownedFormIndex = speciesById.get(baseSpeciesId)?.forms.findIndex(f => f.formKey === "crowned") ?? -1;
+    if (crownedFormIndex < 0) {
+      continue;
+    }
+    const moves = table[crownedSpeciesId];
+    if (moves?.length === 0) {
+      continue;
+    }
+    formTable[baseSpeciesId] = { ...formTable[baseSpeciesId], [crownedFormIndex]: moves };
   }
 }
