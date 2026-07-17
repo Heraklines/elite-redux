@@ -3995,6 +3995,11 @@ export async function buildShowdownDuo(
   guestRuntime.controller.connect();
   await drainLoopback();
 
+  // Production installs both versus runtimes before CommandPhase accepts input. Showdown fixtures
+  // deliberately stop at the pre-command boundary so the orphan-runtime guard remains meaningful;
+  // open the host command surface only after the authoritative pair has connected.
+  await withClient(hostCtx, () => hostGame.phaseInterceptor.to("CommandPhase"));
+
   const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
   // Showdown rigs own the same two independently assembled runtimes as ordinary co-op rigs. Register
   // them with the shared afterEach teardown too: clearing only the ambient (usually guest) runtime leaves

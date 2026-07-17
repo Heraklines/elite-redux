@@ -66,7 +66,9 @@ async function runToShowdownCommand(
     const selectStarterPhase = new SelectStarterPhase();
     selectStarterPhase.initBattle(starters);
   });
-  await game.phaseInterceptor.to("CommandPhase");
+  // Bootstrap assertions do not need to accept command input. Stop at the exact boundary so this
+  // single-engine fixture does not impersonate a production versus session without its runtime.
+  await game.phaseInterceptor.to("CommandPhase", false);
 }
 
 describe.skipIf(!RUN)("Showdown versus battle bootstrap (C3v2b)", () => {

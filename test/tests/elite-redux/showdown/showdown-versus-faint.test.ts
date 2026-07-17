@@ -170,7 +170,7 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       game.scene.phaseManager.pushNew("EncounterPhase", false);
       new SelectStarterPhase().initBattle(starters);
     });
-    await game.phaseInterceptor.to("CommandPhase");
+    await game.phaseInterceptor.to("CommandPhase", false);
     game.scene.getPlayerParty()[0].moveset = hostLeadMoves.map(m => new PokemonMove(m));
   }
 

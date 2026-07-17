@@ -38,6 +38,7 @@ import type { Phase } from "#app/phase";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
+import { PokemonMove } from "#data/moves/pokemon-move";
 import { Weather } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
@@ -274,6 +275,12 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
     // installed at this boundary; starting the command phase first now correctly terminates an
     // orphaned shared session. The caller assembles both runtimes, then opens this exact command UI.
     await game.phaseInterceptor.to("CommandPhase", false);
+    game.scene.getPlayerParty()[0].moveset = [
+      new PokemonMove(MoveId.TACKLE),
+      new PokemonMove(MoveId.SPLASH),
+      new PokemonMove(MoveId.FLAIL),
+      new PokemonMove(MoveId.BOUNCE),
+    ];
   }
 
   it("guest renders the host's turn-1 entry ability, does not DERIVE it locally (weather parity)", async () => {
@@ -281,7 +288,6 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
 
     const pair = createScheduledCoopPair({ automatic: true });
     const rig: ShowdownDuoRig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown);
-    await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase"));
     pair.setAutomaticDelivery(false);
 
     // Plant a DROUGHT INNATE on the host's OWN lead (its local PLAYER). The slot override rides the
@@ -342,7 +348,6 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
 
     const pair = createScheduledCoopPair({ automatic: true });
     const rig: ShowdownDuoRig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown);
-    await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase"));
     pair.setAutomaticDelivery(false);
 
     // The guest commands its own team with a harmless SPLASH each turn (the host's EnemyCommandPhase await).

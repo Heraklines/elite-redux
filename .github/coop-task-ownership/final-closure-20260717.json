@@ -3,7 +3,7 @@
   "taskId": "final-closure-20260717",
   "branch": "ci/coop/final-closure-20260717",
   "trainRef": "ci/coop/final-closure-20260717",
-  "baseSha": "feab8999efc0088e9f5e9865876b437c68b346f7",
+  "baseSha": "d816e3ca930573f30bfbbb22f27c00ab7d57a694",
   "allowedFiles": [
     ".github/coop-task-ownership/final-closure-20260717.json",
     ".github/coop-task-ownership/p33-gameover-public-ui.json",
@@ -31,6 +31,14 @@
     "test/tests/elite-redux/coop/coop-p33-client.test.ts",
     "test/tests/elite-redux/coop/coop-rejoin-recovery-boundary.test.ts",
     "test/tests/elite-redux/coop/coop-wiring-completeness.test.ts",
-    "test/tests/elite-redux/showdown/showdown-versus-summon-desync.test.ts"
+    "test/tests/elite-redux/showdown/showdown-battle.test.ts",
+    "test/tests/elite-redux/showdown/showdown-duo.test.ts",
+    "test/tests/elite-redux/showdown/showdown-fairness-parity.test.ts",
+    "test/tests/elite-redux/showdown/showdown-guest-real-boot.test.ts",
+    "test/tests/elite-redux/showdown/showdown-preset-duo.test.ts",
+    "test/tests/elite-redux/showdown/showdown-versus-faint.test.ts",
+    "test/tests/elite-redux/showdown/showdown-versus-host-faint.test.ts",
+    "test/tests/elite-redux/showdown/showdown-versus-summon-desync.test.ts",
+    "test/tools/coop-duo-harness.ts"
   ]
 }
