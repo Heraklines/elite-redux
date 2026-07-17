@@ -506,6 +506,10 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       addAttrUnique(move, new ConfuseAttr(false));
     },
   ],
+  // DOUBLE_HIT: ER 2.65 dex "The user slams the foe twice in a row. Increased
+  // crit rate." The numeric pass pins the ER 45 BP / 100 acc; the raised crit
+  // ratio is a MoveAttr the numeric pass can't apply, so add HighCritAttr here.
+  [MoveId.DOUBLE_HIT, move => addAttrUnique(move, new HighCritAttr())],
   [MoveId.JAW_LOCK, move => retypeMove(move, PokemonType.FIGHTING)],
   [MoveId.SNAP_TRAP, move => retypeMove(move, PokemonType.STEEL)],
   [
@@ -1798,7 +1802,7 @@ class ErMatchUserSecondTypeAttr extends VariableMoveTypeAttr {
   override apply(user: Pokemon, _target: Pokemon, _move: Move, args: any[]): boolean {
     const moveType = args[0] as { value: PokemonType };
     const types = user.getTypes(true, true);
-    const second = types.at(-1);
+    const second = types[1] ?? types[0];
     if (second === undefined) {
       return false;
     }

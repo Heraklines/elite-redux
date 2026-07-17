@@ -1136,10 +1136,15 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     // Staff-authored custom trainers (er-custom-trainers.json) are curated
     // content fielded EXACTLY as authored - the wave-ladder cap must never
     // devolve/swap their mons (maintainer directive: staff intent wins).
+    // ER (#419 follow-up): a cross-player GHOST battle fields the uploader's roster
+    // VERBATIM - its fairness is the +40-wave eligibility window at selection, not
+    // species mutation. Exempt the whole ghost battle so the cap never devolves/swaps
+    // its stored mons (the "ghost became a different species / wrong moves" report).
     if (
       globalScene.gameMode?.isDaily ||
       globalScene.gameMode?.isShowdown ||
       erColosseumBattleActive ||
+      globalScene.currentBattle?.trainer?.erIsGhost ||
       isErCustomTrainerBstBypassActive() ||
       (globalScene.currentBattle?.isBattleMysteryEncounter?.() ?? false)
     ) {

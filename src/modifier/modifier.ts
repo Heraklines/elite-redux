@@ -603,6 +603,14 @@ export class MapModifier extends PersistentModifier {
     return new MapModifier(this.type, this.stackCount);
   }
 
+  // Singleton key item (max stack 1). Without a match() override the base
+  // Modifier.match() returns false, so a second grant (ER shops / mystery
+  // encounters can hand it out outside the reward-pool ownership gate) would
+  // push a duplicate icon instead of merging - see the Mega Bracelet report.
+  match(modifier: Modifier): boolean {
+    return modifier instanceof MapModifier;
+  }
+
   override apply(..._args: unknown[]): boolean {
     return true;
   }
@@ -617,6 +625,12 @@ export class MegaEvolutionAccessModifier extends PersistentModifier {
     return new MegaEvolutionAccessModifier(this.type, this.stackCount);
   }
 
+  // Singleton key item: dedup a second grant (ER biome market / bug-type-superfan
+  // ME can grant it again once already owned) so the HUD never shows two.
+  match(modifier: Modifier): boolean {
+    return modifier instanceof MegaEvolutionAccessModifier;
+  }
+
   override apply(..._args: unknown[]): boolean {
     return true;
   }
@@ -629,6 +643,11 @@ export class MegaEvolutionAccessModifier extends PersistentModifier {
 export class GigantamaxAccessModifier extends PersistentModifier {
   clone(): GigantamaxAccessModifier {
     return new GigantamaxAccessModifier(this.type, this.stackCount);
+  }
+
+  // Singleton key item (Dynamax Band): dedup a second grant so only one icon shows.
+  match(modifier: Modifier): boolean {
+    return modifier instanceof GigantamaxAccessModifier;
   }
 
   /**
@@ -648,6 +667,11 @@ export class GigantamaxAccessModifier extends PersistentModifier {
 export class TerastallizeAccessModifier extends PersistentModifier {
   clone(): TerastallizeAccessModifier {
     return new TerastallizeAccessModifier(this.type, this.stackCount);
+  }
+
+  // Singleton key item: dedup a second grant so only one icon shows.
+  match(modifier: Modifier): boolean {
+    return modifier instanceof TerastallizeAccessModifier;
   }
 
   /**

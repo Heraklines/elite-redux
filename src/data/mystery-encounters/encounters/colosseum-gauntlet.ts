@@ -364,6 +364,25 @@ export async function buildColosseumGauntlet(): Promise<ColosseumChallenger[]> {
   return out.slice(0, MAX_ROUNDS);
 }
 
+/**
+ * The desired FLAT "slightly above" level bump for the vanilla (Ace/Youngster)
+ * colosseum round, where the trainer brings its own team so we can't pin each mon
+ * to {@linkcode colosseumTargetLevel} directly.
+ */
+const COLOSSEUM_VANILLA_LEVEL_NUDGE = 2;
+
+/**
+ * The `levelAdditiveModifier` that lands the vanilla round's enemies a FLAT
+ * {@linkcode COLOSSEUM_VANILLA_LEVEL_NUDGE} levels above the wave curve, at ANY wave.
+ * The framework formula is `level += round(waveIndex / 10 * modifier)`, so a fixed
+ * modifier of 2 added +2 at wave 20 but a huge +24 at wave 118 (the "tournament
+ * trainers were ~20 levels over my cap" report). Scale the modifier by the inverse
+ * of the wave so the round is a small constant nudge regardless of depth.
+ */
+export function colosseumVanillaLevelModifier(waveIndex: number): number {
+  return waveIndex > 0 ? (COLOSSEUM_VANILLA_LEVEL_NUDGE * 10) / waveIndex : 0;
+}
+
 /** Enemy level every gauntlet mon is pinned to: your strongest party member. */
 function colosseumTargetLevel(): number {
   let top = 0;
@@ -430,7 +449,10 @@ export function colosseumRoundConfig(challenger: ColosseumChallenger): EnemyPart
   if (pokemonConfigs.length > 0) {
     return { trainerType: challenger.trainerType, pokemonConfigs };
   }
-  // Pure-vanilla round (Ace/Youngster): the trainer brings its own team; just
-  // nudge the level up a touch so it isn't trivially under-levelled.
-  return { trainerType: challenger.trainerType, levelAdditiveModifier: 2 };
+  // Pure-vanilla round (Ace/Youngster): the trainer brings its own team; nudge the
+  // level a FLAT couple of levels above the wave curve so it isn't trivially
+  // under-levelled - but wave-independently, so late-wave rounds don't balloon ~20
+  // levels over the player's cap (the world-tournament over-level report).
+  const wave = globalScene.currentBattle?.waveIndex ?? 0;
+  return { trainerType: challenger.trainerType, levelAdditiveModifier: colosseumVanillaLevelModifier(wave) };
 }

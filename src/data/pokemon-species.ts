@@ -1278,7 +1278,13 @@ export class PokemonSpecies extends PokemonSpeciesForm implements Localizable {
       return Gender.GENDERLESS;
     }
 
-    if (randSeedFloat() * 100 <= this.malePercent) {
+    // Strict `<`, not `<=`: a female-only species has malePercent === 0, and
+    // `randSeedFloat() * 100 <= 0` returns MALE whenever randSeedFloat() yields
+    // exactly 0 — leaking male Enamorus / male Chansey etc. from hatch/catch.
+    // `< 0` is never true (FEMALE), while male-only (100) stays MALE because
+    // randSeedFloat() is [0, 1) so the product is always < 100. The RNG is still
+    // drawn in every branch, so the seeded stream position is unchanged.
+    if (randSeedFloat() * 100 < this.malePercent) {
       return Gender.MALE;
     }
     return Gender.FEMALE;

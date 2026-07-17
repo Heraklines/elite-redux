@@ -416,6 +416,19 @@ export class GameData {
   public lastCloudSyncFailed = false;
 
   /**
+   * ER save-integrity guard: `true` once THIS GameData instance has been populated
+   * from real persisted system data (a successful {@linkcode initParsedSystem}), or
+   * once a brand-new account has legitimately committed its first system save.
+   *
+   * A fresh `new GameData()` - notably the one {@linkcode BattleScene.reset} installs
+   * on a 401 / auth-reset, before the re-login re-loads - starts `false`. saveSystem
+   * reads this to REFUSE overwriting EXISTING non-empty local data with an empty,
+   * never-loaded in-memory state (the "I lost all my data" clobber vector). A genuine
+   * new account has no existing local blob, so its first save is still allowed.
+   */
+  private systemDataLoaded = false;
+
+  /**
    * A confirmed overwrite has already retired the previous cloud row. Its replacement must bypass
    * the ordinary cloud cadence exactly once, otherwise the preceding save's 20-minute success
    * cooldown can leave the newly occupied slot local-only after the destructive delete.
@@ -749,8 +762,29 @@ export class GameData {
       typeof v === "bigint" ? (v <= maxIntAttrValue ? Number(v) : v.toString()) : v,
     );
 
-    const localSaved = trySetLocalStorageItem(`data_${loggedInUser?.username}`, encrypt(systemData, bypassLogin));
+    // ER save-integrity guard (the "I lost all my data" clobber vector): NEVER let an
+    // in-memory GameData that was never loaded from persistence overwrite EXISTING
+    // non-empty local data. This is the state a 401 / auth-reset leaves behind
+    // (BattleScene.reset installs a fresh, empty `new GameData()` before the re-login
+    // re-loads); a stray save in that window would replace good local bytes with an
+    // empty save. A genuine new account has no existing local blob, so its first save
+    // still lands. We preserve the bytes and surface the failure instead of persisting.
+    const systemLocalKey = `data_${loggedInUser?.username}`;
+    const existingLocal = localStorage.getItem(systemLocalKey);
+    if (!this.systemDataLoaded && existingLocal != null && existingLocal.length > 0) {
+      console.error(
+        "[save] refusing to overwrite existing local system save with never-loaded (empty) data - preserving local bytes",
+      );
+      this.lastCloudSyncFailed = true;
+      this.warnCloudSaveProtected();
+      globalScene.ui.savingIcon.hide();
+      return false;
+    }
+
+    const localSaved = trySetLocalStorageItem(systemLocalKey, encrypt(systemData, bypassLogin));
     if (localSaved) {
+      // This instance is now the source of truth for local bytes; later saves may overwrite.
+      this.systemDataLoaded = true;
       this.warnedLocalStorageFull = false;
       this.lastLocalSaveFailed = false;
     } else {
@@ -1274,6 +1308,9 @@ export class GameData {
     // species' dex entries onto their RDX counterparts (gen slot reverts to
     // vanilla; shiny/candies land on the RDX entry). Additive + idempotent.
     migrateErReduxDexHijack(this);
+
+    // This instance now reflects real persisted data - saves may overwrite local.
+    this.systemDataLoaded = true;
   }
 
   public async initSystem(systemDataStr: string, cachedSystemDataStr?: string): Promise<boolean> {

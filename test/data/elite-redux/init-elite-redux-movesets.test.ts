@@ -1,10 +1,12 @@
-import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
+import { pokemonFormLevelMoves, pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
+import { allSpecies } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-movesets";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import type { LevelMoves } from "#types/pokemon-level-moves";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -171,6 +173,63 @@ describe("initEliteReduxMovesets (B6)", () => {
     const snapshot = pokemonSpeciesLevelMoves[sampleId] as LevelMoves;
     initEliteReduxMovesets();
     expect(pokemonSpeciesLevelMoves[sampleId]).toBe(snapshot);
+  });
+
+  // #606 follow-up: the Crowned form's LEVEL-UP learnset must come from ER data,
+  // not the vanilla `pokemonFormLevelMoves[ZACIAN][crowned]` shadow (Behemoth
+  // Blade, ...). See installCrownedFormLevelMoves.
+  describe.each([
+    { base: SpeciesId.ZACIAN, crownedConst: "SPECIES_ZACIAN_CROWNED_SWORD" },
+    { base: SpeciesId.ZAMAZENTA, crownedConst: "SPECIES_ZAMAZENTA_CROWNED_SHIELD" },
+  ])("Crowned form learnset override ($crownedConst)", ({ base, crownedConst }) => {
+    // Lazily resolved inside each test: allSpecies is populated by init.ts, which
+    // runs AFTER describe.each collection.
+    const crownedFormIndexOf = () => getPokemonSpecies(base).forms.findIndex(f => f.formKey === "crowned");
+
+    it("resolves a crowned form index", () => {
+      expect(crownedFormIndexOf()).toBeGreaterThanOrEqual(0);
+    });
+
+    it("mirrors the ER Crowned draft onto pokemonFormLevelMoves[base][crowned]", () => {
+      const crownedFormIndex = crownedFormIndexOf();
+      const crownedDraft = ER_SPECIES.find(d => d.speciesConst === crownedConst);
+      expect(crownedDraft).toBeDefined();
+      if (!crownedDraft) {
+        return;
+      }
+      const expected = crownedDraft.levelUpMoves
+        .map(lvm => {
+          const mid = ER_ID_MAP.moves[lvm.id];
+          return mid === undefined ? null : ([lvm.level, mid] as [number, number]);
+        })
+        .filter((p): p is [number, number] => p !== null);
+
+      const live = pokemonFormLevelMoves[base]?.[crownedFormIndex];
+      expect(live).toBeDefined();
+      expect(live).toEqual(expected);
+    });
+
+    it("the Crowned form entry differs from the vanilla shadow it replaced", () => {
+      // Vanilla shipped a short Crowned entry led by an EVOLVE_MOVE (Behemoth
+      // Blade/Bash at level 0). The ER learnset is a full level-up table, so the
+      // FIRST few real levels differ from the vanilla `[0, BEHEMOTH_*]` head.
+      const crownedFormIndex = crownedFormIndexOf();
+      const live = pokemonFormLevelMoves[base]?.[crownedFormIndex] ?? [];
+      expect(live.length).toBeGreaterThan(0);
+      // ER data starts several moves at level 1 (not a single level-0 evolve move).
+      expect(live.filter(([lvl]) => lvl === 1).length).toBeGreaterThan(1);
+    });
+  });
+
+  it("leaves the redux-form mirror intact after the crowned pass (no shared table key)", () => {
+    // Regression guard: installCrownedFormLevelMoves must only touch species that
+    // ship a "crowned" form, never clobber an unrelated form entry.
+    const anyReduxBase = allSpecies.find(sp => sp.speciesId < 10000 && sp.forms?.some(f => f.formKey === "redux"));
+    if (!anyReduxBase) {
+      return;
+    }
+    const reduxIdx = anyReduxBase.forms.findIndex(f => f.formKey === "redux");
+    expect(pokemonFormLevelMoves[anyReduxBase.speciesId]?.[reduxIdx]).toBeDefined();
   });
 
   it("speciesSkippedEmpty matches the count of ER drafts with no level-up moves", () => {

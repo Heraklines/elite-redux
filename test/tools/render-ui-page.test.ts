@@ -97,7 +97,7 @@ import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import i18next from "i18next";
 import Phaser from "phaser";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 // ER_RENDER_PAGE: a single page, a comma-separated list, or "all" to render every recipe
@@ -1931,6 +1931,19 @@ describe.skipIf(!RUN)("render-ui-page", () => {
   beforeAll(async () => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
     ctx = await createRenderScene();
+  });
+
+  // The freshly-built throwaway handlers this harness renders are never destroy()'d (unlike a
+  // live scene, which tears its handler - and thus its owned ErShinyLabNameFx - down). The Name-FX
+  // schedules a LOOPING timer on the GameManager scene's MockClock, whose setInterval keeps firing
+  // forever. Once renderTwoPass's `uiInner.removeAll(true)` destroys the FX overlay sprite, that
+  // orphaned timer's next tick() calls setTexture on a destroyed sprite (scene undefined) and throws
+  // - flooding the NEXT page with uncaught exceptions and terminating the worker. Purging the just-
+  // rendered page's clock events after each test removes the leaked timer at the source, before the
+  // next page's teardown can destroy the sprite it points at. (Runs even when a page's assertion
+  // throws, so one red page can't cascade.) Fires no render, changes no pixels.
+  afterEach(() => {
+    lastScene?.time?.removeAllEvents?.();
   });
 
   it.each(PAGES)(`renders the "%s" page to a PNG`, async (PAGE: string) => {

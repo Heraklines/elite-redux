@@ -85,6 +85,15 @@ export function erLegendMinWave(baseTotal: number): number {
  * reached early via the World Map) spawned a Lv13 Primeape (it evolves at 28). Walk
  * back to the stage whose LEVEL evolution requirement is at or below the level.
  * Item / condition evolutions (level <= 1) are left alone (valid at any level).
+ *
+ * ER (#19 redo): the ONLY devolve trigger is a KNOWN, positive level requirement that
+ * EXCEEDS this encounter level. An UNAUDITED evolution (ER data frequently leaves
+ * `evo.level` undefined) must be treated like an item/condition evo - valid at any
+ * level, never devolved. The original hotfix disabled this whole gate because the old
+ * `evo.level <= level` check read `undefined <= 100` as false and devolved even a
+ * correctly-evolved Lv100 Watchog down to Patrat; guarding on `typeof === "number"`
+ * closes that hole so only genuinely-under-leveled evolved wilds (a Lv9 Raticate, evo
+ * at 20) are walked back.
  */
 export function deEvolveWildForLevel(species: PokemonSpecies, level: number): PokemonSpecies {
   let current = species;
@@ -94,7 +103,11 @@ export function deEvolveWildForLevel(species: PokemonSpecies, level: number): Po
       break;
     }
     const evo = pokemonEvolutions[prevoId]?.find(e => e.speciesId === current.speciesId);
-    if (!evo || evo.level <= 1 || evo.level <= level) {
+    const evoLevel = evo?.level;
+    // Stop unless there is a KNOWN numeric level requirement above this level. Missing
+    // record, undefined/unaudited level, or an item/condition evo (level <= 1) = valid
+    // at any level (do NOT devolve - the Lv100-Watchog-to-Patrat hotfix regression).
+    if (!evo || typeof evoLevel !== "number" || evoLevel <= 1 || evoLevel <= level) {
       break;
     }
     current = getPokemonSpecies(prevoId);
@@ -841,12 +854,15 @@ export class Arena {
       }
     }
 
-    // ER (#19): de-evolution of over-evolved-for-level wilds is DISABLED. The ER
-    // evolution levels aren't fully audited yet, so deEvolveWildForLevel was
-    // mis-firing on correctly-evolved mons (e.g. a Lv100 Watchog shown as Patrat,
-    // even in Hell) - a far worse regression than the under-leveled-evo it was
-    // meant to catch. Re-enable only after the evolution-level data is audited
-    // (tasks #58-60). The function + its unit test are kept for that work.
+    // ER (#19 redo): de-evolve a wild that is too evolved for its encounter level
+    // (a Lv9 Raticate, which evolves at 20). RE-ENABLED after the original hotfix
+    // disabled it: deEvolveWildForLevel now devolves ONLY on a KNOWN numeric evo
+    // level that exceeds this level, so an UNAUDITED (undefined) evo level no longer
+    // devolves correctly-evolved mons (the Lv100-Watchog-to-Patrat regression). This
+    // runs in species SELECTION, before the EnemyPokemon is built, so the final
+    // species' sprite loads correctly at construction (no post-load #434 swap).
+    species = deEvolveWildForLevel(species, level);
+
     return species;
   }
 

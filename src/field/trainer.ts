@@ -73,6 +73,16 @@ export class Trainer extends Phaser.GameObjects.Container {
   public erGhostFxSpeed?: number | undefined;
   public erGhostFxIntensity?: number | undefined;
 
+  /**
+   * ER (#419 follow-up): true when this trainer is a cross-player GHOST (its party is
+   * an uploader's stored roster fielded VERBATIM). Set by `markTrainerAsGhost`. Read by
+   * the universal BST power gate (`enforceErEliteBstCurve`) to exempt the whole ghost
+   * battle - a ghost's fairness is the +40-wave eligibility window, NOT species mutation,
+   * so the wave-ladder cap must not devolve/swap its mons. A plain field keeps the gate
+   * import-free (avoids the ghost module's circular-init hazard).
+   */
+  public erIsGhost?: boolean | undefined;
+
   private erAuraFx: ErTrainerAuraFx | null = null;
   /** Per-instance counter used to namespace generated aura-FX texture keys. */
   private static erAuraFxSeq = 0;
@@ -574,6 +584,8 @@ export class Trainer extends Phaser.GameObjects.Container {
             + (((this.config.useSameSeedForAllMembers ? 0 : index) + 1) << 8),
     );
 
+    resetBattleResultForm(ret!);
+
     return ret!; // TODO: is this bang correct?
   }
 
@@ -979,5 +991,36 @@ export class Trainer extends Phaser.GameObjects.Container {
   override destroy(fromScene?: boolean): void {
     this.removeErGhostAuraFx();
     super.destroy(fromScene);
+  }
+}
+
+/**
+ * Battle-RESULT form keys: a form a mon only enters as the OUTCOME of a battle
+ * event (Mimikyu's Disguise breaking into "busted"), NOT a resting form it can
+ * be generated in. The player restores these between battles via
+ * `PostBattleInitAbAttr` (BattleScene.reset), but that pass is player-party only,
+ * so a trainer / ghost snapshot that captured a mon mid-run in its result form
+ * would field it already broken (the #442 Unown-Revelation leak class, extended
+ * to Busted). Reset them to the base form at party generation.
+ */
+const BATTLE_RESULT_FORM_KEYS: readonly string[] = ["busted"];
+
+/**
+ * If a freshly generated enemy is sitting in a battle-result form (see
+ * {@linkcode BATTLE_RESULT_FORM_KEYS}), reset it to the species' resting form so
+ * it spawns intact. All Mimikyu tiers (vanilla base + the ER Apex / Rayquaza
+ * custom species) carry the busted form at a non-zero index, and the busted
+ * disguise is stat-identical to the resting form, so this is a pure sprite/form
+ * reset (no stat recompute needed). The resting form is the first form that is
+ * NOT itself a battle-result form (Mimikyu's "disguised", the Apex tiers' base).
+ */
+export function resetBattleResultForm(pokemon: EnemyPokemon): void {
+  if (!pokemon || !BATTLE_RESULT_FORM_KEYS.includes(pokemon.getFormKey())) {
+    return;
+  }
+  const baseIndex = pokemon.species.forms.findIndex(f => !BATTLE_RESULT_FORM_KEYS.includes(f.formKey));
+  if (baseIndex >= 0 && baseIndex !== pokemon.formIndex) {
+    pokemon.formIndex = baseIndex;
+    pokemon.generateName();
   }
 }

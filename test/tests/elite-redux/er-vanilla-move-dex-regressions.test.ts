@@ -5,11 +5,14 @@
  * Run: ER_SCENARIO=1 npx vitest run test/tests/elite-redux/er-vanilla-move-dex-regressions.test.ts
  */
 
+import { allMoves } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -81,6 +84,65 @@ describe.skipIf(!RUN)("ER vanilla move dex regressions", () => {
     await game.toEndOfTurn();
 
     expect(enemy.getTag(BattlerTagType.CONFUSED)).toBeDefined();
+  });
+
+  it("Synchronoise takes the user's SECOND type on mono/dual/tri-typed users", async () => {
+    game.override
+      .battleStyle("single")
+      .moveset(MoveId.SYNCHRONOISE)
+      .startingLevel(50)
+      .enemyLevel(50)
+      .enemySpecies(SpeciesId.WOBBUFFET);
+    await game.classicMode.startBattle(SpeciesId.MEW);
+
+    const player = game.field.getPlayerPokemon();
+    const synchronoise = allMoves[MoveId.SYNCHRONOISE];
+
+    // Monotype: falls back to the first (only) type.
+    player.summonData.types = [PokemonType.FIRE];
+    expect(player.getMoveType(synchronoise)).toBe(PokemonType.FIRE);
+
+    // Dual-typed: the SECOND type.
+    player.summonData.types = [PokemonType.FIRE, PokemonType.WATER];
+    expect(player.getMoveType(synchronoise)).toBe(PokemonType.WATER);
+
+    // Tri-typed: still the SECOND type, NOT the extra (third) type. This is the
+    // regression: the old `types.at(-1)` picked the third type here.
+    player.summonData.types = [PokemonType.FIRE, PokemonType.WATER, PokemonType.GRASS];
+    expect(player.getMoveType(synchronoise)).toBe(PokemonType.WATER);
+  });
+
+  it("Double Hit is 45 BP / 100 acc with a raised critical-hit ratio", async () => {
+    await game.classicMode.startBattle(SpeciesId.MEW);
+    const doubleHit = allMoves[MoveId.DOUBLE_HIT];
+    expect(doubleHit.power).toBe(45);
+    expect(doubleHit.accuracy).toBe(100);
+    expect(doubleHit.hasAttr("HighCritAttr")).toBe(true);
+  });
+
+  it("Magic Bounce does NOT reflect the ER damaging Growl", async () => {
+    game.override
+      .battleStyle("single")
+      .moveset(MoveId.GROWL)
+      .startingLevel(50)
+      .enemyLevel(100)
+      .enemyAbility(AbilityId.MAGIC_BOUNCE)
+      .enemySpecies(SpeciesId.WOBBUFFET);
+    await game.classicMode.startBattle(SpeciesId.CHARIZARD);
+
+    const player = game.field.getPlayerPokemon();
+    const enemy = game.field.getEnemyPokemon();
+
+    game.move.select(MoveId.GROWL);
+    await game.toEndOfTurn();
+
+    // Growl is a SPECIAL damaging move in ER: it lands on the enemy (damage +
+    // Atk drop) instead of being bounced back onto the user.
+    expect(enemy.hp).toBeLessThan(enemy.getMaxHp());
+    expect(enemy.getStatStage(Stat.ATK)).toBe(-1);
+    // The user was NOT the reflected target: a bounced Growl would have dropped
+    // the user's OWN Atk to -1. It stays at 0, proving Magic Bounce did not fire.
+    expect(player.getStatStage(Stat.ATK)).toBe(0);
   });
 
   it("Ominous Wind hits both opposing Pokemon in doubles", async () => {

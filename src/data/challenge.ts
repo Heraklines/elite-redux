@@ -822,7 +822,14 @@ export class SingleTypeChallenge extends Challenge {
 
   override applyStarterChoice(species: PokemonSpecies, isValid: BooleanHolder, dexAttr: DexAttrProps): boolean {
     const speciesForm = getPokemonSpeciesForm(species.speciesId, dexAttr.formIndex);
-    const types = [speciesForm.type1, speciesForm.type2];
+    // ER (#mono-fairy): fold in NATIVE extra/N-types (setExtraTypes) so the starter
+    // filter uses the SAME predicate as in-battle enforcement (applyPokemonInBattle ->
+    // isOfType -> getBaseTypes, which includes getExtraTypes). Post type-nativization a
+    // Fairy (etc.) that a mon used to gain from an ability is a native EXTRA type; the
+    // old [type1, type2] check ignored it, so an extra-typed mon was legal to FIELD but
+    // wrongly rejected in the starter grid (the mono-Fairy Redux mismatch). The two
+    // predicates must agree.
+    const types = [speciesForm.type1, speciesForm.type2, ...speciesForm.getExtraTypes()];
     if (!types.includes(this.value - 1)) {
       isValid.value = false;
       return true;

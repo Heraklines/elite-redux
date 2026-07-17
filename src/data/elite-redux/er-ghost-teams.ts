@@ -812,6 +812,41 @@ export function setCoopGhostPool(pool: GhostTeamSnapshot[]): void {
   prefetchStarted = true;
 }
 
+// -----------------------------------------------------------------------------
+// Difficulty gating (#345/#difficulty-pools): a run must NEVER field a ghost of a
+// HARDER difficulty than its own tier. Youngster/Ace are pure vanilla and have NO
+// scheduled ghost waves (er-ghost-waves), so the only way they meet a ghost is the
+// explicit Ghost Trainers CHALLENGE opt-in - and even then the reported bug was a
+// Youngster run drawing Hell-scaled evolved rosters, because the challenge pool
+// topped up from the deepest (Hell/Elite) pools to avoid starvation. Constrain the
+// top-up to the run's tier and EASIER only, so an easy run never faces a harder team.
+// -----------------------------------------------------------------------------
+const GHOST_DIFFICULTY_RANK: Record<string, number> = {
+  youngster: 0,
+  ace: 1,
+  elite: 2,
+  hell: 3,
+  mystery: 3, // dev gauntlet, hell-equivalent (uses its own scripted carrier anyway)
+};
+
+/** Rank of a difficulty label; unknown/legacy snapshots default to Ace (the historical era). */
+function ghostDifficultyRank(d: string | undefined): number {
+  return GHOST_DIFFICULTY_RANK[d ?? ""] ?? GHOST_DIFFICULTY_RANK.ace;
+}
+
+/**
+ * The difficulty pools the Ghost Trainers CHALLENGE may draw from for a `run` tier:
+ * the run's own tier first (for pool depth), then progressively EASIER tiers to fight
+ * starvation - but NEVER a harder tier. So a Youngster challenge draws only Youngster
+ * teams, Ace draws Ace+Youngster, and only Hell draws the full ladder.
+ */
+export function ghostChallengePoolOrder(run: ErDifficulty): ErDifficulty[] {
+  const easierFirst: ErDifficulty[] = ["hell", "elite", "ace", "youngster"]; // descending rank
+  const runRank = ghostDifficultyRank(run);
+  const rest = easierFirst.filter(d => d !== run && ghostDifficultyRank(d) <= runRank);
+  return [run, ...rest];
+}
+
 function isValidSnapshot(s: unknown): s is GhostTeamSnapshot {
   return (
     !!s
@@ -851,7 +886,10 @@ async function fetchGhostTeams(difficulty: ErDifficulty, count: number, minWave:
   // (prefer the right difficulty), most-recent first.
   const local = loadLocalGhostTeams().filter(s => isValidSnapshot(s) && s.waveReached >= minWave);
   const matched = local.filter(s => s.difficulty === difficulty);
-  return (matched.length > 0 ? matched : local).slice().reverse();
+  // #difficulty-pools: when no exact-tier team exists, fall back only to teams that are
+  // NOT HARDER than the requested tier (never field a Hell roster on a Youngster run).
+  const notHarder = local.filter(s => ghostDifficultyRank(s.difficulty) <= ghostDifficultyRank(difficulty));
+  return (matched.length > 0 ? matched : notHarder).slice().reverse();
 }
 
 /**
@@ -873,15 +911,16 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
   // prefetch a full batch immediately (floor 1). The pool endpoint filters by
   // DIFFICULTY, and a difficulty with few stored runs (Ace!) starved the
   // challenge into constant normal-trainer fallbacks - so under the challenge
-  // we top up from the OTHER difficulties' pools too (current first, then the
-  // deepest pools), de-duped by id.
+  // we top up from EASIER difficulties' pools too (current first, then easier),
+  // de-duped by id. #difficulty-pools: the top-up is capped at the run's tier so
+  // an easy run never draws a HARDER (Hell/Elite) team - the Youngster-sees-Hell bug.
   // Mystery Gauntlet uses its fixed scripted carrier and must not depend on an external fetch.
   const immediateGhostPool = isErGhostChallengeActive();
   if (immediateGhostPool) {
     prefetchStarted = true;
     void (async () => {
       const collected: GhostTeamSnapshot[] = [];
-      const order: ErDifficulty[] = [getErDifficulty(), "hell", "elite", "ace", "youngster"];
+      const order: ErDifficulty[] = ghostChallengePoolOrder(getErDifficulty());
       const tried = new Set<string>();
       for (const diff of order) {
         if (tried.has(diff)) {
@@ -970,20 +1009,56 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
  * fielding the same player twice in a row when alternatives exist (#422). */
 let lastGhostUploader: string | null = null;
 
+/** How many recently-fielded ghost waves the picker avoids re-fielding the same
+ * uploader from (the "same ghost N waves in a row" report, #ghost-repeat). */
+const GHOST_RECENT_UPLOADER_WINDOW = 3;
+
 /**
- * Seeded-random pick among candidate snapshots, preferring an uploader other
- * than the previous ghost's. Deterministic per (run seed, wave) so reloading
- * the same wave fields the same ghost - but DIFFERENT waves and different
- * runs spread across the pool. Replaces the old shallowest-first sort, which
- * deterministically handed every early wave to whichever single player owned
- * the shallow end of the sample ("why is it always Arctic Flame?").
+ * The uploaders fielded in the {@linkcode GHOST_RECENT_UPLOADER_WINDOW} waves just
+ * before `waveIndex`, read from the already-recorded {@linkcode ghostByWave} cache
+ * (so this needs no new per-run state and stays co-op-deterministic + save/restore
+ * safe). Most-recent first, `lastGhostUploader` folded in so the immediately previous
+ * pick counts even on a non-contiguous ghost-wave schedule.
+ */
+function recentGhostUploaders(waveIndex: number): string[] {
+  const out: string[] = [];
+  if (lastGhostUploader) {
+    out.push(lastGhostUploader);
+  }
+  for (let w = waveIndex - 1; w >= waveIndex - GHOST_RECENT_UPLOADER_WINDOW && w >= 0; w--) {
+    const name = ghostByWave.get(w)?.trainerName;
+    if (name && !out.includes(name)) {
+      out.push(name);
+    }
+  }
+  return out;
+}
+
+/**
+ * Seeded-random pick among candidate snapshots, preferring an uploader NOT fielded in
+ * the recent-wave window - so the same player's ghost can't appear several waves in a
+ * row (the "same ghost 4x in a row" report). The window relaxes step by step when a
+ * strict filter would empty the pool, so a one-uploader-dominated sample still fields
+ * something rather than nothing. Deterministic per (run seed, wave) so reloading the
+ * same wave fields the same ghost - but DIFFERENT waves and different runs spread across
+ * the pool. Replaces the old shallowest-first sort, which deterministically handed every
+ * early wave to whichever single player owned the shallow end of the sample.
  */
 function pickGhost(candidates: GhostTeamSnapshot[], waveIndex: number): GhostTeamSnapshot | undefined {
   if (candidates.length === 0) {
     return undefined;
   }
-  const fresh = candidates.filter(s => (s.trainerName ?? "") !== lastGhostUploader);
-  const pool = fresh.length > 0 ? fresh : candidates;
+  const recent = recentGhostUploaders(waveIndex);
+  // Relax the recent window one uploader at a time until some candidate survives.
+  let pool = candidates;
+  for (let depth = recent.length; depth >= 1; depth--) {
+    const banned = new Set(recent.slice(0, depth));
+    const filtered = candidates.filter(s => !banned.has(s.trainerName ?? ""));
+    if (filtered.length > 0) {
+      pool = filtered;
+      break;
+    }
+  }
   const key = `${globalScene.seed}:ghostpick:${waveIndex}`;
   let h = 0;
   for (let i = 0; i < key.length; i++) {
@@ -1225,6 +1300,12 @@ export function buildGhostDialogueCtx(): GhostDialogueContext {
 /** Flag a freshly-built Trainer as a ghost, and size its party to the snapshot. */
 export function markTrainerAsGhost(trainer: Trainer, snapshot: GhostTeamSnapshot): void {
   GHOST_BY_TRAINER.set(trainer, snapshot);
+  // ER (#419 follow-up): mark the whole battle as a ghost so the universal BST power
+  // gate (enforceErEliteBstCurve) exempts every member of the fielded roster - the
+  // ghost is shown VERBATIM (fairness is the +40-wave eligibility window, not species
+  // mutation). A plain boolean read there needs no cross-module import (avoids the
+  // circular-init hazard this module guards against).
+  trainer.erIsGhost = true;
   const size = Math.min(snapshot.party.length, MAX_PARTY);
   // Shadow the instance method so getPartyLevels / genParty field exactly the
   // ghost's team size (the shared trainer config is left untouched).
@@ -1324,6 +1405,17 @@ export function hasErGhostOverride(trainer: Trainer): boolean {
 }
 
 /**
+ * The full ghost snapshot backing this trainer, or `null` when it is not an ER ghost.
+ * The ghost identity lives ONLY in the in-memory {@linkcode GHOST_BY_TRAINER} WeakMap,
+ * which a save/reload wipes - so {@linkcode TrainerData} persists this snapshot and
+ * re-applies it via {@linkcode markTrainerAsGhost} on reconstruction, restoring the
+ * ghost's name, BGM, and authored presentation mid-battle (#ghost-identity).
+ */
+export function getErGhostSnapshot(trainer: Trainer): GhostTeamSnapshot | null {
+  return GHOST_BY_TRAINER.get(trainer) ?? null;
+}
+
+/**
  * The species ids on this ghost trainer's snapshot team, or null when the trainer is
  * not an ER ghost. Used by the achievement layer (IDENTITY_THEFT) to check whether the
  * player fields a species that also appears on the ghost's team. Read-only accessor over
@@ -1378,15 +1470,21 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     }
     const level = battle?.enemyLevels?.[index] ?? member.level;
     const trainerSlot = !trainer.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
+    // ER (#419 follow-up): a ghost is fielded VERBATIM (the uploader's exact roster).
+    // Its eligibility is already gated by the +40-wave fairness window at SELECTION, so
+    // the universal BST cap must NOT additionally devolve/SWAP the stored species to the
+    // wave ceiling (e.g. a wave-63 hell ghost's Skarmory -> Clamperl) - that swap was the
+    // reported "ghost mons became a different species / wrong moves" bug. The whole ghost
+    // battle is exempt from enforceErEliteBstCurve via the trainer's `erIsGhost` marker
+    // (set in markTrainerAsGhost), which covers EVERY construction pass (party-gen AND
+    // the send-out rebuild). Our own fairness devolve above (below ER_GHOST_NO_DEVOLVE_WAVE
+    // only) is the intended depth-gate and still ran.
     const enemy = globalScene.addEnemyPokemon(species, level, trainerSlot);
-    // `addEnemyPokemon` runs enforceErEliteBstCurve, which can devolve/SWAP the species
-    // AGAIN to fit the wave's BST ceiling (e.g. a low-wave Skarmory -> Clamperl) and
-    // then generate a level-appropriate moveset for THAT final species. So restore the
-    // stored loadout (form + ability slot + exact moveset) ONLY when the final species
-    // still matches the stored member - otherwise the stored data belongs to a different
-    // species and the moves are wrong or outright illegal for it (the reported "ghost
-    // trainer has the wrong/empty moves" bug). This also subsumes our fairness devolve
-    // above; when the species differs we keep the moveset addEnemyPokemon generated.
+    // With the BST cap suppressed the final species now equals the stored member, so the
+    // stored loadout (form + ability slot + exact moveset) is restored below. The match
+    // check is kept as defense-in-depth: our fairness devolve (early challenge waves)
+    // legitimately changes the species, and in that case the level-appropriate moveset
+    // addEnemyPokemon generated for the devolved species is kept instead.
     const speciesMatchesStored = enemy.species.speciesId === member.speciesId;
     if (member.formIndex >= 0 && speciesMatchesStored && member.formIndex < (enemy.species.forms?.length ?? 0)) {
       enemy.formIndex = member.formIndex;

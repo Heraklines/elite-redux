@@ -1078,6 +1078,98 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Eternal Floette shows its ER kit (Energy Tap + 3 innates)",
+    description:
+      "KIT fix (starter / summary / battle surface) - Eternal Floette (the vanilla ETERNAL_FLOETTE\n"
+      + "the game actually fields) must carry the ER 2.65 'Floette Eternal Flower' kit: ACTIVES Energy\n"
+      + "Tap / Grassy Surge / Fairy Aura, INNATES Pastel Veil / Magic Guard / Mystic Power. The ability\n"
+      + "override's innate triple was wrong (Magic Guard / Mega Launcher / Reckless). Corrected to Pastel\n"
+      + "Veil / Magic Guard / Mystic Power.\n"
+      + "DO: open Eternal Floette on the starter grid / summary and read its ability + innates.\n"
+      + "EXPECT: active Energy Tap (cycles to Grassy Surge / Fairy Aura); innates Pastel Veil, Magic\n"
+      + "Guard, Mystic Power - NOT Flower Veil, NOT Mega Launcher/Reckless. Unit-tested in\n"
+      + "test/tests/elite-redux/er-eternal-floette-kit.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.ETERNAL_FLOETTE, {
+          moveset: [MoveId.MOONBLAST, MoveId.GIGA_DRAIN, MoveId.PSYCHIC, MoveId.QUIVER_DANCE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Trainers never field an already-Busted Mimikyu",
+    description:
+      "GENERATION guard (not a battle behavior) - 'Busted' is a battle-RESULT form (Mimikyu's\n"
+      + "Disguise breaking), never a resting form. The player restores it between battles via\n"
+      + "PostBattleInitAbAttr, but that pass is player-party ONLY, so a trainer / ghost-team snapshot\n"
+      + "that captured a Mimikyu mid-run in its busted form fielded it already broken (#442\n"
+      + "Unown-Revelation leak class, extended to Busted). Trainer.genPartyMember now resets any\n"
+      + "battle-result form to the resting form for every generated member.\n"
+      + "DO: fight trainers / ghost teams that run a Mimikyu (any tier: base, Apex, Rayquaza).\n"
+      + "EXPECT: it always ENTERS with its disguise INTACT (never pre-busted). It still breaks\n"
+      + "normally when first hit. Unit-tested in\n"
+      + "test/tests/elite-redux/er-mimikyu-busted-spawn-guard.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.MIMIKYU, {
+          moveset: [MoveId.PLAY_ROUGH, MoveId.SHADOW_SNEAK, MoveId.SWORDS_DANCE, MoveId.WOOD_HAMMER],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Enamorus is female-only (no male from hatch/catch)",
+    description:
+      "GENERATION fix (not a battle behavior) - Enamorus is a female-only species (malePercent 0).\n"
+      + "The gender roll used `randSeedFloat() * 100 <= malePercent`, so when the roll returned exactly\n"
+      + "0 the `<= 0` branch produced a MALE Enamorus (and any other female-only species) from egg\n"
+      + "hatch / wild catch. Fixed to a strict `<` so a female-only species is ALWAYS female while\n"
+      + "male-only (100) stays male and the seeded RNG stream position is unchanged.\n"
+      + "DO: hatch and/or catch several Enamorus (or any female-only species). EXPECT: every one is\n"
+      + "FEMALE - never a male. Unit-tested in test/tests/elite-redux/er-enamorus-female-only.test.ts.\n"
+      + "This scenario just fields an Enamorus so you can confirm the gender glyph in the summary.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.ENAMORUS, {
+          moveset: [MoveId.MOONBLAST, MoveId.AIR_SLASH, MoveId.EARTH_POWER, MoveId.QUIVER_DANCE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Zacian/Zamazenta Crowned uses the ER level-up learnset (not vanilla)",
+    description:
+      "DATA fix (#606 follow-up). The Crowned form's LEVEL-UP learnset was VANILLA (Behemoth\n"
+      + "Blade + Bite/Quick Attack/Metal Claw...), not ER's. Cause: vanilla ships a\n"
+      + "pokemonFormLevelMoves[ZACIAN][crowned] entry which PokemonSpeciesForm.getLevelMoves\n"
+      + "PREFERS over ER's species-level override, so the ER learnset never reached the Crowned\n"
+      + "form (same shadowing bug the redux forms hit). #606 fixed the Crowned abilities/stats/\n"
+      + "types; the learnset was missed. Fix: installCrownedFormLevelMoves mirrors the ER Crowned\n"
+      + "form species (SPECIES_ZACIAN_CROWNED_SWORD / _ZAMAZENTA_CROWNED_SHIELD) learnset onto the\n"
+      + "vanilla Crowned form index.\n"
+      + "DO: field the Zacian below (already in its Crowned form), open the SUMMARY, and view its\n"
+      + "level-up moves (or level it up). EXPECT: the ER Zacian kit (Play Rough / Sacred Sword /\n"
+      + "Swords Dance ... per the ER 2.65 dex), NOT the vanilla Behemoth-Blade list. Unit-tested in\n"
+      + "test/data/elite-redux/init-elite-redux-movesets.test.ts (Crowned form learnset override).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 60 });
+      return [
+        makeStarter(SpeciesId.ZACIAN, {
+          formIndex: formIndexContaining(SpeciesId.ZACIAN, "crowned"),
+          moveset: [MoveId.BEHEMOTH_BLADE, MoveId.PLAY_ROUGH, MoveId.SACRED_SWORD, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Type-nativization ability corrections (maintainer 2026-07-17)",
     description:
       "PURE DATA CHECK (no battle behavior to watch here) for seven maintainer-dictated\n"
@@ -18225,6 +18317,89 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.WEAVILE, {
           moveset: [MoveId.PURSUIT, MoveId.ICE_PUNCH, MoveId.NIGHT_SLASH, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Ghost teams: identity survives reload; verbatim roster; no repeats; difficulty-gated",
+    description:
+      "GHOST-POOL fixes (pool/serialization, not a single forcible battle) - verify via the Ghost\n"
+      + "Trainers challenge and a mid-battle save/reload:\n"
+      + "1. IDENTITY (#ghost-identity): save + reload DURING a ghost battle - the trainer KEEPS its\n"
+      + "   uploader name, piano BGM, and authored dialogue (was reverting to a plain NPC).\n"
+      + "2. VERBATIM (#419): a fielded ghost shows the uploader's EXACT species (no BST-cap devolve/\n"
+      + "   swap to the wave ceiling - e.g. a Snorlax stays Snorlax at an early ghost wave).\n"
+      + "3. NO-REPEAT (#ghost-repeat): consecutive ghost waves do NOT field the same player 3x+ in a row.\n"
+      + "4. DIFFICULTY (#345): a Youngster/Ace run NEVER meets a Hell-scaled ghost team (challenge pool is\n"
+      + "   capped at the run's tier and easier).\n"
+      + "Unit-tested: er-ghost-identity-reload / er-ghost-species-verbatim / er-ghost-repeat-suppression /\n"
+      + "er-ghost-difficulty-pool.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 20 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Colosseum vanilla round is not ~20 levels over the player cap",
+    description:
+      "LEVEL-CALC fix (ME-gated, not a plain battle) - the ER Colosseum / World Tournament vanilla\n"
+      + "(Ace/Youngster) round nudged the enemy level by round(waveIndex/10 * 2), which is +24 at wave 118\n"
+      + "(reported: tournament trainers ~20 levels over a L104 cap). It is now a FLAT ~+2 at any wave.\n"
+      + "DO: reach the Colosseum encounter deep in an Ace run and read the enemy levels.\n"
+      + "EXPECT: enemies are within a couple levels of your cap, not ~20 over. Unit-tested in\n"
+      + "test/tests/elite-redux/er-colosseum-level.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 118, STARTING_LEVEL_OVERRIDE: 104 });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Under-leveled evolved wilds de-evolve (Lv9 Raticate -> Rattata)",
+    description:
+      "WILD GENERATION fix (#19 redo, species-selection not a battle behavior) - a wild too evolved for\n"
+      + "its level is walked back to the stage valid for that level (a Lv9 Raticate, evo at 20 -> Rattata).\n"
+      + "The old gate was disabled because an UNDEFINED ER evo level devolved even a correctly-evolved\n"
+      + "Lv100 Watchog; it now devolves ONLY on a KNOWN numeric evo level above the encounter level.\n"
+      + "DO: encounter early-wave wilds; catch a high-BST evolved wild at a high wave.\n"
+      + "EXPECT: no under-leveled evolved wilds (no Lv9 Raticate), and correctly-evolved high-level wilds\n"
+      + "are untouched. Unit-tested in test/tests/elite-redux/er-wild-encounter-gates.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 3, STARTING_LEVEL_OVERRIDE: 9 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Mono-Type challenge: native extra/N-typed mons are starter-legal",
+    description:
+      "STARTER-GRID fix (#mono-fairy, UI not a battle behavior) - a mon that is Fairy (etc.) ONLY via a\n"
+      + "native extra/N-type (post type-nativization) was legal to FIELD/CATCH under the mono-type\n"
+      + "challenge but wrongly greyed out of the starter grid. The starter filter now folds in the extra\n"
+      + "types, matching in-battle enforcement.\n"
+      + "DO: start a Mono FAIRY challenge; open the starter grid.\n"
+      + "EXPECT: a natively-extra-Fairy mon is selectable (not greyed), consistent with being catchable/\n"
+      + "fieldable in the same run. Unit-tested in test/tests/elite-redux/er-monotype-native-extra-type.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 20 });
+      return [
+        makeStarter(SpeciesId.CLEFABLE, {
+          moveset: [MoveId.MOONBLAST, MoveId.MOONLIGHT, MoveId.THUNDERBOLT, MoveId.SOFT_BOILED],
         }),
       ];
     },
