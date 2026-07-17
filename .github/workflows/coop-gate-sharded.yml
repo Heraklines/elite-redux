@@ -120,19 +120,43 @@ jobs:
 
       - uses: ./.github/actions/setup-deps
 
+      # Optimization brief R7: cache the built bundle keyed on the GAME-SOURCE inputs only
+      # (the campaign workflow's proven pattern at coop-public-ui-campaign.yml). A
+      # test-/harness-only push reuses the identical-source bundle and skips the multi-minute
+      # production Vite build. The seal step below ALWAYS re-runs, re-stamping the manifest
+      # with the current commit SHA, so exact-SHA seal semantics are preserved and a bad
+      # reuse fails loudly at the browser job's manifest verification.
+      - name: Restore source-keyed browser bundle
+        id: bundle-cache
+        uses: actions/cache@v4
+        with:
+          path: dist-coop-browser
+          key: >-
+            coop-gate-bundle-v1-${{ hashFiles('src/**', 'public/**', 'index.html', 'index.css',
+            'pnpm-lock.yaml', 'scripts/coop-browser-transport-entry.ts',
+            'scripts/prepare-coop-browser-artifact.mjs', 'scripts/vite.coop-browser.config.mjs',
+            'vite.config.ts', 'patches/**', '.github/workflows/coop-gate-sharded.yml') }}
+
       - name: Build and seal browser checkpoint bundle once
         id: build
         env:
           COOP_BROWSER_OUT_DIR: dist-coop-browser
           VITE_COOP_SERVER_URL: http://127.0.0.1:4174
+          BUNDLE_CACHE_HIT: ${{ steps.bundle-cache.outputs.cache-hit }}
         shell: bash
         run: |
           set +e
           set -o pipefail
-          pnpm exec vite build --mode production --config scripts/vite.coop-browser.config.mjs \
-            2>&1 | tee coop-browser-build.log
-          status=${PIPESTATUS[0]}
+          status=0
+          if [ "$BUNDLE_CACHE_HIT" = "true" ]; then
+            echo "source-keyed bundle cache HIT - skipping vite build" | tee coop-browser-build.log
+          else
+            pnpm exec vite build --mode production --config scripts/vite.coop-browser.config.mjs \
+              2>&1 | tee coop-browser-build.log
+            status=${PIPESTATUS[0]}
+          fi
           if [ "$status" -eq 0 ]; then
+            rm -f dist-coop-browser/coop-browser-artifact.json
             node scripts/prepare-coop-browser-artifact.mjs
             status=$?
           fi
@@ -201,6 +225,17 @@ jobs:
         with:
           name: coop-browser-bundle-${{ github.sha }}
           path: dist-coop-browser
+
+      # Optimization brief R7: restore the Chrome build BEFORE the install step so the
+      # install becomes a no-op on hit. Keyed on OS + arch + the lockfile identity that
+      # pins the puppeteer (and thus browser) version.
+      - name: Restore Chrome runtime cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-chrome-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            puppeteer-chrome-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Install isolated Chrome runtime
         run: pnpm exec puppeteer browsers install chrome
@@ -289,6 +324,18 @@ jobs:
           fi
           git cat-file -e "${base}^{commit}"
           echo "COOP_BASE_SHA=$base" >> "$GITHUB_ENV"
+
+      # Optimization brief R7: warm-start incremental tsc. Keyed on compiler + tsconfig
+      # identity with a BRANCH RESTORE-KEYS PREFIX - an exact-source key would give zero
+      # incremental reuse after any edit; the prefix restore is the entire point. tsc still
+      # RUNS every time; only its .tsbuildinfo warm state is cached (tsconfig `incremental`).
+      - name: Restore incremental typecheck state
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/tsbuildinfo.json
+          key: tsbuildinfo-${{ runner.os }}-${{ hashFiles('tsconfig.json', 'pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            tsbuildinfo-${{ runner.os }}-${{ hashFiles('tsconfig.json', 'pnpm-lock.yaml') }}-
 
       - name: Check changed-file types, formatting, and lint
         id: static
