@@ -2098,18 +2098,19 @@ const RECIPES: Record<string, Recipe> = {
     diffTolerance: 0,
   },
   // ER Omniform (#partner-eevee): the level-up batch panel for a Partner Eevee. The
-  // top band shows the selected-evolution name + the evolution STRIP (Eevee + the 8
-  // partner eeveelutions, base selected, (F) key-badge); the LEARNABLE column offers
-  // the moves annotated for the BASE form (illegal / already-known ones dimmed), the
-  // CURRENT column shows the base moveset. Static -> exact diff.
+  // panel itself renders IDENTICALLY to the vanilla batch panel; the evolution STRIP
+  // sits OUTSIDE it, on its TOP EDGE (Eevee + the 8 partner eeveelutions, base
+  // selected with a gold underline, (F) key-badge, > overflow arrow). The LEARNABLE
+  // column offers the moves annotated for the BASE form (illegal / already-known ones
+  // dimmed), the CURRENT column shows the base moveset. Static -> exact diff.
   "learn-move-batch-omniform": {
     mode: UiMode.LEARN_MOVE_BATCH,
     prepare: async game => [await partnerEeveeBatchDeps(game)],
     diffTolerance: 0,
   },
   // ER Omniform: one CYCLE_FORM press selects the 2nd family form (Partner Vaporeon);
-  // the name label + the CURRENT column re-render to THAT evolution's OWN stored
-  // moveset, and the LEARNABLE column re-annotates the offers for it.
+  // the strip underline moves to it and the CURRENT column re-renders to THAT
+  // evolution's OWN stored moveset, and the LEARNABLE column re-annotates its offers.
   "learn-move-batch-omniform-cycled": {
     mode: UiMode.LEARN_MOVE_BATCH,
     prepare: async game => [await partnerEeveeBatchDeps(game)],
