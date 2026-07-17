@@ -3,7 +3,7 @@
   "taskId": "final-closure-20260717",
   "branch": "ci/coop/final-closure-20260717",
   "trainRef": "ci/coop/final-closure-20260717",
-  "baseSha": "edc503e0565071fd264fe082297b1a6b7baa5457",
+  "baseSha": "17397d38f7fd3a5100099c53e2fe3553fee1c550",
   "allowedFiles": [
     ".github/coop-task-ownership/final-closure-20260717.json",
     ".github/coop-task-ownership/p33-gameover-public-ui.json",
@@ -23,7 +23,9 @@
     "test/browser/coop-public-ui/semantic-surface-evidence.test.mjs",
     "test/browser/coop-public-ui/solo-classic.mjs",
     "test/tests/elite-redux/coop/coop-duo-resume.test.ts",
+    "test/tests/elite-redux/coop/coop-game-over-teardown.test.ts",
     "test/tests/elite-redux/coop/coop-rejoin-recovery-boundary.test.ts",
-    "test/tests/elite-redux/coop/coop-wiring-completeness.test.ts"
+    "test/tests/elite-redux/coop/coop-wiring-completeness.test.ts",
+    "test/tests/elite-redux/showdown/showdown-versus-summon-desync.test.ts"
   ]
 }

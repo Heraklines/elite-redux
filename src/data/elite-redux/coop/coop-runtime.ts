@@ -5836,6 +5836,10 @@ export function clearCoopRuntime(): void {
   // every production start/connect path clears first, so a fresh pairing must never inherit prior-run edges.
   resetCoopUiRelayTrace();
   if (active == null) {
+    // Capability negotiation belongs to the runtime/control plane, not the process. A full teardown
+    // (unlike a hot rejoin, which never calls this function) must remove the frozen intersection even
+    // when another terminal path already cleared the active runtime.
+    clearNegotiatedCoopCapabilities();
     return;
   }
   try {
@@ -5939,4 +5943,8 @@ export function clearCoopRuntime(): void {
   // (never silently falls back to a stale/global cursor).
   setActiveCoopRuntimeOpState(null);
   active = null;
+  // Clear only after the old runtime and transport are fully disposed: close handlers still execute during
+  // teardown and must observe the session's frozen capability set, not pre-handshake local-flag semantics.
+  // Without this reset, the next solo/pre-handshake surface can inherit the departed peer's capability mask.
+  clearNegotiatedCoopCapabilities();
 }

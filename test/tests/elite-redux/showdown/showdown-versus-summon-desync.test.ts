@@ -261,10 +261,15 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
     await game.runToTitle();
     game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
       game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
-      beginShowdownBattle([manifest(HOST_LEAD, [MoveId.TACKLE, MoveId.SPLASH, MoveId.FLAIL, MoveId.BOUNCE])], opponent);
+      const own = [manifest(HOST_LEAD, [MoveId.TACKLE, MoveId.SPLASH, MoveId.FLAIL, MoveId.BOUNCE])];
+      beginShowdownBattle(own, opponent);
       const starters = generateStarters(game.scene, [HOST_LEAD]);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      new SelectStarterPhase().initBattle(starters);
+      // Production Showdown builds the player's party from its manifest. Thread that manifest through
+      // here too: the legacy starter-only fixture can now reach CommandPhase with no player party after
+      // the strict Showdown manifest path was introduced, making this test crash before exercising the
+      // authoritative summon/weather behavior it exists to prove.
+      new SelectStarterPhase().initBattle(starters, true, undefined, own);
     });
     await game.phaseInterceptor.to("CommandPhase");
     game.scene.getPlayerParty()[0].moveset = [
