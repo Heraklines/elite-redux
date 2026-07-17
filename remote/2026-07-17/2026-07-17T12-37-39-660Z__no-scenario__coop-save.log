@@ -1,0 +1,105 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:5c1c767edeb60b18998ec06eb91b7e01b5da32d0:run-29580617982.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
+platform: Win32
+screen:   1920x1080 @1x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@38371ms -> title-shown@55256ms
+lastSess: n/a (first load / storage blocked)
+mode:     0  wave:?
+seed:     OfzjrAvnsG308AeVs6SOChdJ
+party:    
+enemy:    
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:5c1c767edeb60b18998ec06eb91b7e01b5da32d0:run-29580617982.1","source":"github","sha":"5c1c767edeb60b18998ec06eb91b7e01b5da32d0","workflow":{"provider":"github-actions","runId":"29580617982","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CO-OP REPORT CORRELATION (JSON) -----
+{"version":1,"pairKey":"coop-v1|session=-|run=-|epoch=0|seed=OfzjrAvnsG308AeVs6SOChdJ","runId":null,"epoch":0,"seed":"OfzjrAvnsG308AeVs6SOChdJ","binding":null,"membership":{"revision":2,"connectionGeneration":0},"local":{"role":"guest","seat":1},"partner":{"role":"host","seat":0},"build":{"version":1,"id":"github:5c1c767edeb60b18998ec06eb91b7e01b5da32d0:run-29580617982.1","source":"github","sha":"5c1c767edeb60b18998ec06eb91b7e01b5da32d0","workflow":{"provider":"github-actions","runId":"29580617982","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}}
+
+----- CO-OP CONTROL PLANE -----
+session:  role=guest seat=1 gen=0g epoch=0 run=- binding=- sessionId=- netcode=authoritative PRESENTATION-FINGERPRINT-MISMATCH
+members:  rev=2 state=recovering connectionGen=0 present=[0:host=false, 1:guest=true]
+phase:    running=TitlePhase queue=[]
+interact: counter=0 awaiting=none
+commands: pending=[]
+rendez:   awaiting=[] localArrived=[] partnerArrived=[]
+transport(local): state=disconnected generation=0 lastRx=45s
+causal:   2/2 most-recent edges
+  #1 recovery:channel-lost id=rejoin:e0:g0:c0 role=guest @e0/w0/t0 data channel closed
+  #2 recovery:redial-started id=rejoin:e0:g0:c0 role=guest @e0
+uiRelay:  none
+
+----- CONSOLE -----
+[12:35:18.518] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[12:35:19.361] LOG: [ER] build {"version":1,"id":"github:5c1c767edeb60b18998ec06eb91b7e01b5da32d0:run-29580617982.1","source":"github","sha":"5c1c767edeb60b18998ec06eb91b7e01b5da32d0","workflow":{"provider":"github-actions","runId":"29580617982","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[12:35:19.782] LOG: [dev-tools] loaded — 637 scenarios + Send Logs button
+[12:35:52.894] DEBUG: Destroying loading scene
+[12:35:52.894] DEBUG: Destroyed loading scene
+[12:35:53.002] LOG: Seed: OfzjrAvnsG308AeVs6SOChdJ
+[12:35:53.002] LOG: Wave Seed: OfzjrAvnsG308AeVs6SOChdJ 0
+[12:35:59.541] LOG: %cStart Phase LoginPhase color:green;
+[12:36:08.523] LOG: Client Session: mnPFKQ4zmPsRaIb5rZmtJxqSDgBhZ2Yq
+[12:36:09.764] LOG: %cStart Phase TitlePhase color:green;
+[12:36:09.767] LOG: Getting Session Slot id: %d 1
+[12:36:10.676] LOG: use seasonal splash messages true
+[12:36:39.705] LOG: %cStart Phase SelectStarterPhase color:green;
+[12:36:41.648] LOG: %cStart Phase TitlePhase color:green;
+[12:36:41.649] LOG: Getting Session Slot id: %d 1
+[12:36:41.672] LOG: use seasonal splash messages true
+[12:36:42.938] LOG: [coop:lobby] start announce name=test4 protocol=p33
+[12:36:44.107] LOG: [coop:lobby] poll players=1
+[12:36:44.847] LOG: [coop:lobby] request target=p33_IrNp_oA-Mms0NDLviUEoraUEJKOH4-pT (self=p33_Mn-FLFwQRp-lqs_Alotq93-y9ECEtFLT)
+[12:36:45.462] LOG: [coop:lobby] poll players=1
+[12:36:47.265] LOG: [coop:lobby] poll players=1
+[12:36:49.102] LOG: [coop:lobby] poll matched code=QCNJVD transportRole=answerer -> connect
+[12:36:49.382] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[12:36:50.908] LOG: [coop:launch] data channel already open
+[12:36:50.908] LOG: [coop:webrtc] peer connection state role=guest state=connected channel=open
+[12:36:50.908] LOG: [coop:webrtc] ICE connection state role=guest state=connected channel=open
+[12:36:50.909] LOG: [coop:webrtc] ctor role=guest readyState=open state=connected
+[12:36:50.910] LOG: [coop:webrtc] channel OPEN role=guest gen=0
+[12:36:51.105] LOG: [coop:launch] connectCoopSession role=guest state=connected username=test4 netcode=authoritative
+[12:36:51.107] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[12:36:51.108] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[12:36:51.109] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[12:36:51.109] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[12:36:51.110] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[12:36:51.110] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[12:36:51.110] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[12:36:51.110] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[12:36:51.110] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[12:36:51.111] LOG: [coop:launch] peer session ready role=guest netcode=authoritative -> connecting
+[12:36:51.111] LOG: [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=test4 version=er-coop-37 tiebreak=0.5140136408458783
+[12:36:51.112] LOG: [coop:webrtc] raw tx QUEUE role=guest t=hello bytes=531
+[12:36:51.156] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=d934626e515c046f(1108) movesName=12be97f97ecdc120(1108) movesets=44374aedf908f2ff(1920) abilitiesData=484720164af0dd92(1115) abilitiesName=1581743383868012(1115)
+[12:36:51.157] LOG: [coop:webrtc] raw tx QUEUE role=guest t=dataFingerprint bytes=329
+[12:36:51.160] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.160] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.160] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.160] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.163] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=542 handlers=11
+[12:36:51.164] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[12:36:51.164] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.164] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.164] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.164] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.165] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.165] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.166] LOG: [coop:webrtc] raw rx role=guest t=dataFingerprint bytes=329 handlers=11
+[12:36:51.166] WARN: [coop:checksum] PRESENTATION MISMATCH sections=movesName,abilitiesName - simulation compatible - movesName local=12be97f97ecdc120(1108) peer=c262a065143b9028(1108) abilitiesName local=1581743383868012(1115) peer=0dc202b994a0ebe5(1115)
+[12:36:51.166] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.166] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.166] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.166] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[12:36:51.578] WARN: [coop:webrtc] carrier LOST role=guest state=connected gen=0 reason=data channel closed
+[12:36:51.578] LOG: [coop:webrtc] state role=guest connected -> disconnected
+[12:36:51.580] WARN: [coop:runtime] partner channel disconnected -> entering membership recovery (shared waits retained)
+[12:36:52.382] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[12:36:56.112] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[12:36:56.112] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=5s transport=disconnected journal=0/0 queue=0
+[12:37:26.736] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[12:37:26.736] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=36s transport=disconnected journal=0/0 queue=0
+[12:37:36.293] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+
+----- REPLAY TRACE (JSON) -----
+(none)
