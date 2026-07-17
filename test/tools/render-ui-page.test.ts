@@ -28,6 +28,7 @@ import { getGameMode } from "#app/game-mode";
 import { allAbilities, modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
+import { ER_PARTNER_EEVEE_ABILITY_ID } from "#data/elite-redux/abilities/composite-newcomers";
 import { startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { bargainAbilityDescription } from "#data/elite-redux/er-bargain-sins";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
@@ -58,6 +59,7 @@ import { EggTier } from "#enums/egg-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
@@ -67,6 +69,7 @@ import {
   ModifierTypeOption,
 } from "#modifiers/modifier-type";
 import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
+import { playErTransformFx } from "#sprites/er-form-transform-fx";
 import { achvs } from "#system/achv";
 import { VoucherType } from "#system/voucher";
 import type { GameManager } from "#test/framework/game-manager";
@@ -235,6 +238,24 @@ async function startBattleWithBlackShinyLead(game: GameManager) {
   mon.customPokemonData.erBlackShiny = true;
   mon.customPokemonData.erGiftAbilities = [...GIFT_CHOICES];
   mon.customPokemonData.erGiftIndex = 0;
+  return mon;
+}
+
+/**
+ * ER Omniform (#partner-eevee): start a battle with a Partner Eevee lead - the
+ * vanilla Eevee "partner" FORM carrying the [Fluffy + Omniform] composite. It is
+ * an Omniform mon, so the summary shows the evolution browser strip (Eevee +
+ * the 8 partner eeveelutions). The composite is forced ACTIVE (a player innate is
+ * inert until candy-unlocked). Returns that PlayerPokemon.
+ */
+async function startBattleWithPartnerEeveeLead(game: GameManager) {
+  const partnerFormIndex = getPokemonSpecies(SpeciesId.EEVEE).forms.findIndex(f => f.formKey === "partner");
+  game.override.starterForms({ [SpeciesId.EEVEE]: partnerFormIndex }).ability(ER_PARTNER_EEVEE_ABILITY_ID as AbilityId);
+  await game.classicMode.startBattle(SpeciesId.EEVEE);
+  const mon = game.scene.getPlayerPokemon();
+  if (!mon) {
+    throw new Error("summary-multiform recipe: no player pokemon after startBattle");
+  }
   return mon;
 }
 
@@ -525,6 +546,42 @@ function showdownWagerArgs(): [ShowdownWagerArgs] {
 }
 
 const RECIPES: Record<string, Recipe> = {
+  // ER partner / Omniform TRANSFORM burst FX (per-type). Not a screen but a field
+  // overlay, rendered in isolation so `frames:` gives a flip-book SMOKE CHECK that
+  // the type-themed particles + tinted light draw non-blank and step without
+  // crashing. Faithful ANIMATION is out of scope here (the harness auto-completes
+  // tweens - CLAUDE.md "animation/timing"); the tween mock never APPLIES values,
+  // so the burst renders at its SPAWN state, which is what we want to eyeball.
+  // Math.random + the teardown timer are pinned so the render is deterministic
+  // (golden-stable) and the burst survives every captured frame.
+  "er-transform-fx": {
+    frames: 4,
+    diffTolerance: 4000,
+    render: (game, ctx) => {
+      const gs: any = game.scene;
+      // A field-scale (x6) host container centred on screen for the burst shapes.
+      const host = gs.add.container(0, 0).setScale(6).setPosition(960, 620);
+      ctx.fieldRoot.add(host);
+      const anchor = gs.add.rectangle(0, 0, 1, 1, 0x000000, 0).setVisible(false);
+      host.add(anchor);
+      // fakePokemon.y offsets the FX's internal -26 body nudge back to the origin.
+      const fakePokemon: any = { x: 0, y: 26, getSprite: () => anchor };
+
+      const realRandom = Math.random;
+      const realDelayed = gs.time.delayedCall?.bind(gs.time);
+      Math.random = () => 0.5; // deterministic spread
+      gs.time.delayedCall = () => ({ remove() {} }); // keep the burst alive across frames
+      try {
+        const prevField = gs.field;
+        gs.field = host; // the FX parents its shapes into globalScene.field
+        playErTransformFx(fakePokemon, PokemonType.GRASS);
+        gs.field = prevField;
+      } finally {
+        Math.random = realRandom;
+        gs.time.delayedCall = realDelayed;
+      }
+    },
+  },
   bargain: {
     mode: UiMode.ER_BARGAIN,
     prepare: () => bargainArgs(),
@@ -1277,6 +1334,32 @@ const RECIPES: Record<string, Recipe> = {
     },
     steps: [Button.CYCLE_SHINY],
     diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
+  },
+  // ER Omniform mons (#partner-eevee): a Partner Eevee lead shows the evolution
+  // browser STRIP on the ABILITIES page (Eevee + the 8 partner eeveelutions), the
+  // current battle-active form marked with a gold underline and boxed as selected.
+  // The < / > overflow arrows appear because 9 entries exceed the 5-icon window.
+  // This golden proves the strip renders for a multi-form Omniform mon; the plain
+  // `summary` recipe above (a single-form mon) proves it does NOT render there.
+  "summary-multiform": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithPartnerEeveeLead(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    diffTolerance: 40000, // live animated Eevee sprite in the summary box
+  },
+  // ER Omniform mons: after two CYCLE_FORM presses the strip selects the 2nd
+  // partner eeveelution and the ABILITIES panel re-renders THAT evolution's kit
+  // (view-only), the window scrolled to keep the selection in view.
+  "summary-multiform-cycled": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithPartnerEeveeLead(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    steps: [Button.CYCLE_FORM, Button.CYCLE_FORM],
+    diffTolerance: 40000, // live animated mon sprite in the summary box
   },
   // Bug #757: the ER money-streak mini-badge ("₽+N%", #348) on the summary name bar collides
   // with the level counter once the level reaches three digits. This recipe pins a level-120
