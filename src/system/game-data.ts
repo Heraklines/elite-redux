@@ -3735,11 +3735,67 @@ export class GameData {
           exactRunSlot(inspection)
           && (bypassLogin
             || (inspection.cloudCas?.mode === "existing" && inspection.cloudCas.runId === commitment.runId));
+        const knownCloudBackedMarkerSlot = async (
+          slot: number,
+        ): Promise<Extract<ResumeSlotInspection, { kind: "occupied" }> | null> => {
+          if (bypassLogin || accountIdentity == null) {
+            return null;
+          }
+          const localRaw = localStorage.getItem(this.sessionStorageKeyForAccount(slot, accountIdentity));
+          if (localRaw == null) {
+            return null;
+          }
+          let localStored: StoredCheckpoint | null = null;
+          try {
+            localStored = await parseStored(decrypt(localRaw, bypassLogin));
+          } catch {
+            return null;
+          }
+          if (localStored == null) {
+            return null;
+          }
+          const knownHead = this.readKnownCoopCloudHead(slot, accountIdentity);
+          if (
+            knownHead.kind !== "valid"
+            || knownHead.head.runId !== localStored.commitment.runId
+            || knownHead.head.checkpointRevision > localStored.commitment.checkpointRevision
+            || (knownHead.head.checkpointRevision === localStored.commitment.checkpointRevision
+              && knownHead.head.digest !== localStored.commitment.digest)
+          ) {
+            return null;
+          }
+          const inspection: Extract<ResumeSlotInspection, { kind: "occupied" }> = {
+            kind: "occupied",
+            slot,
+            localRaw,
+            stored: localStored,
+            cloudCas: {
+              mode: "existing",
+              runId: knownHead.head.runId,
+              checkpointRevision: knownHead.head.checkpointRevision,
+              digest: knownHead.head.digest,
+            },
+          };
+          return exactRunSlot(inspection) ? inspection : null;
+        };
 
         for (let attempt = 0; attempt < 2; attempt++) {
           const marker = readCoopResumeMarker(controller.localName(), partner);
           const markerMatchesRun = marker?.runId === commitment.runId;
-          const markerInspection = markerMatchesRun && marker?.slot != null ? await inspectSlot(marker.slot) : null;
+          // The frequent per-wave checkpoint is intentionally local-only. Once a prior cloud-CAS read/write
+          // established a known head for this exact run and marker slot, its local descendant does not need
+          // five fresh cloud reads before every ACK. Besides wasting a round trip, the old scan let the fixed
+          // five-second network race classify a healthy but CPU-starved browser's slot as unavailable, select
+          // an empty slot, and abort the shared run at the next wave. Cloud-cadence checkpoints still execute
+          // the full live CAS scan below; this shortcut can only advance a marker-local same-run descendant
+          // whose last known cloud ancestor is already frozen in account-scoped storage.
+          const markerKnownCloudInspection =
+            !mirrorCloud && markerMatchesRun && marker?.slot != null
+              ? await knownCloudBackedMarkerSlot(marker.slot)
+              : null;
+          const markerInspection =
+            markerKnownCloudInspection
+            ?? (markerMatchesRun && marker?.slot != null ? await inspectSlot(marker.slot) : null);
           const markerIsCloudBackedExactRun = markerInspection != null && cloudBackedExactRunSlot(markerInspection);
           // A marker-local same-run row with a missing cloud parent is not authority. Scan for an
           // exact cloud-backed survivor elsewhere; if none exists, fail closed instead of ACKing an

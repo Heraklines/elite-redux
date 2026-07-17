@@ -615,6 +615,22 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     ).toBe(priorGameplaySlot);
     expect(requestedCloudBytes, "ordinary per-wave local replicas do not bypass the cloud throttle").toEqual([]);
 
+    const readsBeforeLocalCadenceReplay = cloudRead.mock.calls.length;
+    cloudRead.mockImplementation(async () => {
+      throw new Error("a non-cloud cadence checkpoint must not touch the network after ancestry is frozen");
+    });
+    await expect(
+      withPeerPumpingClient(rig.guestCtx, () => host.sendResumeCheckpoint(hostJson, commitment!)),
+      "a known cloud-backed marker remains locally durable when the live cloud read is slow/unavailable",
+    ).resolves.toBe(true);
+    expect(
+      cloudRead,
+      "the local-only cadence reuses its frozen cloud ancestry instead of racing five network reads",
+    ).toHaveBeenCalledTimes(readsBeforeLocalCadenceReplay);
+    cloudRead.mockImplementation(async request =>
+      request.slot === cloudSlot && cloudRaw != null ? coopCasFound(cloudRaw) : coopCasMissing(),
+    );
+
     const newerRaw = JSON.parse(hostJson) as Record<string, unknown>;
     const newerJson = JSON.stringify({
       ...newerRaw,

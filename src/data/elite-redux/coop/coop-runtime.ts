@@ -2742,6 +2742,26 @@ export function failCoopSharedSession(reason: string, failure: CoopSharedSession
   const runtime = getCoopRuntime();
   if (runtime != null) {
     failCoopRuntimeSharedSession(runtime, reason, failure);
+    return;
+  }
+
+  // A phase can outlive an asynchronously torn-down runtime. That is still a fatal shared-session
+  // boundary: silently returning here lets the orphaned phase resume through its solo/local path and
+  // mutate mechanics without a peer. There is no authenticated control plane left with which to retain
+  // or ACK a terminal, so use the same immediate local fallback as an unbound legacy session and install
+  // exactly one title continuation. This is deliberately best-effort for engine-free tests/pre-scene
+  // failures, but the caller must still return/park after invoking us.
+  const safeReason = terminalReason(reason);
+  coopWarn("runtime", `orphaned shared session terminal requested: ${safeReason}`);
+  try {
+    releaseCoopTerminalPhaseProgression();
+    globalScene.reset();
+    (globalScene.phaseManager as unknown as CoopTerminalPhaseManagerBridge).clearAllPhases?.();
+    globalScene.phaseManager.unshiftNew("TitlePhase");
+    globalScene.phaseManager.shiftPhase();
+  } catch {
+    // With no runtime there is no remaining control plane to dispose. The public-input caller still
+    // refuses to advance, which preserves fail-closed mechanics in narrow harness/pre-scene contexts.
   }
 }
 

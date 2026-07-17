@@ -580,13 +580,21 @@ export class CommandPhase extends FieldPhase {
    * wrapped so a sync hiccup can never break the turn.
    */
   private tryCoopCheckpointSync(): boolean {
-    if (!globalScene.gameMode.isCoop) {
+    // Read the scene mode directly: isVersusSession() is runtime-backed and therefore becomes false
+    // in the exact orphaned-runtime condition this boundary must catch.
+    if (!globalScene.gameMode.isCoop && !globalScene.gameMode.isShowdown) {
       return true;
     }
     const controller = getCoopController();
     const streamer = getCoopBattleStreamer();
     if (controller == null || streamer == null) {
-      return true;
+      failCoopSharedSession("A shared battle reached command input without its authoritative runtime.", {
+        boundary: "recovery",
+        reasonCode: "recovery-exhausted",
+        wave: globalScene.currentBattle?.waveIndex,
+        turn: globalScene.currentBattle?.turn,
+      });
+      return false;
     }
     const { turn, waveIndex } = globalScene.currentBattle;
     // M6c (#633): the LOCKSTEP per-turn checkpoint broadcast/adopt that used to live here was

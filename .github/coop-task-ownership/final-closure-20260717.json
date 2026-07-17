@@ -10,9 +10,15 @@
     ".github/workflows/coop-public-ui-campaign.yml",
     "scripts/run-coop-browser-transport.mjs",
     "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/phases/command-phase.ts",
+    "src/phases/select-biome-phase.ts",
+    "src/phases/select-modifier-phase.ts",
+    "src/system/game-data.ts",
     "test/browser/coop-public-ui/config.mjs",
     "test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs",
     "test/browser/coop-public-ui/solo-classic.mjs",
-    "test/tests/elite-redux/coop/coop-rejoin-recovery-boundary.test.ts"
+    "test/tests/elite-redux/coop/coop-duo-resume.test.ts",
+    "test/tests/elite-redux/coop/coop-rejoin-recovery-boundary.test.ts",
+    "test/tests/elite-redux/coop/coop-wiring-completeness.test.ts"
   ]
 }
