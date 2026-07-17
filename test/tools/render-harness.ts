@@ -315,6 +315,37 @@ export function registerFonts(): void {
   }
 }
 
+let bitmapFontsRegistered = false;
+/**
+ * Register the "item-count" bitmap font (the stack-count / charge numerals drawn on
+ * held-item icons) into the CANVAS scene's cache. The live game loads it with
+ * `this.load.bitmapFont("item-count", ...)` in loading-scene; the harness has no
+ * Phaser file loader, so parse the .xml + .png by hand (jsdom supplies DOMParser).
+ * Without it every page that draws a STACKABLE held-item icon (the summary items
+ * row, the reward shop, the battle modifier bar) throws "Invalid BitmapText key:
+ * item-count" and blanks. Idempotent + safe to call each render.
+ */
+export async function registerBitmapFonts(scene: Phaser.Scene): Promise<void> {
+  if (bitmapFontsRegistered || scene.cache.bitmapFont.has("item-count")) {
+    bitmapFontsRegistered = true;
+    return;
+  }
+  const png = assetPath("fonts/item-count.png");
+  const xmlPath = assetPath("fonts/item-count.xml");
+  if (!png || !xmlPath) {
+    return;
+  }
+  if (!scene.textures.exists("item-count")) {
+    const img = await loadImage(png);
+    scene.textures.addImage("item-count", img as any);
+  }
+  const texture = scene.textures.get("item-count");
+  const xml = new DOMParser().parseFromString(readFileSync(xmlPath, "utf8"), "text/xml");
+  const data = (Phaser.GameObjects.BitmapText as any).ParseXMLBitmapFont(xml, texture.get(), 0, 0, texture);
+  scene.cache.bitmapFont.add("item-count", { data, texture: "item-count", frame: null });
+  bitmapFontsRegistered = true;
+}
+
 // ---------------------------------------------------------------------------
 // Asset resolution: basename -> file index over the UI-ish asset dirs
 // ---------------------------------------------------------------------------
@@ -1212,6 +1243,7 @@ export async function renderTwoPass(
   run: () => void | Promise<void>,
 ): Promise<{ injected: string[]; unresolved: string[] }> {
   // Pass 1: collect requested texture keys.
+  await registerBitmapFonts(ctx.scene);
   purgeSceneTimers();
   ctx.uiInner.removeAll(true);
   ctx.fieldRoot.removeAll(true);

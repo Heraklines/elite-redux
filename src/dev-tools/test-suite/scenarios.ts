@@ -1187,6 +1187,40 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Held-item icons align in the summary items row (vanilla + ER)",
+    description:
+      "UI ALIGNMENT fix (not a battle behavior) - the ER-custom held items (tactical / reactive /\n"
+      + "elemental-gem / terrain-seed) drew their summary icon ~6px BELOW the vanilla items in the\n"
+      + "'ITEMS' strip. Their forSummary icon scaled the SPRITE while vanilla scales the whole\n"
+      + "CONTAINER, so the (0,12) anchor stayed at full size instead of halving to 6. Now every icon\n"
+      + "centres on the same line.\n"
+      + "DO: this scenario grants a mix of vanilla + ER held items (Leftovers + Utility Umbrella + Iron\n"
+      + "Ball + Weakness Policy + a Fire gem + an Electric Seed). Open the mon's SUMMARY and switch to\n"
+      + "the STATS page - look at the 'ITEMS' strip at the top.\n"
+      + "EXPECT: all item icons sit on ONE baseline - no ER icon sags below its vanilla neighbours.\n"
+      + "Render-tested via test/tools/render-ui-page.test.ts (page 'summary-items-row').",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_HELD_ITEMS_OVERRIDE: [
+          { name: "LEFTOVERS" },
+          { name: "ER_UTILITY_UMBRELLA" },
+          { name: "ER_IRON_BALL" },
+          { name: "ER_WEAKNESS_POLICY" },
+          { name: "ER_FIRE_GEM" },
+          { name: "ER_ELECTRIC_SEED" },
+        ],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Trainers never field an already-Busted Mimikyu",
     description:
       "GENERATION guard (not a battle behavior) - 'Busted' is a battle-RESULT form (Mimikyu's\n"

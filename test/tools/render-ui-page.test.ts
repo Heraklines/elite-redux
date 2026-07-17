@@ -34,9 +34,11 @@ import { bargainAbilityDescription } from "#data/elite-redux/er-bargain-sins";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
 import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import { buildDemoChallengesConfig } from "#data/elite-redux/er-community-challenges";
+import { ErGemModifier, erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks, erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
+import { ErReactiveItemModifier, erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
 import {
   ER_SHINY_LAB_DEFAULT_PARAMS,
@@ -46,6 +48,8 @@ import {
   setErShinyLabOwnedBit,
   unlockErShinyLabNameFx,
 } from "#data/elite-redux/er-shiny-lab-effects";
+import { ErTacticalItemModifier, erTacticalItemType } from "#data/elite-redux/er-tactical-items";
+import { ErSeedModifier, erSeedItemType } from "#data/elite-redux/er-terrain-seeds";
 import {
   ensureOmniformFormMovesets,
   omniformFamilyForms,
@@ -362,6 +366,65 @@ async function startBattleWithMoneyStreakLead(game: GameManager, level: number) 
   for (let i = 0; i < 40 && erStreakBonusPercent(mon.id) < 10; i++) {
     advanceErMoneyStreaks();
   }
+  return mon;
+}
+
+/**
+ * Held-items-row repro: a player lead carrying a MIX of vanilla held items (drawn
+ * from the "items" atlas) and ER-custom standalone-texture items (tactical /
+ * reactive / elemental-gem / terrain-seed, each a 24x24 er-assets PNG). The STATS
+ * summary page (Page.STATS = 2) draws all of them in the top "ITEM" strip. Before
+ * the origin/scale fix the ER icons sagged ~6px below the vanilla neighbours (the
+ * ER summary path scaled the SPRITE while vanilla scales the whole CONTAINER, so
+ * the (0,12) anchor offset was applied un-scaled). This recipe surfaces the whole
+ * mixed row so the baseline shows every icon on the same centre line.
+ */
+async function startBattleWithMixedHeldItems(game: GameManager) {
+  await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+  const mon = game.scene.getPlayerPokemon();
+  if (!mon) {
+    throw new Error("summary-items-row recipe: no player pokemon after startBattle");
+  }
+  // Vanilla held items (items-atlas frames) - the alignment reference.
+  for (const typeFunc of [modifierTypes.LEFTOVERS, modifierTypes.WIDE_LENS, modifierTypes.FOCUS_BAND]) {
+    game.scene.addModifier(getModifierType(typeFunc).newModifier(mon), true, false, false, true);
+  }
+  // ER standalone-texture items (24x24 er-assets PNGs) - the ones that sagged.
+  game.scene.addModifier(
+    new ErTacticalItemModifier(erTacticalItemType("utilityUmbrella"), mon.id, "utilityUmbrella", false, 0, 1),
+    true,
+    false,
+    false,
+    true,
+  );
+  game.scene.addModifier(
+    new ErTacticalItemModifier(erTacticalItemType("ironBall"), mon.id, "ironBall", false, 0, 1),
+    true,
+    false,
+    false,
+    true,
+  );
+  game.scene.addModifier(
+    new ErReactiveItemModifier(erReactiveItemType("weaknessPolicy"), mon.id, "weaknessPolicy", 1),
+    true,
+    false,
+    false,
+    true,
+  );
+  game.scene.addModifier(
+    new ErGemModifier(erGemItemType(PokemonType.FIRE), mon.id, PokemonType.FIRE, 1),
+    true,
+    false,
+    false,
+    true,
+  );
+  game.scene.addModifier(
+    new ErSeedModifier(erSeedItemType("electricSeed"), mon.id, "electricSeed", 1),
+    true,
+    false,
+    false,
+    true,
+  );
   return mon;
 }
 
@@ -1444,6 +1507,21 @@ const RECIPES: Record<string, Recipe> = {
       return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
     },
     steps: [Button.CYCLE_SHINY],
+    diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
+  },
+  // Held-items row alignment: the STATS page (Page.STATS = 2) top "ITEM" strip with a
+  // MIX of vanilla items (Leftovers/Wide Lens/Focus Band, items-atlas frames) and ER
+  // standalone-texture items (Utility Umbrella + Iron Ball tactical, Weakness Policy
+  // reactive, a Fire gem, an Electric Seed). Before the fix the ER icons sat ~6px
+  // BELOW the vanilla neighbours (ER summary path scaled the sprite, not the container,
+  // so the (0,12) anchor was applied un-scaled). After the fix every icon centres on
+  // the same line. The live animated mon sprite in the summary box needs a tolerance.
+  "summary-items-row": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithMixedHeldItems(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, 2 /* Page.STATS */];
+    },
     diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
   },
   // ER Omniform mons (#partner-eevee): a Partner Eevee lead shows the evolution
