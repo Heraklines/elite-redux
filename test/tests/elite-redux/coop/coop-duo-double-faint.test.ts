@@ -162,7 +162,11 @@ describe.skipIf(!RUN)(
       // Drive to TurnEndPhase - both replacement SwitchPhases open after, guest-owned first then host-owned.
       // The focused harness drives only the host's real phase queue. Materialize the replay guest reaching
       // the same post-replacement command boundary; production gets this from its own CommandPhase.
-      const commandPoint = `cmd:${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}`;
+      // The POST-REPLACEMENT boundary: the double-KO turn (currently `turn`, pre-resolution) ends with
+      // incrementTurn(), so the reciprocal command point both engines meet at is the NEXT turn. Awaiting
+      // the current turn's point (`cmd:1:1`) waits on a boundary the host passed pre-pairing and will
+      // never re-announce (gate-10 B7: RENDEZVOUS RECOVERY EXHAUSTED point=cmd:1:1).
+      const commandPoint = `cmd:${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn + 1}`;
       withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.arrive(commandPoint));
       await drainLoopback();
       await withClient(rig.hostCtx, async () => {
@@ -216,7 +220,10 @@ describe.skipIf(!RUN)(
         if (hostOwnedFaintPending(rig)) {
           registerHostFaintAutoPick(game, rig);
         }
-        hostAdvance = game.phaseInterceptor.to("CommandPhase", false) as Promise<void>;
+        // Run the target (no `false`): the host's next-command rendezvous barrier lives in
+        // CommandPhase.start() (coopNextCommandBarrier) - parking the phase unrun means the host
+        // never announces its post-replacement arrival and any reciprocity await times out.
+        hostAdvance = game.phaseInterceptor.to("CommandPhase") as Promise<void>;
         await drainLoopback();
       });
       expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
