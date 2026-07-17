@@ -1158,6 +1158,47 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Softlock — solo new-biome (wave-11) freeze
+  // ===========================================================================
+  {
+    label: "Biome transition: solo wave-11 does not freeze (P0 2026-07-17)",
+    description:
+      "P0 live softlock (2 captures, builds 1c0a237ba / a8f0a659b): a SOLO run reached the\n"
+      + "FIRST wave of a NEW biome (the wave right after a successful biome pick + SwitchBiome),\n"
+      + "generated the wild enemy, then FROZE - the encounter never presented and the phase never\n"
+      + "ended (no error, no reset, just a dead screen). The earlier wave-10 biome-PICK fix let solo\n"
+      + "runs get past the pick, which then exposed this downstream NewBiomeEncounterPhase freeze.\n"
+      + "Cause: the new-biome encounter gated its own presentation on a co-op-only liveness check\n"
+      + "that is always false off co-op, so the solo presentation early-returned before finishing.\n"
+      + "This scenario starts you ON the wave-10 boundary against a trivial foe.\n"
+      + "DO: win the opening (wave 10) battle, then pick any biome on the map / travel.\n"
+      + "EXPECT: wave 11 loads normally - the new biome's wild encounter appears and you get a fresh\n"
+      + "command menu. Before the fix the screen sat frozen on the new-biome intro. Regression:\n"
+      + "test/tests/elite-redux/er-solo-new-biome-freeze-regression.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 10,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.CRUNCH, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // QoL — out-of-battle party reorder
   // ===========================================================================
   {
