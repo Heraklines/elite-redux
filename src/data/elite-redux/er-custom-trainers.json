@@ -2224,52 +2224,128 @@
     "name": "Horrid Dreadsden",
     "team": [
       {
-        "abilitySlot": 0,
-        "fusion": {
-          "abilitySlot": 0,
-          "formIndex": 0,
-          "species": 10120
-        },
-        "heldItems": [
+        "variants": [
           {
-            "count": 2,
-            "item": "SCOPE_LENS"
-          }
-        ],
-        "level": null,
-        "moves": [
-          "BANEFUL_BUNKER",
-          "HYPNOSIS",
-          "CURSE",
-          "POLTERGEIST"
-        ],
-        "species": 10101
-      },
-      {
-        "abilitySlot": 1,
-        "fusion": {
-          "abilitySlot": 1,
-          "formIndex": 0,
-          "species": 469
-        },
-        "heldItems": [
-          {
-            "count": 1,
-            "item": "QUICK_CLAW"
+            "abilitySlot": 0,
+            "fusion": {
+              "abilitySlot": 0,
+              "formIndex": 0,
+              "species": 10120
+            },
+            "heldItems": [
+              {
+                "count": 2,
+                "item": "SCOPE_LENS"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "BANEFUL_BUNKER",
+              "HYPNOSIS",
+              "CURSE",
+              "POLTERGEIST"
+            ],
+            "species": 10101,
+            "weight": 1
           },
           {
-            "count": 1,
-            "item": "ER_GHOST_GEM"
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 1,
+              "formIndex": 0,
+              "species": 10462
+            },
+            "heldItems": [
+              {
+                "count": 2,
+                "item": "SCOPE_LENS"
+              },
+              {
+                "count": 1,
+                "item": "CALCIUM"
+              },
+              {
+                "count": 1,
+                "item": "IRON"
+              },
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "BODY_PRESS",
+              "HYPNOSIS",
+              "DREAM_EATER",
+              "NIGHT_SHADE"
+            ],
+            "species": 10101,
+            "weight": 3
           }
-        ],
-        "level": null,
-        "moves": [
-          "HEX",
-          "SONIC_BOOM",
-          "THUNDER_WAVE",
-          "NASTY_PLOT"
-        ],
-        "species": 354
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 1,
+              "formIndex": 0,
+              "species": 101
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "ER_GHOST_GEM"
+              },
+              {
+                "count": 1,
+                "item": "ER_ELECTRIC_GEM"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "ELECTRO_DRIFT",
+              "RLA",
+              "THUNDER_WAVE",
+              "RLNA"
+            ],
+            "species": 10126,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 1,
+              "formIndex": 0,
+              "species": 469
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "ER_GHOST_GEM"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "HEX",
+              "SONIC_BOOM",
+              "THUNDER_WAVE",
+              "NASTY_PLOT"
+            ],
+            "species": 354,
+            "weight": 4
+          }
+        ]
       },
       {
         "abilitySlot": 1,
@@ -2302,37 +2378,59 @@
         "species": 10539
       },
       {
-        "abilitySlot": 2,
-        "fusion": {
-          "abilitySlot": 0,
-          "formIndex": 0,
-          "species": 10074
-        },
-        "heldItems": [
+        "variants": [
           {
-            "count": 2,
-            "item": "LEFTOVERS"
+            "abilitySlot": 2,
+            "fusion": {
+              "abilitySlot": 0,
+              "formIndex": 0,
+              "species": 10074
+            },
+            "heldItems": [
+              {
+                "count": 2,
+                "item": "LEFTOVERS"
+              },
+              {
+                "count": 2,
+                "item": "SITRUS_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "IRON"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "BITTER_MALICE",
+              "GIGA_DRAIN",
+              "RLA",
+              "RLNA"
+            ],
+            "shiny": {
+              "surface": "mistveil"
+            },
+            "species": 201,
+            "weight": 1
           },
           {
-            "count": 2,
-            "item": "SITRUS_BERRY"
-          },
-          {
-            "count": 1,
-            "item": "IRON"
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 2,
+              "formIndex": 0,
+              "species": 10821
+            },
+            "level": null,
+            "moves": [
+              "SUCKER_PUNCH",
+              "THIEF",
+              "BEAT_UP",
+              "SNATCH"
+            ],
+            "species": 10035,
+            "weight": 1
           }
-        ],
-        "level": null,
-        "moves": [
-          "BITTER_MALICE",
-          "GIGA_DRAIN",
-          "RLA",
-          "RLNA"
-        ],
-        "shiny": {
-          "surface": "mistveil"
-        },
-        "species": 201
+        ]
       },
       {
         "abilitySlot": 2,
@@ -2369,30 +2467,62 @@
         "species": 426
       },
       {
-        "abilitySlot": 0,
-        "fusion": {
-          "abilitySlot": 0,
-          "formIndex": 0,
-          "species": 10526
-        },
-        "heldItems": [
+        "variants": [
           {
-            "count": 1,
-            "item": "LANSAT_BERRY"
+            "abilitySlot": 0,
+            "fusion": {
+              "abilitySlot": 0,
+              "formIndex": 0,
+              "species": 10526
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "LANSAT_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "LIECHI_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "PROTECT",
+              "CURSE",
+              "BULLET_PUNCH",
+              "SHADOW_PUNCH"
+            ],
+            "species": 979,
+            "weight": 2
           },
           {
-            "count": 1,
-            "item": "LIECHI_BERRY"
+            "abilitySlot": 0,
+            "fusion": {
+              "abilitySlot": 0,
+              "formIndex": 0,
+              "species": 10526
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "LANSAT_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "LIECHI_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "DRAIN_PUNCH",
+              "RLNA",
+              "ATOMIC_FIRE",
+              "RLA"
+            ],
+            "species": 10655,
+            "weight": 1
           }
-        ],
-        "level": null,
-        "moves": [
-          "PROTECT",
-          "CURSE",
-          "BULLET_PUNCH",
-          "SHADOW_PUNCH"
-        ],
-        "species": 979
+        ]
       }
     ],
     "trainerClass": "ALLISTER",
