@@ -5118,7 +5118,21 @@ export class GameData {
         case "enemyParty": {
           const ret: PokemonData[] = [];
           for (const pd of v ?? []) {
-            ret.push(new PokemonData(pd));
+            // Fail SOFT per mon: a single unresolvable entry (e.g. a species id
+            // that no longer registers via getPokemonSpecies, so the PokemonData
+            // ctor's `getPokemonSpecies(species).forms` throws) must NOT abort the
+            // whole parse and report the entire save "corrupted / cannot be loaded"
+            // (#961 save-integrity). Skip the bad mon + log; the rest of the
+            // session still loads.
+            try {
+              ret.push(new PokemonData(pd));
+            } catch (err) {
+              console.error(
+                `[session-load] dropped an unloadable ${k} member (species ${pd?.species}): ${
+                  err instanceof Error ? err.message : String(err)
+                }`,
+              );
+            }
           }
           return ret;
         }
