@@ -1161,12 +1161,17 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
   );
   const observations = events.map(surfaceEvent => surfaceEvent.observation);
   const first = observations[0];
+  // The two engines legitimately host the SAME mystery surface from different phase classes: the
+  // authoritative host sits in MysteryEncounterPhase while the replaying guest presents it from
+  // CoopReplayMePhase (run 29595067992: every other field incl. the state digest matched). Compare
+  // phases modulo that known pairing - a genuine divergence still differs in digest/address/options.
+  const normalizeMePhase = phase => (phase === "CoopReplayMePhase" ? "MysteryEncounterPhase" : phase);
   for (const observation of observations.slice(1)) {
     const sameAddress = JSON.stringify(observation.address) === JSON.stringify(first.address);
     const sameOptions = JSON.stringify(observation.optionIds ?? null) === JSON.stringify(first.optionIds ?? null);
     if (
       observation.surfaceId !== first.surfaceId
-      || observation.phase !== first.phase
+      || normalizeMePhase(observation.phase) !== normalizeMePhase(first.phase)
       || observation.uiMode !== first.uiMode
       || observation.operationClass !== first.operationClass
       || observation.ownerSeat !== first.ownerSeat
