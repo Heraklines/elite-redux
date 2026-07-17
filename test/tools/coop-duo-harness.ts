@@ -1966,6 +1966,38 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
   });
   disposers.push(() => setCoopDurabilityScheduleWrapperForTesting(null));
 
+  // RAW setTimeout ownership: engine code also schedules continuation timers directly (e.g.
+  // setModeBoundedWhen's bounded verdict timer evaluates boundaryStillLive - which reads the ACTIVE
+  // runtime - inside a raw setTimeout; gate 29608072519 seating: that predicate fired under the guest
+  // window, judged the host boundary dead, and terminaled a healthy session). A timer scheduled while
+  // a client window is installed fires under that client; timers scheduled with NO window installed
+  // (vitest internals, the settle loop's own sleeps) pass through untouched.
+  const originalSetTimeout = globalThis.setTimeout;
+  const pinnedSetTimeout = ((handler: unknown, timeout?: number, ...timerArgs: unknown[]) => {
+    const owner = typeof handler === "function" ? activeClientCtx : null;
+    if (owner == null) {
+      return (originalSetTimeout as (...a: unknown[]) => unknown)(handler, timeout, ...timerArgs);
+    }
+    const fn = handler as (...a: unknown[]) => void;
+    return (originalSetTimeout as (...a: unknown[]) => unknown)(
+      (...cbArgs: unknown[]) => {
+        if (activeClientLabel === owner.label) {
+          fn(...cbArgs);
+          return;
+        }
+        withClientSync(owner, () => fn(...cbArgs));
+      },
+      timeout,
+      ...timerArgs,
+    );
+  }) as typeof setTimeout;
+  globalThis.setTimeout = pinnedSetTimeout;
+  disposers.push(() => {
+    if (globalThis.setTimeout === pinnedSetTimeout) {
+      globalThis.setTimeout = originalSetTimeout;
+    }
+  });
+
   duoCtxPinDisposers.set(rig, disposers);
 }
 

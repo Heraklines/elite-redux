@@ -285,29 +285,35 @@ export class SwitchPhase extends BattlePhase {
               return;
             }
             const releaseAfterPeerMaterial = (): void => {
-              void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result => {
-                if (coopSessionGeneration() !== sourceGeneration) {
-                  return;
-                }
-                if (result === "superseded" || !boundaryStillLive()) {
-                  failCoopSharedSession("The replacement flow lost its exact host boundary while closing.");
-                  return;
-                }
-                if (slotIndex >= battlerCount && slotIndex < 6) {
-                  scene.phaseManager.unshiftNew(
-                    "SwitchSummonPhase",
-                    this.switchType,
-                    fieldIndex,
-                    slotIndex,
-                    this.doReturn,
-                  );
-                  // Queue the checkpoint only after the retained old-address terminal and this host
-                  // message surface have both materially closed. It may carry turn N+1, but can no
-                  // longer race an N modal or leak into a superseding phase.
-                  scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
-                }
-                scene.phaseManager.shiftPhase();
-              });
+              // The close verdict must be judged under THIS runtime: the .then continuation resumes on
+              // the shared microtask queue, and boundaryStillLive reads the ACTIVE runtime - ambient
+              // state a two-engine test process legitimately points elsewhere between pumps. In a real
+              // browser the runtime is always active, so this defers nothing live.
+              void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result =>
+                runWhenCoopRuntimeActive(runtime, () => {
+                  if (coopSessionGeneration() !== sourceGeneration) {
+                    return;
+                  }
+                  if (result === "superseded" || !boundaryStillLive()) {
+                    failCoopSharedSession("The replacement flow lost its exact host boundary while closing.");
+                    return;
+                  }
+                  if (slotIndex >= battlerCount && slotIndex < 6) {
+                    scene.phaseManager.unshiftNew(
+                      "SwitchSummonPhase",
+                      this.switchType,
+                      fieldIndex,
+                      slotIndex,
+                      this.doReturn,
+                    );
+                    // Queue the checkpoint only after the retained old-address terminal and this host
+                    // message surface have both materially closed. It may carry turn N+1, but can no
+                    // longer race an N modal or leak into a superseding phase.
+                    scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+                  }
+                  scene.phaseManager.shiftPhase();
+                }),
+              );
             };
             if (receipt.operationId == null) {
               if (!legal) {
@@ -484,17 +490,21 @@ export class SwitchPhase extends BattlePhase {
             }
             scene.phaseManager.shiftPhase();
           };
-          if (authoritative) {
-            void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, ownerBoundaryStillLive).then(result => {
-              if (coopSessionGeneration() !== ownerGeneration) {
-                return;
-              }
-              if (result === "superseded" || !ownerBoundaryStillLive()) {
-                failCoopSharedSession("The owner replacement lost its exact phase boundary while closing.");
-                return;
-              }
-              finishOwnerReplacement();
-            });
+          if (authoritative && ownerRuntime != null) {
+            // Judge the close verdict under THIS runtime (see the non-owner branch above): the .then
+            // resumes on the shared microtask queue and ownerBoundaryStillLive reads the ACTIVE runtime.
+            void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, ownerBoundaryStillLive).then(result =>
+              runWhenCoopRuntimeActive(ownerRuntime, () => {
+                if (coopSessionGeneration() !== ownerGeneration) {
+                  return;
+                }
+                if (result === "superseded" || !ownerBoundaryStillLive()) {
+                  failCoopSharedSession("The owner replacement lost its exact phase boundary while closing.");
+                  return;
+                }
+                finishOwnerReplacement();
+              }),
+            );
           } else {
             scene.ui.setMode(UiMode.MESSAGE).then(finishOwnerReplacement);
           }

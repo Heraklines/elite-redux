@@ -211,17 +211,21 @@ export class ShowdownEnemyFaintSwitchPhase extends BattlePhase {
         return;
       }
       const releaseAfterPeerMaterial = (): void => {
-        void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result => {
-          if (coopSessionGeneration() !== sourceGeneration) {
-            return;
-          }
-          if (result === "superseded" || !boundaryStillLive()) {
-            failCoopSharedSession("The opponent replacement lost its exact host boundary while closing.");
-            return;
-          }
-          this.unshiftSummon(scene, slotIndex);
-          scene.phaseManager.shiftPhase();
-        });
+        // Judge the close verdict under THIS runtime (see SwitchPhase's non-owner branch): the .then
+        // resumes on the shared microtask queue and boundaryStillLive reads the ACTIVE runtime.
+        void scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, boundaryStillLive).then(result =>
+          runWhenCoopRuntimeActive(runtime, () => {
+            if (coopSessionGeneration() !== sourceGeneration) {
+              return;
+            }
+            if (result === "superseded" || !boundaryStillLive()) {
+              failCoopSharedSession("The opponent replacement lost its exact host boundary while closing.");
+              return;
+            }
+            this.unshiftSummon(scene, slotIndex);
+            scene.phaseManager.shiftPhase();
+          }),
+        );
       };
       if (receipt.operationId == null) {
         if (usedFallback) {
