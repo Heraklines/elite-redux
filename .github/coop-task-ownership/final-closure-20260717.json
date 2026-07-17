@@ -3,7 +3,7 @@
   "taskId": "final-closure-20260717",
   "branch": "ci/coop/final-closure-20260717",
   "trainRef": "ci/coop/final-closure-20260717",
-  "baseSha": "24179c4dd8f0fb05b6ec5c43ae181e054aa2b4a8",
+  "baseSha": "feab8999efc0088e9f5e9865876b437c68b346f7",
   "allowedFiles": [
     ".github/coop-task-ownership/final-closure-20260717.json",
     ".github/coop-task-ownership/p33-gameover-public-ui.json",
@@ -18,8 +18,8 @@
     "src/phases/select-biome-phase.ts",
     "src/phases/select-modifier-phase.ts",
     "src/system/game-data.ts",
-    "test/browser/coop-public-ui/campaign.mjs",
     "test/browser/coop-public-ui/campaign-nav.mjs",
+    "test/browser/coop-public-ui/campaign.mjs",
     "test/browser/coop-public-ui/config.mjs",
     "test/browser/coop-public-ui/evidence.mjs",
     "test/browser/coop-public-ui/faint-replacement-evidence.test.mjs",
