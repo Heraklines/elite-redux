@@ -332,22 +332,31 @@ export class SelectStarterPhase extends Phase {
       });
       return;
     }
-    // HOST: verify emptiness against BOTH replicas. Cloud-unavailable and all-full fail closed; a fresh
-    // run never overwrites an unrelated save merely because the browser cache was empty/stale.
-    let slot: number | null;
+    // HOST: prefer a slot verified empty against BOTH replicas; when all five are occupied, reclaim
+    // the LEAST-RECENT save automatically (maintainer directive, like the solo new-game flow) via
+    // the full cloud-safe delete path. Only an unverifiable reclamation still fails closed - a fresh
+    // run never overwrites anything merely because the browser cache was empty/stale.
+    let selection: { slot: number; overwrote: { slot: number; wave: number | null } | null } | null;
     try {
-      slot = await globalScene.gameData.findVerifiedEmptyCoopSessionSlot();
+      selection = await globalScene.gameData.findCoopLaunchSlotWithOverride();
     } catch (error) {
       console.error("[coop-launch] verified slot lookup failed", error);
       getCoopBattleStreamer()?.sendLaunchSnapshotAbort(COOP_LAUNCH_WAVE, "no-safe-slot");
       failCoopSharedSession("fresh co-op slot verification threw");
       return;
     }
-    if (slot == null) {
+    if (selection == null) {
       console.warn("[coop-launch] host: no verified empty local+cloud save slot; aborting fresh co-op launch");
       getCoopBattleStreamer()?.sendLaunchSnapshotAbort(COOP_LAUNCH_WAVE);
       failCoopSharedSession("fresh co-op launch has no verified empty local+cloud save slot");
       return;
+    }
+    const slot = selection.slot;
+    if (selection.overwrote != null) {
+      console.log(
+        `[coop-launch] host: reclaimed least-recent save slot=${selection.overwrote.slot} `
+          + `(wave ${selection.overwrote.wave ?? "?"}) for the fresh co-op run`,
+      );
     }
     globalScene.sessionSlotId = slot;
     console.log(`[coop-launch] host: auto-picked slot ${slot} (no picker), clearing STARTER_SELECT -> MESSAGE`);

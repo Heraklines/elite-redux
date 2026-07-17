@@ -3531,6 +3531,68 @@ export class GameData {
     return null;
   }
 
+  /**
+   * Maintainer directive (2026-07-17): a fresh co-op run reclaims a save slot AUTOMATICALLY, like
+   * the solo new-game flow, instead of failing closed when no slot verifies empty. Preference:
+   *  1. A verified-empty slot (unchanged path; nothing is deleted).
+   *  2. Otherwise DELETE-and-claim the least valuable occupied slot: unreadable/conflicted co-op
+   *     remnants first (they are unresumable), then the healthy save with the OLDEST timestamp.
+   * Reclamation runs the full {@linkcode deleteSession} path (cloud-safe classification, co-op run
+   * tombstoning, leased local retirement) and then re-runs the SAME verified-empty selection, so
+   * the overwrite is an explicit, logged decision and the first save still wins backend empty-slot
+   * CAS. If every reclamation attempt fails verification, the caller keeps the fail-closed abort.
+   */
+  public async findCoopLaunchSlotWithOverride(): Promise<{
+    slot: number;
+    overwrote: { slot: number; wave: number | null } | null;
+  } | null> {
+    const empty = await this.findVerifiedEmptyCoopSessionSlot();
+    if (empty != null) {
+      return { slot: empty, overwrote: null };
+    }
+    const accountIdentity = this.currentPersistenceAccount();
+    const candidates: { slot: number; unreadable: boolean; timestamp: number; wave: number | null }[] = [];
+    for (let slot = 0; slot < 5; slot++) {
+      const raw = localStorage.getItem(this.sessionStorageKeyForAccount(slot, accountIdentity));
+      if (raw == null) {
+        // Locally empty but cloud/lineage-unverifiable: there is nothing here the player chose to
+        // keep, but deleting cloud state we cannot classify is exactly the overwrite class the
+        // verified path exists to prevent. Skip; a later candidate's reclamation may still verify.
+        continue;
+      }
+      try {
+        const session = this.parseSessionData(decrypt(raw, bypassLogin));
+        candidates.push({
+          slot,
+          unreadable: false,
+          timestamp: session.timestamp ?? 0,
+          wave: session.waveIndex ?? null,
+        });
+      } catch {
+        candidates.push({ slot, unreadable: true, timestamp: 0, wave: null });
+      }
+    }
+    candidates.sort((a, b) => Number(b.unreadable) - Number(a.unreadable) || a.timestamp - b.timestamp);
+    for (const candidate of candidates) {
+      coopLog(
+        "launch",
+        `fresh co-op launch reclaiming least-recent save slot=${candidate.slot} `
+          + `wave=${candidate.wave ?? "?"} unreadable=${candidate.unreadable}`,
+      );
+      if (!(await this.deleteSession(candidate.slot))) {
+        coopWarn("launch", `least-recent reclamation delete failed slot=${candidate.slot}; trying next candidate`);
+        continue;
+      }
+      const claimed = await this.findVerifiedEmptyCoopSessionSlot();
+      if (claimed != null) {
+        return { slot: claimed, overwrote: { slot: candidate.slot, wave: candidate.wave } };
+      }
+      // Deleted but the account still has no verifiable slot (e.g. residual cloud state elsewhere):
+      // keep trying strictly-less-valuable candidates before giving up fail-closed.
+    }
+    return null;
+  }
+
   /** Final synchronous local fence immediately before starter materialization. */
   public confirmPendingFreshCoopSessionSlot(slot: number): boolean {
     const claim = this.pendingFreshCoopSlotClaim;

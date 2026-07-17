@@ -31,7 +31,12 @@ test("lobby quarantines one save-slot failure and releases a fresh run only thro
   assert.match(title, /Press to start a separate co-op run\. Existing saves will not be overwritten\./u);
   assert.match(title, /hostStartNew/u);
 
-  assert.match(starter, /findVerifiedEmptyCoopSessionSlot\(\)/u);
+  // Maintainer directive (2026-07-17): the launch reclaims the least-recent save automatically
+  // (solo new-game parity) through the wrapper; the verified-empty selection and the fail-closed
+  // abort remain the inner mechanism and the backstop respectively.
+  assert.match(starter, /findCoopLaunchSlotWithOverride\(\)/u);
+  assert.match(gameData, /findVerifiedEmptyCoopSessionSlot\(\)/u);
+  assert.match(gameData, /deleteSession\(candidate\.slot\)/u);
   assert.match(starter, /confirmPendingFreshCoopSessionSlot\(slot\)/u);
   assert.match(starter, /fresh co-op launch has no verified empty local\+cloud save slot/u);
 });
