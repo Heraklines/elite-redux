@@ -52,7 +52,7 @@ import {
 import type { Variant } from "#sprites/variant";
 import { getVariantTint } from "#sprites/variant";
 import { achvs } from "#system/achv";
-import { OmniformEvolutionStrip } from "#ui/omniform-evolution-strip";
+import { OmniformEvolutionStrip, omniformStripWidth } from "#ui/omniform-evolution-strip";
 import {
   currentEvolutionIndex,
   getEvolutionAbilities,
@@ -460,12 +460,6 @@ export class SummaryUiHandler extends UiHandler {
   }
 
   /**
-   * Vertical space (logical px) the Omniform strip reserves at the top of the
-   * ABILITIES + MOVES panels so its icons never overlap the page content.
-   */
-  private static readonly OMNIFORM_STRIP_OFFSET = 30;
-
-  /**
    * ER Omniform mons: (re)build the evolution browser strip for the current mon.
    * Only DEFAULT-mode summaries get it; a normal (non-Omniform) mon clears it so
    * the strip never renders. Selection defaults to the current battle-active form.
@@ -480,17 +474,23 @@ export class SummaryUiHandler extends UiHandler {
       return;
     }
     this.omniformViewIndex = currentEvolutionIndex(this.omniformEvolutions);
+    // Place the strip in the empty TOP HEADER bar (the row that holds "Pokemon
+    // Info" and the page-tab title), right-aligned, so it takes ZERO vertical
+    // space from the content panel below - which also means a 5-ability screen
+    // (a black shiny with the switchable 5th slot) can never overlap it.
+    const stripWindow = 5;
+    const stripCell = 16;
+    const rightEdgeX = 315;
     this.omniformStrip = new OmniformEvolutionStrip(
       this.summaryContainer,
       this.omniformEvolutions,
       this.omniformViewIndex,
       {
-        x: 110,
-        y: -159,
-        windowSize: 5,
-        cellWidth: 20,
-        iconScale: 0.6,
-        showName: true,
+        x: rightEdgeX - omniformStripWidth(stripWindow, stripCell),
+        y: this.abilitiesTabText.y + 6, // vertically centred in the header row
+        windowSize: stripWindow,
+        cellWidth: stripCell,
+        iconScale: 0.5,
         onChange: index => this.onOmniformSelectionChange(index),
       },
     );
@@ -521,13 +521,6 @@ export class SummaryUiHandler extends UiHandler {
   private getOmniformViewEntry(): OmniformEvolutionEntry | null {
     const entry = this.omniformEvolutions[this.omniformViewIndex];
     return entry && !entry.isCurrent ? entry : null;
-  }
-
-  /** Top offset a page reserves for the strip (0 unless the strip drives it). */
-  private omniformStripOffset(page: Page): number {
-    return this.omniformStrip != null && (page === Page.ABILITIES || page === Page.MOVES)
-      ? SummaryUiHandler.OMNIFORM_STRIP_OFFSET
-      : 0;
   }
 
   show(
@@ -1560,12 +1553,12 @@ export class SummaryUiHandler extends UiHandler {
         break;
       }
       case Page.MOVES: {
-        // ER Omniform: reserve top space for the strip; when an evolution is
-        // being previewed, its (view-only) moveset replaces the live moveset.
-        const movesStripOffset = this.omniformStripOffset(Page.MOVES);
+        // ER Omniform: when an evolution is being previewed (header strip), its
+        // (view-only) moveset replaces the live moveset. The strip lives in the
+        // header, so the moves panel keeps its full layout.
         const movesViewEntry = this.getOmniformViewEntry();
         const movesViewSet = movesViewEntry ? getEvolutionMoveset(this.pokemon!, movesViewEntry, 5) : null;
-        this.movesContainer = globalScene.add.container(5, -pageBg.height + 26 + movesStripOffset);
+        this.movesContainer = globalScene.add.container(5, -pageBg.height + 26);
         pageContainer.add(this.movesContainer);
 
         this.movesContainerMovesTitle = globalScene.add.image(
@@ -1715,9 +1708,7 @@ export class SummaryUiHandler extends UiHandler {
         moveDescriptionTextMaskRect.setScale(6);
         moveDescriptionTextMaskRect.fillStyle(0xffffff);
         moveDescriptionTextMaskRect.beginPath();
-        // Shift the mask by the same logical offset the container took for the
-        // Omniform strip, so the description stays aligned under its mask.
-        moveDescriptionTextMaskRect.fillRect(112, 130 + movesStripOffset, 202, 46);
+        moveDescriptionTextMaskRect.fillRect(112, 130, 202, 46);
 
         const moveDescriptionTextMask = moveDescriptionTextMaskRect.createGeometryMask();
 
@@ -1921,16 +1912,16 @@ export class SummaryUiHandler extends UiHandler {
     pageContainer: Phaser.GameObjects.Container,
     pageBg: Phaser.GameObjects.Sprite,
   ): void {
-    // ER Omniform: reserve top space for the strip and, when a NON-current
-    // evolution is selected, source the panel's abilities from THAT evolution's
-    // registration (view-only). `viewOnly` suppresses candy/level lock chrome
-    // (it is the browsed mon's, meaningless for a previewed evolution).
-    const stripOffset = this.omniformStripOffset(Page.ABILITIES);
+    // ER Omniform: when a NON-current evolution is selected in the header strip,
+    // source the panel's abilities from THAT evolution's registration (view-only).
+    // `viewOnly` suppresses candy/level lock chrome (it is the browsed mon's,
+    // meaningless for a previewed evolution). The strip lives in the top header
+    // bar, so it reserves NO space here (a 5-ability screen never overlaps it).
     const viewEntry = this.getOmniformViewEntry();
     const viewOnly = viewEntry != null;
     const viewAbilities = viewEntry ? getEvolutionAbilities(viewEntry) : null;
 
-    const container = globalScene.add.container(0, -pageBg.height + stripOffset);
+    const container = globalScene.add.container(0, -pageBg.height);
     pageContainer.add(container);
 
     const mon = this.pokemon;
@@ -2009,7 +2000,7 @@ export class SummaryUiHandler extends UiHandler {
     // 214x159 (summary_profile frame). Each row: an accent header bar with the
     // aligned label + name, then the abbreviated description below.
     const panelW = pageBg.width; // 214
-    const panelH = pageBg.height - stripOffset; // 159, less the Omniform strip band
+    const panelH = pageBg.height; // 159
     const rowH = Math.floor((panelH - 4) / Math.max(rows.length, 1));
     const headerH = 13;
     const labelX = 5;
