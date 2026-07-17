@@ -8,6 +8,12 @@
 const LAB = window.LAB;
 const CDN = LAB.cdn;
 const SPECIES = LAB.species;
+// Sprite file stem for a dex id: numeric id, except a form-only species (e.g.
+// Vivillon #666, which ships no 666.png) carries an explicit form stem in `f`.
+const spriteStem = id => {
+  const s = SPECIES.find(x => x.i === id);
+  return (s && s.f) || id;
+};
 const PAD = 28;
 let FW = 0;
 let FH = 0;
@@ -131,14 +137,15 @@ function auxLook(id) {
     auxCache.set(id, e);
     (async () => {
       try {
-        const atlas = await fetch(`${CDN}/${id}.json`).then(r => {
+        const stem = spriteStem(id);
+        const atlas = await fetch(`${CDN}/${stem}.json`).then(r => {
           if (!r.ok) {
             throw new Error("no atlas");
           }
           return r.json();
         });
         const fr = parseFrames(atlas)[0];
-        const img = await loadImg(`${CDN}/${id}.png`);
+        const img = await loadImg(`${CDN}/${stem}.png`);
         const w = (fr.sourceSize && fr.sourceSize.w) || fr.frame.w;
         const h = (fr.sourceSize && fr.sourceSize.h) || fr.frame.h;
         const cv = document.createElement("canvas");
@@ -209,7 +216,7 @@ const status = msg => {
 
 async function loadSpecies(id) {
   status("loading #" + id + " ...");
-  const base = `${CDN}/${id}`;
+  const base = `${CDN}/${spriteStem(id)}`;
   const atlas = await fetch(base + ".json").then(r => {
     if (!r.ok) {
       throw new Error("no atlas");

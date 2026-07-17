@@ -14,12 +14,20 @@ const sha = execSync(`git -C ${ERA} rev-parse HEAD`).toString().trim();
 const CDN = `https://cdn.jsdelivr.net/gh/Heraklines/er-assets@${sha}/images/pokemon`;
 
 // which base sprites exist (numeric <id>.png), national-dex range
-const present = new Set(
-  fs
-    .readdirSync(`${ERA}/images/pokemon`)
-    .filter(f => /^\d+\.png$/.test(f))
-    .map(f => +f.slice(0, -4)),
-);
+const pokemonFiles = fs.readdirSync(`${ERA}/images/pokemon`);
+const present = new Set(pokemonFiles.filter(f => /^\d+\.png$/.test(f)).map(f => +f.slice(0, -4)));
+
+// form-only species: no numeric <id>.png, but <id>-<form>.png form sprites exist
+// (Vivillon #666, the Deoxys/Rotom/Oricorio/... families). Collect the form stems
+// so the picker can still list the species EXACTLY ONCE with a representative form
+// sprite - without this the prev/next walk skips straight past them (665 -> 667).
+const presentForms = {};
+for (const f of pokemonFiles) {
+  const m = /^(\d+)-(.+)\.png$/.exec(f);
+  if (m) {
+    (presentForms[+m[1]] ??= []).push(f.slice(0, -4));
+  }
+}
 
 // dex -> name from the species enum (auto-incrementing: only anchors carry "= N")
 const enumSrc = fs.readFileSync("src/enums/species-id.ts", "utf8");
@@ -43,10 +51,32 @@ for (const line of enumSrc.split("\n")) {
       .join(" ");
   }
 }
+// formIndex-0 form key per species (Vivillon -> "meadow"), so a form-only species
+// defaults to its canonical form sprite rather than an arbitrary one.
+const firstFormKey = {};
+for (const chunk of fs.readFileSync("src/data/balance/pokemon-species.ts", "utf8").split("new PokemonSpecies(").slice(1)) {
+  const idm = /^\s*SpeciesId\.([A-Z0-9_]+)/.exec(chunk);
+  const id = idm && nameToId[idm[1]];
+  if (!id || id in firstFormKey) {
+    continue;
+  }
+  const fm = /new PokemonForm\(\s*"[^"]*",\s*"([^"]*)"/.exec(chunk);
+  if (fm && fm[1]) {
+    firstFormKey[id] = fm[1];
+  }
+}
+
 const species = [];
 for (let id = 1; id <= 1025; id++) {
   if (present.has(id)) {
     species.push({ i: id, n: names[id] || "No. " + id });
+  } else if (presentForms[id]?.length) {
+    // No base sprite, but form sprites exist: list once, defaulting to the
+    // formIndex-0 form's sprite when published, else the first available form.
+    const forms = presentForms[id];
+    const preferred = firstFormKey[id] ? `${id}-${firstFormKey[id]}` : null;
+    const stem = preferred && forms.includes(preferred) ? preferred : forms.slice().sort()[0];
+    species.push({ i: id, n: names[id] || "No. " + id, f: stem });
   }
 }
 
