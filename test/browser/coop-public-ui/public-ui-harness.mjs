@@ -3079,6 +3079,19 @@ export class DuoPublicUiRig {
       if (terminal != null) {
         throw new Error(`${owner.label}: shared session terminated before the replacement picker: ${terminal.text}`);
       }
+      // RECOVERY: if the picker is stuck in the mon action SUBMENU (party-option:* ids - e.g. an
+      // errant message-dismiss Space selected the fainted FIELD slot, run 29613070126), back out to
+      // the slot list; the finder above only accepts the slot-list form.
+      const rawSurface = owner.evidence.findLastSemanticSurface(replacementCursors[owner.label], "party:replacement");
+      if (
+        rawSurface?.observation.uiMode === "PARTY"
+        && Array.isArray(rawSurface.observation.optionIds)
+        && rawSurface.observation.optionIds.some(id => /^party-option:/u.test(id))
+      ) {
+        await owner.press("Backspace", "replacement-submenu-backout");
+        await delay(200);
+        continue;
+      }
       if (await advanceBattlePrompt()) {
         continue;
       }

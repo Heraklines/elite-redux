@@ -543,6 +543,17 @@ export function createBattlePromptAdvancer(
       if (!readyEvent) {
         continue;
       }
+      // A live replacement picker means the intro message chain has ALREADY yielded to the party UI:
+      // the matched message event is stale, and one more Space would fall through into the picker and
+      // select the fainted FIELD slot (run 29613070126: its submenu correctly lacks send-out, so the
+      // slot drive then threw "target not in options"). Leave the picker to driveReplacement.
+      const latestSurface = client.evidence.findLastSemanticSurface(cursors.get(client.label) ?? 0);
+      if (
+        latestSurface?.observation.surfaceId === "party:replacement"
+        && latestSurface.observation.uiMode === "PARTY"
+      ) {
+        continue;
+      }
       cursors.set(client.label, readyEvent.index + 1);
       const { surfaceId, phase, phaseInstance } = readyEvent.observation;
       consumedInstances.add(`${client.label}:${surfaceId}:${phaseInstance}`);

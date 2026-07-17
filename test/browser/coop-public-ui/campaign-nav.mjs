@@ -44,6 +44,11 @@ export function findOwnedActionableReplacementSurface(client, fromCursor = 0) {
     && observation.localSeat === client.publicSeat
     && observation.ownerSeat === client.publicSeat
     && observation.seatsWithInput?.includes(client.publicSeat)
+    // SLOT-LIST form only: a surface exposing the mon action SUBMENU (party-option:* ids) is the
+    // picker mid-descent - driving party-slot:* keys at it throws "target not in options"
+    // (run 29613070126: an errant Space had opened the fainted FIELD slot's submenu, which
+    // correctly lacks send-out). The driver must wait for / recover to the slot list.
+    && !(Array.isArray(observation.optionIds) && observation.optionIds.some(id => /^party-option:/u.test(id)))
     && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
     ? event
     : null;
