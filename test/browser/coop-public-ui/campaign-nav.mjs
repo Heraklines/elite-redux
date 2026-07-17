@@ -49,6 +49,39 @@ export function findOwnedActionableReplacementSurface(client, fromCursor = 0) {
     : null;
 }
 
+/**
+ * The currently rendered target picker for this stable seat.
+ *
+ * Looking up only the last matching `command:target` event is insufficient: after ACTION
+ * closes the picker that event remains in the trace. Requiring it to also be the client's
+ * latest semantic surface prevents a delayed poll from spending a second key on the next UI.
+ */
+export function findOwnedActionableTargetSurface(client, fromCursor = 0, expectedAddress = null) {
+  const event = client.evidence.findLastSemanticSurface(fromCursor, "command:target");
+  const latest = client.evidence.findLastSemanticSurface(fromCursor);
+  const observation = event?.observation;
+  const address = observation?.address;
+  const addressKey =
+    Number.isSafeInteger(address?.epoch) && Number.isSafeInteger(address?.wave) && Number.isSafeInteger(address?.turn)
+      ? `${address.epoch}:${address.wave}:${address.turn}`
+      : null;
+  return event != null
+    && latest?.index === event.index
+    && observation?.operationClass === "command"
+    && observation.ownerModel === "local"
+    && observation.phase === "SelectTargetPhase"
+    && observation.uiMode === "TARGET_SELECT"
+    && observation.localSeat === client.publicSeat
+    && observation.seatsWithInput?.includes(client.publicSeat)
+    && (expectedAddress == null || addressKey === expectedAddress)
+    && Array.isArray(observation.optionIds)
+    && observation.optionIds.length > 0
+    && observation.optionIds.includes(observation.selectedOptionId)
+    && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
+    ? event
+    : null;
+}
+
 /** Pick the first observer-proven healthy reserve, never the currently fielded/fainted slot. */
 export function replacementTargetOptionId(observation) {
   const target = observation?.partySlots?.find(slot => slot?.replacementEligible === true);

@@ -71,6 +71,31 @@ test("semantic evidence accepts an exact non-actionable replay watcher", () => {
   assert.deepEqual(parsed.seatsWithInput, []);
 });
 
+test("semantic evidence accepts an exact locally owned battle target surface", () => {
+  const parsed = semanticSurfaceView(
+    `${PREFIX}${JSON.stringify(
+      valid({
+        surfaceId: "command:target",
+        operationClass: "command",
+        ownerModel: "local",
+        ownerSeat: null,
+        seatsWithInput: [1],
+        localSeat: 1,
+        localRole: "guest",
+        selectedOptionId: "battle-target:2",
+        optionIds: ["battle-target:2", "battle-target:3"],
+        optionCount: 2,
+        ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+        phase: "SelectTargetPhase",
+        surfaceGeneration: null,
+        uiMode: "TARGET_SELECT",
+      }),
+    )}`,
+  );
+  assert.equal(parsed.surfaceId, "command:target");
+  assert.equal(parsed.selectedOptionId, "battle-target:2");
+});
+
 test("semantic evidence accepts the paired pre-battle title surface without weakening gameplay epochs", () => {
   const parsed = semanticSurfaceView(
     `${PREFIX}${JSON.stringify(

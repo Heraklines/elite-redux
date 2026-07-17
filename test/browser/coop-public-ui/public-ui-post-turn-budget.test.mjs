@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createBattlePromptAdvancer, driveConfirmedLeave } from "./campaign.mjs";
+import { findOwnedActionableTargetSurface } from "./campaign-nav.mjs";
 import { marketObservationView } from "./evidence.mjs";
 import { assertMarketPurchaseConverged, planMarketGridKeys } from "./market-journey.mjs";
 import {
@@ -460,6 +461,150 @@ test("sequential command driver submits the first owner before waiting for the p
     second: secondEvidence.events.at(-1).index,
   });
   assert.equal(result.expectedCommandAddress, "73:1:2");
+});
+
+test("target selection is admitted only while the exact owned picker is the current semantic surface", () => {
+  const evidence = new FakeEvidence("owner");
+  const client = { label: "owner", publicSeat: 1, evidence };
+  const address = { epoch: 73, wave: 1, turn: 2 };
+  evidence.push({
+    kind: "browser-surface2",
+    observation: {
+      operationClass: "command",
+      surfaceId: "command:target",
+      ownerModel: "local",
+      phase: "SelectTargetPhase",
+      phaseInstance: 8,
+      uiMode: "TARGET_SELECT",
+      address,
+      localSeat: 1,
+      seatsWithInput: [1],
+      selectedOptionId: "battle-target:2",
+      optionIds: ["battle-target:2", "battle-target:3"],
+      ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+    },
+  });
+
+  assert.equal(findOwnedActionableTargetSurface(client, 0, "73:1:2"), evidence.events[0]);
+  assert.equal(findOwnedActionableTargetSurface(client, 0, "73:1:3"), null, "the address is fail-closed");
+
+  evidence.push({
+    kind: "browser-surface2",
+    observation: {
+      ...ownedCommand(1, address).observation,
+      surfaceId: "battle:message",
+      operationClass: "battle-progress",
+      phase: "MovePhase",
+      uiMode: "MESSAGE",
+    },
+  });
+  assert.equal(
+    findOwnedActionableTargetSurface(client, 0, "73:1:2"),
+    null,
+    "a closed picker cannot spend a delayed second key",
+  );
+});
+
+test("sequential command driver resolves an animation-delayed target before waiting for the peer owner", async () => {
+  const order = [];
+  const address = { epoch: 73, wave: 1, turn: 2 };
+  const firstEvidence = new FakeEvidence("first");
+  const secondEvidence = new FakeEvidence("second");
+  firstEvidence.push(ownedCommand(0, address));
+  const first = {
+    label: "first",
+    publicSeat: 0,
+    evidence: firstEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("first-command");
+      firstEvidence.push({
+        kind: "browser-surface2",
+        observation: {
+          operationClass: "command",
+          surfaceId: "command:target",
+          ownerModel: "local",
+          phase: "SelectTargetPhase",
+          phaseInstance: 9,
+          uiMode: "TARGET_SELECT",
+          address,
+          localSeat: 0,
+          seatsWithInput: [0],
+          selectedOptionId: "battle-target:2",
+          optionIds: ["battle-target:2", "battle-target:3"],
+          ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+        },
+      });
+    },
+    press: async key => {
+      order.push(`first-target:${key}`);
+      secondEvidence.push(ownedCommand(1, address));
+    },
+  };
+  const second = {
+    label: "second",
+    publicSeat: 1,
+    evidence: secondEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("second-command");
+    },
+    press: async () => {},
+  };
+  const rig = { clients: { first, second }, config: { timeoutMs: 1_000 } };
+
+  await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
+    rig,
+    { first: 0, second: 0 },
+    ["Space", "Space", "Space"],
+    "targeted-turn",
+  );
+
+  assert.deepEqual(order, ["first-command", "first-target:Space", "second-command"]);
+  assert.equal(
+    firstEvidence.events.some(event => event.kind === "semantic-target-selection-proof"),
+    true,
+  );
+});
+
+test("paired reward frontier supersedes a next-command wait before either owner opens", async () => {
+  const firstEvidence = new FakeEvidence("first");
+  const secondEvidence = new FakeEvidence("second");
+  firstEvidence.push({ kind: "console", text: "Start Phase SelectModifierPhase" });
+  secondEvidence.push({ kind: "console", text: "Start Phase SelectModifierPhase" });
+  const unexpected = async () => {
+    throw new Error("a structural reward must not spend a command key");
+  };
+  const first = {
+    label: "first",
+    publicSeat: 0,
+    evidence: firstEvidence,
+    checkpoint: async () => {},
+    sequence: unexpected,
+    press: unexpected,
+  };
+  const second = {
+    label: "second",
+    publicSeat: 1,
+    evidence: secondEvidence,
+    checkpoint: async () => {},
+    sequence: unexpected,
+    press: unexpected,
+  };
+  const rig = { clients: { first, second }, config: { timeoutMs: 1_000 } };
+
+  const result = await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
+    rig,
+    { first: 0, second: 0 },
+    ["Space", "Space", "Space"],
+    "post-replacement-frontier",
+  );
+
+  assert.equal(result.commandEvents.first, undefined);
+  assert.equal(result.commandEvents.second, undefined);
+  assert.deepEqual(result.outcomeCursors, { first: 0, second: 0 });
+  assert.equal(firstEvidence.events.at(-1).supersededBy, "reward");
+  assert.equal(secondEvidence.events.at(-1).supersededBy, "reward");
 });
 
 test("sequential command driver accepts an exact-address collection close when the partner slot cannot act", async () => {

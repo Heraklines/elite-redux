@@ -413,9 +413,12 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
     case "COMMAND":
     case "FIGHT":
     case "BALL":
-    case "TARGET_SELECT":
       return phase === "CommandPhase"
         ? { surfaceId: `command:${uiMode.toLowerCase()}`, operationClass: "command", ownerModel: "local" }
+        : null;
+    case "TARGET_SELECT":
+      return phase === "SelectTargetPhase"
+        ? { surfaceId: "command:target", operationClass: "command", ownerModel: "local" }
         : null;
     case "STARTER_SELECT":
       return { surfaceId: "starter-select", operationClass: "starter", ownerModel: "local" };
@@ -633,6 +636,23 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       selectedOptionId,
       optionIds: null,
       optionCount: null,
+    };
+  }
+  if (uiMode === "TARGET_SELECT") {
+    const targets = (handler as unknown as { targets?: unknown }).targets;
+    const optionIds = Array.isArray(targets)
+      ? targets
+          .filter((target): target is number => Number.isSafeInteger(target))
+          .map(target => `battle-target:${target}`)
+      : null;
+    const selectedOptionId =
+      selectedIndex != null && optionIds?.includes(`battle-target:${selectedIndex}`)
+        ? `battle-target:${selectedIndex}`
+        : null;
+    return {
+      selectedOptionId,
+      optionIds,
+      optionCount: optionIds?.length ?? null,
     };
   }
   if (uiMode === "MODIFIER_SELECT") {

@@ -9,6 +9,7 @@ import {
   confirmDefaultStarterTeam,
   confirmSeededStarterTeam,
   findOwnedActionableReplacementSurface,
+  findOwnedActionableTargetSurface,
   replacementTargetOptionId,
   selectOptionById,
   waitForSemanticSurface,
@@ -247,6 +248,35 @@ function findAddressedCommandCollectionClosed(client, from, expectedAddress) {
       && sameAddress(observation.address, expectedAddress)
     );
   });
+}
+
+function findRoundSupersedingOutcome(client, from) {
+  return client.evidence.find(REWARD_PHASE, from) ?? client.evidence.find(GAME_OVER_PHASE, from) ?? null;
+}
+
+async function driveOwnedTargetSelection(client, from, expectedAddress, consumedInstances, purpose) {
+  const event = findOwnedActionableTargetSurface(client, from, expectedAddress);
+  if (event == null) {
+    return false;
+  }
+  const observation = event.observation;
+  const instance =
+    `${client.label}:${observation.address.epoch}:${observation.address.wave}:`
+    + `${observation.address.turn}:${observation.phaseInstance}`;
+  if (consumedInstances.has(instance)) {
+    return false;
+  }
+  consumedInstances.add(instance);
+  client.evidence.record("semantic-target-selection-proof", {
+    purpose,
+    surfaceEventIndex: event.index,
+    selectedOptionId: observation.selectedOptionId,
+    optionIds: observation.optionIds,
+    address: observation.address,
+    phaseInstance: observation.phaseInstance,
+  });
+  await client.press("Space", `${purpose}-${client.label}-${observation.selectedOptionId}`);
+  return true;
 }
 
 /**
@@ -2475,6 +2505,14 @@ export class DuoPublicUiRig {
           throw new Error("Unexpected faint picker in the wave-1 journey; use faint-replacement with prepared saves");
         }
         await this.driveReplacement(outcome.client, outcomeCursors);
+        // The cursors which found the faint necessarily precede the just-consumed PARTY
+        // picker and the original turn's command surfaces. Starting the next owner wait
+        // there can re-admit those stale commands. A real player resumes from the completed
+        // replacement boundary, so establish the same fresh public evidence floor.
+        commandCursors = Object.fromEntries(
+          Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
+        );
+        continue;
       }
       if (outcome.kind === "command") {
         // Command ownership opens sequentially: submitting the first owner's next-turn command is
@@ -2741,8 +2779,61 @@ export class DuoPublicUiRig {
     let submittedCommandAddress = null;
     let postSubmissionCursors = null;
     let commandCollectionClosed = null;
+    let supersedingOutcome = null;
+    const consumedTargetInstances = new Set();
 
     while (pending.size > 0 && Date.now() < progressBudget.observe()) {
+      const structuralOutcomes = clients.map(client => ({
+        client,
+        event: findRoundSupersedingOutcome(client, from[client.label] ?? 0),
+      }));
+      if (structuralOutcomes.some(candidate => candidate.event != null)) {
+        if (structuralOutcomes.every(candidate => candidate.event != null)) {
+          supersedingOutcome = structuralOutcomes[0].event.text?.includes("GameOverPhase") ? "gameOver" : "reward";
+          for (const label of pending) {
+            outcomeCursors[label] = from[label] ?? 0;
+          }
+          pending.clear();
+          break;
+        }
+        // A structural terminal on either browser proves no new command owner can open at
+        // this address. Drain only readiness-proven narration until the peer converges.
+        advanceBattlePrompt ??= createBattlePromptAdvancer(
+          this,
+          from,
+          {},
+          `${purpose}-structural-frontier`,
+          promptCommandAddress == null ? undefined : { expectedCommandAddress: promptCommandAddress },
+        );
+        if (await advanceBattlePrompt()) {
+          continue;
+        }
+        await delay(100);
+        continue;
+      }
+
+      let droveTarget = false;
+      for (const client of clients) {
+        if (
+          await driveOwnedTargetSelection(
+            client,
+            from[client.label] ?? 0,
+            promptCommandAddress,
+            consumedTargetInstances,
+            `${purpose}-target`,
+          )
+        ) {
+          // Exclude the consumed target surface from the following post-turn scan. The
+          // key event itself is recorded synchronously before Phaser handles the action.
+          outcomeCursors[client.label] = client.evidence.cursor();
+          droveTarget = true;
+          break;
+        }
+      }
+      if (droveTarget) {
+        continue;
+      }
+
       let droveCommand = false;
       for (const client of clients) {
         if (!pending.has(client.label)) {
@@ -2830,9 +2921,11 @@ export class DuoPublicUiRig {
       client.evidence.record("sequential-command-proof", {
         purpose,
         commandEventIndex: commandEvents[client.label]?.index ?? null,
-        skippedAfterCollectionClosed: commandEvents[client.label] == null && commandCollectionClosed != null,
+        skippedAfterCollectionClosed:
+          commandEvents[client.label] == null && (commandCollectionClosed != null || supersedingOutcome != null),
         collectionClosedEventIndex: commandCollectionClosed?.event.index ?? null,
         collectionClosedObservedBy: commandCollectionClosed?.client.label ?? null,
+        supersededBy: supersedingOutcome,
         outcomeCursor: outcomeCursors[client.label],
       });
     }
@@ -2845,6 +2938,7 @@ export class DuoPublicUiRig {
 
   async waitForPostTurnOutcome(from, { expectedCommandAddress = null, progressBudgetOptions = {} } = {}) {
     let advanceBattlePrompt = null;
+    const consumedTargetInstances = new Set();
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs, progressBudgetOptions);
     let partialGameOver = [];
     while (Date.now() < progressBudget.observe()) {
@@ -2880,6 +2974,24 @@ export class DuoPublicUiRig {
         ) {
           return { kind: "faint", client };
         }
+      }
+      let droveTarget = false;
+      for (const client of values) {
+        if (
+          await driveOwnedTargetSelection(
+            client,
+            from[client.label] ?? 0,
+            expectedCommandAddress,
+            consumedTargetInstances,
+            "public-ui-post-turn-target",
+          )
+        ) {
+          droveTarget = true;
+          break;
+        }
+      }
+      if (droveTarget) {
+        continue;
       }
       // A renderer can still be parked on an exact, readiness-proven narration prompt
       // after the authority has opened the next command frontier. Drain that human input

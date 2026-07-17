@@ -301,6 +301,16 @@ if (
   failures.push("coop-browser-entry.ts: EXP prompts must expose complete actionable readiness to the public driver");
 }
 if (
+  !browserEntry.includes('phase === "SelectTargetPhase"')
+  || !browserEntry.includes('surfaceId: "command:target"')
+  || !browserEntry.includes("`battle-target:${target}`")
+  || !harness.includes("findOwnedActionableTargetSurface")
+  || !harness.includes('"semantic-target-selection-proof"')
+  || !harness.includes('"public-ui-post-turn-target"')
+) {
+  failures.push("target selection must remain an address-bound semantic public UI-to-relay chain");
+}
+if (
   !browserEntry.includes("[coop-browser:render-profile]")
   || !browserEntry.includes("mode === UiMode.SETTINGS")
   || !browserEntry.includes("mode === UiMode.SETTINGS_DISPLAY")
