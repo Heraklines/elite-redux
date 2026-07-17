@@ -1100,6 +1100,29 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Trainers never field an already-Busted Mimikyu",
+    description:
+      "GENERATION guard (not a battle behavior) - 'Busted' is a battle-RESULT form (Mimikyu's\n"
+      + "Disguise breaking), never a resting form. The player restores it between battles via\n"
+      + "PostBattleInitAbAttr, but that pass is player-party ONLY, so a trainer / ghost-team snapshot\n"
+      + "that captured a Mimikyu mid-run in its busted form fielded it already broken (#442\n"
+      + "Unown-Revelation leak class, extended to Busted). Trainer.genPartyMember now resets any\n"
+      + "battle-result form to the resting form for every generated member.\n"
+      + "DO: fight trainers / ghost teams that run a Mimikyu (any tier: base, Apex, Rayquaza).\n"
+      + "EXPECT: it always ENTERS with its disguise INTACT (never pre-busted). It still breaks\n"
+      + "normally when first hit. Unit-tested in\n"
+      + "test/tests/elite-redux/er-mimikyu-busted-spawn-guard.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.MIMIKYU, {
+          moveset: [MoveId.PLAY_ROUGH, MoveId.SHADOW_SNEAK, MoveId.SWORDS_DANCE, MoveId.WOOD_HAMMER],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Enamorus is female-only (no male from hatch/catch)",
     description:
       "GENERATION fix (not a battle behavior) - Enamorus is a female-only species (malePercent 0).\n"
