@@ -162,5 +162,24 @@ export async function skipBattleRunMysteryEncounterRewardsPhase(game: GameManage
   game.scene.phaseManager.pushPhase(new VictoryPhase(0));
   game.endPhase();
   game.setMode(UiMode.MESSAGE);
+  // Post-victory EXP can level mons into the ER batch learn-move panel, which
+  // waits on real input; dismiss it (Cancel -> confirm "Yes") or the interceptor
+  // parks at LearnMoveBatchPhase forever. Prompts are one-shot and EVERY mon
+  // that levels opens its own panel, so stack one registration per party slot.
+  for (let i = 0; i < 6; i++) {
+    game.onNextPrompt(
+      "LearnMoveBatchPhase",
+      UiMode.LEARN_MOVE_BATCH,
+      () => {
+        const ui = game.scene.ui;
+        ui.processInput(Button.CANCEL);
+        if (ui.getMode() === UiMode.LEARN_MOVE_BATCH) {
+          ui.processInput(Button.RIGHT); // confirm prompt: move to "Yes"
+          ui.processInput(Button.ACTION);
+        }
+      },
+      () => game.isCurrentPhase("MysteryEncounterRewardsPhase"),
+    );
+  }
   await game.phaseInterceptor.to("MysteryEncounterRewardsPhase", runRewardsPhase);
 }
