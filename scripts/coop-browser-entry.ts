@@ -416,6 +416,8 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       return phase === "CommandPhase"
         ? { surfaceId: `command:${uiMode.toLowerCase()}`, operationClass: "command", ownerModel: "local" }
         : null;
+    // The resolved target belongs to the same local command, but production deliberately
+    // commits it from its own phase after the human chooses the concrete battler index.
     case "TARGET_SELECT":
       return phase === "SelectTargetPhase"
         ? { surfaceId: "command:target", operationClass: "command", ownerModel: "local" }
