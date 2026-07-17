@@ -67,7 +67,6 @@ import { UiMode } from "#enums/ui-mode";
 import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
 import { readErShinyLabSpriteSourcePixels } from "#sprites/er-shiny-lab-sprite-fx";
 import { ensureErShinyLabPaletteVariantCache } from "#sprites/variant";
-import { ER_EFFECTS_LAB_CATEGORIES, type ErEffectsLabView } from "#ui/handlers/er-effects-lab";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -202,25 +201,6 @@ const TUNE_BAR_SEGMENTS = 12;
 const TUNE_SEG_W = 6;
 const TUNE_VALUE_X = LIST_X + LIST_W - 9;
 
-// --- Effects section layout ---
-// The "Effects" toggle button sits in the header band (y < 15), above the shiny
-// option area and separate from the tabs (the maintainer's "a button above").
-const EFFECTS_BTN_W = 64;
-const EFFECTS_BTN_H = 11;
-const EFFECTS_BTN_X = 112;
-const EFFECTS_BTN_Y = 2;
-// The effects body covers everything below the header band with an opaque backdrop.
-const EFFECTS_BODY_Y = 15;
-const EFFECTS_BODY_H = SCREEN_H - EFFECTS_BODY_Y;
-// Left category column + the right-hand preview view bounds.
-const EFFECTS_CAT_X = 6;
-const EFFECTS_CAT_Y = 36;
-const EFFECTS_CAT_STEP = 13;
-const EFFECTS_VIEW_X = 100;
-const EFFECTS_VIEW_Y = 30;
-const EFFECTS_VIEW_W = SCREEN_W - EFFECTS_VIEW_X - 4;
-const EFFECTS_VIEW_H = 140;
-
 export class ErShinyLabUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   // Preview pane.
@@ -269,25 +249,10 @@ export class ErShinyLabUiHandler extends UiHandler {
   private detailStatus: Phaser.GameObjects.Text;
   // Hint.
   private hintText: Phaser.GameObjects.Text;
-  // Effects section (a separate lab: category-driven effect previews).
-  private effectsButtonBg: Phaser.GameObjects.Rectangle;
-  private effectsButtonText: Phaser.GameObjects.Text;
-  private effectsContainer: Phaser.GameObjects.Container;
-  private effectsTitle: Phaser.GameObjects.Text;
-  private effectsHint: Phaser.GameObjects.Text;
-  private categoryTexts: Phaser.GameObjects.Text[] = [];
-  private effectsViewLayer: Phaser.GameObjects.Container;
-  private effectsView: ErEffectsLabView | null = null;
 
   // State.
   private config: ErShinyLabConfig | null = null;
   private tab: Tab = "palette";
-  /** Which lab section is active: the shiny designer, or the effects previewer. */
-  private section: "shiny" | "effects" = "shiny";
-  /** In the shiny section, whether focus is on the header "Effects" button vs the body. */
-  private shinyFocus: "body" | "button" = "body";
-  /** The selected category in the effects section (data-driven; one category today). */
-  private effectsCategoryIndex = 0;
   // `cursor` (the active effect-list index) is the inherited UiHandler.cursor.
   private scrollTop = 0;
   /** Cursor within the TUNE panel rows. */
@@ -482,88 +447,11 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.hintText = addTextObject(SCREEN_W / 2, HINT_Y, "", TextStyle.WINDOW, { fontSize: "34px", align: "center" });
     this.hintText.setOrigin(0.5, 0).setColor(DIM);
     this.container.add(this.hintText);
-
-    this.setupEffectsSection();
-  }
-
-  /**
-   * Build the "Effects" toggle button (header) and the effects-section body (an
-   * opaque backdrop + category column + the built view's layer). The button lives
-   * in the header band so it always shows above the shiny option area; the body
-   * container is added LAST so, when visible, its backdrop covers the shiny content.
-   */
-  private setupEffectsSection(): void {
-    // Header toggle button: keyboard-focusable (Up from the top of the shiny body)
-    // AND touchable (mobile). Pressing it switches to / from the effects section.
-    this.effectsButtonBg = globalScene.add.rectangle(
-      EFFECTS_BTN_X,
-      EFFECTS_BTN_Y,
-      EFFECTS_BTN_W,
-      EFFECTS_BTN_H,
-      0x1c2440,
-      1,
-    );
-    this.effectsButtonBg.setOrigin(0, 0).setStrokeStyle(1, 0x5ad1ff, 0.7);
-    this.container.add(this.effectsButtonBg);
-    this.effectsButtonText = addTextObject(
-      EFFECTS_BTN_X + EFFECTS_BTN_W / 2,
-      EFFECTS_BTN_Y + EFFECTS_BTN_H / 2,
-      "EFFECTS >",
-      TextStyle.WINDOW,
-      { fontSize: "34px", align: "center" },
-    );
-    this.effectsButtonText.setOrigin(0.5, 0.5).setColor("#a6e9ff");
-    this.container.add(this.effectsButtonText);
-    // Touch: a tap on the button toggles the section (mirrors the keyboard A press).
-    // Guarded so the headless test mock (whose Rectangle has no input support) does
-    // not crash handler setup; in the real game the pointer path is fully wired.
-    if (typeof this.effectsButtonBg.setInteractive === "function") {
-      this.effectsButtonBg.setInteractive(
-        new Phaser.Geom.Rectangle(0, 0, EFFECTS_BTN_W, EFFECTS_BTN_H),
-        Phaser.Geom.Rectangle.Contains,
-      );
-      this.effectsButtonBg.on("pointerup", () => {
-        if (this.active) {
-          this.toggleSection();
-        }
-      });
-    }
-
-    // Effects body (hidden until the section is entered).
-    this.effectsContainer = globalScene.add.container(0, 0);
-    this.effectsContainer.setVisible(false);
-    this.container.add(this.effectsContainer);
-    this.effectsContainer.add(
-      globalScene.add.rectangle(0, EFFECTS_BODY_Y, SCREEN_W, EFFECTS_BODY_H, VOID_COLOR, 1).setOrigin(0, 0),
-    );
-    this.effectsTitle = addTextObject(EFFECTS_CAT_X, 19, "EFFECTS LAB", TextStyle.WINDOW, { fontSize: "42px" });
-    this.effectsTitle.setOrigin(0, 0).setColor("#a6e9ff");
-    this.effectsContainer.add(this.effectsTitle);
-    // Category column (data-driven; renders every registered category).
-    for (let i = 0; i < ER_EFFECTS_LAB_CATEGORIES.length; i++) {
-      const cat = ER_EFFECTS_LAB_CATEGORIES[i];
-      const label = addTextObject(EFFECTS_CAT_X, EFFECTS_CAT_Y + i * EFFECTS_CAT_STEP, cat.label, TextStyle.WINDOW, {
-        fontSize: "34px",
-        wordWrap: { width: 88 * 6 },
-      });
-      label.setOrigin(0, 0);
-      this.effectsContainer.add(label);
-      this.categoryTexts.push(label);
-    }
-    this.effectsViewLayer = globalScene.add.container(0, 0);
-    this.effectsContainer.add(this.effectsViewLayer);
-    this.effectsHint = addTextObject(SCREEN_W / 2, HINT_Y, "", TextStyle.WINDOW, { fontSize: "34px", align: "center" });
-    this.effectsHint.setOrigin(0.5, 0).setColor(DIM);
-    this.effectsContainer.add(this.effectsHint);
   }
 
   show(args: any[]): boolean {
     const cfg = args.length > 0 && this.isConfig(args[0]) ? (args[0] as ErShinyLabConfig) : buildDemoConfig(144);
     this.config = cfg;
-    this.section = "shiny";
-    this.shinyFocus = "body";
-    this.destroyEffectsView();
-    this.effectsContainer.setVisible(false);
     this.tab = "palette";
     this.cursor = 0;
     this.scrollTop = 0;
@@ -581,7 +469,6 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.nameText.setText(cfg.speciesName);
     this.refreshTier();
     this.render();
-    this.refreshSectionButton();
 
     this.openedAt = performance.now();
     this.container.setVisible(true);
@@ -1438,10 +1325,6 @@ export class ErShinyLabUiHandler extends UiHandler {
   }
 
   private refreshHint(): void {
-    if (this.section === "shiny" && this.shinyFocus === "button") {
-      this.hintText.setText("A Open Effects Lab    Down Back");
-      return;
-    }
     this.hintText.setText(
       this.tab === "tune"
         ? "L/R Adjust    U/D Select    A Apply    B Effects"
@@ -1455,127 +1338,15 @@ export class ErShinyLabUiHandler extends UiHandler {
     if (performance.now() - this.openedAt < 250) {
       return true;
     }
-    if (this.section === "effects") {
-      return this.inputEffectsSection(button);
-    }
-    if (this.shinyFocus === "button") {
-      return this.inputSectionButton(button);
-    }
     return this.tab === "tune" ? this.inputTune(button) : this.inputEffect(button);
-  }
-
-  // ---- Effects section: entry / nav ---------------------------------------
-
-  /** Highlight state + label of the header "Effects" toggle button. */
-  private refreshSectionButton(): void {
-    const focused = this.section === "shiny" && this.shinyFocus === "button";
-    this.effectsButtonText.setText(this.section === "effects" ? "< SHINY" : "EFFECTS >");
-    this.effectsButtonBg.setStrokeStyle(1, focused ? 0xa6e9ff : 0x5ad1ff, focused ? 1 : 0.7);
-    this.effectsButtonBg.setFillStyle(focused ? 0x24345c : 0x1c2440, 1);
-  }
-
-  /** Move keyboard focus onto the header "Effects" button (from the top of the shiny body). */
-  private focusSectionButton(): void {
-    this.shinyFocus = "button";
-    this.cursorObj.setVisible(false);
-    this.refreshSectionButton();
-    this.refreshHint();
-    globalScene.ui.playSelect();
-  }
-
-  /** Input while the header "Effects" button is focused (shiny section). */
-  private inputSectionButton(button: Button): boolean {
-    switch (button) {
-      case Button.DOWN:
-        this.shinyFocus = "body";
-        this.refreshSectionButton();
-        this.render();
-        globalScene.ui.playSelect();
-        return true;
-      case Button.ACTION:
-        this.enterEffects();
-        return true;
-      case Button.CANCEL:
-        this.exit();
-        return true;
-      default:
-        // Swallow Left/Right/Up while parked on the button.
-        return true;
-    }
-  }
-
-  private toggleSection(): void {
-    if (this.section === "shiny") {
-      this.enterEffects();
-    } else {
-      this.exitEffects();
-    }
-  }
-
-  private enterEffects(): void {
-    this.section = "effects";
-    this.shinyFocus = "body";
-    this.cursorObj.setVisible(false);
-    this.buildEffectsView();
-    this.effectsContainer.setVisible(true);
-    this.refreshSectionButton();
-    globalScene.ui.playSelect();
-  }
-
-  private exitEffects(): void {
-    this.section = "shiny";
-    this.destroyEffectsView();
-    this.effectsContainer.setVisible(false);
-    this.refreshSectionButton();
-    this.render();
-    globalScene.ui.playSelect();
-  }
-
-  /** Build the selected category's view + the category-column highlight. */
-  private buildEffectsView(): void {
-    this.destroyEffectsView();
-    for (let i = 0; i < this.categoryTexts.length; i++) {
-      this.categoryTexts[i].setColor(i === this.effectsCategoryIndex ? "#a6e9ff" : DIM);
-    }
-    const category = ER_EFFECTS_LAB_CATEGORIES[this.effectsCategoryIndex];
-    if (!category) {
-      return;
-    }
-    this.effectsTitle.setText(category.label.toUpperCase());
-    this.effectsView = category.buildView({
-      parent: this.effectsViewLayer,
-      bounds: { x: EFFECTS_VIEW_X, y: EFFECTS_VIEW_Y, w: EFFECTS_VIEW_W, h: EFFECTS_VIEW_H },
-    });
-    this.effectsHint.setText(this.effectsView.getHint());
-  }
-
-  private destroyEffectsView(): void {
-    this.effectsView?.destroy();
-    this.effectsView = null;
-  }
-
-  /** Input while the effects section is active; B returns to the shiny section. */
-  private inputEffectsSection(button: Button): boolean {
-    if (button === Button.CANCEL) {
-      this.exitEffects();
-      return true;
-    }
-    this.effectsView?.handleInput(button);
-    if (this.effectsView) {
-      this.effectsHint.setText(this.effectsView.getHint());
-    }
-    return true;
   }
 
   private inputEffect(button: Button): boolean {
     const count = this.effects().length;
     switch (button) {
       case Button.UP:
-        // From the top of the list, Up parks on the header "Effects" button.
-        if (count === 0 || this.cursor === 0) {
-          this.focusSectionButton();
-        } else {
-          this.cursor -= 1;
+        if (count > 0) {
+          this.cursor = this.cursor > 0 ? this.cursor - 1 : count - 1;
           this.afterEffectMove();
         }
         return true;
@@ -1659,12 +1430,7 @@ export class ErShinyLabUiHandler extends UiHandler {
   private inputTune(button: Button): boolean {
     switch (button) {
       case Button.UP:
-        // From the top row, Up parks on the header "Effects" button.
-        if (this.tuneCursor === 0) {
-          this.focusSectionButton();
-          return true;
-        }
-        this.tuneCursor -= 1;
+        this.tuneCursor = (this.tuneCursor - 1 + TUNE_ROWS.length) % TUNE_ROWS.length;
         this.refreshTune();
         globalScene.ui.playSelect();
         return true;
@@ -1935,11 +1701,6 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.previewAnimTimer = null;
     this.nameFx?.destroy();
     this.nameFx = undefined;
-    // Tear down the effects view (its evolution strip + any live transform burst).
-    this.destroyEffectsView();
-    this.effectsContainer.setVisible(false);
-    this.section = "shiny";
-    this.shinyFocus = "body";
     this.container.setVisible(false);
     this.monSprite.stop();
     this.monSprite.setVisible(false);
