@@ -25,8 +25,20 @@
 /** localStorage key holding the CURRENT session's milestone trail (read back next boot). */
 const STORAGE_KEY = "er-boot-milestones";
 
-/** Ordered boot checkpoints. A session that never records `title-shown` died during boot. */
-export type BootMilestone = "boot-start" | "loading-complete" | "title-shown";
+/**
+ * Ordered boot checkpoints. A session that never records `title-shown` died during boot.
+ * The `ios-*` breadcrumbs are extra markers around the iOS-only boot mitigations
+ * (#ios-stability): they annotate WHERE an iOS boot deferred work, so a crash report shows
+ * whether a session died around BGM/icon deferral or the background icon stream.
+ */
+export type BootMilestone =
+  | "boot-start"
+  | "loading-complete"
+  | "title-shown"
+  | "ios-bgm-deferred"
+  | "ios-icons-deferred"
+  | "ios-icons-bg-start"
+  | "ios-icons-bg-done";
 
 interface MilestoneRecord {
   /** Which checkpoint. */
