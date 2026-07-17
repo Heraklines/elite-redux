@@ -1,0 +1,370 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:be341246fbf0f973865c549b92e2b1445f846d40:run-29586409323.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
+platform: Win32
+screen:   1920x1080 @1x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@35608ms -> title-shown@41309ms
+lastSess: crashed after loading-complete
+mode:     0  wave:?
+seed:     7iM6yUw6RuoGONadciF0cAsM
+party:    
+enemy:    
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:be341246fbf0f973865c549b92e2b1445f846d40:run-29586409323.1","source":"github","sha":"be341246fbf0f973865c549b92e2b1445f846d40","workflow":{"provider":"github-actions","runId":"29586409323","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[14:28:00.716] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[14:28:02.057] LOG: [ER] build {"version":1,"id":"github:be341246fbf0f973865c549b92e2b1445f846d40:run-29586409323.1","source":"github","sha":"be341246fbf0f973865c549b92e2b1445f846d40","workflow":{"provider":"github-actions","runId":"29586409323","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[14:28:02.731] LOG: [dev-tools] loaded — 638 scenarios + Send Logs button
+[14:28:31.704] DEBUG: Destroying loading scene
+[14:28:31.704] DEBUG: Destroyed loading scene
+[14:28:31.777] LOG: Seed: nC89uGK2ByKqGNXpyo8n8cRO
+[14:28:31.778] LOG: Wave Seed: nC89uGK2ByKqGNXpyo8n8cRO 0
+[14:28:36.470] LOG: %cStart Phase LoginPhase color:green;
+[14:28:36.764] LOG: Client Session: tVnURG7MpJV4CJ6OBx2pBjgF8CD8AbjS
+[14:28:37.276] DEBUG: Using cached system data
+[14:28:37.392] LOG: %cStart Phase TitlePhase color:green;
+[14:28:37.394] LOG: Getting Session Slot id: %d 0
+[14:28:37.411] LOG: use seasonal splash messages true
+[14:29:24.674] LOG: [coop:lobby] start announce name=Heraklines1 protocol=p33
+[14:29:26.368] LOG: [coop:lobby] poll players=0
+[14:29:28.224] LOG: [coop:lobby] poll players=1
+[14:29:31.690] LOG: [coop:lobby] poll players=1
+[14:29:34.807] LOG: [coop:lobby] poll players=1
+[14:29:36.578] LOG: [coop:lobby] poll players=1
+[14:29:38.340] LOG: [coop:lobby] poll players=1
+[14:29:40.087] LOG: [coop:lobby] poll players=1
+[14:29:41.852] LOG: [coop:lobby] poll players=1
+[14:29:43.696] LOG: [coop:lobby] poll: incoming request from=p33_VJEJK9wRbUYQhoJ_V-5spuO5vdUD5L_N name=test4
+[14:29:43.704] LOG: [coop:lobby] poll players=1
+[14:29:44.202] LOG: [coop:lobby] respond accept=true from=p33_VJEJK9wRbUYQhoJ_V-5spuO5vdUD5L_N (self=p33_BWTlHiHOGAiXJongVJUtc6oWBWssHwjV)
+[14:29:44.775] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[14:29:46.816] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[14:29:46.861] LOG: [coop:launch] data channel OPEN
+[14:29:46.862] LOG: [coop:webrtc] peer connection state role=host state=connected channel=open
+[14:29:46.862] LOG: [coop:webrtc] ICE connection state role=host state=connected channel=open
+[14:29:46.863] LOG: [coop:webrtc] ctor role=host readyState=open state=connected
+[14:29:46.889] LOG: [coop:launch] connectCoopSession role=host state=connected username=Heraklines1 netcode=authoritative
+[14:29:46.893] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[14:29:46.896] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[14:29:46.896] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[14:29:46.897] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[14:29:46.898] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[14:29:46.899] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[14:29:46.899] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[14:29:46.899] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[14:29:46.902] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[14:29:46.903] LOG: [coop:launch] peer session ready role=host netcode=authoritative -> connecting
+[14:29:46.903] LOG: [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=Heraklines1 version=er-coop-37 tiebreak=0.8661389098681185
+[14:29:46.906] LOG: [coop:webrtc] raw tx QUEUE role=host t=hello bytes=542
+[14:29:46.981] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=d934626e515c046f(1108) movesName=c262a065143b9028(1108) movesets=44374aedf908f2ff(1920) abilitiesData=484720164af0dd92(1115) abilitiesName=0dc202b994a0ebe5(1115)
+[14:29:46.988] LOG: [coop:webrtc] raw tx QUEUE role=host t=dataFingerprint bytes=329
+[14:29:46.993] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:46.993] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:46.993] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:46.993] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:46.996] LOG: [coop:webrtc] raw rx role=host t=hello bytes=531 handlers=11
+[14:29:46.997] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[14:29:46.997] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:46.997] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:46.998] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:46.998] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:46.998] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:46.998] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:47.033] LOG: [coop:webrtc] raw rx role=host t=dataFingerprint bytes=329 handlers=11
+[14:29:47.034] WARN: [coop:checksum] PRESENTATION MISMATCH sections=movesName,abilitiesName - simulation compatible - movesName local=c262a065143b9028(1108) peer=12be97f97ecdc120(1108) abilitiesName local=0dc202b994a0ebe5(1115) peer=1581743383868012(1115)
+[14:29:47.034] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:47.034] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:47.034] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:47.034] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:51.437] LOG: [coop:launch] RUN IDENTITY fresh reason=start-new run=af22de39-f162-4736-bb68-99a9db6526a5
+[14:29:51.437] LOG: [coop:launch] EPOCH MINT epoch=1827121757632468 reason=start-new
+[14:29:51.437] LOG: [coop:launch] SEND resumeStartNew id=mrp1b8i5-0.v6ikrriu36g-1 (#810 durable barrier release)
+[14:29:51.438] LOG: [coop:webrtc] raw tx QUEUE role=host t=resumeStartNew bytes=157
+[14:29:51.438] LOG: [coop:webrtc] raw tx QUEUE role=host t=hello bytes=542
+[14:29:51.441] LOG: [coop:webrtc] raw tx QUEUE role=host t=sessionBinding bytes=533
+[14:29:51.473] LOG: [coop:webrtc] raw rx role=host t=resumeDecisionAck bytes=65 handlers=11
+[14:29:51.473] LOG: [coop:launch] RECV resumeDecisionAck id=mrp1b8i5-0.v6ikrriu36g-1 -> start-new committed on both peers
+[14:29:51.478] LOG: [coop-launch] title challenge-gate: role=host isCoopGuest=false -> SelectChallengePhase
+[14:29:51.478] LOG: %cStart Phase SelectChallengePhase color:green;
+[14:29:51.480] LOG: [coop:webrtc] raw rx role=host t=sessionBindingAck bytes=148 handlers=11
+[14:29:51.481] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:51.481] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:51.481] LOG: [coop:webrtc] raw rx role=host t=hello bytes=802 handlers=11
+[14:29:51.481] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:51.481] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:51.904] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[14:29:51.904] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=0s transport=connected journal=0/0 queue=0
+[14:29:53.543] LOG: %cStart Phase SelectStarterPhase color:green;
+[14:29:53.544] LOG: [coop-launch] startCoopSelect role=host partnerConnected=true partnerReady=false
+[14:29:53.589] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:29:53.589] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:01.549] LOG: Goldeen's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[14:30:02.927] LOG: Goldeen's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[14:30:22.464] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[14:30:22.465] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=0s transport=connected journal=0/0 queue=0
+[14:30:24.887] LOG: [coop-runconfig] startRun role=host willBroadcast=true difficulty=elite
+[14:30:24.888] LOG: [coop:runtime] host broadcast difficulty=elite netcode=authoritative kind=coop (role=host)
+[14:30:24.888] LOG: [coop:webrtc] raw tx QUEUE role=host t=runConfig bytes=585
+[14:30:24.888] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:24.888] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:24.888] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=host partnerReady=false
+[14:30:24.888] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:24.888] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:24.923] LOG: [coop-launch] local team locked in: 3 mons, role=host
+[14:30:24.934] LOG: [coop:session] roster carry shinyLab speciesId=118 -> ATTACHED
+[14:30:24.934] LOG: [coop:session] roster carry shinyLab speciesId=37 -> ATTACHED
+[14:30:24.934] LOG: [coop:session] roster carry shinyLab speciesId=151 -> none
+[14:30:24.935] LOG: [coop:roster] add ACCEPT role=host speciesId=118 cost=0.5 hasStarter=true -> count=1 spent=0.5 remaining=4.5
+[14:30:24.935] LOG: [coop:roster] add ACCEPT role=host speciesId=37 cost=1 hasStarter=true -> count=2 spent=1.5 remaining=3.5
+[14:30:24.935] LOG: [coop:roster] add ACCEPT role=host speciesId=151 cost=3 hasStarter=true -> count=3 spent=4.5 remaining=0.5
+[14:30:24.935] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.5 species=[118,37,151]
+[14:30:24.935] LOG: [coop:roster] rosterSync SEND role=host entries=3 ready=false spent=4.5 species=[118,37,151]
+[14:30:24.935] LOG: [coop:webrtc] raw tx QUEUE role=host t=rosterSync bytes=1382
+[14:30:24.935] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:24.935] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:24.935] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[14:30:24.935] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:24.935] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:24.935] LOG: [coop:roster] setLocalReady role=host localReady=true localCount=3 partnerReady=false -> bothReady=false
+[14:30:24.935] LOG: [coop:roster] rosterSync SEND role=host entries=3 ready=true spent=4.5 species=[118,37,151]
+[14:30:24.936] LOG: [coop:webrtc] raw tx QUEUE role=host t=rosterSync bytes=1381
+[14:30:24.936] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:24.936] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:24.936] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[14:30:24.936] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:24.936] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:24.936] LOG: [coop-launch] local ready, partner NOT ready -> waiting screen
+[14:30:26.937] LOG: [coop-launch] lobby resync tick (waiting for partner) role=host (#868)
+[14:30:26.937] LOG: [coop:launch] resyncLobbyState role=host localReady=true partnerReady=false hasRunConfig=true (#868 self-healing handshake)
+[14:30:26.937] LOG: [coop:roster] rosterSync SEND role=host entries=3 ready=true spent=4.5 species=[118,37,151]
+[14:30:26.937] LOG: [coop:webrtc] raw tx QUEUE role=host t=rosterSync bytes=1381
+[14:30:26.937] LOG: [coop:runtime] host broadcast difficulty=elite netcode=authoritative kind=coop (role=host)
+[14:30:26.937] LOG: [coop:webrtc] raw tx QUEUE role=host t=runConfig bytes=585
+[14:30:26.941] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:26.942] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:26.942] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[14:30:26.942] LOG: [coop:launch] RESEND resumeStartNew id=mrp1b8i5-0.v6ikrriu36g-1 after reconnect
+[14:30:26.942] LOG: [coop:webrtc] raw tx QUEUE role=host t=resumeStartNew bytes=157
+[14:30:26.942] LOG: [coop:webrtc] raw tx QUEUE role=host t=hello bytes=813
+[14:30:26.942] LOG: [coop:webrtc] raw tx QUEUE role=host t=requestRoster bytes=21
+[14:30:26.943] LOG: [coop:interaction] SEND counter snapshot reason=reconnect choice=0 role=host
+[14:30:26.943] LOG: [coop:webrtc] raw tx QUEUE role=host t=interaction bytes=50
+[14:30:26.950] LOG: [coop:webrtc] raw rx role=host t=resumeDecisionAck bytes=65 handlers=11
+[14:30:26.950] WARN: [coop:launch] DROP stale resumeDecisionAck id=mrp1b8i5-0.v6ikrriu36g-1 active=none
+[14:30:26.953] LOG: [coop:webrtc] raw rx role=host t=sessionBindingAck bytes=148 handlers=11
+[14:30:26.953] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:26.953] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:26.954] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[14:30:26.954] LOG: [coop:webrtc] raw rx role=host t=rosterSync bytes=377 handlers=11
+[14:30:26.954] LOG: [coop:roster] replace role=guest requested=0 accepted=0 spent=0 species=[]
+[14:30:26.954] LOG: [coop:roster] rosterSync RECV partner=guest entries=0 partnerReady=false partnerCount=0 -> bothReady=false (local role=host)
+[14:30:26.954] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:26.954] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:26.954] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[14:30:28.937] LOG: [coop-launch] lobby resync tick (waiting for partner) role=host (#868)
+[14:30:28.937] LOG: [coop:launch] resyncLobbyState role=host localReady=true partnerReady=false hasRunConfig=true (#868 self-healing handshake)
+[14:30:28.937] LOG: [coop:roster] rosterSync SEND role=host entries=3 ready=true spent=4.5 species=[118,37,151]
+[14:30:28.937] LOG: [coop:webrtc] raw tx QUEUE role=host t=rosterSync bytes=1381
+[14:30:28.937] LOG: [coop:runtime] host broadcast difficulty=elite netcode=authoritative kind=coop (role=host)
+[14:30:28.937] LOG: [coop:webrtc] raw tx QUEUE role=host t=runConfig bytes=585
+[14:30:28.937] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:28.937] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:28.937] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[14:30:28.937] LOG: [coop:launch] RESEND resumeStartNew id=mrp1b8i5-0.v6ikrriu36g-1 after reconnect
+[14:30:28.937] LOG: [coop:webrtc] raw tx QUEUE role=host t=resumeStartNew bytes=157
+[14:30:28.937] LOG: [coop:webrtc] raw tx QUEUE role=host t=hello bytes=813
+[14:30:28.937] LOG: [coop:webrtc] raw tx QUEUE role=host t=requestRoster bytes=21
+[14:30:28.937] LOG: [coop:interaction] SEND counter snapshot reason=reconnect choice=0 role=host
+[14:30:28.937] LOG: [coop:webrtc] raw tx QUEUE role=host t=interaction bytes=50
+[14:30:28.958] LOG: [coop:webrtc] raw rx role=host t=resumeDecisionAck bytes=65 handlers=11
+[14:30:28.958] WARN: [coop:launch] DROP stale resumeDecisionAck id=mrp1b8i5-0.v6ikrriu36g-1 active=none
+[14:30:28.958] LOG: [coop:webrtc] raw rx role=host t=sessionBindingAck bytes=148 handlers=11
+[14:30:28.958] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:28.958] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:28.958] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[14:30:28.960] LOG: [coop:webrtc] raw rx role=host t=rosterSync bytes=377 handlers=11
+[14:30:28.961] LOG: [coop:roster] replace role=guest requested=0 accepted=0 spent=0 species=[]
+[14:30:28.961] LOG: [coop:roster] rosterSync RECV partner=guest entries=0 partnerReady=false partnerCount=0 -> bothReady=false (local role=host)
+[14:30:28.961] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:28.961] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:28.961] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[14:30:30.938] LOG: [coop-launch] lobby resync tick (waiting for partner) role=host (#868)
+[14:30:30.939] LOG: [coop:launch] resyncLobbyState role=host localReady=true partnerReady=false hasRunConfig=true (#868 self-healing handshake)
+[14:30:30.939] LOG: [coop:roster] rosterSync SEND role=host entries=3 ready=true spent=4.5 species=[118,37,151]
+[14:30:30.940] LOG: [coop:webrtc] raw tx QUEUE role=host t=rosterSync bytes=1381
+[14:30:30.940] LOG: [coop:runtime] host broadcast difficulty=elite netcode=authoritative kind=coop (role=host)
+[14:30:30.940] LOG: [coop:webrtc] raw tx QUEUE role=host t=runConfig bytes=585
+[14:30:30.940] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:30.940] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:30.940] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[14:30:30.940] LOG: [coop:launch] RESEND resumeStartNew id=mrp1b8i5-0.v6ikrriu36g-1 after reconnect
+[14:30:30.940] LOG: [coop:webrtc] raw tx QUEUE role=host t=resumeStartNew bytes=157
+[14:30:30.940] LOG: [coop:webrtc] raw tx QUEUE role=host t=hello bytes=813
+[14:30:30.940] LOG: [coop:webrtc] raw tx QUEUE role=host t=requestRoster bytes=21
+[14:30:30.940] LOG: [coop:interaction] SEND counter snapshot reason=reconnect choice=0 role=host
+[14:30:30.940] LOG: [coop:webrtc] raw tx QUEUE role=host t=interaction bytes=50
+[14:30:30.971] LOG: [coop:webrtc] raw rx role=host t=resumeDecisionAck bytes=65 handlers=11
+[14:30:30.971] WARN: [coop:launch] DROP stale resumeDecisionAck id=mrp1b8i5-0.v6ikrriu36g-1 active=none
+[14:30:30.971] LOG: [coop:webrtc] raw rx role=host t=sessionBindingAck bytes=148 handlers=11
+[14:30:30.971] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:30.971] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:30.971] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[14:30:30.973] LOG: [coop:webrtc] raw rx role=host t=rosterSync bytes=377 handlers=11
+[14:30:30.973] LOG: [coop:roster] replace role=guest requested=0 accepted=0 spent=0 species=[]
+[14:30:30.974] LOG: [coop:roster] rosterSync RECV partner=guest entries=0 partnerReady=false partnerCount=0 -> bothReady=false (local role=host)
+[14:30:30.974] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:30.974] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:30.974] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[14:30:31.055] LOG: [coop:webrtc] raw rx role=host t=rosterSync bytes=971 handlers=11
+[14:30:31.055] LOG: [coop:roster] add ACCEPT role=guest speciesId=115 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[14:30:31.055] LOG: [coop:roster] add ACCEPT role=guest speciesId=131 cost=3 hasStarter=true -> count=2 spent=5 remaining=0
+[14:30:31.055] LOG: [coop:roster] replace role=guest requested=2 accepted=2 spent=5 species=[115,131]
+[14:30:31.055] LOG: [coop:roster] rosterSync RECV partner=guest entries=2 partnerReady=false partnerCount=2 -> bothReady=false (local role=host)
+[14:30:31.055] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:31.055] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:31.055] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[14:30:31.055] LOG: [coop:webrtc] raw rx role=host t=rosterSync bytes=970 handlers=11
+[14:30:31.055] LOG: [coop:roster] add ACCEPT role=guest speciesId=115 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[14:30:31.055] LOG: [coop:roster] add ACCEPT role=guest speciesId=131 cost=3 hasStarter=true -> count=2 spent=5 remaining=0
+[14:30:31.055] LOG: [coop:roster] replace role=guest requested=2 accepted=2 spent=5 species=[115,131]
+[14:30:31.055] LOG: [coop:roster] rosterSync RECV partner=guest entries=2 partnerReady=true partnerCount=2 -> bothReady=true (local role=host)
+[14:30:31.055] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:31.055] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:30:31.055] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=true role=host partnerReady=true
+[14:30:31.056] LOG: [coop-launch] launchCoopMergedParty role=host merged=5 slot=0
+[14:30:31.235] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:31.235] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:32.154] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:32.154] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:32.740] WARN: [coop:launch] fresh co-op slot scan found NO verified slot [0:local-occupied 1:local-occupied 2:local-occupied 3:local-occupied 4:local-occupied]
+[14:30:33.155] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:33.155] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:33.719] LOG: [coop:launch] fresh co-op launch reclaiming least-recent save slot=4 wave=? garbage=true
+[14:30:34.150] ERROR: Local/cloud checkpoint bytes differ; refusing ambiguous delete.
+[14:30:34.150] WARN: [coop:launch] least-recent reclamation delete failed slot=4; trying next candidate
+[14:30:34.150] LOG: [coop:launch] fresh co-op launch reclaiming least-recent save slot=1 wave=6 garbage=false
+[14:30:34.156] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:34.156] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:34.970] DEBUG: %cSending a request to delete session in slot %d color: blue 1
+[14:30:35.157] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:35.157] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:35.733] LOG: [coop:launch] fresh co-op slot scan verified slot 1 [0:local-occupied]
+[14:30:35.734] LOG: [coop-launch] host: reclaimed least-recent save slot=1 (wave 6) for the fresh co-op run
+[14:30:35.734] LOG: [coop-launch] host: auto-picked slot 1 (no picker), clearing STARTER_SELECT -> MESSAGE
+[14:30:36.158] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:36.158] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:37.164] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:37.165] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:37.175] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 1/2 with cache-buster
+[14:30:37.371] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 2/2 via fastly mirror + cache-buster
+[14:30:38.165] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:38.165] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:38.936] ERROR: [asset-retry] PERMANENT load failure key=PRAS-Dragon Dance BG url=images/battle_anims/PRAS-Dragon Dance BG.png
+[14:30:38.984] LOG: Wave Seed: oD9:vHL3CzLrHOYqzp9o9dSP 1
+[14:30:38.993] LOG: %cStart Phase EncounterPhase color:green;
+[14:30:39.001] LOG: [coop:shop] dex baseline captured (species=1925 starters=922) - deltas are run-scoped
+[14:30:39.023] LOG: Starting species pool tier: COMMON
+[14:30:39.077] LOG: Pokemon: Wild Sentret | Species ID: 161 | Level: 2 | Nature: Hasty (+Spd/-Def)
+[14:30:39.077] LOG: Stats (IVs): HP: 13 (8), Atk: 7 (16), Def: 5 (20), Spatk: 6 (27), Spdef: 7 (24), Spd: 9 (15)
+[14:30:39.077] LOG: Ability: Run Away | Passive Ability: Frisk 
+[14:30:39.077] LOG: Moveset: ["Fury Swipes","Defense Curl","Scratch"]
+[14:30:39.078] LOG: Starting species pool tier: COMMON
+[14:30:39.120] LOG: Pokemon: Wild Caterpie | Species ID: 10 | Level: 2 | Nature: Hardy (-)
+[14:30:39.120] LOG: Stats (IVs): HP: 13 (6), Atk: 6 (19), Def: 6 (14), Spatk: 5 (4), Spdef: 6 (11), Spd: 7 (14)
+[14:30:39.121] LOG: Ability: Anticipation | Passive Ability: Swarm 
+[14:30:39.121] LOG: Moveset: ["Skitter Smack","Tackle"]
+[14:30:39.165] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:39.165] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:40.048] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[14:30:40.409] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:40.409] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:40.942] LOG: [coop:launch] resume marker recorded slot=1 self=Heraklines1 partner=test4 wave=1 (#810)
+[14:30:40.944] LOG: [coop:webrtc] raw tx QUEUE role=host t=resumeCheckpoint bytes=18214
+[14:30:40.947] LOG: [coop:webrtc] raw tx CHUNKED role=host t=resumeCheckpoint bytes=18214 chunks=3 id=host-0-27
+[14:30:41.174] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:41.174] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:42.188] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:42.188] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:42.423] LOG: [coop:webrtc] raw rx role=host t=resumeCheckpointAck bytes=126 handlers=11
+[14:30:42.424] DEBUG: Session data saved to slot 1!
+[14:30:43.191] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=11
+[14:30:43.191] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:30:43.639] LOG: [coop:replay] host SEND launchSnapshot wave=1 sessionLen=15954
+[14:30:43.639] LOG: [coop:webrtc] raw tx QUEUE role=host t=launchSnapshot bytes=17798
+[14:30:43.641] LOG: [coop:webrtc] raw tx CHUNKED role=host t=launchSnapshot bytes=17798 chunks=2 id=host-0-28
+[14:30:43.652] LOG: [coop:replay] host SEND enemyPartySync wave=1 count=2 meType=-1 battleType=0
+[14:30:43.652] LOG: [coop:webrtc] raw tx QUEUE role=host t=enemyPartySync bytes=16239
+[14:30:43.653] LOG: [coop:webrtc] raw tx CHUNKED role=host t=enemyPartySync bytes=16239 chunks=2 id=host-0-29
+[14:30:43.656] LOG: Wave Seed: oD9:vHL3CzLrHOYqzp9o9dSP 1
+[14:30:43.884] WARN: cry/10 not found
+[14:30:44.330] LOG: %cStart Phase SummonPhase color:green;
+[14:30:45.230] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:30:45.341] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:30:45.342] LOG: %cStart Phase SummonPhase color:green;
+[14:30:45.782] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:30:46.280] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:30:46.280] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:30:46.280] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:30:46.308] LOG: %cStart Phase PostSummonPhase color:green;
+[14:30:46.309] LOG: Ran PSP for: Kangaskhan
+[14:30:46.339] LOG: %cStart Phase PostSummonPhase color:green;
+[14:30:46.343] LOG: %cStart Phase PostSummonPhase color:green;
+[14:30:46.345] LOG: %cStart Phase PostSummonPhase color:green;
+[14:30:46.345] LOG: Ran PSP for: Goldeen
+[14:30:46.347] LOG: %cStart Phase PostSummonPhase color:green;
+[14:30:46.349] LOG: %cStart Phase PostSummonPhase color:green;
+[14:30:46.349] LOG: %cStart Phase PostSummonPhase color:green;
+[14:30:46.350] LOG: Ran PSP for: Sentret
+[14:30:46.359] LOG: %cStart Phase PostSummonPhase color:green;
+[14:30:46.360] LOG: %cStart Phase PostSummonPhase color:green;
+[14:30:46.379] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:30:46.630] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:30:46.730] LOG: %cStart Phase PostSummonPhase color:green;
+[14:30:46.730] LOG: Ran PSP for: Caterpie
+[14:30:46.731] LOG: %cStart Phase PostSummonPhase color:green;
+[14:30:46.747] LOG: %cStart Phase PostSummonPhase color:green;
+[14:30:46.747] LOG: %cStart Phase TurnInitPhase color:green;
+[14:30:46.781] LOG: %cStart Phase CommandPhase color:green;
+[14:30:46.791] LOG: [coop:replay] host SEND enemyPartySync wave=1 count=2 meType=-1 battleType=0
+[14:30:46.791] LOG: [coop:webrtc] raw tx QUEUE role=host t=enemyPartySync bytes=16374
+[14:30:46.792] LOG: [coop:webrtc] raw tx CHUNKED role=host t=enemyPartySync bytes=16374 chunks=2 id=host-0-30
+[14:30:46.793] LOG: [coop:replay] host RE-BROADCAST wave-start authority wave=1 after post-summon entry effects settled (#920)
+[14:30:46.809] LOG: [coop:rendezvous] next-command barrier ARRIVE+AWAIT cmd:1:1 slot=0
+[14:30:46.810] LOG: [coop:rendezvous] ARRIVE point=cmd:1:1 (send) role=host
+[14:30:46.810] LOG: [coop:webrtc] raw tx QUEUE role=host t=rendezvous bytes=36
+[14:30:46.811] LOG: [coop:rendezvous] AWAIT point=cmd:1:1 timeoutMs=60000 -> network-wait role=host
+[14:30:46.934] LOG: [coop:webrtc] raw rx role=host t=sharedTerminal bytes=689 handlers=11
+[14:30:46.937] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[14:30:46.942] LOG: [coop:webrtc] raw tx QUEUE role=host t=sharedTerminalAck bytes=436
+[14:30:47.209] WARN: [coop:webrtc] carrier LOST role=host state=connected gen=0 reason=data channel closed
+[14:30:47.209] LOG: [coop:webrtc] state role=host connected -> disconnected
+[14:30:47.604] WARN: [coop:webrtc] send DARK role=host t=sharedTerminalAck -> queued (depth=1 state=disconnected readyState=closed)
+[14:30:47.854] WARN: [coop:webrtc] send DARK role=host t=sharedTerminalAck -> queued (depth=2 state=disconnected readyState=closed)
+[14:30:48.109] WARN: [coop:webrtc] send DARK role=host t=sharedTerminalAck -> queued (depth=3 state=disconnected readyState=closed)
+[14:30:48.375] WARN: [coop:webrtc] send DARK role=host t=sharedTerminalAck -> queued (depth=4 state=disconnected readyState=closed)
+[14:30:48.631] WARN: [coop:webrtc] send DARK role=host t=sharedTerminalAck -> queued (depth=5 state=disconnected readyState=closed)
+[14:30:48.915] WARN: [coop:webrtc] send DARK role=host t=sharedTerminalAck -> queued (depth=6 state=disconnected readyState=closed)
+[14:30:49.188] WARN: [coop:webrtc] send DARK role=host t=sharedTerminalAck -> queued (depth=7 state=disconnected readyState=closed)
+[14:30:49.455] WARN: [coop:webrtc] send DARK role=host t=sharedTerminalAck -> queued (depth=8 state=disconnected readyState=closed)
+[14:30:49.733] WARN: [coop:webrtc] send DARK role=host t=sharedTerminalAck -> queued (depth=9 state=disconnected readyState=closed)
+[14:30:49.988] WARN: [coop:webrtc] send DARK role=host t=sharedTerminalAck -> queued (depth=10 state=disconnected readyState=closed)
+[14:30:50.239] WARN: [coop:webrtc] send DARK role=host t=sharedTerminalAck -> queued (depth=11 state=disconnected readyState=closed)
+[14:30:50.445] LOG: [coop:launch] clearCoopRuntime role=host netcode=authoritative gen->1
+[14:30:50.446] LOG: [coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[14:30:50.446] LOG: [coop:relay] dispose() (no in-flight waiters)
+[14:30:50.447] LOG: [coop:pump] end session {"wasOwner":false,"seq":-1,"termSeq":-1}
+[14:30:50.447] WARN: [coop:rendezvous] RENDEZVOUS ABORT point=cmd:1:1 - waiter torn down without partner arrival role=host
+[14:30:50.448] LOG: [coop:webrtc] close() role=host state=disconnected
+[14:30:50.448] LOG: [coop:webrtc] state role=host disconnected -> closed
+[14:30:50.448] LOG: [coop:turn] host recorder: CLEAR (null-out) live emitter (was=true)
+[14:30:50.463] LOG: [coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+[14:30:50.478] LOG: Seed: 7iM6yUw6RuoGONadciF0cAsM
+[14:30:50.478] LOG: Wave Seed: 7iM6yUw6RuoGONadciF0cAsM 0
+[14:30:50.480] LOG: %cStart Phase TitlePhase color:green;
+[14:30:50.483] WARN: [coop:rendezvous] next-command barrier cmd:1:1 ABORTED during teardown/recovery - command UI remains closed
+[14:30:50.491] LOG: use seasonal splash messages true
+
+----- REPLAY TRACE (JSON) -----
+(none)
