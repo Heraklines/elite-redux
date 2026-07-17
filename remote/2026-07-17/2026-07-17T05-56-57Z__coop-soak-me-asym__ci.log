@@ -1,0 +1,56 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: PASS
+waves_requested: 150
+run: 29558208047 (main)
+timestamp: 2026-07-17T05-56-57Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+
+----- vitest result tail -----
+[coop:launch] clearCoopRuntime role=host netcode=authoritative gen->6
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: 8_000_013, termSeq: -1, wasOwner: false }
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=true)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+[coop:transport] state guest connected -> disconnected
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:213:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[33m[coop:runtime] partner channel closed -> entering membership recovery (shared waits retained)[39m
+[33m[coop:runtime] shared session terminal requested: Your partner disconnected and no authenticated rejoin path is available.[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:213:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[coop-soak-me] GUEST-OWNED-ME DONE seed=828633 waves=13/13 findings=0 MEs=[{"wave":12,"type":"DEPARTMENT_STORE_SALE","path":"guest-owned"}] skips={}
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:213:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:launch] clearCoopRuntime role=guest netcode=authoritative gen->7
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: -1, termSeq: -1, wasOwner: false }
+[coop:transport] state guest disconnected -> closed
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:213:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1) > drives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [33m20863[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-me.test.ts:213:3[39m
+
+[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 05:55:17
+[2m   Duration [22m 99.19s[2m (transform 40.10s, setup 50.45s, import 525ms, tests 81.19s, environment 2.01s)[22m
+
