@@ -35,6 +35,7 @@ import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-infer
 import { buildDemoChallengesConfig } from "#data/elite-redux/er-community-challenges";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
+import { advanceErMoneyStreaks, erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
 import {
   ER_SHINY_LAB_DEFAULT_PARAMS,
@@ -247,6 +248,28 @@ async function startBattleWithShinyLabLead(game: GameManager, id: SpeciesId = Sp
   mon.shiny = true;
   mon.variant = 0;
   await mon.loadAssets();
+  return mon;
+}
+
+/**
+ * Bug #757 repro helper: a player lead at an explicit LEVEL carrying a maxed money
+ * streak (so the summary name bar shows the "₽+N%" mini-badge next to "Lv.<level>").
+ * The streak is advanced by replaying the real per-wave advance (each call = +1 faint-free
+ * wave for every party mon) until the lead's badge bonus caps, so the badge text is the
+ * widest it ever renders ("₽+10%"). At level >= 100 the level counter is three digits, which
+ * is the collision the fix addresses; a 2-digit level keeps the badge clear.
+ */
+async function startBattleWithMoneyStreakLead(game: GameManager, level: number) {
+  game.override.startingLevel(level);
+  await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+  const mon = game.scene.getPlayerPokemon();
+  if (!mon) {
+    throw new Error("money-streak summary recipe: no player pokemon after startBattle");
+  }
+  // Replay enough won waves to cap this mon's per-mon money bonus (widest badge text).
+  for (let i = 0; i < 40 && erStreakBonusPercent(mon.id) < 10; i++) {
+    advanceErMoneyStreaks();
+  }
   return mon;
 }
 
@@ -1255,6 +1278,29 @@ const RECIPES: Record<string, Recipe> = {
     steps: [Button.CYCLE_SHINY],
     diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
   },
+  // Bug #757: the ER money-streak mini-badge ("₽+N%", #348) on the summary name bar collides
+  // with the level counter once the level reaches three digits. This recipe pins a level-120
+  // lead with a maxed streak so "Lv.120" (3 digits) and "₽+10%" both draw; before the fix the
+  // badge (x=60) sits under the tail of the level number, after the fix it clears it.
+  "summary-money-streak-3digit": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithMoneyStreakLead(game, 120);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
+  },
+  // The 2-digit control for #757: same maxed streak badge, but a level-55 lead ("Lv.55"). The
+  // badge must render exactly as before (no collision at 1-2 digit levels) - this recipe guards
+  // that the fix does not shift the badge for the common case.
+  "summary-money-streak-2digit": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithMoneyStreakLead(game, 55);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
+  },
   // Regression for Shiny Lab equipped looks in the party SUMMARY view. The lead owns
   // and equips palette + surface + around FX; the summary mon sprite must use the
   // exact renderer, not the default shiny palette or palette-only shader path.
@@ -1557,6 +1603,67 @@ const RECIPES: Record<string, Recipe> = {
       // batch. Leaving it at its default keeps the 4 revealed tiles clean + deterministic.
       ui.setActiveHandler?.(handler);
     },
+    diffTolerance: 2000,
+  },
+  // Bug #613: in the reward shop, a long item DESCRIPTION overlaps the leave-confirmation
+  // prompt. Repro: focus a long-description item (Eviolite, 116 chars) so its dedicated
+  // description box is shown, then press CANCEL - the leave path opens the CONFIRM overlay
+  // (the "skip taking an item?" Yes/No prompt) WITHOUT clearing the description box, so the
+  // wrapped description text draws under the confirm prompt. The onActionInput callback here
+  // mirrors SelectModifierPhase's real leave handler (showText + setOverlayMode(CONFIRM)). The
+  // fix hides the description on CANCEL, so post-fix the confirm prompt renders clean.
+  "modifier-select-leave-confirm": {
+    mode: UiMode.MODIFIER_SELECT,
+    field: true,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.PIKACHU);
+      return [];
+    },
+    render: game => {
+      const ui: any = game.scene.ui;
+      const registered: any = ui.handlers[UiMode.MODIFIER_SELECT];
+      let handler: any = registered;
+      try {
+        handler = new registered.constructor();
+      } catch {
+        handler = registered;
+      }
+      handler.setup();
+      const options = [
+        new ModifierTypeOption(modifierTypes.EVIOLITE(), 0),
+        new ModifierTypeOption(modifierTypes.FLAME_ORB(), 0),
+        new ModifierTypeOption(modifierTypes.SUPER_POTION(), 0),
+      ];
+      // The leave handler, mirroring SelectModifierPhase's modifierSelectCallback for (-1,-1):
+      // show the skip question in the message box, then open the CONFIRM overlay.
+      const leaveConfirmCallback = (rowCursor: number, cursor: number): boolean => {
+        if (rowCursor < 0 || cursor < 0) {
+          ui.showText(i18next.t("battle:skipItemQuestion"));
+          ui.setOverlayMode(
+            UiMode.CONFIRM,
+            () => {},
+            () => {},
+          );
+          return true;
+        }
+        return false;
+      };
+      handler.show([true, options, leaveConfirmCallback, 0]);
+      for (const opt of handler.options ?? []) {
+        opt.revealInstant?.();
+      }
+      // Focus the long-description item (row 1, cursor 0 = Eviolite) so its description box shows.
+      handler.setRowCursor(1);
+      handler.setCursor(0);
+      // The animation-gated input flag is set asynchronously in show(); set it directly so the
+      // CANCEL step routes into the leave handler.
+      handler.awaitingActionInput = true;
+      handler.onActionInput = leaveConfirmCallback;
+      ui.setActiveHandler?.(handler);
+    },
+    // CANCEL triggers the leave path -> the CONFIRM overlay opens over the (pre-fix) still-visible
+    // item description. The main PNG ends on that final state.
+    steps: [Button.CANCEL],
     diffTolerance: 2000,
   },
   // The in-battle FIGHT move-select (UiMode.FIGHT): the 4 moves + PP + type/effectiveness bar,

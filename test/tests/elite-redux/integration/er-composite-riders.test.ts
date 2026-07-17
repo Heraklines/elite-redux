@@ -260,7 +260,12 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     expect(enemy.getStatStage(Stat.SPDEF)).toBe(0);
   });
 
-  it("Komodo (851): adds Dragon type on summon", async () => {
+  it("Komodo (851): nativized to Draconize + Envenom, no longer adds Dragon type on summon", async () => {
+    // Maintainer 2026-07-17: Komodo swapped its Half-Drake type-grant for Draconize
+    // (Normal moves become Dragon-type; conditional Dragon STAB / Dragon-vs-Fairy),
+    // keeping the Envenom poison. The holder must NOT gain a persistent Dragon type
+    // on entry any more (the type-grant was removed epic-wide). See
+    // test/tests/elite-redux/er-7corrections.test.ts for the attr-level assertions.
     const ability = await erId(851);
     if (ability === undefined) {
       return;
@@ -277,7 +282,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
       .criticalHits(false);
     await game.classicMode.startBattle([SpeciesId.SNORLAX]); // Normal-type base
     const player = game.field.getPlayerPokemon();
-    expect(player.getTypes()).toContain(PokemonType.DRAGON);
+    expect(player.getTypes()).not.toContain(PokemonType.DRAGON);
   });
 
   it("Lightsaber (908): adds Fire type on summon", async () => {

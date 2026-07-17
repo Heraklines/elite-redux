@@ -315,10 +315,13 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
           }
         } else {
           // Human-owned dialogue is not a timeout. The callback chain is lifetime-fenced, and the mechanical
-          // watchdog is suspended while a real trainer/ME surface is awaiting input.
+          // watchdog is suspended while a real trainer/ME surface is awaiting input. Use the unified
+          // presentation-boundary predicate (true for solo, the retained co-op boundary for authoritative
+          // co-op) so a SOLO new-biome intro is not gated on coopBoundaryStillLive() - which is always false
+          // off co-op (coopGeneration < 0), stalling doEncounterCommon before it ends the wave-11 encounter.
           this.doEncounterCommon(
             false,
-            () => this.coopBoundaryStillLive(),
+            () => this.isEncounterPresentationBoundaryLive(),
             waiting => this.setInteractivePresentationWaiting(waiting),
           );
         }
@@ -488,6 +491,15 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
 
   /** EncounterPhase's asset/UI promise chain must share this exact retained transition lifetime. */
   protected override isEncounterPresentationBoundaryLive(): boolean {
+    // A SOLO run (and any non-bounded, non-authoritative-co-op phase) has no retained co-op
+    // transition lifetime, so its coopBoundaryStillLive() is always false (coopGeneration < 0).
+    // Gating EncounterPhase.runEncounter's async presentation chain on that would early-return it,
+    // so the first wave of the new biome never presents - the solo wave-11 biome-transition softlock.
+    // Only a bounded authoritative co-op phase ties the shared chain to the retained co-op boundary;
+    // solo falls back to the base "always live" boundary.
+    if (!this.isBoundedAuthoritativeCoop()) {
+      return super.isEncounterPresentationBoundaryLive();
+    }
     return this.coopBoundaryStillLive();
   }
 

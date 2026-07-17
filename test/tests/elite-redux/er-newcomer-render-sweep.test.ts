@@ -13,6 +13,7 @@
 //   (b) STARTER SELECT        (species-level front atlas + the mini icon)
 //   (c) COMBAT front AND back (form-level front + back atlas)
 //   (d) DEX page              (species-level front atlas)
+//   (e) SHINY variant tiers   (form-level shiny front + back, variants 0/1/2)
 //
 // This is a PIXEL-LEVEL gate, not a key-resolution check: for each surface it
 // resolves the sprite atlas path the surface actually uses (via the real
@@ -22,6 +23,21 @@
 // species-level getSpriteAtlasPath returned `311-mega`/`312-mega` for Minun/Plusle,
 // and the Primal Mew/Regigigas dex spritelessness) AND when the resolved art is
 // empty/placeholder where real art exists.
+//
+// SHINY-VARIANT COVERAGE (added after the 2026-07-16 live report "no primal mew
+// sprites"): the base surfaces above only exercise the NON-shiny (variant-0)
+// palette. ER-custom slug art ships a SEPARATE atlas file per shiny tier
+// (`shiny`/`shiny-2`/`shiny-3` and their `-back` twins) because ER customs carry NO
+// vanilla `variantData` recolor - loadAssets forces spriteOnly, so a shiny mon of
+// variant tier N renders `elite-redux/<slug>/shiny[-N+1][-back]` DIRECTLY. A shiny
+// variant-2 (variant index 1) Primal Mew's BACK sprite requested
+// `pkmn__back__er__mew_primal_shiny2` -> `elite-redux/mew_primal/shiny-back-2`,
+// which was not yet published, so the player's own Primal Mew showed no back sprite
+// in battle. The base-only sweep stayed green through that miss. The shiny block
+// below closes the gap: it gates every shiny tier, front AND back, on the FORM-level
+// path the battle field uses, for entries whose art resolves to the `elite-redux/`
+// slug scheme (vanilla-aliasing partner eeveelutions recolor via vanilla variantData
+// - a different, working path this file-existence gate does not model).
 //
 // Roster (24): the 4 newcomer species (Tentalect/Astoot/Discupid/Regitube), the 8
 // partner eeveelutions (alias vanilla base art), and the 12 injected forms
@@ -115,6 +131,70 @@ async function analyzeAtlas(atlasPath: string): Promise<AtlasAnalysis> {
   return { exists: true, transparentPct: (transparent / total) * 100, dims: `${frame.w}x${frame.h}`, spriteSized };
 }
 
+/**
+ * ER-custom forms still AWAITING shiny-variant art on er-assets (the maintainer owes
+ * the art; art is a maintainer decision, never fabricated by a fix). Tracked here so
+ * the shiny gate below does NOT silently pass them AND fails loudly when the art
+ * lands (prompting removal from this quarantine so the hard gate takes over). The
+ * value lists the missing atlas files under `elite-redux/<slug>/` as of 2026-07-17.
+ *
+ * These are the SAME "no shiny sprite" bug class as the reported Primal Mew, but
+ * their art simply does not exist yet (their dirs ship base front/back/icon only) -
+ * distinct from Primal Mew, whose complete shiny set the maintainer HAS published.
+ */
+const KNOWN_MISSING_SHINY_ART: Record<string, readonly string[]> = {
+  parasect_mega: ["shiny", "shiny-2", "shiny-3", "shiny-back", "shiny-back-2", "shiny-back-3"],
+  jumpluff_mega: ["shiny", "shiny-2", "shiny-3", "shiny-back", "shiny-back-2", "shiny-back-3"],
+  skarmory_mega_z: ["shiny", "shiny-2", "shiny-3", "shiny-back", "shiny-back-2", "shiny-back-3"],
+  dragonite_mega_z: ["shiny", "shiny-2", "shiny-3", "shiny-back", "shiny-back-2", "shiny-back-3"],
+  electivire_mega_x: ["shiny", "shiny-2", "shiny-3", "shiny-back-2", "shiny-back-3"],
+};
+
+/** A form's shiny-variant atlases (tiers 0/1/2 x front/back) partitioned by health. */
+interface ShinyVariantReport {
+  /** Resolved ER-custom shiny atlases with no file (the 404 / no-sprite class). */
+  missing: string[];
+  /** Resolved ER-custom shiny atlases that exist but are empty / non-sprite frame. */
+  broken: string[];
+  /** True if ANY shiny tier resolved to the `elite-redux/` slug scheme. */
+  sawErCustom: boolean;
+}
+
+/** Minimal shape shared by PokemonSpecies + PokemonForm for sprite-atlas resolution. */
+interface AtlasResolver {
+  getSpriteAtlasPath(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
+}
+
+/**
+ * Analyze the FORM-level shiny atlas the battle field draws, across all 3 shiny
+ * tiers (variant 0/1/2) x {front, back}. Only ER-custom slug art uses the per-tier
+ * file scheme (`elite-redux/<slug>/shiny[-N][-back]`); entries that resolve elsewhere
+ * (partner eeveelutions -> vanilla variantData recolor) are skipped - a different,
+ * working shiny path this file-existence gate does not model.
+ */
+async function analyzeShinyVariants(form: AtlasResolver, formIndex: number): Promise<ShinyVariantReport> {
+  const report: ShinyVariantReport = { missing: [], broken: [], sawErCustom: false };
+  for (let variant = 0; variant <= 2; variant++) {
+    for (const back of [false, true]) {
+      const atlasPath = form.getSpriteAtlasPath(false, formIndex, true, variant, back);
+      if (!atlasPath.startsWith("elite-redux/")) {
+        continue;
+      }
+      report.sawErCustom = true;
+      const surface = `combat shiny v${variant} ${back ? "back" : "front"}`;
+      const a = await analyzeAtlas(atlasPath);
+      if (!a.exists) {
+        report.missing.push(`${surface}: resolved atlas "${atlasPath}" has NO file (wrong/404 path)`);
+      } else if (a.transparentPct >= 99) {
+        report.broken.push(`${surface}: atlas "${atlasPath}" (${a.dims}) is EMPTY (${a.transparentPct.toFixed(1)}%)`);
+      } else if (!a.spriteSized) {
+        report.broken.push(`${surface}: atlas "${atlasPath}" decoded a NON-sprite frame (${a.dims})`);
+      }
+    }
+  }
+  return report;
+}
+
 /** One roster entry to sweep. */
 interface SweepEntry {
   label: string;
@@ -200,5 +280,26 @@ describe.skipIf(!RUN)("ER newcomer render sweep (non-empty sprite on every surfa
       }
     }
     expect(failures, `${entry.label}:\n${failures.join("\n")}`).toEqual([]);
+
+    // --- SHINY VARIANT sprites (the "no primal mew sprites" gap, 2026-07-16) ----
+    // The base surfaces above only exercise variant 0. Gate every shiny tier
+    // (0/1/2) x {front, back} of the FORM-level path the battle field draws.
+    const shiny = await analyzeShinyVariants(form, formIndex);
+    if (Object.hasOwn(KNOWN_MISSING_SHINY_ART, entry.label)) {
+      // Documented as awaiting shiny art: assert it is STILL missing, so when the
+      // maintainer publishes it this test fails loudly and the entry gets removed
+      // from KNOWN_MISSING_SHINY_ART (the hard gate then covers it).
+      expect(
+        shiny.missing.length,
+        `${entry.label}: shiny art has LANDED (0 missing) - remove it from `
+          + "KNOWN_MISSING_SHINY_ART so the hard gate covers it.",
+      ).toBeGreaterThan(0);
+    } else if (shiny.sawErCustom) {
+      // Hard gate: every ER-custom shiny tier (front + back) must have real art. This
+      // is the surface the sweep previously missed - Primal Mew shipped with no
+      // `shiny-back-2` and the base-only sweep stayed green.
+      const shinyFailures = [...shiny.missing, ...shiny.broken];
+      expect(shinyFailures, `${entry.label} (shiny variants):\n${shinyFailures.join("\n")}`).toEqual([]);
+    }
   });
 });

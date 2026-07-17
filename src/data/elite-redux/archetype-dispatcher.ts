@@ -3676,13 +3676,26 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           BattlerTagType.ER_BLEED,
         ),
       ]);
-    case 851:
-      // Komodo — "Adds Dragon-type + moves have 30% Bad Poison chance."
-      // ER ROM: add Dragon to type3 + post-attack 30% TOXIC chance.
+    case 851: {
+      // Komodo — Maintainer 2026-07-17: nativized to Draconize + Envenom (was the
+      // Half-Drake type-grant "adds Dragon type" + Toxic). Draconize converts Normal
+      // moves to Dragon and grants conditional Dragon STAB / Dragon-vs-Fairy neutral
+      // (mirrors case 413); Envenom is the post-attack 30% poison chance. No
+      // add-self-type EntryEffect remains, so the holder no longer type-grants.
+      const dragonVsFairy = new OffensiveTypeChartOverrideAbAttr({
+        rules: [{ attackType: PokemonType.DRAGON, defenderType: PokemonType.FAIRY, newMultiplier: 1 }],
+      });
+      dragonVsFairy.addCondition(holder => holder.isOfType(PokemonType.DRAGON));
       return ok([
-        new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.DRAGON }),
-        new PostAttackApplyStatusEffectAbAttr(false, 30, StatusEffect.TOXIC),
+        new TypeConversionAbAttr({
+          source: { kind: "type", type: PokemonType.NORMAL },
+          newType: PokemonType.DRAGON,
+        }),
+        new StabAddAbAttr({ targetType: PokemonType.DRAGON }),
+        dragonVsFairy,
+        new PostAttackApplyStatusEffectAbAttr(false, 30, StatusEffect.POISON),
       ]);
+    }
     case 728:
       // Wind Rage — "Uses Defog on switch-in. Air-based moves get a 1.3x boost."
       return ok([
