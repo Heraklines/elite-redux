@@ -8,6 +8,7 @@ const css = fs.readFileSync(`${DIR}/site/style.css`, "utf8");
 const fxSrc = fs.readFileSync(`${DIR}/fx.mjs`, "utf8").replace(/^export /gm, "");
 const exoticSrc = fs.readFileSync(`${DIR}/site/exotic.mjs`, "utf8").replace(/^export .*$/gm, "");
 const appJs = fs.readFileSync(`${DIR}/site/app.js`, "utf8");
+const effectsSrc = fs.readFileSync(`${DIR}/site/effects.mjs`, "utf8").replace(/^export /gm, "");
 
 // pin the er-assets sha (jsDelivr serves cold files reliably only when pinned)
 const sha = execSync(`git -C ${ERA} rev-parse HEAD`).toString().trim();
@@ -156,6 +157,12 @@ ${css}
   </div>
 </header>
 
+<div class="labnav">
+  <button id="openEffects" class="labnav-btn">&#9889;&nbsp; Effects</button>
+  <span class="labnav-hint">preview the in-game effect bursts (transform, and more to come) on the partner Eeveelutions</span>
+</div>
+
+<div id="shinyView">
 <section class="hero">
   <div id="stage" class="stage void">
     <div class="glow"></div>
@@ -223,6 +230,19 @@ ${css}
 <div class="grid" id="rigGrid"></div>
 <div class="section-title"><h3>Moments</h3><span class="cnt"><span id="momCount"></span></span><span>finite event sequences that loop automatically - watch a few seconds</span></div>
 <div class="grid" id="momGrid"></div>
+</div>
+
+<section id="effectsLab" class="effects-lab" style="display:none">
+  <div class="fx-head">
+    <button id="fxBack" class="fxback">&#8592;&nbsp; Back to Shiny Tools</button>
+    <h2><span class="ar">Effects</span> Lab</h2>
+    <p class="fx-sub">Category based previews of the in-game effect bursts. First category: <b>Transformation Effects</b> -
+      the per-type transform burst shown on each partner Eeveelution's front and back sprite. More categories
+      (ability effects, move effects) plug in here later.</p>
+  </div>
+  <div class="fx-cats" id="fxCats"></div>
+  <div class="fx-body" id="fxBody"></div>
+</section>
 
 <footer>
   Prototype for the Elite Redux special-form shiny system. Sprites stream from the er-assets CDN (jsDelivr, pinned sha) like the game.
@@ -237,6 +257,7 @@ ${css}
 ${fxSrc}
 ${exoticSrc}
 ${appJs}
+${effectsSrc}
 </script>
 </body>
 </html>`;

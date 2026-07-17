@@ -8,6 +8,33 @@
 mega-expansion doubled every catalog; v7.1 quality pass reworked the weak ones after
 zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review tool).
 
+## Effects lab (2026-07-17) - in-game effect previews, category based
+
+A SECOND view sits behind the **Effects** button above the shiny options (top of the
+page). It is a category based lab for previewing in-game effect bursts, kept separate
+from the shiny palette/surface/around tools. The categories live in a small registry
+(`FX_CATEGORIES` in `site/effects.mjs`), so adding a future category (ability effects,
+move effects) is ONE new entry, not a new page.
+
+- **Transformation Effects** (first category): previews the in-game per-type transform
+  burst on each partner Eeveelution. Pick any partner (Partner Eevee base + the 8
+  partner eeveelutions), flip the FRONT / BACK sprite, and PLAY / REPLAY the burst over
+  the sprite on a canvas. It auto-plays when you change partner or flip the sprite; a
+  Replay button re-fires it.
+- The burst is a faithful canvas-2D port of `src/sprites/er-form-transform-fx.ts`: the
+  same per-type tint colours (`getTypeRgb`), the same shape/motion vocabulary (grass/bug
+  leaves-sway, fire embers-rise, water droplets-fall, ice/rock/steel/ground shards,
+  electric sparks-burst, motes fallback), the ~950ms duration, the <=20 particle cap,
+  and the tinted flash (bright core + soft halo + expanding ring) plus a brief on-sprite
+  type-coloured tint. Each partner previews with ITS OWN primary type (Flareon fire,
+  Leafeon grass, Vaporeon water, ..., Partner Eevee base = normal).
+- Partner sprites alias their base eeveelution's vanilla art (numeric dex stem, or the
+  Eevee `partner` form stem for the family head), streamed from the er-assets CDN exactly
+  like the shiny tools. No new assets. Source: `ER_PARTNER_FAMILY` in
+  `src/data/elite-redux/er-newcomer-species.ts`.
+- Files: `site/effects.mjs` (registry + FX port + view), styles appended to
+  `site/style.css`, wired into the bundle by `build-site.mjs`.
+
 ## v7.2 - Psiell's feedback round (2026-07-06)
 - **Box-edge falloff**: around FX no longer hard-clip at the sprite-box edge - every
   off-sprite aura fades out over the last ~9px (`edgeFalloff` in fx.mjs; fixes fog /
