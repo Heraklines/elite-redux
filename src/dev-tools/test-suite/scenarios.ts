@@ -1078,6 +1078,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Enamorus is female-only (no male from hatch/catch)",
+    description:
+      "GENERATION fix (not a battle behavior) - Enamorus is a female-only species (malePercent 0).\n"
+      + "The gender roll used `randSeedFloat() * 100 <= malePercent`, so when the roll returned exactly\n"
+      + "0 the `<= 0` branch produced a MALE Enamorus (and any other female-only species) from egg\n"
+      + "hatch / wild catch. Fixed to a strict `<` so a female-only species is ALWAYS female while\n"
+      + "male-only (100) stays male and the seeded RNG stream position is unchanged.\n"
+      + "DO: hatch and/or catch several Enamorus (or any female-only species). EXPECT: every one is\n"
+      + "FEMALE - never a male. Unit-tested in test/tests/elite-redux/er-enamorus-female-only.test.ts.\n"
+      + "This scenario just fields an Enamorus so you can confirm the gender glyph in the summary.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.ENAMORUS, {
+          moveset: [MoveId.MOONBLAST, MoveId.AIR_SLASH, MoveId.EARTH_POWER, MoveId.QUIVER_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Type-nativization ability corrections (maintainer 2026-07-17)",
     description:
       "PURE DATA CHECK (no battle behavior to watch here) for seven maintainer-dictated\n"
