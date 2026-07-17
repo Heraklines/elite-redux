@@ -8,10 +8,11 @@
 // ER Omniform teach-path via LearnMovePhase (TM Case / Learner's Shroom / etc).
 //
 // A taught move (LearnMoveType.TM here, mirroring the TM Case / Learner's Shroom
-// modifier-apply) on an Omniform mon opens an evolution picker (OPTION_SELECT),
-// and picking a non-base evolution routes the teach through learnMoveForEvolution
-// into that evolution's OWN stored moveset. Verifies the picker opens with the
-// right options and the teach lands per evolution.
+// modifier-apply) on an Omniform mon converges on the SAME existing batch level-up
+// panel (UiMode.LEARN_MOVE_BATCH) with that one move offered - not a separate
+// picker. Cycling the strip to a non-base evolution and learning routes the teach
+// through learnMoveForEvolution into that evolution's OWN stored moveset. Verifies
+// the panel opens and the teach lands per evolution (and TM bookkeeping runs).
 //
 // Gated behind ER_SCENARIO=1 (needs the ER species/registry init).
 // =============================================================================
@@ -33,7 +34,6 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { PokemonMove } from "#moves/pokemon-move";
 import { GameManager } from "#test/framework/game-manager";
-import type { AbstractOptionSelectUiHandler } from "#ui/abstract-option-select-ui-handler";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -46,7 +46,7 @@ function partnerFormIndex(): number {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-describe.skipIf(!RUN)("ER Omniform teach path (LearnMovePhase evolution picker)", () => {
+describe.skipIf(!RUN)("ER Omniform teach path (LearnMovePhase converges on the batch panel)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
 
@@ -68,43 +68,43 @@ describe.skipIf(!RUN)("ER Omniform teach path (LearnMovePhase evolution picker)"
       .starterForms({ [SpeciesId.EEVEE]: partnerFormIndex() });
   });
 
-  it("a taught move opens the evolution picker; a non-base pick learns into that evolution", async () => {
+  it("a taught move opens the SAME batch panel; a non-base pick learns into that evolution", async () => {
     await game.classicMode.startBattle(SpeciesId.EEVEE);
     const mon = game.field.getPlayerPokemon();
     ensureOmniformFormMovesets(mon);
 
     const forms = omniformFamilyForms(mon);
-    const baseForm = forms[0];
     const evoForm = forms[1];
-    // A move BOTH base and the evolution can learn, unknown to both, so the picker
-    // lists [base, evolution, ...] and the evolution sits at option index 1.
+    // A move the 2nd evolution can legally learn but does not already know.
     const evoLearnable = omniformFormLearnableMoves(evoForm);
-    const shared = [...omniformFormLearnableMoves(baseForm)].filter(m => m !== MoveId.NONE && evoLearnable.has(m));
-    expect(shared.length).toBeGreaterThanOrEqual(2);
-    const teachMove = shared[0];
-    // Control both movesets so neither knows teachMove (base stays in the offer list)
-    // and the evolution has a free slot (teach lands without a forget-picker).
-    mon.moveset.splice(0, mon.moveset.length, new PokemonMove(shared[1]));
+    const teachMove = [...evoLearnable].find(m => m !== MoveId.NONE && m !== MoveId.TACKLE)!;
+    expect(teachMove).toBeDefined();
+    // Free slot on the evolution so the teach lands without a forget prompt; base
+    // moveset controlled so it does not already know teachMove.
+    mon.moveset.splice(0, mon.moveset.length, new PokemonMove(MoveId.TACKLE));
     mon.customPokemonData.erOmniformMovesets ??= {};
-    mon.customPokemonData.erOmniformMovesets[omniformFormKey(evoForm.speciesId, evoForm.formIndex)] = [[shared[1], 0]];
-    // Confirm the picker order: base first, evolution at index 1.
-    const canLearn = listOmniformEvolutionsForMove(mon, teachMove).filter(o => o.canLearn);
-    expect(canLearn[0].form.speciesId).toBe(baseForm.speciesId);
-    expect(canLearn[1].form.speciesId).toBe(evoForm.speciesId);
+    mon.customPokemonData.erOmniformMovesets[omniformFormKey(evoForm.speciesId, evoForm.formIndex)] = [
+      [MoveId.TACKLE, 0],
+    ];
+    expect(
+      listOmniformEvolutionsForMove(mon, teachMove).find(
+        o => o.form.speciesId === evoForm.speciesId && o.form.formIndex === evoForm.formIndex,
+      )?.canLearn,
+    ).toBe(true);
 
     // Drive a LearnMovePhase as a TM Case / Learner's Shroom would (LearnMoveType.TM).
+    // It converges on the SAME batch panel (UiMode.LEARN_MOVE_BATCH) - no separate picker.
     game.scene.phaseManager.create("LearnMovePhase", 0, teachMove, LearnMoveType.TM).start();
-    // The phase opens the evolution picker (a message prompt then OPTION_SELECT).
-    for (let i = 0; i < 20 && game.scene.ui.getMode() !== UiMode.OPTION_SELECT; i++) {
-      game.scene.ui.processInput(Button.ACTION); // advance the "wants to learn" prompt
+    for (let i = 0; i < 20 && game.scene.ui.getMode() !== UiMode.LEARN_MOVE_BATCH; i++) {
       await sleep(5);
     }
-    expect(game.scene.ui.getMode(), "the evolution picker (OPTION_SELECT) opened").toBe(UiMode.OPTION_SELECT);
+    expect(game.scene.ui.getMode(), "the shared batch panel opened").toBe(UiMode.LEARN_MOVE_BATCH);
 
-    // Options are base-first; pick the 2nd (the non-base evolution) and confirm.
-    const handler = game.scene.ui.getHandler() as AbstractOptionSelectUiHandler;
-    handler.setCursor(1);
-    handler.processInput(Button.ACTION);
+    // Base is selected by default; cycle to the evolution (F), learn the move (ACTION),
+    // then close (B - a committed learn finishes immediately).
+    game.scene.ui.processInput(Button.CYCLE_FORM);
+    game.scene.ui.processInput(Button.ACTION);
+    game.scene.ui.processInput(Button.CANCEL);
     await sleep(20);
 
     // The move landed in the evolution's OWN stored moveset, NOT the base live moveset.
@@ -116,5 +116,7 @@ describe.skipIf(!RUN)("ER Omniform teach path (LearnMovePhase evolution picker)"
       mon.getMoveset(true).some(m => m.moveId === teachMove),
       "base did NOT learn it",
     ).toBe(false);
+    // A TM records into usedTMs (the reward-shop continuation bookkeeping ran).
+    expect(mon.usedTMs?.includes(teachMove)).toBe(true);
   });
 });

@@ -115,6 +115,13 @@ export interface LearnMoveBatchDeps {
    * Unset for a normal mon, so the vanilla single-moveset panel is byte-identical.
    */
   omniform?: boolean;
+  /**
+   * ER Omniform: called once per COMMITTED teach (base OR a non-base evolution), so a
+   * host can run item-specific bookkeeping (e.g. the TM Case / Learner's Shroom
+   * reward-shop continuation cleanup) exactly when something was learned. The
+   * level-up path omits it.
+   */
+  learnHook?: () => void;
 }
 
 /**

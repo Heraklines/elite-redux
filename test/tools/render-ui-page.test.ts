@@ -76,7 +76,7 @@ import {
 } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
-import { playErTransformFx } from "#sprites/er-form-transform-fx";
+import { playErTransformMorph } from "#sprites/er-form-transform-fx";
 import { achvs } from "#system/achv";
 import { VoucherType } from "#system/voucher";
 import type { GameManager } from "#test/framework/game-manager";
@@ -617,14 +617,23 @@ function showdownWagerArgs(): [ShowdownWagerArgs] {
 }
 
 const RECIPES: Record<string, Recipe> = {
-  // ER partner / Omniform TRANSFORM burst FX (per-type). Not a screen but a field
-  // overlay, rendered in isolation so `frames:` gives a flip-book SMOKE CHECK that
-  // the type-themed particles + tinted light draw non-blank and step without
-  // crashing. Faithful ANIMATION is out of scope here (the harness auto-completes
-  // tweens - CLAUDE.md "animation/timing"); the tween mock never APPLIES values,
-  // so the burst renders at its SPAWN state, which is what we want to eyeball.
-  // Math.random + the teardown timer are pinned so the render is deterministic
-  // (golden-stable) and the burst survives every captured frame.
+  // ER partner / Omniform TRANSFORM FX. Not a screen but a field overlay, rendered
+  // in isolation so `frames:` gives a flip-book SMOKE CHECK that the type-themed
+  // particles + tinted light draw non-blank and step without crashing.
+  //
+  // This exercises `playErTransformMorph` - the FULL sequence entry point (fill ->
+  // SDF shape morph -> reveal + burst) - on its FAIL-CLOSED path, which is the only
+  // path this harness can render. The animated fill/morph is a per-frame canvas
+  // texture driven by a real Phaser clock over a real loaded sprite atlas; both are
+  // animation-tier (CLAUDE.md "out of scope: animation/timing" - tweens/timers are
+  // auto-completed/no-op'd) AND depend on real sprite PIXELS this fake overlay has
+  // none of. So `playErTransformMorph` deterministically fails closed to the snappy
+  // burst-only reveal here (the fake sprite's texture key does not exist, so the
+  // mask read returns null), which is exactly the golden this recipe locks: the
+  // burst renders at its SPAWN state (the tween mock never applies values). The
+  // morph's SDF math is unit-tested purely instead (er-form-transform-fx.test.ts).
+  // Math.random + the teardown timer are pinned so the render is deterministic and
+  // the burst survives every captured frame.
   "er-transform-fx": {
     frames: 4,
     diffTolerance: 4000,
@@ -633,10 +642,18 @@ const RECIPES: Record<string, Recipe> = {
       // A field-scale (x6) host container centred on screen for the burst shapes.
       const host = gs.add.container(0, 0).setScale(6).setPosition(960, 620);
       ctx.fieldRoot.add(host);
-      const anchor = gs.add.rectangle(0, 0, 1, 1, 0x000000, 0).setVisible(false);
-      host.add(anchor);
+      // A getSprite() stub whose texture key does NOT exist -> the morph mask read
+      // returns null -> `playErTransformMorph` fails closed to the burst (the path
+      // this harness renders). x/y = 0 so the burst anchors at the container origin.
+      const fakeSprite: any = { x: 0, y: 0, texture: { key: "er-transform-fx-recipe-no-atlas" }, setAlpha() {} };
       // fakePokemon.y offsets the FX's internal -26 body nudge back to the origin.
-      const fakePokemon: any = { x: 0, y: 26, getSprite: () => anchor };
+      const fakePokemon: any = {
+        id: 0,
+        x: 0,
+        y: 26,
+        getSprite: () => fakeSprite,
+        getSpriteScale: () => 1,
+      };
 
       const realRandom = Math.random;
       const realDelayed = gs.time.delayedCall?.bind(gs.time);
@@ -645,7 +662,7 @@ const RECIPES: Record<string, Recipe> = {
       try {
         const prevField = gs.field;
         gs.field = host; // the FX parents its shapes into globalScene.field
-        playErTransformFx(fakePokemon, PokemonType.GRASS);
+        playErTransformMorph(fakePokemon, PokemonType.GRASS, { onSwap: () => {} });
         gs.field = prevField;
       } finally {
         Math.random = realRandom;
@@ -2098,18 +2115,19 @@ const RECIPES: Record<string, Recipe> = {
     diffTolerance: 0,
   },
   // ER Omniform (#partner-eevee): the level-up batch panel for a Partner Eevee. The
-  // top band shows the selected-evolution name + the evolution STRIP (Eevee + the 8
-  // partner eeveelutions, base selected, (F) key-badge); the LEARNABLE column offers
-  // the moves annotated for the BASE form (illegal / already-known ones dimmed), the
-  // CURRENT column shows the base moveset. Static -> exact diff.
+  // panel itself renders IDENTICALLY to the vanilla batch panel; the evolution STRIP
+  // sits OUTSIDE it, on its TOP EDGE (Eevee + the 8 partner eeveelutions, base
+  // selected with a gold underline, (F) key-badge, > overflow arrow). The LEARNABLE
+  // column offers the moves annotated for the BASE form (illegal / already-known ones
+  // dimmed), the CURRENT column shows the base moveset. Static -> exact diff.
   "learn-move-batch-omniform": {
     mode: UiMode.LEARN_MOVE_BATCH,
     prepare: async game => [await partnerEeveeBatchDeps(game)],
     diffTolerance: 0,
   },
   // ER Omniform: one CYCLE_FORM press selects the 2nd family form (Partner Vaporeon);
-  // the name label + the CURRENT column re-render to THAT evolution's OWN stored
-  // moveset, and the LEARNABLE column re-annotates the offers for it.
+  // the strip underline moves to it and the CURRENT column re-renders to THAT
+  // evolution's OWN stored moveset, and the LEARNABLE column re-annotates its offers.
   "learn-move-batch-omniform-cycled": {
     mode: UiMode.LEARN_MOVE_BATCH,
     prepare: async game => [await partnerEeveeBatchDeps(game)],

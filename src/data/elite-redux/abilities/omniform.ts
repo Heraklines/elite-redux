@@ -60,7 +60,7 @@ import { UiMode } from "#enums/ui-mode";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 import { PokemonMove } from "#moves/pokemon-move";
-import { playErTransformFx } from "#sprites/er-form-transform-fx";
+import { playErTransformMorph } from "#sprites/er-form-transform-fx";
 import type { AbAttrBaseParams } from "#types/ability-types";
 import type { FightUiHandler } from "#ui/handlers/fight-ui-handler";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -154,8 +154,16 @@ export function erOmniformRevertToBase(holder: Pokemon): void {
   holder.summonData.moveset = loadOmniformBattleMoveset(holder, base);
 
   (globalScene.ui?.handlers?.[UiMode.FIGHT] as FightUiHandler | undefined)?.refreshMoves();
-  playErTransformFx(holder, holder.getSpeciesForm().type1);
-  void holder.loadAssets(false).then(() => holder.updateInfo());
+  // Full transform SEQUENCE (fill -> shape morph -> reveal + burst). The sprite +
+  // info swap runs INSIDE `onSwap`, awaited under the glow, so the reveal drains
+  // onto the already-swapped base-form sprite (the late-swap fix). Fire-and-forget:
+  // the phase flow never awaits it (fail-closed = the old burst-only behaviour).
+  playErTransformMorph(holder, holder.getSpeciesForm().type1, {
+    onSwap: async () => {
+      await holder.loadAssets(false);
+      await holder.updateInfo();
+    },
+  });
   globalScene.phaseManager.queueMessage(
     `${getPokemonNameWithAffix(holder)} reverted to ${original.species.getName()}!`,
   );
@@ -278,13 +286,20 @@ export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
   // mid-move transform (menu already closed) leaves it a no-op.
   (globalScene.ui?.handlers?.[UiMode.FIGHT] as FightUiHandler | undefined)?.refreshMoves();
 
-  // Partner-evolution transform VFX: a brief burst tinted by the TARGET form's
-  // primary type + type-themed particles. This path IS the partner/Omniform
-  // predicate (only registered mappings reach here), so OTHER form changes keep
-  // their existing presentation. Purely visual + fail-closed (never throws).
-  playErTransformFx(user, speciesForm.type1);
-
-  void user.loadAssets(false).then(() => user.updateInfo());
+  // Partner-evolution transform SEQUENCE: fill (TARGET primary-type light) ->
+  // SDF shape morph (source form -> target form) -> reveal + per-type burst. This
+  // path IS the partner/Omniform predicate (only registered mappings reach here),
+  // so OTHER form changes keep their existing presentation. The real sprite + info
+  // swap runs INSIDE `onSwap`, awaited UNDER the glow so the reveal drains onto the
+  // already-swapped target sprite (the late-swap fix). Purely visual + fail-closed
+  // (never throws; degrades to the burst-only reveal). Fire-and-forget: the phase
+  // flow is never awaited on it.
+  playErTransformMorph(user, speciesForm.type1, {
+    onSwap: async () => {
+      await user.loadAssets(false);
+      await user.updateInfo();
+    },
+  });
   globalScene.phaseManager.queueMessage(
     `${getPokemonNameWithAffix(user)} adapted into ${getPokemonSpecies(target.speciesId).getName()}!`,
   );

@@ -36,10 +36,6 @@ const ROW_H = 14;
 const ROW_TOP = 44;
 /** How many list rows show at once per column before the column scrolls. */
 const VISIBLE_ROWS = 5;
-/** ER Omniform: extra height reserved at the top of the panel for the evolution strip band. */
-const OMNIFORM_BAND_H = 16;
-/** ER Omniform: visible rows per column when the strip band is present (keeps the list inside the panel). */
-const OMNIFORM_VISIBLE_ROWS = 4;
 /** Left side panel (learning mon's icon + base stats), drawn just left of the main window. */
 const LEFT_W = 56;
 const LEFT_GAP = 0; // flush against the main panel (touching, not overlapping)
@@ -109,7 +105,6 @@ export class LearnMoveBatchUiHandler extends UiHandler {
   /** Teach targets, parallel to {@link omniformEntries}; base first (index 0). */
   private omniformTargets: OmniformTarget[] = [];
   private omniformSel = 0;
-  private omniformNameText: Phaser.GameObjects.Text | null = null;
   /** Deep copies of each NON-base evolution's stored moveset at show(), so Undo restores them. */
   private omniformSnapshots: SerializedOmniformMove[][] = [];
 
@@ -240,12 +235,10 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     this.destroyOmniform();
     const deps = this.deps;
     if (!deps?.omniform || !isErOmniformMon(deps.pokemon)) {
-      this.repositionRows();
       return;
     }
     const targets = omniformFamilyForms(deps.pokemon);
     if (targets.length <= 1) {
-      this.repositionRows();
       return;
     }
     this.omniformActive = true;
@@ -259,56 +252,32 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     this.omniformSnapshots = targets.map((form, i) =>
       i === 0 ? [] : getOrRollFormMoveset(deps.pokemon, form).map(([m, pp]) => [m, pp] as SerializedOmniformMove),
     );
-    // Selected-evolution name label in the top band (left), strip right-aligned.
-    this.omniformNameText = addTextObject(PANEL_X + 6, PANEL_Y + 9, "", TextStyle.WINDOW_ALT).setOrigin(0, 0.5);
-    this.container.add(this.omniformNameText);
+    // The strip sits OUTSIDE the panel, on its TOP edge (the free space above the
+    // window), right-aligned to the main window - so the panel itself renders
+    // exactly like the vanilla batch panel. The selected evolution gets the gold
+    // underline (underlineSelected). F / controller LB / mobile apad cycle it.
     const stripWindow = 5;
     const stripCell = 15;
-    const rightEdgeX = PANEL_X + PANEL_W - 6;
+    const rightEdgeX = PANEL_X + PANEL_W;
     this.omniformStrip = new OmniformEvolutionStrip(this.container, this.omniformEntries, this.omniformSel, {
       x: rightEdgeX - omniformStripWidth(stripWindow, stripCell),
-      y: PANEL_Y + 9,
+      y: PANEL_Y - 9, // vertical centre just above the window's top edge
       windowSize: stripWindow,
       cellWidth: stripCell,
       iconScale: 0.45,
+      underlineSelected: true,
       onChange: index => this.onOmniformSelect(index),
     });
-    this.repositionRows();
-    this.updateOmniformName();
   }
 
   private destroyOmniform(): void {
     this.omniformStrip?.destroy();
     this.omniformStrip = null;
-    this.omniformNameText?.destroy();
-    this.omniformNameText = null;
     this.omniformEntries = [];
     this.omniformTargets = [];
     this.omniformSnapshots = [];
     this.omniformActive = false;
     this.omniformSel = 0;
-  }
-
-  /** Reposition the column headers + scroll arrows for the (optional) top strip band. */
-  private repositionRows(): void {
-    const band = this.omniformActive ? OMNIFORM_BAND_H : 0;
-    this.learnableHeader.y = ROW_TOP - 18 + band;
-    this.currentHeader.y = ROW_TOP - 18 + band;
-    this.learnUp.y = ROW_TOP - 9 + band;
-    this.currentUp.y = ROW_TOP - 9 + band;
-    const botY = ROW_TOP + this.visibleRows() * ROW_H + band;
-    this.learnDown.y = botY;
-    this.currentDown.y = botY;
-  }
-
-  /** Top Y of the first list row (shifted down by the strip band when Omniform). */
-  private listTop(): number {
-    return ROW_TOP + (this.omniformActive ? OMNIFORM_BAND_H : 0);
-  }
-
-  /** Visible rows per column (fewer when the strip band eats vertical space). */
-  private visibleRows(): number {
-    return this.omniformActive ? OMNIFORM_VISIBLE_ROWS : VISIBLE_ROWS;
   }
 
   /** The selected evolution's teach target, or null when not Omniform. */
@@ -330,17 +299,8 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       this.pendingMoveId = null;
     }
     this.clampScroll();
-    this.updateOmniformName();
     globalScene.ui.playSelect();
     this.render();
-  }
-
-  private updateOmniformName(): void {
-    const entry = this.omniformEntries[this.omniformSel];
-    // A COMPACT label: the bare species name minus the "Partner " family prefix
-    // ("Eevee", "Vaporeon", ...). The full "Eevee (Partner)" / "Partner Vaporeon"
-    // collides with the strip in the narrow top band.
-    this.omniformNameText?.setText(entry ? entry.species.getName().replace(/^Partner\s+/i, "") : "");
   }
 
   /**
@@ -418,7 +378,6 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       t.setVisible(!confirming);
     }
     this.omniformStrip?.setVisible(this.omniformActive && !confirming);
-    this.omniformNameText?.setVisible(this.omniformActive && !confirming);
 
     if (confirming) {
       // Hide the move lists + arrows + cursor so only the confirm prompt shows.
@@ -456,8 +415,6 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       learnRows = this.learnableRows();
     }
 
-    const top = this.listTop();
-    const vis = this.visibleRows();
     this.learnableTexts = this.renderColumn(
       this.learnableTexts,
       learnRows,
@@ -465,8 +422,6 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       PANEL_X + 12,
       this.learnUp,
       this.learnDown,
-      top,
-      vis,
       learnDisabled,
     );
     this.currentTexts = this.renderColumn(
@@ -476,8 +431,6 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       PANEL_X + 12 + COL_GAP,
       this.currentUp,
       this.currentDown,
-      top,
-      vis,
       null,
     );
 
@@ -486,7 +439,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
   }
 
   /**
-   * Render one column's `visRows`-tall window of `rows` starting at `scroll`,
+   * Render one column's VISIBLE_ROWS-tall window of `rows` starting at `scroll`,
    * reusing/destroying the old text objects, and toggle its up/down arrows. Rows
    * flagged in `disabled` are dimmed (illegal / already-known Omniform offers).
    */
@@ -497,17 +450,15 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     x: number,
     upArrow: Phaser.GameObjects.Text,
     downArrow: Phaser.GameObjects.Text,
-    top: number,
-    visRows: number,
     disabled: boolean[] | null,
   ): Phaser.GameObjects.Text[] {
     for (const t of old) {
       t.destroy();
     }
     const out: Phaser.GameObjects.Text[] = [];
-    const end = Math.min(scroll + visRows, rows.length);
+    const end = Math.min(scroll + VISIBLE_ROWS, rows.length);
     for (let i = scroll; i < end; i++) {
-      const t = addTextObject(x, top + (i - scroll) * ROW_H, rows[i], TextStyle.WINDOW);
+      const t = addTextObject(x, ROW_TOP + (i - scroll) * ROW_H, rows[i], TextStyle.WINDOW);
       if (disabled?.[i]) {
         t.setAlpha(0.5);
       }
@@ -515,7 +466,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       out.push(t);
     }
     upArrow.setVisible(scroll > 0);
-    downArrow.setVisible(scroll + visRows < rows.length);
+    downArrow.setVisible(scroll + VISIBLE_ROWS < rows.length);
     return out;
   }
 
@@ -529,23 +480,22 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     const scroll = isSlot ? this.slotScroll : this.newScroll;
     // Origin (0, 0.5): x = arrow's left edge (just left of the column text at
     // PANEL_X + 12), y = vertical centre of the cursor's VISIBLE row.
-    const cy = this.listTop() + (cursor - scroll) * ROW_H + Math.floor(ROW_H / 2);
+    const cy = ROW_TOP + (cursor - scroll) * ROW_H + Math.floor(ROW_H / 2);
     this.cursorObj.setPosition(PANEL_X + 4 + (isSlot ? COL_GAP : 0), cy);
   }
 
   /** Keep the active column's cursor inside its visible window (scroll if needed). */
   private clampScroll(): void {
-    const vis = this.visibleRows();
     if (this.state === "pickSlot") {
       if (this.slotCursor < this.slotScroll) {
         this.slotScroll = this.slotCursor;
-      } else if (this.slotCursor >= this.slotScroll + vis) {
-        this.slotScroll = this.slotCursor - vis + 1;
+      } else if (this.slotCursor >= this.slotScroll + VISIBLE_ROWS) {
+        this.slotScroll = this.slotCursor - VISIBLE_ROWS + 1;
       }
     } else if (this.newCursor < this.newScroll) {
       this.newScroll = this.newCursor;
-    } else if (this.newCursor >= this.newScroll + vis) {
-      this.newScroll = this.newCursor - vis + 1;
+    } else if (this.newCursor >= this.newScroll + VISIBLE_ROWS) {
+      this.newScroll = this.newCursor - VISIBLE_ROWS + 1;
     }
   }
 
@@ -759,6 +709,9 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       this.deps!.assign(moveId, slotIndex);
     }
     this.learnedAny = true;
+    // Notify the host of a committed teach (base or evolution) - the TM Case /
+    // Learner's Shroom path uses this for its reward-shop continuation cleanup.
+    this.deps!.learnHook?.();
     globalScene.ui.playSelect();
     if (this.omniformActive) {
       // Keep the offered move (expanded per evolution, not in total); it now reads

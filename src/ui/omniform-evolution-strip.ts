@@ -54,6 +54,13 @@ export interface OmniformEvolutionStripOptions {
   buttonGlyph?: string;
   /** Fired whenever the selected index changes via {@link cycle}/{@link setSelectedIndex}. */
   onChange?: (index: number, entry: OmniformEvolutionEntry) => void;
+  /**
+   * Put the gold underline on the SELECTED evolution instead of the current
+   * battle-active form. The summary browser marks the current form (default false);
+   * the level-up batch panel marks the selected evolution being taught (true), so
+   * the underline tracks the cursor.
+   */
+  underlineSelected?: boolean;
 }
 
 const DEFAULTS = {
@@ -79,6 +86,7 @@ export class OmniformEvolutionStrip {
   private readonly cellWidth: number;
   private readonly iconScale: number;
   private readonly buttonGlyph: string;
+  private readonly underlineSelected: boolean;
   private readonly onChange: ((index: number, entry: OmniformEvolutionEntry) => void) | undefined;
   private selectedIndex: number;
 
@@ -93,6 +101,7 @@ export class OmniformEvolutionStrip {
     this.cellWidth = options.cellWidth ?? DEFAULTS.cellWidth;
     this.iconScale = options.iconScale ?? DEFAULTS.iconScale;
     this.buttonGlyph = options.buttonGlyph ?? DEFAULTS.buttonGlyph;
+    this.underlineSelected = options.underlineSelected ?? false;
     this.onChange = options.onChange;
     this.selectedIndex = Math.max(0, Math.min(selectedIndex, Math.max(0, entries.length - 1)));
 
@@ -172,8 +181,10 @@ export class OmniformEvolutionStrip {
     icon.setAlpha(selected ? 1 : 0.5);
     this.container.add(icon);
 
-    // Distinct marker for the CURRENT battle-active form: a small gold underline.
-    if (entry.isCurrent) {
+    // Gold underline marker. By default it marks the CURRENT battle-active form (the
+    // summary browser); with `underlineSelected` it marks the SELECTED evolution
+    // instead (the level-up batch panel, where the underline tracks the cursor).
+    if (this.underlineSelected ? selected : entry.isCurrent) {
       const mark = globalScene.add
         .rectangle(cx, rowY + this.cellWidth / 2 - 1, this.cellWidth - 5, 1.5, 0xffd700, 1)
         .setOrigin(0.5, 0.5);
