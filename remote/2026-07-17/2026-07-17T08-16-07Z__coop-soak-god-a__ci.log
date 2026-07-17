@@ -1,0 +1,57 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 200
+run_mode: calibrated-release
+calibration_id: god-200
+target_sha: 4026bf6ca7d4f8095cb9cf7a0008d303b88479d5
+checked_out_sha: 4026bf6ca7d4f8095cb9cf7a0008d303b88479d5
+base_seed: 20260717
+campaign_seed: 20260717
+run: 29565689975 (workflow source 4026bf6ca7d4f8095cb9cf7a0008d303b88479d5)
+timestamp: 2026-07-17T08-16-07Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260717 WAVES=200 - replay this run with:  SOAK_SEED=20260717 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+Starting species pool tier: COMMON
+Pokemon: Wild Pidgey | Species ID: 16 | Level: 2 | Nature: Hardy (-)
+Stats (IVs): HP: 13 (31), Atk: 6 (31), Def: 6 (31), Spatk: 6 (31), Spdef: 7 (31), Spd: 6 (31)
+Ability: Guts | Passive Ability: Flock 
+Moveset: [ 'Air Cutter', 'Steel Wing', 'Sand Attack', 'Peck' ]
+Starting species pool tier: COMMON
+Pokemon: Wild Zigzagoon | Species ID: 263 | Level: 2 | Nature: Hardy (-)
+Stats (IVs): HP: 14 (31), Atk: 7 (31), Def: 7 (31), Spatk: 6 (31), Spdef: 7 (31), Spd: 6 (31)
+Ability: Momentum | Passive Ability: Pickup 
+Moveset: [ 'Growl', 'Double-Edge', 'Stomping Tantrum', 'Mud Sport' ]
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[38;2;0;60;189mUI mode changed from TITLE (=1) to MESSAGE (=0)![39m
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[33m[bgm] audio missing from cache for key "battle_wild"; keeping the current track (#826)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[34mA wild Pidgey and Zigzagoon appeared![39m
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[33m[bgm] audio missing from cache for key "battle_wild"; keeping the current track (#826)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[38;2;255;127;80mPhaseInterceptor.to: Stopping on completion of EncounterPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39mEnemy held items removed
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: SummonPhase[39m
+[34mGo! Eternatus![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: ToggleDoublePositionPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[32mStart Phase: SummonPhase[39m
+[34mGo! Rayquaza![39m
+
