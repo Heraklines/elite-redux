@@ -85,6 +85,7 @@ import {
   coopBiomeInteractionStartValue,
   setCoopBiomeInteractionStart,
 } from "#data/elite-redux/coop/coop-biome-pin-state";
+import { setCoopDurabilityScheduleWrapperForTesting } from "#data/elite-redux/coop/coop-durability";
 import {
   commitMeOwnerIntent,
   isCoopMeOperationEnabled,
@@ -542,6 +543,8 @@ function captureLiveCtx(): {
 /** The label of the client currently being pumped (so the log sink routes lines to its bucket). */
 export let activeClientLabel: "host" | "guest" | "none" = "none";
 let activeClientInboundPump: (() => number) | undefined;
+/** The complete ClientCtx currently installed (null between windows). Timer-ownership pins consult it. */
+let activeClientCtx: ClientCtx | null = null;
 
 let meBoundaryGeneration = 0;
 
@@ -569,10 +572,12 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   const prev = captureLiveCtx();
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
+  const prevClientCtx = activeClientCtx;
   const prevAccountIdentity = loggedInUser?.username;
   const capturedBoundaryGeneration = meBoundaryGeneration;
   activeClientLabel = ctx.label;
   activeClientInboundPump = ctx.pumpInbound;
+  activeClientCtx = ctx;
   if (ctx.accountIdentity != null && loggedInUser != null) {
     loggedInUser.username = ctx.accountIdentity;
   }
@@ -615,6 +620,7 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     }
     activeClientLabel = prevLabel;
     activeClientInboundPump = prevInboundPump;
+    activeClientCtx = prevClientCtx;
     if (prev.runtime != null) {
       setCoopRuntime(prev.runtime);
       installCoopHooksForActive(prev.runtime);
@@ -630,10 +636,12 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   const prev = captureLiveCtx();
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
+  const prevClientCtx = activeClientCtx;
   const prevAccountIdentity = loggedInUser?.username;
   const capturedBoundaryGeneration = meBoundaryGeneration;
   activeClientLabel = ctx.label;
   activeClientInboundPump = ctx.pumpInbound;
+  activeClientCtx = ctx;
   if (ctx.accountIdentity != null && loggedInUser != null) {
     loggedInUser.username = ctx.accountIdentity;
   }
@@ -685,6 +693,7 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     }
     activeClientLabel = prevLabel;
     activeClientInboundPump = prevInboundPump;
+    activeClientCtx = prevClientCtx;
     if (prev.runtime != null) {
       setCoopRuntime(prev.runtime);
       installCoopHooksForActive(prev.runtime);
@@ -1850,6 +1859,67 @@ export async function driveDuoGuestTackleThroughPublicUi(
 const liveDuoRigs = new Set<DuoRig>();
 
 /**
+ * TIMER OWNERSHIP (the gate-4 29600149131 SwitchSummonPhase orphan class): in two real browsers every
+ * timer fires inside the event loop of the client that scheduled it. In this one-process harness both
+ * scenes' MockClocks tick off ambient 1ms setIntervals and the host interceptor advances phases from
+ * vi.waitUntil timer callbacks - all under WHATEVER ClientCtx happens to be installed at that instant.
+ * Evidence from the seating duo logs: the HOST's summon continuation (delayedCall -> end() ->
+ * queuePostSummon -> shiftPhase) fired while the GUEST ctx was resident, so the host phase pushed
+ * PostSummonPhase onto the GUEST's phase manager (allowlist-neutralized there, correctly) and shifted
+ * the GUEST's queue - orphaning the host's own queue inside SwitchSummonPhase forever, which the
+ * turn-commit machinery then surfaced as an endless RE-SEND/requestTurnCommit ping-pong.
+ *
+ * Pin each engine's callback DISPATCH to its owning client's ctx:
+ *  - each scene's clock update (fires delayedCall callbacks) runs under that scene's ctx;
+ *  - the host interceptor's run() (the synchronous phase.start() head; the awaited tail is a passive
+ *    poll, so withClientSync's restore-after-sync-head is exactly right) runs under the host ctx;
+ *  - default-scheduled durability recovery/deferral timers fire under the ctx installed when they
+ *    were scheduled (production wrapper is null - zero live impact).
+ */
+function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
+  const pinClock = (scene: BattleScene, ctx: ClientCtx): void => {
+    const clock = scene.time as unknown as {
+      update: (time: number, delta: number) => void;
+      _active?: unknown[];
+    };
+    const originalUpdate = clock.update.bind(scene.time);
+    clock.update = (time: number, delta: number): void => {
+      // Only a tick that can FIRE callbacks needs the swap; an idle clock stays a cheap direct call.
+      if ((clock._active?.length ?? 0) === 0 || activeClientLabel === ctx.label) {
+        originalUpdate(time, delta);
+        return;
+      }
+      withClientSync(ctx, () => originalUpdate(time, delta));
+    };
+  };
+  pinClock(rig.hostScene, rig.hostCtx);
+  pinClock(rig.guestScene, rig.guestCtx);
+
+  const interceptor = hostGame.phaseInterceptor as unknown as { run: (phase: Phase) => Promise<void> };
+  const originalRun = interceptor.run.bind(hostGame.phaseInterceptor);
+  interceptor.run = (phase: Phase): Promise<void> =>
+    activeClientLabel === rig.hostCtx.label
+      ? originalRun(phase)
+      : withClientSync(rig.hostCtx, () => originalRun(phase));
+
+  // Idempotent (re)install: capture the scheduling client at schedule time; passthrough when no duo
+  // window is installed (single-engine tests in the same worker are untouched).
+  setCoopDurabilityScheduleWrapperForTesting(callback => {
+    const owner = activeClientCtx;
+    if (owner == null) {
+      return callback;
+    }
+    return () => {
+      if (activeClientLabel === owner.label) {
+        callback();
+        return;
+      }
+      withClientSync(owner, callback);
+    };
+  });
+}
+
+/**
  * Dispose both independently assembled runtimes owned by a duo rig.
  *
  * `clearCoopRuntime()` can only see the process-global active runtime. Most duo tests leave the guest
@@ -2042,6 +2112,7 @@ export async function buildDuo(
   await drainLoopback();
 
   const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair: runtimePair };
+  installDuoCtxOwnershipPins(rig, hostGame);
   liveDuoRigs.add(rig);
   return rig;
 }
@@ -3182,6 +3253,7 @@ export async function buildDuoForMe(
   await drainLoopback();
 
   const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair: runtimePair };
+  installDuoCtxOwnershipPins(rig, hostGame);
   liveDuoRigs.add(rig);
   return rig;
 }
@@ -4116,6 +4188,7 @@ export async function buildShowdownDuo(
   // them with the shared afterEach teardown too: clearing only the ambient (usually guest) runtime leaves
   // the host battle stream's retained replacement timer alive, so a prior test can retransmit an old-epoch
   // checkpoint into the next match and reopen CoopGuestFaintSwitchPhase after the new replacement settled.
+  installDuoCtxOwnershipPins(rig, hostGame);
   liveDuoRigs.add(rig);
   return rig;
 }

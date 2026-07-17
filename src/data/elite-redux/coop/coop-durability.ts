@@ -676,8 +676,23 @@ const DURABILITY_DEFERRED_DEADLINE_MS = 60_000;
 const OPERATION_AUTHORITY_CONTINUATION_DEADLINE_MS = 180_000;
 const OPERATION_PEER_CONTINUATION_DEADLINE_MS = 60_000;
 
+/**
+ * Harness-only (null in production): wraps every default-scheduled recovery/deferral callback at
+ * SCHEDULE time. The two-engine duo harness installs a wrapper that captures the scheduling client's
+ * complete context, so the timer later FIRES under its owning engine even though both engines share
+ * one process event loop (in two real browsers every timer runs inside the loop that scheduled it).
+ * Without this, a guest deferral retry could fire while the host context is installed and mutate the
+ * wrong engine's state.
+ */
+let durabilityScheduleWrapper: ((callback: () => void) => () => void) | null = null;
+
+export function setCoopDurabilityScheduleWrapperForTesting(wrap: ((callback: () => void) => () => void) | null): void {
+  durabilityScheduleWrapper = wrap;
+}
+
 function defaultDurabilitySchedule(callback: () => void, ms: number): () => void {
-  const timer = setTimeout(callback, ms);
+  const scheduled = durabilityScheduleWrapper?.(callback) ?? callback;
+  const timer = setTimeout(scheduled, ms);
   (timer as ReturnType<typeof setTimeout> & { unref?: () => void }).unref?.();
   return () => clearTimeout(timer);
 }
