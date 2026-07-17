@@ -839,7 +839,7 @@ export function semanticSurfaceView(text) {
     || !value.address
     || typeof value.address !== "object"
     || !Number.isSafeInteger(value.address.epoch)
-    || value.address.epoch < (value.coop ? 1 : 0)
+    || value.address.epoch < 0
     || !Number.isSafeInteger(value.address.wave)
     || value.address.wave < 0
     || !Number.isSafeInteger(value.address.turn)
@@ -862,7 +862,7 @@ export function semanticSurfaceView(text) {
     || !nullablePositiveInteger(value.surfaceGeneration)
     || !nullableMysteryEncounterType(value.mysteryEncounterType)
     || !nullableStateDigest(value.stateDigest)
-    || (value.coop && value.address.wave > 0 && value.stateDigest === null)
+    || (value.coop && value.address.wave > 0 && (value.address.epoch < 1 || value.stateDigest === null))
     || (value.coop
       && (value.localSeat === null
         || value.localRole === null
