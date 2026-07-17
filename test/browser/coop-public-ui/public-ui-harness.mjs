@@ -3102,7 +3102,9 @@ export class DuoPublicUiRig {
     // (run 29600150702 depth lanes: selectOptionById raced the close and saw the torn-down
     // submenu). Accept that outcome as a valid resolution wherever the drive loses the surface.
     const supersededByAuthority = () =>
-      owner.evidence.find(/own-faint picker CLOSE from committed authority/u, replacementCursor);
+      // Probe from the drive's ORIGIN cursor: the authority can commit while the driver is still
+      // polling for an actionable surface, i.e. BEFORE replacementCursor was even taken.
+      owner.evidence.find(/own-faint picker CLOSE from committed authority/u, replacementCursors[owner.label]);
     try {
       await selectOptionById(owner, {
         surfaceId: "party:replacement",
