@@ -221,10 +221,17 @@ describe.skipIf(!RUN)(
       });
       expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
       await settleDuoPromise(rig, hostAdvance!, "double-KO replacement host crossing");
-      await drainLoopback();
-      const guestBoundary = await withClient(rig.guestCtx, () =>
-        rig.guestRuntime.rendezvous.awaitPartner(commandPoint),
-      );
+      // The reciprocity proof is itself a two-engine crossing: the host's arrival frame reaches the
+      // guest only while the guest's inbox pumps, so the awaitPartner promise must settle under BOTH
+      // destination contexts (a guest-only await with the vitest 50ms rendezvous budget times out
+      // before the arrival is ever consumed - the gate-9 B7 red).
+      let boundaryPending: Promise<{ timedOut: boolean }> | undefined;
+      await withClient(rig.guestCtx, async () => {
+        boundaryPending = rig.guestRuntime.rendezvous.awaitPartner(commandPoint) as Promise<{ timedOut: boolean }>;
+        await drainLoopback();
+      });
+      expect(boundaryPending, "the guest reciprocity wait was started").toBeDefined();
+      const guestBoundary = await settleDuoPromise(rig, boundaryPending!, "post-replacement reciprocal boundary");
       expect(guestBoundary.timedOut, "post-replacement command boundary was reciprocal").toBe(false);
 
       // No strand: the host reached the next CommandPhase.
