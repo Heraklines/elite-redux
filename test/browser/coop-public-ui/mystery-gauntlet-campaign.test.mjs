@@ -214,7 +214,7 @@ test("parallel lobby pairing reselects the exact visible username before every r
 });
 
 test("semantic option identity is independent of every presentation language", async () => {
-  const [observer, optionType, gender, confirm, title, starter, party] = await Promise.all([
+  const [observer, optionType, gender, confirm, title, starter, party, campaignNav] = await Promise.all([
     readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
     readFile(resolve(root, "src/ui/handlers/abstract-option-select-ui-handler.ts"), "utf8"),
     readFile(resolve(root, "src/phases/select-gender-phase.ts"), "utf8"),
@@ -222,6 +222,7 @@ test("semantic option identity is independent of every presentation language", a
     readFile(resolve(root, "src/phases/title-phase.ts"), "utf8"),
     readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
     readFile(resolve(root, "src/ui/handlers/party-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign-nav.mjs"), "utf8"),
   ]);
 
   assert.match(optionType, /semanticId\?: string/u);
@@ -234,6 +235,12 @@ test("semantic option identity is independent of every presentation language", a
   assert.match(title, /semanticId: `accept:\$\{from\.name\}`/u);
   assert.match(starter, /semanticId: "add-to-party"/u);
   assert.match(starter, /semanticId: key\.toLowerCase\(\)/u);
+  assert.match(observer, /selectedOptionId: "starter-action:random"/u);
+  assert.match(observer, /selectedOptionId: `starter-team:\$\{starterHandler\.starterIconsCursorIndex\}`/u);
+  assert.match(campaignNav, /starter-grid-to-random/u);
+  assert.match(campaignNav, /starter-random-add-proof/u);
+  assert.match(campaignNav, /first random pick left no affordable second starter/u);
+  assert.match(campaignNav, /targetId: "remove-from-party"/u);
   assert.match(party, /export enum PartyOption/u);
   assert.match(observer, /partyOptionSemanticId\(/u);
   assert.match(observer, /party-option:\$\{enumName\.toLowerCase\(\)\.replaceAll\("_", "-"\)\}/u);
