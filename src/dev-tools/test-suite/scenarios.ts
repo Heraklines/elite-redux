@@ -18321,4 +18321,87 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Ghost teams: identity survives reload; verbatim roster; no repeats; difficulty-gated",
+    description:
+      "GHOST-POOL fixes (pool/serialization, not a single forcible battle) - verify via the Ghost\n"
+      + "Trainers challenge and a mid-battle save/reload:\n"
+      + "1. IDENTITY (#ghost-identity): save + reload DURING a ghost battle - the trainer KEEPS its\n"
+      + "   uploader name, piano BGM, and authored dialogue (was reverting to a plain NPC).\n"
+      + "2. VERBATIM (#419): a fielded ghost shows the uploader's EXACT species (no BST-cap devolve/\n"
+      + "   swap to the wave ceiling - e.g. a Snorlax stays Snorlax at an early ghost wave).\n"
+      + "3. NO-REPEAT (#ghost-repeat): consecutive ghost waves do NOT field the same player 3x+ in a row.\n"
+      + "4. DIFFICULTY (#345): a Youngster/Ace run NEVER meets a Hell-scaled ghost team (challenge pool is\n"
+      + "   capped at the run's tier and easier).\n"
+      + "Unit-tested: er-ghost-identity-reload / er-ghost-species-verbatim / er-ghost-repeat-suppression /\n"
+      + "er-ghost-difficulty-pool.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 20 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Colosseum vanilla round is not ~20 levels over the player cap",
+    description:
+      "LEVEL-CALC fix (ME-gated, not a plain battle) - the ER Colosseum / World Tournament vanilla\n"
+      + "(Ace/Youngster) round nudged the enemy level by round(waveIndex/10 * 2), which is +24 at wave 118\n"
+      + "(reported: tournament trainers ~20 levels over a L104 cap). It is now a FLAT ~+2 at any wave.\n"
+      + "DO: reach the Colosseum encounter deep in an Ace run and read the enemy levels.\n"
+      + "EXPECT: enemies are within a couple levels of your cap, not ~20 over. Unit-tested in\n"
+      + "test/tests/elite-redux/er-colosseum-level.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 118, STARTING_LEVEL_OVERRIDE: 104 });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Under-leveled evolved wilds de-evolve (Lv9 Raticate -> Rattata)",
+    description:
+      "WILD GENERATION fix (#19 redo, species-selection not a battle behavior) - a wild too evolved for\n"
+      + "its level is walked back to the stage valid for that level (a Lv9 Raticate, evo at 20 -> Rattata).\n"
+      + "The old gate was disabled because an UNDEFINED ER evo level devolved even a correctly-evolved\n"
+      + "Lv100 Watchog; it now devolves ONLY on a KNOWN numeric evo level above the encounter level.\n"
+      + "DO: encounter early-wave wilds; catch a high-BST evolved wild at a high wave.\n"
+      + "EXPECT: no under-leveled evolved wilds (no Lv9 Raticate), and correctly-evolved high-level wilds\n"
+      + "are untouched. Unit-tested in test/tests/elite-redux/er-wild-encounter-gates.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 3, STARTING_LEVEL_OVERRIDE: 9 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Mono-Type challenge: native extra/N-typed mons are starter-legal",
+    description:
+      "STARTER-GRID fix (#mono-fairy, UI not a battle behavior) - a mon that is Fairy (etc.) ONLY via a\n"
+      + "native extra/N-type (post type-nativization) was legal to FIELD/CATCH under the mono-type\n"
+      + "challenge but wrongly greyed out of the starter grid. The starter filter now folds in the extra\n"
+      + "types, matching in-battle enforcement.\n"
+      + "DO: start a Mono FAIRY challenge; open the starter grid.\n"
+      + "EXPECT: a natively-extra-Fairy mon is selectable (not greyed), consistent with being catchable/\n"
+      + "fieldable in the same run. Unit-tested in test/tests/elite-redux/er-monotype-native-extra-type.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 20 });
+      return [
+        makeStarter(SpeciesId.CLEFABLE, {
+          moveset: [MoveId.MOONBLAST, MoveId.MOONLIGHT, MoveId.THUNDERBOLT, MoveId.SOFT_BOILED],
+        }),
+      ];
+    },
+  },
 ];
