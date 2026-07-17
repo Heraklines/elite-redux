@@ -572,9 +572,14 @@ describe("co-op lobby self-healing handshake (#868)", () => {
   // -------------------------------------------------------------------------
   it("requestRoster recovers a rosterSync the host missed (one-shot re-answered)", async () => {
     const { host, guest } = createLoopbackPair();
+    // Open a genuine later zero-handler loss window. Pre-first-subscription frames
+    // are deliberately buffered so slow controller construction cannot lose identity
+    // or roster handshakes.
+    const closeInitialHostSubscription = host.onMessage(() => {});
+    closeInitialHostSubscription();
     const g = new CoopSessionController(guest, { username: "Guest" });
-    // The guest announces + locks in BEFORE the host controller exists, so the host misses
-    // the one-shot rosterSync entirely (it is delivered to no handler).
+    // The guest announces + locks in while the host has no current controller, so the
+    // one-shot rosterSync is deliberately dropped in the post-subscription loss window.
     g.connect();
     g.setLocalRoster([{ speciesId: 7, cost: 3 }]);
     g.setLocalReady(true);

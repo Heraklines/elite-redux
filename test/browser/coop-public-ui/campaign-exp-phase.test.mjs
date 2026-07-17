@@ -369,7 +369,7 @@ test("registered surfaces deduplicate re-emissions by semantic identity, not evi
     owner: { marker: /OWNER drives reward screen/u },
   };
   const address = { epoch: 7, wave: 1, turn: 4 };
-  const pushReward = phaseInstance => {
+  const pushReward = (phaseInstance, surfaceGeneration = null) => {
     authority.evidence.events.push({
       index: authority.evidence.events.length,
       kind: "browser-surface2",
@@ -377,6 +377,7 @@ test("registered surfaces deduplicate re-emissions by semantic identity, not evi
         surfaceId: "reward-shop",
         address,
         phaseInstance,
+        surfaceGeneration,
         localSeat: 0,
         ownerSeat: 0,
         ready: { handlerActive: true, awaitingActionInput: false },
@@ -384,12 +385,22 @@ test("registered surfaces deduplicate re-emissions by semantic identity, not evi
     });
   };
   pushReward(11);
-  const handled = new Map([["reward:authority", JSON.stringify(["reward-shop", 7, 1, 4, 11])]]);
+  const handled = new Map([["reward:authority", JSON.stringify(["reward-shop", 7, 1, 4, 11, null])]]);
   pushReward(11);
   assert.equal(findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }, handled), null);
 
   pushReward(12);
   assert.equal(findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }, handled), driver);
+
+  const generationHandled = new Map([["reward:authority", JSON.stringify(["reward-shop", 7, 1, 4, 12, 1])]]);
+  pushReward(12, 1);
+  assert.equal(findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }, generationHandled), null);
+  pushReward(12, 2);
+  assert.equal(
+    findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }, generationHandled),
+    driver,
+    "a new UI generation inside one phase object is a new actionable appearance",
+  );
 });
 
 test("only ready active local battle narration and EXP instances advance once on each public client", async () => {

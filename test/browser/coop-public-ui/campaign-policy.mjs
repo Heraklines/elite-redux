@@ -158,6 +158,7 @@ export function loadCampaignPolicy() {
     autoFirst: autoFirstRequested && mode === "shakedown",
     stallMs: envInteger("COOP_UI_CAMPAIGN_STALL_MS", 8_000),
     rewardMode,
+    rewardTargetSlot: envInteger("COOP_UI_REWARD_PARTY_SLOT", 0),
     market: {
       mode: marketMode,
       targetId: marketTargetId,
@@ -274,6 +275,16 @@ export function buildDispatchTable(policy) {
       confirmSurfaceId: policy.rewardMode === "pick-first" ? null : "reward:confirm",
     },
     {
+      name: "reward-target",
+      phase: REWARD_PHASE,
+      present: REWARD_PHASE,
+      v2SurfaceId: "party:reward-target",
+      semanticOnly: true,
+      owner: { marker: REWARD_OWNER },
+      keys: [],
+      partySlot: policy.rewardTargetSlot,
+    },
+    {
       name: "biome-shop",
       phase: BIOME_SHOP_ROLES,
       present: BIOME_SHOP_ROLES,
@@ -295,7 +306,7 @@ export function buildDispatchTable(policy) {
       name: "biome-pick",
       phase: BIOME_PICK_PHASE,
       present: BIOME_PICK_OWNER,
-      v2SurfaceId: "biome-select",
+      v2SurfaceId: "world-map",
       owner: { marker: BIOME_PICK_OWNER },
       keys: policy.keys.biomePick,
     },

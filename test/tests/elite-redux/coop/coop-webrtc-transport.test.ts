@@ -1467,7 +1467,7 @@ describe("co-op WebRTC transport - early-rx buffering (pre-subscription frames)"
   });
 
   it("keeps loopback parity by disconnecting both endpoints on pre-subscription overflow", async () => {
-    const [host, guest] = createLoopbackPair();
+    const { host, guest } = createLoopbackPair();
     for (let i = 0; i < COOP_EARLY_RX_MAX_FRAMES + 1; i++) {
       host.send(hello(`frame-${i}`));
     }

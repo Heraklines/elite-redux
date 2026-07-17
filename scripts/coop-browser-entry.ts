@@ -22,6 +22,7 @@ const [
   { Command },
   { MoveId },
   { PokemonModifierType },
+  { PartyOption, PartyUiMode },
   { StatusEffect },
   { UiMode },
 ] = await Promise.all([
@@ -34,6 +35,7 @@ const [
   import("../src/enums/command"),
   import("../src/enums/move-id"),
   import("../src/modifier/modifier-type"),
+  import("../src/ui/handlers/party-ui-handler"),
   import("../src/enums/status-effect"),
   import("../src/enums/ui-mode"),
 ]);
@@ -519,6 +521,27 @@ interface SelectionReadout {
   readonly optionCount: number | null;
 }
 
+function partyOptionSemanticId(partyUiMode: number | undefined, option: number, index: number): string {
+  if (
+    partyUiMode === PartyUiMode.REMEMBER_MOVE_MODIFIER
+    || partyUiMode === PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER
+    || partyUiMode === PartyUiMode.ER_TM_CASE_MODIFIER
+  ) {
+    return `party-option:move-index:${option}`;
+  }
+  if (
+    (partyUiMode === PartyUiMode.MODIFIER_TRANSFER || partyUiMode === PartyUiMode.DISCARD)
+    && option >= 0
+    && option < PartyOption.SCROLL_UP
+  ) {
+    return `party-option:item-index:${option}`;
+  }
+  const enumName = PartyOption[option];
+  return typeof enumName === "string"
+    ? `party-option:${enumName.toLowerCase().replaceAll("_", "-")}`
+    : `party-option:slot:${index}`;
+}
+
 /**
  * The visible options + selected id, where the handler exposes them publicly. Reward
  * options carry a stable modifier-type id; option-select menus expose their explicit semantic id.
@@ -547,6 +570,27 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       const optionIds = modOptions.map((option, index) => option?.modifierTypeOption?.type?.id ?? `slot:${index}`);
       return {
         selectedOptionId: selectedIndex == null ? null : (optionIds[selectedIndex] ?? `cursor:${selectedIndex}`),
+        optionIds,
+        optionCount: optionIds.length,
+      };
+    }
+  }
+  if (uiMode === "PARTY") {
+    const partyHandler = handler as unknown as {
+      optionsMode?: boolean;
+      optionsCursor?: number;
+      options?: number[];
+      partyUiMode?: number;
+    };
+    if (partyHandler.optionsMode === true && Array.isArray(partyHandler.options) && partyHandler.options.length > 0) {
+      const optionIds = partyHandler.options.map((option, index) =>
+        partyOptionSemanticId(partyHandler.partyUiMode, option, index),
+      );
+      const optionsCursor = Number.isSafeInteger(partyHandler.optionsCursor)
+        ? (partyHandler.optionsCursor as number)
+        : null;
+      return {
+        selectedOptionId: optionsCursor == null ? null : (optionIds[optionsCursor] ?? `cursor:${optionsCursor}`),
         optionIds,
         optionCount: optionIds.length,
       };
@@ -1011,11 +1055,13 @@ function observeSemanticSurface(): void {
     // therefore prevents a read-only browser observer from publishing a stale ready=true between
     // repeated ExpPhase prompts. Non-message handlers keep the established raw-field projection.
     const awaitingActionInput =
-      typeof promptReady === "function"
-        ? promptReady.call(handler)
-        : typeof awaitingRaw === "boolean"
-          ? awaitingRaw
-          : null;
+      uiMode === "PARTY"
+        ? null
+        : typeof promptReady === "function"
+          ? promptReady.call(handler)
+          : typeof awaitingRaw === "boolean"
+            ? awaitingRaw
+            : null;
     const promptGeneration =
       uiMode === "MESSAGE" && typeof readPromptGeneration === "function" ? readPromptGeneration.call(handler) : null;
     const inputBlocked =
@@ -1037,6 +1083,7 @@ function observeSemanticSurface(): void {
       semanticSurfaceInstance,
       `${epoch}:${wave}:${turn}`,
       selection.selectedOptionId ?? "",
+      selection.optionIds?.join(",") ?? "",
       teamSpeciesIds?.join(",") ?? "",
       ownerSeat ?? "?",
       awaitingActionInput,
