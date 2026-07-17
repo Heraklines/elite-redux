@@ -608,6 +608,7 @@ async function fxSelectFromTo(opts) {
     fxState.morphImg = fxState.morphCtx.createImageData(MW, MH);
     fxState.anchor = { x: MW / 2, y: MH / 2 - toRec.h * 0.12 };
     fxState.parts = fxBuildParticles(fxState.cfg);
+    fxState.restOnTarget = false; // new pairing: idle on the source until it plays
     fxState.ready = true;
     fxSetStatus("");
     if (!opts || opts.play !== false) {
@@ -630,11 +631,16 @@ function fxRenderFrame(now) {
   const el = started ? now - fxState.playStart : -1;
 
   if (!started) {
-    ctx.drawImage(fxState.fromCv, fxState.offFrom.x, fxState.offFrom.y); // idle on source
+    // Idle: before the first play rest on the source; after a completed
+    // sequence rest on the TARGET (the transform result persists).
+    const restCv = fxState.restOnTarget ? fxState.toCv : fxState.fromCv;
+    const restOff = fxState.restOnTarget ? fxState.offTo : fxState.offFrom;
+    ctx.drawImage(restCv, restOff.x, restOff.y);
     return;
   }
   if (el >= FX_SEQ_TOTAL) {
     ctx.drawImage(fxState.toCv, fxState.offTo.x, fxState.offTo.y); // rest on target
+    fxState.restOnTarget = true;
     fxState.playStart = -1;
     return;
   }
