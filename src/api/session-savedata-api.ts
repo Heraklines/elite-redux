@@ -148,10 +148,10 @@ export class PokerogueSessionSavedataApi extends ApiBase {
    * Status-preserving session read for co-op CAS reconciliation. Unlike the legacy `get`, an HTTP
    * error body can never be mistaken for savedata and a missing row is a machine-readable state.
    */
-  public async getCoopCas(params: GetSessionSavedataRequest): Promise<CoopCasSessionGetResult> {
+  public async getCoopCas(params: GetSessionSavedataRequest, signal?: AbortSignal): Promise<CoopCasSessionGetResult> {
     try {
       const urlSearchParams = this.toUrlSearchParams(params);
-      const response = await this.doGet(`/savedata/session/get?${urlSearchParams}`);
+      const response = await this.doGet(`/savedata/session/get?${urlSearchParams}`, signal);
       if (!response.ok) {
         let body = "";
         try {
@@ -193,11 +193,15 @@ export class PokerogueSessionSavedataApi extends ApiBase {
    * @param rawSavedata - The raw, unencrypted savedata
    * @returns An error message if something went wrong
    */
-  public async update(params: UpdateSessionSavedataRequest, rawSavedata: string): Promise<string> {
+  public async update(
+    params: UpdateSessionSavedataRequest,
+    rawSavedata: string,
+    signal?: AbortSignal,
+  ): Promise<string> {
     try {
       const urlSearchParams = this.toUrlSearchParams(params);
 
-      const response = await this.doPost(`/savedata/session/update?${urlSearchParams}`, rawSavedata);
+      const response = await this.doPost(`/savedata/session/update?${urlSearchParams}`, rawSavedata, "json", signal);
       return await response.text();
     } catch (err) {
       console.warn("Could not update session savedata!", err);
@@ -213,10 +217,16 @@ export class PokerogueSessionSavedataApi extends ApiBase {
   public async updateCoopCas(
     params: CoopCasSessionSavedataRequest,
     rawSavedata: string,
+    signal?: AbortSignal,
   ): Promise<CoopCasMutationResult> {
     try {
       const urlSearchParams = this.toUrlSearchParams(params);
-      const response = await this.doPost(`/savedata/session/coop-cas-update?${urlSearchParams}`, rawSavedata);
+      const response = await this.doPost(
+        `/savedata/session/coop-cas-update?${urlSearchParams}`,
+        rawSavedata,
+        "json",
+        signal,
+      );
       return await coopCasResult(response);
     } catch (err) {
       console.warn("Could not conditionally update co-op session savedata!", err);
@@ -225,10 +235,13 @@ export class PokerogueSessionSavedataApi extends ApiBase {
   }
 
   /** Delete exactly one co-op checkpoint and permanently tombstone its run identity. */
-  public async deleteCoopCas(params: CoopCasDeleteSessionSavedataRequest): Promise<CoopCasMutationResult> {
+  public async deleteCoopCas(
+    params: CoopCasDeleteSessionSavedataRequest,
+    signal?: AbortSignal,
+  ): Promise<CoopCasMutationResult> {
     try {
       const urlSearchParams = this.toUrlSearchParams(params);
-      const response = await this.doPost(`/savedata/session/coop-cas-delete?${urlSearchParams}`, "");
+      const response = await this.doPost(`/savedata/session/coop-cas-delete?${urlSearchParams}`, "", "json", signal);
       return await coopCasResult(response);
     } catch (err) {
       console.warn("Could not conditionally delete co-op session savedata!", err);
@@ -239,10 +252,16 @@ export class PokerogueSessionSavedataApi extends ApiBase {
   /** Remove one exact duplicate only while the exact same-run survivor is still live. */
   public async deleteCoopDuplicateExact(
     params: CoopDuplicateExactDeleteSessionSavedataRequest,
+    signal?: AbortSignal,
   ): Promise<CoopCasMutationResult> {
     try {
       const urlSearchParams = this.toUrlSearchParams(params);
-      const response = await this.doPost(`/savedata/session/coop-duplicate-exact-delete?${urlSearchParams}`, "");
+      const response = await this.doPost(
+        `/savedata/session/coop-duplicate-exact-delete?${urlSearchParams}`,
+        "",
+        "json",
+        signal,
+      );
       return await coopCasResult(response);
     } catch (err) {
       console.warn("Could not converge duplicate co-op session savedata!", err);
@@ -251,10 +270,10 @@ export class PokerogueSessionSavedataApi extends ApiBase {
   }
 
   /** Read account-scoped authoritative proof that one co-op run is live, deleted, or absent. */
-  public async getCoopRunStatus(params: CoopRunStatusRequest): Promise<CoopRunStatusResult> {
+  public async getCoopRunStatus(params: CoopRunStatusRequest, signal?: AbortSignal): Promise<CoopRunStatusResult> {
     try {
       const urlSearchParams = this.toUrlSearchParams(params);
-      const response = await this.doGet(`/savedata/session/coop-run-status?${urlSearchParams}`);
+      const response = await this.doGet(`/savedata/session/coop-run-status?${urlSearchParams}`, signal);
       if (!response.ok) {
         const failure = await coopCasResult(response);
         return failure.ok
@@ -288,10 +307,18 @@ export class PokerogueSessionSavedataApi extends ApiBase {
   }
 
   /** Exact recovery deletion for an opaque row; classified co-op/solo JSON is rejected server-side. */
-  public async deleteOpaqueExact(params: OpaqueExactDeleteSessionSavedataRequest): Promise<CoopCasMutationResult> {
+  public async deleteOpaqueExact(
+    params: OpaqueExactDeleteSessionSavedataRequest,
+    signal?: AbortSignal,
+  ): Promise<CoopCasMutationResult> {
     try {
       const urlSearchParams = this.toUrlSearchParams(params);
-      const response = await this.doPost(`/savedata/session/opaque-exact-delete?${urlSearchParams}`, "");
+      const response = await this.doPost(
+        `/savedata/session/opaque-exact-delete?${urlSearchParams}`,
+        "",
+        "json",
+        signal,
+      );
       return await coopCasResult(response);
     } catch (err) {
       console.warn("Could not exactly delete opaque session savedata!", err);
@@ -302,10 +329,16 @@ export class PokerogueSessionSavedataApi extends ApiBase {
   /** Exact removal for a protected pre-run-id/malformed co-op-like row that cannot enter CAS. */
   public async deleteLegacyCoopExact(
     params: LegacyCoopExactDeleteSessionSavedataRequest,
+    signal?: AbortSignal,
   ): Promise<CoopCasMutationResult> {
     try {
       const urlSearchParams = this.toUrlSearchParams(params);
-      const response = await this.doPost(`/savedata/session/legacy-coop-exact-delete?${urlSearchParams}`, "");
+      const response = await this.doPost(
+        `/savedata/session/legacy-coop-exact-delete?${urlSearchParams}`,
+        "",
+        "json",
+        signal,
+      );
       return await coopCasResult(response);
     } catch (err) {
       console.warn("Could not exactly delete legacy co-op session savedata!", err);
@@ -318,10 +351,10 @@ export class PokerogueSessionSavedataApi extends ApiBase {
    * @param params The {@linkcode DeleteSessionSavedataRequest} to send
    * @returns An error message if something went wrong
    */
-  public async delete(params: DeleteSessionSavedataRequest): Promise<string | null> {
+  public async delete(params: DeleteSessionSavedataRequest, signal?: AbortSignal): Promise<string | null> {
     try {
       const urlSearchParams = this.toUrlSearchParams(params);
-      const response = await this.doGet(`/savedata/session/delete?${urlSearchParams}`);
+      const response = await this.doGet(`/savedata/session/delete?${urlSearchParams}`, signal);
       console.debug("%cSending a request to delete session in slot %d", "color: blue", params.slot);
 
       if (response.ok) {
@@ -343,10 +376,11 @@ export class PokerogueSessionSavedataApi extends ApiBase {
   public async clear(
     params: ClearSessionSavedataRequest,
     sessionData: SessionSaveData,
+    signal?: AbortSignal,
   ): Promise<ClearSessionSavedataResponse> {
     try {
       const urlSearchParams = this.toUrlSearchParams(params);
-      const response = await this.doPost(`/savedata/session/clear?${urlSearchParams}`, sessionData);
+      const response = await this.doPost(`/savedata/session/clear?${urlSearchParams}`, sessionData, "json", signal);
 
       return (await response.json()) as ClearSessionSavedataResponse;
     } catch (err) {

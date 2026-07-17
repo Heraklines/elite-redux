@@ -2487,15 +2487,32 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
     installImmediateCoopPersistenceTimeouts();
     setBypassLoginForTesting(false);
-    const hungRead = vi
-      .spyOn(pokerogueApi.savedata.session, "getCoopCas")
-      .mockImplementation(() => new Promise<never>(() => {}));
+    let abortedReads = 0;
+    const hungRead = vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(
+      (_request, signal) =>
+        new Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.getCoopCas>>>(resolve => {
+          signal?.addEventListener(
+            "abort",
+            () => {
+              abortedReads++;
+              resolve({
+                ok: false,
+                status: null,
+                error: "aborted by bounded co-op deadline",
+                failureKind: "transient",
+              });
+            },
+            { once: true },
+          );
+        }),
+    );
 
     await expect(
       withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot()),
       "a never-settling fetch cannot hold the lobby forever",
     ).resolves.toBeNull();
     expect(hungRead, "the exhaustive five-slot scan remains intact").toHaveBeenCalledTimes(5);
+    expect(abortedReads, "every expired read is actually aborted before the scan returns").toBe(5);
     logs.flush();
   }, 300_000);
 
@@ -2512,9 +2529,25 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       expect(slot).not.toBeNull();
       rig.hostScene.sessionSlotId = slot!;
       installImmediateCoopPersistenceTimeouts();
-      const hungWrite = vi
-        .spyOn(pokerogueApi.savedata.session, "updateCoopCas")
-        .mockImplementation(() => new Promise<never>(() => {}));
+      let abortedWrites = 0;
+      const hungWrite = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockImplementation(
+        (_request, _raw, signal) =>
+          new Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.updateCoopCas>>>(resolve => {
+            signal?.addEventListener(
+              "abort",
+              () => {
+                abortedWrites++;
+                resolve({
+                  ok: false,
+                  status: null,
+                  error: "aborted by bounded co-op deadline",
+                  failureKind: "transient",
+                });
+              },
+              { once: true },
+            );
+          }),
+      );
       const guestAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
 
       await expect(
@@ -2523,6 +2556,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       ).resolves.toBe(false);
       await expect(guestAbort, "the guest cannot remain on an unbounded first-save wait").resolves.toBeNull();
       expect(hungWrite).toHaveBeenCalledOnce();
+      expect(abortedWrites, "the expired first-save CAS is actually aborted before terminal release").toBe(1);
       expect(localStorage.getItem(keys[slot!]), "an unproved first CAS never publishes local launch bytes").toBeNull();
     } finally {
       prior.forEach((value, slot) => {

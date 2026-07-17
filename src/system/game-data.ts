@@ -2656,12 +2656,19 @@ export class GameData {
     }
   }
 
-  private async withCoopPersistenceNetworkTimeout<T>(operation: Promise<T>, timeoutValue: T): Promise<T> {
+  private async withCoopPersistenceNetworkTimeout<T>(
+    operation: (signal: AbortSignal) => Promise<T>,
+    timeoutValue: T,
+  ): Promise<T> {
+    const abortController = new AbortController();
     let timer: unknown;
     return Promise.race([
-      operation,
+      Promise.resolve().then(() => operation(abortController.signal)),
       new Promise<T>(resolve => {
-        timer = coopPersistenceClock.schedule(() => resolve(timeoutValue), coopPersistenceClock.networkTimeoutMs);
+        timer = coopPersistenceClock.schedule(() => {
+          abortController.abort("co-op persistence network timeout");
+          resolve(timeoutValue);
+        }, coopPersistenceClock.networkTimeoutMs);
       }),
     ]).finally(() => {
       if (timer != null) {
@@ -2671,86 +2678,107 @@ export class GameData {
   }
 
   private readCoopCas(slot: number): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.getCoopCas>>> {
-    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.getCoopCas({ slot, clientSessionId }), {
-      ok: false,
-      status: null,
-      error: "Co-op session read timed out.",
-      failureKind: "transient",
-    });
+    return this.withCoopPersistenceNetworkTimeout(
+      signal => pokerogueApi.savedata.session.getCoopCas({ slot, clientSessionId }, signal),
+      {
+        ok: false,
+        status: null,
+        error: "Co-op session read timed out.",
+        failureKind: "transient",
+      },
+    );
   }
 
   private readCoopRunStatus(
     request: Parameters<typeof pokerogueApi.savedata.session.getCoopRunStatus>[0],
   ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.getCoopRunStatus>>> {
-    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.getCoopRunStatus(request), {
-      ok: false,
-      status: null,
-      error: "Co-op run status timed out.",
-      failureKind: "transient",
-    });
+    return this.withCoopPersistenceNetworkTimeout(
+      signal => pokerogueApi.savedata.session.getCoopRunStatus(request, signal),
+      {
+        ok: false,
+        status: null,
+        error: "Co-op run status timed out.",
+        failureKind: "transient",
+      },
+    );
   }
 
   private updateCoopCasBounded(
     request: Parameters<typeof pokerogueApi.savedata.session.updateCoopCas>[0],
     raw: string,
   ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.updateCoopCas>>> {
-    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.updateCoopCas(request, raw), {
-      ok: false,
-      status: null,
-      error: "Co-op cloud CAS timed out.",
-      failureKind: "transient",
-    });
+    return this.withCoopPersistenceNetworkTimeout(
+      signal => pokerogueApi.savedata.session.updateCoopCas(request, raw, signal),
+      {
+        ok: false,
+        status: null,
+        error: "Co-op cloud CAS timed out.",
+        failureKind: "transient",
+      },
+    );
   }
 
   private deleteCoopDuplicateExactBounded(
     request: Parameters<typeof pokerogueApi.savedata.session.deleteCoopDuplicateExact>[0],
   ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.deleteCoopDuplicateExact>>> {
-    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.deleteCoopDuplicateExact(request), {
-      ok: false,
-      status: null,
-      error: "Co-op duplicate delete timed out.",
-      failureKind: "transient",
-    });
+    return this.withCoopPersistenceNetworkTimeout(
+      signal => pokerogueApi.savedata.session.deleteCoopDuplicateExact(request, signal),
+      {
+        ok: false,
+        status: null,
+        error: "Co-op duplicate delete timed out.",
+        failureKind: "transient",
+      },
+    );
   }
 
   private deleteCoopCasBounded(
     request: Parameters<typeof pokerogueApi.savedata.session.deleteCoopCas>[0],
   ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.deleteCoopCas>>> {
-    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.deleteCoopCas(request), {
-      ok: false,
-      status: null,
-      error: "Co-op checkpoint delete timed out.",
-      failureKind: "transient",
-    });
+    return this.withCoopPersistenceNetworkTimeout(
+      signal => pokerogueApi.savedata.session.deleteCoopCas(request, signal),
+      {
+        ok: false,
+        status: null,
+        error: "Co-op checkpoint delete timed out.",
+        failureKind: "transient",
+      },
+    );
   }
 
   private deleteLegacyCoopExactBounded(
     request: Parameters<typeof pokerogueApi.savedata.session.deleteLegacyCoopExact>[0],
   ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.deleteLegacyCoopExact>>> {
-    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.deleteLegacyCoopExact(request), {
-      ok: false,
-      status: null,
-      error: "Legacy co-op checkpoint delete timed out.",
-      failureKind: "transient",
-    });
+    return this.withCoopPersistenceNetworkTimeout(
+      signal => pokerogueApi.savedata.session.deleteLegacyCoopExact(request, signal),
+      {
+        ok: false,
+        status: null,
+        error: "Legacy co-op checkpoint delete timed out.",
+        failureKind: "transient",
+      },
+    );
   }
 
   private deleteOpaqueExactBounded(
     request: Parameters<typeof pokerogueApi.savedata.session.deleteOpaqueExact>[0],
   ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.deleteOpaqueExact>>> {
-    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.deleteOpaqueExact(request), {
-      ok: false,
-      status: null,
-      error: "Opaque checkpoint delete timed out.",
-      failureKind: "transient",
-    });
+    return this.withCoopPersistenceNetworkTimeout(
+      signal => pokerogueApi.savedata.session.deleteOpaqueExact(request, signal),
+      {
+        ok: false,
+        status: null,
+        error: "Opaque checkpoint delete timed out.",
+        failureKind: "transient",
+      },
+    );
   }
 
   private deleteSessionBounded(
     request: Parameters<typeof pokerogueApi.savedata.session.delete>[0],
   ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.delete>>> {
     return this.withCoopPersistenceNetworkTimeout(
-      pokerogueApi.savedata.session.delete(request),
+      signal => pokerogueApi.savedata.session.delete(request, signal),
       "Session delete timed out.",
     );
   }
@@ -2760,7 +2788,7 @@ export class GameData {
     raw: string,
   ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.update>>> {
     return this.withCoopPersistenceNetworkTimeout(
-      pokerogueApi.savedata.session.update(request, raw),
+      signal => pokerogueApi.savedata.session.update(request, raw, signal),
       "Session update timed out.",
     );
   }
@@ -2769,17 +2797,20 @@ export class GameData {
     request: Parameters<typeof pokerogueApi.savedata.session.clear>[0],
     session: Parameters<typeof pokerogueApi.savedata.session.clear>[1],
   ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.clear>>> {
-    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.clear(request, session), {
-      success: false,
-      error: "Session clear timed out.",
-    });
+    return this.withCoopPersistenceNetworkTimeout(
+      signal => pokerogueApi.savedata.session.clear(request, session, signal),
+      {
+        success: false,
+        error: "Session clear timed out.",
+      },
+    );
   }
 
   private updateAllBounded(
     request: Parameters<typeof pokerogueApi.savedata.updateAll>[0],
   ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.updateAll>>> {
     return this.withCoopPersistenceNetworkTimeout(
-      pokerogueApi.savedata.updateAll(request),
+      signal => pokerogueApi.savedata.updateAll(request, signal),
       "Combined cloud save timed out.",
     );
   }
