@@ -203,6 +203,12 @@ input:-internal-autofill-selected {
   display: none;
 }
 
+/* ER Omniform: show the #apadOmniform "cycle evolution" button ONLY on the
+   Pokémon summary (mobile), where CYCLE_FORM switches the evolution being viewed. */
+#touchControls:not(.config-mode):not([data-ui-mode="SUMMARY"]) #apadOmniform {
+  display: none;
+}
+
 /* Show cycle buttons only on STARTER_SELECT and on touch configuration panel.
    SUMMARY is included for #apadOpenFilters so touch players get the [C] button
    that cycles the move-detail pages on the Pokémon summary's Moves page. */

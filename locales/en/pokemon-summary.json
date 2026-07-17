@@ -8,6 +8,8 @@
   "innateLockedLevel": "Active from Lv. {{level}}",
   "innateDisabled": "Disabled",
   "abilitySealedRun": "Sealed by Giratina's Bargain for this run",
+  "omniformMovesetPreview": "Previewing {{name}} moveset.",
+  "omniformMovesetBasePreview": "Previewing {{name}} (base level-up moves).",
   "abilityDetailPrompt": "Detail",
   "abilityDetailBack": "Back",
   "powerAccuracyCategory": "Power\nAccuracy\nCategory",
