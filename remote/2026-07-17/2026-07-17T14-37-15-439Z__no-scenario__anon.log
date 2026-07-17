@@ -1,0 +1,22 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:be341246fbf0f973865c549b92e2b1445f846d40:run-29586409323.1
+ua:       Mozilla/5.0 (iPhone; CPU iPhone OS 26_5_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/429.1.942703598 Mobile/15E148 Safari/604.1
+platform: iPhone
+screen:   375x667 @2x  devmem:?
+boot:     boot-start@1ms -> ios-icons-deferred@2309ms -> ios-bgm-deferred@2312ms
+lastSess: ok (reached title)
+mode:     ?  wave:?
+seed:     ?
+party:    
+enemy:    
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:be341246fbf0f973865c549b92e2b1445f846d40:run-29586409323.1","source":"github","sha":"be341246fbf0f973865c549b92e2b1445f846d40","workflow":{"provider":"github-actions","runId":"29586409323","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[14:37:08.526] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[14:37:09.326] LOG: [ER] build {"version":1,"id":"github:be341246fbf0f973865c549b92e2b1445f846d40:run-29586409323.1","source":"github","sha":"be341246fbf0f973865c549b92e2b1445f846d40","workflow":{"provider":"github-actions","runId":"29586409323","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[14:37:09.521] LOG: [dev-tools] loaded — 638 scenarios + Send Logs button
+
+----- REPLAY TRACE (JSON) -----
+(none)
