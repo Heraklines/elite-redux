@@ -36,6 +36,21 @@ export interface CoopFieldMonView {
   maxHp: number;
   /** `StatusEffect` enum value (0 = none). */
   status: number;
+  /**
+   * `Status.toxicTurnCount` (status sub-state sync): the toxic-damage ramp counter that scales
+   * poison/toxic post-turn damage. The pure-renderer guest never runs PostTurnStatusEffectPhase, so
+   * without carrying this it stays 0 while the host ramps - a permanent status divergence a badly-toxic'd
+   * mon never heals (the checkpoint apply reconstructs Status from the effect enum alone). Absent/0 for a
+   * non-toxic mon.
+   */
+  statusToxicTurnCount?: number;
+  /**
+   * `Status.sleepTurnsRemaining` (status sub-state sync): forced-sleep turns left. Same rationale as
+   * {@linkcode statusToxicTurnCount} - the guest never decrements it locally, so a Yawn/Spore sleep's
+   * remaining-turn companion the effect enum cannot carry has to ride the checkpoint. Absent when the mon
+   * is not asleep (or an older/indefinite sleep with no explicit counter).
+   */
+  statusSleepTurnsRemaining?: number;
   /** The 7 stat stages (ATK..ACC/EVA). */
   statStages: number[];
   fainted: boolean;
@@ -100,6 +115,35 @@ export function isResolvableCoopFormIndex(formCount: number, formIndex: number):
   );
 }
 
+/**
+ * Normalize the OPTIONAL status sub-state (status sub-state sync): the toxic-damage counter + remaining
+ * sleep turns a `Status` carries beyond its `effect` enum, sanitized to concrete `Status`-constructor args.
+ *
+ * BACKWARD COMPATIBLE by construction: an OLD payload (missing both sub-fields) yields
+ * `{ toxicTurnCount: 0, sleepTurnsRemaining: undefined }` - i.e. effect-only, exactly the pre-migration
+ * `new Status(effect)` behavior - so a mixed-version session never crashes and never mis-applies. Both the
+ * BUILD side (outgoing sanitize) and every APPLY side (guest reconstruct) route through this so the fields
+ * are read identically on both ends.
+ */
+export function coopStatusSubState(fields: {
+  statusToxicTurnCount?: number | undefined;
+  statusSleepTurnsRemaining?: number | undefined;
+}): { toxicTurnCount: number; sleepTurnsRemaining: number | undefined } {
+  const toxicTurnCount =
+    fields.statusToxicTurnCount !== undefined
+    && Number.isFinite(fields.statusToxicTurnCount)
+    && fields.statusToxicTurnCount > 0
+      ? Math.trunc(fields.statusToxicTurnCount)
+      : 0;
+  const sleepTurnsRemaining =
+    fields.statusSleepTurnsRemaining !== undefined
+    && Number.isFinite(fields.statusSleepTurnsRemaining)
+    && fields.statusSleepTurnsRemaining >= 0
+      ? Math.trunc(fields.statusSleepTurnsRemaining)
+      : undefined;
+  return { toxicTurnCount, sleepTurnsRemaining };
+}
+
 /** Normalize a field mon's mutable state into the wire shape (clamped, cloned, safe). */
 export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState {
   const maxHp = Math.max(1, Math.trunc(mon.maxHp));
@@ -144,6 +188,17 @@ export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState
   // #804: pass the owner tag through, value-checked (only ever "host"/"guest" on the wire).
   if (mon.coopOwner === "host" || mon.coopOwner === "guest") {
     state.coopOwner = mon.coopOwner;
+  }
+  // Status sub-state (status sub-state sync): carry the toxic counter + remaining sleep turns so a
+  // badly-statused mon's FULL Status converges on the pure-renderer guest (which never runs
+  // PostTurnStatusEffectPhase). Omitted at their defaults (toxicTurnCount 0 / no sleep counter) so a
+  // statusless or freshly-statused mon's wire shape is UNCHANGED, and an OLDER receiver ignores them.
+  const statusSub = coopStatusSubState(mon);
+  if (statusSub.toxicTurnCount > 0) {
+    state.statusToxicTurnCount = statusSub.toxicTurnCount;
+  }
+  if (statusSub.sleepTurnsRemaining !== undefined) {
+    state.statusSleepTurnsRemaining = statusSub.sleepTurnsRemaining;
   }
   // ER bleed/frost/fear tags (#633 Fix #4h): carry them through, sanitized (string type +
   // non-negative integer turns). Omitted when empty so a tagless mon's wire shape is unchanged.
@@ -220,6 +275,12 @@ export function normalizeMonState(state: CoopSerializedMonState): CoopSerialized
     hp: state.hp,
     maxHp: state.maxHp,
     status: state.status,
+    // Status sub-state (status sub-state sync): pass the sub-fields through the re-clamp so a received
+    // toxic counter / sleep-turn companion survives normalization (an old shape omits them -> effect only).
+    ...(state.statusToxicTurnCount === undefined ? {} : { statusToxicTurnCount: state.statusToxicTurnCount }),
+    ...(state.statusSleepTurnsRemaining === undefined
+      ? {}
+      : { statusSleepTurnsRemaining: state.statusSleepTurnsRemaining }),
     statStages: state.statStages,
     fainted: state.fainted,
     ...(state.formIndex === undefined ? {} : { formIndex: state.formIndex }),

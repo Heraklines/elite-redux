@@ -33,6 +33,7 @@ import {
   buildCheckpoint,
   type CoopArenaView,
   type CoopFieldMonView,
+  coopStatusSubState,
   isResolvableCoopFormIndex,
   monStateByIndex,
   normalizeMonState,
@@ -248,6 +249,13 @@ function readMonView(mon: ReturnType<typeof globalScene.getField>[number]): Coop
     // self-consistent terminal state; otherwise field reconciliation stamps FAINT and this scalar pass
     // immediately clears it back to NONE.
     status: mon.isFainted() ? StatusEffect.FAINT : (mon.status?.effect ?? 0),
+    // Status sub-state (status sub-state sync): carry the toxic ramp counter + remaining sleep turns so
+    // the guest reconstructs the FULL Status, not effect-only. serializeMonState omits them at their
+    // defaults, so a non-toxic / awake mon's wire shape is unchanged.
+    ...(mon.status?.toxicTurnCount ? { statusToxicTurnCount: mon.status.toxicTurnCount } : {}),
+    ...(mon.status?.sleepTurnsRemaining === undefined
+      ? {}
+      : { statusSleepTurnsRemaining: mon.status.sleepTurnsRemaining }),
     // getStatStages() returns the live 7-length array; clone so the checkpoint never aliases it.
     statStages: [...mon.getStatStages()],
     fainted: mon.isFainted(),
@@ -1084,7 +1092,17 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
             }
           }
           mon.hp = Math.min(state.hp, mon.getMaxHp());
-          mon.status = state.status ? new Status(state.status as StatusEffect) : null;
+          // Status sub-state (status sub-state sync): reconstruct the FULL Status (effect + toxic ramp
+          // counter + remaining sleep turns), not effect-only. Without the sub-state this apply CLOBBERED
+          // the host-authored toxicTurnCount/sleepTurnsRemaining back to 0 EVERY turn - so even a correct
+          // full resync (PokemonData carries them) was re-corrupted by the next checkpoint, leaving a
+          // permanent status digest divergence. An OLD host omits the sub-fields -> effect-only (no change).
+          if (state.status) {
+            const sub = coopStatusSubState(state);
+            mon.status = new Status(state.status as StatusEffect, sub.toxicTurnCount, sub.sleepTurnsRemaining);
+          } else {
+            mon.status = null;
+          }
           const stages = mon.getStatStages();
           for (let i = 0; i < 7 && i < stages.length; i++) {
             stages[i] = state.statStages[i];
@@ -2484,6 +2502,13 @@ function readFullMon(mon: Pokemon): CoopFullMonSnapshot {
     hp: mon.hp,
     maxHp: mon.getMaxHp(),
     status: mon.status?.effect ?? 0,
+    // Status sub-state (status sub-state sync): carry the toxic ramp counter + remaining sleep turns in the
+    // resync too, so the FULL-snapshot heal reconstructs the complete Status (matches the per-turn
+    // checkpoint). Omitted at their defaults so a non-toxic / awake mon's payload shape is unchanged.
+    ...(mon.status?.toxicTurnCount ? { statusToxicTurnCount: mon.status.toxicTurnCount } : {}),
+    ...(mon.status?.sleepTurnsRemaining === undefined
+      ? {}
+      : { statusSleepTurnsRemaining: mon.status.sleepTurnsRemaining }),
     statStages: [...mon.getStatStages()],
     fainted: mon.isFainted(),
     abilityId: readAbilityId(mon),
@@ -4108,12 +4133,20 @@ function applyFullMon(
       coopWarn("resync", `maxhp divergence bi=${snap.bi} host=${Math.trunc(snap.maxHp)} guest=${mon.getMaxHp()}`);
       mon.setStat(Stat.HP, Math.trunc(snap.maxHp));
     }
-    // Status.
+    // Status (status sub-state sync): reconstruct the FULL Status (effect + toxic ramp counter + remaining
+    // sleep turns) so the resync heal converges the complete Status, not effect-only - otherwise the next
+    // per-turn checkpoint would be the only carrier and any snapshot-only heal would drop the sub-state.
+    // An OLD host omits the sub-fields -> effect-only (pre-migration behavior, no crash).
     const prevStatus = mon.status?.effect ?? 0;
     if (prevStatus !== (snap.status ?? 0)) {
       coopWarn("heal", `status bi=${snap.bi} host=${snap.status ?? 0} guest=${prevStatus} -> applied`);
     }
-    mon.status = snap.status ? new Status(snap.status as StatusEffect) : null;
+    if (snap.status) {
+      const sub = coopStatusSubState(snap);
+      mon.status = new Status(snap.status as StatusEffect, sub.toxicTurnCount, sub.sleepTurnsRemaining);
+    } else {
+      mon.status = null;
+    }
     // Stat stages (7).
     const stages = mon.getStatStages();
     if (isCoopDebug()) {

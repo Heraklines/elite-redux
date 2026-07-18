@@ -563,6 +563,20 @@ export interface CoopSerializedMonState {
   coopOwner?: "host" | "guest";
   /** `StatusEffect` enum value (0 = none). */
   status: number;
+  /**
+   * `Status.toxicTurnCount` (status sub-state sync): the toxic-damage ramp counter. The `status` enum
+   * above carries the EFFECT only, so without this the guest reconstructs `new Status(effect)` with a 0
+   * counter every turn - a badly-toxic'd player mon's Status permanently diverges from the host (the
+   * pure-renderer guest never runs the post-turn status ramp). Optional/additive: an older host omits it
+   * and the guest applies effect only (no crash, pre-migration behavior). Absent/0 for a non-toxic mon.
+   */
+  statusToxicTurnCount?: number;
+  /**
+   * `Status.sleepTurnsRemaining` (status sub-state sync): forced-sleep turns remaining. Same rationale as
+   * {@linkcode statusToxicTurnCount} - a Yawn/Spore sleep's remaining-turn companion the `status` enum
+   * cannot carry. Optional/additive; absent when the mon is not asleep.
+   */
+  statusSleepTurnsRemaining?: number;
   /** The 7 stat stages (ATK..ACC/EVA), absolute values. */
   statStages: number[];
   fainted: boolean;
@@ -656,6 +670,17 @@ export interface CoopFullMonSnapshot {
   maxHp: number;
   /** `StatusEffect` enum value (0 = none). */
   status: number;
+  /**
+   * `Status.toxicTurnCount` (status sub-state sync): the toxic-damage ramp counter, carried in the resync
+   * so the FULL-snapshot heal reconstructs the complete Status (not effect-only). Matches the per-turn
+   * checkpoint's {@linkcode CoopSerializedMonState.statusToxicTurnCount}; optional/additive (older host omits).
+   */
+  statusToxicTurnCount?: number;
+  /**
+   * `Status.sleepTurnsRemaining` (status sub-state sync): remaining forced-sleep turns, carried in the
+   * resync alongside {@linkcode statusToxicTurnCount}. Optional/additive; absent when not asleep.
+   */
+  statusSleepTurnsRemaining?: number;
   /** The 7 stat stages (ATK..ACC/EVA). */
   statStages: number[];
   fainted: boolean;
