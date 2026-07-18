@@ -902,7 +902,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
-  // Partner Eevee - Omniform per-evolution movesets + Normal-status revert
+  // Partner Eevee - Omniform per-evolution movesets + Normal-move revert
   // ===========================================================================
   {
     label: "Partner: Eevee Omniform movesets",
@@ -910,16 +910,18 @@ export const DEV_SCENARIOS: DevScenario[] = [
       "Partner Eevee (the 'partner' Eevee form with the Fluffy + Omniform composite)\n"
       + "adapts mid-battle into a partner eeveelution based on the move TYPE it uses, and\n"
       + "EACH evolution carries its OWN moveset (rolled from that evolution's learnset).\n"
-      + "A Normal-type STATUS move reverts it to the base Eevee form.\n"
+      + "Every element type maps to its evolution; NORMAL maps back to base, so ANY\n"
+      + "Normal-type move (an ATTACK like Tackle OR a status move like Swords Dance)\n"
+      + "reverts a transformed eeveelution to the base Eevee form.\n"
       + "DO: turn 1, use Water Gun. Turn 2, open Fight and LOOK at the moves - the set is\n"
-      + "now Partner Vaporeon's OWN moveset (not Eevee's). Turn 2, use Ember (chains into\n"
-      + "Partner Flareon, again with Flareon's own moveset). Turn 3, use Swords Dance (a\n"
-      + "Normal status move).\n"
+      + "now Partner Vaporeon's OWN moveset (not Eevee's). Turn 2, use a Normal-type move\n"
+      + "the current form has - an ATTACK (e.g. Tackle) or a status move (e.g. Swords\n"
+      + "Dance); either reverts.\n"
       + "EXPECT: Water Gun turns Eevee into Partner Vaporeon ('adapted into Partner\n"
-      + "Vaporeon!') and its 3 other moves are replaced by Vaporeon's own set; Ember\n"
-      + "chains it into Partner Flareon with Flareon's own set; Swords Dance (Normal\n"
-      + "status) reverts it to the base Eevee form ('reverted to Eevee!') with Eevee's\n"
-      + "original moves back. Each form's moveset is independent and persists across the\n"
+      + "Vaporeon!') and its 3 other moves are replaced by Vaporeon's own set; the Normal\n"
+      + "move - damaging OR status - reverts it to the base Eevee form ('reverted to\n"
+      + "Eevee!') with Eevee's original moves back (a Normal ATTACK no longer keeps it in\n"
+      + "the eeveelution form). Each form's moveset is independent and persists across the\n"
       + "run (and a save/reload).",
     setup: () => {
       resetDevOverrides();
