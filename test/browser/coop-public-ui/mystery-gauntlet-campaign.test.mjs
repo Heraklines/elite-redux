@@ -57,6 +57,14 @@ test("Mystery gauntlet policy is loud-fail and drives every projected encounter 
         ),
         [],
       );
+      // Track R cycle-11: a guest-owned `selectPokemonForOption` ME (PART_TIMER) opens a PARTY
+      // sub-prompt with NO driver, stalling the mystery lane (run 29654429335). The dispatch now
+      // carries an OWNER-ONLY mystery-party driver keyed off the plain `party` surface.
+      const mysteryParty = dispatch.find(driver => driver.name === "mystery-party");
+      assert.ok(mysteryParty != null, "dispatch must carry a mystery-party driver");
+      assert.equal(mysteryParty.mysteryParty, true);
+      assert.equal(mysteryParty.v2SurfaceId, "party");
+      assert.equal(mysteryParty.phase, buildDispatchTable(policy).find(d => d.name === "mystery-encounter")?.phase);
       assert.deepEqual(
         dispatch
           .filter(driver => ["reward-target", "biome-pick"].includes(driver.name))
@@ -171,6 +179,32 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /consumedInstances\.add\(`\$\{client\.label\}:\$\{surfaceId\}:\$\{phaseInstance\}`\)/u);
   assert.match(campaign, /const advanceMysteryNarration = createMysteryNarrationAdvancer\(/u);
   assert.match(campaign, /if \(await advanceMysteryNarration\(\)\) \{/u);
+
+  // Track R cycle-11 mystery lane (run 29654429335): a guest-owned PART_TIMER opened a PARTY
+  // sub-prompt (surfaceId "party", ownerModel "local", ownerSeat null) with no driver; the owner
+  // sat ~180s and the host's await exhausted -> shared-session terminal. The mystery-party driver
+  // resolves the owner via the ME-gated owned-picker finder (never the generic v2 semantic owner,
+  // which needs ownerSeat === localSeat), drives it OWNER-ONLY (the watcher never renders it, so it
+  // must NOT route through the paired-mystery checkpoint), and both between-wave advancers guard
+  // against pressing a stale prompt THROUGH the open party UI.
+  const nav = await readFile(resolve(root, "test/browser/coop-public-ui/campaign-nav.mjs"), "utf8");
+  assert.match(nav, /export function findOwnedActionableMysteryPartySurface\(client, fromCursor = 0\)/u);
+  assert.match(
+    nav,
+    /observation\.ownerModel === "local"[\s\S]*Number\.isSafeInteger\(observation\.mysteryEncounterType\)/u,
+  );
+  assert.match(nav, /export function isPartyPickerSurfaceOpen\(observation\)/u);
+  assert.match(nav, /export function mysteryPartyTargetOptionId\(observation\)/u);
+  assert.match(nav, /slot\?\.allowedInBattle === true && slot\?\.fainted !== true/u);
+  assert.match(campaign, /async function driveMysteryPartyPicker\(rig, owner, cursors, stats\)/u);
+  assert.match(campaign, /findOwnedActionableMysteryPartySurface\(owner, from\)/u);
+  assert.match(campaign, /targetId: "party-option:select"/u);
+  // The paired-mystery checkpoint (which awaits the surface on BOTH clients) must be SKIPPED for the
+  // owner-only party sub-prompt, else the watcher hangs it.
+  assert.match(campaign, /if \(driver\.mysteryParty\) \{[\s\S]*OWNER-ONLY/u);
+  assert.match(campaign, /await driveMysteryPartyPicker\(rig, client, cursors, stats\)/u);
+  // Both advancers use the shared party-picker guard (faint replacement OR ME party sub-prompt).
+  assert.equal((campaign.match(/isPartyPickerSurfaceOpen\(latestSurface\?\.observation\)/gu) ?? []).length, 2);
 });
 
 test("the continuity profile visibly declines Bargain and co-op cannot persist a half-open phase", async () => {

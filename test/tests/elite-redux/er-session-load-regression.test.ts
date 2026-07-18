@@ -72,6 +72,38 @@ describe.skipIf(!RUN)("ER P0 session-load regression", () => {
     expect(parsed.party.every((p: any) => getPokemonSpecies(p.species))).toBe(true);
   });
 
+  it("C: a NON-ARRAY container field does NOT abort the parse (coerced to empty, session loads)", async () => {
+    // Track R cycle-11 dirty lane (run 29654429335): a fresh/dirty account's slot-4 remnant carried
+    // a non-array `modifiers` (a bare number). `for (const md of modifiers ?? [])` only substitutes on
+    // null/undefined, so a truthy non-array fell into for..of and threw the cryptic
+    // "(t ?? []) is not iterable", aborting the ENTIRE session parse. On TitlePhase that surfaced as a
+    // fatal-looking console error. The reviver now fails SOFT per container (coerce non-array -> []).
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const save = game.scene.gameData.getSessionSaveData();
+    const json = JSON.parse(JSON.stringify(save)) as any;
+    // The exact live corruption shape, plus the sibling array containers, as non-arrays.
+    json.modifiers = 7;
+    json.enemyModifiers = { not: "an array" };
+    json.enemyParty = 0;
+    json.challenges = "corrupt";
+
+    let parsed: any;
+    expect(() => {
+      parsed = game.scene.gameData.parseSessionData(JSON.stringify(json));
+    }).not.toThrow();
+    // Each non-array container coerces to an empty array; the rest of the session still loads.
+    expect(Array.isArray(parsed.modifiers)).toBe(true);
+    expect(parsed.modifiers.length).toBe(0);
+    expect(Array.isArray(parsed.enemyModifiers)).toBe(true);
+    expect(parsed.enemyModifiers.length).toBe(0);
+    expect(Array.isArray(parsed.enemyParty)).toBe(true);
+    expect(parsed.enemyParty.length).toBe(0);
+    expect(Array.isArray(parsed.challenges)).toBe(true);
+    expect(parsed.challenges.length).toBe(0);
+    // The valid party container is untouched.
+    expect(parsed.party.length).toBe(json.party.length);
+  });
+
   it("A: registered newcomer species (partner eeveelution + Regitube) still round-trip", async () => {
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
     const save = game.scene.gameData.getSessionSaveData();

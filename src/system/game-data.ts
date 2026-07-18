@@ -5415,7 +5415,14 @@ export class GameData {
         case "party":
         case "enemyParty": {
           const ret: PokemonData[] = [];
-          for (const pd of v ?? []) {
+          // Fail SOFT per CONTAINER too, not only per-member (#961 extended). `v ?? []` only
+          // substitutes on null/undefined, so a truthy NON-array (an object/number where an array
+          // was expected in a corrupt/partial save) fell straight into `for..of` and threw the
+          // cryptic "(t ?? []) is not iterable", aborting the ENTIRE parse. On the title screen that
+          // surfaced as an uncaught-looking console error on a fresh/dirty account (Track R cycle-11
+          // dirty lane, TitlePhase reading a divergent slot). Coerce a non-array container to empty -
+          // same recover-what-you-can philosophy as the per-member skip below.
+          for (const pd of Array.isArray(v) ? v : []) {
             // Fail SOFT per mon: a single unresolvable entry (e.g. a species id
             // that no longer registers via getPokemonSpecies, so the PokemonData
             // ctor's `getPokemonSpecies(species).forms` throws) must NOT abort the
@@ -5441,7 +5448,9 @@ export class GameData {
         case "modifiers":
         case "enemyModifiers": {
           const ret: PersistentModifierData[] = [];
-          for (const md of v ?? []) {
+          // Fail SOFT per container (see the party case above): a non-array `modifiers` must coerce
+          // to empty, never throw "is not iterable".
+          for (const md of Array.isArray(v) ? v : []) {
             if (md?.className === "ExpBalanceModifier") {
               // Temporarily limit EXP Balance until it gets reworked
               md.stackCount = Math.min(md.stackCount, 4);
@@ -5466,7 +5475,9 @@ export class GameData {
 
         case "challenges": {
           const ret: ChallengeData[] = [];
-          for (const c of v ?? []) {
+          // Fail SOFT per container (see the party case above): a non-array `challenges` must coerce
+          // to empty, never throw "is not iterable".
+          for (const c of Array.isArray(v) ? v : []) {
             ret.push(new ChallengeData(c));
           }
           return ret;

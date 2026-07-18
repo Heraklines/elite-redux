@@ -6,7 +6,14 @@
 import { appendFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { loadCampaignLifecyclePolicy, withinDeadline } from "./campaign-lifecycle.mjs";
-import { findOwnedActionableReplacementSurface, isActionableSemanticObservation } from "./campaign-nav.mjs";
+import {
+  findOwnedActionableMysteryPartySurface,
+  findOwnedActionableReplacementSurface,
+  isActionableSemanticObservation,
+  isPartyPickerSurfaceOpen,
+  mysteryPartyTargetOptionId,
+  selectOptionById,
+} from "./campaign-nav.mjs";
 import {
   buildDispatchTable,
   GAME_OVER_PHASE,
@@ -543,15 +550,14 @@ export function createBattlePromptAdvancer(
       if (!readyEvent) {
         continue;
       }
-      // A live replacement picker means the intro message chain has ALREADY yielded to the party UI:
-      // the matched message event is stale, and one more Space would fall through into the picker and
-      // select the fainted FIELD slot (run 29613070126: its submenu correctly lacks send-out, so the
-      // slot drive then threw "target not in options"). Leave the picker to driveReplacement.
+      // A live party picker (faint replacement OR a Mystery-encounter `selectPokemonForOption`
+      // sub-prompt) means the intro/narration chain has ALREADY yielded to the party UI: the matched
+      // message event is stale, and one more Space would fall through into the picker and select a
+      // default slot (run 29613070126: the faint picker's fainted-field submenu lacks send-out, so
+      // the slot drive threw "target not in options"; the ME party class is the same fall-through
+      // hazard). Leave the picker to driveReplacement / driveMysteryPartyPicker.
       const latestSurface = client.evidence.findLastSemanticSurface(cursors.get(client.label) ?? 0);
-      if (
-        latestSurface?.observation.surfaceId === "party:replacement"
-        && latestSurface.observation.uiMode === "PARTY"
-      ) {
+      if (isPartyPickerSurfaceOpen(latestSurface?.observation)) {
         continue;
       }
       cursors.set(client.label, readyEvent.index + 1);
@@ -641,6 +647,13 @@ export function createMysteryNarrationAdvancer(rig, from, stats, purpose) {
         );
       });
       if (!readyEvent) {
+        continue;
+      }
+      // Same picker-guard as the battle-prompt advancer: once the ME has yielded to a party
+      // sub-prompt (`selectPokemonForOption`), the last narration prompt is stale and one more Space
+      // would fall through into the party UI. Leave the picker to driveMysteryPartyPicker.
+      const latestSurface = client.evidence.findLastSemanticSurface(cursors.get(client.label) ?? 0);
+      if (isPartyPickerSurfaceOpen(latestSurface?.observation)) {
         continue;
       }
       cursors.set(client.label, readyEvent.index + 1);
@@ -1062,6 +1075,16 @@ function semanticAppearanceIsNew(event, handled) {
 export function findRegisteredSurface(rig, dispatch, cursors, handledIndex = new Map()) {
   return (
     dispatch.find(driver => {
+      // The ME PARTY sub-prompt shares the plain `party` surfaceId with a (non-driven) between-wave
+      // party context, so it can only be considered "registered" via its ME-gated owned-picker finder
+      // - never a bare `party` semantic presence, which would strand a non-ME party surface at the
+      // deadline. Owner-only: the watcher never renders it.
+      if (driver.mysteryParty) {
+        return Object.values(rig.clients).some(client => {
+          const event = findOwnedActionableMysteryPartySurface(client, cursors[client.label] ?? 0);
+          return semanticAppearanceIsNew(event, handledIndex.get(`${driver.name}:${client.label}`));
+        });
+      }
       if (driver.v2SurfaceId && hasSemanticSurface(rig, driver.v2SurfaceId, cursors)) {
         return Object.values(rig.clients).some(client => {
           const event = client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, driver.v2SurfaceId);
@@ -1095,6 +1118,22 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
       ? semanticAppearanceIsNew(event, handled)
       : event != null && event.index > (handled ?? -1);
   };
+
+  // Mystery-encounter PARTY sub-prompt (`selectPokemonForOption`): projected as the plain `party`
+  // surface with `ownerModel: "local"` and `ownerSeat: null`, so the generic v2 semantic-owner path
+  // (which requires `ownerSeat === localSeat`) can never resolve it. The owner is the seat that
+  // rendered its own actionable ME party slot-list; the watcher never renders it. Inert for any
+  // non-ME party surface (the predicate gates on `mysteryEncounterType`), so it never fires in a
+  // between-wave party context.
+  if (driver.mysteryParty) {
+    for (const client of clients) {
+      const event = findOwnedActionableMysteryPartySurface(client, cursors[client.label] ?? 0);
+      if (notYetHandled(client, event)) {
+        return { client, markerEvent: event };
+      }
+    }
+    return null;
+  }
 
   // The v2 projection is the actionable public surface and its own ownership contract. Legacy
   // OWNER lines can be emitted while preceding narration is still active, or before a campaign's
@@ -1567,6 +1606,100 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
 }
 
 /**
+ * Drive the OWNER seat's mystery-encounter PARTY sub-prompt (`selectPokemonForOption`, e.g.
+ * PART_TIMER). Only the owning browser opens the party UI; a guest owner relays its slot pick to
+ * the authoritative host, a host owner applies it locally, and the watcher never renders the
+ * surface. Pick a legal party slot from the observer-proven slot list, then confirm through the mon
+ * action submenu's `select` option - the SAME semantic-surface + generation-keyed navigation idiom
+ * driveOwnedReplacementPicker uses, never a blind key macro, and gated to the picker-open cursor so
+ * a stale prompt can never fall through into a default slot.
+ */
+async function driveMysteryPartyPicker(rig, owner, cursors, stats) {
+  const from = cursors[owner.label] ?? 0;
+  // Wait for the actionable owned slot-list projection. The finder rejects the mid-descent submenu
+  // form (party-option:* ids) and every non-ME party context (mysteryEncounterType == null).
+  const deadline = Date.now() + rig.config.timeoutMs;
+  let slotSurface = null;
+  while (Date.now() < deadline) {
+    slotSurface = findOwnedActionableMysteryPartySurface(owner, from);
+    if (slotSurface != null) {
+      break;
+    }
+    const terminal = owner.evidence.find(SHARED_SESSION_TERMINAL, from) ?? owner.evidence.find(GAME_OVER_PHASE, from);
+    if (terminal != null) {
+      throw new Error(
+        `${owner.label}: shared session terminated before the Mystery party sub-prompt: ${terminal.text}`,
+      );
+    }
+    await delay(100);
+  }
+  if (slotSurface == null) {
+    throw new Error(`${owner.label}: timed out waiting for an actionable owned Mystery party sub-prompt`);
+  }
+  const targetOptionId = mysteryPartyTargetOptionId(slotSurface.observation);
+  if (targetOptionId == null) {
+    throw new Error(
+      `${owner.label}: Mystery party sub-prompt exposed no in-battle-eligible party slot: `
+        + `${JSON.stringify(slotSurface.observation.partySlots ?? null)}`,
+    );
+  }
+  // Record the sub-prompt against this wave's mystery event so the gauntlet surface tally includes it.
+  const event = stats.mysteryEvents.find(candidate => candidate.wave === slotSurface.observation.address.wave);
+  if (event != null) {
+    appendMysteryProof(rig, event, {
+      stage: "party",
+      surfaceId: "party",
+      phase: slotSurface.observation.phase,
+      uiMode: slotSurface.observation.uiMode,
+      selectedOptionId: slotSurface.observation.selectedOptionId ?? null,
+      address: slotSurface.observation.address,
+      ownerSeat: owner.publicSeat,
+      optionIds: slotSurface.observation.optionIds ?? null,
+      mysteryEncounterType: slotSurface.observation.mysteryEncounterType ?? null,
+      stateDigest: slotSurface.observation.stateDigest ?? null,
+    });
+  }
+  await owner.checkpoint(`wave-${stats.wave}-mystery-party-slot`);
+  const slotCursor = owner.evidence.cursor();
+  // 1) Navigate to the legal slot and open its mon action submenu.
+  await selectOptionById(owner, {
+    surfaceId: "party",
+    targetId: targetOptionId,
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: from,
+  });
+  // 2) PartyUiMode.SELECT opens the mon action SUBMENU (PartyOption.SELECT). Wait for its actionable
+  // projection (party-option:* ids), then confirm `select` to commit the pick.
+  const submenuSurface = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(slotCursor, "party");
+      const observation = candidate?.observation;
+      return observation?.optionIds?.includes("party-option:select")
+        && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: `Mystery party action submenu for ${targetOptionId}` },
+  );
+  await selectOptionById(owner, {
+    surfaceId: "party",
+    targetId: "party-option:select",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: submenuSurface.index,
+  });
+  owner.evidence.record("campaign-mystery-party-pick", {
+    address: slotSurface.observation.address,
+    ownerSeat: owner.publicSeat,
+    targetOptionId,
+    mysteryEncounterType: slotSurface.observation.mysteryEncounterType ?? null,
+  });
+}
+
+/**
  * A leave action is two separate public surfaces, not a timing-based key macro. Open
  * the confirmation, prove that exact addressed handler is actionable, and only then
  * submit the remaining key(s). This is load-bearing on throttled remote Chromium.
@@ -1659,7 +1792,12 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
               ? "reward"
               : null;
     let mechanicalBoundary = null;
-    if (mysteryStage === "bargain") {
+    if (driver.mysteryParty) {
+      // The ME PARTY sub-prompt is OWNER-ONLY: only the owning browser opens the party UI
+      // (`selectPokemonForOption`); the watcher never renders it, so the paired-mystery checkpoint
+      // (which awaits the surface on BOTH clients) would hang. Its owner-only convergence + drive
+      // live in driveMysteryPartyPicker below.
+    } else if (mysteryStage === "bargain") {
       await checkpointAsymmetricBargainSurface(rig, cursors, stats, client);
     } else if (mysteryStage != null && driver.v2SurfaceId) {
       const targetReached = await checkpointPairedMysterySurface(rig, driver.v2SurfaceId, cursors, stats, mysteryStage);
@@ -1676,6 +1814,8 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       stats.market = await driveTargetedMarket(rig, cursors, driver.market);
     } else if (driver.name === "reward-target" && mechanicalBoundary != null) {
       await driveRewardPartyTarget(rig, driver, client, mechanicalBoundary);
+    } else if (driver.mysteryParty) {
+      await driveMysteryPartyPicker(rig, client, cursors, stats);
     } else if (driver.confirmSurfaceId && mechanicalBoundary != null) {
       await driveConfirmedLeave(rig, driver, client, mechanicalBoundary.authority, cursors);
     } else {
