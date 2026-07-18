@@ -53,7 +53,11 @@ import {
 // them so a committed INTERACTION_COMMIT is fingerprinted through whichever adapter recognizes it.
 import { shadowOfInteractionEntry as learnShadowOfEntry } from "#data/elite-redux/coop/authority-v2/adapters/interactions-learn";
 import { shadowOfInteractionEntry as mysteryShadowOfEntry } from "#data/elite-redux/coop/authority-v2/adapters/interactions-mystery";
-import { shadowOfInteractionEntry as rewardShadowOfEntry } from "#data/elite-redux/coop/authority-v2/adapters/interactions-reward";
+import {
+  buildRewardInteractionEntry,
+  type CoopRewardChoiceV2,
+  shadowOfInteractionEntry as rewardShadowOfEntry,
+} from "#data/elite-redux/coop/authority-v2/adapters/interactions-reward";
 import {
   buildTurnCommitEntry,
   computeShadowParity,
@@ -99,24 +103,24 @@ import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 // ---------------------------------------------------------------------------
 // Build-feature gate. The shadow harness is fully wired but ADVERTISED only when
-// this flag is on. It defaults OFF so a co-op session is BYTE-IDENTICAL to the
-// pre-shadow build (the capability is never negotiated -> the harness never builds
-// -> no v2 frame is ever sent -> the transport v===2 branch is dead) - the safest
-// possible rollout. Flip it ON (env COOP_AUTHORITY_V2_SHADOW=on) on BOTH peers to
-// activate the live shadow run.
+// this flag is on. It now defaults ON - the MILESTONE-1 shadow-evidence enabler:
+// the wiring is complete (the three remaining taps are live) and the duo-harness
+// blocker is closed (inbound routing is per-runtime via the transport's own
+// onV2Frame seam, so two harnesses in ONE process no longer collide on a single
+// module-level handler). Default ON only ADVERTISES the capability; it still takes
+// BOTH peers negotiating `authority.v2shadow` to activate a live shadow run, and a
+// single-engine / solo session never negotiates it - so those paths are untouched.
+// Set env COOP_AUTHORITY_V2_SHADOW=off to force the advertisement off (the old
+// provably byte-identical rollback).
 //
-// WHY DEFAULT OFF (rollout note): the single module-level inbound handler below is
-// correct for PRODUCTION (one harness per process, frames arrive from the REMOTE
-// peer). The CI two-engine duo harness runs BOTH peers in ONE process, so a single
-// module-level handler cannot disambiguate the two harnesses' inbound v2 frames.
-// The shadow is isolated from legacy (it never touches engine state, every path is
-// try/caught), so it cannot break a legacy assertion - but until the duo-harness
-// inbound routing is made per-runtime, keep the capability off by default so the
-// gate stays provably byte-identical. See the report's contract change requests.
+// SHIP-SAFETY (unchanged by the flip): even when advertised + negotiated, the
+// shadow NEVER touches engine state, every tap + egress path is try/caught, and a
+// parity mismatch or protocol violation is LOG-ONLY. Legacy still controls ALL
+// mechanics; the shadow only computes + compares alongside it.
 // ---------------------------------------------------------------------------
-const COOP_V2_SHADOW_ENABLED = typeof process !== "undefined" && process.env?.COOP_AUTHORITY_V2_SHADOW === "on";
+const COOP_V2_SHADOW_ENABLED = typeof process === "undefined" || process.env?.COOP_AUTHORITY_V2_SHADOW !== "off";
 
-/** Whether this build ADVERTISES the authority-v2 shadow capability (flip on with env COOP_AUTHORITY_V2_SHADOW=on). */
+/** Whether this build ADVERTISES the authority-v2 shadow capability (default ON; force off with env COOP_AUTHORITY_V2_SHADOW=off). */
 export function isCoopV2ShadowEnabled(): boolean {
   return COOP_V2_SHADOW_ENABLED;
 }
@@ -197,6 +201,23 @@ export interface CoopV2ShadowInteractionTap {
   /** The entry the runtime built via the matching interaction adapter builder (reward/mystery/learn). */
   readonly entry: Omit<CoopAuthorityEntry, "revision">;
   readonly legacyDigest: string;
+}
+
+/**
+ * Interaction tap from the relay owner-commit, expressed as PRIMITIVES (the relay has no adapter-shaped
+ * entry, epoch, wave, or context). The harness builds the reward INTERACTION_COMMIT from these + its own
+ * authenticated context. `wave` defaults to the last wave a turn/replacement/wave tap observed; `ownerSeatId`
+ * is the sender's seat (0 host / 1 guest, matching the legacy stream convention).
+ */
+export interface CoopV2ShadowInteractionChoiceTap {
+  readonly seq: number;
+  readonly kind: string;
+  readonly choice: number;
+  readonly data?: readonly number[];
+  readonly ownerSeatId: number;
+  readonly wave?: number;
+  /** Optional legacy comparand; absent -> a stable relay-derived token (parity logs match=false). */
+  readonly legacyDigest?: string;
 }
 
 /** Live counters for the taps + the protocol round-trip (asserted directly in the node-pure test). */
@@ -311,6 +332,11 @@ export class CoopAuthorityV2Shadow {
   private parityChecks = 0;
   private parityMatches = 0;
   private faults = 0;
+  /** The most recent wave a turn/replacement/wave/terminal tap observed; the interaction-choice tap (which
+   *  has no wave of its own at the relay seam) addresses its shadow reward window against it. */
+  private lastObservedWave = 0;
+  /** Unsubscribe for the per-instance transport inbound seam (see the constructor); called on dispose. */
+  private transportV2Unsub: (() => void) | null = null;
 
   constructor(deps: CoopV2ShadowDeps) {
     const id = deps.identity;
@@ -354,6 +380,17 @@ export class CoopAuthorityV2Shadow {
       projector: this.projector,
       receipts: { emit: receipt => this.sendReceipt(receipt) },
     };
+
+    // Per-runtime inbound routing (contract change request 2): register THIS harness's inbound handler on
+    // its OWN transport endpoint via the additive onV2Frame seam. This is what makes the two-peers-in-one-
+    // process duo harness routable - each harness owns a distinct transport endpoint, so the two never
+    // collide on the single module-level handler (which the runtime keeps as the compat fallback). A
+    // transport that has not adopted the seam (a bare stub, an older transport) leaves this null and the
+    // module-level fallback drives routing, so this stays additive-optional. The raw frame is routed through
+    // the SAME boundary validator the module-level path uses (never a cast).
+    this.transportV2Unsub =
+      deps.transport.onV2Frame?.(raw => routeCoopV2InboundFrameTo(raw, frame => this.handleInboundFrame(frame)))
+      ?? null;
   }
 
   // -------------------------------------------------------------------------
@@ -363,6 +400,7 @@ export class CoopAuthorityV2Shadow {
 
   /** Tap the host's turn-commit emit. Builds a TURN_COMMIT via the turn adapter + records parity. */
   tapTurnCommit(input: CoopV2ShadowTurnTap): CoopAuthorityEntry | null {
+    this.lastObservedWave = input.nextCommand.wave;
     return this.runTap("TURN_COMMIT", () => {
       const barrier: MutationBarrier = { pendingTokens: () => input.pendingTokens ?? 0 };
       const built = buildTurnCommitEntry({
@@ -386,6 +424,7 @@ export class CoopAuthorityV2Shadow {
 
   /** Tap the faint-switch authority commit. Builds a REPLACEMENT_COMMIT via the faint adapter + records parity. */
   tapReplacementCommit(input: CoopV2ShadowReplacementTap): CoopAuthorityEntry | null {
+    this.lastObservedWave = input.proposal.sourceAddress.wave;
     return this.runTap("REPLACEMENT_COMMIT", () => {
       const built = buildReplacementCommitEntry({
         context: this.frameContext,
@@ -405,6 +444,7 @@ export class CoopAuthorityV2Shadow {
 
   /** Tap the waveResolved broadcast. Builds a WAVE_ADVANCE via the wave-terminal adapter + records parity. */
   tapWaveAdvance(input: CoopV2ShadowWaveTap): CoopAuthorityEntry | null {
+    this.lastObservedWave = input.transition.wave;
     return this.runTap("WAVE_ADVANCE", () => {
       const built = buildWaveAdvanceEntry({
         context: this.frameContext,
@@ -445,6 +485,40 @@ export class CoopAuthorityV2Shadow {
       // recognized interaction is fingerprinted through its OWN seam, then compare against legacy.
       const v2Digest = this.interactionShadowDigest(entry) ?? entry.material.digest;
       this.logParity("INTERACTION_COMMIT", entry.revision, v2Digest === input.legacyDigest, "materialDigest");
+      return entry;
+    });
+  }
+
+  /**
+   * Tap the interaction relay owner-commit from PRIMITIVES (the relay seam carries no adapter-shaped entry
+   * of its own - it has no epoch/wave/context, which live on the harness). Builds a generic REWARD
+   * INTERACTION_COMMIT via the reward adapter: the owner's relayed pick becomes a reward "pick" (optionIndex
+   * = choice, subPicks = data), addressed against the harness epoch + the last observed wave + the relayed
+   * seq as the per-window action ordinal. Records ONE parity check. The relay seam excludes faint-switch /
+   * revival kinds (those are the REPLACEMENT tap's domain), so this never double-taps a faint replacement.
+   */
+  tapInteractionChoice(input: CoopV2ShadowInteractionChoiceTap): CoopAuthorityEntry | null {
+    return this.runTap("INTERACTION_COMMIT", () => {
+      const wave = input.wave ?? this.lastObservedWave;
+      const ownerSeatId = input.ownerSeatId;
+      const rewardChoice: CoopRewardChoiceV2 = {
+        kind: "pick",
+        optionIndex: input.choice >= 0 ? input.choice : 0,
+        subPicks: input.data == null ? [] : input.data.filter(value => Number.isSafeInteger(value)),
+      };
+      const built = buildRewardInteractionEntry({
+        context: this.frameContext,
+        address: { epoch: this.frameContext.sessionEpoch, wave, ownerSeatId, actionOrdinal: input.seq },
+        material: { kind: "reward", wave, ownerSeatId, choice: rewardChoice, terminal: true },
+        successor: null,
+      });
+      const entry = this.commit(built);
+      const v2Digest = this.interactionShadowDigest(entry) ?? entry.material.digest;
+      // No true legacy digest exists at the relay seam yet (the legacy path is not v2-digested), so the
+      // legacy comparand is a stable relay-derived token: parity logs match=false until the legacy carrier
+      // is fingerprinted the same way. The evidence this tap yields is the end-to-end protocol round-trip.
+      const legacyDigest = input.legacyDigest ?? `relay:${input.kind}:${input.choice}`;
+      this.logParity("INTERACTION_COMMIT", entry.revision, v2Digest === legacyDigest, "materialDigest");
       return entry;
     });
   }
@@ -533,6 +607,14 @@ export class CoopAuthorityV2Shadow {
       return;
     }
     this.disposed = true;
+    // Drop the per-instance transport inbound registration first, so no late frame routes into a
+    // half-disposed harness (handleInboundFrame also self-guards on `disposed`).
+    try {
+      this.transportV2Unsub?.();
+    } catch (error) {
+      this.fault("dispose(transportV2Unsub)", error);
+    }
+    this.transportV2Unsub = null;
     try {
       this.log.dispose(reason);
     } catch (error) {
@@ -730,9 +812,18 @@ export function tapCoopV2ShadowReplacementCommit(input: CoopV2ShadowReplacementT
   activeHarness?.tapReplacementCommit(input);
 }
 
-/** Tap the interaction relay owner-commit (thin, cycle-free). No-op unless a harness is active. */
+/** Tap the interaction relay owner-commit with a pre-built entry (thin, cycle-free). No-op unless active. */
 export function tapCoopV2ShadowInteraction(input: CoopV2ShadowInteractionTap): void {
   activeHarness?.tapInteraction(input);
+}
+
+/**
+ * Tap the interaction relay owner-commit from PRIMITIVES (thin, cycle-free). The emit seam (the relay's
+ * `sendInteractionChoice`) has no adapter-shaped entry / epoch / wave / context, so it passes the raw pick
+ * and the harness (which owns the context) builds the shadow reward entry. No-op unless a harness is active.
+ */
+export function tapCoopV2ShadowInteractionChoice(input: CoopV2ShadowInteractionChoiceTap): void {
+  activeHarness?.tapInteractionChoice(input);
 }
 
 /** Whether a shadow harness is active (an emit seam can gate its input construction on this). */
@@ -764,12 +855,30 @@ export type CoopV2InboundRouting = "routed" | "cosmetic-drop" | "protocol-violat
  * inputs - never throws back into the transport.
  */
 export function routeCoopV2InboundFrame(raw: unknown): CoopV2InboundRouting {
+  return routeValidatedInboundFrame(raw, inboundHandler);
+}
+
+/**
+ * Route a raw inbound v2 frame to a SPECIFIC harness's inbound handler - the per-instance transport seam
+ * (contract change request 2). Same validation + classification as {@linkcode routeCoopV2InboundFrame}, but
+ * targeted at the passed handler instead of the module-level one, so two harnesses in one process each admit
+ * only the frames delivered on THEIR OWN transport endpoint.
+ */
+export function routeCoopV2InboundFrameTo(raw: unknown, handler: (frame: CoopFrameV2) => void): CoopV2InboundRouting {
+  return routeValidatedInboundFrame(raw, handler);
+}
+
+/** The shared validate-then-route body for both the module-level handler and the per-instance seam. */
+function routeValidatedInboundFrame(
+  raw: unknown,
+  handler: ((frame: CoopFrameV2) => void) | null,
+): CoopV2InboundRouting {
   const result = validateInboundFrame(raw);
   switch (result.kind) {
     case "valid":
-      if (inboundHandler != null) {
+      if (handler != null) {
         try {
-          inboundHandler(result.frame);
+          handler(result.frame);
         } catch (error) {
           coopWarn("v2-shadow", `FAULT route: ${describeError(error)}`);
         }

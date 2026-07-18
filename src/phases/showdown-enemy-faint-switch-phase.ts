@@ -203,6 +203,8 @@ export class ShowdownEnemyFaintSwitchPhase extends BattlePhase {
             payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data: terminalData },
             ownerRole: "guest",
             localRole: "host",
+            // #799 identity for the authority-v2 shadow REPLACEMENT tap (unused by the legacy carrier).
+            speciesId: authoritativePick.species?.speciesId ?? terminalData[1],
             ...sourceAddress,
           },
           operationBinding,

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { isCoopV2ShadowActive, tapCoopV2ShadowReplacementCommit } from "#data/elite-redux/coop/authority-v2/shadow";
 import { COOP_CAP_OP_FAINT_SWITCH, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
@@ -557,6 +558,13 @@ export function commitFaintSwitchAuthorityResult(
     wave: number;
     turn: number;
     occurrence?: number;
+    /**
+     * The picked replacement's species id (#799 identity, promoted out of `data[1]`). OPTIONAL and UNUSED
+     * by the legacy carrier (which resolves by slot) - it is threaded only so the authority-v2 shadow
+     * REPLACEMENT tap can name the species in its typed proposal instead of a bare slot. Absent -> the tap
+     * falls back to `payload.data[1]`. Populated at the call sites from `authoritativePick?.species?.speciesId`.
+     */
+    speciesId?: number;
   },
   binding?: CoopFaintSwitchOperationBinding | null,
 ): CoopFaintSwitchCommitReceipt | null {
@@ -602,6 +610,36 @@ export function commitFaintSwitchAuthorityResult(
       if (!retainEnvelope(result.envelope, binding)) {
         coopWarn("replay", `faint-switch op could not retain rev=${result.envelope.revision} id=${operation.id}`);
         return null;
+      }
+      // authority-v2 SHADOW tap (contract change request 4): mirror this committed replacement into the v2
+      // shadow harness for parity evidence. Null-guarded (no-op unless a harness is active) + the tap runs
+      // under the harness's own try/catch, so a shadow fault is logged, never thrown back into the legacy
+      // commit. Legacy still owns the replacement entirely; this only records + compares alongside it.
+      if (isCoopV2ShadowActive()) {
+        const resolutionCode = params.payload.data[COOP_FAINT_SWITCH_RESOLUTION_INDEX];
+        const speciesId = params.speciesId ?? params.payload.data[1] ?? 0;
+        const noReplacement = resolutionCode === COOP_FAINT_SWITCH_RESOLUTION_NONE;
+        const selected =
+          noReplacement || !(speciesId > 0) || params.payload.partySlot < 0
+            ? null
+            : { partySlot: params.payload.partySlot, speciesId };
+        tapCoopV2ShadowReplacementCommit({
+          proposal: {
+            sourceAddress: {
+              epoch: s.epoch,
+              wave: params.wave,
+              turn: params.turn,
+              occurrence,
+              fieldIndex: params.payload.fieldIndex,
+            },
+            ownerSeatId: owner,
+            selected,
+          },
+          resolution: resolutionCode === COOP_FAINT_SWITCH_RESOLUTION_OWNER ? "owner-pick" : "fallback-auto",
+          successor: { kind: "terminal" },
+          operationId: operation.id,
+          legacyDigest: operation.id,
+        });
       }
       return { operationId: operation.id };
     }

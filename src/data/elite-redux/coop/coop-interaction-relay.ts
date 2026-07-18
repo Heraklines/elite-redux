@@ -25,6 +25,7 @@
 // LoopbackTransport, exactly like CoopBattleStreamer.
 // =============================================================================
 
+import { isCoopV2ShadowActive, tapCoopV2ShadowInteractionChoice } from "#data/elite-redux/coop/authority-v2/shadow";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { setCoopMeActivePresentation } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
@@ -501,6 +502,20 @@ export class CoopInteractionRelay {
       choice,
       ...(data === undefined ? {} : { data: [...data] }),
     });
+    // authority-v2 SHADOW tap (contract change request 4): mirror this owner-committed interaction pick into
+    // the v2 shadow harness for parity evidence. Faint-switch / revival relays are EXCLUDED (they are the
+    // REPLACEMENT tap's domain - tapping them here would double-count a faint replacement). Null-guarded
+    // (no-op unless a harness is active) + the tap runs under the harness's own try/catch, so a shadow fault
+    // is logged, never thrown back into the relay send. Legacy owns the interaction entirely.
+    if (isCoopV2ShadowActive() && kind !== "switch" && kind !== "revival") {
+      tapCoopV2ShadowInteractionChoice({
+        seq,
+        kind,
+        choice,
+        ...(data === undefined ? {} : { data: [...data] }),
+        ownerSeatId: this.transport.role === "host" ? 0 : 1,
+      });
+    }
   }
 
   /**

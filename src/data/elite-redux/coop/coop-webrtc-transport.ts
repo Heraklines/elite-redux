@@ -164,6 +164,8 @@ export class WebRtcTransport implements CoopTransport {
   private wireGeneration: number;
   private readonly msgHandlers = new Set<(msg: CoopMessage) => void>();
   private readonly stateHandlers = new Set<(state: CoopConnectionState) => void>();
+  /** Co-op AUTHORITY V2: per-instance inbound handler for `v === 2` frames (see {@link CoopTransport.onV2Frame}). */
+  private v2FrameHandler: ((frame: unknown) => void) | null = null;
   /**
    * #857 keepalive: cancel handle for the running ping timer AND the browser resume listeners (null until
    * {@linkcode startKeepalive}). Calling it stops the timer and unregisters every event listener - teardown
@@ -822,6 +824,15 @@ export class WebRtcTransport implements CoopTransport {
     };
   }
 
+  onV2Frame(handler: (frame: unknown) => void): () => void {
+    this.v2FrameHandler = handler;
+    return () => {
+      if (this.v2FrameHandler === handler) {
+        this.v2FrameHandler = null;
+      }
+    };
+  }
+
   close(): void {
     coopLog("webrtc", `close() role=${this.role} state=${this._state}`);
     this.keepaliveCancel?.();
@@ -839,6 +850,7 @@ export class WebRtcTransport implements CoopTransport {
     this.transportFailureReason = undefined;
     this.msgHandlers.clear();
     this.stateHandlers.clear();
+    this.v2FrameHandler = null;
   }
 
   private setState(state: CoopConnectionState): void {
@@ -883,7 +895,12 @@ export class WebRtcTransport implements CoopTransport {
     // malformed v2 frame is classified, not smuggled downstream. A v2 frame is only ever emitted when
     // BOTH peers negotiated authority.v2shadow, so this path is dead when the capability is off.
     if (parsed != null && typeof parsed === "object" && (parsed as { v?: unknown }).v === 2) {
-      routeCoopV2InboundFrame(parsed);
+      // Prefer THIS endpoint's per-instance handler; fall back to the module-level handler for compat.
+      if (this.v2FrameHandler == null) {
+        routeCoopV2InboundFrame(parsed);
+      } else {
+        this.v2FrameHandler(parsed);
+      }
       return;
     }
     if (parsed != null && typeof parsed === "object" && typeof (parsed as { t?: unknown }).t === "string") {
