@@ -23,6 +23,11 @@
 // TYPE-ONLY import (erased at runtime): the data-fingerprint diagnostic message carries a
 // plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
 import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
+// frame-codec is engine-free (pure JSON codec, zero runtime deps), so the transport keeps its lowest-layer
+// standing. `encodeFrameV2` is the wire serializer the in-process loopback uses to HOLD a deferred v2 frame
+// as its wire string (duo-harness destination pumping) - so a held frame round-trips through decode+validate
+// on delivery exactly like the real WebRTC path, never an in-process object hand-off.
+import { encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { routeCoopV2InboundFrame } from "#data/elite-redux/coop/authority-v2/shadow";
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
@@ -1977,6 +1982,21 @@ export interface CoopTransport {
    * seam -> the module-level fallback is used, so this stays additive-optional.
    */
   onV2Frame?(handler: (frame: unknown) => void): () => void;
+  /**
+   * Co-op AUTHORITY V2 duo-harness seam (optional, additive, in-process loopback ONLY). When enabled, inbound
+   * `v === 2` frames are QUEUED as their wire strings instead of dispatched on arrival, so a two-engine test
+   * rig can drain them under the DESTINATION client's installed context - the replica then applies material
+   * under its OWN receiving realm, never the sender's ambient. Default OFF and absent on the real WebRTC
+   * transport (where each peer is already its own realm), so production stays byte-identical.
+   */
+  setV2InboundDeferred?(enabled: boolean): void;
+  /**
+   * Co-op AUTHORITY V2 duo-harness seam (optional, additive): drain deferred inbound v2 frames, routing each
+   * through the SAME boundary validator the immediate path uses (decode + validate of the wire string).
+   * Returns the count delivered. Call under the destination client's installed context. No-op / absent when
+   * deferral was never enabled.
+   */
+  pumpV2Inbound?(limit?: number): number;
   /** Tear down the connection. */
   close(): void;
   /**
@@ -2173,6 +2193,9 @@ class LoopbackTransport implements CoopTransport {
   private readonly stateHandlers = new Set<(state: CoopConnectionState) => void>();
   /** Co-op AUTHORITY V2: per-instance inbound handler for `v === 2` frames (see {@link CoopTransport.onV2Frame}). */
   private v2FrameHandler: ((frame: unknown) => void) | null = null;
+  /** Duo-harness only: HOLD inbound v2 frames (as wire strings) until the destination context pumps them. */
+  private v2InboundDeferred = false;
+  private readonly v2DeferredInbound: string[] = [];
   /** #diagnostics: epoch-ms the last inbound frame was delivered to this endpoint (0 = none yet). */
   private lastRxAt = 0;
 
@@ -2187,6 +2210,38 @@ class LoopbackTransport implements CoopTransport {
         this.v2FrameHandler = null;
       }
     };
+  }
+
+  /**
+   * Duo-harness seam (see {@link CoopTransport.setV2InboundDeferred}). When enabled, inbound v2 frames are
+   * queued (as wire strings) instead of dispatched on arrival, so a two-engine rig pumps them under the
+   * destination client's context. Default OFF -> single-engine loopback dispatches v2 frames immediately.
+   */
+  setV2InboundDeferred(enabled: boolean): void {
+    this.v2InboundDeferred = enabled;
+  }
+
+  /**
+   * Duo-harness seam (see {@link CoopTransport.pumpV2Inbound}). Drain up to `limit` deferred inbound v2
+   * frames, routing each wire string through the SAME boundary validator the immediate path uses (decode +
+   * validate, never an in-process object hand-off). Returns the count delivered.
+   */
+  pumpV2Inbound(limit = Number.POSITIVE_INFINITY): number {
+    let delivered = 0;
+    while (this.v2DeferredInbound.length > 0 && delivered < limit) {
+      this.routeV2Inbound(this.v2DeferredInbound.shift()!);
+      delivered += 1;
+    }
+    return delivered;
+  }
+
+  /** Route one inbound v2 value (wire string or decoded object) to this endpoint's handler, or the fallback. */
+  private routeV2Inbound(raw: unknown): void {
+    if (this.v2FrameHandler == null) {
+      routeCoopV2InboundFrame(raw);
+    } else {
+      this.v2FrameHandler(raw);
+    }
   }
 
   get state(): CoopConnectionState {
@@ -2271,11 +2326,16 @@ class LoopbackTransport implements CoopTransport {
     // module-level handler for compat. Dead when authority.v2shadow is not negotiated (no v2 frame is ever
     // sent), so loopback stays byte-identical.
     if ((frame as { v?: unknown }).v === 2) {
-      if (this.v2FrameHandler == null) {
-        routeCoopV2InboundFrame(frame);
-      } else {
-        this.v2FrameHandler(frame);
+      // Duo-harness destination realm: when v2 inbound deferral is enabled (a two-engine rig), HOLD the frame
+      // as its wire string until the destination pumps it under its OWN client context, so the replica applies
+      // material under the RECEIVING realm - never the sender's synchronous ambient (the cross-realm
+      // strand-the-guest hazard). Default OFF => production + single-engine loopback dispatch immediately
+      // (byte-identical), so this is inert unless a rig opted in.
+      if (this.v2InboundDeferred) {
+        this.v2DeferredInbound.push(encodeFrameV2(frame as CoopFrameV2));
+        return;
       }
+      this.routeV2Inbound(frame);
       return;
     }
     for (const h of [...this.msgHandlers]) {
@@ -2368,6 +2428,7 @@ class LoopbackTransport implements CoopTransport {
     this.msgHandlers.clear();
     this.stateHandlers.clear();
     this.v2FrameHandler = null;
+    this.v2DeferredInbound.length = 0;
     this.earlyRx.length = 0;
   }
 }

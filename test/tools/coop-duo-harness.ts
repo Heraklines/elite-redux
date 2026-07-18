@@ -1472,6 +1472,11 @@ function destinationPumpOperationEnvelopes(pair: {
         return () => handlers.delete(handler);
       },
       onStateChange: handler => inner.onStateChange(handler),
+      // authority-v2 duo delivery: forward the per-instance v2 seam straight to the inner loopback so the
+      // shadow harness's inbound handler lands on the real endpoint. Inbound v2 frames are held on the inner
+      // (setV2InboundDeferred, enabled below) and drained by `flush(role)` under the destination context, so
+      // a delivered TURN_COMMIT/receipt applies under the RECEIVING realm - not the sender's ambient.
+      ...(typeof inner.onV2Frame === "function" ? { onV2Frame: handler => inner.onV2Frame!(handler) } : {}),
       close(): void {
         unsubscribe();
         handlers.clear();
@@ -1504,6 +1509,11 @@ function destinationPumpOperationEnvelopes(pair: {
   const host = wrap(pair.host);
   const guest = wrap(pair.guest);
   const endpoints: Record<CoopRole, ReturnType<typeof wrap>> = { host, guest };
+  // authority-v2: HOLD inbound v2 frames on each inner endpoint until `flush(role)` drains them under the
+  // destination client's context (see the seam docs on {@link CoopTransport.setV2InboundDeferred}). Legacy
+  // CoopMessage traffic keeps its existing queue; the two are independent.
+  pair.host.setV2InboundDeferred?.(true);
+  pair.guest.setV2InboundDeferred?.(true);
   const wrapped: DestinationEnvelopePumpPair = {
     host: host.transport,
     guest: guest.transport,
@@ -1513,6 +1523,9 @@ function destinationPumpOperationEnvelopes(pair: {
         endpoints[role].deliverQueued(queues[role].shift()!);
         delivered++;
       }
+      // Drain this endpoint's deferred inbound v2 frames under the (now-installed) destination context, so a
+      // delivered TURN_COMMIT/receipt admits + applies material under the RECEIVING realm.
+      delivered += pair[role].pumpV2Inbound?.(limit === Number.POSITIVE_INFINITY ? undefined : limit) ?? 0;
       return delivered;
     },
     setDestinationContextDelivery(enabled): void {
@@ -4183,6 +4196,15 @@ export async function buildShowdownDuo(
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
 
+  // authority-v2 (versus uses the RAW loopback pair directly): HOLD inbound v2 frames on each endpoint until
+  // the destination context pumps them, so a delivered TURN_COMMIT admits + applies the replacement under the
+  // RECEIVING realm - not the host's synchronous ambient (the empty-enemy strand). `pumpInbound` (below)
+  // drains them. Feature-detected: a scheduled pair that owns its own v2 delivery leaves these absent.
+  pair.host.setV2InboundDeferred?.(true);
+  pair.guest.setV2InboundDeferred?.(true);
+  const pumpInboundFor = (role: "host" | "guest") => (): number =>
+    (scheduledPair.flush?.(role) ?? 0) + (pair[role].pumpV2Inbound?.() ?? 0);
+
   // The host is already a showdown engine (idempotent flip). NO coopOwner tags - versus has no merged party.
   toShowdownGameMode(hostScene);
 
@@ -4211,7 +4233,7 @@ export async function buildShowdownDuo(
     moduleLets: snapshotModuleLets(),
     biomeState: snapshotBiomeModuleState(),
     mePins: { ...IDLE_ME_PINS },
-    ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("host") } : {}),
+    pumpInbound: pumpInboundFor("host"),
   };
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
@@ -4226,7 +4248,7 @@ export async function buildShowdownDuo(
     moduleLets: snapshotModuleLets(),
     biomeState: structuredClone(hostCtx.biomeState!),
     mePins: { ...IDLE_ME_PINS },
-    ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("guest") } : {}),
+    pumpInbound: pumpInboundFor("guest"),
   };
   await withClient(guestCtx, () => {
     toShowdownGameMode(guestScene);
