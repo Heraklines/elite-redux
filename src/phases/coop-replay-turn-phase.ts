@@ -370,6 +370,13 @@ export class CoopReplayTurnPhase extends Phase {
                 "replay",
                 `guest replay turn=${this.turn}: replacement filled OUR slot ${ownSlot} -> opening own CommandPhase`,
               );
+              // Track R barrier / turn-commit softlock: this parked replay armed `requestTurnCommit(turn)`
+              // (passively awaiting the host's turn resolution). We are now PIVOTING to command our own
+              // refilled slot - the guest PRODUCES this turn's command; it does not passively await it. Cancel
+              // the premature request so the guest stops pinging `requestTurnCommit -> turnCommitPending` at the
+              // host (which is correctly awaiting OUR command). The re-queued CoopReplayTurnPhase below re-arms
+              // the await legitimately AFTER the command is broadcast.
+              streamer.cancelPendingTurnCommitRequests(envelope.epoch, envelope.wave, envelope.turn);
               globalScene.phaseManager.unshiftNew("CommandPhase", ownSlot);
               globalScene.phaseManager.unshiftNew(
                 "CoopReplayTurnPhase",

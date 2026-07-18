@@ -2396,6 +2396,21 @@ export class CoopBattleStreamer {
     this.requestTurnCommit(epoch, wave, turn, revision);
   }
 
+  /**
+   * GUEST (Track R replay->command PIVOT): cancel any pending turn-commit REQUEST + its retry loop for this
+   * exact turn address. When a mid-turn replacement fills the guest's OWN slot, its parked
+   * CoopReplayTurnPhase (which armed `requestTurnCommit(turn)` while passively awaiting the host's turn
+   * resolution) PIVOTS to opening the guest's own CommandPhase - the guest is now going to PRODUCE that
+   * turn's command, not passively await it. Leaving the request armed leaves the guest pinging the host
+   * `requestTurnCommit -> turnCommitPending` forever while the host is (correctly) awaiting the guest's
+   * command (the observed barrier / turn-commit softlock shape). The re-queued CoopReplayTurnPhase re-arms
+   * the await legitimately AFTER the command is broadcast, so this only silences the premature request at
+   * the pivot. Idempotent; a no-op when no request is pending.
+   */
+  cancelPendingTurnCommitRequests(epoch: number, wave: number, turn: number): void {
+    this.clearTurnCommitRequestsAtAddress({ epoch, wave, turn });
+  }
+
   onTurnCommit(handler: (resolution: CoopTurnResolution) => void): () => void {
     this.turnCommitHandlers.add(handler);
     return () => this.turnCommitHandlers.delete(handler);
