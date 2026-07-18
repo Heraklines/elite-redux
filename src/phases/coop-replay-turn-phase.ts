@@ -22,6 +22,7 @@ import type { CoopAuthorityFailure, CoopCheckpointEnvelope } from "#data/elite-r
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
 import {
+  coopHasPendingWaveAdvance,
   coopLocalOwnedPlayerFieldSlot,
   coopRetainedGameOverSupersedesReplay,
   coopSessionGeneration,
@@ -355,7 +356,22 @@ export class CoopReplayTurnPhase extends Phase {
               );
               return;
             }
-            if (globalScene.currentBattle.turnCommands[ownSlot] == null) {
+            // Track R depth lane (run 29654429335): on a MUTUAL-KO double faint (both player field
+            // slots AND every enemy faint the SAME turn = the wave is WON) the host still auto-summons a
+            // replacement into the surviving-owner's fainted slot and ships this out-of-band checkpoint,
+            // then commits WAVE_ADVANCE. The refilled slot has NO next turn to command; opening a
+            // CommandPhase here parks the guest in UiMode.COMMAND forever (host-liveness pending turn
+            // commit) awaiting a turn the host, already advanced, never resolves, so the host's
+            // WAVE_ADVANCE op continuation deadline expires -> "Durable operation recovery exhausted ...
+            // continuation-timeout" terminal. Detect the won wave by the host's AUTHORITATIVE frame just
+            // applied above (getEnemyParty fully fainted - the exact signal coopMeHandoffBattleWon uses; a
+            // trainer with living reserves is NOT all-fainted, so a legitimate mid-wave replacement command
+            // is never suppressed) or an already-pending advance, and fall through to ack the replacement
+            // continuation instead of opening a command. coop-runtime's WIN unpark then dissolves the
+            // re-parked replay into the authoritative wave-advance tail.
+            const waveWon =
+              coopHasPendingWaveAdvance() || globalScene.getEnemyParty().every(mon => mon == null || mon.isFainted());
+            if (!waveWon && globalScene.currentBattle.turnCommands[ownSlot] == null) {
               if (
                 !streamer.registerReplacementContinuation(envelope, {
                   kind: "command",
@@ -388,9 +404,34 @@ export class CoopReplayTurnPhase extends Phase {
               this.end();
               return;
             }
-            // A delayed/rejoined carrier may arrive after this exact owner's public command was already
-            // committed.  The command record is stronger evidence than reopening a duplicate menu.
+            // Either the wave is already WON (no next player turn - see above; the held replay drains into
+            // the authoritative WAVE_ADVANCE tail) OR a delayed/rejoined carrier arrived after this exact
+            // owner's public command was already committed. Ack the replacement continuation; the command
+            // record / won wave is stronger evidence than reopening a duplicate menu.
+            if (waveWon) {
+              // Cancel the passive-await turn-commit request the same way the command pivot does: the host
+              // has advanced past this turn and will never resolve it, so the ping would otherwise retry.
+              streamer.cancelPendingTurnCommitRequests(envelope.epoch, envelope.wave, envelope.turn);
+              coopLog(
+                "replay",
+                `guest replay turn=${this.turn}: replacement filled OUR slot ${ownSlot} on a WON wave `
+                  + "-> ack continuation, hold for the wave-advance tail (NOT a phantom command)",
+              );
+            }
             if (!streamer.acknowledgeReplacement(envelope, "continuationReady")) {
+              return;
+            }
+            if (waveWon && coopHasPendingWaveAdvance()) {
+              // Message-order A (WAVE_ADVANCE landed BEFORE this checkpoint): coop-runtime already queued the
+              // safe-boundary CoopWaveAdvanceBoundaryPhase behind us. Re-parking (continue -> awaitTurn) would
+              // strand that boundary forever. END so it becomes current and runs the authoritative tail.
+              // Message-order B (checkpoint first): pending is false here, so we fall through to `continue` and
+              // re-park; coop-runtime's WIN unpark then dissolves that park when the WAVE_ADVANCE lands.
+              coopLog(
+                "replay",
+                `guest replay turn=${this.turn}: WON-wave advance already pending -> end into the queued wave-advance boundary`,
+              );
+              this.end();
               return;
             }
           }

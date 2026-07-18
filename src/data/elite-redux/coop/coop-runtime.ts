@@ -4493,13 +4493,19 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
       // Run 29520815364: gameOver landed after the guest had already opened wave-N turn+1 and parked its
       // replay waiter. Queue the continuation FIRST, then dissolve that impossible waiter so end() shifts
       // directly into this boundary and the terminal DATA/continuation proof can complete on both peers.
+      // Track R depth lane (run 29654429335): the SAME class fires for a WON wave, not just gameOver - a
+      // mutual-KO double faint whose out-of-band replacement checkpoint (correctly deferred to the
+      // complete field by cycle-8) lands AFTER the guest's final-turn finalize already parked the next
+      // turn. The guest suppresses the phantom command (coop-replay-turn-phase) and holds that park; a WIN
+      // WAVE_ADVANCE must dissolve it too, or it awaits a turn resolution the host - now advanced - never
+      // sends, and THIS op's continuation deadline expires. abortIfRetainedTerminalSuperseded only wakes a
+      // park at/after the settled turn awaiting authority, so a legitimate in-flight earlier turn is never
+      // dropped; a normal won wave has no trailing park, so this is inert there.
       const unparkedReplay =
-        payload.outcome === "gameOver"
-        && (coopActiveReplayTurnAborter?.(
-          `retained gameOver WAVE_ADVANCE wave=${payload.wave} settledTurn=${envelope.turn}`,
+        coopActiveReplayTurnAborter?.(
+          `retained ${payload.outcome} WAVE_ADVANCE wave=${payload.wave} settledTurn=${envelope.turn}`,
           envelope.turn,
-        )
-          ?? false);
+        ) ?? false;
       coopLog(
         "runtime",
         `wave-advance JOURNAL ${wakeAlreadyQueued ? "retained" : "queued"} safe-boundary wake wave=${payload.wave} unparkedReplay=${Number(unparkedReplay)}`,
