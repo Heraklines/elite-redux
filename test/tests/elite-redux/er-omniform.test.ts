@@ -8,6 +8,7 @@ import {
 import { clearOmniformRegistry, registerOmniformMapping } from "#data/elite-redux/abilities/omniform-registry";
 import { PokemonSpeciesForm } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
+import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
@@ -147,13 +148,58 @@ describe.skipIf(!RUN)("ER Omniform (5929)", () => {
     expect(holder.getMoveset().map(m => m?.moveId)).toContain(MoveId.EMBER);
   });
 
-  it("does nothing for an unmapped move type (general: no forced transform)", async () => {
+  it("does nothing for an unmapped, non-Normal move type (general: no forced transform)", async () => {
     await game.classicMode.startBattle(SpeciesId.EEVEE);
     const holder = game.field.getPlayerPokemon();
 
-    // Normal-type Tackle has no mapping for Eevee.
-    erOmniformOnMoveStart(holder, allMoves[MoveId.TACKLE]);
+    // Grass-type Vine Whip has no mapping for Eevee (and is NOT Normal, so it does
+    // not hit the Normal revert seam either) - the holder must stay put.
+    erOmniformOnMoveStart(holder, allMoves[MoveId.VINE_WHIP]);
     expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+  });
+
+  it("a Normal DAMAGING move reverts a transformed holder to the base form WITH the revert sequence", async () => {
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const holder = game.field.getPlayerPokemon();
+    const baseMoveIds = holder.getMoveset().map(m => m?.moveId);
+
+    // Adapt Eevee -> Vaporeon (Water).
+    erOmniformOnMoveStart(holder, allMoves[MoveId.WATER_GUN]);
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.VAPOREON);
+
+    // A Normal DAMAGING move (Quick Attack) reverts all the way back to the base form,
+    // just like a Normal status move does - Normal maps to base for both categories.
+    expect(allMoves[MoveId.QUICK_ATTACK].type).toBe(PokemonType.NORMAL);
+    expect(allMoves[MoveId.QUICK_ATTACK].category).not.toBe(MoveCategory.STATUS);
+    const queueMessage = vi.spyOn(game.scene.phaseManager, "queueMessage");
+    erOmniformOnMoveStart(holder, allMoves[MoveId.QUICK_ATTACK]);
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+    // The live moveset is the base form's own moveset again.
+    expect(holder.getMoveset().map(m => m?.moveId)).toEqual(baseMoveIds);
+    // The revert ran the full transform sequence - the "reverted to" message is queued
+    // (VFX morph/burst hook fires under it), so this is the same presentation as the
+    // status-move revert, not a silent species swap.
+    expect(queueMessage.mock.calls.some(call => String(call[0]).includes("reverted to"))).toBe(true);
+  });
+
+  it("a Normal DAMAGING move while ALREADY on base is a TOTAL no-op (the revert seam)", async () => {
+    // Never transformed => on base. A Normal damaging move routes through the revert
+    // path, which must be inert (no snapshot to revert to): no message, no wait phase.
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const holder = game.field.getPlayerPokemon();
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+
+    const movesBefore = holder.getMoveset().map(m => m?.moveId);
+    const queueMessage = vi.spyOn(game.scene.phaseManager, "queueMessage");
+    const unshiftNew = vi.spyOn(game.scene.phaseManager, "unshiftNew");
+
+    // Quick Attack is a Normal-type damaging move.
+    erOmniformOnMoveStart(holder, allMoves[MoveId.QUICK_ATTACK]);
+
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+    expect(holder.getMoveset().map(m => m?.moveId)).toEqual(movesBefore);
+    expect(queueMessage).not.toHaveBeenCalled();
+    expect(unshiftNew.mock.calls.some(call => call[0] === "ErOmniformTransformWaitPhase")).toBe(false);
   });
 
   it("is a TOTAL no-op when the mapped target IS the holder's current form (already that form)", async () => {

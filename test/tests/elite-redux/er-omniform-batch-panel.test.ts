@@ -20,7 +20,10 @@
 // Gated behind ER_SCENARIO=1 (needs the ER species/registry init).
 // =============================================================================
 
+import { allMoves } from "#data/data-lists";
 import { ER_PARTNER_EEVEE_ABILITY_ID } from "#data/elite-redux/abilities/composite-newcomers";
+import { erOmniformOnMoveStart } from "#data/elite-redux/abilities/omniform";
+import { ER_PARTNER_VAPOREON_SPECIES_ID } from "#data/elite-redux/er-newcomer-species";
 import {
   ensureOmniformFormMovesets,
   getOrRollFormMoveset,
@@ -158,6 +161,42 @@ describe.skipIf(!RUN)("ER Omniform level-up batch panel (per-evolution teach)", 
     );
     expect(illegalOffer?.learnable).toBe(false);
     expect(illegalOffer?.canLearn).toBe(false);
+  });
+
+  it("opened while the mon is TRANSFORMED, the strip defaults to the CURRENT evolution (not base)", async () => {
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const mon = game.field.getPlayerPokemon();
+    expect(isErOmniformMon(mon)).toBe(true);
+    ensureOmniformFormMovesets(mon);
+
+    // Transform Partner Eevee -> Partner Vaporeon so the mon is CURRENTLY a non-base form.
+    erOmniformOnMoveStart(mon, allMoves[MoveId.WATER_GUN]);
+    const sf = mon.getSpeciesForm();
+    expect(sf.speciesId).toBe(ER_PARTNER_VAPOREON_SPECIES_ID);
+
+    // The family list is base-first, so the current (Vaporeon) form is NOT index 0.
+    const forms = omniformFamilyForms(mon);
+    const currentIdx = forms.findIndex(f => f.speciesId === sf.speciesId && f.formIndex === mon.formIndex);
+    expect(currentIdx).toBeGreaterThan(0);
+
+    // Two real, resolvable offers so render() doesn't choke; content is irrelevant here.
+    const deps: LearnMoveBatchDeps = {
+      pokemon: mon,
+      learnableIds: [MoveId.TACKLE, MoveId.QUICK_ATTACK],
+      omniform: true,
+      assign: (moveId, slotIndex) => mon.setMove(slotIndex, moveId),
+      revert: () => {},
+      done: () => {},
+      fallback: () => {},
+    };
+
+    await game.scene.ui.setMode(UiMode.LEARN_MOVE_BATCH, deps);
+    expect(game.scene.ui.getMode()).toBe(UiMode.LEARN_MOVE_BATCH);
+
+    // The panel's initial evolution selection defaults to the mon's CURRENT form, so
+    // the strip's offers/columns operate on the eeveelution it is wearing, not base.
+    const handler = game.scene.ui.getHandler() as unknown as { omniformSel: number };
+    expect(handler.omniformSel).toBe(currentIdx);
   });
 
   it("the REAL LearnMoveBatchPhase opens the Omniform panel and learns per evolution", async () => {

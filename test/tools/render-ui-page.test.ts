@@ -29,6 +29,7 @@ import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
 import { ER_PARTNER_EEVEE_ABILITY_ID } from "#data/elite-redux/abilities/composite-newcomers";
+import { erOmniformOnMoveStart } from "#data/elite-redux/abilities/omniform";
 import { startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { bargainAbilityDescription } from "#data/elite-redux/er-bargain-sins";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
@@ -2220,6 +2221,22 @@ const RECIPES: Record<string, Recipe> = {
     mode: UiMode.LEARN_MOVE_BATCH,
     prepare: async game => [await partnerEeveeBatchDeps(game)],
     steps: [Button.CYCLE_FORM, Button.ACTION],
+    diffTolerance: 0,
+  },
+  // ER Omniform: the batch panel opened while the mon is TRANSFORMED. The evolution
+  // strip now DEFAULTS to the CURRENT (transformed) form instead of base, so the gold
+  // underline + the CURRENT column open on Partner Vaporeon's own stored moveset with
+  // NO cycle press (the current-form-default refinement). The untransformed recipe
+  // above still defaults to base. Static -> exact diff.
+  "learn-move-batch-omniform-transformed": {
+    mode: UiMode.LEARN_MOVE_BATCH,
+    prepare: async game => {
+      const deps = await partnerEeveeBatchDeps(game);
+      // Adapt Partner Eevee -> Partner Vaporeon (Water) so the panel opens on the
+      // eeveelution the mon is currently wearing (the 2nd family form).
+      erOmniformOnMoveStart(deps.pokemon, allMoves[MoveId.WATER_GUN]);
+      return [deps];
+    },
     diffTolerance: 0,
   },
   // NOTE: TITLE (UiMode.TITLE) is intentionally NOT a recipe - it is animation-tier. Its
