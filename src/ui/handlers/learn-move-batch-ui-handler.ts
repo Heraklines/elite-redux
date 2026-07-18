@@ -17,7 +17,11 @@ import { UiMode } from "#enums/ui-mode";
 import type { LearnMoveBatchDeps } from "#phases/learn-move-batch-phase";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { OmniformEvolutionStrip, omniformStripWidth } from "#ui/omniform-evolution-strip";
-import { type OmniformEvolutionEntry, omniformEntriesForTargets } from "#ui/omniform-evolution-view";
+import {
+  currentEvolutionIndex,
+  type OmniformEvolutionEntry,
+  omniformEntriesForTargets,
+} from "#ui/omniform-evolution-view";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -244,8 +248,11 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     this.omniformActive = true;
     this.omniformTargets = targets;
     this.omniformEntries = omniformEntriesForTargets(deps.pokemon, targets);
-    // A level-up happens on the base form, so default the selection to base (index 0).
-    this.omniformSel = 0;
+    // Default the selection to the form the mon is CURRENTLY in: a transformed
+    // eeveelution selects that evolution, an untransformed mon selects the base
+    // (index 0, since the family list is base-first). Mirrors the summary strip's
+    // current-form default (currentEvolutionIndex).
+    this.omniformSel = currentEvolutionIndex(this.omniformEntries);
     // Deep-snapshot each NON-base evolution's stored moveset so Undo can restore it
     // (the base form's moveset is restored by deps.revert). getOrRollFormMoveset
     // returns the live stored array, so copy each [moveId, ppUsed] pair.
