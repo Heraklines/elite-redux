@@ -158,7 +158,7 @@ describe.skipIf(!RUN)("ER Omniform (5929)", () => {
     expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
   });
 
-  it("a Normal DAMAGING move reverts a transformed holder to the base form (moveset restored)", async () => {
+  it("a Normal DAMAGING move reverts a transformed holder to the base form WITH the revert sequence", async () => {
     await game.classicMode.startBattle(SpeciesId.EEVEE);
     const holder = game.field.getPlayerPokemon();
     const baseMoveIds = holder.getMoveset().map(m => m?.moveId);
@@ -171,10 +171,15 @@ describe.skipIf(!RUN)("ER Omniform (5929)", () => {
     // just like a Normal status move does - Normal maps to base for both categories.
     expect(allMoves[MoveId.QUICK_ATTACK].type).toBe(PokemonType.NORMAL);
     expect(allMoves[MoveId.QUICK_ATTACK].category).not.toBe(MoveCategory.STATUS);
+    const queueMessage = vi.spyOn(game.scene.phaseManager, "queueMessage");
     erOmniformOnMoveStart(holder, allMoves[MoveId.QUICK_ATTACK]);
     expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
     // The live moveset is the base form's own moveset again.
     expect(holder.getMoveset().map(m => m?.moveId)).toEqual(baseMoveIds);
+    // The revert ran the full transform sequence - the "reverted to" message is queued
+    // (VFX morph/burst hook fires under it), so this is the same presentation as the
+    // status-move revert, not a silent species swap.
+    expect(queueMessage.mock.calls.some(call => String(call[0]).includes("reverted to"))).toBe(true);
   });
 
   it("a Normal DAMAGING move while ALREADY on base is a TOTAL no-op (the revert seam)", async () => {
