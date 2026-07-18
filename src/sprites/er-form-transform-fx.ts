@@ -603,6 +603,14 @@ export interface ErMorphTickPlan {
   revealStart: number;
   /** True once the sequence has fully settled (tear the visual down). */
   done: boolean;
+  /**
+   * True when the true source->target shape morph is (or was) engaged for this run.
+   * During the REVEAL the overlay is only drawn when morphing (it is the TARGET
+   * shape then, matching the revealed sprite); on the degrade path it is `false`
+   * and the overlay is suppressed so the OLD-form silhouette is never drawn over
+   * the visible new sprite (the reported eevee/eeveelution overlap).
+   */
+  morphing: boolean;
 }
 
 /**
@@ -639,6 +647,7 @@ export function planErMorphTick(input: ErMorphTickInput): ErMorphTickPlan {
       fireBurst: false,
       revealStart: -1,
       done: false,
+      morphing: false,
     };
   }
 
@@ -661,6 +670,7 @@ export function planErMorphTick(input: ErMorphTickInput): ErMorphTickPlan {
           fireBurst: false,
           revealStart: -1,
           done: false,
+          morphing: true,
         };
       }
       // Morph complete -> fall through to reveal.
@@ -676,12 +686,19 @@ export function planErMorphTick(input: ErMorphTickInput): ErMorphTickPlan {
         fireBurst: false,
         revealStart: -1,
         done: false,
+        morphing: false,
       };
     }
     // swapDone but no usable mask -> degrade: drain-reveal with no shape morph.
   }
 
-  // REVEAL (+ burst): drain the glow onto the already-swapped target sprite.
+  // REVEAL (+ burst): fade the swapped target sprite in and fire the burst once.
+  // MORPH path: the overlay is the TARGET shape (morphP 1), so draining it OVER the
+  // target sprite reads as one form (no old-form overlap). DEGRADE path: there is
+  // no target mask, so drawing the overlay would paint the OLD (source) silhouette
+  // on top of the visible new sprite - the reported eevee/eeveelution overlap. So
+  // on the degrade path the overlay is suppressed (overallAlpha 0) and the per-type
+  // burst carries the reveal; only the real sprite fades in.
   const startingReveal = input.revealStart < 0;
   const revealStart = startingReveal ? el : input.revealStart;
   const drainEl = el - revealStart;
@@ -691,10 +708,11 @@ export function planErMorphTick(input: ErMorphTickInput): ErMorphTickPlan {
     stage: "reveal",
     spriteAlpha: done ? 1 : Math.min(1, drainEl / DRAIN),
     morphP: canMorph ? 1 : 0,
-    overallAlpha: done ? 0 : drain,
+    overallAlpha: done || !canMorph ? 0 : drain,
     fireBurst: startingReveal,
     revealStart,
     done,
+    morphing: canMorph,
   };
 }
 
@@ -772,8 +790,11 @@ class ErFormTransformMorph implements ErTransformSequence {
   private readonly startNow: number;
   private loop: Phaser.Time.TimerEvent | null = null;
   private safety: Phaser.Time.TimerEvent | null = null;
+  private swapKickTimer: Phaser.Time.TimerEvent | null = null;
 
   private ready = false;
+  /** The `onSwap` (loadAssets) has been kicked off (deferred to the end of FILL). */
+  private swapKicked = false;
   /** The `onSwap` (loadAssets) has resolved: the real sprite now shows the target form. */
   private swapDone = false;
   private readyAtMs = 0;
@@ -818,22 +839,14 @@ class ErFormTransformMorph implements ErTransformSequence {
       this.settleResolve = resolve;
     });
 
-    // Kick the target form's asset load IMMEDIATELY (fill start), so the atlas
-    // download and the source fade overlap instead of running back-to-back. It
-    // resolves UNDER the glow; its result only gates the reveal - the phase flow
-    // never awaits it. On success we mark the swap landed and capture the target
-    // mask; on failure we still mark it landed so the sequence degrades (drains)
-    // rather than holding the glow to the absolute backstop.
-    Promise.resolve()
-      .then(() => this.onSwap())
-      .then(() => {
-        this.swapDone = true;
-        this.captureTarget();
-      })
-      .catch((err: unknown) => {
-        console.error("ER transform morph onSwap failed", err);
-        this.swapDone = true;
-      });
+    // Defer the VISIBLE swap until the source has fully faded out (end of FILL), so
+    // the real sprite only ever changes to the target form UNDER the solid glow
+    // (alpha 0). If it swapped during FILL - which the summon-time PRELOAD makes
+    // near-instant, since the target atlas is already cached - the incoming form
+    // would flash into view mid-fade, briefly overlapping the outgoing one (the
+    // reported eevee/eeveelution overlap). A tick-driven kick handles the normal
+    // path; this timer is the backstop in case the loop is starved.
+    this.swapKickTimer = globalScene.time.delayedCall(ER_TRANSFORM_MORPH_FILL_MS, () => this.kickSwap());
 
     this.loop = globalScene.time.addEvent({
       delay: ER_TRANSFORM_MORPH_TICK_MS,
@@ -945,6 +958,35 @@ class ErFormTransformMorph implements ErTransformSequence {
   }
 
   /**
+   * Kick the deferred `onSwap` (the real sprite/info swap) exactly once, at the end
+   * of FILL. With the summon-time preload the target atlas is already cached, so
+   * `onSwap` resolves near-instantly and the mask builds with no stretch - the FULL
+   * morph plays. The moment it resolves we hide the just-swapped sprite (alpha 0) so
+   * it stays UNDER the glow until the reveal (never a mid-sequence overlap), mark the
+   * swap landed and capture the target mask; on failure we still mark it landed so
+   * the sequence degrades (drains) rather than holding the glow to the backstop.
+   */
+  private kickSwap(): void {
+    if (this.swapKicked || this.destroyed) {
+      return;
+    }
+    this.swapKicked = true;
+    Promise.resolve()
+      .then(() => this.onSwap())
+      .then(() => {
+        // Hide the freshly-swapped target sprite so it never shows THROUGH the glow
+        // before the reveal - the tick also re-asserts alpha 0, this closes the gap.
+        this.setSpriteAlpha(0);
+        this.swapDone = true;
+        this.captureTarget();
+      })
+      .catch((err: unknown) => {
+        console.error("ER transform morph onSwap failed", err);
+        this.swapDone = true;
+      });
+  }
+
+  /**
    * Build the TARGET silhouette mask as soon as its texture is available (right
    * after the swap lands). Sets {@linkcode ready} + {@linkcode readyAtMs} on
    * success so the tick planner can run the true source->target morph. On any
@@ -990,6 +1032,11 @@ class ErFormTransformMorph implements ErTransformSequence {
   private tick(): void {
     if (this.destroyed) {
       return;
+    }
+    // Kick the deferred swap once the source has faded out (end of FILL). Driven from
+    // the tick so it fires promptly even if the backstop timer is delayed; idempotent.
+    if (this.elapsed() >= ER_TRANSFORM_MORPH_FILL_MS) {
+      this.kickSwap();
     }
     const plan = planErMorphTick({
       elapsed: this.elapsed(),
@@ -1101,6 +1148,10 @@ class ErFormTransformMorph implements ErTransformSequence {
     if (this.safety) {
       this.safety.remove(false);
       this.safety = null;
+    }
+    if (this.swapKickTimer) {
+      this.swapKickTimer.remove(false);
+      this.swapKickTimer = null;
     }
     try {
       this.image.destroy();

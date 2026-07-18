@@ -159,7 +159,7 @@ describe("ER transform morph - deferred-swap timing (real morph instance + real 
     swapAtMs: number;
     maskBuilds: boolean;
     end: number;
-  }): Promise<{ revealAt: number | null; settled: boolean; revealedBeforeSwap: boolean }> {
+  }): Promise<{ revealAt: number | null; settled: boolean; revealedBeforeSwap: boolean; swappedDuringFill: boolean }> {
     const id = ++runId;
     const srcKey = `src-${id}`;
     const tgtKey = `tgt-${id}`;
@@ -175,6 +175,9 @@ describe("ER transform morph - deferred-swap timing (real morph instance + real 
       );
     }
 
+    // The visible texture swap happens INSIDE onSwap (as the real `loadAssets` does),
+    // so the FX controls WHEN it lands: the instance defers the onSwap kick to the end
+    // of FILL, so the swap can never show during the source fade.
     const sprite = { x: 0, y: 0, texture: { key: srcKey }, frame: { name: "0" }, setAlpha: () => {} };
     const pokemon = {
       id,
@@ -189,7 +192,8 @@ describe("ER transform morph - deferred-swap timing (real morph instance + real 
 
     const seq = playErTransformMorph(pokemon, PokemonType.GRASS, {
       onSwap: async () => {
-        await swapGate;
+        await swapGate; // the target atlas "download" completes
+        sprite.texture.key = tgtKey; // loadAssets swaps the visible texture
       },
     });
     expect(seq.mode).toBe("morph");
@@ -199,22 +203,25 @@ describe("ER transform morph - deferred-swap timing (real morph instance + real 
 
     let revealAt: number | null = null;
     let revealedBeforeSwap = false;
-    let swapLanded = false;
+    let swappedDuringFill = false;
+    let released = false;
 
     for (let el = 0; el <= opts.end; el += 16) {
-      if (!swapLanded && el >= opts.swapAtMs) {
-        swapLanded = true;
-        // The atlas "download" finished: the real sprite now shows the target key.
-        sprite.texture.key = tgtKey;
-        rig.now.value = el;
+      if (!released && el >= opts.swapAtMs) {
+        released = true;
         releaseSwap();
-        await flush(); // swap -> captureTarget builds the target mask (or fails)
       }
       const before = rig.ellipseCount();
-      rig.tickTo(el);
+      rig.tickTo(el); // sets the clock + fires the tick (which kicks onSwap at FILL)
+      await flush(); // settle the onSwap -> captureTarget microtasks
+      // The visible swap must NEVER land during the source fade (overlap fix).
+      if (el < FILL && sprite.texture.key !== srcKey) {
+        swappedDuringFill = true;
+      }
       if (revealAt === null && rig.ellipseCount() > before) {
         revealAt = el;
-        if (!swapLanded) {
+        // Reveal must never fire before the target sprite is actually in place.
+        if (sprite.texture.key === srcKey) {
           revealedBeforeSwap = true;
         }
       }
@@ -223,12 +230,44 @@ describe("ER transform morph - deferred-swap timing (real morph instance + real 
       }
     }
     await flush();
-    return { revealAt, settled, revealedBeforeSwap };
+    return { revealAt, settled, revealedBeforeSwap, swappedDuringFill };
   }
 
+  it("never swaps the visible sprite during the source fade (deferred swap - the overlap fix)", async () => {
+    // Even a fully pre-warmed cache (swap ready at t=0) must not swap the sprite until
+    // the source has faded out, or the incoming form flashes over the outgoing one.
+    for (const opts of [
+      { swapAtMs: 0, maskBuilds: true, end: 3000 },
+      { swapAtMs: 1200, maskBuilds: true, end: 4500 },
+      { swapAtMs: 2400, maskBuilds: false, end: 5500 },
+    ]) {
+      const res = await run(opts);
+      expect(res.swappedDuringFill).toBe(false);
+      expect(res.settled).toBe(true);
+    }
+  });
+
+  it("PRE-WARMED cache -> the full morph plays with ZERO stretch (reveal at ~FILL + MORPH)", async () => {
+    // The atlas is already cached (preloaded at summon), so onSwap resolves the moment
+    // it is kicked at end-of-FILL: the mask builds instantly, the morph runs from FILL
+    // with no hold/stretch, and the reveal lands right at FILL + MORPH.
+    const { revealAt, settled, revealedBeforeSwap, swappedDuringFill } = await run({
+      swapAtMs: 0,
+      maskBuilds: true,
+      end: 3000,
+    });
+    expect(settled).toBe(true);
+    expect(revealedBeforeSwap).toBe(false);
+    expect(swappedDuringFill).toBe(false);
+    expect(revealAt).not.toBeNull();
+    // No stretch: the reveal is at ~FILL + MORPH, far below the stretched worst case.
+    expect(revealAt!).toBeGreaterThanOrEqual(FILL + MORPH - 32);
+    expect(revealAt!).toBeLessThanOrEqual(FILL + MORPH + 80);
+  });
+
   it("runs the real source->target MORPH when the atlas lands late but within the stretch (reveal waits for the morph)", async () => {
-    // Swap + mask land at 1200ms (< FILL + HOLD = 1980): the morph runs, so the
-    // reveal (burst) cannot start until the morph has played (~ready + MORPH).
+    // Cold miss: swap + mask land at 1200ms (< FILL + HOLD = 1980): the morph runs, so
+    // the reveal (burst) cannot start until the morph has played (~ready + MORPH).
     const { revealAt, settled, revealedBeforeSwap } = await run({ swapAtMs: 1200, maskBuilds: true, end: 4500 });
     expect(settled).toBe(true);
     expect(revealedBeforeSwap).toBe(false);
