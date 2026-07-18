@@ -40,6 +40,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import {
   deleteOmniformOriginal,
+  erOmniformConnectedForms,
   getOmniformOriginal,
   lookupOmniformTarget,
   type OmniformTarget,
@@ -52,6 +53,7 @@ import {
   loadOmniformBattleMoveset,
   snapshotOmniformBattleMoveset,
 } from "#data/elite-redux/omniform-movesets";
+import { Gender } from "#data/gender";
 import type { PokemonSpeciesForm } from "#data/pokemon-species";
 import type { AbilityId } from "#enums/ability-id";
 import { MoveCategory } from "#enums/move-category";
@@ -71,13 +73,71 @@ export const ER_OMNIFORM_ABILITY_ID = 5929;
 /** Number of moves auto-derived from the target form's learnset (DEFAULT). */
 export const OMNIFORM_DERIVED_MOVE_COUNT = 3;
 
-/** Pure marker: Omniform is driven by the pre-move seam below. */
+/**
+ * Omniform is driven by the pre-move seam below; its PostSummon apply does the ONE
+ * summon-time job: warm every form this holder could transform into, so the target
+ * atlas is already cached by the time a move is selected (see
+ * {@linkcode erOmniformPreloadTargets}).
+ */
 export class OmniformAbAttr extends PostSummonAbAttr {
   constructor() {
     super(false);
   }
 
-  override apply(_params: AbAttrBaseParams): void {}
+  override apply(params: AbAttrBaseParams): void {
+    if (params.simulated) {
+      return;
+    }
+    erOmniformPreloadTargets(params.pokemon);
+  }
+}
+
+/**
+ * Preload, in the background at summon time, the battle sprite atlas of EVERY form
+ * this Omniform holder could transform into this battle. On staging the transform
+ * target's atlas downloads from the CDN DURING the transform sequence, so the target
+ * silhouette mask was never ready in time and the morph degraded (glow, no shape
+ * change) - and the sprite popped in visibly late. Warming all reachable target
+ * atlases up front (the whole Omniform family - for the partner eeveelutions that is
+ * the base plus the 8 evolutions) means that by the time any move is selected the
+ * target texture is already cached: the mask builds instantly and the FULL
+ * source->target morph plays with no stretch.
+ *
+ * Fire-and-forget: it never blocks the summon (nothing is awaited), and each target's
+ * load is independently guarded so one failure can't stop the rest. The mid-battle
+ * moveset can change through transform chains, so it warms the ENTIRE connected family
+ * (not just the current form's direct targets / the current moveset's types). The
+ * stretch/hold + degrade machinery in the FX stays as the fallback for a genuine
+ * cache miss.
+ */
+export function erOmniformPreloadTargets(holder: Pokemon): void {
+  try {
+    if (!hasOmniform(holder)) {
+      return;
+    }
+    const sf = holder.getSpeciesForm();
+    const family = erOmniformConnectedForms(sf.speciesId, sf.formIndex);
+    const female = holder.getGender() === Gender.FEMALE;
+    const shiny = holder.isShiny();
+    const variant = holder.getVariant();
+    for (const target of family) {
+      // Skip the current form: it is already loaded (the holder is wearing it).
+      if (target.speciesId === sf.speciesId && target.formIndex === sf.formIndex) {
+        continue;
+      }
+      try {
+        // startLoad=true kicks the shared loader in the background; spriteOnly=true
+        // skips the cry audio (the morph only needs the sprite atlas + its pixels).
+        void Promise.resolve(
+          resolveSpeciesForm(target).loadAssets(female, target.formIndex, shiny, variant, true, false, true),
+        ).catch((err: unknown) => console.error("ER Omniform target preload failed", target.speciesId, err));
+      } catch (err: unknown) {
+        console.error("ER Omniform target preload threw", target.speciesId, err);
+      }
+    }
+  } catch (err: unknown) {
+    console.error("ER Omniform preload failed", err);
+  }
 }
 
 /**
