@@ -222,12 +222,26 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
   }
 
   /** Register a one-shot driver for the HOST's OWN vanilla faint picker (its own team's replacement). */
-  function driveHostOwnFaintPicker(): void {
+  function driveHostOwnFaintPicker(rig: ShowdownDuoRig): void {
     game.onNextPrompt("SwitchPhase", UiMode.PARTY, () => {
-      const handler = game.scene.ui.getHandler() as PartyUiHandler;
-      handler.setCursor(1); // the host's bench (SNORLAX)
-      handler.processInput(Button.ACTION); // select it
-      handler.processInput(Button.ACTION); // send it out
+      // The PromptHandler fires this on a process-global setInterval, OUTSIDE any client window, so the
+      // send-out's globalScene reads AND its async close (`setMode(MESSAGE).then(() => super.end())`, whose
+      // super.end() shifts the PROCESS-GLOBAL globalScene.phaseManager) must run under the host scene, or
+      // the host SwitchPhase orphans onto the guest queue and stalls at SwitchPhase/PARTY. Hold the host ctx
+      // open across the close's microtask hops - the same fix as the co-op host faint picker
+      // (coop-soak-driver's driveHostFaintPickUnderHostCtx) and the harness interceptor microtask-hold.
+      void withClient(rig.hostCtx, async () => {
+        const handler = game.scene.ui.getHandler() as PartyUiHandler;
+        handler.setCursor(1); // the host's bench (SNORLAX)
+        handler.processInput(Button.ACTION); // select it
+        handler.processInput(Button.ACTION); // send it out
+        for (let i = 0; i < 6; i++) {
+          await Promise.resolve();
+        }
+      }).catch(error => {
+        // Never swallow: a failed host pick must fail the crossing loudly, not hang it silently.
+        throw error instanceof Error ? error : new Error(`showdown host own-faint pick failed: ${String(error)}`);
+      });
     });
   }
 
@@ -474,7 +488,7 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
 
     // HOST crosses: BOTH replacement flows run in the SAME crossing - the host's OWN vanilla picker (driven
     // here) AND the ShowdownEnemyFaintSwitchPhase awaiting the guest's buffered pick. Neither deadlocks.
-    driveHostOwnFaintPicker();
+    driveHostOwnFaintPicker(rig);
     let hostAdvance: Promise<void> | undefined;
     await withClient(rig.hostCtx, async () => {
       hostAdvance = game.phaseInterceptor.to("CommandPhase");

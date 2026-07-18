@@ -1011,6 +1011,58 @@ export function hostHalfExhausted(rig: DuoRig): boolean {
 }
 
 /**
+ * SwitchPhase instances this driver has already sent a pick for. The PromptHandler polls on a raw
+ * setInterval, so between our send-out and the owner-replacement's ASYNC close (setModeBoundedWhen(MESSAGE)
+ * -> runWhenCoopRuntimeActive -> finishOwnerReplacement summons + advances) the fainted slot is still
+ * unfilled: hostOwnedFaintPending stays true and the host UI still reads UiMode.PARTY/SwitchPhase. A
+ * re-armed prompt firing a SECOND processInput on that SAME phase opens a fresh UI transition that bumps
+ * modeTransitionGeneration and SUPERSEDES the pending MESSAGE close, tripping
+ * failCoopSharedSession("The owner replacement lost its exact phase boundary while closing.") -> host to
+ * TitlePhase. Drive each SwitchPhase instance EXACTLY ONCE; the re-arm still drains the NEXT host-owned
+ * SwitchPhase (the #847 double-faint's second replacement, a distinct instance).
+ */
+const hostAutoPickDrivenPhases = new WeakSet<object>();
+
+/**
+ * Send out the first legal HOST bench mon through the real PartyUiHandler, holding the HOST client context
+ * open across the owner-replacement's ASYNC close so the whole flow resolves under the host scene/runtime.
+ *
+ * 🔴 CROSS-CTX PICKER (the host-picker-family red). Two coupled hazards, both from this callback firing on
+ * the PromptHandler's process-global setInterval - OUTSIDE any held client window:
+ *   1. `PartyUiHandler.processInput` reads `globalScene.getPlayerParty()[cursor]` and drives the entire
+ *      send-out off the process-global `globalScene`; firing under settleDuoPromise's GUEST pump read an
+ *      undefined party slot and stormed uncaught errors. The pick MUST run under the host scene.
+ *   2. The send-out schedules the owner-replacement close `setModeBoundedWhen(UiMode.MESSAGE, ...)`, whose
+ *      internal `isCurrent`/`ownerBoundaryStillLive` guard resolves on a `fadeOut().then` MICROTASK. A
+ *      synchronous `withClientSync` restores the previous ctx BEFORE that microtask runs, so
+ *      `getCoopRuntime() === ownerRuntime` fails there -> the close reports "superseded" ->
+ *      `failCoopSharedSession("owner replacement lost its exact phase boundary while closing")` -> host to
+ *      TitlePhase. Holding an ASYNC `withClient(hostCtx)` window open across a few microtask hops keeps the
+ *      host runtime installed while that close's first continuation runs (the delayedCall tail is already
+ *      ctx-pinned by installDuoCtxOwnershipPins' pinClock). This mirrors how the GUEST picker resolves its
+ *      own close - inside a held-open `withClient(guestCtx)` driver.
+ *
+ * The hold uses microtask (`Promise.resolve()`) hops only, so no macrotask-suspended sibling window resumes
+ * mid-hold: `processInput` itself runs SYNCHRONOUSLY (before the first await), so the pick + its UI mode
+ * change land before this callback returns; only the close's continuation is deferred.
+ */
+function driveHostFaintPickUnderHostCtx(rig: DuoRig, benchSlot: number): void {
+  void withClient(rig.hostCtx, async () => {
+    const handler = rig.hostScene.ui.getHandler() as PartyUiHandler;
+    handler.setCursor(benchSlot);
+    handler.processInput(Button.ACTION); // select the bench mon
+    handler.processInput(Button.ACTION); // send it out
+    // Keep the host ctx resident while the owner-close's fadeOut().then microtask chain drains.
+    for (let i = 0; i < 6; i++) {
+      await Promise.resolve();
+    }
+  }).catch(error => {
+    // Never swallow: a failed host pick must fail the crossing loudly, not hang it silently.
+    throw error instanceof Error ? error : new Error(`host faint auto-pick failed: ${String(error)}`);
+  });
+}
+
+/**
  * Register a one-shot HOST faint auto-picker for the imminent turn: when a HOST-owned mon faints and the
  * host's real SwitchPhase opens the PARTY picker, send out the first legal host-owned bench mon. (A
  * GUEST-owned faint does NOT open a host PARTY picker - the host's SwitchPhase awaits the guest's relayed
@@ -1042,11 +1094,14 @@ export function registerHostFaintAutoPick(game: GameManager, rig: DuoRig): void 
         || (faintedOccupant == null
           && (typeof fieldIndex !== "number" || coopOwnerForPartySlot(fieldIndex) === "host"));
       const benchSlot = firstLegalBenchSlot(rig.hostScene, "host");
-      if (drivesHostSlot && benchSlot >= 0) {
-        const handler = rig.hostScene.ui.getHandler() as PartyUiHandler;
-        handler.setCursor(benchSlot);
-        handler.processInput(Button.ACTION); // select the bench mon
-        handler.processInput(Button.ACTION); // send it out
+      // Drive this exact SwitchPhase instance only once (see hostAutoPickDrivenPhases): a second send-out on
+      // the same phase during its async owner-close supersedes that close and fatals the shared session.
+      const alreadyDriven = phase != null && hostAutoPickDrivenPhases.has(phase);
+      if (!alreadyDriven && drivesHostSlot && benchSlot >= 0) {
+        if (phase != null) {
+          hostAutoPickDrivenPhases.add(phase);
+        }
+        driveHostFaintPickUnderHostCtx(rig, benchSlot);
       }
       // 🔴 #847 DOUBLE / INTERLEAVED FAINT: one turn can KO BOTH field slots, opening TWO replacement
       // SwitchPhases in a single crossing - the GUEST-owned one (watcher/relay) and this HOST-owned one -
