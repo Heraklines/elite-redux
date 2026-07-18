@@ -1954,10 +1954,31 @@ function installDuoCtxOwnershipPins(rig: DuoRig, hostGame: GameManager): void {
 
   const interceptor = hostGame.phaseInterceptor as unknown as { run: (phase: Phase) => Promise<void> };
   const originalRun = interceptor.run.bind(hostGame.phaseInterceptor);
-  interceptor.run = (phase: Phase): Promise<void> =>
-    activeClientLabel === rig.hostCtx.label
-      ? originalRun(phase)
-      : withClientSync(rig.hostCtx, () => originalRun(phase));
+  interceptor.run = (phase: Phase): Promise<void> => {
+    if (activeClientLabel === rig.hostCtx.label) {
+      return originalRun(phase);
+    }
+    // A phase started from a FOREIGN-ctx interceptor tick must run its synchronous `phase.start()` head
+    // under the host ctx - AND drain the promise-MICROTASK continuations that head schedules under the
+    // host ctx too. The test framework mocks `tweens.add` to fire `onComplete` synchronously
+    // (game-wrapper.ts), so a phase like ShowAbilityPhase / HideAbilityPhase resolves its
+    // `abilityBar.showAbility()` promise inside `start()`, and its `.then(() => this.end())` runs on the
+    // NEXT microtask. `Phase.end()` shifts the PROCESS-GLOBAL `globalScene.phaseManager` (phase.ts): if
+    // that microtask drains after a synchronous `withClientSync` restore, it shifts the GUEST queue and
+    // orphans the host phase - the interceptor state never leaves "running", so `to(...)` soft-locks at
+    // ShowAbilityPhase/HideAbilityPhase (the showdown-versus-faint + double-faint summon-path stalls).
+    // Hold the host ctx across a few microtask hops so `end()` lands on the HOST phase manager; the awaited
+    // POLL tail is a passive state poll and returns under ambient ctx, so macrotask guest pumps still
+    // interleave there (a genuinely guest-dependent phase completes via the clock/loopback pins, not here -
+    // no deadlock, since only MICROTASKS are held and the guest pump is a macrotask).
+    let poll: Promise<void> | undefined;
+    return withClient(rig.hostCtx, async () => {
+      poll = originalRun(phase);
+      for (let i = 0; i < 4; i++) {
+        await Promise.resolve();
+      }
+    }).then(() => poll ?? Promise.resolve());
+  };
   disposers.push(() => {
     interceptor.run = originalRun;
   });
