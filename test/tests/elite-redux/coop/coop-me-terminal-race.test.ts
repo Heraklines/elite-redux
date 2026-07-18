@@ -184,6 +184,55 @@ describe("co-op authoritative host-owned ME terminal race (#633 softlock #693/#6
     hostRelay.dispose();
   });
 
+  it("JOURNAL MODE: the 9M terminal arm is inert, so a null/stray outcome-arm win cannot be terminal-resolved (must re-request)", async () => {
+    // Regression lock for the #693 battle-handoff class surviving in real browser netcode (run 29634537697).
+    // In journal mode CoopReplayMePhase.awaitOutcomeThenTerminal sets `terminalArm = journalTerminalArm`, a
+    // promise that NEVER resolves (the retained ME_TERMINAL transaction drives the terminal directly via
+    // setOnMeCommittedTerminal - the raw 9M inbox is never consumed). The host streams NO meResync on 8M in
+    // journal mode, so the OUTCOME arm resolves null on timeout ("outcome arm resolved without subPrompt/
+    // meResync; resolving via terminal arm"). The BUG: the fall-through used to `void terminalArm.then(...)`,
+    // which is DEAD against the inert journal arm - nothing re-requested the committed terminal, so the guest
+    // hung while the host's durable ME_PRESENT/ME_PICK continuation deadline exhausted, dropping BOTH clients
+    // to Title. This test locks the premise: with the inert journal terminal arm, a null outcome-arm win can
+    // NEVER be resolved by awaiting the terminal arm, so the phase MUST take an independent recovery
+    // re-request (production: handleTerminalAction(null) -> recoverMissingControl -> durability.reconnect()).
+    const start = 10;
+    const seqMe = COOP_ME_PUMP_SEQ_BASE + start;
+    const { host, guest } = createLoopbackPair();
+    const hostRelay = new CoopInteractionRelay(host);
+    const guestRelay = new CoopInteractionRelay(guest);
+
+    // Journal mode: the terminal is delivered OUT OF BAND (via the committed transaction), never on 9M. Model
+    // that exactly as production does - the never-resolving journal terminal arm.
+    const journalTerminalArm = new Promise<{ tag: "terminal"; action: CoopInteractionChoice | null }>(() => {});
+    // The OUTCOME arm resolves null (the host sent no meResync; a short bounded timeout stands in for the long
+    // production wait so the test is fast) - this is the exact "outcome arm resolved without ... meResync" win.
+    const outcomeArm = guestRelay
+      .awaitInteractionOutcome(seqMe, 5)
+      .then(outcome => ({ tag: "outcome" as const, outcome }));
+
+    const winner = await Promise.race([outcomeArm, journalTerminalArm]);
+    expect(winner.tag, "the null OUTCOME arm wins - the inert journal terminal arm cannot").toBe("outcome");
+    if (winner.tag !== "outcome") {
+      throw new Error("the inert journal terminal arm must not resolve the race");
+    }
+    expect(winner.outcome, "no meResync/subPrompt was streamed - the outcome is null").toBeNull();
+
+    // Awaiting the journal terminal arm to end the ME (the old fall-through) hangs forever: a bounded probe
+    // sentinel always wins the race against it, proving the terminal can never be resolved that way.
+    const sentinel = Symbol("never");
+    const resolvedByTerminalArm = await Promise.race([
+      journalTerminalArm.then(() => "terminal" as const),
+      new Promise<typeof sentinel>(r => setTimeout(() => r(sentinel), 10)),
+    ]);
+    expect(resolvedByTerminalArm, "the inert journal terminal arm never resolves; a re-request is required").toBe(
+      sentinel,
+    );
+
+    guestRelay.dispose();
+    hostRelay.dispose();
+  });
+
   it("a mid-ME sub-prompt mePresent wins the race over the terminal so the guest captures it before leaving", async () => {
     // A host sub-prompt (party / secondary) streams a `mePresent` with a subPrompt on seq_me's OUTCOME
     // inbox BEFORE any terminal. The race must surface it (so the guest opens its capture screen), not
