@@ -364,13 +364,18 @@ export class CoopReplayTurnPhase extends Phase {
             // commit) awaiting a turn the host, already advanced, never resolves, so the host's
             // WAVE_ADVANCE op continuation deadline expires -> "Durable operation recovery exhausted ...
             // continuation-timeout" terminal. Detect the won wave by the host's AUTHORITATIVE frame just
-            // applied above (getEnemyParty fully fainted - the exact signal coopMeHandoffBattleWon uses; a
-            // trainer with living reserves is NOT all-fainted, so a legitimate mid-wave replacement command
-            // is never suppressed) or an already-pending advance, and fall through to ack the replacement
-            // continuation instead of opening a command. coop-runtime's WIN unpark then dissolves the
-            // re-parked replay into the authoritative wave-advance tail.
+            // applied above (getEnemyParty NON-EMPTY and fully fainted - the exact signal
+            // coopMeHandoffBattleWon uses; a trainer with living reserves is NOT all-fainted, so a
+            // legitimate mid-wave replacement command is never suppressed) or an already-pending advance, and
+            // fall through to ack the replacement continuation instead of opening a command. coop-runtime's
+            // WIN unpark then dissolves the re-parked replay into the authoritative wave-advance tail. The
+            // `length > 0` guard is load-bearing: an EMPTY enemy party (a pre-materialization / carrier
+            // replay frame that has not yet installed the authoritative enemy party) makes `[].every()`
+            // vacuously true, which would wrongly suppress the legitimate replacement command.
+            const enemyParty = globalScene.getEnemyParty();
             const waveWon =
-              coopHasPendingWaveAdvance() || globalScene.getEnemyParty().every(mon => mon == null || mon.isFainted());
+              coopHasPendingWaveAdvance()
+              || (enemyParty.length > 0 && enemyParty.every(mon => mon == null || mon.isFainted()));
             if (!waveWon && globalScene.currentBattle.turnCommands[ownSlot] == null) {
               if (
                 !streamer.registerReplacementContinuation(envelope, {

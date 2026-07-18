@@ -108,6 +108,10 @@ describe("production replacement carrier transaction", () => {
       gameMode: { isCoop: true, isShowdown: false },
       currentBattle: { waveIndex: 4, turn: 2, turnCommands: [{}, null] },
       getPlayerField: () => [hostMon, guestMon],
+      // The replacement->command pivot inspects the applied authoritative enemy party to detect a WON wave
+      // (all enemies fainted) before opening a command. This mid-turn replacement lands on a LIVE wave, so
+      // the materialized enemy (state().enemyParty = [{ id: 202 }]) is still up -> not a won wave.
+      getEnemyParty: () => [{ isFainted: () => false }],
       phaseManager: {
         getCurrentPhase: () => phase,
         unshiftNew,
