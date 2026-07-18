@@ -432,6 +432,11 @@ jobs:
         env:
           COOP_GATE_MANIFEST: coop-gate-assignment.json
           NODE_OPTIONS: --max-old-space-size=8192
+          # Authority-v2 CUTOVER SURFACE 1 (turn/command): both duo peers advertise
+          # authority.v2turn, so negotiated sessions run v2 as the SOLE turn authority
+          # (legacy retention/RE-SEND/requestTurnCommit suppressed). Off-path safety was
+          # proven by runs 29624520778 / 29625681669 / 29626883595 + node fall-through tests.
+          COOP_AUTHORITY_V2_TURN: "on"
         shell: bash
         run: |
           set +e
