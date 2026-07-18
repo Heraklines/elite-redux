@@ -2885,6 +2885,34 @@ export class DuoPublicUiRig {
         continue;
       }
 
+      // STAGGERED SIMULTANEOUS DOUBLE FAINT (Track R, run 29640634363, depth lane): the two own-slot
+      // FAINT_SWITCH pickers are NOT concurrent - the authority resolves the PARTNER's relayed
+      // faint-switch (pick + continuationReady) FIRST, then opens its OWN SwitchPhase seconds later,
+      // AFTER driveReplacement's bounded concurrent-detection window (SIMULTANEOUS_FAINT_PARTNER_SETTLE_MS)
+      // has already closed. That leaves the authority parked in an undriven own-slot replacement picker
+      // (replacementCount stayed 1 while both leads had fainted), so it never reaches this round's
+      // CommandPhase and both owners hang. A late-opening owned actionable replacement picker is exactly
+      // what a real human at that seat would still clear here, so drive it - reusing the identical
+      // driveOwnedReplacementPicker guards (authority-close acceptance, submenu slot-list recovery,
+      // Backspace backout, battle-prompt-advancer suppression; bumps replacementCount). Gated on a genuine
+      // owned actionable party:replacement surface, so it never fires in a non-faint round.
+      let droveReplacement = false;
+      for (const client of clients) {
+        if (!pending.has(client.label)) {
+          continue;
+        }
+        if (findOwnedReadyReplacement(client, from[client.label] ?? 0) == null) {
+          continue;
+        }
+        await this.driveOwnedReplacementPicker(client, from);
+        outcomeCursors[client.label] = client.evidence.cursor();
+        droveReplacement = true;
+        break;
+      }
+      if (droveReplacement) {
+        continue;
+      }
+
       let droveCommand = false;
       for (const client of clients) {
         if (!pending.has(client.label)) {

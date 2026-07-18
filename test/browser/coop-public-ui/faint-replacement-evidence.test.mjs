@@ -48,6 +48,24 @@ test("faint replacement waits for the owned actionable party surface before pres
   );
 });
 
+test("the sequential command round drives a late-opening owned replacement picker (staggered double faint)", async () => {
+  const harness = await readFile(new URL("public-ui-harness.mjs", import.meta.url), "utf8");
+  // Track R run 29640634363 depth lane: a staggered simultaneous double faint parks the authority in
+  // its OWN own-slot SwitchPhase picker AFTER driveReplacement's bounded concurrent-detection window has
+  // closed, so it never reaches the round's CommandPhase and driveSequentialCommandRound timed out
+  // "waiting for sequential command owners". The command round must therefore clear a late-opening owned
+  // actionable replacement picker (like a real human at that seat) before it can converge both owners.
+  const round = harness.slice(
+    harness.indexOf("async driveSequentialCommandRound("),
+    harness.indexOf("async waitForPostTurnOutcome("),
+  );
+  assert.ok(round.length > 0, "driveSequentialCommandRound must precede waitForPostTurnOutcome");
+  assert.match(
+    round,
+    /if \(findOwnedReadyReplacement\(client, from\[client\.label\] \?\? 0\) == null\) \{[\s\S]*?await this\.driveOwnedReplacementPicker\(client, from\);[\s\S]*?if \(droveReplacement\) \{/u,
+  );
+});
+
 for (const phase of ["SwitchPhase", "CoopGuestFaintSwitchPhase"]) {
   test(`replacement consumer accepts the actionable ${phase} owner surface`, () => {
     const event = {
