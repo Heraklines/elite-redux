@@ -210,6 +210,14 @@ input:-internal-autofill-selected {
   display: none;
 }
 
+/* ER Black Shinies (#349): show the #apadGiftAbility "cycle gift ability" button
+   only on the Pokémon summary (CYCLE_SHINY cycles the black shiny's gift ability
+   on the Abilities page). Same hide-except-SUMMARY idiom as #apadOmniform above;
+   on a black-shiny Partner Eevee both buttons show and flex-wrap side by side. */
+#touchControls:not(.config-mode):not([data-ui-mode="SUMMARY"]) #apadGiftAbility {
+  display: none;
+}
+
 /* Show cycle buttons only on STARTER_SELECT and on touch configuration panel.
    SUMMARY is included for #apadOpenFilters so touch players get the [C] button
    that cycles the move-detail pages on the Pokémon summary's Moves page. */
