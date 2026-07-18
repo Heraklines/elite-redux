@@ -56,7 +56,6 @@ import {
 import { Gender } from "#data/gender";
 import type { PokemonSpeciesForm } from "#data/pokemon-species";
 import type { AbilityId } from "#enums/ability-id";
-import { MoveCategory } from "#enums/move-category";
 import { PokemonType } from "#enums/pokemon-type";
 import { UiMode } from "#enums/ui-mode";
 import type { Pokemon } from "#field/pokemon";
@@ -196,13 +195,14 @@ export function erOmniformRevertOnLeaveField(holder: Pokemon): void {
 }
 
 /**
- * MID-BATTLE revert to the BASE evolution form (the Normal-type status-move rule).
- * Unlike {@linkcode erOmniformRevertOnLeaveField} (which runs after `resetSummonData`
- * has already cleared summon data on switch-out), this runs while the holder stays on
- * the field: it restores the pre-transform species/form, swaps the live moveset back
- * to the base form's own moveset (PP preserved for the battle), keeps Omniform pinned,
- * and fires the same transform VFX. A no-op when the holder has not transformed
- * (already on base) — a Normal status move then simply keeps it on base.
+ * MID-BATTLE revert to the BASE evolution form (the Normal-type-move rule: any Normal
+ * move, damaging or status, maps back to base). Unlike
+ * {@linkcode erOmniformRevertOnLeaveField} (which runs after `resetSummonData` has
+ * already cleared summon data on switch-out), this runs while the holder stays on the
+ * field: it restores the pre-transform species/form, swaps the live moveset back to the
+ * base form's own moveset (PP preserved for the battle), keeps Omniform pinned, and
+ * fires the same transform VFX. A no-op when the holder has not transformed (already on
+ * base) — a Normal move then simply keeps it on base.
  */
 export function erOmniformRevertToBase(holder: Pokemon): void {
   const original = getOmniformOriginal(holder);
@@ -286,11 +286,14 @@ export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
   }
   const moveType = user.getMoveType(move);
 
-  // NORMAL-type STATUS move => revert to the BASE evolution form (dex rule). Keyed on
-  // the move's INHERENT (base) type so a genuinely Normal status move (Growl, Tail
-  // Whip, ...) always reverts, even on a holder whose ability would -ate it to another
-  // type. Same transform pathway (so the VFX hook fires); a no-op when already on base.
-  if (move.category === MoveCategory.STATUS && move.type === PokemonType.NORMAL) {
+  // ANY NORMAL-type move (damaging OR status) => revert to the BASE evolution form.
+  // Every element type maps to its evolution; Normal maps back to the base form, so a
+  // Normal attack no longer keeps a transformed eeveelution in its current form. Keyed
+  // on the move's INHERENT (base) type so a genuinely Normal move (Quick Attack, Growl,
+  // Tail Whip, ...) always reverts, even on a holder whose ability would -ate it to
+  // another type. Same transform pathway (so the VFX hook fires); a no-op when already
+  // on base (the revert is a no-op with no snapshot to restore).
+  if (move.type === PokemonType.NORMAL) {
     erOmniformRevertToBase(user);
     return;
   }

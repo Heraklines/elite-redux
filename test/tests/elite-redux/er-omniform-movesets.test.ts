@@ -216,6 +216,37 @@ describe.skipIf(!RUN)("ER Omniform per-evolution moveset model", () => {
     expect(holder.getMoveset().map(m => m.moveId)).toEqual(baseMoveIds);
   });
 
+  it("a NORMAL-type DAMAGING move reverts a transformed holder to base (moveset + per-form PP preserved)", async () => {
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const holder = game.field.getPlayerPokemon();
+    activateOmniform();
+    ensureOmniformFormMovesets(holder);
+
+    // Spend some PP on the BASE (Eevee) moveset before transforming, so we can prove
+    // the revert restores the base form's OWN moveset WITH its battle PP intact.
+    holder.moveset.forEach((m, i) => {
+      m.ppUsed = i + 1;
+    });
+    const baseMoveIds = holder.moveset.map(m => m.moveId);
+    const basePpUsed = holder.moveset.map(m => m.ppUsed);
+
+    // Adapt into Partner Vaporeon (snapshots the outgoing base form's live PP).
+    erOmniformOnMoveStart(holder, allMoves[MoveId.WATER_GUN]);
+    expect(holder.getSpeciesForm().speciesId).toBe(ER_PARTNER_VAPOREON_SPECIES_ID);
+
+    // A genuinely Normal-type DAMAGING move reverts to the base Eevee form (Normal maps
+    // to base for damaging moves too, not just status). Resolved from live move data.
+    const normalDamaging = allMoves.find(
+      m => m != null && m.id !== MoveId.NONE && m.type === PokemonType.NORMAL && m.category !== MoveCategory.STATUS,
+    );
+    expect(normalDamaging).toBeDefined();
+    erOmniformOnMoveStart(holder, normalDamaging!);
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+    // The live moveset is the base form's own moveset again, PP preserved for the battle.
+    expect(holder.getMoveset().map(m => m.moveId)).toEqual(baseMoveIds);
+    expect(holder.getMoveset().map(m => m.ppUsed)).toEqual(basePpUsed);
+  });
+
   it("real battle turn: a Water move drives the transform + moveset swap through MovePhase", async () => {
     // Force the [Fluffy + Omniform] composite ACTIVE so Omniform fires in a real turn.
     game.override.ability(ER_PARTNER_EEVEE_ABILITY_ID as unknown as AbilityId);
