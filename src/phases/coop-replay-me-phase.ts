@@ -15,9 +15,11 @@ import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handof
 import {
   adoptMeWatcherChoice,
   commitMeOwnerIntent,
+  coopMeGuestAppliedPickContinuationAddress,
   coopMeTerminalSanctionedTails,
   isCoopMeOperationEnabled,
   isCoopMeOperationJournalActive,
+  setOnCoopMeGuestOwnerPickApplied,
   settleCoopMeOwnerIntentRetries,
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
@@ -35,6 +37,7 @@ import {
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import { notifyCoopOperationContinuationSurface } from "#data/elite-redux/coop/coop-operation-journal";
 import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   coopSessionGeneration,
@@ -355,6 +358,12 @@ export class CoopReplayMePhase extends Phase {
         } catch {
           /* a narration render failure must never hang the guest's encounter */
         }
+        // Track R: post-pick narration IS the guest owner's public continuation surface for its committed
+        // ME_PICK (UiMode.MESSAGE maps to no continuation surface by design). Release the retained pick op
+        // here so its authority-continuation deadline can never exhaust -> Title. No-op until material apply
+        // / off the guest-owner path (see releaseAppliedPickContinuationSurface). Runs AFTER the render try
+        // so a render failure never blocks the release.
+        this.releaseAppliedPickContinuationSurface();
       }) ?? null;
 
     // #821 SHOP HANDOFF (live 'the reward shop doesn't load for the other player'): a
@@ -535,6 +544,13 @@ export class CoopReplayMePhase extends Phase {
   private pickSent = false;
   /** Distinct durable address for every repeated Delve/Safari selector on this pinned ME. */
   private pickStep = 0;
+  /**
+   * Track R (run 29640634363 mystery lane): the guest OWNER's committed ME_PICK operation continuation is
+   * released from the post-pick NARRATION surface exactly once. See {@linkcode releaseAppliedPickContinuationSurface}.
+   */
+  private pickContinuationReleased = false;
+  /** The ME wave the committed ME_PICK op was addressed at (captured at commit; the emit's op-derived address). */
+  private pickWave = -1;
 
   /**
    * Whether this replay client owns the pinned ME and may originate option input. This is intentionally
@@ -618,6 +634,7 @@ export class CoopReplayMePhase extends Phase {
       return;
     }
     const step = this.pickStep;
+    const pickWave = globalScene.currentBattle?.waveIndex ?? -1;
     const operationId = commitMeOwnerIntent({
       kind: "ME_PICK",
       seq: this.seq,
@@ -625,7 +642,7 @@ export class CoopReplayMePhase extends Phase {
       step,
       payload: { optionIndex: index },
       localRole: getCoopController()?.role ?? "guest",
-      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      wave: pickWave,
       turn: 0,
       resend: isCoopMeOperationJournalActive()
         ? () => relay.sendInteractionChoice(this.seq, ME_CHOICE_KIND, index, [step])
@@ -637,6 +654,11 @@ export class CoopReplayMePhase extends Phase {
     }
     this.pickStep = step + 1;
     this.pickSent = true;
+    // Track R: this pick's committed operation continuation must be released from the post-pick narration
+    // surface (see releaseAppliedPickContinuationSurface). Capture the op's EXACT wave and re-arm the
+    // once-only release for THIS pick (a repeated Delve/Safari round re-fires handleGuestOptionSelect).
+    this.pickWave = pickWave;
+    this.pickContinuationReleased = false;
     // #819 ('the selection screen doesn't disappear'): the pick is committed - dismiss the
     // option UI so narration renders in a clean message box, mirroring the engine side.
     void this.openModeBounded(UiMode.MESSAGE);
@@ -650,6 +672,63 @@ export class CoopReplayMePhase extends Phase {
     // allowed, and this re-armed race INHERITS the live 9M terminal arm (awaitOutcomeThenTerminal reads
     // this.liveTerminalArm) rather than re-awaiting the inbox - a fast host's buffered LEAVE is never lost.
     this.awaitOutcomeThenTerminal(relay);
+  }
+
+  /**
+   * Track R (run 29640634363 mystery lane): release the guest OWNER's retained ME_PICK operation
+   * continuation from the post-pick NARRATION surface.
+   *
+   * After a pick the guest transitions to `UiMode.MESSAGE` to render the host's post-pick narration, and
+   * `coopAuthorityContinuationSurface(MESSAGE)` is deliberately null (coop-ui-registry.ts:311 - generic
+   * chrome must NEVER retire a retained authority commit). So the committed ME_PICK op (whose continuation
+   * REARM surface is `sharedInput`) has NO public continuation surface: its authority-continuation deadline
+   * exhausts (`operation continuation EXHAUSTED key=...ME_PICK`, ~3min) -> shared session terminal -> both
+   * to Title. The prior terminal-arm recovery cannot substitute, because the ME terminal is itself gated
+   * BEHIND this unreleased pick.
+   *
+   * Mirroring the parked-renderer `rendererWait` precedent (command-phase.ts / coop-replay-turn-phase.ts:248),
+   * emit ONE phase-owned continuation surface for the applied pick at its EXACT operation continuation
+   * address - OP-DERIVED (epoch from the op-state the id was minted under, `turn` 0 the committed ME_PICK
+   * op's turn), NOT a mode-only inference and NOT an ambient-scene guess. Constraints, all enforced here:
+   *  - only in journal mode (the operation continuation machinery is inert otherwise);
+   *  - only after the guest has MATERIALLY APPLIED the committed op:
+   *    {@linkcode coopMeGuestAppliedPickContinuationAddress} returns null (so this no-ops) until
+   *    `hasApplied(pickOpId)`, the exact per-op material-apply gate;
+   *  - exactly once: the emit flips `pickContinuationReleased`, and every later caller no-ops.
+   * The address scopes the release to THIS ME's applied pick; it can never retire another op. Public so the
+   * material-apply hook ({@linkcode setOnCoopMeGuestOwnerPickApplied}, the guaranteed once-per-op driver) and
+   * the post-pick narration render (an idempotent secondary caller) both reach it. A no-op for every
+   * non-owner (no pick sent), non-journal, or pre-apply path. This does NOT widen
+   * `coopAuthorityContinuationSurface` (that registry stays MESSAGE->null by design).
+   */
+  public releaseAppliedPickContinuationSurface(): void {
+    if (this.pickContinuationReleased || !this.pickSent || !isCoopMeOperationJournalActive()) {
+      return;
+    }
+    // The committed top-level pick is at (pickStep - 1); handleGuestOptionSelect (and the harness relay seam)
+    // advanced pickStep past it. A repeated Delve/Safari round mints a distinct op at its own step, so this
+    // always addresses the latest committed pick.
+    const pickStep = this.pickStep - 1;
+    if (pickStep < 0) {
+      return;
+    }
+    // The op-derived wave: captured at commit (handleGuestOptionSelect); the stable ME wave is the exact
+    // fallback for the two-engine harness relay path, which mints the intent without that capture.
+    const wave = this.pickWave >= 0 ? this.pickWave : (globalScene.currentBattle?.waveIndex ?? -1);
+    const address = coopMeGuestAppliedPickContinuationAddress(this.seq, pickStep, this.interactionCounter, wave);
+    if (address == null) {
+      return; // not materially applied yet (or off the migrated path) - a harmless no-op; a later call retries
+    }
+    // hasApplied(id) is true, so the pick's pending continuation exists with (or is about to receive) its
+    // materialApplied ACK - notifyOperationContinuationSurface releases it now, or records it as `observed`
+    // for the receiver's own synchronous finalize. Either way the release is guaranteed, so retire the emit.
+    notifyCoopOperationContinuationSurface("sharedInput", address);
+    this.pickContinuationReleased = true;
+    coopLog("me", "released retained ME_PICK continuation from post-pick surface (Track R)", {
+      seq: this.seq,
+      wave,
+      step: pickStep,
+    });
   }
 
   /**
@@ -2217,4 +2296,15 @@ setOnMeSnapshotRebind(snapshot => {
     return;
   }
   activeCoopReplayMePhase.rebindFromActiveMysterySnapshot(snapshot);
+});
+
+// Track R (run 29640634363 mystery lane): the guaranteed once-per-op driver for the guest-owner ME_PICK
+// continuation release. Fired from applyJournaledMeEnvelope the instant the committed pick materially applies
+// on the guest, so a zero-narration option or a narration line that raced ahead of the apply can never leave
+// the retained pick's authority-continuation deadline to exhaust -> Title. Scoped to the live retained phase
+// on the exact pinned counter; releaseAppliedPickContinuationSurface self-gates the rest (once-only + apply).
+setOnCoopMeGuestOwnerPickApplied(pinned => {
+  if (activeCoopReplayMePhase != null && coopMeInteractionStartValue() === pinned) {
+    activeCoopReplayMePhase.releaseAppliedPickContinuationSurface();
+  }
 });

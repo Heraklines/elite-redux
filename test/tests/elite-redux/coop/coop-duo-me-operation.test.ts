@@ -49,7 +49,12 @@ import {
   createCoopRuntimeOpState,
   setActiveCoopRuntimeOpState,
 } from "#data/elite-redux/coop/coop-operation-runtime";
-import { clearCoopRuntime, getCoopInteractionRelay, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  coopHostStreamMeMessage,
+  getCoopInteractionRelay,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -500,6 +505,153 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     expect(rig.guestRuntime.controller.interactionCounter(), "guest counter lockstep after the ME").toBe(
       counterBefore + 1,
     );
+
+    logs.flush();
+  }, 300_000);
+
+  // =====================================================================================
+  // LEG 2b - TRACK R (run 29640634363 mystery lane): GUEST-OWNED NARRATION-BEARING ME. The guest owner
+  // picks; the HOST commits the ME_PICK and RETAINS it awaiting the guest's continuation surface. The
+  // guest then shows post-pick NARRATION in UiMode.MESSAGE, whose continuation surface is null by design
+  // (coop-ui-registry.ts:311) - so WITHOUT the fix the committed ME_PICK's authority-continuation deadline
+  // exhausts (`operation continuation EXHAUSTED key=...ME_PICK`, ~3min) -> shared session terminal -> both
+  // to Title, and the ME terminal (gated behind the unreleased pick) can never substitute. The fix
+  // (CoopReplayMePhase.releaseAppliedPickContinuationSurface, driven from the guest-owned ME_PICK
+  // material-apply hook in applyJournaledMeEnvelope) emits ONE phase-owned `sharedInput` continuation for
+  // the applied pick at its exact op-derived address. This LEG proves that release fires from the phase -
+  // BEFORE any reward-shop surface opens - so the pick continuation drains, the guest reaches the terminal
+  // without Title, and both engines converge in lockstep.
+  // =====================================================================================
+  it("LEG 2b (guest-owned, narration-bearing): the committed ME_PICK continuation releases from the post-pick surface, no Title (Track R)", async () => {
+    await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+    const hostScene = game.scene;
+
+    const pair = createLoopbackPair();
+    const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+
+    // Seed the interaction counter to 1 (ODD -> guest owns the ME).
+    await withClient(rig.hostCtx, () => rig.hostRuntime.controller.advanceInteraction());
+    await withClient(rig.guestCtx, () => rig.guestRuntime.controller.advanceInteraction());
+    await drainLoopback();
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    expect(counterBefore, "the ME opens on interaction counter 1 (guest owns odd)").toBe(1);
+
+    const guestDurability = rig.guestRuntime.durability;
+    if (guestDurability == null) {
+      throw new Error("guest-owned narration ME test lost its durability journal");
+    }
+    // The exact seam the fix relies on: the phase's post-pick sharedInput continuation emit routes through
+    // the ACTIVE durability (the guest's, under guestCtx). Capturing it proves the phase - not a later
+    // shop surface - retired the retained pick.
+    const releaseSpy = vi.spyOn(guestDurability, "notifyOperationContinuationSurface");
+
+    // STEP A (host): reach MysteryEncounterPhase; the host parks awaiting the guest's relayed index.
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("MysteryEncounterPhase", false);
+      await game.phaseInterceptor.to("MysteryEncounterPhase");
+    });
+    await drainLoopback();
+
+    // STEP B (guest): start the divert -> CoopReplayMePhase (opens the selector as owner), then relay
+    // option index 0 send-only (the harness split; the outcome race defers to STEP D).
+    const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+    withClientSync(rig.guestCtx, () => {
+      const relay = getCoopInteractionRelay();
+      const seq = (replay as unknown as { seq: number }).seq;
+      if (relay == null) {
+        throw new Error("guest-owned narration ME test lost its production interaction relay");
+      }
+      const operationId = meOp.commitMeOwnerIntent({
+        kind: "ME_PICK",
+        seq,
+        pinned: counterBefore,
+        step: 0,
+        payload: { optionIndex: 0 },
+        localRole: "guest",
+        wave: rig.guestScene.currentBattle.waveIndex,
+        turn: 0,
+        resend: () => relay.sendInteractionChoice(seq, "me", 0, [0]),
+      });
+      expect(operationId, "the guest intent enters retained control before its raw proposal").not.toBeNull();
+      relay.sendInteractionChoice(seq, "me", 0, [0]);
+    });
+
+    // STEP C (host): flush the relayed index; the host COMMITS the guest's ME_PICK (invariant 3), applies
+    // it, and BROADCASTS the retained pick envelope. It then streams a post-pick NARRATION line (the guest
+    // renders it in MESSAGE - a null continuation surface), and reaches the embedded reward shop.
+    let hostShop!: ShopPhaseSeam;
+    await withClient(rig.hostCtx, async () => {
+      await drainLoopback();
+      // Narration-bearing: stream one post-pick host line so the guest's onMeMessage secondary release path
+      // is exercised too. The MESSAGE surface it renders in retires nothing (coopAuthorityContinuationSurface
+      // MESSAGE -> null), so only the phase's own emit can release the retained pick.
+      coopHostStreamMeMessage("The clerk rings up your order.");
+      await game.phaseInterceptor.to("SelectModifierPhase", false);
+      hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+      hostShop.start();
+      await drainLoopback();
+    });
+
+    // STEP C1 (guest): pump the guest so it APPLIES the broadcast ME_PICK envelope. The Track R
+    // material-apply hook fires here and releases the pick's continuation from the phase - BEFORE the guest
+    // opens any reward-shop (sharedInput) surface. Snapshot the emit count first so the assertion isolates
+    // THIS pick-apply window (the earlier ME_PRESENT selector surface emit is excluded).
+    const emitsBeforePickApply = releaseSpy.mock.calls.length;
+    const pickApplyEmits = await withClient(rig.guestCtx, async () => {
+      for (let i = 0; i < 8; i++) {
+        await drainLoopback();
+      }
+      return releaseSpy.mock.calls.slice(emitsBeforePickApply);
+    });
+    expect(
+      pickApplyEmits.some(
+        ([surface, address]) => surface === "sharedInput" && address.wave === ME_WAVE && address.turn === 0,
+      ),
+      "the guest released its committed ME_PICK continuation from the phase at the pick apply, before any shop opened (Track R)",
+    ).toBe(true);
+    expect(
+      guestDurability.operationContinuationDiagnostics().pending,
+      "the guest owner's pending op:me continuation set drained after the pick",
+    ).toBe(0);
+
+    // STEP C2 (guest): the guest OWNS the reward pick (#828) - open its shop as owner, relay LEAVE sync.
+    const guestShop = await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
+    withClientSync(rig.guestCtx, () => relayGuestMeShopLeaveSync(guestShop));
+
+    // STEP C3 (host): drain so the guest owner's LEAVE applies, the host shop ends, and the option chain
+    // runs to PostMysteryEncounterPhase (streams the terminal + advances once).
+    await withClient(rig.hostCtx, async () => {
+      for (let i = 0; i < 16; i++) {
+        await drainLoopback();
+        await withClient(rig.guestCtx, () => drainLoopback());
+        await drainLoopback();
+        if (hostScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
+          break;
+        }
+      }
+      await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+    });
+    expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once for the ME").toBe(
+      counterBefore + 1,
+    );
+
+    // STEP D (guest): start the outcome/terminal race and drain to the terminal. The guest REACHES its
+    // terminal (settles) - it never fell to Title behind an unreleased pick.
+    const guestReplay = await withClient(rig.guestCtx, async () => {
+      startGuestMeOutcomeRace(replay);
+      return drainGuestMeReplayToSettle(replay);
+    });
+    expect(guestReplay.settled, "guest CoopReplayMePhase reached its terminal (left once) - no Title").toBe(true);
+
+    // Both engines converged in lockstep - the pick continuation never stranded the shared session.
+    expect(rig.hostRuntime.controller.interactionCounter(), "host counter is 2 after the ME").toBe(counterBefore + 1);
+    expect(rig.guestRuntime.controller.interactionCounter(), "guest counter is 2 after the ME (lockstep)").toBe(
+      counterBefore + 1,
+    );
+    expect(
+      guestDurability.operationContinuationDiagnostics().pending,
+      "the guest holds no stranded op:me continuation after the ME",
+    ).toBe(0);
 
     logs.flush();
   }, 300_000);

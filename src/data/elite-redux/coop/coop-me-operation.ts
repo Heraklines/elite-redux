@@ -767,6 +767,51 @@ export function adoptCoopMeCommittedOwnerOrdinal(op: CoopPendingOperation): bool
 }
 
 /**
+ * Track R (run 29640634363 mystery lane): the guest replay's post-apply hook for a GUEST-OWNED ME_PICK.
+ * Fired from {@linkcode applyJournaledMeEnvelope} at the exact once-per-op material-apply moment (NOT the
+ * cosmetic, droppable narration line), so the retained pick's operation continuation is released even for a
+ * zero-narration option or a single narration line that raced ahead of the apply. Registered by the replay
+ * phase module (no import cycle: adapter -> phase seam). Null off the migrated path / with no live replay.
+ */
+let onGuestOwnerPickApplied: ((pinned: number) => void) | null = null;
+
+/** Register (or clear) the guest-owned ME_PICK material-apply release hook (Track R). Last registration wins. */
+export function setOnCoopMeGuestOwnerPickApplied(fn: ((pinned: number) => void) | null): () => void {
+  const previous = onGuestOwnerPickApplied;
+  onGuestOwnerPickApplied = fn;
+  return () => {
+    if (onGuestOwnerPickApplied === fn) {
+      onGuestOwnerPickApplied = previous;
+    }
+  };
+}
+
+/**
+ * The guest OWNER's committed ME_PICK operation continuation address for the pick at `step`, or null until
+ * the guest has MATERIALLY APPLIED that committed op. Track R: the guest-role CoopReplayMePhase releases the
+ * retained pick continuation from its post-pick narration/apply surface using THIS exact address. The epoch
+ * and turn are OP-DERIVED (never ambient scene guesses): `epoch` is the operation-state epoch the op id was
+ * minted under (so a mid-ME session-epoch bump can never address a stale op - the failure the ambient
+ * `controller.sessionEpoch` would hit), and `turn` is the ME_PICK op's committed turn (always 0). `wave` is
+ * the caller's committed ME wave (guest waveIndex == host waveIndex per #658). The guest-minted op id is
+ * byte-identical to the host-committed one (makeCoopOperationId is deterministic from epoch/ownerSeat/addr/
+ * kind), so `hasApplied(id)` is the exact material-apply gate. Null off the migrated path / before apply.
+ */
+export function coopMeGuestAppliedPickContinuationAddress(
+  seq: number,
+  step: number,
+  pinned: number,
+  wave: number,
+): { epoch: number; wave: number; turn: number } | null {
+  if (!isCoopMeOperationEnabled() || wave < 0 || !Number.isSafeInteger(step) || step < 0) {
+    return null;
+  }
+  const s = state();
+  const id = makeCoopOperationId(s.epoch, ownerSeatFor("ME_PICK", pinned), meOpAddr("ME_PICK", seq, step), "ME_PICK");
+  return guest().hasApplied(id) ? { epoch: s.epoch, wave, turn: 0 } : null;
+}
+
+/**
  * The owner-parity validator (§1.3): the intent's owner seat MUST be the seat the interaction counter
  * assigns for this pinned slot. The typed successor of `isLocalOwnerAtCounter` - the host refuses an
  * intent from the wrong seat instead of trusting the sender. NOTE: for an ME the presentation ack + the
@@ -1229,6 +1274,19 @@ function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopAp
     return meApply; // transient non-applicable (retriable/deferred); never a permanent condition (that is a duplicate above).
   }
   adoptCoopMeCommittedOwnerOrdinal(op);
+  // Track R: the GUEST-OWNED (owner seat 1) top-level pick just materially applied. Poke the retained
+  // replay so it releases the pick's operation continuation from its post-pick surface - the guaranteed
+  // once-per-op signal, independent of the cosmetic narration channel. The hook self-gates on the live
+  // phase/pin; a host-owned pick (owner 0) or a sub/present/terminal op never fires it.
+  if (op.kind === "ME_PICK") {
+    const parsed = parseCoopOperationId(op.id);
+    if (parsed != null && parsed.owner === 1) {
+      const pinned = Math.floor(parsed.pinnedSeq / 8000) - COOP_ME_PUMP_SEQ_BASE;
+      if (Number.isSafeInteger(pinned) && pinned >= 0) {
+        onGuestOwnerPickApplied?.(pinned);
+      }
+    }
+  }
   // Route newly-consumed ME operations into the production live sink. A terminal sink applies its complete
   // retained DATA+destination synchronously before this guest revision can advance/ACK.
   coopLog("me", `ME op JOURNAL apply kind=${op.kind} id=${op.id} rev=${envelope.revision} (Wave-2e/W2e-R)`);
