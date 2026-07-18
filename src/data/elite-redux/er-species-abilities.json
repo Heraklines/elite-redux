@@ -1,4 +1,13 @@
 {
+  "SPECIES_AIPOM": {
+    "ability2": 53,
+    "hidden": 118,
+    "innates": [
+      158,
+      101,
+      92
+    ]
+  },
   "SPECIES_AMAURA": {
     "ability1": 116,
     "ability2": 174,
@@ -34,6 +43,13 @@
   "SPECIES_AURORUS": {
     "ability2": 174
   },
+  "SPECIES_BEAUTIFLY": {
+    "ability1": 5020,
+    "hidden": 118
+  },
+  "SPECIES_BEEFENDER": {
+    "hidden": 118
+  },
   "SPECIES_BISHARP_REDUX": {
     "ability1": 128,
     "ability2": 101,
@@ -62,6 +78,25 @@
       137,
       101
     ]
+  },
+  "SPECIES_BURMY": {
+    "ability2": 118
+  },
+  "SPECIES_BURMY_SANDY_CLOAK": {
+    "ability2": 118
+  },
+  "SPECIES_BURMY_TRASH_CLOAK": {
+    "ability2": 118
+  },
+  "SPECIES_CASCOON": {
+    "ability2": 192,
+    "hidden": 118
+  },
+  "SPECIES_COMBEE": {
+    "ability1": 118
+  },
+  "SPECIES_CUTIEFLY": {
+    "hidden": 118
   },
   "SPECIES_DEDENNE": {
     "ability1": 249,
@@ -92,6 +127,9 @@
     "ability1": 91,
     "ability2": 92,
     "hidden": 34
+  },
+  "SPECIES_DUSTOX": {
+    "hidden": 118
   },
   "SPECIES_EMOLGA": {
     "ability1": 5208,
@@ -152,6 +190,13 @@
   },
   "SPECIES_HARIYAMA_MEGA": {
     "ability1": 62
+  },
+  "SPECIES_HERACROSS": {
+    "innates": [
+      118,
+      4,
+      62
+    ]
   },
   "SPECIES_HISUI_ZORUA": {
     "ability1": 5171,
@@ -267,8 +312,14 @@
       5099
     ]
   },
+  "SPECIES_MUNCHLAX": {
+    "ability1": 118
+  },
   "SPECIES_PHANTOWL": {
     "ability2": 5123
+  },
+  "SPECIES_RIBOMBEE": {
+    "hidden": 118
   },
   "SPECIES_SAWSBUCK": {
     "ability1": 91,
@@ -280,8 +331,19 @@
       5511
     ]
   },
+  "SPECIES_SILCOON": {
+    "ability2": 192,
+    "hidden": 118
+  },
   "SPECIES_TEDDIURSA": {
     "hidden": 118
+  },
+  "SPECIES_VESPIQUEN": {
+    "innates": [
+      5146,
+      214,
+      118
+    ]
   },
   "SPECIES_ZORUA": {
     "ability1": 5285,
