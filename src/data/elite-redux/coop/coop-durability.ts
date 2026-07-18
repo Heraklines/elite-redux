@@ -598,6 +598,13 @@ interface CoopOperationAuthorityAddress extends CoopOperationContinuationAddress
   cls: string;
   seq: number;
   operationId: string;
+  /**
+   * The committing envelope's logical run phase. Only populated when the address is derived from a real
+   * envelope ({@linkcode retainedOperationAuthorityFor}); the key-only inline constructions omit it. Used to
+   * scope the pre-commit in-turn exemption ({@linkcode isPreCommitTurnResolveOp}); never part of the address
+   * KEY, so leaving it undefined on a key-only construction is harmless.
+   */
+  logicalPhase?: string;
 }
 
 interface PendingOperationContinuation {
@@ -747,9 +754,27 @@ function retainedOperationAuthorityFor(
       epoch: envelope.sessionEpoch,
       wave: envelope.wave,
       turn: envelope.turn,
+      logicalPhase: envelope.logicalPhase,
     },
     expectedSurface: envelope.logicalPhase === "GAME_OVER" ? "terminal" : "sharedBoundary",
   };
+}
+
+/**
+ * A PRE-COMMIT in-turn operation (`logicalPhase === "TURN_RESOLVE"`): the host is resolving a turn and the
+ * guest is parked in CoopReplayTurnPhase rendering it. Such an op is committed BEFORE the turn commit
+ * (`CoopTurnCommitPhase`, queued last in `TurnEndPhase`). While parked the guest DEFERS the operation envelope
+ * (its live sink/picker is not open - `applyCoopOperationEnvelope` returns `"deferred"`), so it can never send a
+ * pre-commit `materialApplied`, and it opens NO real public continuation surface for the op, so `continuationReady`
+ * is architecturally unreachable. Requiring the peer's pre-commit convergence self-deadlocks the host: it blocks
+ * before `TurnEndPhase` and therefore never publishes the very turn commit the guest is parked waiting for
+ * (fix branch coop/fix-battle-message-pacing). For these ops the host advances on its OWN pacing and convergence
+ * rides the turn-commit checkpoint - it does not block its turn on the peer's material proof, and the op RELEASES
+ * at `materialApplied` (the guest applying it via post-commit replay) instead of the unreachable `continuationReady`.
+ * Scoped strictly to `TURN_RESOLVE`, so every between-wave surface (reward/biome/ME/wave-advance) is unchanged.
+ */
+function isPreCommitTurnResolveOp(authority: CoopOperationAuthorityAddress): boolean {
+  return authority.logicalPhase === "TURN_RESOLVE";
 }
 
 interface PendingRetainedWaveAck {
@@ -1114,6 +1139,15 @@ export class CoopDurabilityManager {
       return Promise.resolve(false);
     }
     const [key, pending] = matches[0];
+    // Pre-commit in-turn op (coop/fix-battle-message-pacing): the guest is parked in CoopReplayTurnPhase and
+    // DEFERS this op until AFTER it processes the turn commit this op precedes, so it cannot send a pre-commit
+    // `materialApplied`. Blocking the host turn on that structurally-impossible proof self-deadlocks the run
+    // (the host never reaches TurnEndPhase, so it never publishes the turn commit the guest awaits). Advance on
+    // the host's own pacing; the guest converges on the turn-commit checkpoint and the op releases at its own
+    // post-commit `materialApplied`.
+    if (isPreCommitTurnResolveOp(pending.authority)) {
+      return Promise.resolve(true);
+    }
     const evidence = this.hostOperationAckEvidence.get(key);
     if (evidence != null && OPERATION_ACK_STAGE_ORDER[evidence.stage] >= OPERATION_ACK_STAGE_ORDER.materialApplied) {
       return Promise.resolve(true);
@@ -1865,7 +1899,12 @@ export class CoopDurabilityManager {
     if (OPERATION_ACK_STAGE_ORDER[msg.stage] >= OPERATION_ACK_STAGE_ORDER.materialApplied) {
       this.settleOperationMaterialWaiters(key, true);
     }
-    if (msg.stage !== "continuationReady") {
+    // A pre-commit in-turn (TURN_RESOLVE) op reaches its convergence proof at `materialApplied` (the guest
+    // applying it via post-commit replay). It opens no public continuation surface, so it must NOT wait for the
+    // unreachable `continuationReady` - doing so would head-of-line-block the journal prefix and exhaust into a
+    // shared terminal. Every other op still releases only at `continuationReady`.
+    const releasesAtMaterial = msg.stage === "materialApplied" && isPreCommitTurnResolveOp(authority);
+    if (msg.stage !== "continuationReady" && !releasesAtMaterial) {
       return;
     }
     this.releaseAcknowledgedPrefix(authority.cls);
@@ -1902,7 +1941,13 @@ export class CoopDurabilityManager {
       const admitted = retainedOperationAuthorityFor(entry.cls, entry.seq, entry.msg);
       if (admitted != null) {
         const key = operationAuthorityKey(admitted.authority);
-        if (this.hostOperationAckEvidence.get(key)?.stage !== "continuationReady") {
+        // A pre-commit in-turn (TURN_RESOLVE) op releases at `materialApplied` (the guest's post-commit replay
+        // apply); every other op requires the full `continuationReady` public-surface proof.
+        const requiredStage: CoopOperationAckStage = isPreCommitTurnResolveOp(admitted.authority)
+          ? "materialApplied"
+          : "continuationReady";
+        const provenStage = this.hostOperationAckEvidence.get(key)?.stage;
+        if (provenStage == null || OPERATION_ACK_STAGE_ORDER[provenStage] < OPERATION_ACK_STAGE_ORDER[requiredStage]) {
           break;
         }
         this.operationContinuationTimers.get(key)?.cancel();
@@ -1910,7 +1955,11 @@ export class CoopDurabilityManager {
         this.cancelOperationDeliveryRetry(key);
         this.settleOperationMaterialWaiters(key, true);
         this.pendingHostOperationContinuations.delete(key);
-        this.recordOperationCausalStage(admitted.authority, "released", "proof=continuation-ready");
+        this.recordOperationCausalStage(
+          admitted.authority,
+          "released",
+          requiredStage === "materialApplied" ? "proof=material-applied(turn-resolve)" : "proof=continuation-ready",
+        );
       } else if (entry.seq > cumulativeThrough) {
         break;
       }
