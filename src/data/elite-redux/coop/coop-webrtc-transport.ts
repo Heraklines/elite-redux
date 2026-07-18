@@ -22,6 +22,7 @@
 // outside this module; once the channel is open, this is all the game needs.
 // =============================================================================
 
+import { routeCoopV2InboundFrame } from "#data/elite-redux/coop/authority-v2/shadow";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
   CoopOutboundQueue,
@@ -875,6 +876,14 @@ export class WebRtcTransport implements CoopTransport {
     }
     if (this.isChunkFrame(parsed)) {
       this.receiveChunk(parsed);
+      return;
+    }
+    // authority-v2 boundary: a decoded object stamped v===2 is a v2 frame, NOT a legacy CoopMessage.
+    // Route it through the ONE boundary validator (never the legacy `parsed as CoopMessage` cast) so a
+    // malformed v2 frame is classified, not smuggled downstream. A v2 frame is only ever emitted when
+    // BOTH peers negotiated authority.v2shadow, so this path is dead when the capability is off.
+    if (parsed != null && typeof parsed === "object" && (parsed as { v?: unknown }).v === 2) {
+      routeCoopV2InboundFrame(parsed);
       return;
     }
     if (parsed != null && typeof parsed === "object" && typeof (parsed as { t?: unknown }).t === "string") {

@@ -22,6 +22,7 @@
 
 // TYPE-ONLY import (erased at runtime): the data-fingerprint diagnostic message carries a
 // plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
+import { routeCoopV2InboundFrame } from "#data/elite-redux/coop/authority-v2/shadow";
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopFrozenAckQuorumV1, CoopMembershipSnapshotV1 } from "#data/elite-redux/coop/coop-membership";
@@ -2231,6 +2232,13 @@ class LoopbackTransport implements CoopTransport {
 
   /** Isolated fan-out of one inbound frame (see the WebRtcTransport counterpart). */
   private dispatchInbound(frame: CoopMessage): void {
+    // authority-v2 boundary: a frame stamped v===2 is a v2 frame, NOT a legacy CoopMessage. Route it
+    // through the ONE boundary validator instead of fanning it out to legacy handlers. Dead when
+    // authority.v2shadow is not negotiated (no v2 frame is ever sent), so loopback stays byte-identical.
+    if ((frame as { v?: unknown }).v === 2) {
+      routeCoopV2InboundFrame(frame);
+      return;
+    }
     for (const h of [...this.msgHandlers]) {
       try {
         h(frame);

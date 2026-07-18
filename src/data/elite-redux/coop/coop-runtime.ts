@@ -20,6 +20,20 @@
 
 import { globalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
+import type {
+  CoopTerminalMaterialV2,
+  CoopWaveAdvanceDestination,
+  CoopWaveTransitionMaterialV2,
+} from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
+import {
+  CoopAuthorityV2Shadow,
+  type CoopV2ShadowIdentity,
+  clearActiveCoopV2Shadow,
+  clearCoopV2ShadowInbound,
+  isCoopV2ShadowEnabled,
+  registerCoopV2ShadowInbound,
+  setActiveCoopV2Shadow,
+} from "#data/elite-redux/coop/authority-v2/shadow";
 import {
   armCoopAbilityJournalMaterialization,
   COOP_ABILITY_ACTION_STRIDE,
@@ -75,6 +89,7 @@ import {
   setCoopBiomeOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-biome-operation";
 import {
+  COOP_CAP_AUTHORITY_V2_SHADOW,
   COOP_CAP_DURABILITY_JOURNAL,
   COOP_CAP_OP_ABILITY,
   COOP_CAP_OP_BARGAIN,
@@ -3347,6 +3362,120 @@ const pendingRuntimeActivations = new WeakMap<CoopRuntime, Set<() => void>>();
 /** Last scene installed alongside each runtime; direct engine-free tests intentionally share one scene. */
 const runtimeSceneBindings = new WeakMap<CoopRuntime, object>();
 
+// ---------------------------------------------------------------------------
+// authority-v2 SHADOW harness (src/data/elite-redux/coop/authority-v2/shadow.ts).
+// Per-runtime, built LAZILY on first tap once authority.v2shadow is negotiated (a
+// hot-path capability gate becomes available only after the hello handshake, which
+// runs AFTER assembly). A build failure (incomplete identity) is remembered so we
+// never retry-thrash, and leaves the harness null - so a tap is a pure no-op. This
+// is the ship-safety boundary: when the capability is off, getCoopV2Shadow returns
+// null and every `getCoopV2Shadow()?.tapX(...)` short-circuits with zero side effect.
+// ---------------------------------------------------------------------------
+const coopV2ShadowHarnesses = new WeakMap<CoopRuntime, CoopAuthorityV2Shadow>();
+const coopV2ShadowBuildFailed = new WeakSet<CoopRuntime>();
+
+/** Resolve the immutable v2 shadow identity from a runtime's session controller, or null if unavailable. */
+function resolveCoopV2ShadowIdentity(runtime: CoopRuntime): CoopV2ShadowIdentity | null {
+  const controller = runtime.controller;
+  const localSeatId = controller.localSeatId;
+  const connectionGeneration = runtime.localTransport.connectionGeneration?.() ?? 0;
+  const binding = controller.authenticatedBinding;
+  if (binding != null) {
+    return {
+      runtimeId: `${binding.sessionId}:seat${localSeatId}`,
+      sessionId: binding.sessionId,
+      runId: binding.runId ?? controller.runId,
+      epoch: binding.sessionEpoch,
+      localSeatId,
+      authoritySeatId: binding.authoritySeatId,
+      membershipRevision: binding.membershipRevision,
+      seatMapId: binding.seatMap.seatMapId,
+      connectionGeneration,
+    };
+  }
+  // Non-authenticated dev/loopback session: synthesize a stable identity from the shared run id + epoch so
+  // both peers derive IDENTICAL session-identity fields (admit's isSameSessionIdentity requires it).
+  const runId = controller.runId;
+  const epoch = controller.sessionEpoch;
+  if (typeof runId !== "string" || runId.length === 0 || !Number.isSafeInteger(epoch) || epoch < 0) {
+    return null;
+  }
+  return {
+    runtimeId: `${runId}:seat${localSeatId}`,
+    sessionId: runId,
+    runId,
+    epoch,
+    localSeatId,
+    authoritySeatId: controller.authoritySeatId,
+    membershipRevision: 1,
+    seatMapId: `coop-v2-shadow-seatmap:${runId}`,
+    connectionGeneration,
+  };
+}
+
+/**
+ * The authority-v2 shadow harness for a runtime (default: the active runtime), or `null` when the
+ * capability is not negotiated / the harness cannot be built. Builds lazily + memoizes. NEVER throws -
+ * a build failure returns null so a tap is a pure no-op. This is the ONLY entry point the tap call sites
+ * use, so the capability-off path is a single null check with zero behavioural change.
+ */
+export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAuthorityV2Shadow | null {
+  if (runtime == null || !isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_SHADOW)) {
+    return null;
+  }
+  const existing = coopV2ShadowHarnesses.get(runtime);
+  if (existing != null) {
+    return existing;
+  }
+  if (coopV2ShadowBuildFailed.has(runtime)) {
+    return null;
+  }
+  const identity = resolveCoopV2ShadowIdentity(runtime);
+  if (identity == null) {
+    coopV2ShadowBuildFailed.add(runtime);
+    return null;
+  }
+  try {
+    const localTransport = runtime.localTransport;
+    const harness = new CoopAuthorityV2Shadow({
+      identity,
+      scene: globalScene,
+      transport: localTransport,
+      send: frame => {
+        // Wire boundary: v2 frames ride the SAME transport as legacy CoopMessages but are a distinct
+        // envelope (v:2). The receive path intercepts v===2 BEFORE the legacy cast (coop-transport /
+        // coop-webrtc-transport), so a v2 frame never reaches a legacy CoopMessage handler - this is the
+        // send-side mirror of that receive-side wire boundary.
+        const wire: unknown = frame;
+        localTransport.send(wire as CoopMessage);
+      },
+    });
+    registerCoopV2ShadowInbound(frame => harness.handleInboundFrame(frame));
+    setActiveCoopV2Shadow(harness);
+    coopV2ShadowHarnesses.set(runtime, harness);
+    coopLog(
+      "v2-shadow",
+      `harness built role=${runtime.controller.authorityRole} seat=${identity.localSeatId} session=${identity.sessionId}`,
+    );
+    return harness;
+  } catch (error) {
+    coopWarn("v2-shadow", `harness build FAILED: ${error instanceof Error ? error.message : String(error)}`);
+    coopV2ShadowBuildFailed.add(runtime);
+    return null;
+  }
+}
+
+/** Dispose + drop the shadow harness for a runtime (teardown). Idempotent. */
+function disposeCoopV2Shadow(runtime: CoopRuntime): void {
+  const harness = coopV2ShadowHarnesses.get(runtime);
+  if (harness != null) {
+    clearActiveCoopV2Shadow(harness);
+    harness.dispose("coop-runtime-teardown");
+    coopV2ShadowHarnesses.delete(runtime);
+  }
+  coopV2ShadowBuildFailed.delete(runtime);
+}
+
 export function runWhenCoopRuntimeActive(runtime: CoopRuntime, callback: () => void): () => void {
   let live = true;
   let queued: Set<() => void> | null = null;
@@ -3935,6 +4064,60 @@ export function buildCoopWaveAdvancePayload(outcome: CoopWaveOutcome, wave: numb
   return isVictory ? { ...payload, victoryKind } : payload;
 }
 
+/**
+ * authority-v2 SHADOW tap for the waveResolved broadcast + the game-over/terminal path. Builds the v2
+ * WAVE_ADVANCE (win/capture/flee) or TERMINAL_COMMIT (gameOver) INDEPENDENTLY, commits it to the shadow
+ * log (a full replica round-trip over the v2 frame channel), and logs one PARITY line vs the legacy
+ * transition digest. A pure no-op when authority.v2shadow is not negotiated (getCoopV2Shadow -> null). The
+ * harness guards its own taps, so this never throws into the host's post-battle flow.
+ */
+function tapCoopV2ShadowWaveBoundary(
+  runtime: CoopRuntime,
+  wave: number,
+  outcome: CoopWaveOutcome,
+  transition: CoopWaveAdvancePayload,
+): void {
+  const shadow = getCoopV2Shadow(runtime);
+  if (shadow == null) {
+    return;
+  }
+  const turn = globalScene.currentBattle?.turn ?? 1;
+  const legacyDigest = fnv1a64(canonicalize(transition));
+  const ownerSeatId = runtime.controller.authoritySeatId;
+  if (outcome === "gameOver") {
+    const terminal: CoopTerminalMaterialV2 = {
+      kind: "terminal",
+      terminalId: `coop-v2-shadow-terminal:w${wave}`,
+      reason: "game-over",
+      wave,
+      turn: Math.max(0, turn),
+    };
+    shadow.tapTerminal({ operationId: `WSHADOW/TERM/w${wave}`, terminal, legacyDigest });
+    return;
+  }
+  const meBoundary: "none" | "battle-victory" = transition.meBoundary === "battle-victory" ? "battle-victory" : "none";
+  const base = {
+    kind: "wave-advance" as const,
+    wave,
+    turn: Math.max(0, turn),
+    nextWave: transition.nextWave,
+    biomeChange: transition.biomeChange,
+    eggLapse: transition.eggLapse,
+    meBoundary,
+  };
+  // victoryKind is present IFF the outcome is a victory (win/capture); a flee carries none.
+  const material: CoopWaveTransitionMaterialV2 =
+    outcome === "flee"
+      ? { ...base, outcome: "flee" }
+      : { ...base, outcome, victoryKind: transition.victoryKind ?? "wild" };
+  const destination: CoopWaveAdvanceDestination = {
+    kind: "REWARD",
+    operationId: `WSHADOW/REWARD/w${wave}`,
+    ownerSeatId,
+  };
+  shadow.tapWaveAdvance({ operationId: `WSHADOW/ADV/w${wave}`, transition: material, destination, legacyDigest });
+}
+
 export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation?: CoopCapturePresentation): void {
   if (!globalScene.gameMode.isCoop || active == null || getCoopNetcodeMode() !== "authoritative") {
     return;
@@ -3957,6 +4140,9 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
   }
   const transition = buildCoopWaveAdvancePayload(outcome, wave);
   pendingHostWaveTransitions.set(wave, transition);
+  // authority-v2 SHADOW: independently compute + compare the wave/terminal progression. Runs AFTER the
+  // legacy transition is staged; never affects it (pure no-op unless authority.v2shadow is negotiated).
+  tapCoopV2ShadowWaveBoundary(active, wave, outcome, transition);
   // Normal win/capture/flee transitions settle later in BattleEnd. GameOver has no BattleEndPhase, so seal
   // its terminal DATA first; a throwing/dropped raw presentation carrier cannot suppress correctness.
   if (outcome === "gameOver") {
@@ -5511,6 +5697,14 @@ function buildLocalCoopCapabilities(durabilityEnabled: boolean): CoopCapabilityK
     caps.push(COOP_CAP_DURABILITY_JOURNAL);
   }
   caps.push(COOP_CAP_RENDERER_ALLOWLIST_ENFORCE);
+  // authority-v2 SHADOW: advertise the shadow capability, gated by the build flag (default OFF - flip on
+  // with env COOP_AUTHORITY_V2_SHADOW=on on BOTH peers). Two shadow-enabled builds negotiate it; a peer
+  // with it off drops it from the intersection and BOTH sides stay off - the harness never builds, no v2
+  // frame is ever sent. Default-off keeps a co-op session BYTE-IDENTICAL to the pre-shadow build. The
+  // harness authorizes NOTHING (legacy owns all mechanics), so a parity failure never affects progression.
+  if (isCoopV2ShadowEnabled()) {
+    caps.push(COOP_CAP_AUTHORITY_V2_SHADOW);
+  }
   return caps;
 }
 
@@ -5943,6 +6137,8 @@ export function clearCoopRuntime(): void {
     // (unlike a hot rejoin, which never calls this function) must remove the frozen intersection even
     // when another terminal path already cleared the active runtime.
     clearNegotiatedCoopCapabilities();
+    // Drop any registered shadow inbound handler even when the active runtime was already cleared.
+    clearCoopV2ShadowInbound();
     return;
   }
   try {
@@ -5962,6 +6158,11 @@ export function clearCoopRuntime(): void {
   sharedTerminal?.dispose();
   sharedTerminalSupervisors.delete(active);
   clearPendingCoopSnapshotProof(active);
+  // authority-v2 shadow: dispose the harness (log timers + lifecycle + owned scheduler) BEFORE the
+  // transport closes, and drop the module-level inbound routing handler so no v2 frame reaches a torn-down
+  // harness. Zero leaked timers is the harness's own invariant (its dispose cancels every armed timer).
+  disposeCoopV2Shadow(active);
+  clearCoopV2ShadowInbound();
   active.controller.dispose();
   active.battleSync.dispose();
   active.battleStream.dispose();

@@ -82,6 +82,14 @@ export const COOP_CAP_DURABILITY_JOURNAL: CoopCapabilityKey = "durability.journa
  * PREREQUISITE for that flip; the flip itself gates on isCoopCapabilityNegotiated(this key).
  */
 export const COOP_CAP_RENDERER_ALLOWLIST_ENFORCE: CoopCapabilityKey = "renderer.allowlistEnforce";
+/**
+ * The authority-v2 SHADOW harness (src/data/elite-redux/coop/authority-v2/shadow.ts). When BOTH peers
+ * negotiate it, each independently runs the v2 foundation + adapters ALONGSIDE the live legacy netcode -
+ * computing the authoritative progression, exchanging v2 frames, and logging parity - WITHOUT authorizing
+ * any progression (legacy controls all mechanics). A one-sided build never activates it (the intersection
+ * gates it), so a mixed build can never emit v2 frames a peer that lacks the harness would receive.
+ */
+export const COOP_CAP_AUTHORITY_V2_SHADOW: CoopCapabilityKey = "authority.v2shadow";
 
 // -----------------------------------------------------------------------------
 // The pure negotiation math (unit-tested engine-free).
