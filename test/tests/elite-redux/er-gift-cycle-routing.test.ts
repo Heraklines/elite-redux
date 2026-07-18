@@ -11,7 +11,8 @@
 
 import type { InputsController } from "#app/inputs-controller";
 import { UiInputs } from "#app/ui-inputs";
-import { isErGiftCycleAllowed } from "#data/elite-redux/er-black-shinies";
+import { applyErBlackShinyKit, isErBlackShiny, isErGiftCycleAllowed } from "#data/elite-redux/er-black-shinies";
+import { AbilityId } from "#enums/ability-id";
 import { Button } from "#enums/buttons";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
@@ -19,6 +20,25 @@ import { GameManager } from "#test/framework/game-manager";
 import type { SummaryUiHandler } from "#ui/summary-ui-handler";
 import Phaser from "phaser";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+/** Page.ABILITIES is module-local (value 1) in summary-ui-handler. */
+const SUMMARY_PAGE_ABILITIES = 1;
+/** Three distinct gift choices so the pinned gift slot is deterministic. */
+const GIFT_CHOICES: [AbilityId, AbilityId, AbilityId] = [AbilityId.STURDY, AbilityId.LEVITATE, AbilityId.INTIMIDATE];
+
+/**
+ * Whitebox view of the summary handler's gift-badge state under test. We drive
+ * `populatePageContainer(..., Page.ABILITIES)` directly (the proven pattern from
+ * summary-ui-3-passive-slots.test.ts) rather than the full show() transition, so
+ * the ABILITIES render runs deterministically against our bound mon.
+ */
+type SummaryGiftBadgeInternals = {
+  pokemon: unknown;
+  giftCycleBadge: Phaser.GameObjects.Sprite | null;
+  abilitiesRows: { ability: { id: AbilityId; name: string } }[];
+  summaryPageContainer: Phaser.GameObjects.Container;
+  populatePageContainer(pageContainer: Phaser.GameObjects.Container, page?: number): void;
+};
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -75,5 +95,44 @@ describe.skipIf(!RUN)("ER R-key gift-cycle routing (#349)", () => {
 
     spy.mockReturnValue(phase("CommandPhase")); // mid-combat
     expect(isErGiftCycleAllowed()).toBe(false);
+  });
+
+  // ER (#349 follow-up): the "R" key-badge sprite (keyboard atlas, same idiom as the
+  // Omniform F badge) must be drawn on the GIFT row so keyboard players SEE the binding.
+  // It is gated on the conditional UI being present: a player-owned black shiny's gift
+  // row. A normal mon has no gift row, so no badge.
+  it("draws the R gift-cycle key-badge for a player black shiny's gift row", async () => {
+    await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+    const mon = game.scene.getPlayerPokemon();
+    expect(mon).toBeDefined();
+    applyErBlackShinyKit(mon!);
+    mon!.customPokemonData.erBlackShiny = true;
+    mon!.customPokemonData.erGiftAbilities = [...GIFT_CHOICES];
+    mon!.customPokemonData.erGiftIndex = 0;
+
+    expect(isErBlackShiny(mon), "setup must flag the lead as a black shiny").toBe(true);
+
+    const summary = game.scene.ui.handlers[UiMode.SUMMARY] as unknown as SummaryGiftBadgeInternals;
+    summary.pokemon = mon;
+    summary.populatePageContainer(summary.summaryPageContainer, SUMMARY_PAGE_ABILITIES);
+
+    // The gift row is the extra 5th slot beyond the main ability + innates.
+    expect(summary.abilitiesRows.length, "a gift row must be present for a black shiny").toBeGreaterThanOrEqual(2);
+    // The R key-badge is only ever created inside the player gift-row branch, so a
+    // non-null badge is proof the conditional gift-cycle prompt rendered.
+    expect(summary.giftCycleBadge, "the R key-badge must be drawn for a player black shiny").not.toBeNull();
+  });
+
+  it("draws NO gift-cycle badge for a normal (non-black-shiny) mon", async () => {
+    await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+    const mon = game.scene.getPlayerPokemon();
+    expect(mon).toBeDefined();
+
+    const summary = game.scene.ui.handlers[UiMode.SUMMARY] as unknown as SummaryGiftBadgeInternals;
+    summary.pokemon = mon;
+    summary.populatePageContainer(summary.summaryPageContainer, SUMMARY_PAGE_ABILITIES);
+
+    // No gift row for a normal mon, so the badge is absent.
+    expect(summary.giftCycleBadge, "a normal mon must have no gift-cycle badge").toBeNull();
   });
 });

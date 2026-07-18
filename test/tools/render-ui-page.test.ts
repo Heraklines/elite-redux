@@ -1500,7 +1500,8 @@ const RECIPES: Record<string, Recipe> = {
     steps: [Button.RIGHT, Button.RIGHT, Button.RIGHT, Button.DOWN],
   },
   // The party SUMMARY screen on its ER ABILITIES page, with a BLACK SHINY (#349) lead so the
-  // violet-italic GIFT row ("Gift 1/3 (R)") is present. steps fires R (Button.CYCLE_SHINY):
+  // violet-italic GIFT row ("Gift 1/3") + its "R" key-badge cycle prompt are present. steps
+  // fires R (Button.CYCLE_SHINY):
   // before the fix the data advanced but the page-cursor re-render dropped the forced-refresh
   // flag so the row never redrew; after the fix the handler redraws the page in place, so the
   // gift NAME + idx/choices counter change. The dedicated before/after assertion test below

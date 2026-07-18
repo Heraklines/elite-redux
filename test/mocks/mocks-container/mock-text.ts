@@ -228,6 +228,12 @@ export class MockText implements MockGameObject {
     return this;
   }
 
+  setFontStyle(_style): this {
+    // Sets the font style of this Game Object (e.g. the summary Black Shiny gift
+    // row uses "bold italic"). Headless no-op; real Text applies it in-browser.
+    return this;
+  }
+
   getBounds() {
     // return this.phaserText.getBounds();
     return {

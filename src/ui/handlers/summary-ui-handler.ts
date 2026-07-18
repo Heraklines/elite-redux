@@ -123,6 +123,13 @@ export class SummaryUiHandler extends UiHandler {
   private abilitiesCursorObj: Phaser.GameObjects.NineSlice | null = null;
   /** "Ⓐ Detail" prompt shown on the selected ability row's header. */
   private abilitiesDetailPrompt: Phaser.GameObjects.Text | null = null;
+  /**
+   * ER Black Shinies (#349): the "R" key-badge sprite drawn on the player's GIFT
+   * row header (keyboard atlas, same idiom as the Omniform F badge) so keyboard
+   * players SEE that R cycles the gift. Only present for a player-owned black
+   * shiny's gift row; null otherwise.
+   */
+  private giftCycleBadge: Phaser.GameObjects.Sprite | null = null;
   /** Full-screen ability-detail overlay (long description); null when closed. */
   private abilitiesDetailContainer: Phaser.GameObjects.Container | null = null;
   private shinyOverlay: Phaser.GameObjects.Image;
@@ -1988,8 +1995,11 @@ export class SummaryUiHandler extends UiHandler {
         const choices = mon.customPokemonData.erGiftAbilities.length;
         const idx = (mon.customPokemonData.erGiftIndex ?? 0) + 1;
         rows.push({
-          // ER (#349): R cycles the player's own gift between its 3 choices.
-          label: mon.isPlayer() ? `Gift ${idx}/${choices} (R)` : `Gift ${idx}/${choices}`,
+          // ER (#349): R (keyboard) / RB (controller) / the on-screen apad button
+          // cycle the player's own gift between its 3 choices. The prompt is drawn
+          // as a real "R" key-badge sprite on the row header (see below), not baked
+          // into the label text, so it reads as an actual button.
+          label: `Gift ${idx}/${choices}`,
           ability: gift,
           gift: true,
         });
@@ -2008,6 +2018,7 @@ export class SummaryUiHandler extends UiHandler {
 
     this.abilitiesRows = [];
     this.abilitiesRowCount = rows.length;
+    this.giftCycleBadge = null;
     if (this.abilitiesCursor >= rows.length) {
       this.abilitiesCursor = 0;
     }
@@ -2077,6 +2088,18 @@ export class SummaryUiHandler extends UiHandler {
         // face so it reads as the special 5th slot.
         nameText.setFontStyle("bold italic");
         nameText.setColor("#e8d8ff");
+        // Only the OWNER can cycle the gift, so the "R" key-badge prompt is drawn
+        // for player-owned mons only (an enemy black shiny shows the gift row but
+        // no cycle prompt). Same keyboard-atlas key-badge idiom as the Omniform F
+        // badge; RB (controller) and the #apadGiftAbility on-screen button map to
+        // the same Button.CYCLE_SHINY.
+        if (isPlayerMon) {
+          const badge = globalScene.add
+            .sprite(panelW - 4, top + Math.floor(headerH / 2), "keyboard", "R.png")
+            .setOrigin(1, 0.5);
+          container.add(badge);
+          this.giftCycleBadge = badge;
+        }
       }
       container.add(nameText);
 
@@ -2398,6 +2421,7 @@ export class SummaryUiHandler extends UiHandler {
     this.abilitiesSelectMode = false;
     this.abilitiesCursorObj = null;
     this.abilitiesDetailPrompt = null;
+    this.giftCycleBadge = null;
     this.stopShinyLabSummaryFxTimer();
     this.shinyLabFxOverlay?.hide(false);
     this.nameFx?.destroy();
