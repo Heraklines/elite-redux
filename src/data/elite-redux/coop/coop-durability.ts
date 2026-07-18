@@ -605,6 +605,13 @@ interface CoopOperationAuthorityAddress extends CoopOperationContinuationAddress
    * KEY, so leaving it undefined on a key-only construction is harmless.
    */
   logicalPhase?: string;
+  /**
+   * The committing envelope's operation kind ({@linkcode CoopPendingOperation.kind}). Like `logicalPhase`,
+   * only populated from a real envelope ({@linkcode retainedOperationAuthorityFor}) and never part of the KEY.
+   * Used to carve FAINT_SWITCH out of the barrier-side pre-commit exemption: its guest opens a live picker
+   * that emits `materialApplied` pre-commit, so the host must park on that proof rather than advance blindly.
+   */
+  kind?: string;
 }
 
 interface PendingOperationContinuation {
@@ -776,6 +783,9 @@ function retainedOperationAuthorityFor(
       wave: envelope.wave,
       turn: envelope.turn,
       logicalPhase: envelope.logicalPhase,
+      // Only carry `kind` when the envelope actually names an operation (exactOptionalPropertyTypes: an
+      // absent op means undefined kind, which reads as "not FAINT_SWITCH" at the barrier - correct).
+      ...(envelope.pendingOperation?.kind == null ? {} : { kind: envelope.pendingOperation.kind }),
     },
     expectedSurface: envelope.logicalPhase === "GAME_OVER" ? "terminal" : "sharedBoundary",
   };
@@ -1187,7 +1197,18 @@ export class CoopDurabilityManager {
     // (the host never reaches TurnEndPhase, so it never publishes the turn commit the guest awaits). Advance on
     // the host's own pacing; the guest converges on the turn-commit checkpoint and the op releases at its own
     // post-commit `materialApplied`.
-    if (isPreCommitTurnResolveOp(pending.authority)) {
+    //
+    // EXCEPTION (#786 retained peer-material barrier): a FAINT_SWITCH replacement is NOT a deferred op. Its
+    // guest opens a LIVE picker (CoopGuestFaintSwitchPhase) off the faint presentation and emits its
+    // `materialApplied` PRE-COMMIT, before CoopTurnCommitPhase - so the host MUST park on that real proof
+    // (single-engine: no peer -> the waiter stays pending -> the host never leaks a summon past the barrier).
+    // The advance-on-own-pacing exemption here is only ever reached by faint-switch callers (op:reward, the
+    // one other barrier caller, is not TURN_RESOLVE), so excluding FAINT_SWITCH lets it fall through to the
+    // real waiter registration below; a slow/parked guest no longer deadlocks the host because the merged
+    // continuation-recovery re-drive (armOperationContinuationDeadline, attempts>0) re-broadcasts the retained
+    // op until the guest applies + ACKs it. The RELEASE-side exemption (`requiredStage` / `releasesAtMaterial`)
+    // is deliberately left intact, so this cannot reintroduce the journal HOL-block it was built for.
+    if (isPreCommitTurnResolveOp(pending.authority) && pending.authority.kind !== "FAINT_SWITCH") {
       return Promise.resolve(true);
     }
     const evidence = this.hostOperationAckEvidence.get(key);

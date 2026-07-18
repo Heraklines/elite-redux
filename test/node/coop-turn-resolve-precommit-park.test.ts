@@ -33,6 +33,17 @@
 // Every between-wave surface (REWARD_SELECT / WAVE_VICTORY / etc.) is unchanged - it
 // still requires the full continuationReady public-surface proof.
 //
+// #786 BARRIER CARVE-OUT (coop/fix-b7-barrier): FAINT_SWITCH is the one pre-commit
+// TURN_RESOLVE kind that opens a LIVE guest picker (CoopGuestFaintSwitchPhase) and so
+// emits its `materialApplied` PRE-COMMIT - it must therefore PARK on that real proof
+// at the barrier, not advance blindly (a slow/parked guest is now recovered by the
+// merged continuation re-drive, not by advancing past the barrier). That park is
+// proven by coop-guest-renderer.test.ts:756 + showdown-versus-faint. So the barrier
+// advance-exemption below is exercised with a genuinely-deferred, NO-pre-commit-picker
+// kind (LEARN_MOVE_BATCH: the guest processes the batch level-up panel post-commit),
+// which is what the exemption is actually for. The RELEASE-site behavior (case 2) is
+// unchanged and stays keyed on FAINT_SWITCH.
+//
 // This is a NODE-ONLY (engine-free) duo of two real CoopDurabilityManagers over a
 // LoopbackTransport - the SAME framing the two-engine coop-duo harness rides. It
 // FAILS on the pre-fix code (waitForOperationMaterialApplied never resolves for the
@@ -67,7 +78,7 @@ const STATE: CoopAuthoritativeBattleStateV1 = {
 
 function envelope(
   logicalPhase: CoopLogicalPhase,
-  kind: "FAINT_SWITCH" | "REWARD",
+  kind: "FAINT_SWITCH" | "REWARD" | "LEARN_MOVE_BATCH",
   revision = 1,
 ): CoopAuthoritativeEnvelopeV1 {
   return {
@@ -104,10 +115,13 @@ async function settledOrPending<T>(promise: Promise<T>): Promise<"resolved" | "p
 afterEach(() => setCoopOperationDurability(null));
 
 describe("co-op pre-commit in-turn operation does not deadlock the host turn (coop/fix-battle-message-pacing)", () => {
-  it("a parked guest that DEFERS a TURN_RESOLVE op cannot block the host's material barrier", async () => {
+  it("a parked guest that DEFERS a TURN_RESOLVE op (no pre-commit picker) cannot block the host's material barrier", async () => {
     const pair = createLoopbackPair();
     // The guest is parked in CoopReplayTurnPhase: its live sink is not open, so it DEFERS the
     // in-turn operation envelope (never sends materialApplied) - the exact live-deadlock condition.
+    // Uses LEARN_MOVE_BATCH (a genuinely-deferred kind with NO pre-commit picker); FAINT_SWITCH is
+    // carved OUT of this barrier exemption (#786 - it PARKS on its live picker's material proof, see
+    // coop-guest-renderer.test.ts:756), so it is no longer a valid stand-in for the deferred case.
     const host = new CoopDurabilityManager(pair.host);
     const guest = new CoopDurabilityManager(pair.guest, {
       extractKey: message => (message.t === "envelope" ? { cls: "op:global", seq: message.envelope.revision } : null),
@@ -115,7 +129,7 @@ describe("co-op pre-commit in-turn operation does not deadlock the host turn (co
     });
     setCoopOperationDurability(guest);
     try {
-      const turnResolve = envelope("TURN_RESOLVE", "FAINT_SWITCH");
+      const turnResolve = envelope("TURN_RESOLVE", "LEARN_MOVE_BATCH");
       expect(host.commit("op:global", turnResolve.revision, { t: "envelope", envelope: turnResolve })).toBe(true);
       await flush();
       // The parked guest deferred it: NO material proof exists, and the host still retains the op.
