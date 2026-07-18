@@ -354,6 +354,24 @@ export function buildDispatchTable(policy) {
       keys: policy.keys.mystery,
     },
     {
+      // A `selectPokemonForOption` ME (e.g. PART_TIMER, ME type 21) opens a PARTY sub-prompt on the
+      // OWNER client only (the watcher never renders it). It projects as the plain `party` surface
+      // with ownerModel "local" / ownerSeat null, so the generic v2 semantic-owner path can never
+      // resolve it; the `mysteryParty` path owns it (findOwnedActionableMysteryPartySurface +
+      // driveMysteryPartyPicker), picking a legal slot via the same semantic-surface + generation-
+      // keyed navigation the faint picker uses. Owner-seat only; inert outside an ME context
+      // (the finder gates on mysteryEncounterType). v2SurfaceId keys the post-drive suppression by
+      // semantic identity so a driven pick is not re-driven. (Track R cycle-11: a guest-owned
+      // PART_TIMER party sub-prompt had no driver and stalled the mystery lane, run 29654429335.)
+      name: "mystery-party",
+      phase: MYSTERY_PHASE,
+      present: MYSTERY_PHASE,
+      mysteryParty: true,
+      v2SurfaceId: "party",
+      owner: { marker: ME_HOST_OWNER },
+      keys: policy.keys.mystery,
+    },
+    {
       name: "catch-full",
       phase: ATTEMPT_CAPTURE_PHASE,
       present: ATTEMPT_CAPTURE_PHASE,

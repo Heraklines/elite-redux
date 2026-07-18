@@ -9,7 +9,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { EvidenceSink, fatalCoopConsoleReason, isExpectedLocaleFallbackError } from "./evidence.mjs";
+import {
+  EvidenceSink,
+  fatalCoopConsoleReason,
+  isExpectedLocaleFallbackError,
+  isExpectedMissingSystemSaveError,
+} from "./evidence.mjs";
 
 const fatalLines = [
   "[coop:ASSERT] turn=3 CHECKSUM MISMATCH #1 (severity=log): authoritative payload failed",
@@ -67,6 +72,15 @@ function consoleMessage(text, type = "warn") {
   };
 }
 
+/** An error-level console message whose source location is a specific resource URL. */
+function errorAt(text, url) {
+  return {
+    text: () => text,
+    type: () => "error",
+    location: () => ({ url }),
+  };
+}
+
 async function withSink(run, allowedConsoleErrors = []) {
   const artifactDir = await mkdtemp(join(tmpdir(), "coop-fatal-evidence-"));
   const sink = new EvidenceSink("client", artifactDir, allowedConsoleErrors);
@@ -109,6 +123,77 @@ test("only non-English locale JSON 404s are classified as expected i18next fallb
     ),
     false,
   );
+});
+
+test("fresh/dirty account exempts ONLY the two exact missing save/session reads, nothing else", () => {
+  const notFound = "Failed to load resource: the server responded with a status of 404 ()";
+  const api = "https://er-save-api-staging.heraklines.workers.dev";
+  // Track R cycle-11 dirty lane (run 29654429335): a freshly-registered dirty account has no system
+  // save yet, so exactly these two reads legitimately 404. They are expected ONLY under the
+  // fresh-account flag.
+  for (const path of ["/savedata/system/get", "/savedata/session/get"]) {
+    assert.equal(isExpectedMissingSystemSaveError("error", notFound, `${api}${path}`, true), true, path);
+    // No flag (ordinary existing login account) => still fatal.
+    assert.equal(isExpectedMissingSystemSaveError("error", notFound, `${api}${path}`, false), false, path);
+  }
+  assert.equal(isExpectedMissingSystemSaveError("error", "Session read failed (missing).", api, true), true);
+  // STILL FATAL even with the flag: any OTHER endpoint's 404, a non-404 status, or a non-error level.
+  assert.equal(
+    isExpectedMissingSystemSaveError("error", notFound, `${api}/savedata/session/coop-cas-update`, true),
+    false,
+  );
+  assert.equal(isExpectedMissingSystemSaveError("error", notFound, `${api}/savedata/updateall`, true), false);
+  assert.equal(
+    isExpectedMissingSystemSaveError(
+      "error",
+      "Failed to load resource: the server responded with a status of 500 ()",
+      `${api}/savedata/system/get`,
+      true,
+    ),
+    false,
+  );
+  assert.equal(isExpectedMissingSystemSaveError("warning", notFound, `${api}/savedata/system/get`, true), false);
+});
+
+test("EvidenceSink exempts the two fresh-account save 404s but keeps every other 404/pageerror fatal", async () => {
+  const notFound = "Failed to load resource: the server responded with a status of 404 ()";
+  const api = "https://er-save-api-staging.heraklines.workers.dev";
+  const artifactDir = await mkdtemp(join(tmpdir(), "coop-fresh-account-"));
+  const sink = new EvidenceSink("client", artifactDir, [], 0, true);
+  const page = new EventEmitter();
+  try {
+    await sink.init();
+    sink.attach(page);
+    // The two designed fresh-account reads: exempt (recorded expected, never a failure).
+    page.emit("console", errorAt(notFound, `${api}/savedata/system/get`));
+    page.emit("console", errorAt(notFound, `${api}/savedata/session/get`));
+    assert.equal(sink.failures.length, 0);
+    // A 404 on ANY OTHER endpoint stays fatal.
+    page.emit("console", errorAt(notFound, `${api}/savedata/session/coop-cas-update`));
+    assert.equal(sink.failures.length, 1);
+    // A pageerror is always fatal, flag or not.
+    page.emit("pageerror", new Error("TypeError: (t ?? []) is not iterable"));
+    assert.equal(sink.failures.length, 2);
+    assert.throws(() => sink.assertClean(), /2 fatal browser event\(s\)/u);
+  } finally {
+    await rm(artifactDir, { recursive: true, force: true });
+  }
+});
+
+test("without the fresh-account flag the same two save 404s stay fatal", async () => {
+  const notFound = "Failed to load resource: the server responded with a status of 404 ()";
+  const api = "https://er-save-api-staging.heraklines.workers.dev";
+  const artifactDir = await mkdtemp(join(tmpdir(), "coop-existing-account-"));
+  const sink = new EvidenceSink("client", artifactDir, [], 0, false);
+  const page = new EventEmitter();
+  try {
+    await sink.init();
+    sink.attach(page);
+    page.emit("console", errorAt(notFound, `${api}/savedata/system/get`));
+    assert.equal(sink.failures.length, 1);
+  } finally {
+    await rm(artifactDir, { recursive: true, force: true });
+  }
 });
 
 test("EvidenceSink fails on warning-level recovery and an allowlisted checksum error", async () => {

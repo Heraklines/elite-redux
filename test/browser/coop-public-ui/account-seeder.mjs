@@ -15,8 +15,9 @@
 // clientSessionId is the active one and the run never sees "session out of
 // date"):
 //   slots 0-3: valid solo sessions with STAGGERED timestamps (slot 0 oldest)
-//   slot 4:    an unparseable cloud blob - the quarantined/divergent remnant
-//              class, which the reclaim ranking must consume FIRST.
+//   slot 4:    a content-thin epoch-timestamp remnant (a non-array `modifiers` field, the exact
+//              "(t ?? []) is not iterable" TitlePhase shape) - the LEAST-RECENT save, which the
+//              reclaim ranking must consume FIRST before any healthy slot.
 //
 // CLI (used by the dirty-account campaign profile):
 //   node account-seeder.mjs --api-origin <url> --emit-env
@@ -95,12 +96,18 @@ export function soloSessionJson({ seed, timestamp, waveIndex }) {
 }
 
 /**
- * The divergent-remnant blob for slot 4 (quarantine + garbage-first reclaim class). It must be
- * VALID JSON that classifies as a plain solo save server-side (the worker fail-closed-409s any
- * body it cannot prove is not co-op - raw garbage is refused), while the CLIENT's
- * parseSessionData reviver throws on it (`modifiers` is not iterable), which lands the slot in
- * the isolated lobby snapshot's failures map - the exact quarantined class the reclaim ranking
- * must consume first.
+ * The least-valuable slot-4 blob the fresh co-op launch reclaims FIRST. It must be VALID JSON that
+ * classifies as a plain solo save server-side (the worker fail-closed-409s any body it cannot prove
+ * is not co-op - raw garbage is refused). Its `modifiers` field is a NON-ARRAY (`7`), the exact
+ * "(t ?? []) is not iterable" shape that TitlePhase hit on a fresh/dirty account (Track R cycle-11
+ * dirty lane, run 29654429335).
+ *
+ * NOTE (cycle-11): parseSessionData now fails SOFT on a non-array container (coerces `modifiers` to
+ * []) instead of throwing, so this blob is RECOVERED as a valid but content-thin solo save rather
+ * than landing in the lobby snapshot's failures map. The reclaim contract is unchanged either way:
+ * `timestamp: 1` (epoch) makes slot 4 by far the LEAST-RECENT save, so the least-recent reclaim
+ * ranking still consumes it FIRST before any of the healthy slots 0-3. (The garbage-first branch of
+ * that ranking is source-locked separately by resume-scan-isolation.test.mjs.)
  */
 export function divergentRemnantBlob() {
   return JSON.stringify({

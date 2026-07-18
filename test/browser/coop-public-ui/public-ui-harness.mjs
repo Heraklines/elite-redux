@@ -896,6 +896,10 @@ export class PublicUiClient {
       config.artifactDir,
       config.allowedConsoleErrors,
       config.accountMode === "register" ? 1 : 0,
+      // The dirty/reclaim lane logs in visibly (accountMode "login") but its account is freshly
+      // registered with only SESSION slots seeded and NO system save, so its system/session reads
+      // 404 like a fresh account. expectReclaim is that lane's unique signal (run 29654429335).
+      config.expectReclaim === true,
     );
   }
 

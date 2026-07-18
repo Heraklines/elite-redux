@@ -57,6 +57,71 @@ export function findOwnedActionableReplacementSurface(client, fromCursor = 0) {
     : null;
 }
 
+/** Phases that host a mystery-encounter PARTY sub-prompt: the authoritative host runs it from
+ * MysteryEncounterPhase; a guest owner renders it from its CoopReplayMePhase replay. */
+const MYSTERY_PARTY_PHASES = new Set(["MysteryEncounterPhase", "CoopReplayMePhase"]);
+
+/**
+ * A mystery-encounter PARTY sub-prompt owned by THIS browser's local seat, ready for a key.
+ *
+ * A `selectPokemonForOption` ME (e.g. PART_TIMER) opens the party UI (`PartyUiMode.SELECT`) on the
+ * OWNER client only; the watcher never renders it. Unlike the faint picker (`party:replacement`,
+ * `ownerModel: "interaction"`, `ownerSeat === localSeat`), this sub-prompt projects as the plain
+ * `party` surface with `ownerModel: "local"` and `ownerSeat: null` - the owner is the seat listed
+ * in `seatsWithInput`. So `findSemanticOwner` (which needs `ownerSeat === localSeat`) can never
+ * resolve it; this dedicated predicate does, and stays INERT for any non-ME party surface
+ * (a between-wave party context has `mysteryEncounterType == null`).
+ */
+export function findOwnedActionableMysteryPartySurface(client, fromCursor = 0) {
+  const event = client.evidence.findLastSemanticSurface(fromCursor, "party");
+  const observation = event?.observation;
+  // SLOT-LIST form only (same guard as the faint picker): a surface exposing the mon action
+  // SUBMENU (party-option:* ids) is the picker mid-descent; driving party-slot:* keys at it throws
+  // "target not in options". The driver waits for / recovers to the slot list.
+  const slotListForm = !(
+    Array.isArray(observation?.optionIds) && observation.optionIds.some(id => /^party-option:/u.test(id))
+  );
+  return observation?.operationClass === "party"
+    && observation.ownerModel === "local"
+    && MYSTERY_PARTY_PHASES.has(observation.phase)
+    && Number.isSafeInteger(observation.mysteryEncounterType)
+    && observation.uiMode === "PARTY"
+    && observation.localSeat === client.publicSeat
+    && Array.isArray(observation.seatsWithInput)
+    && observation.seatsWithInput.length === 1
+    && observation.seatsWithInput.includes(client.publicSeat)
+    && Array.isArray(observation.optionIds)
+    && observation.optionIds.some(id => /^party-slot:\d+$/u.test(id))
+    && slotListForm
+    && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
+    ? event
+    : null;
+}
+
+/** Whether ANY latest surface at/after the cursor is an OPEN party picker (faint replacement or an
+ * ME party sub-prompt). The between-wave advancers must not press a stale prompt Space THROUGH an
+ * open party UI into a default slot selection (mirrors the existing `party:replacement` guard). */
+export function isPartyPickerSurfaceOpen(observation) {
+  if (observation?.uiMode !== "PARTY") {
+    return false;
+  }
+  if (observation.surfaceId === "party:replacement") {
+    return true;
+  }
+  return (
+    observation.surfaceId === "party"
+    && observation.operationClass === "party"
+    && Number.isSafeInteger(observation.mysteryEncounterType)
+  );
+}
+
+/** The first legal party slot for an ME party sub-prompt: an in-battle-eligible, non-fainted mon
+ * (the `selectPokemonForOption` filter class - PART_TIMER accepts any non-KOd party member). */
+export function mysteryPartyTargetOptionId(observation) {
+  const target = observation?.partySlots?.find(slot => slot?.allowedInBattle === true && slot?.fainted !== true);
+  return Number.isSafeInteger(target?.slot) ? `party-slot:${target.slot}` : null;
+}
+
 /**
  * The currently rendered target picker for this stable seat.
  *

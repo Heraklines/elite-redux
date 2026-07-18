@@ -415,16 +415,19 @@ export function exactCoopDeleteRequestView(value) {
   return { slot, runId, checkpointRevision, digest };
 }
 
-function isExpectedMissingSystemSaveError(type, text, source, registerMode) {
-  if (type !== "error" || !registerMode) {
+export function isExpectedMissingSystemSaveError(type, text, source, freshAccount) {
+  if (type !== "error" || !freshAccount) {
     return false;
   }
-  // A fresh (register-mode) account has NO persisted data yet: the client reads the system
-  // AND session saves, which legitimately 404 until the first persist, and the game logs its
-  // own "Session read failed (missing)." line for the same missing-session read. These are the
-  // expected fresh-account no-save condition - exempt them (dedicated exemption, NOT the
-  // general allowlist). An EXISTING (login-mode) account gets no exemption, so a real missing
-  // save there still fails closed.
+  // A fresh account has NO persisted data yet: the client reads the system AND session saves, which
+  // legitimately 404 until the first persist, and the game logs its own "Session read failed
+  // (missing)." line for the same missing-session read. `freshAccount` is true for a register-mode
+  // account AND for the pre-seeded dirty/reclaim login lane (Track R cycle-11 run 29654429335: the
+  // dirty account is freshly registered with session slots seeded but NO system save, so its
+  // system/session reads 404 exactly like a register-mode account even though it logs in). This is a
+  // DEDICATED exemption of two EXACT endpoint shapes, NOT the general allowlist and NOT a general 404
+  // exemption. An ordinary existing (login-mode) account without this flag gets no exemption, so a
+  // real missing save there still fails closed.
   const path = parsedUrl(source)?.pathname;
   const missingSaveRead =
     (path === "/savedata/system/get" || path === "/savedata/session/get") && /status of 404/u.test(text);
@@ -889,11 +892,24 @@ export function semanticSurfaceView(text) {
 }
 
 export class EvidenceSink {
-  constructor(label, artifactDir, allowedConsoleErrors = [], expectedMissingSystemSaveErrors = 0) {
+  constructor(
+    label,
+    artifactDir,
+    allowedConsoleErrors = [],
+    expectedMissingSystemSaveErrors = 0,
+    freshAccountMissingSaves = false,
+  ) {
     this.label = label;
     this.dir = resolve(artifactDir, label);
     this.allowedConsoleErrors = allowedConsoleErrors;
     this.expectedMissingSystemSaveErrors = expectedMissingSystemSaveErrors;
+    // Track R cycle-11 dirty lane (run 29654429335): the pre-seeded dirty account is FRESHLY
+    // registered (session slots seeded, NO system save ever persisted) and then logged in visibly.
+    // So its system/session reads legitimately 404 exactly like a register-mode fresh account, even
+    // though accountMode is "login". This flag widens ONLY the two exact missing-save reads
+    // (/savedata/system/get + /savedata/session/get) to that dirty/fresh-account context - never a
+    // general 404 exemption.
+    this.freshAccountMissingSaves = freshAccountMissingSaves;
     this.events = [];
     this.failures = [];
     this.expectedSharedTerminalAfterGameOver = null;
@@ -1367,7 +1383,7 @@ export class EvidenceSink {
         message.type(),
         text,
         source,
-        this.expectedMissingSystemSaveErrors,
+        this.expectedMissingSystemSaveErrors || this.freshAccountMissingSaves,
       );
       const expectedLocaleFallback = isExpectedLocaleFallbackError(message.type(), text, source);
       if (expectedMissingSystemSave || expectedLocaleFallback) {
