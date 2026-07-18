@@ -3457,11 +3457,22 @@ function reconstructCoopV2TurnResolution(
  * verb is guarded so an engine throw becomes a `false`/`null` (material rejected / fall-through), never a
  * crash into the frame handler.
  */
-function buildCoopV2TurnLiveSeams(): CoopV2LiveReplicaSeams {
+function buildCoopV2TurnLiveSeams(runtime: CoopRuntime): CoopV2LiveReplicaSeams {
   return {
     applyMaterial: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null => {
       if (entry.kind !== "TURN_COMMIT") {
         return null; // only the TURN surface is cut over; every other kind stays shadow.
+      }
+      // The turn AUTHORITY never REPLICATES its OWN committed turn. A proper peer transport delivers the
+      // TURN_COMMIT to the OTHER seat's replica; but a self-loopback (a single-engine spoof peer / the
+      // module-level inbound fallback when the peer transport exposes no per-instance v2 handler) routes the
+      // authority's own frame back into its own replica pipeline. Re-applying the numeric checkpoint onto the
+      // authority's OWN live scene reconstructs each mon's Status from the effect-only checkpoint, DROPPING
+      // companions the effect number cannot carry (e.g. a freshly-settled Yawn sleep's sleepTurnsRemaining) -
+      // corrupting live state the host already authored correctly. Fall through to pure shadow (in-memory
+      // accounting only, no engine mutation): the authority owns the turn, it must not replicate it.
+      if (runtime.controller.authorityRole === "authority") {
+        return null;
       }
       try {
         const payload = entry.material.payload as TurnResolutionImage | undefined;
@@ -3477,16 +3488,34 @@ function buildCoopV2TurnLiveSeams(): CoopV2LiveReplicaSeams {
         // longer starve the guest (the soft-lock class) and the terrain/arenaTags/field companions the
         // numeric checkpoint omits converge (the wave-start drift class). Idempotent: the streamer classes
         // an identical redelivery as a re-ACK/ignore, so first delivery and every redelivery are equivalent.
+        //
+        // CONTEXT-BIND (never ambient): the authority log delivers the FIRST TURN_COMMIT SYNCHRONOUSLY on
+        // commit, so in a single-realm (duo) session this seam runs under the HOST ambient while the entry
+        // is destined for the GUEST replica. admit() then dedupes the backoff redeliveries, so this seam
+        // runs at most once per entry. Reading the ambient getCoopBattleStreamer() would therefore wake the
+        // HOST streamer's inbox and strand the guest's parked CoopReplayTurnPhase (which awaits THIS
+        // runtime's streamer) forever. Ingest into runtime.battleStream directly so the correct replica
+        // wakes regardless of which scene is ambient at synchronous-delivery time.
         const resolution = reconstructCoopV2TurnResolution(payload);
         if (resolution != null) {
-          getCoopBattleStreamer()?.ingestAuthoritativeV2Turn(resolution);
+          runtime.battleStream.ingestAuthoritativeV2Turn(resolution);
+          // Eager numeric checkpoint apply ONLY when THIS runtime is the live ambient one (its scene is
+          // globalScene). Off-ambient (synchronous cross-context delivery) it would mutate the WRONG scene;
+          // the now-woken guest replay pump reaches CoopFinalizeTurnPhase which re-applies the checkpoint +
+          // full companions under the correct guest ambient. The ingest above is the honest materialApplied
+          // verdict on its own (the authoritative image is installed on the destination replica).
+          if (active === runtime) {
+            applyCoopCheckpoint(checkpoint as Parameters<typeof applyCoopCheckpoint>[0]);
+          }
+          return true;
         }
-        // Also apply the numeric checkpoint eagerly (tick-gated + idempotent via coopAcceptStateTick) so
-        // materialApplied honestly reports canonical numeric state installed even before the guest's replay
-        // pump reaches finalize; CoopFinalizeTurnPhase re-applies it (a no-op) plus the full companions. When
-        // the resolution could not be reconstructed (a bare/malformed image) the checkpoint apply is the
-        // materialApplied verdict on its own, preserving the pre-enrichment behaviour.
-        return applyCoopCheckpoint(checkpoint as Parameters<typeof applyCoopCheckpoint>[0]);
+        // A bare/malformed image (no reconstructable companions - a pure shadow image or an older host):
+        // the numeric checkpoint apply is the materialApplied verdict on its own, preserving the
+        // pre-enrichment behaviour. Still scene-gated so an off-ambient delivery never touches a foreign
+        // scene; off-ambient it declines the material (false) rather than mutating the wrong scene.
+        return active === runtime
+          ? applyCoopCheckpoint(checkpoint as Parameters<typeof applyCoopCheckpoint>[0])
+          : false;
       } catch (error) {
         coopWarn("v2-turn", `live applyMaterial threw for rev=${entry.revision}`, error);
         return false;
@@ -3593,7 +3622,7 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
         // `CoopMessage` union (contract change request 3), so this crosses the seam type-exact, no cast.
         localTransport.send(frame);
       },
-      ...(turnCutover ? { liveReplica: buildCoopV2TurnLiveSeams() } : {}),
+      ...(turnCutover ? { liveReplica: buildCoopV2TurnLiveSeams(runtime) } : {}),
     });
     registerCoopV2ShadowInbound(frame => harness.handleInboundFrame(frame));
     setActiveCoopV2Shadow(harness);

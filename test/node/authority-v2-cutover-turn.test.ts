@@ -377,3 +377,83 @@ describe("authority-v2 turn cutover - guest LIVE replica routing", () => {
     expect(seamGuest.receiptsSent).toBe(pureGuest.receiptsSent);
   });
 });
+
+describe("authority-v2 turn cutover - replica context binding + authority self-apply guard", () => {
+  it("delivers the applier a context that identifies a REPLICA (localSeat != authoritySeat) vs the AUTHORITY", () => {
+    // The live seam (coop-runtime buildCoopV2TurnLiveSeams) must NOT read the ambient runtime/scene: the first
+    // TURN_COMMIT delivery is SYNCHRONOUS on commit, so in a single-realm session it can run under a foreign
+    // ambient. The seam instead consults the CONTEXT its harness carries. This locks that the delivered context
+    // exposes the seat discriminator both fixes rely on: on the guest replica localSeatId != authoritySeatId
+    // (it applies + wakes ITS OWN streamer), and the authority is exactly the seat where they are equal (it must
+    // decline to replicate its own committed turn - the Yawn self-apply corruption guard).
+    const seenCtx: { localSeatId: number; authoritySeatId: number }[] = [];
+    const live: CoopV2LiveReplicaSeams = {
+      applyMaterial(ctx, entry: CoopAuthorityEntry): boolean | null {
+        if (entry.kind !== "TURN_COMMIT") {
+          return null;
+        }
+        seenCtx.push({ localSeatId: ctx.localSeatId, authoritySeatId: ctx.authoritySeatId });
+        return true;
+      },
+      projectControl: (_ctx, control: NonNullable<CoopNextControl>): CoopControlInstallResult | null =>
+        control.kind === "COMMAND" ? { kind: "installed", controlId: controlIdOf(control) } : null,
+    };
+    const clock = new FakeClock();
+    const duo = buildDuo(clock, live);
+
+    duo.host.tapTurnCommit(turnTap());
+
+    // The guest replica applied under ITS seat (1), the authority seat is 0, and the two differ - so a runtime
+    // whose local seat EQUALS the authority seat (the host) can recognize its own turn and skip replicating it.
+    expect(seenCtx).toEqual([{ localSeatId: 1, authoritySeatId: 0 }]);
+    expect(seenCtx[0].localSeatId).not.toBe(seenCtx[0].authoritySeatId);
+    duo.dispose();
+  });
+
+  it("an AUTHORITY self-loopback that declines its own TURN_COMMIT (returns null) falls through to shadow, no double authority", () => {
+    // Models the Yawn/B-13 corruption: a single-engine spoof peer (or the module-level inbound fallback) routes
+    // the authority's OWN committed TURN_COMMIT back into its own replica pipeline. buildCoopV2TurnLiveSeams
+    // recognizes it is the authority (localSeat == authoritySeat) and returns null, so the numeric checkpoint is
+    // NEVER re-applied onto the authority's own live scene (which would drop companions like sleepTurnsRemaining).
+    // The entry still accounts as pure shadow - never a second authority, never a stuck one.
+    const applyCalls: number[] = [];
+    const engineApplies: number[] = [];
+    const authoritySkipSeam: CoopV2LiveReplicaSeams = {
+      applyMaterial(ctx, entry: CoopAuthorityEntry): boolean | null {
+        if (entry.kind !== "TURN_COMMIT") {
+          return null;
+        }
+        applyCalls.push(entry.revision); // the self-loopback DID reach the replica applier (as in the B-13 log)
+        // The authority never replicates its own committed turn (the coop-runtime guard, expressed here via the
+        // frame-context seat discriminator equivalent to runtime.controller.authorityRole === "authority").
+        if (ctx.localSeatId === ctx.authoritySeatId) {
+          return null;
+        }
+        engineApplies.push(entry.revision);
+        return true;
+      },
+      projectControl: () => null,
+    };
+    const clock = new FakeClock();
+    // A harness on the AUTHORITY seat (0) whose send self-loopbacks the committed frame back into itself.
+    let authority!: CoopAuthorityV2Shadow;
+    authority = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => routeInto(authority, encodeFrameV2(frame)),
+      scheduler: createCoopScheduler(clock),
+      liveReplica: authoritySkipSeam,
+    });
+
+    authority.tapTurnCommit(turnTap());
+
+    const diag = authority.diagnostics();
+    // The self-loopback REACHED the applier (proving the guard path is genuinely exercised), the seam declined
+    // (no engine apply), yet the entry is accounted in shadow state exactly like pure shadow.
+    expect(applyCalls).toEqual([1]);
+    expect(engineApplies).toEqual([]);
+    expect(diag.shadowStateSize).toBe(1);
+    authority.dispose();
+  });
+});
