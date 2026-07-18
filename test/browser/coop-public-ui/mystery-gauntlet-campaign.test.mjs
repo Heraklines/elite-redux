@@ -118,7 +118,23 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.doesNotMatch(campaign, /\^cursor:\(\\d\+\)\$/u);
   assert.match(campaign, /selected\.startsWith\("party-option:"\)/u);
   assert.match(campaign, /campaign-reward-target-action/u);
-  assert.match(campaign, /await driveConfirmedLeave\(rig, driver, client, mechanicalBoundary\.authority\)/u);
+  assert.match(campaign, /await driveConfirmedLeave\(rig, driver, client, mechanicalBoundary\.authority, cursors\)/u);
+  // Track R dirty lane wave-3: the watcher's non-actionable reward-shop replica is emitted ONCE and held on
+  // a digest-budget-throttled runner (guest "mechanical digest p95 70.7ms exceeds the 50ms budget"), so the
+  // reward-watcher wait must scan from the WAVE-START cursor (not a post-convergence cursor), else it times
+  // out ("timed out waiting for non-actionable reward watcher") on a correctly-parked guest.
+  assert.match(
+    campaign,
+    /export async function driveConfirmedLeave\(rig, driver, owner, authority, waveStartCursors = null\)/u,
+  );
+  assert.match(
+    campaign,
+    /const watcherRewardFrom = waveStartCursors\?\.\[watcher\.label\] \?\? confirmationCursors\[watcher\.label\]/u,
+  );
+  assert.match(
+    campaign,
+    /watcher\.waitForAddressedRewardWatcher\(watcherRewardFrom, owner\.publicSeat, authority\.address\)/u,
+  );
   assert.match(campaign, /event\.terminal\.wave === wave \+ 1/u);
   assert.match(campaign, /if \(nextBoundary\.wave <= event\.wave\)/u);
   assert.match(campaign, /mysteryEvents: mysteryCoverage\.events/u);
@@ -143,6 +159,15 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
     /surfaceId === "mystery-encounter:message"[\s\S]*?operationClass === "encounter-prompt"[\s\S]*?phase === "MysteryEncounterPhase" \|\| observation\.phase === "CoopReplayMePhase"/u,
   );
   assert.match(campaign, /observation\.localSeat === observation\.ownerSeat/u);
+  // Track R mystery-gauntlet wave-1 ME (#816): on a GUEST-owned ME the authoritative HOST advances its OWN
+  // MysteryEncounterPhase engine MESSAGE dialogue itself (the guest renderer's CoopReplayMePhase Space never
+  // relays to the host), so the advancer must drive the host too - else the host's outcome narration parks
+  // forever after the owner's option pick (host stalled at an actionable mystery-encounter:message).
+  assert.match(
+    campaign,
+    /client === rig\.host\s*&&\s*observation\.phase === "MysteryEncounterPhase"\s*&&\s*observation\.localSeat !== observation\.ownerSeat/u,
+  );
+  assert.match(campaign, /\(ownerDrives \|\| hostEngineDialogue\)/u);
   assert.match(campaign, /consumedInstances\.add\(`\$\{client\.label\}:\$\{surfaceId\}:\$\{phaseInstance\}`\)/u);
   assert.match(campaign, /const advanceMysteryNarration = createMysteryNarrationAdvancer\(/u);
   assert.match(campaign, /if \(await advanceMysteryNarration\(\)\) \{/u);

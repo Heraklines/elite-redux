@@ -3242,7 +3242,18 @@ export class DuoPublicUiRig {
     // re-pressed an already-consumed pre-picker battle:message straight through into the PARTY UI.
     const pickerOpenIndex = findReplacementPickerOpenIndex(owner, replacementCursors[owner.label] ?? 0);
     const advancerCursors = { ...replacementCursors, [owner.label]: pickerOpenIndex };
-    const advanceBattlePrompt = createBattlePromptAdvancer(this, advancerCursors, {}, "faint-replacement-picker");
+    // A faint window is INHERENTLY a divergent-address state: the fainted owner is in its own-slot
+    // SwitchPhase / replacement picker while the partner still holds (or has already left) the last
+    // battle command surface, so the two clients have NO single shared public command address. The
+    // default advancer eagerly computes currentSharedCommandAddress and THREW here on a staggered /
+    // double faint (Track R animations-on-surface lane: "battle prompt advancement requires one shared
+    // public command address"). This advancer only drives the local CoopFaintReplayPhase MessagePhase
+    // narration, which is scoped by the picker-open cursor and each ready prompt's own live battle
+    // address - it never needs a shared command address. Same relaxation the between-wave advancer
+    // already uses (advanceToNextWaveCommand) for the same divergent-address reason.
+    const advanceBattlePrompt = createBattlePromptAdvancer(this, advancerCursors, {}, "faint-replacement-picker", {
+      requireSharedCommandAddress: false,
+    });
     const deadline = Date.now() + this.config.timeoutMs;
     let replacementSurface = null;
     while (Date.now() < deadline) {

@@ -585,10 +585,15 @@ export function createBattlePromptAdvancer(
  * they are not in BATTLE_PROMPT_PHASES - so nothing pressed them and both seats stalled until the
  * deadline (run 29644735938). This presses Space once PER PROMPT GENERATION for the owner seat only,
  * keyed by phaseInstance in a consumed-instance set exactly like createBattlePromptAdvancer (the
- * product bumps phaseInstance per narration message, so distinct prompts are distinct). Only the
- * owner client matches: its interaction surface stamps ownerSeat === localSeat and seatsWithInput =
+ * product bumps phaseInstance per narration message, so distinct prompts are distinct). The owner
+ * client matches: its interaction surface stamps ownerSeat === localSeat and seatsWithInput =
  * [ownerSeat], while the watcher's projection carries the same seatsWithInput = [ownerSeat] with its
  * own localSeat != ownerSeat and is therefore never pressed - exactly a human at the owner seat.
+ *
+ * GUEST-OWNED ME (#816): the authoritative HOST additionally drives its OWN MysteryEncounterPhase
+ * engine MESSAGE dialogue, because ui.ts lets the host advance that dialogue itself while the guest
+ * owns the ME (the guest renderer's CoopReplayMePhase Space never relays to the host). Without it the
+ * host's outcome narration parks forever after the owner's option pick.
  */
 export function createMysteryNarrationAdvancer(rig, from, stats, purpose) {
   const clients = Object.values(rig.clients);
@@ -602,6 +607,25 @@ export function createMysteryNarrationAdvancer(rig, from, stats, purpose) {
         }
         const observation = event.observation;
         const instanceKey = `${client.label}:${observation.surfaceId}:${observation.phaseInstance}`;
+        // The OWNER seat advances its own ME narration prompt: its interaction surface stamps ownerSeat
+        // === localSeat with seatsWithInput = [ownerSeat]; the watcher's projection carries the same
+        // seatsWithInput with a DIFFERENT localSeat and is therefore never pressed - a human at the owner.
+        const ownerDrives =
+          observation.localSeat === observation.ownerSeat
+          && observation.seatsWithInput?.includes(observation.ownerSeat)
+          && observation.seatsWithInput?.includes(observation.localSeat);
+        // #816 (GUEST-owned ME): the authoritative HOST runs the sole ME engine (MysteryEncounterPhase)
+        // and, per ui.ts processInputCoopAware, ADVANCES ITS OWN engine MESSAGE dialogue itself while a
+        // GUEST owns the ME - the guest renderer (CoopReplayMePhase) cannot drive the host's authoritative
+        // narration (its Space advances only the local replay, never relays), so NOTHING else presses the
+        // host's outcome prompt and MysteryEncounterPhase parks forever (Track R mystery-gauntlet lane,
+        // wave-1 ME: host stalled at an actionable mystery-encounter:message awaiting the owner seat). The
+        // host is NOT the owner here (localSeat !== ownerSeat) and its engine dialogue omits the owner seat
+        // from its own input, so this branch is disjoint from ownerDrives and never fires on a host-owned ME.
+        const hostEngineDialogue =
+          client === rig.host
+          && observation.phase === "MysteryEncounterPhase"
+          && observation.localSeat !== observation.ownerSeat;
         return (
           observation.surfaceId === "mystery-encounter:message"
           && observation.operationClass === "encounter-prompt"
@@ -609,9 +633,7 @@ export function createMysteryNarrationAdvancer(rig, from, stats, purpose) {
           && observation.uiMode === "MESSAGE"
           && observation.ownerModel === "interaction"
           && observation.coop === true
-          && observation.localSeat === observation.ownerSeat
-          && observation.seatsWithInput?.includes(observation.ownerSeat)
-          && observation.seatsWithInput?.includes(observation.localSeat)
+          && (ownerDrives || hostEngineDialogue)
           && Number.isSafeInteger(observation.phaseInstance)
           && observation.ready?.handlerActive === true
           && observation.ready?.awaitingActionInput === true
@@ -1549,7 +1571,7 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
  * the confirmation, prove that exact addressed handler is actionable, and only then
  * submit the remaining key(s). This is load-bearing on throttled remote Chromium.
  */
-export async function driveConfirmedLeave(rig, driver, owner, authority) {
+export async function driveConfirmedLeave(rig, driver, owner, authority, waveStartCursors = null) {
   const [openConfirmKey, ...confirmKeys] = driver.keys;
   if (!openConfirmKey || confirmKeys.length === 0 || !driver.confirmSurfaceId) {
     throw new Error(`[campaign-readiness] ${driver.name} semantic leave has no open/confirm key split`);
@@ -1560,13 +1582,25 @@ export async function driveConfirmedLeave(rig, driver, owner, authority) {
     throw new Error(`[campaign-readiness] ${driver.name} semantic leave has no paired watcher`);
   }
   const confirmationCursors = fromEach(clients, client => client.evidence.cursor());
+  // The watcher's non-actionable reward-shop replica is a STABLE state: on a throttled runner whose
+  // semantic-digest budget is blown (Track R dirty lane wave-3: the guest logged "mechanical digest p95
+  // 70.7ms exceeds the 50ms budget") the guest emits that projection ONCE and holds it, rather than
+  // re-emitting across the owner's confirm navigation. checkpointPairedMechanicalSurface already CONVERGED
+  // on (and consumed) that single projection, so scanning the watcher from confirmationCursors - captured
+  // AFTER the convergence - finds no fresh emission and times out even though the guest is correctly parked
+  // ("timed out waiting for non-actionable reward watcher at .../3/3"). Scan the watcher from the wave-start
+  // cursor instead, so the already-proven, address-pinned non-actionable replica still satisfies the wait.
+  // The invariant is intact: findAddressedRewardWatcher returns the LATEST reward-shop and requires
+  // awaitingActionInput === false at the exact authority address, so a watcher that ever turned actionable
+  // still fails. The owner-confirm half is unchanged (its reward:confirm surface only appears post-open).
+  const watcherRewardFrom = waveStartCursors?.[watcher.label] ?? confirmationCursors[watcher.label];
   await owner.press(openConfirmKey, `campaign-${driver.name}-open-confirm`);
 
   let ownerConfirm;
   if (driver.confirmSurfaceId === "reward:confirm") {
     [ownerConfirm] = await Promise.all([
       owner.waitForOwnedRewardConfirm(confirmationCursors[owner.label], authority.address),
-      watcher.waitForAddressedRewardWatcher(confirmationCursors[watcher.label], owner.publicSeat, authority.address),
+      watcher.waitForAddressedRewardWatcher(watcherRewardFrom, owner.publicSeat, authority.address),
     ]);
   } else {
     ownerConfirm = await owner.evidence.waitForCondition(
@@ -1643,7 +1677,7 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
     } else if (driver.name === "reward-target" && mechanicalBoundary != null) {
       await driveRewardPartyTarget(rig, driver, client, mechanicalBoundary);
     } else if (driver.confirmSurfaceId && mechanicalBoundary != null) {
-      await driveConfirmedLeave(rig, driver, client, mechanicalBoundary.authority);
+      await driveConfirmedLeave(rig, driver, client, mechanicalBoundary.authority, cursors);
     } else {
       await client.sequence(driver.keys, `campaign-${driver.name}`);
     }

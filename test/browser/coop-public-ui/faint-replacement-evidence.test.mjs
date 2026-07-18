@@ -64,7 +64,14 @@ test("the replacement picker drive gates its battle-prompt advancer to picker-op
     /const pickerOpenIndex = findReplacementPickerOpenIndex\(owner, replacementCursors\[owner\.label\]/u,
   );
   assert.match(drive, /const advancerCursors = \{ \.\.\.replacementCursors, \[owner\.label\]: pickerOpenIndex \}/u);
-  assert.match(drive, /createBattlePromptAdvancer\(this, advancerCursors, \{\}, "faint-replacement-picker"\)/u);
+  // Track R animations-on-surface lane: a faint window has NO shared public command address (the fainted
+  // owner is in its picker while the partner holds/left the command surface), so the advancer must NOT
+  // require one - the default eager currentSharedCommandAddress THREW "requires one shared public command
+  // address" on a staggered/double faint. It drives only local faint-replay narration by live address.
+  assert.match(
+    drive,
+    /createBattlePromptAdvancer\(this, advancerCursors, \{\}, "faint-replacement-picker", \{\s*requireSharedCommandAddress: false,\s*\}\)/u,
+  );
   // The picker-open finder itself uses the first party:replacement surface / SwitchPhase-class start.
   assert.match(
     harness,
