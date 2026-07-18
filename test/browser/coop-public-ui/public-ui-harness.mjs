@@ -2207,15 +2207,38 @@ export class DuoPublicUiRig {
     const priorAddress = this.lastSharedSurfaceAddress.get("command");
     const deadline = Date.now() + this.config.timeoutMs;
     let match = null;
+    // Divergence-aware fast-abort: the frontier matcher REQUIRES host and guest to publish the
+    // SAME stateDigest at one command address (findSharedCommandFrontierMatch). If both clients
+    // sit at the same command address with STABLE but UNEQUAL digests for ~30s, that convergence
+    // can never happen - abort now naming the diverging components instead of burning the full
+    // timeout on a decided divergence (mirrors assertSharedSurface's shared-surface abort).
+    let divergenceSignature = null;
+    let divergenceSince = 0;
     while (Date.now() < deadline && match == null) {
       match = findSharedCommandFrontierMatch(host, guest, cursors, priorAddress, {
         allowAddressRepeat,
         expectedWave,
         expectedAddress,
       });
-      if (match == null) {
-        await delay(100);
+      if (match != null) {
+        break;
       }
+      const divergence = detectSurfaceDivergence(host, guest, "command", cursors);
+      if (divergence == null) {
+        divergenceSignature = null;
+      } else {
+        const signature = `${divergence.address}|${divergence.hostDigest}|${divergence.guestDigest}`;
+        if (signature !== divergenceSignature) {
+          divergenceSignature = signature;
+          divergenceSince = Date.now();
+        } else if (Date.now() - divergenceSince > 30_000) {
+          const components = diffDigestComponents(host, guest, divergence.address, cursors);
+          throw new Error(
+            `${proofName}: STABLE state-digest DIVERGENCE at command address ${divergence.address} (host=${divergence.hostDigest} guest=${divergence.guestDigest}) held >30s; diverging components: ${components}`,
+          );
+        }
+      }
+      await delay(100);
     }
     if (match == null) {
       const latest = client => observedCommandFrontiers(client, cursors[client.label] ?? 0)[0] ?? null;
