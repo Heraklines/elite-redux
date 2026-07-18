@@ -241,6 +241,13 @@ describe("ER transform FX - deferred target-mask timing (planErMorphTick)", () =
     doneAt: number | null;
     /** True if the glow ever ENDED (reveal) before the target swap landed (a late pop). */
     revealedBeforeSwap: boolean;
+    /**
+     * True if at ANY tick the source-shaped glow overlay is drawn (overallAlpha > 0)
+     * while the real sprite is also visible (spriteAlpha > 0) on the NON-morph path
+     * (morphing === false) - i.e. the OLD-form silhouette painted over the NEW sprite
+     * (the reported eevee/eeveelution overlap). Must always be false.
+     */
+    overlapViolation: boolean;
   }
 
   /** Step the pure planner tick-by-tick, threading its own persisted `revealStart`. */
@@ -251,6 +258,7 @@ describe("ER transform FX - deferred target-mask timing (planErMorphTick)", () =
     let burstCount = 0;
     let doneAt: number | null = null;
     let revealedBeforeSwap = false;
+    let overlapViolation = false;
     for (let el = 0; el <= end; el += 16) {
       const swapDone = swapAt !== null && el >= swapAt;
       const maskReady = maskReadyAt !== null && el >= maskReadyAt;
@@ -272,6 +280,14 @@ describe("ER transform FX - deferred target-mask timing (planErMorphTick)", () =
       if (plan.stage === "reveal" && !swapDone) {
         revealedBeforeSwap = true;
       }
+      // The overlap invariant applies once the sprite is the NEW form (the REVEAL):
+      // whenever the glow overlay is drawn AND the new sprite is visible, the overlay
+      // must be the TARGET shape (morphing), never the source. (During FILL the sprite
+      // is still the OLD form and its source-shaped glow is the intended dissolve, not
+      // an overlap; during HOLD/MORPH the sprite is hidden at alpha 0.)
+      if (plan.stage === "reveal" && plan.overallAlpha > 0 && plan.spriteAlpha > 0 && !plan.morphing) {
+        overlapViolation = true;
+      }
       if (plan.revealStart >= 0) {
         revealStart = plan.revealStart;
       }
@@ -280,7 +296,7 @@ describe("ER transform FX - deferred target-mask timing (planErMorphTick)", () =
         break;
       }
     }
-    return { stages, burstCount, doneAt, revealedBeforeSwap };
+    return { stages, burstCount, doneAt, revealedBeforeSwap, overlapViolation };
   }
 
   it("plays the FILL from t=0 with no target asset (fades the source out, floods the glow in)", () => {
@@ -371,5 +387,61 @@ describe("ER transform FX - deferred target-mask timing (planErMorphTick)", () =
       expect(res.burstCount).toBe(1);
       expect(res.doneAt).not.toBeNull();
     }
+  });
+
+  it("NEVER draws the old-form silhouette over the visible new sprite (the eevee/eeveelution overlap)", () => {
+    // Every path - warm morph, late-but-in-stretch morph, degrade, slow degrade - must
+    // keep the overlap invariant: the source-shaped glow is never drawn while the real
+    // (target) sprite is visible. On the morph path the overlay is the TARGET shape
+    // (matches the sprite); on the degrade path the overlay is suppressed entirely.
+    const cases = [
+      { maskReadyAt: 300, swapAt: 300, end: 3000 }, // warm morph
+      { maskReadyAt: 1200, swapAt: 1200, end: 4000 }, // late-but-in-stretch morph
+      { maskReadyAt: null, swapAt: 1200, end: 4500 }, // degrade
+      { maskReadyAt: null, swapAt: 2500, end: 5500 }, // slow degrade
+    ];
+    for (const c of cases) {
+      expect(drive(c).overlapViolation).toBe(false);
+    }
+  });
+
+  it("on the DEGRADE reveal suppresses the source overlay (overlay off, sprite fades in, morphing=false)", () => {
+    // A reveal tick on the degrade path: swap landed (2500), no mask ever.
+    const plan = planErMorphTick({
+      elapsed: 2600,
+      fillMs: FILL,
+      holdCapMs: HOLD,
+      morphMs: MORPH,
+      drainMs: DRAIN,
+      swapDone: true,
+      maskReady: false,
+      readyAtMs: 0,
+      revealStart: 2500,
+    });
+    expect(plan.stage).toBe("reveal");
+    expect(plan.morphing).toBe(false);
+    // Sprite is fading IN, but the source-shaped overlay is NOT drawn.
+    expect(plan.spriteAlpha).toBeGreaterThan(0);
+    expect(plan.overallAlpha).toBe(0);
+  });
+
+  it("on the MORPH reveal the overlay is the TARGET shape (morphP 1) so it matches the sprite", () => {
+    const plan = planErMorphTick({
+      elapsed: FILL + MORPH + 100, // just into the drain
+      fillMs: FILL,
+      holdCapMs: HOLD,
+      morphMs: MORPH,
+      drainMs: DRAIN,
+      swapDone: true,
+      maskReady: true,
+      readyAtMs: FILL,
+      revealStart: FILL + MORPH,
+    });
+    expect(plan.stage).toBe("reveal");
+    expect(plan.morphing).toBe(true);
+    // Both drawn together, but the overlay is the TARGET shape (p = 1), not the source.
+    expect(plan.spriteAlpha).toBeGreaterThan(0);
+    expect(plan.overallAlpha).toBeGreaterThan(0);
+    expect(plan.morphP).toBe(1);
   });
 });

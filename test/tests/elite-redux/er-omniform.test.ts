@@ -2,9 +2,11 @@ import { allMoves } from "#data/data-lists";
 import {
   ER_OMNIFORM_ABILITY_ID,
   erOmniformOnMoveStart,
+  erOmniformPreloadTargets,
   erOmniformRevertOnLeaveField,
 } from "#data/elite-redux/abilities/omniform";
 import { clearOmniformRegistry, registerOmniformMapping } from "#data/elite-redux/abilities/omniform-registry";
+import { PokemonSpeciesForm } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -195,5 +197,51 @@ describe.skipIf(!RUN)("ER Omniform (5929)", () => {
     expect(holder.getMoveset().map(m => m?.moveId)).toEqual(movesBefore);
     expect(queueMessage).not.toHaveBeenCalled();
     expect(unshiftNew.mock.calls.some(call => call[0] === "ErOmniformTransformWaitPhase")).toBe(false);
+  });
+
+  it("preloads EVERY reachable transform-target atlas (the whole family), skipping the current form", () => {
+    // Registry maps Eevee -> Vaporeon -> Flareon, so the connected family from Eevee is
+    // {Eevee, Vaporeon, Flareon}. Preload must warm Vaporeon + Flareon (not Eevee).
+    const loaded: number[] = [];
+    const holder = {
+      getSpeciesForm: () => ({ speciesId: SpeciesId.EEVEE, formIndex: 0 }),
+      getAllActiveAbilityAttrs: () => [{ constructor: { name: "OmniformAbAttr" } }],
+      isActive: () => true,
+      getGender: () => 0,
+      isShiny: () => false,
+      getVariant: () => 0,
+    } as unknown as Parameters<typeof erOmniformPreloadTargets>[0];
+
+    const spy = vi.spyOn(PokemonSpeciesForm.prototype, "loadAssets").mockImplementation(function (
+      this: PokemonSpeciesForm,
+    ) {
+      loaded.push(this.speciesId);
+      return Promise.resolve();
+    });
+    try {
+      erOmniformPreloadTargets(holder);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(loaded).toContain(SpeciesId.VAPOREON);
+    expect(loaded).toContain(SpeciesId.FLAREON);
+    // The current form is already loaded (the holder is wearing it) - not re-warmed.
+    expect(loaded).not.toContain(SpeciesId.EEVEE);
+    // Sprite-only + background start: spriteOnly=true (arg 7) and startLoad=true (arg 5).
+    for (const call of spy.mock.calls) {
+      expect(call[4]).toBe(true); // startLoad
+      expect(call[6]).toBe(true); // spriteOnly
+    }
+  });
+
+  it("warms the transform targets automatically on SUMMON (the PostSummon seam)", async () => {
+    // A call-through spy so the real summon still loads Eevee; the Omniform PostSummon
+    // apply must additionally warm the mapped-target atlases (Vaporeon + Flareon).
+    const spy = vi.spyOn(PokemonSpeciesForm.prototype, "loadAssets");
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const loaded = spy.mock.instances.map(inst => (inst as PokemonSpeciesForm).speciesId);
+    expect(loaded).toContain(SpeciesId.VAPOREON);
+    expect(loaded).toContain(SpeciesId.FLAREON);
   });
 });

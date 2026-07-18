@@ -1165,6 +1165,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) New game over an occupied SOLO slot overwrites (does not boot to title)",
+    description:
+      "SAVE-SLOT flow fix (P0, not a battle behavior) - starting a NEW run and overwriting an\n"
+      + "occupied SOLO save slot silently failed with 'Local/cloud checkpoint bytes differ; refusing\n"
+      + "ambiguous delete' and booted straight back to the title. The overwrite delete compared local\n"
+      + "vs cloud bytes and dead-ended on ANY divergence (which deploy churn caused for most testers).\n"
+      + "An EXPLICIT user overwrite of a solo slot now proceeds and clears both copies; co-op slots and\n"
+      + "automatic/background clears keep the strict guard.\n"
+      + "DO (this is a TITLE-SCREEN check, ignore the throwaway battle you spawn into): from the title,\n"
+      + "start a NEW game, pick a starter, and on the save-slot screen choose a slot that ALREADY has a\n"
+      + "solo run. Confirm the overwrite.\n"
+      + "EXPECT: the run STARTS (wave 1) instead of flashing back to the title. Deleting a solo run and\n"
+      + "starting into an EMPTY slot still work. Unit-tested in\n"
+      + "test/tests/elite-redux/er-solo-overwrite-divergence.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 5,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Eternal Floette shows its ER kit (Energy Tap + 3 innates)",
     description:
       "KIT fix (starter / summary / battle surface) - Eternal Floette (the vanilla ETERNAL_FLOETTE\n"
@@ -18582,10 +18610,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "(Eevee fully becomes Leafeon), and ONLY THEN does the move animation play as\n"
       + "Leafeon - the transform must NOT happen on top of / after the move. After the\n"
       + "reveal the mon RESTS cleanly on the new Leafeon form (correct sprite, fully\n"
-      + "visible, no snap-back to Eevee, no glow remnant). On a SLOW connection the\n"
-      + "glow HOLDS (stretches) until the new sprite has finished loading, then morphs\n"
-      + "and reveals onto it - the glow must never end and leave the sprite to pop in\n"
-      + "visibly late. The starting moveset also has Water Gun / Ember / Thunder Shock,\n"
+      + "visible, no snap-back to Eevee, no glow remnant). At NO point are the old and\n"
+      + "new sprites both visible at once - the Eevee sprite must never overlap the\n"
+      + "eeveelution (the swap happens hidden under the glow). The eeveelution sprites\n"
+      + "are PRELOADED the moment Eevee is sent out, so on a normal connection the shape\n"
+      + "morph plays immediately with no delay. On a SLOW connection the glow HOLDS\n"
+      + "(stretches) until the new sprite has finished loading, then morphs and reveals\n"
+      + "onto it - the glow must never end and leave the sprite to pop in visibly late.\n"
+      + "The starting moveset also has Water Gun / Ember / Thunder Shock,\n"
       + "so a fresh run of this scenario can show the blue (Vaporeon), orange (Flareon)\n"
       + "and yellow (Jolteon) variants.\n"
       + "ALSO DO: once you have adapted to a form, use that SAME form's own type again\n"
