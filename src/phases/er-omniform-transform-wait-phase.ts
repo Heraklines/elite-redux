@@ -8,7 +8,9 @@
 // Elite Redux — Omniform transform presentation hold.
 //
 // The Omniform transform plays a ~2.2s fill/morph/reveal sequence
-// (`playErTransformMorph`) that must LAND before the move animation plays, so
+// (`playErTransformMorph`) - longer when the target atlas is still downloading on
+// staging, since the glow STRETCHES until the swap lands - that must LAND before
+// the move animation plays, so
 // the mon visibly becomes the new form FIRST and then attacks as that form (the
 // maintainer-reported ordering: the transform must not happen "afterwards", on
 // top of / behind the move anim). Because the FX is scene-clock driven and the
@@ -32,8 +34,14 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 
-/** Hard cap on how long the move flow holds for the transform FX before failing open. */
-export const ER_OMNIFORM_TRANSFORM_WAIT_TIMEOUT_MS = 3500;
+/**
+ * Hard cap on how long the move flow holds for the transform FX before failing
+ * open. Must exceed the morph's own absolute-lifetime backstop (fully stretched
+ * fill + morph + drain, ~4.0s) so on every normal path the FX settles first and
+ * this timeout is only ever the last-resort net. Bounded, so no softlock: the
+ * sprite is already swapped and the battle continues even if the FX dies.
+ */
+export const ER_OMNIFORM_TRANSFORM_WAIT_TIMEOUT_MS = 4500;
 
 export class ErOmniformTransformWaitPhase extends Phase {
   public readonly phaseName = "ErOmniformTransformWaitPhase";

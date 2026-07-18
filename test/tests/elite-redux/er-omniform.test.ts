@@ -2,9 +2,11 @@ import { allMoves } from "#data/data-lists";
 import {
   ER_OMNIFORM_ABILITY_ID,
   erOmniformOnMoveStart,
+  erOmniformPreloadTargets,
   erOmniformRevertOnLeaveField,
 } from "#data/elite-redux/abilities/omniform";
 import { clearOmniformRegistry, registerOmniformMapping } from "#data/elite-redux/abilities/omniform-registry";
+import { PokemonSpeciesForm } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -12,7 +14,7 @@ import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 const OMNIFORM = ER_OMNIFORM_ABILITY_ID as AbilityId;
@@ -152,5 +154,94 @@ describe.skipIf(!RUN)("ER Omniform (5929)", () => {
     // Normal-type Tackle has no mapping for Eevee.
     erOmniformOnMoveStart(holder, allMoves[MoveId.TACKLE]);
     expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+  });
+
+  it("is a TOTAL no-op when the mapped target IS the holder's current form (already that form)", async () => {
+    // Jolteon mapping Electric -> Jolteon: using an Electric move while ALREADY
+    // Jolteon must not re-adapt (the maintainer's report). No message, no FX/wait
+    // phase, no moveset re-derive - the move just plays.
+    registerOmniformMapping(SpeciesId.JOLTEON, 0, PokemonType.ELECTRIC, SpeciesId.JOLTEON);
+    await game.classicMode.startBattle(SpeciesId.JOLTEON);
+    const holder = game.field.getPlayerPokemon();
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.JOLTEON);
+
+    const movesBefore = holder.getMoveset().map(m => m?.moveId);
+    const queueMessage = vi.spyOn(game.scene.phaseManager, "queueMessage");
+    const unshiftNew = vi.spyOn(game.scene.phaseManager, "unshiftNew");
+
+    // Thunder Shock is Electric; Jolteon maps Electric -> Jolteon (itself).
+    erOmniformOnMoveStart(holder, allMoves[MoveId.THUNDER_SHOCK]);
+
+    // Still Jolteon, moveset byte-identical, and NOTHING was queued.
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.JOLTEON);
+    expect(holder.getMoveset().map(m => m?.moveId)).toEqual(movesBefore);
+    expect(queueMessage).not.toHaveBeenCalled();
+    expect(unshiftNew.mock.calls.some(call => call[0] === "ErOmniformTransformWaitPhase")).toBe(false);
+  });
+
+  it("a Normal STATUS move while ALREADY on base is a no-op (the revert seam)", async () => {
+    // Never transformed => on base. A Normal status move routes through the revert
+    // path, which must be inert (no snapshot to revert to): no message, no wait phase.
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const holder = game.field.getPlayerPokemon();
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+
+    const movesBefore = holder.getMoveset().map(m => m?.moveId);
+    const queueMessage = vi.spyOn(game.scene.phaseManager, "queueMessage");
+    const unshiftNew = vi.spyOn(game.scene.phaseManager, "unshiftNew");
+
+    // Growl is a Normal-type status move.
+    erOmniformOnMoveStart(holder, allMoves[MoveId.GROWL]);
+
+    expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+    expect(holder.getMoveset().map(m => m?.moveId)).toEqual(movesBefore);
+    expect(queueMessage).not.toHaveBeenCalled();
+    expect(unshiftNew.mock.calls.some(call => call[0] === "ErOmniformTransformWaitPhase")).toBe(false);
+  });
+
+  it("preloads EVERY reachable transform-target atlas (the whole family), skipping the current form", () => {
+    // Registry maps Eevee -> Vaporeon -> Flareon, so the connected family from Eevee is
+    // {Eevee, Vaporeon, Flareon}. Preload must warm Vaporeon + Flareon (not Eevee).
+    const loaded: number[] = [];
+    const holder = {
+      getSpeciesForm: () => ({ speciesId: SpeciesId.EEVEE, formIndex: 0 }),
+      getAllActiveAbilityAttrs: () => [{ constructor: { name: "OmniformAbAttr" } }],
+      isActive: () => true,
+      getGender: () => 0,
+      isShiny: () => false,
+      getVariant: () => 0,
+    } as unknown as Parameters<typeof erOmniformPreloadTargets>[0];
+
+    const spy = vi.spyOn(PokemonSpeciesForm.prototype, "loadAssets").mockImplementation(function (
+      this: PokemonSpeciesForm,
+    ) {
+      loaded.push(this.speciesId);
+      return Promise.resolve();
+    });
+    try {
+      erOmniformPreloadTargets(holder);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(loaded).toContain(SpeciesId.VAPOREON);
+    expect(loaded).toContain(SpeciesId.FLAREON);
+    // The current form is already loaded (the holder is wearing it) - not re-warmed.
+    expect(loaded).not.toContain(SpeciesId.EEVEE);
+    // Sprite-only + background start: spriteOnly=true (arg 7) and startLoad=true (arg 5).
+    for (const call of spy.mock.calls) {
+      expect(call[4]).toBe(true); // startLoad
+      expect(call[6]).toBe(true); // spriteOnly
+    }
+  });
+
+  it("warms the transform targets automatically on SUMMON (the PostSummon seam)", async () => {
+    // A call-through spy so the real summon still loads Eevee; the Omniform PostSummon
+    // apply must additionally warm the mapped-target atlases (Vaporeon + Flareon).
+    const spy = vi.spyOn(PokemonSpeciesForm.prototype, "loadAssets");
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const loaded = spy.mock.instances.map(inst => (inst as PokemonSpeciesForm).speciesId);
+    expect(loaded).toContain(SpeciesId.VAPOREON);
+    expect(loaded).toContain(SpeciesId.FLAREON);
   });
 });

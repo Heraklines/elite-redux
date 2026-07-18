@@ -4795,6 +4795,7 @@ export class GameData {
     slot: number,
     localRaw: string | null,
     accountIdentity: string,
+    explicitUserDeletion = false,
   ): Promise<{ error: string | null; deletedCoopRunId?: string }> {
     if (!this.persistenceAccountIsCurrent(accountIdentity)) {
       return { error: "Delete account changed before cloud inspection." };
@@ -4854,7 +4855,18 @@ export class GameData {
         return { error: "Local/cloud checkpoint conflict must be reconciled before delete." };
       }
     } else if (localRaw != null && localJson !== observed) {
-      return { error: "Local/cloud checkpoint bytes differ; refusing ambiguous delete." };
+      // Local and cloud plaintext have DIVERGED. For an automatic/background delete this is
+      // ambiguous, so we refuse - never silently destroy the newer of two diverged copies. But
+      // when the user has EXPLICITLY confirmed destroying this slot (overwrite to start a new run,
+      // or the delete-run action) AND both sides are plain solo checkpoints, the divergence no
+      // longer matters: both copies are being discarded on purpose, so proceed and clear both
+      // instead of dead-ending to the title. Stay strict when the cloud side is anything other
+      // than a plain solo checkpoint (co-op / legacy / opaque) - that is frozen co-op territory
+      // and must not be clobbered by a solo-local explicit delete.
+      const cloudIsPlainSolo = cloudCommitment == null && cloudKind === "solo";
+      if (!(explicitUserDeletion && cloudIsPlainSolo)) {
+        return { error: "Local/cloud checkpoint bytes differ; refusing ambiguous delete." };
+      }
     }
     if (cloudCommitment != null && cloudSession != null) {
       const error = await this.deleteCoopCloudCas(slot, observed, cloudSession, accountIdentity);
@@ -5181,7 +5193,10 @@ export class GameData {
 
     const deletion = await enqueueSessionCloudMutation(accountIdentity, () =>
       this.persistenceAccountIsCurrent(accountIdentity)
-        ? this.deleteSessionCloudSafely(slotId, localBeforeCloud, accountIdentity)
+        ? // deleteSession is the explicit user-confirmed overwrite/delete-run entry point, so a
+          // solo local/cloud byte divergence must not dead-end the flow (P0: "i cant create new
+          // games"). The automatic tryClearSession co-op path below keeps the default strict guard.
+          this.deleteSessionCloudSafely(slotId, localBeforeCloud, accountIdentity, true)
         : Promise.resolve({ error: "Delete account changed while queued." }),
     );
     const error = deletion.error;
@@ -5401,7 +5416,21 @@ export class GameData {
         case "enemyParty": {
           const ret: PokemonData[] = [];
           for (const pd of v ?? []) {
-            ret.push(new PokemonData(pd));
+            // Fail SOFT per mon: a single unresolvable entry (e.g. a species id
+            // that no longer registers via getPokemonSpecies, so the PokemonData
+            // ctor's `getPokemonSpecies(species).forms` throws) must NOT abort the
+            // whole parse and report the entire save "corrupted / cannot be loaded"
+            // (#961 save-integrity). Skip the bad mon + log; the rest of the
+            // session still loads.
+            try {
+              ret.push(new PokemonData(pd));
+            } catch (err) {
+              console.error(
+                `[session-load] dropped an unloadable ${k} member (species ${pd?.species}): ${
+                  err instanceof Error ? err.message : String(err)
+                }`,
+              );
+            }
           }
           return ret;
         }
