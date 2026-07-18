@@ -2943,7 +2943,22 @@ export class DuoPublicUiRig {
         if (!pending.has(client.label)) {
           continue;
         }
-        if (findOwnedReadyReplacement(client, from[client.label] ?? 0) == null) {
+        const readyReplacement = findOwnedReadyReplacement(client, from[client.label] ?? 0);
+        if (readyReplacement == null) {
+          continue;
+        }
+        // Track R animations-on-surface lane (run 29651275134): when driveReplacement already cleared
+        // this faint at the wave loop, the owner's engine can advance into its NEXT CommandPhase DURING
+        // the picker drive - so the trace holds BOTH the stale (already-consumed) party:replacement AND
+        // the newer owned command surface. findOwnedReadyReplacement returns the last party:replacement
+        // regardless of that later command, so driving it here would short-circuit (already committed)
+        // and then advance from[client] PAST the already-emitted command surface. On a throttled runner
+        // that command is emitted ONCE and never re-emitted, so it becomes unreachable and this round
+        // times out ("waiting for sequential command owners"). A real human at that seat would COMMAND,
+        // not re-open a resolved picker: if an owned command surface already exists AT/AFTER the
+        // replacement, the replacement is resolved - fall through to the command path below.
+        const supersedingCommand = findOwnedCommandOrTerminal(client, from[client.label] ?? 0);
+        if (supersedingCommand != null && supersedingCommand.index >= readyReplacement.index) {
           continue;
         }
         await this.driveOwnedReplacementPicker(client, from);

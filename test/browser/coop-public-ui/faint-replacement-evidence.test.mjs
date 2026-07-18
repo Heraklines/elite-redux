@@ -135,7 +135,17 @@ test("the sequential command round drives a late-opening owned replacement picke
   assert.ok(round.length > 0, "driveSequentialCommandRound must precede waitForPostTurnOutcome");
   assert.match(
     round,
-    /if \(findOwnedReadyReplacement\(client, from\[client\.label\] \?\? 0\) == null\) \{[\s\S]*?await this\.driveOwnedReplacementPicker\(client, from\);[\s\S]*?if \(droveReplacement\) \{/u,
+    /const readyReplacement = findOwnedReadyReplacement\(client, from\[client\.label\] \?\? 0\);[\s\S]*?if \(readyReplacement == null\) \{[\s\S]*?await this\.driveOwnedReplacementPicker\(client, from\);[\s\S]*?if \(droveReplacement\) \{/u,
+  );
+  // Track R animations-on-surface lane (run 29651275134): when driveReplacement already cleared the faint
+  // at the wave loop, the owner can advance into its NEXT CommandPhase DURING the picker drive, so the
+  // trace holds BOTH the stale party:replacement AND the newer owned command surface. Re-driving the stale
+  // replacement here would advance from[client] PAST that once-emitted command surface and time out
+  // "waiting for sequential command owners". If an owned command already exists AT/AFTER the replacement,
+  // it is resolved - fall through to the command path instead of re-opening the picker.
+  assert.match(
+    round,
+    /const supersedingCommand = findOwnedCommandOrTerminal\(client, from\[client\.label\] \?\? 0\);\s*if \(supersedingCommand != null && supersedingCommand\.index >= readyReplacement\.index\) \{\s*continue;\s*\}/u,
   );
 });
 

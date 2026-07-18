@@ -268,6 +268,28 @@ describe.skipIf(!RUN)(
         "interaction counters lockstep after the double faint",
       ).toBe(rig.hostRuntime.controller.interactionCounter());
 
+      // Track R mystery-gauntlet lane (run 29651275134): in a double faint the FIRST-resolved faint's
+      // CoopPushReplacementCheckpointPhase must NOT ship a turn N+1 replacement frame while the OTHER
+      // owned field slot is still fainted (its summon queued later) - the guest applies it while parked
+      // (checksum converges on the same incomplete field) and its CoopReplayTurnPhase then FATALs its own
+      // still-fainted slot with "Replacement authority did not project into the local owner's command
+      // slot". The fix DEFERS that premature checkpoint so only the COMPLETE-field checkpoint is sent.
+      // Lock the invariant: no seat ever emitted that projection-failure terminal across the crossing.
+      const allLogs = [...logs.host, ...logs.guest];
+      expect(
+        allLogs.some(line => /did not project into the local owner's command slot/.test(line)),
+        "no incomplete-field replacement checkpoint projected an empty owned slot onto a seat (double-faint FATAL)",
+      ).toBe(false);
+      // Both owned replacement slots are active on the GUEST engine too (it applied only complete frames).
+      withClientSync(rig.guestCtx, () => {
+        const guestOwnHost = rig.guestScene.getPlayerField()[COOP_HOST_FIELD_INDEX];
+        const guestOwnGuest = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+        expect(
+          guestOwnHost != null && guestOwnHost.isActive() && guestOwnGuest != null && guestOwnGuest.isActive(),
+          "the guest engine sees both refilled field slots active after the double-faint crossing",
+        ).toBe(true);
+      });
+
       logs.flush();
     }, 240_000);
   },
