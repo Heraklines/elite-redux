@@ -432,13 +432,14 @@ jobs:
         env:
           COOP_GATE_MANIFEST: coop-gate-assignment.json
           NODE_OPTIONS: --max-old-space-size=8192
-          # Authority-v2 CUTOVER SURFACE 1 (turn/command): ROLLED BACK to off after run
-          # 29628503614 (cutover-active) mass-failed the matrix - the guest async v2-apply
-          # vs presentation interleaving drifts on real engines (the exact CI frontier the
-          # cutover report flagged). The cutover code remains, default-off = byte-identical
-          # (proven by 29624520778/29625681669/29626883595). Re-enable only after the
-          # projector becomes a real COMMAND installer and the drift diagnosis is fixed.
-          COOP_AUTHORITY_V2_TURN: "off"
+          # Authority-v2 CUTOVER SURFACE 1 (turn/command), RE-ENABLED after the 29628503614
+          # root-cause fix: the mass failure was the HOST's legacy turn-ACK terminal check
+          # firing on ACKs for the cosmetic (unretained) carrier - now suppressed
+          # symmetrically under cutover (suppressesLegacyTurnAckProgression; v2
+          # controlInstalled remains the sole retirement - never zero, never two).
+          # Success = clean 3-shard baseline + "host IGNORE cosmetic turn ACK" lines,
+          # zero "Turn ACK was missing/stale" terminals on clean turns.
+          COOP_AUTHORITY_V2_TURN: "on"
         shell: bash
         run: |
           set +e
