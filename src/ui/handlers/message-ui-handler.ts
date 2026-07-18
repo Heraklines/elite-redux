@@ -289,6 +289,19 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
     return this.promptGeneration;
   }
 
+  /**
+   * Advance the monotonic prompt-generation identity for a subclass that arms an ACTION prompt WITHOUT
+   * routing through {@linkcode showTextInternal} (which bumps it at {@linkcode promptGeneration}). The
+   * level-up stat panel ({@linkcode BattleMessageUiHandler.promptLevelUpStats}) and the IV panel each
+   * re-arm `awaitingActionInput` in place for a NEW human-action sub-prompt; without a fresh generation
+   * the co-op / browser input drivers (which deduplicate one Space per generation) cannot tell the
+   * second sub-prompt from the first, so they never advance it and the host parks in LevelUpPhase and
+   * never reaches CoopTurnCommitPhase. Bumping keeps each sub-prompt a distinct, advanceable stage.
+   */
+  protected bumpPromptGeneration(): void {
+    this.promptGeneration += 1;
+  }
+
   clearText() {
     this.message.setText("");
     this.pendingPrompt = false;

@@ -216,6 +216,11 @@ export class BattleMessageUiHandler extends MessageUiHandler {
       this.levelUpStatsValuesContent.text = levelUpStatsValuesText;
       this.levelUpStatsIncrContent.setVisible(!showTotals);
       this.levelUpStatsContainer.setVisible(true);
+      // Each stat panel (increments then totals) is a distinct human-action sub-prompt that re-arms
+      // `awaitingActionInput` in place. Advance the prompt generation so a co-op / browser input driver
+      // treats it as a NEW advanceable stage rather than the already-consumed prior one (see
+      // MessageUiHandler.bumpPromptGeneration - the wave-3 LevelUpPhase co-op deadlock).
+      this.bumpPromptGeneration();
       this.awaitingActionInput = true;
       this.onActionInput = () => {
         if (!showTotals) {
@@ -237,6 +242,10 @@ export class BattleMessageUiHandler extends MessageUiHandler {
         this.levelUpStatsValuesContent.text = levelUpStatsValuesText;
         this.levelUpStatsIncrContent.setVisible(false);
         this.levelUpStatsContainer.setVisible(true);
+        // Distinct human-action sub-prompt re-arming `awaitingActionInput` in place - advance the prompt
+        // generation so co-op / browser drivers see a fresh advanceable stage (see
+        // MessageUiHandler.bumpPromptGeneration).
+        this.bumpPromptGeneration();
         this.awaitingActionInput = true;
         this.onActionInput = () => {
           this.levelUpStatsContainer.setVisible(false);

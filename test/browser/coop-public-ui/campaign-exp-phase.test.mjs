@@ -505,6 +505,61 @@ test("only ready active local battle narration and EXP instances advance once on
   );
 });
 
+// Track R cycle 4 - the wave-3-turn-2 LevelUpPhase co-op deadlock (campaign run 29644735938,
+// 3-wave animations-on-surface). The host wins wave 3, and the FIRST level-up of the run opens
+// LevelUpPhase, which shows a level-up MESSAGE and then promptLevelUpStats - a TWO-step human-action
+// panel (stat increments, then totals) that re-arms `awaitingActionInput` in place. The advancer
+// authorizes exactly one Space per (surfaceId, phaseInstance) - "the semantic surface's prompt
+// generation is the actionable identity". Pre-fix, promptLevelUpStats did NOT bump the message
+// handler's prompt generation for its two sub-prompts, so the delta and totals sub-prompts collided
+// onto ONE phaseInstance with the level-up message: the advancer pressed once and treated the rest as
+// already consumed, so promptLevelUpStats never resolved, LevelUpPhase.end() never ran, and the host
+// never reached CoopTurnCommitPhase (the guest looped requestTurnCommit -> host turnCommitPending
+// forever). The product fix (MessageUiHandler.bumpPromptGeneration, called from
+// BattleMessageUiHandler.promptLevelUpStats) gives each stat sub-prompt a DISTINCT generation, so the
+// advancer drives all three. This engine-free contract pins that boundary from both sides.
+test("a level-up stat panel's two sub-prompts each advance only when they carry distinct prompt generations", async () => {
+  // POST-FIX: message (gen 10) -> delta stats (gen 11) -> totals stats (gen 12). Each distinct
+  // generation is a separate advanceable stage, so the advancer drives all three.
+  {
+    const authority = fakeClient("authority");
+    const renderer = fakeClient("renderer");
+    const rig = { host: authority, clients: { authority, renderer } };
+    const stats = { battleMessagePrompts: 0, postBattleExpPrompts: 0 };
+    authority.evidence.pushCommandSurface();
+    renderer.evidence.pushCommandSurface();
+    const advance = createBattlePromptAdvancer(rig, { authority: 0, renderer: 0 }, stats, "wave-3-turn-2");
+    authority.evidence.pushBattleReadiness("battle:message", "LevelUpPhase", true, 10);
+    assert.equal(await advance(), true, "the level-up message advances");
+    authority.evidence.pushBattleReadiness("battle:message", "LevelUpPhase", true, 11);
+    assert.equal(await advance(), true, "the stat-increments sub-prompt is a distinct advanceable stage");
+    authority.evidence.pushBattleReadiness("battle:message", "LevelUpPhase", true, 12);
+    assert.equal(await advance(), true, "the stat-totals sub-prompt is a distinct advanceable stage");
+    assert.equal(await advance(), false);
+    assert.equal(stats.battleMessagePrompts, 3, "all three level-up prompts advance once each");
+  }
+
+  // PRE-FIX REPRODUCTION: without the generation bump, the delta and totals sub-prompts re-arm on the
+  // SAME phaseInstance as the message. The advancer consumes that instance once and skips the rest -
+  // promptLevelUpStats never resolves and the host parks in LevelUpPhase (the live deadlock).
+  {
+    const authority = fakeClient("authority");
+    const renderer = fakeClient("renderer");
+    const rig = { host: authority, clients: { authority, renderer } };
+    const stats = { battleMessagePrompts: 0, postBattleExpPrompts: 0 };
+    authority.evidence.pushCommandSurface();
+    renderer.evidence.pushCommandSurface();
+    const advance = createBattlePromptAdvancer(rig, { authority: 0, renderer: 0 }, stats, "wave-3-turn-2-park");
+    authority.evidence.pushBattleReadiness("battle:message", "LevelUpPhase", true, 10);
+    assert.equal(await advance(), true, "the level-up message advances");
+    authority.evidence.pushBattleReadiness("battle:message", "LevelUpPhase", true, 10);
+    assert.equal(await advance(), false, "a colliding-generation stat sub-prompt is NOT re-driven (the park)");
+    authority.evidence.pushBattleReadiness("battle:message", "LevelUpPhase", true, 10);
+    assert.equal(await advance(), false, "the totals sub-prompt also collides and is never advanced");
+    assert.equal(stats.battleMessagePrompts, 1, "only the message advanced - the stat panel deadlocks");
+  }
+});
+
 test("between-wave prompt advancement admits a live NextEncounter narration without an old command address", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
