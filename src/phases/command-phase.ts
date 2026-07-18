@@ -29,6 +29,7 @@ import {
   getCoopNetcodeMode,
   getCoopRendezvous,
   getCoopRuntime,
+  isCoopAuthoritativeGuest,
   isCoopSharedTerminalFrozen,
   isVersusSession,
   recordCoopOwnSlotCommand,
@@ -952,6 +953,21 @@ export class CommandPhase extends FieldPhase {
         return null;
       }
       coopLog("rendezvous", `next-command barrier ARRIVE+AWAIT ${point} slot=${this.fieldIndex}`);
+      // Co-op replacement-retention release (Track R deadlock): the authoritative guest has now
+      // reached its OWN next command point - the auto-summon that filled this slot is already
+      // materialApplied + presentationReady - and is about to PACING-wait on the partner. That park IS
+      // this replacement continuation's real public surface. Emit it here as a "rendererWait"
+      // continuation (mirrors CoopReplayTurnPhase's parked-renderer emit) so the retained replacement
+      // checkpoint releases at continuationReady the instant the guest is command-ready, instead of
+      // being gated behind the post-barrier setMode(UiMode.COMMAND) - which never fires while the host
+      // is still choosing its OWN-slot replacement, leaving the host to RE-SEND the unacked replacement
+      // checkpoint forever. notifyContinuationSurface only releases a continuation whose address matches
+      // the current authority address, so this is a safe no-op when none is pending. Guest-only: the
+      // host reports its command surface through ui.setMode's post-commit chokepoint and has no pending
+      // guest-side continuation here.
+      if (isCoopAuthoritativeGuest()) {
+        getCoopBattleStreamer()?.notifyContinuationSurface("rendererWait");
+      }
       return rendezvous
         .rendezvous(point, getCoopRendezvousWaitMs(), COMMAND_RENDEZVOUS_RECOVERY_MAX_ATTEMPTS)
         .then(result => {
