@@ -2,18 +2,34 @@
   "SPECIES_AMAURA": {
     "ability1": 116,
     "ability2": 174,
-    "innates": [5056, 115, 5055]
+    "innates": [
+      5056,
+      115,
+      5055
+    ]
   },
   "SPECIES_ARASHINNE": {
-    "innates": [82, 5019, 182]
+    "innates": [
+      82,
+      5019,
+      182
+    ]
   },
   "SPECIES_ARCANINE_MEGA_REDUX": {
     "hidden": 1,
-    "innates": [5733, 55, 17]
+    "innates": [
+      5733,
+      55,
+      17
+    ]
   },
   "SPECIES_ARCANINE_REDUX": {
     "hidden": 1,
-    "innates": [5075, 181, 18]
+    "innates": [
+      5075,
+      181,
+      18
+    ]
   },
   "SPECIES_AURORUS": {
     "ability2": 174
@@ -22,24 +38,40 @@
     "ability1": 128,
     "ability2": 101,
     "hidden": 5157,
-    "innates": [5009, 22, 5304]
+    "innates": [
+      5009,
+      22,
+      5304
+    ]
   },
   "SPECIES_BLOODMOON_URSALUNA": {
     "ability1": 5266,
     "ability2": 5067,
     "hidden": 5264,
-    "innates": [299, 5209, 142]
+    "innates": [
+      299,
+      5209,
+      142
+    ]
   },
   "SPECIES_BRELOOM_MEGA": {
     "ability1": 5135,
     "hidden": 203,
-    "innates": [5026, 137, 101]
+    "innates": [
+      5026,
+      137,
+      101
+    ]
   },
   "SPECIES_DEDENNE": {
     "ability1": 249,
     "ability2": 5023,
     "hidden": 5332,
-    "innates": [82, 5019, 182]
+    "innates": [
+      82,
+      5019,
+      182
+    ]
   },
   "SPECIES_DEERLING": {
     "ability1": 91,
@@ -65,34 +97,58 @@
     "ability1": 5208,
     "ability2": 5511,
     "hidden": 5510,
-    "innates": [9, 78, 5020]
+    "innates": [
+      9,
+      78,
+      5020
+    ]
   },
   "SPECIES_EMPOLEON_REDUX_MEGA": {
     "ability1": 190,
     "ability2": 117,
     "hidden": 5564,
-    "innates": [185, 5206, 5563]
+    "innates": [
+      185,
+      5206,
+      5563
+    ]
   },
   "SPECIES_ETERNAL_FLOETTE": {
     "ability1": 5576,
     "ability2": 229,
     "hidden": 187,
-    "innates": [257, 98, 5025]
+    "innates": [
+      257,
+      98,
+      5025
+    ]
   },
   "SPECIES_FLYGON_REDUX_B": {
     "hidden": 26,
-    "innates": [5402, 206, 29]
+    "innates": [
+      5402,
+      206,
+      29
+    ]
   },
   "SPECIES_FLYGON_REDUX_B_MEGA": {
     "hidden": 26,
-    "innates": [5402, 206, 29]
+    "innates": [
+      5402,
+      206,
+      29
+    ]
   },
   "SPECIES_GRANBULL_MEGA": {
     "ability2": 62
   },
   "SPECIES_GROWLITHE_REDUX": {
     "hidden": 1,
-    "innates": [5075, 181, 18]
+    "innates": [
+      5075,
+      181,
+      18
+    ]
   },
   "SPECIES_HARIYAMA_MEGA": {
     "ability1": 62
@@ -101,37 +157,65 @@
     "ability1": 5171,
     "ability2": 5333,
     "hidden": 5022,
-    "innates": [5526, 5014, 290]
+    "innates": [
+      5526,
+      5014,
+      290
+    ]
   },
   "SPECIES_HOUNDOOM_MEGA_REDUX": {
     "ability1": 138,
     "ability2": 5327
   },
   "SPECIES_HYDREIGON_REDUX_MEGA": {
-    "innates": [5355, 5085, 5426]
+    "innates": [
+      5355,
+      5085,
+      5426
+    ]
   },
   "SPECIES_KANGASKHAN_MEGA": {
-    "innates": [185, 113, 62]
+    "innates": [
+      185,
+      113,
+      62
+    ]
   },
   "SPECIES_KINGAMBIT_REDUX": {
     "ability1": 128,
     "ability2": 101,
     "hidden": 5157,
-    "innates": [5009, 22, 5304]
+    "innates": [
+      5009,
+      22,
+      5304
+    ]
   },
   "SPECIES_KINGAMBIT_REDUX_MEGA": {
     "ability1": 128,
     "ability2": 101,
     "hidden": 5297,
-    "innates": [5169, 22, 5304]
+    "innates": [
+      5169,
+      22,
+      5304
+    ]
   },
   "SPECIES_LUMINOSITEON": {
     "ability1": 5232,
     "ability2": 168,
-    "innates": [114, 5551, 35]
+    "innates": [
+      114,
+      5551,
+      35
+    ]
   },
   "SPECIES_LUXRAY_MEGA": {
-    "innates": [5410, 62, 5174]
+    "innates": [
+      5410,
+      62,
+      5174
+    ]
   },
   "SPECIES_MACHAMP": {
     "ability1": 125,
@@ -142,7 +226,11 @@
   },
   "SPECIES_MACHAMP_REDUX": {
     "hidden": 192,
-    "innates": [5064, 89, 5059]
+    "innates": [
+      5064,
+      89,
+      5059
+    ]
   },
   "SPECIES_MACHOKE": {
     "ability1": 125,
@@ -150,7 +238,11 @@
   },
   "SPECIES_MACHOKE_REDUX": {
     "hidden": 192,
-    "innates": [99, 89, 5059]
+    "innates": [
+      99,
+      89,
+      5059
+    ]
   },
   "SPECIES_MACHOP": {
     "ability1": 125,
@@ -159,27 +251,46 @@
   },
   "SPECIES_MACHOP_REDUX": {
     "hidden": 192,
-    "innates": [99, 89, 5059]
+    "innates": [
+      99,
+      89,
+      5059
+    ]
   },
   "SPECIES_MEDITITE": {
     "ability1": 72,
     "ability2": 5190,
     "hidden": 74,
-    "innates": [39, 101, 5099]
+    "innates": [
+      39,
+      101,
+      5099
+    ]
+  },
+  "SPECIES_PHANTOWL": {
+    "ability2": 5123
   },
   "SPECIES_SAWSBUCK": {
     "ability1": 91,
     "ability2": 92,
     "hidden": 34,
-    "innates": [5129, 5088, 5511]
+    "innates": [
+      5129,
+      5088,
+      5511
+    ]
+  },
+  "SPECIES_TEDDIURSA": {
+    "hidden": 118
   },
   "SPECIES_ZORUA": {
     "ability1": 5285,
     "ability2": 194,
     "hidden": 290,
-    "innates": [5096, 5022, 5171]
-  },
-  "SPECIES_PHANTOWL": {
-    "ability2": 5123
+    "innates": [
+      5096,
+      5022,
+      5171
+    ]
   }
 }
