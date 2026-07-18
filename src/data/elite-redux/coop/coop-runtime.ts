@@ -3443,11 +3443,11 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
       transport: localTransport,
       send: frame => {
         // Wire boundary: v2 frames ride the SAME transport as legacy CoopMessages but are a distinct
-        // envelope (v:2). The receive path intercepts v===2 BEFORE the legacy cast (coop-transport /
+        // envelope (v:2). The receive path intercepts v===2 BEFORE the legacy fan-out (coop-transport /
         // coop-webrtc-transport), so a v2 frame never reaches a legacy CoopMessage handler - this is the
-        // send-side mirror of that receive-side wire boundary.
-        const wire: unknown = frame;
-        localTransport.send(wire as CoopMessage);
+        // send-side mirror of that receive-side wire boundary. `CoopFrameV2` is now an additive arm of the
+        // `CoopMessage` union (contract change request 3), so this crosses the seam type-exact, no cast.
+        localTransport.send(frame);
       },
     });
     registerCoopV2ShadowInbound(frame => harness.handleInboundFrame(frame));

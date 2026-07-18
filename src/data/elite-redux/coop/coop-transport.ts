@@ -22,6 +22,7 @@
 
 // TYPE-ONLY import (erased at runtime): the data-fingerprint diagnostic message carries a
 // plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
+import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { routeCoopV2InboundFrame } from "#data/elite-redux/coop/authority-v2/shadow";
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
@@ -1943,7 +1944,17 @@ export type CoopMessage =
   /** Host -> peer: the match resolved. `winner` is the winning role; `reason` is how it ended. `matchId` is null for a friendly (no escrow). */
   | { t: "showdownResult"; matchId: string | null; winner: CoopRole; reason: "victory" | "forfeit" | "timeout" }
   /** Either player -> peer: the match is VOIDED (no winner) - `reason` is why. `matchId` is null for a friendly (no escrow). */
-  | { t: "showdownVoid"; matchId: string | null; reason: "checksum" | "illegalTeam" | "earlyDisconnect" };
+  | { t: "showdownVoid"; matchId: string | null; reason: "checksum" | "illegalTeam" | "earlyDisconnect" }
+  /**
+   * Co-op AUTHORITY V2 shadow envelope (additive arm). A v2 frame (`v: 2`) rides the SAME transport as a
+   * legacy `CoopMessage` but is a DISTINCT envelope shape - the send/receive boundaries intercept `v === 2`
+   * BEFORE the legacy `t`-discriminant fan-out, so a v2 frame never reaches a legacy handler. Modelling it
+   * as a union arm makes both boundaries type-exact (the shadow send seam passes a {@linkcode CoopFrameV2}
+   * with NO `as CoopMessage` cast, and the transport routes it without smuggling an unvalidated object).
+   * Its `t` values (`authorityEntry`, `authorityReceipt`, ...) are disjoint from every legacy `t`, so no
+   * legacy discriminant switch is affected; it is DEAD unless `authority.v2shadow` is negotiated.
+   */
+  | CoopFrameV2;
 
 /** A transport moves {@linkcode CoopMessage}s between two paired clients. */
 export interface CoopTransport {
@@ -1955,6 +1966,17 @@ export interface CoopTransport {
   onMessage(handler: (msg: CoopMessage) => void): () => void;
   /** Subscribe to connection-state changes. Returns an unsubscribe function. */
   onStateChange(handler: (state: CoopConnectionState) => void): () => void;
+  /**
+   * Co-op AUTHORITY V2 (optional, additive): register a PER-INSTANCE inbound handler for `v === 2` frames
+   * on THIS transport endpoint. Returns an unsubscribe. When set, the receive path routes a v2 frame to this
+   * instance handler instead of the module-level {@linkcode routeCoopV2InboundFrame} fallback - which is what
+   * makes the two-peers-in-ONE-process duo harness routable (a single module-level handler cannot
+   * disambiguate two live harnesses; two transport endpoints each with their own handler can). The handler
+   * receives the RAW decoded frame and is responsible for the boundary validation (the shadow harness routes
+   * it through the same validator the module-level path uses). Absent on a transport that has not adopted the
+   * seam -> the module-level fallback is used, so this stays additive-optional.
+   */
+  onV2Frame?(handler: (frame: unknown) => void): () => void;
   /** Tear down the connection. */
   close(): void;
   /**
@@ -2149,11 +2171,22 @@ class LoopbackTransport implements CoopTransport {
   private earlyRxDrainScheduled = false;
   private hasEverSubscribed = false;
   private readonly stateHandlers = new Set<(state: CoopConnectionState) => void>();
+  /** Co-op AUTHORITY V2: per-instance inbound handler for `v === 2` frames (see {@link CoopTransport.onV2Frame}). */
+  private v2FrameHandler: ((frame: unknown) => void) | null = null;
   /** #diagnostics: epoch-ms the last inbound frame was delivered to this endpoint (0 = none yet). */
   private lastRxAt = 0;
 
   constructor(role: CoopRole) {
     this.role = role;
+  }
+
+  onV2Frame(handler: (frame: unknown) => void): () => void {
+    this.v2FrameHandler = handler;
+    return () => {
+      if (this.v2FrameHandler === handler) {
+        this.v2FrameHandler = null;
+      }
+    };
   }
 
   get state(): CoopConnectionState {
@@ -2233,10 +2266,16 @@ class LoopbackTransport implements CoopTransport {
   /** Isolated fan-out of one inbound frame (see the WebRtcTransport counterpart). */
   private dispatchInbound(frame: CoopMessage): void {
     // authority-v2 boundary: a frame stamped v===2 is a v2 frame, NOT a legacy CoopMessage. Route it
-    // through the ONE boundary validator instead of fanning it out to legacy handlers. Dead when
-    // authority.v2shadow is not negotiated (no v2 frame is ever sent), so loopback stays byte-identical.
+    // through the ONE boundary validator instead of fanning it out to legacy handlers. Prefer THIS
+    // endpoint's per-instance handler (so two harnesses in one process are disambiguated); fall back to the
+    // module-level handler for compat. Dead when authority.v2shadow is not negotiated (no v2 frame is ever
+    // sent), so loopback stays byte-identical.
     if ((frame as { v?: unknown }).v === 2) {
-      routeCoopV2InboundFrame(frame);
+      if (this.v2FrameHandler == null) {
+        routeCoopV2InboundFrame(frame);
+      } else {
+        this.v2FrameHandler(frame);
+      }
       return;
     }
     for (const h of [...this.msgHandlers]) {
@@ -2328,6 +2367,7 @@ class LoopbackTransport implements CoopTransport {
     }
     this.msgHandlers.clear();
     this.stateHandlers.clear();
+    this.v2FrameHandler = null;
     this.earlyRx.length = 0;
   }
 }

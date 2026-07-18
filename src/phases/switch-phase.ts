@@ -279,6 +279,8 @@ export class SwitchPhase extends BattlePhase {
                   },
                   ownerRole: coopOwnerOfPlayerFieldSlot(this.fieldIndex),
                   localRole: coopController.role,
+                  // #799 identity for the authority-v2 shadow REPLACEMENT tap (unused by the legacy carrier).
+                  speciesId: authoritativePick?.species?.speciesId ?? terminalData[1],
                   ...sourceAddress,
                 },
                 operationBinding,

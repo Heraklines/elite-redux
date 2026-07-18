@@ -45,6 +45,7 @@ import {
   tapCoopV2ShadowReplacementCommit,
   tapCoopV2ShadowTurnCommit,
 } from "#data/elite-redux/coop/authority-v2/shadow";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { afterEach, describe, expect, it } from "vitest";
 
 // --- deterministic test doubles ---------------------------------------------
@@ -447,6 +448,70 @@ describe("authority-v2 shadow transport routing seam", () => {
 
     clearActiveCoopV2Shadow(host);
     host.dispose();
+  });
+
+  it("routes v2 frames PER TRANSPORT INSTANCE via onV2Frame - two harnesses in one process (duo)", async () => {
+    // The duo-harness blocker (contract change request 2): the OLD single module-level inbound handler
+    // could not disambiguate two harnesses in one process (the last registration won, so one harness got
+    // NOTHING). Here each harness registers on its OWN transport endpoint's onV2Frame seam, so a frame
+    // delivered on one loopback pair reaches ONLY that pair's harness - never the other pair's.
+    const clock = new FakeClock();
+    // Two INDEPENDENT loopback pairs => two independent sessions in ONE process.
+    const pairA = createLoopbackPair();
+    const pairB = createLoopbackPair();
+    // Production always has a legacy `onMessage` subscriber (the session controller); register a no-op one on
+    // every endpoint so the loopback's early-rx buffer drains and v2 frames dispatch (the harness itself only
+    // subscribes the v2 seam).
+    for (const t of [pairA.host, pairA.guest, pairB.host, pairB.guest]) {
+      t.onMessage(() => {});
+    }
+
+    // The harness auto-registers its inbound handler on its injected transport's onV2Frame seam (constructor),
+    // so NO module-level registerCoopV2ShadowInbound is used here - the whole point of the per-instance seam.
+    const makeHarness = (localSeatId: number, endpoint: (typeof pairA)["host"]) =>
+      new CoopAuthorityV2Shadow({
+        identity: identity(localSeatId),
+        scene: STUB_SCENE,
+        transport: endpoint,
+        // A v2 frame is now an additive arm of the CoopMessage union, so it crosses transport.send type-exact.
+        send: frame => endpoint.send(frame),
+        scheduler: createCoopScheduler(clock),
+      });
+    const hostA = makeHarness(0, pairA.host);
+    const guestA = makeHarness(1, pairA.guest);
+    const hostB = makeHarness(0, pairB.host);
+    const guestB = makeHarness(1, pairB.guest);
+
+    // Loopback delivery is asynchronous (queueMicrotask); flush both microtasks and one macrotask round.
+    const flush = async () => {
+      for (let i = 0; i < 8; i++) {
+        await new Promise<void>(resolve => setTimeout(resolve, 0));
+      }
+    };
+
+    // hostA taps a turn -> the entry crosses pairA ONLY.
+    hostA.tapTurnCommit(turnTap("DUO/A/turn"));
+    await flush();
+    // The frame reached pairA's guest and NO OTHER harness (per-instance routing, not the global handler).
+    expect(guestA.diagnostics().admitted).toBe(1);
+    expect(guestB.diagnostics().admitted).toBe(0);
+    expect(hostB.diagnostics().admitted).toBe(0);
+    // The receipts round-tripped back over pairA and retired the entry on hostA.
+    expect(hostA.diagnostics().retained).toBe(0);
+
+    // hostB taps a turn -> the entry crosses pairB ONLY (guestA still untouched).
+    hostB.tapTurnCommit(turnTap("DUO/B/turn"));
+    await flush();
+    expect(guestB.diagnostics().admitted).toBe(1);
+    expect(guestA.diagnostics().admitted).toBe(1);
+    expect(hostB.diagnostics().retained).toBe(0);
+
+    hostA.dispose();
+    guestA.dispose();
+    hostB.dispose();
+    guestB.dispose();
+    pairA.host.close();
+    pairB.host.close();
   });
 
   it("isCoopV2ShadowActive reflects the active-harness registration", () => {

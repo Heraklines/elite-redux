@@ -22,6 +22,7 @@
 // a checkpoint lives in `coop-battle-checkpoint.ts`; this file is just the wire.
 // =============================================================================
 
+import { isCoopV2ShadowActive, tapCoopV2ShadowTurnCommit } from "#data/elite-redux/coop/authority-v2/shadow";
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type {
@@ -2052,6 +2053,29 @@ export class CoopBattleStreamer {
       return false;
     }
     this.transport.send(commit);
+    // authority-v2 SHADOW tap (contract change request 4): mirror this published turnResolution into the v2
+    // shadow harness for parity evidence. Null-guarded (no-op unless a harness is active) + the tap runs
+    // under the harness's own try/catch, so a shadow fault is logged, never thrown back into the host stream.
+    // Legacy owns the turn entirely; this only computes + compares alongside it. The stated next-command
+    // successor names the first live player field mon (a valid COMMAND address); when none is resolvable the
+    // tap is skipped rather than committing a malformed successor.
+    if (isCoopV2ShadowActive()) {
+      const commandSeat = authoritativeState.field.find(seat => seat.side === "player" && seat.pokemonId > 0);
+      if (commandSeat != null) {
+        tapCoopV2ShadowTurnCommit({
+          operationId: `TURN/e${epoch}/w${wave}/t${turn}`,
+          capture: { turnResolution: events, checkpoint },
+          nextCommand: {
+            epoch,
+            wave,
+            resolvedTurn: turn,
+            ownerSeatId: this.transport.role === "host" ? 0 : 1,
+            pokemonId: commandSeat.pokemonId,
+          },
+          legacyDigest: checksum,
+        });
+      }
+    }
     return true;
   }
 
