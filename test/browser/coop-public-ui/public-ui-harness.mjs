@@ -61,6 +61,14 @@ const COMMANDER_BOUNDARY_HARD_CEILING_MS = 420_000;
 // ~100s animation gap. Keep Commander waits alive across that observed dilation while retaining the
 // immutable seven-minute ceiling above; ordinary battle waits remain at the tighter 90s allowance.
 const COMMANDER_POST_TURN_PROGRESS_ALLOWANCE_MS = 150_000;
+// SIMULTANEOUS DOUBLE FAINT: after driving the reported faint owner's picker, how long to watch
+// the PARTNER seat for its OWN concurrent replacement picker before concluding it was a single
+// faint. In a real double faint the partner's own-slot party:replacement surface opened in the
+// same turn resolution, so it is observed on the first poll; a single faint never shows one and
+// this window is spent (bounded) then skipped. This is a DETECTION window for owing a second
+// human-equivalent drive - it never auto-commits a pick (the host's 60s fallback stays the only
+// owner-side timeout, by maintainer decision).
+const SIMULTANEOUS_FAINT_PARTNER_SETTLE_MS = 5_000;
 
 // Self-healing pairing cadence: how often the requester re-issues its ask while unpaired. Kept
 // well under the observed ~17s worker-side request TTL so each re-send REFRESHES the request and
@@ -3088,6 +3096,72 @@ export class DuoPublicUiRig {
     }
     const replacementCursors =
       from ?? Object.fromEntries(Object.values(this.clients).map(value => [value.label, value.evidence.cursor()]));
+    // Drive the reported faint owner's own-slot picker first, exactly like a human at that seat.
+    await this.driveOwnedReplacementPicker(owner, replacementCursors);
+    const drivenLabels = new Set([owner.label]);
+    // SIMULTANEOUS DOUBLE FAINT (Track R, run 29634537697): when BOTH leads faint in the same turn
+    // window each owner opens its OWN concurrent FAINT_SWITCH picker (ownerSeat === its seat). The
+    // campaign driver only forwards one outcome.client, so the PARTNER's own-slot picker previously
+    // went undriven - stalling its CommandPhase before the reciprocal command rendezvous
+    // (replacementCount stayed 1 while two leads had fainted; the host's party:replacement
+    // ownerSeat=0 surface stayed undriven). Drive every remaining owned actionable replacement
+    // picker too, like a second real human, reusing the identical single-seat guards.
+    for (const partner of Object.values(this.clients)) {
+      if (drivenLabels.has(partner.label)) {
+        continue;
+      }
+      if (!(await this.awaitConcurrentOwnedReplacement(partner, replacementCursors[partner.label]))) {
+        continue;
+      }
+      await this.driveOwnedReplacementPicker(partner, replacementCursors);
+      drivenLabels.add(partner.label);
+    }
+    // One applied-checkpoint after ALL of this faint window's drives; each drive already bumped
+    // replacementCount, so a double faint records two applied replacements.
+    await Promise.all(Object.values(this.clients).map(value => value.checkpoint("replacement-applied")));
+  }
+
+  /**
+   * Whether `partner` has opened its OWN concurrent replacement picker (a simultaneous double
+   * faint). In a real double faint the partner's own-slot party:replacement surface is already
+   * present since `fromCursor` (it opened in the same turn resolution), so this resolves on the
+   * first poll; a single faint never shows one and this returns false after the bounded settle
+   * window. It only decides WHETHER a second human-equivalent drive is owed - it never commits a
+   * pick and imposes no owner-side auto-commit timeout.
+   */
+  async awaitConcurrentOwnedReplacement(partner, fromCursor) {
+    const deadline = Date.now() + SIMULTANEOUS_FAINT_PARTNER_SETTLE_MS;
+    for (;;) {
+      // Already resolved by the host's committed-authority fallback - no human drive is owed.
+      if (partner.evidence.find(/own-faint picker CLOSE from committed authority/u, fromCursor) != null) {
+        return false;
+      }
+      const event = partner.evidence.findLastSemanticSurface(fromCursor, "party:replacement");
+      const observation = event?.observation;
+      if (
+        observation?.operationClass === "replacement"
+        && observation.ownerModel === "interaction"
+        && (observation.phase === "SwitchPhase" || observation.phase === "CoopGuestFaintSwitchPhase")
+        && observation.localSeat === partner.publicSeat
+        && observation.ownerSeat === partner.publicSeat
+      ) {
+        return true;
+      }
+      if (Date.now() >= deadline) {
+        return false;
+      }
+      await delay(100);
+    }
+  }
+
+  /**
+   * Drive ONE owner's own-slot replacement picker to a committed send-out (or accept the host
+   * fallback's authority-close). Reused per seat so a simultaneous double faint drives both
+   * pickers with identical guards: authority-close acceptance, the submenu slot-list recovery,
+   * the Backspace backout, and battle-prompt-advancer suppression. Bumps replacementCount per
+   * applied drive; the caller owns the shared replacement-applied checkpoint.
+   */
+  async driveOwnedReplacementPicker(owner, replacementCursors) {
     const advanceBattlePrompt = createBattlePromptAdvancer(this, replacementCursors, {}, "faint-replacement-picker");
     const deadline = Date.now() + this.config.timeoutMs;
     let replacementSurface = null;
@@ -3192,7 +3266,6 @@ export class DuoPublicUiRig {
       });
     }
     this.replacementCount += 1;
-    await Promise.all(Object.values(this.clients).map(value => value.checkpoint("replacement-applied")));
   }
 
   async leaveRewardsAndReachWave2({ commanderFixture = false } = {}) {
