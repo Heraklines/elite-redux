@@ -1,0 +1,168 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:6f4ea9994c06eff49fbcf8181b76e3d682447191:run-29624910776.1
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36
+platform: Linux armv81
+screen:   384x832 @2.8125x  devmem:8 GB
+boot:     boot-start@0ms -> loading-complete@90795ms -> title-shown@95935ms
+lastSess: ok (reached title)
+mode:     0  wave:2
+seed:     foUFSymmZnVFICAaknREDIRj
+party:    Kecleon(L5 22hp f0)
+enemy:    Bidoof(L3)
+
+----- COMMENT -----
+Still no R button to switch my Black shiny abilities on mobile </3
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:6f4ea9994c06eff49fbcf8181b76e3d682447191:run-29624910776.1","source":"github","sha":"6f4ea9994c06eff49fbcf8181b76e3d682447191","workflow":{"provider":"github-actions","runId":"29624910776","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[03:32:26.926] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[03:32:28.123] LOG: [ER] build {"version":1,"id":"github:6f4ea9994c06eff49fbcf8181b76e3d682447191:run-29624910776.1","source":"github","sha":"6f4ea9994c06eff49fbcf8181b76e3d682447191","workflow":{"provider":"github-actions","runId":"29624910776","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[03:32:28.157] LOG: [dev-tools] loaded — 643 scenarios + Send Logs button
+[03:33:52.732] DEBUG: Destroying loading scene
+[03:33:52.732] DEBUG: Destroyed loading scene
+[03:33:52.786] LOG: Seed: foUFSymmZnVFICAaknREDIRj
+[03:33:52.786] LOG: Wave Seed: foUFSymmZnVFICAaknREDIRj 0
+[03:33:55.938] LOG: %cStart Phase LoginPhase color:green;
+[03:33:57.353] LOG: Client Session: FHETxnU1IUOaBNUgoJ7XoJ2rClozFnYo
+[03:33:57.770] DEBUG: Using cached system data
+[03:33:57.844] LOG: %cStart Phase TitlePhase color:green;
+[03:33:57.845] LOG: Getting Session Slot id: %d 4
+[03:33:57.854] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:33:57.854] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:33:57.854] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:33:57.854] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:33:57.854] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:33:57.854] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:33:57.869] LOG: use seasonal splash messages true
+[03:34:02.571] LOG: %cStart Phase TitlePhase color:green;
+[03:34:02.571] LOG: Getting Session Slot id: %d 4
+[03:34:02.589] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:34:02.589] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:34:02.589] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:34:02.589] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:34:02.589] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:34:02.589] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:34:02.593] LOG: use seasonal splash messages true
+[03:34:03.818] LOG: %cStart Phase SelectStarterPhase color:green;
+[03:34:16.715] WARN: cry/352 not found
+[03:34:21.288] LOG: %cSaving starter preferences color: blue
+[03:34:21.549] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 352_1
+[03:34:21.556] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 352_1
+[03:34:21.556] LOG: Kecleon's variant icon does not exist. Replacing with default.
+[03:34:21.558] LOG: %cSaving starter preferences color: blue
+[03:34:21.728] LOG: %cSaving starter preferences color: blue
+[03:34:21.979] LOG: %cSaving starter preferences color: blue
+[03:34:25.306] LOG: %cSaving starter preferences color: blue
+[03:34:25.324] LOG: Getting Session Slot id: %d 0
+[03:34:25.334] LOG: Getting Session Slot id: %d 1
+[03:34:25.340] LOG: Getting Session Slot id: %d 2
+[03:34:25.347] LOG: Getting Session Slot id: %d 3
+[03:34:25.351] LOG: Getting Session Slot id: %d 4
+[03:34:25.356] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:34:25.356] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:34:25.356] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:34:25.356] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:34:25.356] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:34:25.356] ERROR: [session-load] dropped an unloadable party member (species undefined): Cannot read properties of undefined (reading 'forms')
+[03:34:38.632] DEBUG: %cSending a request to delete session in slot %d color: blue 1
+[03:34:40.038] LOG: Wave Seed: gpVGTznn[oWGJDBbloSFEJSk 1
+[03:34:40.040] LOG: %cStart Phase EncounterPhase color:green;
+[03:34:40.042] LOG: Starting species pool tier: UNCOMMON
+[03:34:40.049] LOG: Pokemon: Wild Nidoran♂ | Species ID: 32 | Level: 2 | Nature: Sassy (+SpDef/-Spd)
+[03:34:40.049] LOG: Stats (IVs): HP: 14 (31), Atk: 7 (31), Def: 6 (13), Spatk: 6 (5), Spdef: 8 (25), Spd: 6 (3)
+[03:34:40.049] LOG: Ability: Growing Tooth | Passive Ability: Poison Point 
+[03:34:40.049] LOG: Moveset: ["Poison Fang","Double Kick","Captivate","Poison Sting"]
+[03:34:40.520] DEBUG: Session data saved to slot 1!
+[03:34:42.282] LOG: Wave Seed: gpVGTznn[oWGJDBbloSFEJSk 1
+[03:34:42.730] LOG: %cStart Phase SummonPhase color:green;
+[03:34:42.964] WARN: cry/352 not found
+[03:34:43.036] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:34:43.111] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[03:34:43.113] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:34:43.115] LOG: %cStart Phase PostSummonPhase color:green;
+[03:34:43.116] LOG: Ran PSP for: Kecleon
+[03:34:43.118] LOG: %cStart Phase PostSummonPhase color:green;
+[03:34:43.119] LOG: %cStart Phase PostSummonPhase color:green;
+[03:34:43.120] LOG: %cStart Phase MovePhase color:green;
+[03:34:43.120] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[03:34:43.124] LOG: %cStart Phase MessagePhase color:green;
+[03:34:43.236] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:34:43.240] LOG: Battle Seed: mKQSdciFA4uyasqF
+[03:34:43.255] LOG: crit stage: +0
+[03:34:43.257] LOG: Move: Scratch | Base damage: 11.066666666666666 | Power: 40 | Source attack: 17 | Target defense: 6
+[03:34:43.259] LOG: Move: Scratch | Attack damage: 16
+[03:34:43.262] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:34:43.279] LOG: %cStart Phase FaintPhase color:green;
+[03:34:44.121] LOG: %cStart Phase MessagePhase color:green;
+[03:34:44.617] LOG: %cStart Phase VictoryPhase color:green;
+[03:34:44.620] LOG: %cStart Phase ExpPhase color:green;
+[03:34:44.903] LOG: %cStart Phase MoveEndPhase color:green;
+[03:34:44.904] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:34:45.088] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:34:45.284] LOG: %cStart Phase MessagePhase color:green;
+[03:34:45.494] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:34:45.529] LOG: %cStart Phase PostSummonPhase color:green;
+[03:34:45.529] LOG: Ran PSP for: Nidoran♂
+[03:34:45.530] LOG: %cStart Phase PostSummonPhase color:green;
+[03:34:45.530] LOG: %cStart Phase PostSummonPhase color:green;
+[03:34:45.530] LOG: %cStart Phase BattleEndPhase color:green;
+[03:34:45.531] LOG: Battle Score: 14 (0 Turns x1.15)
+[03:34:45.531] LOG: Total Score: 14
+[03:34:45.539] LOG: %cStart Phase EggLapsePhase color:green;
+[03:34:45.540] LOG: %cStart Phase SelectModifierPhase color:green;
+[03:34:45.540] LOG: Wave Seed: gpVGTznn[oWGJDBbloSFEJSk 1
+[03:34:45.544] LOG: 9 4 [2,3,4,5]
+[03:34:45.544] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[03:34:45.545] LOG: 6 4 [2,3,4,5]
+[03:34:45.545] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[03:34:45.545] LOG: 0 0 [2,3,4,5]
+[03:34:45.545] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[03:34:49.184] LOG: %cStart Phase LearnMovePhase color:green;
+[03:34:50.608] WARN: cry/352 not found
+[03:34:52.738] LOG: [coop:reward] advanceCoopInteractionForContinuation SKIP (isCoop=false fromSeq=-1 meInProgress=false)
+[03:34:53.374] LOG: %cStart Phase NewBattlePhase color:green;
+[03:34:53.374] LOG: Wave Seed: hqWHU{oo\pXHKECcmpTGFKTl 2
+[03:34:53.380] LOG: %cStart Phase NextEncounterPhase color:green;
+[03:34:53.381] LOG: Starting species pool tier: COMMON
+[03:34:53.389] LOG: Pokemon: Wild Bidoof | Species ID: 399 | Level: 3 | Nature: Brave (+Atk/-Spd)
+[03:34:53.389] LOG: Stats (IVs): HP: 17 (26), Atk: 9 (12), Def: 8 (5), Spatk: 7 (12), Spdef: 7 (4), Spd: 6 (14)
+[03:34:53.389] LOG: Ability: Lumberjack | Passive Ability: Unaware 
+[03:34:53.390] LOG: Moveset: ["Hyper Fang","Defense Curl","Strength","Growl"]
+[03:34:53.790] DEBUG: Session data saved to slot 1!
+[03:34:53.790] LOG: Wave Seed: hqWHU{oo\pXHKECcmpTGFKTl 2
+[03:34:54.218] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[03:34:54.218] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:34:54.219] LOG: %cStart Phase PostSummonPhase color:green;
+[03:34:54.219] LOG: Ran PSP for: Kecleon
+[03:34:54.220] LOG: %cStart Phase PostSummonPhase color:green;
+[03:34:54.221] LOG: %cStart Phase PostSummonPhase color:green;
+[03:34:54.221] LOG: %cStart Phase MovePhase color:green;
+[03:34:54.221] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[03:34:54.223] LOG: %cStart Phase MessagePhase color:green;
+[03:34:54.336] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:34:54.337] LOG: Battle Seed: PwSq1cbVdV3stTJa
+[03:34:54.353] LOG: crit stage: +0
+[03:34:54.355] LOG: Move: Scratch | Base damage: 8.8 | Power: 40 | Source attack: 17 | Target defense: 8
+[03:34:54.356] LOG: Move: Scratch | Attack damage: 12
+[03:34:54.358] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:34:54.387] LOG: %cStart Phase MoveEndPhase color:green;
+[03:34:54.387] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:34:54.570] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:34:54.754] LOG: %cStart Phase MessagePhase color:green;
+[03:34:54.969] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:34:55.004] LOG: %cStart Phase PostSummonPhase color:green;
+[03:34:55.004] LOG: Ran PSP for: Bidoof
+[03:34:55.004] LOG: %cStart Phase PostSummonPhase color:green;
+[03:34:55.004] LOG: %cStart Phase PostSummonPhase color:green;
+[03:34:55.004] LOG: %cStart Phase TurnInitPhase color:green;
+[03:34:55.006] LOG: %cStart Phase CommandPhase color:green;
+[03:34:56.553] WARN: cry/352 not found
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"foUFSymmZnVFICAaknREDIRj","gameModeId":0,"difficulty":"youngster","challenges":[],"roster":[{"id":1306305771,"player":true,"species":352,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":128,"levelExp":0,"gender":0,"hp":22,"stats":[22,17,13,10,18,10],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":729,"ppUsed":0,"ppUp":0},{"moveId":252,"ppUsed":0,"ppUp":0},{"moveId":310,"ppUsed":0,"ppUp":0},{"moveId":293,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":352,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[0],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,2,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":10,"targets":[2],"result":1,"useMode":3},{"move":10,"targets":[2],"result":1,"useMode":3}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[5504,127,5000],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"interaction","seq":0,"kind":"reward","choice":0},{"type":"interaction","seq":1,"kind":"learnMove","choice":3}],"endState":{"waveIndex":2,"money":1000,"party":[{"species":352,"level":5,"hp":22,"maxHp":22}]},"checkpoint":{"wave":1,"seed":"foUFSymmZnVFICAaknREDIRj","party":[{"id":1306305771,"player":true,"species":352,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":128,"levelExp":0,"gender":0,"hp":22,"stats":[22,17,13,10,18,10],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":729,"ppUsed":0,"ppUp":0},{"moveId":252,"ppUsed":0,"ppUp":0},{"moveId":310,"ppUsed":0,"ppUp":0},{"moveId":293,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":352,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[0],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,2,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":10,"targets":[2],"result":1,"useMode":3},{"move":10,"targets":[2],"result":1,"useMode":3}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[5504,127,5000],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"}],"money":1000,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":0}}}
