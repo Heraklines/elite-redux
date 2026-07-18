@@ -63,15 +63,67 @@ import type { ApplyMaterialFn } from "#data/elite-redux/coop/authority-v2/replic
 
 /**
  * The injected turn-capture image: the serialized authoritative resolution of one
- * turn plus the settled checkpoint image. Both are OPAQUE JSON-shaped wire values
- * (the log never inspects them); the concrete serialization is owned by the engine
- * capture lane. This adapter only fingerprints + carries them.
+ * turn plus the settled checkpoint image. Every field is an OPAQUE JSON-shaped wire
+ * value (the log never inspects them); the concrete serialization is owned by the
+ * engine capture lane. This adapter only fingerprints + carries them.
+ *
+ * CUTOVER COMPANIONS (surface 1). A live turn cutover must feed the guest's REAL
+ * progression (its `CoopReplayTurnPhase` -> `CoopFinalizeTurnPhase` presentation
+ * flow), which consumes a COMPLETE legacy turn resolution - not just the numeric
+ * checkpoint. The numeric `checkpoint` alone omits terrain / arena tags / field
+ * companion state (moveset+PP / tera / boss / held items / ability / form), so a
+ * checkpoint-only apply drifts on exactly those fields (the observed wave-start
+ * field/terrain/arenaTags mismatch class). The optional companions below carry the
+ * rest of the legacy `CoopTurnResolution` so the replica can reconstruct the exact
+ * carrier the guest's real progression awaits, making the (now-cosmetic, unretained)
+ * legacy carrier's loss/race non-fatal. They are OPTIONAL: a bare shadow-parity image
+ * (no live cutover) omits them and keeps its exact pre-enrichment digest.
  */
 export interface TurnResolutionImage {
   /** The serialized, ordered turn-resolution events the host committed for turn N. */
   readonly turnResolution: unknown;
-  /** The authoritative post-settle checkpoint image (battle state) for turn N. */
+  /** The authoritative post-settle numeric checkpoint image (battle state) for turn N. */
   readonly checkpoint: unknown;
+  /** Cutover companion: the host's full-state checksum at this turn boundary. */
+  readonly checksum?: unknown;
+  /** Cutover companion: the canonical state pre-image the `checksum` hashed. */
+  readonly preimage?: unknown;
+  /** Cutover companion: the host's COMPLETE per-mon on-field snapshot (heals what the numeric checkpoint omits). */
+  readonly fullField?: unknown;
+  /** Cutover companion: the full authoritative battle state (terrain / arena tags / parties / field). */
+  readonly authoritativeState?: unknown;
+  /** Cutover companion: the session epoch this resolution was committed under. */
+  readonly epoch?: unknown;
+  /** Cutover companion: the wave this resolution resolved. */
+  readonly wave?: unknown;
+  /** Cutover companion: the turn (N) this resolution resolved. */
+  readonly turn?: unknown;
+  /** Cutover companion: the authoritative-state tick / revision of this resolution. */
+  readonly revision?: unknown;
+}
+
+/**
+ * Project a capture into the canonical image the digest + payload carry: always the
+ * `turnResolution` + `checkpoint`, plus any cutover companion that is actually present.
+ * A companion left `undefined` (a bare shadow image) is OMITTED, so its key never
+ * enters the canonical object and the digest is byte-identical to the pre-enrichment
+ * scheme for such an image. The explicit per-companion spread keeps the digest + the
+ * carried payload in exact agreement over which fields fingerprint + travel, so a
+ * companion can never escape the digest and smuggle a divergent state under a match.
+ */
+function selectTurnCommitImage(capture: TurnResolutionImage): TurnResolutionImage {
+  return {
+    turnResolution: capture.turnResolution,
+    checkpoint: capture.checkpoint,
+    ...(capture.checksum === undefined ? {} : { checksum: capture.checksum }),
+    ...(capture.preimage === undefined ? {} : { preimage: capture.preimage }),
+    ...(capture.fullField === undefined ? {} : { fullField: capture.fullField }),
+    ...(capture.authoritativeState === undefined ? {} : { authoritativeState: capture.authoritativeState }),
+    ...(capture.epoch === undefined ? {} : { epoch: capture.epoch }),
+    ...(capture.wave === undefined ? {} : { wave: capture.wave }),
+    ...(capture.turn === undefined ? {} : { turn: capture.turn }),
+    ...(capture.revision === undefined ? {} : { revision: capture.revision }),
+  };
 }
 
 /**
@@ -143,14 +195,20 @@ export const TURN_COMMIT_KIND: CoopAuthorityEntryKind = "TURN_COMMIT";
  * replica applier + the shadow seam agree on the exact scheme.
  */
 export function computeTurnCommitDigest(capture: TurnResolutionImage): string {
-  return fnv1a64(canonicalize({ turnResolution: capture.turnResolution, checkpoint: capture.checkpoint }));
+  return fnv1a64(canonicalize(selectTurnCommitImage(capture)));
 }
 
-/** Assemble the concrete {@link TurnCommitMaterial} (digest + image payload) for a capture. */
+/**
+ * Assemble the concrete {@link TurnCommitMaterial} (digest + image payload) for a capture.
+ * The payload carries the `turnResolution` + `checkpoint` AND every present cutover companion,
+ * so a replica can reconstruct the exact legacy resolution the guest's real progression awaits.
+ * A bare shadow image (no companions) yields the identical `{ turnResolution, checkpoint }` payload
+ * + digest as the pre-enrichment scheme.
+ */
 export function buildTurnCommitMaterial(capture: TurnResolutionImage): TurnCommitMaterial {
   return {
     digest: computeTurnCommitDigest(capture),
-    payload: { turnResolution: capture.turnResolution, checkpoint: capture.checkpoint },
+    payload: selectTurnCommitImage(capture),
   };
 }
 

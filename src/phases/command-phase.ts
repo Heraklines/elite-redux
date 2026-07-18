@@ -5,7 +5,6 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
-import { isCoopV2TurnCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-turn";
 import {
   applyCoopAuthoritativeBattleState,
   coopAppliedStateTick,
@@ -905,14 +904,14 @@ export class CommandPhase extends FieldPhase {
       if (!globalScene.gameMode.isCoop || getCoopRuntime()?.spoof != null) {
         return null;
       }
-      // authority-v2 turn CUTOVER: the successor COMMAND is STATED by the host and PROJECTED onto this guest's
-      // phase manager (frozen decision 4 - the guest never derives its next command from the local rendezvous
-      // barrier). The legacy next-command reciprocal barrier must NOT run for a negotiated session (the frozen
-      // "no second authority" rule), so take the null fast-path exactly as a solo/spoof session does. No-op /
-      // byte-identical when the cutover is not active.
-      if (isCoopV2TurnCutoverActive()) {
-        return null;
-      }
+      // authority-v2 turn CUTOVER note: the successor COMMAND ADDRESS is STATED by the host and PROJECTED
+      // (frozen decision 4 - the guest never DERIVES its next command from this barrier). The reciprocal
+      // next-command rendezvous below is pure PACING, NOT authority: it only ARRIVEs + AWAITs the partner at
+      // the shared cmd:<wave>:<turn> point and never chooses a command or an address. An earlier cutover pass
+      // short-circuited it entirely, which dropped the reciprocal faint-replacement/command lock (#839) - the
+      // faster seat then raced ahead of a partner mid-replay (the observed missing-arrival class). So it MUST
+      // keep running under cutover; it stays a no-op / byte-identical outside a live co-op run (the guards
+      // below) and re-introduces no second authority for the command content.
       const rendezvous = getCoopRendezvous();
       if (rendezvous == null) {
         return null;

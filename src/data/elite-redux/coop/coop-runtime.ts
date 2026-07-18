@@ -293,8 +293,11 @@ import {
 import type {
   CoopActiveControlSnapshotV1,
   CoopAuthoritativeBattleStateV1,
+  CoopBattleCheckpoint,
+  CoopBattleEvent,
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
+  CoopFullMonSnapshot,
   CoopInteractionOutcome,
   CoopMessage,
   CoopNetcodeMode,
@@ -3399,14 +3402,60 @@ function isCoopV2TurnNegotiated(): boolean {
 }
 
 /**
+ * Reconstruct the COMPLETE legacy `turnResolution` carrier from an enriched v2 TURN_COMMIT material image
+ * (surface 1). Returns `null` when any cutover companion is missing/mistyped (a bare shadow-parity image or
+ * an older host) - the caller then falls back to the checkpoint-only apply, byte-identical to the
+ * pre-enrichment behaviour. The streamer re-validates the carrier strictly (hasCompleteAuthorityCompanions)
+ * before admitting it, so this only assembles the message shape and screens the coarse field types.
+ */
+function reconstructCoopV2TurnResolution(
+  payload: TurnResolutionImage,
+): Extract<CoopMessage, { t: "turnResolution" }> | null {
+  const { turnResolution, checkpoint, checksum, preimage, fullField, authoritativeState, epoch, wave, turn, revision } =
+    payload;
+  if (
+    !Array.isArray(turnResolution)
+    || checkpoint == null
+    || typeof checkpoint !== "object"
+    || typeof checksum !== "string"
+    || typeof preimage !== "string"
+    || !Array.isArray(fullField)
+    || authoritativeState == null
+    || typeof authoritativeState !== "object"
+    || typeof epoch !== "number"
+    || typeof wave !== "number"
+    || typeof turn !== "number"
+    || typeof revision !== "number"
+  ) {
+    return null;
+  }
+  return {
+    t: "turnResolution",
+    epoch,
+    wave,
+    turn,
+    revision,
+    events: turnResolution as CoopBattleEvent[],
+    checkpoint: checkpoint as CoopBattleCheckpoint,
+    checksum,
+    preimage,
+    fullField: fullField as CoopFullMonSnapshot[],
+    authoritativeState: authoritativeState as CoopAuthoritativeBattleStateV1,
+  };
+}
+
+/**
  * Build the LIVE replica seams (cutover surface 1). The guest applies a delivered TURN_COMMIT through the
- * REAL engine: the material applier maps to the existing checkpoint-apply seam ({@link applyCoopCheckpoint}),
- * and the projector reports the stated COMMAND control as installed - the guest's own (non-suppressed)
- * presentation phase flow (CoopReplayTurnPhase -> CoopFinalizeTurnPhase -> CommandPhase) is what materializes
- * that command on the real phase manager, so the projector's role is to sign controlInstalled (retirement)
- * once the material has applied, never to double-drive the phase queue. A non-cutover kind / non-COMMAND
- * control returns `null` so the harness falls through to pure shadow. Every verb is guarded so an engine
- * throw becomes a `false`/`null` (material rejected / fall-through), never a crash into the frame handler.
+ * REAL engine: the material applier reconstructs the COMPLETE legacy turn resolution from the enriched
+ * material companions and feeds it through the streamer's admission path (so the guest's own non-suppressed
+ * presentation flow CoopReplayTurnPhase -> CoopFinalizeTurnPhase -> CommandPhase resolves even when the
+ * now-cosmetic legacy carrier is lost/raced), then applies the numeric checkpoint ({@link applyCoopCheckpoint})
+ * so materialApplied is honest. The projector reports the stated COMMAND control as installed - that same
+ * presentation flow materializes the command on the real phase manager, so the projector's role is to sign
+ * controlInstalled (retirement) once the material has applied, never to double-drive the phase queue. A
+ * non-cutover kind / non-COMMAND control returns `null` so the harness falls through to pure shadow. Every
+ * verb is guarded so an engine throw becomes a `false`/`null` (material rejected / fall-through), never a
+ * crash into the frame handler.
  */
 function buildCoopV2TurnLiveSeams(): CoopV2LiveReplicaSeams {
   return {
@@ -3417,11 +3466,26 @@ function buildCoopV2TurnLiveSeams(): CoopV2LiveReplicaSeams {
       try {
         const payload = entry.material.payload as TurnResolutionImage | undefined;
         const checkpoint = payload?.checkpoint;
-        if (checkpoint == null || typeof checkpoint !== "object") {
+        if (payload == null || checkpoint == null || typeof checkpoint !== "object") {
           return false; // malformed TURN material - refuse before signing materialApplied.
         }
-        // The checkpoint-apply seam is tick-gated + idempotent (coopAcceptStateTick), so a redelivered entry
-        // is safe. Its boolean is the materialApplied verdict.
+        // Feed the guest's REAL progression: reconstruct the COMPLETE legacy turn resolution from the
+        // enriched material companions and deliver it through the streamer's admission path - the SAME
+        // seam the (now-cosmetic, unretained) legacy carrier uses. This resolves the guest's parked
+        // CoopReplayTurnPhase pump -> CoopFinalizeTurnPhase (which applies checkpoint + authoritativeState
+        // + fullField and verifies the checksum) -> CommandPhase, so a lost/raced cosmetic carrier can no
+        // longer starve the guest (the soft-lock class) and the terrain/arenaTags/field companions the
+        // numeric checkpoint omits converge (the wave-start drift class). Idempotent: the streamer classes
+        // an identical redelivery as a re-ACK/ignore, so first delivery and every redelivery are equivalent.
+        const resolution = reconstructCoopV2TurnResolution(payload);
+        if (resolution != null) {
+          getCoopBattleStreamer()?.ingestAuthoritativeV2Turn(resolution);
+        }
+        // Also apply the numeric checkpoint eagerly (tick-gated + idempotent via coopAcceptStateTick) so
+        // materialApplied honestly reports canonical numeric state installed even before the guest's replay
+        // pump reaches finalize; CoopFinalizeTurnPhase re-applies it (a no-op) plus the full companions. When
+        // the resolution could not be reconstructed (a bare/malformed image) the checkpoint apply is the
+        // materialApplied verdict on its own, preserving the pre-enrichment behaviour.
         return applyCoopCheckpoint(checkpoint as Parameters<typeof applyCoopCheckpoint>[0]);
       } catch (error) {
         coopWarn("v2-turn", `live applyMaterial threw for rev=${entry.revision}`, error);

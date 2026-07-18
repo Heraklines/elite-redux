@@ -22,6 +22,7 @@
 // a checkpoint lives in `coop-battle-checkpoint.ts`; this file is just the wire.
 // =============================================================================
 
+import type { TurnResolutionImage } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
 import {
   activeCoopTurnAuthorityMode,
   getActiveCoopV2TurnCutover,
@@ -2083,6 +2084,8 @@ export class CoopBattleStreamer {
         events,
         checkpoint,
         checksum,
+        preimage,
+        fullField,
         authoritativeState,
       );
       if (!this.retainAndRetryTurnCommit(commit, v2Committed)) {
@@ -2098,7 +2101,17 @@ export class CoopBattleStreamer {
     }
     this.transport.send(commit);
     // Shadow parity tap AFTER the legacy send (unchanged position) - a pure no-op unless a harness is active.
-    this.emitCoopV2TurnAuthority(epoch, wave, turn, events, checkpoint, checksum, authoritativeState);
+    this.emitCoopV2TurnAuthority(
+      epoch,
+      wave,
+      turn,
+      events,
+      checkpoint,
+      checksum,
+      preimage,
+      fullField,
+      authoritativeState,
+    );
     return true;
   }
 
@@ -2117,6 +2130,8 @@ export class CoopBattleStreamer {
     events: CoopBattleEvent[],
     checkpoint: CoopBattleCheckpoint,
     checksum: string,
+    preimage: string,
+    fullField: CoopFullMonSnapshot[],
     authoritativeState: CoopAuthoritativeBattleStateV1,
   ): boolean {
     const cutoverActive = isCoopV2TurnCutoverActive();
@@ -2127,6 +2142,23 @@ export class CoopBattleStreamer {
     if (commandSeat == null) {
       return false;
     }
+    // Cutover surface 1: the v2 material must carry the COMPLETE legacy turn resolution (not just the
+    // numeric checkpoint), so a guest applying it can reconstruct the exact carrier its REAL progression
+    // (CoopReplayTurnPhase -> CoopFinalizeTurnPhase) awaits - making the now-cosmetic, unretained legacy
+    // carrier's loss/race non-fatal, and healing the terrain/arenaTags/field companion state the numeric
+    // checkpoint omits. Identical to the legacy image, so shadow parity still compares like-for-like.
+    const capture: TurnResolutionImage = {
+      turnResolution: events,
+      checkpoint,
+      checksum,
+      preimage,
+      fullField,
+      authoritativeState,
+      epoch,
+      wave,
+      turn,
+      revision: authoritativeState.tick,
+    };
     // Deliverable 2: thread the REAL owner seat of the next-command mon. The authoritative field seat carries
     // its owner ROLE; map it to the seat id (host=0, guest=1). When the seat carries no owner (an older host
     // payload / genuinely unavailable), keep the best-effort local-role seat and MARK the record so the
@@ -2141,7 +2173,7 @@ export class CoopBattleStreamer {
         : 1;
     const input: CoopV2ShadowTurnTap = {
       operationId: `TURN/e${epoch}/w${wave}/t${turn}`,
-      capture: { turnResolution: events, checkpoint },
+      capture,
       nextCommand: {
         epoch,
         wave,
@@ -2149,10 +2181,10 @@ export class CoopBattleStreamer {
         ownerSeatId,
         pokemonId: commandSeat.pokemonId,
       },
-      // Deliverable 1: fingerprint the LEGACY turn image (the resolution + checkpoint legacy just committed)
-      // through the SAME turn digest so parity compares like-for-like (v2 entry digest vs v2-digest-of-legacy-
-      // image); the full-state checksum stays as the raw legacy token for the log.
-      legacyImage: { turnResolution: events, checkpoint },
+      // Deliverable 1: fingerprint the LEGACY turn image (the resolution + checkpoint + companions legacy just
+      // committed) through the SAME turn digest so parity compares like-for-like (v2 entry digest vs
+      // v2-digest-of-legacy-image); the full-state checksum stays as the raw legacy token for the log.
+      legacyImage: capture,
       legacyDigest: checksum,
       successorSeatSource: ownerResolved ? "owner-field" : "local-role-fallback",
     };
@@ -3642,6 +3674,21 @@ export class CoopBattleStreamer {
       coopLog("replay", `guest live-pump drain turn=${turn} seq=${fromSeq}..${fromSeq + run.length - 1}`);
     }
     return run;
+  }
+
+  /**
+   * authority-v2 turn CUTOVER (surface 1): deliver a RELIABLY-transported turn resolution through the
+   * EXACT same admission + waiter path the (now-cosmetic, unretained) legacy `turnResolution` carrier
+   * uses on receipt. Under cutover the host emits the legacy carrier cosmetically (sent once, never
+   * retained/resent), so a lost or raced cosmetic carrier would otherwise starve the guest's parked
+   * {@linkcode CoopReplayTurnPhase} pump - the observed soft-lock class (stuck at an ability/presentation
+   * phase, never reaching CommandPhase). The v2 authority log delivers the SAME resolution reliably; the
+   * replica hands it here as the backstop. Idempotent by the turnResolution admission classification (an
+   * identical redelivery is re-ACKed / ignored, never re-applied), so first delivery and every redelivery
+   * are equivalent, and racing the cosmetic carrier only settles the same waiter once.
+   */
+  ingestAuthoritativeV2Turn(msg: Extract<CoopMessage, { t: "turnResolution" }>): void {
+    this.handle(msg);
   }
 
   /**

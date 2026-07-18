@@ -23,6 +23,7 @@
 
 import {
   buildTurnCommitEntry,
+  buildTurnCommitMaterial,
   CommandRequestLeaseBook,
   computeShadowParity,
   computeTurnCommitDigest,
@@ -66,6 +67,23 @@ const CAPTURE: TurnResolutionImage = {
     { seq: 1, kind: "damage", bi: 2, hp: 118 },
   ],
   checkpoint: { field: [{ bi: 0, hp: 200 }], weather: 0, checksum: "abc123" },
+};
+
+/**
+ * A cutover capture: the same bare image PLUS the legacy `CoopTurnResolution` companions the guest's real
+ * progression (CoopReplayTurnPhase -> CoopFinalizeTurnPhase) reconstructs from. Every companion is an opaque
+ * JSON-shaped value here (the adapter never inspects them); the streamer re-validates them strictly on apply.
+ */
+const CAPTURE_WITH_COMPANIONS: TurnResolutionImage = {
+  ...CAPTURE,
+  checksum: "0123456789abcdef",
+  preimage: "canonical-state-preimage",
+  fullField: [{ bi: 0, partyIndex: 0, speciesId: 1, hp: 200, maxHp: 200 }],
+  authoritativeState: { tick: 7, wave: 3, turn: 5, terrain: 2, arenaTags: ["stealth-rock"] },
+  epoch: 1,
+  wave: 3,
+  turn: 5,
+  revision: 7,
 };
 
 /** A fresh CoopScheduler over a NEVER-firing fake clock, so armed timers stay pending for assertions. */
@@ -155,6 +173,203 @@ describe("buildTurnCommitEntry - shape + digest", () => {
 
   it("carries an explicit subsumes list through to the entry", () => {
     expect(buildCommitted({ subsumes: [7, 9] }).subsumes).toEqual([7, 9]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (1) AUTHORITY: cutover companions round-trip through material + digest
+// ---------------------------------------------------------------------------
+
+describe("TurnResolutionImage cutover companions", () => {
+  it("carries every present companion into the material payload (round-trip)", () => {
+    const material = buildTurnCommitMaterial(CAPTURE_WITH_COMPANIONS);
+    expect(material.payload).toEqual({
+      turnResolution: CAPTURE_WITH_COMPANIONS.turnResolution,
+      checkpoint: CAPTURE_WITH_COMPANIONS.checkpoint,
+      checksum: CAPTURE_WITH_COMPANIONS.checksum,
+      preimage: CAPTURE_WITH_COMPANIONS.preimage,
+      fullField: CAPTURE_WITH_COMPANIONS.fullField,
+      authoritativeState: CAPTURE_WITH_COMPANIONS.authoritativeState,
+      epoch: CAPTURE_WITH_COMPANIONS.epoch,
+      wave: CAPTURE_WITH_COMPANIONS.wave,
+      turn: CAPTURE_WITH_COMPANIONS.turn,
+      revision: CAPTURE_WITH_COMPANIONS.revision,
+    });
+  });
+
+  it("omits absent companions so a bare image keeps its exact pre-enrichment payload + digest", () => {
+    // A bare shadow image (no companions) round-trips to just { turnResolution, checkpoint }: byte-identical
+    // to the pre-enrichment scheme, so a shadow-only / capability-off session is unchanged.
+    const bare = buildTurnCommitMaterial(CAPTURE);
+    expect(bare.payload).toEqual({ turnResolution: CAPTURE.turnResolution, checkpoint: CAPTURE.checkpoint });
+    expect(bare.digest).toBe(
+      computeTurnCommitDigest({ turnResolution: CAPTURE.turnResolution, checkpoint: CAPTURE.checkpoint }),
+    );
+  });
+
+  it("fingerprints the companions into the digest (enriched != bare, and each companion is load-bearing)", () => {
+    const bareDigest = computeTurnCommitDigest(CAPTURE);
+    const enrichedDigest = computeTurnCommitDigest(CAPTURE_WITH_COMPANIONS);
+    expect(enrichedDigest).not.toBe(bareDigest);
+    expect(enrichedDigest).toMatch(/^[0-9a-f]{16}$/);
+    // A divergent authoritativeState (terrain/arenaTags live here) must change the digest, so a redelivery
+    // can never smuggle a divergent state under a matching digest.
+    expect(
+      computeTurnCommitDigest({
+        ...CAPTURE_WITH_COMPANIONS,
+        authoritativeState: { tick: 7, wave: 3, turn: 5, terrain: 3, arenaTags: [] },
+      }),
+    ).not.toBe(enrichedDigest);
+    // A divergent checksum likewise.
+    expect(computeTurnCommitDigest({ ...CAPTURE_WITH_COMPANIONS, checksum: "ffffffffffffffff" })).not.toBe(
+      enrichedDigest,
+    );
+  });
+
+  it("is deterministic under key-order differences in the companions", () => {
+    const reordered: TurnResolutionImage = {
+      revision: 7,
+      turn: 5,
+      wave: 3,
+      epoch: 1,
+      authoritativeState: { arenaTags: ["stealth-rock"], terrain: 2, turn: 5, wave: 3, tick: 7 },
+      fullField: [{ maxHp: 200, hp: 200, speciesId: 1, partyIndex: 0, bi: 0 }],
+      preimage: "canonical-state-preimage",
+      checksum: "0123456789abcdef",
+      checkpoint: CAPTURE.checkpoint,
+      turnResolution: CAPTURE.turnResolution,
+    };
+    expect(computeTurnCommitDigest(reordered)).toBe(computeTurnCommitDigest(CAPTURE_WITH_COMPANIONS));
+  });
+
+  it("survives the applier digest gate with the enriched payload and hands back the full image", () => {
+    const entry: CoopAuthorityEntry = { ...buildCommitted({ capture: CAPTURE_WITH_COMPANIONS }), revision: 1 };
+    const rec = recordingSink();
+    let handed: TurnResolutionImage | null = null;
+    const out = applyEntry(CTX, entry, {
+      applyMaterial: turnMaterialApplier((_ctx, material) => {
+        handed = material.payload;
+        return true;
+      }),
+      projector: fixedProjector({ kind: "installed", controlId: turnCommandControlId(entry) as string }),
+      receipts: rec.sink,
+    });
+    expect(rec.stages()).toEqual(["admitted", "materialApplied", "controlInstalled"]);
+    expect(out.kind).toBe("applied");
+    // The applier receives the WHOLE enriched image (the companions the guest's real progression needs).
+    expect(handed).toEqual(entry.material.payload);
+    expect((handed as unknown as TurnResolutionImage).authoritativeState).toEqual(
+      CAPTURE_WITH_COMPANIONS.authoritativeState,
+    );
+    expect((handed as unknown as TurnResolutionImage).fullField).toEqual(CAPTURE_WITH_COMPANIONS.fullField);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (2) REPLICA: the material FEED runs (and signs materialApplied) BEFORE controlInstalled
+// ---------------------------------------------------------------------------
+
+describe("replica pipeline - material feed precedes controlInstalled", () => {
+  it("feeds the guest progression (materialApplied) strictly before the control is installed", () => {
+    const entry = fullEntry(1, { capture: CAPTURE_WITH_COMPANIONS });
+    const controlId = turnCommandControlId(entry) as string;
+    const order: string[] = [];
+    const rec = recordingSink();
+
+    const out = applyEntry(CTX, entry, {
+      // The applier stands in for the live seam that feeds the guest's real progression (the streamer
+      // ingest). It must run - and sign materialApplied - BEFORE the projector installs the control.
+      applyMaterial: turnMaterialApplier(() => {
+        order.push("feed");
+        return true;
+      }),
+      projector: {
+        project: () => {
+          order.push("install");
+          return { kind: "installed", controlId };
+        },
+      },
+      receipts: rec.sink,
+    });
+
+    expect(order).toEqual(["feed", "install"]);
+    expect(rec.stages()).toEqual(["admitted", "materialApplied", "controlInstalled"]);
+    expect(out).toEqual({ kind: "applied", controlId, presentationSettled: false });
+  });
+
+  it("never installs the control when the feed refuses (materialRejected halts before projection)", () => {
+    const entry = fullEntry(1, { capture: CAPTURE_WITH_COMPANIONS });
+    const order: string[] = [];
+    const rec = recordingSink();
+    const out = applyEntry(CTX, entry, {
+      applyMaterial: turnMaterialApplier(() => {
+        order.push("feed");
+        return false; // the guest could not accept the material -> stop before controlInstalled
+      }),
+      projector: {
+        project: () => {
+          order.push("install");
+          return { kind: "installed", controlId: "x" };
+        },
+      },
+      receipts: rec.sink,
+    });
+    expect(order).toEqual(["feed"]);
+    expect(rec.stages()).toEqual(["admitted"]);
+    expect(out.kind).toBe("materialRejected");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (2) REPLICA: redelivery equivalence (first delivery == every redelivery)
+// ---------------------------------------------------------------------------
+
+describe("replica pipeline - redelivery equivalence", () => {
+  it("hands an identical enriched payload to the feed on first delivery and every redelivery", () => {
+    const entry = fullEntry(1, { capture: CAPTURE_WITH_COMPANIONS });
+    const controlId = turnCommandControlId(entry) as string;
+    const handed: TurnResolutionImage[] = [];
+    const deps = {
+      applyMaterial: turnMaterialApplier((_ctx, material) => {
+        handed.push(material.payload);
+        return true;
+      }),
+      projector: fixedProjector({ kind: "installed", controlId } as CoopControlInstallResult),
+      receipts: recordingSink().sink,
+    };
+
+    const first = applyEntry(CTX, entry, deps);
+    const second = applyEntry(CTX, entry, deps); // redelivery of the SAME immutable entry
+    const third = applyEntry(CTX, entry, deps);
+
+    expect(first).toEqual(second);
+    expect(second).toEqual(third);
+    expect(handed).toHaveLength(3);
+    // Every delivery hands the byte-identical image (the digest gate proves the payload is the same), so a
+    // downstream idempotent consumer (the streamer's turnResolution admission) classifies redeliveries as
+    // identical and never double-applies.
+    expect(handed[0]).toEqual(handed[1]);
+    expect(handed[1]).toEqual(handed[2]);
+    expect(handed[0]).toEqual(entry.material.payload);
+  });
+
+  it("keeps rejecting a redelivered entry whose digest was tampered (no smuggled state on retry)", () => {
+    const tampered: CoopAuthorityEntry = {
+      ...fullEntry(1, { capture: CAPTURE_WITH_COMPANIONS }),
+      material: { digest: "deadbeefdeadbeef", payload: CAPTURE_WITH_COMPANIONS },
+    };
+    let feeds = 0;
+    const deps = {
+      applyMaterial: turnMaterialApplier(() => {
+        feeds += 1;
+        return true;
+      }),
+      projector: fixedProjector({ kind: "installed", controlId: "x" }),
+      receipts: recordingSink().sink,
+    };
+    expect(applyEntry(CTX, tampered, deps).kind).toBe("materialRejected");
+    expect(applyEntry(CTX, tampered, deps).kind).toBe("materialRejected");
+    expect(feeds).toBe(0);
   });
 });
 
