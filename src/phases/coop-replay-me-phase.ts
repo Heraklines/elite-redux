@@ -889,11 +889,15 @@ export class CoopReplayMePhase extends Phase {
       if (outcome != null && outcome.k === "meResync") {
         if (isCoopMeOperationJournalActive()) {
           coopWarn("me", "raw meResync ignored while the journal owns the terminal transaction", { seq: this.seq });
-          void terminalArm.then(t => {
-            if (this.boundaryStillLive()) {
-              this.handleTerminalAction(t.action);
-            }
-          });
+          // JOURNAL MODE: terminalArm is `journalTerminalArm` (a promise that never resolves - the retained
+          // ME_TERMINAL transaction drives the terminal directly via setOnMeCommittedTerminal). Awaiting it
+          // here is inert, so if the committed terminal has not landed yet nothing re-requests it and the
+          // guest hangs while the host's durable ME_PRESENT/ME_PICK continuation deadline exhausts (both
+          // clients then fall to Title). Drive the durability recovery re-request instead: handleTerminalAction
+          // (null) -> recoverMissingControl -> durability.reconnect() pulls the committed op:me tail.
+          if (!this.settled || this.settledDetached) {
+            this.handleTerminalAction(null);
+          }
           return;
         }
         coopLog("me", "host sent comprehensive outcome (meResync); applying", {
@@ -924,6 +928,20 @@ export class CoopReplayMePhase extends Phase {
         seq: this.seq,
         got: outcome == null ? "null" : outcome.k,
       });
+      if (isCoopMeOperationJournalActive()) {
+        // JOURNAL MODE: the 9M `terminalArm` (journalTerminalArm) never resolves - the retained ME_TERMINAL
+        // transaction drives the terminal directly (setOnMeCommittedTerminal). If the OUTCOME arm lost/timed
+        // out (got:"null" - the normal journal-mode timeout, since the host streams no meResync) BEFORE that
+        // transaction landed, `void terminalArm.then(...)` below is dead and NOTHING re-requests the committed
+        // terminal: the guest hangs and the host's durable ME_PRESENT/ME_PICK continuation deadline exhausts,
+        // dropping BOTH clients to Title (#693 battle-handoff class in real browser netcode). Route into the
+        // recovery re-request so the committed op:me tail (present/pick/terminal) is pulled and the terminal
+        // materializes, closing the ME cleanly and releasing the owner's retention.
+        if (!this.settled || this.settledDetached) {
+          this.handleTerminalAction(null);
+        }
+        return;
+      }
       void terminalArm.then(t => {
         if (!this.settled || this.settledDetached) {
           this.handleTerminalAction(t.action);
