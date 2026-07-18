@@ -182,6 +182,11 @@ interface Recipe {
   diffTolerance?: number;
 }
 
+// Collects `Texture "items" has no frame "<key>"` warnings from the FINAL render pass (the ER
+// reward-icon repro clears it at the start of each render pass, so pass-1 pre-injection misses
+// don't count). Asserted empty for the modifier-select-er page. See its recipe + the it() body.
+const ITEMS_ATLAS_FRAME_MISSES: string[] = [];
+
 const CAUGHT = DexAttr.NON_SHINY | DexAttr.MALE | DexAttr.DEFAULT_VARIANT | DexAttr.DEFAULT_FORM;
 
 /** Mark a species fully caught so the full render branch runs, return its species object. */
@@ -1902,6 +1907,51 @@ const RECIPES: Record<string, Recipe> = {
     },
     diffTolerance: 2000,
   },
+  // ER reward-icon repro (live log 2026-07-18): ER custom items (tactical/reactive/gems/
+  // seeds) are STANDALONE er_* textures, NOT frames in the "items" atlas. The reward screen
+  // built its icon as `add.sprite(0,0,"items", iconImage)`, so Phaser logged `Texture
+  // "items" has no frame "er_eject_pack"` and the tile rendered blank. This recipe stages
+  // Eject Pack + Room Service (both er_*) alongside two vanilla items so the golden shows all
+  // four icons rendering. Pre-fix these two tiles were blank / a __BASE whole-atlas suspect.
+  "modifier-select-er": {
+    mode: UiMode.MODIFIER_SELECT,
+    field: true,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.PIKACHU);
+      return [];
+    },
+    render: (game, ctx) => {
+      // Clear so ITEMS_ATLAS_FRAME_MISSES ends up holding only THIS pass's warnings; the it()
+      // body asserts on the final (pass-2) contents. Live these textures are preloaded in
+      // loading-scene; the harness only loads what a page requests, and the (now-fixed) atlas
+      // path masks the request - so declare the standalone er_* keys the two-pass injector needs.
+      ITEMS_ATLAS_FRAME_MISSES.length = 0;
+      for (const key of ["er_eject_pack", "er_room_service", "er_heavy_duty_boots"]) {
+        ctx.missing.add(key);
+      }
+      const ui: any = game.scene.ui;
+      const registered: any = ui.handlers[UiMode.MODIFIER_SELECT];
+      let handler: any = registered;
+      try {
+        handler = new registered.constructor();
+      } catch {
+        handler = registered;
+      }
+      handler.setup();
+      const options = [
+        new ModifierTypeOption(modifierTypes.ER_EJECT_PACK(), 0),
+        new ModifierTypeOption(modifierTypes.ER_ROOM_SERVICE(), 0),
+        new ModifierTypeOption(modifierTypes.ER_HEAVY_DUTY_BOOTS(), 0),
+        new ModifierTypeOption(modifierTypes.SUPER_POTION(), 0),
+      ];
+      handler.show([true, options, () => {}, 0]);
+      for (const opt of handler.options ?? []) {
+        opt.revealInstant?.();
+      }
+      ui.setActiveHandler?.(handler);
+    },
+    diffTolerance: 2000,
+  },
   // Bug #613: in the reward shop, a long item DESCRIPTION overlaps the leave-confirmation
   // prompt. Repro: focus a long-description item (Eviolite, 116 chars) so its dedicated
   // description box is shown, then press CANCEL - the leave path opens the CONFIRM overlay
@@ -2337,6 +2387,22 @@ describe.skipIf(!RUN)("render-ui-page", () => {
     repointGlobalScene(game.scene, ctx);
     await sleep(0);
 
+    // Capture Phaser's `Texture "items" has no frame "<key>"` warning - emitted exactly when
+    // an ER custom item is drawn via the wrong (atlas-frame) path, right before it blanks.
+    // Phaser calls console.warn('Texture "%s" has no frame "%s"', textureKey, frameName), so
+    // filter on textureKey === "items" (NOT the harness's pre-injection __MISSING misses).
+    // ITEMS_ATLAS_FRAME_MISSES is module-scoped + cleared at the start of the ER recipe's
+    // render each pass, so after renderTwoPass it holds ONLY the FINAL (pass-2) render's misses
+    // (pass 1 always warns before the two-pass injector loads the standalone textures).
+    ITEMS_ATLAS_FRAME_MISSES.length = 0;
+    const realWarn = console.warn;
+    console.warn = (...a: any[]) => {
+      if (typeof a[0] === "string" && /has no frame/.test(a[0]) && a[1] === "items") {
+        ITEMS_ATLAS_FRAME_MISSES.push(`items/${a[2]}`);
+      }
+      return realWarn.apply(console, a as any);
+    };
+
     let renderError: unknown = null;
     const run = async () => {
       try {
@@ -2380,6 +2446,7 @@ describe.skipIf(!RUN)("render-ui-page", () => {
       writeFileSync(`dev-logs/ui-pages/${PAGE}-error.txt`, String((e as Error)?.stack ?? e));
       return { injected: [], unresolved: [] as string[] };
     });
+    console.warn = realWarn;
 
     // --- Input driving (universal) ----------------------------------------------------
     // Fire the recipe's button sequence on the LIVE page. Each press goes to the currently
@@ -2445,6 +2512,12 @@ describe.skipIf(!RUN)("render-ui-page", () => {
     );
 
     expect(nonBlankPx).toBeGreaterThan(0);
+    if (PAGE === "modifier-select-er") {
+      expect(
+        ITEMS_ATLAS_FRAME_MISSES,
+        `${PAGE}: ER item icons must resolve to their own standalone textures - the final render must emit no 'Texture "items" has no frame' warning. Got: ${JSON.stringify(ITEMS_ATLAS_FRAME_MISSES)}`,
+      ).toEqual([]);
+    }
     if (recipe.expectThrow) {
       expect(stepCrash, `${PAGE}: expected an input-triggered crash but none occurred`).not.toBeNull();
     } else {

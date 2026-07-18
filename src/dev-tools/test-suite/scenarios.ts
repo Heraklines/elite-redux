@@ -2951,6 +2951,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.DNA_SPLICERS, modifierTypes.ETHER, modifierTypes.MEMORY_MUSHROOM],
   },
   {
+    label: "UI: ER custom item icons render on the reward screen (Eject Pack / Room Service)",
+    description:
+      "UI fix (live log 2026-07-18): ER custom items (tactical/reactive held items, elemental\n"
+      + "Gems, terrain/ward seeds) are STANDALONE er_* textures, NOT frames in the 'items' atlas.\n"
+      + "The post-battle REWARD screen built its icon as an atlas frame, so Phaser logged 'Texture\n"
+      + '"items" has no frame "er_eject_pack"\' and the tile rendered BLANK (icons were fine in the\n'
+      + "summary items row + battle held-item bar, which use the ER-aware getIcon path). DO: win the\n"
+      + "opening battle and open the FIRST reward shop. EXPECT: the Eject Pack and Room Service tiles\n"
+      + "show their real item icons (a bag / a bell-hop bell), NOT a blank or placeholder box. Fixed\n"
+      + "by the shared addItemIconSprite resolver; harness golden test/tools/ui-baselines/\n"
+      + "modifier-select-er.png.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SNORE] }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_EJECT_PACK, modifierTypes.ER_ROOM_SERVICE],
+  },
+  {
     label: "(note) Co-op: the Dex Nav species picker opens only for the item USER (wiring audit)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): the ER Dex Nav consumable registers\n"

@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { allMoves } from "#data/data-lists";
+import { addItemIconSprite } from "#data/elite-redux/er-item-icon";
 import { getPokeballAtlasKey } from "#data/pokeball";
 import { Button } from "#enums/buttons";
 import type { PokeballType } from "#enums/pokeball";
@@ -918,7 +919,10 @@ export class ModifierOption extends Phaser.GameObjects.Container {
     this.add(this.itemContainer);
 
     const getItem = () => {
-      const item = globalScene.add.sprite(0, 0, "items", this.modifierTypeOption.type?.iconImage);
+      // ER custom items (tactical/reactive/gems/seeds) are STANDALONE er_* textures,
+      // NOT frames in the "items" atlas - the plain atlas-frame lookup blanked them on
+      // the reward screen (live log 2026-07-18). addItemIconSprite resolves either.
+      const item = addItemIconSprite(0, 0, this.modifierTypeOption.type?.iconImage);
       // ER reskinned items (#437): Ward Stones / community items carry their
       // recolor on the ModifierType - without applying it here the shop
       // offered a Copper Rod that looked like a plain Quick Claw.

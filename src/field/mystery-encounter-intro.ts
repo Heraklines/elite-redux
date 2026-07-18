@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { addItemIconSprite } from "#data/elite-redux/er-item-icon";
 import type { SpeciesId } from "#enums/species-id";
 import { getSpriteKeysFromSpecies } from "#mystery-encounters/encounter-pokemon-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
@@ -129,7 +130,10 @@ export class MysteryEncounterIntroVisuals extends Phaser.GameObjects.Container {
     };
 
     const getItemSprite = (spriteKey: string, hasShadow?: boolean, yShadow?: number) => {
-      const icon = globalScene.add.sprite(-19, 2, "items", spriteKey);
+      // ER custom items (tactical/reactive/gems/seeds) are STANDALONE er_* textures,
+      // not frames in the "items" atlas - a plain atlas-frame lookup blanks them when
+      // an ER item is the encounter reward on the field. addItemIconSprite resolves either.
+      const icon = addItemIconSprite(-19, 2, spriteKey);
       icon.setOrigin(0.5, 1);
       icon.setPipeline(globalScene.spritePipeline, {
         tone: [0.0, 0.0, 0.0, 0.0],
