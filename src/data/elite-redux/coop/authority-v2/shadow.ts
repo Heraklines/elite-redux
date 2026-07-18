@@ -47,20 +47,42 @@ import {
   type ReplacementProposal,
   type ReplacementResolutionMode,
   type ReplacementSuccessor,
+  replacementImageDigest,
   shadowParityOfEntry,
+  toReplacementCommitImage,
 } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 // The three interaction adapters each export `shadowOfInteractionEntry` (different return shapes); alias
-// them so a committed INTERACTION_COMMIT is fingerprinted through whichever adapter recognizes it.
-import { shadowOfInteractionEntry as learnShadowOfEntry } from "#data/elite-redux/coop/authority-v2/adapters/interactions-learn";
-import { shadowOfInteractionEntry as mysteryShadowOfEntry } from "#data/elite-redux/coop/authority-v2/adapters/interactions-mystery";
+// them so a committed INTERACTION_COMMIT is fingerprinted through whichever adapter recognizes it. The
+// per-surface builders are imported directly so the relay-primitive interaction tap routes each pick to
+// its MATCHING adapter builder (deliverable 3) instead of forcing a generic reward entry.
 import {
+  buildAbilityPickInteractionEntry,
+  buildColosseumBoardInteractionEntry,
+  buildLearnMoveBatchInteractionEntry,
+  buildLearnMoveInteractionEntry,
+  buildStormglassInteractionEntry,
+  shadowOfInteractionEntry as learnShadowOfEntry,
+} from "#data/elite-redux/coop/authority-v2/adapters/interactions-learn";
+import {
+  buildCatchFullDecisionEntry,
+  buildMysteryOptionPickEntry,
+  buildMysteryTerminalEntry,
+  type CoopInteractionAddress,
+  shadowOfInteractionEntry as mysteryShadowOfEntry,
+} from "#data/elite-redux/coop/authority-v2/adapters/interactions-mystery";
+import {
+  buildBiomeInteractionEntry,
+  buildMarketInteractionEntry,
   buildRewardInteractionEntry,
+  type CoopBiomeSelectionV2,
+  type CoopMarketActionV2,
   type CoopRewardChoiceV2,
   shadowOfInteractionEntry as rewardShadowOfEntry,
 } from "#data/elite-redux/coop/authority-v2/adapters/interactions-reward";
 import {
   buildTurnCommitEntry,
   computeShadowParity,
+  computeTurnCommitDigest,
   type MutationBarrier,
   type TurnCommandTarget,
   type TurnResolutionImage,
@@ -71,6 +93,7 @@ import {
   type CoopTerminalMaterialV2,
   type CoopWaveAdvanceDestination,
   type CoopWaveTransitionMaterialV2,
+  digestOfMaterial,
   shadowOfWaveTerminalEntry,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import { AuthorityLog, type CoopAuthorityWire } from "#data/elite-redux/coop/authority-v2/authority-log";
@@ -163,11 +186,23 @@ export interface CoopV2ShadowDeps {
 // the harness stamps its own authenticated context on every entry.
 // ---------------------------------------------------------------------------
 
+/** Where the turn tap's next-command successor seat came from (deliverable 2 - never a silent degrade). */
+export type CoopV2ShadowSuccessorSeatSource = "owner-field" | "local-role-fallback";
+
 export interface CoopV2ShadowTurnTap {
   readonly operationId: string;
   readonly capture: TurnResolutionImage;
   readonly nextCommand: TurnCommandTarget;
+  /** The raw legacy comparand token (the host full-state checksum) - a DIFFERENT scheme, kept for the log. */
   readonly legacyDigest: string;
+  /**
+   * The LEGACY turn image (the resolution + checkpoint legacy committed). When present the shadow fingerprints
+   * it through the SAME turn digest as the v2 entry, so parity compares like-for-like (v2 entry digest vs
+   * v2-digest-of-legacy-image) and a divergence means the STATES differ, not the encodings (deliverable 1).
+   */
+  readonly legacyImage?: TurnResolutionImage;
+  /** Whether the stated next-command owner seat is the REAL field-seat owner or a best-effort fallback. */
+  readonly successorSeatSource?: CoopV2ShadowSuccessorSeatSource;
   readonly subsumes?: readonly number[];
   /** Outstanding mutation-barrier tokens at the legacy commit (should be 0 - we tap AFTER legacy settles). */
   readonly pendingTokens?: number;
@@ -177,7 +212,15 @@ export interface CoopV2ShadowReplacementTap {
   readonly proposal: ReplacementProposal;
   readonly resolution: ReplacementResolutionMode;
   readonly successor: ReplacementSuccessor;
+  /** The raw legacy comparand token (the legacy op id) - a DIFFERENT scheme, kept for the log. */
   readonly legacyDigest: string;
+  /**
+   * The LEGACY replacement image (the proposal + resolution the legacy carrier committed). When present the
+   * shadow fingerprints it through the faint adapter's OWN image digest, so parity compares like-for-like
+   * (v2 entry digest vs v2-digest-of-legacy-image) - a divergence means the resolved STATES differ, not the
+   * encodings (deliverable 1).
+   */
+  readonly legacyImage?: { readonly proposal: ReplacementProposal; readonly resolution: ReplacementResolutionMode };
   readonly operationId?: string;
   readonly subsumes?: readonly number[];
 }
@@ -187,6 +230,8 @@ export interface CoopV2ShadowWaveTap {
   readonly transition: CoopWaveTransitionMaterialV2;
   readonly destination: CoopWaveAdvanceDestination;
   readonly legacyDigest: string;
+  /** The LEGACY wave-transition image; when present it is fingerprinted through the wave adapter's digest. */
+  readonly legacyImage?: CoopWaveTransitionMaterialV2;
   readonly subsumes?: readonly number[];
 }
 
@@ -194,6 +239,8 @@ export interface CoopV2ShadowTerminalTap {
   readonly operationId: string;
   readonly terminal: CoopTerminalMaterialV2;
   readonly legacyDigest: string;
+  /** The LEGACY terminal image; when present it is fingerprinted through the terminal adapter's digest. */
+  readonly legacyImage?: CoopTerminalMaterialV2;
   readonly subsumes?: readonly number[];
 }
 
@@ -201,6 +248,11 @@ export interface CoopV2ShadowInteractionTap {
   /** The entry the runtime built via the matching interaction adapter builder (reward/mystery/learn). */
   readonly entry: Omit<CoopAuthorityEntry, "revision">;
   readonly legacyDigest: string;
+  /**
+   * The LEGACY interaction entry (built via the matching adapter). When present the shadow fingerprints it
+   * through the SAME interaction shadow seam, so parity compares like-for-like (deliverable 1).
+   */
+  readonly legacyImage?: Omit<CoopAuthorityEntry, "revision"> | CoopAuthorityEntry;
 }
 
 /**
@@ -335,6 +387,9 @@ export class CoopAuthorityV2Shadow {
   /** The most recent wave a turn/replacement/wave/terminal tap observed; the interaction-choice tap (which
    *  has no wave of its own at the relay seam) addresses its shadow reward window against it. */
   private lastObservedWave = 0;
+  /** The most recent turn a turn/replacement/wave tap observed; the interaction-choice tap addresses a
+   *  mystery interaction (which needs a positive turn coordinate) against it. Defaults to 1 (a valid turn). */
+  private lastObservedTurn = 1;
   /** Unsubscribe for the per-instance transport inbound seam (see the constructor); called on dispose. */
   private transportV2Unsub: (() => void) | null = null;
 
@@ -401,6 +456,9 @@ export class CoopAuthorityV2Shadow {
   /** Tap the host's turn-commit emit. Builds a TURN_COMMIT via the turn adapter + records parity. */
   tapTurnCommit(input: CoopV2ShadowTurnTap): CoopAuthorityEntry | null {
     this.lastObservedWave = input.nextCommand.wave;
+    if (input.nextCommand.resolvedTurn >= 1) {
+      this.lastObservedTurn = input.nextCommand.resolvedTurn;
+    }
     return this.runTap("TURN_COMMIT", () => {
       const barrier: MutationBarrier = { pendingTokens: () => input.pendingTokens ?? 0 };
       const built = buildTurnCommitEntry({
@@ -416,8 +474,15 @@ export class CoopAuthorityV2Shadow {
         return null;
       }
       const entry = this.commit(built.entry);
-      const parity = computeShadowParity(input.legacyDigest, entry);
-      this.logParity("TURN_COMMIT", entry.revision, parity.digestsMatch, "materialDigest");
+      // Deliverable 1: when the caller supplies the legacy turn IMAGE, fingerprint it through the SAME turn
+      // digest so parity compares like-for-like (v2 entry digest vs v2-digest-of-legacy-image). Otherwise the
+      // raw legacy token (the host full-state checksum) is a different scheme and structurally diverges.
+      const comparand = input.legacyImage == null ? input.legacyDigest : computeTurnCommitDigest(input.legacyImage);
+      const parity = computeShadowParity(comparand, entry);
+      // Deliverable 2: name whether the stated next-command successor seat was the REAL field-seat owner or a
+      // best-effort local-role fallback, so a degraded successor is recorded, never silently accepted.
+      const note = input.successorSeatSource == null ? undefined : `successor=${input.successorSeatSource}`;
+      this.logParity("TURN_COMMIT", entry.revision, parity.digestsMatch, "materialDigest", note);
       return entry;
     });
   }
@@ -425,6 +490,9 @@ export class CoopAuthorityV2Shadow {
   /** Tap the faint-switch authority commit. Builds a REPLACEMENT_COMMIT via the faint adapter + records parity. */
   tapReplacementCommit(input: CoopV2ShadowReplacementTap): CoopAuthorityEntry | null {
     this.lastObservedWave = input.proposal.sourceAddress.wave;
+    if (input.proposal.sourceAddress.turn >= 1) {
+      this.lastObservedTurn = input.proposal.sourceAddress.turn;
+    }
     return this.runTap("REPLACEMENT_COMMIT", () => {
       const built = buildReplacementCommitEntry({
         context: this.frameContext,
@@ -437,7 +505,13 @@ export class CoopAuthorityV2Shadow {
       const entry = this.commit(built);
       const parity = shadowParityOfEntry(entry);
       const v2Digest = parity?.digest ?? entry.material.digest;
-      this.logParity("REPLACEMENT_COMMIT", entry.revision, v2Digest === input.legacyDigest, "digest");
+      // Deliverable 1: fingerprint the LEGACY replacement image through the faint adapter's OWN image digest
+      // so parity compares like-for-like; the raw legacy op id stays only as the fallback token.
+      const comparand =
+        input.legacyImage == null
+          ? input.legacyDigest
+          : replacementImageDigest(toReplacementCommitImage(input.legacyImage.proposal, input.legacyImage.resolution));
+      this.logParity("REPLACEMENT_COMMIT", entry.revision, v2Digest === comparand, "digest");
       return entry;
     });
   }
@@ -445,6 +519,9 @@ export class CoopAuthorityV2Shadow {
   /** Tap the waveResolved broadcast. Builds a WAVE_ADVANCE via the wave-terminal adapter + records parity. */
   tapWaveAdvance(input: CoopV2ShadowWaveTap): CoopAuthorityEntry | null {
     this.lastObservedWave = input.transition.wave;
+    if (input.transition.turn >= 1) {
+      this.lastObservedTurn = input.transition.turn;
+    }
     return this.runTap("WAVE_ADVANCE", () => {
       const built = buildWaveAdvanceEntry({
         context: this.frameContext,
@@ -455,7 +532,9 @@ export class CoopAuthorityV2Shadow {
       });
       const entry = this.commit(built);
       const shadow = shadowOfWaveTerminalEntry(entry);
-      this.logParity("WAVE_ADVANCE", entry.revision, shadow.materialDigest === input.legacyDigest, "materialDigest");
+      // Deliverable 1: fingerprint the LEGACY transition image through the wave adapter's OWN digest.
+      const comparand = input.legacyImage == null ? input.legacyDigest : digestOfMaterial(input.legacyImage);
+      this.logParity("WAVE_ADVANCE", entry.revision, shadow.materialDigest === comparand, "materialDigest");
       return entry;
     });
   }
@@ -471,7 +550,9 @@ export class CoopAuthorityV2Shadow {
       });
       const entry = this.commit(built);
       const shadow = shadowOfWaveTerminalEntry(entry);
-      this.logParity("TERMINAL_COMMIT", entry.revision, shadow.materialDigest === input.legacyDigest, "materialDigest");
+      // Deliverable 1: fingerprint the LEGACY terminal image through the terminal adapter's OWN digest.
+      const comparand = input.legacyImage == null ? input.legacyDigest : digestOfMaterial(input.legacyImage);
+      this.logParity("TERMINAL_COMMIT", entry.revision, shadow.materialDigest === comparand, "materialDigest");
       return entry;
     });
   }
@@ -484,7 +565,13 @@ export class CoopAuthorityV2Shadow {
       // mystery/catch/revival, learn/ability/bargain/colosseum/stormglass); consult each in turn so a
       // recognized interaction is fingerprinted through its OWN seam, then compare against legacy.
       const v2Digest = this.interactionShadowDigest(entry) ?? entry.material.digest;
-      this.logParity("INTERACTION_COMMIT", entry.revision, v2Digest === input.legacyDigest, "materialDigest");
+      // Deliverable 1: when the caller supplies the LEGACY interaction entry, fingerprint it through the SAME
+      // interaction shadow seam so parity compares like-for-like; otherwise fall back to the raw legacy token.
+      const comparand =
+        input.legacyImage == null
+          ? input.legacyDigest
+          : (this.interactionShadowDigest(input.legacyImage) ?? input.legacyImage.material.digest);
+      this.logParity("INTERACTION_COMMIT", entry.revision, v2Digest === comparand, "materialDigest");
       return entry;
     });
   }
@@ -499,28 +586,232 @@ export class CoopAuthorityV2Shadow {
    */
   tapInteractionChoice(input: CoopV2ShadowInteractionChoiceTap): CoopAuthorityEntry | null {
     return this.runTap("INTERACTION_COMMIT", () => {
-      const wave = input.wave ?? this.lastObservedWave;
-      const ownerSeatId = input.ownerSeatId;
-      const rewardChoice: CoopRewardChoiceV2 = {
-        kind: "pick",
-        optionIndex: input.choice >= 0 ? input.choice : 0,
-        subPicks: input.data == null ? [] : input.data.filter(value => Number.isSafeInteger(value)),
-      };
-      const built = buildRewardInteractionEntry({
-        context: this.frameContext,
-        address: { epoch: this.frameContext.sessionEpoch, wave, ownerSeatId, actionOrdinal: input.seq },
-        material: { kind: "reward", wave, ownerSeatId, choice: rewardChoice, terminal: true },
-        successor: null,
-      });
+      // Deliverable 3: route the relayed pick to its MATCHING adapter builder by kind, so the committed entry
+      // is surface-correct (its material digest is that surface's scheme) instead of a generic reward entry
+      // for every between-wave pick. A lossy pick that cannot form valid surface material falls back to the
+      // generic reward entry - never a FAULT.
+      const { built, surface } = this.routeInteractionChoice(input);
       const entry = this.commit(built);
       const v2Digest = this.interactionShadowDigest(entry) ?? entry.material.digest;
-      // No true legacy digest exists at the relay seam yet (the legacy path is not v2-digested), so the
-      // legacy comparand is a stable relay-derived token: parity logs match=false until the legacy carrier
-      // is fingerprinted the same way. The evidence this tap yields is the end-to-end protocol round-trip.
+      // No independent legacy digest exists at the relay seam (the legacy carrier is not v2-digested), so the
+      // comparand is a stable relay-derived token: parity logs match=false until the legacy carrier is
+      // fingerprinted the same way. The evidence this tap yields is the surface-correct entry + the end-to-end
+      // round-trip; the parity line records the routed SURFACE + relay KIND so a reviewer can judge routing.
       const legacyDigest = input.legacyDigest ?? `relay:${input.kind}:${input.choice}`;
-      this.logParity("INTERACTION_COMMIT", entry.revision, v2Digest === legacyDigest, "materialDigest");
+      this.logParity(
+        "INTERACTION_COMMIT",
+        entry.revision,
+        v2Digest === legacyDigest,
+        "materialDigest",
+        `surface=${surface} kind=${input.kind}`,
+      );
       return entry;
     });
+  }
+
+  /**
+   * Route one relayed interaction pick (deliverable 3) to the MATCHING adapter builder by its relay kind,
+   * using only the relay-carried primitives (seq / kind / choice / data / ownerSeatId) plus the harness's own
+   * epoch + last-observed wave/turn. The relay seam is lossy - it carries no move / species identity and its
+   * `choice` is often a NEGATIVE sentinel (LEAVE=-1, REROLL=-2, ability-outcome=-3, ME-handoff=-1000) - so a
+   * surface whose required identity is genuinely absent is built with a documented placeholder, and a pick
+   * that still cannot form valid surface material (or an unknown kind) falls back to the generic reward entry
+   * with its kind recorded. Every builder call is guarded, so a lossy pick can never FAULT the tap.
+   */
+  private routeInteractionChoice(input: CoopV2ShadowInteractionChoiceTap): {
+    built: Omit<CoopAuthorityEntry, "revision">;
+    surface: string;
+  } {
+    const context = this.frameContext;
+    const epoch = this.frameContext.sessionEpoch;
+    const wave = input.wave ?? this.lastObservedWave;
+    const turn = this.lastObservedTurn;
+    const ownerSeatId = input.ownerSeatId;
+    const choice = input.choice;
+    const data = input.data == null ? [] : input.data.filter(value => Number.isSafeInteger(value));
+    const sentinel = choice < 0;
+    const seqOrdinal = input.seq >= 0 ? input.seq : 0;
+    // A wire-safe synthetic operationId for the learn/mystery builders that require an explicit identity.
+    const relayOpId = `IX/RELAY/${input.kind}/e${epoch}/w${wave}/t${turn}/s${ownerSeatId}/q${input.seq}`;
+
+    const generic = (): { built: Omit<CoopAuthorityEntry, "revision">; surface: string } => {
+      // The relay seam carries no separate legacy species; `1` is a documented placeholder used only where the
+      // surface material requires a positive identity the relay does not supply (parity is match=false here).
+      const rewardChoice: CoopRewardChoiceV2 = sentinel
+        ? { kind: "leave" }
+        : { kind: "pick", optionIndex: choice, subPicks: data };
+      return {
+        built: buildRewardInteractionEntry({
+          context,
+          address: { epoch, wave, ownerSeatId, actionOrdinal: input.seq },
+          material: { kind: "reward", wave, ownerSeatId, choice: rewardChoice, terminal: true },
+          successor: null,
+        }),
+        surface: `reward/generic(${input.kind})`,
+      };
+    };
+
+    try {
+      switch (input.kind) {
+        // --- interactions-reward: MARKET (the between-wave biome shop). ---
+        case "biomeShop": {
+          const action: CoopMarketActionV2 = sentinel
+            ? { kind: "leave" }
+            : {
+                kind: "buy",
+                slot: choice,
+                outcome: { kind: "applied", moneyAfter: data[1] ?? 0, targetPartySlot: data[0] ?? null },
+              };
+          return {
+            built: buildMarketInteractionEntry({
+              context,
+              address: { epoch, wave, ownerSeatId, actionOrdinal: input.seq },
+              material: { kind: "market", wave, ownerSeatId, action, terminal: sentinel },
+              successor: null,
+            }),
+            surface: "market",
+          };
+        }
+        // --- interactions-reward: BIOME pick + crossroads (the between-wave route picks). ---
+        case "biomePick": {
+          const selection: CoopBiomeSelectionV2 = {
+            kind: "biome-pick",
+            sourceBiomeId: 0,
+            biomeId: data[0] ?? 0,
+            nodeIndex: choice >= -1 ? choice : -1,
+            nextWave: wave + 1,
+          };
+          return {
+            built: buildBiomeInteractionEntry({
+              context,
+              address: { epoch, wave, ownerSeatId, selection: "biome-pick" },
+              material: { kind: "biome", wave, ownerSeatId, selection },
+              successor: null,
+            }),
+            surface: "biome/biome-pick",
+          };
+        }
+        case "crossroads": {
+          if (choice !== 0 && choice !== 1) {
+            break; // not a valid Stay/Leave option index -> generic
+          }
+          const selection: CoopBiomeSelectionV2 = { kind: "crossroads-pick", optionIndex: choice };
+          return {
+            built: buildBiomeInteractionEntry({
+              context,
+              address: { epoch, wave, ownerSeatId, selection: "crossroads-pick" },
+              material: { kind: "biome", wave, ownerSeatId, selection },
+              successor: null,
+            }),
+            surface: "biome/crossroads",
+          };
+        }
+        // --- interactions-learn: ability / colosseum / stormglass / learn-move (single + batch). ---
+        case "abilityPicker":
+          return {
+            built: buildAbilityPickInteractionEntry({ context, operationId: relayOpId, ownerSeatId, data }),
+            surface: "learn/ability-pick",
+          };
+        case "coloPick": {
+          const round = data[0] ?? 0;
+          if ((choice !== 0 && choice !== 1) || round < 0 || round > 49) {
+            break; // not a valid Colosseum decision -> generic
+          }
+          return {
+            built: buildColosseumBoardInteractionEntry({
+              context,
+              operationId: relayOpId,
+              ownerSeatId,
+              board: { type: "decision", pinned: seqOrdinal, round, index: choice },
+            }),
+            surface: "learn/colosseum-decision",
+          };
+        }
+        case "stormglass": {
+          if (choice < 0 || choice >= 5) {
+            break; // out-of-range weather index -> generic
+          }
+          return {
+            built: buildStormglassInteractionEntry({
+              context,
+              operationId: relayOpId,
+              ownerSeatId,
+              weatherIndex: choice,
+              weather: data[0] ?? 0,
+            }),
+            surface: "learn/stormglass",
+          };
+        }
+        case "learnMove":
+          // The relay carries only the forget-slot choice; partySlot / moveId identity are not on the seam, so
+          // they are documented placeholders (partySlot 0, a positive moveId) - the entry is surface-correct.
+          return {
+            built: buildLearnMoveInteractionEntry({
+              context,
+              operationId: relayOpId,
+              ownerSeatId,
+              choice: {
+                phase: "decision",
+                partySlot: 0,
+                moveId: data[0] != null && data[0] > 0 ? data[0] : 1,
+                forgetSlot: choice,
+                maxMoveCount: 4,
+              },
+            }),
+            surface: "learn/learn-move",
+          };
+        case "learnMoveBatch":
+          return {
+            built: buildLearnMoveBatchInteractionEntry({
+              context,
+              operationId: relayOpId,
+              ownerSeatId,
+              choice: { phase: "decision", partySlot: 0, assignments: pairwiseSafe(data), fallback: sentinel },
+            }),
+            surface: "learn/learn-move-batch",
+          };
+        // --- interactions-mystery: ME option pick / terminal + catch-full. ---
+        case "me":
+        case "meSub":
+        case "meBtn": {
+          const address: CoopInteractionAddress = { epoch, wave, turn, interactionSeq: seqOrdinal, ownerSeatId };
+          if (sentinel) {
+            // A LEAVE / handoff sentinel closes the encounter: route to the terminal, not an option pick.
+            return {
+              built: buildMysteryTerminalEntry({ context, address, outcome: "leave" }),
+              surface: "mystery/me-terminal",
+            };
+          }
+          const step = data[0] != null && data[0] >= 0 ? data[0] : 0;
+          return {
+            built: buildMysteryOptionPickEntry({ context, address, optionIndex: choice, step }).entry,
+            surface: "mystery/me-option-pick",
+          };
+        }
+        case "catchFull": {
+          const address: CoopInteractionAddress = { epoch, wave, turn, interactionSeq: seqOrdinal, ownerSeatId };
+          const keep = choice >= 0 && choice < 6;
+          return {
+            built: buildCatchFullDecisionEntry({
+              context,
+              address,
+              decision: keep ? "keep" : "release",
+              partySlot: keep ? choice : -1,
+              // The caught species is not on the relay seam; `1` is a documented placeholder identity.
+              speciesId: 1,
+            }),
+            surface: "mystery/catch-full",
+          };
+        }
+        default:
+          break;
+      }
+    } catch {
+      // A lossy pick that cannot form valid surface material (a malformed field for the routed adapter) falls
+      // back to the generic reward entry - a controlled fallback, never a FAULT. The kind stays recorded.
+      return generic();
+    }
+    return generic();
   }
 
   // -------------------------------------------------------------------------
@@ -717,7 +1008,7 @@ export class CoopAuthorityV2Shadow {
   }
 
   /** Fingerprint an interaction entry through whichever interaction adapter recognizes it, or null. */
-  private interactionShadowDigest(entry: CoopAuthorityEntry): string | null {
+  private interactionShadowDigest(entry: Omit<CoopAuthorityEntry, "revision"> | CoopAuthorityEntry): string | null {
     const reward = rewardShadowOfEntry(entry);
     if (reward != null) {
       return reward.materialDigest;
@@ -733,12 +1024,16 @@ export class CoopAuthorityV2Shadow {
     return null;
   }
 
-  private logParity(kind: string, revision: number, match: boolean, divergentField: string): void {
+  private logParity(kind: string, revision: number, match: boolean, divergentField: string, note?: string): void {
     this.parityChecks += 1;
     if (match) {
       this.parityMatches += 1;
     }
-    coopLog("v2-shadow", `PARITY kind=${kind} rev=${revision} match=${match} field=${match ? "-" : divergentField}`);
+    const suffix = note == null ? "" : ` ${note}`;
+    coopLog(
+      "v2-shadow",
+      `PARITY kind=${kind} rev=${revision} match=${match} field=${match ? "-" : divergentField}${suffix}`,
+    );
   }
 
   private fault(where: string, error: unknown): void {
@@ -768,6 +1063,20 @@ function tailRequestFrame(ctx: CoopFrameContextV2, fromRevision: number): CoopFr
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Reshape a flat safe-integer relay array into `[learnableId, forgetSlot]` pairs for a batch level-up
+ * decision. A trailing odd element is dropped (the relay carries no partner for it). Empty in / odd-length in
+ * yields the pairs it can form - the batch adapter validates each pair, so a malformed shape falls the tap
+ * back to the generic reward entry rather than committing garbage.
+ */
+function pairwiseSafe(values: readonly number[]): (readonly [number, number])[] {
+  const pairs: (readonly [number, number])[] = [];
+  for (let i = 0; i + 1 < values.length; i += 2) {
+    pairs.push([values[i], values[i + 1]] as const);
+  }
+  return pairs;
 }
 
 // ---------------------------------------------------------------------------

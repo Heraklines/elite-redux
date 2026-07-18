@@ -623,21 +623,28 @@ export function commitFaintSwitchAuthorityResult(
           noReplacement || !(speciesId > 0) || params.payload.partySlot < 0
             ? null
             : { partySlot: params.payload.partySlot, speciesId };
-        tapCoopV2ShadowReplacementCommit({
-          proposal: {
-            sourceAddress: {
-              epoch: s.epoch,
-              wave: params.wave,
-              turn: params.turn,
-              occurrence,
-              fieldIndex: params.payload.fieldIndex,
-            },
-            ownerSeatId: owner,
-            selected,
+        const proposal = {
+          sourceAddress: {
+            epoch: s.epoch,
+            wave: params.wave,
+            turn: params.turn,
+            occurrence,
+            fieldIndex: params.payload.fieldIndex,
           },
-          resolution: resolutionCode === COOP_FAINT_SWITCH_RESOLUTION_OWNER ? "owner-pick" : "fallback-auto",
+          ownerSeatId: owner,
+          selected,
+        };
+        const resolution = resolutionCode === COOP_FAINT_SWITCH_RESOLUTION_OWNER ? "owner-pick" : "fallback-auto";
+        tapCoopV2ShadowReplacementCommit({
+          proposal,
+          resolution,
           successor: { kind: "terminal" },
           operationId: operation.id,
+          // Deliverable 1: fingerprint the LEGACY replacement image (the same resolved proposal the legacy
+          // carrier committed) through the faint adapter's OWN image digest, so the shadow compares
+          // like-for-like (v2 entry digest vs v2-digest-of-legacy-image) - a mismatch means the resolved
+          // STATES differ, not the encodings. The legacy op id stays only as the raw fallback token.
+          legacyImage: { proposal, resolution },
           legacyDigest: operation.id,
         });
       }

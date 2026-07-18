@@ -23,7 +23,14 @@
 // =============================================================================
 
 import type { BattleScene } from "#app/battle-scene";
-import { buildRewardInteractionEntry } from "#data/elite-redux/coop/authority-v2/adapters/interactions-reward";
+import { decodeInteractionMaterial as learnDecodeInteractionMaterial } from "#data/elite-redux/coop/authority-v2/adapters/interactions-learn";
+import { decodeInteractionMaterial as mysteryDecodeInteractionMaterial } from "#data/elite-redux/coop/authority-v2/adapters/interactions-mystery";
+import {
+  buildRewardInteractionEntry,
+  decodeBiomeInteractionMaterial,
+  decodeMarketInteractionMaterial,
+  decodeRewardInteractionMaterial,
+} from "#data/elite-redux/coop/authority-v2/adapters/interactions-reward";
 import { computeTurnCommitDigest } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
 import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
@@ -45,8 +52,9 @@ import {
   tapCoopV2ShadowReplacementCommit,
   tapCoopV2ShadowTurnCommit,
 } from "#data/elite-redux/coop/authority-v2/shadow";
+import { setCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // --- deterministic test doubles ---------------------------------------------
 
@@ -529,5 +537,264 @@ describe("authority-v2 shadow transport routing seam", () => {
     clearActiveCoopV2Shadow(harness);
     expect(isCoopV2ShadowActive()).toBe(false);
     harness.dispose();
+  });
+});
+
+// =============================================================================
+// PARITY FIDELITY (authority-v2 shadow parity-fidelity phase). The properties:
+//   - deliverable 1: a tap fingerprints the LEGACY image through the SAME adapter
+//     digest as the v2 entry, so parity match=true is ACHIEVABLE (identical states)
+//     and a match=false names the divergent field (differing states, not encodings);
+//   - deliverable 2: the turn tap records whether the next-command successor seat is
+//     the REAL field-seat owner or a best-effort fallback (never a silent degrade);
+//   - deliverable 3: the relay-primitive interaction tap routes each pick to its
+//     MATCHING adapter builder by kind (reward/market/biome, mystery, learn), and an
+//     unknown kind keeps the generic reward path with the kind recorded - fault-free.
+// =============================================================================
+
+describe("authority-v2 shadow PARITY FIDELITY", () => {
+  const captured: string[] = [];
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    captured.length = 0;
+    setCoopDebug(true);
+    logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      captured.push(args.map(a => (typeof a === "string" ? a : JSON.stringify(a))).join(" "));
+    });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    setCoopDebug(false);
+    clearActiveCoopV2Shadow();
+    clearCoopV2ShadowInbound();
+  });
+
+  /** The most recent PARITY log line for a tap kind. */
+  const parityLine = (kind: string): string =>
+    captured.filter(line => line.includes("PARITY") && line.includes(`kind=${kind}`)).at(-1) ?? "";
+
+  const waveTransition = (nextWave: number) =>
+    ({
+      kind: "wave-advance",
+      wave: 5,
+      turn: 1,
+      outcome: "win",
+      nextWave,
+      biomeChange: false,
+      eggLapse: true,
+      meBoundary: "none",
+      victoryKind: "wild",
+    }) as const;
+
+  const terminalMaterial = (reason: "game-over" | "final-flee") =>
+    ({ kind: "terminal", terminalId: "term-parity", reason, wave: 6, turn: 1 }) as const;
+
+  const replacementProposal = (speciesId: number) => ({
+    sourceAddress: { epoch: SESSION.epoch, wave: 5, turn: 1, occurrence: 0, fieldIndex: 0 },
+    ownerSeatId: 0,
+    selected: { partySlot: 2, speciesId },
+  });
+
+  // ------------------------------------------------------------------------
+  // Deliverable 1 - match=true per tap kind when the legacy image equals the v2 state.
+  // ------------------------------------------------------------------------
+
+  it("TURN parity match=true when the legacy image equals the v2 capture (like-for-like)", () => {
+    const duo = buildDuo(new FakeClock());
+    const capture = { turnResolution: { events: [7, 8] }, checkpoint: { hp: 42 } };
+    duo.host.tapTurnCommit({
+      operationId: "TURN/parity-true",
+      capture,
+      nextCommand: { epoch: SESSION.epoch, wave: 5, resolvedTurn: 1, ownerSeatId: 0, pokemonId: 9 },
+      legacyImage: capture,
+      legacyDigest: "raw-full-state-checksum",
+      successorSeatSource: "owner-field",
+    });
+    const diag = duo.host.diagnostics();
+    expect(diag.parityChecks).toBe(1);
+    expect(diag.parityMatches).toBe(1);
+    expect(diag.faults).toBe(0);
+    const line = parityLine("TURN_COMMIT");
+    expect(line).toContain("match=true");
+    expect(line).toContain("field=-");
+    expect(line).toContain("successor=owner-field");
+    duo.dispose();
+  });
+
+  it("TURN parity match=false with the divergent field named when the states differ", () => {
+    const duo = buildDuo(new FakeClock());
+    duo.host.tapTurnCommit({
+      operationId: "TURN/parity-false",
+      capture: { turnResolution: { events: [7, 8] }, checkpoint: { hp: 42 } },
+      nextCommand: { epoch: SESSION.epoch, wave: 5, resolvedTurn: 1, ownerSeatId: 0, pokemonId: 9 },
+      // A legacy image whose checkpoint DIVERGES from the v2 capture -> the two states differ.
+      legacyImage: { turnResolution: { events: [7, 8] }, checkpoint: { hp: 999 } },
+      legacyDigest: "raw-full-state-checksum",
+      successorSeatSource: "local-role-fallback",
+    });
+    const diag = duo.host.diagnostics();
+    expect(diag.parityChecks).toBe(1);
+    expect(diag.parityMatches).toBe(0);
+    const line = parityLine("TURN_COMMIT");
+    expect(line).toContain("match=false");
+    expect(line).toContain("field=materialDigest");
+    // Deliverable 2: a best-effort successor seat is NAMED, never silently degraded.
+    expect(line).toContain("successor=local-role-fallback");
+    duo.dispose();
+  });
+
+  it("REPLACEMENT parity match=true/false by fingerprinting the legacy image through the faint adapter", () => {
+    const duo = buildDuo(new FakeClock());
+    // Identical legacy image -> match=true.
+    duo.host.tapReplacementCommit({
+      proposal: replacementProposal(25),
+      resolution: "owner-pick",
+      successor: { kind: "terminal" },
+      legacyDigest: "op-id",
+      legacyImage: { proposal: replacementProposal(25), resolution: "owner-pick" },
+    });
+    // A legacy image resolving a DIFFERENT species -> the resolved states differ -> match=false.
+    duo.host.tapReplacementCommit({
+      proposal: replacementProposal(25),
+      resolution: "owner-pick",
+      successor: { kind: "terminal" },
+      operationId: "RC/divergent",
+      legacyDigest: "op-id",
+      legacyImage: { proposal: replacementProposal(999), resolution: "owner-pick" },
+    });
+    const diag = duo.host.diagnostics();
+    expect(diag.parityChecks).toBe(2);
+    expect(diag.parityMatches).toBe(1);
+    expect(diag.faults).toBe(0);
+    expect(parityLine("REPLACEMENT_COMMIT")).toContain("match=false");
+    expect(parityLine("REPLACEMENT_COMMIT")).toContain("field=digest");
+    duo.dispose();
+  });
+
+  it("WAVE parity match=true/false by fingerprinting the legacy transition image", () => {
+    const duo = buildDuo(new FakeClock());
+    const destination = { kind: "REWARD", operationId: "W/reward", ownerSeatId: 0 } as const;
+    duo.host.tapWaveAdvance({
+      operationId: "WAVE/true",
+      transition: waveTransition(6),
+      destination,
+      legacyDigest: "legacy-wave-token",
+      legacyImage: waveTransition(6),
+    });
+    duo.host.tapWaveAdvance({
+      operationId: "WAVE/false",
+      transition: waveTransition(6),
+      destination,
+      legacyDigest: "legacy-wave-token",
+      legacyImage: waveTransition(7), // a divergent nextWave -> states differ
+    });
+    const diag = duo.host.diagnostics();
+    expect(diag.parityMatches).toBe(1);
+    expect(diag.faults).toBe(0);
+    expect(parityLine("WAVE_ADVANCE")).toContain("match=false");
+    expect(parityLine("WAVE_ADVANCE")).toContain("field=materialDigest");
+    duo.dispose();
+  });
+
+  it("TERMINAL parity match=true/false by fingerprinting the legacy terminal image", () => {
+    const duo = buildDuo(new FakeClock());
+    duo.host.tapTerminal({
+      operationId: "TERM/true",
+      terminal: terminalMaterial("game-over"),
+      legacyDigest: "legacy-term-token",
+      legacyImage: terminalMaterial("game-over"),
+    });
+    duo.host.tapTerminal({
+      operationId: "TERM/false",
+      terminal: terminalMaterial("game-over"),
+      legacyDigest: "legacy-term-token",
+      legacyImage: terminalMaterial("final-flee"), // a divergent reason -> states differ
+    });
+    const diag = duo.host.diagnostics();
+    expect(diag.parityMatches).toBe(1);
+    expect(diag.faults).toBe(0);
+    expect(parityLine("TERMINAL_COMMIT")).toContain("match=false");
+    duo.dispose();
+  });
+
+  it("INTERACTION (pre-built) parity match=true/false by fingerprinting the legacy interaction image", () => {
+    const duo = buildDuo(new FakeClock());
+    const reward = (choice: { kind: "leave" } | { kind: "skip" }) =>
+      buildRewardInteractionEntry({
+        context: duo.host.authenticatedFrameContext,
+        address: { epoch: SESSION.epoch, wave: 6, ownerSeatId: 0, actionOrdinal: 0 },
+        material: { kind: "reward", wave: 6, ownerSeatId: 0, choice, terminal: true },
+        successor: null,
+      });
+    // Identical legacy image -> match=true.
+    duo.host.tapInteraction({
+      entry: reward({ kind: "leave" }),
+      legacyDigest: "tok",
+      legacyImage: reward({ kind: "leave" }),
+    });
+    // A legacy image with a DIFFERENT choice -> states differ -> match=false.
+    duo.host.tapInteraction({
+      entry: reward({ kind: "leave" }),
+      legacyDigest: "tok",
+      legacyImage: reward({ kind: "skip" }),
+    });
+    const diag = duo.host.diagnostics();
+    expect(diag.parityChecks).toBe(2);
+    expect(diag.parityMatches).toBe(1);
+    expect(diag.faults).toBe(0);
+    expect(parityLine("INTERACTION_COMMIT")).toContain("match=false");
+    duo.dispose();
+  });
+
+  // ------------------------------------------------------------------------
+  // Deliverable 3 - per-surface interaction routing (relay-primitive tap).
+  // ------------------------------------------------------------------------
+
+  it("routes each relay interaction kind to its MATCHING adapter builder (fault-free)", () => {
+    const duo = buildDuo(new FakeClock());
+    const host = duo.host;
+    const tap = (kind: string, choice: number, data?: number[]) =>
+      host.tapInteractionChoice({ seq: 1, kind, choice, ownerSeatId: 0, wave: 5, ...(data == null ? {} : { data }) });
+
+    // interactions-reward: BIOME pick + crossroads.
+    const biomePick = tap("biomePick", 0, [3]);
+    expect(decodeBiomeInteractionMaterial(biomePick!)?.selection.kind).toBe("biome-pick");
+    const crossroads = tap("crossroads", 1);
+    expect(decodeBiomeInteractionMaterial(crossroads!)?.selection.kind).toBe("crossroads-pick");
+
+    // interactions-reward: MARKET (the biome shop).
+    const market = tap("biomeShop", 0, [1, 200]);
+    expect(decodeMarketInteractionMaterial(market!)?.kind).toBe("market");
+
+    // interactions-learn: ability / colosseum / stormglass / learn-move.
+    expect(learnDecodeInteractionMaterial(tap("abilityPicker", -3, [1, 2, 3])!)?.surface).toBe("ability-pick");
+    expect(learnDecodeInteractionMaterial(tap("coloPick", 0, [4])!)?.surface).toBe("colosseum/decision");
+    expect(learnDecodeInteractionMaterial(tap("stormglass", 2)!)?.surface).toBe("stormglass");
+    expect(learnDecodeInteractionMaterial(tap("learnMove", 1)!)?.surface).toBe("learn-move/decision");
+
+    // interactions-mystery: ME option-pick, ME terminal (a LEAVE sentinel), catch-full.
+    expect(mysteryDecodeInteractionMaterial(tap("me", 0, [0])!)?.kind).toBe("me-option-pick");
+    expect(mysteryDecodeInteractionMaterial(tap("meBtn", -1)!)?.kind).toBe("me-terminal");
+    expect(mysteryDecodeInteractionMaterial(tap("catchFull", 2)!)?.kind).toBe("catch-full");
+
+    // an UNKNOWN kind keeps the generic reward path with the kind recorded in the parity line.
+    const unknown = tap("quizAns", 0);
+    expect(decodeRewardInteractionMaterial(unknown!)?.kind).toBe("reward");
+    expect(parityLine("INTERACTION_COMMIT")).toContain("surface=reward/generic(quizAns)");
+
+    // Every routed pick committed WITHOUT a single shadow fault.
+    expect(host.diagnostics().faults).toBe(0);
+    duo.dispose();
+  });
+
+  it("records the routed surface + relay kind in the interaction parity line (judgeable routing)", () => {
+    const duo = buildDuo(new FakeClock());
+    duo.host.tapInteractionChoice({ seq: 2, kind: "biomeShop", choice: 0, data: [0, 50], ownerSeatId: 0, wave: 8 });
+    const line = parityLine("INTERACTION_COMMIT");
+    expect(line).toContain("surface=market");
+    expect(line).toContain("kind=biomeShop");
+    duo.dispose();
   });
 });

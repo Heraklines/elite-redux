@@ -2062,6 +2062,18 @@ export class CoopBattleStreamer {
     if (isCoopV2ShadowActive()) {
       const commandSeat = authoritativeState.field.find(seat => seat.side === "player" && seat.pokemonId > 0);
       if (commandSeat != null) {
+        // Deliverable 2: thread the REAL owner seat of the next-command mon. The authoritative field seat
+        // carries its owner ROLE; map it to the seat id (host=0, guest=1). When the seat carries no owner (an
+        // older host payload / genuinely unavailable), keep the best-effort local-role seat and MARK the parity
+        // record so the successor is never silently degraded.
+        const ownerResolved = commandSeat.owner != null;
+        const ownerSeatId = ownerResolved
+          ? commandSeat.owner === "guest"
+            ? 1
+            : 0
+          : this.transport.role === "host"
+            ? 0
+            : 1;
         tapCoopV2ShadowTurnCommit({
           operationId: `TURN/e${epoch}/w${wave}/t${turn}`,
           capture: { turnResolution: events, checkpoint },
@@ -2069,10 +2081,15 @@ export class CoopBattleStreamer {
             epoch,
             wave,
             resolvedTurn: turn,
-            ownerSeatId: this.transport.role === "host" ? 0 : 1,
+            ownerSeatId,
             pokemonId: commandSeat.pokemonId,
           },
+          // Deliverable 1: fingerprint the LEGACY turn image (the resolution + checkpoint legacy just
+          // committed) through the SAME turn digest so the shadow compares like-for-like (v2 entry digest vs
+          // v2-digest-of-legacy-image); the full-state checksum stays as the raw legacy token for the log.
+          legacyImage: { turnResolution: events, checkpoint },
           legacyDigest: checksum,
+          successorSeatSource: ownerResolved ? "owner-field" : "local-role-fallback",
         });
       }
     }
