@@ -432,11 +432,13 @@ jobs:
         env:
           COOP_GATE_MANIFEST: coop-gate-assignment.json
           NODE_OPTIONS: --max-old-space-size=8192
-          # Authority-v2 CUTOVER SURFACE 1 (turn/command): both duo peers advertise
-          # authority.v2turn, so negotiated sessions run v2 as the SOLE turn authority
-          # (legacy retention/RE-SEND/requestTurnCommit suppressed). Off-path safety was
-          # proven by runs 29624520778 / 29625681669 / 29626883595 + node fall-through tests.
-          COOP_AUTHORITY_V2_TURN: "on"
+          # Authority-v2 CUTOVER SURFACE 1 (turn/command): ROLLED BACK to off after run
+          # 29628503614 (cutover-active) mass-failed the matrix - the guest async v2-apply
+          # vs presentation interleaving drifts on real engines (the exact CI frontier the
+          # cutover report flagged). The cutover code remains, default-off = byte-identical
+          # (proven by 29624520778/29625681669/29626883595). Re-enable only after the
+          # projector becomes a real COMMAND installer and the drift diagnosis is fixed.
+          COOP_AUTHORITY_V2_TURN: "off"
         shell: bash
         run: |
           set +e
