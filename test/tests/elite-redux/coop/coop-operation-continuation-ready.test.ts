@@ -328,12 +328,16 @@ describe("protocol-33 retained operation continuation lifecycle", () => {
     }
   });
 
-  it("routes a missing continuation through the bounded failure callback without discarding authority", async () => {
+  it("routes a missing continuation through bounded re-drives then the fail-closed terminal without discarding authority", async () => {
     const pair = createLoopbackPair();
     const deadlines: { callback: () => void; cancelled: boolean; ms: number }[] = [];
     const failures: CoopDurabilityRecoveryFailure[] = [];
     const host = new CoopDurabilityManager(pair.host, {
       operationContinuationDeadlineMs: 25,
+      // Before any destructive terminal, the layer performs REAL addressed re-drives of the stuck op; keep
+      // that bounded budget small + deterministic here.
+      operationContinuationRecoveryWindowMs: 25,
+      operationContinuationRecoveryMaxAttempts: 2,
       scheduleOperationContinuationDeadline: (callback, ms) => {
         const deadline = { callback, cancelled: false, ms };
         deadlines.push(deadline);
@@ -355,16 +359,32 @@ describe("protocol-33 retained operation continuation lifecycle", () => {
       expect(deadlines[0].ms).toBe(25);
       expect(host.unackedCount()).toBe(1);
 
-      deadlines[0].callback();
+      // The op is not awaiting human input (no host authority surface opened), so each deadline elapse re-drives
+      // the exact stuck op and re-arms a bounded window; only once the re-drive budget is spent does the terminal
+      // fire - fail-closed, and now reporting the REAL attempt count (>0) instead of the old hard-coded 0.
+      let cursor = 0;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        expect(deadlines[cursor], `recovery window ${attempt} is armed`).toBeDefined();
+        deadlines[cursor].callback();
+        await flush();
+        expect(failures, `no terminal until the real re-drives are exhausted (after ${attempt})`).toEqual([]);
+        cursor++;
+      }
+      expect(deadlines[cursor]).toBeDefined();
+      deadlines[cursor].callback();
+      await flush();
       expect(failures).toEqual([
         {
           cls: "op:global",
           from: 0,
           blockedSeq: 1,
-          attempts: 0,
+          attempts: 2,
           reason: "continuation-timeout",
         },
       ]);
+      expect(failures[0].attempts, "the terminal reflects real re-drive attempts, not a hard-coded 0").toBeGreaterThan(
+        0,
+      );
       expect(host.unackedCount(), "bounded failure is fail-closed; authority remains available for diagnosis").toBe(1);
     } finally {
       host.dispose();

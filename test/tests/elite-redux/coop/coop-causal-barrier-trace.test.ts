@@ -137,19 +137,27 @@ describe("co-op causal barrier tracing", () => {
       recoveryDeadlineMs: 100,
       scheduleRecovery: callback => recovery.schedule(callback),
       operationContinuationDeadlineMs: 10,
+      // The continuation-timeout now performs bounded real re-drives before the terminal; keep the budget at 1
+      // so a single re-drive then the fail-closed terminal both appear in the trace.
+      operationContinuationRecoveryWindowMs: 10,
+      operationContinuationRecoveryMaxAttempts: 1,
       scheduleOperationContinuationDeadline: callback => continuation.schedule(callback),
     });
 
     try {
       expect(host.commit("op:global", committed.revision, { t: "envelope", envelope: committed })).toBe(true);
       recovery.fire(0);
+      // First continuation elapse re-drives the exact stuck op (records a continuation-redrive edge, re-arms a
+      // window); the second, with the re-drive budget spent, fires the peer-coherent terminal.
       continuation.fire(0);
+      continuation.fire(1);
 
       const events = getCoopCausalTrace();
       expect(events.map(event => event.stage)).toEqual([
         "retained",
         "continuation-deadline",
         "delivery-retry",
+        "continuation-redrive",
         "terminal",
       ]);
       expect(events[1].detail).toBe("stage=authority-surface budgetMs=10");

@@ -626,6 +626,8 @@ interface PendingHostOperationContinuation {
   authoritySurfaceRearmed: boolean;
   /** Exact host phase barriers waiting only for the peer's ordered materialApplied proof. */
   materialWaiters: Set<(applied: boolean) => void>;
+  /** Real continuation re-drive attempts already performed for this op before any terminal (so attempts>0). */
+  continuationRecoveryAttempts: number;
 }
 
 /** Identity is load-bearing: a cancelled first-stage callback must not exhaust a newly rearmed deadline. */
@@ -682,6 +684,25 @@ const DURABILITY_DEFERRED_DEADLINE_MS = 60_000;
  */
 const OPERATION_AUTHORITY_CONTINUATION_DEADLINE_MS = 180_000;
 const OPERATION_PEER_CONTINUATION_DEADLINE_MS = 60_000;
+/**
+ * Before destroying BOTH sessions on a continuation timeout, the safety layer performs REAL addressed
+ * re-drive attempts for the exact stuck op: it re-broadcasts the op's retained envelope so the peer re-runs
+ * its apply + continuation ACK chain (and re-emits `continuationReady` if its public surface is now open).
+ * Each re-drive re-arms one bounded window to await that proof; only after this many failed re-drives does
+ * the peer-coherent terminal fire - with `attempts` reflecting the REAL count (>0). Kept small + bounded so
+ * the terminal stays reachable for a genuinely lost continuation (fail-closed; never an infinite wait).
+ */
+const OPERATION_CONTINUATION_RECOVERY_MAX_ATTEMPTS = 6;
+const OPERATION_CONTINUATION_RECOVERY_WINDOW_MS = 5_000;
+/**
+ * A continuation timeout must NOT nuke a session that is merely waiting on a human. An op whose OWNER PROMPT
+ * is open (its host authority surface opened - the durability-layer proxy for `awaitingActionInput`) with a
+ * demonstrably LIVE peer is re-armed, never terminal: the human simply has not picked yet, and the existing
+ * input-fallback (the owner's replacement pick) will produce `continuationReady`. "Live" = the channel is
+ * connected AND an inbound frame (INCLUDING transport keepalive) arrived within this window - a live-but-idle
+ * tab keeps pinging (~5s), so a small `lastRxMs` proves the peer is alive; a growing one proves it is gone.
+ */
+const OPERATION_PEER_LIVENESS_FRESH_MS = 12_500;
 
 /**
  * Harness-only (null in production): wraps every default-scheduled recovery/deferral callback at
@@ -939,6 +960,12 @@ export interface CoopDurabilityHooks {
   operationAuthorityContinuationDeadlineMs?: number;
   /** Dedicated timer seam for deterministic continuation-retention tests. */
   scheduleOperationContinuationDeadline?: (callback: () => void, ms: number) => () => void;
+  /** Bounded REAL continuation re-drive attempts performed before a continuation-timeout terminal (default 6). */
+  operationContinuationRecoveryMaxAttempts?: number;
+  /** Window (ms) awaited after each continuation re-drive for the peer's `continuationReady` proof (default 5000). */
+  operationContinuationRecoveryWindowMs?: number;
+  /** Freshness window (ms) within which an inbound frame proves the peer is LIVE for the awaiting-input gate. */
+  operationPeerLivenessFreshMs?: number;
   /** Runtime bridge into the peer-coherent terminal supervisor after one class exhausts its retry budget. */
   onRecoveryExhausted?: (failure: CoopDurabilityRecoveryFailure) => void;
 }
@@ -997,6 +1024,9 @@ export class CoopDurabilityManager {
   private readonly scheduleOperationContinuationDeadline: (callback: () => void, ms: number) => () => void;
   private readonly operationAuthorityContinuationDeadlineMs: number;
   private readonly operationPeerContinuationDeadlineMs: number;
+  private readonly operationContinuationRecoveryMaxAttempts: number;
+  private readonly operationContinuationRecoveryWindowMs: number;
+  private readonly operationPeerLivenessFreshMs: number;
   private disposed = false;
 
   constructor(
@@ -1025,6 +1055,11 @@ export class CoopDurabilityManager {
       hooks.operationAuthorityContinuationDeadlineMs
       ?? hooks.operationContinuationDeadlineMs
       ?? OPERATION_AUTHORITY_CONTINUATION_DEADLINE_MS;
+    this.operationContinuationRecoveryMaxAttempts =
+      hooks.operationContinuationRecoveryMaxAttempts ?? OPERATION_CONTINUATION_RECOVERY_MAX_ATTEMPTS;
+    this.operationContinuationRecoveryWindowMs =
+      hooks.operationContinuationRecoveryWindowMs ?? OPERATION_CONTINUATION_RECOVERY_WINDOW_MS;
+    this.operationPeerLivenessFreshMs = hooks.operationPeerLivenessFreshMs ?? OPERATION_PEER_LIVENESS_FRESH_MS;
     if (
       !Number.isSafeInteger(this.recoveryInitialMs)
       || this.recoveryInitialMs <= 0
@@ -1044,6 +1079,12 @@ export class CoopDurabilityManager {
       || this.operationAuthorityContinuationDeadlineMs <= 0
       || !Number.isSafeInteger(this.operationPeerContinuationDeadlineMs)
       || this.operationPeerContinuationDeadlineMs <= 0
+      || !Number.isSafeInteger(this.operationContinuationRecoveryMaxAttempts)
+      || this.operationContinuationRecoveryMaxAttempts <= 0
+      || !Number.isSafeInteger(this.operationContinuationRecoveryWindowMs)
+      || this.operationContinuationRecoveryWindowMs <= 0
+      || !Number.isSafeInteger(this.operationPeerLivenessFreshMs)
+      || this.operationPeerLivenessFreshMs <= 0
     ) {
       throw new Error("invalid durability recovery timing configuration");
     }
@@ -1105,6 +1146,7 @@ export class CoopDurabilityManager {
           ...operation,
           authoritySurfaceRearmed: false,
           materialWaiters: new Set(),
+          continuationRecoveryAttempts: 0,
         });
       }
       this.armOperationContinuationDeadline(operation.authority, "authority-surface");
@@ -2071,45 +2113,173 @@ export class CoopDurabilityManager {
     if (this.operationContinuationTimers.has(key) || this.exhaustedOperationContinuations.has(key)) {
       return;
     }
-    const deadline: OperationContinuationDeadline = { cancel: () => {} };
     const deadlineMs =
       stage === "authority-surface"
         ? this.operationAuthorityContinuationDeadlineMs
         : this.operationPeerContinuationDeadlineMs;
-    deadline.cancel = this.scheduleOperationContinuationDeadline(() => {
-      // A host-surface rearm replaces the first-stage deadline. A stale callback that was already queued
-      // before cancellation has no authority to delete/exhaust the replacement stage.
-      if (this.operationContinuationTimers.get(key) !== deadline) {
-        return;
-      }
-      this.operationContinuationTimers.delete(key);
-      if (
-        this.disposed
-        || this.journal.ackedThrough(authority.cls) >= authority.seq
-        || this.hostOperationAckEvidence.get(key)?.stage === "continuationReady"
-      ) {
-        return;
-      }
-      this.exhaustedOperationContinuations.add(key);
-      this.cancelOperationDeliveryRetry(key);
-      this.settleOperationMaterialWaiters(key, false);
-      this.pendingHostOperationContinuations.delete(key);
-      this.recordOperationCausalStage(authority, "terminal", "reason=continuation-timeout");
-      coopWarn("durability", `operation continuation EXHAUSTED key=${key}`);
-      try {
-        this.hooks.onRecoveryExhausted?.({
-          cls: authority.cls,
-          from: this.journal.ackedThrough(authority.cls),
-          blockedSeq: authority.seq,
-          attempts: 0,
-          reason: "continuation-timeout",
-        });
-      } catch (error) {
-        coopWarn("durability", `operation continuation terminal hook threw key=${key}`, error);
-      }
-    }, deadlineMs);
-    this.operationContinuationTimers.set(key, deadline);
+    this.scheduleOperationContinuationTimer(authority, key, deadlineMs);
     this.recordOperationCausalStage(authority, "continuation-deadline", `stage=${stage} budgetMs=${deadlineMs}`);
+  }
+
+  /**
+   * Arm ONE continuation timer whose elapse routes into {@linkcode onOperationContinuationDeadlineElapsed}. The
+   * timer identity is load-bearing: a host-surface rearm (or a recovery rearm) replaces the prior timer, and a
+   * stale callback already queued before its cancellation has no authority to act on the replacement.
+   */
+  private scheduleOperationContinuationTimer(authority: CoopOperationAuthorityAddress, key: string, ms: number): void {
+    if (this.disposed || this.exhaustedOperationContinuations.has(key) || this.operationContinuationTimers.has(key)) {
+      return;
+    }
+    const deadline: OperationContinuationDeadline = { cancel: () => {} };
+    deadline.cancel = this.scheduleOperationContinuationDeadline(
+      () => this.onOperationContinuationDeadlineElapsed(authority, key, deadline),
+      ms,
+    );
+    this.operationContinuationTimers.set(key, deadline);
+  }
+
+  /** A continuation deadline elapsed: drop the timer, and unless already released, run recovery/terminal. */
+  private onOperationContinuationDeadlineElapsed(
+    authority: CoopOperationAuthorityAddress,
+    key: string,
+    deadline: OperationContinuationDeadline,
+  ): void {
+    if (this.operationContinuationTimers.get(key) !== deadline) {
+      return;
+    }
+    this.operationContinuationTimers.delete(key);
+    if (
+      this.disposed
+      || this.journal.ackedThrough(authority.cls) >= authority.seq
+      || this.hostOperationAckEvidence.get(key)?.stage === "continuationReady"
+    ) {
+      return;
+    }
+    this.recoverOperationContinuationOrExhaust(authority, key);
+  }
+
+  /**
+   * A continuation deadline elapsed for a STILL-RETAINED op. Instead of the previous immediate destroy-to-Title
+   * with a hard-coded `attempts: 0`, perform REAL addressed recovery before any terminal:
+   *  1. If the op is legitimately AWAITING HUMAN INPUT with a demonstrably live peer (its owner prompt/UI is open
+   *     and the channel keeps receiving frames), RE-ARM the window and return - NEVER terminal. The human simply
+   *     has not picked yet; the existing input-fallback (the owner's replacement pick) yields `continuationReady`.
+   *     This is bounded by peer liveness, not blind inflation: once the peer goes dark the next elapse falls
+   *     through to re-drive + terminal.
+   *  2. Otherwise re-drive the exact stuck op toward `continuationReady` (re-broadcast its retained envelope so
+   *     the peer re-runs its apply + continuation ACK chain), counting the attempt, and re-arm one bounded window
+   *     to await the peer's proof.
+   *  3. Once the bounded re-drives are exhausted (peer not converging and not merely awaiting input), fire the
+   *     peer-coherent terminal with `attempts` = the REAL re-drive count (>0). Fail-closed preserved.
+   */
+  private recoverOperationContinuationOrExhaust(authority: CoopOperationAuthorityAddress, key: string): void {
+    const pending = this.pendingHostOperationContinuations.get(key);
+    if (pending == null) {
+      // No retained record survives (already released/evicted). Preserve the original fail-closed terminal for
+      // this degenerate edge - there is no op to re-drive, so no real attempt is possible.
+      this.exhaustOperationContinuation(authority, key, 0);
+      return;
+    }
+    if (this.isOperationAwaitingLivePeerInput(authority, key, pending)) {
+      this.recordOperationCausalStage(authority, "continuation-input-wait", `lastRxMs=${this.peerLastRxMs() ?? "n/a"}`);
+      coopLog(
+        "durability",
+        `continuation deadline HELD (owner prompt open, peer live lastRxMs=${this.peerLastRxMs() ?? "n/a"}) key=${key}`,
+      );
+      this.scheduleOperationContinuationTimer(authority, key, this.operationContinuationRecoveryWindowMs);
+      return;
+    }
+    if (pending.continuationRecoveryAttempts < this.operationContinuationRecoveryMaxAttempts) {
+      pending.continuationRecoveryAttempts++;
+      const redriven = this.redriveOperationContinuation(authority);
+      this.recordOperationCausalStage(
+        authority,
+        "continuation-redrive",
+        `attempt=${pending.continuationRecoveryAttempts}/${this.operationContinuationRecoveryMaxAttempts} redriven=${redriven}`,
+      );
+      coopLog(
+        "durability",
+        `continuation RE-DRIVE key=${key} attempt=${pending.continuationRecoveryAttempts}/${this.operationContinuationRecoveryMaxAttempts} redriven=${redriven}`,
+      );
+      this.scheduleOperationContinuationTimer(authority, key, this.operationContinuationRecoveryWindowMs);
+      return;
+    }
+    this.exhaustOperationContinuation(authority, key, pending.continuationRecoveryAttempts);
+  }
+
+  /**
+   * Is this op genuinely waiting on a human pick with a live peer? True only when its host authority/public
+   * surface actually opened (`authoritySurfaceRearmed` - the durability-layer proxy for `awaitingActionInput`),
+   * the peer has not yet proven `continuationReady`, the op is still retained, AND the peer connection is live.
+   */
+  private isOperationAwaitingLivePeerInput(
+    authority: CoopOperationAuthorityAddress,
+    key: string,
+    pending: PendingHostOperationContinuation,
+  ): boolean {
+    if (!pending.authoritySurfaceRearmed) {
+      return false;
+    }
+    if (this.hostOperationAckEvidence.get(key)?.stage === "continuationReady") {
+      return false;
+    }
+    if (this.journal.ackedThrough(authority.cls) >= authority.seq) {
+      return false;
+    }
+    return this.isPeerConnectionLive();
+  }
+
+  /** The channel is connected AND an inbound frame (incl. keepalive) arrived within the freshness window. */
+  private isPeerConnectionLive(): boolean {
+    if (this.transport.state !== "connected") {
+      return false;
+    }
+    const rx = this.peerLastRxMs();
+    return rx != null && rx < this.operationPeerLivenessFreshMs;
+  }
+
+  private peerLastRxMs(): number | undefined {
+    return this.transport.lastRxMs?.();
+  }
+
+  /**
+   * Re-broadcast the exact retained envelope for the stuck op. This is a protocol-level re-drive, NOT UI input
+   * injection: the peer re-runs its apply + continuation ACK chain and re-emits `presentationReady`/
+   * `continuationReady` when its addressed public surface is open (or a lost `continuationReady` ACK is resent).
+   */
+  private redriveOperationContinuation(authority: CoopOperationAuthorityAddress): boolean {
+    const retained = this.journal.entry(authority.cls, authority.seq);
+    if (retained == null) {
+      return false;
+    }
+    try {
+      this.transport.send(retained.msg);
+    } catch (error) {
+      coopWarn("durability", `continuation re-drive send deferred key=${operationAuthorityKey(authority)}`, error);
+      return false;
+    }
+    return true;
+  }
+
+  /** The genuinely-unrecoverable terminal: destroy both sessions, reporting the REAL re-drive attempt count. */
+  private exhaustOperationContinuation(authority: CoopOperationAuthorityAddress, key: string, attempts: number): void {
+    this.exhaustedOperationContinuations.add(key);
+    this.cancelOperationDeliveryRetry(key);
+    this.settleOperationMaterialWaiters(key, false);
+    this.pendingHostOperationContinuations.delete(key);
+    this.recordOperationCausalStage(authority, "terminal", `reason=continuation-timeout attempts=${attempts}`);
+    coopWarn("durability", `operation continuation EXHAUSTED key=${key} after ${attempts} re-drive attempts`);
+    try {
+      this.hooks.onRecoveryExhausted?.({
+        cls: authority.cls,
+        from: this.journal.ackedThrough(authority.cls),
+        blockedSeq: authority.seq,
+        attempts,
+        reason: "continuation-timeout",
+      });
+    } catch (error) {
+      coopWarn("durability", `operation continuation terminal hook threw key=${key}`, error);
+    }
   }
 
   /**

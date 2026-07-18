@@ -186,12 +186,16 @@ describe("co-op guest-owned ME_PICK continuation releases from the post-pick sha
     }
   });
 
-  it("without the post-pick sharedInput surface the retained pick's continuation deadline EXHAUSTS to Title (the deadlock the fix breaks)", async () => {
+  it("without the post-pick sharedInput surface the retained pick's continuation EXHAUSTS to Title after real re-drives (the deadlock the fix breaks)", async () => {
     const pair = createLoopbackPair();
     const deadlines: { callback: () => void; cancelled: boolean; ms: number }[] = [];
     const failures: CoopDurabilityRecoveryFailure[] = [];
     const host = new CoopDurabilityManager(pair.host, {
       operationContinuationDeadlineMs: 25,
+      // The generic continuation-recovery layer re-drives the stuck op a bounded number of times before it
+      // may destroy both sessions; keep that budget small + deterministic here.
+      operationContinuationRecoveryWindowMs: 25,
+      operationContinuationRecoveryMaxAttempts: 2,
       scheduleOperationContinuationDeadline: (callback, ms) => {
         const deadline = { callback, cancelled: false, ms };
         deadlines.push(deadline);
@@ -212,19 +216,35 @@ describe("co-op guest-owned ME_PICK continuation releases from the post-pick sha
       expect(host.unackedCount(), "the committed pick is retained awaiting the guest's continuation").toBe(1);
       expect(deadlines).toHaveLength(1);
 
-      // The guest never opened a continuation surface (it sat in MESSAGE-class narration -> null surface).
-      // The retained pick's deadline fires -> the peer-coherent terminal (Title), fail-closed on the exact
-      // ME_PICK class. THIS is exactly what the phase's post-pick emit prevents.
-      deadlines[0].callback();
+      // The guest never opened a continuation surface (it sat in MESSAGE-class narration -> null surface) and
+      // its host authority surface never opened, so this is NOT an awaiting-human-input hold: the generic layer
+      // performs REAL addressed re-drives first (each re-arms a bounded window), then, only after the re-drive
+      // budget is spent, fires the peer-coherent terminal (Title) - fail-closed on the exact ME_PICK class, and
+      // now reporting the REAL attempt count (>0) rather than the old hard-coded 0. THIS is exactly what the
+      // phase's post-pick emit prevents.
+      let cursor = 0;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        expect(deadlines[cursor], `recovery window ${attempt} is armed`).toBeDefined();
+        deadlines[cursor].callback();
+        await flush();
+        expect(failures, `no terminal until the real re-drives are exhausted (after ${attempt})`).toEqual([]);
+        cursor++;
+      }
+      expect(deadlines[cursor]).toBeDefined();
+      deadlines[cursor].callback();
+      await flush();
       expect(failures, "the unreleased ME_PICK continuation exhausts into the shared-session terminal").toEqual([
         {
           cls: "op:me",
           from: 0,
           blockedSeq: committed.revision,
-          attempts: 0,
+          attempts: 2,
           reason: "continuation-timeout",
         },
       ]);
+      expect(failures[0].attempts, "the terminal reflects real re-drive attempts, not a hard-coded 0").toBeGreaterThan(
+        0,
+      );
       expect(host.unackedCount(), "fail-closed: the exact retained pick stays available for diagnosis").toBe(1);
     } finally {
       host.dispose();
