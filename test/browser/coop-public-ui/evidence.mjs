@@ -260,6 +260,13 @@ async function inspectCheckpointPixels(page, screenshot) {
 }
 
 export function checkpointRequiresGameplayCoverage(checkpointName) {
+  // Reward/market checkpoints capture a full-screen shop overlay that LEGITIMATELY covers the
+  // gameplay tiles (run 29646xxx 30-wave: wave-2-reward-owner minTileColor=0.007 on an otherwise
+  // perfect capture - 302 color bins, no vertical-edge corruption). The other integrity classes
+  // (near-empty palette, near-black, stripe corruption) still apply to them.
+  if (/(?:^|-)reward(?:-|$)|(?:^|-)market(?:-|$)/u.test(checkpointName)) {
+    return false;
+  }
   return /(?:^|-)wave-\d+(?:-|$)|(?:^|-)campaign-failed$/u.test(checkpointName);
 }
 
