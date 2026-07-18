@@ -40,6 +40,7 @@ import {
   setActiveCoopV2TurnCutover,
   suppressesLegacyGuestTurnRequest,
   suppressesLegacyNextCommandBarrier,
+  suppressesLegacyTurnAckProgression,
   suppressesLegacyTurnResend,
 } from "#data/elite-redux/coop/authority-v2/cutover-turn";
 import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
@@ -209,6 +210,10 @@ describe("authority-v2 turn cutover - suppression predicates", () => {
       suppressesLegacyTurnResend,
       suppressesLegacyGuestTurnRequest,
       suppressesLegacyNextCommandBarrier,
+      // The host's legacy turn-ACK terminal check retires under cutover too: the cosmetic carrier's ACK is
+      // non-authoritative (the v2 receipt owns retirement), so a retained==null turn ACK is expected, not a
+      // violation. Off (legacy) it stays armed, byte-identical to the pre-cutover build.
+      suppressesLegacyTurnAckProgression,
     ]) {
       expect(suppress("v2")).toBe(true);
       expect(suppress("legacy")).toBe(false);
@@ -306,6 +311,41 @@ describe("authority-v2 turn cutover - guest LIVE replica routing", () => {
     expect(guest.applied).toBe(1);
     expect(guest.controlLedgerSize).toBe(1);
     expect(guest.shadowStateSize).toBe(1);
+    expect(duo.host.diagnostics().retained).toBe(0);
+
+    duo.dispose();
+  });
+
+  it("applies the material seam (materialApplied) BEFORE the projector signs controlInstalled", () => {
+    // The fixed cutover contract: the v2 replica pipeline resolves the material/checkpoint legacy-consumer
+    // seam (applyMaterial -> materialApplied) BEFORE the projector signs controlInstalled (retirement). If
+    // the projector signed first, retirement would race a checkpoint that had not yet reconciled guest state.
+    const timeline: string[] = [];
+    const live: CoopV2LiveReplicaSeams = {
+      applyMaterial(_ctx, entry: CoopAuthorityEntry): boolean | null {
+        if (entry.kind !== "TURN_COMMIT") {
+          return null;
+        }
+        timeline.push("applyMaterial");
+        return true;
+      },
+      projectControl(_ctx, control: NonNullable<CoopNextControl>): CoopControlInstallResult | null {
+        if (control.kind !== "COMMAND") {
+          return null;
+        }
+        timeline.push("projectControl");
+        return { kind: "installed", controlId: controlIdOf(control) };
+      },
+    };
+    const clock = new FakeClock();
+    const duo = buildDuo(clock, live);
+
+    duo.host.tapTurnCommit(turnTap());
+
+    // Material reconciles first; only then is the COMMAND control's controlInstalled signed.
+    expect(timeline).toEqual(["applyMaterial", "projectControl"]);
+    // And the turn retired with no dual legacy authority left retained on the host.
+    expect(duo.guest.diagnostics().applied).toBe(1);
     expect(duo.host.diagnostics().retained).toBe(0);
 
     duo.dispose();

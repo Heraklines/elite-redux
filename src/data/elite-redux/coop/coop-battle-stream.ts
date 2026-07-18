@@ -23,8 +23,10 @@
 // =============================================================================
 
 import {
+  activeCoopTurnAuthorityMode,
   getActiveCoopV2TurnCutover,
   isCoopV2TurnCutoverActive,
+  suppressesLegacyTurnAckProgression,
 } from "#data/elite-redux/coop/authority-v2/cutover-turn";
 import {
   type CoopV2ShadowTurnTap,
@@ -4623,6 +4625,16 @@ export class CoopBattleStreamer {
             && isAuthorityAckStage(stage)
             && prior.canonical === canonicalize(msg)
           ) {
+            return;
+          }
+          // authority-v2 turn CUTOVER: the host emitted the carrier COSMETICALLY (retainAndRetryTurnCommit
+          // cosmeticOnly => sentTurnCommits is never populated for a cut-over turn), so a staged ACK arriving
+          // with retained==null is EXPECTED, not a violation - the guest's presentation phases ACK the
+          // cosmetic carrier they consumed, but the v2 controlInstalled receipt is the SOLE retirement.
+          // Ignore it, symmetric with the cosmetic send. When v2 FELL BACK for a turn (v2Committed=false),
+          // that turn IS retained under legacy, so retained!=null and the terminal check below stays armed.
+          if (retained == null && suppressesLegacyTurnAckProgression(activeCoopTurnAuthorityMode())) {
+            coopLog("stream", `host IGNORE cosmetic turn ACK stage=${stage} key=${key} (v2 owns retirement)`);
             return;
           }
           this.failHostAckProgression("turnResolution", msg, `Turn ACK was missing/stale/wrong-address at ${key}.`);

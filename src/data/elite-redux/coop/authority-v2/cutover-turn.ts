@@ -103,6 +103,19 @@ export function suppressesLegacyNextCommandBarrier(mode: CoopTurnAuthorityMode):
   return mode === "v2";
 }
 
+/**
+ * HOST: suppress the legacy turn-COMMIT-ACK terminal progression. Once cut over, the host emits the legacy
+ * turnResolution carrier COSMETICALLY (never retained - see suppressesLegacyTurnResend), so its staged
+ * `turnCommitAck` carries NO legacy authority: the guest's presentation phases still ACK the cosmetic
+ * carrier they consumed, but the v2 receipt (`controlInstalled`) is the SOLE retirement. A cosmetic ACK that
+ * finds no retained turn is therefore EXPECTED, not a protocol violation - the symmetric receive-side mirror
+ * of the cosmetic send. Without this, the host's legacy ACK-progression check terminalizes every clean
+ * cut-over turn ("Turn ACK was missing/stale/wrong-address"), because retention was deliberately suppressed.
+ */
+export function suppressesLegacyTurnAckProgression(mode: CoopTurnAuthorityMode): boolean {
+  return mode === "v2";
+}
+
 // ---------------------------------------------------------------------------
 // The live cutover controller. Wraps the per-runtime harness; the host commit
 // path delegates to the harness's turn tap (which, with the live seams wired, IS
