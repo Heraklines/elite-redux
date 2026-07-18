@@ -65,7 +65,9 @@ describe("co-op session controller (#633, P1)", () => {
     });
 
     it("rejects an er-coop-37 peer without addressed recovery and journal admission", async () => {
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-38");
+      // er-coop-39: status sub-state carried in checkpoints/snapshots; a 38 peer would silently
+      // reproduce the permanent status-digest divergence for mixed pairs, so pairing fails closed.
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-39");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",

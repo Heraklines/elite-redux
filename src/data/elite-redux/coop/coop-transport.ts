@@ -114,7 +114,12 @@ export type CoopRole = "host" | "guest";
 // The same protocol adds an exact operation-journal admission ACK. A protocol-37 authority cannot distinguish
 // a retained WAVE_ADVANCE that is safely staged behind presentation from an operation that was never
 // delivered, so mixed builds must refuse pairing instead of exhausting delivery retries spuriously.
-export const COOP_PROTOCOL_VERSION = "er-coop-38";
+// er-coop-39 carries full status SUB-STATE (statusToxicTurnCount / statusSleepTurnsRemaining) in the
+// per-turn checkpoint and the full resync snapshot. The fields are shape-tolerant on receive, which is
+// exactly why a version bump is REQUIRED: a cached protocol-38 client pairing with a 39 client would
+// silently reproduce the permanent playerParty.status digest divergence (the guest's Status counters
+// re-clobbered to 0 every turn) instead of failing pairing closed. Mixed builds must refuse pairing.
+export const COOP_PROTOCOL_VERSION = "er-coop-39";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
