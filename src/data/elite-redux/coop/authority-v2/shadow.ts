@@ -167,6 +167,20 @@ export interface CoopV2ShadowIdentity {
   readonly connectionGeneration: number;
 }
 
+/**
+ * The LIVE replica seams (cutover surface 1). When injected, the harness's replica pipeline routes a
+ * CUTOVER-kind delivered entry through these REAL engine verbs instead of its in-memory shadow ones; a
+ * `null` return falls through to shadow behaviour, so a non-cutover kind stays shadow. Absent => the
+ * harness is pure shadow (byte-identical to the pre-cutover build). Defined here (where the harness
+ * consumes it) so the engine-free cutover switchboard imports it from the harness without a cycle.
+ */
+export interface CoopV2LiveReplicaSeams {
+  /** Install the entry's material into REAL engine state (checkpoint-apply seam), or `null` to fall through to shadow. */
+  applyMaterial(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null;
+  /** Project the stated control onto the REAL phase manager, or `null` to fall through to the shadow projector. */
+  projectControl(ctx: CoopRuntimeContext, control: NonNullable<CoopNextControl>): CoopControlInstallResult | null;
+}
+
 /** Everything the harness needs beyond its own foundation objects, all injected. */
 export interface CoopV2ShadowDeps {
   readonly identity: CoopV2ShadowIdentity;
@@ -178,6 +192,12 @@ export interface CoopV2ShadowDeps {
   readonly send: (frame: CoopFrameV2) => void;
   /** Optional injected scheduler (a deterministic fake for tests); default a real scheduler the harness owns. */
   readonly scheduler?: CoopSchedulerImpl;
+  /**
+   * Optional LIVE replica seams (cutover surface 1). When present, a delivered CUTOVER-kind entry is applied
+   * against REAL engine state + the real phase manager instead of the in-memory shadow ledger. Absent =>
+   * pure shadow. Never touched unless a frame is actually delivered AND the seam recognizes the kind.
+   */
+  readonly liveReplica?: CoopV2LiveReplicaSeams;
 }
 
 // ---------------------------------------------------------------------------
@@ -330,12 +350,26 @@ export class CoopShadowControlLedger {
  */
 class CoopShadowControlProjector implements CoopControlProjector {
   private readonly ledger: CoopShadowControlLedger;
+  /** Optional live projector consulted FIRST (cutover); a `null` return falls through to the shadow ledger. */
+  private readonly live: CoopV2LiveReplicaSeams | null;
 
-  constructor(ledger: CoopShadowControlLedger) {
+  constructor(ledger: CoopShadowControlLedger, live: CoopV2LiveReplicaSeams | null) {
     this.ledger = ledger;
+    this.live = live;
   }
 
-  project(_ctx: CoopRuntimeContext, control: NonNullable<CoopNextControl>): CoopControlInstallResult {
+  project(ctx: CoopRuntimeContext, control: NonNullable<CoopNextControl>): CoopControlInstallResult {
+    // Cutover: a live projector installs the stated control on the REAL phase manager. A `null` result means
+    // "not a cutover kind here" and we record into the in-memory ledger exactly as pure shadow does.
+    const liveResult = this.live?.projectControl(ctx, control) ?? null;
+    if (liveResult != null) {
+      // Mirror the installed controlId into the ledger too, so a redelivered entry is idempotent and the
+      // shadow diagnostics still count it - the live install is authoritative, the ledger is bookkeeping.
+      if (liveResult.kind === "installed" || liveResult.kind === "already-installed") {
+        this.ledger.record(liveResult.controlId);
+      }
+      return liveResult;
+    }
     const projectable = control as ProjectableControl;
     const validation = validateNextControl(projectable);
     if (!validation.ok) {
@@ -374,6 +408,8 @@ export class CoopAuthorityV2Shadow {
   private readonly projector: CoopControlProjector;
   private readonly replicaDeps: ReplicaApplyDeps;
   private readonly sendFrame: (frame: CoopFrameV2) => void;
+  /** Live replica seams (cutover surface 1); null in pure shadow mode. Consulted FIRST by the applier/projector. */
+  private readonly liveReplica: CoopV2LiveReplicaSeams | null;
   private readonly shadowState = new Map<number, ShadowStateRecord>();
 
   private disposed = false;
@@ -429,9 +465,10 @@ export class CoopAuthorityV2Shadow {
       ownerId: `authority-v2-shadow:${id.sessionId}:seat${id.localSeatId}`,
     });
 
-    this.projector = new CoopShadowControlProjector(this.ledger);
+    this.liveReplica = deps.liveReplica ?? null;
+    this.projector = new CoopShadowControlProjector(this.ledger, this.liveReplica);
     this.replicaDeps = {
-      applyMaterial: this.shadowApplyMaterial,
+      applyMaterial: (ctx, entry) => this.applyMaterialRouted(ctx, entry),
       projector: this.projector,
       receipts: { emit: receipt => this.sendReceipt(receipt) },
     };
@@ -964,6 +1001,22 @@ export class CoopAuthorityV2Shadow {
     return committed;
   }
 
+  /**
+   * The routed material applier: in CUTOVER mode a live seam installs a cutover-kind entry into REAL engine
+   * state (a `null` return means "not a cutover kind here" and we fall through). In pure shadow mode the
+   * live seam is absent, so this is exactly the in-memory shadow applier - byte-identical to before.
+   */
+  private applyMaterialRouted(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean {
+    const live = this.liveReplica?.applyMaterial(ctx, entry) ?? null;
+    if (live != null) {
+      // Still record the applied revision into the shadow state so the diagnostics + duplicate-idempotency
+      // bookkeeping hold; the live install is the authoritative one, this Map is observability.
+      this.shadowApplyMaterial(ctx, entry);
+      return live;
+    }
+    return this.shadowApplyMaterial(ctx, entry);
+  }
+
   /** The shadow material applier: record the admitted entry into shadow state (never engine state). */
   private readonly shadowApplyMaterial: ApplyMaterialFn = (_ctx, entry) => {
     this.shadowState.set(entry.revision, {
@@ -1138,6 +1191,16 @@ export function tapCoopV2ShadowInteractionChoice(input: CoopV2ShadowInteractionC
 /** Whether a shadow harness is active (an emit seam can gate its input construction on this). */
 export function isCoopV2ShadowActive(): boolean {
   return activeHarness != null;
+}
+
+/**
+ * The active harness's authenticated session epoch, or `null` when no harness is active. Exposed so an emit
+ * seam that must build a v2 address (a positive session epoch) WITHOUT the surface's own op-state - e.g. the
+ * faint-switch REPLACEMENT tap in a lane where the op surface is rolled back - can source the epoch the same
+ * authenticated way the harness stamps it, instead of reaching into ambient op state.
+ */
+export function activeCoopV2ShadowSessionEpoch(): number | null {
+  return activeHarness?.authenticatedFrameContext.sessionEpoch ?? null;
 }
 
 /** Register the live harness's inbound handler (runtime assembly). */

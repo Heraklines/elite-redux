@@ -90,6 +90,18 @@ export const COOP_CAP_RENDERER_ALLOWLIST_ENFORCE: CoopCapabilityKey = "renderer.
  * gates it), so a mixed build can never emit v2 frames a peer that lacks the harness would receive.
  */
 export const COOP_CAP_AUTHORITY_V2_SHADOW: CoopCapabilityKey = "authority.v2shadow";
+/**
+ * The authority-v2 TURN/COMMAND CUTOVER (surface 1, src/data/elite-redux/coop/authority-v2/cutover-turn.ts).
+ * When BOTH peers negotiate it (and the shadow harness is present), the turn surface stops being a legacy
+ * authority: the host commits ONLY the v2 TURN_COMMIT entry (the legacy turnResolution stays cosmetic - not
+ * retained, not resent, not acked), and the guest applies the turn through the v2 replica pipeline (material
+ * applier -> checkpoint-apply seam; projector -> the real phase-manager COMMAND control). A one-sided build
+ * never activates it (the intersection gates it), so a mixed build can never leave one peer on legacy turn
+ * authority while the other is on v2. Advertised default-OFF behind the COOP_AUTHORITY_V2_TURN build flag;
+ * CI enables it per-lane. This capability implies (and requires) the v2 shadow harness - the cutover reuses
+ * the SAME per-runtime CoopAuthorityLog + frame channel the shadow harness stands up.
+ */
+export const COOP_CAP_AUTHORITY_V2_TURN: CoopCapabilityKey = "authority.v2turn";
 
 // -----------------------------------------------------------------------------
 // The pure negotiation math (unit-tested engine-free).

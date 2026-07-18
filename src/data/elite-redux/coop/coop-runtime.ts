@@ -20,13 +20,28 @@
 
 import { globalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
+import type { TurnResolutionImage } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
 import type {
   CoopTerminalMaterialV2,
   CoopWaveAdvanceDestination,
   CoopWaveTransitionMaterialV2,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
+import type {
+  CoopAuthorityEntry,
+  CoopControlInstallResult,
+  CoopNextControl,
+  CoopRuntimeContext,
+} from "#data/elite-redux/coop/authority-v2/contract";
+import {
+  CoopV2TurnCutover,
+  clearActiveCoopV2TurnCutover,
+  isCoopV2TurnEnabled,
+  setActiveCoopV2TurnCutover,
+} from "#data/elite-redux/coop/authority-v2/cutover-turn";
+import { controlIdOf, type ProjectableControl } from "#data/elite-redux/coop/authority-v2/next-control";
 import {
   CoopAuthorityV2Shadow,
+  type CoopV2LiveReplicaSeams,
   type CoopV2ShadowIdentity,
   clearActiveCoopV2Shadow,
   clearCoopV2ShadowInbound,
@@ -59,6 +74,7 @@ import {
 import { COOP_CHECKSUM_SENTINEL, canonicalize, fnv1a64 } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopAuthoritativeBattleState,
+  applyCoopCheckpoint,
   applyCoopDexDelta,
   applyCoopFullSnapshot,
   applyCoopMeOutcome,
@@ -90,6 +106,7 @@ import {
 } from "#data/elite-redux/coop/coop-biome-operation";
 import {
   COOP_CAP_AUTHORITY_V2_SHADOW,
+  COOP_CAP_AUTHORITY_V2_TURN,
   COOP_CAP_DURABILITY_JOURNAL,
   COOP_CAP_OP_ABILITY,
   COOP_CAP_OP_BARGAIN,
@@ -3373,6 +3390,63 @@ const runtimeSceneBindings = new WeakMap<CoopRuntime, object>();
 // ---------------------------------------------------------------------------
 const coopV2ShadowHarnesses = new WeakMap<CoopRuntime, CoopAuthorityV2Shadow>();
 const coopV2ShadowBuildFailed = new WeakSet<CoopRuntime>();
+/** The live turn cutover controller per runtime (built alongside the harness when authority.v2turn is negotiated). */
+const coopV2TurnCutovers = new WeakMap<CoopRuntime, CoopV2TurnCutover>();
+
+/** Whether the turn/command surface is CUT OVER to v2 for `runtime` (authority.v2turn negotiated + harness present). */
+function isCoopV2TurnNegotiated(): boolean {
+  return isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_TURN);
+}
+
+/**
+ * Build the LIVE replica seams (cutover surface 1). The guest applies a delivered TURN_COMMIT through the
+ * REAL engine: the material applier maps to the existing checkpoint-apply seam ({@link applyCoopCheckpoint}),
+ * and the projector reports the stated COMMAND control as installed - the guest's own (non-suppressed)
+ * presentation phase flow (CoopReplayTurnPhase -> CoopFinalizeTurnPhase -> CommandPhase) is what materializes
+ * that command on the real phase manager, so the projector's role is to sign controlInstalled (retirement)
+ * once the material has applied, never to double-drive the phase queue. A non-cutover kind / non-COMMAND
+ * control returns `null` so the harness falls through to pure shadow. Every verb is guarded so an engine
+ * throw becomes a `false`/`null` (material rejected / fall-through), never a crash into the frame handler.
+ */
+function buildCoopV2TurnLiveSeams(): CoopV2LiveReplicaSeams {
+  return {
+    applyMaterial: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null => {
+      if (entry.kind !== "TURN_COMMIT") {
+        return null; // only the TURN surface is cut over; every other kind stays shadow.
+      }
+      try {
+        const payload = entry.material.payload as TurnResolutionImage | undefined;
+        const checkpoint = payload?.checkpoint;
+        if (checkpoint == null || typeof checkpoint !== "object") {
+          return false; // malformed TURN material - refuse before signing materialApplied.
+        }
+        // The checkpoint-apply seam is tick-gated + idempotent (coopAcceptStateTick), so a redelivered entry
+        // is safe. Its boolean is the materialApplied verdict.
+        return applyCoopCheckpoint(checkpoint as Parameters<typeof applyCoopCheckpoint>[0]);
+      } catch (error) {
+        coopWarn("v2-turn", `live applyMaterial threw for rev=${entry.revision}`, error);
+        return false;
+      }
+    },
+    projectControl: (
+      _ctx: CoopRuntimeContext,
+      control: NonNullable<CoopNextControl>,
+    ): CoopControlInstallResult | null => {
+      if (control.kind !== "COMMAND") {
+        return null; // only the successor COMMAND is a turn-cutover control; anything else falls through to shadow.
+      }
+      try {
+        const controlId = controlIdOf(control as ProjectableControl);
+        // The command control is materialized by the guest's ordinary presentation phase flow (which the
+        // cutover deliberately does NOT suppress); the projector signs controlInstalled so the entry retires.
+        return { kind: "installed", controlId };
+      } catch (error) {
+        coopWarn("v2-turn", "live projectControl threw", error);
+        return null;
+      }
+    },
+  };
+}
 
 /** Resolve the immutable v2 shadow identity from a runtime's session controller, or null if unavailable. */
 function resolveCoopV2ShadowIdentity(runtime: CoopRuntime): CoopV2ShadowIdentity | null {
@@ -3420,7 +3494,9 @@ function resolveCoopV2ShadowIdentity(runtime: CoopRuntime): CoopV2ShadowIdentity
  * use, so the capability-off path is a single null check with zero behavioural change.
  */
 export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAuthorityV2Shadow | null {
-  if (runtime == null || !isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_SHADOW)) {
+  // Build the harness when EITHER the shadow OR the turn-cutover capability is negotiated - the cutover
+  // reuses the SAME per-runtime log + frame channel. Off both => null, and every tap is a pure no-op.
+  if (runtime == null || !(isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_SHADOW) || isCoopV2TurnNegotiated())) {
     return null;
   }
   const existing = coopV2ShadowHarnesses.get(runtime);
@@ -3437,6 +3513,10 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
   }
   try {
     const localTransport = runtime.localTransport;
+    // Cutover surface 1: inject the LIVE replica seams ONLY when authority.v2turn is negotiated. Absent, the
+    // harness is pure shadow (byte-identical). Present, a delivered TURN_COMMIT applies against real engine
+    // state + the real phase manager on the guest.
+    const turnCutover = isCoopV2TurnNegotiated();
     const harness = new CoopAuthorityV2Shadow({
       identity,
       scene: globalScene,
@@ -3449,10 +3529,20 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
         // `CoopMessage` union (contract change request 3), so this crosses the seam type-exact, no cast.
         localTransport.send(frame);
       },
+      ...(turnCutover ? { liveReplica: buildCoopV2TurnLiveSeams() } : {}),
     });
     registerCoopV2ShadowInbound(frame => harness.handleInboundFrame(frame));
     setActiveCoopV2Shadow(harness);
     coopV2ShadowHarnesses.set(runtime, harness);
+    // Cutover surface 1: when authority.v2turn is negotiated, install the live turn cutover so the legacy
+    // turn seams (coop-battle-stream RE-SEND/requestTurnCommit, command-phase next-command barrier) suppress
+    // themselves - the frozen "no second authority for a cut-over surface" rule.
+    if (turnCutover) {
+      const cutover = new CoopV2TurnCutover(harness);
+      coopV2TurnCutovers.set(runtime, cutover);
+      setActiveCoopV2TurnCutover(cutover);
+      coopLog("v2-turn", `turn CUTOVER active role=${runtime.controller.authorityRole} session=${identity.sessionId}`);
+    }
     coopLog(
       "v2-shadow",
       `harness built role=${runtime.controller.authorityRole} seat=${identity.localSeatId} session=${identity.sessionId}`,
@@ -3467,6 +3557,12 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
 
 /** Dispose + drop the shadow harness for a runtime (teardown). Idempotent. */
 function disposeCoopV2Shadow(runtime: CoopRuntime): void {
+  const cutover = coopV2TurnCutovers.get(runtime);
+  if (cutover != null) {
+    clearActiveCoopV2TurnCutover(cutover);
+    cutover.dispose();
+    coopV2TurnCutovers.delete(runtime);
+  }
   const harness = coopV2ShadowHarnesses.get(runtime);
   if (harness != null) {
     clearActiveCoopV2Shadow(harness);
@@ -4092,7 +4188,11 @@ function tapCoopV2ShadowWaveBoundary(
       wave,
       turn: Math.max(0, turn),
     };
-    shadow.tapTerminal({ operationId: `WSHADOW/TERM/w${wave}`, terminal, legacyDigest });
+    // Deliverable 3: fingerprint the LEGACY terminal image (the waveEndState the legacy path sealed, mapped
+    // to the v2 terminal material the same way the entry is) through the terminal adapter's OWN digest, so
+    // wave/terminal parity compares like-for-like (v2 entry digest vs v2-digest-of-legacy-image) instead of
+    // the raw canonicalize(transition) token that is a different scheme and always diverges. Shadow only.
+    shadow.tapTerminal({ operationId: `WSHADOW/TERM/w${wave}`, terminal, legacyImage: terminal, legacyDigest });
     return;
   }
   const meBoundary: "none" | "battle-victory" = transition.meBoundary === "battle-victory" ? "battle-victory" : "none";
@@ -4115,7 +4215,17 @@ function tapCoopV2ShadowWaveBoundary(
     operationId: `WSHADOW/REWARD/w${wave}`,
     ownerSeatId,
   };
-  shadow.tapWaveAdvance({ operationId: `WSHADOW/ADV/w${wave}`, transition: material, destination, legacyDigest });
+  // Deliverable 3: fingerprint the LEGACY waveResolved image (the transition the host broadcast) through the
+  // wave adapter's OWN digest so wave parity becomes JUDGEABLE-true - v2 entry digest vs v2-digest-of-legacy-
+  // image, like-for-like. The raw canonicalize(transition) token stays as the fallback legacyDigest for the
+  // log. Shadow only - no wave cutover; the wave surface stays legacy-authoritative.
+  shadow.tapWaveAdvance({
+    operationId: `WSHADOW/ADV/w${wave}`,
+    transition: material,
+    destination,
+    legacyImage: material,
+    legacyDigest,
+  });
 }
 
 export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation?: CoopCapturePresentation): void {
@@ -5705,6 +5815,15 @@ function buildLocalCoopCapabilities(durabilityEnabled: boolean): CoopCapabilityK
   if (isCoopV2ShadowEnabled()) {
     caps.push(COOP_CAP_AUTHORITY_V2_SHADOW);
   }
+  // authority-v2 TURN/COMMAND CUTOVER (surface 1): advertise the cutover capability, gated by the build flag
+  // (default OFF - flip on with env COOP_AUTHORITY_V2_TURN=on; CI enables it per-lane). Two cutover-enabled
+  // builds negotiate it; a peer with it off drops it from the intersection and BOTH sides stay on legacy turn
+  // authority. Default-off keeps a co-op session BYTE-IDENTICAL to the pre-cutover build. The cutover reuses
+  // the shadow harness's log + frame channel, so it is only effective alongside the harness (which builds when
+  // either capability is negotiated).
+  if (isCoopV2TurnEnabled()) {
+    caps.push(COOP_CAP_AUTHORITY_V2_TURN);
+  }
   return caps;
 }
 
@@ -5769,6 +5888,18 @@ export function assembleCoopRuntime(
     // in-process engine while the peer's transport is being pumped.
     onEpochNegotiated: epoch =>
       withActiveCoopRuntimeOpState(opState, () => applyCoopOperationEpoch(epoch, waveOperationBinding)),
+    // authority-v2: EAGERLY build the shadow harness (and the turn cutover, when authority.v2turn is
+    // negotiated) the moment capabilities are frozen, so the turn-surface cutover is ACTIVE before the first
+    // turn commit - otherwise a lazy first-tap build would leave wave-1 turns on legacy authority (a window
+    // of dual authority the frozen cutover rule forbids). A pure no-op when neither v2 capability negotiated
+    // (getCoopV2Shadow returns null); guarded so a build failure never unwinds the negotiation callback.
+    onCapabilitiesNegotiated: () => {
+      try {
+        getCoopV2Shadow(runtime);
+      } catch (error) {
+        coopWarn("v2-shadow", "eager harness build on negotiation threw", error);
+      }
+    },
     onPartnerInteractionRecoveryExhausted: failure => {
       const point = readCoopBattlePoint();
       failCoopRuntimeSharedSession(

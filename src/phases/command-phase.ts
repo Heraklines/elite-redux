@@ -5,6 +5,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
+import { isCoopV2TurnCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-turn";
 import {
   applyCoopAuthoritativeBattleState,
   coopAppliedStateTick,
@@ -902,6 +903,14 @@ export class CommandPhase extends FieldPhase {
   private coopNextCommandBarrier(): Promise<boolean> | null {
     try {
       if (!globalScene.gameMode.isCoop || getCoopRuntime()?.spoof != null) {
+        return null;
+      }
+      // authority-v2 turn CUTOVER: the successor COMMAND is STATED by the host and PROJECTED onto this guest's
+      // phase manager (frozen decision 4 - the guest never derives its next command from the local rendezvous
+      // barrier). The legacy next-command reciprocal barrier must NOT run for a negotiated session (the frozen
+      // "no second authority" rule), so take the null fast-path exactly as a solo/spoof session does. No-op /
+      // byte-identical when the cutover is not active.
+      if (isCoopV2TurnCutoverActive()) {
         return null;
       }
       const rendezvous = getCoopRendezvous();

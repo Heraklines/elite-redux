@@ -3,7 +3,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { isCoopV2ShadowActive, tapCoopV2ShadowReplacementCommit } from "#data/elite-redux/coop/authority-v2/shadow";
+import {
+  activeCoopV2ShadowSessionEpoch,
+  isCoopV2ShadowActive,
+  tapCoopV2ShadowReplacementCommit,
+} from "#data/elite-redux/coop/authority-v2/shadow";
 import { COOP_CAP_OP_FAINT_SWITCH, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
@@ -546,6 +550,58 @@ export function materializeCoopFaintSwitchPickerTerminal(
 }
 
 /**
+ * Deliverable 4: build + fire the REPLACEMENT_COMMIT shadow tap from the raw faint params, WITHOUT the
+ * op-surface state (this lane has it rolled back). The session epoch is sourced from the active harness's
+ * authenticated frame context (the same authenticated epoch the harness stamps), so the v2 address is
+ * well-formed; a non-positive epoch/wave/turn simply skips the tap rather than committing a malformed
+ * proposal. The comparand is like-for-like (the same resolved proposal fingerprinted through the faint
+ * adapter's own image digest), matching the op-surface-enabled tap. Shadow only - it never authorizes.
+ */
+function tapFaintReplacementShadowFromParams(params: {
+  payload: CoopFaintSwitchPayload;
+  ownerRole: CoopRole;
+  wave: number;
+  turn: number;
+  occurrence?: number;
+  speciesId?: number;
+}): void {
+  const epoch = activeCoopV2ShadowSessionEpoch();
+  if (epoch == null || epoch <= 0 || !(params.wave > 0) || !(params.turn > 0)) {
+    return;
+  }
+  const owner = coopSeatOfRole(params.ownerRole);
+  const occurrence = params.occurrence ?? params.payload.data[COOP_FAINT_SWITCH_OCCURRENCE_INDEX] ?? 0;
+  const resolutionCode = params.payload.data[COOP_FAINT_SWITCH_RESOLUTION_INDEX];
+  const speciesId = params.speciesId ?? params.payload.data[1] ?? 0;
+  const noReplacement = resolutionCode === COOP_FAINT_SWITCH_RESOLUTION_NONE;
+  const selected =
+    noReplacement || !(speciesId > 0) || params.payload.partySlot < 0
+      ? null
+      : { partySlot: params.payload.partySlot, speciesId };
+  const proposal = {
+    sourceAddress: {
+      epoch,
+      wave: params.wave,
+      turn: params.turn,
+      occurrence,
+      fieldIndex: params.payload.fieldIndex,
+    },
+    ownerSeatId: owner,
+    selected,
+  };
+  const resolution = resolutionCode === COOP_FAINT_SWITCH_RESOLUTION_OWNER ? "owner-pick" : "fallback-auto";
+  tapCoopV2ShadowReplacementCommit({
+    proposal,
+    resolution,
+    successor: { kind: "terminal" },
+    legacyImage: { proposal, resolution },
+    // No legacy carrier op id exists in this lane (op surface off); derive the adapter's own stable window
+    // address as the raw fallback token, so the parity line has a meaningful comparand.
+    legacyDigest: `RC/e${epoch}/w${params.wave}/t${params.turn}/o${occurrence}/f${params.payload.fieldIndex}/s${owner}`,
+  });
+}
+
+/**
  * Commit one authoritative replacement terminal and return the retained identity needed for the
  * host's peer-material barrier. A null result is a retention failure; an enabled operation always
  * returns its exact operation id.
@@ -569,6 +625,14 @@ export function commitFaintSwitchAuthorityResult(
   binding?: CoopFaintSwitchOperationBinding | null,
 ): CoopFaintSwitchCommitReceipt | null {
   if (!isCoopFaintSwitchOperationEnabled()) {
+    // Deliverable 4: the op surface is rolled back in THIS lane (the legacy carrier resolves the faint), but a
+    // faint still happened - so still emit the REPLACEMENT_COMMIT shadow tap on the HOST, with a like-for-like
+    // comparand, so faint-bearing lanes retain parity evidence instead of only op-surface-enabled ones. The
+    // tap is host-only (the authority), harness-gated, and self-guarded (a throw is a logged shadow FAULT,
+    // never propagated) - it can never affect the legacy carrier.
+    if (params.localRole === "host" && isCoopV2ShadowActive()) {
+      tapFaintReplacementShadowFromParams(params);
+    }
     return { operationId: null };
   }
   assertBindingRole(binding, params.localRole);

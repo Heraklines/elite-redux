@@ -22,7 +22,15 @@
 // a checkpoint lives in `coop-battle-checkpoint.ts`; this file is just the wire.
 // =============================================================================
 
-import { isCoopV2ShadowActive, tapCoopV2ShadowTurnCommit } from "#data/elite-redux/coop/authority-v2/shadow";
+import {
+  getActiveCoopV2TurnCutover,
+  isCoopV2TurnCutoverActive,
+} from "#data/elite-redux/coop/authority-v2/cutover-turn";
+import {
+  type CoopV2ShadowTurnTap,
+  isCoopV2ShadowActive,
+  tapCoopV2ShadowTurnCommit,
+} from "#data/elite-redux/coop/authority-v2/shadow";
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type {
@@ -1678,9 +1686,19 @@ export class CoopBattleStreamer {
     return false;
   }
 
-  private retainAndRetryTurnCommit(commit: Extract<CoopMessage, { t: "turnResolution" }>): boolean {
+  private retainAndRetryTurnCommit(
+    commit: Extract<CoopMessage, { t: "turnResolution" }>,
+    cosmeticOnly = false,
+  ): boolean {
     if (this.authorityTerminalStarted) {
       return false;
+    }
+    // authority-v2 turn CUTOVER: the v2 authority log already committed this turn, so the legacy carrier is
+    // COSMETIC. Send it once (the caller does) for observability, but do NOT retain / schedule the RE-SEND
+    // loop / track it as issued authority - the v2 log owns retention + redelivery. This is the frozen "no
+    // second authority for a cut-over surface" rule: the legacy turn-commit RE-SEND loop must not run.
+    if (cosmeticOnly) {
+      return true;
     }
     const key = authorityKey(commit);
     const retainedCommit = structuredClone(commit);
@@ -2048,52 +2066,103 @@ export class CoopBattleStreamer {
     if (!hasCompleteAuthorityCompanions(commit) || typeof preimage !== "string" || preimage.length === 0) {
       throw new Error(`refusing malformed turn commit e=${epoch} wave=${wave} turn=${turn} rev=${revision}`);
     }
+    // authority-v2 turn/command CUTOVER (surface 1). Two disjoint paths, gated on the cutover being active:
+    //   - CUTOVER ACTIVE: commit the v2 TURN_COMMIT as the SOLE authority FIRST, then make the legacy carrier
+    //     COSMETIC (sent once, never retained/resent/acked). `v2Committed` false (no live command seat / barred
+    //     / fault) means the v2 commit did not happen, so legacy stays the authority for this turn - never a
+    //     turn with no authority, never two authorities.
+    //   - NOT ACTIVE (legacy or shadow-only): the EXACT original ordering (retain -> send -> shadow tap), so a
+    //     capability-off / shadow-only session is byte-identical to the pre-cutover build.
+    if (isCoopV2TurnCutoverActive()) {
+      const v2Committed = this.emitCoopV2TurnAuthority(
+        epoch,
+        wave,
+        turn,
+        events,
+        checkpoint,
+        checksum,
+        authoritativeState,
+      );
+      if (!this.retainAndRetryTurnCommit(commit, v2Committed)) {
+        coopWarn("stream", `host WITHHOLD turn commit e=${epoch} wave=${wave} turn=${turn}: authority terminal active`);
+        return false;
+      }
+      this.transport.send(commit);
+      return true;
+    }
     if (!this.retainAndRetryTurnCommit(commit)) {
       coopWarn("stream", `host WITHHOLD turn commit e=${epoch} wave=${wave} turn=${turn}: authority terminal active`);
       return false;
     }
     this.transport.send(commit);
-    // authority-v2 SHADOW tap (contract change request 4): mirror this published turnResolution into the v2
-    // shadow harness for parity evidence. Null-guarded (no-op unless a harness is active) + the tap runs
-    // under the harness's own try/catch, so a shadow fault is logged, never thrown back into the host stream.
-    // Legacy owns the turn entirely; this only computes + compares alongside it. The stated next-command
-    // successor names the first live player field mon (a valid COMMAND address); when none is resolvable the
-    // tap is skipped rather than committing a malformed successor.
-    if (isCoopV2ShadowActive()) {
-      const commandSeat = authoritativeState.field.find(seat => seat.side === "player" && seat.pokemonId > 0);
-      if (commandSeat != null) {
-        // Deliverable 2: thread the REAL owner seat of the next-command mon. The authoritative field seat
-        // carries its owner ROLE; map it to the seat id (host=0, guest=1). When the seat carries no owner (an
-        // older host payload / genuinely unavailable), keep the best-effort local-role seat and MARK the parity
-        // record so the successor is never silently degraded.
-        const ownerResolved = commandSeat.owner != null;
-        const ownerSeatId = ownerResolved
-          ? commandSeat.owner === "guest"
-            ? 1
-            : 0
-          : this.transport.role === "host"
-            ? 0
-            : 1;
-        tapCoopV2ShadowTurnCommit({
-          operationId: `TURN/e${epoch}/w${wave}/t${turn}`,
-          capture: { turnResolution: events, checkpoint },
-          nextCommand: {
-            epoch,
-            wave,
-            resolvedTurn: turn,
-            ownerSeatId,
-            pokemonId: commandSeat.pokemonId,
-          },
-          // Deliverable 1: fingerprint the LEGACY turn image (the resolution + checkpoint legacy just
-          // committed) through the SAME turn digest so the shadow compares like-for-like (v2 entry digest vs
-          // v2-digest-of-legacy-image); the full-state checksum stays as the raw legacy token for the log.
-          legacyImage: { turnResolution: events, checkpoint },
-          legacyDigest: checksum,
-          successorSeatSource: ownerResolved ? "owner-field" : "local-role-fallback",
-        });
-      }
-    }
+    // Shadow parity tap AFTER the legacy send (unchanged position) - a pure no-op unless a harness is active.
+    this.emitCoopV2TurnAuthority(epoch, wave, turn, events, checkpoint, checksum, authoritativeState);
     return true;
+  }
+
+  /**
+   * authority-v2 surface 1: build the v2 TURN_COMMIT input from the just-published turn image and drive the
+   * v2 authority path. In CUTOVER mode (authority.v2turn negotiated) the commit is the SOLE authority for the
+   * turn and this returns whether it committed; in shadow-only mode it runs the parity tap and returns false
+   * (legacy stays the authority). The stated next-command successor names the first live player field mon (a
+   * valid COMMAND address); when none is resolvable the v2 path is skipped (returns false) rather than
+   * committing a malformed successor - so legacy remains the fallback authority for that turn.
+   */
+  private emitCoopV2TurnAuthority(
+    epoch: number,
+    wave: number,
+    turn: number,
+    events: CoopBattleEvent[],
+    checkpoint: CoopBattleCheckpoint,
+    checksum: string,
+    authoritativeState: CoopAuthoritativeBattleStateV1,
+  ): boolean {
+    const cutoverActive = isCoopV2TurnCutoverActive();
+    if (!cutoverActive && !isCoopV2ShadowActive()) {
+      return false;
+    }
+    const commandSeat = authoritativeState.field.find(seat => seat.side === "player" && seat.pokemonId > 0);
+    if (commandSeat == null) {
+      return false;
+    }
+    // Deliverable 2: thread the REAL owner seat of the next-command mon. The authoritative field seat carries
+    // its owner ROLE; map it to the seat id (host=0, guest=1). When the seat carries no owner (an older host
+    // payload / genuinely unavailable), keep the best-effort local-role seat and MARK the record so the
+    // successor is never silently degraded.
+    const ownerResolved = commandSeat.owner != null;
+    const ownerSeatId = ownerResolved
+      ? commandSeat.owner === "guest"
+        ? 1
+        : 0
+      : this.transport.role === "host"
+        ? 0
+        : 1;
+    const input: CoopV2ShadowTurnTap = {
+      operationId: `TURN/e${epoch}/w${wave}/t${turn}`,
+      capture: { turnResolution: events, checkpoint },
+      nextCommand: {
+        epoch,
+        wave,
+        resolvedTurn: turn,
+        ownerSeatId,
+        pokemonId: commandSeat.pokemonId,
+      },
+      // Deliverable 1: fingerprint the LEGACY turn image (the resolution + checkpoint legacy just committed)
+      // through the SAME turn digest so parity compares like-for-like (v2 entry digest vs v2-digest-of-legacy-
+      // image); the full-state checksum stays as the raw legacy token for the log.
+      legacyImage: { turnResolution: events, checkpoint },
+      legacyDigest: checksum,
+      successorSeatSource: ownerResolved ? "owner-field" : "local-role-fallback",
+    };
+    if (cutoverActive) {
+      // CUTOVER: commit the v2 TURN_COMMIT as the sole authority. A non-null entry => committed (legacy becomes
+      // cosmetic); null => barred/fault, so legacy remains the authority for this turn (never dual, never none).
+      const committed = getActiveCoopV2TurnCutover()?.commitHostTurn(input) ?? null;
+      return committed != null;
+    }
+    // SHADOW-ONLY: the tap computes + compares alongside legacy; legacy stays the authority.
+    tapCoopV2ShadowTurnCommit(input);
+    return false;
   }
 
   /** Newest checkpoint capable of completing the exact replay-turn park, including its N+1 replacement. */
@@ -2250,6 +2319,14 @@ export class CoopBattleStreamer {
   /** GUEST: keep requesting one exact logical turn until its verified ACK clears the request. */
   requestTurnCommit(epoch: number, wave: number, turn: number, revision?: number): void {
     if (this.authorityTerminalStarted) {
+      return;
+    }
+    // authority-v2 turn CUTOVER: the v2 authority log owns tail requests + redelivery for the turn, and the
+    // guest applies the turn through the v2 replica pipeline. The legacy requestTurnCommit RE-REQUEST loop
+    // must NOT run for a negotiated session (the frozen "no second authority" rule) - a lost cosmetic carrier
+    // only stutters presentation; the v2 log redelivers the authoritative entry. No-op here, byte-identical
+    // to legacy when the cutover is not active.
+    if (isCoopV2TurnCutoverActive()) {
       return;
     }
     const request = { epoch, wave, turn, ...(revision === undefined ? {} : { revision }) };
