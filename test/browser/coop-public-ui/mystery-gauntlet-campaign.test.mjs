@@ -132,6 +132,20 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /observation\.stateDigest !== first\.stateDigest/u);
   assert.match(campaign, /duplicateWaves/u);
   assert.match(campaign, /ordinary encounters were not six distinct registry types/u);
+  // Track R run 29644735938 mystery lane: the ME driver never advanced the owner's post-pick narration.
+  // The between-wave loop must own a per-prompt-generation advancer for the owner's
+  // mystery-encounter:message prompts (host MysteryEncounterPhase / guest CoopReplayMePhase), keyed by
+  // phaseInstance in a consumed-instance set like createBattlePromptAdvancer, driven only for the seat
+  // that owns the surface (localSeat === ownerSeat, seatsWithInput includes it).
+  assert.match(campaign, /export function createMysteryNarrationAdvancer\(rig, from, stats, purpose\)/u);
+  assert.match(
+    campaign,
+    /surfaceId === "mystery-encounter:message"[\s\S]*?operationClass === "encounter-prompt"[\s\S]*?phase === "MysteryEncounterPhase" \|\| observation\.phase === "CoopReplayMePhase"/u,
+  );
+  assert.match(campaign, /observation\.localSeat === observation\.ownerSeat/u);
+  assert.match(campaign, /consumedInstances\.add\(`\$\{client\.label\}:\$\{surfaceId\}:\$\{phaseInstance\}`\)/u);
+  assert.match(campaign, /const advanceMysteryNarration = createMysteryNarrationAdvancer\(/u);
+  assert.match(campaign, /if \(await advanceMysteryNarration\(\)\) \{/u);
 });
 
 test("the continuity profile visibly declines Bargain and co-op cannot persist a half-open phase", async () => {

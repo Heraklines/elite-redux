@@ -576,6 +576,72 @@ export function createBattlePromptAdvancer(
 }
 
 /**
+ * Advance the OWNER's post-pick Mystery-encounter narration prompts.
+ *
+ * After the owner chooses an ME option the encounter types its outcome text as a chain of
+ * `mystery-encounter:message` prompts (operationClass "encounter-prompt", ownerModel "interaction").
+ * The authoritative host parks in MysteryEncounterPhase and the replaying guest in CoopReplayMePhase,
+ * BOTH awaiting the OWNER seat's advance. The between-wave battle-prompt advancer ignores these -
+ * they are not in BATTLE_PROMPT_PHASES - so nothing pressed them and both seats stalled until the
+ * deadline (run 29644735938). This presses Space once PER PROMPT GENERATION for the owner seat only,
+ * keyed by phaseInstance in a consumed-instance set exactly like createBattlePromptAdvancer (the
+ * product bumps phaseInstance per narration message, so distinct prompts are distinct). Only the
+ * owner client matches: its interaction surface stamps ownerSeat === localSeat and seatsWithInput =
+ * [ownerSeat], while the watcher's projection carries the same seatsWithInput = [ownerSeat] with its
+ * own localSeat != ownerSeat and is therefore never pressed - exactly a human at the owner seat.
+ */
+export function createMysteryNarrationAdvancer(rig, from, stats, purpose) {
+  const clients = Object.values(rig.clients);
+  const cursors = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
+  const consumedInstances = new Set();
+  return async () => {
+    for (const client of clients) {
+      const readyEvent = client.evidence.events.slice(cursors.get(client.label) ?? 0).find(event => {
+        if (event.kind !== "browser-surface2") {
+          return false;
+        }
+        const observation = event.observation;
+        const instanceKey = `${client.label}:${observation.surfaceId}:${observation.phaseInstance}`;
+        return (
+          observation.surfaceId === "mystery-encounter:message"
+          && observation.operationClass === "encounter-prompt"
+          && (observation.phase === "MysteryEncounterPhase" || observation.phase === "CoopReplayMePhase")
+          && observation.uiMode === "MESSAGE"
+          && observation.ownerModel === "interaction"
+          && observation.coop === true
+          && observation.localSeat === observation.ownerSeat
+          && observation.seatsWithInput?.includes(observation.ownerSeat)
+          && observation.seatsWithInput?.includes(observation.localSeat)
+          && Number.isSafeInteger(observation.phaseInstance)
+          && observation.ready?.handlerActive === true
+          && observation.ready?.awaitingActionInput === true
+          && !consumedInstances.has(instanceKey)
+        );
+      });
+      if (!readyEvent) {
+        continue;
+      }
+      cursors.set(client.label, readyEvent.index + 1);
+      const { surfaceId, phase, phaseInstance, ownerSeat } = readyEvent.observation;
+      consumedInstances.add(`${client.label}:${surfaceId}:${phaseInstance}`);
+      stats.mysteryNarrationPrompts = (stats.mysteryNarrationPrompts ?? 0) + 1;
+      client.evidence.record("campaign-mystery-narration-advance", {
+        surfaceId,
+        phase,
+        phaseInstance,
+        readyEventIndex: readyEvent.index,
+        promptOrdinal: stats.mysteryNarrationPrompts,
+        inputSeat: client.label,
+        ownerSeat,
+      });
+      await client.press("Space", `${purpose}-${client.label}-mystery-narration-${stats.mysteryNarrationPrompts}`);
+      return true;
+    }
+    return false;
+  };
+}
+
+/**
  * Bound a browser outcome wait by both a normal deadline and a larger hard ceiling while
  * allowing a newly observed real move-animation phase to refresh part of the budget.
  *
@@ -1676,6 +1742,15 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
     `wave-${waveOrdinal}-between-wave`,
     { requireSharedCommandAddress: false },
   );
+  // The owner's post-pick Mystery narration prompts (mystery-encounter:message) are not battle
+  // prompts, so advanceBattlePrompt ignores them; without this both seats park after the ME option
+  // pick (host in MysteryEncounterPhase, guest in CoopReplayMePhase) until the deadline.
+  const advanceMysteryNarration = createMysteryNarrationAdvancer(
+    rig,
+    commandCursors,
+    stats,
+    `wave-${waveOrdinal}-mystery-narration`,
+  );
   const deadline = Date.now() + rig.config.timeoutMs * 3;
   let stallSince = 0;
   let lastPhaseProgress = phaseProgressSignature(clients);
@@ -1732,6 +1807,14 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
     }
 
     if (await advanceBattlePrompt()) {
+      stallSince = 0;
+      lastRegisteredSurface = null;
+      lastPhaseProgress = phaseProgressSignature(clients);
+      drivenSurfacePhaseSignature = lastPhaseProgress;
+      continue;
+    }
+
+    if (await advanceMysteryNarration()) {
       stallSince = 0;
       lastRegisteredSurface = null;
       lastPhaseProgress = phaseProgressSignature(clients);
@@ -1890,6 +1973,7 @@ export async function runCampaign(rig) {
         fallbackTurns: 0,
         battleMessagePrompts: 0,
         postBattleExpPrompts: 0,
+        mysteryNarrationPrompts: 0,
         surfaces: [],
         // One ME can hand off to a battle at the same wave and finish only after the next outer
         // battle-loop iteration. The ledger must therefore outlive any individual stats record.

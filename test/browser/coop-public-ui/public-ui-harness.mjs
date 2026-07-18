@@ -28,6 +28,13 @@ const POST_GAME_OVER_PHASE = /Start Phase PostGameOverPhase/u;
 const REWARD_OWNER = /OWNER drives reward screen/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
+// A replacement pick has COMMITTED once either the picker logs its choice or the send-out summon
+// starts. Once this appears the picker's action submenu never reappears, so a drive that keeps
+// waiting for a send-out menu after it would hang forever (run 29644735938, 30-wave lane).
+const REPLACEMENT_PICK_COMMITTED = /faint picker PICK|Start Phase SwitchSummonPhase/u;
+const REPLACEMENT_PICKER_OPEN = /Start Phase (?:SwitchPhase|CoopGuestFaintSwitchPhase)|guest own-faint picker OPEN/u;
+// Distinct resolution sentinel for the send-out-menu wait: the authority committed the pick under us.
+const REPLACEMENT_DRIVE_SUPERSEDED = Symbol("replacement-drive-superseded");
 const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) wave=(\d+) turn=(\d+) rev=(\d+)/u;
 const SHARED_SESSION_TERMINAL = /\[coop:runtime\] shared session (?:terminal requested|stopped safely):/u;
 const LAUNCH_SNAPSHOT_ABORT = /launchSnapshotAbort wave=\d+ reason=/u;
@@ -334,6 +341,36 @@ function findOwnedReadyReward(client, from) {
 
 function findOwnedReadyReplacement(client, from) {
   return findOwnedActionableReplacementSurface(client, from);
+}
+
+/**
+ * The evidence index at which THIS owner's faint replacement picker OPENED: the earliest of the
+ * first `party:replacement` semantic surface and the SwitchPhase / CoopGuestFaintSwitchPhase start
+ * (or the guest own-faint picker OPEN marker) at-or-after the faint cursor. The picker drive builds
+ * a FRESH createBattlePromptAdvancer with an empty consumed-instance set, so scanning it from the
+ * pre-faint cursor re-matched the already-consumed pre-picker "X fainted" battle:message and pressed
+ * Space again, falling THROUGH the picker's MESSAGE intro into the PARTY UI, selecting the default
+ * slot -> a submenu with no send-out -> a ~116s Backspace recovery that blew the 60s host auto-pick
+ * (run 29644735938, dirty lane). Gating the advancer's from-cursor here confines it to narration
+ * prompts born at-or-after picker open; before the picker exists it stays at the faint cursor.
+ */
+function findReplacementPickerOpenIndex(owner, fromCursor) {
+  const from = Math.max(0, fromCursor ?? 0);
+  for (let i = from; i < owner.evidence.events.length; i++) {
+    const event = owner.evidence.events[i];
+    if (
+      (event.kind === "browser-surface2" && event.observation?.surfaceId === "party:replacement")
+      || REPLACEMENT_PICKER_OPEN.test(event.text ?? "")
+    ) {
+      return i;
+    }
+  }
+  return from;
+}
+
+/** Stable per-faint-window identity for a committed replacement pick (owner seat + picker address). */
+function replacementPickerCommitKey(owner, address) {
+  return `${owner.label}:${address?.epoch ?? "?"}:${address?.wave ?? "?"}:${address?.turn ?? "?"}`;
 }
 
 function sameAddress(left, right) {
@@ -1584,6 +1621,11 @@ export class DuoPublicUiRig {
     this.tracePage = null;
     this.traceGeneration = 0;
     this.replacementCount = 0;
+    // Owner+address keys for replacement picks already committed this session. A staggered double
+    // faint / late-picker path can re-enter driveOwnedReplacementPicker for a pick the authority (or a
+    // prior drive) already committed; guarding on this prevents a second nav-submit that would hang
+    // forever on a send-out submenu that never reappears (run 29644735938, 30-wave lane).
+    this.committedReplacementPickers = new Set();
     this.lastSharedSurfaceAddress = new Map();
     this.activeBattleWave = null;
     this.pairRoleCursors = null;
@@ -2905,6 +2947,11 @@ export class DuoPublicUiRig {
           continue;
         }
         await this.driveOwnedReplacementPicker(client, from);
+        // Advance this client's scan floor past the just-driven picker. driveOwnedReplacementPicker
+        // short-circuits an already-committed re-entry without emitting a new surface, so leaving the
+        // pre-picker scan cursor would re-detect the same stale actionable party:replacement and busy
+        // loop; a real player resumes from the completed replacement boundary.
+        from[client.label] = client.evidence.cursor();
         outcomeCursors[client.label] = client.evidence.cursor();
         droveReplacement = true;
         break;
@@ -3190,7 +3237,12 @@ export class DuoPublicUiRig {
    * applied drive; the caller owns the shared replacement-applied checkpoint.
    */
   async driveOwnedReplacementPicker(owner, replacementCursors) {
-    const advanceBattlePrompt = createBattlePromptAdvancer(this, replacementCursors, {}, "faint-replacement-picker");
+    // Gate the fresh battle-prompt advancer to THIS owner's picker-open index so it can only match
+    // narration prompts born at-or-after the picker opened; scanning from the pre-faint cursor
+    // re-pressed an already-consumed pre-picker battle:message straight through into the PARTY UI.
+    const pickerOpenIndex = findReplacementPickerOpenIndex(owner, replacementCursors[owner.label] ?? 0);
+    const advancerCursors = { ...replacementCursors, [owner.label]: pickerOpenIndex };
+    const advanceBattlePrompt = createBattlePromptAdvancer(this, advancerCursors, {}, "faint-replacement-picker");
     const deadline = Date.now() + this.config.timeoutMs;
     let replacementSurface = null;
     while (Date.now() < deadline) {
@@ -3225,6 +3277,19 @@ export class DuoPublicUiRig {
     if (replacementSurface == null) {
       throw new Error(`${owner.label}: timed out waiting for an actionable owned replacement picker`);
     }
+    // RE-ENTRY GUARD: a staggered double faint / late-picker path can call this again for a pick the
+    // authority (or a prior drive) already committed. The stale actionable surface predates the commit,
+    // so nav-submitting the slot again would open no action submenu and hang forever on a send-out menu
+    // that never reappears. Short-circuit an already-committed owner+address pick as a completed drive.
+    const committedKey = replacementPickerCommitKey(owner, replacementSurface.observation.address);
+    if (this.committedReplacementPickers.has(committedKey)) {
+      owner.evidence.record("replacement-drive-skipped-committed", {
+        committedKey,
+        phase: replacementSurface.observation.phase,
+        address: replacementSurface.observation.address,
+      });
+      return;
+    }
     const targetOptionId = replacementTargetOptionId(replacementSurface.observation);
     if (targetOptionId == null) {
       throw new Error(
@@ -3243,6 +3308,11 @@ export class DuoPublicUiRig {
       // Probe from the drive's ORIGIN cursor: the authority can commit while the driver is still
       // polling for an actionable surface, i.e. BEFORE replacementCursor was even taken.
       owner.evidence.find(/own-faint picker CLOSE from committed authority/u, replacementCursors[owner.label]);
+    // The pick is committed once this drive's own send-out lands (REPLACEMENT_PICK_COMMITTED after
+    // replacementCursor) or the authority closes the picker from under us. Either way the action
+    // submenu will never reappear, so the send-out-menu wait must stop instead of hanging.
+    const pickCommitted = () =>
+      owner.evidence.find(REPLACEMENT_PICK_COMMITTED, replacementCursor) ?? supersededByAuthority();
     try {
       await selectOptionById(owner, {
         surfaceId: "party:replacement",
@@ -3254,6 +3324,10 @@ export class DuoPublicUiRig {
       });
       const sendOutSurface = await owner.evidence.waitForCondition(
         sink => {
+          // Pick committed under us -> stop waiting for a send-out menu that will never reappear.
+          if (pickCommitted() != null) {
+            return REPLACEMENT_DRIVE_SUPERSEDED;
+          }
           const event = sink.findLastSemanticSurface(replacementCursor, "party:replacement");
           return event?.observation.optionIds?.includes("party-option:send-out") ? event : null;
         },
@@ -3262,24 +3336,34 @@ export class DuoPublicUiRig {
           description: `replacement action menu for ${targetOptionId}`,
         },
       );
-      await selectOptionById(owner, {
-        surfaceId: "party:replacement",
-        targetId: "party-option:send-out",
-        navKeys: ["ArrowDown", "ArrowUp"],
-        submitKey: "Space",
-        timeoutMs: this.config.timeoutMs,
-        fromCursor: sendOutSurface.index,
-      });
-      await owner.evidence.waitFor(/faint picker PICK|Start Phase SwitchSummonPhase/u, {
-        from: replacementCursor,
-        timeoutMs: this.config.timeoutMs,
-        description: "replacement pick/summon evidence",
-      });
-      owner.evidence.record("replacement-selection-proof", {
-        targetOptionId,
-        phase: replacementSurface.observation.phase,
-        address: replacementSurface.observation.address,
-      });
+      if (sendOutSurface === REPLACEMENT_DRIVE_SUPERSEDED) {
+        owner.evidence.record("replacement-superseded-by-authority", {
+          attemptedTargetOptionId: targetOptionId,
+          authorityClose: supersededByAuthority()?.text ?? null,
+          phase: replacementSurface.observation.phase,
+          address: replacementSurface.observation.address,
+          driveError: null,
+        });
+      } else {
+        await selectOptionById(owner, {
+          surfaceId: "party:replacement",
+          targetId: "party-option:send-out",
+          navKeys: ["ArrowDown", "ArrowUp"],
+          submitKey: "Space",
+          timeoutMs: this.config.timeoutMs,
+          fromCursor: sendOutSurface.index,
+        });
+        await owner.evidence.waitFor(REPLACEMENT_PICK_COMMITTED, {
+          from: replacementCursor,
+          timeoutMs: this.config.timeoutMs,
+          description: "replacement pick/summon evidence",
+        });
+        owner.evidence.record("replacement-selection-proof", {
+          targetOptionId,
+          phase: replacementSurface.observation.phase,
+          address: replacementSurface.observation.address,
+        });
+      }
     } catch (error) {
       const superseded = supersededByAuthority();
       if (superseded == null) {
@@ -3293,6 +3377,9 @@ export class DuoPublicUiRig {
         driveError: error instanceof Error ? error.message : String(error),
       });
     }
+    // Record the committed pick BEFORE bumping the count so a re-entry for this same owner+address
+    // window short-circuits above instead of nav-submitting the same slot again.
+    this.committedReplacementPickers.add(committedKey);
     this.replacementCount += 1;
   }
 
