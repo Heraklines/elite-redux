@@ -1165,6 +1165,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) New game over an occupied SOLO slot overwrites (does not boot to title)",
+    description:
+      "SAVE-SLOT flow fix (P0, not a battle behavior) - starting a NEW run and overwriting an\n"
+      + "occupied SOLO save slot silently failed with 'Local/cloud checkpoint bytes differ; refusing\n"
+      + "ambiguous delete' and booted straight back to the title. The overwrite delete compared local\n"
+      + "vs cloud bytes and dead-ended on ANY divergence (which deploy churn caused for most testers).\n"
+      + "An EXPLICIT user overwrite of a solo slot now proceeds and clears both copies; co-op slots and\n"
+      + "automatic/background clears keep the strict guard.\n"
+      + "DO (this is a TITLE-SCREEN check, ignore the throwaway battle you spawn into): from the title,\n"
+      + "start a NEW game, pick a starter, and on the save-slot screen choose a slot that ALREADY has a\n"
+      + "solo run. Confirm the overwrite.\n"
+      + "EXPECT: the run STARTS (wave 1) instead of flashing back to the title. Deleting a solo run and\n"
+      + "starting into an EMPTY slot still work. Unit-tested in\n"
+      + "test/tests/elite-redux/er-solo-overwrite-divergence.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 5,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Eternal Floette shows its ER kit (Energy Tap + 3 innates)",
     description:
       "KIT fix (starter / summary / battle surface) - Eternal Floette (the vanilla ETERNAL_FLOETTE\n"
