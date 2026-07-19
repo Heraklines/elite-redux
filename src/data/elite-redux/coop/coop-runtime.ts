@@ -4157,6 +4157,29 @@ function matchingCoopV2WaveTransaction(
 }
 
 /**
+ * Release the real turn finalizer parked by a null-successor TURN_COMMIT. The successor's live adapter must
+ * call this only after installing its own phase wake or stream carrier, so Phaser can never fall through an
+ * empty queue into a locally-derived command.
+ */
+function releaseCoopV2ParkedTurnBoundary(runtime: CoopRuntime, entry: CoopAuthorityEntry): boolean {
+  if (active !== runtime || runtime.controller.authorityRole !== "replica") {
+    return false;
+  }
+  const phase = globalScene.phaseManager?.getCurrentPhase() as
+    | {
+        releaseForCoopV2Successor?: (successor: { sessionEpoch: number; revision: number; kind: string }) => boolean;
+      }
+    | undefined;
+  return (
+    phase?.releaseForCoopV2Successor?.({
+      sessionEpoch: entry.context.sessionEpoch,
+      revision: entry.revision,
+      kind: entry.kind,
+    }) === true
+  );
+}
+
+/**
  * MIGRATION: this is the one remaining ambient bridge for the existing Phaser wave-tail factory. The
  * transaction and destination runtime are captured before delivery; the callback runs only after
  * setCoopRuntime installs that runtime's scene/op selectors together.
@@ -4284,6 +4307,10 @@ function applyCoopV2WaveEntry(runtime: CoopRuntime, entry: CoopAuthorityEntry): 
       });
     }
   }
+  // bootstrapCoopV2WaveTransaction appends the exact safe-boundary wake before this release. If the
+  // TURN_COMMIT finalized before this entry arrived, dissolve that parked finalizer now so the wake is
+  // next; if the wave was already buffered, finishTurn consumes it synchronously and this is a no-op.
+  releaseCoopV2ParkedTurnBoundary(runtime, entry);
   if (transaction.bootstrapProjected && globalScene.phaseManager?.getCurrentPhase()?.phaseName === "BattleEndPhase") {
     applyCoopV2WaveDataAtBoundary(runtime, transaction);
   }
@@ -4482,6 +4509,10 @@ function buildCoopV2LiveSeams(
             return true;
           }
           runtime.battleStream.ingestAuthoritativeV2Replacement(checkpoint);
+          // The checkpoint is now retained in the correct replica stream. Release a preceding
+          // null-successor turn only after that carrier exists, allowing the normal TurnInit/replay path
+          // to consume it without opening a phantom command first.
+          releaseCoopV2ParkedTurnBoundary(runtime, entry);
           return "deferred";
         }
         const payload = entry.material.payload as TurnResolutionImage | undefined;

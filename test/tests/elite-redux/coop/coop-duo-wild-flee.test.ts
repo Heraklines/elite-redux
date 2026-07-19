@@ -128,7 +128,8 @@ describe.skipIf(!RUN)("#838 VERIFY-1: co-op wild-flee wave-advance broadcast", (
       driveClientPhaseQueueTo(rig.guestScene, "guest-owned next-wave CommandPhase", {
         matches: phase =>
           phase.phaseName === "CommandPhase"
-          && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+          && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX
+          && rig.guestScene.currentBattle.waveIndex === 2,
       }),
     );
     expect(guestCommand.phaseName, "the guest crossed its real flee tail to CommandPhase").toBe("CommandPhase");

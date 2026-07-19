@@ -928,6 +928,9 @@ export class CoopFinalizeTurnPhase extends Phase {
   private presentationSettled = false;
   private turnCommitDeadline = 0;
   private ended = false;
+  /** A V2 TURN with no stated immediate control remains current until the next ordered entry installs a wake. */
+  private awaitingAuthoritySuccessor = false;
+  private authoritySuccessorMachineWaitEnd: (() => void) | null = null;
   private supersedingCheckpoint: CoopCheckpointEnvelope | null | undefined;
   private turnCommitSupersededBy: CoopCheckpointEnvelope | undefined;
 
@@ -1056,12 +1059,39 @@ export class CoopFinalizeTurnPhase extends Phase {
 
   public override end(): void {
     this.ended = true;
+    this.awaitingAuthoritySuccessor = false;
+    this.authoritySuccessorMachineWaitEnd?.();
+    this.authoritySuccessorMachineWaitEnd = null;
     this.clearTurnCommitRetry();
     this.authorityFailureUnsubscribe?.();
     this.authorityFailureUnsubscribe = null;
     this.presentationDeadlineCancel?.();
     this.presentationDeadlineCancel = null;
     super.end();
+  }
+
+  /**
+   * Release a null-successor TURN only after its next ordered Authority V2 entry has installed the engine
+   * wake/carrier that will run next. Ending sooner lets an empty Phaser queue manufacture a phantom
+   * TurnInit/CommandPhase for the old wave; ending later leaves the installed successor stuck behind this
+   * finalizer. The global revision and authenticated epoch are the causal fence.
+   */
+  public releaseForCoopV2Successor(successor: { sessionEpoch: number; revision: number; kind: string }): boolean {
+    if (
+      !this.awaitingAuthoritySuccessor
+      || this.ended
+      || successor.sessionEpoch !== this.epoch
+      || this.revision == null
+      || successor.revision <= this.revision
+    ) {
+      return false;
+    }
+    coopLog(
+      "v2-turn",
+      `guest release parked turn=${this.turn} rev=${this.revision} for ${successor.kind} rev=${successor.revision}`,
+    );
+    this.end();
+    return true;
   }
 
   private isModernTurnCommit(): boolean {
@@ -1724,9 +1754,14 @@ export class CoopFinalizeTurnPhase extends Phase {
         // Authority V2 explicitly stated that this TURN_COMMIT has no immediate COMMAND successor. The
         // following ordered WAVE_ADVANCE / REPLACEMENT_COMMIT / INTERACTION_COMMIT owns progression. If it
         // was already buffered, completeModernTurnCommit's safe-boundary retry admitted it synchronously;
-        // otherwise its retained delivery will append the appropriate engine wake. Ending this finalizer
-        // without incrementing is the intentional parked boundary: a renderer may never manufacture turn
-        // N+1 while waiting for the authority's next global revision.
+        // otherwise its retained delivery will install the appropriate engine wake and explicitly release
+        // this phase. Keep the finalizer CURRENT: calling end() on an empty queue makes Phaser manufacture
+        // TurnInit -> Command for the old wave, which can permanently block a slightly-later wave/replacement
+        // wake behind human input.
+        this.awaitingAuthoritySuccessor = true;
+        this.authoritySuccessorMachineWaitEnd ??= beginCoopMachineWait(
+          `authority-v2-successor:w${wave}:t${this.turn}:r${this.revision ?? "?"}`,
+        );
         coopLog(
           "v2-turn",
           `guest finalize turn=${this.turn}: no immediate command successor; waiting for next ordered authority entry`,
@@ -1760,6 +1795,10 @@ export class CoopFinalizeTurnPhase extends Phase {
         error,
       );
       failCoopSharedSession(`Could not finalize authoritative turn ${this.turn}.`);
+    }
+    if (this.awaitingAuthoritySuccessor) {
+      coopLog("replay", `guest finalize turn=${this.turn}: PARKED for ordered Authority V2 successor`);
+      return;
     }
     coopLog("replay", `guest finalize turn=${this.turn}: END (checkpoint applied, turn-end queued)`);
     this.end();
