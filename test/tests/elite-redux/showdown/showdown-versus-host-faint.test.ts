@@ -54,6 +54,7 @@ import {
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
+  materializeMirroredGuestInputTurn,
   type ShowdownDuoRig,
   withClient,
   withClientSync,
@@ -176,6 +177,10 @@ describe.skipIf(!RUN)("Showdown versus - HOST-faints replacement ordering (two-e
   async function driveGuestToCommand(
     rig: ShowdownDuoRig,
   ): Promise<{ commandOpened: boolean; enemyAtCommand: { sp: number; fainted: boolean; active: boolean } }> {
+    // The direct two-engine fixture deliberately skips the real pre-pairing login/title walk. Materialize
+    // only that missing boot edge, then let the actual TurnInit -> TurnStart -> CoopReplay queue expose the
+    // post-replacement CommandPhase exactly as production does.
+    materializeMirroredGuestInputTurn(rig.guestScene);
     const command = await driveClientPhaseQueueTo(rig.guestScene, "CommandPhase");
     command.start();
     await drainLoopback();
