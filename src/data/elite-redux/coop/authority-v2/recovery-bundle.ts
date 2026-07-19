@@ -28,15 +28,37 @@
 // ENGINE-FREE: pure data + a pure validator. No Phaser, no globalScene.
 // =============================================================================
 
+import { isSameSessionIdentity, isValidAuthorityEntry } from "#data/elite-redux/coop/authority-v2/authority-entry";
 import type {
   CoopAuthoritativeMaterial,
   CoopAuthorityEntry,
   CoopFrameContextV2,
   CoopNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import { controlsEqual, validateNextControl } from "#data/elite-redux/coop/authority-v2/next-control";
+
+/** One exact, correlated request minted by the recovering replica after its fence is held. */
+export interface CoopRecoveryRequestV2 {
+  readonly requestId: string;
+  readonly capturedFrontier: number;
+  readonly reason: string;
+}
+
+/**
+ * Mechanical completion proof for a recovery request. This closes bundle retransmission only; it never
+ * retires AuthorityLog entries. Ordinary exact-operation receipts still retire the sole retained log.
+ */
+export interface CoopRecoveryAppliedProofV2 {
+  readonly requestId: string;
+  readonly frontier: number;
+  readonly materialDigest: string;
+  readonly controlId?: string;
+}
 
 /** The requested, validated-before-applied recovery snapshot. */
 export interface CoopRecoveryBundle {
+  /** Exact request this response answers; delayed bundles cannot satisfy a later transaction. */
+  readonly requestId: string;
   /** The frame context the image was cut on (epoch / membership / seatMap). */
   readonly context: CoopFrameContextV2;
   /** The canonical state image to install. */
@@ -78,12 +100,21 @@ function frameMismatchReason(bundle: CoopFrameContextV2, live: CoopFrameContextV
   if (bundle.membershipRevision !== live.membershipRevision) {
     return `membership ${bundle.membershipRevision} != ${live.membershipRevision}`;
   }
+  if (bundle.authoritySeatId !== live.authoritySeatId) {
+    return `authority seat ${bundle.authoritySeatId} != ${live.authoritySeatId}`;
+  }
+  if (bundle.senderSeatId !== bundle.authoritySeatId) {
+    return `sender seat ${bundle.senderSeatId} is not authority ${bundle.authoritySeatId}`;
+  }
   return;
 }
 
 /** The required tail must be strictly increasing and land exactly on the frontier. */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: this is the one atomic validator for every tail identity, ordering, and successor invariant
 function tailInconsistencyReason(
   tail: readonly CoopAuthorityEntry[],
+  bundleContext: CoopFrameContextV2,
+  nextControl: CoopNextControl,
   capturedFrontier: number,
   frontier: number,
 ): string | undefined {
@@ -92,14 +123,36 @@ function tailInconsistencyReason(
     return frontier === capturedFrontier ? undefined : `empty tail cannot span (${capturedFrontier}, ${frontier}]`;
   }
   let previous = capturedFrontier;
+  const operationIds = new Set<string>();
   for (const entry of tail) {
-    if (entry.revision <= previous) {
-      return `tail revision ${entry.revision} not strictly after ${previous}`;
+    if (!isValidAuthorityEntry(entry)) {
+      return "tail entry is malformed";
     }
+    if (
+      !isSameSessionIdentity(entry.context, bundleContext)
+      || entry.context.sessionEpoch !== bundleContext.sessionEpoch
+      || entry.context.membershipRevision !== bundleContext.membershipRevision
+      || entry.context.senderSeatId !== bundleContext.senderSeatId
+      || entry.context.authoritySeatId !== bundleContext.authoritySeatId
+      || entry.context.connectionGeneration !== bundleContext.connectionGeneration
+    ) {
+      return `tail revision ${entry.revision} has a different authority frame context`;
+    }
+    if (entry.revision !== previous + 1) {
+      return `tail revision ${entry.revision} is not contiguous after ${previous}`;
+    }
+    if (operationIds.has(entry.operationId)) {
+      return `tail operation ${entry.operationId} is duplicated`;
+    }
+    operationIds.add(entry.operationId);
     previous = entry.revision;
   }
   if (previous !== frontier) {
     return `tail ends at ${previous}, not frontier ${frontier}`;
+  }
+  const finalEntry = tail.at(-1);
+  if (finalEntry == null || !controlsEqual(finalEntry.nextControl, nextControl)) {
+    return "tail final nextControl does not match the recovery successor";
   }
   return;
 }
@@ -113,7 +166,11 @@ export function validateRecoveryBundle(
   bundle: CoopRecoveryBundle,
   live: CoopFrameContextV2,
   capturedFrontier: number,
+  expectedRequestId: string,
 ): CoopRecoveryBundleValidation {
+  if (bundle.requestId !== expectedRequestId || expectedRequestId.length === 0) {
+    return { kind: "mismatch", reason: `request ${bundle.requestId} != ${expectedRequestId}` };
+  }
   const frameReason = frameMismatchReason(bundle.context, live);
   if (frameReason !== undefined) {
     return { kind: "mismatch", reason: `frame ${frameReason}` };
@@ -125,6 +182,15 @@ export function validateRecoveryBundle(
       kind: "mismatch",
       reason: `bundle membership ${bundle.membershipRevision} != context ${bundle.context.membershipRevision}`,
     };
+  }
+  if (
+    !Number.isSafeInteger(bundle.frontier)
+    || bundle.frontier < 0
+    || typeof bundle.material?.digest !== "string"
+    || bundle.material.digest.length === 0
+    || (bundle.nextControl != null && !validateNextControl(bundle.nextControl).ok)
+  ) {
+    return { kind: "mismatch", reason: "bundle frontier, material, or nextControl is malformed" };
   }
 
   // The load-bearing staleness gate: a snapshot that does not prove progress
@@ -139,7 +205,13 @@ export function validateRecoveryBundle(
     };
   }
 
-  const tailReason = tailInconsistencyReason(bundle.requiredTail, capturedFrontier, bundle.frontier);
+  const tailReason = tailInconsistencyReason(
+    bundle.requiredTail,
+    bundle.context,
+    bundle.nextControl,
+    capturedFrontier,
+    bundle.frontier,
+  );
   if (tailReason !== undefined) {
     return { kind: "mismatch", reason: `tail ${tailReason}` };
   }

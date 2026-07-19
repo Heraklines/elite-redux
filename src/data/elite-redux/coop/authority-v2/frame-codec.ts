@@ -28,10 +28,13 @@
 // =============================================================================
 
 import type {
+  CoopAuthoritativeMaterial,
   CoopAuthorityEntry,
   CoopAuthorityReceipt,
   CoopFrameContextV2,
+  CoopNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import type { CoopRecoveryAppliedProofV2 } from "#data/elite-redux/coop/authority-v2/recovery-bundle";
 
 /** The single-source v2 wire protocol version. Bump when the envelope shape changes. */
 export const COOP_FRAME_PROTOCOL_VERSION = 2 as const;
@@ -43,6 +46,7 @@ export type CoopFrameTypeV2 =
   | "tailRequest"
   | "recoveryRequest"
   | "recoveryBundle"
+  | "recoveryApplied"
   | "terminal";
 
 /** The exhaustive frame-type set, iterable for recognition + tests. */
@@ -52,6 +56,7 @@ export const COOP_FRAME_TYPES_V2: readonly CoopFrameTypeV2[] = [
   "tailRequest",
   "recoveryRequest",
   "recoveryBundle",
+  "recoveryApplied",
   "terminal",
 ];
 
@@ -77,15 +82,26 @@ export interface CoopTailRequestBodyV2 {
 
 /** recoveryRequest body: the recovering peer requests a bundle for its captured frontier. */
 export interface CoopRecoveryRequestBodyV2 {
+  readonly requestId: string;
   readonly capturedFrontier: number;
   readonly reason: string;
 }
 
-/** recoveryBundle body: the authority's response - a proven frontier + the entries to apply. */
+/**
+ * recoveryBundle body: the authority's correlated atomic snapshot. The envelope supplies the authority
+ * context for the bundle and each required-tail entry; repeated/spoofable nested contexts stay off wire.
+ */
 export interface CoopRecoveryBundleBodyV2 {
+  readonly requestId: string;
+  readonly material: CoopAuthoritativeMaterial;
   readonly frontier: number;
-  readonly entries: readonly CoopAuthorityEntryBodyV2[];
+  readonly membershipRevision: number;
+  readonly nextControl: CoopNextControl;
+  readonly requiredTail: readonly CoopAuthorityEntryBodyV2[];
 }
+
+/** recoveryApplied body: correlated completion proof; never an AuthorityLog retirement receipt. */
+export type CoopRecoveryAppliedBodyV2 = CoopRecoveryAppliedProofV2;
 
 /** terminal body: a classified shared-terminal statement ending mechanical liveness. */
 export interface CoopTerminalBodyV2 {
@@ -108,6 +124,7 @@ export type CoopFrameV2 =
   | CoopFrameEnvelopeV2<"tailRequest", CoopTailRequestBodyV2>
   | CoopFrameEnvelopeV2<"recoveryRequest", CoopRecoveryRequestBodyV2>
   | CoopFrameEnvelopeV2<"recoveryBundle", CoopRecoveryBundleBodyV2>
+  | CoopFrameEnvelopeV2<"recoveryApplied", CoopRecoveryAppliedBodyV2>
   | CoopFrameEnvelopeV2<"terminal", CoopTerminalBodyV2>;
 
 // ---------------------------------------------------------------------------

@@ -23,7 +23,6 @@ import type { BattleScene } from "#app/battle-scene";
 import type {
   CoopAuthorityEntry,
   CoopAuthorityLog,
-  CoopAuthorityReceipt,
   CoopControlInstallResult,
   CoopControlProjector,
   CoopFrameContextV2,
@@ -38,7 +37,10 @@ import {
   type CoopRecoveryTransactionDeps,
   createRecoveryTransaction,
 } from "#data/elite-redux/coop/authority-v2/recovery";
-import type { CoopRecoveryBundle } from "#data/elite-redux/coop/authority-v2/recovery-bundle";
+import type {
+  CoopRecoveryAppliedProofV2,
+  CoopRecoveryBundle,
+} from "#data/elite-redux/coop/authority-v2/recovery-bundle";
 import { validateRecoveryBundle } from "#data/elite-redux/coop/authority-v2/recovery-bundle";
 import { createRecoveryFence } from "#data/elite-redux/coop/authority-v2/recovery-fence";
 import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
@@ -137,9 +139,13 @@ const FRAME: CoopFrameContextV2 = {
   sessionEpoch: 3,
   seatMapId: "map-1",
   membershipRevision: 2,
-  senderSeatId: 1,
+  senderSeatId: 0,
   authoritySeatId: 0,
   connectionGeneration: 1,
+};
+const REPLICA_FRAME: CoopFrameContextV2 = {
+  ...FRAME,
+  senderSeatId: 1,
 };
 
 const COMMAND_CONTROL: NonNullable<CoopNextControl> = {
@@ -164,6 +170,7 @@ function entry(revision: number): CoopAuthorityEntry {
 
 function makeBundle(overrides: Partial<CoopRecoveryBundle> = {}): CoopRecoveryBundle {
   return {
+    requestId: "recovery-1",
     context: FRAME,
     material: { digest: "material-digest", payload: { hp: 42 } },
     frontier: 12,
@@ -219,7 +226,7 @@ function makeHarness(
   const ctx = makeCtx(scheduler, new AbortController().signal);
   const phases: CoopRecoveryPhase[] = [];
   const applyMaterial = vi.fn(async () => opts.applyResult ?? true);
-  const acknowledge = vi.fn((_ctx: CoopRuntimeContext, _receipt: CoopAuthorityReceipt) => {});
+  const acknowledge = vi.fn((_ctx: CoopRuntimeContext, _proof: CoopRecoveryAppliedProofV2) => {});
   const project = vi.fn((): CoopControlInstallResult => opts.projectResult ?? INSTALLED);
   const projector: CoopControlProjector = { project };
   const fence = opts.fence ?? createRecoveryFence();
@@ -227,7 +234,9 @@ function makeHarness(
     log,
     projector,
     fence,
-    frame: () => FRAME,
+    frame: () => REPLICA_FRAME,
+    requestId: "recovery-1",
+    reason: "unit-test",
     request,
     applyMaterial,
     acknowledge,
@@ -253,29 +262,62 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void; reje
 describe("authority-v2 recovery bundle validation", () => {
   it("classifies a frame mismatch as mismatch", () => {
     const bundle = makeBundle({ context: { ...FRAME, sessionEpoch: 99 } });
-    const verdict = validateRecoveryBundle(bundle, FRAME, 10);
+    const verdict = validateRecoveryBundle(bundle, REPLICA_FRAME, 10, "recovery-1");
     expect(verdict.kind).toBe("mismatch");
   });
 
   it("classifies a frontier behind the captured one as stale, never valid", () => {
     const bundle = makeBundle({ frontier: 8, requiredTail: [] });
-    const verdict = validateRecoveryBundle(bundle, FRAME, 10);
+    const verdict = validateRecoveryBundle(bundle, REPLICA_FRAME, 10, "recovery-1");
     expect(verdict.kind).toBe("stale");
   });
 
   it("accepts a contiguous forward bundle", () => {
-    expect(validateRecoveryBundle(makeBundle(), FRAME, 10).kind).toBe("valid");
+    expect(validateRecoveryBundle(makeBundle(), REPLICA_FRAME, 10, "recovery-1").kind).toBe("valid");
   });
 
   it("rejects a non-contiguous required tail", () => {
     const bundle = makeBundle({ requiredTail: [entry(11), entry(14)] });
-    expect(validateRecoveryBundle(bundle, FRAME, 10).kind).toBe("mismatch");
+    expect(validateRecoveryBundle(bundle, REPLICA_FRAME, 10, "recovery-1").kind).toBe("mismatch");
+  });
+
+  it("rejects a delayed bundle from another request before applying material", () => {
+    const bundle = makeBundle({ requestId: "older-request" });
+    expect(validateRecoveryBundle(bundle, REPLICA_FRAME, 10, "recovery-1")).toMatchObject({
+      kind: "mismatch",
+      reason: expect.stringContaining("older-request"),
+    });
+  });
+
+  it("requires every recovery bundle and tail entry to be authority-signed", () => {
+    const replicaSigned = { ...FRAME, senderSeatId: 1 };
+    expect(
+      validateRecoveryBundle(makeBundle({ context: replicaSigned }), REPLICA_FRAME, 10, "recovery-1"),
+    ).toMatchObject({
+      kind: "mismatch",
+      reason: expect.stringContaining("not authority"),
+    });
+    expect(
+      validateRecoveryBundle(
+        makeBundle({ requiredTail: [entry(11), { ...entry(12), context: replicaSigned }] }),
+        REPLICA_FRAME,
+        10,
+        "recovery-1",
+      ),
+    ).toMatchObject({
+      kind: "mismatch",
+      reason: expect.stringContaining("different authority frame context"),
+    });
   });
 });
 
 describe("authority-v2 recovery transaction", () => {
   it("happy path reaches 'recovered' with the frozen phases in order", async () => {
-    const h = makeHarness(async () => makeBundle());
+    const requestSeen = vi.fn();
+    const h = makeHarness(async (_ctx, request) => {
+      requestSeen(request);
+      return makeBundle();
+    });
     const txn = createRecoveryTransaction(h.ctx, h.deps);
 
     const result = await txn.run();
@@ -297,11 +339,18 @@ describe("authority-v2 recovery transaction", () => {
     expect(h.applyMaterial).toHaveBeenCalledTimes(1);
     expect(h.log.adopted).toEqual([12]);
     expect(h.project).toHaveBeenCalledTimes(1);
-    // ACK carries controlInstalled because nextControl was non-null.
-    const receipt = h.acknowledge.mock.calls[0][1] as CoopAuthorityReceipt;
-    expect(receipt.stage).toBe("controlInstalled");
-    expect(receipt.controlId).toBe("ctrl-1");
-    expect(receipt.revision).toBe(12);
+    expect(requestSeen).toHaveBeenCalledWith({
+      requestId: "recovery-1",
+      capturedFrontier: 10,
+      reason: "unit-test",
+    });
+    const proof = h.acknowledge.mock.calls[0][1] as CoopRecoveryAppliedProofV2;
+    expect(proof).toEqual({
+      requestId: "recovery-1",
+      frontier: 12,
+      materialDigest: "material-digest",
+      controlId: "ctrl-1",
+    });
   });
 
   it("skips control-installed and ACKs materialApplied when nextControl is null", async () => {
@@ -311,8 +360,8 @@ describe("authority-v2 recovery transaction", () => {
     expect(await txn.run()).toBe("recovered");
     expect(h.phases).not.toContain("control-installed");
     expect(h.project).not.toHaveBeenCalled();
-    const receipt = h.acknowledge.mock.calls[0][1] as CoopAuthorityReceipt;
-    expect(receipt.stage).toBe("materialApplied");
+    const proof = h.acknowledge.mock.calls[0][1] as CoopRecoveryAppliedProofV2;
+    expect(proof.controlId).toBeUndefined();
   });
 
   it("freezes every progression surface while the fence is held, then releases", async () => {

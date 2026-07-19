@@ -82,6 +82,7 @@ export const COOP_AUTHORITATIVE_TYPES: ReadonlySet<CoopMessageType> = new Set<Co
   "tailRequest",
   "recoveryRequest",
   "recoveryBundle",
+  "recoveryApplied",
   "terminal",
   "turnResolution",
   "battleCheckpoint",

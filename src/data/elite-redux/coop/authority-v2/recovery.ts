@@ -36,7 +36,6 @@
 import type {
   CoopAuthoritativeMaterial,
   CoopAuthorityLog,
-  CoopAuthorityReceipt,
   CoopControlProjector,
   CoopFrameContextV2,
   CoopRecoveryPhase,
@@ -44,7 +43,11 @@ import type {
   CoopRuntimeContext,
   CoopTimerOwner,
 } from "#data/elite-redux/coop/authority-v2/contract";
-import type { CoopRecoveryBundle } from "#data/elite-redux/coop/authority-v2/recovery-bundle";
+import type {
+  CoopRecoveryAppliedProofV2,
+  CoopRecoveryBundle,
+  CoopRecoveryRequestV2,
+} from "#data/elite-redux/coop/authority-v2/recovery-bundle";
 import { validateRecoveryBundle } from "#data/elite-redux/coop/authority-v2/recovery-bundle";
 import type { CoopRecoveryFence } from "#data/elite-redux/coop/authority-v2/recovery-fence";
 
@@ -71,12 +74,23 @@ export interface CoopRecoveryTransactionDeps {
   readonly fence: CoopRecoveryFence;
   /** The current live frame context (re-read at validate time). */
   readonly frame: () => CoopFrameContextV2;
+  /** Stable, caller-minted identity for this one transaction. */
+  readonly requestId: string;
+  /** Diagnostic trigger carried on the correlated request. */
+  readonly reason: string;
   /** Request one exact recovery bundle; MUST honor the AbortSignal. */
-  readonly request: (ctx: CoopRuntimeContext, signal: AbortSignal) => Promise<CoopRecoveryBundle>;
+  readonly request: (
+    ctx: CoopRuntimeContext,
+    request: CoopRecoveryRequestV2,
+    signal: AbortSignal,
+  ) => Promise<CoopRecoveryBundle>;
   /** Install the canonical material image; returns whether it applied exactly. */
   readonly applyMaterial: (ctx: CoopRuntimeContext, material: CoopAuthoritativeMaterial) => boolean | Promise<boolean>;
-  /** Emit the replica receipt (ACK) for the adopted frontier. */
-  readonly acknowledge: (ctx: CoopRuntimeContext, receipt: CoopAuthorityReceipt) => void;
+  /**
+   * Prove this correlated bundle completed. This closes response retransmission only; AuthorityLog entries
+   * remain governed by their ordinary exact-operation receipts.
+   */
+  readonly acknowledge: (ctx: CoopRuntimeContext, proof: CoopRecoveryAppliedProofV2) => void;
   /** Recovery request deadline in "recovery"-class ms. Default 300_000. */
   readonly requestTimeoutMs?: number;
   /** Optional phase observer (fires on every reached phase, in order). */
@@ -94,6 +108,9 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
   private outcome: Promise<"recovered" | "terminalized"> | undefined;
 
   constructor(ctx: CoopRuntimeContext, deps: CoopRecoveryTransactionDeps) {
+    if (deps.requestId.length === 0 || deps.reason.length === 0) {
+      throw new Error("CoopRecoveryTransaction requires a non-empty request identity and reason");
+    }
     this.ctx = ctx;
     this.deps = deps;
   }
@@ -140,7 +157,7 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
   private timerOwner(): CoopTimerOwner {
     return {
       ownerId: `recovery:${this.ctx.runtimeId}:${this.ctx.epoch}`,
-      address: `recovery/${this.ctx.sessionId}/${this.ctx.runId}`,
+      address: `recovery/${this.ctx.sessionId}/${this.ctx.runId}/${this.deps.requestId}`,
       reason: "authority-v2 recovery request deadline",
     };
   }
@@ -171,7 +188,18 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
     });
 
     try {
-      return await Promise.race([this.deps.request(this.ctx, signal), abortPromise]);
+      return await Promise.race([
+        this.deps.request(
+          this.ctx,
+          {
+            requestId: this.deps.requestId,
+            capturedFrontier: this.frontier,
+            reason: this.deps.reason,
+          },
+          signal,
+        ),
+        abortPromise,
+      ]);
     } finally {
       cancelTimer();
     }
@@ -281,7 +309,7 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
     if (liveFrontier !== this.frontier) {
       return `frontier advanced under the fence (${this.frontier} -> ${liveFrontier}); snapshot is stale`;
     }
-    const verdict = validateRecoveryBundle(bundle, this.deps.frame(), this.frontier);
+    const verdict = validateRecoveryBundle(bundle, this.deps.frame(), this.frontier, this.deps.requestId);
     if (verdict.kind !== "valid") {
       return `recovery bundle ${verdict.kind}: ${verdict.reason}`;
     }
@@ -320,17 +348,19 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
     return { ok: false, reason: `control projection ${result.kind}: ${result.reason}` };
   }
 
-  /** Emit the replica receipt for the adopted frontier; returns a reason on failure. */
+  /**
+   * Emit a correlated recovery-completion proof. This is deliberately not an AuthorityReceipt: a snapshot
+   * has no synthetic log operation and therefore cannot forge an operationId or retire another peer's lease.
+   */
   private sendAck(bundle: CoopRecoveryBundle, controlId: string | undefined): string | undefined {
-    const receipt: CoopAuthorityReceipt = {
-      context: bundle.context,
-      revision: bundle.frontier,
-      operationId: `recovery:${this.ctx.runtimeId}:${bundle.frontier}`,
-      stage: bundle.nextControl == null ? "materialApplied" : "controlInstalled",
+    const proof: CoopRecoveryAppliedProofV2 = {
+      requestId: bundle.requestId,
+      frontier: bundle.frontier,
+      materialDigest: bundle.material.digest,
       ...(controlId === undefined ? {} : { controlId }),
     };
     try {
-      this.deps.acknowledge(this.ctx, receipt);
+      this.deps.acknowledge(this.ctx, proof);
     } catch (error) {
       return `ack threw: ${describeError(error)}`;
     }

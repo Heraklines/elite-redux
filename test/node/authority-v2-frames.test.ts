@@ -77,8 +77,36 @@ const FRAMES: Record<CoopFrameTypeV2, CoopFrameV2> = {
     body: { revision: 5, operationId: "op-1", stage: "controlInstalled", controlId: "ctrl-1" },
   },
   tailRequest: { v: 2, t: "tailRequest", ctx: CTX, body: { fromRevision: 2 } },
-  recoveryRequest: { v: 2, t: "recoveryRequest", ctx: CTX, body: { capturedFrontier: 10, reason: "rejoin" } },
-  recoveryBundle: { v: 2, t: "recoveryBundle", ctx: CTX, body: { frontier: 12, entries: [ENTRY_BODY] } },
+  recoveryRequest: {
+    v: 2,
+    t: "recoveryRequest",
+    ctx: CTX,
+    body: { requestId: "recovery-1", capturedFrontier: 4, reason: "rejoin" },
+  },
+  recoveryBundle: {
+    v: 2,
+    t: "recoveryBundle",
+    ctx: CTX,
+    body: {
+      requestId: "recovery-1",
+      material: { digest: "snapshot-5", payload: { state: "canonical" } },
+      frontier: 5,
+      membershipRevision: CTX.membershipRevision,
+      nextControl: ENTRY_BODY.nextControl,
+      requiredTail: [ENTRY_BODY],
+    },
+  },
+  recoveryApplied: {
+    v: 2,
+    t: "recoveryApplied",
+    ctx: CTX,
+    body: {
+      requestId: "recovery-1",
+      frontier: 5,
+      materialDigest: "snapshot-5",
+      controlId: "COMMAND_FRONTIER/e3/w4/t1/f0:s0:p99",
+    },
+  },
   terminal: { v: 2, t: "terminal", ctx: CTX, body: { terminalId: "term-1", reason: "capture-failed" } },
 };
 
@@ -215,11 +243,23 @@ describe("authority-v2 boundary - malformed bodies", () => {
   });
 
   it("names a malformed nested entry inside a recoveryBundle", () => {
-    const frame = { v: 2, t: "recoveryBundle", ctx: CTX, body: { frontier: 1, entries: [{ revision: "bad" }] } };
+    const frame = {
+      v: 2,
+      t: "recoveryBundle",
+      ctx: CTX,
+      body: {
+        requestId: "recovery-bad",
+        material: { digest: "snapshot", payload: null },
+        frontier: 1,
+        membershipRevision: CTX.membershipRevision,
+        nextControl: null,
+        requiredTail: [{ revision: "bad" }],
+      },
+    };
     const result = validateInboundFrame(frame);
     expect(result.kind).toBe("protocol-violation");
     if (result.kind === "protocol-violation") {
-      expect(result.issues.some(issue => issue.startsWith("body.entries[0]."))).toBe(true);
+      expect(result.issues.some(issue => issue.startsWith("body.requiredTail[0]."))).toBe(true);
     }
   });
 

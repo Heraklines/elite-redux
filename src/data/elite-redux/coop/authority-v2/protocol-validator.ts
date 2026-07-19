@@ -36,6 +36,7 @@ import type {
   CoopAuthorityReceiptBodyV2,
   CoopFrameTypeV2,
   CoopFrameV2,
+  CoopRecoveryAppliedBodyV2,
   CoopRecoveryBundleBodyV2,
   CoopRecoveryRequestBodyV2,
   CoopTailRequestBodyV2,
@@ -164,6 +165,9 @@ function recoveryRequestBodyIssues(body: unknown): string[] {
     return ["not an object"];
   }
   const issues: string[] = [];
+  if (!isNonEmptyString(body.requestId)) {
+    issues.push("requestId");
+  }
   if (!isNonNegSafeInt(body.capturedFrontier)) {
     issues.push("capturedFrontier");
   }
@@ -178,17 +182,45 @@ function recoveryBundleBodyIssues(body: unknown): string[] {
     return ["not an object"];
   }
   const issues: string[] = [];
+  if (!isNonEmptyString(body.requestId)) {
+    issues.push("requestId");
+  }
+  issues.push(...materialIssues(body.material));
   if (!isNonNegSafeInt(body.frontier)) {
     issues.push("frontier");
   }
-  if (Array.isArray(body.entries)) {
-    body.entries.forEach((entry, index) => {
+  if (!isNonNegSafeInt(body.membershipRevision)) {
+    issues.push("membershipRevision");
+  }
+  issues.push(...nextControlIssues(body.nextControl));
+  if (Array.isArray(body.requiredTail)) {
+    body.requiredTail.forEach((entry, index) => {
       for (const entryIssue of authorityEntryBodyIssues(entry)) {
-        issues.push(`entries[${index}].${entryIssue}`);
+        issues.push(`requiredTail[${index}].${entryIssue}`);
       }
     });
   } else {
-    issues.push("entries");
+    issues.push("requiredTail");
+  }
+  return issues;
+}
+
+function recoveryAppliedBodyIssues(body: unknown): string[] {
+  if (!isPlainObject(body)) {
+    return ["not an object"];
+  }
+  const issues: string[] = [];
+  if (!isNonEmptyString(body.requestId)) {
+    issues.push("requestId");
+  }
+  if (!isNonNegSafeInt(body.frontier)) {
+    issues.push("frontier");
+  }
+  if (!isNonEmptyString(body.materialDigest)) {
+    issues.push("materialDigest");
+  }
+  if ("controlId" in body && body.controlId !== undefined && !isNonEmptyString(body.controlId)) {
+    issues.push("controlId");
   }
   return issues;
 }
@@ -219,6 +251,8 @@ function bodyIssuesFor(frameType: CoopFrameTypeV2, body: unknown): string[] {
       return recoveryRequestBodyIssues(body);
     case "recoveryBundle":
       return recoveryBundleBodyIssues(body);
+    case "recoveryApplied":
+      return recoveryAppliedBodyIssues(body);
     case "terminal":
       return terminalBodyIssues(body);
   }
@@ -245,6 +279,9 @@ function isRecoveryRequestBody(body: unknown): body is CoopRecoveryRequestBodyV2
 function isRecoveryBundleBody(body: unknown): body is CoopRecoveryBundleBodyV2 {
   return recoveryBundleBodyIssues(body).length === 0;
 }
+function isRecoveryAppliedBody(body: unknown): body is CoopRecoveryAppliedBodyV2 {
+  return recoveryAppliedBodyIssues(body).length === 0;
+}
 function isTerminalBody(body: unknown): body is CoopTerminalBodyV2 {
   return terminalBodyIssues(body).length === 0;
 }
@@ -263,6 +300,7 @@ function violation(frameType: string | null, issues: string[]): CoopInboundFrame
  * per-type guard narrows `body` to its exact type (no cast). The defensive
  * fall-throughs are unreachable but keep the assembly total.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: exhaustive typed assembly intentionally mirrors the closed wire-frame union in one boundary
 function assembleValidFrame(frameType: CoopFrameTypeV2, ctx: unknown, body: unknown): CoopInboundFrameResultV2 {
   const v = COOP_FRAME_PROTOCOL_VERSION;
   if (!isFrameContextV2(ctx)) {
@@ -288,6 +326,10 @@ function assembleValidFrame(frameType: CoopFrameTypeV2, ctx: unknown, body: unkn
     case "recoveryBundle":
       return isRecoveryBundleBody(body)
         ? { kind: "valid", frame: { v, t: "recoveryBundle", ctx, body } }
+        : violation(frameType, ["body"]);
+    case "recoveryApplied":
+      return isRecoveryAppliedBody(body)
+        ? { kind: "valid", frame: { v, t: "recoveryApplied", ctx, body } }
         : violation(frameType, ["body"]);
     case "terminal":
       return isTerminalBody(body)
