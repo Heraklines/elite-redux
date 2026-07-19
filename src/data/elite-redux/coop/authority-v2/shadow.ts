@@ -109,7 +109,11 @@ import type {
   CoopRuntimeContext,
 } from "#data/elite-redux/coop/authority-v2/contract";
 import { COOP_FRAME_PROTOCOL_VERSION, type CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
-import { bindFrameContext, type CoopFrameConnectionBindingV2 } from "#data/elite-redux/coop/authority-v2/frame-context";
+import {
+  assertFrameContextV2,
+  bindFrameContext,
+  type CoopFrameConnectionBindingV2,
+} from "#data/elite-redux/coop/authority-v2/frame-context";
 import { CoopLifecycle } from "#data/elite-redux/coop/authority-v2/lifecycle";
 import {
   controlIdOf,
@@ -457,7 +461,7 @@ interface ShadowStateRecord {
 export class CoopAuthorityV2Shadow {
   private readonly ctxHandle: CoopRuntimeContextHandle;
   private readonly ctx: CoopRuntimeContext;
-  private readonly frameContext: CoopFrameContextV2;
+  private frameContext: CoopFrameContextV2;
   private readonly scheduler: CoopSchedulerImpl;
   private readonly ownsScheduler: boolean;
   private readonly log: AuthorityLog;
@@ -530,11 +534,14 @@ export class CoopAuthorityV2Shadow {
     this.liveReplica = deps.liveReplica ?? null;
     this.onProtocolViolation = deps.onProtocolViolation;
     this.projector = new CoopShadowControlProjector(this.ledger, this.liveReplica);
+    const harness = this;
     this.replicaDeps = {
       applyMaterial: (ctx, entry) => this.applyMaterialRouted(ctx, entry),
       projector: this.projector,
       receipts: { emit: receipt => this.sendReceipt(receipt) },
-      receiptContext: this.frameContext,
+      get receiptContext() {
+        return harness.frameContext;
+      },
       recordStage: (entry, stage) => this.log.recordReplicaStage(entry, stage),
     };
 
@@ -1038,6 +1045,45 @@ export class CoopAuthorityV2Shadow {
    */
   get authenticatedFrameContext(): CoopFrameContextV2 {
     return this.frameContext;
+  }
+
+  /**
+   * Preserve the one global log across an authenticated hot rejoin while rotating its channel axes.
+   *
+   * The session/run/epoch/seat-map/seat roles are immutable. Only membership revision and local/peer
+   * connection generations may advance. AuthorityLog performs the fail-closed validation and re-addresses
+   * retained/unfinished entries without resetting revisions or accepted mechanical stages.
+   */
+  rebindIdentity(identity: CoopV2ShadowIdentity): number {
+    const next = assertFrameContextV2({
+      sessionId: identity.sessionId,
+      runId: identity.runId,
+      sessionEpoch: identity.epoch,
+      seatMapId: identity.seatMapId,
+      membershipRevision: identity.membershipRevision,
+      senderSeatId: identity.localSeatId,
+      authoritySeatId: identity.authoritySeatId,
+      connectionGeneration: identity.connectionGeneration,
+    });
+    const prior = this.frameContext;
+    // AuthorityLog may synchronously redeliver on loopback. Publish the receiving context first so a receipt
+    // that re-enters before rebindConnection returns is checked and signed against the replacement channel.
+    this.frameContext = Object.freeze({ ...next });
+    let redelivered: number;
+    try {
+      redelivered = this.log.rebindConnection(next, identity.peerBindings);
+    } catch (error) {
+      this.frameContext = prior;
+      throw error;
+    }
+    if (redelivered > 0) {
+      coopLog(
+        "v2-recovery",
+        `rebound seat=${identity.localSeatId} membership=${identity.membershipRevision} `
+          + `generation=${identity.connectionGeneration} redelivered=${redelivered}`,
+      );
+    }
+    return redelivered;
   }
 
   // -------------------------------------------------------------------------

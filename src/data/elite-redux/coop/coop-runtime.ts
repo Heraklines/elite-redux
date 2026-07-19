@@ -3804,16 +3804,36 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
   ) {
     return null;
   }
-  const existing = coopV2ShadowHarnesses.get(runtime);
-  if (existing != null) {
-    activateCoopV2Runtime(runtime);
-    return existing;
-  }
-  if (coopV2ShadowBuildFailed.has(runtime)) {
-    return null;
-  }
   const identity = resolveCoopV2ShadowIdentity(runtime);
   if (identity == null) {
+    // An authenticated hot rejoin must re-prove its retained binding before V2 can mint any frame under the
+    // replacement channel. Keep the existing log retained, but expose no newly resolved harness until the
+    // binding-ready callback supplies the advanced membership/generation axes.
+    return null;
+  }
+  const existing = coopV2ShadowHarnesses.get(runtime);
+  if (existing != null) {
+    try {
+      existing.rebindIdentity(identity);
+      activateCoopV2Runtime(runtime);
+      return existing;
+    } catch (error) {
+      const point = readCoopBattlePoint();
+      coopWarn("v2-recovery", "authenticated hot-rejoin binding could not rebind the retained V2 log", error);
+      failCoopRuntimeSharedSession(
+        runtime,
+        "Authority V2 could not adopt the authenticated replacement channel without changing its session axes.",
+        {
+          boundary: "recovery",
+          reasonCode: "binding-mismatch",
+          wave: point.wave,
+          turn: point.turn,
+        },
+      );
+      return null;
+    }
+  }
+  if (coopV2ShadowBuildFailed.has(runtime)) {
     return null;
   }
   try {

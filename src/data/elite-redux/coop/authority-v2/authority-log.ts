@@ -183,7 +183,7 @@ export interface AuthorityLogOptions {
  */
 interface DeliveryLease {
   readonly revision: number;
-  readonly entry: CoopAuthorityEntry;
+  entry: CoopAuthorityEntry;
   readonly owner: CoopTimerOwner;
   /** Frozen remote receipt quorum and each seat's highest stage (STAGE_NONE before any). */
   readonly peerStages: Map<number, { readonly connectionGeneration: number; stage: number }>;
@@ -250,7 +250,7 @@ export type AuthorityReceiptVerdict =
  * each hold one (the same class, different methods exercised).
  */
 export class AuthorityLog implements CoopAuthorityLog {
-  private readonly localContext: CoopFrameContextV2;
+  private localContext: CoopFrameContextV2;
   private readonly scheduler: CoopScheduler;
   private readonly send: (wire: CoopAuthorityWire) => void;
   private readonly ownerBase: string;
@@ -258,7 +258,7 @@ export class AuthorityLog implements CoopAuthorityLog {
   private readonly deliveryTimeClass: CoopTimeClass;
   private readonly maxDeliveryAttempts: number | null;
   private readonly retentionCapacity: number;
-  private readonly peerBindings: readonly CoopAuthorityPeerBindingV2[];
+  private peerBindings: readonly CoopAuthorityPeerBindingV2[];
 
   /** AUTHORITY: retained-but-unretired entries, bounded + revision-ordered, keyed by their delivery lease. */
   private readonly retainedWindow: BoundedRevisionWindow<DeliveryLease>;
@@ -310,6 +310,137 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       throw new Error("AuthorityLog requires a valid delivery backoff (0 < initialMs <= maxMs, factor >= 1)");
     }
+  }
+
+  /**
+   * Rebind the one live log after an authenticated hot rejoin without resetting its global revision domain.
+   *
+   * Connection generation and membership revision are transport axes, not mechanical operation identity.
+   * A channel replacement therefore re-addresses every still-retained entry and unfinished replica entry
+   * while preserving revision, material, control, accepted peer stages, and delivery leases. Old-generation
+   * frames immediately fail the ordinary admission checks; retained entries are re-emitted once under the
+   * new binding so a frame flushed from the dark channel cannot strand the session.
+   *
+   * Throws on any stable-axis change, generation rollback, membership rollback, or peer-seat change. The
+   * runtime converts that fail-closed verdict into the shared terminal rather than silently starting a new
+   * log or falling back to a second legacy authority.
+   *
+   * @returns the number of retained authority entries immediately re-emitted under the new binding.
+   */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one transaction validates every immutable and advancing authentication axis before committing the rebind
+  rebindConnection(
+    nextLocalContext: CoopFrameContextV2,
+    nextPeerBindings: readonly CoopAuthorityPeerBindingV2[],
+  ): number {
+    if (this.disposed) {
+      throw new Error("AuthorityLog.rebindConnection after dispose");
+    }
+    if (!isValidFrameContext(nextLocalContext)) {
+      throw new Error("AuthorityLog.rebindConnection requires a valid local frame context");
+    }
+    const current = this.localContext;
+    if (
+      !isSameSessionIdentity(nextLocalContext, current)
+      || nextLocalContext.sessionEpoch !== current.sessionEpoch
+      || nextLocalContext.senderSeatId !== current.senderSeatId
+      || nextLocalContext.authoritySeatId !== current.authoritySeatId
+      || nextLocalContext.membershipRevision < current.membershipRevision
+      || nextLocalContext.connectionGeneration < current.connectionGeneration
+    ) {
+      throw new Error("AuthorityLog.rebindConnection changed or rolled back a stable authenticated axis");
+    }
+
+    const peers = validatePeerBindings(nextPeerBindings, nextLocalContext.senderSeatId);
+    if (peers.length !== this.peerBindings.length) {
+      throw new Error("AuthorityLog.rebindConnection changed the authenticated peer quorum");
+    }
+    for (let index = 0; index < peers.length; index++) {
+      const prior = this.peerBindings[index];
+      const next = peers[index];
+      if (
+        prior == null
+        || next == null
+        || next.seatId !== prior.seatId
+        || next.connectionGeneration < prior.connectionGeneration
+      ) {
+        throw new Error("AuthorityLog.rebindConnection changed a peer seat or rolled back its generation");
+      }
+    }
+
+    const contextUnchanged =
+      nextLocalContext.membershipRevision === current.membershipRevision
+      && nextLocalContext.connectionGeneration === current.connectionGeneration;
+    const peersUnchanged = peers.every(
+      (peer, index) => peer.connectionGeneration === this.peerBindings[index]?.connectionGeneration,
+    );
+    if (contextUnchanged && peersUnchanged) {
+      return 0;
+    }
+
+    // Validate and prepare the complete replacement before mutating any live state. A malformed quorum must
+    // leave the old binding wholly usable; the runtime may then enter its shared terminal without inheriting
+    // a half-rebound log.
+    const reboundLocalContext = Object.freeze({ ...nextLocalContext });
+    const authority = peers.find(peer => peer.seatId === reboundLocalContext.authoritySeatId);
+    if (this.pendingReplicaEntry != null && authority == null) {
+      throw new Error("AuthorityLog.rebindConnection has no bound authority peer for the replica");
+    }
+    const reboundReplicaEntry =
+      this.pendingReplicaEntry == null || authority == null
+        ? this.pendingReplicaEntry
+        : freezeAuthorityEntry(
+            cloneEntry({
+              ...this.pendingReplicaEntry,
+              context: {
+                ...this.pendingReplicaEntry.context,
+                membershipRevision: reboundLocalContext.membershipRevision,
+                connectionGeneration: authority.connectionGeneration,
+              },
+            }),
+          );
+    const reboundLeases: {
+      readonly lease: DeliveryLease;
+      readonly entry: CoopAuthorityEntry;
+      readonly peerStages: Map<number, { connectionGeneration: number; stage: number }>;
+    }[] = [];
+    for (const lease of this.retainedWindow.values()) {
+      const peerStages = new Map<number, { connectionGeneration: number; stage: number }>();
+      for (const peer of peers) {
+        const priorStage = lease.peerStages.get(peer.seatId);
+        if (priorStage == null) {
+          throw new Error("AuthorityLog.rebindConnection retained lease peer quorum changed");
+        }
+        peerStages.set(peer.seatId, {
+          connectionGeneration: peer.connectionGeneration,
+          stage: priorStage.stage,
+        });
+      }
+      reboundLeases.push({
+        lease,
+        entry: freezeAuthorityEntry(cloneEntry({ ...lease.entry, context: reboundLocalContext })),
+        peerStages,
+      });
+    }
+
+    this.localContext = reboundLocalContext;
+    this.peerBindings = peers;
+    this.pendingTailRequestFrom = null;
+    this.pendingReplicaEntry = reboundReplicaEntry;
+    for (const rebound of reboundLeases) {
+      rebound.lease.entry = rebound.entry;
+      rebound.lease.peerStages.clear();
+      for (const [seatId, stage] of rebound.peerStages) {
+        rebound.lease.peerStages.set(seatId, stage);
+      }
+    }
+
+    // Publish only after every live lease and replica cursor observes the new binding. The send carrier may
+    // be synchronous in loopback tests, so a receipt can legitimately re-enter this log before send returns.
+    for (const rebound of reboundLeases) {
+      this.sendGuarded({ kind: "deliver", entry: rebound.entry });
+    }
+    const redelivered = reboundLeases.length;
+    return redelivered;
   }
 
   // ---------------------------------------------------------------------------

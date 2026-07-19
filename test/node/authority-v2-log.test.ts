@@ -342,6 +342,122 @@ describe("authority-v2 log", () => {
     expect(log.retained()).toHaveLength(0);
   });
 
+  it("rebinds a retained authority lease across hot rejoin without resetting revision or receipt progress", () => {
+    const initialContext = frameContext({ membershipRevision: 7, connectionGeneration: 3 });
+    const log = makeLog(scheduler, sent, {
+      localContext: initialContext,
+      peerBindings: [{ seatId: 1, connectionGeneration: 5 }],
+    });
+    const committed = log.commit(
+      entryInput("op-rejoin", {
+        context: initialContext,
+        nextControl: commandControl(),
+      }),
+    );
+    expect(
+      log.acceptReceiptDetailed(
+        receipt(committed, "admitted", {
+          context: { ...committed.context, senderSeatId: 1, connectionGeneration: 5 },
+        }),
+      ),
+    ).toEqual({ kind: "advanced", retired: false, waitingForSeatIds: [1] });
+    const deliveriesBeforeRebind = delivered(sent).length;
+
+    expect(
+      log.rebindConnection(frameContext({ membershipRevision: 8, connectionGeneration: 4 }), [
+        { seatId: 1, connectionGeneration: 6 },
+      ]),
+    ).toBe(1);
+    const rebound = log.retained()[0];
+    expect(rebound).toMatchObject({
+      revision: 1,
+      operationId: "op-rejoin",
+      context: {
+        membershipRevision: 8,
+        connectionGeneration: 4,
+      },
+    });
+    expect(delivered(sent)).toHaveLength(deliveriesBeforeRebind + 1);
+    expect(delivered(sent).at(-1)).toEqual(rebound);
+
+    // A delayed receipt flushed from the replaced channel cannot advance the rebound lease.
+    expect(
+      log.acceptReceiptDetailed(
+        receipt(committed, "materialApplied", {
+          context: { ...committed.context, senderSeatId: 1, connectionGeneration: 5 },
+        }),
+      ),
+    ).toEqual({ kind: "rejected", reason: "membership-mismatch" });
+
+    // The admitted stage survived the channel replacement; the new generation resumes at material/control.
+    expect(
+      log.acceptReceiptDetailed(
+        receipt(rebound, "materialApplied", {
+          context: { ...rebound.context, senderSeatId: 1, connectionGeneration: 6 },
+        }),
+      ),
+    ).toEqual({ kind: "advanced", retired: false, waitingForSeatIds: [1] });
+    expect(
+      log.acceptReceiptDetailed(
+        receipt(rebound, "controlInstalled", {
+          context: { ...rebound.context, senderSeatId: 1, connectionGeneration: 6 },
+        }),
+      ),
+    ).toEqual({ kind: "advanced", retired: true, waitingForSeatIds: [] });
+    expect(log.diagnostics()).toMatchObject({ headRevision: 1, retainedEntries: 0 });
+  });
+
+  it("rebinds an unfinished replica entry to the new authority generation without re-applying old frames", () => {
+    const initialLocal = frameContext({ senderSeatId: 1, membershipRevision: 7, connectionGeneration: 5 });
+    const log = makeReplicaLog(scheduler, sent, {
+      localContext: initialLocal,
+      peerBindings: [{ seatId: 0, connectionGeneration: 3 }],
+    });
+    const oldEntry = fullEntry(1, "op-rejoin-replica", {
+      context: frameContext({ membershipRevision: 7, connectionGeneration: 3 }),
+      nextControl: commandControl(),
+    });
+    expect(log.admit(oldEntry)).toEqual({ kind: "admitted" });
+
+    expect(
+      log.rebindConnection(frameContext({ senderSeatId: 1, membershipRevision: 8, connectionGeneration: 6 }), [
+        { seatId: 0, connectionGeneration: 4 },
+      ]),
+    ).toBe(0);
+    expect(log.admit(oldEntry)).toEqual({ kind: "rejected", reason: "membership-mismatch" });
+
+    const reboundEntry: CoopAuthorityEntry = {
+      ...oldEntry,
+      context: { ...oldEntry.context, membershipRevision: 8, connectionGeneration: 4 },
+    };
+    expect(log.admit(reboundEntry)).toEqual({ kind: "duplicate-pending-material" });
+    expect(log.recordReplicaStage(reboundEntry, "materialApplied")).toBe(true);
+    expect(log.recordReplicaStage(reboundEntry, "controlInstalled")).toBe(true);
+    expect(log.controlInstalledThrough()).toBe(1);
+  });
+
+  it("refuses a hot-rejoin rebind that changes a stable session axis or rolls a generation back", () => {
+    const log = makeLog(scheduler, sent, {
+      localContext: frameContext({ membershipRevision: 7, connectionGeneration: 3 }),
+      peerBindings: [{ seatId: 1, connectionGeneration: 5 }],
+    });
+    expect(() =>
+      log.rebindConnection(frameContext({ runId: "other-run", membershipRevision: 8, connectionGeneration: 4 }), [
+        { seatId: 1, connectionGeneration: 6 },
+      ]),
+    ).toThrow(/stable authenticated axis/u);
+    expect(() =>
+      log.rebindConnection(frameContext({ membershipRevision: 8, connectionGeneration: 2 }), [
+        { seatId: 1, connectionGeneration: 6 },
+      ]),
+    ).toThrow(/stable authenticated axis/u);
+    expect(() =>
+      log.rebindConnection(frameContext({ membershipRevision: 8, connectionGeneration: 4 }), [
+        { seatId: 1, connectionGeneration: 4 },
+      ]),
+    ).toThrow(/peer seat or rolled back/u);
+  });
+
   it("keeps receipt, material, and control truth separate and retries only the unfinished stage", () => {
     const log = makeReplicaLog(scheduler, sent);
     const entry = fullEntry(1, "op-1", { nextControl: commandControl() });

@@ -217,6 +217,93 @@ afterEach(() => {
 // --- tests ------------------------------------------------------------------
 
 describe("authority-v2 shadow harness", () => {
+  it("rotates the authenticated frame axes in place after hot rejoin", () => {
+    const clock = new FakeClock();
+    const harness = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: () => {},
+      scheduler: createCoopScheduler(clock),
+    });
+    const rebound: CoopV2ShadowIdentity = {
+      ...identity(0),
+      membershipRevision: 2,
+      connectionGeneration: 1,
+      peerBindings: [{ seatId: 1, connectionGeneration: 1 }],
+    };
+
+    expect(harness.rebindIdentity(rebound)).toBe(0);
+    expect(harness.authenticatedFrameContext).toMatchObject({
+      sessionId: SESSION.sessionId,
+      runId: SESSION.runId,
+      sessionEpoch: SESSION.epoch,
+      membershipRevision: 2,
+      senderSeatId: 0,
+      authoritySeatId: 0,
+      connectionGeneration: 1,
+    });
+    expect(harness.rebindIdentity(rebound)).toBe(0);
+    expect(() => harness.rebindIdentity({ ...rebound, runId: "other-run" })).toThrow(/stable authenticated axis/u);
+    harness.dispose();
+  });
+
+  it("retires a dark-channel lease when hot-rejoin redelivery and its receipt re-enter synchronously", () => {
+    const clock = new FakeClock();
+    let host!: CoopAuthorityV2Shadow;
+    let guest!: CoopAuthorityV2Shadow;
+    let receiptsReachHost = false;
+    const cross = (target: () => CoopAuthorityV2Shadow, frame: CoopFrameV2): void => {
+      routeCoopV2InboundFrameInto(target(), encodeFrameV2(frame));
+    };
+    host = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => cross(() => guest, frame),
+      scheduler: createCoopScheduler(clock),
+    });
+    guest = new CoopAuthorityV2Shadow({
+      identity: identity(1),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => {
+        if (receiptsReachHost) {
+          cross(() => host, frame);
+        }
+      },
+      scheduler: createCoopScheduler(clock),
+    });
+
+    host.tapTurnCommit(turnTap("TURN/hot-rejoin-dark-channel"));
+    expect(guest.diagnostics()).toMatchObject({ applied: 1, retained: 0 });
+    expect(host.diagnostics().retained).toBe(1);
+
+    const guestRebound: CoopV2ShadowIdentity = {
+      ...identity(1),
+      membershipRevision: 2,
+      connectionGeneration: 1,
+      peerBindings: [{ seatId: 0, connectionGeneration: 1 }],
+    };
+    const hostRebound: CoopV2ShadowIdentity = {
+      ...identity(0),
+      membershipRevision: 2,
+      connectionGeneration: 1,
+      peerBindings: [{ seatId: 1, connectionGeneration: 1 }],
+    };
+    expect(guest.rebindIdentity(guestRebound)).toBe(0);
+    receiptsReachHost = true;
+    expect(host.rebindIdentity(hostRebound)).toBe(1);
+    expect(host.diagnostics().retained).toBe(0);
+    expect(host.authenticatedFrameContext).toMatchObject({
+      membershipRevision: 2,
+      connectionGeneration: 1,
+    });
+
+    host.dispose();
+    guest.dispose();
+  });
+
   it("taps commit entries, the replica admits+applies over the channel, and the authority retires them", () => {
     const clock = new FakeClock();
     const duo = buildDuo(clock);

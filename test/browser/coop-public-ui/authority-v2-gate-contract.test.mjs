@@ -11,6 +11,7 @@ const root = new URL("../../../", import.meta.url);
 const gateWorkflow = readFileSync(new URL(".github/workflows/coop-gate-sharded.yml", root), "utf8");
 const campaignWorkflow = readFileSync(new URL(".github/workflows/coop-public-ui-campaign.yml", root), "utf8");
 const stagingWorkflow = readFileSync(new URL(".github/workflows/deploy-staging.yml", root), "utf8");
+const coopRuntime = readFileSync(new URL("src/data/elite-redux/coop/coop-runtime.ts", root), "utf8");
 
 function jobBlock(workflow, job) {
   const lines = workflow.split(/\r?\n/gu);
@@ -46,4 +47,19 @@ test("public-browser campaign and staging bundle qualify the same V2 cutover", (
   assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_TURN=on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_REPLACEMENT=on"/u);
+});
+
+test("an existing Authority V2 runtime rebinds only after the replacement channel is authenticated", () => {
+  const start = coopRuntime.indexOf("export function getCoopV2Shadow(");
+  const end = coopRuntime.indexOf("\nexport function ", start + 1);
+  assert.notEqual(start, -1, "runtime exposes the Authority V2 harness resolver");
+  assert.notEqual(end, -1, "runtime resolver has a bounded source block");
+  const resolver = coopRuntime.slice(start, end);
+  const identity = resolver.indexOf("const identity = resolveCoopV2ShadowIdentity(runtime);");
+  const unavailable = resolver.indexOf("if (identity == null)");
+  const existing = resolver.indexOf("const existing = coopV2ShadowHarnesses.get(runtime);");
+  const rebind = resolver.indexOf("existing.rebindIdentity(identity);");
+  assert.ok(identity >= 0 && unavailable > identity, "replacement identity is resolved and required");
+  assert.ok(existing > unavailable && rebind > existing, "a retained harness is rebound only after identity proof");
+  assert.match(resolver, /reasonCode:\s*"binding-mismatch"/u, "a rejected rebind fails the shared session closed");
 });
