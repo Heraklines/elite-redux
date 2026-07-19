@@ -277,24 +277,28 @@ async function configurePage(page, label, browserErrors, sourceAssetMisses, boot
   try {
     await waitForBridge(90_000);
   } catch (firstError) {
-    // This checkpoint owns transport behavior, not simultaneous Phaser boot pressure. A single Chromium
-    // process occasionally leaves one of two concurrently-created contexts on the preloader background
-    // while the sibling initializes normally; six immediately preceding exact-SHA gates completed this
-    // same bridge. Reload only that inert page once, retain the first failure as evidence, and still fail
-    // closed if the normal application cannot initialize on the bounded second attempt.
+    // This checkpoint owns transport behavior, not simultaneous Phaser boot pressure. A page with both
+    // the sealed bridge and a canvas is actively booting Phaser; reloading it discards that progress and,
+    // under two-context runner pressure, can turn a merely slow boot into an empty-page false red. Give an
+    // active boot the same bounded second budget in place. Reload exactly once only when the page is truly
+    // inert, retaining both states and every browser error as fail-closed evidence.
     const firstState = await bootState();
-    bootRecoveries.push({ label, firstState, error: String(firstError) });
+    const activeBoot = firstState?.bridgeDefined === true && firstState?.canvasCount > 0;
+    bootRecoveries.push({ label, firstState, activeBoot, error: String(firstError) });
     process.stderr.write(
-      `[coop-browser] ${label} bridge boot stalled; one bounded reload ${JSON.stringify(firstState)}\n`,
+      `[coop-browser] ${label} bridge boot stalled; bounded ${activeBoot ? "in-place continuation" : "reload"} `
+        + `${JSON.stringify(firstState)}\n`,
     );
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 90_000 });
+    if (!activeBoot) {
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 90_000 });
+    }
     try {
       await waitForBridge(180_000);
     } catch (secondError) {
       const secondState = await bootState();
       const relatedErrors = browserErrors.filter(error => error.startsWith(`[${label}:`));
       throw new Error(
-        `${label} sealed page bridge never became ready after one reload: `
+        `${label} sealed page bridge never became ready after bounded ${activeBoot ? "active boot" : "reload"}: `
           + `${JSON.stringify({ firstState, secondState, relatedErrors })}`,
         { cause: secondError },
       );
