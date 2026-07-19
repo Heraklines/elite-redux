@@ -109,6 +109,7 @@ describe("System - Game Data", () => {
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
       vi.spyOn(pokerogueApi.account, "getInfo").mockResolvedValue([
         {
+          accountId: "er-account:cloud",
           username: "cloud",
           lastSessionSlot: -1,
           discordId: "",
@@ -169,6 +170,7 @@ describe("System - Game Data", () => {
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
       vi.spyOn(pokerogueApi.account, "getInfo").mockResolvedValue([
         {
+          accountId: "er-account:cloud",
           username: "cloud",
           lastSessionSlot: -1,
           discordId: "",
@@ -198,7 +200,14 @@ describe("System - Game Data", () => {
     beforeEach(async () => {
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
       vi.spyOn(pokerogueApi.account, "getInfo").mockResolvedValue([
-        { username: "cloud", lastSessionSlot: -1, discordId: "", googleId: "", hasAdminRole: false },
+        {
+          accountId: "er-account:cloud",
+          username: "cloud",
+          lastSessionSlot: -1,
+          discordId: "",
+          googleId: "",
+          hasAdminRole: false,
+        },
         200,
       ]);
       await account.updateUserInfo();
