@@ -2101,9 +2101,15 @@ export function notifyCoopWaveContinuationSurfaceReady(
     if (transaction == null || !transaction.dataApplied) {
       return false;
     }
-    // The real surface itself is checked by the V2 control projector on the next retained redelivery.
-    // This callback is only an eager causal wake for legacy battle-stream presentation accounting.
+    // The phase calls this only after its real public handler is active. Retry the already-admitted V2 entry
+    // NOW, while that exact surface and its pinned owner address are still current; waiting for the next
+    // 250ms authority redelivery races fast public input and can observe the following interaction counter.
+    // The replica ledger selects the safe resume stage, so DATA is never applied twice.
     runtime.battleStream.notifyContinuationSurface("sharedInput");
+    const completed = coopV2ShadowHarnesses.get(runtime)?.retryPendingReplicaEntries() ?? 0;
+    if (completed > 0) {
+      coopLog("v2-wave", `real continuation surface completed ${completed} retained V2 entry`);
+    }
     return true;
   }
   const ready = maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding, runtime, phaseOwnedSurface);

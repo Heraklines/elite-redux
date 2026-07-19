@@ -508,6 +508,15 @@ export class CoopAuthorityV2Shadow {
     | ((violation: Extract<CoopInboundFrameResultV2, { kind: "protocol-violation" }>) => void)
     | undefined;
   private readonly shadowState = new Map<number, ShadowStateRecord>();
+  /**
+   * Replica entries that are admitted but still waiting on their real material/control boundary.
+   *
+   * Authority redelivery remains the durable retry owner. This bounded local reference only lets an engine
+   * chokepoint (for example, the exact frame a reward UI becomes actionable) retry immediately instead of
+   * racing a fast user against the next 250ms delivery lease. The ordered ledger permits at most one
+   * mechanically incomplete revision, so this cannot become a second journal.
+   */
+  private readonly pendingReplicaEntries = new Map<number, CoopAuthorityEntry>();
 
   private disposed = false;
   private committed = 0;
@@ -1001,41 +1010,7 @@ export class CoopAuthorityV2Shadow {
       switch (frame.t) {
         case "authorityEntry": {
           const entry: CoopAuthorityEntry = { context: frame.ctx, ...frame.body };
-          const result = this.log.admit(entry);
-          this.logReplicaAdmission(entry, result.kind);
-          if (result.kind === "rejected") {
-            this.reportOwnedReplicaViolation(entry, `entry.${result.reason}`);
-          }
-          if (
-            result.kind === "admitted"
-            || result.kind === "duplicate-pending-material"
-            || result.kind === "duplicate-pending-control"
-            || result.kind === "duplicate-complete"
-          ) {
-            if (result.kind === "admitted") {
-              this.admitted += 1;
-            }
-            const resume =
-              result.kind === "duplicate-pending-control"
-                ? "materialApplied"
-                : result.kind === "duplicate-complete"
-                  ? "controlInstalled"
-                  : "admitted";
-            const outcome = applyEntry(this.runtimeContext, entry, this.replicaDeps, resume);
-            this.logReplicaApply(entry, resume, outcome);
-            if (outcome.kind === "materialRejected" || outcome.kind === "controlRejected") {
-              this.reportOwnedReplicaViolation(entry, `${outcome.kind}.${outcome.reason}`);
-            }
-            if (outcome.kind === "applied" && result.kind !== "duplicate-complete") {
-              this.applied += 1;
-            }
-          } else if (result.kind === "gap") {
-            // A later authenticated replacement may carry the exact terminal needed to let the currently
-            // admitted turn finish its presentation/finalize path. Release only that local modal edge; the
-            // gap entry remains unadmitted and emits no receipt until ordinary ordered redelivery reaches it.
-            // The live seam's address/owner checks make unrelated future entries inert.
-            this.releaseBlockedPredecessor(entry);
-          }
+          this.applyReplicaEntry(entry);
           break;
         }
         case "authorityReceipt": {
@@ -1077,6 +1052,30 @@ export class CoopAuthorityV2Shadow {
     } catch (error) {
       this.fault(`inbound(${frame.t})`, error);
     }
+  }
+
+  /**
+   * Retry every mechanically incomplete admitted replica entry at a real engine chokepoint.
+   *
+   * This is an eager pace signal, not a retention system: the authority lease still redelivers until the
+   * signed terminal receipt arrives, and the replica ledger still decides the exact resume stage. Returning
+   * the number completed makes the hook observable without exposing entry material.
+   */
+  retryPendingReplicaEntries(): number {
+    if (this.disposed) {
+      return 0;
+    }
+    let completed = 0;
+    for (const entry of [...this.pendingReplicaEntries.values()].sort((a, b) => a.revision - b.revision)) {
+      try {
+        if (this.applyReplicaEntry(entry)) {
+          completed += 1;
+        }
+      } catch (error) {
+        this.fault(`retryReplica(${entry.revision})`, error);
+      }
+    }
+    return completed;
   }
 
   // -------------------------------------------------------------------------
@@ -1192,6 +1191,7 @@ export class CoopAuthorityV2Shadow {
       this.scheduler.dispose();
     }
     this.shadowState.clear();
+    this.pendingReplicaEntries.clear();
     this.ledger.clear();
   }
 
@@ -1228,6 +1228,58 @@ export class CoopAuthorityV2Shadow {
       this.fault(`tap(${kind})`, error);
       return null;
     }
+  }
+
+  /**
+   * Admit/apply one authority entry through the single ordered replica pipeline.
+   *
+   * Returns true only when this call newly reaches the entry's required mechanical stage. Both transport
+   * delivery and eager real-surface wakes use this exact path, so receipt order and idempotency cannot drift.
+   */
+  private applyReplicaEntry(entry: CoopAuthorityEntry): boolean {
+    const result = this.log.admit(entry);
+    this.logReplicaAdmission(entry, result.kind);
+    if (result.kind === "rejected") {
+      this.reportOwnedReplicaViolation(entry, `entry.${result.reason}`);
+      return false;
+    }
+    if (result.kind === "gap") {
+      // A later authenticated replacement may carry the exact terminal needed to let the currently
+      // admitted turn finish its presentation/finalize path. Release only that local modal edge; the
+      // gap entry remains unadmitted and emits no receipt until ordinary ordered redelivery reaches it.
+      // The live seam's address/owner checks make unrelated future entries inert.
+      this.releaseBlockedPredecessor(entry);
+      return false;
+    }
+    if (result.kind === "staleEpoch") {
+      return false;
+    }
+    if (result.kind === "admitted") {
+      this.admitted += 1;
+      this.pendingReplicaEntries.set(entry.revision, entry);
+    } else if (result.kind === "duplicate-pending-material" || result.kind === "duplicate-pending-control") {
+      this.pendingReplicaEntries.set(entry.revision, entry);
+    }
+    const resume =
+      result.kind === "duplicate-pending-control"
+        ? "materialApplied"
+        : result.kind === "duplicate-complete"
+          ? "controlInstalled"
+          : "admitted";
+    const outcome = applyEntry(this.runtimeContext, entry, this.replicaDeps, resume);
+    this.logReplicaApply(entry, resume, outcome);
+    if (outcome.kind === "materialRejected" || outcome.kind === "controlRejected") {
+      this.reportOwnedReplicaViolation(entry, `${outcome.kind}.${outcome.reason}`);
+    }
+    if (outcome.kind !== "applied") {
+      return false;
+    }
+    this.pendingReplicaEntries.delete(entry.revision);
+    if (result.kind === "duplicate-complete") {
+      return false;
+    }
+    this.applied += 1;
+    return true;
   }
 
   /** Commit an entry to the shadow log (which delivers it over the wire) and count it. */

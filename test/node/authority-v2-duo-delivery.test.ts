@@ -501,4 +501,47 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
 
     duo.dispose();
   });
+
+  it("retries a deferred control immediately when its real surface opens", async () => {
+    const clock = new FakeClock();
+    let applies = 0;
+    let projections = 0;
+    let surfaceReady = false;
+    const guestLive: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: control => control.kind === "COMMAND_FRONTIER",
+      applyMaterial: () => {
+        applies += 1;
+        return true;
+      },
+      projectControl: (_ctx, control) => {
+        projections += 1;
+        return surfaceReady
+          ? { kind: "installed", controlId: controlIdOf(control) }
+          : { kind: "deferred", reason: "real public surface has not opened" };
+      },
+    };
+    const duo = buildDeferredDuo(clock, guestLive);
+
+    duo.host.tapTurnCommit(turnTap("TURN/real-surface-wake"));
+    await flushLoopback();
+    duo.flush("guest");
+    expect(applies).toBe(1);
+    expect(projections).toBe(1);
+    expect(duo.guest.diagnostics().applied).toBe(0);
+
+    // A public UI can open and accept input before the authority's 250ms redelivery lease. The real engine
+    // hook retries the admitted entry synchronously, resumes at materialApplied, and signs controlInstalled
+    // without applying canonical material twice or advancing fake time.
+    surfaceReady = true;
+    expect(duo.guest.retryPendingReplicaEntries()).toBe(1);
+    expect(applies).toBe(1);
+    expect(projections).toBe(2);
+    expect(duo.guest.diagnostics().applied).toBe(1);
+
+    await flushLoopback();
+    duo.flush("host");
+    expect(duo.host.diagnostics().retained).toBe(0);
+    duo.dispose();
+  });
 });
