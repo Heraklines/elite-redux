@@ -52,8 +52,12 @@ interface Env {
   GITHUB_REPO: string;
   GITHUB_BRANCH: string;
   GITHUB_WORKFLOW_FILE?: string;
-  /** Workflow that imports YouTube videos/playlists into the BGM catalog. */
+  /** Workflow that imports YouTube links or uploaded media into the BGM catalog. */
   MEDIA_IMPORT_WORKFLOW_FILE?: string;
+  /** Optional branch used only by media workflow dispatches. */
+  MEDIA_IMPORT_BRANCH?: string;
+  /** Private temporary storage for direct audio/video uploads. */
+  MEDIA_UPLOADS?: R2BucketLike;
   EDITOR_PASSWORD: string;
   ALLOWED_ORIGIN: string;
   /** Sprite asset repo for /upload-assets (default "Heraklines/er-assets").
@@ -61,6 +65,40 @@ interface Env {
   ASSETS_REPO?: string;
   /** Branch of ASSETS_REPO to commit sprites to (default "main"). */
   ASSETS_BRANCH?: string;
+}
+
+interface R2UploadedPartLike {
+  partNumber: number;
+  etag: string;
+}
+
+interface R2MultipartUploadLike {
+  uploadId: string;
+  uploadPart(partNumber: number, value: ReadableStream): Promise<R2UploadedPartLike>;
+  complete(parts: R2UploadedPartLike[]): Promise<unknown>;
+  abort(): Promise<void>;
+}
+
+interface R2ObjectLike {
+  body: ReadableStream;
+  size: number;
+  httpEtag: string;
+  httpMetadata?: { contentType?: string };
+  customMetadata?: Record<string, string>;
+}
+
+interface R2BucketLike {
+  createMultipartUpload(
+    key: string,
+    options?: {
+      httpMetadata?: { contentType?: string };
+      customMetadata?: Record<string, string>;
+    },
+  ): Promise<R2MultipartUploadLike>;
+  resumeMultipartUpload(key: string, uploadId: string): R2MultipartUploadLike;
+  get(key: string): Promise<R2ObjectLike | null>;
+  head(key: string): Promise<Omit<R2ObjectLike, "body"> | null>;
+  delete(key: string): Promise<void>;
 }
 
 const DEFAULT_WORKFLOW_FILE = "deploy-staging.yml";
@@ -935,8 +973,8 @@ async function triggerDeploy(env: Env): Promise<{ ok: true } | { ok: false; erro
 function corsHeaders(env: Env): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Editor-Password",
   };
 }
 
@@ -1579,6 +1617,359 @@ async function handleTrainerSpriteUpload(body: TrainerSpriteUploadBody, env: Env
   return json({ ok: true, assetsCommit: assets.commit, catalogCommit: catalog.commit, key }, 200, env);
 }
 
+const MEDIA_UPLOAD_PART_BYTES = 8 * 1024 * 1024;
+const MEDIA_UPLOAD_MAX_BYTES = 1024 * 1024 * 1024;
+const MEDIA_UPLOAD_ID_RE = /^[0-9a-f-]{36}$/;
+const MEDIA_UPLOAD_EXTENSIONS = new Set([
+  "3gp",
+  "aac",
+  "aif",
+  "aiff",
+  "avi",
+  "caf",
+  "flac",
+  "m4a",
+  "mkv",
+  "mov",
+  "mp3",
+  "mp4",
+  "mpeg",
+  "mpg",
+  "oga",
+  "ogg",
+  "opus",
+  "ts",
+  "wav",
+  "webm",
+  "wma",
+]);
+const MEDIA_UPLOAD_LICENSES = new Set(["original", "permission", "cc0", "cc-by", "unknown"]);
+
+interface MediaUploadStartBody {
+  password?: string;
+  fileName?: string;
+  fileSize?: number;
+  contentType?: string;
+}
+
+interface MediaUploadCompleteBody {
+  password?: string;
+  id?: string;
+  uploadId?: string;
+  parts?: R2UploadedPartLike[];
+  keyPrefix?: string;
+  title?: string;
+  artist?: string;
+  license?: string;
+  attribution?: string;
+  sourceUrl?: string;
+  author?: string;
+  deployStaging?: boolean;
+  rightsConfirmed?: boolean;
+}
+
+interface MediaUploadAbortBody {
+  password?: string;
+  id?: string;
+  uploadId?: string;
+}
+
+function mediaUploadKey(id: string): string {
+  return `media-import/${id}`;
+}
+
+function randomMediaToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return [...bytes].map(value => value.toString(16).padStart(2, "0")).join("");
+}
+
+function validatedMediaFileName(value: unknown): string | null {
+  if (typeof value !== "string" || value.length < 3 || value.length > 180) {
+    return null;
+  }
+  const name = value.replaceAll("\\", "/").split("/").pop()?.trim() || "";
+  const extension = name.split(".").pop()?.toLowerCase() || "";
+  return name && MEDIA_UPLOAD_EXTENSIONS.has(extension) ? name : null;
+}
+
+function mediaUploadUnavailable(env: Env): Response | null {
+  return env.MEDIA_UPLOADS ? null : json({ ok: false, error: "direct media uploads are not configured" }, 503, env);
+}
+
+async function dispatchMediaImport(
+  env: Env,
+  inputs: Record<string, string>,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const workflow = env.MEDIA_IMPORT_WORKFLOW_FILE || "deploy-staging.yml";
+  const response = await fetch(
+    `https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/${workflow}/dispatches`,
+    {
+      method: "POST",
+      headers: { ...ghHeaders(env), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ref: env.MEDIA_IMPORT_BRANCH || env.GITHUB_BRANCH,
+        inputs,
+      }),
+    },
+  );
+  return response.status === 204
+    ? { ok: true }
+    : { ok: false, error: `media import dispatch failed: ${response.status} ${await response.text()}` };
+}
+
+async function handleMediaUploadStart(body: MediaUploadStartBody, env: Env): Promise<Response> {
+  if (env.EDITOR_PASSWORD && body.password !== env.EDITOR_PASSWORD) {
+    return json({ ok: false, error: "unauthorized" }, 401, env);
+  }
+  const unavailable = mediaUploadUnavailable(env);
+  if (unavailable) {
+    return unavailable;
+  }
+  const fileName = validatedMediaFileName(body.fileName);
+  const fileSize = Number(body.fileSize);
+  const contentType = typeof body.contentType === "string" ? body.contentType.slice(0, 120) : "";
+  if (!fileName) {
+    return json({ ok: false, error: "choose a supported audio or video file" }, 400, env);
+  }
+  if (!Number.isSafeInteger(fileSize) || fileSize <= 0 || fileSize > MEDIA_UPLOAD_MAX_BYTES) {
+    return json({ ok: false, error: "file size must be between 1 byte and 1 GiB" }, 400, env);
+  }
+  if (contentType && !/^(audio|video)\//i.test(contentType) && contentType !== "application/octet-stream") {
+    return json({ ok: false, error: "file content type must be audio or video" }, 400, env);
+  }
+
+  const id = crypto.randomUUID();
+  const upload = await env.MEDIA_UPLOADS!.createMultipartUpload(mediaUploadKey(id), {
+    httpMetadata: { contentType: contentType || "application/octet-stream" },
+    customMetadata: {
+      downloadToken: randomMediaToken(),
+      fileName: encodeURIComponent(fileName),
+      expectedSize: String(fileSize),
+      createdAt: new Date().toISOString(),
+    },
+  });
+  return json(
+    {
+      ok: true,
+      id,
+      uploadId: upload.uploadId,
+      partSize: MEDIA_UPLOAD_PART_BYTES,
+      maxSize: MEDIA_UPLOAD_MAX_BYTES,
+    },
+    201,
+    env,
+  );
+}
+
+async function handleMediaUploadPart(request: Request, url: URL, env: Env): Promise<Response> {
+  if (env.EDITOR_PASSWORD && request.headers.get("X-Editor-Password") !== env.EDITOR_PASSWORD) {
+    return json({ ok: false, error: "unauthorized" }, 401, env);
+  }
+  const unavailable = mediaUploadUnavailable(env);
+  if (unavailable) {
+    return unavailable;
+  }
+  const match = url.pathname.match(/^\/media-upload\/([0-9a-f-]{36})\/parts\/(\d{1,5})$/);
+  const id = match?.[1] || "";
+  const partNumber = Number(match?.[2]);
+  const uploadId = url.searchParams.get("uploadId") || "";
+  const contentLength = Number(request.headers.get("Content-Length") || 0);
+  if (
+    !MEDIA_UPLOAD_ID_RE.test(id)
+    || !uploadId
+    || uploadId.length > 200
+    || !Number.isInteger(partNumber)
+    || partNumber < 1
+    || partNumber > 10_000
+    || !request.body
+  ) {
+    return json({ ok: false, error: "invalid multipart upload request" }, 400, env);
+  }
+  if (contentLength > MEDIA_UPLOAD_PART_BYTES) {
+    return json({ ok: false, error: "upload part exceeds the negotiated part size" }, 413, env);
+  }
+  try {
+    const upload = env.MEDIA_UPLOADS!.resumeMultipartUpload(mediaUploadKey(id), uploadId);
+    const part = await upload.uploadPart(partNumber, request.body);
+    return json({ ok: true, part }, 200, env);
+  } catch (error) {
+    return json(
+      { ok: false, error: `upload part failed: ${error instanceof Error ? error.message : error}` },
+      502,
+      env,
+    );
+  }
+}
+
+function validateMediaUploadMetadata(
+  body: MediaUploadCompleteBody,
+):
+  | { ok: true; metadata: Required<Pick<MediaUploadCompleteBody, "keyPrefix" | "title" | "license">> }
+  | { ok: false; error: string } {
+  const keyPrefix = (body.keyPrefix || "battle_custom").trim();
+  const title = (body.title || "").trim();
+  const license = (body.license || "unknown").trim();
+  if (!/^[a-z0-9_]{2,40}$/.test(keyPrefix)) {
+    return { ok: false, error: "key prefix must use lowercase letters, numbers, and underscores" };
+  }
+  if (!title || title.length > 160) {
+    return { ok: false, error: "track title is required and must be at most 160 characters" };
+  }
+  if (!MEDIA_UPLOAD_LICENSES.has(license)) {
+    return { ok: false, error: "select a valid upload license" };
+  }
+  if ((body.artist || "").length > 120 || (body.attribution || "").length > 500 || (body.author || "").length > 40) {
+    return { ok: false, error: "artist, attribution, or staff name is too long" };
+  }
+  if (body.sourceUrl && (body.sourceUrl.length > 500 || !/^https?:\/\//i.test(body.sourceUrl))) {
+    return { ok: false, error: "source URL is invalid" };
+  }
+  if (license === "cc-by" && (!(body.attribution || "").trim() || !(body.sourceUrl || "").trim())) {
+    return { ok: false, error: "CC BY uploads require attribution and a public source URL" };
+  }
+  if (body.rightsConfirmed !== true) {
+    return { ok: false, error: "rights confirmation is required" };
+  }
+  return { ok: true, metadata: { keyPrefix, title, license } };
+}
+
+async function handleMediaUploadComplete(body: MediaUploadCompleteBody, request: Request, env: Env): Promise<Response> {
+  if (env.EDITOR_PASSWORD && body.password !== env.EDITOR_PASSWORD) {
+    return json({ ok: false, error: "unauthorized" }, 401, env);
+  }
+  const unavailable = mediaUploadUnavailable(env);
+  if (unavailable) {
+    return unavailable;
+  }
+  const metadataResult = validateMediaUploadMetadata(body);
+  if (!metadataResult.ok) {
+    return json({ ok: false, error: metadataResult.error }, 400, env);
+  }
+  const id = body.id || "";
+  const uploadId = body.uploadId || "";
+  const parts = Array.isArray(body.parts)
+    ? body.parts
+        .map(part => ({ partNumber: Number(part.partNumber), etag: String(part.etag || "") }))
+        .sort((a, b) => a.partNumber - b.partNumber)
+    : [];
+  if (
+    !MEDIA_UPLOAD_ID_RE.test(id)
+    || !uploadId
+    || uploadId.length > 200
+    || parts.length === 0
+    || parts.length > 10_000
+    || parts.some((part, index) => part.partNumber !== index + 1 || !part.etag || part.etag.length > 200)
+  ) {
+    return json({ ok: false, error: "multipart completion data is invalid" }, 400, env);
+  }
+
+  const key = mediaUploadKey(id);
+  try {
+    await env.MEDIA_UPLOADS!.resumeMultipartUpload(key, uploadId).complete(parts);
+  } catch (error) {
+    return json(
+      { ok: false, error: `upload completion failed: ${error instanceof Error ? error.message : error}` },
+      502,
+      env,
+    );
+  }
+  const object = await env.MEDIA_UPLOADS!.head(key);
+  const downloadToken = object?.customMetadata?.downloadToken || "";
+  const encodedFileName = object?.customMetadata?.fileName || "";
+  const expectedSize = Number(object?.customMetadata?.expectedSize);
+  if (!object || !downloadToken || !encodedFileName) {
+    await env.MEDIA_UPLOADS!.delete(key);
+    return json({ ok: false, error: "completed upload metadata is missing" }, 502, env);
+  }
+  if (!Number.isSafeInteger(expectedSize) || object.size !== expectedSize) {
+    await env.MEDIA_UPLOADS!.delete(key);
+    return json({ ok: false, error: "completed upload size does not match the selected file" }, 400, env);
+  }
+  if (object.size > MEDIA_UPLOAD_MAX_BYTES) {
+    await env.MEDIA_UPLOADS!.delete(key);
+    return json({ ok: false, error: "completed upload exceeds the 1 GiB limit" }, 413, env);
+  }
+
+  const fileName = decodeURIComponent(encodedFileName);
+  const uploadUrl = `${new URL(request.url).origin}/media-upload/${id}?token=${encodeURIComponent(downloadToken)}`;
+  const dispatched = await dispatchMediaImport(env, {
+    operation: "import_music",
+    source_urls: "",
+    upload_url: uploadUrl,
+    upload_name: fileName,
+    upload_title: metadataResult.metadata.title,
+    upload_artist: (body.artist || "").trim().slice(0, 120),
+    upload_license: metadataResult.metadata.license,
+    upload_attribution: (body.attribution || "").trim().slice(0, 500),
+    upload_source_url: (body.sourceUrl || "").trim().slice(0, 500),
+    key_prefix: metadataResult.metadata.keyPrefix,
+    split_chapters: "false",
+    require_creative_commons: "false",
+    deploy_staging: body.deployStaging === true ? "true" : "false",
+    author: (body.author || "").trim().slice(0, 40),
+  });
+  if (!dispatched.ok) {
+    await env.MEDIA_UPLOADS!.delete(key);
+    return json({ ok: false, error: dispatched.error }, 502, env);
+  }
+  return json({ ok: true, queued: true, id, fileName, size: object.size }, 202, env);
+}
+
+async function handleMediaUploadAbort(body: MediaUploadAbortBody, env: Env): Promise<Response> {
+  if (env.EDITOR_PASSWORD && body.password !== env.EDITOR_PASSWORD) {
+    return json({ ok: false, error: "unauthorized" }, 401, env);
+  }
+  const unavailable = mediaUploadUnavailable(env);
+  if (unavailable) {
+    return unavailable;
+  }
+  const id = body.id || "";
+  const uploadId = body.uploadId || "";
+  if (!MEDIA_UPLOAD_ID_RE.test(id) || !uploadId || uploadId.length > 200) {
+    return json({ ok: false, error: "invalid multipart upload" }, 400, env);
+  }
+  try {
+    await env.MEDIA_UPLOADS!.resumeMultipartUpload(mediaUploadKey(id), uploadId).abort();
+  } catch {
+    // A completed session cannot be aborted; deleting the object below is still authoritative.
+  }
+  await env.MEDIA_UPLOADS!.delete(mediaUploadKey(id));
+  return json({ ok: true, aborted: true }, 200, env);
+}
+
+async function handleMediaUploadObject(request: Request, url: URL, env: Env): Promise<Response> {
+  const unavailable = mediaUploadUnavailable(env);
+  if (unavailable) {
+    return unavailable;
+  }
+  const id = url.pathname.match(/^\/media-upload\/([0-9a-f-]{36})$/)?.[1] || "";
+  const token = url.searchParams.get("token") || "";
+  if (!MEDIA_UPLOAD_ID_RE.test(id) || token.length < 32 || token.length > 128) {
+    return json({ ok: false, error: "invalid upload download request" }, 400, env);
+  }
+  const key = mediaUploadKey(id);
+  const object = await env.MEDIA_UPLOADS!.get(key);
+  if (!object || object.customMetadata?.downloadToken !== token) {
+    return json({ ok: false, error: "upload not found" }, 404, env);
+  }
+  if (request.method === "DELETE") {
+    await env.MEDIA_UPLOADS!.delete(key);
+    return json({ ok: true, deleted: true }, 200, env);
+  }
+  const encodedFileName = object.customMetadata?.fileName || "upload.bin";
+  const fileName = decodeURIComponent(encodedFileName).replaceAll(/[\r\n"]/g, "_");
+  return new Response(object.body, {
+    status: 200,
+    headers: {
+      "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
+      "Content-Length": String(object.size),
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+      ETag: object.httpEtag,
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
+
 interface MediaImportBody {
   password?: string;
   urls?: string[];
@@ -1612,29 +2003,25 @@ async function handleMediaImport(body: MediaImportBody, env: Env): Promise<Respo
   if (!/^[a-z0-9_]{2,40}$/.test(keyPrefix)) {
     return json({ ok: false, error: "key prefix must use lowercase letters, numbers, and underscores" }, 400, env);
   }
-  const workflow = env.MEDIA_IMPORT_WORKFLOW_FILE || "deploy-staging.yml";
-  const dispatch = await fetch(
-    `https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/${workflow}/dispatches`,
-    {
-      method: "POST",
-      headers: { ...ghHeaders(env), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ref: env.GITHUB_BRANCH,
-        inputs: {
-          operation: "import_music",
-          source_urls: urls.join("\n"),
-          key_prefix: keyPrefix,
-          split_chapters: body.splitChapters === false ? "false" : "true",
-          require_creative_commons: body.requireCreativeCommons === true ? "true" : "false",
-          deploy_staging: body.deployStaging === true ? "true" : "false",
-          author: (body.author || "").slice(0, 40),
-        },
-      }),
-    },
-  );
-  return dispatch.status === 204
+  const dispatched = await dispatchMediaImport(env, {
+    operation: "import_music",
+    source_urls: urls.join("\n"),
+    upload_url: "",
+    upload_name: "",
+    upload_title: "",
+    upload_artist: "",
+    upload_license: "",
+    upload_attribution: "",
+    upload_source_url: "",
+    key_prefix: keyPrefix,
+    split_chapters: body.splitChapters === false ? "false" : "true",
+    require_creative_commons: body.requireCreativeCommons === true ? "true" : "false",
+    deploy_staging: body.deployStaging === true ? "true" : "false",
+    author: (body.author || "").slice(0, 40),
+  });
+  return dispatched.ok
     ? json({ ok: true, queued: true }, 202, env)
-    : json({ ok: false, error: `media import dispatch failed: ${dispatch.status} ${await dispatch.text()}` }, 502, env);
+    : json({ ok: false, error: dispatched.error }, 502, env);
 }
 
 async function handleMediaJobs(password: string | undefined, env: Env): Promise<Response> {
@@ -1660,7 +2047,12 @@ async function handleMediaJobs(password: string | undefined, env: Env): Promise<
     }[];
   };
   return json(
-    { ok: true, runs: (data.workflow_runs || []).filter(run => run.display_title === "Import YouTube BGM") },
+    {
+      ok: true,
+      runs: (data.workflow_runs || []).filter(
+        run => run.display_title === "Import BGM" || run.display_title === "Import YouTube BGM",
+      ),
+    },
     200,
     env,
   );
@@ -1675,6 +2067,39 @@ export default {
     }
     if (url.pathname === "/health") {
       return json({ ok: true }, 200, env);
+    }
+    if (/^\/media-upload\/[0-9a-f-]{36}\/parts\/\d{1,5}$/.test(url.pathname) && request.method === "POST") {
+      return handleMediaUploadPart(request, url, env);
+    }
+    if (/^\/media-upload\/[0-9a-f-]{36}$/.test(url.pathname) && ["GET", "DELETE"].includes(request.method)) {
+      return handleMediaUploadObject(request, url, env);
+    }
+    if (url.pathname === "/media-upload/start" && request.method === "POST") {
+      let body: MediaUploadStartBody;
+      try {
+        body = (await request.json()) as MediaUploadStartBody;
+      } catch {
+        return json({ ok: false, error: "invalid JSON body" }, 400, env);
+      }
+      return handleMediaUploadStart(body, env);
+    }
+    if (url.pathname === "/media-upload/complete" && request.method === "POST") {
+      let body: MediaUploadCompleteBody;
+      try {
+        body = (await request.json()) as MediaUploadCompleteBody;
+      } catch {
+        return json({ ok: false, error: "invalid JSON body" }, 400, env);
+      }
+      return handleMediaUploadComplete(body, request, env);
+    }
+    if (url.pathname === "/media-upload/abort" && request.method === "POST") {
+      let body: MediaUploadAbortBody;
+      try {
+        body = (await request.json()) as MediaUploadAbortBody;
+      } catch {
+        return json({ ok: false, error: "invalid JSON body" }, 400, env);
+      }
+      return handleMediaUploadAbort(body, env);
     }
 
     if (url.pathname === "/deploy" && request.method === "POST") {
