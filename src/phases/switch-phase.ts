@@ -1,5 +1,6 @@
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
+import { isCoopV2ReplacementCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   addressCoopFaintSwitchChoiceData,
@@ -539,6 +540,9 @@ export class SwitchPhase extends BattlePhase {
       fieldIndex,
       (slotIndex: number, option: PartyOption) => {
         if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
+          if (!this.stageVersusHostOwnReplacement(slotIndex)) {
+            return;
+          }
           const switchType = option === PartyOption.PASS_BATON ? SwitchType.BATON_PASS : this.switchType;
           globalScene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
           this.maybePushVersusHostReplacementCheckpoint();
@@ -547,6 +551,43 @@ export class SwitchPhase extends BattlePhase {
       },
       PartyUiHandler.FilterNonFainted,
     );
+  }
+
+  /**
+   * Showdown's host-owned faint uses the vanilla player-party picker because Showdown is not a co-op game
+   * mode. Once replacement Authority V2 is negotiated, that must not skip the typed pre-summon proposal:
+   * the post-summon checkpoint phase can commit only proposals staged at the immutable faint address.
+   */
+  private stageVersusHostOwnReplacement(slotIndex: number): boolean {
+    const controller = getCoopController();
+    if (!isVersusSession() || controller?.role !== "host" || !isCoopV2ReplacementCutoverActive()) {
+      return true;
+    }
+    const sourceAddress = this.faintSourceAddress ?? {
+      wave: globalScene.currentBattle.waveIndex,
+      turn: globalScene.currentBattle.turn ?? 0,
+      occurrence: 0,
+    };
+    const replacement = globalScene.getPlayerParty()[slotIndex];
+    const speciesId = replacement?.species?.speciesId ?? 0;
+    const retained = commitFaintSwitchAuthorityIntent({
+      payload: {
+        fieldIndex: this.fieldIndex,
+        partySlot: slotIndex,
+        // V2 consumes the typed fields below, but keep this compatibility payload dense so the legacy
+        // sparse-array rejection class cannot re-enter if this seam is inspected during a mixed build.
+        data: [0, speciesId, controller.sessionEpoch, 0, COOP_FAINT_SWITCH_RESOLUTION_OWNER, sourceAddress.occurrence],
+      },
+      ownerRole: controller.role,
+      localRole: controller.role,
+      speciesId,
+      ...sourceAddress,
+    });
+    if (!retained) {
+      failCoopSharedSession("The Showdown host replacement could not be staged in Authority V2.");
+      return false;
+    }
+    return true;
   }
 
   /**
