@@ -81,6 +81,16 @@ test("the replacement picker drive gates its battle-prompt advancer to picker-op
     harness,
     /const REPLACEMENT_PICKER_OPEN = \/Start Phase \(\?:SwitchPhase\|CoopGuestFaintSwitchPhase\)\|guest own-faint picker OPEN\//u,
   );
+  // Track R run 29673757003 depth lane: the guest-owned replacement drive created a fresh prompt
+  // advancer whose per-call ledger forgot prior input. It re-pressed stale host Command/Message/EXP
+  // events into the live faint boundary. Prompt ownership is session-wide, and an append-only event
+  // may spend input only while it remains the browser's latest semantic surface.
+  const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
+  assert.match(harness, /this\.consumedBattlePromptInstances = new Set\(\)/u);
+  assert.match(campaign, /rig\.consumedBattlePromptInstances \?\?= new Set\(\)/u);
+  assert.match(campaign, /const consumedInstances = rig\.consumedBattlePromptInstances/u);
+  assert.match(campaign, /if \(latestSurface\?\.index !== readyEvent\.index\) \{/u);
+  assert.match(campaign, /cursors\.set\(client\.label, readyEvent\.index \+ 1\);\s*continue;/u);
 });
 
 test("the replacement picker drive short-circuits a committed pick and guards re-entry (30-wave lane)", async () => {

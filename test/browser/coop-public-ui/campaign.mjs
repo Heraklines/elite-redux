@@ -532,7 +532,24 @@ export function createBattlePromptAdvancer(
   const expectedAddress =
     expectedCommandAddress ?? (requireSharedCommandAddress ? currentSharedCommandAddress(clients, purpose) : null);
   const cursors = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
-  const consumedInstances = new Set();
+  // Consumption belongs to the browser session, not one helper invocation. Several public journeys
+  // create a fresh advancer at the same battle boundary (post-turn -> faint picker -> next command).
+  // A per-call set forgets every prior Space and can replay an old readiness event into a later UI.
+  rig.consumedBattlePromptInstances ??= new Set();
+  const consumedInstances = rig.consumedBattlePromptInstances;
+  const instanceKeyFor = (client, observation) =>
+    JSON.stringify([
+      client.label,
+      observation.surfaceId,
+      observation.phase,
+      observation.address?.epoch ?? null,
+      observation.address?.wave ?? null,
+      observation.address?.turn ?? null,
+      observation.membershipRevision ?? null,
+      observation.connectionGeneration ?? null,
+      observation.phaseInstance,
+      observation.surfaceGeneration ?? null,
+    ]);
   return async () => {
     for (const client of clients) {
       const readyEvent = client.evidence.events.slice(cursors.get(client.label) ?? 0).find(event => {
@@ -548,7 +565,7 @@ export function createBattlePromptAdvancer(
           && observation.address.wave > 0
           && Number.isSafeInteger(observation.address?.turn)
           && observation.address.turn > 0;
-        const instanceKey = `${client.label}:${observation.surfaceId}:${observation.phaseInstance}`;
+        const instanceKey = instanceKeyFor(client, observation);
         return (
           BATTLE_PROMPT_PHASES.has(observation.surfaceId)
           && (expectedAddress == null ? hasLiveBattleAddress : observedAddress === expectedAddress)
@@ -566,19 +583,28 @@ export function createBattlePromptAdvancer(
       if (!readyEvent) {
         continue;
       }
+      // Evidence is append-only; an old ready event remains searchable after its UI has been replaced.
+      // It authorizes input only while it is still the browser's CURRENT semantic surface. Run
+      // 29673757003's depth lane recreated this helper after a faint and re-pressed stale CommandPhase,
+      // MessagePhase and ExpPhase events into the live SwitchPhase boundary. Retire stale candidates
+      // without spending a key; the next poll can admit the current prompt if one exists.
+      const latestSurface = client.evidence.findLastSemanticSurface(cursors.get(client.label) ?? 0);
+      if (latestSurface?.index !== readyEvent.index) {
+        cursors.set(client.label, readyEvent.index + 1);
+        continue;
+      }
       // A live party picker (faint replacement OR a Mystery-encounter `selectPokemonForOption`
       // sub-prompt) means the intro/narration chain has ALREADY yielded to the party UI: the matched
       // message event is stale, and one more Space would fall through into the picker and select a
       // default slot (run 29613070126: the faint picker's fainted-field submenu lacks send-out, so
       // the slot drive threw "target not in options"; the ME party class is the same fall-through
       // hazard). Leave the picker to driveReplacement / driveMysteryPartyPicker.
-      const latestSurface = client.evidence.findLastSemanticSurface(cursors.get(client.label) ?? 0);
       if (isPartyPickerSurfaceOpen(latestSurface?.observation)) {
         continue;
       }
       cursors.set(client.label, readyEvent.index + 1);
       const { surfaceId, phase, phaseInstance } = readyEvent.observation;
-      consumedInstances.add(`${client.label}:${surfaceId}:${phaseInstance}`);
+      consumedInstances.add(instanceKeyFor(client, readyEvent.observation));
       const statName = phase === "ExpPhase" ? "postBattleExpPrompts" : "battleMessagePrompts";
       stats[statName] = (stats[statName] ?? 0) + 1;
       client.evidence.record("campaign-battle-prompt-advance", {

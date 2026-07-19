@@ -1638,6 +1638,10 @@ export class DuoPublicUiRig {
     // prior drive) already committed; guarding on this prevents a second nav-submit that would hang
     // forever on a send-out submenu that never reappears (run 29644735938, 30-wave lane).
     this.committedReplacementPickers = new Set();
+    // One public MESSAGE/EXP prompt generation can authorize at most one human-equivalent Space for
+    // the entire live browser session. createBattlePromptAdvancer is intentionally recreated at
+    // several boundaries; keeping the ledger here prevents a new helper from replaying stale evidence.
+    this.consumedBattlePromptInstances = new Set();
     this.lastSharedSurfaceAddress = new Map();
     this.activeBattleWave = null;
     this.pairRoleCursors = null;

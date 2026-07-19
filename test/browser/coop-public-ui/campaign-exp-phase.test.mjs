@@ -505,6 +505,36 @@ test("only ready active local battle narration and EXP instances advance once on
   );
 });
 
+test("battle prompt consumption survives helper recreation and stale ready surfaces never spend input", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const from = { authority: 0, renderer: 0 };
+  const stats = { battleMessagePrompts: 0, postBattleExpPrompts: 0 };
+  authority.evidence.pushCommandSurface();
+  renderer.evidence.pushCommandSurface();
+  authority.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 31);
+
+  const first = createBattlePromptAdvancer(rig, from, stats, "first-driver");
+  assert.equal(await first(), true, "the visibly current prompt is driven once");
+  assert.equal(authority.presses.length, 1);
+
+  const recreated = createBattlePromptAdvancer(rig, from, stats, "recreated-driver");
+  assert.equal(await recreated(), false, "a recreated helper must retain the session's consumed prompt ledger");
+  assert.equal(authority.presses.length, 1, "the old prompt receives no second Space");
+
+  // Append a non-ready semantic surface that supersedes an otherwise-ready historical prompt.
+  // A fresh driver scans from the old cursor but must respect what the browser currently displays.
+  authority.evidence.pushBattleReadiness("battle:message", "FaintPhase", false, 32);
+  const afterSupersession = createBattlePromptAdvancer(rig, from, stats, "stale-driver");
+  assert.equal(await afterSupersession(), false, "a superseded ready event is evidence, not current input authority");
+  assert.equal(authority.presses.length, 1);
+
+  authority.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 33);
+  assert.equal(await afterSupersession(), true, "a later visibly-current prompt generation remains drivable");
+  assert.equal(authority.presses.length, 2);
+});
+
 // Track R cycle 4 - the wave-3-turn-2 LevelUpPhase co-op deadlock (campaign run 29644735938,
 // 3-wave animations-on-surface). The host wins wave 3, and the FIRST level-up of the run opens
 // LevelUpPhase, which shows a level-up MESSAGE and then promptLevelUpStats - a TWO-step human-action
