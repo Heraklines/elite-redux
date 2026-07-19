@@ -30,7 +30,6 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
-import type { Phase } from "#app/phase";
 import { setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { type CoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -51,6 +50,7 @@ import {
   buildShowdownDuo,
   type CoopResyncProbe,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
@@ -172,53 +172,17 @@ describe.skipIf(!RUN)("Showdown versus - HOST-faints replacement ordering (two-e
     });
   }
 
-  /**
-   * Drive the guest's REAL turn-`turn` machinery (TurnInitPhase -> TurnStartPhase -> the replay pump)
-   * exactly as production does, stopping the instant a CommandPhase becomes the current phase (the guest's
-   * own command opens). Records the enemy-lead species AT THE MOMENT the command opens - the axis the bug
-   * corrupts. Stubs the guest scene's command-UI setMode to a no-op (headless). Throws on a no-progress
-   * stall. MUST be called inside withClient(guestCtx, ...).
-   */
+  /** Drive the retained V2 replacement entry through its real phase queue and open the stated command surface. */
   async function driveGuestToCommand(
     rig: ShowdownDuoRig,
   ): Promise<{ commandOpened: boolean; enemyAtCommand: { sp: number; fainted: boolean; active: boolean } }> {
-    const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
-    const realSetMode = ui.setMode.bind(ui);
-    ui.setMode = (...args: unknown[]): unknown => {
-      if (args[0] === UiMode.COMMAND || args[0] === UiMode.MESSAGE || args[0] === UiMode.FIGHT) {
-        return Promise.resolve();
-      }
-      return realSetMode(...args);
+    const command = await driveClientPhaseQueueTo(rig.guestScene, "CommandPhase");
+    command.start();
+    await drainLoopback();
+    return {
+      commandOpened: command.phaseName === "CommandPhase" && rig.guestScene.ui.getMode() === UiMode.COMMAND,
+      enemyAtCommand: guestEnemyLead(rig),
     };
-    try {
-      const pm = rig.guestScene.phaseManager;
-      pm.create("TurnInitPhase").start();
-      await drainLoopback();
-      let last: Phase | null = null;
-      let stall = 0;
-      for (let i = 0; i < 256; i++) {
-        const cur = pm.getCurrentPhase();
-        if (cur == null) {
-          break;
-        }
-        if (cur.phaseName === "CommandPhase") {
-          return { commandOpened: true, enemyAtCommand: guestEnemyLead(rig) };
-        }
-        if (cur === last) {
-          if (++stall > 24) {
-            throw new Error(`guest turn-init HANG: stuck on ${cur.phaseName}`);
-          }
-        } else {
-          stall = 0;
-        }
-        last = cur;
-        cur.start();
-        await drainLoopback();
-      }
-      return { commandOpened: false, enemyAtCommand: guestEnemyLead(rig) };
-    } finally {
-      ui.setMode = realSetMode;
-    }
   }
 
   it("(i) HOST faint -> the guest's next command opens with the host's replacement RENDERED, not an empty enemy", async () => {

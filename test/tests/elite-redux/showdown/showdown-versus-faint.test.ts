@@ -55,6 +55,7 @@ import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-comman
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import { BattlerIndex } from "#enums/battler-index";
+import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -363,9 +364,10 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       });
 
     // GUEST replays turn N+1: the pump consumes the replacement checkpoint and OPENS the guest's OWN
-    // CommandPhase (the fix) instead of parking in replay; drive that command to ship WATERFALL. The
-    // guest ships over ITS transport (guestPeer) - beginShowdownBattle points getShowdownRelay at it for
-    // the send, then restores the host relay (the harness shares the process-global showdown state).
+    // CommandPhase (the fix) instead of parking in replay; drive COMMAND -> FIGHT -> WATERFALL through
+    // the same public UI handlers a browser uses. The guest ships over ITS transport (guestPeer) -
+    // beginShowdownBattle points getShowdownRelay at it for the send, then restores the host relay (the
+    // one-process harness shares this module state; two browsers each own an independent instance).
     let shipped: SerializedCommand | null = null;
     const offTap = rig.pair.host.onMessage(m => {
       if (m.t === "showdownCommand" && m.turn === turn + 1) {
@@ -373,46 +375,38 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       }
     });
     await withClient(rig.guestCtx, async () => {
-      // Keep the guest's command UI open a NO-OP headlessly (the guest scene lacks a full command
-      // handler); we drive the pick directly via handleCommand below.
-      const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
-      const realSetMode = ui.setMode.bind(ui);
-      ui.setMode = (...args: unknown[]): unknown => {
-        if (args[0] === UiMode.COMMAND || args[0] === UiMode.MESSAGE || args[0] === UiMode.FIGHT) {
-          return Promise.resolve();
-        }
-        return realSetMode(...args);
-      };
-      try {
-        await driveGuestReplayTurn(rig.guestScene, turn + 1);
-        const cur = rig.guestScene.phaseManager.getCurrentPhase();
-        // RED-PROOF ANCHOR (defect 1): with the seat-slot bug the pump never opens the command turn -
-        // the current phase stays CoopReplayTurnPhase (the guest parked in replay) and this fails.
-        expect(cur?.phaseName, "the guest OPENED its own CommandPhase for turn N+1 (not replay) - defect-1 fix").toBe(
-          "CommandPhase",
-        );
-        // Production's phase manager starts this newly-current CommandPhase before
-        // keyboard input. The intercepted test manager deliberately does not; run
-        // the real start chokepoint so Authority V2 observes the same installed
-        // guest-owned command control a browser proves before handleCommand.
-        (cur as unknown as { start: () => void }).start();
-        const own = getShowdownOwnManifest();
-        const opp = getShowdownOpponentManifest();
-        if (own != null && opp != null) {
-          beginShowdownBattle(own, opp, rig.guestPeer);
-          try {
-            (cur as unknown as { handleCommand: (c: Command, cursor: number) => boolean }).handleCommand(
-              Command.FIGHT,
-              GUEST_TURN2_MOVE_SLOT,
-            );
-          } finally {
-            beginShowdownBattle(own, opp, rig.hostRelay);
-          }
-        }
-        await drainLoopback();
-      } finally {
-        ui.setMode = realSetMode;
+      await driveGuestReplayTurn(rig.guestScene, turn + 1);
+      const cur = rig.guestScene.phaseManager.getCurrentPhase();
+      // RED-PROOF ANCHOR (defect 1): with the seat-slot bug the pump never opens the command turn -
+      // the current phase stays CoopReplayTurnPhase (the guest parked in replay) and this fails.
+      expect(cur?.phaseName, "the guest OPENED its own CommandPhase for turn N+1 (not replay) - defect-1 fix").toBe(
+        "CommandPhase",
+      );
+      // Production's phase manager starts this newly-current CommandPhase before keyboard input. The
+      // intercepted test manager deliberately does not; run the real start chokepoint so Authority V2
+      // observes the installed guest-owned command control before the public UI accepts a choice.
+      cur.start();
+      await drainLoopback();
+      const own = getShowdownOwnManifest();
+      const opp = getShowdownOpponentManifest();
+      if (own == null || opp == null) {
+        throw new Error("the Showdown manifests disappeared before the guest command surface opened");
       }
+      beginShowdownBattle(own, opp, rig.guestPeer);
+      try {
+        expect(rig.guestScene.ui.getMode(), "the guest opened its real command menu").toBe(UiMode.COMMAND);
+        expect(rig.guestScene.ui.processInput(Button.ACTION), "the guest selected Fight through COMMAND UI").toBe(true);
+        expect(rig.guestScene.ui.getMode(), "the guest opened its real move picker").toBe(UiMode.FIGHT);
+        expect(rig.guestScene.ui.processInput(Button.RIGHT), "the guest moved to WATERFALL in the move grid").toBe(
+          true,
+        );
+        expect(rig.guestScene.ui.processInput(Button.ACTION), "the guest committed WATERFALL through FIGHT UI").toBe(
+          true,
+        );
+      } finally {
+        beginShowdownBattle(own, opp, rig.hostRelay);
+      }
+      await drainLoopback();
     });
     offTap();
 
