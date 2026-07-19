@@ -357,6 +357,69 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     duo.dispose();
   });
 
+  it("lets an authenticated replacement gap release its predecessor picker without applying out of order", async () => {
+    const clock = new FakeClock();
+    let predecessorReleased = false;
+    let releases = 0;
+    const appliedRevisions: number[] = [];
+    const guestLive: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "REPLACEMENT_COMMIT",
+      ownsControl: () => false,
+      releaseBlockedPredecessor: (_ctx, entry) => {
+        if (entry.kind !== "REPLACEMENT_COMMIT") {
+          return null;
+        }
+        releases += 1;
+        predecessorReleased = true;
+        return true;
+      },
+      applyMaterial: (_ctx, entry) => {
+        if (entry.revision === 1 && !predecessorReleased) {
+          return false;
+        }
+        appliedRevisions.push(entry.revision);
+        return true;
+      },
+      projectControl: () => null,
+    };
+    const duo = buildDeferredDuo(clock, guestLive);
+
+    // Revision 1 is admitted but its real turn material cannot settle while the faint picker is open.
+    duo.host.tapTurnCommit(turnTap("TURN/blocked-by-picker"));
+    await flushLoopback();
+    duo.flush("guest");
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 0 });
+    expect(appliedRevisions).toEqual([]);
+
+    // Revision 2 is the committed picker answer. It is still a ledger GAP, so it must not be admitted,
+    // applied, or receipted; only the address-exact predecessor-release seam may observe it.
+    duo.host.tapReplacementCommit({
+      proposal: {
+        sourceAddress: { epoch: SESSION.epoch, wave: 5, turn: 1, occurrence: 4, fieldIndex: 0 },
+        ownerSeatId: 1,
+        selected: { partySlot: 1, speciesId: 131 },
+      },
+      resolution: "fallback-auto",
+      successor: { kind: "terminal" },
+      legacyDigest: "legacy-replacement",
+    });
+    await flushLoopback();
+    duo.flush("guest");
+    expect(releases).toBe(1);
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 0 });
+    expect(appliedRevisions).toEqual([]);
+
+    // Authority-owned redelivery now retries revision 1, which can finish; the retained revision 2 then
+    // crosses the ordinary ordered admission/apply path. Canonical material order remains exactly [1, 2].
+    clock.advance(1_000);
+    await flushLoopback();
+    duo.flush("guest");
+    expect(appliedRevisions).toEqual([1, 2]);
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 2, applied: 2 });
+
+    duo.dispose();
+  });
+
   it("retries a deferred control without applying canonical material twice", async () => {
     const clock = new FakeClock();
     let applies = 0;

@@ -67,11 +67,9 @@ import {
   type CoopResyncProbe,
   type DuoRig,
   drainLoopback,
-  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
-  materializeGuestInputAfterReplacement,
   pumpDuoDestinations,
   setCoopHarnessLiveEvents,
   withClient,
@@ -222,12 +220,12 @@ describe.skipIf(!RUN)(
       // compatibility checkpoint directly. Both paths must materialize FENNEKIN and the SAME array swap.
       await withClient(rig.guestCtx, async () => {
         if (V2_REPLACEMENT_CUTOVER) {
-          await driveClientPhaseQueueTo(rig.guestScene, "host-owned replacement CoopFinalizeTurnPhase", {
-            matches: phase => phase.phaseName === "CoopFinalizeTurnPhase",
-            perPhaseTimeoutMs: 5_000,
-            pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
-          });
-          await materializeGuestInputAfterReplacement(rig.guestScene);
+          // The focused rig has already drained turn N and is parked on its synthetic boot TitlePhase.
+          // Production reaches the retained replacement through turn N+1's real replay wait, so drive that
+          // same public replay ingress instead of waiting for a finalize phase that cannot exist until the
+          // V2 carrier is consumed.
+          rig.guestScene.currentBattle.turn = turn + 1;
+          await driveGuestReplayTurn(rig.guestScene, turn + 1);
         } else {
           const envelope = rig.guestRuntime.battleStream.consumeCheckpoint();
           expect(envelope?.reason, "the host pushed the replacement checkpoint for its OWN faint (SOURCE fix)").toBe(

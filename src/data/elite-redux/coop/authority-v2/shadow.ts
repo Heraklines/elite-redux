@@ -191,6 +191,18 @@ export interface CoopV2LiveReplicaSeams {
    * `null` from projectControl must not sign a shadow controlInstalled receipt.
    */
   ownsControl(control: NonNullable<CoopNextControl>): boolean;
+  /**
+   * Release an exact local interaction surface that prevents the currently-admitted predecessor from
+   * reaching materialApplied. This is invoked only for an authenticated later entry that the ordered log
+   * classified as a gap. It may close that entry's address-exact modal terminal, but MUST NOT install the
+   * later entry's canonical state, project its successor, advance a ledger cursor, or emit a receipt.
+   *
+   * Replacement is the motivating causal chain: TURN_COMMIT revision N presents a faint picker; the
+   * REPLACEMENT_COMMIT at N+1 is the committed answer that closes it. Refusing to inspect N+1 until N
+   * materializes creates a cycle. This seam breaks only the modal edge while preserving strict state order.
+   * `null` means the live cutover does not own this entry kind.
+   */
+  releaseBlockedPredecessor?(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null;
   /** Install material into REAL engine state, or `null` only when {@link ownsEntry} is false. */
   applyMaterial(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null;
   /** Project control onto the REAL phase manager, or `null` only when {@link ownsControl} is false. */
@@ -930,6 +942,12 @@ export class CoopAuthorityV2Shadow {
             if (outcome.kind === "applied" && result.kind !== "duplicate-complete") {
               this.applied += 1;
             }
+          } else if (result.kind === "gap") {
+            // A later authenticated replacement may carry the exact terminal needed to let the currently
+            // admitted turn finish its presentation/finalize path. Release only that local modal edge; the
+            // gap entry remains unadmitted and emits no receipt until ordinary ordered redelivery reaches it.
+            // The live seam's address/owner checks make unrelated future entries inert.
+            this.releaseBlockedPredecessor(entry);
           }
           break;
         }
@@ -1073,6 +1091,23 @@ export class CoopAuthorityV2Shadow {
       return false;
     }
     return this.shadowApplyMaterial(ctx, entry);
+  }
+
+  /**
+   * Best-effort causal predecessor release for a validated gap entry. This intentionally has no shadow
+   * fallback: pure shadow has no real modal to release, while a live owned entry must pass its exact
+   * surface checks. No return value can advance replica truth; ordered applyEntry remains the sole receipt
+   * and ledger path.
+   */
+  private releaseBlockedPredecessor(entry: CoopAuthorityEntry): void {
+    if (this.liveReplica?.ownsEntry(entry) !== true || this.liveReplica.releaseBlockedPredecessor == null) {
+      return;
+    }
+    try {
+      this.liveReplica.releaseBlockedPredecessor(this.ctx, entry);
+    } catch (error) {
+      this.fault(`releaseBlockedPredecessor(rev=${entry.revision})`, error);
+    }
   }
 
   /** The shadow material applier: record the admitted entry into shadow state (never engine state). */

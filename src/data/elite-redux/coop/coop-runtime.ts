@@ -3611,6 +3611,20 @@ function buildCoopV2LiveSeams(
     ownsControl: control =>
       (surfaces.turn && control.kind === "COMMAND_FRONTIER")
       || (surfaces.replacement && control.kind === "REPLACEMENT"),
+    releaseBlockedPredecessor: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null => {
+      if (entry.kind !== "REPLACEMENT_COMMIT" || !surfaces.replacement) {
+        return null;
+      }
+      // Do not apply the post-summon carrier out of order. The only permitted early effect is consuming
+      // the address-exact committed answer on the old picker that is preventing the prior TURN_COMMIT from
+      // finalizing. The replacement entry remains a gap, sends no receipt, and will be fully applied only
+      // after the predecessor advances the ordered ledger.
+      const image = decodeReplacementCommitMaterial(entry);
+      if (image == null) {
+        return false;
+      }
+      return materializeCoopV2ReplacementPickerTerminal(image, runtime.controller.localSeatId, runtime.opState);
+    },
     applyMaterial: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null => {
       if (
         (entry.kind !== "TURN_COMMIT" || !surfaces.turn)

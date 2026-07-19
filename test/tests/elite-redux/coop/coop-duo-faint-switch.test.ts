@@ -395,11 +395,6 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       const retainedOperationId = materialBarrierSpy.mock.calls[0]?.[0];
       if (V2_REPLACEMENT_CUTOVER) {
         expect(retainedOperationId, "V2 never creates a legacy faint-operation authority").toBeUndefined();
-        const diagnostics = withClientSync(rig.hostCtx, () => getCoopV2Shadow(rig.hostRuntime)?.diagnostics());
-        expect(
-          diagnostics?.committed,
-          "the host committed the staged fallback only after the post-summon carrier existed",
-        ).toBeGreaterThan(v2CommittedBefore);
       } else {
         expect(retainedOperationId, "the timeout entered one exact retained-operation barrier").toMatch(
           /:FAINT_SWITCH:/u,
@@ -450,6 +445,13 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       // it queue one summon plus one replacement checkpoint and finish the crossing to CommandPhase.
       expect(hostAdvance, "the host CommandPhase crossing was started").toBeDefined();
       await settleDuoPromise(rig, hostAdvance!, "idle faint fallback host crossing");
+      if (V2_REPLACEMENT_CUTOVER) {
+        const diagnostics = withClientSync(rig.hostCtx, () => getCoopV2Shadow(rig.hostRuntime)?.diagnostics());
+        expect(
+          diagnostics?.committed,
+          "the host committed the staged fallback only after the post-summon carrier phase executed",
+        ).toBeGreaterThan(v2CommittedBefore);
+      }
       expect(
         unshiftSpy.mock.calls.filter(([name]) => name === "SwitchSummonPhase"),
         "the material barrier releases exactly one authoritative summon",
