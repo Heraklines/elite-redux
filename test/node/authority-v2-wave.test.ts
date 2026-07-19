@@ -294,6 +294,27 @@ describe("buildWaveAdvanceEntry - destination coverage", () => {
 describe("material completeness validation", () => {
   it("accepts a complete transition and rejects incomplete/inconsistent ones", () => {
     expect(isValidWaveTransitionMaterial(WIN_TRANSITION)).toBe(true);
+    expect(
+      isValidWaveTransitionMaterial({
+        ...WIN_TRANSITION,
+        authorityCarrier: {
+          authoritativeState: { version: 1, tick: 10, wave: 3, turn: 2 },
+          transition: { outcome: "win", wave: 3 },
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isValidWaveTransitionMaterial({
+        ...WIN_TRANSITION,
+        authorityCarrier: { authoritativeState: null, transition: { outcome: "win" } },
+      }),
+    ).toBe(false);
+    expect(
+      isValidWaveTransitionMaterial({
+        ...WIN_TRANSITION,
+        authorityCarrier: { authoritativeState: { tick: 10 }, transition: null },
+      }),
+    ).toBe(false);
     // flee must NOT carry a victoryKind.
     expect(isValidWaveTransitionMaterial({ ...WIN_TRANSITION, outcome: "flee", victoryKind: "wild" })).toBe(false);
     // a valid flee has no victoryKind.
@@ -309,6 +330,21 @@ describe("material completeness validation", () => {
 
   it("accepts a complete terminal and rejects incomplete ones", () => {
     expect(isValidTerminalMaterial(GAME_OVER_TERMINAL)).toBe(true);
+    expect(
+      isValidTerminalMaterial({
+        ...GAME_OVER_TERMINAL,
+        authorityCarrier: {
+          authoritativeState: { version: 1, tick: 10, wave: 3, turn: 2 },
+          transition: { outcome: "gameOver", wave: 3 },
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isValidTerminalMaterial({
+        ...GAME_OVER_TERMINAL,
+        authorityCarrier: { authoritativeState: [], transition: { outcome: "gameOver" } },
+      }),
+    ).toBe(false);
     for (const reason of ["game-over", "final-flee", "final-boss-credits", "shared-fault"] as const) {
       expect(isValidTerminalMaterial({ ...GAME_OVER_TERMINAL, reason })).toBe(true);
     }

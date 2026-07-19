@@ -15,6 +15,7 @@ import {
   consumeCoopPendingWaveEndState,
   deferCoopAutomaticVictorySealAtBattleEnd,
   failCoopSharedSession,
+  getCoopPendingRetainedWaveBoundary,
   getCoopWaveAdvanceRuntimeBinding,
   holdForCoopMeBattleSettlementAtBattleEnd,
   isCoopAuthoritativeGuest,
@@ -24,7 +25,6 @@ import {
 import { coopAuthorityContinuationSurface } from "#data/elite-redux/coop/coop-ui-registry";
 import {
   type CoopWaveAdvanceOperationBinding,
-  getCoopPendingWaveAdvanceBoundary,
   isValidCoopWaveAdvancePayload,
   registerCoopWaveAdvanceBoundaryDataApplier,
 } from "#data/elite-redux/coop/coop-wave-operation";
@@ -155,8 +155,7 @@ export class BattleEndPhase extends BattlePhase {
     this.automaticVictorySeal = automaticVictorySeal;
     this.meSettlementPlan = meSettlementPlan;
     this.retainedWaveBinding = getCoopWaveAdvanceRuntimeBinding();
-    const retainedBoundary =
-      this.retainedWaveBinding == null ? null : getCoopPendingWaveAdvanceBoundary(this.retainedWaveBinding);
+    const retainedBoundary = getCoopPendingRetainedWaveBoundary();
     this.hasRetainedWaveBoundary = retainedBoundary != null;
     this.retainedSourceWave = retainedBoundary?.wave ?? globalScene.currentBattle?.waveIndex ?? -1;
     this.retainedSourceWasTrainer =

@@ -80,6 +80,16 @@ export type CoopWaveVictoryKindV2 = "wild" | "trainer";
 export type CoopWaveMeBoundaryV2 = "none" | "battle-victory";
 
 /**
+ * Complete engine carrier required by LIVE cutover. It stays opaque to this engine-free adapter, but it is
+ * part of the digested immutable material. Shadow-only fixtures may omit it; a live replica must reject an
+ * entry without it before signing materialApplied.
+ */
+export interface CoopWaveTerminalAuthorityCarrierV2 {
+  readonly authoritativeState: unknown;
+  readonly transition: unknown;
+}
+
+/**
  * The COMPLETE post-battle transition stated on a WAVE_ADVANCE entry. Every field
  * the guest previously DERIVED from a one-bit outcome is stated here as typed
  * material: the guest constructs its tail BY ADOPTION of this, never by inference.
@@ -104,6 +114,8 @@ export interface CoopWaveTransitionMaterialV2 {
   readonly meBoundary: CoopWaveMeBoundaryV2;
   /** The victory kind for win/capture (wild vs trainer); MUST be absent for a flee. */
   readonly victoryKind?: CoopWaveVictoryKindV2;
+  /** Complete settled engine image + executable transition. Mandatory in live cutover. */
+  readonly authorityCarrier?: CoopWaveTerminalAuthorityCarrierV2;
 }
 
 /** Why a TERMINAL_COMMIT sealed the session. Every one is a canonical successor of the final live events. */
@@ -125,6 +137,8 @@ export interface CoopTerminalMaterialV2 {
   readonly wave: number;
   /** The turn the session sealed on. */
   readonly turn: number;
+  /** Complete settled engine image + executable transition. Mandatory in live cutover. */
+  readonly authorityCarrier?: CoopWaveTerminalAuthorityCarrierV2;
 }
 
 /** The canonical destination a WAVE_ADVANCE may state: REWARD | BIOME | COMMAND_FRONTIER | MYSTERY. */
@@ -217,6 +231,10 @@ export function isValidWaveTransitionMaterial(value: unknown): value is CoopWave
     return false;
   }
   // victoryKind is present IFF the outcome is a victory (win/capture); a flee has none.
+  const carrierValid = isValidOptionalAuthorityCarrier(m.authorityCarrier);
+  if (!carrierValid) {
+    return false;
+  }
   if (m.outcome === "flee") {
     return m.victoryKind === undefined;
   }
@@ -234,10 +252,29 @@ export function isValidTerminalMaterial(value: unknown): value is CoopTerminalMa
     && isNonEmptyString(m.terminalId)
     && isSafeNonNegInt(m.wave)
     && isSafeNonNegInt(m.turn)
+    && isValidOptionalAuthorityCarrier(m.authorityCarrier)
     && (m.reason === "game-over"
       || m.reason === "final-flee"
       || m.reason === "final-boss-credits"
       || m.reason === "shared-fault")
+  );
+}
+
+function isValidOptionalAuthorityCarrier(value: unknown): boolean {
+  if (value === undefined) {
+    return true;
+  }
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const carrier = value as Partial<CoopWaveTerminalAuthorityCarrierV2>;
+  return (
+    carrier.authoritativeState != null
+    && typeof carrier.authoritativeState === "object"
+    && !Array.isArray(carrier.authoritativeState)
+    && carrier.transition != null
+    && typeof carrier.transition === "object"
+    && !Array.isArray(carrier.transition)
   );
 }
 

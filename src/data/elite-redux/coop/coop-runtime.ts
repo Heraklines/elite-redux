@@ -25,10 +25,13 @@ import {
   type ReplacementAuthorityCarrier,
 } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 import type { TurnResolutionImage } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
-import type {
-  CoopTerminalMaterialV2,
-  CoopWaveAdvanceDestination,
-  CoopWaveTransitionMaterialV2,
+import {
+  type CoopTerminalMaterialV2,
+  type CoopWaveAdvanceDestination,
+  type CoopWaveTransitionMaterialV2,
+  digestOfMaterial,
+  isValidTerminalMaterial,
+  isValidWaveTransitionMaterial,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import {
   resolveCoopV2CommandFrontier,
@@ -55,6 +58,13 @@ import {
   isCoopV2TurnEnabled,
   setActiveCoopV2TurnCutover,
 } from "#data/elite-redux/coop/authority-v2/cutover-turn";
+import {
+  CoopV2WaveCutover,
+  clearActiveCoopV2WaveCutover,
+  isCoopV2WaveCutoverActive,
+  isCoopV2WaveEnabled,
+  setActiveCoopV2WaveCutover,
+} from "#data/elite-redux/coop/authority-v2/cutover-wave";
 import {
   commandControlTargetId,
   commandTargetsOwnedBySeat,
@@ -141,6 +151,7 @@ import {
   COOP_CAP_AUTHORITY_V2_REPLACEMENT,
   COOP_CAP_AUTHORITY_V2_SHADOW,
   COOP_CAP_AUTHORITY_V2_TURN,
+  COOP_CAP_AUTHORITY_V2_WAVE,
   COOP_CAP_DURABILITY_JOURNAL,
   COOP_CAP_OP_ABILITY,
   COOP_CAP_OP_BARGAIN,
@@ -364,6 +375,7 @@ import {
   type CoopWaveAdvanceOperationBinding,
   commitWaveAdvanceOwnerIntent,
   describeCoopWaveAdvanceOperationBinding,
+  getCoopPendingWaveAdvanceBoundary,
   getCoopPendingWaveContinuationBoundary,
   getCoopStagedWaveAdvanceTransaction,
   isCoopWaveAdvanceOperationEnabled,
@@ -1514,9 +1526,10 @@ function usesRetainedCoopWaveTransaction(runtime: CoopRuntime | null = active): 
   return (
     runtime != null
     && !runtime.controller.isVersusSession()
-    && isCoopWaveAdvanceOperationEnabled()
-    && isCoopCapabilityNegotiated(COOP_CAP_OP_WAVE)
-    && isCoopOperationJournalActiveFor(runtime.waveOperationBinding.durability)
+    && (coopV2WaveCutovers.has(runtime)
+      || (isCoopWaveAdvanceOperationEnabled()
+        && isCoopCapabilityNegotiated(COOP_CAP_OP_WAVE)
+        && isCoopOperationJournalActiveFor(runtime.waveOperationBinding.durability)))
   );
 }
 
@@ -1586,6 +1599,23 @@ export function deferCoopAutomaticVictorySealAtBattleEnd(identity: CoopAutomatic
     return true;
   }
   if (runtime.controller.role === "guest") {
+    if (coopV2WaveCutovers.has(runtime)) {
+      const staged = runtime.v2WaveTransactions.get(identity.wave);
+      if (
+        staged == null
+        || staged.dataApplied !== true
+        || staged.transition.outcome !== "win"
+        || staged.transition.wave !== identity.wave
+      ) {
+        failCoopSharedSession(
+          `The renderer reached BattleEnd before the Authority V2 victory state for wave ${identity.wave} `
+            + `(applied ${staged?.dataApplied === true}).`,
+        );
+        return true;
+      }
+      coopLog("v2-wave", `GUEST automatic victory settlement deferred wave=${identity.wave}`);
+      return true;
+    }
     const staged = getCoopStagedWaveAdvanceTransaction(identity.wave, identity.binding);
     const payload = staged?.envelope.pendingOperation?.payload;
     if (
@@ -1685,6 +1715,18 @@ export function consumeCoopPendingWaveEndState(): CoopAuthoritativeBattleStateV1
 
 /** Apply a defensive copy of the staged DATA exactly once at a safe post-battle boundary. */
 function tryApplyCoopSettledWaveData(wave: number, binding: CoopWaveAdvanceOperationBinding): boolean {
+  const runtime = active;
+  if (runtime != null && coopV2WaveCutovers.has(runtime)) {
+    const transaction = runtime.v2WaveTransactions.get(wave);
+    if (transaction == null) {
+      coopWarn("v2-wave", `retained DATA missing wave=${wave}`);
+      return false;
+    }
+    if (!applyCoopV2WaveDataAtBoundary(runtime, transaction)) {
+      return false;
+    }
+    return true;
+  }
   const staged = getCoopStagedWaveAdvanceTransaction(wave, binding);
   if (staged == null) {
     const evidence = describeCoopWaveAdvanceOperationBinding(binding);
@@ -1733,14 +1775,20 @@ export function awaitCoopSettledWaveAdvanceAtBattleEnd(
     failCoopSharedSession("The retained post-battle boundary had no valid source wave.");
     return true;
   }
-  const staged = getCoopStagedWaveAdvanceTransaction(wave, binding);
+  const v2Staged = coopV2WaveCutovers.has(runtime) ? runtime.v2WaveTransactions.get(wave) : null;
+  const staged = v2Staged == null ? getCoopStagedWaveAdvanceTransaction(wave, binding) : null;
   // A real Mystery battle is the continuation of an already-retained ME terminal transaction. Its
   // BattleEnd returns through PostMysteryEncounterPhase and must never synthesize a colliding WAVE_ADVANCE.
   // Ambient state is allowed to exempt this tail only when it still describes the exact source wave and
   // no addressed WAVE_ADVANCE exists. A speculative next-wave Mystery battle cannot steal ownership from
   // an already-staged ordinary victory (the wave-11 -> speculative ME wave-12 regression).
   const ambientBattle = globalScene.currentBattle;
-  if (staged == null && ambientBattle?.waveIndex === wave && ambientBattle.isBattleMysteryEncounter?.()) {
+  if (
+    staged == null
+    && v2Staged == null
+    && ambientBattle?.waveIndex === wave
+    && ambientBattle.isBattleMysteryEncounter?.()
+  ) {
     return false;
   }
   pendingSettledWaveBoundary = { wave, release, released: false };
@@ -1942,6 +1990,28 @@ export function resolveCoopRetainedWaveContinuationIdentity(
   if (!requireWaveBoundary) {
     return { kind: "ambient" };
   }
+  if (coopV2WaveCutovers.has(runtime)) {
+    const candidates = [...runtime.v2WaveTransactions.values()]
+      .map(transaction => ({
+        operationId: transaction.operationId,
+        turn: transaction.authoritativeState.turn,
+        wave: transaction.transition.wave,
+      }))
+      .sort((a, b) => a.wave - b.wave || a.turn - b.turn || a.operationId.localeCompare(b.operationId));
+    if (candidates.length === 1) {
+      return { kind: "retained", address: { wave: candidates[0].wave, turn: candidates[0].turn } };
+    }
+    if (allowMissingWaveBoundary && candidates.length === 0) {
+      return { kind: "ambient" };
+    }
+    const classification = candidates.length === 0 ? "missing" : "ambiguous";
+    return {
+      kind: "invalid",
+      reason:
+        `[authority-v2] retained wave continuation identity ${classification}: `
+        + `candidates=[${candidates.map(candidate => `${candidate.operationId}@${candidate.wave}:${candidate.turn}`).join(",")}]`,
+    };
+  }
   const address = getCoopPendingWaveContinuationBoundary(runtime.waveOperationBinding);
   if (address != null) {
     return { kind: "retained", address };
@@ -1984,7 +2054,32 @@ export function getCoopRetainedWaveContinuationAddress(): CoopRetainedWaveContin
   if (runtime == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
     return null;
   }
+  if (coopV2WaveCutovers.has(runtime)) {
+    const candidates = [...runtime.v2WaveTransactions.values()];
+    return candidates.length === 1
+      ? { wave: candidates[0].transition.wave, turn: candidates[0].authoritativeState.turn }
+      : null;
+  }
   return getCoopPendingWaveContinuationBoundary(runtime.waveOperationBinding);
+}
+
+/** Phase-construction proof for the exact retained wave whose BattleEnd is being queued. */
+export function getCoopPendingRetainedWaveBoundary(
+  runtime: CoopRuntime | null = active,
+): { readonly wave: number; readonly victoryKind: CoopWaveAdvancePayload["victoryKind"] } | null {
+  if (runtime == null || !usesRetainedCoopWaveTransaction(runtime)) {
+    return null;
+  }
+  if (coopV2WaveCutovers.has(runtime)) {
+    const candidates = [...runtime.v2WaveTransactions.values()].filter(transaction => !transaction.dataApplied);
+    return candidates.length === 1
+      ? {
+          wave: candidates[0].transition.wave,
+          victoryKind: candidates[0].transition.victoryKind,
+        }
+      : null;
+  }
+  return getCoopPendingWaveAdvanceBoundary(runtime.waveOperationBinding);
 }
 
 export function notifyCoopWaveContinuationSurfaceReady(
@@ -1998,6 +2093,18 @@ export function notifyCoopWaveContinuationSurfaceReady(
   const wave = sourceWave ?? globalScene.currentBattle?.waveIndex ?? -1;
   if (!Number.isSafeInteger(wave) || wave < 0) {
     return false;
+  }
+  if (coopV2WaveCutovers.has(runtime)) {
+    const transaction =
+      runtime.v2WaveTransactions.get(wave)
+      ?? [...runtime.v2WaveTransactions.values()].find(candidate => candidate.transition.nextWave === wave);
+    if (transaction == null || !transaction.dataApplied) {
+      return false;
+    }
+    // The real surface itself is checked by the V2 control projector on the next retained redelivery.
+    // This callback is only an eager causal wake for legacy battle-stream presentation accounting.
+    runtime.battleStream.notifyContinuationSurface("sharedInput");
+    return true;
   }
   const ready = maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding, runtime, phaseOwnedSurface);
   if (ready) {
@@ -3623,6 +3730,18 @@ export function markCoopLearnMoveForwardInFlight(partySlot: number): boolean {
   return true;
 }
 
+interface CoopV2WaveLiveTransaction {
+  readonly entryRevision: number;
+  readonly operationId: string;
+  readonly materialDigest: string;
+  readonly transition: CoopWaveAdvancePayload;
+  readonly authoritativeState: CoopAuthoritativeBattleStateV1;
+  readonly terminalId: string | null;
+  readonly nextControlId: string;
+  bootstrapProjected: boolean;
+  dataApplied: boolean;
+}
+
 /** Everything tied to one live co-op session. */
 export interface CoopRuntime {
   /** The local player's session brain (host authority in the spoof/dev path). */
@@ -3696,6 +3815,8 @@ export interface CoopRuntime {
    * occurrence without manufacturing a second UI.
    */
   readonly v2InstalledReplacementTargets: Set<string>;
+  /** Runtime-owned V2 wave/terminal transactions awaiting safe DATA and real destination proof. */
+  readonly v2WaveTransactions: Map<number, CoopV2WaveLiveTransaction>;
 }
 
 let active: CoopRuntime | null = null;
@@ -3724,6 +3845,8 @@ const coopV2ShadowBuildFailed = new WeakSet<CoopRuntime>();
 const coopV2TurnCutovers = new WeakMap<CoopRuntime, CoopV2TurnCutover>();
 /** The live replacement cutover controller per runtime. */
 const coopV2ReplacementCutovers = new WeakMap<CoopRuntime, CoopV2ReplacementCutover>();
+/** The live wave/terminal cutover controller per runtime. */
+const coopV2WaveCutovers = new WeakMap<CoopRuntime, CoopV2WaveCutover>();
 
 /**
  * Swap every cycle-free V2 selector with the active runtime. Production has one runtime; the two-engine
@@ -3750,6 +3873,12 @@ function activateCoopV2Runtime(runtime: CoopRuntime): void {
   } else {
     setActiveCoopV2ReplacementCutover(replacement);
   }
+  const wave = coopV2WaveCutovers.get(runtime);
+  if (wave == null) {
+    clearActiveCoopV2WaveCutover();
+  } else {
+    setActiveCoopV2WaveCutover(wave);
+  }
 }
 
 /** Whether the turn/command surface is CUT OVER to v2 for `runtime` (authority.v2turn negotiated + harness present). */
@@ -3769,12 +3898,22 @@ function isCoopV2ReplacementNegotiated(): boolean {
   );
 }
 
+/** Wave/terminal authority can cut over only after every in-battle predecessor lives in the same log. */
+function isCoopV2WaveNegotiated(): boolean {
+  return (
+    isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_WAVE)
+    && isCoopV2TurnNegotiated()
+    && isCoopV2ReplacementNegotiated()
+  );
+}
+
 /** V2 recovery is valid only when the one log already owns every migrated mechanical predecessor. */
 function isCoopV2RecoveryNegotiated(): boolean {
   return (
     isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_RECOVERY)
     && isCoopV2TurnNegotiated()
     && isCoopV2ReplacementNegotiated()
+    && isCoopV2WaveNegotiated()
   );
 }
 
@@ -3891,6 +4030,282 @@ function reconstructCoopV2ReplacementCheckpoint(
   };
 }
 
+function decodeCoopV2WaveTransaction(entry: CoopAuthorityEntry): CoopV2WaveLiveTransaction | null {
+  if (entry.kind !== "WAVE_ADVANCE" && entry.kind !== "TERMINAL_COMMIT") {
+    return null;
+  }
+  const payload = entry.material.payload;
+  let waveMaterial: CoopWaveTransitionMaterialV2 | null = null;
+  let terminalMaterial: CoopTerminalMaterialV2 | null = null;
+  if (entry.kind === "WAVE_ADVANCE") {
+    if (!isValidWaveTransitionMaterial(payload)) {
+      return null;
+    }
+    waveMaterial = payload;
+  } else {
+    if (!isValidTerminalMaterial(payload)) {
+      return null;
+    }
+    terminalMaterial = payload;
+  }
+  const material = waveMaterial ?? terminalMaterial;
+  if (material == null || digestOfMaterial(material) !== entry.material.digest || entry.nextControl == null) {
+    return null;
+  }
+  const carrier = material.authorityCarrier;
+  if (carrier == null || !isValidCoopWaveAdvancePayload(carrier.transition)) {
+    return null;
+  }
+  const transition = structuredClone(carrier.transition);
+  const authoritativeState = structuredClone(carrier.authoritativeState) as CoopAuthoritativeBattleStateV1;
+  if (
+    authoritativeState == null
+    || typeof authoritativeState !== "object"
+    || !Number.isSafeInteger(authoritativeState.wave)
+    || !Number.isSafeInteger(authoritativeState.turn)
+    || !Number.isSafeInteger(authoritativeState.tick)
+    || authoritativeState.wave !== material.wave
+    || authoritativeState.turn !== material.turn
+    || transition.wave !== material.wave
+    || transition.settledStateTick !== authoritativeState.tick
+  ) {
+    return null;
+  }
+  if (
+    (waveMaterial != null
+      && (transition.outcome === "gameOver"
+        || transition.outcome !== waveMaterial.outcome
+        || transition.nextWave !== waveMaterial.nextWave
+        || transition.biomeChange !== waveMaterial.biomeChange
+        || transition.eggLapse !== waveMaterial.eggLapse
+        || transition.meBoundary !== waveMaterial.meBoundary
+        || transition.victoryKind !== waveMaterial.victoryKind))
+    || (terminalMaterial != null
+      && ((terminalMaterial.reason === "game-over" && transition.outcome !== "gameOver")
+        || (terminalMaterial.reason === "final-boss-credits"
+          && !(
+            (transition.outcome === "win" || transition.outcome === "capture")
+            && transition.nextWave === transition.wave
+          ))))
+  ) {
+    return null;
+  }
+  return {
+    entryRevision: entry.revision,
+    operationId: entry.operationId,
+    materialDigest: entry.material.digest,
+    transition,
+    authoritativeState,
+    terminalId: terminalMaterial?.terminalId ?? null,
+    nextControlId: controlIdOf(entry.nextControl),
+    bootstrapProjected: false,
+    dataApplied: false,
+  };
+}
+
+function matchingCoopV2WaveTransaction(
+  runtime: CoopRuntime,
+  control: NonNullable<CoopNextControl>,
+): CoopV2WaveLiveTransaction | null {
+  const controlId = controlIdOf(control as ProjectableControl);
+  return [...runtime.v2WaveTransactions.values()].find(transaction => transaction.nextControlId === controlId) ?? null;
+}
+
+/**
+ * MIGRATION: this is the one remaining ambient bridge for the existing Phaser wave-tail factory. The
+ * transaction and destination runtime are captured before delivery; the callback runs only after
+ * setCoopRuntime installs that runtime's scene/op selectors together.
+ */
+function bootstrapCoopV2WaveTransaction(runtime: CoopRuntime, transaction: CoopV2WaveLiveTransaction): boolean {
+  if (transaction.bootstrapProjected) {
+    return true;
+  }
+  if (active !== runtime || runtime.controller.authorityRole !== "replica") {
+    return false;
+  }
+  const payload = transaction.transition;
+  const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+  if (payload.wave <= lastResolvedWave) {
+    transaction.bootstrapProjected = true;
+    return true;
+  }
+  if (currentWave !== payload.wave) {
+    return false;
+  }
+  runtime.battleStream.noteWaveAdvanceAdmitted(runtime.controller.sessionEpoch, payload.wave);
+  const merged = mergeCoopPendingWaveAdvance(
+    pendingWaveAdvance,
+    payload.wave,
+    payload.outcome,
+    undefined,
+    pendingRawWavePresentations.get(payload.wave),
+    payload,
+    transaction.authoritativeState.turn,
+  );
+  if (merged == null) {
+    return false;
+  }
+  pendingWaveAdvance = merged;
+  pendingRawWavePresentations.delete(payload.wave);
+  transaction.bootstrapProjected = true;
+
+  if (coopWaveAdvanceBoundaryWakeFactory != null && coopHasPendingWaveAdvance()) {
+    const wakeAlreadyQueued = globalScene.phaseManager?.getQueuedPhaseNames().includes("CoopFinalizeTurnPhase");
+    if (!wakeAlreadyQueued) {
+      globalScene.phaseManager.pushPhase(coopWaveAdvanceBoundaryWakeFactory());
+    }
+    const unparkedReplay =
+      coopActiveReplayTurnAborter?.(
+        `retained Authority V2 ${payload.outcome} wave=${payload.wave} settledTurn=${transaction.authoritativeState.turn}`,
+        transaction.authoritativeState.turn,
+      ) ?? false;
+    coopLog(
+      "v2-wave",
+      `bootstrap wave=${payload.wave} outcome=${payload.outcome} wake=${Number(!wakeAlreadyQueued)} `
+        + `unparkedReplay=${Number(unparkedReplay)}`,
+    );
+  }
+  return true;
+}
+
+function applyCoopV2WaveDataAtBoundary(runtime: CoopRuntime, transaction: CoopV2WaveLiveTransaction): boolean {
+  if (transaction.dataApplied) {
+    return releaseCoopSettledWaveBoundary(transaction.transition.wave);
+  }
+  if (active !== runtime || runtime.controller.authorityRole !== "replica") {
+    return false;
+  }
+  const sourceWave = transaction.transition.wave;
+  const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+  const phaseName = globalScene.phaseManager?.getCurrentPhase()?.phaseName;
+  const exactQueuedBattleEnd =
+    phaseName === "BattleEndPhase" && currentWave === sourceWave + 1 && isCoopSettledWaveBoundaryPending(sourceWave);
+  const exactTerminalFinalizer =
+    transaction.transition.outcome === "gameOver"
+    && phaseName === "CoopFinalizeTurnPhase"
+    && currentWave === sourceWave;
+  if (
+    (currentWave !== sourceWave && !exactQueuedBattleEnd)
+    || (phaseName !== "BattleEndPhase" && !exactTerminalFinalizer)
+  ) {
+    return false;
+  }
+
+  const immutableState = structuredClone(transaction.authoritativeState);
+  let applied = applyCoopAuthoritativeBattleState(immutableState, true);
+  const appliedTick = coopAppliedStateTick();
+  if (!applied && appliedTick > immutableState.tick) {
+    applied = true;
+    coopLog(
+      "v2-wave",
+      `DATA tick=${immutableState.tick} superseded by recovered tick=${appliedTick} wave=${sourceWave}`,
+    );
+  } else if (!applied && appliedTick === immutableState.tick) {
+    applied = reapplyAcceptedCoopAuthoritativeBattleState(immutableState, true);
+  }
+  if (!applied) {
+    return false;
+  }
+  transaction.dataApplied = true;
+  coopLog("v2-wave", `DATA applied rev=${transaction.entryRevision} wave=${sourceWave} tick=${immutableState.tick}`);
+  return releaseCoopSettledWaveBoundary(sourceWave);
+}
+
+function applyCoopV2WaveEntry(runtime: CoopRuntime, entry: CoopAuthorityEntry): ApplyMaterialResult {
+  const decoded = decodeCoopV2WaveTransaction(entry);
+  if (decoded == null) {
+    return false;
+  }
+  const wave = decoded.transition.wave;
+  const prior = runtime.v2WaveTransactions.get(wave);
+  if (
+    prior != null
+    && (prior.entryRevision !== decoded.entryRevision
+      || prior.operationId !== decoded.operationId
+      || prior.materialDigest !== decoded.materialDigest)
+  ) {
+    return false;
+  }
+  const transaction = prior ?? decoded;
+  if (prior == null) {
+    runtime.v2WaveTransactions.set(wave, transaction);
+  }
+  if (!transaction.bootstrapProjected) {
+    if (active === runtime) {
+      bootstrapCoopV2WaveTransaction(runtime, transaction);
+    } else {
+      runWhenCoopRuntimeActive(runtime, () => {
+        bootstrapCoopV2WaveTransaction(runtime, transaction);
+      });
+    }
+  }
+  if (transaction.bootstrapProjected && globalScene.phaseManager?.getCurrentPhase()?.phaseName === "BattleEndPhase") {
+    applyCoopV2WaveDataAtBoundary(runtime, transaction);
+  }
+  return transaction.dataApplied ? true : "deferred";
+}
+
+function projectCoopV2WaveControl(
+  runtime: CoopRuntime,
+  control: NonNullable<CoopNextControl>,
+): CoopControlInstallResult {
+  const transaction = matchingCoopV2WaveTransaction(runtime, control);
+  const controlId = controlIdOf(control as ProjectableControl);
+  if (transaction == null) {
+    return { kind: "rejected", reason: `no admitted V2 wave transaction owns ${controlId}` };
+  }
+  if (!transaction.dataApplied) {
+    return { kind: "deferred", reason: `wave ${transaction.transition.wave} DATA has not reached BattleEnd` };
+  }
+  const phaseName = globalScene.phaseManager?.getCurrentPhase()?.phaseName;
+  const handlerActive = globalScene.ui.getHandler()?.active === true;
+  const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+  const atTransactionWave =
+    currentWave === transaction.transition.wave || currentWave === transaction.transition.nextWave;
+  const installed = (): CoopControlInstallResult => {
+    runtime.v2WaveTransactions.delete(transaction.transition.wave);
+    return { kind: "installed", controlId };
+  };
+  switch (control.kind) {
+    case "REWARD": {
+      const correctOwner = coopInteractionOwnerSeat(runtime.controller.interactionCounter()) === control.ownerSeatId;
+      return correctOwner
+        && atTransactionWave
+        && handlerActive
+        && (phaseName === "SelectModifierPhase"
+          || phaseName === "BiomeShopPhase"
+          || phaseName === "TheBargainPhase"
+          || phaseName === "ErCrossroadsPhase")
+        ? installed()
+        : { kind: "deferred", reason: `awaiting real reward surface for ${controlId}` };
+    }
+    case "BIOME": {
+      const correctOwner = coopInteractionOwnerSeat(runtime.controller.interactionCounter()) === control.ownerSeatId;
+      return correctOwner && atTransactionWave && handlerActive && phaseName === "SelectBiomePhase"
+        ? installed()
+        : { kind: "deferred", reason: `awaiting real biome surface for ${controlId}` };
+    }
+    case "MYSTERY": {
+      const correctOwner = coopInteractionOwnerSeat(runtime.controller.interactionCounter()) === control.ownerSeatId;
+      return correctOwner
+        && atTransactionWave
+        && handlerActive
+        && (phaseName === "MysteryEncounterPhase"
+          || phaseName === "CoopReplayMePhase"
+          || phaseName === "PostMysteryEncounterPhase")
+        ? installed()
+        : { kind: "deferred", reason: `awaiting real Mystery surface for ${controlId}` };
+    }
+    case "TERMINAL":
+      return (transaction.terminalId === control.terminalId && phaseName === "GameOverPhase")
+        || isCoopSharedTerminalFrozen(runtime)
+        ? installed()
+        : { kind: "deferred", reason: `awaiting real terminal surface for ${controlId}` };
+    default:
+      return { kind: "rejected", reason: `${control.kind} is not a wave-owned continuation` };
+  }
+}
+
 /**
  * Build the LIVE replica seams (cutover surface 1). The guest applies a delivered TURN_COMMIT through the
  * REAL engine: the material applier reconstructs the COMPLETE legacy turn resolution from the enriched
@@ -3906,14 +4321,21 @@ function reconstructCoopV2ReplacementCheckpoint(
  */
 function buildCoopV2LiveSeams(
   runtime: CoopRuntime,
-  surfaces: { readonly turn: boolean; readonly replacement: boolean },
+  surfaces: { readonly turn: boolean; readonly replacement: boolean; readonly wave: boolean },
 ): CoopV2LiveReplicaSeams {
   return {
     ownsEntry: entry =>
-      (surfaces.turn && entry.kind === "TURN_COMMIT") || (surfaces.replacement && entry.kind === "REPLACEMENT_COMMIT"),
+      (surfaces.turn && entry.kind === "TURN_COMMIT")
+      || (surfaces.replacement && entry.kind === "REPLACEMENT_COMMIT")
+      || (surfaces.wave && (entry.kind === "WAVE_ADVANCE" || entry.kind === "TERMINAL_COMMIT")),
     ownsControl: control =>
       (surfaces.turn && control.kind === "COMMAND_FRONTIER")
-      || (surfaces.replacement && control.kind === "REPLACEMENT"),
+      || (surfaces.replacement && control.kind === "REPLACEMENT")
+      || (surfaces.wave
+        && (control.kind === "REWARD"
+          || control.kind === "BIOME"
+          || control.kind === "MYSTERY"
+          || control.kind === "TERMINAL")),
     releaseBlockedPredecessor: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null => {
       if (entry.kind !== "REPLACEMENT_COMMIT" || !surfaces.replacement) {
         return null;
@@ -3932,6 +4354,7 @@ function buildCoopV2LiveSeams(
       if (
         (entry.kind !== "TURN_COMMIT" || !surfaces.turn)
         && (entry.kind !== "REPLACEMENT_COMMIT" || !surfaces.replacement)
+        && ((entry.kind !== "WAVE_ADVANCE" && entry.kind !== "TERMINAL_COMMIT") || !surfaces.wave)
       ) {
         return null;
       }
@@ -3947,6 +4370,9 @@ function buildCoopV2LiveSeams(
         return null;
       }
       try {
+        if (entry.kind === "WAVE_ADVANCE" || entry.kind === "TERMINAL_COMMIT") {
+          return surfaces.wave ? applyCoopV2WaveEntry(runtime, entry) : null;
+        }
         if (entry.kind === "REPLACEMENT_COMMIT") {
           const image = decodeReplacementCommitMaterial(entry);
           if (image == null || image.authorityCarrier == null) {
@@ -4013,6 +4439,20 @@ function buildCoopV2LiveSeams(
       _ctx: CoopRuntimeContext,
       control: NonNullable<CoopNextControl>,
     ): CoopControlInstallResult | null => {
+      if (
+        surfaces.wave
+        && (control.kind === "REWARD"
+          || control.kind === "BIOME"
+          || control.kind === "MYSTERY"
+          || control.kind === "TERMINAL")
+      ) {
+        try {
+          return projectCoopV2WaveControl(runtime, control);
+        } catch (error) {
+          coopWarn("v2-wave", "live wave/terminal projectControl threw", error);
+          return null;
+        }
+      }
       if (control.kind !== "COMMAND_FRONTIER") {
         if (control.kind !== "REPLACEMENT" || !surfaces.replacement) {
           return null;
@@ -4047,6 +4487,12 @@ function buildCoopV2LiveSeams(
               commandControlTargetId(control.epoch, control.wave, control.turn, command),
             ),
         );
+        if (missing.length === 0 && surfaces.wave) {
+          const waveTransaction = matchingCoopV2WaveTransaction(runtime, control);
+          if (waveTransaction != null && waveTransaction.dataApplied) {
+            runtime.v2WaveTransactions.delete(waveTransaction.transition.wave);
+          }
+        }
         return missing.length === 0
           ? { kind: "already-installed", controlId }
           : {
@@ -4157,6 +4603,7 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
       isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_SHADOW)
       || isCoopV2TurnNegotiated()
       || isCoopV2ReplacementNegotiated()
+      || isCoopV2WaveNegotiated()
       || isCoopV2RecoveryNegotiated()
     )
   ) {
@@ -4201,6 +4648,7 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
     // state + the real phase manager on the guest.
     const turnCutover = isCoopV2TurnNegotiated();
     const replacementCutover = isCoopV2ReplacementNegotiated();
+    const waveCutover = isCoopV2WaveNegotiated();
     const recoveryCutover = isCoopV2RecoveryNegotiated();
     let harness!: CoopAuthorityV2Shadow;
     const liveRecovery = recoveryCutover ? buildCoopV2LiveRecoverySeams(runtime, () => harness) : undefined;
@@ -4216,11 +4664,17 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
         // `CoopMessage` union (contract change request 3), so this crosses the seam type-exact, no cast.
         localTransport.send(frame);
       },
-      ...(turnCutover || replacementCutover
-        ? { liveReplica: buildCoopV2LiveSeams(runtime, { turn: turnCutover, replacement: replacementCutover }) }
+      ...(turnCutover || replacementCutover || waveCutover
+        ? {
+            liveReplica: buildCoopV2LiveSeams(runtime, {
+              turn: turnCutover,
+              replacement: replacementCutover,
+              wave: waveCutover,
+            }),
+          }
         : {}),
       ...(liveRecovery == null ? {} : { liveRecovery }),
-      ...(turnCutover || replacementCutover
+      ...(turnCutover || replacementCutover || waveCutover
         ? {
             onProtocolViolation: (violation: { frameType: string | null; issues: readonly string[] }) => {
               const point = readCoopBattlePoint();
@@ -4257,6 +4711,15 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
       coopLog(
         "v2-replacement",
         `replacement CUTOVER active role=${runtime.controller.authorityRole} session=${identity.sessionId}`,
+      );
+    }
+    if (waveCutover) {
+      const cutover = new CoopV2WaveCutover(harness);
+      coopV2WaveCutovers.set(runtime, cutover);
+      setActiveCoopV2WaveCutover(cutover);
+      coopLog(
+        "v2-wave",
+        `wave/terminal CUTOVER active role=${runtime.controller.authorityRole} session=${identity.sessionId}`,
       );
     }
     coopLog(
@@ -4309,6 +4772,12 @@ export function commitCoopV2ReplacementAuthority(
 
 /** Dispose + drop the shadow harness for a runtime (teardown). Idempotent. */
 function disposeCoopV2Shadow(runtime: CoopRuntime): void {
+  const waveCutover = coopV2WaveCutovers.get(runtime);
+  if (waveCutover != null) {
+    clearActiveCoopV2WaveCutover(waveCutover);
+    waveCutover.dispose();
+    coopV2WaveCutovers.delete(runtime);
+  }
   const replacementCutover = coopV2ReplacementCutovers.get(runtime);
   if (replacementCutover != null) {
     clearActiveCoopV2ReplacementCutover(replacementCutover);
@@ -4328,6 +4797,7 @@ function disposeCoopV2Shadow(runtime: CoopRuntime): void {
     coopV2ShadowHarnesses.delete(runtime);
   }
   coopV2ShadowBuildFailed.delete(runtime);
+  runtime.v2WaveTransactions.clear();
 }
 
 export function runWhenCoopRuntimeActive(runtime: CoopRuntime, callback: () => void): () => void {
@@ -5038,6 +5508,11 @@ function tapCoopV2ShadowWaveBoundary(
   outcome: CoopWaveOutcome,
   transition: CoopWaveAdvancePayload,
 ): void {
+  // Live wave cutover commits only after the complete settled state exists. An early shadow entry here
+  // would consume a global revision without the authority carrier and become a second, unapplyable boundary.
+  if (isCoopV2WaveCutoverActive()) {
+    return;
+  }
   const shadow = getCoopV2Shadow(runtime);
   if (shadow == null) {
     return;
@@ -5901,22 +6376,30 @@ function commitCoopSettledWaveAdvance(
     ...transition,
     settledStateTick: state.tick,
   };
-  const envelope = commitWaveAdvanceOwnerIntent(
-    {
-      payload: settledTransition,
-      authoritativeState: state,
-      localRole: runtime.controller.role,
-      wave,
-      turn: state.turn,
-    },
-    runtime.waveOperationBinding,
-  );
-  if (usesRetainedCoopWaveTransaction(runtime) && envelope == null) {
-    failCoopSharedSession(`Could not retain the complete authoritative transition for wave ${wave}.`);
-    return null;
-  }
-  if (envelope != null) {
+  if (isCoopV2WaveCutoverActive()) {
+    if (!commitCoopV2SettledWaveAdvance(runtime, settledTransition, state)) {
+      failCoopSharedSession(`Could not retain the complete Authority V2 transition for wave ${wave}.`);
+      return null;
+    }
     settledHostWaveTransitions.set(wave, settledTransition);
+  } else {
+    const envelope = commitWaveAdvanceOwnerIntent(
+      {
+        payload: settledTransition,
+        authoritativeState: state,
+        localRole: runtime.controller.role,
+        wave,
+        turn: state.turn,
+      },
+      runtime.waveOperationBinding,
+    );
+    if (usesRetainedCoopWaveTransaction(runtime) && envelope == null) {
+      failCoopSharedSession(`Could not retain the complete authoritative transition for wave ${wave}.`);
+      return null;
+    }
+    if (envelope != null) {
+      settledHostWaveTransitions.set(wave, settledTransition);
+    }
   }
   coopLog(
     "runtime",
@@ -5924,6 +6407,150 @@ function commitCoopSettledWaveAdvance(
   );
   pendingHostWaveTransitions.delete(wave);
   return state;
+}
+
+function commitCoopV2SettledWaveAdvance(
+  runtime: CoopRuntime,
+  transition: CoopWaveAdvancePayload,
+  state: CoopAuthoritativeBattleStateV1,
+): boolean {
+  const cutover = coopV2WaveCutovers.get(runtime);
+  if (
+    cutover == null
+    || runtime.controller.authorityRole !== "authority"
+    || transition.wave !== state.wave
+    || transition.settledStateTick !== state.tick
+  ) {
+    return false;
+  }
+  const authorityCarrier = {
+    authoritativeState: structuredClone(state),
+    transition: structuredClone(transition),
+  };
+  const terminal =
+    transition.outcome === "gameOver"
+    || ((transition.outcome === "win" || transition.outcome === "capture") && transition.nextWave === transition.wave);
+  if (terminal) {
+    const terminalId = `V2/TERMINAL/e${runtime.controller.sessionEpoch}/w${transition.wave}/tick${state.tick}`;
+    const material: CoopTerminalMaterialV2 = {
+      kind: "terminal",
+      terminalId,
+      reason: transition.outcome === "gameOver" ? "game-over" : "final-boss-credits",
+      wave: transition.wave,
+      turn: state.turn,
+      authorityCarrier,
+    };
+    return (
+      cutover.commitHostTerminal({
+        operationId: terminalId,
+        terminal: material,
+        legacyImage: material,
+        legacyDigest: digestOfMaterial(material),
+      }) != null
+    );
+  }
+
+  const base = {
+    kind: "wave-advance" as const,
+    wave: transition.wave,
+    turn: state.turn,
+    nextWave: transition.nextWave,
+    biomeChange: transition.biomeChange,
+    eggLapse: transition.eggLapse,
+    meBoundary: transition.meBoundary,
+    authorityCarrier,
+  };
+  const victoryKind = transition.victoryKind;
+  if (transition.outcome !== "flee" && victoryKind == null) {
+    coopWarn("v2-wave", `refused victory without an authoritative victoryKind wave=${transition.wave}`);
+    return false;
+  }
+  const material: CoopWaveTransitionMaterialV2 =
+    transition.outcome === "flee"
+      ? { ...base, outcome: "flee" }
+      : { ...base, outcome: transition.outcome, victoryKind: victoryKind as "wild" | "trainer" };
+  const destinationKind = resolveCoopV2SettledWaveDestination(transition);
+  if (destinationKind == null) {
+    return false;
+  }
+  const ownerSeatId = coopInteractionOwnerSeat(runtime.controller.interactionCounter());
+  let destination: CoopWaveAdvanceDestination;
+  if (destinationKind === "REWARD" || destinationKind === "MYSTERY") {
+    destination = {
+      kind: destinationKind,
+      operationId: `V2/WAVE/NEXT/e${runtime.controller.sessionEpoch}/w${transition.wave}/tick${state.tick}`,
+      ownerSeatId,
+    };
+  } else if (destinationKind === "BIOME") {
+    destination = {
+      kind: "BIOME",
+      operationId: `V2/WAVE/BIOME/e${runtime.controller.sessionEpoch}/w${transition.wave}/tick${state.tick}`,
+      ownerSeatId,
+    };
+  } else {
+    const frontier = resolveCoopV2CommandFrontier(state);
+    if (frontier.commands.length === 0 || frontier.unresolved.length > 0) {
+      coopWarn(
+        "v2-wave",
+        `refused next-wave COMMAND frontier commands=${frontier.commands.length} unresolved=${frontier.unresolved.length}`,
+      );
+      return false;
+    }
+    destination = {
+      kind: "COMMAND_FRONTIER",
+      epoch: runtime.controller.sessionEpoch,
+      wave: transition.nextWave,
+      turn: 1,
+      commands: frontier.commands,
+    };
+  }
+  const operationId = `V2/WAVE/e${runtime.controller.sessionEpoch}/w${transition.wave}/tick${state.tick}`;
+  return (
+    cutover.commitHostWave({
+      operationId,
+      transition: material,
+      destination,
+      legacyImage: material,
+      legacyDigest: digestOfMaterial(material),
+    }) != null
+  );
+}
+
+type CoopV2SettledWaveDestinationKind = CoopWaveAdvanceDestination["kind"];
+
+/**
+ * The authority commits only after BattleEnd/CoopVictorySeal has queued the complete executable tail.
+ * Read that host-authored queue and name its first real player/control boundary. This is deliberately not
+ * recomputed from wave modulo, mode, biome, or Mystery RNG: those predicates already ran once when the
+ * host built the tail, and duplicating them here would recreate the derived-tail split V2 removes.
+ */
+function resolveCoopV2SettledWaveDestination(
+  transition: CoopWaveAdvancePayload,
+): CoopV2SettledWaveDestinationKind | null {
+  if (transition.meBoundary === "battle-victory") {
+    return "MYSTERY";
+  }
+  const queued = globalScene.phaseManager?.getQueuedPhaseNames?.() ?? [];
+  for (const phaseName of queued) {
+    switch (phaseName) {
+      case "SelectModifierPhase":
+      case "BiomeShopPhase":
+      case "TheBargainPhase":
+      case "ErCrossroadsPhase":
+        return "REWARD";
+      case "SelectBiomePhase":
+        return "BIOME";
+      case "MysteryEncounterPhase":
+      case "CoopReplayMePhase":
+        return "MYSTERY";
+      case "NewBattlePhase":
+      case "EncounterPhase":
+      case "CommandPhase":
+        return "COMMAND_FRONTIER";
+    }
+  }
+  coopWarn("v2-wave", `refused wave=${transition.wave} without a stated executable tail; queued=[${queued.join(",")}]`);
+  return null;
 }
 
 /** BattleEnd destroys enemy presentation after capture; encode that completed projection explicitly. */
@@ -5962,6 +6589,27 @@ export function sealCoopAutomaticVictoryBoundary(identity: CoopAutomaticVictoryS
   }
 
   if (runtime.controller.role === "guest") {
+    if (coopV2WaveCutovers.has(runtime)) {
+      const staged = runtime.v2WaveTransactions.get(identity.wave);
+      if (
+        staged == null
+        || staged.dataApplied !== true
+        || staged.transition.outcome !== "win"
+        || staged.transition.wave !== identity.wave
+        || (identity.turn != null && identity.turn !== staged.authoritativeState.turn)
+      ) {
+        failCoopSharedSession(
+          `The renderer reached an incomplete Authority V2 victory seal for wave ${identity.wave} `
+            + `(turn ${staged?.authoritativeState.turn ?? "missing"}, applied ${staged?.dataApplied === true}).`,
+        );
+        return false;
+      }
+      coopLog(
+        "v2-wave",
+        `GUEST automatic victory settlement admitted wave=${identity.wave} turn=${staged.authoritativeState.turn}`,
+      );
+      return true;
+    }
     const staged = getCoopStagedWaveAdvanceTransaction(identity.wave, identity.binding);
     const payload = staged?.envelope.pendingOperation?.payload;
     const retainedTurn = staged?.envelope.authoritativeState.turn;
@@ -6770,7 +7418,10 @@ function buildLocalCoopCapabilities(durabilityEnabled: boolean): CoopCapabilityK
   if (isCoopV2ReplacementEnabled() && isCoopV2TurnEnabled()) {
     caps.push(COOP_CAP_AUTHORITY_V2_REPLACEMENT);
   }
-  if (isCoopV2RecoveryEnabled() && isCoopV2ReplacementEnabled() && isCoopV2TurnEnabled()) {
+  if (isCoopV2WaveEnabled() && isCoopV2ReplacementEnabled() && isCoopV2TurnEnabled()) {
+    caps.push(COOP_CAP_AUTHORITY_V2_WAVE);
+  }
+  if (isCoopV2RecoveryEnabled() && isCoopV2WaveEnabled() && isCoopV2ReplacementEnabled() && isCoopV2TurnEnabled()) {
     caps.push(COOP_CAP_AUTHORITY_V2_RECOVERY);
   }
   return caps;
@@ -6833,6 +7484,7 @@ export function assembleCoopRuntime(
       disposeCoopV2Shadow(runtime);
       runtime.v2InstalledCommandTargets.clear();
       runtime.v2InstalledReplacementTargets.clear();
+      runtime.v2WaveTransactions.clear();
       coopLog("v2-recovery", `hard epoch boundary ${authorityV2Epoch}->${epoch}; retired prior authoritative log`);
     }
     authorityV2Epoch = epoch;
@@ -7039,6 +7691,7 @@ export function assembleCoopRuntime(
     waveOperationBinding,
     v2InstalledCommandTargets: new Set<string>(),
     v2InstalledReplacementTargets: new Set<string>(),
+    v2WaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
   };
   sharedTerminalStates.set(runtime, {
     frozen: false,

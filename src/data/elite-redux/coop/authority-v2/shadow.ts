@@ -96,6 +96,8 @@ import {
   type CoopWaveTransitionMaterialV2,
   digestOfMaterial,
   shadowOfWaveTerminalEntry,
+  terminalSubsumes,
+  waveBoundarySubsumes,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import { AuthorityLog, type CoopAuthorityWire } from "#data/elite-redux/coop/authority-v2/authority-log";
 import type {
@@ -695,7 +697,7 @@ export class CoopAuthorityV2Shadow {
         operationId: input.operationId,
         transition: input.transition,
         destination: input.destination,
-        ...(input.subsumes == null ? {} : { subsumes: input.subsumes }),
+        subsumes: input.subsumes ?? waveBoundarySubsumes(this.log.retained(), input.transition.wave),
       });
       const entry = this.commit(built);
       const shadow = shadowOfWaveTerminalEntry(entry);
@@ -713,7 +715,7 @@ export class CoopAuthorityV2Shadow {
         context: this.frameContext,
         operationId: input.operationId,
         terminal: input.terminal,
-        ...(input.subsumes == null ? {} : { subsumes: input.subsumes }),
+        subsumes: input.subsumes ?? terminalSubsumes(this.log.retained()),
       });
       const entry = this.commit(built);
       const shadow = shadowOfWaveTerminalEntry(entry);

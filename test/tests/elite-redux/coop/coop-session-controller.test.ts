@@ -10,9 +10,11 @@
 // Pure logic over LoopbackTransport - no game engine.
 
 import {
+  COOP_CAP_AUTHORITY_V2_RECOVERY,
   COOP_CAP_AUTHORITY_V2_REPLACEMENT,
   COOP_CAP_AUTHORITY_V2_SHADOW,
   COOP_CAP_AUTHORITY_V2_TURN,
+  COOP_CAP_AUTHORITY_V2_WAVE,
   COOP_CAP_DURABILITY_JOURNAL,
   COOP_CAP_OP_BIOME,
   clearNegotiatedCoopCapabilities,
@@ -138,7 +140,13 @@ describe("co-op session controller (#633, P1)", () => {
       clearNegotiatedCoopCapabilities();
       const { host, guest } = createLoopbackPair();
       const required = [COOP_CAP_OP_BIOME, COOP_CAP_DURABILITY_JOURNAL];
-      const authorityV2 = [COOP_CAP_AUTHORITY_V2_SHADOW, COOP_CAP_AUTHORITY_V2_TURN, COOP_CAP_AUTHORITY_V2_REPLACEMENT];
+      const authorityV2 = [
+        COOP_CAP_AUTHORITY_V2_SHADOW,
+        COOP_CAP_AUTHORITY_V2_TURN,
+        COOP_CAP_AUTHORITY_V2_REPLACEMENT,
+        COOP_CAP_AUTHORITY_V2_WAVE,
+        COOP_CAP_AUTHORITY_V2_RECOVERY,
+      ];
       const controller = new CoopSessionController(host, {
         username: "Host",
         version: COOP_PROTOCOL_VERSION,

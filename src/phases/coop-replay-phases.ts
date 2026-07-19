@@ -32,6 +32,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { Phase } from "#app/phase";
 import { CommonBattleAnim, MoveAnim } from "#data/battle-anims";
+import { isCoopV2WaveCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-wave";
 import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
@@ -1764,37 +1765,40 @@ export class CoopFinalizeTurnPhase extends Phase {
     const reconstructed = resolveCoopPendingWaveTransition(pending, () =>
       buildCoopWaveAdvancePayload(pending.outcome, pending.wave),
     );
-    const waveBinding = getCoopWaveAdvanceRuntimeBinding();
-    if (isCoopWaveAdvanceOperationEnabled() && waveBinding == null) {
-      failCoopSharedSession(`The retained wave ${pending.wave} continuation had no owning runtime.`);
-      return;
-    }
-    const decision = adoptWaveAdvanceWatcherChoice(
-      {
-        payload: reconstructed,
-        localRole: getCoopController()?.role ?? "guest",
-        // The retained transaction owns its source address. The ambient Battle may already be the next
-        // wave when a delayed continuation materializes; feeding that mutable value into the op ledger
-        // turns an exact wave-N commit into a wave-(N+1) envelope.
-        wave: pending.wave,
-        turn: globalScene.currentBattle.turn,
-      },
-      waveBinding,
-    );
-    if (isCoopWaveAdvanceOperationEnabled() && !decision.adopt && !decision.stale) {
-      // FAIL LOUD (§2.5 item 4): a flag-ON guest with an unadoptable op (fail-closed unknown kind / applier
-      // gap) must NOT silently derive the tail. The #859 phantom-dissolve + resync backstops recover.
-      coopWarn(
-        "replay",
-        `guest wave-advance FAIL-LOUD (op ${decision.reason}) wave=${pending.wave} - NOT deriving (Wave-2f)`,
+    let tail = reconstructed;
+    if (!isCoopV2WaveCutoverActive()) {
+      const waveBinding = getCoopWaveAdvanceRuntimeBinding();
+      if (isCoopWaveAdvanceOperationEnabled() && waveBinding == null) {
+        failCoopSharedSession(`The retained wave ${pending.wave} continuation had no owning runtime.`);
+        return;
+      }
+      const decision = adoptWaveAdvanceWatcherChoice(
+        {
+          payload: reconstructed,
+          localRole: getCoopController()?.role ?? "guest",
+          // The retained transaction owns its source address. The ambient Battle may already be the next
+          // wave when a delayed continuation materializes; feeding that mutable value into the op ledger
+          // turns an exact wave-N commit into a wave-(N+1) envelope.
+          wave: pending.wave,
+          turn: globalScene.currentBattle.turn,
+        },
+        waveBinding,
       );
-      return;
+      if (isCoopWaveAdvanceOperationEnabled() && !decision.adopt && !decision.stale) {
+        // FAIL LOUD (§2.5 item 4): a flag-ON guest with an unadoptable op (fail-closed unknown kind / applier
+        // gap) must NOT silently derive the tail. The #859 phantom-dissolve + resync backstops recover.
+        coopWarn(
+          "replay",
+          `guest wave-advance FAIL-LOUD (op ${decision.reason}) wave=${pending.wave} - NOT deriving (Wave-2f)`,
+        );
+        return;
+      }
+      // The transition to build FROM: the adopted op's host-stated payload when the op adopted fresh (op-
+      // selected), else the reconstructed payload (flag-off pass-through, OR the journal pre-applied it). Either
+      // way op.outcome == pending.outcome. §3 strict-tails: sanction the boundary tails this op legitimately
+      // builds (observe-mode evidence - a tail outside the sanction logs TAIL WOULD-BLOCK).
+      tail = decision.adopt ? decision.payload : reconstructed;
     }
-    // The transition to build FROM: the adopted op's host-stated payload when the op adopted fresh (op-
-    // selected), else the reconstructed payload (flag-off pass-through, OR the journal pre-applied it). Either
-    // way op.outcome == pending.outcome. §3 strict-tails: sanction the boundary tails this op legitimately
-    // builds (observe-mode evidence - a tail outside the sanction logs TAIL WOULD-BLOCK).
-    const tail = decision.adopt ? decision.payload : reconstructed;
     setCoopWaveTailSanction(coopWaveAdvanceSanctionedTails(tail));
     // DIAGNOSTIC (#633 trainer-victory deadlock): log the outcome + the guest's battleType so a live
     // capture confirms the guest queues the right tail. For a "win" on a TRAINER wave the VictoryPhase

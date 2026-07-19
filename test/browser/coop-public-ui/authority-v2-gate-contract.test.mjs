@@ -14,7 +14,13 @@ const stagingWorkflow = readFileSync(new URL(".github/workflows/deploy-staging.y
 const coopRuntime = readFileSync(new URL("src/data/elite-redux/coop/coop-runtime.ts", root), "utf8");
 const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
+const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
+const replayPhases = readFileSync(new URL("src/phases/coop-replay-phases.ts", root), "utf8");
 const shadow = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/shadow.ts", root), "utf8");
+const waveAdapter = readFileSync(
+  new URL("src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts", root),
+  "utf8",
+);
 
 function jobBlock(workflow, job) {
   const lines = workflow.split(/\r?\n/gu);
@@ -34,11 +40,12 @@ test("every real-engine shard qualifies Authority V2 instead of hiding behind le
   const gate = jobBlock(gateWorkflow, "gate");
   assert.match(gate, /COOP_AUTHORITY_V2_TURN:\s*"on"/u);
   assert.match(gate, /COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
+  assert.match(gate, /COOP_AUTHORITY_V2_WAVE:\s*"on"/u);
   assert.match(gate, /COOP_AUTHORITY_V2_RECOVERY:\s*"on"/u);
   assert.match(gate, /node scripts\/run-coop-gate\.mjs/u);
   assert.doesNotMatch(
     gate,
-    /COOP_AUTHORITY_V2_(?:TURN|REPLACEMENT):\s*"(?:off|false|0)"/u,
+    /COOP_AUTHORITY_V2_(?:TURN|REPLACEMENT|WAVE):\s*"(?:off|false|0)"/u,
     "the exhaustive gameplay matrix may never downgrade the production architecture",
   );
 });
@@ -47,13 +54,32 @@ test("public-browser campaign and staging bundle qualify the same V2 cutover", (
   const browserBuild = jobBlock(gateWorkflow, "browser-build");
   assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_TURN:\s*"on"/u);
   assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
+  assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_WAVE:\s*"on"/u);
   assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_RECOVERY:\s*"on"/u);
   assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_TURN:\s*"on"/u);
   assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
+  assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_WAVE:\s*"on"/u);
   assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_RECOVERY:\s*"on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_TURN=on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_REPLACEMENT=on"/u);
+  assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_WAVE=on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_RECOVERY=on"/u);
+});
+
+test("wave/terminal cutover carries full settled state and retires every legacy wave authority", () => {
+  assert.match(waveAdapter, /interface CoopWaveTerminalAuthorityCarrierV2[\s\S]*authoritativeState: unknown/u);
+  assert.match(waveAdapter, /interface CoopWaveTerminalAuthorityCarrierV2[\s\S]*transition: unknown/u);
+  assert.match(coopRuntime, /entry\.kind === "WAVE_ADVANCE" \|\| entry\.kind === "TERMINAL_COMMIT"/u);
+  assert.match(coopRuntime, /return surfaces\.wave \? applyCoopV2WaveEntry\(runtime, entry\) : null/u);
+  assert.match(coopRuntime, /if \(isCoopV2WaveCutoverActive\(\)\)[\s\S]*commitCoopV2SettledWaveAdvance/u);
+  assert.match(
+    coopRuntime,
+    /if \(isCoopV2WaveCutoverActive\(\)\)[\s\S]*\}\s*else\s*\{[\s\S]*commitWaveAdvanceOwnerIntent/u,
+  );
+  assert.match(replayPhases, /if \(!isCoopV2WaveCutoverActive\(\)\)[\s\S]*adoptWaveAdvanceWatcherChoice/u);
+  assert.match(battleEndPhase, /getCoopPendingRetainedWaveBoundary\(\)/u);
+  assert.match(shadow, /waveBoundarySubsumes\(this\.log\.retained\(\), input\.transition\.wave\)/u);
+  assert.match(shadow, /terminalSubsumes\(this\.log\.retained\(\)\)/u);
 });
 
 test("correlated recovery is wired through all four production progression fences", () => {
