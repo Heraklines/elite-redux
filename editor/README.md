@@ -13,8 +13,11 @@ deploy. Four tabs:
 | 🎛 Game | 62 validated balance knobs (shiny/candy/eggs/money/curves...) | `src/data/elite-redux/er-balance-tuning.json` |
 | ➕ Add a Mon | whole new species: stats, types, abilities, moves, cost - plus a sprite studio that generates tier-2/3 shinies by hue rotation from an uploaded front/back | `src/data/elite-redux/er-custom-mons.json` + sprites committed to `Heraklines/er-assets` |
 
-The **Assets** tab imports YouTube videos or playlists into the battle-music
-catalog and uploads reusable trainer sprites. Music metadata is stored in
+The **Assets** tab imports YouTube videos/playlists or direct audio/video files
+into the battle-music catalog and uploads reusable trainer sprites. Direct
+uploads accept common formats such as MP3, WAV, FLAC, OGG, M4A, MP4, MOV, MKV,
+AVI, and WebM. The importer finds the audio stream, removes video, loudness
+normalizes it, and writes a 44.1 kHz stereo MP3. Music metadata is stored in
 `editor/data/bgm.json`; trainer-sprite metadata is stored in
 `src/data/elite-redux/er-custom-trainer-sprites.json`; binary media is committed
 to `Heraklines/er-assets`.
@@ -103,13 +106,17 @@ The workflow lives at `.github/workflows/deploy-staging.yml` and deploys to the
 
 ```bash
 cd workers/er-editor-api
+npx wrangler r2 bucket create er-editor-media-uploads
 npx wrangler secret put GITHUB_TOKEN      # the PAT from step 1
 npx wrangler secret put EDITOR_PASSWORD   # shared password the team types to save
 npx wrangler deploy
 ```
 
 Confirm `GITHUB_BRANCH` / `GITHUB_WORKFLOW_FILE` in `wrangler.toml`. Note the
-deployed URL (e.g. `https://er-editor-api.heraklines.workers.dev`).
+deployed URL (e.g. `https://er-editor-api.heraklines.workers.dev`). The R2 bucket
+is private and only holds temporary multipart uploads. Completed files are
+removed by the import job; configure an R2 lifecycle rule to remove abandoned
+multipart uploads and objects after one day.
 
 ### 4. Point the SPA at the Worker
 
@@ -137,12 +144,16 @@ the team.
    - **Commit & Deploy** — commits *and* rebuilds the staging site (live in a
      few minutes). With no pending edits, this just redeploys current.
 
-On the **Assets** tab, playlist videos become separate tracks. Long videos split
-on YouTube chapters or timestamp lists in the description; a mix without either
-remains one track and is marked for manual splitting. Each imported track records
-its source, attribution text, and detected license. Trainer images are converted
-to transparent, tightly cropped PNG atlases before upload, then become selectable
-without changing the trainer's gameplay class.
+On the **Assets** tab, choose **YouTube** for links/playlists or **Upload file**
+for a local audio/video file. Playlist videos become separate tracks. Long
+YouTube videos split on chapters or timestamp lists in the description; a mix
+without either remains one track and is marked for manual splitting. A direct
+upload always becomes one track and files longer than 15 minutes are marked for
+manual splitting. Direct uploads require the uploader to record the rights basis,
+license, title, artist, and attribution/source information. Duplicate direct
+uploads are skipped by SHA-256. Trainer images are converted to transparent,
+tightly cropped PNG atlases before upload, then become selectable without
+changing the trainer's gameplay class.
 
 ## Notes / future
 

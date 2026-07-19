@@ -12,7 +12,7 @@ name: Deploy Staging
 # The Cloudflare account must contain a dedicated `er-coop-staging` D1. The
 # workflow resolves it by exact name and refuses production's D1 id.
 
-run-name: ${{ inputs.operation == 'import_music' && 'Import YouTube BGM' || 'Deploy Staging' }}
+run-name: ${{ inputs.operation == 'import_music' && 'Import BGM' || 'Deploy Staging' }}
 
 on:
   workflow_dispatch:
@@ -27,6 +27,34 @@ on:
           - import_music
       source_urls:
         description: YouTube video or playlist URLs, one per line
+        required: false
+        type: string
+      upload_url:
+        description: Private temporary direct-upload URL
+        required: false
+        type: string
+      upload_name:
+        description: Original uploaded filename
+        required: false
+        type: string
+      upload_title:
+        description: Uploaded track title
+        required: false
+        type: string
+      upload_artist:
+        description: Uploaded track artist
+        required: false
+        type: string
+      upload_license:
+        description: Uploaded track license
+        required: false
+        type: string
+      upload_attribution:
+        description: Uploaded track attribution
+        required: false
+        type: string
+      upload_source_url:
+        description: Optional public source for an uploaded track
         required: false
         type: string
       key_prefix:
@@ -58,7 +86,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ${{ inputs.operation == 'import_music' && 'er-youtube-bgm-import' || 'deploy-staging' }}
+  group: ${{ inputs.operation == 'import_music' && 'er-bgm-import' || 'deploy-staging' }}
   # Queue every promotion. Cancelling between Worker and Pages deploys can expose mismatched
   # save/co-op protocol versions to staging players.
   cancel-in-progress: false
@@ -84,6 +112,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
+      - name: Verify direct media conversion
+        run: node scripts/test-import-bgm-direct.mjs
+
       - name: Check asset repository token
         env:
           ASSETS_TOKEN: ${{ secrets.ER_ASSETS_TOKEN }}
@@ -101,6 +132,13 @@ jobs:
       - name: Import and normalize tracks
         env:
           SOURCE_URLS: ${{ inputs.source_urls }}
+          UPLOAD_URL: ${{ inputs.upload_url }}
+          UPLOAD_NAME: ${{ inputs.upload_name }}
+          UPLOAD_TITLE: ${{ inputs.upload_title }}
+          UPLOAD_ARTIST: ${{ inputs.upload_artist }}
+          UPLOAD_LICENSE: ${{ inputs.upload_license }}
+          UPLOAD_ATTRIBUTION: ${{ inputs.upload_attribution }}
+          UPLOAD_SOURCE_URL: ${{ inputs.upload_source_url }}
           KEY_PREFIX: ${{ inputs.key_prefix }}
           SPLIT_CHAPTERS: ${{ inputs.split_chapters }}
           REQUIRE_CREATIVE_COMMONS: ${{ inputs.require_creative_commons }}
@@ -108,7 +146,7 @@ jobs:
           ASSETS_DIR: ${{ runner.temp }}/er-assets
           CATALOG_PATH: editor/data/bgm.json
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        run: node scripts/import-youtube-bgm.mjs
+        run: node scripts/import-bgm.mjs
 
       - name: Commit audio assets
         working-directory: ${{ runner.temp }}/er-assets

@@ -1,12 +1,32 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  createReadStream,
+  createWriteStream,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 const sourceUrls = (process.env.SOURCE_URLS || "")
   .split(/\r?\n/)
   .map(value => value.trim())
   .filter(Boolean);
+const uploadUrl = (process.env.UPLOAD_URL || "").trim();
+const uploadName = (process.env.UPLOAD_NAME || "").trim();
+const uploadTitle = (process.env.UPLOAD_TITLE || "").trim();
+const uploadArtist = (process.env.UPLOAD_ARTIST || "").trim();
+const uploadLicense = (process.env.UPLOAD_LICENSE || "").trim();
+const uploadAttribution = (process.env.UPLOAD_ATTRIBUTION || "").trim();
+const uploadSourceUrl = (process.env.UPLOAD_SOURCE_URL || "").trim();
 const keyPrefix = process.env.KEY_PREFIX || "battle_custom";
 const splitChapters = process.env.SPLIT_CHAPTERS !== "false";
 const requireCreativeCommons = process.env.REQUIRE_CREATIVE_COMMONS === "true";
@@ -15,8 +35,8 @@ const catalogPath = process.env.CATALOG_PATH || "editor/data/bgm.json";
 const youtubeApiKey = process.env.YOUTUBE_API_KEY || "";
 const importedBy = (process.env.IMPORT_AUTHOR || "").trim();
 
-if (!assetsDir || sourceUrls.length === 0) {
-  throw new Error("SOURCE_URLS and ASSETS_DIR are required");
+if (!assetsDir || (sourceUrls.length === 0 && !uploadUrl) || (sourceUrls.length > 0 && uploadUrl)) {
+  throw new Error("ASSETS_DIR and exactly one YouTube URL list or direct upload are required");
 }
 
 const run = (command, args, options = {}) =>
@@ -121,12 +141,142 @@ const existingKeys = new Set(catalog.map(track => track.key));
 const existingSources = new Set(
   catalog.filter(track => track.sourceVideoId).map(track => `${track.sourceVideoId}:${track.chapterStart ?? 0}`),
 );
+const existingUploadHashes = new Set(catalog.map(track => track.sourceFileSha256).filter(Boolean));
 const workRoot = mkdtempSync(join(tmpdir(), "er-bgm-"));
 const bgmDir = join(assetsDir, "audio", "bgm");
 let imported = 0;
 let skipped = 0;
 
-try {
+function uniqueKey(base) {
+  let key = base.slice(0, 64);
+  let collision = 2;
+  while (existingKeys.has(key)) {
+    const suffix = `_${collision++}`;
+    key = `${base.slice(0, 64 - suffix.length)}${suffix}`;
+  }
+  existingKeys.add(key);
+  return key;
+}
+
+function transcode(inputFile, output, start, end) {
+  const trimArgs = start === undefined || end === undefined ? [] : ["-ss", String(start), "-to", String(end)];
+  run("ffmpeg", [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    ...trimArgs,
+    "-i",
+    inputFile,
+    "-vn",
+    "-af",
+    "loudnorm=I=-16:LRA=11:TP=-1.5",
+    "-ar",
+    "44100",
+    "-ac",
+    "2",
+    "-b:a",
+    "160k",
+    output,
+  ]);
+  if (statSync(output).size > 95 * 1024 * 1024) {
+    rmSync(output, { force: true });
+    throw new Error("normalized track exceeds the asset repository's 95 MiB safety limit");
+  }
+}
+
+async function fileSha256(path) {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(path)) {
+    hash.update(chunk);
+  }
+  return hash.digest("hex");
+}
+
+async function downloadUploadedMedia() {
+  const response = await fetch(uploadUrl);
+  if (!response.ok || !response.body) {
+    throw new Error(`temporary upload download failed: ${response.status} ${await response.text()}`);
+  }
+  const extension =
+    extname(uploadName)
+      .toLowerCase()
+      .replace(/[^a-z0-9.]/g, "") || ".bin";
+  const inputFile = join(workRoot, `direct-upload${extension}`);
+  await pipeline(Readable.fromWeb(response.body), createWriteStream(inputFile));
+  return inputFile;
+}
+
+function inspectLocalMedia(inputFile) {
+  const probe = JSON.parse(
+    run("ffprobe", [
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration:stream=codec_type,codec_name",
+      "-of",
+      "json",
+      inputFile,
+    ]),
+  );
+  const duration = Number(probe.format?.duration) || 0;
+  if (!probe.streams?.some(stream => stream.codec_type === "audio")) {
+    throw new Error(`${uploadName}: no audio stream was found`);
+  }
+  if (duration < 8 || duration > 14_400) {
+    throw new Error(`${uploadName}: duration must be between 8 seconds and 4 hours`);
+  }
+  return {
+    duration,
+    codecs: probe.streams.filter(stream => stream.codec_type === "audio").map(stream => stream.codec_name),
+  };
+}
+
+async function importDirectUpload() {
+  const allowedLicenses = new Set(["original", "permission", "cc0", "cc-by", "unknown"]);
+  if (!uploadName || !uploadTitle || !allowedLicenses.has(uploadLicense)) {
+    throw new Error("direct upload filename, title, and license are required");
+  }
+  const inputFile = await downloadUploadedMedia();
+  const { duration, codecs } = inspectLocalMedia(inputFile);
+  const sourceFileSha256 = await fileSha256(inputFile);
+  if (existingUploadHashes.has(sourceFileSha256)) {
+    skipped++;
+    console.log(`${uploadName}: identical uploaded media already exists; skipped`);
+    return;
+  }
+
+  const key = uniqueKey(`${keyPrefix}_${slug(uploadTitle)}`);
+  const output = join(bgmDir, `${key}.mp3`);
+  transcode(inputFile, output);
+  const artist = uploadArtist || "Unknown artist";
+  const attribution = uploadAttribution || `${uploadTitle} by ${artist}`;
+  catalog.push({
+    key,
+    battle: true,
+    title: uploadTitle,
+    artist,
+    sourceUrl: uploadSourceUrl || undefined,
+    sourceType: "direct-upload",
+    sourceFileName: uploadName,
+    sourceFileSha256,
+    sourceAudioCodecs: codecs,
+    license: uploadLicense,
+    attributionRequired: uploadLicense === "cc-by",
+    attribution,
+    splitMethod: "whole",
+    chapterStart: 0,
+    chapterEnd: duration,
+    needsManualSplit: duration >= 900,
+    importedAt: new Date().toISOString(),
+    importedBy: importedBy || undefined,
+  });
+  existingUploadHashes.add(sourceFileSha256);
+  imported++;
+  console.log(`${key}: ${uploadLicense}, direct upload, ${Math.round(duration)}s`);
+}
+
+async function importYoutube() {
   const videos = expandSources();
   for (let videoIndex = 0; videoIndex < videos.length; videoIndex++) {
     const source = videos[videoIndex];
@@ -176,35 +326,9 @@ try {
         continue;
       }
       const trackTitle = chapters.length > 1 ? chapter.title || `${info.title} ${chapterIndex + 1}` : info.title;
-      let key = `${keyPrefix}_${String(videoIndex + 1).padStart(2, "0")}_${slug(trackTitle)}`.slice(0, 64);
-      let collision = 2;
-      while (existingKeys.has(key)) {
-        const suffix = `_${collision++}`;
-        key = `${key.slice(0, 64 - suffix.length)}${suffix}`;
-      }
+      const key = uniqueKey(`${keyPrefix}_${String(videoIndex + 1).padStart(2, "0")}_${slug(trackTitle)}`);
       const output = join(bgmDir, `${key}.mp3`);
-      run("ffmpeg", [
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-y",
-        "-ss",
-        String(start),
-        "-to",
-        String(end),
-        "-i",
-        inputFile,
-        "-vn",
-        "-af",
-        "loudnorm=I=-16:LRA=11:TP=-1.5",
-        "-ar",
-        "44100",
-        "-ac",
-        "2",
-        "-b:a",
-        "160k",
-        output,
-      ]);
+      transcode(inputFile, output, start, end);
       const channel = api?.channelTitle || info.channel || info.uploader || "Unknown uploader";
       catalog.push({
         key,
@@ -226,15 +350,32 @@ try {
         importedAt: new Date().toISOString(),
         importedBy: importedBy || undefined,
       });
-      existingKeys.add(key);
       existingSources.add(sourceIdentity);
       imported++;
       console.log(`${key}: ${license}, ${splitMethod}, ${Math.round(end - start)}s`);
     }
+  }
+}
+
+try {
+  if (uploadUrl) {
+    await importDirectUpload();
+  } else {
+    await importYoutube();
   }
   catalog.sort((a, b) => Number(b.battle) - Number(a.battle) || a.key.localeCompare(b.key));
   writeFileSync(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
   console.log(`Imported ${imported} track(s); skipped ${skipped} existing source segment(s).`);
 } finally {
   rmSync(workRoot, { recursive: true, force: true });
+  if (uploadUrl) {
+    try {
+      const cleanup = await fetch(uploadUrl, { method: "DELETE" });
+      if (!cleanup.ok) {
+        console.warn(`temporary upload cleanup failed: ${cleanup.status}`);
+      }
+    } catch (error) {
+      console.warn(`temporary upload cleanup failed: ${error instanceof Error ? error.message : error}`);
+    }
+  }
 }
