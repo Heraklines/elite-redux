@@ -2434,8 +2434,11 @@ export async function driveGuestReplayTurn(
   await maybeSealHostRetainedWaveBoundary(guestScene, options.sealRetainedWaveBoundary !== false);
   // Production-transition journeys arrive here through the guest's real TurnStartPhase, which has already
   // queued and selected CoopReplayTurnPhase. Reuse that CURRENT object so its end() advances the same phase
-  // tree (Victory/reward/NewBattle tails cannot be stranded behind an unrelated constructor phase). Legacy
-  // focused repros that deliberately invoke the replay seam still get a detached freshly-created phase.
+  // tree (Victory/reward/NewBattle tails cannot be stranded behind an unrelated constructor phase). A
+  // focused fixture that has not materialized that boundary must install its created replay into the REAL
+  // phase manager too. Starting it detached can appear to work while authority is already buffered, but if
+  // the frame arrives later this driver sees the unrelated synthetic TitlePhase and returns while the
+  // detached replay remains parked—an impossible browser execution that produced false convergence.
   const current = guestScene.phaseManager.getCurrentPhase();
   const realBoundary = realGuestCommandBoundaries.get(guestScene);
   let replay: Phase;
@@ -2455,6 +2458,12 @@ export async function driveGuestReplayTurn(
       // command-resolution tail is the same structural diversion TurnStart performs in production; most
       // importantly, replay.end() now advances ITS OWN queue instead of an unrelated stale NewBattle tail.
       guestScene.phaseManager.clearPhaseQueue();
+      guestScene.phaseManager.unshiftPhase(replay);
+      guestScene.phaseManager.shiftPhase();
+      replayStarted = true;
+    } else {
+      // Preserve any legitimate queued tail, but make this replay the actual current phase. PhaseInterceptor
+      // suppresses automatic startCurrentPhase in tests, so the drain loop below starts it exactly once.
       guestScene.phaseManager.unshiftPhase(replay);
       guestScene.phaseManager.shiftPhase();
       replayStarted = true;

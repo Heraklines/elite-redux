@@ -792,7 +792,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const v2CommittedBefore = V2_REPLACEMENT_CUTOVER ? (getCoopV2Shadow(runtime)?.diagnostics().committed ?? 0) : 0;
 
     // Drive the host's SwitchPhase for the guest-owned slot 1 (exactly what FaintPhase queues).
-    // Tiny wait so the no-pick fallback fires fast (the live default is 60s).
+    // Tiny timeout so the no-pick fallback fires fast (the live default is 60s). The phase interceptor
+    // must run the real SwitchPhase -> SwitchSummonPhase -> checkpoint queue: merely sleeping after
+    // SwitchPhase queues its children leaves them unstarted under the intercepted test phase manager and
+    // turns runner load into a false "V2 never committed" failure.
     setCoopFaintSwitchWaitMs(30);
     try {
       const switchPhase = game.scene.phaseManager.create(
@@ -806,8 +809,14 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       // boundaryStillLive fence intentionally rejects a detached phase object that is not current.
       game.scene.phaseManager.unshiftPhase(switchPhase);
       game.scene.phaseManager.shiftPhase();
-      switchPhase.start();
-      await new Promise(r => setTimeout(r, 120));
+      if (V2_REPLACEMENT_CUTOVER) {
+        await game.phaseInterceptor.to("CoopPushReplacementCheckpointPhase");
+      } else {
+        // Legacy intentionally remains parked inside SwitchPhase until peer material arrives, so there is
+        // no later phase target to traverse to. Observe the real barrier invocation without a blind sleep.
+        switchPhase.start();
+        await vi.waitUntil(() => materialBarrierSpy.mock.calls.length > 0, { timeout: 2_000, interval: 10 });
+      }
     } finally {
       setCoopFaintSwitchWaitMs(60_000);
     }
@@ -825,10 +834,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
         unshiftSpy.mock.calls.find(([name]) => name === "CoopPushReplacementCheckpointPhase"),
         "V2 captures one complete post-summon replacement carrier",
       ).toBeDefined();
-      await vi.waitUntil(() => (getCoopV2Shadow(runtime)?.diagnostics().committed ?? 0) > v2CommittedBefore, {
-        timeout: 2_000,
-        interval: 10,
-      });
+      expect(
+        getCoopV2Shadow(runtime)?.diagnostics().committed ?? 0,
+        "the real queued post-summon checkpoint committed V2 authority",
+      ).toBeGreaterThan(v2CommittedBefore);
     } else {
       expect(
         materialBarrierSpy,
