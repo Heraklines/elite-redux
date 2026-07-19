@@ -35,11 +35,13 @@ import {
   resolveCoopV2ShowdownCommandProof,
 } from "#data/elite-redux/coop/authority-v2/command-frontier";
 import type {
+  CoopAuthoritativeMaterial,
   CoopAuthorityEntry,
   CoopControlInstallResult,
   CoopNextControl,
   CoopRuntimeContext,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import { createCoopControlProjector } from "#data/elite-redux/coop/authority-v2/control-projector";
 import {
   type CoopV2ReplacementBatchResult,
   CoopV2ReplacementCutover,
@@ -60,10 +62,15 @@ import {
   type ProjectableControl,
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
+import {
+  type CoopRecoveryFencePredicatesV2,
+  isCoopV2RecoveryEnabled,
+} from "#data/elite-redux/coop/authority-v2/recovery-channel";
 import type { ApplyMaterialResult } from "#data/elite-redux/coop/authority-v2/replica";
 import { resolveCoopV2SessionIdentity } from "#data/elite-redux/coop/authority-v2/session-identity";
 import {
   CoopAuthorityV2Shadow,
+  type CoopV2LiveRecoverySeams,
   type CoopV2LiveReplicaSeams,
   type CoopV2ShadowIdentity,
   clearActiveCoopV2Shadow,
@@ -130,6 +137,7 @@ import {
   setCoopBiomeOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-biome-operation";
 import {
+  COOP_CAP_AUTHORITY_V2_RECOVERY,
   COOP_CAP_AUTHORITY_V2_REPLACEMENT,
   COOP_CAP_AUTHORITY_V2_SHADOW,
   COOP_CAP_AUTHORITY_V2_TURN,
@@ -575,6 +583,35 @@ function preflightCoopAtomicSnapshot(runtime: CoopRuntime, snapshot: CoopFullBat
   );
 }
 
+/**
+ * Immutable admission proof carried into the deferred snapshot phase. Legacy recovery owns a stream ticket;
+ * Authority V2 owns a pre-request fence and revalidates that exact transaction before and after material apply.
+ */
+export type CoopSnapshotApplyAdmission =
+  | { readonly kind: "legacy"; readonly ticket: CoopRecoveryAdmissionV1 }
+  | {
+      readonly kind: "authority-v2";
+      readonly isCurrent: () => boolean;
+      /** Keep CoopApplyResyncPhase current until the V2 transaction reopens the fence. */
+      readonly retainUntilReleased: (release: () => void) => void;
+    };
+
+/** One admission predicate shared by inline Mystery recovery and the queued safe-boundary phase. */
+export function isCoopSnapshotApplyAdmissionCurrent(
+  runtime: CoopRuntime,
+  snapshot: CoopFullBattleSnapshot,
+  admission: CoopSnapshotApplyAdmission,
+): boolean {
+  if (admission.kind === "legacy") {
+    return runtime.battleStream.recoveryAdmissionIsCurrent(admission.ticket, snapshot);
+  }
+  try {
+    return admission.isCurrent();
+  } catch {
+    return false;
+  }
+}
+
 function wireCoopResyncResponder(runtime: CoopRuntime): void {
   runtime.battleStream.onStateSyncRequest(ticket => {
     coopLog("resync", `recv requestStateSync id=${ticket.requestId} role=${runtime.controller.role}`);
@@ -897,7 +934,7 @@ export function adoptCoopActiveMysterySnapshot(snapshot: Pick<CoopFullBattleSnap
 function tryApplyCoopActiveMysterySnapshotInline(
   runtime: CoopRuntime,
   snapshot: CoopFullBattleSnapshot,
-  admission: CoopRecoveryAdmissionV1,
+  admission: CoopSnapshotApplyAdmission,
   label: string,
   onHealed?: (() => void) | undefined,
 ): boolean | null {
@@ -917,7 +954,7 @@ function tryApplyCoopActiveMysterySnapshotInline(
   }
   if (
     !preflightCoopAtomicSnapshot(runtime, snapshot)
-    || !runtime.battleStream.recoveryAdmissionIsCurrent(admission, snapshot)
+    || !isCoopSnapshotApplyAdmissionCurrent(runtime, snapshot, admission)
   ) {
     return false;
   }
@@ -966,18 +1003,34 @@ function tryApplyCoopActiveMysterySnapshotInline(
   }
 }
 
-/** Queue one DATA+CONTROL snapshot for safe-boundary apply; ACK control only after checksum convergence. */
-export function queueCoopAtomicSnapshotApply(
+/**
+ * Queue one DATA+CONTROL snapshot for safe-boundary apply. `onCompleted` observes the actual transactional
+ * result, not mere queue admission; Authority V2 awaits it before adopting any log frontier.
+ */
+function queueCoopSnapshotApplyWithAdmission(
   runtime: CoopRuntime,
   snapshot: CoopFullBattleSnapshot,
-  admission: CoopRecoveryAdmissionV1,
+  admission: CoopSnapshotApplyAdmission,
   label: string,
   onHealed?: (() => void) | undefined,
+  onCompleted?: ((applied: boolean) => void) | undefined,
 ): boolean {
+  let completed = false;
+  const complete = (applied: boolean): void => {
+    if (completed) {
+      return;
+    }
+    completed = true;
+    try {
+      onCompleted?.(applied);
+    } catch (error) {
+      coopWarn("resync", `${label} completion observer threw`, error);
+    }
+  };
   const snapshotId = `snapshot:e${snapshot.sessionEpoch ?? 0}:tick${snapshot.authoritativeState?.tick ?? snapshot.tick ?? 0}:${snapshot.checksum ?? "missing"}`;
   if (
     !preflightCoopAtomicSnapshot(runtime, snapshot)
-    || !runtime.battleStream.recoveryAdmissionIsCurrent(admission, snapshot)
+    || !isCoopSnapshotApplyAdmissionCurrent(runtime, snapshot, admission)
   ) {
     recordCoopCausalEvent({
       domain: "snapshot",
@@ -995,10 +1048,12 @@ export function queueCoopAtomicSnapshotApply(
         + `checksum=${snapshot.checksum ?? "missing"} membership=${snapshot.membership?.revision ?? "missing"} `
         + `control=${snapshot.activeControl?.version ?? "missing"}`,
     );
+    complete(false);
     return false;
   }
   const inlineMysteryApply = tryApplyCoopActiveMysterySnapshotInline(runtime, snapshot, admission, label, onHealed);
   if (inlineMysteryApply != null) {
+    complete(inlineMysteryApply);
     return inlineMysteryApply;
   }
   const snapshotTurn = snapshot.authoritativeState?.turn ?? globalScene.currentBattle?.turn ?? 0;
@@ -1012,7 +1067,7 @@ export function queueCoopAtomicSnapshotApply(
     turn: snapshotTurn,
     detail: label,
   });
-  globalScene.phaseManager.pushNew(
+  const applyPhase = globalScene.phaseManager.create(
     "CoopApplyResyncPhase",
     snapshot,
     snapshotTurn,
@@ -1032,6 +1087,7 @@ export function queueCoopAtomicSnapshotApply(
           detail: label,
         });
         coopWarn("resync", `${label} did not converge -> control marks withheld`);
+        complete(false);
         return true;
       }
       if (!commitCoopSnapshotControls(runtime, snapshot)) {
@@ -1046,6 +1102,7 @@ export function queueCoopAtomicSnapshotApply(
           detail: label,
         });
         coopWarn("resync", `${label} material state healed but control adoption failed -> marks withheld`);
+        complete(false);
         return false;
       }
       try {
@@ -1064,10 +1121,203 @@ export function queueCoopAtomicSnapshotApply(
         detail: label,
       });
       coopLog("resync", `${label} atomically applied`);
+      complete(true);
       return true;
     },
   );
+  if (admission.kind === "authority-v2") {
+    if (!globalScene.phaseManager.replaceWithCoopRecoveryPhase(applyPhase)) {
+      coopWarn("resync", `${label} could not claim the fenced phase frontier`);
+      complete(false);
+      return false;
+    }
+  } else {
+    globalScene.phaseManager.pushPhase(applyPhase);
+  }
   return true;
+}
+
+/** Legacy V1 snapshot queue entrypoint. */
+export function queueCoopAtomicSnapshotApply(
+  runtime: CoopRuntime,
+  snapshot: CoopFullBattleSnapshot,
+  admission: CoopRecoveryAdmissionV1,
+  label: string,
+  onHealed?: (() => void) | undefined,
+): boolean {
+  return queueCoopSnapshotApplyWithAdmission(runtime, snapshot, { kind: "legacy", ticket: admission }, label, onHealed);
+}
+
+/**
+ * Authority V2 material install. The promise resolves only after exact checksum convergence and CONTROL
+ * adoption. The phase itself remains current until the recovery channel reports frontier/control/proof
+ * completion and releases the fence.
+ */
+function queueCoopV2AtomicSnapshotApply(
+  runtime: CoopRuntime,
+  snapshot: CoopFullBattleSnapshot,
+  isCurrent: () => boolean,
+  retainUntilReleased: (release: () => void) => void,
+): Promise<boolean> {
+  if (!preflightCoopAtomicSnapshot(runtime, snapshot) || !isCurrent()) {
+    return Promise.resolve(false);
+  }
+  // A real orphaned V1 interaction wait can sit at the head of the phase queue. Cancel only waits the
+  // peer has provably advanced past, and preserve faint/Mystery terminals whose exact retained operations
+  // are reconstructed by the snapshot. This happens only after full V2 preflight and under the fence.
+  const controller = runtime.controller;
+  runtime.interactionRelay.cancelWaiters(
+    seq =>
+      !isCoopFaintSwitchSeq(seq) && !isCoopActiveMysteryWaitSeq(seq) && controller.peerAdvancedPastInteraction(seq),
+  );
+  return new Promise(resolve => {
+    queueCoopSnapshotApplyWithAdmission(
+      runtime,
+      snapshot,
+      { kind: "authority-v2", isCurrent, retainUntilReleased },
+      "Authority V2 correlated recovery",
+      undefined,
+      resolve,
+    );
+  });
+}
+
+const COOP_V2_RECOVERY_MATERIAL_KIND = "COOP_FULL_BATTLE_SNAPSHOT";
+const COOP_V2_RECOVERY_MATERIAL_VERSION = 1;
+
+interface CoopV2RecoveryMaterialPayload {
+  readonly kind: typeof COOP_V2_RECOVERY_MATERIAL_KIND;
+  readonly version: typeof COOP_V2_RECOVERY_MATERIAL_VERSION;
+  readonly snapshot: CoopFullBattleSnapshot;
+}
+
+function coopV2RecoveryMaterialDigest(payload: CoopV2RecoveryMaterialPayload): string {
+  return fnv1a64(canonicalize(payload));
+}
+
+function isCoopV2RecoveryMaterialPayload(value: unknown): value is CoopV2RecoveryMaterialPayload {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const payload = value as Partial<CoopV2RecoveryMaterialPayload>;
+  return (
+    payload.kind === COOP_V2_RECOVERY_MATERIAL_KIND
+    && payload.version === COOP_V2_RECOVERY_MATERIAL_VERSION
+    && payload.snapshot != null
+    && typeof payload.snapshot === "object"
+    && !Array.isArray(payload.snapshot)
+  );
+}
+
+/**
+ * Recovery capture is allowed only at a real input/network wait. A stable checksum alone is insufficient:
+ * an animation can be between two scheduled mutations while its instantaneous checksum is perfectly stable.
+ */
+function isCoopV2RecoveryCaptureBoundary(control: CoopActiveControlSnapshotV1): boolean {
+  return (
+    activePublicSnapshotSurface() != null
+    || control.awaitedInteractions.length > 0
+    || control.pendingCommands.length > 0
+    || control.barriers.awaiting.length > 0
+  );
+}
+
+/**
+ * Authority-side all-in-one capture. DATA, membership, journal high-water, and executable CONTROL are read
+ * twice without an async boundary. Any movement or non-public boundary returns null, leaving the correlated
+ * request lease alive for the next safe boundary.
+ */
+function captureCoopV2RecoveryMaterial(
+  runtime: CoopRuntime,
+  ctx: CoopRuntimeContext,
+): CoopAuthoritativeMaterial | null {
+  if (
+    runtime.controller.authorityRole !== "authority"
+    || ctx.localSeatId !== ctx.authoritySeatId
+    || ctx.epoch !== runtime.controller.sessionEpoch
+  ) {
+    return null;
+  }
+  const checksumBefore = captureCoopChecksum();
+  if (checksumBefore === COOP_CHECKSUM_SENTINEL) {
+    return null;
+  }
+  const membership = runtime.membership.snapshot();
+  const activeControl = captureCoopActiveControl(runtime);
+  const journalHighWater = runtime.durability?.controlPlaneHighWater() ?? {};
+  if (
+    membership.revision !== ctx.membershipRevision
+    || membership.state !== "active"
+    || membership.members.some(member => !member.present)
+    || !isCoopV2RecoveryCaptureBoundary(activeControl)
+  ) {
+    return null;
+  }
+  const snapshot = captureCoopFullSnapshot();
+  if (snapshot?.authoritativeState == null) {
+    return null;
+  }
+  const stamped = bindCoopSnapshotControl({
+    ...snapshot,
+    sessionEpoch: runtime.controller.sessionEpoch,
+    checksum: checksumBefore,
+    membership,
+    activeControl,
+    journalHighWater,
+  } satisfies CoopFullBattleSnapshot);
+
+  const checksumAfter = captureCoopChecksum();
+  const controlAfter = captureCoopActiveControl(runtime);
+  const membershipAfter = runtime.membership.snapshot();
+  const journalAfter = runtime.durability?.controlPlaneHighWater() ?? {};
+  const afterDigest = coopSnapshotControlDigest({
+    checksum: checksumAfter,
+    sessionEpoch: runtime.controller.sessionEpoch,
+    membership: membershipAfter,
+    activeControl: controlAfter,
+    journalHighWater: journalAfter,
+  });
+  if (
+    checksumAfter === COOP_CHECKSUM_SENTINEL
+    || checksumAfter !== checksumBefore
+    || stamped.controlDigest !== afterDigest
+  ) {
+    return null;
+  }
+
+  // Normalize to the exact JSON wire shape before hashing. The digest therefore proves every full-snapshot
+  // field and cannot differ merely because an optional property was `undefined` before serialization.
+  const payload = JSON.parse(
+    JSON.stringify({
+      kind: COOP_V2_RECOVERY_MATERIAL_KIND,
+      version: COOP_V2_RECOVERY_MATERIAL_VERSION,
+      snapshot: stamped,
+    }),
+  ) as CoopV2RecoveryMaterialPayload;
+  return {
+    digest: coopV2RecoveryMaterialDigest(payload),
+    payload,
+  };
+}
+
+/** One queued recovery phase per runtime; populated only after exact DATA+CONTROL material convergence. */
+const pendingCoopV2RecoveryPhaseReleases = new WeakMap<CoopRuntime, () => void>();
+
+function retainCoopV2RecoveryPhase(runtime: CoopRuntime, release: () => void): void {
+  if (pendingCoopV2RecoveryPhaseReleases.has(runtime)) {
+    coopWarn("v2-recovery", "replaced an unexpected prior parked recovery-phase release");
+  }
+  pendingCoopV2RecoveryPhaseReleases.set(runtime, release);
+}
+
+function releaseCoopV2RecoveryPhase(runtime: CoopRuntime): void {
+  const release = pendingCoopV2RecoveryPhaseReleases.get(runtime);
+  pendingCoopV2RecoveryPhaseReleases.delete(runtime);
+  release?.();
+}
+
+function abandonCoopV2RecoveryPhase(runtime: CoopRuntime): void {
+  pendingCoopV2RecoveryPhaseReleases.delete(runtime);
 }
 
 /** Host-side deep-gap escalation: push a heavy snapshot stamped at the evicted class's journal head. */
@@ -2928,6 +3178,26 @@ export async function runCoopStateRecovery(
   request: CoopStateRecoveryRequest,
 ): Promise<"accepted" | "stale" | "terminal"> {
   const { runtime, reason, label, isCurrent, onSnapshot, onFailure } = request;
+  if (isCoopV2RecoveryNegotiated()) {
+    const shadow = getCoopV2Shadow(runtime);
+    const recovery = shadow?.recover(reason) ?? null;
+    if (recovery == null) {
+      if (!isCurrent()) {
+        return "stale";
+      }
+      failCoopRuntimeSharedSession(
+        runtime,
+        `${label} could not start the negotiated Authority V2 recovery transaction.`,
+        { boundary: "recovery", reasonCode: "recovery-exhausted" },
+      );
+      return "terminal";
+    }
+    const result = await recovery;
+    if (!isCurrent()) {
+      return "stale";
+    }
+    return result === "recovered" ? "accepted" : "terminal";
+  }
   let outcome: CoopStateSyncOutcome;
   try {
     outcome = await runtime.battleStream.requestStateSync(reason);
@@ -3499,6 +3769,30 @@ function isCoopV2ReplacementNegotiated(): boolean {
   );
 }
 
+/** V2 recovery is valid only when the one log already owns every migrated mechanical predecessor. */
+function isCoopV2RecoveryNegotiated(): boolean {
+  return (
+    isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_RECOVERY)
+    && isCoopV2TurnNegotiated()
+    && isCoopV2ReplacementNegotiated()
+  );
+}
+
+/** Read the already-built recovery fence without lazily constructing or rebinding a V2 harness. */
+function coopV2RecoveryFencePredicates(runtime: CoopRuntime | null = active): CoopRecoveryFencePredicatesV2 | null {
+  return runtime == null ? null : (coopV2ShadowHarnesses.get(runtime)?.recoveryFencePredicates() ?? null);
+}
+
+/** Command/UI choke point: no new local decision is admissible while correlated recovery owns the frontier. */
+export function isCoopV2CommandAdmissionFrozen(runtime: CoopRuntime | null = active): boolean {
+  return coopV2RecoveryFencePredicates(runtime)?.isCommandAdmissionFrozen() === true;
+}
+
+/** Relay/battle/rendezvous choke point: no new authority wait may be created under the stale frontier. */
+export function isCoopV2AuthorityWaitCreationFrozen(runtime: CoopRuntime | null = active): boolean {
+  return coopV2RecoveryFencePredicates(runtime)?.isAuthorityWaitCreationFrozen() === true;
+}
+
 /**
  * Reconstruct the COMPLETE legacy `turnResolution` carrier from an enriched v2 TURN_COMMIT material image
  * (surface 1). Returns `null` when any cutover companion is missing/mistyped (a bare shadow-parity image or
@@ -3769,6 +4063,69 @@ function buildCoopV2LiveSeams(
   };
 }
 
+/**
+ * Complete recovery integration over the same full snapshot transaction used by V1. Unlike ordinary entry
+ * cutover, recovery projection may enqueue the authority-stated successor while the recovery phase is
+ * deliberately current; that queued control cannot execute until the channel reopens the fence and invokes
+ * onRecovered.
+ */
+function buildCoopV2LiveRecoverySeams(
+  runtime: CoopRuntime,
+  harness: () => CoopAuthorityV2Shadow,
+): CoopV2LiveRecoverySeams {
+  const projector = createCoopControlProjector();
+  const fenceHeld = (): boolean => {
+    const predicates = harness().recoveryFencePredicates();
+    return predicates?.isProgressionFrozen() === true;
+  };
+  return {
+    captureMaterial: ctx => captureCoopV2RecoveryMaterial(runtime, ctx),
+    applyMaterial: (ctx, material) => {
+      if (
+        runtime.controller.authorityRole === "authority"
+        || ctx.localSeatId === ctx.authoritySeatId
+        || ctx.epoch !== runtime.controller.sessionEpoch
+        || !fenceHeld()
+        || !isCoopV2RecoveryMaterialPayload(material.payload)
+        || material.digest !== coopV2RecoveryMaterialDigest(material.payload)
+      ) {
+        return false;
+      }
+      const snapshot = material.payload.snapshot;
+      return queueCoopV2AtomicSnapshotApply(
+        runtime,
+        snapshot,
+        () =>
+          coopV2ShadowHarnesses.get(runtime) === harness()
+          && runtime.controller.sessionEpoch === ctx.epoch
+          && fenceHeld(),
+        release => retainCoopV2RecoveryPhase(runtime, release),
+      );
+    },
+    projectControl: (ctx, control) => {
+      if (
+        coopV2ShadowHarnesses.get(runtime) !== harness()
+        || runtime.controller.sessionEpoch !== ctx.epoch
+        || !fenceHeld()
+      ) {
+        return { kind: "rejected", reason: "Authority V2 recovery fence/runtime is no longer current" };
+      }
+      return projector.project(ctx, control);
+    },
+    onRecovered: () => releaseCoopV2RecoveryPhase(runtime),
+    onTerminal: reason => {
+      abandonCoopV2RecoveryPhase(runtime);
+      const point = readCoopBattlePoint();
+      failCoopRuntimeSharedSession(runtime, reason, {
+        boundary: "recovery",
+        reasonCode: "recovery-exhausted",
+        wave: point.wave,
+        turn: point.turn,
+      });
+    },
+  };
+}
+
 /** Resolve the immutable v2 shadow identity from a runtime's session controller, or null if unavailable. */
 function resolveCoopV2ShadowIdentity(runtime: CoopRuntime): CoopV2ShadowIdentity | null {
   const controller = runtime.controller;
@@ -3800,6 +4157,7 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
       isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_SHADOW)
       || isCoopV2TurnNegotiated()
       || isCoopV2ReplacementNegotiated()
+      || isCoopV2RecoveryNegotiated()
     )
   ) {
     return null;
@@ -3843,7 +4201,10 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
     // state + the real phase manager on the guest.
     const turnCutover = isCoopV2TurnNegotiated();
     const replacementCutover = isCoopV2ReplacementNegotiated();
-    const harness = new CoopAuthorityV2Shadow({
+    const recoveryCutover = isCoopV2RecoveryNegotiated();
+    let harness!: CoopAuthorityV2Shadow;
+    const liveRecovery = recoveryCutover ? buildCoopV2LiveRecoverySeams(runtime, () => harness) : undefined;
+    harness = new CoopAuthorityV2Shadow({
       identity,
       scene: globalScene,
       transport: localTransport,
@@ -3858,6 +4219,7 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
       ...(turnCutover || replacementCutover
         ? { liveReplica: buildCoopV2LiveSeams(runtime, { turn: turnCutover, replacement: replacementCutover }) }
         : {}),
+      ...(liveRecovery == null ? {} : { liveRecovery }),
       ...(turnCutover || replacementCutover
         ? {
             onProtocolViolation: (violation: { frameType: string | null; issues: readonly string[] }) => {
@@ -4057,6 +4419,9 @@ export function setCoopRuntime(runtime: CoopRuntime): void {
   active = runtime;
   activateCoopV2Runtime(runtime);
   runtimeSceneBindings.set(runtime, globalScene);
+  globalScene.phaseManager.setCoopRecoveryProgressionFence?.(
+    () => coopV2RecoveryFencePredicates(runtime)?.isProgressionFrozen() === true,
+  );
   // Wave-2e: point the operation journal at THIS runtime's durability manager. Load-bearing in the duo
   // harness, where two runtimes coexist in-process and `withClient` swaps the active one per pumped client -
   // the migrated adapters' commit path must journal into the ACTIVE client's manager, not a stale global.
@@ -6405,6 +6770,9 @@ function buildLocalCoopCapabilities(durabilityEnabled: boolean): CoopCapabilityK
   if (isCoopV2ReplacementEnabled() && isCoopV2TurnEnabled()) {
     caps.push(COOP_CAP_AUTHORITY_V2_REPLACEMENT);
   }
+  if (isCoopV2RecoveryEnabled() && isCoopV2ReplacementEnabled() && isCoopV2TurnEnabled()) {
+    caps.push(COOP_CAP_AUTHORITY_V2_RECOVERY);
+  }
   return caps;
 }
 
@@ -6526,6 +6894,7 @@ export function assembleCoopRuntime(
   // value overwrites it on receipt). Default "coop" so co-op stays byte-identical.
   controller.setSessionKind(opts.kind ?? "coop");
   const battleSync = new CoopBattleSync(transport, {
+    isAuthorityWaitCreationFrozen: () => isCoopV2AuthorityWaitCreationFrozen(runtime),
     onCommandTimeout: (timeout: CoopCommandTimeout) => {
       failCoopRuntimeSharedSession(
         runtime,
@@ -6583,11 +6952,13 @@ export function assembleCoopRuntime(
   const interactionRelay = new CoopInteractionRelay(transport, {
     isVersus: () => controller.isVersusSession(),
     resolveFieldSlotOwner: coopOwnerOfPlayerFieldSlot,
+    isAuthorityWaitCreationFrozen: () => isCoopV2AuthorityWaitCreationFrozen(runtime),
   });
   const uiMirror = new CoopUiMirror(transport);
   const mePump = new CoopMePump(interactionRelay);
   const rendezvous = new CoopRendezvous(transport, {
     getEpoch: () => controller.sessionEpoch,
+    isAuthorityWaitCreationFrozen: () => isCoopV2AuthorityWaitCreationFrozen(runtime),
     onRecoveryExhausted: failure => {
       const [, waveValue, turnValue] = failure.point.split(":", 3);
       const wave = Number(waveValue);
@@ -6669,6 +7040,9 @@ export function assembleCoopRuntime(
     v2InstalledCommandTargets: new Set<string>(),
     v2InstalledReplacementTargets: new Set<string>(),
   };
+  globalScene.phaseManager.setCoopRecoveryProgressionFence?.(
+    () => coopV2RecoveryFencePredicates(runtime)?.isProgressionFrozen() === true,
+  );
   sharedTerminalStates.set(runtime, {
     frozen: false,
     finalized: false,
@@ -6882,7 +7256,17 @@ export function clearCoopRuntime(): void {
     clearNegotiatedCoopCapabilities();
     // Drop any registered shadow inbound handler even when the active runtime was already cleared.
     clearCoopV2ShadowInbound();
+    try {
+      globalScene.phaseManager.setCoopRecoveryProgressionFence?.(null);
+    } catch {
+      /* engine-free/pre-scene teardown */
+    }
     return;
+  }
+  try {
+    globalScene.phaseManager.setCoopRecoveryProgressionFence?.(null);
+  } catch {
+    /* engine-free/pre-scene teardown */
   }
   try {
     // Normal title/save teardown may supersede an in-flight terminal. Never leak its phase-manager fence

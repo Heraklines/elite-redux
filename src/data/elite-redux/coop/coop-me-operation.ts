@@ -1064,7 +1064,13 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
         terminal: value.terminal ?? null,
         outcomeKind: outcome?.k ?? null,
         base: outcome?.base === null ? "null" : typeof outcome?.base,
+        basePlain:
+          outcome?.base != null
+          && typeof outcome.base === "object"
+          && !Array.isArray(outcome.base)
+          && Object.getPrototypeOf(outcome.base) === Object.prototype,
         party: Array.isArray(outcome?.party),
+        partyAllStrings: Array.isArray(outcome?.party) && outcome.party.every(member => typeof member === "string"),
         meSaveData: typeof outcome?.meSaveData,
         seed: typeof outcome?.seed,
         waveSeed: typeof outcome?.waveSeed,
@@ -1076,6 +1082,8 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
         playerParty: Array.isArray(authoritativeState?.playerParty),
         enemyParty: Array.isArray(authoritativeState?.enemyParty),
         destinationKind: destination?.kind ?? null,
+        destinationNextWave: destination?.kind === "continue" ? destination.nextWave : null,
+        destinationSelectBiome: destination?.kind === "continue" ? typeof destination.selectBiome : null,
       };
       // Browser evidence recorders preserve primitive console arguments. Inline the structured reason so a
       // campaign failure says which field was incomplete instead of flattening the object to `[object Object]`.

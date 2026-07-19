@@ -108,6 +108,11 @@ export const COOP_CAP_AUTHORITY_V2_TURN: CoopCapabilityKey = "authority.v2turn";
  * retention/redelivery and the legacy faint-operation + battleCheckpoint loops cease to be authorities.
  */
 export const COOP_CAP_AUTHORITY_V2_REPLACEMENT: CoopCapabilityKey = "authority.v2replacement";
+/**
+ * The Authority V2 full-state recovery transaction. Requires the V2 turn and replacement cutovers because
+ * a recovery frontier cannot be complete while either progression class still lives in a second legacy log.
+ */
+export const COOP_CAP_AUTHORITY_V2_RECOVERY: CoopCapabilityKey = "authority.v2recovery";
 
 // -----------------------------------------------------------------------------
 // The pure negotiation math (unit-tested engine-free).

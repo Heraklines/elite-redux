@@ -373,7 +373,17 @@ export class CoopReplayTurnPhase extends Phase {
               ? globalScene.getPlayerField().findIndex(m => m?.isActive() === true)
               : coopLocalOwnedPlayerFieldSlot();
             const ownMon = ownSlot < 0 ? undefined : globalScene.getPlayerField()[ownSlot];
-            if (ownSlot < 0 || ownMon?.isActive() !== true) {
+            const hasLivingLocalMon = globalScene.getPlayerParty().some(mon => {
+              if (mon == null || mon.isFainted()) {
+                return false;
+              }
+              const numericSeat = (mon as { coopOwnerSeatId?: number }).coopOwnerSeatId;
+              return Number.isSafeInteger(numericSeat)
+                ? numericSeat === controller?.localSeatId
+                : (mon as { coopOwner?: string }).coopOwner === controller?.role;
+            });
+            const hasLocalCommandSlot = ownSlot >= 0 && ownMon?.isActive() === true;
+            if (!hasLocalCommandSlot && hasLivingLocalMon) {
               this.failAuthority(
                 streamer,
                 "replacement",
@@ -402,7 +412,12 @@ export class CoopReplayTurnPhase extends Phase {
             const waveWon =
               coopHasPendingWaveAdvance()
               || (enemyParty.length > 0 && enemyParty.every(mon => mon == null || mon.isFainted()));
-            if (!waveWon && globalScene.currentBattle.turnCommands[ownSlot] == null) {
+            if (
+              ownSlot >= 0
+              && hasLocalCommandSlot
+              && !waveWon
+              && globalScene.currentBattle.turnCommands[ownSlot] == null
+            ) {
               if (
                 !streamer.registerReplacementContinuation(envelope, {
                   kind: "command",
@@ -434,6 +449,13 @@ export class CoopReplayTurnPhase extends Phase {
               );
               this.end();
               return;
+            }
+            if (!hasLocalCommandSlot) {
+              coopLog(
+                "replay",
+                `guest replay turn=${this.turn}: local seat has no living command actor after replacement `
+                  + "-> watcher-only continuation",
+              );
             }
             // Either the wave is already WON (no next player turn - see above; the held replay drains into
             // the authoritative WAVE_ADVANCE tail) OR a delayed/rejoined carrier arrived after this exact

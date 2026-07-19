@@ -246,6 +246,8 @@ export interface CoopV2LiveRecoverySeams {
   projectControl(ctx: CoopRuntimeContext, control: NonNullable<CoopNextControl>): CoopControlInstallResult;
   /** Enter the retained shared terminal synchronously on any recovery invariant failure. */
   onTerminal(reason: string): void;
+  /** Release the parked engine boundary only after the recovery fence is open. */
+  onRecovered(): void;
 }
 
 /** Everything the harness needs beyond its own foundation objects, all injected. */
@@ -578,6 +580,7 @@ export class CoopAuthorityV2Shadow {
             captureMaterial: ctx => liveRecovery.captureMaterial(ctx),
             applyMaterial: (ctx, material) => liveRecovery.applyMaterial(ctx, material),
             onTerminal: reason => liveRecovery.onTerminal(reason),
+            onRecovered: () => liveRecovery.onRecovered(),
           });
     const harness = this;
     this.replicaDeps = {
@@ -1238,6 +1241,9 @@ export class CoopAuthorityV2Shadow {
    * live seam is absent, so this is exactly the in-memory shadow applier - byte-identical to before.
    */
   private applyMaterialRouted(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): ApplyMaterialResult {
+    if (this.recoveryChannel?.fencePredicates().isMaterializationFrozen() === true) {
+      return "deferred";
+    }
     const live = this.liveReplica?.applyMaterial(ctx, entry) ?? null;
     if (live != null) {
       // Record observability only after real material applied. Deferred/rejected work must never inflate the

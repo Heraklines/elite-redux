@@ -94,6 +94,8 @@ export interface CoopBattleSyncOptions {
    * terminal control before a CommandPhase continuation can mistake that release for permission to choose AI.
    */
   onCommandTimeout?: (timeout: CoopCommandTimeout) => void;
+  /** Authority V2 recovery fence; a held transaction may not admit or create another command wait. */
+  isAuthorityWaitCreationFrozen?: () => boolean;
 }
 
 // Wait up to 20 MINUTES for the real partner's move before shared terminal control (#633).
@@ -443,12 +445,14 @@ export class CoopBattleSync {
   private responder: CoopCommandResponder | null = null;
   private readonly offMessage: () => void;
   private readonly offStateChange: () => void;
+  private readonly isAuthorityWaitCreationFrozen: () => boolean;
 
   constructor(transport: CoopTransport, opts: CoopBattleSyncOptions = {}) {
     this.transport = transport;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.schedule = opts.schedule ?? defaultSchedule;
     this.onCommandTimeout = opts.onCommandTimeout ?? null;
+    this.isAuthorityWaitCreationFrozen = opts.isAuthorityWaitCreationFrozen ?? (() => false);
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offStateChange = transport.onStateChange(state => {
       if (state !== "connected") {
@@ -540,6 +544,10 @@ export class CoopBattleSync {
   ): Promise<SerializedCommand | null> {
     if (this.terminalFrozen) {
       traceCommand("rejected", fieldIndex, turn, owner, address, "shared-terminal-frozen");
+      return Promise.resolve(null);
+    }
+    if (this.isAuthorityWaitCreationFrozen()) {
+      traceCommand("rejected", fieldIndex, turn, owner, address, "authority-v2-recovery-frozen");
       return Promise.resolve(null);
     }
     const key = commandKey(fieldIndex, turn, owner, address);

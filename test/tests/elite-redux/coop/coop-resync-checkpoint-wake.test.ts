@@ -145,13 +145,10 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
       authoritativeState: state(18),
       sessionEpoch: runtime.controller.sessionEpoch,
     } as CoopFullBattleSnapshot;
-    currentPhase = new CoopApplyResyncPhase(
-      snapshot,
-      1,
-      "old-checksum",
-      undefined,
-      recoveryAdmission(runtime.controller.sessionEpoch),
-    );
+    currentPhase = new CoopApplyResyncPhase(snapshot, 1, "old-checksum", undefined, {
+      kind: "legacy",
+      ticket: recoveryAdmission(runtime.controller.sessionEpoch),
+    });
     const phaseInternals = currentPhase as unknown as {
       armSupersedingCheckpointWake: () => boolean;
       recoveryTickFloor: number;
@@ -237,7 +234,7 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
       1,
       "old-checksum",
       undefined,
-      recoveryAdmission(runtime.controller.sessionEpoch),
+      { kind: "legacy", ticket: recoveryAdmission(runtime.controller.sessionEpoch) },
     );
     const phaseInternals = currentPhase as unknown as {
       armSupersedingCheckpointWake: () => boolean;

@@ -31,6 +31,7 @@ import {
   getCoopRuntime,
   isCoopAuthoritativeGuest,
   isCoopSharedTerminalFrozen,
+  isCoopV2CommandAdmissionFrozen,
   isVersusSession,
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
@@ -671,6 +672,11 @@ export class CommandPhase extends FieldPhase {
 
   public override start(): void {
     super.start();
+
+    if (isCoopV2CommandAdmissionFrozen()) {
+      coopWarn("v2-recovery", `CommandPhase start held field=${this.fieldIndex}: recovery owns the frontier`);
+      return;
+    }
 
     // CommandPhase is the first stable boundary after the authoritative renderer gate may have
     // neutralized structural SummonPhase. Restore trainer chrome only; Pokémon visibility and field
@@ -1604,6 +1610,10 @@ export class CommandPhase extends FieldPhase {
     useMode: boolean | MoveUseMode = false,
     move?: TurnMove,
   ): boolean {
+    if (isCoopV2CommandAdmissionFrozen()) {
+      coopWarn("v2-recovery", `Command admission refused field=${this.fieldIndex}: recovery owns the frontier`);
+      return false;
+    }
     // SHOWDOWN 1v1 (Task F1): the versus guest SHIPS its own-slot pick to the host instead of
     // resolving it locally (the host is the sole engine). Intercept BEFORE any local execution.
     if (this.tryShipShowdownGuestCommand(command, cursor, useMode)) {

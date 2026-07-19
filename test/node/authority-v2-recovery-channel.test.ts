@@ -124,6 +124,7 @@ interface PairOptions {
   readonly dropFirstRequest?: boolean;
   readonly dropFirstApplied?: boolean;
   readonly captureReady?: () => boolean;
+  readonly applySucceeds?: boolean;
 }
 
 function makePair(options: PairOptions = {}) {
@@ -144,9 +145,10 @@ function makePair(options: PairOptions = {}) {
     peerBindings: [{ seatId: 0, connectionGeneration: 0 }],
   });
   const retained = authorityLog.commit(pendingEntry());
-  const applyMaterial = vi.fn(async () => true);
+  const applyMaterial = vi.fn(async () => options.applySucceeds !== false);
   const project = vi.fn(() => ({ kind: "installed" as const, controlId: controlIdOf(NEXT_COMMAND) }));
   const terminalReasons: string[] = [];
+  const recoveredSeats: number[] = [];
   const replicaFrames: CoopFrameV2[] = [];
   const authorityFrames: CoopFrameV2[] = [];
   let requestDrops = options.dropFirstRequest ? 1 : 0;
@@ -168,6 +170,7 @@ function makePair(options: PairOptions = {}) {
       options.captureReady?.() === false ? null : { digest: "snapshot-digest", payload: { wave: 8, hp: [21, 30] } },
     applyMaterial,
     onTerminal: reason => terminalReasons.push(`authority:${reason}`),
+    onRecovered: () => recoveredSeats.push(0),
   };
   const replicaDeps: CoopRecoveryChannelV2Deps = {
     frame: () => REPLICA_FRAME,
@@ -190,6 +193,7 @@ function makePair(options: PairOptions = {}) {
     captureMaterial: () => null,
     applyMaterial,
     onTerminal: reason => terminalReasons.push(`replica:${reason}`),
+    onRecovered: () => recoveredSeats.push(1),
   };
   authorityChannel = new CoopRecoveryChannelV2(authorityDeps);
   replicaChannel = new CoopRecoveryChannelV2(replicaDeps);
@@ -206,6 +210,7 @@ function makePair(options: PairOptions = {}) {
     applyMaterial,
     project,
     terminalReasons,
+    recoveredSeats,
     retained,
     dispose() {
       authorityChannel.dispose();
@@ -230,10 +235,22 @@ describe("authority-v2 correlated recovery channel", () => {
     expect(pair.authorityChannel.diagnostics().activeAuthorityResponses).toBe(0);
     expect(pair.authorityLog.retained()).toEqual([pair.retained]);
     expect(pair.terminalReasons).toEqual([]);
+    expect(pair.recoveredSeats).toEqual([1]);
 
     pair.dispose();
     expect(pair.authorityScheduler.liveCount).toBe(0);
     expect(pair.replicaScheduler.liveCount).toBe(0);
+  });
+
+  it("propagates a transaction-level material failure into the shared terminal instead of silently fencing", async () => {
+    const pair = makePair({ applySucceeds: false });
+
+    await expect(pair.replicaChannel.recover("material-could-not-converge")).resolves.toBe("terminalized");
+    expect(pair.replicaChannel.diagnostics().fenceState).toBe("terminal");
+    expect(pair.recoveredSeats).toEqual([]);
+    expect(pair.terminalReasons).toEqual([expect.stringContaining("material could not be applied exactly")]);
+
+    pair.dispose();
   });
 
   it("redelivers a bundle after a lost completion proof and the replica re-proves without reapplying", async () => {

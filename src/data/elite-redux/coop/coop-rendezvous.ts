@@ -141,6 +141,8 @@ export interface CoopRendezvousOptions {
   maxRecoveryAttempts?: number;
   /** Runtime-owned fail-closed terminal hook; the engine-free rendezvous never imports runtime state. */
   onRecoveryExhausted?: (failure: CoopRendezvousRecoveryFailure) => void;
+  /** Authority V2 recovery fence; buffered arrivals remain consumable, but no new barrier wait may open. */
+  isAuthorityWaitCreationFrozen?: () => boolean;
 }
 
 export interface CoopRendezvousRecoveryFailure {
@@ -178,6 +180,7 @@ export class CoopRendezvous {
   private readonly getEpoch: () => number;
   private readonly maxRecoveryAttempts: number;
   private readonly onRecoveryExhausted: ((failure: CoopRendezvousRecoveryFailure) => void) | undefined;
+  private readonly isAuthorityWaitCreationFrozen: () => boolean;
 
   /** Points THIS client has arrived at (idempotent local arrival; suppresses a duplicate send). */
   private readonly localArrived = new Set<string>();
@@ -215,6 +218,7 @@ export class CoopRendezvous {
       throw new Error("invalid rendezvous recovery attempt bound");
     }
     this.onRecoveryExhausted = opts.onRecoveryExhausted;
+    this.isAuthorityWaitCreationFrozen = opts.isAuthorityWaitCreationFrozen ?? (() => false);
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offStateChange = transport.onStateChange(state => {
       if (state === "connected") {
@@ -412,6 +416,13 @@ export class CoopRendezvous {
         );
       }
       return Promise.resolve(this.recordWaitOutcome(point, { point, timedOut: false }));
+    }
+    if (this.isAuthorityWaitCreationFrozen()) {
+      coopWarn(
+        "rendezvous",
+        `AWAIT point=${point} REFUSED (Authority V2 recovery fence held) role=${this.transport.role}`,
+      );
+      return Promise.resolve(this.recordWaitOutcome(point, { point, timedOut: true }));
     }
     // A buffered FOREIGN arrival is a classified branch mismatch, not packet loss. Preserve the existing
     // catch-up release until the authoritative phase-route operation replaces it.

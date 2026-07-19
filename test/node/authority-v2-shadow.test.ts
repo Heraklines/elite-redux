@@ -313,6 +313,7 @@ describe("authority-v2 shadow harness", () => {
       controlId: controlIdOf(control),
     }));
     const terminal = vi.fn();
+    const recovered = vi.fn();
     let host!: CoopAuthorityV2Shadow;
     let guest!: CoopAuthorityV2Shadow;
     const deliver = (target: () => CoopAuthorityV2Shadow) => (frame: CoopFrameV2) =>
@@ -328,6 +329,7 @@ describe("authority-v2 shadow harness", () => {
         applyMaterial,
         projectControl,
         onTerminal: terminal,
+        onRecovered: recovered,
       },
     });
     guest = new CoopAuthorityV2Shadow({
@@ -341,6 +343,7 @@ describe("authority-v2 shadow harness", () => {
         applyMaterial,
         projectControl,
         onTerminal: terminal,
+        onRecovered: recovered,
       },
     });
     host.tapTurnCommit(turnTap("TURN/recovery-live-seam"));
@@ -349,6 +352,7 @@ describe("authority-v2 shadow harness", () => {
     expect(recovery).not.toBeNull();
     await expect(recovery).resolves.toBe("recovered");
     expect(applyMaterial).toHaveBeenCalledTimes(1);
+    expect(recovered).toHaveBeenCalledTimes(1);
     expect(projectControl).toHaveBeenCalledTimes(1);
     expect(terminal).not.toHaveBeenCalled();
     expect(guest.recoveryFencePredicates()?.isProgressionFrozen()).toBe(false);

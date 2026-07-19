@@ -12,6 +12,9 @@ const gateWorkflow = readFileSync(new URL(".github/workflows/coop-gate-sharded.y
 const campaignWorkflow = readFileSync(new URL(".github/workflows/coop-public-ui-campaign.yml", root), "utf8");
 const stagingWorkflow = readFileSync(new URL(".github/workflows/deploy-staging.yml", root), "utf8");
 const coopRuntime = readFileSync(new URL("src/data/elite-redux/coop/coop-runtime.ts", root), "utf8");
+const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
+const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
+const shadow = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/shadow.ts", root), "utf8");
 
 function jobBlock(workflow, job) {
   const lines = workflow.split(/\r?\n/gu);
@@ -31,6 +34,7 @@ test("every real-engine shard qualifies Authority V2 instead of hiding behind le
   const gate = jobBlock(gateWorkflow, "gate");
   assert.match(gate, /COOP_AUTHORITY_V2_TURN:\s*"on"/u);
   assert.match(gate, /COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
+  assert.match(gate, /COOP_AUTHORITY_V2_RECOVERY:\s*"on"/u);
   assert.match(gate, /node scripts\/run-coop-gate\.mjs/u);
   assert.doesNotMatch(
     gate,
@@ -43,10 +47,23 @@ test("public-browser campaign and staging bundle qualify the same V2 cutover", (
   const browserBuild = jobBlock(gateWorkflow, "browser-build");
   assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_TURN:\s*"on"/u);
   assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
+  assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_RECOVERY:\s*"on"/u);
   assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_TURN:\s*"on"/u);
   assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
+  assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_RECOVERY:\s*"on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_TURN=on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_REPLACEMENT=on"/u);
+  assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_RECOVERY=on"/u);
+});
+
+test("correlated recovery is wired through all four production progression fences", () => {
+  assert.match(commandPhase, /isCoopV2CommandAdmissionFrozen\(\)/u);
+  assert.match(phaseManager, /replaceWithCoopRecoveryPhase/u);
+  assert.match(phaseManager, /coopRecoveryProgressionFrozen\(\)/u);
+  assert.match(shadow, /isMaterializationFrozen\(\).*"deferred"/su);
+  assert.match(coopRuntime, /isAuthorityWaitCreationFrozen:\s*\(\)\s*=>/u);
+  assert.match(coopRuntime, /queueCoopV2AtomicSnapshotApply/u);
+  assert.match(coopRuntime, /retainUntilReleased/u);
 });
 
 test("an existing Authority V2 runtime rebinds only after the replacement channel is authenticated", () => {

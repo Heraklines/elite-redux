@@ -347,6 +347,11 @@ export class PhaseManager {
    * those completions from rebuilding a turn after the gameplay queues were drained.
    */
   private coopTerminalProgressionFrozen = false;
+  /**
+   * Authority V2 recovery owns the current frontier while its correlated snapshot transaction is held.
+   * The predicate is injected by the co-op runtime so this engine-level queue owner stays cycle-free.
+   */
+  private coopRecoveryProgressionFrozen: () => boolean = () => false;
 
   /**
    * Clear all previously set phases, then add a new {@linkcode TitlePhase} to transition to the title screen.
@@ -457,13 +462,32 @@ export class PhaseManager {
     return this.coopTerminalProgressionFrozen;
   }
 
+  /** Install or clear the cycle-free Authority V2 recovery progression fence. */
+  public setCoopRecoveryProgressionFence(predicate: (() => boolean) | null): void {
+    this.coopRecoveryProgressionFrozen = predicate ?? (() => false);
+  }
+
+  /**
+   * Atomically replace an obsolete local frontier with the one recovery phase. The prior phase may still
+   * receive late async completions, but {@linkcode shiftPhase} ignores them while the injected fence is held.
+   */
+  public replaceWithCoopRecoveryPhase(phase: Phase): boolean {
+    if (!phase.is("CoopApplyResyncPhase") || !this.coopRecoveryProgressionFrozen()) {
+      return false;
+    }
+    this.clearAllPhases();
+    this.currentPhase = phase;
+    this.startCurrentPhase();
+    return true;
+  }
+
   /**
    * Determine the next phase to run and start it.
    * @privateRemarks
    * This is called by {@linkcode Phase.end} by default, and should not be called by other methods.
    */
   public shiftPhase(): void {
-    if (this.coopTerminalProgressionFrozen) {
+    if (this.coopTerminalProgressionFrozen || this.coopRecoveryProgressionFrozen()) {
       return;
     }
     if (this.standbyPhase) {

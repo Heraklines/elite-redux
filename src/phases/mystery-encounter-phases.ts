@@ -249,7 +249,9 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
       destination: {
         kind: "continue",
         nextWave: wave + 1,
-        selectBiome: globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome(),
+        // Some game-mode implementations expose an optional/undefined biome edge. The durable terminal
+        // protocol requires a literal boolean so both replicas install the same next control.
+        selectBiome: Boolean(globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome()),
       },
     } satisfies CoopMeTerminalPayload;
     terminalOperationId = commitMeOwnerIntent({

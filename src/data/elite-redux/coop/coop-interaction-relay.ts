@@ -248,6 +248,8 @@ export interface CoopInteractionRelayOptions {
    * engine-free fixed launch map remains the default for relay-only tests.
    */
   resolveFieldSlotOwner?: (fieldIndex: number) => CoopRole;
+  /** Authority V2 recovery fence; buffered results remain consumable, but no new wire wait may be armed. */
+  isAuthorityWaitCreationFrozen?: () => boolean;
 }
 
 // The owner is a human shopping / reading an ME, so the watcher's wait must comfortably
@@ -367,6 +369,7 @@ export class CoopInteractionRelay {
   private readonly schedule: (cb: () => void, ms: number) => () => void;
   private readonly isVersus: () => boolean;
   private readonly resolveFieldSlotOwner: (fieldIndex: number) => CoopRole;
+  private readonly isAuthorityWaitCreationFrozen: () => boolean;
   private readonly offMessage: () => void;
   private readonly offState: () => void;
   /** Raw outcomes awaiting their matching journal carrier; keyed by seq + exact JSON payload. */
@@ -421,6 +424,7 @@ export class CoopInteractionRelay {
     this.schedule = opts.schedule ?? defaultSchedule;
     this.isVersus = opts.isVersus ?? (() => false);
     this.resolveFieldSlotOwner = opts.resolveFieldSlotOwner ?? coopOwnerOfFieldIndex;
+    this.isAuthorityWaitCreationFrozen = opts.isAuthorityWaitCreationFrozen ?? (() => false);
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offState = transport.onStateChange(state => {
       if (state !== "connected") {
@@ -609,6 +613,10 @@ export class CoopInteractionRelay {
       "relay",
       `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs} expected=[${(expectedKinds ?? []).join(",")}] -> network-wait`,
     );
+    if (this.isAuthorityWaitCreationFrozen()) {
+      coopWarn("relay", `AWAIT interactionChoice seq=${seq} REFUSED (Authority V2 recovery fence held)`);
+      return Promise.resolve(null);
+    }
     this.pendingSince.set(seq, Date.now());
     // Supersede any stale waiter parked on this seq.
     const prior = this.pending.get(seq);
@@ -709,6 +717,10 @@ export class CoopInteractionRelay {
       return Promise.resolve(next);
     }
     coopLog("relay", `AWAIT interactionOutcome seq=${seq} timeoutMs=${timeoutMs} -> network-wait`);
+    if (this.isAuthorityWaitCreationFrozen()) {
+      coopWarn("relay", `AWAIT interactionOutcome seq=${seq} REFUSED (Authority V2 recovery fence held)`);
+      return Promise.resolve(null);
+    }
     // Supersede any stale waiter parked on this seq.
     if (this.outcomePending.has(seq)) {
       coopWarn("relay", `AWAIT interactionOutcome seq=${seq} SUPERSEDE stale waiter -> resolved null`);
@@ -803,6 +815,10 @@ export class CoopInteractionRelay {
       return Promise.resolve(buffered);
     }
     coopLog("relay", `AWAIT rewardOptions key=${key} timeoutMs=${timeoutMs} -> network-wait`);
+    if (this.isAuthorityWaitCreationFrozen()) {
+      coopWarn("relay", `AWAIT rewardOptions key=${key} REFUSED (Authority V2 recovery fence held)`);
+      return Promise.resolve(null);
+    }
     // Supersede any stale waiter on this key.
     if (this.rewardOptionsPending.has(key)) {
       coopWarn("relay", `AWAIT rewardOptions key=${key} SUPERSEDE stale waiter -> resolved null`);

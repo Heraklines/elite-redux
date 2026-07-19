@@ -69,6 +69,7 @@ import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-p
 import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   buildCoopWaveAdvancePayload,
+  type CoopSnapshotApplyAdmission,
   consumeCoopPendingWaveAdvance,
   coopHasPendingWaveAdvance,
   coopMeHandoffBattleWon,
@@ -82,6 +83,7 @@ import {
   getCoopRuntime,
   getCoopWaveAdvanceRuntimeBinding,
   isCoopAuthoritativeGuest,
+  isCoopSnapshotApplyAdmissionCurrent,
   isShowdownGuestFlip,
   isVersusSession,
   queueCoopAtomicSnapshotApply,
@@ -98,7 +100,6 @@ import type {
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
-  CoopRecoveryAdmissionV1,
 } from "#data/elite-redux/coop/coop-transport";
 import {
   adoptWaveAdvanceWatcherChoice,
@@ -1974,7 +1975,7 @@ export class CoopApplyResyncPhase extends Phase {
     private readonly turn: number,
     private readonly hostChecksum: string,
     private readonly hostObj: unknown,
-    private readonly recoveryAdmission: CoopRecoveryAdmissionV1,
+    private readonly recoveryAdmission: CoopSnapshotApplyAdmission,
     private readonly onSettled?: ((healed: boolean) => boolean | void) | undefined,
   ) {
     super();
@@ -2323,10 +2324,13 @@ export class CoopApplyResyncPhase extends Phase {
     super.start();
     let rollback: CoopFullBattleSnapshot | null = null;
     try {
-      const streamer = getCoopBattleStreamer();
-      if (streamer == null || !streamer.recoveryAdmissionIsCurrent(this.recoveryAdmission, this.snapshot)) {
+      const runtime = getCoopRuntime();
+      if (runtime == null || !isCoopSnapshotApplyAdmissionCurrent(runtime, this.snapshot, this.recoveryAdmission)) {
         coopWarn("resync", `turn=${this.turn} DROP snapshot whose immutable recovery ticket is no longer current`);
         this.settle(false);
+        if (this.recoveryAdmission.kind === "authority-v2") {
+          return;
+        }
         failCoopSharedSession(`Turn ${this.turn} recovery ticket was superseded before atomic apply.`);
         return;
       }
@@ -2345,6 +2349,9 @@ export class CoopApplyResyncPhase extends Phase {
             + "-> DROPPED (newer checkpoint supersedes)",
         );
         this.settle(false);
+        if (this.recoveryAdmission.kind === "authority-v2") {
+          return;
+        }
         failCoopSharedSession(`Turn ${this.turn} recovery snapshot no longer matches the live frontier.`);
         return;
       }
@@ -2361,6 +2368,9 @@ export class CoopApplyResyncPhase extends Phase {
       if (rollback == null) {
         coopWarn("resync", `turn=${this.turn} snapshot refused: no transactional rollback image`);
         this.settle(false);
+        if (this.recoveryAdmission.kind === "authority-v2") {
+          return;
+        }
         failCoopSharedSession(`Turn ${this.turn} recovery could not capture a rollback image.`);
         return;
       }
@@ -2378,7 +2388,17 @@ export class CoopApplyResyncPhase extends Phase {
           applyCoopFullSnapshot(rollback, isCoopAuthoritativeGuest(), true);
           this.settle(false);
           coopWarn("resync", `turn=${this.turn} control commit failed; DATA rolled back atomically`);
+          if (this.recoveryAdmission.kind === "authority-v2") {
+            return;
+          }
           failCoopSharedSession(`Turn ${this.turn} recovery control commit failed after material convergence.`);
+          return;
+        }
+        if (this.recoveryAdmission.kind === "authority-v2") {
+          // Material is installed, but the frozen transaction still owns frontier adoption, successor
+          // projection, completion proof, and fence release. Keep this exact safe boundary current until
+          // CoopRecoveryChannelV2 reports that complete sequence recovered.
+          this.recoveryAdmission.retainUntilReleased(() => this.end());
           return;
         }
       } else {
@@ -2427,6 +2447,12 @@ export class CoopApplyResyncPhase extends Phase {
         // phase at the last known-good boundary with an actionable message; reconnect/resume is safer than
         // resolving further commands on divergent state.
         this.settle(false);
+        if (this.recoveryAdmission.kind === "authority-v2") {
+          // RecoveryTransaction observes false, permanently terminalizes its fence, and synchronously
+          // enters the shared-session terminal through the channel integration. Do not arm a legacy
+          // checkpoint wake under a V2-owned recovery or end into ordinary progression.
+          return;
+        }
         try {
           globalScene.ui.showText(
             "Co-op sync recovery could not converge. Play is paused; reconnect with your partner to recover safely.",
@@ -2458,6 +2484,9 @@ export class CoopApplyResyncPhase extends Phase {
       // frame can still recover this safe boundary under the same strict checksum proof as above.
       coopWarn("resync", `turn=${this.turn} CoopApplyResyncPhase: apply/verify threw -> awaiting newer checkpoint`);
       this.settle(false);
+      if (this.recoveryAdmission.kind === "authority-v2") {
+        return;
+      }
       this.armSupersedingCheckpointWake();
       return;
     }

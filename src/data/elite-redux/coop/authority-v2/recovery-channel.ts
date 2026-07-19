@@ -51,6 +51,16 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 300_000;
 const DEFAULT_ABSOLUTE_TIMEOUT_MS = 1_200_000;
 const COMPLETION_CACHE_LIMIT = 16;
 
+const viteEnv = import.meta.env as unknown as Record<string, string | undefined>;
+const COOP_V2_RECOVERY_ENABLED =
+  viteEnv.VITE_COOP_AUTHORITY_V2_RECOVERY === "on"
+  || (typeof process !== "undefined" && process.env?.COOP_AUTHORITY_V2_RECOVERY === "on");
+
+/** Whether this build advertises the complete Authority V2 recovery transaction (default OFF). */
+export function isCoopV2RecoveryEnabled(): boolean {
+  return COOP_V2_RECOVERY_ENABLED;
+}
+
 interface PendingReplicaRequest {
   readonly request: CoopRecoveryRequestV2;
   readonly owner: CoopTimerOwner;
@@ -97,6 +107,8 @@ export interface CoopRecoveryChannelV2Deps {
   readonly applyMaterial: (ctx: CoopRuntimeContext, material: CoopAuthoritativeMaterial) => boolean | Promise<boolean>;
   /** Synchronous fail-closed integration hook. */
   readonly onTerminal: (reason: string) => void;
+  /** Resume the engine boundary only after frontier + control + proof completed and the fence reopened. */
+  readonly onRecovered?: (() => void) | undefined;
   readonly requestTimeoutMs?: number;
   readonly absoluteTimeoutMs?: number;
 }
@@ -225,12 +237,30 @@ export class CoopRecoveryChannelV2 {
       requestTimeoutMs: this.deps.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
     });
     this.activeTransaction = transaction;
-    const outcome = transaction.run().finally(() => {
-      if (this.activeTransaction === transaction) {
-        this.activeTransaction = null;
-        this.activeOutcome = null;
-      }
-    });
+    const outcome = transaction
+      .run()
+      .then(result => {
+        if (result === "recovered") {
+          try {
+            this.deps.onRecovered?.();
+          } catch (error) {
+            this.failClosed(`Authority V2 recovery release hook threw: ${describeError(error)}.`);
+            return "terminalized" as const;
+          }
+          return result;
+        }
+        // RecoveryTransaction owns the exact invariant reason on its terminal fence. Propagate that
+        // result into the runtime terminal supervisor; otherwise the engine remains frozen forever
+        // without either a shared terminal or a reconnectable outcome.
+        this.failClosed(this.fence.terminalReason ?? "Authority V2 recovery transaction terminalized.");
+        return "terminalized" as const;
+      })
+      .finally(() => {
+        if (this.activeTransaction === transaction) {
+          this.activeTransaction = null;
+          this.activeOutcome = null;
+        }
+      });
     this.activeOutcome = outcome;
     return outcome;
   }

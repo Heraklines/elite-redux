@@ -146,6 +146,7 @@ jobs:
           # as the engine shards; a Node-only COOP_* variable is not visible in the Vite bundle.
           VITE_COOP_AUTHORITY_V2_TURN: "on"
           VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          VITE_COOP_AUTHORITY_V2_RECOVERY: "on"
           BUNDLE_CACHE_HIT: ${{ steps.bundle-cache.outputs.cache-hit }}
         shell: bash
         run: |
@@ -457,6 +458,7 @@ jobs:
           # Surface 2: picker decisions are staged, then committed with the complete post-summon carrier.
           # Its authority log owns retention/redelivery; the legacy faint-op/checkpoint loops are cosmetic.
           COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          COOP_AUTHORITY_V2_RECOVERY: "on"
         shell: bash
         run: |
           set +e
