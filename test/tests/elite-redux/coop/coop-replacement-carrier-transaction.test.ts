@@ -6,7 +6,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
-import * as coopPresentation from "#data/elite-redux/coop/coop-presentation";
+import { installCoopAuthoritativeProjectionAdapter } from "#data/elite-redux/coop/coop-presentation";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import type {
   CoopAuthoritativeBattleStateV1,
@@ -93,6 +93,7 @@ describe("production replacement carrier transaction", () => {
   let clearPhaseQueue: ReturnType<typeof vi.fn>;
   let showText: ReturnType<typeof vi.fn>;
   let resetScene: ReturnType<typeof vi.fn>;
+  let disposeProjectionAdapter: () => void;
 
   beforeEach(() => {
     priorScene = globalScene;
@@ -101,7 +102,6 @@ describe("production replacement carrier transaction", () => {
     clearPhaseQueue = vi.fn();
     showText = vi.fn();
     resetScene = vi.fn();
-    vi.spyOn(coopPresentation, "settleCoopAuthoritativeProjection").mockResolvedValue(true);
     const hostMon = { coopOwner: "host", isActive: () => true };
     const guestMon = { coopOwner: "guest", isActive: () => true };
     initGlobalScene({
@@ -121,9 +121,11 @@ describe("production replacement carrier transaction", () => {
       ui: { clearText: () => {}, showText },
       reset: resetScene,
     } as unknown as BattleScene);
+    disposeProjectionAdapter = installCoopAuthoritativeProjectionAdapter(globalScene, () => true);
   });
 
   afterEach(() => {
+    disposeProjectionAdapter();
     vi.restoreAllMocks();
     coopEngine.resetCoopStateTicks();
     clearCoopRuntime();

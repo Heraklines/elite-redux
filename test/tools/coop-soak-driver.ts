@@ -3400,9 +3400,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
                 break;
               }
             }
-            // Peer materialization completes the embedded shop terminal. Production's scheduler then runs
-            // the retained EggLapse/PostMystery tail, where the ME owns its single +1 interaction commit.
-            // The interceptor runner must execute that real tail before asserting the post-ME counter.
+            // Peer materialization completes the embedded shop terminal. Both browser schedulers then run
+            // their local EggLapse tail and park at PostMystery before the owner starts the final retained
+            // LEAVE. Starting the host PostMystery while the guest is still on EggLapse correctly leaves the
+            // transaction deferred; transport pumping alone cannot advance that local presentation phase.
+            await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase", false));
+            await withClient(rig.guestCtx, () =>
+              driveClientPhaseQueueTo(rig.guestScene, "PostMysteryEncounterPhase", {
+                pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+              }),
+            );
             await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
             retainedTerminalDrovePostMystery = true;
             await withClient(rig.guestCtx, async () => {
@@ -3704,6 +3711,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
           await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
           await pumpDuoDestinations(rig, 2);
+          await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase", false));
+          await withClient(rig.guestCtx, () =>
+            driveClientPhaseQueueTo(rig.guestScene, "PostMysteryEncounterPhase", {
+              pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+            }),
+          );
           await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
         }
         await withClient(rig.guestCtx, async () => {

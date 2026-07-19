@@ -519,6 +519,7 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
       try {
         await driveGuestOwnedMysteryRounds(game, rig, replay, journey.picks);
         await driveGuestOwnedEmbeddedReward(game, rig);
+        await driveQueuedPhaseWithPublicDialogue(rig.guestCtx, "PostMysteryEncounterPhase");
       } finally {
         showDialogue.mockRestore();
         showText.mockRestore();

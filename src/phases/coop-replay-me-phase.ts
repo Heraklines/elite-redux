@@ -1483,6 +1483,11 @@ export class CoopReplayMePhase extends Phase {
       revision: captureCoopActiveMysteryControl()?.revision ?? 0,
       continuation: destination.continuation,
     };
+    // This replay has handed mechanical control to the declared continuation. Keep it registered as the
+    // durable receiver for the ordered final LEAVE, but retire every presentation/outcome arm owned by the
+    // pre-reward shell. In particular, a delayed initial mePresent must not re-arm the old 8M race after
+    // MysteryEncounterRewardsPhase/SelectModifierPhase has already become the executable surface.
+    this.settled = true;
     if (destination.continuation === "encounter") {
       if (this.battleEndDelegateOwnsContinuation) {
         // The Colosseum's detached board driver already owns the between-round surface and next terminal.
