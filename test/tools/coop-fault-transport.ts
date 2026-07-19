@@ -74,6 +74,15 @@ export const COOP_DEFAULT_CUE_TYPES: ReadonlySet<CoopMessageType> = new Set<Coop
  *   - `stateSync`/`enemyPartySync`/`launchSnapshot`/`rendezvous` the resync + launch backbone.
  */
 export const COOP_AUTHORITATIVE_TYPES: ReadonlySet<CoopMessageType> = new Set<CoopMessageType>([
+  // Authority V2 is the playable source-of-truth backbone. These distinct envelopes must remain
+  // addressable by deterministic fault schedules; otherwise a nominal V2 fault campaign only perturbs
+  // legacy carriers and provides no evidence for entry, receipt, tail, recovery, or terminal durability.
+  "authorityEntry",
+  "authorityReceipt",
+  "tailRequest",
+  "recoveryRequest",
+  "recoveryBundle",
+  "terminal",
   "turnResolution",
   "battleCheckpoint",
   "interactionChoice",
@@ -246,6 +255,21 @@ class CoopFaultTransport implements CoopTransport {
 
   onStateChange(handler: (state: CoopConnectionState) => void): () => void {
     return this.inner.onStateChange(handler);
+  }
+
+  /** Preserve the transport's distinct Authority V2 receive boundary through this send-side decorator. */
+  onV2Frame(handler: (frame: unknown) => void): () => void {
+    return this.inner.onV2Frame?.(handler) ?? (() => {});
+  }
+
+  /** Preserve the duo harness's destination-context V2 scheduling through nested transport decorators. */
+  setV2InboundDeferred(enabled: boolean): void {
+    this.inner.setV2InboundDeferred?.(enabled);
+  }
+
+  /** Drain the wrapped endpoint's V2 queue under the destination client context. */
+  pumpV2Inbound(limit?: number): number {
+    return this.inner.pumpV2Inbound?.(limit) ?? 0;
   }
 
   private isFaultable(msg: CoopMessage): boolean {

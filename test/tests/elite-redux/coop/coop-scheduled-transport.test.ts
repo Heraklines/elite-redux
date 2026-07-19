@@ -71,6 +71,23 @@ describe("co-op production-transition scheduled transport", () => {
     expect(legacyRx, "a v2 envelope must never enter the legacy t-discriminant handlers").not.toHaveBeenCalled();
   });
 
+  it("preserves the Authority V2 receive seam through the deterministic fault decorator", () => {
+    const scheduled = createScheduledCoopPair();
+    const pair = wrapCoopFaultPair(scheduled, { drop: 0, reorder: 0, delay: 0 }, { seed: 0x503332 });
+    const legacyRx = vi.fn();
+    const v2Rx = vi.fn();
+    pair.guest.onMessage(legacyRx);
+    pair.guest.onV2Frame!(v2Rx);
+
+    const frame = v2TailRequest();
+    pair.host.send(frame);
+    scheduled.flush("guest");
+
+    expect(v2Rx).toHaveBeenCalledOnce();
+    expect(v2Rx).toHaveBeenCalledWith(frame);
+    expect(legacyRx).not.toHaveBeenCalled();
+  });
+
   it("supports declared drop/duplicate/reconnect schedules without reordering surviving frames", () => {
     const pair = createScheduledCoopPair();
     const guestRx = vi.fn();

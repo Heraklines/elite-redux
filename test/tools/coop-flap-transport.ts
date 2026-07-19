@@ -51,6 +51,28 @@ export class CoopFlapTransport implements CoopTransport {
     return () => this.stateHandlers.delete(handler);
   }
 
+  /** Preserve the distinct Authority V2 receive seam and honor the same simulated wire state as legacy. */
+  onV2Frame(handler: (frame: unknown) => void): () => void {
+    return (
+      this.inner.onV2Frame?.(frame => {
+        if (this.connected && !this.closed) {
+          handler(frame);
+        }
+      }) ?? (() => {})
+    );
+  }
+
+  setV2InboundDeferred(enabled: boolean): void {
+    this.inner.setV2InboundDeferred?.(enabled);
+  }
+
+  pumpV2Inbound(limit?: number): number {
+    if (!this.connected || this.closed) {
+      return 0;
+    }
+    return this.inner.pumpV2Inbound?.(limit) ?? 0;
+  }
+
   close(): void {
     if (this.closed) {
       return;
