@@ -3464,7 +3464,10 @@ export async function startGuestMeReplay(guestScene: MeReplayPumpScene): Promise
   guestScene.phaseManager.pushPhase(mePhase);
   guestScene.phaseManager.shiftPhase();
   mePhase.start();
-  await drainLoopback();
+  // Capture the production-queued replay synchronously at the divert edge. A complete retained
+  // ME_PRESENT/ME_PICK may already be buffered, so draining first can legitimately advance this real
+  // replay into a CommonAnimPhase (C1 run 29673281666). The old late observation then rejected a valid
+  // handoff merely because the manually scheduled guest was faster than the harness.
   const replay = guestScene.phaseManager.getCurrentPhase();
   if (replay == null || replay.phaseName !== "CoopReplayMePhase") {
     throw new Error(
@@ -3597,6 +3600,25 @@ export function startGuestMeOutcomeRace(replay: Phase): void {
 export async function drainGuestMeReplayToSettle(replay: Phase): Promise<GuestMeReplay> {
   for (let i = 0; i < 16; i++) {
     await drainLoopback();
+    const lifecycle = replay as unknown as {
+      continuationHandedOff: boolean;
+      settled: boolean;
+    };
+    if (!lifecycle.settled && lifecycle.continuationHandedOff) {
+      // A real browser's Phaser scheduler runs the complete local continuation in parallel with
+      // transport delivery. This directly-constructed guest deliberately has an inert phase manager,
+      // so transport-only drains leave a valid final LEAVE deferred forever behind the real queued
+      // EggLapse/MysteryEncounterRewards/PostMysteryEncounter tail (B7/B9 run 29673281666).
+      //
+      // Drive only after the retained reward/battle settlement has explicitly handed off control, and
+      // stop only when that same replay's final retained transaction settles. This preserves the
+      // production lifecycle fence: LEAVE must still wait for the actual PostMysteryEncounterPhase;
+      // the harness neither clears the queue nor manufactures a replacement phase.
+      await driveClientPhaseQueueTo(globalScene, "retained Mystery final leave", {
+        matches: () => meReplaySettled(replay),
+        maxPhases: 32,
+      });
+    }
     if (meReplaySettled(replay)) {
       // Journal terminals settle the replay directly, so the losing legacy 8M outcome arm can remain parked
       // until its long timeout. Retire that exact, now-dead waiter before this client scope exits; otherwise
