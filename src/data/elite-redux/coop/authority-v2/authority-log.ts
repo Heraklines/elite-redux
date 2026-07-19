@@ -60,12 +60,13 @@ import type {
   CoopAuthorityPeerBindingV2,
   CoopAuthorityReceipt,
   CoopFrameContextV2,
+  CoopNextControl,
   CoopReplicaMechanicalStage,
   CoopScheduler,
   CoopTimeClass,
   CoopTimerOwner,
 } from "#data/elite-redux/coop/authority-v2/contract";
-import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
+import { controlIdOf, controlsEqual } from "#data/elite-redux/coop/authority-v2/next-control";
 
 /** Monotonic index of each ACK stage. Retirement compares against these; presentationSettled is never required. */
 const STAGE_ORDER: Readonly<Record<CoopAckStage, number>> = {
@@ -215,6 +216,19 @@ export interface AuthorityLogDiagnostics {
   readonly disposed: boolean;
 }
 
+/**
+ * Exact log proof an authority may attach to one recovery snapshot.
+ *
+ * `requiredTail` is complete for `(capturedFrontier, frontier]`; a missing retired revision makes the
+ * request unprovable and therefore returns `null` instead of inventing history. `nextControl` is the last
+ * control the authority actually stated, retained as constant-size log metadata after delivery retirement.
+ */
+export interface CoopAuthorityRecoverySliceV2 {
+  readonly frontier: number;
+  readonly nextControl: CoopNextControl;
+  readonly requiredTail: readonly CoopAuthorityEntry[];
+}
+
 /** Exact classification of one authority-side receipt intake attempt. */
 export type AuthorityReceiptVerdict =
   | {
@@ -278,6 +292,8 @@ export class AuthorityLog implements CoopAuthorityLog {
   private pendingTailRequestFrom: number | null = null;
   /** AUTHORITY: the highest revision assigned (commit assigns headRevision + 1). */
   private headRevision = 0;
+  /** AUTHORITY: constant-size successor metadata for a snapshot taken after the head entry retired. */
+  private latestNextControl: CoopNextControl = null;
   private retentionRefusals = 0;
   private wireSendFailures = 0;
   private disposed = false;
@@ -499,6 +515,7 @@ export class AuthorityLog implements CoopAuthorityLog {
     // A revision exists only after retention accepted it. An overflow therefore
     // never burns a number and cannot create an unfillable replica gap.
     this.headRevision = revision;
+    this.latestNextControl = structuredClone(committed.nextControl);
 
     // Deliver once immediately, then redeliver on the backoff until mechanically retired.
     this.sendGuarded({ kind: "deliver", entry: committed });
@@ -616,6 +633,51 @@ export class AuthorityLog implements CoopAuthorityLog {
   /** Retained-but-unretired entries in revision order (contract). */
   retained(): readonly CoopAuthorityEntry[] {
     return this.retainedWindow.values().map(lease => lease.entry);
+  }
+
+  /**
+   * Build the exact recovery proof for a replica's captured frontier.
+   *
+   * A peer that is genuinely behind keeps every missing entry retained because authority retirement requires
+   * that peer's own mechanical receipt. Consequently, a hole here means the request/frontier cannot be
+   * reconciled with this live log and must fail closed. The head-equal case legitimately has an empty tail:
+   * a full snapshot may be repairing state after all log operations were already mechanically acknowledged.
+   */
+  recoverySlice(capturedFrontier: number): CoopAuthorityRecoverySliceV2 | null {
+    if (
+      this.disposed
+      || !Number.isSafeInteger(capturedFrontier)
+      || capturedFrontier < 0
+      || capturedFrontier > this.headRevision
+    ) {
+      return null;
+    }
+    if (capturedFrontier === this.headRevision) {
+      return Object.freeze({
+        frontier: this.headRevision,
+        nextControl: structuredClone(this.latestNextControl),
+        requiredTail: Object.freeze([]),
+      });
+    }
+
+    const retained = new Map(this.retained().map(entry => [entry.revision, entry] as const));
+    const requiredTail: CoopAuthorityEntry[] = [];
+    for (let revision = capturedFrontier + 1; revision <= this.headRevision; revision++) {
+      const entry = retained.get(revision);
+      if (entry == null) {
+        return null;
+      }
+      requiredTail.push(entry);
+    }
+    const last = requiredTail.at(-1);
+    if (last == null || !controlsEqual(last.nextControl, this.latestNextControl)) {
+      return null;
+    }
+    return Object.freeze({
+      frontier: this.headRevision,
+      nextControl: structuredClone(this.latestNextControl),
+      requiredTail: Object.freeze(requiredTail),
+    });
   }
 
   // ---------------------------------------------------------------------------

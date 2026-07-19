@@ -227,7 +227,11 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
     this.enter("fence-acquired");
 
     // --- capture frontier under the fence, BEFORE any request goes out ---
-    this.frontier = this.deps.log.appliedThrough();
+    // Recovery must resume from the last MECHANICALLY COMPLETE revision. A
+    // material-applied entry whose stated control never landed is still an
+    // unfinished operation; treating it as the snapshot frontier would let the
+    // recovery response skip that operation's control proof.
+    this.frontier = this.deps.log.controlInstalledThrough();
     this.enter("frontier-captured");
 
     // --- request the exact bundle (fenced, abortable, scheduler-timed) ---
@@ -272,6 +276,18 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
     }
     this.enter("material-applied");
 
+    // applyMaterial may cross an async engine boundary. Re-prove the fence,
+    // authenticated frame, and correlated bundle after it returns and before
+    // either frontier or control is installed. A rejoin/cancellation during the
+    // apply must never let an old snapshot commit into a new membership.
+    const postApplyReason = this.validateFenced(bundle);
+    if (postApplyReason !== undefined) {
+      return this.terminalize(`post-apply ${postApplyReason}`);
+    }
+    if (this.abortController.signal.aborted) {
+      return this.terminalize(`post-apply recovery aborted: ${this.abortReason().message}`);
+    }
+
     try {
       this.deps.log.adoptFrontier(bundle.frontier);
     } catch (error) {
@@ -305,7 +321,7 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
    * frontier. Returns a terminalize reason, or undefined when valid.
    */
   private validateFenced(bundle: CoopRecoveryBundle): string | undefined {
-    const liveFrontier = this.deps.log.appliedThrough();
+    const liveFrontier = this.deps.log.controlInstalledThrough();
     if (liveFrontier !== this.frontier) {
       return `frontier advanced under the fence (${this.frontier} -> ${liveFrontier}); snapshot is stale`;
     }

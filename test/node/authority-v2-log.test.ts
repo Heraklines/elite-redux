@@ -598,6 +598,46 @@ describe("authority-v2 log", () => {
     expect(noControl.retained()).toHaveLength(0);
   });
 
+  it("builds a contiguous recovery slice and retains the last stated control after retirement", () => {
+    const log = makeLog(scheduler, sent);
+    const first = log.commit(entryInput("op-recovery-1"));
+    const second = log.commit(entryInput("op-recovery-2", { nextControl: commandControl() }));
+
+    expect(log.recoverySlice(0)).toEqual({
+      frontier: 2,
+      nextControl: commandControl(),
+      requiredTail: [first, second],
+    });
+    expect(log.recoverySlice(1)).toEqual({
+      frontier: 2,
+      nextControl: commandControl(),
+      requiredTail: [second],
+    });
+
+    expect(log.acceptReceipt(receipt(first, "materialApplied"))).toBe(true);
+    expect(log.acceptReceipt(receipt(second, "materialApplied"))).toBe(false);
+    expect(log.acceptReceipt(receipt(second, "controlInstalled"))).toBe(true);
+    expect(log.retained()).toHaveLength(0);
+    expect(log.recoverySlice(2)).toEqual({
+      frontier: 2,
+      nextControl: commandControl(),
+      requiredTail: [],
+    });
+  });
+
+  it("refuses a recovery slice with an impossible hole or a frontier ahead of authority", () => {
+    const log = makeLog(scheduler, sent);
+    const first = log.commit(entryInput("op-recovery-hole-1"));
+    log.commit(entryInput("op-recovery-hole-2"));
+    expect(log.acceptReceipt(receipt(first, "materialApplied"))).toBe(true);
+
+    // A real replica that still reported frontier 0 could not have retired revision 1. Refuse the
+    // contradictory request rather than returning revision 2 as if it were a complete tail.
+    expect(log.recoverySlice(0)).toBeNull();
+    expect(log.recoverySlice(3)).toBeNull();
+    expect(log.recoverySlice(-1)).toBeNull();
+  });
+
   it("dispose leaves zero timers and zero leases", () => {
     const log = makeLog(scheduler, sent);
     log.commit(entryInput("op-1", { nextControl: commandControl() }));

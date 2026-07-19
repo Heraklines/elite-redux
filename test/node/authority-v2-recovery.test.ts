@@ -156,14 +156,14 @@ const COMMAND_CONTROL: NonNullable<CoopNextControl> = {
   commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 0 }],
 };
 
-function entry(revision: number): CoopAuthorityEntry {
+function entry(revision: number, nextControl: CoopNextControl = null): CoopAuthorityEntry {
   return {
     context: FRAME,
     revision,
     operationId: `op-${revision}`,
     kind: "TURN_COMMIT",
     material: { digest: `d-${revision}`, payload: null },
-    nextControl: null,
+    nextControl,
     subsumes: [],
   };
 }
@@ -176,7 +176,7 @@ function makeBundle(overrides: Partial<CoopRecoveryBundle> = {}): CoopRecoveryBu
     frontier: 12,
     membershipRevision: 2,
     nextControl: COMMAND_CONTROL,
-    requiredTail: [entry(11), entry(12)],
+    requiredTail: [entry(11), entry(12, COMMAND_CONTROL)],
     ...overrides,
   };
 }
@@ -219,13 +219,15 @@ function makeHarness(
     frontier?: number;
     projectResult?: CoopControlInstallResult;
     applyResult?: boolean;
+    applyMaterial?: CoopRecoveryTransactionDeps["applyMaterial"];
+    frame?: () => CoopFrameContextV2;
   } = {},
 ): Harness {
   const scheduler = new FakeScheduler();
   const log = makeLog(opts.frontier ?? 10);
   const ctx = makeCtx(scheduler, new AbortController().signal);
   const phases: CoopRecoveryPhase[] = [];
-  const applyMaterial = vi.fn(async () => opts.applyResult ?? true);
+  const applyMaterial = vi.fn(opts.applyMaterial ?? (async () => opts.applyResult ?? true));
   const acknowledge = vi.fn((_ctx: CoopRuntimeContext, _proof: CoopRecoveryAppliedProofV2) => {});
   const project = vi.fn((): CoopControlInstallResult => opts.projectResult ?? INSTALLED);
   const projector: CoopControlProjector = { project };
@@ -234,7 +236,7 @@ function makeHarness(
     log,
     projector,
     fence,
-    frame: () => REPLICA_FRAME,
+    frame: opts.frame ?? (() => REPLICA_FRAME),
     requestId: "recovery-1",
     reason: "unit-test",
     request,
@@ -412,6 +414,25 @@ describe("authority-v2 recovery transaction", () => {
     expect(h.log.adopted).toEqual([]);
     expect(h.project).not.toHaveBeenCalled();
     expect(h.phases).not.toContain("validated");
+  });
+
+  it("revalidates after async material apply and refuses a membership that changed underneath it", async () => {
+    let liveFrame = REPLICA_FRAME;
+    const h = makeHarness(async () => makeBundle(), {
+      frame: () => liveFrame,
+      applyMaterial: async () => {
+        liveFrame = { ...REPLICA_FRAME, membershipRevision: 3, connectionGeneration: 2 };
+        return true;
+      },
+    });
+    const txn = createRecoveryTransaction(h.ctx, h.deps);
+
+    expect(await txn.run()).toBe("terminalized");
+    expect(h.deps.fence.terminalReason).toContain("post-apply recovery bundle mismatch");
+    expect(h.applyMaterial).toHaveBeenCalledTimes(1);
+    expect(h.log.adopted).toEqual([]);
+    expect(h.project).not.toHaveBeenCalled();
+    expect(h.acknowledge).not.toHaveBeenCalled();
   });
 
   it("terminalizes on a bundle whose frontier is behind the captured frontier", async () => {
