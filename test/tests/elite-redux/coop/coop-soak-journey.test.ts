@@ -142,9 +142,12 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
     expect(result.actionScript, "Field Trip selected a real move row through the guest capture UI").toContain(
       "wave 24: ME FIELD_TRIP public OPTION_SELECT pick=0",
     );
-    expect(result.actionScript, "Field Trip left its embedded reward through the guest public UI").toContain(
-      "wave 24: ME FIELD_TRIP public embedded reward leave",
-    );
+    expect(
+      result.actionScript.some(action =>
+        /^wave 24: ME FIELD_TRIP option=1 driven \((?:host|guest)-owned, counter \d+->\d+\)$/u.test(action),
+      ),
+      "Field Trip crossed its exact terminal and advanced the shared interaction counter once",
+    ).toBe(true);
     expect(new Set(result.mysteryEncounters.map(event => event.type)).size, "event types are heterogeneous").toBe(
       EVENT_SCHEDULE.size,
     );

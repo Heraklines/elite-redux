@@ -669,7 +669,6 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const startedHostTailPhases = new WeakSet<Phase>();
     let hostMapCommitted = false;
     let guestMapCommitted = false;
-    let hostEncounterAcknowledged = false;
     const guestCommand = await withClient(rig.guestCtx, async () =>
       driveClientPhaseQueueTo(rig.guestScene, "guest post-ME CommandPhase", {
         matches: phase =>
@@ -727,13 +726,11 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
         // waiting for reciprocal carriers. Continue that exact invocation; never start it twice.
         startedPhases: startedHostTailPhases,
         drivePublicPhaseInput: phase => {
-          if (
-            phase.phaseName === "NextEncounterPhase"
-            && rig.hostScene.ui.getMode() === UiMode.MESSAGE
-            && !hostEncounterAcknowledged
-          ) {
-            hostEncounterAcknowledged = rig.hostScene.ui.processInput(Button.ACTION);
-            return hostEncounterAcknowledged;
+          if (phase.phaseName === "NextEncounterPhase" && rig.hostScene.ui.getMode() === UiMode.MESSAGE) {
+            // NextEncounterPhase can expose more than one sequential narration prompt. Each accepted
+            // ACTION consumes exactly the currently-visible public prompt; a one-shot latch strands the
+            // second prompt even though a browser player would press through it normally.
+            return rig.hostScene.ui.processInput(Button.ACTION);
           }
           if (
             phase.phaseName === "SelectBiomePhase"

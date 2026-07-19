@@ -178,6 +178,7 @@ test("between-wave completion accepts both semantic command frontiers without le
       kind: "browser-surface2",
       observation: {
         surfaceId: "command:command",
+        operationClass: "command",
         phase: "CommandPhase",
         uiMode: "COMMAND",
         localSeat: seat,

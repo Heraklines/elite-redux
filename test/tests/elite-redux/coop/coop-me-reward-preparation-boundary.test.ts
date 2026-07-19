@@ -62,7 +62,10 @@ describe("Mystery battle reward preparation boundary", () => {
       /encounter\.encounterMode === MysteryEncounterMode\.NO_BATTLE[\s\S]*?mysteryEncounterRewardSurfaces\(encounter, "rewards", addHealPhase\)[\s\S]*?"MysteryEncounterRewardsPhase", addHealPhase, null, settlementPlan/u,
     );
     expect(replay).toContain("typed reward options retained for the declared no-battle reward continuation");
-    expect(replay).toMatch(/const exactSurface = terminal === "battle-settled"[\s\S]*?: current === this;/u);
+    expect(replay).toContain("private isRewardSettlementSurfaceReady(current: Phase | undefined): boolean");
+    expect(replay).toContain('current?.phaseName === "CoopReplayTurnPhase"');
+    expect(replay).toContain("this.detachedQuizCompleted");
+    expect(replay).toContain('abortActiveCoopReplayTurnPhase("completed mirror quiz retained reward continuation")');
     expect(replay).toMatch(
       /terminal === "reward-settled"[\s\S]*?globalScene\.phaseManager\.clearPhaseQueue\(\)[\s\S]*?"MysteryEncounterRewardsPhase"/u,
     );

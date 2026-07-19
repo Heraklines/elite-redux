@@ -593,6 +593,13 @@ export class CoopReplayMePhase extends Phase {
   private settledDetached = false;
 
   /**
+   * A detached mirror quiz has finished its final public verdict. Its retained reward settlement may now
+   * supersede only the phantom replay turn produced by an empty local phase tree; it may not interrupt the
+   * live quiz or any unrelated continuation.
+   */
+  private detachedQuizCompleted = false;
+
+  /**
    * #818: the watcher reward shop is opened at most ONCE - by settleForWatcherShop (the shop-only
    * handoff), or (when a reward shop FOLLOWS a quiz handoff) directly by the rewardOptions hook.
    */
@@ -1400,16 +1407,18 @@ export class CoopReplayMePhase extends Phase {
       );
     }
     if (transaction.payload.terminal === "reward-settled") {
+      const current = globalScene.phaseManager.getCurrentPhase();
       const ready =
         this.acceptedTerminal.kind === "pending"
         && transaction.step === 0
-        && globalScene.phaseManager.getCurrentPhase() === this;
+        && this.isRewardSettlementSurfaceReady(current);
       if (!ready) {
         coopLog("me", "retained reward settlement deferred at lifecycle fence", {
           operationId: transaction.operationId,
           step: transaction.step,
-          currentPhase: globalScene.phaseManager.getCurrentPhase()?.phaseName ?? "none",
+          currentPhase: current?.phaseName ?? "none",
           acceptedTerminal: this.acceptedTerminal.kind,
+          detachedQuizCompleted: this.detachedQuizCompleted,
         });
       }
       return ready;
@@ -1527,8 +1536,16 @@ export class CoopReplayMePhase extends Phase {
     destination: CoopMeRewardDestination,
   ): boolean {
     const current = globalScene.phaseManager.getCurrentPhase();
-    const exactSurface = terminal === "battle-settled" ? current?.phaseName === "BattleEndPhase" : current === this;
+    const detachedQuizPhantom =
+      terminal === "reward-settled" && current !== this && this.isRewardSettlementSurfaceReady(current);
+    const exactSurface =
+      terminal === "battle-settled"
+        ? current?.phaseName === "BattleEndPhase"
+        : this.isRewardSettlementSurfaceReady(current);
     if (!exactSurface || globalScene.currentBattle?.turn !== destination.hostTurn) {
+      return false;
+    }
+    if (detachedQuizPhantom && !abortActiveCoopReplayTurnPhase("completed mirror quiz retained reward continuation")) {
       return false;
     }
     this.acceptedTerminal = {
@@ -1600,8 +1617,28 @@ export class CoopReplayMePhase extends Phase {
         globalScene.phaseManager.pushNew("EggLapsePhase");
       }
     }
-    current.end();
+    // The phantom replay owns its own exactly-once end after abortTurnWait wakes it. Ending it here too
+    // would shift past the freshly queued reward continuation when that async waiter resumes.
+    if (!detachedQuizPhantom) {
+      current.end();
+    }
     return true;
+  }
+
+  /**
+   * A no-battle reward settlement normally applies only while this replay shell is current. A mirrored quiz
+   * deliberately ends that shell, and an empty local queue can briefly build a non-authoritative battle chain
+   * before the retained transaction is redelivered. Admit only its final parked replay turn after the quiz's
+   * last verdict; every earlier quiz/interstitial and every real ME-battle handoff remains fail-closed.
+   */
+  private isRewardSettlementSurfaceReady(current: Phase | undefined): boolean {
+    return (
+      current === this
+      || (this.settledDetached
+        && this.detachedQuizCompleted
+        && !coopMeHandoffBattleStarted()
+        && current?.phaseName === "CoopReplayTurnPhase")
+    );
   }
 
   /** Project the host's final state directly into its declared continuation, skipping local ME mechanics. */
@@ -2288,13 +2325,23 @@ export class CoopReplayMePhase extends Phase {
     globalScene.phaseManager.unshiftNew("ErQuizPhase", {
       questions: sub.questions as ErQuizQuestion[],
       stopOnWrong: sub.stopOnWrong,
-      onComplete: (result: ErQuizResult) =>
-        this.boundaryStillLive()
-          ? coopLog("me", "guest mirror quiz complete (engine outcome comes from the host)", {
-              correct: result.correct,
-              answered: result.answered,
-            })
-          : undefined,
+      onComplete: (result: ErQuizResult) => {
+        if (!this.boundaryStillLive()) {
+          return;
+        }
+        coopLog("me", "guest mirror quiz complete (engine outcome comes from the host)", {
+          correct: result.correct,
+          answered: result.answered,
+        });
+        this.detachedQuizCompleted = true;
+        // ErQuizPhase invokes onComplete immediately before its own end(). Re-request on the following
+        // microtask so the retained transaction can never clear or double-end the still-current quiz.
+        queueMicrotask(() => {
+          if (this.boundaryStillLive()) {
+            this.boundRuntime?.durability?.reconnect();
+          }
+        });
+      },
     });
     // The outcome/terminal race that DELIVERED this quiz subPrompt has already resolved (its raceDone is
     // set). Re-arm the race DETACHED (promises outlive end()) so the host's post-quiz meResync applies
