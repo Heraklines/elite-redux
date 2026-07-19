@@ -138,6 +138,18 @@ export interface SessionSaveData {
    */
   erUsedTrainerKeys?: string[];
   /**
+   * ER editor custom-trainer keys already encountered in this run. Kept
+   * separate from the regular ER trainer registry because the key spaces and
+   * selection systems are independent.
+   */
+  erUsedCustomTrainerKeys?: string[];
+  /**
+   * Zero-based custom-trainer spawn windows already consumed in this run.
+   * Persisting these prevents a refresh between adjacent waves from allowing a
+   * second custom trainer inside the same window.
+   */
+  erUsedCustomTrainerWindows?: number[];
+  /**
    * ER (#348): per-mon faint-free money-streak counters ([pokemonId, waves]),
    * so a reload keeps each mon's streak. Optional for backwards compatibility
    * (older saves restore fresh streaks).

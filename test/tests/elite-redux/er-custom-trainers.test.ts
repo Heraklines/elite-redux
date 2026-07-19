@@ -446,6 +446,57 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     }
   });
 
+  it("persists used trainers and consumed windows across a real session reload", async () => {
+    const TWO = {
+      A: {
+        id: 70059,
+        name: "Alpha",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 500,
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+      B: {
+        id: 70060,
+        name: "Bravo",
+        trainerClass: "VETERAN",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 500,
+        team: [{ species: SpeciesId.SNORLAX }],
+      },
+    };
+    setErCustomTrainersForTesting(TWO as never);
+    globalScene.seed = "reload-repeat";
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 100 });
+    resetErCustomTrainerTracking();
+    setErDifficulty("ace");
+
+    const anchor = erCustomTrainerWindowWave(globalScene.seed, 0, 10);
+    expect(anchor).toBeLessThan(10);
+    const first = selectErCustomTrainerForWave(anchor);
+    expect(first).not.toBeNull();
+    if (first === null) {
+      throw new Error("expected a custom trainer in the first forced window");
+    }
+    markErCustomTrainerUsed(first.key);
+
+    const snapshot = game.scene.gameData.getSessionSaveData();
+    expect(snapshot.erUsedCustomTrainerKeys).toEqual([first.key]);
+    expect(snapshot.erUsedCustomTrainerWindows).toEqual([0]);
+    await game.scene.gameData.saveAll();
+
+    // A page refresh starts with empty module memory before the session is restored.
+    resetErCustomTrainerTracking();
+    await game.reload.reloadSession();
+
+    // The already-consumed window cannot field another trainer on the next wave.
+    expect(selectErCustomTrainerForWave(anchor + 1)).toBeNull();
+    // Later windows may field the other trainer, but never the one already fought.
+    expect(playRun(11, 200).some(p => p.key === first.key)).toBe(false);
+  });
+
   it("at most one custom trainer per window (density caps density, not trainer count)", () => {
     // Two eligible trainers, both spanning the whole run. Every window fires, but
     // each window fields AT MOST ONE -> no two appearances share a window.

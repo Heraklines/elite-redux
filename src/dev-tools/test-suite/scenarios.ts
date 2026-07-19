@@ -9145,6 +9145,26 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Custom trainers never repeat after Continue",
+    description:
+      "Custom-trainer no-repeat persistence fix. Editor-authored custom trainers\n"
+      + "were tracked only in page memory, so REFRESH / Continue / cloud resume\n"
+      + "forgot both the trainer already fought and its consumed 10-wave spawn\n"
+      + "window. This could repeat one trainer later in the run or put custom\n"
+      + "trainers on adjacent waves such as 17 and 18. CHECK: after fighting a\n"
+      + "custom trainer, refresh and Continue. That trainer must never appear again\n"
+      + "in the run, and no second custom trainer may appear in the same spawn window.\n"
+      + "Regression-covered by er-custom-trainers.test.ts with a real session reload.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.SURF, MoveId.NASTY_PLOT, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Mega forms share their base's candy",
     description:
       "Candy-pooling fix (dex/UI, not battle-testable). An ER custom Mega (e.g. Flygon\n"
