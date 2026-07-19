@@ -244,7 +244,12 @@ describe("buildReplacementCommitEntry", () => {
 
 describe("double-KO chaining", () => {
   function makeAuthorityLog(sent: CoopAuthorityWire[], scheduler: CoopSchedulerImpl): AuthorityLog {
-    return new AuthorityLog({ localContext: FRAME, scheduler, send: wire => sent.push(wire) });
+    return new AuthorityLog({
+      localContext: FRAME,
+      scheduler,
+      send: wire => sent.push(wire),
+      peerBindings: [{ seatId: 1, connectionGeneration: FRAME.connectionGeneration }],
+    });
   }
 
   it("commits two occurrence-addressed entries whose successors chain", () => {
@@ -503,7 +508,12 @@ describe("zero timers after retire", () => {
     const clock = new ManualClock();
     const scheduler = createCoopScheduler(clock);
     const sent: CoopAuthorityWire[] = [];
-    const log = new AuthorityLog({ localContext: FRAME, scheduler, send: wire => sent.push(wire) });
+    const log = new AuthorityLog({
+      localContext: FRAME,
+      scheduler,
+      send: wire => sent.push(wire),
+      peerBindings: [{ seatId: 1, connectionGeneration: FRAME.connectionGeneration }],
+    });
 
     const entry = log.commit(
       buildReplacementCommitEntry({

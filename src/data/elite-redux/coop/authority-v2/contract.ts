@@ -115,6 +115,12 @@ export interface CoopFrameContextV2 {
   readonly connectionGeneration: number;
 }
 
+/** Authenticated remote seat binding frozen into an authority-log instance for this membership generation. */
+export interface CoopAuthorityPeerBindingV2 {
+  readonly seatId: number;
+  readonly connectionGeneration: number;
+}
+
 // ADJUDICATION (integration owner, 2026-07-18, Lane 5 change request): `seatMapId` and
 // `connectionGeneration` are NOT fields of the immutable per-session CoopRuntimeContext -
 // connectionGeneration increments per channel replacement (reconnect) without a new session

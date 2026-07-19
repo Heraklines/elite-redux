@@ -546,7 +546,12 @@ describe("CommandRequestLeaseBook - scheduler-owned, bounded, zero-leak", () => 
   it("full retirement over the FOUNDATION log + scheduler leaves zero timers (delivery + request)", () => {
     const controller = new AbortController();
     const sent: CoopAuthorityWire[] = [];
-    const log = new AuthorityLog({ localContext: FRAME, scheduler, send: w => sent.push(w) });
+    const log = new AuthorityLog({
+      localContext: FRAME,
+      scheduler,
+      send: w => sent.push(w),
+      peerBindings: [{ seatId: 1, connectionGeneration: FRAME.connectionGeneration }],
+    });
     const book = makeBook(controller.signal);
 
     const committed = log.commit(buildCommitted());

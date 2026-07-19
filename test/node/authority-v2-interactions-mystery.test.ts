@@ -132,7 +132,12 @@ class ManualClock implements CoopSchedulerClock {
 
 function makeLog(sent: CoopAuthorityWire[]) {
   const scheduler = createCoopScheduler(new ManualClock());
-  const log = new AuthorityLog({ localContext: FRAME, scheduler, send: wire => sent.push(wire) });
+  const log = new AuthorityLog({
+    localContext: FRAME,
+    scheduler,
+    send: wire => sent.push(wire),
+    peerBindings: [{ seatId: 1, connectionGeneration: FRAME.connectionGeneration }],
+  });
   return { log, scheduler };
 }
 

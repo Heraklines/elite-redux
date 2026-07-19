@@ -57,6 +57,7 @@ import type {
   CoopAdmitResult,
   CoopAuthorityEntry,
   CoopAuthorityLog,
+  CoopAuthorityPeerBindingV2,
   CoopAuthorityReceipt,
   CoopFrameContextV2,
   CoopReplicaMechanicalStage,
@@ -84,6 +85,32 @@ function isAckStage(value: unknown): value is CoopAckStage {
     || value === "controlInstalled"
     || value === "presentationSettled"
   );
+}
+
+function validatePeerBindings(
+  peers: readonly CoopAuthorityPeerBindingV2[],
+  localSeatId: number,
+): readonly CoopAuthorityPeerBindingV2[] {
+  if (!Array.isArray(peers) || peers.length === 0) {
+    throw new Error("AuthorityLog requires at least one authenticated remote peer binding");
+  }
+  const seen = new Set<number>();
+  const validated: CoopAuthorityPeerBindingV2[] = [];
+  for (const peer of peers) {
+    if (
+      !Number.isSafeInteger(peer?.seatId)
+      || peer.seatId < 0
+      || peer.seatId === localSeatId
+      || seen.has(peer.seatId)
+      || !Number.isSafeInteger(peer.connectionGeneration)
+      || peer.connectionGeneration < 0
+    ) {
+      throw new Error("AuthorityLog requires unique non-local peer seats with valid connection generations");
+    }
+    seen.add(peer.seatId);
+    validated.push(Object.freeze({ ...peer }));
+  }
+  return Object.freeze(validated.sort((left, right) => left.seatId - right.seatId));
 }
 
 /**
@@ -128,6 +155,11 @@ export interface AuthorityLogOptions {
   readonly scheduler: CoopScheduler;
   /** Wire egress: AUTHORITY redelivers entries; REPLICA requests tails on gaps. */
   readonly send: (wire: CoopAuthorityWire) => void;
+  /**
+   * Authenticated remote seats for this exact membership/channel generation. Authority commits freeze one
+   * receipt stage per peer; replicas accept entries only from the bound authority peer.
+   */
+  readonly peerBindings: readonly CoopAuthorityPeerBindingV2[];
   /** Owner-id prefix for this log's timers (default derived from the local session + seat). */
   readonly ownerId?: string;
   /** Hard cap on retained-but-unretired entries (default {@linkcode COOP_DEFAULT_RETAIN_CAPACITY}). */
@@ -153,8 +185,8 @@ interface DeliveryLease {
   readonly revision: number;
   readonly entry: CoopAuthorityEntry;
   readonly owner: CoopTimerOwner;
-  /** Highest ACK-stage index observed via receipts (STAGE_NONE before any). */
-  stage: number;
+  /** Frozen remote receipt quorum and each seat's highest stage (STAGE_NONE before any). */
+  readonly peerStages: Map<number, { readonly connectionGeneration: number; stage: number }>;
   attempts: number;
   /** Cancel handle for the currently pending retry timer, or null when none is scheduled. */
   cancelTimer: (() => void) | null;
@@ -162,6 +194,10 @@ interface DeliveryLease {
   stopped: boolean;
   /** Whether this entry's subsumption list has already been actioned (once, on first reaching admitted). */
   subsumptionDone: boolean;
+}
+
+function allPeersReached(lease: DeliveryLease, requiredStage: number): boolean {
+  return [...lease.peerStages.values()].every(peer => peer.stage >= requiredStage);
 }
 
 /** Live counts for the no-orphan-timer + bounded-retention invariants (asserted directly in tests). */
@@ -192,6 +228,7 @@ export class AuthorityLog implements CoopAuthorityLog {
   private readonly deliveryTimeClass: CoopTimeClass;
   private readonly maxDeliveryAttempts: number | null;
   private readonly retentionCapacity: number;
+  private readonly peerBindings: readonly CoopAuthorityPeerBindingV2[];
 
   /** AUTHORITY: retained-but-unretired entries, bounded + revision-ordered, keyed by their delivery lease. */
   private readonly retainedWindow: BoundedRevisionWindow<DeliveryLease>;
@@ -220,6 +257,7 @@ export class AuthorityLog implements CoopAuthorityLog {
       options.maxDeliveryAttempts != null && Number.isSafeInteger(options.maxDeliveryAttempts)
         ? options.maxDeliveryAttempts
         : null;
+    this.peerBindings = validatePeerBindings(options.peerBindings, options.localContext.senderSeatId);
     this.retentionCapacity = options.retainCapacity ?? COOP_DEFAULT_RETAIN_CAPACITY;
     this.retainedWindow = new BoundedRevisionWindow<DeliveryLease>(this.retentionCapacity);
     this.ledger = new AuthorityLedger();
@@ -272,7 +310,12 @@ export class AuthorityLog implements CoopAuthorityLog {
         address: `authority-v2/deliver/${revision}`,
         reason: `redeliver revision ${revision} until mechanically retired`,
       },
-      stage: STAGE_NONE,
+      peerStages: new Map(
+        this.peerBindings.map(peer => [
+          peer.seatId,
+          { connectionGeneration: peer.connectionGeneration, stage: STAGE_NONE },
+        ]),
+      ),
       attempts: 0,
       cancelTimer: null,
       stopped: false,
@@ -318,11 +361,15 @@ export class AuthorityLog implements CoopAuthorityLog {
     // A receipt is evidence from the receiving replica, never a reflection of the authority's own entry
     // context. The transport/session binding performs exact peer authentication; the log still rejects a
     // self-signed/spoofed-authority receipt so copied entry context can never retire its own mutation.
+    const peerStage = lease.peerStages.get(receipt.context.senderSeatId);
     if (
       receipt.context.authoritySeatId !== this.localContext.authoritySeatId
       || lease.entry.context.senderSeatId !== this.localContext.authoritySeatId
       || receipt.context.senderSeatId === lease.entry.context.senderSeatId
       || receipt.context.senderSeatId === receipt.context.authoritySeatId
+      || receipt.context.membershipRevision !== lease.entry.context.membershipRevision
+      || peerStage == null
+      || receipt.context.connectionGeneration !== peerStage.connectionGeneration
     ) {
       return false;
     }
@@ -339,18 +386,18 @@ export class AuthorityLog implements CoopAuthorityLog {
     // Presentation is intentionally outside the retirement rule. It is not a substitute for the exact
     // mechanical proof below it (in particular it carries no successor controlId), so it may only be
     // observed after the required stage was already proven.
-    if (receipt.stage === "presentationSettled" && lease.stage < required) {
+    if (receipt.stage === "presentationSettled" && peerStage.stage < required) {
       return false;
     }
     // Per-operation stage ordering: stages are monotonic. A same/older stage is a duplicate receipt - a safe
     // no-op that never re-advances or re-retires.
-    if (stageIdx <= lease.stage) {
+    if (stageIdx <= peerStage.stage) {
       return false;
     }
-    lease.stage = stageIdx;
+    peerStage.stage = stageIdx;
 
-    // Supersession by log order: when this entry is admitted, retire every revision it explicitly subsumes.
-    if (!lease.subsumptionDone) {
+    // Supersession is a quorum fact. One fast peer may never discard material a slower required peer still needs.
+    if (!lease.subsumptionDone && allPeersReached(lease, STAGE_ORDER.admitted)) {
       lease.subsumptionDone = true;
       for (const subsumed of lease.entry.subsumes) {
         this.retire(subsumed);
@@ -358,7 +405,7 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     // Retirement rule: admitted + materialApplied + (controlInstalled where nextControl != null). Never
     // presentationSettled.
-    if (lease.stage >= required) {
+    if (allPeersReached(lease, required)) {
       return this.retire(receipt.revision);
     }
     return false;
@@ -394,10 +441,13 @@ export class AuthorityLog implements CoopAuthorityLog {
     if (entry.context.membershipRevision !== this.localContext.membershipRevision) {
       return { kind: "rejected", reason: "membership-mismatch" };
     }
+    const authorityPeer = this.peerBindings.find(peer => peer.seatId === entry.context.authoritySeatId);
     if (
       entry.context.authoritySeatId !== this.localContext.authoritySeatId
       || entry.context.senderSeatId !== entry.context.authoritySeatId
       || this.localContext.senderSeatId === this.localContext.authoritySeatId
+      || authorityPeer == null
+      || entry.context.connectionGeneration !== authorityPeer.connectionGeneration
     ) {
       return { kind: "rejected", reason: "authority-sender-mismatch" };
     }

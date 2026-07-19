@@ -646,7 +646,12 @@ describe("owner window + zero timers after retire", () => {
 
   it("leaves zero scheduler timers once the committed entry retires and the window is cancelled", () => {
     const sent: CoopAuthorityWire[] = [];
-    const log = new AuthorityLog({ localContext: FRAME, scheduler, send: wire => sent.push(wire) });
+    const log = new AuthorityLog({
+      localContext: FRAME,
+      scheduler,
+      send: wire => sent.push(wire),
+      peerBindings: [{ seatId: 1, connectionGeneration: FRAME.connectionGeneration }],
+    });
 
     const entry = log.commit(
       buildBiomeInteractionEntry({

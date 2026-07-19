@@ -3553,6 +3553,18 @@ function resolveCoopV2ShadowIdentity(runtime: CoopRuntime): CoopV2ShadowIdentity
   const connectionGeneration = runtime.localTransport.connectionGeneration?.() ?? 0;
   const binding = controller.authenticatedBinding;
   if (binding != null) {
+    const membership = controller.p33MembershipSnapshot();
+    if (membership == null) {
+      return null;
+    }
+    const peerBindings = membership.requiredAckSeats
+      .filter(seatId => seatId !== localSeatId)
+      .map(seatId => membership.members.find(member => member.seatId === seatId))
+      .filter(member => member != null)
+      .map(member => ({ seatId: member.seatId, connectionGeneration: member.connectionGeneration }));
+    if (peerBindings.length !== membership.requiredAckSeats.length - 1 || peerBindings.length === 0) {
+      return null;
+    }
     return {
       runtimeId: `${binding.sessionId}:seat${localSeatId}`,
       sessionId: binding.sessionId,
@@ -3560,9 +3572,10 @@ function resolveCoopV2ShadowIdentity(runtime: CoopRuntime): CoopV2ShadowIdentity
       epoch: binding.sessionEpoch,
       localSeatId,
       authoritySeatId: binding.authoritySeatId,
-      membershipRevision: binding.membershipRevision,
+      membershipRevision: membership.revision,
       seatMapId: binding.seatMap.seatMapId,
       connectionGeneration,
+      peerBindings,
     };
   }
   // Non-authenticated dev/loopback session: synthesize a stable identity from the shared run id + epoch so
@@ -3582,6 +3595,9 @@ function resolveCoopV2ShadowIdentity(runtime: CoopRuntime): CoopV2ShadowIdentity
     membershipRevision: 1,
     seatMapId: `coop-v2-shadow-seatmap:${runId}`,
     connectionGeneration,
+    // The unbound compatibility path is currently a two-seat transport. Both endpoints share the channel
+    // generation; authenticated multi-seat sessions use the membership-derived bindings above.
+    peerBindings: [{ seatId: localSeatId === 0 ? 1 : 0, connectionGeneration }],
   };
 }
 

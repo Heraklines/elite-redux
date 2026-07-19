@@ -108,6 +108,7 @@ function identity(localSeatId: number): CoopV2ShadowIdentity {
     membershipRevision: SESSION.membershipRevision,
     seatMapId: SESSION.seatMapId,
     connectionGeneration: 0,
+    peerBindings: [{ seatId: localSeatId === 0 ? 1 : 0, connectionGeneration: 0 }],
   };
 }
 

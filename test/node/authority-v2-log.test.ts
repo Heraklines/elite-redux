@@ -157,6 +157,7 @@ function makeLog(scheduler: FakeScheduler, sent: CoopAuthorityWire[], over: Part
     localContext: frameContext(),
     scheduler,
     send: wire => sent.push(wire),
+    peerBindings: [{ seatId: 1, connectionGeneration: frameContext().connectionGeneration }],
     ...over,
   });
 }
@@ -164,6 +165,7 @@ function makeLog(scheduler: FakeScheduler, sent: CoopAuthorityWire[], over: Part
 function makeReplicaLog(scheduler: FakeScheduler, sent: CoopAuthorityWire[], over: Partial<AuthorityLogOptions> = {}) {
   return makeLog(scheduler, sent, {
     localContext: frameContext({ senderSeatId: 1 }),
+    peerBindings: [{ seatId: 0, connectionGeneration: frameContext().connectionGeneration }],
     ...over,
   });
 }
@@ -252,6 +254,44 @@ describe("authority-v2 log", () => {
     expect(log.acceptReceipt(receipt(committed, "controlInstalled"))).toBe(true);
   });
 
+  it("retires only after every frozen peer seat proves the exact connection generation", () => {
+    const log = makeLog(scheduler, sent, {
+      peerBindings: [
+        { seatId: 1, connectionGeneration: 4 },
+        { seatId: 2, connectionGeneration: 9 },
+      ],
+    });
+    const committed = log.commit(entryInput("op-quorum"));
+
+    expect(
+      log.acceptReceipt(
+        receipt(committed, "materialApplied", {
+          context: { ...committed.context, senderSeatId: 1, connectionGeneration: 4 },
+        }),
+      ),
+    ).toBe(false);
+    expect(log.retained()).toHaveLength(1);
+
+    // Right seat, stale generation: cannot satisfy the frozen quorum.
+    expect(
+      log.acceptReceipt(
+        receipt(committed, "materialApplied", {
+          context: { ...committed.context, senderSeatId: 2, connectionGeneration: 8 },
+        }),
+      ),
+    ).toBe(false);
+    expect(log.retained()).toHaveLength(1);
+
+    expect(
+      log.acceptReceipt(
+        receipt(committed, "materialApplied", {
+          context: { ...committed.context, senderSeatId: 2, connectionGeneration: 9 },
+        }),
+      ),
+    ).toBe(true);
+    expect(log.retained()).toHaveLength(0);
+  });
+
   it("keeps receipt, material, and control truth separate and retries only the unfinished stage", () => {
     const log = makeReplicaLog(scheduler, sent);
     const entry = fullEntry(1, "op-1", { nextControl: commandControl() });
@@ -296,6 +336,7 @@ describe("authority-v2 log", () => {
       localContext: frameContext({ sessionEpoch: 2, membershipRevision: 5, senderSeatId: 1 }),
       scheduler,
       send: wire => sent.push(wire),
+      peerBindings: [{ seatId: 0, connectionGeneration: frameContext().connectionGeneration }],
     });
 
     // Same session identity, older epoch generation -> staleEpoch (never rejected/duplicate).
@@ -314,6 +355,15 @@ describe("authority-v2 log", () => {
         fullEntry(1, "op-1", { context: frameContext({ sessionEpoch: 2, membershipRevision: 5, seatMapId: "other" }) }),
       ).kind,
     ).toBe("rejected");
+
+    // Right authority seat, stale authenticated channel generation -> rejected.
+    expect(
+      log.admit(
+        fullEntry(1, "op-1", {
+          context: frameContext({ sessionEpoch: 2, membershipRevision: 5, connectionGeneration: 0 }),
+        }),
+      ),
+    ).toEqual({ kind: "rejected", reason: "authority-sender-mismatch" });
 
     // Nothing was applied through any rejection/stale path.
     expect(log.appliedThrough()).toBe(0);

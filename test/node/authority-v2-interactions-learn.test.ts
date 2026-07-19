@@ -134,6 +134,7 @@ function makeLog(scheduler: FakeScheduler, sent: CoopAuthorityWire[], over: Part
     localContext: frameContext(),
     scheduler,
     send: wire => sent.push(wire),
+    peerBindings: [{ seatId: 1, connectionGeneration: frameContext().connectionGeneration }],
     ...over,
   });
 }

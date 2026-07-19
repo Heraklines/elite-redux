@@ -99,6 +99,7 @@ import {
 import { AuthorityLog, type CoopAuthorityWire } from "#data/elite-redux/coop/authority-v2/authority-log";
 import type {
   CoopAuthorityEntry,
+  CoopAuthorityPeerBindingV2,
   CoopAuthorityReceipt,
   CoopControlInstallResult,
   CoopControlProjector,
@@ -165,6 +166,8 @@ export interface CoopV2ShadowIdentity {
   readonly membershipRevision: number;
   readonly seatMapId: string;
   readonly connectionGeneration: number;
+  /** Exact remote seat/channel generations for this membership snapshot. */
+  readonly peerBindings: readonly CoopAuthorityPeerBindingV2[];
 }
 
 /**
@@ -462,6 +465,7 @@ export class CoopAuthorityV2Shadow {
       localContext: this.frameContext,
       scheduler: this.scheduler,
       send: wire => this.emitWire(wire),
+      peerBindings: id.peerBindings,
       ownerId: `authority-v2-shadow:${id.sessionId}:seat${id.localSeatId}`,
     });
 
