@@ -4419,7 +4419,7 @@ export function setCoopRuntime(runtime: CoopRuntime): void {
   active = runtime;
   activateCoopV2Runtime(runtime);
   runtimeSceneBindings.set(runtime, globalScene);
-  globalScene.phaseManager.setCoopRecoveryProgressionFence?.(
+  globalScene?.phaseManager?.setCoopRecoveryProgressionFence?.(
     () => coopV2RecoveryFencePredicates(runtime)?.isProgressionFrozen() === true,
   );
   // Wave-2e: point the operation journal at THIS runtime's durability manager. Load-bearing in the duo
@@ -7254,14 +7254,14 @@ export function clearCoopRuntime(): void {
     // Drop any registered shadow inbound handler even when the active runtime was already cleared.
     clearCoopV2ShadowInbound();
     try {
-      globalScene.phaseManager.setCoopRecoveryProgressionFence?.(null);
+      globalScene?.phaseManager?.setCoopRecoveryProgressionFence?.(null);
     } catch {
       /* engine-free/pre-scene teardown */
     }
     return;
   }
   try {
-    globalScene.phaseManager.setCoopRecoveryProgressionFence?.(null);
+    globalScene?.phaseManager?.setCoopRecoveryProgressionFence?.(null);
   } catch {
     /* engine-free/pre-scene teardown */
   }
