@@ -3331,7 +3331,38 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // shop -> barrier opens -> owner terminal -> watcher terminal -> ME terminal.
       let hostShop!: ShopPhaseSeam;
       await withClient(rig.hostCtx, async () => {
-        await runMysteryEncounterToEnd(game, option);
+        const scriptedSubPicks = [...(opts.meSubPicks?.get(wave) ?? [])];
+        const partySlot = scriptedSubPicks.shift();
+        const secondaryOption = scriptedSubPicks.shift();
+        await runMysteryEncounterToEnd(
+          game,
+          option,
+          partySlot == null
+            ? undefined
+            : {
+                // The campaign scripts use the production zero-based callback values. The shared encounter
+                // test helper drives the real PARTY / OPTION_SELECT handlers but accepts human one-based rows.
+                pokemonNo: partySlot + 1,
+                ...(secondaryOption == null ? {} : { optionNo: secondaryOption + 1 }),
+              },
+        );
+        if (partySlot != null) {
+          hitMode(UiMode.PARTY);
+          actionScript.push(`wave ${wave}: ME ${MysteryEncounterType[type]} public PARTY pick=${partySlot}`);
+        }
+        if (secondaryOption != null) {
+          hitMode(UiMode.OPTION_SELECT);
+          actionScript.push(
+            `wave ${wave}: ME ${MysteryEncounterType[type]} public OPTION_SELECT pick=${secondaryOption}`,
+          );
+        }
+        if (scriptedSubPicks.length > 0) {
+          fail(
+            "no-park",
+            wave,
+            `${MysteryEncounterType[type]} host-owned public nested driver left ${scriptedSubPicks.length} unused pick(s)`,
+          );
+        }
         await game.phaseInterceptor.to(noRewardShop ? "PostMysteryEncounterPhase" : "SelectModifierPhase", false);
         if (!noRewardShop) {
           hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;

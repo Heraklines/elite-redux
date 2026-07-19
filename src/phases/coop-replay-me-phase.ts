@@ -1342,13 +1342,30 @@ export class CoopReplayMePhase extends Phase {
    * mode, or separately timed enemy-party carrier participates in the decision.
    */
   public canApplyCommittedTerminalTransaction(transaction: CoopMeCommittedTerminalTransaction): boolean {
-    if (
-      !this.boundaryStillLive()
-      || transaction.pinned !== this.interactionCounter
-      || (transaction.payload.terminal === "battle") !== (transaction.payload.destination.kind === "battle")
-      || (transaction.payload.terminal === "battle-settled" || transaction.payload.terminal === "reward-settled")
-        !== (transaction.payload.destination.kind === "reward")
-    ) {
+    const boundaryLive = this.boundaryStillLive();
+    const addressValid = transaction.pinned === this.interactionCounter;
+    const destinationValid =
+      (transaction.payload.terminal === "battle") === (transaction.payload.destination.kind === "battle")
+      && (transaction.payload.terminal === "battle-settled" || transaction.payload.terminal === "reward-settled")
+        === (transaction.payload.destination.kind === "reward");
+    if (!boundaryLive || !addressValid || !destinationValid) {
+      coopLog("me", "retained Mystery terminal preflight deferred before lifecycle check", {
+        operationId: transaction.operationId,
+        terminal: transaction.payload.terminal,
+        step: transaction.step,
+        boundaryLive,
+        addressValid,
+        destinationValid,
+        activeReplay: activeCoopReplayMePhase === this,
+        sceneBound: this.boundScene === globalScene,
+        runtimeBound: this.boundRuntime === getCoopRuntime(),
+        controllerBound: this.boundController === getCoopController(),
+        generationBound: this.boundGeneration === coopSessionGeneration(),
+        pin: coopMeInteractionStartValue(),
+        expectedPin: this.interactionCounter,
+        currentPhase: globalScene.phaseManager.getCurrentPhase()?.phaseName ?? "none",
+        acceptedTerminal: this.acceptedTerminal.kind,
+      });
       return false;
     }
     if (
@@ -1383,11 +1400,19 @@ export class CoopReplayMePhase extends Phase {
       );
     }
     if (transaction.payload.terminal === "reward-settled") {
-      return (
+      const ready =
         this.acceptedTerminal.kind === "pending"
         && transaction.step === 0
-        && globalScene.phaseManager.getCurrentPhase() === this
-      );
+        && globalScene.phaseManager.getCurrentPhase() === this;
+      if (!ready) {
+        coopLog("me", "retained reward settlement deferred at lifecycle fence", {
+          operationId: transaction.operationId,
+          step: transaction.step,
+          currentPhase: globalScene.phaseManager.getCurrentPhase()?.phaseName ?? "none",
+          acceptedTerminal: this.acceptedTerminal.kind,
+        });
+      }
+      return ready;
     }
     const currentPhaseName = globalScene.phaseManager.getCurrentPhase()?.phaseName;
     const leaveSurfaceReady =
@@ -1397,15 +1422,29 @@ export class CoopReplayMePhase extends Phase {
         : this.battleEndDelegateOwnsContinuation
           ? currentPhaseName === "BattleEndPhase"
           : globalScene.phaseManager.getCurrentPhase() === this);
-    return (
+    const ready =
       (this.acceptedTerminal.kind === "pending" && transaction.step === 0)
       || ((this.acceptedTerminal.kind === "battle-settled" || this.acceptedTerminal.kind === "reward-settled")
         && transaction.step === this.acceptedTerminal.step + 1
         && leaveSurfaceReady)
       || (this.acceptedTerminal.kind === "leave"
         && this.acceptedTerminal.operationId === transaction.operationId
-        && this.acceptedTerminal.step === transaction.step)
-    );
+        && this.acceptedTerminal.step === transaction.step);
+    if (!ready) {
+      coopLog("me", "retained Mystery leave deferred at lifecycle fence", {
+        operationId: transaction.operationId,
+        step: transaction.step,
+        currentPhase: currentPhaseName ?? "none",
+        acceptedTerminal: this.acceptedTerminal.kind,
+        acceptedStep: this.acceptedTerminal.kind === "pending" ? null : this.acceptedTerminal.step,
+        acceptedContinuation:
+          this.acceptedTerminal.kind === "battle-settled" || this.acceptedTerminal.kind === "reward-settled"
+            ? this.acceptedTerminal.continuation
+            : null,
+        leaveSurfaceReady,
+      });
+    }
+    return ready;
   }
 
   public applyCommittedTerminalTransaction(transaction: CoopMeCommittedTerminalTransaction): boolean {
