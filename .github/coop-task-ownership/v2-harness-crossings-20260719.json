@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "taskId": "v2-harness-crossings-20260719",
+  "branch": "ci/coop/v2-harness-crossings-20260719",
+  "trainRef": "coop/integration-20260718",
+  "baseSha": "9605e5287696908f36f1e3bea9b279d9b2c4afe4",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-harness-crossings-20260719.json",
+    "progress.md",
+    "test/tests/elite-redux/coop/coop-duo-fault.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-resume.test.ts",
+    "test/tests/elite-redux/showdown/showdown-versus-host-faint.test.ts"
+  ]
+}
