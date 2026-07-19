@@ -75,7 +75,7 @@ const FATAL_COOP_CONSOLE_RULES = Object.freeze([
     "durability resync requested",
   ],
   [
-    /^\[coop:durability\].*(?:\brecovery EXHAUSTED\b|\bdeferred continuation EXHAUSTED\b|\boperation continuation EXHAUSTED\b|\boperation delivery retries exhausted\b)/u,
+    /^\[coop:durability\].*(?:\brecovery EXHAUSTED\b|\bdeferred continuation EXHAUSTED\b|\boperation continuation EXHAUSTED\b)/u,
     "durability recovery exhausted",
   ],
   [

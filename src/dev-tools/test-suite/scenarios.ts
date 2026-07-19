@@ -13849,6 +13849,25 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     shopItems: [modifierTypes.TM_CASE],
   },
+  {
+    label: "(note) Co-op game-over deletes its save without a torn-down-runtime error",
+    description:
+      "CO-OP SAVE LIFECYCLE (needs two paired clients; not reproducible as one forced battle).\n"
+      + "DO: start or resume a co-op run in a disposable slot, deliberately lose the battle, and\n"
+      + "accept the Game Over flow. Return to the co-op save list on both clients.\n"
+      + "EXPECT: the finished co-op save is deleted/tombstoned for both players, both clients reach\n"
+      + "the title/post-game UI, and neither browser logs 'co-op identity/control plane already\n"
+      + "cleared' or another session-serialization page error. A new co-op run can reuse that slot.\n"
+      + "Regression: test/tests/system/game-data.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+  },
   // Greater Ability Capsule permanently unlocks an innate even when it is only run-free
   {
     label: "Greater Ability Capsule: permanent unlock works on a run-free innate",

@@ -1,7 +1,9 @@
 import { pokerogueApi } from "#api/api";
 import * as account from "#app/account";
+import { getGameMode } from "#app/game-mode";
 import * as appConstants from "#constants/app-constants";
 import { AbilityId } from "#enums/ability-id";
+import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { GameManager } from "#test/framework/game-manager";
 import type { SessionSaveData, SystemSaveData } from "#types/save-data";
@@ -74,6 +76,31 @@ describe("System - Game Data", () => {
 
       expect(result).toEqual([false, false]);
       expect(account.updateUserInfo).toHaveBeenCalled();
+    });
+
+    it("does not serialize a torn-down co-op runtime while deleting its finished run", async () => {
+      game.scene.gameMode = getGameMode(GameModes.COOP);
+      const serialize = vi.spyOn(game.scene.gameData, "getSessionSaveData").mockImplementation(() => {
+        throw new Error("co-op identity/control plane already cleared");
+      });
+      const deleteCloud = vi
+        .spyOn(
+          game.scene.gameData as unknown as {
+            deleteSessionCloudSafely: (
+              slot: number,
+              localRaw: string | null,
+              accountIdentity: string,
+            ) => Promise<{ error: string | null; deletedCoopRunId?: string }>;
+          },
+          "deleteSessionCloudSafely",
+        )
+        .mockResolvedValue({ error: null });
+
+      const result = await game.scene.gameData.tryClearSession(0);
+
+      expect(result).toEqual([true, true]);
+      expect(deleteCloud).toHaveBeenCalledOnce();
+      expect(serialize).not.toHaveBeenCalled();
     });
   });
 

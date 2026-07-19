@@ -22,6 +22,7 @@ const [
   { BattleType },
   { Command },
   { MysteryEncounterOptionMode },
+  { MoveCategory },
   { MoveId },
   { PokemonModifierType },
   { PartyOption, PartyUiMode },
@@ -36,6 +37,7 @@ const [
   import("../src/enums/battle-type"),
   import("../src/enums/command"),
   import("../src/enums/mystery-encounter-option-mode"),
+  import("../src/enums/move-category"),
   import("../src/enums/move-id"),
   import("../src/modifier/modifier-type"),
   import("../src/ui/handlers/party-ui-handler"),
@@ -529,6 +531,42 @@ interface SelectionReadout {
   readonly optionCount: number | null;
 }
 
+interface FightMoveProjection {
+  readonly index: number;
+  readonly optionId: string;
+  readonly moveId: number;
+  readonly power: number;
+  readonly category: string;
+  readonly usable: boolean;
+}
+
+/**
+ * Read the same move cells, power/category values, and selectability the active FIGHT
+ * handler presents. This is assertion-only metadata: the browser driver still reaches
+ * the menu and moves its cursor exclusively through normal public keyboard input.
+ */
+function readFightMoveSlots(uiMode: string): FightMoveProjection[] | null {
+  if (uiMode !== "FIGHT") {
+    return null;
+  }
+  const phase = globalScene.phaseManager.getCurrentPhase();
+  if (!phase?.is("CommandPhase")) {
+    return null;
+  }
+  const pokemon = phase.getPokemon();
+  return pokemon.getMoveset().map((pokemonMove, index) => {
+    const move = pokemonMove.getMove();
+    return {
+      index,
+      optionId: `move:${pokemonMove.moveId}:slot:${index}`,
+      moveId: pokemonMove.moveId,
+      power: Number.isFinite(move.power) ? move.power : 0,
+      category: MoveCategory[move.category] ?? "UNKNOWN",
+      usable: pokemonMove.isUsable(pokemon, false, true)[0],
+    };
+  });
+}
+
 function partyOptionSemanticId(partyUiMode: number | undefined, option: number, index: number): string {
   if (
     partyUiMode === PartyUiMode.REMEMBER_MOVE_MODIFIER
@@ -658,6 +696,17 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       optionIds,
       optionCount: optionIds?.length ?? null,
     };
+  }
+  if (uiMode === "FIGHT") {
+    const moveSlots = readFightMoveSlots(uiMode);
+    if (moveSlots != null) {
+      const optionIds = moveSlots.map(slot => slot.optionId);
+      return {
+        selectedOptionId: selectedIndex == null ? null : (optionIds[selectedIndex] ?? `cursor:${selectedIndex}`),
+        optionIds,
+        optionCount: optionIds.length,
+      };
+    }
   }
   if (uiMode === "MODIFIER_SELECT") {
     const modOptions = (handler as unknown as { options?: Array<{ modifierTypeOption?: { type?: { id?: string } } }> })
@@ -1095,6 +1144,7 @@ function observeSemanticSurface(): void {
         optionIds: null,
         optionCount: null,
         teamSpeciesIds: null,
+        moveSlots: null,
         ready: { handlerActive: false, awaitingActionInput: false, inputBlocked: true },
         phase,
         phaseInstance: semanticPhaseInstance,
@@ -1143,6 +1193,7 @@ function observeSemanticSurface(): void {
         optionIds: null,
         optionCount: null,
         teamSpeciesIds: null,
+        moveSlots: null,
         ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
         phase,
         phaseInstance: semanticPhaseInstance,
@@ -1203,6 +1254,7 @@ function observeSemanticSurface(): void {
     }
 
     const selection = readSelection(handler, uiMode);
+    const moveSlots = readFightMoveSlots(uiMode);
     const starterGridCandidates = uiMode === "STARTER_SELECT" ? readStarterGridCandidates(handler) : null;
     const partySlots =
       uiMode === "PARTY"
@@ -1220,6 +1272,8 @@ function observeSemanticSurface(): void {
               coopOwner,
               active,
               fainted,
+              hp: pokemon.hp,
+              maxHp: pokemon.getMaxHp(),
               allowedInBattle,
               replacementEligible: reserve && !active && !fainted && allowedInBattle && ownedReplacement,
             };
@@ -1274,6 +1328,7 @@ function observeSemanticSurface(): void {
       `${epoch}:${wave}:${turn}`,
       selection.selectedOptionId ?? "",
       selection.optionIds?.join(",") ?? "",
+      moveSlots == null ? "" : JSON.stringify(moveSlots),
       ownerSeat ?? "?",
       awaitingActionInput,
       inputBlocked,
@@ -1285,6 +1340,7 @@ function observeSemanticSurface(): void {
     const probeKey = [
       semanticDigestKey,
       teamSpeciesIds?.join(",") ?? "",
+      moveSlots == null ? "" : JSON.stringify(moveSlots),
       starterGridCandidates == null ? "" : JSON.stringify(starterGridCandidates),
       partySlots == null ? "" : JSON.stringify(partySlots),
       stateDigest,
@@ -1313,6 +1369,7 @@ function observeSemanticSurface(): void {
       optionIds: selection.optionIds,
       optionCount: selection.optionCount,
       teamSpeciesIds,
+      moveSlots,
       starterGridCandidates,
       partySlots,
       ready: { handlerActive: true, awaitingActionInput, inputBlocked },

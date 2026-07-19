@@ -53,6 +53,9 @@ const benignLines = [
   "[coop:durability] apply DEFERRED cls=reward seq=2 -> no ack (boundary pending)",
   "[coop:durability] reconnect resend cls=reward unacked=1",
   "[coop:durability] operation delivery RETRY key=reward:2 attempt=1/8",
+  // Delivery retry exhaustion is not a terminal: the exact continuation deadline remains
+  // armed and the retained journal/resync path can still admit and ACK the operation.
+  "[coop:durability] operation delivery retries exhausted key=reward:2 attempts=3; continuation deadline remains armed",
   "[coop:durability] resync cls=reward from=2 -> replay 0 entries",
   "[coop:resync] post-rejoin full resync request seq=9300001",
   "[coop:resync] turn=3 applying full snapshot (suppressResummon=false)",

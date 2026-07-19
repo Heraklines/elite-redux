@@ -213,6 +213,28 @@ export function chooseNavigationKey(observation, targetId, navKeys, step) {
   const options = observation?.optionIds;
   const current = Array.isArray(options) ? options.indexOf(observation.selectedOptionId) : -1;
   const target = Array.isArray(options) ? options.indexOf(targetId) : -1;
+  // FIGHT is a two-column grid (and may gain a fifth cell). Its option order is
+  // stable, but treating it as a one-dimensional wrap-around list sends arrows
+  // to nonexistent neighbours. Follow the same row/column geometry a human sees.
+  if (
+    observation?.surfaceId === "command:fight"
+    && current >= 0
+    && target >= 0
+    && navKeys.includes("ArrowUp")
+    && navKeys.includes("ArrowDown")
+    && navKeys.includes("ArrowLeft")
+    && navKeys.includes("ArrowRight")
+  ) {
+    const currentRow = Math.floor(current / 2);
+    const targetRow = Math.floor(target / 2);
+    if (currentRow < targetRow) {
+      return "ArrowDown";
+    }
+    if (currentRow > targetRow) {
+      return "ArrowUp";
+    }
+    return current < target ? "ArrowRight" : "ArrowLeft";
+  }
   const axis = orderedAxisKeys(navKeys);
   if (axis != null && current >= 0 && target >= 0 && options.length > 1) {
     const forward = (target - current + options.length) % options.length;
@@ -220,6 +242,79 @@ export function chooseNavigationKey(observation, targetId, navKeys, step) {
     return forward <= backward ? axis.forward : axis.backward;
   }
   return navKeys[step % navKeys.length];
+}
+
+/**
+ * Choose a real, currently selectable move from the read-only FIGHT projection.
+ * Damaging moves beat status moves; higher visible power wins; stable slot order
+ * breaks ties. Fixed-damage attacks can report non-positive power, so category is
+ * also considered instead of assuming `power > 0` is the complete damage model.
+ */
+export function chooseBestCampaignMove(observation) {
+  if (
+    observation?.surfaceId !== "command:fight"
+    || !Array.isArray(observation.optionIds)
+    || !Array.isArray(observation.moveSlots)
+  ) {
+    return null;
+  }
+  const selectable = observation.moveSlots.filter(
+    slot =>
+      Number.isSafeInteger(slot?.index)
+      && Number.isSafeInteger(slot?.moveId)
+      && typeof slot?.optionId === "string"
+      && observation.optionIds.includes(slot.optionId)
+      && slot.usable === true,
+  );
+  selectable.sort((left, right) => {
+    const leftDamaging = left.category !== "STATUS";
+    const rightDamaging = right.category !== "STATUS";
+    return (
+      Number(rightDamaging) - Number(leftDamaging)
+      || Math.max(0, right.power ?? 0) - Math.max(0, left.power ?? 0)
+      || left.index - right.index
+    );
+  });
+  return selectable[0] ?? null;
+}
+
+/**
+ * Submit the strongest visible usable move through the ordinary command and fight
+ * menus. All decisions come from the public semantic mirror; all state changes are
+ * Space/arrow key presses. Target selection remains owned by the harness's addressed
+ * command-target driver.
+ */
+export async function driveBestCampaignMove(client, purpose, { timeoutMs = 15_000 } = {}) {
+  const fightCursor = client.evidence.cursor();
+  await client.press("Space", `${purpose}-open-fight`);
+  const fight = await waitForActionableSemanticSurface(client, "command:fight", {
+    fromCursor: fightCursor,
+    timeoutMs,
+  });
+  const move = chooseBestCampaignMove(fight.observation);
+  if (move == null) {
+    throw new Error(
+      `${client.label}: ${purpose} exposed no observer-proven usable move: `
+        + `${JSON.stringify(fight.observation.moveSlots ?? null)}`,
+    );
+  }
+  await selectOptionById(client, {
+    surfaceId: "command:fight",
+    targetId: move.optionId,
+    navKeys: ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"],
+    submitKey: "Space",
+    fromCursor: fightCursor,
+    timeoutMs,
+  });
+  client.evidence.record("campaign-battle-move", {
+    purpose,
+    moveId: move.moveId,
+    slot: move.index,
+    power: move.power,
+    category: move.category,
+    optionId: move.optionId,
+  });
+  return move;
 }
 
 /** Wait until a semantic observation for `surfaceId` appears at/after `fromCursor`, or null on timeout. */

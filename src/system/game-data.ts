@@ -5320,7 +5320,6 @@ export class GameData {
     let newClear = false;
     let deletedCoopRunId: string | undefined;
     if (userOk) {
-      const sessionData = this.getSessionSaveData();
       const { trainerId } = this;
       const jsonResponse = coopClear
         ? await enqueueSessionCloudMutation(accountIdentity, async () => {
@@ -5332,11 +5331,16 @@ export class GameData {
               ? { success: true, error: null, deletedCoopRunId: deletion.deletedCoopRunId }
               : { success: false, error: deletion.error };
           })
-        : await enqueueSessionCloudMutation(accountIdentity, () =>
-            this.persistenceAccountIsCurrent(accountIdentity)
-              ? this.clearSessionBounded({ slot: slotId, trainerId, clientSessionId }, sessionData)
-              : Promise.resolve({ success: false, error: "Clear account changed while queued." }),
-          );
+        : await enqueueSessionCloudMutation(accountIdentity, () => {
+            if (!this.persistenceAccountIsCurrent(accountIdentity)) {
+              return Promise.resolve({ success: false, error: "Clear account changed while queued." });
+            }
+            // Co-op teardown intentionally clears the runtime identity/control plane before
+            // PostGameOverPhase removes the persisted run. Solo serialization belongs only to
+            // this branch; eagerly serializing above made a successful co-op game-over emit a
+            // page error even though its tombstone path never consumes sessionData.
+            return this.clearSessionBounded({ slot: slotId, trainerId, clientSessionId }, this.getSessionSaveData());
+          });
 
       if (jsonResponse.error) {
         if (coopClear || jsonResponse.error.startsWith("session out of date")) {

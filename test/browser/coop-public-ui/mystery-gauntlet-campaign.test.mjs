@@ -9,10 +9,16 @@ import { resolve } from "node:path";
 import test from "node:test";
 import {
   assertAsymmetricMysteryPromptProjection,
+  chooseRewardPartyTargetSlot,
   createMysteryNarrationAdvancer,
   driveMysteryEncounterChoice,
 } from "./campaign.mjs";
-import { chooseAffordableStarterPair, selectOptionById } from "./campaign-nav.mjs";
+import {
+  chooseAffordableStarterPair,
+  chooseBestCampaignMove,
+  chooseNavigationKey,
+  selectOptionById,
+} from "./campaign-nav.mjs";
 import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
 import {
   captureCheckpointPngWithFallback,
@@ -107,6 +113,70 @@ test("workflow builds the staging-only fifth difficulty and fans a fixed ten-wav
   assert.match(workflow, /COOP_UI_DIFFICULTY_ID: \$\{\{ matrix\.difficulty \}\}/u);
   assert.match(workflow, /COOP_UI_DIFFICULTY_OPTION_ID: \$\{\{ matrix\.difficulty_option \}\}/u);
   assert.match(workflow, /COOP_UI_REQUIRE_MYSTERY_GAUNTLET: \$\{\{ matrix\.require_mystery \}\}/u);
+});
+
+test("campaign fight policy prefers a usable damaging move and follows the visible two-column grid", () => {
+  const observation = {
+    surfaceId: "command:fight",
+    selectedOptionId: "move:45:slot:0",
+    optionIds: ["move:45:slot:0", "move:33:slot:1", "move:74:slot:2", "move:22:slot:3"],
+    moveSlots: [
+      { index: 0, optionId: "move:45:slot:0", moveId: 45, power: 0, category: "STATUS", usable: true },
+      { index: 1, optionId: "move:33:slot:1", moveId: 33, power: 40, category: "PHYSICAL", usable: true },
+      { index: 2, optionId: "move:74:slot:2", moveId: 74, power: 0, category: "STATUS", usable: true },
+      { index: 3, optionId: "move:22:slot:3", moveId: 22, power: 45, category: "PHYSICAL", usable: true },
+    ],
+  };
+
+  const best = chooseBestCampaignMove(observation);
+  assert.equal(best?.optionId, "move:22:slot:3");
+  assert.equal(
+    chooseNavigationKey(observation, best.optionId, ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"], 0),
+    "ArrowDown",
+  );
+  assert.equal(
+    chooseNavigationKey(
+      { ...observation, selectedOptionId: "move:74:slot:2" },
+      best.optionId,
+      ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"],
+      1,
+    ),
+    "ArrowRight",
+  );
+
+  withEnvironment({ COOP_UI_BATTLE_KEYS: "" }, () => {
+    assert.equal(loadCampaignPolicy().keys.battleKeysFromEnv, false);
+  });
+  withEnvironment({ COOP_UI_BATTLE_KEYS: '["Space","ArrowRight","Space"]' }, () => {
+    const policy = loadCampaignPolicy();
+    assert.equal(policy.keys.battleKeysFromEnv, true);
+    assert.deepEqual(policy.keys.battle, ["Space", "ArrowRight", "Space"]);
+  });
+});
+
+test("reward targeting chooses a legal visible party slot instead of blindly selecting slot zero", () => {
+  const partySlots = [
+    { slot: 0, fainted: false, hp: 20, maxHp: 20, allowedInBattle: true },
+    { slot: 1, fainted: false, hp: 7, maxHp: 20, allowedInBattle: true },
+    { slot: 2, fainted: true, hp: 0, maxHp: 20, allowedInBattle: false },
+  ];
+  const boundary = rewardId => ({
+    authority: { partySlots },
+    peerEvents: [{ observation: { surfaceId: "reward-shop", selectedOptionId: rewardId } }],
+  });
+
+  assert.deepEqual(chooseRewardPartyTargetSlot(boundary("REVIVE"), 0), {
+    slot: 2,
+    rewardId: "REVIVE",
+  });
+  assert.deepEqual(chooseRewardPartyTargetSlot(boundary("SUPER_POTION"), 0), {
+    slot: 1,
+    rewardId: "SUPER_POTION",
+  });
+  assert.deepEqual(chooseRewardPartyTargetSlot(boundary("RARE_CANDY"), 0), {
+    slot: 0,
+    rewardId: "RARE_CANDY",
+  });
 });
 
 test("Mystery choice navigation skips a production-disabled default through verified public keys", async () => {

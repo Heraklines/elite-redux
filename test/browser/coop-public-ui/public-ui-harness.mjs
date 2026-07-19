@@ -2877,7 +2877,7 @@ export class DuoPublicUiRig {
    * mutated; the returned cursors exclude these command surfaces so the post-turn outcome cannot
    * mistake the just-submitted round for the next one.
    */
-  async driveSequentialCommandRound(from, keys, purpose) {
+  async driveSequentialCommandRound(from, keys, purpose, { driveCommand = null } = {}) {
     const clients = Object.values(this.clients);
     const pending = new Set(clients.map(client => client.label));
     const outcomeCursors = {};
@@ -3023,7 +3023,11 @@ export class DuoPublicUiRig {
         const beforeSubmissionCursors = Object.fromEntries(
           clients.map(value => [value.label, value.evidence.cursor()]),
         );
-        await client.sequence(keys, `${purpose}-${client.label}`);
+        if (driveCommand == null) {
+          await client.sequence(keys, `${purpose}-${client.label}`);
+        } else {
+          await driveCommand(client, `${purpose}-${client.label}`, event);
+        }
         pending.delete(client.label);
         const commandAddress = event.observation?.address;
         if (

@@ -218,7 +218,10 @@ export function loadCampaignPolicy() {
       ]),
       renderProfileToggle: envKeys("COOP_UI_RENDER_PROFILE_TOGGLE_KEYS", ["ArrowRight"]),
       renderProfileClose: envKeys("COOP_UI_RENDER_PROFILE_CLOSE_KEYS", ["Backspace", "ArrowUp", "ArrowUp", "ArrowUp"]),
-      // Attack-first: FIGHT -> first move -> confirm target. Same default as the harness.
+      // A non-empty override preserves exact diagnostic/reproduction sequences. Without one,
+      // the campaign opens FIGHT, reads the visible usable moves, and navigates to the strongest
+      // damaging option through public keys; the array remains the explicit-override payload.
+      battleKeysFromEnv: (process.env.COOP_UI_BATTLE_KEYS ?? "").trim().length > 0,
       battle: envKeys("COOP_UI_BATTLE_KEYS", ["Space", "Space", "Space"]),
       // Fallback when the first move does not resolve the turn (no PP / disabled): reopen
       // FIGHT and cycle to the next move.

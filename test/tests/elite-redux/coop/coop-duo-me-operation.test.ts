@@ -720,12 +720,16 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     // so their reciprocal rendezvous opens the public COMMAND surfaces that publish the two outstanding
     // continuation proofs. Merely making CommandPhase current is not player-observable and cannot retire
     // retained authority; the old fixture asserted zero pending immediately before this call chain.
-    await withClient(rig.guestCtx, async () => {
-      guestCommand.start();
-      await drainLoopback();
-    });
+    // The owner must publish the command frontier before the guest watcher tries to consume it.
+    // Starting the guest first manufactures a rendezvous timeout that no player can produce: in
+    // production the authoritative host materializes and starts this phase before its carrier is
+    // observed by the guest.
     await withClient(rig.hostCtx, async () => {
       hostCommand.start();
+      await drainLoopback();
+    });
+    await withClient(rig.guestCtx, async () => {
+      guestCommand.start();
       await drainLoopback();
     });
     await withClient(rig.guestCtx, async () => {

@@ -48,7 +48,9 @@ for (const file of files) {
 }
 
 const harness = sources.get("public-ui-harness.mjs");
+const campaignNav = sources.get("campaign-nav.mjs");
 const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
+const evidence = sources.get("evidence.mjs");
 if (
   // Optimization brief R1: launchBrowser carries the seat so each Chromium process is
   // pinned to its OWN Xvfb display (COOP_UI_DISPLAY_HOST/GUEST). Still exactly two
@@ -309,6 +311,44 @@ if (
   || !harness.includes('"public-ui-post-turn-target"')
 ) {
   failures.push("target selection must remain an address-bound semantic public UI-to-relay chain");
+}
+if (
+  !browserEntry.includes("function readFightMoveSlots(")
+  || !browserEntry.includes("pokemonMove.isUsable(pokemon, false, true)[0]")
+  || !browserEntry.includes("MoveCategory[move.category]")
+  || !browserEntry.includes("moveSlots,")
+  || /\.usePp\(|\.setCursor\(|\.handleCommand\(/u.test(browserEntry)
+  || !campaignNav?.includes("function chooseBestCampaignMove(")
+  || !campaignNav.includes("function driveBestCampaignMove(")
+  || !campaignNav.includes('surfaceId: "command:fight"')
+  || !campaign.includes("driveBestCampaignMove(client, commandPurpose")
+  || !campaign.includes("policy.keys.battleKeysFromEnv")
+  || !harness.includes("driveCommand(client, `${purpose}-${client.label}`, event)")
+) {
+  failures.push(
+    "campaign battle selection must use read-only visible FIGHT metadata and public keys, with exact key overrides retained",
+  );
+}
+if (
+  !browserEntry.includes("hp: pokemon.hp")
+  || !browserEntry.includes("maxHp: pokemon.getMaxHp()")
+  || !campaign.includes("export function chooseRewardPartyTargetSlot(")
+  || !campaign.includes('observation?.surfaceId === "reward-shop"')
+  || !campaign.includes("slot.fainted === true")
+  || !campaign.includes("slot.hp < slot.maxHp")
+  || !campaign.includes("chooseRewardPartyTargetSlot(boundary, driver.partySlot ?? 0)")
+) {
+  failures.push(
+    "reward targeting must derive a legal revive/healing slot from the read-only visible party and reward projections",
+  );
+}
+if (
+  evidence?.includes("/operation delivery retries exhausted/iu")
+  || !evidence?.includes("\\boperation continuation EXHAUSTED\\b")
+) {
+  failures.push(
+    "delivery retry exhaustion must remain recoverable while true operation continuation exhaustion stays fatal",
+  );
 }
 if (
   !browserEntry.includes("[coop-browser:render-profile]")

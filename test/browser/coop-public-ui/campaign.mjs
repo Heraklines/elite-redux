@@ -7,6 +7,7 @@ import { appendFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { loadCampaignLifecyclePolicy, withinDeadline } from "./campaign-lifecycle.mjs";
 import {
+  driveBestCampaignMove,
   findOwnedActionableMysteryPartySurface,
   findOwnedActionableReplacementSurface,
   isActionableSemanticObservation,
@@ -1049,6 +1050,12 @@ async function driveBattleWave(rig, policy, stats) {
       commandCursors,
       policy.keys.battle,
       `${purpose}-attack-first`,
+      {
+        driveCommand: policy.keys.battleKeysFromEnv
+          ? null
+          : (client, commandPurpose) =>
+              driveBestCampaignMove(client, commandPurpose, { timeoutMs: rig.config.timeoutMs }),
+      },
     );
     if (pendingCommandProof != null) {
       try {
@@ -1456,6 +1463,11 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
   for (const observation of observations.slice(1)) {
     const sameAddress = JSON.stringify(observation.address) === JSON.stringify(first.address);
     const sameOptions = JSON.stringify(observation.optionIds ?? null) === JSON.stringify(first.optionIds ?? null);
+    // Once the encounter has committed its terminal, each renderer may clear the
+    // presentation-only mysteryEncounter object on a different frame while opening
+    // the same addressed reward. Reward convergence is proven by its options,
+    // owner, address, and full mechanical digest; encounter identity was already
+    // proven at presentation/subprompt and remains in the campaign event ledger.
     if (
       observation.surfaceId !== first.surfaceId
       || normalizeMePhase(observation.phase) !== normalizeMePhase(first.phase)
@@ -1463,7 +1475,7 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
       || observation.operationClass !== first.operationClass
       || observation.ownerSeat !== first.ownerSeat
       || observation.selectedOptionId !== first.selectedOptionId
-      || observation.mysteryEncounterType !== first.mysteryEncounterType
+      || (stage !== "reward" && observation.mysteryEncounterType !== first.mysteryEncounterType)
       || observation.stateDigest !== first.stateDigest
       || !sameAddress
       || !sameOptions
@@ -1480,7 +1492,10 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
     address: first.address,
     ownerSeat: first.ownerSeat,
     optionIds: first.optionIds ?? null,
-    mysteryEncounterType: first.mysteryEncounterType ?? null,
+    mysteryEncounterType:
+      stage === "reward"
+        ? (stats.mysteryEvents.find(candidate => candidate.wave === first.address.wave)?.mysteryEncounterType ?? null)
+        : (first.mysteryEncounterType ?? null),
     stateDigest: first.stateDigest ?? null,
   };
   if (stage === "presentation") {
@@ -1515,10 +1530,11 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
     };
     stats.mysteryEvents.push(event);
   }
-  if (event.mysteryEncounterType !== (first.mysteryEncounterType ?? null)) {
+  const observedEncounterType = first.mysteryEncounterType ?? null;
+  if (stage !== "reward" && event.mysteryEncounterType !== observedEncounterType) {
     throw new Error(
       `[campaign-mystery] encounter type changed within wave ${first.address.wave}: `
-        + `${event.mysteryEncounterType} -> ${first.mysteryEncounterType ?? null}`,
+        + `${event.mysteryEncounterType} -> ${observedEncounterType}`,
     );
   }
   appendMysteryProof(rig, event, proof);
@@ -1841,8 +1857,39 @@ async function checkpointRewardPartyTarget(rig, cursors, owner) {
   return { authority, ownerEvent, peerEvents: [watcherEvent] };
 }
 
+/** Pick a party slot on which the visible reward can actually operate. */
+export function chooseRewardPartyTargetSlot(boundary, fallbackSlot = 0) {
+  const slots = Array.isArray(boundary?.authority?.partySlots) ? boundary.authority.partySlots : [];
+  const rewardId =
+    boundary?.peerEvents?.map(event => event?.observation).find(observation => observation?.surfaceId === "reward-shop")
+      ?.selectedOptionId ?? null;
+  const exactFallback = slots.find(slot => slot?.slot === fallbackSlot);
+  const first = predicate => slots.find(slot => Number.isSafeInteger(slot?.slot) && predicate(slot));
+  let target = null;
+  if (typeof rewardId === "string" && /REVIVE/u.test(rewardId)) {
+    target = first(slot => slot.fainted === true);
+  } else if (
+    typeof rewardId === "string"
+    && /POTION|RESTORE|HEAL|WATER|SODA|LEMONADE|MOOMOO_MILK|ENERGY_ROOT|BERRY/u.test(rewardId)
+  ) {
+    target = first(
+      slot =>
+        slot.fainted !== true && typeof slot.hp === "number" && typeof slot.maxHp === "number" && slot.hp < slot.maxHp,
+    );
+  }
+  target ??=
+    exactFallback != null && exactFallback.fainted !== true
+      ? exactFallback
+      : (first(slot => slot.fainted !== true && slot.allowedInBattle === true) ?? first(slot => slot.fainted !== true));
+  return {
+    slot: Number.isSafeInteger(target?.slot) ? target.slot : fallbackSlot,
+    rewardId,
+  };
+}
+
 async function driveRewardPartyTarget(rig, driver, owner, boundary) {
-  const targetSlot = driver.partySlot ?? 0;
+  const target = chooseRewardPartyTargetSlot(boundary, driver.partySlot ?? 0);
+  const targetSlot = target.slot;
   let event = boundary.ownerEvent;
   const selectedCursor = () => /^party-slot:(\d+)$/u.exec(event.observation.selectedOptionId ?? "");
   const match = selectedCursor();
@@ -1896,6 +1943,7 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
     address: boundary.authority.address,
     ownerSeat: owner.publicSeat,
     partySlot: targetSlot,
+    rewardId: target.rewardId,
     selectedOptionId: optionEvent.observation.selectedOptionId,
     optionIds: optionEvent.observation.optionIds,
   });
