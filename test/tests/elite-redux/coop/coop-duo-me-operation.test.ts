@@ -57,9 +57,11 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
+import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
   awaitRewardShopPhaseExit,
@@ -664,6 +666,9 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     // phase-manager path so the guest observes both still-retained public continuations (REWARD and
     // ME_TERMINAL) at wave+1/turn-1. Never notify the durability layer directly: this regression must fail
     // if a future real UI-to-relay call chain stops being wired.
+    const startedHostTailPhases = new WeakSet<Phase>();
+    let hostMapCommitted = false;
+    let guestMapCommitted = false;
     await withClient(rig.guestCtx, async () => {
       await driveClientPhaseQueueTo(rig.guestScene, "guest post-ME CommandPhase", {
         matches: phase =>
@@ -671,7 +676,34 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
           && rig.guestScene.currentBattle.waveIndex === ME_WAVE + 1
           && rig.guestScene.currentBattle.turn === 1,
         perPhaseTimeoutMs: 5_000,
-        pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+        drivePublicPhaseInput: phase => {
+          if (
+            phase.phaseName === "SelectBiomePhase"
+            && rig.guestScene.ui.getMode() === UiMode.ER_MAP
+            && !guestMapCommitted
+          ) {
+            guestMapCommitted = rig.guestScene.ui.processInput(Button.ACTION);
+            return guestMapCommitted;
+          }
+          return false;
+        },
+        pumpPeer: () =>
+          withClient(rig.hostCtx, async () => {
+            await drainLoopback();
+            const phase = rig.hostScene.phaseManager.getCurrentPhase();
+            if (phase != null && phase.phaseName !== "CommandPhase" && !startedHostTailPhases.has(phase)) {
+              startedHostTailPhases.add(phase);
+              phase.start();
+            }
+            if (
+              phase?.phaseName === "SelectBiomePhase"
+              && rig.hostScene.ui.getMode() === UiMode.ER_MAP
+              && !hostMapCommitted
+            ) {
+              hostMapCommitted = rig.hostScene.ui.processInput(Button.ACTION);
+            }
+            await drainLoopback();
+          }),
       });
     });
 

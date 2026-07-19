@@ -33,7 +33,9 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
+import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattleType } from "#enums/battle-type";
 import { Button } from "#enums/buttons";
@@ -65,6 +67,26 @@ const ME_WAVE = 12;
 
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+/** Unique committed Mystery terminal operations observed on the retained transport, in first-send order. */
+function committedMeTerminals(calls: readonly (readonly CoopMessage[])[]): {
+  id: string;
+  payload: CoopMeTerminalPayload;
+}[] {
+  const byId = new Map<string, { id: string; payload: CoopMeTerminalPayload }>();
+  for (const call of calls) {
+    const message = call[0];
+    if (message?.t !== "envelope") {
+      continue;
+    }
+    const operation = message.envelope.pendingOperation;
+    if (operation?.status !== "applied" || operation.kind !== "ME_TERMINAL") {
+      continue;
+    }
+    byId.set(operation.id, { id: operation.id, payload: operation.payload as CoopMeTerminalPayload });
+  }
+  return [...byId.values()];
 }
 
 describe.skipIf(!RUN)(
@@ -311,9 +333,22 @@ describe.skipIf(!RUN)(
 
       // ----- ASSERTIONS -----
       expect(guestReplay.settled, "guest CoopReplayMePhase settled (left the ME exactly once)").toBe(true);
-      expect(applyMeOutcomeSpy.mock.calls.length, "guest applied the host's comprehensive meResync exactly once").toBe(
-        1,
-      );
+      const terminals = committedMeTerminals(hostSend.mock.calls);
+      expect(
+        terminals.map(({ payload }) => [payload.terminal, payload.destination.kind]),
+        "host committed the ordered pre-reward and final Mystery destinations exactly once each",
+      ).toEqual([
+        ["reward-settled", "reward"],
+        ["leave", "continue"],
+      ]);
+      expect(
+        new Set(terminals.map(({ id }) => id)).size,
+        "the two terminal state images have distinct operation IDs",
+      ).toBe(2);
+      expect(
+        applyMeOutcomeSpy.mock.calls.length,
+        "guest applied the pre-reward settlement and final leave state exactly once each",
+      ).toBe(2);
 
       // CONVERGENCE: the guest's RNG seed + ME-save converged to the host's authoritative values via meResync.
       expect(rig.guestScene.seed, "guest RNG seed converged to the host's via meResync").toBe(hostSeed);

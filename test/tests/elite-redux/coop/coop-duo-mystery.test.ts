@@ -52,11 +52,11 @@ import { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
 import { GameManager } from "#test/framework/game-manager";
 import {
   awaitRewardShopPhaseExit,
-  beginRewardShopWatch,
   buildDuoForMe,
   drainGuestMeReplayNewRounds,
   drainGuestMeReplayToSettle,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestMeReplay,
   driveGuestMirrorQuiz,
   driveGuestRewardWatch,
@@ -789,6 +789,7 @@ describe.skipIf(!RUN)(
       let guestMePhase: Phase | undefined;
       let guestQuizQuestions = 0;
       let guestQuizAnswered = 0;
+      let guestQuizShop: ShopPhaseSeam | undefined;
 
       // A mirror-quiz handoff must be INTERLEAVED (the IT #2 split), NOT driven host-fully-first. On the
       // quiz's `mePresent subPrompt {kind:"quiz"}`, the guest's CoopReplayMePhase.start races the 8M outcome
@@ -826,60 +827,71 @@ describe.skipIf(!RUN)(
           () => game.isCurrentPhase("ErQuizPhase"),
         );
 
-        // Register the quiz drive prompts: per question, invoke the ER_QUIZ handler's stored answer callback
-        // with the fixed index (the DRIVE side relays it as a "quizAns"). The ErQuizUiHandler stores the
-        // phase's `(choice) => void this.onAnswer(choice)` as its private `onChoice` field when show() runs -
-        // the ShopPhaseSeam-style cast reaches it. The verdict message then AUTO-advances (the headless
-        // message handler completes its own prompt), so only the choice prompts are needed. Prompts fire FIFO
-        // via the prompt interval while phaseInterceptor.run(ErQuizPhase) waits for the async quiz to end.
-        for (let q = 0; q < QUIZ_QUESTIONS; q++) {
-          game.onNextPrompt(
-            "ErQuizPhase",
-            UiMode.ER_QUIZ,
-            () => {
-              const handler = game.scene.ui.getHandler() as unknown as { onChoice: ((i: number) => void) | null };
-              handler.onChoice?.(HOST_ANSWER);
-            },
-            () => game.isCurrentPhase("PostMysteryEncounterPhase"),
-          );
-        }
+        // Stop before the owner quiz starts, then run both clients together. The former host-fully-first
+        // fixture let a retained reward settlement retire historical presentation work before the manual
+        // guest scheduler ran—an ordering two continuously-running browsers do not create.
+        await game.phaseInterceptor.to("ErQuizPhase", false);
+        const hostQuiz = hostScene.phaseManager.getCurrentPhase() as unknown as ErQuizPhaseSeam;
+        hostQuiz.start();
 
-        // Pump through the quiz to the embedded post-quiz reward/heal shop (the encounter opens one on every
-        // path: a reward shop when >=1 glyph is decoded, else a heal shop). The quiz prompts fire during the
-        // ErQuizPhase run.
+        await withClient(rig.guestCtx, async () => {
+          guestMePhase = await startGuestMeReplay(rig.guestScene);
+          for (let i = 0; i < 16 && rig.guestScene.phaseManager.getCurrentPhase() === guestMePhase; i++) {
+            await drainLoopback();
+          }
+          if (rig.guestScene.phaseManager.getCurrentPhase() === guestMePhase) {
+            throw new Error("guest quiz handoff stayed parked on CoopReplayMePhase");
+          }
+          const quizPhase = (await driveClientPhaseQueueTo(rig.guestScene, "mirrored ErQuizPhase", {
+            matches: phase => phase.phaseName === "ErQuizPhase",
+            maxPhases: 16,
+          })) as unknown as ErQuizPhaseSeam;
+          guestQuizQuestions = quizPhase.questions.length;
+
+          const answeredHostQuestions = new Set<number>();
+          guestQuizAnswered = await driveGuestMirrorQuiz(rig.guestScene, quizPhase, QUIZ_QUESTIONS, {
+            pumpPeer: () =>
+              withClient(rig.hostCtx, async () => {
+                await drainLoopback();
+                if (
+                  hostScene.phaseManager.getCurrentPhase() === (hostQuiz as unknown as Phase)
+                  && hostScene.ui.getMode() === UiMode.ER_QUIZ
+                  && !answeredHostQuestions.has(hostQuiz.index)
+                ) {
+                  const handler = hostScene.ui.getHandler() as unknown as {
+                    onChoice: ((index: number) => void) | null;
+                  };
+                  answeredHostQuestions.add(hostQuiz.index);
+                  handler.onChoice?.(HOST_ANSWER);
+                } else if (hostScene.ui.getMode() === UiMode.MESSAGE) {
+                  const handler = hostScene.ui.getHandler() as unknown as {
+                    awaitingActionInput?: boolean;
+                    processInput?: (button: Button) => boolean;
+                  };
+                  if (handler.awaitingActionInput) {
+                    handler.processInput?.(Button.ACTION);
+                  }
+                }
+                await drainLoopback();
+              }),
+          });
+        });
+
+        // Both quiz phases are complete. Continue the owner's real queue to the post-quiz shop.
         await game.phaseInterceptor.to("SelectModifierPhase", false);
         const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
         expect(hostShop.phaseName, "host reached the embedded post-quiz reward shop").toBe("SelectModifierPhase");
         await driveHostRewardShopOwner(hostShop, {
           takeReward: false,
-          // A real client cannot leave this reciprocal shop before the watcher arrives. Start the guest's
-          // already-buffered ME replay here, consume the mirrored quiz, and let its production tail reach
-          // the same shop boundary before the host commits LEAVE.
+          // The follower already completed its mirror quiz; now enter the retained reciprocal reward tail.
           partnerReady: async () => {
-            await withClient(rig.guestCtx, async () => {
-              guestMePhase = await startGuestMeReplay(rig.guestScene);
-              let quizPhase: ErQuizPhaseSeam | undefined;
-              for (let i = 0; i < 16; i++) {
-                await drainLoopback();
-                const current = rig.guestScene.phaseManager.getCurrentPhase();
-                if (current?.phaseName === "ErQuizPhase") {
-                  quizPhase = current as unknown as ErQuizPhaseSeam;
-                  break;
-                }
-              }
-              if (quizPhase == null) {
-                throw new Error("guest did not reach its mirrored quiz before the reciprocal reward shop");
-              }
-              guestQuizQuestions = quizPhase.questions.length;
-              guestQuizAnswered = await driveGuestMirrorQuiz(rig.guestScene, quizPhase, QUIZ_QUESTIONS);
-            });
+            guestQuizShop = await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
           },
           partnerSettle: async () => {
-            await withClient(rig.guestCtx, async () => {
-              for (let i = 0; i < 16; i++) {
-                await drainLoopback();
-              }
-            });
+            if (guestQuizShop == null) {
+              throw new Error("guest quiz reward continuation never opened its reciprocal shop");
+            }
+            await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestQuizShop!, { alreadyStarted: true }));
           },
         });
         // MAJOR-3: the embedded ME shop suppresses its own advance mid-ME - still counter 0.
@@ -1117,8 +1129,19 @@ describe.skipIf(!RUN)(
         try {
           // Round 0: pick DIVE (starts the press-your-luck loop -> re-fires round 1).
           await pickHostMeOption(game, hostScene, DIVE_OPTION_CURSOR);
+          await withClient(rig.guestCtx, async () => {
+            replay = await startGuestMeReplay(rig.guestScene);
+            newRounds = await drainGuestMeReplayNewRounds(replay, 1);
+          });
+          expect(newRounds, "guest rendered repeated delve round 1 while the owner waited").toBe(1);
+
           // Round 1: pick PUSH -> survives (randSeedInt mocked to max) -> re-fires round 2.
           await pickHostMeOption(game, hostScene, PUSH_CURSOR);
+          await withClient(rig.guestCtx, async () => {
+            newRounds = await drainGuestMeReplayNewRounds(replay, EXPECTED_NEW_ROUNDS);
+          });
+          expect(newRounds, "guest rendered repeated delve round 2 while the owner waited").toBe(EXPECTED_NEW_ROUNDS);
+
           // Round 2: pick BANK -> ends the delve (sets rewards + leaves) -> embedded reward shop.
           await pickHostMeOption(game, hostScene, BANK_CURSOR);
           // Drive the embedded end-of-ME reward shop (owner leave). MAJOR-3: it suppresses its own advance
@@ -1129,25 +1152,10 @@ describe.skipIf(!RUN)(
           await driveHostRewardShopOwner(hostShop, {
             takeReward: false,
             // Materialize every buffered delve round on the watcher before the owner leaves the
-            // reciprocal shop. This preserves the terminal-empty ordering while matching two browsers:
-            // both are physically present at the shop boundary at the same time.
+            // reciprocal shop. The rounds were already rendered in lockstep above; now both browsers
+            // are physically present at the retained reward boundary at the same time.
             partnerReady: async () => {
-              await withClient(rig.guestCtx, async () => {
-                replay = await startGuestMeReplay(rig.guestScene);
-                newRounds = await drainGuestMeReplayNewRounds(replay, EXPECTED_NEW_ROUNDS);
-                const rewardWrapper = rig.guestScene.phaseManager.getCurrentPhase();
-                expect(
-                  rewardWrapper?.phaseName,
-                  "the repeated-round replay handed off to its declared reward wrapper",
-                ).toBe("MysteryEncounterRewardsPhase");
-                rewardWrapper!.start();
-                const current = rig.guestScene.phaseManager.getCurrentPhase();
-                expect(current?.phaseName, "the reward wrapper queued the real embedded watcher").toBe(
-                  "SelectModifierPhase",
-                );
-                guestShop = current as unknown as ShopPhaseSeam;
-                await beginRewardShopWatch(guestShop);
-              });
+              guestShop = await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
             },
             partnerSettle: async () => {
               await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));

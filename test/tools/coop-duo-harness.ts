@@ -3779,11 +3779,15 @@ export async function startGuestMeShopOwner(guestScene: BattleScene): Promise<Sh
   }
   for (let i = 0; i < 16; i++) {
     await drainLoopback();
-    if (Array.isArray(shop.typeOptions) && shop.typeOptions.length > 0) {
+    // An empty authoritative pool is a complete, playable shop: Hot Spring's "Move on" path
+    // deliberately opens a healing shop with zero choices and only LEAVE. The production phase
+    // opens MODIFIER_SELECT only after authoritative adoption, so that public surface—not a
+    // non-empty-array assumption—is the readiness proof.
+    if (Array.isArray(shop.typeOptions) && guestScene.ui.getMode() === UiMode.MODIFIER_SELECT) {
       return shop;
     }
   }
-  if (!Array.isArray(shop.typeOptions) || shop.typeOptions.length === 0) {
+  if (!Array.isArray(shop.typeOptions) || guestScene.ui.getMode() !== UiMode.MODIFIER_SELECT) {
     throw new Error("guest ME shop handoff FAILED: production SelectModifierPhase never adopted reward options");
   }
   return shop;
@@ -3856,9 +3860,14 @@ export async function driveGuestMirrorQuiz(
   guestScene: BattleScene,
   quizPhase: ErQuizPhaseSeam,
   total: number,
+  options: {
+    /** Pump the owner browser while the follower waits for each relayed answer. */
+    pumpPeer?: () => Promise<void>;
+  } = {},
 ): Promise<number> {
   quizPhase.start();
   for (let i = 0; i < 600; i++) {
+    await options.pumpPeer?.();
     await drainLoopback();
     advanceGuestVerdict(guestScene);
     if (quizPhase.answered >= total) {
@@ -3873,6 +3882,7 @@ export async function driveGuestMirrorQuiz(
   // Advance the FINAL verdict so finish() runs (onComplete + end) - not load-bearing for the tally, but
   // leaves the mirror phase cleanly ended rather than parked on its last message.
   for (let i = 0; i < 8; i++) {
+    await options.pumpPeer?.();
     await drainLoopback();
     advanceGuestVerdict(guestScene);
   }
