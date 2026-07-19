@@ -103,6 +103,14 @@ import { isDevToolsEnabled } from "#app/dev-tools/registry";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
+import {
+  hasErCustomTrainerBeenUsed,
+  hasErCustomTrainerWindowBeenUsed,
+  markErCustomTrainerUsed,
+  markErCustomTrainerWindowUsed,
+  resetErCustomTrainerTracking,
+  resetErCustomTrainerWindowTracking,
+} from "#data/elite-redux/er-custom-trainer-run-state";
 import { getErCustomTrainerSprite } from "#data/elite-redux/er-custom-trainer-sprites";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
@@ -532,7 +540,7 @@ let activeSpawnConfig: ErCustomTrainerSpawnConfig = normalizeErCustomTrainerSpaw
 export function setErCustomTrainersForTesting(trainers?: ErCustomTrainers): void {
   activeTrainers = trainers ?? (customTrainersJson as ErCustomTrainers);
   resolvedCache = null;
-  USED_CUSTOM_TRAINER_WINDOWS.clear();
+  resetErCustomTrainerWindowTracking();
 }
 
 /** The active (normalized) global spawn-density config. */
@@ -543,7 +551,7 @@ export function getErCustomTrainerSpawnConfig(): ErCustomTrainerSpawnConfig {
 /** Test hook: replace (or with `undefined` restore) the active spawn-density config. */
 export function setErCustomTrainerSpawnConfigForTesting(config?: Partial<ErCustomTrainerSpawnConfig>): void {
   activeSpawnConfig = normalizeErCustomTrainerSpawnConfig(config ?? customTrainersConfigJson);
-  USED_CUSTOM_TRAINER_WINDOWS.clear();
+  resetErCustomTrainerWindowTracking();
 }
 
 /** Move enum NAME -> pokerogue MoveId, vanilla + ER customs (mirror of er-trainer-tuning.ts). */
@@ -945,28 +953,9 @@ export function getErCustomTrainers(): readonly ErCustomTrainerResolved[] {
 // window, no repeats per run. Both the used-key set and the used-window set are
 // run-scoped (cleared at run start via resetErCustomTrainerTracking); everything
 // derives from the run seed so a save reload — and a future co-op adoption —
-// land identically (NO Math.random).
+// land identically (NO Math.random). The two sets live in the dependency-free
+// er-custom-trainer-run-state module so session save/load can persist them.
 // -----------------------------------------------------------------------------
-const USED_CUSTOM_TRAINER_KEYS = new Set<string>();
-
-/** Windows (0-based indices) that have already fielded a custom trainer this run. */
-const USED_CUSTOM_TRAINER_WINDOWS = new Set<number>();
-
-/** Reset per-run custom-trainer state (used keys + used windows); call at run start. */
-export function resetErCustomTrainerTracking(): void {
-  USED_CUSTOM_TRAINER_KEYS.clear();
-  USED_CUSTOM_TRAINER_WINDOWS.clear();
-}
-
-/** Mark a custom trainer as fielded this run (no repeats). */
-export function markErCustomTrainerUsed(key: string): void {
-  USED_CUSTOM_TRAINER_KEYS.add(key);
-}
-
-/** Mark a spawn window (0-based index) as having fielded its one custom trainer. */
-export function markErCustomTrainerWindowUsed(windowIndex: number): void {
-  USED_CUSTOM_TRAINER_WINDOWS.add(windowIndex);
-}
 
 /** Deterministic FNV-1a hash of a seed string (mirrors runtime-hook selection seeding). */
 function hashSeed(seed: string): number {
@@ -1309,7 +1298,7 @@ function isErCustomTrainerEligible(
   difficulty: string,
   ignoreChallenge = false,
 ): boolean {
-  if (USED_CUSTOM_TRAINER_KEYS.has(trainer.key)) {
+  if (hasErCustomTrainerBeenUsed(trainer.key)) {
     return false;
   }
   if (!trainer.difficulties.includes(difficulty)) {
@@ -1423,7 +1412,7 @@ export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainer
   const config = getErCustomTrainerSpawnConfig();
   const windowIndex = erCustomTrainerWindowIndex(waveIndex, config.windowSize);
   // At most one custom trainer per window.
-  if (USED_CUSTOM_TRAINER_WINDOWS.has(windowIndex)) {
+  if (hasErCustomTrainerWindowBeenUsed(windowIndex)) {
     return null;
   }
   // Global-density roll: does this window field a custom trainer at all?
@@ -1457,6 +1446,7 @@ export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainer
 // runtime hook can read it without an import cycle; re-exported here so callers
 // have a single custom-trainer entry point.
 export { isErCustomTrainerBstBypassActive, setErCustomTrainerBstBypass } from "#data/elite-redux/er-custom-trainer-bst-flag";
+export { markErCustomTrainerUsed, resetErCustomTrainerTracking };
 
 // -----------------------------------------------------------------------------
 // Enemy construction (the exact-party guarantee).
