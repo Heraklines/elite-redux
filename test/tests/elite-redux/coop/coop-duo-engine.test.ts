@@ -24,7 +24,7 @@ import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -40,6 +40,7 @@ import {
   installDuoLogCapture,
   installHeadlessPlayerAtlasCompletionModel,
   mirrorHostBattleToGuest,
+  shiftQueuedGuestBootTail,
   withClient,
 } from "#test/tools/coop-duo-harness";
 import { installHeadlessCoopSemanticProjectionOracle } from "#test/tools/coop-semantic-presentation";
@@ -47,6 +48,7 @@ import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+const V2_TURN_CUTOVER = process.env.COOP_AUTHORITY_V2_TURN === "on";
 
 describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibility spike)", () => {
   let phaserGame: Phaser.Game;
@@ -85,6 +87,40 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
 
   afterAll(() => {
     // best-effort
+  });
+
+  it("headless boot-tail bridge skips only recognized synthetic boot prefixes", () => {
+    const makeScene = (currentName: string, queuedNames: string[]) => {
+      let current = { phaseName: currentName };
+      const queued = [...queuedNames];
+      const scene = {
+        phaseManager: {
+          getCurrentPhase: () => current,
+          getQueuedPhaseNames: () => [...queued],
+          shiftPhase: () => {
+            const next = queued.shift();
+            if (next != null) {
+              current = { phaseName: next };
+            }
+          },
+        },
+      } as unknown as BattleScene;
+      return { scene, currentName: () => current.phaseName };
+    };
+
+    const delayedBoot = makeScene("SelectGenderPhase", ["TitlePhase", "CoopFinalizeTurnPhase"]);
+    expect(shiftQueuedGuestBootTail(delayedBoot.scene)).toBe(true);
+    expect(delayedBoot.currentName()).toBe("TitlePhase");
+    expect(shiftQueuedGuestBootTail(delayedBoot.scene)).toBe(true);
+    expect(delayedBoot.currentName()).toBe("CoopFinalizeTurnPhase");
+    expect(shiftQueuedGuestBootTail(delayedBoot.scene), "the authoritative tail is never skipped").toBe(false);
+
+    const gameplayAhead = makeScene("TitlePhase", ["SelectModifierPhase", "CoopFinalizeTurnPhase"]);
+    expect(
+      shiftQueuedGuestBootTail(gameplayAhead.scene),
+      "an intervening gameplay/UI phase keeps the bridge fail-closed",
+    ).toBe(false);
+    expect(gameplayAhead.currentName()).toBe("TitlePhase");
   });
 
   it("HOST smoke: a real authoritative-host co-op double EMITs a turnResolution over the loopback", async () => {
@@ -220,12 +256,13 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
       targets: [BattlerIndex.ENEMY_2],
     }));
 
-    // Track the guest applying the host's checkpoint (the load-bearing render proof).
+    // Track the exact carrier the guest received. Legacy applies the numeric checkpoint directly; Authority
+    // V2 intentionally bypasses that function and proves the immutable carrier reached its material boundary.
     const applyCheckpointSpy = vi.spyOn(coopEngine, "applyCoopCheckpoint");
-    let guestRecvTurnResolution = false;
+    let guestTurnResolution: Extract<CoopMessage, { t: "turnResolution" }> | null = null;
     pair.guest.onMessage(msg => {
       if (msg.t === "turnResolution") {
-        guestRecvTurnResolution = true;
+        guestTurnResolution = msg;
       }
     });
 
@@ -238,7 +275,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     await drainLoopback();
 
     // The host EMITted + the guest RECVd the turnResolution over the loopback.
-    expect(guestRecvTurnResolution, "the guest received the host's turnResolution").toBe(true);
+    expect(guestTurnResolution, "the guest received the host's turnResolution").not.toBeNull();
 
     // The spike predates buildDuo's sequential-boundary bridge. Finish the real host BattleEnd seam and its
     // retained automatic-victory seal now so the COMPLETE post-victory WAVE_ADVANCE transaction exists
@@ -263,8 +300,20 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
       }
     });
 
-    // The guest RESOLVEd + applied the host's checkpoint (rendered the host's outcome).
-    expect(applyCheckpointSpy, "the guest applied the host's streamed checkpoint").toHaveBeenCalled();
+    // The guest RESOLVEd + applied the host's authoritative material (rendered the host's outcome). The
+    // assertion follows the negotiated implementation instead of demanding an obsolete legacy helper call.
+    if (V2_TURN_CUTOVER) {
+      const resolution = guestTurnResolution;
+      if (resolution == null) {
+        throw new Error("the guest lost the received Authority V2 turn carrier");
+      }
+      expect(
+        guestRuntime.battleStream.hasFinalizedAuthoritativeV2Turn(resolution),
+        "the exact V2 carrier completed the guest's live material/finalize boundary",
+      ).toBe(true);
+    } else {
+      expect(applyCheckpointSpy, "the guest applied the host's streamed legacy checkpoint").toHaveBeenCalled();
+    }
     // The guest engine's enemies converged to the host's KO'd state (the frail Magikarps fainted) -
     // the guest computed nothing, it rendered the host's authoritative outcome.
     const guestEnemiesFainted = guestScene.currentBattle.enemyParty.every(e => e.isFainted());

@@ -1564,15 +1564,29 @@ export async function drainLoopback(): Promise<void> {
   }
 }
 
+const DIRECT_GUEST_BOOT_PHASES = new Set(["LoginPhase", "SelectGenderPhase", "TitlePhase"]);
+
 /**
- * Reproduce the one scheduler edge omitted by the directly-constructed guest scene. Its boot TitlePhase is
- * deliberately inert, while production Phaser automatically shifts an engine-owned retained wave tail that
- * arrives behind it. No other queue shape is admitted here.
+ * Reproduce the one scheduler edge omitted by the directly-constructed guest scene. Its synthetic boot
+ * phases are deliberately inert, while production has already completed login/title/gender selection before
+ * a paired battle can receive an engine-owned retained wave tail.
+ *
+ * A slow headless scene can retain more than one boot phase (observed:
+ * SelectGenderPhase -> TitlePhase -> CoopFinalizeTurnPhase). Advance exactly one recognized boot phase per
+ * call only when every phase ahead of the first authoritative tail is also a recognized boot phase. Any
+ * gameplay/UI phase, or a queue without an authoritative tail, still fails closed in the normal driver.
  */
 export function shiftQueuedGuestBootTail(scene: BattleScene): boolean {
   const phase = scene.phaseManager.getCurrentPhase();
   const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
-  if (phase?.phaseName !== "TitlePhase" || (queued[0] !== "CoopFinalizeTurnPhase" && queued[0] !== "VictoryPhase")) {
+  if (phase == null || !DIRECT_GUEST_BOOT_PHASES.has(phase.phaseName)) {
+    return false;
+  }
+  const firstNonBootIndex = queued.findIndex(name => !DIRECT_GUEST_BOOT_PHASES.has(name));
+  if (
+    firstNonBootIndex < 0
+    || (queued[firstNonBootIndex] !== "CoopFinalizeTurnPhase" && queued[firstNonBootIndex] !== "VictoryPhase")
+  ) {
     return false;
   }
   scene.phaseManager.shiftPhase();
@@ -2604,15 +2618,10 @@ export async function reachQueuedRewardShop(
     drivePublicPhaseInput?: (phase: Phase) => boolean | Promise<boolean>;
   } = {},
 ): Promise<ShopPhaseSeam> {
-  const current = scene.phaseManager.getCurrentPhase();
-  const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
-
   // Detached replay fixtures can finish with the real post-battle boundary wake / Victory tail queued
-  // behind the scene's inert boot TitlePhase. Production reaches the same queued phase by ending the
-  // replay/current engine phase. Admit only those exact production-owned shapes, then continue through
-  // the real phase manager; do not clear the queue or construct/apply a reward surface out of order.
-  if (current?.phaseName === "TitlePhase" && (queued[0] === "CoopFinalizeTurnPhase" || queued[0] === "VictoryPhase")) {
-    scene.phaseManager.shiftPhase();
+  // behind one or more inert guest boot phases. Cross only the shared, fail-closed boot-tail seam; do not
+  // clear the queue or construct/apply a reward surface out of order.
+  if (shiftQueuedGuestBootTail(scene)) {
     await drainLoopback();
   }
 
