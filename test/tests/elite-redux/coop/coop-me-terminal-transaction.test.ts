@@ -6,11 +6,13 @@
 
 import {
   CoopMeTerminalTransactionReceiver,
+  captureCoopMeCommittedTerminalCursor,
   commitMeOwnerIntent,
   coopMeTerminalSanctionedTails,
   isCompleteCoopMeTerminalPayload,
   nextCoopMePresentationStep,
   receiveCoopMeTerminalTransaction,
+  releaseCoopMeRetainedTerminal,
   resetCoopMeOperationFlag,
   resetCoopMeOperationState,
   setCoopMeOperationEnabled,
@@ -164,6 +166,60 @@ function eggReward(overrides: Record<string, unknown> = {}): CoopMeRewardSurface
 }
 
 describe("complete retained Mystery terminal transaction", () => {
+  it("keeps an explicit monotonic host terminal cursor and releases the whole pinned lifecycle", () => {
+    const runtime = createCoopRuntimeOpState("host");
+    const pinned = 7;
+
+    setCoopMeOperationEnabled(true);
+    setActiveCoopRuntimeOpState(runtime);
+    setCoopMePresentationAuthorityStateHooksForTest({
+      capture: turn => ({ ...authoritativeState(12), turn }),
+    });
+    try {
+      const settlementId = commitMeOwnerIntent({
+        kind: "ME_TERMINAL",
+        seq: COOP_ME_TERM_SEQ_BASE + pinned,
+        pinned,
+        step: 0,
+        payload: rewardSettledPayload(12),
+        localRole: "host",
+        wave: 12,
+        turn: 3,
+      });
+      expect(settlementId).not.toBeNull();
+      expect(captureCoopMeCommittedTerminalCursor(pinned)).toEqual({
+        operationId: settlementId,
+        terminal: "reward-settled",
+        step: 0,
+      });
+
+      const leaveId = commitMeOwnerIntent({
+        kind: "ME_TERMINAL",
+        seq: COOP_ME_TERM_SEQ_BASE + pinned,
+        pinned,
+        step: 1,
+        payload: leavePayload(12),
+        localRole: "host",
+        wave: 12,
+        turn: 3,
+      });
+      expect(leaveId).not.toBeNull();
+      expect(captureCoopMeCommittedTerminalCursor(pinned)).toEqual({
+        operationId: leaveId,
+        terminal: "leave",
+        step: 1,
+      });
+
+      releaseCoopMeRetainedTerminal(leaveId);
+      expect(captureCoopMeCommittedTerminalCursor(pinned)).toBeUndefined();
+    } finally {
+      resetCoopMeOperationState();
+      setActiveCoopRuntimeOpState(null);
+      setCoopMePresentationAuthorityStateHooksForTest(null);
+      resetCoopMeOperationFlag();
+    }
+  });
+
   it("keeps host presentation ordinals and commit logs isolated per runtime", () => {
     const runtimeA = createCoopRuntimeOpState("host");
     const runtimeB = createCoopRuntimeOpState("guest");

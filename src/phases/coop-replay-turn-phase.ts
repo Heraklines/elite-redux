@@ -20,7 +20,7 @@ import {
 } from "#data/elite-redux/coop/coop-battle-engine";
 import type { CoopAuthorityFailure, CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
+import { beginCoopAuthoritativeProjectionSettlement } from "#data/elite-redux/coop/coop-presentation";
 import {
   coopHasPendingWaveAdvance,
   coopLocalOwnedPlayerFieldSlot,
@@ -761,10 +761,15 @@ export class CoopReplayTurnPhase extends Phase {
       } else {
         cancelDeadline = scheduledCancel;
       }
-      void settleCoopAuthoritativeProjection(envelope.authoritativeState).then(
-        ready => finish(ready),
-        () => finish(false),
-      );
+      const presentation = beginCoopAuthoritativeProjectionSettlement(envelope.authoritativeState);
+      if (presentation.kind === "immediate") {
+        finish(presentation.ready);
+      } else {
+        void presentation.ready.then(
+          ready => finish(ready),
+          () => finish(false),
+        );
+      }
     });
   }
 

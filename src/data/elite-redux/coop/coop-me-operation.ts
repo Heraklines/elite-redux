@@ -504,6 +504,7 @@ interface MeOpState {
   readonly authoritySubPickSteps: Map<number, number>;
   readonly authorityPickSteps: Map<number, number>;
   readonly retainedTerminalPayloads: Map<string, CoopMeTerminalPayload>;
+  readonly committedTerminalByPinned: Map<number, CoopMeCommittedTerminalCursor>;
   lastAppliedPinned: number;
   readonly pendingOwnerIntentRetries: Map<string, ReturnType<typeof setTimeout>>;
   readonly terminalTransactions: CoopMeTerminalTransactionReceiver;
@@ -520,6 +521,7 @@ registerCoopOpSurfaceState(
     authoritySubPickSteps: new Map<number, number>(),
     authorityPickSteps: new Map<number, number>(),
     retainedTerminalPayloads: new Map<string, CoopMeTerminalPayload>(),
+    committedTerminalByPinned: new Map<number, CoopMeCommittedTerminalCursor>(),
     lastAppliedPinned: -1,
     pendingOwnerIntentRetries: new Map<string, ReturnType<typeof setTimeout>>(),
     terminalTransactions: new CoopMeTerminalTransactionReceiver(),
@@ -593,11 +595,62 @@ export function settleCoopMeOwnerIntentRetries(): void {
   pendingOwnerIntentRetries.clear();
 }
 
-/** Release the host's first-capture terminal image only after its local close/advance transaction succeeds. */
-export function releaseCoopMeRetainedTerminal(operationId: string | null): void {
-  if (operationId != null) {
-    state().retainedTerminalPayloads.delete(operationId);
+export interface CoopMeCommittedTerminalCursor {
+  readonly operationId: string;
+  readonly terminal: CoopMeTerminalKind;
+  readonly step: number;
+}
+
+/**
+ * Return the host journal's latest committed terminal for one pinned encounter. Unlike the presentation
+ * control snapshot, this state belongs to the explicit runtime operation log and therefore survives a
+ * renderer/context hand-off without depending on an ambient module-global control pointer.
+ */
+export function captureCoopMeCommittedTerminalCursor(pinned: number): CoopMeCommittedTerminalCursor | undefined {
+  const cursor = state().committedTerminalByPinned.get(pinned);
+  return cursor == null ? undefined : { ...cursor };
+}
+
+function terminalPinnedFromOperationId(operationId: string): number | null {
+  const parsed = parseCoopOperationId(operationId);
+  if (parsed?.kind !== "ME_TERMINAL" || parsed.owner !== 0) {
+    return null;
   }
+  const seq = Math.floor(parsed.pinnedSeq / 8000);
+  const remainder = parsed.pinnedSeq - seq * 8000;
+  const step = remainder - ME_KIND_TAG.ME_TERMINAL * 1000;
+  const pinned = seq - COOP_ME_TERM_SEQ_BASE;
+  return Number.isSafeInteger(pinned)
+    && pinned >= 0
+    && Number.isSafeInteger(step)
+    && step >= 0
+    && step < 1_000
+    && meOpAddr("ME_TERMINAL", seq, step) === parsed.pinnedSeq
+    ? pinned
+    : null;
+}
+
+/**
+ * Release every first-capture image for the completed pinned terminal lifecycle. A lifecycle can contain
+ * both `reward-settled`/`battle-settled` and its later `leave`; retaining only the last id used to leak the
+ * earlier immutable image until session teardown.
+ */
+export function releaseCoopMeRetainedTerminal(operationId: string | null): void {
+  if (operationId == null) {
+    return;
+  }
+  const pinned = terminalPinnedFromOperationId(operationId);
+  const s = state();
+  if (pinned == null) {
+    s.retainedTerminalPayloads.delete(operationId);
+    return;
+  }
+  for (const retainedId of s.retainedTerminalPayloads.keys()) {
+    if (terminalPinnedFromOperationId(retainedId) === pinned) {
+      s.retainedTerminalPayloads.delete(retainedId);
+    }
+  }
+  s.committedTerminalByPinned.delete(pinned);
 }
 
 function armOwnerIntentRetry(operationId: string, resend: () => void): void {
@@ -684,6 +737,7 @@ export function resetCoopMeOperationState(): void {
   s.authoritySubPickSteps.clear();
   s.authorityPickSteps.clear();
   s.retainedTerminalPayloads.clear();
+  s.committedTerminalByPinned.clear();
   s.lastAppliedPinned = -1;
   s.revisionFloor = 0;
   s.terminalTransactions.reset();
@@ -989,6 +1043,21 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
         if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
           coopWarn("me", `ME op OWNER ${res.kind} could not be retained id=${intent.id}`);
           return null;
+        }
+        if (params.kind === "ME_TERMINAL") {
+          const terminalPayload = payload as CoopMeTerminalPayload;
+          const priorTerminal = s.committedTerminalByPinned.get(params.pinned);
+          if (
+            priorTerminal == null
+            || step > priorTerminal.step
+            || (step === priorTerminal.step && priorTerminal.operationId === intent.id)
+          ) {
+            s.committedTerminalByPinned.set(params.pinned, {
+              operationId: intent.id,
+              terminal: terminalPayload.terminal,
+              step,
+            });
+          }
         }
         if (params.kind === "ME_PRESENT") {
           s.ownerPresentationSteps.set(params.pinned, step + 1);

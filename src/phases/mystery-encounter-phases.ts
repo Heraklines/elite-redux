@@ -11,6 +11,7 @@ import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-p
 import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   CoopMeTerminalOutcomeLatch,
+  captureCoopMeCommittedTerminalCursor,
   commitMeAuthorityGuestIntent,
   commitMeAuthorityLocalPick,
   commitMeOwnerIntent,
@@ -206,12 +207,26 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
     return false;
   }
   coopLog("me", "coopEndMePump: close pump + advance alternation", { counter: coopMeInteractionStartValue() });
+  const pinned = coopMeInteractionStartValue();
   const activeControl = captureCoopActiveMysteryControl();
+  const committedTerminal =
+    controller.role === "host" && isCoopMeOperationEnabled() ? captureCoopMeCommittedTerminalCursor(pinned) : undefined;
   const handoff = coopMeHandoffBattleStarted();
-  const retainedSettlement =
+  const retainedControlSettlement =
     activeControl?.interactionCounter === coopMeInteractionStartValue()
     && (activeControl.terminal === "battle-settled" || activeControl.terminal === "reward-settled");
-  const terminalStep = retainedSettlement ? (activeControl.terminalStep ?? -1) + 1 : handoff ? -1 : 0;
+  const retainedJournalSettlement =
+    committedTerminal?.terminal === "battle-settled" || committedTerminal?.terminal === "reward-settled";
+  const terminalStep =
+    committedTerminal?.terminal === "leave"
+      ? committedTerminal.step
+      : retainedJournalSettlement
+        ? committedTerminal.step + 1
+        : retainedControlSettlement
+          ? (activeControl.terminalStep ?? -1) + 1
+          : handoff
+            ? -1
+            : 0;
   let terminalOperationId: string | null = null;
   if (controller.role === "host" && isCoopMeOperationEnabled()) {
     if (outcome == null) {

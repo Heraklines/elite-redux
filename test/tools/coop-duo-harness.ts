@@ -3685,10 +3685,20 @@ export async function drainGuestMeReplayNewRounds(replay: Phase, expected: numbe
  */
 export async function startGuestMeShopOwner(guestScene: BattleScene): Promise<ShopPhaseSeam> {
   let shop: ShopPhaseSeam | null = null;
+  let rewardWrapperStarted = false;
   let shopStarted = false;
   for (let i = 0; i < 16; i++) {
     await drainLoopback();
     const current = guestScene.phaseManager.getCurrentPhase();
+    if (!rewardWrapperStarted && current?.phaseName === "MysteryEncounterRewardsPhase") {
+      // A complete retained no-battle settlement now owns the wrapper as well as the concrete reward
+      // surfaces. Production's phase manager starts it automatically; the direct two-engine scene uses
+      // a manual manager, so cross that scheduler edge on the real queued wrapper before looking for the
+      // child SelectModifierPhase.
+      current.start();
+      rewardWrapperStarted = true;
+      continue;
+    }
     if (current?.phaseName === "SelectModifierPhase") {
       shop = current as unknown as ShopPhaseSeam;
       // The direct guest scene deliberately uses a manual phase manager. Production automatically starts

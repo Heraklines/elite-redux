@@ -164,27 +164,11 @@ function projectionNodesReady(pokemon: Pokemon): boolean {
  * when a required seat, atlas, sprite, or battle-info bar cannot be produced; callers then enter the
  * shared bounded terminal instead of ACKing a visually unusable continuation.
  */
-export async function settleCoopAuthoritativeProjection(state: CoopAuthoritativeBattleStateV1): Promise<boolean> {
-  const scene = globalScene;
-  const adapter = projectionAdapters.get(scene);
-  if (adapter != null) {
-    try {
-      const result = adapter(scene, state);
-      // The headless two-client oracle is deliberately synchronous: yielding here would let its
-      // process-global scene pointer move to the peer between observation and verdict, a scheduling
-      // artifact that cannot occur across real browser processes. Real asynchronous adapters retain
-      // the destination-owned post-await fence below.
-      if (typeof result === "boolean") {
-        return result && globalScene === scene;
-      }
-      const ready = await result;
-      // A verifier is destination-owned just like the real asset wait: a scene swap while it was pending
-      // invalidates the result instead of ACKing a continuation from another client context.
-      return ready === true && globalScene === scene;
-    } catch {
-      return false;
-    }
-  }
+export type CoopProjectionSettlement =
+  | { readonly kind: "immediate"; readonly ready: boolean }
+  | { readonly kind: "pending"; readonly ready: Promise<boolean> };
+
+async function settleProductionProjection(scene: BattleScene, state: CoopAuthoritativeBattleStateV1): Promise<boolean> {
   // Mechanical apply reflects host coordinates for a Showdown guest. Presentation must inspect the same
   // local orientation or it would look for each team in the opposite party and falsely terminal a valid turn.
   const localState = isShowdownGuestFlipGated() ? swapAuthoritativeState(state) : state;
@@ -225,4 +209,39 @@ export async function settleCoopAuthoritativeProjection(state: CoopAuthoritative
     && [...enemyIds].every(id => actualEnemyIds.has(id))
     && wanted.every(({ pokemon }) => projectionNodesReady(pokemon))
   );
+}
+
+/**
+ * Start projection settlement without forcing a microtask when a synchronous harness oracle is installed.
+ * Real browser projection remains asynchronous; this split only prevents a single-process two-client test
+ * from swapping its process-global scene between a synchronous observation and its verdict.
+ */
+export function beginCoopAuthoritativeProjectionSettlement(
+  state: CoopAuthoritativeBattleStateV1,
+): CoopProjectionSettlement {
+  const scene = globalScene;
+  const adapter = projectionAdapters.get(scene);
+  if (adapter != null) {
+    try {
+      const result = adapter(scene, state);
+      if (typeof result === "boolean") {
+        return { kind: "immediate", ready: result && globalScene === scene };
+      }
+      return {
+        kind: "pending",
+        ready: Promise.resolve(result).then(
+          ready => ready === true && globalScene === scene,
+          () => false,
+        ),
+      };
+    } catch {
+      return { kind: "immediate", ready: false };
+    }
+  }
+  return { kind: "pending", ready: settleProductionProjection(scene, state) };
+}
+
+export function settleCoopAuthoritativeProjection(state: CoopAuthoritativeBattleStateV1): Promise<boolean> {
+  const settlement = beginCoopAuthoritativeProjectionSettlement(state);
+  return settlement.kind === "immediate" ? Promise.resolve(settlement.ready) : settlement.ready;
 }
