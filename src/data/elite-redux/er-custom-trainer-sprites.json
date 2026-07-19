@@ -1,4 +1,17 @@
 {
+  "furisode_girl": {
+    "author": "Kyle Dove",
+    "genders": false,
+    "kind": "other",
+    "label": "Furisode Girl",
+    "license": "cc-by",
+    "sourceUrl": "https://eeveeexpo.com/resources/851/",
+    "spriteKey": "furisode_girl",
+    "tags": [
+      "kalos",
+      "fairy"
+    ]
+  },
   "model_1": {
     "author": "Kyle Dove",
     "genders": false,
