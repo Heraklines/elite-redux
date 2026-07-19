@@ -25,6 +25,10 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  COOP_CAP_AUTHORITY_V2_REPLACEMENT,
+  isCoopCapabilityNegotiated,
+} from "#data/elite-redux/coop/coop-capabilities";
 import { adoptCoopEnemiesStructural, buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { CoopInteractionRelay, setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -78,7 +82,6 @@ import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
-const V2_REPLACEMENT_CUTOVER = process.env.COOP_AUTHORITY_V2_REPLACEMENT === "on";
 
 function completeTurnCarrier(turn: number) {
   const carrier = coopEngine.captureCoopAuthoritativeCarrier(turn, "turnResolution");
@@ -756,6 +759,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   // complete post-summon carrier; the old operation-journal build parks on its peer-material barrier.
   it("PLAYER REPLACEMENT (#786): timeout uses exactly one negotiated replacement authority", async () => {
     const field = await startCoopGuest();
+    // This single-engine role-flip fixture negotiates against the engine-free CPU
+    // spoof, which truthfully does not advertise a V2 replica. Branch on the
+    // negotiated session capability, never the build flag.
+    const v2ReplacementCutover = isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_REPLACEMENT);
     // This is the HOST simulating the turn (the watcher of the guest-owned slot 1). Flip local role.
     setFixtureRole("host");
 
@@ -789,7 +796,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     }
     const materialBarrierSpy = vi.spyOn(durability, "waitForOperationMaterialApplied");
     const unshiftSpy = vi.spyOn(globalScene.phaseManager, "unshiftNew");
-    const v2CommittedBefore = V2_REPLACEMENT_CUTOVER ? (getCoopV2Shadow(runtime)?.diagnostics().committed ?? 0) : 0;
+    const v2CommittedBefore = v2ReplacementCutover ? (getCoopV2Shadow(runtime)?.diagnostics().committed ?? 0) : 0;
 
     // Drive the host's SwitchPhase for the guest-owned slot 1 (exactly what FaintPhase queues).
     // Tiny timeout so the no-pick fallback fires fast (the live default is 60s). The phase interceptor
@@ -809,7 +816,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       // boundaryStillLive fence intentionally rejects a detached phase object that is not current.
       game.scene.phaseManager.unshiftPhase(switchPhase);
       game.scene.phaseManager.shiftPhase();
-      if (V2_REPLACEMENT_CUTOVER) {
+      if (v2ReplacementCutover) {
         await game.phaseInterceptor.to("CoopPushReplacementCheckpointPhase");
       } else {
         // Legacy intentionally remains parked inside SwitchPhase until peer material arrives, so there is
@@ -824,7 +831,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // The host DID await the guest's pick first (#786) ...
     expect(awaitSpy, "the host awaits the guest's relayed replacement pick").toHaveBeenCalled();
     const switchSummon = unshiftSpy.mock.calls.find(([name]) => name === "SwitchSummonPhase");
-    if (V2_REPLACEMENT_CUTOVER) {
+    if (v2ReplacementCutover) {
       expect(
         materialBarrierSpy,
         "V2 never starts the retired operation-journal peer-material barrier",

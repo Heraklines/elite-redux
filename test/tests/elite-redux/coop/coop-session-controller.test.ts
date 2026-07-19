@@ -10,9 +10,13 @@
 // Pure logic over LoopbackTransport - no game engine.
 
 import {
+  COOP_CAP_AUTHORITY_V2_REPLACEMENT,
+  COOP_CAP_AUTHORITY_V2_SHADOW,
+  COOP_CAP_AUTHORITY_V2_TURN,
   COOP_CAP_DURABILITY_JOURNAL,
   COOP_CAP_OP_BIOME,
   clearNegotiatedCoopCapabilities,
+  isCoopCapabilityNegotiated,
 } from "#data/elite-redux/coop/coop-capabilities";
 import { computeErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { CoopSessionController, type CoopSessionSnapshot } from "#data/elite-redux/coop/coop-session-controller";
@@ -134,10 +138,11 @@ describe("co-op session controller (#633, P1)", () => {
       clearNegotiatedCoopCapabilities();
       const { host, guest } = createLoopbackPair();
       const required = [COOP_CAP_OP_BIOME, COOP_CAP_DURABILITY_JOURNAL];
+      const authorityV2 = [COOP_CAP_AUTHORITY_V2_SHADOW, COOP_CAP_AUTHORITY_V2_TURN, COOP_CAP_AUTHORITY_V2_REPLACEMENT];
       const controller = new CoopSessionController(host, {
         username: "Host",
         version: COOP_PROTOCOL_VERSION,
-        localCapabilities: required,
+        localCapabilities: [...required, ...authorityV2],
         requiredCapabilities: required,
         requireFunctionalFingerprint: true,
       });
@@ -153,6 +158,14 @@ describe("co-op session controller (#633, P1)", () => {
         expect(controller.compatibilityAccepted).toBe(true);
         expect(controller.sessionEpoch).toBeGreaterThan(0);
         expect(controller.runId).not.toBe("");
+        expect(
+          required.every(isCoopCapabilityNegotiated),
+          "the CPU keeps the operation capabilities it implements",
+        ).toBe(true);
+        expect(
+          authorityV2.some(isCoopCapabilityNegotiated),
+          "the engine-free CPU never claims to own an Authority V2 replica",
+        ).toBe(false);
       } finally {
         spoof.dispose();
         controller.dispose();

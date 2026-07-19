@@ -22,6 +22,11 @@
 // =============================================================================
 
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
+import {
+  COOP_CAP_AUTHORITY_V2_REPLACEMENT,
+  COOP_CAP_AUTHORITY_V2_SHADOW,
+  COOP_CAP_AUTHORITY_V2_TURN,
+} from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
@@ -49,8 +54,22 @@ const DEFAULT_SPOOF_ROSTER: CoopRosterEntry[] = [
 ];
 
 /**
+ * The engine-free CPU stand-in answers legacy command requests, but it does not
+ * own a replica engine/log. Advertising a live Authority V2 capability would
+ * make the host publish retained entries to a receiver that cannot admit,
+ * materialize, or receipt them.
+ */
+const UNSUPPORTED_SPOOF_CAPABILITIES = new Set<string>([
+  COOP_CAP_AUTHORITY_V2_SHADOW,
+  COOP_CAP_AUTHORITY_V2_TURN,
+  COOP_CAP_AUTHORITY_V2_REPLACEMENT,
+]);
+
+/**
  * Drives the guest endpoint of a loopback pair to imitate a second human. Bind it
  * to the `guest` transport from `createLoopbackPair()`; the local human's
+ * capability advertisement is mirrored only for protocols this stand-in
+ * implements.
  * {@linkcode CoopSessionController} sits on the `host` endpoint.
  */
 export class SpoofGuest {
@@ -164,6 +183,7 @@ export class SpoofGuest {
   }
 
   private replyHello(hostHello: Extract<CoopMessage, { t: "hello"; username: string }>): void {
+    const capabilities = hostHello.capabilities?.filter(capability => !UNSUPPORTED_SPOOF_CAPABILITIES.has(capability));
     this.transport.send({
       t: "hello",
       version: this.version ?? hostHello.version,
@@ -171,7 +191,7 @@ export class SpoofGuest {
       role: this.transport.role,
       epoch: hostHello.epoch,
       ...(hostHello.runId == null ? {} : { runId: hostHello.runId, checkpointRevision: hostHello.checkpointRevision }),
-      ...(hostHello.capabilities == null ? {} : { capabilities: [...hostHello.capabilities] }),
+      ...(capabilities == null ? {} : { capabilities }),
     });
   }
 

@@ -554,6 +554,34 @@ describe("authority-v2 shadow transport routing seam", () => {
     pairB.host.close();
   });
 
+  it("never routes an unowned concrete endpoint through another endpoint's global handler", async () => {
+    const clock = new FakeClock();
+    const pair = createLoopbackPair();
+    pair.host.onMessage(() => {});
+    pair.guest.onMessage(() => {});
+
+    const crossedEndpoint = vi.fn();
+    registerCoopV2ShadowInbound(crossedEndpoint);
+    const host = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: pair.host,
+      send: frame => pair.host.send(frame),
+      scheduler: createCoopScheduler(clock),
+    });
+
+    host.tapTurnCommit(turnTap("NO-RECEIVER/turn"));
+    for (let i = 0; i < 8; i++) {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
+
+    expect(crossedEndpoint, "the guest endpoint cannot borrow another endpoint's receiver").not.toHaveBeenCalled();
+    expect(host.diagnostics().retained, "no receiver means no forged receipt retires the entry").toBe(1);
+
+    host.dispose();
+    pair.host.close();
+  });
+
   it("isCoopV2ShadowActive reflects the active-harness registration", () => {
     const clock = new FakeClock();
     const harness = new CoopAuthorityV2Shadow({

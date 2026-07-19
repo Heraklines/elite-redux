@@ -22,7 +22,7 @@
 // outside this module; once the channel is open, this is all the game needs.
 // =============================================================================
 
-import { routeCoopV2InboundFrame } from "#data/elite-redux/coop/authority-v2/shadow";
+import { rejectCoopV2InboundFrameWithoutReceiver } from "#data/elite-redux/coop/authority-v2/shadow";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
   CoopOutboundQueue,
@@ -895,9 +895,10 @@ export class WebRtcTransport implements CoopTransport {
     // malformed v2 frame is classified, not smuggled downstream. A v2 frame is only ever emitted when
     // BOTH peers negotiated authority.v2shadow, so this path is dead when the capability is off.
     if (parsed != null && typeof parsed === "object" && (parsed as { v?: unknown }).v === 2) {
-      // Prefer THIS endpoint's per-instance handler; fall back to the module-level handler for compat.
+      // A concrete endpoint may only route into ITS instance receiver. Borrowing a
+      // realm-global handler can feed another same-process endpoint the frame.
       if (this.v2FrameHandler == null) {
-        routeCoopV2InboundFrame(parsed);
+        rejectCoopV2InboundFrameWithoutReceiver(parsed);
       } else {
         this.v2FrameHandler(parsed);
       }

@@ -391,6 +391,11 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
         expect(cur?.phaseName, "the guest OPENED its own CommandPhase for turn N+1 (not replay) - defect-1 fix").toBe(
           "CommandPhase",
         );
+        // Production's phase manager starts this newly-current CommandPhase before
+        // keyboard input. The intercepted test manager deliberately does not; run
+        // the real start chokepoint so Authority V2 observes the same installed
+        // guest-owned command control a browser proves before handleCommand.
+        (cur as unknown as { start: () => void }).start();
         const own = getShowdownOwnManifest();
         const opp = getShowdownOpponentManifest();
         if (own != null && opp != null) {

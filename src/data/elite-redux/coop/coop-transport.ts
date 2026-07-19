@@ -28,7 +28,7 @@ import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-code
 // as its wire string (duo-harness destination pumping) - so a held frame round-trips through decode+validate
 // on delivery exactly like the real WebRTC path, never an in-process object hand-off.
 import { encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
-import { routeCoopV2InboundFrame } from "#data/elite-redux/coop/authority-v2/shadow";
+import { rejectCoopV2InboundFrameWithoutReceiver } from "#data/elite-redux/coop/authority-v2/shadow";
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopFrozenAckQuorumV1, CoopMembershipSnapshotV1 } from "#data/elite-redux/coop/coop-membership";
@@ -2009,12 +2009,13 @@ export interface CoopTransport {
   /**
    * Co-op AUTHORITY V2 (optional, additive): register a PER-INSTANCE inbound handler for `v === 2` frames
    * on THIS transport endpoint. Returns an unsubscribe. When set, the receive path routes a v2 frame to this
-   * instance handler instead of the module-level {@linkcode routeCoopV2InboundFrame} fallback - which is what
+   * instance handler instead of rejecting an unowned endpoint delivery - which is what
    * makes the two-peers-in-ONE-process duo harness routable (a single module-level handler cannot
    * disambiguate two live harnesses; two transport endpoints each with their own handler can). The handler
    * receives the RAW decoded frame and is responsible for the boundary validation (the shadow harness routes
-   * it through the same validator the module-level path uses). Absent on a transport that has not adopted the
-   * seam -> the module-level fallback is used, so this stays additive-optional.
+   * it through the same validator the module-level path uses). A transport that has not adopted this optional
+   * seam may retain its own legacy routing; a concrete transport that implements it never borrows another
+   * endpoint's realm-global handler.
    */
   onV2Frame?(handler: (frame: unknown) => void): () => void;
   /**
@@ -2270,10 +2271,10 @@ class LoopbackTransport implements CoopTransport {
     return delivered;
   }
 
-  /** Route one inbound v2 value (wire string or decoded object) to this endpoint's handler, or the fallback. */
+  /** Route one inbound v2 value to this endpoint's handler, or reject the unowned endpoint delivery. */
   private routeV2Inbound(raw: unknown): void {
     if (this.v2FrameHandler == null) {
-      routeCoopV2InboundFrame(raw);
+      rejectCoopV2InboundFrameWithoutReceiver(raw);
     } else {
       this.v2FrameHandler(raw);
     }

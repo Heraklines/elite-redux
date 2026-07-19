@@ -1401,6 +1401,16 @@ export function routeCoopV2InboundFrame(raw: unknown): CoopV2InboundRouting {
 }
 
 /**
+ * Validate and reject a v2 frame delivered to a concrete transport endpoint
+ * that has no instance receiver. Concrete transports support `onV2Frame`, so
+ * falling back to another endpoint's realm-global handler would cross session
+ * ownership in same-process rigs (and can feed an authority its own entry).
+ */
+export function rejectCoopV2InboundFrameWithoutReceiver(raw: unknown): CoopV2InboundRouting {
+  return routeValidatedInboundFrame(raw, null);
+}
+
+/**
  * Route a raw inbound v2 frame to a SPECIFIC harness's inbound handler - the per-instance transport seam
  * (contract change request 2). Same validation + classification as {@linkcode routeCoopV2InboundFrame}, but
  * targeted at the passed handler instead of the module-level one, so two harnesses in one process each admit
