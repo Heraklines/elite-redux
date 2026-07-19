@@ -18612,6 +18612,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Starter Select: Black Shiny preview, Luck 5, and one-per-team cap",
+    description:
+      "STARTER-SELECT fix (UI state, not a battle behavior) - cycling an unlocked epic shiny into\n"
+      + "Black Shiny now refreshes the generated t4 sprite atlas, black shiny marker, displayed Luck 5,\n"
+      + "and an already-selected party entry together. A second Black Shiny is rejected in every\n"
+      + "starter-select mode; restored or merged launch data is capped again before materialization.\n"
+      + "DO: open starter select with two Black Shiny unlocks. Cycle the first red/epic shiny once.\n"
+      + "EXPECT: its large preview changes to the actual Black Shiny art and Luck reads 5. Add it, then\n"
+      + "try to add the second as Black Shiny. EXPECT: the second is refused with the one-per-team message.\n"
+      + "Headless reproduction: node scripts/run-ui-scenario.mjs --surface starter-black-shiny.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 20 });
+      return [
+        makeStarter(SpeciesId.BULBASAUR, {
+          moveset: [MoveId.TACKLE, MoveId.VINE_WHIP, MoveId.GROWL, MoveId.GROWTH],
+        }),
+      ];
+    },
+  },
   // ===========================================================================
   // FX - Partner Eevee (Omniform) per-type TRANSFORM burst
   // ===========================================================================

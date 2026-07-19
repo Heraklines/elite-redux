@@ -9,7 +9,11 @@ import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
 import { allMoves, modifierTypes } from "#data/data-lists";
-import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
+import {
+  applyErBlackShinyKit,
+  ER_BLACK_SHINY_LUCK,
+  enforceErBlackShinyStarterLimit,
+} from "#data/elite-redux/er-black-shinies";
 import { isErCustomTrainerDevForceArmed, setErCustomTrainerDevForce } from "#data/elite-redux/er-custom-trainers";
 import { PokemonMove } from "#moves/pokemon-move";
 import { installErCustomTrainerForCurrentWave } from "#phases/er-custom-trainer-install";
@@ -637,6 +641,11 @@ export class SelectStarterPhase extends Phase {
     showdownManifests?: ShowdownMonManifest[],
     startingLevels?: readonly number[],
   ) {
+    const cappedStarters = enforceErBlackShinyStarterLimit(starters);
+    if (cappedStarters.some((starter, index) => starter !== starters[index])) {
+      console.warn("[er-black-shiny] starter team contained multiple Black Shinies; later picks were demoted");
+      starters = cappedStarters;
+    }
     const party = globalScene.getPlayerParty();
     const loadPokemonAssets: Promise<void>[] = [];
     // Showdown 1v1 (staging fix 2026-07-07): the HOST's OWN party must be fielded from the
@@ -992,7 +1001,7 @@ function coopOwnerSnapshot(s: Starter): { coopPassiveAttr: number[]; coopLuck: n
   const rootId = species.getRootSpeciesId();
   const passiveAttr = globalScene.gameData.starterData[rootId]?.passiveAttr ?? 0;
   const caughtAttr = globalScene.gameData.dexData[species.speciesId]?.caughtAttr ?? 0;
-  const luck = globalScene.gameData.getDexAttrLuck(caughtAttr);
+  const luck = s.erBlackShiny ? ER_BLACK_SHINY_LUCK : globalScene.gameData.getDexAttrLuck(caughtAttr);
   return { coopPassiveAttr: [passiveAttr, passiveAttr, passiveAttr], coopLuck: luck };
 }
 
