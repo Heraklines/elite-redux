@@ -74,7 +74,7 @@ const AUTHORITY_ENTRY_KINDS: ReadonlySet<string> = new Set([
 ]);
 
 const NEXT_CONTROL_KINDS: ReadonlySet<string> = new Set([
-  "COMMAND",
+  "COMMAND_FRONTIER",
   "REPLACEMENT",
   "REWARD",
   "BIOME",
