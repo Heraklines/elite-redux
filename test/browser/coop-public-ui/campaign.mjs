@@ -621,6 +621,21 @@ export function createMysteryNarrationAdvancer(rig, from, stats, purpose) {
   const clients = Object.values(rig.clients);
   const cursors = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
   const consumedInstances = new Set();
+  // Keep this aligned with Ui.coopMeInteractivePhase(): these are the production phases whose
+  // MESSAGE handlers can participate in the owner/watcher ME input pump. Run 29672540141 selected
+  // a guest-owned option successfully, advanced its selected-option dialogue, and then left the
+  // authoritative host visibly parked in MysteryEncounterOptionSelectedPhase because the browser
+  // driver admitted only the opening MysteryEncounterPhase. A real player can and must advance
+  // that prompt too. The surface/operation/readiness/ownership fences below remain the authority;
+  // this set only names the phase classes in which that exact public prompt is valid.
+  const interactiveMysteryPhases = new Set([
+    "MysteryEncounterPhase",
+    "MysteryEncounterOptionSelectedPhase",
+    "MysteryEncounterRewardsPhase",
+    "PostMysteryEncounterPhase",
+    "ErQuizPhase",
+    "CoopReplayMePhase",
+  ]);
   return async () => {
     for (const client of clients) {
       const readyEvent = client.evidence.events.slice(cursors.get(client.label) ?? 0).find(event => {
@@ -651,7 +666,7 @@ export function createMysteryNarrationAdvancer(rig, from, stats, purpose) {
         return (
           observation.surfaceId === "mystery-encounter:message"
           && observation.operationClass === "encounter-prompt"
-          && (observation.phase === "MysteryEncounterPhase" || observation.phase === "CoopReplayMePhase")
+          && interactiveMysteryPhases.has(observation.phase)
           && observation.uiMode === "MESSAGE"
           && observation.ownerModel === "interaction"
           && observation.coop === true

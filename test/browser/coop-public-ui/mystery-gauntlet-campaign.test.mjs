@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
+import { createMysteryNarrationAdvancer } from "./campaign.mjs";
 import { chooseAffordableStarterPair, selectOptionById } from "./campaign-nav.mjs";
 import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
 import {
@@ -164,8 +165,9 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /export function createMysteryNarrationAdvancer\(rig, from, stats, purpose\)/u);
   assert.match(
     campaign,
-    /surfaceId === "mystery-encounter:message"[\s\S]*?operationClass === "encounter-prompt"[\s\S]*?phase === "MysteryEncounterPhase" \|\| observation\.phase === "CoopReplayMePhase"/u,
+    /surfaceId === "mystery-encounter:message"[\s\S]*?operationClass === "encounter-prompt"[\s\S]*?interactiveMysteryPhases\.has\(observation\.phase\)/u,
   );
+  assert.match(campaign, /"MysteryEncounterOptionSelectedPhase"/u);
   assert.match(campaign, /observation\.localSeat === observation\.ownerSeat/u);
   // Track R mystery-gauntlet wave-1 ME (#816): on a GUEST-owned ME the authoritative HOST advances its OWN
   // MysteryEncounterPhase engine MESSAGE dialogue itself (the guest renderer's CoopReplayMePhase Space never
@@ -205,6 +207,66 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /await driveMysteryPartyPicker\(rig, client, cursors, stats\)/u);
   // Both advancers use the shared party-picker guard (faint replacement OR ME party sub-prompt).
   assert.equal((campaign.match(/isPartyPickerSurfaceOpen\(latestSurface\?\.observation\)/gu) ?? []).length, 2);
+});
+
+test("the mystery narration driver advances the authoritative selected-option phase once", async () => {
+  const hostEvents = [
+    {
+      index: 0,
+      kind: "browser-surface2",
+      observation: {
+        surfaceId: "mystery-encounter:message",
+        operationClass: "encounter-prompt",
+        phase: "MysteryEncounterOptionSelectedPhase",
+        uiMode: "MESSAGE",
+        ownerModel: "interaction",
+        coop: true,
+        localSeat: 0,
+        ownerSeat: 1,
+        seatsWithInput: [1],
+        phaseInstance: 14,
+        ready: { handlerActive: true, awaitingActionInput: true },
+      },
+    },
+  ];
+  const guestEvents = [];
+  const makeClient = (label, events) => {
+    const presses = [];
+    return {
+      label,
+      presses,
+      evidence: {
+        events,
+        findLastSemanticSurface(fromCursor = 0) {
+          return events.filter(event => event.index >= fromCursor && event.kind === "browser-surface2").at(-1) ?? null;
+        },
+        record() {},
+      },
+      async press(key, purpose) {
+        presses.push({ key, purpose });
+      },
+    };
+  };
+  const host = makeClient("host-seat", hostEvents);
+  const guest = makeClient("guest-seat", guestEvents);
+  const rig = { host, guest, clients: { host, guest } };
+  const stats = {};
+  const advance = createMysteryNarrationAdvancer(
+    rig,
+    { "host-seat": 0, "guest-seat": 0 },
+    stats,
+    "wave-1-mystery-narration",
+  );
+
+  assert.equal(await advance(), true);
+  assert.deepEqual(host.presses, [
+    {
+      key: "Space",
+      purpose: "wave-1-mystery-narration-host-seat-mystery-narration-1",
+    },
+  ]);
+  assert.deepEqual(guest.presses, []);
+  assert.equal(await advance(), false, "one prompt generation must never be submitted twice");
 });
 
 test("the continuity profile visibly declines Bargain and co-op cannot persist a half-open phase", async () => {
