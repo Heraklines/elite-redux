@@ -52,6 +52,16 @@ Three tracks: **R** (stabilization — ACTIVE, this handoff), **S** (liveness, p
    REWARD/ME_TERMINAL strands in that test are HARNESS drive gaps — fix by driving the guest to its real
    post-ME `CommandPhase` (real `setMode` → `coopAuthoritySurfaceReady`), NEVER by calling
    `notifyOperationContinuationSurface` from the test. If the agent died, redo from that verdict.
+   A SECOND Oracle verdict (items 1-2, idle-fallback family) also surfaced: TEST-HARNESS DRIVE GAP, not
+   product. The idle-fallback guest reaches its next command via the CHECKPOINT route
+   (`coop-replay-turn-phase.ts:262-411`, own CommandPhase at :401) whose
+   materialApplied→presentationReady→continuationReady handshake needs BOTH engines pumped; the guest-only
+   `driveClientPhaseQueueTo` starves it (guest parks at rendererWait :247-250). Fix test-side in both tests:
+   use the harness `pumpPeer` seam (`driveClientPhaseQueueTo(..., { pumpPeer: () => withClient(hostCtx,
+   () => drainLoopback()) })`, seam at harness :1601/:1634) and DROP `materializeGuestInputAfterReplacement`
+   on the idle path (pick-path-only driver; throws on the parked replay). Confirm via guest log:
+   "guest apply OUT-OF-BAND checkpoint mid-park" (good) vs "guest discard OUT-OF-BAND checkpoint"
+   (address mismatch → separate genuine issue). Production unaffected (both browsers pump continuously).
    When it pushes: merge → sentinels (tsc delta 0, test:node) → push integration.
 
 ## 3. STATE OF THE BOARD (what is fixed, what is red)
