@@ -170,13 +170,10 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /"MysteryEncounterOptionSelectedPhase"/u);
   assert.match(campaign, /observation\.localSeat === observation\.ownerSeat/u);
   // Track R mystery-gauntlet wave-1 ME (#816): on a GUEST-owned ME the authoritative HOST advances its OWN
-  // MysteryEncounterPhase engine MESSAGE dialogue itself (the guest renderer's CoopReplayMePhase Space never
-  // relays to the host), so the advancer must drive the host too - else the host's outcome narration parks
+  // engine MESSAGE dialogue in every production ME phase (the guest renderer's CoopReplayMePhase Space never
+  // relays to the host), so the advancer must drive the host too - else its selected-option narration parks
   // forever after the owner's option pick (host stalled at an actionable mystery-encounter:message).
-  assert.match(
-    campaign,
-    /client === rig\.host\s*&&\s*observation\.phase === "MysteryEncounterPhase"\s*&&\s*observation\.localSeat !== observation\.ownerSeat/u,
-  );
+  assert.match(campaign, /client === rig\.host && observation\.localSeat !== observation\.ownerSeat/u);
   assert.match(campaign, /\(ownerDrives \|\| hostEngineDialogue\)/u);
   assert.match(campaign, /consumedInstances\.add\(`\$\{client\.label\}:\$\{surfaceId\}:\$\{phaseInstance\}`\)/u);
   assert.match(campaign, /const advanceMysteryNarration = createMysteryNarrationAdvancer\(/u);
