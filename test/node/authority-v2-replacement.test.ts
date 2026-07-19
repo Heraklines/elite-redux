@@ -206,6 +206,9 @@ describe("buildReplacementCommitEntry", () => {
       resolution: "owner-pick",
       successor: {
         kind: "resume-command-frontier",
+        epoch: 1,
+        wave: 3,
+        turn: 2,
         commands: [{ ownerSeatId: 1, pokemonId: 4242, fieldIndex: 1 }],
       },
     });
@@ -283,6 +286,9 @@ describe("buildReplacementCommitEntry", () => {
         resolution: "owner-pick",
         successor: {
           kind: "resume-command-frontier",
+          epoch: 1,
+          wave: 3,
+          turn: 2,
           commands: [{ ownerSeatId: 1, pokemonId: 0, fieldIndex: 1 }],
         }, // pokemonId must be positive
       }),
@@ -324,6 +330,9 @@ describe("double-KO chaining", () => {
       resolution: "owner-pick",
       successor: {
         kind: "resume-command-frontier",
+        epoch: 1,
+        wave: 3,
+        turn: 2,
         commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 1 }],
       },
     });
@@ -375,6 +384,9 @@ describe("shadow parity seam", () => {
       resolution: "owner-pick" as const,
       successor: {
         kind: "resume-command-frontier" as const,
+        epoch: 1,
+        wave: 3,
+        turn: 2,
         commands: [{ ownerSeatId: 1, pokemonId: 99, fieldIndex: 1 }],
       },
     };
@@ -432,6 +444,9 @@ describe("replica applier (picker-close semantics)", () => {
       resolution,
       successor: {
         kind: "resume-command-frontier",
+        epoch: 1,
+        wave: 3,
+        turn: 2,
         commands: [{ ownerSeatId: 1, pokemonId: 42, fieldIndex: 1 }],
       },
     });
@@ -572,6 +587,9 @@ describe("owner window (fallback-auto)", () => {
       resolution: "fallback-auto",
       successor: {
         kind: "resume-command-frontier",
+        epoch: 1,
+        wave: 3,
+        turn: 2,
         commands: [{ ownerSeatId: 1, pokemonId: 55, fieldIndex: 1 }],
       },
     });
@@ -631,6 +649,9 @@ describe("zero timers after retire", () => {
         resolution: "owner-pick",
         successor: {
           kind: "resume-command-frontier",
+          epoch: 1,
+          wave: 3,
+          turn: 2,
           commands: [{ ownerSeatId: 1, pokemonId: 42, fieldIndex: 1 }],
         },
       }),

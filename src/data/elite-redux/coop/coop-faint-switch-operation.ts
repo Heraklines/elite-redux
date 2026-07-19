@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type {
+  ReplacementCommitImage,
+  ReplacementProposal,
+  ReplacementResolutionMode,
+} from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
+import { replacementOperationId } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
+import { getActiveCoopV2ReplacementCutover } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import {
   activeCoopV2ShadowSessionEpoch,
   isCoopV2ShadowActive,
@@ -453,6 +460,8 @@ export function armCoopFaintSwitchIntentResend(
 export interface CoopFaintSwitchCommitReceipt {
   /** Null only when the negotiated operation carrier is disabled and the legacy path owns progression. */
   readonly operationId: string | null;
+  /** True when the resolved proposal is staged for the complete post-summon Authority V2 commit. */
+  readonly v2Staged?: boolean;
 }
 
 function pickerKey(wave: number, turn: number, occurrence: number, fieldIndex: number): string {
@@ -569,6 +578,31 @@ function tapFaintReplacementShadowFromParams(params: {
   if (epoch == null || epoch <= 0 || !(params.wave > 0) || !(params.turn > 0)) {
     return;
   }
+  const tap = replacementTapFromParams(params, epoch);
+  tapCoopV2ShadowReplacementCommit({
+    ...tap,
+    successor: { kind: "terminal" },
+  });
+}
+
+function replacementTapFromParams(
+  params: {
+    payload: CoopFaintSwitchPayload;
+    ownerRole: CoopRole;
+    wave: number;
+    turn: number;
+    occurrence?: number;
+    speciesId?: number;
+  },
+  epoch: number,
+  operationId?: string,
+): {
+  proposal: ReplacementProposal;
+  resolution: ReplacementResolutionMode;
+  legacyImage: { proposal: ReplacementProposal; resolution: ReplacementResolutionMode };
+  legacyDigest: string;
+  operationId?: string;
+} {
   const owner = coopSeatOfRole(params.ownerRole);
   const occurrence = params.occurrence ?? params.payload.data[COOP_FAINT_SWITCH_OCCURRENCE_INDEX] ?? 0;
   const resolutionCode = params.payload.data[COOP_FAINT_SWITCH_RESOLUTION_INDEX];
@@ -590,15 +624,14 @@ function tapFaintReplacementShadowFromParams(params: {
     selected,
   };
   const resolution = resolutionCode === COOP_FAINT_SWITCH_RESOLUTION_OWNER ? "owner-pick" : "fallback-auto";
-  tapCoopV2ShadowReplacementCommit({
+  const derivedId = replacementOperationId(proposal.sourceAddress, owner);
+  return {
     proposal,
     resolution,
-    successor: { kind: "terminal" },
     legacyImage: { proposal, resolution },
-    // No legacy carrier op id exists in this lane (op surface off); derive the adapter's own stable window
-    // address as the raw fallback token, so the parity line has a meaningful comparand.
-    legacyDigest: `RC/e${epoch}/w${params.wave}/t${params.turn}/o${occurrence}/f${params.payload.fieldIndex}/s${owner}`,
-  });
+    legacyDigest: operationId ?? derivedId,
+    ...(operationId == null ? {} : { operationId }),
+  };
 }
 
 /**
@@ -624,6 +657,18 @@ export function commitFaintSwitchAuthorityResult(
   },
   binding?: CoopFaintSwitchOperationBinding | null,
 ): CoopFaintSwitchCommitReceipt | null {
+  const replacementCutover = getActiveCoopV2ReplacementCutover();
+  if (params.localRole === "host" && replacementCutover != null) {
+    try {
+      const staged = replacementCutover.stageHostReplacement(
+        replacementTapFromParams(params, replacementCutover.authenticatedFrameContext.sessionEpoch),
+      );
+      return staged ? { operationId: null, v2Staged: true } : null;
+    } catch (error) {
+      coopWarn("v2-replacement", "resolved replacement could not be staged before summon", error);
+      return null;
+    }
+  }
   if (!isCoopFaintSwitchOperationEnabled()) {
     // Deliverable 4: the op surface is rolled back in THIS lane (the legacy carrier resolves the faint), but a
     // faint still happened - so still emit the REPLACEMENT_COMMIT shadow tap on the HOST, with a like-for-like
@@ -722,6 +767,61 @@ export function commitFaintSwitchAuthorityResult(
     coopWarn("replay", "faint-switch op commit threw; legacy carrier/fallback remains active", error);
     return null;
   }
+}
+
+/**
+ * Authority V2 replica anti-softlock seam. A committed fallback/owner result closes only the exact picker
+ * owned by this local seat. It returns false until the real bounded modal transition has materialized, so
+ * the V2 log retains/redelivers instead of applying post-summon state beneath a stale picker.
+ */
+export function materializeCoopV2ReplacementPickerTerminal(
+  image: ReplacementCommitImage,
+  localSeatId: number,
+  opState: CoopRuntimeOpState,
+): boolean {
+  if (image.ownerSeatId !== localSeatId) {
+    return true;
+  }
+  const s = requireCoopOpSurfaceStateFor<FaintSwitchOpState>(opState, "faintSwitch");
+  const address = image.sourceAddress;
+  const key = pickerKey(address.wave, address.turn, address.occurrence, address.fieldIndex);
+  if (s.settledPickers.has(key)) {
+    return true;
+  }
+  const terminal = s.pickerTerminals.get(address.fieldIndex);
+  if (terminal == null) {
+    // An explicit no-legal-replacement terminal is produced for a wiped owner half. The renderer correctly
+    // does not open a modal with zero legal choices, so absence of a terminal is the exact material proof,
+    // not a reason to retain this entry forever.
+    if (image.selected === null) {
+      rememberSettledPicker(s, key);
+      return true;
+    }
+    return false;
+  }
+  if (terminal.wave !== address.wave || terminal.turn !== address.turn || terminal.occurrence !== address.occurrence) {
+    return false;
+  }
+  const resolutionCode =
+    image.selected == null
+      ? COOP_FAINT_SWITCH_RESOLUTION_NONE
+      : image.resolution === "owner-pick"
+        ? COOP_FAINT_SWITCH_RESOLUTION_OWNER
+        : COOP_FAINT_SWITCH_RESOLUTION_FALLBACK;
+  const payload: CoopFaintSwitchPayload = {
+    fieldIndex: address.fieldIndex,
+    partySlot: image.selected?.partySlot ?? -1,
+    // Dense compatibility payload for the existing picker terminal; identity/authority remains the typed
+    // V2 image and every slot here is finite (the sparse-array failure class cannot re-enter).
+    data: [0, image.selected?.speciesId ?? 0, address.epoch, 0, resolutionCode, address.occurrence],
+  };
+  const operationId = replacementOperationId(address, image.ownerSeatId);
+  if (!terminal.consume(payload, operationId)) {
+    return false;
+  }
+  s.pickerTerminals.delete(address.fieldIndex);
+  rememberSettledPicker(s, key);
+  return true;
 }
 
 /** Compatibility boolean for existing synchronous callers and engine-free contracts. */

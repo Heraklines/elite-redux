@@ -171,6 +171,9 @@ jobs:
             # Stabilization staging exercises the negotiated Authority V2 turn/command cutover. Production
             # remains default-off until its separate all-green promotion qualification.
             echo "VITE_COOP_AUTHORITY_V2_TURN=on"
+            # Replacement proposals + complete post-summon state use the same retained V2 log. This remains
+            # staging-only until its exact-SHA gate and public-browser campaign qualify it.
+            echo "VITE_COOP_AUTHORITY_V2_REPLACEMENT=on"
             # Showdown battle telemetry (D5): dedicated worker + er-telemetry D1.
             # Without this the client falls back to VITE_SERVER_URL (404 no-op).
             echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry.heraklines.workers.dev"

@@ -25,7 +25,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
@@ -55,6 +55,7 @@ import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+const V2_REPLACEMENT_CUTOVER = process.env.COOP_AUTHORITY_V2_REPLACEMENT === "on";
 
 /** The guest picks party slot 3 (CHARIZARD). The auto-pick fallback would take slot 2 (LAPRAS). */
 const GUEST_PICK_SLOT = 3;
@@ -289,6 +290,9 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     }
     const materialBarrierSpy = vi.spyOn(hostDurability, "waitForOperationMaterialApplied");
     const unshiftSpy = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew");
+    const v2CommittedBefore = V2_REPLACEMENT_CUTOVER
+      ? withClientSync(rig.hostCtx, () => getCoopV2Shadow(rig.hostRuntime)?.diagnostics().committed ?? 0)
+      : 0;
     let hostAdvance: Promise<void> | undefined;
 
     try {
@@ -358,34 +362,59 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       });
 
       // Start the host's real post-turn phase crossing. It times out the idle guest and retains a
-      // concrete fallback, but the promise cannot reach CommandPhase until peer material settlement.
+      // concrete fallback. Legacy parks before summon on its operation-journal material barrier; V2 stages
+      // the answer, summons, then retains the complete carrier in its one authority log.
       await withClient(rig.hostCtx, async () => {
         hostAdvance = game.phaseInterceptor.to("CommandPhase", false);
-        await vi.waitUntil(() => materialBarrierSpy.mock.calls.length === 1, {
-          timeout: 5_000,
-          interval: 10,
-        });
-
-        expect(
-          unshiftSpy.mock.calls.filter(([name]) => name === "SwitchSummonPhase"),
-          "the host cannot summon before the guest materially closes the old picker",
-        ).toHaveLength(0);
-        expect(
-          unshiftSpy.mock.calls.filter(([name]) => name === "CoopPushReplacementCheckpointPhase"),
-          "the host cannot publish a replacement checkpoint before peer material settlement",
-        ).toHaveLength(0);
+        if (V2_REPLACEMENT_CUTOVER) {
+          await vi.waitUntil(
+            () =>
+              unshiftSpy.mock.calls.some(([name]) => name === "SwitchSummonPhase")
+              && unshiftSpy.mock.calls.some(([name]) => name === "CoopPushReplacementCheckpointPhase"),
+            { timeout: 5_000, interval: 10 },
+          );
+          expect(
+            materialBarrierSpy,
+            "the V2 replacement surface never starts the retired legacy pre-summon material barrier",
+          ).not.toHaveBeenCalled();
+        } else {
+          await vi.waitUntil(() => materialBarrierSpy.mock.calls.length === 1, {
+            timeout: 5_000,
+            interval: 10,
+          });
+          expect(
+            unshiftSpy.mock.calls.filter(([name]) => name === "SwitchSummonPhase"),
+            "legacy cannot summon before the guest materially closes the old picker",
+          ).toHaveLength(0);
+          expect(
+            unshiftSpy.mock.calls.filter(([name]) => name === "CoopPushReplacementCheckpointPhase"),
+            "legacy cannot publish a replacement checkpoint before peer material settlement",
+          ).toHaveLength(0);
+        }
       });
       const retainedOperationId = materialBarrierSpy.mock.calls[0]?.[0];
-      expect(retainedOperationId, "the timeout entered one exact retained-operation barrier").toMatch(
-        /:FAINT_SWITCH:/u,
-      );
+      if (V2_REPLACEMENT_CUTOVER) {
+        expect(retainedOperationId, "V2 never creates a legacy faint-operation authority").toBeUndefined();
+        const diagnostics = withClientSync(rig.hostCtx, () => getCoopV2Shadow(rig.hostRuntime)?.diagnostics());
+        expect(
+          diagnostics?.committed,
+          "the host committed the staged fallback only after the post-summon carrier existed",
+        ).toBeGreaterThan(v2CommittedBefore);
+      } else {
+        expect(retainedOperationId, "the timeout entered one exact retained-operation barrier").toMatch(
+          /:FAINT_SWITCH:/u,
+        );
+      }
       expect(pickerCloses, "the retained envelope has not yet been pumped into the guest engine").toBe(0);
 
-      // Pump the retained envelope only under the guest context. Its first application closes the
-      // modal and shifts the phase but stays unacknowledged; the durability deferred retry can ACK
-      // only after that asynchronous material boundary has completed.
+      // Pump the retained authority only under the guest context. Its first application closes the modal
+      // and shifts the phase but cannot claim installed material before that asynchronous boundary completes.
       await withClient(rig.guestCtx, async () => {
-        for (let attempt = 0; attempt < 100 && materialAcks.length === 0; attempt++) {
+        for (
+          let attempt = 0;
+          attempt < 100 && (V2_REPLACEMENT_CUTOVER ? pickerCloses === 0 : materialAcks.length === 0);
+          attempt++
+        ) {
           await drainLoopback();
           await new Promise<void>(resolve => setTimeout(resolve, 10));
         }
@@ -395,20 +424,27 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
           "the material ACK cannot precede leaving the guest picker phase",
         ).not.toBe("CoopGuestFaintSwitchPhase");
       });
-      expect(
-        materialAcks.length,
-        "the guest emitted at least one material ACK after closing the picker",
-      ).toBeGreaterThanOrEqual(1);
-      expect(materialAckOperationId, "the ACK belongs to the exact retained fallback").toBe(retainedOperationId);
-      expect(
-        materialAcks.every(ack => ack.operationId === retainedOperationId),
-        "any idempotent material ACK replay stays scoped to the exact retained fallback",
-      ).toBe(true);
-      expect(materialAcks[0]).toMatchObject({
-        operationId: retainedOperationId,
-        wave: rig.hostScene.currentBattle.waveIndex,
-        turn,
-      });
+      if (V2_REPLACEMENT_CUTOVER) {
+        expect(
+          materialAcks,
+          "the retired legacy faint-operation carrier emits no material receipt while V2 owns the surface",
+        ).toHaveLength(0);
+      } else {
+        expect(
+          materialAcks.length,
+          "the guest emitted at least one material ACK after closing the picker",
+        ).toBeGreaterThanOrEqual(1);
+        expect(materialAckOperationId, "the ACK belongs to the exact retained fallback").toBe(retainedOperationId);
+        expect(
+          materialAcks.every(ack => ack.operationId === retainedOperationId),
+          "any idempotent material ACK replay stays scoped to the exact retained fallback",
+        ).toBe(true);
+        expect(materialAcks[0]).toMatchObject({
+          operationId: retainedOperationId,
+          wave: rig.hostScene.currentBattle.waveIndex,
+          turn,
+        });
+      }
 
       // Reactivating the host flushes the exact runWhenCoopRuntimeActive continuation. Only now may
       // it queue one summon plus one replacement checkpoint and finish the crossing to CommandPhase.

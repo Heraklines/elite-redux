@@ -24,6 +24,11 @@
 
 import type { TurnResolutionImage } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
 import {
+  activeCoopReplacementAuthorityMode,
+  suppressesLegacyReplacementAckProgression,
+  suppressesLegacyReplacementRequest,
+} from "#data/elite-redux/coop/authority-v2/cutover-replacement";
+import {
   activeCoopTurnAuthorityMode,
   getActiveCoopV2TurnCutover,
   isCoopV2TurnCutoverActive,
@@ -952,6 +957,8 @@ export class CoopBattleStreamer {
    * never masquerade as installed material.
    */
   private readonly finalizedTurnAuthorities = new Set<string>();
+  /** Exact immutable replacement carriers whose complete apply+checksum material transaction succeeded. */
+  private readonly finalizedReplacementAuthorities = new Set<string>();
 
   markTurnFinalized(epoch: number, wave: number, turn: number): void {
     if (!isSafeAddressPart(epoch, false) || !isSafeAddressPart(wave, false) || !isSafeAddressPart(turn, false)) {
@@ -1006,6 +1013,44 @@ export class CoopBattleStreamer {
     const admitted = this.seenTurnAuthority.get(exactKey);
     return (
       admitted != null && admitted.canonical === canonicalize(normalized) && this.finalizedTurnAuthorities.has(exactKey)
+    );
+  }
+
+  private markAuthoritativeReplacementFinalized(envelope: CoopCheckpointEnvelope): boolean {
+    const exactKey = authorityKey(envelope);
+    const admitted = this.seenReplacementAuthority.get(exactKey);
+    if (
+      admitted == null
+      || admitted.canonical !== canonicalize(envelope)
+      || !sameAuthorityAckIdentity(admitted.value, envelope)
+    ) {
+      return false;
+    }
+    rememberBoundedValue(this.finalizedReplacementAuthorities, exactKey);
+    return true;
+  }
+
+  /** V2 material receipt proof: admission is insufficient; the exact carrier must have converged in-engine. */
+  hasFinalizedAuthoritativeV2Replacement(
+    message: CoopCheckpointEnvelope | Extract<CoopMessage, { t: "battleCheckpoint" }>,
+  ): boolean {
+    const normalized: CoopCheckpointEnvelope = {
+      reason: message.reason,
+      epoch: message.epoch,
+      wave: message.wave,
+      turn: message.turn,
+      revision: message.revision,
+      checkpoint: message.checkpoint,
+      checksum: message.checksum,
+      fullField: message.fullField,
+      authoritativeState: message.authoritativeState,
+    };
+    const exactKey = authorityKey(normalized);
+    const admitted = this.seenReplacementAuthority.get(exactKey);
+    return (
+      admitted != null
+      && admitted.canonical === canonicalize(normalized)
+      && this.finalizedReplacementAuthorities.has(exactKey)
     );
   }
 
@@ -2473,6 +2518,16 @@ export class CoopBattleStreamer {
       return;
     }
     this.replacementRedeliveryRequests.add(authorityKey(envelope));
+    if (suppressesLegacyReplacementRequest(activeCoopReplacementAuthorityMode())) {
+      // Keep the local re-open latch: when the V2 delivery lease redelivers this immutable entry, the
+      // compatibility transaction must re-enter its safe consumer after a failed apply. Only the legacy
+      // wire request is retired; the V2 authority log already owns reliable redelivery.
+      coopLog(
+        "v2-replacement",
+        `guest awaits retained V2 redelivery for failed replacement key=${authorityKey(envelope)}`,
+      );
+      return;
+    }
     this.transport.send({
       t: "requestBattleCheckpoint",
       reason: "replacement",
@@ -2771,6 +2826,14 @@ export class CoopBattleStreamer {
     }
     if (progress === "advance") {
       rememberAckEvidence(this.ackedReplacementCommits, key, { stage, canonical, value: ack });
+    }
+    if (stage === "materialApplied" && !this.markAuthoritativeReplacementFinalized(envelope)) {
+      this.failLocalAckProgression(
+        "replacement",
+        envelope,
+        `Replacement materialApplied could not prove exact installed authority ${key}.`,
+      );
+      return false;
     }
     this.replacementRedeliveryRequests.delete(key);
     if (stage === "continuationReady") {
@@ -3924,6 +3987,16 @@ export class CoopBattleStreamer {
   }
 
   /**
+   * Deliver a reliably-retained V2 replacement through the existing strict engine transaction. The frame
+   * already passed V2 session/membership/order admission, so the ambient legacy battle-shell address may
+   * not discard it; immutable carrier classification, complete-companion checks, and apply/checksum proof
+   * remain unchanged.
+   */
+  ingestAuthoritativeV2Replacement(msg: Extract<CoopMessage, { t: "battleCheckpoint" }>): void {
+    this.handle(msg, "authority-v2");
+  }
+
+  /**
    * GUEST live pump (#782, instant streaming): await EITHER the host's `turnResolution` for `turn`
    * OR the next live `battleEvent` for it landing at-or-beyond `fromSeq` - whichever first. This is
    * what lets {@linkcode CoopReplayTurnPhase} present the host's events the moment they arrive
@@ -4228,6 +4301,7 @@ export class CoopBattleStreamer {
     this.supersededTurnWaits.clear();
     this.finalizedMarks.clear();
     this.finalizedTurnAuthorities.clear();
+    this.finalizedReplacementAuthorities.clear();
     this.lastEnemyParty = null;
     this.enemyPartyStateByWave.clear();
     this.enemyPartyEncounterByWave.clear();
@@ -4310,6 +4384,7 @@ export class CoopBattleStreamer {
     this.supersededTurnWaits.clear();
     this.finalizedMarks.clear();
     this.finalizedTurnAuthorities.clear();
+    this.finalizedReplacementAuthorities.clear();
     this.liveEventHandler = null;
     this.liveWaiter = null;
     this.pendingCheckpoints.clear();
@@ -4759,7 +4834,7 @@ export class CoopBattleStreamer {
           this.transport.send(completedAck.value);
           return;
         }
-        if (!this.acceptsCheckpointAddress(envelope)) {
+        if (source !== "authority-v2" && !this.acceptsCheckpointAddress(envelope)) {
           coopWarn(
             "checkpoint",
             `guest DROP cross-address battleCheckpoint reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} `
@@ -5046,6 +5121,19 @@ export class CoopBattleStreamer {
             && isAuthorityAckStage(stage)
             && prior.canonical === canonicalize(msg)
           ) {
+            return;
+          }
+          // The live V2 replica deliberately reuses the proven replacement apply/presentation transaction,
+          // whose staged compatibility ACKs still cross the legacy transport. No legacy carrier is retained
+          // in cutover mode, so those ACKs are observability only; the V2 material/control receipt is the sole
+          // retirement authority. A clean V2 ACK must never terminalize because sentReplacementCheckpoints is
+          // intentionally empty. A genuine V2 commit failure never reaches this branch: the host terminalizes
+          // before allowing a second authority.
+          if (retained == null && suppressesLegacyReplacementAckProgression(activeCoopReplacementAuthorityMode())) {
+            coopLog(
+              "stream",
+              `host IGNORE compatibility replacement ACK stage=${stage} key=${key} (v2 owns retirement)`,
+            );
             return;
           }
           this.failHostAckProgression("replacement", msg, `Replacement ACK was missing/stale/wrong-address at ${key}.`);

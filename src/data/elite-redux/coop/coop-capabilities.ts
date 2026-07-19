@@ -102,6 +102,12 @@ export const COOP_CAP_AUTHORITY_V2_SHADOW: CoopCapabilityKey = "authority.v2shad
  * the SAME per-runtime CoopAuthorityLog + frame channel the shadow harness stands up.
  */
 export const COOP_CAP_AUTHORITY_V2_TURN: CoopCapabilityKey = "authority.v2turn";
+/**
+ * The authority-v2 faint/replacement cutover. The owner proposal is staged at the picker boundary and
+ * committed only after SwitchSummonPhase supplies a complete post-summon carrier. The V2 log then owns
+ * retention/redelivery and the legacy faint-operation + battleCheckpoint loops cease to be authorities.
+ */
+export const COOP_CAP_AUTHORITY_V2_REPLACEMENT: CoopCapabilityKey = "authority.v2replacement";
 
 // -----------------------------------------------------------------------------
 // The pure negotiation math (unit-tested engine-free).

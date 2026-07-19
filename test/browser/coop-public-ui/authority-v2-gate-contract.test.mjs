@@ -29,15 +29,21 @@ function jobBlock(workflow, job) {
 test("every real-engine shard qualifies Authority V2 instead of hiding behind legacy", () => {
   const gate = jobBlock(gateWorkflow, "gate");
   assert.match(gate, /COOP_AUTHORITY_V2_TURN:\s*"on"/u);
+  assert.match(gate, /COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
   assert.match(gate, /node scripts\/run-coop-gate\.mjs/u);
   assert.doesNotMatch(
     gate,
-    /COOP_AUTHORITY_V2_TURN:\s*"(?:off|false|0)"/u,
+    /COOP_AUTHORITY_V2_(?:TURN|REPLACEMENT):\s*"(?:off|false|0)"/u,
     "the exhaustive gameplay matrix may never downgrade the production architecture",
   );
 });
 
 test("public-browser campaign and staging bundle qualify the same V2 cutover", () => {
+  const browserBuild = jobBlock(gateWorkflow, "browser-build");
+  assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_TURN:\s*"on"/u);
+  assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
   assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_TURN:\s*"on"/u);
+  assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_TURN=on"/u);
+  assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_REPLACEMENT=on"/u);
 });

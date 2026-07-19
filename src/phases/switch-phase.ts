@@ -315,11 +315,19 @@ export class SwitchPhase extends BattlePhase {
                       // message surface have both materially closed. It may carry turn N+1, but can no
                       // longer race an N modal or leak into a superseding phase.
                       scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+                    } else if (receipt.v2Staged === true) {
+                      // Explicit no-replacement is still an authoritative transaction: no summon phase will
+                      // create a later capture point, so publish the complete sealed-slot state now.
+                      scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
                     }
                     scene.phaseManager.shiftPhase();
                   }),
                 );
               };
+              if (receipt.v2Staged === true) {
+                releaseAfterPeerMaterial();
+                return;
+              }
               if (receipt.operationId == null) {
                 if (!legal) {
                   failCoopSharedSession("A replacement timeout cannot continue without a retained peer terminal.");
@@ -401,7 +409,7 @@ export class SwitchPhase extends BattlePhase {
             },
             operationBinding,
           );
-          const retained = commitFaintSwitchAuthorityIntent(
+          const receipt = commitFaintSwitchAuthorityResult(
             {
               payload: { fieldIndex: this.fieldIndex, partySlot: -1, data },
               ownerRole: coopController.role,
@@ -410,9 +418,14 @@ export class SwitchPhase extends BattlePhase {
             },
             operationBinding,
           );
-          if (!retained) {
+          if (receipt == null) {
             failCoopSharedSession("The authoritative no-replacement choice could not be retained.");
             return;
+          }
+          if (receipt.v2Staged === true) {
+            // No SwitchSummonPhase follows a half-wipe. Queue the post-resolution capture explicitly so
+            // the typed null selection and complete sealed-slot carrier cannot remain staged forever.
+            scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
           }
         }
         coopRelay.sendInteractionChoice(seq, "switch", -1, [0]);

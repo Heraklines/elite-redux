@@ -230,6 +230,10 @@ export class ShowdownEnemyFaintSwitchPhase extends BattlePhase {
             }),
           );
         };
+        if (receipt.v2Staged === true) {
+          releaseAfterPeerMaterial();
+          return;
+        }
         if (receipt.operationId == null) {
           if (usedFallback) {
             failCoopSharedSession("An opponent replacement timeout cannot continue without a retained peer terminal.");

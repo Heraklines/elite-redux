@@ -136,6 +136,10 @@ export type ReplacementResolutionMode = "owner-pick" | "fallback-auto";
 export type ReplacementSuccessor =
   | {
       readonly kind: "resume-command-frontier";
+      /** Exact post-summon control address. A faint sourced at turn N can materialize after TurnInit opens N+1. */
+      readonly epoch: number;
+      readonly wave: number;
+      readonly turn: number;
       readonly commands: readonly CoopCommandControlTarget[];
     }
   | {
@@ -397,9 +401,9 @@ export function successorControl(address: ReplacementSourceAddress, successor: R
     case "resume-command-frontier":
       return {
         kind: "COMMAND_FRONTIER",
-        epoch: address.epoch,
-        wave: address.wave,
-        turn: address.turn,
+        epoch: successor.epoch,
+        wave: successor.wave,
+        turn: successor.turn,
         commands: successor.commands,
       };
     case "next-replacement":

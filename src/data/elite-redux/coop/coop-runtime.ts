@@ -20,6 +20,10 @@
 
 import { globalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
+import {
+  decodeReplacementCommitMaterial,
+  type ReplacementAuthorityCarrier,
+} from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 import type { TurnResolutionImage } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
 import type {
   CoopTerminalMaterialV2,
@@ -32,6 +36,13 @@ import type {
   CoopNextControl,
   CoopRuntimeContext,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import {
+  type CoopV2ReplacementBatchResult,
+  CoopV2ReplacementCutover,
+  clearActiveCoopV2ReplacementCutover,
+  isCoopV2ReplacementEnabled,
+  setActiveCoopV2ReplacementCutover,
+} from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import {
   CoopV2TurnCutover,
   clearActiveCoopV2TurnCutover,
@@ -99,6 +110,7 @@ import {
   type CoopStateSyncFailure,
   type CoopStateSyncOutcome,
   type CoopStateSyncResult,
+  hasCoopV2ImmediateCommandSuccessor,
 } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync, type CoopCommandTimeout } from "#data/elite-redux/coop/coop-battle-sync";
 import {
@@ -109,6 +121,7 @@ import {
   setCoopBiomeOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-biome-operation";
 import {
+  COOP_CAP_AUTHORITY_V2_REPLACEMENT,
   COOP_CAP_AUTHORITY_V2_SHADOW,
   COOP_CAP_AUTHORITY_V2_TURN,
   COOP_CAP_DURABILITY_JOURNAL,
@@ -148,6 +161,7 @@ import { CoopDurabilityManager, isCoopDurabilityEnabled } from "#data/elite-redu
 import {
   isCoopFaintSwitchOperationEnabled,
   materializeCoopFaintSwitchPickerTerminal,
+  materializeCoopV2ReplacementPickerTerminal,
   resetCoopFaintSwitchOperationState,
   setCoopFaintSwitchOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
@@ -3396,6 +3410,13 @@ export interface CoopRuntime {
    * never populate it.
    */
   readonly v2InstalledCommandTargets: Set<string>;
+  /**
+   * Exact V2 REPLACEMENT frontiers installed by the ordered replica projector. This is a protocol
+   * acceptance frontier, not a claim that a local picker exists: replacement choices are resolved before
+   * the complete post-summon carrier is committed, so a chained control authorizes admission of the next
+   * occurrence without manufacturing a second UI.
+   */
+  readonly v2InstalledReplacementTargets: Set<string>;
 }
 
 let active: CoopRuntime | null = null;
@@ -3422,10 +3443,51 @@ const coopV2ShadowHarnesses = new WeakMap<CoopRuntime, CoopAuthorityV2Shadow>();
 const coopV2ShadowBuildFailed = new WeakSet<CoopRuntime>();
 /** The live turn cutover controller per runtime (built alongside the harness when authority.v2turn is negotiated). */
 const coopV2TurnCutovers = new WeakMap<CoopRuntime, CoopV2TurnCutover>();
+/** The live replacement cutover controller per runtime. */
+const coopV2ReplacementCutovers = new WeakMap<CoopRuntime, CoopV2ReplacementCutover>();
+
+/**
+ * Swap every cycle-free V2 selector with the active runtime. Production has one runtime; the two-engine
+ * harness alternates two in one realm, so leaving these selectors on the last-built client can stage a host
+ * replacement in the guest's log (or send a turn through the wrong frame context) while the test still
+ * appears mechanically healthy.
+ */
+function activateCoopV2Runtime(runtime: CoopRuntime): void {
+  const harness = coopV2ShadowHarnesses.get(runtime);
+  if (harness == null) {
+    clearActiveCoopV2Shadow();
+  } else {
+    setActiveCoopV2Shadow(harness);
+  }
+  const turn = coopV2TurnCutovers.get(runtime);
+  if (turn == null) {
+    clearActiveCoopV2TurnCutover();
+  } else {
+    setActiveCoopV2TurnCutover(turn);
+  }
+  const replacement = coopV2ReplacementCutovers.get(runtime);
+  if (replacement == null) {
+    clearActiveCoopV2ReplacementCutover();
+  } else {
+    setActiveCoopV2ReplacementCutover(replacement);
+  }
+}
 
 /** Whether the turn/command surface is CUT OVER to v2 for `runtime` (authority.v2turn negotiated + harness present). */
 function isCoopV2TurnNegotiated(): boolean {
   return isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_TURN);
+}
+
+/**
+ * Replacement resumes through the same aggregate COMMAND control installed by surface 1. Requiring both
+ * capabilities prevents a replacement-only mixed build from partially owning COMMAND controls emitted by
+ * shadow TURN entries.
+ */
+function isCoopV2ReplacementNegotiated(): boolean {
+  return (
+    isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_REPLACEMENT)
+    && isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_TURN)
+  );
 }
 
 /**
@@ -3471,6 +3533,61 @@ function reconstructCoopV2TurnResolution(
   };
 }
 
+/** Rebuild the compatibility envelope consumed by the real replacement replay transaction. */
+function reconstructCoopV2ReplacementCheckpoint(
+  entry: CoopAuthorityEntry,
+): Extract<CoopMessage, { t: "battleCheckpoint" }> | null {
+  const image = decodeReplacementCommitMaterial(entry);
+  const carrier = image?.authorityCarrier;
+  if (
+    image == null
+    || carrier == null
+    || carrier.checkpoint == null
+    || typeof carrier.checkpoint !== "object"
+    || typeof carrier.checksum !== "string"
+    || carrier.checksum.length === 0
+    || typeof carrier.preimage !== "string"
+    || carrier.preimage.length === 0
+    || !Array.isArray(carrier.fullField)
+    || carrier.authoritativeState == null
+    || typeof carrier.authoritativeState !== "object"
+    || typeof carrier.epoch !== "number"
+    || typeof carrier.wave !== "number"
+    || typeof carrier.turn !== "number"
+  ) {
+    return null;
+  }
+  const state = carrier.authoritativeState as CoopAuthoritativeBattleStateV1;
+  if (
+    !Number.isSafeInteger(carrier.epoch)
+    || carrier.epoch <= 0
+    || !Number.isSafeInteger(carrier.wave)
+    || carrier.wave <= 0
+    || !Number.isSafeInteger(carrier.turn)
+    || carrier.turn <= 0
+    || !Number.isSafeInteger(state.tick)
+    || state.tick <= 0
+    || state.wave !== carrier.wave
+    || state.turn !== carrier.turn
+  ) {
+    return null;
+  }
+  return {
+    t: "battleCheckpoint",
+    reason: "replacement",
+    epoch: carrier.epoch,
+    wave: carrier.wave,
+    turn: carrier.turn,
+    // Keep the exact compatibility identity used by sendCheckpoint. The Authority V2 log revision remains
+    // the retained ordering identity; the replay transaction's immutable carrier revision is the state tick.
+    revision: state.tick,
+    checkpoint: carrier.checkpoint as CoopBattleCheckpoint,
+    checksum: carrier.checksum,
+    fullField: carrier.fullField as CoopFullMonSnapshot[],
+    authoritativeState: state,
+  };
+}
+
 /**
  * Build the LIVE replica seams (cutover surface 1). The guest applies a delivered TURN_COMMIT through the
  * REAL engine: the material applier reconstructs the COMPLETE legacy turn resolution from the enriched
@@ -3484,13 +3601,22 @@ function reconstructCoopV2TurnResolution(
  * verb is guarded so an engine throw becomes a `false`/`null` (material rejected / fall-through), never a
  * crash into the frame handler.
  */
-function buildCoopV2TurnLiveSeams(runtime: CoopRuntime): CoopV2LiveReplicaSeams {
+function buildCoopV2LiveSeams(
+  runtime: CoopRuntime,
+  surfaces: { readonly turn: boolean; readonly replacement: boolean },
+): CoopV2LiveReplicaSeams {
   return {
-    ownsEntry: entry => entry.kind === "TURN_COMMIT",
-    ownsControl: control => control.kind === "COMMAND_FRONTIER",
+    ownsEntry: entry =>
+      (surfaces.turn && entry.kind === "TURN_COMMIT") || (surfaces.replacement && entry.kind === "REPLACEMENT_COMMIT"),
+    ownsControl: control =>
+      (surfaces.turn && control.kind === "COMMAND_FRONTIER")
+      || (surfaces.replacement && control.kind === "REPLACEMENT"),
     applyMaterial: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null => {
-      if (entry.kind !== "TURN_COMMIT") {
-        return null; // only the TURN surface is cut over; every other kind stays shadow.
+      if (
+        (entry.kind !== "TURN_COMMIT" || !surfaces.turn)
+        && (entry.kind !== "REPLACEMENT_COMMIT" || !surfaces.replacement)
+      ) {
+        return null;
       }
       // The turn AUTHORITY never REPLICATES its OWN committed turn. A proper peer transport delivers the
       // TURN_COMMIT to the OTHER seat's replica; but a self-loopback (a single-engine spoof peer / the
@@ -3504,6 +3630,27 @@ function buildCoopV2TurnLiveSeams(runtime: CoopRuntime): CoopV2LiveReplicaSeams 
         return null;
       }
       try {
+        if (entry.kind === "REPLACEMENT_COMMIT") {
+          const image = decodeReplacementCommitMaterial(entry);
+          if (image == null || image.authorityCarrier == null) {
+            return false;
+          }
+          // A timeout/fallback commit is also the authoritative close of the old owner picker. Do not
+          // install the post-summon state under a still-open modal; redelivery retries after its bounded
+          // MESSAGE transition reaches the exact source address.
+          if (!materializeCoopV2ReplacementPickerTerminal(image, runtime.controller.localSeatId, runtime.opState)) {
+            return false;
+          }
+          const checkpoint = reconstructCoopV2ReplacementCheckpoint(entry);
+          if (checkpoint == null) {
+            return false;
+          }
+          if (runtime.battleStream.hasFinalizedAuthoritativeV2Replacement(checkpoint)) {
+            return true;
+          }
+          runtime.battleStream.ingestAuthoritativeV2Replacement(checkpoint);
+          return false;
+        }
         const payload = entry.material.payload as TurnResolutionImage | undefined;
         const checkpoint = payload?.checkpoint;
         if (payload == null || checkpoint == null || typeof checkpoint !== "object") {
@@ -3550,7 +3697,25 @@ function buildCoopV2TurnLiveSeams(runtime: CoopRuntime): CoopV2LiveReplicaSeams 
       control: NonNullable<CoopNextControl>,
     ): CoopControlInstallResult | null => {
       if (control.kind !== "COMMAND_FRONTIER") {
-        return null; // only the successor command frontier is a turn-cutover control; anything else falls through to shadow.
+        if (control.kind !== "REPLACEMENT" || !surfaces.replacement) {
+          return null;
+        }
+        try {
+          const controlId = controlIdOf(control);
+          if (runtime.v2InstalledReplacementTargets.has(controlId)) {
+            return { kind: "already-installed", controlId };
+          }
+          // REPLACEMENT is the ordered authority-log acceptance frontier for the next already-resolved
+          // occurrence, not a request to open another picker on the replica. Waiting until that next entry
+          // is admitted is circular: the log cannot admit revision N+1 until revision N's control retires.
+          // Installing this exact typed target therefore advances only the protocol frontier; the following
+          // entry must still pass frame/order/material/picker/checksum admission before it can progress.
+          runtime.v2InstalledReplacementTargets.add(controlId);
+          return { kind: "installed", controlId };
+        } catch (error) {
+          coopWarn("v2-replacement", "live REPLACEMENT projectControl threw", error);
+          return null;
+        }
       }
       try {
         const controlId = controlIdOf(control as ProjectableControl);
@@ -3642,11 +3807,19 @@ function resolveCoopV2ShadowIdentity(runtime: CoopRuntime): CoopV2ShadowIdentity
 export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAuthorityV2Shadow | null {
   // Build the harness when EITHER the shadow OR the turn-cutover capability is negotiated - the cutover
   // reuses the SAME per-runtime log + frame channel. Off both => null, and every tap is a pure no-op.
-  if (runtime == null || !(isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_SHADOW) || isCoopV2TurnNegotiated())) {
+  if (
+    runtime == null
+    || !(
+      isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_SHADOW)
+      || isCoopV2TurnNegotiated()
+      || isCoopV2ReplacementNegotiated()
+    )
+  ) {
     return null;
   }
   const existing = coopV2ShadowHarnesses.get(runtime);
   if (existing != null) {
+    activateCoopV2Runtime(runtime);
     return existing;
   }
   if (coopV2ShadowBuildFailed.has(runtime)) {
@@ -3663,6 +3836,7 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
     // harness is pure shadow (byte-identical). Present, a delivered TURN_COMMIT applies against real engine
     // state + the real phase manager on the guest.
     const turnCutover = isCoopV2TurnNegotiated();
+    const replacementCutover = isCoopV2ReplacementNegotiated();
     const harness = new CoopAuthorityV2Shadow({
       identity,
       scene: globalScene,
@@ -3675,7 +3849,9 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
         // `CoopMessage` union (contract change request 3), so this crosses the seam type-exact, no cast.
         localTransport.send(frame);
       },
-      ...(turnCutover ? { liveReplica: buildCoopV2TurnLiveSeams(runtime) } : {}),
+      ...(turnCutover || replacementCutover
+        ? { liveReplica: buildCoopV2LiveSeams(runtime, { turn: turnCutover, replacement: replacementCutover }) }
+        : {}),
     });
     registerCoopV2ShadowInbound(frame => harness.handleInboundFrame(frame));
     setActiveCoopV2Shadow(harness);
@@ -3689,6 +3865,15 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
       setActiveCoopV2TurnCutover(cutover);
       coopLog("v2-turn", `turn CUTOVER active role=${runtime.controller.authorityRole} session=${identity.sessionId}`);
     }
+    if (replacementCutover) {
+      const cutover = new CoopV2ReplacementCutover(harness);
+      coopV2ReplacementCutovers.set(runtime, cutover);
+      setActiveCoopV2ReplacementCutover(cutover);
+      coopLog(
+        "v2-replacement",
+        `replacement CUTOVER active role=${runtime.controller.authorityRole} session=${identity.sessionId}`,
+      );
+    }
     coopLog(
       "v2-shadow",
       `harness built role=${runtime.controller.authorityRole} seat=${identity.localSeatId} session=${identity.sessionId}`,
@@ -3701,8 +3886,79 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
   }
 }
 
+function replacementCommandHp(
+  state: CoopAuthoritativeBattleStateV1,
+  seat: CoopAuthoritativeBattleStateV1["field"][number],
+): number | null {
+  const party = seat.side === "player" ? state.playerParty : state.enemyParty;
+  const record = party.find(mon => mon?.id === seat.pokemonId);
+  const hp = record?.hp;
+  return typeof hp === "number" && Number.isFinite(hp) ? hp : null;
+}
+
+/**
+ * HOST post-summon boundary: commit every staged faint at this complete carrier as Authority V2. `null`
+ * means this runtime is not cut over; `no-pending` lets unrelated/legacy replacement checkpoints keep their
+ * exact old path. A clean pre-commit failure can fall back to legacy; a partial result must terminalize,
+ * because starting a second authority after one V2 entry committed would violate the frozen contract.
+ */
+export function commitCoopV2ReplacementAuthority(
+  authorityCarrier: ReplacementAuthorityCarrier,
+): CoopV2ReplacementBatchResult | null {
+  const runtime = active;
+  if (runtime == null || runtime.controller.authorityRole !== "authority") {
+    return null;
+  }
+  const cutover = coopV2ReplacementCutovers.get(runtime);
+  if (cutover == null) {
+    return null;
+  }
+  const state = authorityCarrier.authoritativeState as CoopAuthoritativeBattleStateV1 | undefined;
+  if (state == null || typeof state !== "object" || !Array.isArray(state.field)) {
+    return { kind: "failed-clean" };
+  }
+  // Classic co-op commands every independently-owned PLAYER seat. Showdown uses a reflected side mapping;
+  // until its dedicated V2 command target mapper is installed, the replacement material remains terminal
+  // and the existing versus command relay owns the following input (never guess an enemy-side field index).
+  const commandSeats =
+    runtime.controller.isVersusSession() || !hasCoopV2ImmediateCommandSuccessor(state)
+      ? []
+      : state.field
+          .filter(seat => seat.side === "player" && seat.pokemonId > 0 && (replacementCommandHp(state, seat) ?? 1) > 0)
+          .sort((left, right) => left.bi - right.bi);
+  const commands = commandSeats
+    .map(seat => {
+      const ownerSeatId =
+        Number.isSafeInteger(seat.ownerSeatId) && (seat.ownerSeatId as number) >= 0
+          ? (seat.ownerSeatId as number)
+          : seat.owner === "host"
+            ? 0
+            : seat.owner === "guest"
+              ? 1
+              : null;
+      return ownerSeatId == null
+        ? null
+        : {
+            ownerSeatId,
+            pokemonId: seat.pokemonId,
+            fieldIndex: seat.bi,
+          };
+    })
+    .filter((command): command is { ownerSeatId: number; pokemonId: number; fieldIndex: number } => command != null);
+  if (commands.length !== commandSeats.length) {
+    return { kind: "failed-clean" };
+  }
+  return cutover.commitStagedHostReplacements({ authorityCarrier, commands });
+}
+
 /** Dispose + drop the shadow harness for a runtime (teardown). Idempotent. */
 function disposeCoopV2Shadow(runtime: CoopRuntime): void {
+  const replacementCutover = coopV2ReplacementCutovers.get(runtime);
+  if (replacementCutover != null) {
+    clearActiveCoopV2ReplacementCutover(replacementCutover);
+    replacementCutover.dispose();
+    coopV2ReplacementCutovers.delete(runtime);
+  }
   const cutover = coopV2TurnCutovers.get(runtime);
   if (cutover != null) {
     clearActiveCoopV2TurnCutover(cutover);
@@ -3805,6 +4061,7 @@ export function coopSessionGeneration(): number {
 /** Register the live co-op session (called when a co-op run is being set up). */
 export function setCoopRuntime(runtime: CoopRuntime): void {
   active = runtime;
+  activateCoopV2Runtime(runtime);
   runtimeSceneBindings.set(runtime, globalScene);
   // Wave-2e: point the operation journal at THIS runtime's durability manager. Load-bearing in the duo
   // harness, where two runtimes coexist in-process and `withClient` swaps the active one per pumped client -
@@ -6094,6 +6351,12 @@ function buildLocalCoopCapabilities(durabilityEnabled: boolean): CoopCapabilityK
   if (isCoopV2TurnEnabled()) {
     caps.push(COOP_CAP_AUTHORITY_V2_TURN);
   }
+  // Replacement reuses the turn surface's aggregate COMMAND projector, so advertise it only when this
+  // build can advertise both. Negotiation still intersects each key independently and the runtime requires
+  // both, making a mixed build fail closed to the complete legacy replacement path.
+  if (isCoopV2ReplacementEnabled() && isCoopV2TurnEnabled()) {
+    caps.push(COOP_CAP_AUTHORITY_V2_REPLACEMENT);
+  }
   return caps;
 }
 
@@ -6337,6 +6600,7 @@ export function assembleCoopRuntime(
     opState,
     waveOperationBinding,
     v2InstalledCommandTargets: new Set<string>(),
+    v2InstalledReplacementTargets: new Set<string>(),
   };
   sharedTerminalStates.set(runtime, {
     frozen: false,

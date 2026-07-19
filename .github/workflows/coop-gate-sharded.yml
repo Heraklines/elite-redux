@@ -142,6 +142,10 @@ jobs:
         env:
           COOP_BROWSER_OUT_DIR: dist-coop-browser
           VITE_COOP_SERVER_URL: http://127.0.0.1:4174
+          # Browser-native transport qualification must execute the same negotiated Authority V2 surfaces
+          # as the engine shards; a Node-only COOP_* variable is not visible in the Vite bundle.
+          VITE_COOP_AUTHORITY_V2_TURN: "on"
+          VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"
           BUNDLE_CACHE_HIT: ${{ steps.bundle-cache.outputs.cache-hit }}
         shell: bash
         run: |
@@ -450,6 +454,9 @@ jobs:
           # Success = clean 3-shard baseline + "host IGNORE cosmetic turn ACK" lines,
           # zero "Turn ACK was missing/stale" terminals on clean turns.
           COOP_AUTHORITY_V2_TURN: "on"
+          # Surface 2: picker decisions are staged, then committed with the complete post-summon carrier.
+          # Its authority log owns retention/redelivery; the legacy faint-op/checkpoint loops are cosmetic.
+          COOP_AUTHORITY_V2_REPLACEMENT: "on"
         shell: bash
         run: |
           set +e

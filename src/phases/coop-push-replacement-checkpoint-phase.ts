@@ -9,7 +9,12 @@ import { Phase } from "#app/phase";
 import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { captureCoopAuthoritativeCarrier } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { coopSessionGeneration, getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import {
+  commitCoopV2ReplacementAuthority,
+  coopSessionGeneration,
+  getCoopBattleStreamer,
+  getCoopController,
+} from "#data/elite-redux/coop/coop-runtime";
 
 /**
  * Co-op (#633, the guest-faint deadlock): pushed by the HOST right after it auto-summons a
@@ -83,6 +88,34 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
           fatal(`Host could not capture replacement authority for wave ${wave}, turn ${turn}.`);
           return;
         }
+        const v2 = commitCoopV2ReplacementAuthority({
+          checkpoint: carrier.checkpoint,
+          checksum: carrier.checksum,
+          preimage: carrier.preimage,
+          fullField: carrier.fullField,
+          authoritativeState: carrier.authoritativeState,
+          epoch: controller.sessionEpoch,
+          wave: carrier.authoritativeState.wave,
+          turn: carrier.authoritativeState.turn,
+        });
+        if (v2?.kind === "committed") {
+          coopLog(
+            "v2-replacement",
+            `host committed ${v2.entries.length} complete post-summon replacement entr${v2.entries.length === 1 ? "y" : "ies"}`,
+          );
+          this.end();
+          return;
+        }
+        if (v2?.kind === "failed-clean" || v2?.kind === "failed-partial") {
+          const committed = v2.kind === "failed-partial" ? v2.entries.length : 0;
+          fatal(
+            `Authority V2 replacement commit failed after ${committed} committed entr${committed === 1 ? "y" : "ies"} `
+              + `for wave ${wave}, turn ${turn}; refusing a second legacy authority.`,
+          );
+          return;
+        }
+        // `null` = this session is not cut over. `no-pending` = this checkpoint was produced by a still-
+        // legacy path (for example the versus host's vanilla own-side switch). Preserve that path exactly.
         coopLog("checkpoint", "host push OUT-OF-BAND replacement checkpoint (partner-slot auto-summon)");
         streamer.sendCheckpoint(
           "replacement",

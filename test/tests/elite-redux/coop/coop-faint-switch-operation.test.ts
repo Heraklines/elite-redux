@@ -15,6 +15,7 @@ import {
   coopFaintSwitchOperationAddress,
   markCoopFaintSwitchPickerSettled,
   materializeCoopFaintSwitchPickerTerminal,
+  materializeCoopV2ReplacementPickerTerminal,
   registerCoopFaintSwitchPickerTerminal,
   resetCoopFaintSwitchOperationFlag,
   resetCoopFaintSwitchOperationState,
@@ -132,6 +133,37 @@ describe("co-op faint-switch operation migration", () => {
     ).toBe(false);
     markCoopFaintSwitchPickerSettled(8, 2, COOP_GUEST_FIELD_INDEX, binding, 17);
     expect(materializeCoopFaintSwitchPickerTerminal(envelope, binding)).toBe(true);
+  });
+
+  it("V2 treats an explicit wiped-half null as the exact absence of a picker, but retains a concrete pick", () => {
+    const guestState = createCoopRuntimeOpState("guest");
+    const base = {
+      sourceAddress: {
+        epoch: 1,
+        wave: 8,
+        turn: 2,
+        occurrence: 17,
+        fieldIndex: COOP_GUEST_FIELD_INDEX,
+      },
+      ownerSeatId: 1,
+      resolution: "fallback-auto" as const,
+    };
+    expect(
+      materializeCoopV2ReplacementPickerTerminal({ ...base, selected: null }, 1, guestState),
+      "zero legal choices means the renderer correctly opened no modal",
+    ).toBe(true);
+    expect(
+      materializeCoopV2ReplacementPickerTerminal(
+        {
+          ...base,
+          sourceAddress: { ...base.sourceAddress, occurrence: 18 },
+          selected: { partySlot: 3, speciesId: 6 },
+        },
+        1,
+        guestState,
+      ),
+      "a concrete timeout fallback must still close its exact live picker before state installation",
+    ).toBe(false);
   });
 
   it("materializes only the exact old-address picker before acknowledging a timeout fallback", () => {
