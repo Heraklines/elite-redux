@@ -7834,9 +7834,27 @@ export function assembleCoopRuntime(
       && isCoopAuthoritativeGuest()
       && usesRetainedCoopWaveTransaction(runtime)
     ) {
-      const retainedWave = getCoopPendingWaveContinuationBoundary(runtime.waveOperationBinding);
-      if (retainedWave != null) {
-        maybeMarkCoopWaveContinuationReady(retainedWave.wave, runtime.waveOperationBinding, runtime);
+      if (coopV2WaveCutovers.has(runtime)) {
+        // V2 suppresses creation of the legacy wave journal, so consulting only that journal here made the
+        // real GameOver and no-shop next-COMMAND hooks permanent no-ops after cutover: DATA applied, but the
+        // ordered entry could never publish controlInstalled. Select exactly one unfinished V2 transaction
+        // and retry it while this real public surface is current. The projector still proves the immutable
+        // destination's phase, wave, owner/actor, active handler, and terminal id; an unrelated or ambiguous
+        // surface remains deferred and sends no receipt.
+        const candidates = [...runtime.v2WaveTransactions.values()].filter(
+          transaction => transaction.dataApplied && !transaction.continuationReady,
+        );
+        if (candidates.length === 1) {
+          const completed = coopV2ShadowHarnesses.get(runtime)?.retryPendingReplicaEntries() ?? 0;
+          if (completed > 0) {
+            coopLog("v2-wave", `real ${surface} surface completed ${completed} retained V2 entry`);
+          }
+        }
+      } else {
+        const retainedWave = getCoopPendingWaveContinuationBoundary(runtime.waveOperationBinding);
+        if (retainedWave != null) {
+          maybeMarkCoopWaveContinuationReady(retainedWave.wave, runtime.waveOperationBinding, runtime);
+        }
       }
     }
     durability?.retryDeferred("op:global");
