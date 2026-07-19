@@ -488,6 +488,9 @@ test("the companion solo lane publicly selects a readiness-proven empty save slo
   assert.match(navigation, /event\.observation\.selectedOptionId === "empty-slot:0"/u);
   assert.match(navigation, /await client\.press\("Space", "fresh-save-slot-0"\)/u);
   assert.match(solo, /await selectFirstEmptySaveSlot\(client,/u);
+  assert.match(solo, /chooseBestCampaignMove\(fight\.observation\)/u);
+  assert.match(solo, /targetId: move\.optionId/u);
+  assert.doesNotMatch(solo, /surfaceId: FIGHT_SURFACE,\s+targetId: "cursor:0"/u);
 });
 
 function soloCommandProgressClient(promptCount) {

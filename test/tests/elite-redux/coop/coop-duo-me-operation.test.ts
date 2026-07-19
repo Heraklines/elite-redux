@@ -74,6 +74,7 @@ import {
   installDuoLogCapture,
   relayGuestMeShopLeaveSync,
   type ShopPhaseSeam,
+  settleDuoPromise,
   startGuestMeOutcomeRace,
   startGuestMeReplay,
   startGuestMeShopOwner,
@@ -732,10 +733,28 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       guestCommand.start();
       await drainLoopback();
     });
-    await withClient(rig.guestCtx, async () => {
-      for (let i = 0; i < 16 && rig.guestScene.ui.getMode() !== UiMode.COMMAND; i++) {
-        await drainLoopback();
+    // Starting either realm first necessarily parks it at the reciprocal rendezvous.
+    // A fixed one-sided drain loop is not representative of two event loops and races
+    // the guest's enemy-atlas/material apply. Alternate both complete contexts until
+    // both real phase starts expose COMMAND, bounded like the production barrier.
+    const commandSurfacesOpened = (async () => {
+      const deadline = Date.now() + 5_000;
+      while (
+        (rig.hostScene.ui.getMode() !== UiMode.COMMAND || rig.guestScene.ui.getMode() !== UiMode.COMMAND)
+        && Date.now() < deadline
+      ) {
+        await new Promise<void>(resolve => setTimeout(resolve, 10));
       }
+      if (rig.hostScene.ui.getMode() !== UiMode.COMMAND || rig.guestScene.ui.getMode() !== UiMode.COMMAND) {
+        throw new Error(
+          `post-ME command surfaces did not open: host=${UiMode[rig.hostScene.ui.getMode()]}, `
+            + `guest=${UiMode[rig.guestScene.ui.getMode()]}`,
+        );
+      }
+    })();
+    await settleDuoPromise(rig, commandSurfacesOpened, "post-ME reciprocal command surfaces", {
+      timeoutMs: 5_000,
+      intervalMs: 5,
     });
     expect(rig.hostScene.ui.getMode(), "host exposed the next public command continuation").toBe(UiMode.COMMAND);
     expect(rig.guestScene.ui.getMode(), "guest exposed the next public command continuation").toBe(UiMode.COMMAND);

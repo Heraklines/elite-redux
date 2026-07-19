@@ -11,6 +11,7 @@
  */
 
 import {
+  chooseBestCampaignMove,
   confirmDefaultStarterTeam,
   selectFirstEmptySaveSlot,
   selectOptionById,
@@ -170,12 +171,18 @@ export async function runSoloClassic(client) {
     submit: true,
   });
 
-  // The Fight move menu is a real option surface; pick the first move by id and submit.
-  await waitForSemantic(client, FIGHT_SURFACE, client.config.timeoutMs);
+  // The Fight move menu exposes stable move ids rather than the old generic cursor ids.
+  // Choose a real usable move from that visible projection, then navigate/submit with
+  // the same public-key primitive this companion lane exists to validate.
+  const fight = await waitForSemantic(client, FIGHT_SURFACE, client.config.timeoutMs);
   await client.checkpoint("solo-fight-menu");
+  const move = chooseBestCampaignMove(fight.observation);
+  if (move == null) {
+    throw new Error(`${client.label}: solo FIGHT surface exposed no usable move`);
+  }
   await selectOptionById(client, {
     surfaceId: FIGHT_SURFACE,
-    targetId: "cursor:0",
+    targetId: move.optionId,
     navKeys: ["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"],
     submit: true,
   });

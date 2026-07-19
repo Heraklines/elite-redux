@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 const files = [
   "public-ui-harness.mjs",
   "campaign-nav.mjs",
+  "solo-classic.mjs",
   "journeys.mjs",
   "run.mjs",
   "evidence.mjs",
@@ -49,6 +50,7 @@ for (const file of files) {
 
 const harness = sources.get("public-ui-harness.mjs");
 const campaignNav = sources.get("campaign-nav.mjs");
+const soloClassic = sources.get("solo-classic.mjs");
 const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
 const evidence = sources.get("evidence.mjs");
 if (
@@ -69,6 +71,13 @@ if (
   failures.push(
     "public-ui-harness.mjs: both public players must own independent Chrome processes and contexts with bounded teardown",
   );
+}
+if (
+  !soloClassic?.includes("chooseBestCampaignMove(fight.observation)")
+  || !soloClassic.includes("targetId: move.optionId")
+  || soloClassic.includes('surfaceId: FIGHT_SURFACE,\n    targetId: "cursor:0"')
+) {
+  failures.push("solo public-UI validation must select a stable visible usable move instead of a stale cursor id");
 }
 const evaluateCalls = harness?.match(/page\.evaluate\(/gu)?.length ?? 0;
 if (evaluateCalls !== 1 || !harness?.includes("document.activeElement.blur()")) {
