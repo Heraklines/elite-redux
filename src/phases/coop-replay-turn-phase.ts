@@ -360,6 +360,25 @@ export class CoopReplayTurnPhase extends Phase {
             }
             streamer.consumeCheckpointForTurn(this.turn, this.sourceWave);
             streamer.retainAppliedOutOfBandCheckpoint(envelope);
+            // A replacement checkpoint for N+1 is also the authoritative proof that the renderer has
+            // crossed the numeric turn boundary. The normal V2 TURN path intentionally cannot advance
+            // that cursor when its successor is a replacement rather than an immediate command surface.
+            // Adopt it here before opening CommandPhase; otherwise the UI is visually on N+1 while
+            // CommandPhase ships its proposal under stale turn N and the host waits forever.
+            const liveTurn = globalScene.currentBattle.turn;
+            if (liveTurn + 1 === envelope.turn) {
+              globalScene.currentBattle.incrementTurn();
+              globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
+              coopLog("replay", `guest replacement adopted authoritative turn cursor ${liveTurn}->${envelope.turn}`);
+            } else if (liveTurn !== envelope.turn && liveTurn !== envelope.turn + 1) {
+              this.failAuthority(
+                streamer,
+                "replacement",
+                `Replacement authority turn ${envelope.turn} cannot continue from live turn ${liveTurn}.`,
+                envelope,
+              );
+              return;
+            }
             // Showdown versus (Task F1): the versus guest owns its ENTIRE player field (a 1v1 -> field
             // slot 0). The co-op seat map used by coopLocalOwnedPlayerFieldSlot() resolves the fixed
             // GUEST slot (COOP_GUEST_FIELD_INDEX = 1), which is EMPTY in a 1v1 single battle - so the
