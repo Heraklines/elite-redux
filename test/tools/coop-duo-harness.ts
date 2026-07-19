@@ -3026,11 +3026,14 @@ export async function driveGuestRewardWatch(
     if (!drivesLiveQueuedPhase) {
       return;
     }
-    // A host watching a guest-owned retained intent has only consumed the INTENT here. Its current phase
+    // A HOST watching a guest-owned retained intent has only consumed the INTENT here. Its current phase
     // cannot exit until the guest materializes the host RESULT and the exact receipt returns. The caller
-    // must pump that peer causal leg, then use awaitRewardShopPhaseExit on both live phases. This is not a
-    // completed counter-only terminal: the local counter is deliberately still pinned.
-    if (terminalApplied && !advancedPastPinned()) {
+    // must pump that peer causal leg, then use awaitRewardShopPhaseExit on both live phases. A GUEST watcher
+    // is different: the host-authoritative RESULT has already materialized locally, so its real phase must
+    // finish the asynchronous MESSAGE close before this helper returns. Treating both directions alike left
+    // the guest's SelectModifierPhase current, causing the ordered final ME leave to remain correctly
+    // deferred behind the shop forever in every no-battle Mystery test.
+    if (terminalApplied && !advancedPastPinned() && getCoopRuntime()?.controller.role === "host") {
       return;
     }
     // Keep this client's complete context installed until the real async MESSAGE transition invokes

@@ -44,6 +44,7 @@ import { UiMode } from "#enums/ui-mode";
 import { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  awaitRewardShopPhaseExit,
   buildDuoForMe,
   drainGuestMeReplayToSettle,
   drainLoopback,
@@ -269,6 +270,10 @@ describe.skipIf(!RUN)(
         for (let i = 0; i < 16; i++) {
           await drainLoopback();
         }
+        // The retained RESULT has mechanically completed the guest-owned shop, but its public MESSAGE
+        // transition is still the executable surface until Phase.end() releases it. A browser scheduler
+        // waits for that close before PostMystery can receive the ordered final leave; prove the same edge.
+        await awaitRewardShopPhaseExit(guestShop);
       });
       await withClient(rig.hostCtx, async () => {
         for (let i = 0; i < 16; i++) {

@@ -62,6 +62,7 @@ import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  awaitRewardShopPhaseExit,
   buildDuoForMe,
   drainGuestMeReplayToSettle,
   drainLoopback,
@@ -484,6 +485,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       for (let i = 0; i < 16; i++) {
         await drainLoopback();
       }
+      await awaitRewardShopPhaseExit(guestShop);
     });
     await withClient(rig.hostCtx, async () => {
       for (let i = 0; i < 16; i++) {
@@ -642,6 +644,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
           break;
         }
       }
+      await withClient(rig.guestCtx, () => awaitRewardShopPhaseExit(guestShop));
       await game.phaseInterceptor.to("PostMysteryEncounterPhase");
     });
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once for the ME").toBe(

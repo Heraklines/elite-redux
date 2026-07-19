@@ -3501,7 +3501,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           while (!hostReachedDestination && Date.now() < hostDriveDeadline) {
             // No guest pump is needed after its complete pick is queued. Keeping the engine's async option
             // callback in host context also prevents a Promise continuation from ending the guest phase.
-            await withClient(rig.hostCtx, () => drainLoopback());
+            // `hostDrive` deliberately holds the host ClientCtx open for this whole destination crossing.
+            // Re-entering the same ctx on every pump invalidates the outer scope's realm generation and can
+            // make coopHostAwaitGuestIndex's exact liveness fence reject a valid pick after resolving it.
+            // Two browsers never nest-install their own realm; drain the already-installed host directly.
+            await drainLoopback();
             if (hostDriveError != null) {
               throw hostDriveError;
             }

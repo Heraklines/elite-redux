@@ -1626,15 +1626,17 @@ export class CoopFinalizeTurnPhase extends Phase {
       // TurnInit/Command or execute damaging end-of-turn mechanics. Omitting it left a real browser pair
       // on reward:<wave>:hostTurn+1 vs reward:<wave>:guestTurn with otherwise byte-identical state.
       const advanceRenderedTurnBoundary = (): void => {
+        const renderedCursorAlreadyAdvanced = globalScene.currentBattle.turn > this.turn;
         const supersedingReplacementAlreadyOpenedNextTurn =
           this.turnCommitSupersededBy?.reason === "replacement" && this.turnCommitSupersededBy.turn === this.turn + 1;
-        if (supersedingReplacementAlreadyOpenedNextTurn) {
-          // A retained N+1 faint-replacement checkpoint already supplied the exact numeric successor
-          // boundary. Incrementing again here opens phantom N+2 on the renderer while the authority remains
-          // on N+1 (the idle-picker fallback failure). Same-turn replacements still take the normal advance.
+        if (renderedCursorAlreadyAdvanced || supersedingReplacementAlreadyOpenedNextTurn) {
+          // A retained N+1 faint-replacement checkpoint or an already-adopted authoritative image supplied
+          // the exact numeric successor boundary. The latter can precede the out-of-band checkpoint itself
+          // while an idle replacement picker is open. Incrementing either cursor again opens phantom N+2 on
+          // the renderer while the authority remains on N+1. Same-turn replays still take the normal advance.
           coopLog(
             "replay",
-            `guest finalize turn=${this.turn}: retained replacement already opened turn=${this.turn + 1}; skipping duplicate increment`,
+            `guest finalize turn=${this.turn}: rendered cursor already at turn=${globalScene.currentBattle.turn}; skipping duplicate increment`,
           );
         } else {
           globalScene.currentBattle.incrementTurn();

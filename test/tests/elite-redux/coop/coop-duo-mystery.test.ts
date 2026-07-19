@@ -51,6 +51,7 @@ import { UiMode } from "#enums/ui-mode";
 import { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  awaitRewardShopPhaseExit,
   beginRewardShopWatch,
   buildDuoForMe,
   drainGuestMeReplayNewRounds,
@@ -556,6 +557,7 @@ describe.skipIf(!RUN)(
             break;
           }
         }
+        await withClient(rig.guestCtx, () => awaitRewardShopPhaseExit(guestShop));
         await game.phaseInterceptor.to("PostMysteryEncounterPhase");
       });
 
