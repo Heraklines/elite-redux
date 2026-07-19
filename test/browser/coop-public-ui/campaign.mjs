@@ -651,18 +651,14 @@ export function createMysteryNarrationAdvancer(rig, from, stats, purpose) {
           observation.localSeat === observation.ownerSeat
           && observation.seatsWithInput?.includes(observation.ownerSeat)
           && observation.seatsWithInput?.includes(observation.localSeat);
-        // #816 (GUEST-owned ME): the authoritative HOST runs the sole ME engine (MysteryEncounterPhase)
-        // and, per ui.ts processInputCoopAware, ADVANCES ITS OWN engine MESSAGE dialogue itself while a
-        // GUEST owns the ME - the guest renderer (CoopReplayMePhase) cannot drive the host's authoritative
-        // narration (its Space advances only the local replay, never relays), so NOTHING else presses the
-        // host's outcome prompt and MysteryEncounterPhase parks forever (Track R mystery-gauntlet lane,
-        // wave-1 ME: host stalled at an actionable mystery-encounter:message awaiting the owner seat). The
-        // host is NOT the owner here (localSeat !== ownerSeat) and its engine dialogue omits the owner seat
-        // from its own input, so this branch is disjoint from ownerDrives and never fires on a host-owned ME.
-        const hostEngineDialogue =
-          client === rig.host
-          && observation.phase === "MysteryEncounterPhase"
-          && observation.localSeat !== observation.ownerSeat;
+        // #816 (GUEST-owned ME): the authoritative HOST runs the sole ME engine and, per ui.ts
+        // processInputCoopAware, ADVANCES ITS OWN engine MESSAGE dialogue while a GUEST owns the ME. The
+        // guest renderer (CoopReplayMePhase) cannot drive the host's authoritative narration (its Space
+        // advances only the local replay, never relays), so NOTHING else presses the host's opening,
+        // selected-option, reward, quiz, or post-event prompt. The host is NOT the owner here
+        // (localSeat !== ownerSeat), so this branch is disjoint from ownerDrives and never fires on a
+        // host-owned ME. The outer interactiveMysteryPhases fence still limits this to production ME phases.
+        const hostEngineDialogue = client === rig.host && observation.localSeat !== observation.ownerSeat;
         return (
           observation.surfaceId === "mystery-encounter:message"
           && observation.operationClass === "encounter-prompt"
