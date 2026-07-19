@@ -46,14 +46,21 @@ export type { CoopV2LiveReplicaSeams } from "#data/elite-redux/coop/authority-v2
 
 // ---------------------------------------------------------------------------
 // Build-feature gate. DEFAULT OFF (unlike the shadow harness, which is default
-// ON): the cutover authorizes real progression, so it ships dark and CI flips it
-// per-lane with env COOP_AUTHORITY_V2_TURN=on. Advertising it is still gated on
-// BOTH peers negotiating - a locally-on build paired with a locally-off build
-// drops the capability from the intersection and BOTH stay on legacy.
+// ON): the cutover authorizes real progression, so it ships dark. Browser builds
+// flip it with VITE_COOP_AUTHORITY_V2_TURN=on; node-pure/engine CI may use the
+// legacy COOP_AUTHORITY_V2_TURN=on process variable. Reading BOTH is load-bearing:
+// `process` is absent in a Vite browser bundle, so a process-only flag made every
+// supposedly cutover-enabled public-browser campaign silently certify legacy.
+// Advertising is still gated on BOTH peers negotiating - a locally-on build paired
+// with a locally-off build drops the capability from the intersection and BOTH
+// stay on legacy.
 // ---------------------------------------------------------------------------
-const COOP_V2_TURN_ENABLED = typeof process !== "undefined" && process.env?.COOP_AUTHORITY_V2_TURN === "on";
+const viteEnv = import.meta.env as unknown as Record<string, string | undefined>;
+const COOP_V2_TURN_ENABLED =
+  viteEnv.VITE_COOP_AUTHORITY_V2_TURN === "on"
+  || (typeof process !== "undefined" && process.env?.COOP_AUTHORITY_V2_TURN === "on");
 
-/** Whether this build ADVERTISES the authority-v2 turn/command cutover capability (default OFF; on with env COOP_AUTHORITY_V2_TURN=on). */
+/** Whether this build advertises the Authority V2 turn/command cutover capability (default OFF). */
 export function isCoopV2TurnEnabled(): boolean {
   return COOP_V2_TURN_ENABLED;
 }

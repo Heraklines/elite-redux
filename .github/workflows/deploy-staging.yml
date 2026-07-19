@@ -168,6 +168,9 @@ jobs:
             echo "VITE_SERVER_URL=${{ vars.STAGING_SERVER_URL }}"
             echo "VITE_COOP_SERVER_URL=https://er-coop-api-staging.heraklines.workers.dev"
             echo "VITE_COOP_SIGNALING_PROTOCOL=p33"
+            # Stabilization staging exercises the negotiated Authority V2 turn/command cutover. Production
+            # remains default-off until its separate all-green promotion qualification.
+            echo "VITE_COOP_AUTHORITY_V2_TURN=on"
             # Showdown battle telemetry (D5): dedicated worker + er-telemetry D1.
             # Without this the client falls back to VITE_SERVER_URL (404 no-op).
             echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry.heraklines.workers.dev"

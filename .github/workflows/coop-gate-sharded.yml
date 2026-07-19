@@ -449,7 +449,7 @@ jobs:
           # controlInstalled remains the sole retirement - never zero, never two).
           # Success = clean 3-shard baseline + "host IGNORE cosmetic turn ACK" lines,
           # zero "Turn ACK was missing/stale" terminals on clean turns.
-          COOP_AUTHORITY_V2_TURN: "off"
+          COOP_AUTHORITY_V2_TURN: "on"
         shell: bash
         run: |
           set +e

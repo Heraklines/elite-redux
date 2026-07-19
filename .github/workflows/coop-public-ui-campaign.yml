@@ -204,6 +204,9 @@ jobs:
           # exercises the same dev-gated picker and gauntlet schedule testers use on staging.
           VITE_DEV_TOOLS: 1
           VITE_COOP_LOBBY_ROOM_QUERY: 1
+          # The production-fidelity campaign must exercise the architecture being promoted, not silently
+          # fall back to legacy because browser bundles cannot read Node's COOP_AUTHORITY_V2_TURN variable.
+          VITE_COOP_AUTHORITY_V2_TURN: "on"
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_SERVER_URL: ${{ env.COOP_UI_API_ORIGIN }}
