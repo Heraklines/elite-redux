@@ -902,7 +902,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
-  // Partner Eevee - Omniform per-evolution movesets + Normal-status revert
+  // Partner Eevee - Omniform per-evolution movesets + Normal-move revert
   // ===========================================================================
   {
     label: "Partner: Eevee Omniform movesets",
@@ -910,16 +910,18 @@ export const DEV_SCENARIOS: DevScenario[] = [
       "Partner Eevee (the 'partner' Eevee form with the Fluffy + Omniform composite)\n"
       + "adapts mid-battle into a partner eeveelution based on the move TYPE it uses, and\n"
       + "EACH evolution carries its OWN moveset (rolled from that evolution's learnset).\n"
-      + "A Normal-type STATUS move reverts it to the base Eevee form.\n"
+      + "Every element type maps to its evolution; NORMAL maps back to base, so ANY\n"
+      + "Normal-type move (an ATTACK like Tackle OR a status move like Swords Dance)\n"
+      + "reverts a transformed eeveelution to the base Eevee form.\n"
       + "DO: turn 1, use Water Gun. Turn 2, open Fight and LOOK at the moves - the set is\n"
-      + "now Partner Vaporeon's OWN moveset (not Eevee's). Turn 2, use Ember (chains into\n"
-      + "Partner Flareon, again with Flareon's own moveset). Turn 3, use Swords Dance (a\n"
-      + "Normal status move).\n"
+      + "now Partner Vaporeon's OWN moveset (not Eevee's). Turn 2, use a Normal-type move\n"
+      + "the current form has - an ATTACK (e.g. Tackle) or a status move (e.g. Swords\n"
+      + "Dance); either reverts.\n"
       + "EXPECT: Water Gun turns Eevee into Partner Vaporeon ('adapted into Partner\n"
-      + "Vaporeon!') and its 3 other moves are replaced by Vaporeon's own set; Ember\n"
-      + "chains it into Partner Flareon with Flareon's own set; Swords Dance (Normal\n"
-      + "status) reverts it to the base Eevee form ('reverted to Eevee!') with Eevee's\n"
-      + "original moves back. Each form's moveset is independent and persists across the\n"
+      + "Vaporeon!') and its 3 other moves are replaced by Vaporeon's own set; the Normal\n"
+      + "move - damaging OR status - reverts it to the base Eevee form ('reverted to\n"
+      + "Eevee!') with Eevee's original moves back (a Normal ATTACK no longer keeps it in\n"
+      + "the eeveelution form). Each form's moveset is independent and persists across the\n"
       + "run (and a save/reload).",
     setup: () => {
       resetDevOverrides();
@@ -2947,6 +2949,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
     shopItems: [modifierTypes.DNA_SPLICERS, modifierTypes.ETHER, modifierTypes.MEMORY_MUSHROOM],
+  },
+  {
+    label: "UI: ER custom item icons render on the reward screen (Eject Pack / Room Service)",
+    description:
+      "UI fix (live log 2026-07-18): ER custom items (tactical/reactive held items, elemental\n"
+      + "Gems, terrain/ward seeds) are STANDALONE er_* textures, NOT frames in the 'items' atlas.\n"
+      + "The post-battle REWARD screen built its icon as an atlas frame, so Phaser logged 'Texture\n"
+      + '"items" has no frame "er_eject_pack"\' and the tile rendered BLANK (icons were fine in the\n'
+      + "summary items row + battle held-item bar, which use the ER-aware getIcon path). DO: win the\n"
+      + "opening battle and open the FIRST reward shop. EXPECT: the Eject Pack and Room Service tiles\n"
+      + "show their real item icons (a bag / a bell-hop bell), NOT a blank or placeholder box. Fixed\n"
+      + "by the shared addItemIconSprite resolver; harness golden test/tools/ui-baselines/\n"
+      + "modifier-select-er.png.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SNORE] }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_EJECT_PACK, modifierTypes.ER_ROOM_SERVICE],
   },
   {
     label: "(note) Co-op: the Dex Nav species picker opens only for the item USER (wiring audit)",

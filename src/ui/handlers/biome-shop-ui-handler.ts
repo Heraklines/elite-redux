@@ -23,6 +23,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { ER_BIOME_SHOP_SLOTS } from "#data/elite-redux/er-biome-economy";
+import { addItemIconSprite } from "#data/elite-redux/er-item-icon";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
@@ -454,14 +455,10 @@ export class BiomeShopUiHandler extends UiHandler {
 
       // Most items are FRAMES in the "items" atlas, but ER customs (gems, terrain
       // seeds, reactive items) are STANDALONE textures loaded via loadImage. Those
-      // aren't frames in the atlas, so look them up as their own texture first -
-      // otherwise the atlas-frame lookup misses and every one renders the same
-      // placeholder.
-      const iconKey = type?.iconImage;
-      const standalone = iconKey != null && globalScene.textures.exists(iconKey);
-      const icon = standalone
-        ? globalScene.add.sprite(x, y - 3, iconKey).setScale(0.75)
-        : globalScene.add.sprite(x, y - 3, "items", iconKey).setScale(0.75);
+      // aren't frames in the atlas, so addItemIconSprite looks them up as their own
+      // texture first - otherwise the atlas-frame lookup misses and every one renders
+      // the same placeholder.
+      const icon = addItemIconSprite(x, y - 3, type?.iconImage).setScale(0.75);
       if (type?.iconTint != null) {
         icon.setTint(type.iconTint);
       }
