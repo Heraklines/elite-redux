@@ -1565,6 +1565,44 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       hostStream.dispose();
     });
 
+    it("wakes a turn-N replay when a delayed exact N-1 replacement loses the race to local TurnInit", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostCurrent = { epoch: 7, wave: 4, turn: 2 };
+      const guestCurrent = { epoch: 7, wave: 4, turn: 3 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => hostCurrent });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => guestCurrent });
+      const parked = guestStream.awaitTurnOrLiveEvent(3, 0);
+      await flushWire();
+
+      // The renderer has already entered its derived turn-3 shell, but the host's retained replacement
+      // authority was captured at turn 2. The exact active turn-3 wait is the fail-closed evidence that
+      // admits this single predecessor carrier; arbitrary stale checkpoints remain cross-address drops.
+      const replacement = checkpointEnvelope(
+        "replacement",
+        { ...emptyCheckpoint(), tick: 21 },
+        "cafebabecafebabe",
+        emptyAuthoritativeState(4, 2, 22),
+      );
+      hostStream.sendCheckpoint(
+        replacement.reason,
+        replacement.epoch,
+        replacement.wave,
+        replacement.turn,
+        replacement.checkpoint,
+        replacement.checksum,
+        replacement.fullField,
+        replacement.authoritativeState,
+      );
+
+      expect(await parked).toEqual({ kind: "checkpoint" });
+      expect(guestStream.peekCheckpoint(), "ambient consumers cannot steal predecessor-address authority").toBeNull();
+      expect(guestStream.peekCheckpointForTurn(3)).toEqual(replacement);
+      expect(guestStream.consumeCheckpointForTurn(3)).toEqual(replacement);
+      expect(guestStream.peekCheckpointForTurn(3)).toBeNull();
+      guestStream.dispose();
+      hostStream.dispose();
+    });
+
     it("reasserts only a same-turn or exact N+1 applied replacement for a delayed resolution", () => {
       const { guest } = createLoopbackPair();
       const stream = new CoopBattleStreamer(guest);

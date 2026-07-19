@@ -455,6 +455,11 @@ export function getMoveAnimUrl(move: MoveId): string | null {
     }
     return `${ER_ANIMS_SUBDIR}/${slug}.json`;
   }
+  // Happy Hour intentionally has no bespoke animation asset. Route it to a stable self-status
+  // animation instead of synthesizing the known-missing happy-hour.json URL (fatal in browser gates).
+  if (move === MoveId.HAPPY_HOUR) {
+    return "./battle-anims/focus-energy.json";
+  }
   const enumKey = MoveId[move];
   if (!enumKey) {
     return null;

@@ -1477,7 +1477,7 @@ export class PostMysteryEncounterPhase extends Phase {
 
   constructor() {
     super();
-    this.onPostOptionSelect = globalScene.currentBattle.mysteryEncounter?.selectedOption?.onPostOptionPhase;
+    this.onPostOptionSelect = globalScene.currentBattle?.mysteryEncounter?.selectedOption?.onPostOptionPhase;
   }
 
   /**

@@ -26,7 +26,7 @@ on:
         description: Reward shop policy each wave (owner leaves, or takes the first option)
         required: true
         type: choice
-        default: leave
+        default: pick-first
         options:
           - leave
           - pick-first
@@ -289,12 +289,14 @@ jobs:
             difficulty: ace
             difficulty_option: ace
             require_mystery: "0"
+            reward_mode: leave
           - profile: animations-skipped-depth
             artifact: depth
             waves: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
             difficulty: ace
             difficulty_option: ace
             require_mystery: "0"
+            reward_mode: ${{ inputs.reward_mode || 'pick-first' }}
           - profile: mystery-gauntlet
             artifact: mystery
             waves: "10"
@@ -303,6 +305,7 @@ jobs:
             # (run 29586411356: selectOptionById target not in ["youngster","ace","elite","hell","mystery"]).
             difficulty_option: mystery
             require_mystery: "1"
+            reward_mode: leave
           # Account-state fidelity lane (harness post-mortem 2026-07-17): every other profile
           # registers PRISTINE accounts, which made the whole dirty-account bug class (full slots,
           # divergent co-op remnants, reclaim ranking, guest checkpoint no-safe-slot) invisible to
@@ -316,6 +319,7 @@ jobs:
             difficulty_option: ace
             require_mystery: "0"
             dirty_accounts: "1"
+            reward_mode: leave
     steps:
       - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
@@ -400,7 +404,7 @@ jobs:
           # an unknown surface) is now reachable ONLY by an explicit dispatch with auto_first=true - a
           # deliberate ordering test. push = loud-fail smoke, schedule = nightly, dispatch = gating.
           COOP_UI_CAMPAIGN_MODE: ${{ (github.event_name == 'schedule' && 'nightly') || (inputs.auto_first && 'shakedown') || 'gating' }}
-          COOP_UI_REWARD_MODE: ${{ inputs.reward_mode || 'leave' }}
+          COOP_UI_REWARD_MODE: ${{ matrix.reward_mode }}
           # auto-first is NEVER a default (not on push, not on nightly). Explicit opt-in only.
           COOP_UI_AUTO_FIRST: ${{ (inputs.auto_first && '1') || '0' }}
           # Default ON for push/schedule; only an explicit dispatch raise_speed=false turns it off.

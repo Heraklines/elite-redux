@@ -280,11 +280,17 @@ export class CoopReplayTurnPhase extends Phase {
               && envelope.epoch === controller?.sessionEpoch
               && envelope.wave === currentWave
               && checkpointWave === currentWave;
+            const exactPriorTurnReplacement =
+              envelope.reason === "replacement"
+              && envelope.turn + 1 === this.turn
+              && envelope.epoch === controller?.sessionEpoch
+              && envelope.wave === currentWave
+              && checkpointWave === currentWave;
             if (
               envelope.epoch !== controller?.sessionEpoch
               || envelope.wave !== currentWave
               || checkpointWave !== currentWave
-              || (!sameTurn && !exactNextTurnReplacement)
+              || (!sameTurn && !exactNextTurnReplacement && !exactPriorTurnReplacement)
             ) {
               // A replacement carrier can arrive after its turn already advanced through a win tail.
               // It is then obsolete, not an interaction for the next battle. The old unkeyed inbox let

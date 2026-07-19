@@ -29,6 +29,10 @@ describe("battle-anims — getMoveAnimUrl", () => {
       // BODY_SLAM → body-slam.json
       expect(getMoveAnimUrl(MoveId.BODY_SLAM)).toBe("./battle-anims/body-slam.json");
     });
+
+    it("routes assetless HAPPY_HOUR to a stable self-status fallback", () => {
+      expect(getMoveAnimUrl(MoveId.HAPPY_HOUR)).toBe("./battle-anims/focus-energy.json");
+    });
   });
 
   describe("ER-custom moves (id >= 5000)", () => {

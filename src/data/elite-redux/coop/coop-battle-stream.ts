@@ -1368,7 +1368,9 @@ export class CoopBattleStreamer {
   /**
    * Replacement authority is captured after TurnEnd increments the host battle turn. The guest can
    * legitimately still be parked on the just-resolved turn while its owner picker is open, so admit
-   * exactly N+1 only when an exact N turn wait proves that old boundary is still live.
+   * exactly N+1 only when an exact N turn wait proves that old boundary is still live. Conversely,
+   * a renderer can enter its derived TurnInit before the delayed replacement carrier arrives; admit
+   * exactly N-1 only while an exact N replay wait/request proves that successor shell is genuinely live.
    */
   private acceptsCheckpointAddress(envelope: CoopCheckpointEnvelope): boolean {
     if (this.acceptsCurrentAddress(envelope)) {
@@ -1380,7 +1382,7 @@ export class CoopBattleStreamer {
       || envelope.reason !== "replacement"
       || envelope.epoch !== current.epoch
       || envelope.wave !== current.wave
-      || envelope.turn !== current.turn + 1
+      || (envelope.turn !== current.turn + 1 && envelope.turn + 1 !== current.turn)
     ) {
       return false;
     }
@@ -1476,7 +1478,8 @@ export class CoopBattleStreamer {
       envelope.epoch === waitedAddress.epoch
       && envelope.wave === waitedAddress.wave
       && (envelope.turn === waitedAddress.turn
-        || (envelope.reason === "replacement" && envelope.turn === waitedAddress.turn + 1))
+        || (envelope.reason === "replacement"
+          && (envelope.turn === waitedAddress.turn + 1 || envelope.turn + 1 === waitedAddress.turn)))
     );
   }
 
@@ -2218,7 +2221,7 @@ export class CoopBattleStreamer {
     return false;
   }
 
-  /** Newest checkpoint capable of completing the exact replay-turn park, including its N+1 replacement. */
+  /** Newest checkpoint capable of completing the exact replay-turn park, including a bounded N±1 replacement. */
   private checkpointEntryForTurn(turn: number): [string, CoopCheckpointEnvelope] | undefined {
     const waitedAddress = this.currentAuthorityAddress(turn);
     if (this.authorityContext == null) {
@@ -2234,7 +2237,7 @@ export class CoopBattleStreamer {
           || (envelope.reason === "replacement"
             && envelope.epoch === waitedAddress.epoch
             && envelope.wave === waitedAddress.wave
-            && envelope.turn === waitedAddress.turn + 1),
+            && (envelope.turn === waitedAddress.turn + 1 || envelope.turn + 1 === waitedAddress.turn)),
       )
       .sort((left, right) => right[1].revision - left[1].revision)[0];
   }
