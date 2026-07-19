@@ -55,6 +55,7 @@ import {
   getCoopInteractionRelay,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
 import { Button } from "#enums/buttons";
@@ -680,6 +681,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       driveClientPhaseQueueTo(rig.hostScene, "host post-ME CommandPhase", {
         matches: phase =>
           phase.phaseName === "CommandPhase"
+          && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_HOST_FIELD_INDEX
           && rig.hostScene.currentBattle.waveIndex === ME_WAVE + 1
           && rig.hostScene.currentBattle.turn === 1,
         perPhaseTimeoutMs: 5_000,
@@ -700,6 +702,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       driveClientPhaseQueueTo(rig.guestScene, "guest post-ME CommandPhase", {
         matches: phase =>
           phase.phaseName === "CommandPhase"
+          && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX
           && rig.guestScene.currentBattle.waveIndex === ME_WAVE + 1
           && rig.guestScene.currentBattle.turn === 1,
         perPhaseTimeoutMs: 5_000,
@@ -721,16 +724,18 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     // so their reciprocal rendezvous opens the public COMMAND surfaces that publish the two outstanding
     // continuation proofs. Merely making CommandPhase current is not player-observable and cannot retire
     // retained authority; the old fixture asserted zero pending immediately before this call chain.
-    // The owner must publish the command frontier before the guest watcher tries to consume it.
-    // Starting the guest first manufactures a rendezvous timeout that no player can produce: in
-    // production the authoritative host materializes and starts this phase before its carrier is
-    // observed by the guest.
-    await withClient(rig.hostCtx, async () => {
-      hostCommand.start();
-      await drainLoopback();
-    });
+    // Each client must start its OWN slot. The guest's preceding host-owned slot is a renderer-only
+    // generated skip and driveClientPhaseQueueTo has already advanced past it. Starting those two owned
+    // phases in either order is production-reachable; start the guest first so its real arrival is queued
+    // before the host opens slot 0, matching the canonical soak driver. The former fixture stopped at
+    // slot 0 on BOTH clients, so the guest correctly auto-resolved the host's slot without arriving and
+    // the host waited forever for an owned-slot boundary the test had never started.
     await withClient(rig.guestCtx, async () => {
       guestCommand.start();
+      await drainLoopback();
+    });
+    await withClient(rig.hostCtx, async () => {
+      hostCommand.start();
       await drainLoopback();
     });
     // Starting either realm first necessarily parks it at the reciprocal rendezvous.
