@@ -147,16 +147,39 @@ export type ReplacementSuccessor =
   | { readonly kind: "terminal" };
 
 /**
+ * The complete post-summon authority carrier needed by a LIVE replacement cutover.
+ *
+ * The typed proposal identifies which replacement the authority resolved, but identity alone cannot
+ * materialize the resulting battle: the party reorder, active field, HP/status, moves/PP, held items,
+ * arena state, and checksum all belong to the post-summon engine image. These values deliberately remain
+ * opaque here, exactly like the turn adapter's cutover companions; the engine adapter validates their
+ * concrete shapes before it can sign materialApplied.
+ */
+export interface ReplacementAuthorityCarrier {
+  readonly checkpoint: unknown;
+  readonly checksum: unknown;
+  readonly preimage: unknown;
+  readonly fullField: unknown;
+  readonly authoritativeState: unknown;
+  readonly epoch: unknown;
+  readonly wave: unknown;
+  readonly turn: unknown;
+}
+
+/**
  * The authoritative replacement IMAGE - the typed, digestible material the log
  * retains and the replica installs. It is the resolved proposal plus the
- * resolution mode; the log treats it as opaque JSON with a digest, but the
- * replica decodes it back into this exact shape.
+ * resolution mode. A shadow-only image omits `authorityCarrier`; a live cutover
+ * includes the complete post-summon carrier, and every companion is covered by
+ * the same material digest. The log treats it as opaque JSON, while the replica
+ * decodes and validates it before touching engine state.
  */
 export interface ReplacementCommitImage {
   readonly sourceAddress: ReplacementSourceAddress;
   readonly ownerSeatId: number;
   readonly resolution: ReplacementResolutionMode;
   readonly selected: ReplacementSelection | null;
+  readonly authorityCarrier?: ReplacementAuthorityCarrier;
 }
 
 // ---------------------------------------------------------------------------
@@ -326,6 +349,7 @@ export function replacementOperationId(address: ReplacementSourceAddress, ownerS
 export function toReplacementCommitImage(
   proposal: ReplacementProposal,
   resolution: ReplacementResolutionMode,
+  authorityCarrier?: ReplacementAuthorityCarrier,
 ): ReplacementCommitImage {
   const check = validateReplacementProposal(proposal);
   if (!check.ok) {
@@ -345,6 +369,20 @@ export function toReplacementCommitImage(
       proposal.selected == null
         ? null
         : { partySlot: proposal.selected.partySlot, speciesId: proposal.selected.speciesId },
+    ...(authorityCarrier === undefined
+      ? {}
+      : {
+          authorityCarrier: {
+            checkpoint: authorityCarrier.checkpoint,
+            checksum: authorityCarrier.checksum,
+            preimage: authorityCarrier.preimage,
+            fullField: authorityCarrier.fullField,
+            authoritativeState: authorityCarrier.authoritativeState,
+            epoch: authorityCarrier.epoch,
+            wave: authorityCarrier.wave,
+            turn: authorityCarrier.turn,
+          },
+        }),
   };
 }
 
@@ -391,6 +429,8 @@ export interface BuildReplacementCommitEntryInput {
   readonly proposal: ReplacementProposal;
   /** How it was resolved. */
   readonly resolution: ReplacementResolutionMode;
+  /** Complete post-summon carrier for live cutover; omitted by shadow-only parity taps. */
+  readonly authorityCarrier?: ReplacementAuthorityCarrier;
   /** The authority-stated successor control. */
   readonly successor: ReplacementSuccessor;
   /** Revisions this entry explicitly subsumes (supersession by log order); default none. */
@@ -417,7 +457,7 @@ export interface BuildReplacementCommitEntryInput {
 export function buildReplacementCommitEntry(
   input: BuildReplacementCommitEntryInput,
 ): Omit<CoopAuthorityEntry, "revision"> {
-  const image = toReplacementCommitImage(input.proposal, input.resolution);
+  const image = toReplacementCommitImage(input.proposal, input.resolution, input.authorityCarrier);
   const operationId = input.operationId ?? replacementOperationId(image.sourceAddress, image.ownerSeatId);
   if (!isValidOperationId(operationId)) {
     throw new Error(`[authority-v2/faint-replacement] invalid operationId ${String(operationId)}`);
@@ -558,6 +598,10 @@ export function decodeReplacementCommitMaterial(entry: CoopAuthorityEntry): Repl
   }
   const address = payload.sourceAddress as ReplacementSourceAddress;
   const selected = payload.selected as ReplacementSelection | null;
+  const authorityCarrier = decodeReplacementAuthorityCarrier(payload.authorityCarrier);
+  if (payload.authorityCarrier !== undefined && authorityCarrier == null) {
+    return null;
+  }
   const image: ReplacementCommitImage = {
     sourceAddress: {
       epoch: address.epoch,
@@ -569,6 +613,7 @@ export function decodeReplacementCommitMaterial(entry: CoopAuthorityEntry): Repl
     ownerSeatId: payload.ownerSeatId,
     resolution: payload.resolution,
     selected: selected == null ? null : { partySlot: selected.partySlot, speciesId: selected.speciesId },
+    ...(authorityCarrier == null ? {} : { authorityCarrier }),
   };
   // Digest must match the decoded image - proves the redelivery carries the exact
   // committed material (the log's tamper/duplicate guard), so we never install a
@@ -629,6 +674,35 @@ export interface ReplacementShadowParity {
   readonly selected: ReplacementSelection | null;
   /** The stable successor address (controlId), or `null` for a terminal successor. */
   readonly successorControlId: string | null;
+}
+
+function decodeReplacementAuthorityCarrier(value: unknown): ReplacementAuthorityCarrier | null {
+  if (!isPlainObject(value)) {
+    return null;
+  }
+  const required = [
+    "checkpoint",
+    "checksum",
+    "preimage",
+    "fullField",
+    "authoritativeState",
+    "epoch",
+    "wave",
+    "turn",
+  ] as const;
+  if (required.some(field => !(field in value))) {
+    return null;
+  }
+  return {
+    checkpoint: value.checkpoint,
+    checksum: value.checksum,
+    preimage: value.preimage,
+    fullField: value.fullField,
+    authoritativeState: value.authoritativeState,
+    epoch: value.epoch,
+    wave: value.wave,
+    turn: value.turn,
+  };
 }
 
 /**

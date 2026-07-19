@@ -31,6 +31,7 @@ import {
   makeReplacementApplier,
   type OpenReplacementPicker,
   type ReplacementApplierSurface,
+  type ReplacementAuthorityCarrier,
   type ReplacementCommitImage,
   type ReplacementProposal,
   type ReplacementSourceAddress,
@@ -70,6 +71,17 @@ const FRAME: CoopFrameContextV2 = {
   senderSeatId: 0,
   authoritySeatId: 0,
   connectionGeneration: 1,
+};
+
+const AUTHORITY_CARRIER: ReplacementAuthorityCarrier = {
+  checkpoint: { tick: 40, field: [{ hp: 81 }] },
+  checksum: "replacement-checksum",
+  preimage: '{"field":[{"hp":81}]}',
+  fullField: [{ side: "player", fieldIndex: 1, pokemonId: 4242 }],
+  authoritativeState: { version: 1, wave: 3, turn: 3, tick: 41 },
+  epoch: 1,
+  wave: 3,
+  turn: 3,
 };
 
 function address(over: Partial<ReplacementSourceAddress> = {}): ReplacementSourceAddress {
@@ -233,6 +245,34 @@ describe("buildReplacementCommitEntry", () => {
     expect(owner.material.digest).not.toBe(fallback.material.digest);
     // A terminal successor states no control.
     expect(owner.nextControl).toBeNull();
+  });
+
+  it("carries and digests every complete post-summon companion for live cutover", () => {
+    const built = buildReplacementCommitEntry({
+      context: FRAME,
+      proposal: proposal(),
+      resolution: "owner-pick",
+      authorityCarrier: AUTHORITY_CARRIER,
+      successor: { kind: "terminal" },
+    });
+    const image = built.material.payload as ReplacementCommitImage;
+    expect(image.authorityCarrier).toEqual(AUTHORITY_CARRIER);
+    expect(built.material.digest).toBe(
+      replacementImageDigest(toReplacementCommitImage(proposal(), "owner-pick", AUTHORITY_CARRIER)),
+    );
+
+    const changed = buildReplacementCommitEntry({
+      context: FRAME,
+      proposal: proposal(),
+      resolution: "owner-pick",
+      authorityCarrier: { ...AUTHORITY_CARRIER, checksum: "different-checksum" },
+      successor: { kind: "terminal" },
+    });
+    expect(
+      changed.material.digest,
+      "no post-summon companion may travel outside the authenticated material digest",
+    ).not.toBe(built.material.digest);
+    expect(decodeReplacementCommitMaterial({ ...built, revision: 6 })?.authorityCarrier).toEqual(AUTHORITY_CARRIER);
   });
 
   it("throws on a successor that would encode an invalid control", () => {
@@ -445,6 +485,48 @@ describe("replica applier (picker-close semantics)", () => {
     expect(ok).toBe(false);
     expect(install).not.toHaveBeenCalled();
     expect(decodeReplacementCommitMaterial(tampered)).toBeNull();
+  });
+
+  it("rejects a malformed or digest-tampered post-summon carrier before the engine seam runs", () => {
+    const built = buildReplacementCommitEntry({
+      context: FRAME,
+      proposal: proposal(),
+      resolution: "owner-pick",
+      authorityCarrier: AUTHORITY_CARRIER,
+      successor: { kind: "terminal" },
+    });
+    const entry: CoopAuthorityEntry = { ...built, revision: 10 };
+    const image = entry.material.payload as ReplacementCommitImage;
+    const install = vi.fn(() => true);
+    const tampered: CoopAuthorityEntry = {
+      ...entry,
+      material: {
+        ...entry.material,
+        payload: {
+          ...image,
+          authorityCarrier: { ...image.authorityCarrier, fullField: [{ pokemonId: 9999 }] },
+        },
+      },
+    };
+    expect(
+      makeReplacementApplier({ openPickerFor: () => null, installReplacementImage: install })(stubCtx, tampered),
+    ).toBe(false);
+    expect(install).not.toHaveBeenCalled();
+
+    const missingField = {
+      ...entry,
+      material: {
+        ...entry.material,
+        payload: {
+          ...image,
+          authorityCarrier: {
+            checkpoint: AUTHORITY_CARRIER.checkpoint,
+            checksum: AUTHORITY_CARRIER.checksum,
+          },
+        },
+      },
+    } as CoopAuthorityEntry;
+    expect(decodeReplacementCommitMaterial(missingField)).toBeNull();
   });
 });
 

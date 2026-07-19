@@ -44,6 +44,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import {
   buildReplacementCommitEntry,
+  type ReplacementAuthorityCarrier,
   type ReplacementProposal,
   type ReplacementResolutionMode,
   type ReplacementSuccessor,
@@ -247,6 +248,8 @@ export interface CoopV2ShadowReplacementTap {
   readonly proposal: ReplacementProposal;
   readonly resolution: ReplacementResolutionMode;
   readonly successor: ReplacementSuccessor;
+  /** Complete post-summon authority image. Required by live cutover, omitted by shadow-only taps. */
+  readonly authorityCarrier?: ReplacementAuthorityCarrier;
   /** The raw legacy comparand token (the legacy op id) - a DIFFERENT scheme, kept for the log. */
   readonly legacyDigest: string;
   /**
@@ -255,7 +258,11 @@ export interface CoopV2ShadowReplacementTap {
    * (v2 entry digest vs v2-digest-of-legacy-image) - a divergence means the resolved STATES differ, not the
    * encodings (deliverable 1).
    */
-  readonly legacyImage?: { readonly proposal: ReplacementProposal; readonly resolution: ReplacementResolutionMode };
+  readonly legacyImage?: {
+    readonly proposal: ReplacementProposal;
+    readonly resolution: ReplacementResolutionMode;
+    readonly authorityCarrier?: ReplacementAuthorityCarrier;
+  };
   readonly operationId?: string;
   readonly subsumes?: readonly number[];
 }
@@ -564,6 +571,7 @@ export class CoopAuthorityV2Shadow {
         proposal: input.proposal,
         resolution: input.resolution,
         successor: input.successor,
+        ...(input.authorityCarrier == null ? {} : { authorityCarrier: input.authorityCarrier }),
         ...(input.operationId == null ? {} : { operationId: input.operationId }),
         ...(input.subsumes == null ? {} : { subsumes: input.subsumes }),
       });
@@ -575,7 +583,13 @@ export class CoopAuthorityV2Shadow {
       const comparand =
         input.legacyImage == null
           ? input.legacyDigest
-          : replacementImageDigest(toReplacementCommitImage(input.legacyImage.proposal, input.legacyImage.resolution));
+          : replacementImageDigest(
+              toReplacementCommitImage(
+                input.legacyImage.proposal,
+                input.legacyImage.resolution,
+                input.legacyImage.authorityCarrier,
+              ),
+            );
       this.logParity("REPLACEMENT_COMMIT", entry.revision, v2Digest === comparand, "digest");
       return entry;
     });
