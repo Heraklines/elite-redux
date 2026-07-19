@@ -121,6 +121,42 @@ test("the replacement picker drive short-circuits a committed pick and guards re
   );
 });
 
+test("the replacement picker drive completes on a half-wiped close instead of spinning to timeout (depth+dirty lane)", async () => {
+  const harness = await readFile(new URL("public-ui-harness.mjs", import.meta.url), "utf8");
+  // Track R depth+dirty lane: an owner whose WHOLE half is wiped has NO legal same-owner replacement, so
+  // the product relays a no-pick sentinel and CLOSES the forced FAINT_SWITCH picker with the slot left
+  // empty (switch-phase.ts OWNER branch / the guest picker's committed-authority no-pick close), advancing
+  // to the next CommandPhase (coop-duo-half-wiped is green in the gate). The browser driver had NO
+  // half-wiped exit and spun to its timeout waiting for an actionable picker that never opens. Like its
+  // sibling awaitConcurrentOwnedReplacement, the drive must return on the close evidence.
+  assert.match(
+    harness,
+    /const REPLACEMENT_HALF_WIPED_CLOSE =\s*\/no legal same-owner replacement \\\(half wiped\\\)\|own-faint picker CLOSE from committed authority\[\^\\n\]\*party\\\[-1\\\]\/u;/u,
+  );
+  const drive = harness.slice(
+    harness.indexOf("async driveOwnedReplacementPicker("),
+    harness.indexOf("async leaveRewardsAndReachWave2("),
+  );
+  assert.ok(drive.length > 0, "driveOwnedReplacementPicker must precede leaveRewardsAndReachWave2");
+  // The wait loop probes the half-wiped close from the picker-open cursor and RETURNS (no pick owed) - it
+  // never reaches the "timed out waiting for an actionable owned replacement picker" throw for a half-wipe.
+  assert.match(
+    drive,
+    /const halfWipedClose = owner\.evidence\.find\(REPLACEMENT_HALF_WIPED_CLOSE, replacementCursors\[owner\.label\]\);\s*if \(halfWipedClose != null\) \{[\s\S]*?replacement-drive-half-wiped-close[\s\S]*?return;\s*\}/u,
+  );
+  // The half-wiped return sits BEFORE the actionable-surface timeout throw (so it short-circuits it) and
+  // AFTER the actionable-surface find (so a normal faint still drives its real picker first).
+  const findIdx = drive.indexOf(
+    "replacementSurface = findOwnedReadyReplacement(owner, replacementCursors[owner.label]);",
+  );
+  const halfWipeIdx = drive.indexOf("const halfWipedClose = owner.evidence.find(REPLACEMENT_HALF_WIPED_CLOSE");
+  const timeoutIdx = drive.indexOf("timed out waiting for an actionable owned replacement picker");
+  assert.ok(
+    findIdx >= 0 && halfWipeIdx > findIdx && timeoutIdx > halfWipeIdx,
+    "half-wiped exit ordered between the surface find and the timeout throw",
+  );
+});
+
 test("the sequential command round drives a late-opening owned replacement picker (staggered double faint)", async () => {
   const harness = await readFile(new URL("public-ui-harness.mjs", import.meta.url), "utf8");
   // Track R run 29640634363 depth lane: a staggered simultaneous double faint parks the authority in

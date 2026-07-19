@@ -48,6 +48,22 @@ const BATTLE_PROMPT_PHASES = new Map([
 ]);
 const ANIMATION_PROGRESS_ALLOWANCE_MS = 90_000;
 const OUTCOME_HARD_CEILING_MS = 360_000;
+// Track R cycle 13 - animations-on-surface profile calibration (integration-owner authorized).
+// INVESTIGATION FIRST: this is NOT generic timeout inflation. The launch config already sets every
+// anti-throttling flag (--disable-background-timer-throttling / --disable-backgrounding-occluded-windows
+// / --disable-renderer-backgrounding, see DuoPublicUiRig.launch), so there is no rAF-throttling defect to
+// fix. The runner has NO hardware GPU - Xvfb has no GL device, so Phaser renders through Chromium's
+// SwiftShader software WebGL (--use-gl=angle --use-angle=swiftshader-webgl), and TWO Chromium game loops
+// share four cores. Under that the per-EVENT move-animation cost is genuinely irreducible: measured ~18s
+// per streamed battle event (a real GPU client renders one in ~1-3s). A dense ~24-event turn therefore
+// needs ~440s of WALL CLOCK while sync stays byte-correct (per-turn checksums matched); the 360s default
+// ceiling expired it mid-animation even though nothing had diverged. The animations-on ceiling is derived
+// from that measured per-event cost times a bounded max turn-event count (with headroom over the observed
+// 24). It applies to the animations-on-surface profile ONLY - every other profile keeps
+// OUTCOME_HARD_CEILING_MS untouched (the depth/mystery profiles skip animations and never approach it).
+const ANIMATIONS_ON_MEASURED_PER_EVENT_MS = 18_000;
+const ANIMATIONS_ON_MAX_TURN_EVENTS = 32;
+const ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS = ANIMATIONS_ON_MEASURED_PER_EVENT_MS * ANIMATIONS_ON_MAX_TURN_EVENTS;
 
 function fromEach(clients, fn) {
   return Object.fromEntries(clients.map(client => [client.label, fn(client)]));
@@ -761,12 +777,23 @@ export async function waitForOutcomeBounded(
     stopOnOwnedCommandFrontier = false,
     advanceBattlePrompt = null,
     extendForAnimationProgress = false,
+    // Per-profile animation-aware hard ceiling (Track R cycle 13). Null = the default
+    // OUTCOME_HARD_CEILING_MS; only the animations-on-surface caller passes the calibrated value, so no
+    // other profile's budget changes. Ignored unless extendForAnimationProgress is set.
+    animationHardCeilingMs = null,
     singleSidedConfirmMs = 0,
   } = {},
 ) {
   const clients = Object.values(rig.clients);
   const fixedDeadline = Date.now() + timeoutMs;
-  const animationBudget = extendForAnimationProgress ? createAnimationProgressBudget(rig, from, timeoutMs) : null;
+  const animationBudget = extendForAnimationProgress
+    ? createAnimationProgressBudget(
+        rig,
+        from,
+        timeoutMs,
+        animationHardCeilingMs == null ? {} : { hardCeilingMs: animationHardCeilingMs },
+      )
+    : null;
   const confirmationHardDeadline =
     (animationBudget?.hardDeadline() ?? fixedDeadline) + Math.max(0, singleSidedConfirmMs);
   let singleSidedCandidate = null;
@@ -957,6 +984,7 @@ async function driveBattleWave(rig, policy, stats) {
       outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, {
         advanceBattlePrompt,
         extendForAnimationProgress: true,
+        animationHardCeilingMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : null,
         stopOnOwnedCommandFrontier: true,
         singleSidedConfirmMs: SINGLE_SIDED_COMMAND_CONFIRM_MS,
       });
@@ -974,6 +1002,7 @@ async function driveBattleWave(rig, policy, stats) {
       outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, {
         advanceBattlePrompt,
         extendForAnimationProgress: true,
+        animationHardCeilingMs: policy.moveAnimationsExpected ? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : null,
         stopOnOwnedCommandFrontier: true,
         singleSidedConfirmMs: SINGLE_SIDED_COMMAND_CONFIRM_MS,
       });
