@@ -454,14 +454,17 @@ export class CoopReplayMePhase extends Phase {
       return;
     }
     const rewardAddress = parseCoopRewardOptionsKey(key)?.rewardSurface;
-    if (isCoopMeOperationJournalActive() && rewardAddress != null && this.acceptedTerminal.kind === "pending") {
+    if (isCoopMeOperationJournalActive() && rewardAddress != null) {
       // Typed standard reward surfaces are declared by a complete retained settlement. The raw options
       // may arrive first on the relay channel, but are only DATA for the eventual SelectModifierPhase;
-      // they are never authority to leave this replay phase or expose pre-settlement shared state.
-      coopLog("me", "typed reward options buffered behind retained no-battle settlement", {
+      // they are never authority to leave this replay phase or expose shared state. This remains true
+      // AFTER reward-settled applies: an edge retained while the transaction was pending must not wake
+      // later and replace its authoritative MysteryEncounterRewardsPhase with the legacy detached shop.
+      coopLog("me", "typed reward options retained for the declared no-battle reward continuation", {
         counter: this.interactionCounter,
         key,
         rewardSurface: rewardAddress.surfaceId,
+        terminal: this.acceptedTerminal.kind,
       });
       return;
     }

@@ -317,7 +317,12 @@ export class CoopReplayTurnPhase extends Phase {
             if (!streamer.acknowledgeReplacement(envelope, "materialApplied")) {
               return;
             }
-            const presentationReady = await this.awaitReplacementPresentation(streamer, envelope);
+            const presentation = this.beginReplacementPresentation(streamer, envelope);
+            // A destination-scoped headless oracle can prove the projection synchronously. Do not insert
+            // an `await` in that branch: the two-engine harness swaps its process-global scene between
+            // clients at microtask boundaries, so yielding after the exact same-scene proof would discard
+            // the valid continuation. Production atlas settlement remains pending and keeps the deadline.
+            const presentationReady = presentation.kind === "immediate" ? presentation.ready : await presentation.ready;
             if (!presentationReady) {
               this.failAuthority(
                 streamer,
@@ -727,50 +732,54 @@ export class CoopReplayTurnPhase extends Phase {
     return false;
   }
 
-  private awaitReplacementPresentation(
+  private beginReplacementPresentation(
     streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
     envelope: CoopCheckpointEnvelope,
-  ): Promise<boolean> {
+  ): ReturnType<typeof beginCoopAuthoritativeProjectionSettlement> {
     const generation = coopSessionGeneration();
-    return new Promise(resolve => {
-      let settled = false;
-      let cancelDeadline: () => void = () => {};
-      const finish = (ready: boolean): void => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        cancelDeadline();
-        // The replay pump has its own exact active-instance fence. Use it instead of the phase
-        // manager's current pointer: focused two-engine drivers can run the pump as a detached
-        // renderer phase, while production can temporarily expose a presentation child during an
-        // awaited atlas load. In both cases a newer replay, abort, end, session replacement, or
-        // streamer replacement invalidates this completion before it can ACK presentationReady.
-        resolve(
-          ready
-            && !this.aborted
-            && !this.ended
-            && generation === coopSessionGeneration()
-            && getCoopBattleStreamer() === streamer
-            && activeCoopReplayTurnPhase === this,
+    const presentation = beginCoopAuthoritativeProjectionSettlement(envelope.authoritativeState);
+    const remainsExactBoundary = (ready: boolean): boolean =>
+      ready
+      && !this.aborted
+      && !this.ended
+      && generation === coopSessionGeneration()
+      && getCoopBattleStreamer() === streamer
+      && activeCoopReplayTurnPhase === this;
+    if (presentation.kind === "immediate") {
+      return { kind: "immediate", ready: remainsExactBoundary(presentation.ready) };
+    }
+    return {
+      kind: "pending",
+      ready: new Promise(resolve => {
+        let settled = false;
+        let cancelDeadline: () => void = () => {};
+        const finish = (ready: boolean): void => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          cancelDeadline();
+          // The replay pump has its own exact active-instance fence. Use it instead of the phase
+          // manager's current pointer: production can temporarily expose a presentation child during
+          // an awaited atlas load. A newer replay, abort, end, session replacement, or streamer
+          // replacement invalidates this completion before it can ACK presentationReady.
+          resolve(remainsExactBoundary(ready));
+        };
+        const scheduledCancel = streamer.scheduleAuthorityRetry(
+          () => finish(false),
+          REPLACEMENT_PRESENTATION_TIMEOUT_MS,
         );
-      };
-      const scheduledCancel = streamer.scheduleAuthorityRetry(() => finish(false), REPLACEMENT_PRESENTATION_TIMEOUT_MS);
-      if (settled) {
-        scheduledCancel();
-      } else {
-        cancelDeadline = scheduledCancel;
-      }
-      const presentation = beginCoopAuthoritativeProjectionSettlement(envelope.authoritativeState);
-      if (presentation.kind === "immediate") {
-        finish(presentation.ready);
-      } else {
+        if (settled) {
+          scheduledCancel();
+        } else {
+          cancelDeadline = scheduledCancel;
+        }
         void presentation.ready.then(
           ready => finish(ready),
           () => finish(false),
         );
-      }
-    });
+      }),
+    };
   }
 
   /**

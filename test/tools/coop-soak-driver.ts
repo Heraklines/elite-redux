@@ -158,6 +158,7 @@ import {
   type ShopPhaseSeam,
   startGuestMeOutcomeRace,
   startGuestMeReplay,
+  startGuestMeShopOwner,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -3353,29 +3354,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // SelectModifierPhase watcher; the headless scheduler edge below starts it so its arrival releases
         // the host barrier exactly as the browser scheduler would.
         withClientSync(rig.hostCtx, () => hostShop.start());
-        let guestShop!: ShopPhaseSeam;
-        await withClient(rig.guestCtx, async () => {
-          for (let i = 0; i < 8; i++) {
-            await drainLoopback();
-            const current = rig.guestScene.phaseManager.getCurrentPhase();
-            if (current?.phaseName === "SelectModifierPhase") {
-              guestShop = current as unknown as ShopPhaseSeam;
-              // The headless phase manager stops before start(); a browser scheduler starts an unshifted
-              // phase as soon as it becomes current. Start THIS production-queued watcher once so it sends
-              // its reciprocal shop arrival and opens the same public projection a human guest sees. Merely
-              // observing phaseName let the driver commit the host's private terminal while its barrier was
-              // still closed, leaving a stale wave-15 promise that reopened MODIFIER_SELECT over wave 16.
-              if (guestShop.typeOptions == null) {
-                guestShop.start();
-              }
-              await drainLoopback();
-              break;
-            }
-          }
-        });
-        if (guestShop == null) {
-          fail("no-park", wave, "guest never reached the host-owned ME embedded reward shop");
-        }
+        // Cross the manual scheduler edges on the REAL production queue. In journal mode the complete
+        // reward-settled transaction first queues MysteryEncounterRewardsPhase, which then materializes
+        // its declared SelectModifierPhase. A browser starts both on successive frames; the headless
+        // client must do the same instead of waiting only for the child and declaring a false strand.
+        await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
 
         // Flush the guest arrival under the host context, then commit the already-started owner shop exactly
         // once (do not call driveHostRewardShopOwner: it would start the phase/barrier a second time). A
