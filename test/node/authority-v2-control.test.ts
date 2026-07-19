@@ -223,8 +223,10 @@ describe("validateNextControl", () => {
     expect(validateNextControl(replacement({ occurrence: 0, ownerSeatId: 0, fieldIndex: 0 })).ok).toBe(true);
   });
 
-  it("rejects empty, duplicate-field, and duplicate-Pokemon command frontiers", () => {
+  it("rejects empty and duplicate-field command frontiers while allowing side-scoped Pokemon ids", () => {
     expect(validateNextControl(command({ commands: [] })).ok).toBe(false);
+    // Opposing parties may legally reuse a numeric Pokemon id. Canonical fieldIndex + owner seat keeps
+    // both targets unambiguous, so Showdown must not reject the complete two-sided frontier.
     expect(
       validateNextControl(
         command({
@@ -244,7 +246,7 @@ describe("validateNextControl", () => {
           ],
         }),
       ).ok,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("rejects empty opaque ids", () => {

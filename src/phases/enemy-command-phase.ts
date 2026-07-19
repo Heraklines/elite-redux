@@ -1,5 +1,10 @@
 import { globalScene } from "#app/global-scene";
-import { getCoopController, isAuthoritativeBattleSession, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
+import {
+  getCoopController,
+  isAuthoritativeBattleSession,
+  isVersusSession,
+  recordCoopV2CommandControlStarted,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
 import { isReplayRecording, recordReplayCommand } from "#data/elite-redux/replay-recorder";
@@ -39,6 +44,16 @@ export class EnemyCommandPhase extends FieldPhase {
 
   start() {
     super.start();
+
+    // Authority V2 Showdown proof: this is the real mechanically-active command phase for the local enemy
+    // side. On the host it awaits the guest's command; on the guest it is the inert renderer phase for the
+    // host's canonical player. Record before either branch exits and map back to canonical indices in runtime.
+    if (isVersusSession()) {
+      const commandPokemon = globalScene.getEnemyField()[this.fieldIndex];
+      if (commandPokemon != null) {
+        recordCoopV2CommandControlStarted(this.fieldIndex, commandPokemon.id, "enemy");
+      }
+    }
 
     // Co-op AUTHORITATIVE netcode only (#633, TRACK-2 Phase B): the GUEST never resolves
     // enemies - the host is the sole engine. Rolling the AI here (getNextMove /

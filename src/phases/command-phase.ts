@@ -689,15 +689,16 @@ export class CommandPhase extends FieldPhase {
     }
 
     const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
+    const v2Controller = globalScene.gameMode.isCoop || globalScene.gameMode.isShowdown ? getCoopController() : null;
 
     this.checkCommander();
 
     // Authority V2: prove the exact stated successor only from the REAL CommandPhase chokepoint, after
     // checkpoint adoption + field-index repair. This covers both an owner's interactive menu and the
     // non-owner's mechanical await/auto-resolve phase; merely requesting a projection never signs it.
-    if (coopController != null) {
+    if (v2Controller != null) {
       const commandPokemon = this.getPokemon();
-      recordCoopV2CommandControlStarted(this.fieldIndex, commandPokemon.id);
+      recordCoopV2CommandControlStarted(this.fieldIndex, commandPokemon.id, "player");
     }
 
     const hasGeneratedSkip = globalScene.currentBattle.turnCommands[this.fieldIndex]?.skip === true;

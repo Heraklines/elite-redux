@@ -23,6 +23,7 @@
 // =============================================================================
 
 import type { TurnResolutionImage } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
+import { resolveCoopV2CommandFrontier } from "#data/elite-redux/coop/authority-v2/command-frontier";
 import {
   activeCoopReplacementAuthorityMode,
   suppressesLegacyReplacementAckProgression,
@@ -2327,15 +2328,16 @@ export class CoopBattleStreamer {
       return false;
     }
     const hasImmediateCommand = hasCoopV2ImmediateCommandSuccessor(authoritativeState);
-    const commandSeats = hasImmediateCommand
-      ? authoritativeState.field
-          .filter(
-            seat =>
-              seat.side === "player" && seat.pokemonId > 0 && (authoritativeSeatHp(authoritativeState, seat) ?? 1) > 0,
-          )
-          .sort((a, b) => a.bi - b.bi)
-      : [];
-    if (hasImmediateCommand && commandSeats.length === 0) {
+    const commandFrontier = hasImmediateCommand
+      ? resolveCoopV2CommandFrontier(authoritativeState)
+      : { commands: [], unresolved: [] };
+    if (hasImmediateCommand && (commandFrontier.commands.length === 0 || commandFrontier.unresolved.length > 0)) {
+      if (commandFrontier.unresolved.length > 0) {
+        const unresolved = commandFrontier.unresolved
+          .map(issue => `${issue.seat.side}:bi${issue.seat.bi}:pokemon${issue.seat.pokemonId}:${issue.reason}`)
+          .join(",");
+        coopWarn("v2-turn", `host refused incomplete COMMAND frontier [${unresolved}]`);
+      }
       return false;
     }
     // Cutover surface 1: the v2 material must carry the COMPLETE legacy turn resolution (not just the
@@ -2355,38 +2357,15 @@ export class CoopBattleStreamer {
       turn,
       revision: authoritativeState.tick,
     };
-    // State the COMPLETE command frontier. Numeric seat identity is authoritative and scales to N seats.
-    // er-coop-41 still accepts a role-derived 0/1 identity for current persisted two-seat material, but an
-    // unowned field seat cannot be guessed: fail the commit so no partial frontier can retire the turn.
-    const commands = commandSeats.map(seat => {
-      const ownerSeatId =
-        Number.isSafeInteger(seat.ownerSeatId) && (seat.ownerSeatId as number) >= 0
-          ? (seat.ownerSeatId as number)
-          : seat.owner === "host"
-            ? 0
-            : seat.owner === "guest"
-              ? 1
-              : null;
-      return ownerSeatId == null
-        ? null
-        : {
-            ownerSeatId,
-            pokemonId: seat.pokemonId,
-            fieldIndex: seat.bi,
-          };
-    });
-    const completeCommands = commands.filter(
-      (command): command is { ownerSeatId: number; pokemonId: number; fieldIndex: number } => command != null,
-    );
-    if (completeCommands.length !== commandSeats.length) {
-      return false;
-    }
-    const ownerResolved = commandSeats.every(seat => seat.ownerSeatId != null);
+    // State the COMPLETE human command frontier through the single canonical mapper shared with
+    // post-replacement commits. This includes Showdown's explicitly-owned authoritative enemy side while
+    // omitting ordinary AI enemies; an unowned human seat fails the whole commit instead of being guessed.
+    const completeCommands = [...commandFrontier.commands];
     const input: CoopV2ShadowTurnTap = {
       operationId: `TURN/e${epoch}/w${wave}/t${turn}`,
       capture,
       nextCommandFrontier:
-        commandSeats.length === 0
+        completeCommands.length === 0
           ? null
           : {
               epoch,
@@ -2399,8 +2378,7 @@ export class CoopBattleStreamer {
       // v2-digest-of-legacy-image); the full-state checksum stays as the raw legacy token for the log.
       legacyImage: capture,
       legacyDigest: checksum,
-      successorSeatSource:
-        commandSeats.length === 0 ? "none-non-command-boundary" : ownerResolved ? "owner-field" : "local-role-fallback",
+      successorSeatSource: completeCommands.length === 0 ? "none-non-command-boundary" : "owner-field",
     };
     if (cutoverActive) {
       // CUTOVER: commit the v2 TURN_COMMIT as the sole authority. A non-null entry => committed (legacy becomes

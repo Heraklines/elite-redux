@@ -197,7 +197,6 @@ function commandFrontierIssues(control: Record<string, unknown>): string[] {
   }
 
   const seenFields = new Set<number>();
-  const seenPokemon = new Set<number>();
   for (const [index, command] of control.commands.entries()) {
     if (!isPlainObject(command)) {
       issues.push(`commands[${index}]`);
@@ -211,12 +210,6 @@ function commandFrontierIssues(control: Record<string, unknown>): string[] {
         issues.push(`commands[${index}].fieldIndex: duplicate`);
       }
       seenFields.add(command.fieldIndex);
-    }
-    if (isPositiveInt(command.pokemonId)) {
-      if (seenPokemon.has(command.pokemonId)) {
-        issues.push(`commands[${index}].pokemonId: duplicate`);
-      }
-      seenPokemon.add(command.pokemonId);
     }
   }
   return issues;

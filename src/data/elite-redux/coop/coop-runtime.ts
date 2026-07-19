@@ -30,6 +30,10 @@ import type {
   CoopWaveAdvanceDestination,
   CoopWaveTransitionMaterialV2,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
+import {
+  resolveCoopV2CommandFrontier,
+  resolveCoopV2ShowdownCommandProof,
+} from "#data/elite-redux/coop/authority-v2/command-frontier";
 import type {
   CoopAuthorityEntry,
   CoopControlInstallResult,
@@ -78,8 +82,10 @@ import {
   coopAbilityPickerSeq,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
 import {
+  type CoopShowdownSeatAuthority,
   setCoopAuthoritativeGuestPredicate,
   setShowdownGuestFlipPredicate,
+  setShowdownSeatAuthorityResolver,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
   armCoopBargainJournalMaterialization,
@@ -3900,16 +3906,6 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
   }
 }
 
-function replacementCommandHp(
-  state: CoopAuthoritativeBattleStateV1,
-  seat: CoopAuthoritativeBattleStateV1["field"][number],
-): number | null {
-  const party = seat.side === "player" ? state.playerParty : state.enemyParty;
-  const record = party.find(mon => mon?.id === seat.pokemonId);
-  const hp = record?.hp;
-  return typeof hp === "number" && Number.isFinite(hp) ? hp : null;
-}
-
 /**
  * HOST post-summon boundary: commit every staged faint at this complete carrier as Authority V2. `null`
  * means this runtime is not cut over; `no-pending` lets unrelated/legacy replacement checkpoints keep their
@@ -3931,47 +3927,19 @@ export function commitCoopV2ReplacementAuthority(
   if (state == null || typeof state !== "object" || !Array.isArray(state.field)) {
     return { kind: "failed-clean" };
   }
-  // Classic co-op commands every independently-owned PLAYER seat. Showdown uses a reflected side mapping;
-  // until its dedicated V2 command target mapper is installed, the replacement material remains terminal
-  // and the existing versus command relay owns the following input (never guess an enemy-side field index).
-  const commandSeats =
-    runtime.controller.isVersusSession() || !hasCoopV2ImmediateCommandSuccessor(state)
-      ? []
-      : state.field
-          .filter(seat => seat.side === "player" && seat.pokemonId > 0 && (replacementCommandHp(state, seat) ?? 1) > 0)
-          .sort((left, right) => left.bi - right.bi);
-  const commands = commandSeats
-    .map(seat => {
-      const ownerSeatId =
-        Number.isSafeInteger(seat.ownerSeatId) && (seat.ownerSeatId as number) >= 0
-          ? (seat.ownerSeatId as number)
-          : seat.owner === "host"
-            ? 0
-            : seat.owner === "guest"
-              ? 1
-              : null;
-      return ownerSeatId == null
-        ? null
-        : {
-            ownerSeatId,
-            pokemonId: seat.pokemonId,
-            fieldIndex: seat.bi,
-          };
-    })
-    .filter((command): command is { ownerSeatId: number; pokemonId: number; fieldIndex: number } => command != null);
-  if (commands.length !== commandSeats.length) {
-    const unmapped = commandSeats
-      .filter(seat => !Number.isSafeInteger(seat.ownerSeatId) && seat.owner !== "host" && seat.owner !== "guest")
-      .map(seat => `${seat.side}:bi${seat.bi}:pokemon${seat.pokemonId}`)
+  const hasImmediateCommand = hasCoopV2ImmediateCommandSuccessor(state);
+  const commandFrontier = hasImmediateCommand ? resolveCoopV2CommandFrontier(state) : { commands: [], unresolved: [] };
+  if (hasImmediateCommand && (commandFrontier.commands.length === 0 || commandFrontier.unresolved.length > 0)) {
+    const unresolved = commandFrontier.unresolved
+      .map(issue => `${issue.seat.side}:bi${issue.seat.bi}:pokemon${issue.seat.pokemonId}:${issue.reason}`)
       .join(",");
     coopWarn(
       "v2-replacement",
-      `host refused replacement COMMAND frontier: ${commandSeats.length - commands.length} seat(s) lack stable ownership`
-        + ` [${unmapped || "unknown"}]`,
+      `host refused incomplete replacement COMMAND frontier [${unresolved || "no-human-command-seat"}]`,
     );
     return { kind: "failed-clean" };
   }
-  return cutover.commitStagedHostReplacements({ authorityCarrier, commands });
+  return cutover.commitStagedHostReplacements({ authorityCarrier, commands: commandFrontier.commands });
 }
 
 /** Dispose + drop the shadow harness for a runtime (teardown). Idempotent. */
@@ -4103,6 +4071,9 @@ export function setCoopRuntime(runtime: CoopRuntime): void {
   // Install the cycle-free showdown-guest-flip predicate (C5) so the render layer (pokemon.ts /
   // battle-info panels) can consult the versus-guest perspective flip without importing this module.
   setShowdownGuestFlipPredicate(isShowdownGuestFlip);
+  // Install the cycle-free host-canonical side -> authenticated seat resolver so authoritative capture
+  // stamps Showdown's two human sides without battle-engine importing this runtime value graph.
+  setShowdownSeatAuthorityResolver(resolveShowdownSeatAuthority);
   // A real browser receives under its own process-global scene. The two-engine harness can deliver while
   // the sender is active, so received terminal control is retained per runtime and routed only after this
   // destination runtime + scene are installed together.
@@ -4308,6 +4279,33 @@ export function isShowdownGuestFlip(): boolean {
   return isVersusSession() && getCoopController()?.role === "guest";
 }
 
+/**
+ * Canonical Showdown ownership: the authority controls the host/player side and the one other bound seat
+ * controls the guest/enemy side. Authenticated bindings must contain exactly one peer; only the unbound
+ * two-seat compatibility path may use the historic 0/1 fallback.
+ */
+function resolveShowdownSeatAuthority(): CoopShowdownSeatAuthority | null {
+  const controller = active?.controller;
+  if (controller == null || !controller.isVersusSession()) {
+    return null;
+  }
+  const hostSeatId = controller.authoritySeatId;
+  if (!Number.isSafeInteger(hostSeatId) || hostSeatId < 0) {
+    return null;
+  }
+  const binding = controller.authenticatedBinding;
+  if (binding == null) {
+    return { hostSeatId, guestSeatId: hostSeatId === 0 ? 1 : 0 };
+  }
+  const peerSeatIds = binding.seatMap.seats
+    .map(seat => seat.seatId)
+    .filter(seatId => Number.isSafeInteger(seatId) && seatId >= 0 && seatId !== hostSeatId);
+  if (peerSeatIds.length !== 1) {
+    return null;
+  }
+  return { hostSeatId, guestSeatId: peerSeatIds[0] };
+}
+
 /** Convenience: the live battle-command relay, or null when not in a co-op run. */
 export function getCoopBattleSync(): CoopBattleSync | null {
   return active?.battleSync ?? null;
@@ -4376,12 +4374,17 @@ export function coopOwnerOfPlayerFieldSlot(fieldIndex: number): CoopRole {
 }
 
 /**
- * Authority V2 COMMAND control proof. Called from CommandPhase only after its checkpoint funnel and any
- * field-index repair have completed, so the recorded identity is a REAL mechanically-active phase, not a
- * requested/queued projection. Exact owner/address/Pokemon fields make another seat, turn, or actor unable
- * to satisfy the receipt. Hard no-op outside an active negotiated turn cutover.
+ * Authority V2 COMMAND control proof. Called from the real player/enemy command phase only after its
+ * checkpoint funnel and field-index repair, so the recorded identity is mechanically active rather than a
+ * requested projection. Showdown's local guest world is reflected back to host-canonical battler indices
+ * before signing. Exact owner/address/Pokemon fields make another seat, turn, or actor unable to satisfy
+ * the receipt. Hard no-op outside an active negotiated turn cutover.
  */
-export function recordCoopV2CommandControlStarted(fieldIndex: number, pokemonId: number): void {
+export function recordCoopV2CommandControlStarted(
+  fieldIndex: number,
+  pokemonId: number,
+  localSide: "player" | "enemy" = "player",
+): void {
   const runtime = active;
   const battle = globalScene.currentBattle;
   if (
@@ -4395,21 +4398,40 @@ export function recordCoopV2CommandControlStarted(fieldIndex: number, pokemonId:
   ) {
     return;
   }
-  const owner = coopOwnerOfPlayerFieldSlot(fieldIndex);
-  const commandPokemon = globalScene.getPlayerField()[fieldIndex] as { coopOwnerSeatId?: number } | undefined;
-  // Prefer the stable numeric seat identity. The role fallback preserves current two-seat saves while
-  // er-coop-41 introduces the numeric field; N-seat sessions must populate coopOwnerSeatId explicitly.
-  const ownerSeatId =
-    Number.isSafeInteger(commandPokemon?.coopOwnerSeatId) && (commandPokemon?.coopOwnerSeatId as number) >= 0
-      ? (commandPokemon?.coopOwnerSeatId as number)
-      : owner === "host"
-        ? 0
-        : 1;
-  const target = {
-    ownerSeatId,
-    pokemonId,
-    fieldIndex,
-  };
+  let target: { ownerSeatId: number; pokemonId: number; fieldIndex: number };
+  if (runtime.controller.isVersusSession()) {
+    const seats = resolveShowdownSeatAuthority();
+    if (seats == null) {
+      return;
+    }
+    const showdownTarget = resolveCoopV2ShowdownCommandProof({
+      localRole: runtime.controller.role,
+      localSide,
+      fieldIndex,
+      pokemonId,
+      enemyOffset: battle.arrangement.enemyOffset,
+      ...seats,
+    });
+    if (showdownTarget == null) {
+      return;
+    }
+    target = showdownTarget;
+  } else {
+    if (localSide !== "player") {
+      return;
+    }
+    const owner = coopOwnerOfPlayerFieldSlot(fieldIndex);
+    const commandPokemon = globalScene.getPlayerField()[fieldIndex] as { coopOwnerSeatId?: number } | undefined;
+    // Prefer the stable numeric seat identity. The role fallback preserves current two-seat saves while
+    // er-coop-41 introduces the numeric field; N-seat sessions must populate coopOwnerSeatId explicitly.
+    const ownerSeatId =
+      Number.isSafeInteger(commandPokemon?.coopOwnerSeatId) && (commandPokemon?.coopOwnerSeatId as number) >= 0
+        ? (commandPokemon?.coopOwnerSeatId as number)
+        : owner === "host"
+          ? 0
+          : 1;
+    target = { ownerSeatId, pokemonId, fieldIndex };
+  }
   const control: Extract<NonNullable<CoopNextControl>, { kind: "COMMAND_FRONTIER" }> = {
     kind: "COMMAND_FRONTIER",
     epoch: runtime.controller.sessionEpoch,
@@ -6826,6 +6848,12 @@ export function clearCoopRuntime(): void {
   // every production start/connect path clears first, so a fresh pairing must never inherit prior-run edges.
   resetCoopUiRelayTrace();
   if (active == null) {
+    // A prior terminal path may have already nulled the runtime before the ordinary title teardown arrives.
+    // Cycle-free predicates are process-global, so clear them even on that idempotent second teardown; a
+    // later solo run must never inherit Showdown side ownership or renderer gating from the dead session.
+    setCoopAuthoritativeGuestPredicate(null);
+    setShowdownGuestFlipPredicate(null);
+    setShowdownSeatAuthorityResolver(null);
     // Capability negotiation belongs to the runtime/control plane, not the process. A full teardown
     // (unlike a hot rejoin, which never calls this function) must remove the frozen intersection even
     // when another terminal path already cleared the active runtime.
@@ -6935,6 +6963,7 @@ export function clearCoopRuntime(): void {
   // Clear the cycle-free authoritative-guest predicate so a subsequent solo / lockstep run reads false.
   setCoopAuthoritativeGuestPredicate(null);
   setShowdownGuestFlipPredicate(null);
+  setShowdownSeatAuthorityResolver(null);
   // #record-replay: stop + drop the captured trace at run teardown so the next run records fresh.
   clearReplayRecording();
   // Layer-B: drop the active per-runtime op-state so a post-teardown migrated-surface access fails LOUD

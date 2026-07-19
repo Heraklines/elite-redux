@@ -24,6 +24,14 @@ let predicate: (() => boolean) | null = null;
 /** The live showdown-guest-flip predicate, installed by coop-runtime; `null` reads as `false`. */
 let showdownFlipPredicate: (() => boolean) | null = null;
 
+export interface CoopShowdownSeatAuthority {
+  readonly hostSeatId: number;
+  readonly guestSeatId: number;
+}
+
+/** Live Showdown side-to-seat resolver, installed by coop-runtime; `null` means no bound versus run. */
+let showdownSeatAuthorityResolver: (() => CoopShowdownSeatAuthority | null) | null = null;
+
 /**
  * coop-runtime ONLY: install (or clear, with `null`) the real {@linkcode isCoopAuthoritativeGuestGated}
  * predicate. Called once when a session is registered and cleared on teardown so a subsequent solo /
@@ -86,5 +94,36 @@ export function isShowdownGuestFlipGated(): boolean {
     return showdownFlipPredicate?.() === true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * coop-runtime ONLY: install or clear the live canonical Showdown side-to-seat resolver. This shares the
+ * cycle-free gate with the presentation predicate because battle-engine cannot value-import coop-runtime.
+ */
+export function setShowdownSeatAuthorityResolver(resolver: (() => CoopShowdownSeatAuthority | null) | null): void {
+  showdownSeatAuthorityResolver = resolver;
+}
+
+/**
+ * Resolve host-canonical Showdown sides to authenticated numeric seats. A missing, throwing, malformed, or
+ * ambiguous binding returns null so Authority V2 refuses the frontier instead of guessing another seat.
+ */
+export function resolveShowdownSeatAuthorityGated(): CoopShowdownSeatAuthority | null {
+  try {
+    const seats = showdownSeatAuthorityResolver?.() ?? null;
+    if (
+      seats == null
+      || !Number.isSafeInteger(seats.hostSeatId)
+      || seats.hostSeatId < 0
+      || !Number.isSafeInteger(seats.guestSeatId)
+      || seats.guestSeatId < 0
+      || seats.hostSeatId === seats.guestSeatId
+    ) {
+      return null;
+    }
+    return seats;
+  } catch {
+    return null;
   }
 }

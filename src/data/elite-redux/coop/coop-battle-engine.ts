@@ -28,6 +28,7 @@ import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate"
 import {
   isCoopAuthoritativeGuestGated,
   isShowdownGuestFlipGated,
+  resolveShowdownSeatAuthorityGated,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
   buildCheckpoint,
@@ -2675,19 +2676,28 @@ function readAuthoritativeSeat(mon: Pokemon): CoopAuthoritativeFieldSeat {
   // launch slot map (field 0 = host, field 1 = guest). The authoritative carrier must serialize that
   // SAME resolved ownership. Serializing only a raw bench mon tag made a perfectly valid replacement
   // commandable in the engine but ownerless in Authority V2 after it was summoned, so a double faint
-  // failed closed before the replacement entries could commit. Showdown has no merged co-op field and
-  // deliberately receives no fallback here; its two human sides need their dedicated seat mapper.
+  // failed closed before the replacement entries could commit. In Showdown the host-canonical player side
+  // belongs to the authority and the enemy side to the authenticated peer; both are human command seats.
+  const showdownSeats = globalScene.gameMode.isShowdown ? resolveShowdownSeatAuthorityGated() : null;
   const resolvedOwner =
-    coopIdentity.coopOwner
-    ?? (side === "player" && globalScene.gameMode.isCoop ? coopOwnerOfFieldIndex(mon.getFieldIndex()) : undefined);
+    showdownSeats == null
+      ? (coopIdentity.coopOwner
+        ?? (side === "player" && globalScene.gameMode.isCoop ? coopOwnerOfFieldIndex(mon.getFieldIndex()) : undefined))
+      : side === "player"
+        ? "host"
+        : "guest";
   const ownerSeatId =
-    Number.isSafeInteger(coopIdentity.coopOwnerSeatId) && (coopIdentity.coopOwnerSeatId as number) >= 0
-      ? coopIdentity.coopOwnerSeatId
-      : resolvedOwner === "host"
-        ? 0
-        : resolvedOwner === "guest"
-          ? 1
-          : undefined;
+    showdownSeats == null
+      ? Number.isSafeInteger(coopIdentity.coopOwnerSeatId) && (coopIdentity.coopOwnerSeatId as number) >= 0
+        ? coopIdentity.coopOwnerSeatId
+        : resolvedOwner === "host"
+          ? 0
+          : resolvedOwner === "guest"
+            ? 1
+            : undefined
+      : side === "player"
+        ? showdownSeats.hostSeatId
+        : showdownSeats.guestSeatId;
   return {
     side,
     bi: mon.getBattlerIndex(),
