@@ -43,13 +43,14 @@ import {
   clearCoopRuntime,
   coopRetainedGameOverSupersedesReplay,
   flushCoopWaveResolvedAfterTurnCommit,
+  getCoopV2Shadow,
+  getCoopWaveBoundaryStatus,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import * as waveOp from "#data/elite-redux/coop/coop-wave-operation";
 import {
-  isCoopWaveAdvanceTransactionComplete,
   markCoopWaveAdvanceContinuationReady,
   markCoopWaveAdvanceDataApplied,
   resetCoopWaveAdvanceOperationFlag,
@@ -79,7 +80,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   let phaserGame: Phaser.Game;
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
-  /** The committed WAVE_ADVANCE payloads the GUEST routed into its live-mutation sink (the two-engine proxy). */
+  /** The decoded V2 WAVE_ADVANCE payloads admitted by the guest replica. */
   let routed: CoopWaveAdvancePayload[];
 
   beforeAll(() => {
@@ -149,14 +150,16 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
 
   /**
    * Drive the host's REAL wave-end commit chokepoint under a chosen battle context, then pump the loopback
-   * so the guest receives + routes the journaled op. Returns the host-committed payload (the op statement).
+   * so the guest admits the ordered V2 entry. Returns the host-committed payload (the authority statement).
    */
   async function commitAndDeliver(
     rig: DuoRig,
     outcome: "win" | "capture" | "flee" | "gameOver",
     ctx: { battleType?: BattleType; waveIndex?: number },
   ): Promise<CoopWaveAdvancePayload | undefined> {
-    const commitSpy = vi.spyOn(waveOp, "commitWaveAdvanceOwnerIntent");
+    const committedBefore = getCoopV2Shadow(rig.hostRuntime)?.diagnostics().committed ?? 0;
+    let hostOperationId: string | undefined;
+    let hostPayload: CoopWaveAdvancePayload | undefined;
     await withClient(rig.hostCtx, () => {
       if (ctx.battleType !== undefined) {
         rig.hostScene.currentBattle.battleType = ctx.battleType;
@@ -168,14 +171,33 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       if (outcome !== "gameOver") {
         broadcastCoopWaveEndState(outcome === "win" || outcome === "capture");
       }
+      const status = getCoopWaveBoundaryStatus(ctx.waveIndex ?? rig.hostScene.currentBattle.waveIndex, rig.hostRuntime);
+      expect(status?.authority, "the host boundary is owned by Authority V2").toBe("v2");
+      expect(status?.entryRevision, "the V2 authority committed an ordered log revision").toBeGreaterThan(0);
+      hostOperationId = status?.operationId;
+      hostPayload = status?.transition;
     });
     expect(
-      commitSpy.mock.calls.at(-1)?.[1],
-      "the host commit retains against the host runtime even while a second engine exists",
-    ).toBe(rig.hostRuntime.waveOperationBinding);
-    // Pump delivery under the GUEST ctx so its durability manager + live sink run as the guest.
-    await withClient(rig.guestCtx, () => drainLoopback());
-    return commitSpy.mock.calls.at(-1)?.[0].payload;
+      getCoopV2Shadow(rig.hostRuntime)?.diagnostics().committed,
+      "the host committed exactly one ordered V2 boundary",
+    ).toBe(committedBefore + 1);
+    // Pump delivery under the GUEST ctx so the decoded entry is admitted by that replica, never by
+    // whichever process-global scene happened to commit it.
+    await withClient(rig.guestCtx, () => {
+      return drainLoopback().then(() => {
+        const status = getCoopWaveBoundaryStatus(
+          ctx.waveIndex ?? rig.guestScene.currentBattle.waveIndex,
+          rig.guestRuntime,
+        );
+        expect(status?.authority, "the guest observed the decoded Authority V2 boundary").toBe("v2");
+        expect(status?.operationId, "both replicas address the same immutable operation").toBe(hostOperationId);
+        expect(status?.transition, "the guest admitted the host's exact transition statement").toEqual(hostPayload);
+        if (status != null) {
+          routed.push(status.transition);
+        }
+      });
+    });
+    return hostPayload;
   }
 
   it("still commits and routes the complete transaction when both raw wave carriers are dropped", async () => {
@@ -464,7 +486,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     const rig = await bootDuo({ preserveProductionWaveSink: true });
     const hostTerminal = new GameOverPhase(false);
     const hostTerminalHandler = vi.spyOn(hostTerminal, "handleGameOver").mockImplementation(() => {});
-    const unackedBefore = rig.hostRuntime.durability?.unackedCount() ?? 0;
+    const retainedBefore = getCoopV2Shadow(rig.hostRuntime)?.diagnostics().retained ?? 0;
     vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved").mockImplementation(() => {
       throw new Error("drop raw game-over carrier; retained WAVE_ADVANCE must recover");
     });
@@ -494,9 +516,9 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     });
     expect(hostTerminalHandler, "the authority opened its real GameOver continuation").toHaveBeenCalledOnce();
     expect(
-      rig.hostRuntime.durability?.unackedCount(),
-      "host terminal remains retained until the guest opens its terminal",
-    ).toBe(unackedBefore + 1);
+      getCoopV2Shadow(rig.hostRuntime)?.diagnostics().retained,
+      "host V2 terminal remains retained until the guest opens its terminal",
+    ).toBe(retainedBefore + 1);
 
     await withClient(rig.guestCtx, async () => {
       await drainLoopback();
@@ -520,15 +542,16 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       vi.spyOn(guestTerminal as GameOverPhase, "handleGameOver").mockImplementation(() => {});
       guestTerminal.start();
       expect(
-        isCoopWaveAdvanceTransactionComplete(7, rig.guestRuntime.waveOperationBinding),
-        "the guest terminal proves DATA applied plus continuation ready",
-      ).toBe(true);
+        getCoopWaveBoundaryStatus(7, rig.guestRuntime),
+        "the guest terminal proves V2 DATA applied plus continuation ready",
+      ).toMatchObject({ authority: "v2", dataApplied: true, continuationReady: true });
     });
 
     await withClient(rig.hostCtx, () => drainLoopback());
-    expect(rig.hostRuntime.durability?.unackedCount(), "the shared terminal proof releases retained authority").toBe(
-      unackedBefore,
-    );
+    expect(
+      getCoopV2Shadow(rig.hostRuntime)?.diagnostics().retained,
+      "the shared terminal proof releases retained V2 authority",
+    ).toBe(retainedBefore);
     logs.flush();
   }, 300_000);
 });

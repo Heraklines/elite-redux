@@ -8,8 +8,8 @@ import { captureCoopActiveMysteryControl } from "#data/elite-redux/coop/coop-me-
 import {
   failCoopSharedSession,
   getCoopActiveWaveTransition,
-  getCoopWaveAdvanceRuntimeBinding,
   isCoopAuthoritativeGuest,
+  resolveCoopRetainedWaveContinuationIdentity,
 } from "#data/elite-redux/coop/coop-runtime";
 import {
   coopShouldQueueBossVoucherReward,
@@ -21,7 +21,6 @@ import {
   getCoopTrainerVictoryBoundary,
   snapshotCoopTrainerVictoryBoundary,
 } from "#data/elite-redux/coop/coop-trainer-victory-boundary";
-import { getCoopPendingWaveContinuationBoundary } from "#data/elite-redux/coop/coop-wave-operation";
 import { erRecordAchievementTrainerVictory } from "#data/elite-redux/er-achievement-tracker";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { BiomeId } from "#enums/biome-id";
@@ -64,10 +63,18 @@ function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null 
     return { authoritativeGuest, victory, liveTrainerMatches: true };
   }
 
-  const retainedBinding = getCoopWaveAdvanceRuntimeBinding();
-  const retainedBoundary = retainedBinding == null ? null : getCoopPendingWaveContinuationBoundary(retainedBinding);
-  const retainedTransition = retainedBoundary == null ? null : getCoopActiveWaveTransition(retainedBoundary.wave);
-  if (retainedBoundary == null || retainedTransition?.victoryKind !== "trainer") {
+  const retainedIdentity = resolveCoopRetainedWaveContinuationIdentity(true);
+  if (retainedIdentity.kind !== "retained") {
+    const currentIdentity = globalScene.currentBattle?.trainer?.config.trainerType ?? "none";
+    const detail = retainedIdentity.kind === "invalid" ? ` ${retainedIdentity.reason}` : "";
+    failCoopSharedSession(
+      `The retained trainer-victory boundary was missing or mismatched (ambient trainer ${currentIdentity}).${detail}`,
+    );
+    return null;
+  }
+  const retainedBoundary = retainedIdentity.address;
+  const retainedTransition = getCoopActiveWaveTransition(retainedBoundary.wave);
+  if (retainedTransition?.victoryKind !== "trainer") {
     const currentIdentity = globalScene.currentBattle?.trainer?.config.trainerType ?? "none";
     failCoopSharedSession(
       `The retained trainer-victory boundary was missing or mismatched (ambient trainer ${currentIdentity}).`,
@@ -77,9 +84,9 @@ function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null 
 
   const victory = getCoopTrainerVictoryBoundary(globalScene, retainedBoundary.wave);
   if (victory == null || victory.sourceWave !== retainedBoundary.wave) {
-    const retainedIdentity = victory?.trainerType ?? "none";
+    const retainedTrainerType = victory?.trainerType ?? "none";
     failCoopSharedSession(
-      `The retained trainer-victory context for wave ${retainedBoundary.wave} was unavailable or mismatched (trainer ${retainedIdentity}).`,
+      `The retained trainer-victory context for wave ${retainedBoundary.wave} was unavailable or mismatched (trainer ${retainedTrainerType}).`,
     );
     return null;
   }
