@@ -97,6 +97,7 @@ import {
   getCoopInteractionRelay,
   getCoopMeBattleInteractionCounter,
   getCoopRuntime,
+  getCoopWaveBoundaryStatus,
   isCoopLearnMoveForwardInFlightEmpty,
   setCoopDexSyncDelayMs,
   setCoopRuntime,
@@ -110,7 +111,6 @@ import {
   getCoopUiRelayHitModes,
   resetCoopUiRelayTrace,
 } from "#data/elite-redux/coop/coop-ui-relay-trace";
-import { getCoopStagedWaveAdvanceTransaction } from "#data/elite-redux/coop/coop-wave-operation";
 import { erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { TerrainType } from "#data/terrain";
 import { BattleType } from "#enums/battle-type";
@@ -2748,24 +2748,25 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    */
   const awaitGuestWaveTransaction = async (wave: number, continuationReady: boolean): Promise<void> => {
     for (let attempt = 0; attempt < 24; attempt++) {
-      const staged = getCoopStagedWaveAdvanceTransaction(wave, rig.guestRuntime.waveOperationBinding);
+      const status = getCoopWaveBoundaryStatus(wave, rig.guestRuntime);
       const current = rig.guestScene.phaseManager.getCurrentPhase();
       const boundaryReleased = current?.phaseName !== "BattleEndPhase";
       if (
-        staged?.dataApplied === true
+        status?.dataApplied === true
         && boundaryReleased
-        && (!continuationReady || staged.continuationReady === true)
+        && (!continuationReady || status.continuationReady === true)
       ) {
         return;
       }
       await pumpDuoDestinations(rig, 1);
     }
-    const staged = getCoopStagedWaveAdvanceTransaction(wave, rig.guestRuntime.waveOperationBinding);
+    const status = getCoopWaveBoundaryStatus(wave, rig.guestRuntime);
     const current = rig.guestScene.phaseManager.getCurrentPhase();
     throw new Error(
       `guest retained wave ${wave} did not reach ${continuationReady ? "continuationReady" : "dataApplied/release"} `
         + `within 24 destination pumps (current=${current?.phaseName ?? "none"} `
-        + `dataApplied=${staged?.dataApplied === true} continuationReady=${staged?.continuationReady === true})`,
+        + `authority=${status?.authority ?? "none"} dataApplied=${status?.dataApplied === true} `
+        + `continuationReady=${status?.continuationReady === true})`,
     );
   };
 
@@ -4387,9 +4388,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         const modifiers = captureCoopSaveDataNormalized().modifiers;
         return Array.isArray(modifiers) ? structuredClone(modifiers as Record<string, unknown>[]) : [];
       });
-    const staged = getCoopStagedWaveAdvanceTransaction(wave, rig.guestRuntime.waveOperationBinding);
-    const victoryKind = (staged?.envelope.pendingOperation?.payload as { victoryKind?: unknown } | undefined)
-      ?.victoryKind;
+    const boundary = getCoopWaveBoundaryStatus(wave, rig.guestRuntime);
+    const victoryKind = boundary?.transition.victoryKind;
     const preCommandTopology = preCommandTopologies.get(wave);
     if (preCommandTopology == null) {
       throw new Error(`wave ${wave}: missing pre-command topology evidence`);
@@ -4403,12 +4403,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       hostPlayerModifiers: await modifiersFor(rig.hostCtx),
       guestPlayerModifiers: await modifiersFor(rig.guestCtx),
       retainedWaveTransaction:
-        staged == null
+        boundary == null
           ? null
           : {
-              operationId: staged.operationId,
-              dataApplied: staged.dataApplied,
-              continuationReady: staged.continuationReady,
+              operationId: boundary.operationId,
+              dataApplied: boundary.dataApplied,
+              continuationReady: boundary.continuationReady,
             },
       resyncHeals,
     });

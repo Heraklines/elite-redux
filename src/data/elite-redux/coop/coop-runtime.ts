@@ -3740,6 +3740,23 @@ interface CoopV2WaveLiveTransaction {
   readonly nextControlId: string;
   bootstrapProjected: boolean;
   dataApplied: boolean;
+  continuationReady: boolean;
+}
+
+/**
+ * Read-only, authority-neutral evidence for one wave boundary.
+ *
+ * This is deliberately not a compatibility transaction and cannot ACK, resend, apply, or release anything.
+ * Tests, diagnostics, and the public-driver soak use it so enabling Authority V2 does not make them inspect
+ * the retired V1 operation journal and falsely report a softlock after the V2 log has already completed.
+ */
+export interface CoopWaveBoundaryStatus {
+  readonly authority: "legacy" | "v2";
+  readonly operationId: string;
+  readonly transition: CoopWaveAdvancePayload;
+  readonly dataApplied: boolean;
+  readonly continuationReady: boolean;
+  readonly entryRevision?: number;
 }
 
 /** Everything tied to one live co-op session. */
@@ -3817,6 +3834,12 @@ export interface CoopRuntime {
   readonly v2InstalledReplacementTargets: Set<string>;
   /** Runtime-owned V2 wave/terminal transactions awaiting safe DATA and real destination proof. */
   readonly v2WaveTransactions: Map<number, CoopV2WaveLiveTransaction>;
+  /**
+   * Bounded read-only completion evidence. Completed entries leave the live map as soon as their exact
+   * public destination installs; retaining only their immutable status makes observability honest without
+   * retaining a second authority or allowing an old boundary to affect gameplay.
+   */
+  readonly v2CompletedWaveTransactions: Map<number, CoopV2WaveLiveTransaction>;
 }
 
 let active: CoopRuntime | null = null;
@@ -4100,6 +4123,7 @@ function decodeCoopV2WaveTransaction(entry: CoopAuthorityEntry): CoopV2WaveLiveT
     nextControlId: controlIdOf(entry.nextControl),
     bootstrapProjected: false,
     dataApplied: false,
+    continuationReady: false,
   };
 }
 
@@ -4245,6 +4269,19 @@ function applyCoopV2WaveEntry(runtime: CoopRuntime, entry: CoopAuthorityEntry): 
   return transaction.dataApplied ? true : "deferred";
 }
 
+function completeCoopV2WaveTransaction(runtime: CoopRuntime, transaction: CoopV2WaveLiveTransaction): void {
+  transaction.continuationReady = true;
+  runtime.v2CompletedWaveTransactions.set(transaction.transition.wave, transaction);
+  runtime.v2WaveTransactions.delete(transaction.transition.wave);
+  while (runtime.v2CompletedWaveTransactions.size > 32) {
+    const oldestWave = runtime.v2CompletedWaveTransactions.keys().next().value;
+    if (oldestWave == null) {
+      break;
+    }
+    runtime.v2CompletedWaveTransactions.delete(oldestWave);
+  }
+}
+
 function projectCoopV2WaveControl(
   runtime: CoopRuntime,
   control: NonNullable<CoopNextControl>,
@@ -4263,7 +4300,7 @@ function projectCoopV2WaveControl(
   const atTransactionWave =
     currentWave === transaction.transition.wave || currentWave === transaction.transition.nextWave;
   const installed = (): CoopControlInstallResult => {
-    runtime.v2WaveTransactions.delete(transaction.transition.wave);
+    completeCoopV2WaveTransaction(runtime, transaction);
     return { kind: "installed", controlId };
   };
   switch (control.kind) {
@@ -4490,7 +4527,7 @@ function buildCoopV2LiveSeams(
         if (missing.length === 0 && surfaces.wave) {
           const waveTransaction = matchingCoopV2WaveTransaction(runtime, control);
           if (waveTransaction != null && waveTransaction.dataApplied) {
-            runtime.v2WaveTransactions.delete(waveTransaction.transition.wave);
+            completeCoopV2WaveTransaction(runtime, waveTransaction);
           }
         }
         return missing.length === 0
@@ -4928,6 +4965,44 @@ export function getCoopWaveAdvanceRuntimeBinding(
   runtime: CoopRuntime | null = active,
 ): CoopWaveAdvanceOperationBinding | null {
   return runtime?.waveOperationBinding ?? null;
+}
+
+/**
+ * Observe the boundary owned by the negotiated authority for this runtime.
+ *
+ * V2 is consulted first because its cutover suppresses V1 creation. The completed V2 cache is diagnostic
+ * evidence only; live code cannot replay it. A legacy status is returned only when no V2 transaction for
+ * this wave exists, preserving explicit fallback-capability coverage.
+ */
+export function getCoopWaveBoundaryStatus(
+  wave: number,
+  runtime: CoopRuntime | null = active,
+): CoopWaveBoundaryStatus | null {
+  if (runtime == null) {
+    return null;
+  }
+  const v2 = runtime.v2WaveTransactions.get(wave) ?? runtime.v2CompletedWaveTransactions.get(wave);
+  if (v2 != null) {
+    return {
+      authority: "v2",
+      operationId: v2.operationId,
+      transition: v2.transition,
+      dataApplied: v2.dataApplied,
+      continuationReady: v2.continuationReady,
+      entryRevision: v2.entryRevision,
+    };
+  }
+  const legacy = getCoopStagedWaveAdvanceTransaction(wave, runtime.waveOperationBinding);
+  const transition = legacy?.envelope.pendingOperation?.payload;
+  return legacy == null || !isValidCoopWaveAdvancePayload(transition)
+    ? null
+    : {
+        authority: "legacy",
+        operationId: legacy.operationId,
+        transition,
+        dataApplied: legacy.dataApplied,
+        continuationReady: legacy.continuationReady,
+      };
 }
 
 /** Convenience: the live session controller, or null when not in a co-op run. */
@@ -5722,10 +5797,10 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
         `wave-advance JOURNAL bootstrap wave=${payload.wave} outcome=${payload.outcome} (ACK withheld)`,
       );
     }
-    if (
-      globalScene.phaseManager?.getCurrentPhase()?.phaseName === "BattleEndPhase"
-      && !tryApplyCoopSettledWaveData(payload.wave, binding)
-    ) {
+    const getCurrentPhase = globalScene.phaseManager?.getCurrentPhase;
+    const currentPhase =
+      typeof getCurrentPhase === "function" ? getCurrentPhase.call(globalScene.phaseManager) : undefined;
+    if (currentPhase?.phaseName === "BattleEndPhase" && !tryApplyCoopSettledWaveData(payload.wave, binding)) {
       return false;
     }
     const continuationReady = maybeMarkCoopWaveContinuationReady(payload.wave, binding, runtime);
@@ -7692,6 +7767,7 @@ export function assembleCoopRuntime(
     v2InstalledCommandTargets: new Set<string>(),
     v2InstalledReplacementTargets: new Set<string>(),
     v2WaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
+    v2CompletedWaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
   };
   sharedTerminalStates.set(runtime, {
     frozen: false,
