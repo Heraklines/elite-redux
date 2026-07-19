@@ -44,9 +44,13 @@ import {
   setCoopWaveTailSanction,
 } from "#data/elite-redux/coop/coop-renderer-gate";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
-import { clearCoopRuntime, getCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  getCoopRuntime,
+  getCoopWaveBoundaryStatus,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { getCoopStagedWaveAdvanceTransaction } from "#data/elite-redux/coop/coop-wave-operation";
 import {
   type ErRouteNode,
   getErPendingNodes,
@@ -333,9 +337,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         matches: phase => phase instanceof BiomeShopPhase,
       }),
     );
-    const retained = getCoopStagedWaveAdvanceTransaction(10, rig.guestRuntime.waveOperationBinding);
-    expect(retained?.dataApplied, "the market cannot open before retained wave DATA applies").toBe(true);
-    expect(retained?.continuationReady, "phase construction alone cannot release retained authority").toBe(false);
+    expect(
+      getCoopWaveBoundaryStatus(10, rig.guestRuntime),
+      "the market cannot open before ordered V2 wave DATA applies",
+    ).toMatchObject({ authority: "v2", dataApplied: true, continuationReady: false });
 
     await withClient(rig.guestCtx, () => {
       (
@@ -344,7 +349,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         }
       ).notifyCoopBiomeContinuationSurfaceReady();
     });
-    expect(retained?.continuationReady, "an inactive watcher cannot attest a public continuation").toBe(false);
+    expect(
+      getCoopWaveBoundaryStatus(10, rig.guestRuntime)?.continuationReady,
+      "an inactive watcher cannot attest a public continuation",
+    ).toBe(false);
 
     // Reproduce the production wave-20/160 shape: a previous public handler is still active when the
     // watcher starts. The watcher must explicitly replace it with a real MESSAGE surface before stock.
@@ -372,9 +380,9 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     });
     await withClient(rig.guestCtx, () => drainLoopback());
     expect(
-      getCoopStagedWaveAdvanceTransaction(10, rig.guestRuntime.waveOperationBinding)?.continuationReady,
-      "authoritative stock plus the live watcher loop attests the phase-owned continuation",
-    ).toBe(true);
+      getCoopWaveBoundaryStatus(10, rig.guestRuntime),
+      "authoritative stock plus the live watcher loop attests the V2 phase-owned continuation",
+    ).toMatchObject({ authority: "v2", dataApplied: true, continuationReady: true });
     await waitForMode(rig.hostCtx, UiMode.BIOME_SHOP, "host biome market");
     await pressUntilAccepted(rig, rig.hostCtx, Button.CANCEL, "market leave");
     await waitForMode(rig.hostCtx, UiMode.CONFIRM, "market leave confirmation");
@@ -386,12 +394,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         rig.hostRuntime.controller.interactionCounter() === counter + 1
         && rig.guestRuntime.controller.interactionCounter() === counter + 1
       ) {
-        const retained = getCoopStagedWaveAdvanceTransaction(10, rig.guestRuntime.waveOperationBinding);
-        expect(retained?.dataApplied, "the watcher opened only after retained wave DATA applied").toBe(true);
         expect(
-          retained?.continuationReady,
-          "the phase-owned market watcher proves the real terminal-consumer continuation",
-        ).toBe(true);
+          getCoopWaveBoundaryStatus(10, rig.guestRuntime),
+          "the phase-owned market watcher proves the real V2 terminal-consumer continuation",
+        ).toMatchObject({ authority: "v2", dataApplied: true, continuationReady: true });
         return;
       }
     }

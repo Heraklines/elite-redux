@@ -31,6 +31,7 @@ import {
   clearCoopRuntime,
   getCoopController,
   getCoopRuntime,
+  getCoopWaveBoundaryStatus,
   setCoopRuntime,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -43,7 +44,6 @@ import {
 } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
-import { getCoopStagedWaveAdvanceTransaction } from "#data/elite-redux/coop/coop-wave-operation";
 import { captureGhostTeam } from "#data/elite-redux/er-ghost-teams";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
@@ -645,8 +645,10 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
       driveClientPhaseQueueTo(rig.guestScene, "SelectModifierPhase"),
     );
     expect(guestReward.phaseName, "the renderer completed its victory tail too").toBe("SelectModifierPhase");
-    const retained = getCoopStagedWaveAdvanceTransaction(1, rig.guestRuntime.waveOperationBinding);
-    expect(retained?.dataApplied, "the guest reward boundary admitted the exact retained DATA").toBe(true);
+    expect(
+      getCoopWaveBoundaryStatus(1, rig.guestRuntime),
+      "the guest reward boundary admitted the exact ordered V2 DATA",
+    ).toMatchObject({ authority: "v2", dataApplied: true });
     expect(resync.count(), "the public victory journey requested no full-state recovery").toBe(0);
     resync.restore();
 

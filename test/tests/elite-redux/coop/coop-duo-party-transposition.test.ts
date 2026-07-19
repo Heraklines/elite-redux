@@ -12,10 +12,10 @@
 // resolution, so between the faint and that turn - or forever, if the wave ends first - the guest kept the
 // STALE order: its fainted lead still at the front slot, the replacement still on the bench. That party-order
 // TRANSPOSITION is the ONE root of TWO live symptoms:
-//   1. EXP/level desync ("my mon is a level behind my partner's"): the host streams the settled post-exp
-//      state at BattleEndPhase; the guest adopts it. Under the OLD per-slot exp-delta relay a transposed
-//      slot held the WRONG species and the leveled bench mon's level-up was SKIPPED and lost; the id-based
-//      wave-end full-state apply that replaced it mutates by Pokemon.id, so the level-up follows the mon.
+//   1. EXP/level desync ("my mon is a level behind my partner's"): the host commits the settled post-exp
+//      state as Authority V2 wave material; the guest applies it at BattleEnd. Under the OLD per-slot
+//      exp-delta relay a transposed slot held the WRONG species and the leveled bench mon's level-up was
+//      SKIPPED and lost; the id-based V2 material apply mutates by Pokemon.id, so the level-up follows the mon.
 //   2. Switch-in / faint presentation on the wrong mon: `getPlayerField()` reads `party.slice(0, capacity)`,
 //      so a transposed array puts the wrong mon at a field slot (the "switch-in invisible then it fainted"
 //      report).
@@ -36,26 +36,19 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import {
-  adoptCoopHostPlayerPartyOrder,
-  applyCoopAuthoritativeBattleState,
-  applyCoopCheckpoint,
-  captureCoopChecksumState,
-} from "#data/elite-redux/coop/coop-battle-engine";
+import { adoptCoopHostPlayerPartyOrder, captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
+  awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
+  broadcastCoopWaveResolved,
   clearCoopRuntime,
-  consumeCoopPendingWaveEndState,
+  getCoopWaveBoundaryStatus,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import {
-  resetCoopWaveAdvanceOperationFlag,
-  setCoopWaveAdvanceOperationEnabled,
-} from "#data/elite-redux/coop/coop-wave-operation";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -66,7 +59,6 @@ import {
   buildDuo,
   type CoopResyncProbe,
   type DuoRig,
-  drainLoopback,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
@@ -80,7 +72,6 @@ import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
-const V2_REPLACEMENT_CUTOVER = process.env.COOP_AUTHORITY_V2_REPLACEMENT === "on";
 
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
@@ -102,8 +93,6 @@ describe.skipIf(!RUN)(
     });
 
     beforeEach(() => {
-      // This test's direct waveEndState section is the negotiated legacy compatibility path.
-      setCoopWaveAdvanceOperationEnabled(false);
       // Force-hit so the foe's spread ROCK_SLIDE reliably KOs the 1-HP host lead. A determinism knob.
       accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
       setCoopFaintSwitchWaitMs(4000);
@@ -127,7 +116,6 @@ describe.skipIf(!RUN)(
     });
 
     afterEach(() => {
-      resetCoopWaveAdvanceOperationFlag();
       setCoopFaintSwitchWaitMs(60_000);
       setCoopWaveBarrierMs(60_000);
       resetCoopRendezvousWaitMs();
@@ -215,26 +203,15 @@ describe.skipIf(!RUN)(
       expect(hostOrderAfter[0], "host swapped FENNEKIN into the front (field) slot").toBe(SpeciesId.FENNEKIN);
       expect(hostOrderAfter[2], "host moved the fainted CHIKORITA to the vacated bench slot").toBe(SpeciesId.CHIKORITA);
 
-      // GUEST consumes the authoritative replacement transaction: Authority V2 admits its retained
-      // REPLACEMENT_COMMIT through the live replay/finalize seam; a legacy-only build consumes the
-      // compatibility checkpoint directly. Both paths must materialize FENNEKIN and the SAME array swap.
+      // GUEST consumes the ordered Authority V2 REPLACEMENT_COMMIT through the real replay/finalize
+      // ingress. It must materialize FENNEKIN and the same array swap without a compatibility checkpoint.
       await withClient(rig.guestCtx, async () => {
-        if (V2_REPLACEMENT_CUTOVER) {
-          // The focused rig has already drained turn N and is parked on its synthetic boot TitlePhase.
-          // Production reaches the retained replacement through turn N+1's real replay wait, so drive that
-          // same public replay ingress instead of waiting for a finalize phase that cannot exist until the
-          // V2 carrier is consumed.
-          rig.guestScene.currentBattle.turn = turn + 1;
-          await driveGuestReplayTurn(rig.guestScene, turn + 1);
-        } else {
-          const envelope = rig.guestRuntime.battleStream.consumeCheckpoint();
-          expect(envelope?.reason, "the host pushed the replacement checkpoint for its OWN faint (SOURCE fix)").toBe(
-            "replacement",
-          );
-          if (envelope != null) {
-            applyCoopCheckpoint(envelope.checkpoint);
-          }
-        }
+        // The focused rig has already drained turn N and is parked on its synthetic boot TitlePhase.
+        // Production reaches the retained replacement through turn N+1's real replay wait, so drive that
+        // same public replay ingress instead of waiting for a finalize phase that cannot exist until the
+        // V2 carrier is consumed.
+        rig.guestScene.currentBattle.turn = turn + 1;
+        await driveGuestReplayTurn(rig.guestScene, turn + 1);
       });
 
       // LAYER 1 ASSERTION: the guest's party ARRAY order is byte-identical to the host - NO transposition.
@@ -244,22 +221,28 @@ describe.skipIf(!RUN)(
       ).toEqual(hostOrderAfter);
 
       // The bench mon that took the field (FENNEKIN, host slot 0) fights on + levels up: settle it on the host,
-      // then deliver the host's WAVE-END authoritative snapshot exactly as the guest's BattleEndPhase does
-      // (the host broadcasts, the guest adopts it via the id-based full-state apply).
+      // then commit the host's complete settled image into an ordered V2 WAVE_ADVANCE and apply it at the
+      // guest's retained BattleEnd boundary.
       rig.hostScene.getPlayerParty()[0].level = 55;
       rig.hostScene.getPlayerParty()[0].exp += 5000;
       rig.hostScene.getPlayerParty()[0].calculateStats();
-      await withClient(rig.hostCtx, async () => {
+      await withClient(rig.hostCtx, () => {
+        broadcastCoopWaveResolved("win");
         broadcastCoopWaveEndState();
-        await drainLoopback();
       });
-      // waveEndState is intentionally destination-pumped by the two-engine adapter: apply it only while
-      // the guest's complete scene/runtime context is installed, as two independent browsers would.
       await pumpDuoDestinations(rig, 4);
-      const waveEndApplied = withClientSync(rig.guestCtx, () =>
-        applyCoopAuthoritativeBattleState(consumeCoopPendingWaveEndState() ?? undefined, true),
+      let released = 0;
+      const waveBoundaryOwned = withClientSync(rig.guestCtx, () =>
+        awaitCoopSettledWaveAdvanceAtBattleEnd(() => {
+          released += 1;
+        }),
       );
-      expect(waveEndApplied, "the guest adopted the host's wave-end authoritative snapshot").toBe(true);
+      expect(waveBoundaryOwned, "Authority V2 owns the guest's retained wave boundary").toBe(true);
+      expect(released, "the V2 boundary releases only after the settled image applies").toBe(1);
+      expect(
+        withClientSync(rig.guestCtx, () => getCoopWaveBoundaryStatus(1, rig.guestRuntime)),
+        "the guest adopted the host's ordered V2 wave material",
+      ).toMatchObject({ authority: "v2", dataApplied: true });
 
       // LAYER 2 ASSERTION: the leveled mon's level-up LANDED on the guest FENNEKIN. The id-based wave-end
       // apply mutates by Pokemon.id, so the level-up follows the mon regardless of any residual slot skew

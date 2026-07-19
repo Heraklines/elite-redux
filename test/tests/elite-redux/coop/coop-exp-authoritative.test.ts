@@ -9,10 +9,10 @@
 // level / evolution path -> the host's relayed LEARN-MOVE (keyed by party slot) hit a DIFFERENT mon on
 // the guest (the live learn-move-on-the-wrong-mon desync). The host now captures the COMPLETE post-exp
 // battle state (whole party as PokemonData, in its BattleEndPhase AFTER the exp/level/evolution chain
-// drained) and streams it on a `waveEndState` message; the GUEST adopts it via ONE id-based full-state
-// apply (applyCoopAuthoritativeBattleState), so its levels / exp / learned moves / evolved species
-// converge in the SHOP WINDOW off the same wire the live turns use. (The legacy per-slot `expResolved`
-// exp-delta relay this superseded - and its unit tests - have been removed.)
+// drained) and commits it as the material of one ordered Authority V2 WAVE_ADVANCE entry. The GUEST
+// applies that immutable image at its retained BattleEnd boundary, so levels / exp / learned moves /
+// evolved species converge in the SHOP WINDOW. The legacy raw `waveEndState` and per-slot `expResolved`
+// compatibility carriers are not correctness inputs to this test.
 //
 // This is the GUARD the soak CANNOT be (the soak driver re-mirrors the guest at each wave START, which
 // false-greens any between-wave exp gap). Here TWO real engines run over the loopback: the host plays a
@@ -23,21 +23,17 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { applyCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
+  awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
   clearCoopRuntime,
-  consumeCoopPendingWaveEndState,
+  getCoopWaveBoundaryStatus,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import {
-  resetCoopWaveAdvanceOperationFlag,
-  setCoopWaveAdvanceOperationEnabled,
-} from "#data/elite-redux/coop/coop-wave-operation";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -47,9 +43,9 @@ import { PokemonMove } from "#moves/pokemon-move";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
-  drainLoopback,
   driveGuestReplayTurn,
   installDuoLogCapture,
+  pumpDuoDestinations,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -72,9 +68,6 @@ describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest conve
   });
 
   beforeEach(() => {
-    // This file pins the explicitly negotiated legacy raw compatibility arm. P33 production correctness is
-    // covered by the retained wave-transaction suites and deliberately ignores waveEndState.
-    setCoopWaveAdvanceOperationEnabled(false);
     setCoopWaveBarrierMs(50);
     setCoopRendezvousWaitMs(50);
     game = new GameManager(phaserGame);
@@ -91,7 +84,6 @@ describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest conve
   });
 
   afterEach(() => {
-    resetCoopWaveAdvanceOperationFlag();
     setCoopWaveBarrierMs(60_000);
     resetCoopRendezvousWaitMs();
     logs.dispose();
@@ -146,22 +138,26 @@ describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest conve
       "guest lead lacks the host's level-up move before the wave-end apply",
     ).toBe(false);
 
-    // ===== HOST BattleEndPhase emit: stream the WAVE-END authoritative snapshot (post-exp). =====
-    await withClient(rig.hostCtx, async () => {
+    // ===== HOST BattleEndPhase emit: commit the post-exp image into Authority V2. =====
+    await withClient(rig.hostCtx, () => {
       broadcastCoopWaveEndState();
-      await drainLoopback();
     });
-    // The two-engine harness now delivers state carriers only while their destination scene is installed,
-    // matching separate browser realms. Admit the pending wave-end image under the guest context first.
-    await withClient(rig.guestCtx, () => drainLoopback());
+    // Deliver the ordered WAVE_ADVANCE and its predecessor/receipts only under their destination realms.
+    await pumpDuoDestinations(rig, 4);
 
-    // ===== GUEST BattleEndPhase branch: adopt the wave-end snapshot via the id-based full-state apply. This
-    // is the exact production seam (consume the pending wave-end state, then applyCoopAuthoritativeBattleState)
-    // - the sole post-battle progression channel. =====
-    const applied = withClientSync(rig.guestCtx, () =>
-      applyCoopAuthoritativeBattleState(consumeCoopPendingWaveEndState() ?? undefined, true),
+    // ===== GUEST BattleEndPhase branch: apply the V2 material at the real retained boundary. =====
+    let released = 0;
+    const owned = withClientSync(rig.guestCtx, () =>
+      awaitCoopSettledWaveAdvanceAtBattleEnd(() => {
+        released += 1;
+      }),
     );
-    expect(applied, "the guest applied the host's wave-end authoritative snapshot").toBe(true);
+    expect(owned, "Authority V2 owns the guest's BattleEnd boundary").toBe(true);
+    expect(released, "the boundary releases only after V2 material applies").toBe(1);
+    expect(
+      withClientSync(rig.guestCtx, () => getCoopWaveBoundaryStatus(1, rig.guestRuntime)),
+      "the guest records the applied ordered V2 image",
+    ).toMatchObject({ authority: "v2", dataApplied: true });
 
     // ===== CONVERGED in the shop window: same mon by id, same level / exp, and the host's level-up move learned. =====
     const guestLeadAfter = rig.guestScene.getPlayerParty().find(p => p.id === hostLead.id);
