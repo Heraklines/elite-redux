@@ -7040,9 +7040,6 @@ export function assembleCoopRuntime(
     v2InstalledCommandTargets: new Set<string>(),
     v2InstalledReplacementTargets: new Set<string>(),
   };
-  globalScene.phaseManager.setCoopRecoveryProgressionFence?.(
-    () => coopV2RecoveryFencePredicates(runtime)?.isProgressionFrozen() === true,
-  );
   sharedTerminalStates.set(runtime, {
     frozen: false,
     finalized: false,
