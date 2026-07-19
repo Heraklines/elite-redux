@@ -763,6 +763,7 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
         rig.hostScene.getEnemyField()[0]?.species.speciesId,
         "the first legal concrete enemy fallback was summoned only after material closure",
       ).toBe(GUEST_BENCH_1);
+      // External RED baseline: the direct CommandPhase target below preserves the current failing drive.
       // The IDLE-fallback guest reaches its next command via the out-of-band CHECKPOINT route
       // (coop-replay-turn-phase.ts pump: materialApplied -> presentationReady -> continuationReady), which
       // needs BOTH engines pumped for that handshake - a guest-only drive starves the guest at its parked

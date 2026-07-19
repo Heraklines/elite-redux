@@ -427,6 +427,7 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
         "the host used the deterministic first-legal fallback after the idle timeout",
       ).toBe(SpeciesId.LAPRAS);
 
+      // External RED baseline: the direct CommandPhase target below preserves the current failing drive.
       // The IDLE-fallback guest reaches its own post-replacement CommandPhase via the out-of-band
       // CHECKPOINT route (coop-replay-turn-phase.ts pump: materialApplied -> presentationReady ->
       // continuationReady, own CommandPhase opened there). That handshake needs BOTH engines pumped, so a

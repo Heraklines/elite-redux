@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "track-r-pump-tail",
+  "branch": "ci/coop/track-r-pump-tail",
+  "trainRef": "coop/integration-20260718",
+  "baseSha": "82ec6e3fcdbac10913991111ebf8f8b45975be0c",
+  "allowedFiles": [
+    ".github/coop-task-ownership/track-r-pump-tail.json",
+    "test/tests/elite-redux/coop/coop-duo-faint-switch.test.ts",
+    "test/tests/elite-redux/showdown/showdown-versus-faint.test.ts"
+  ]
+}
