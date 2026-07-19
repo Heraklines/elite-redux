@@ -669,6 +669,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const startedHostTailPhases = new WeakSet<Phase>();
     let hostMapCommitted = false;
     let guestMapCommitted = false;
+    let hostEncounterAcknowledged = false;
     const guestCommand = await withClient(rig.guestCtx, async () =>
       driveClientPhaseQueueTo(rig.guestScene, "guest post-ME CommandPhase", {
         matches: phase =>
@@ -726,6 +727,14 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
         // waiting for reciprocal carriers. Continue that exact invocation; never start it twice.
         startedPhases: startedHostTailPhases,
         drivePublicPhaseInput: phase => {
+          if (
+            phase.phaseName === "NextEncounterPhase"
+            && rig.hostScene.ui.getMode() === UiMode.MESSAGE
+            && !hostEncounterAcknowledged
+          ) {
+            hostEncounterAcknowledged = rig.hostScene.ui.processInput(Button.ACTION);
+            return hostEncounterAcknowledged;
+          }
           if (
             phase.phaseName === "SelectBiomePhase"
             && rig.hostScene.ui.getMode() === UiMode.ER_MAP

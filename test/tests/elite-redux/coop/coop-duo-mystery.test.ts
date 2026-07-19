@@ -856,6 +856,8 @@ describe.skipIf(!RUN)(
       let guestQuizQuestions = 0;
       let guestQuizAnswered = 0;
       let guestQuizShop: ShopPhaseSeam | undefined;
+      let guestQuizPhase: ErQuizPhaseSeam | undefined;
+      let guestQuizStartObserved = false;
 
       // A mirror-quiz handoff must be INTERLEAVED (the IT #2 split), NOT driven host-fully-first. On the
       // quiz's `mePresent subPrompt {kind:"quiz"}`, the guest's CoopReplayMePhase.start races the 8M outcome
@@ -870,11 +872,14 @@ describe.skipIf(!RUN)(
       // guest-owned handshake also dodges), keeping applyCoopMeOutcome + leaveEncounterWithoutBattle +
       // advanceInteraction all against the GUEST scene/controller.
 
-      // ===== STEP A (host): select the quiz option, run its embedded ErQuizPhase headlessly (answer every
-      // question via the ER_QUIZ handler's stored callback), drive the post-quiz embedded shop, and PARK at
-      // PostMysteryEncounterPhase WITHOUT running it - so the session + quizAns are buffered but the terminal
-      // meResync (8M) + LEAVE (9M) are NOT sent yet (they only fire in PostMysteryEncounterPhase.start). =====
-      await withClient(rig.hostCtx, async () => {
+      // ===== STEP A1 (host): select the quiz option and start its embedded ErQuizPhase, but do not answer
+      // yet. Signal from the first real ER_QUIZ surface so the follower can start concurrently, before the
+      // durable reward-settled transaction can legitimately supersede this transient presentation. =====
+      let signalHostQuizOpen!: () => void;
+      const hostQuizOpen = new Promise<void>(resolve => {
+        signalHostQuizOpen = resolve;
+      });
+      const hostToQuizShop = withClient(rig.hostCtx, async () => {
         // Cross the intro dialogue into MysteryEncounterPhase (coopBeginMePump pins the ME counter +
         // streams the presentation, so coopQuizSide() resolves "drive") and pick the cipher-quiz option.
         await runSelectMysteryEncounterOption(game, QUIZ_OPTION);
@@ -893,11 +898,48 @@ describe.skipIf(!RUN)(
           () => game.isCurrentPhase("ErQuizPhase"),
         );
 
-        // Complete the owner's async quiz with hostCtx continuously installed. Two browsers have separate
-        // globals; switching this one-realm fixture to guestCtx between questions makes the host phase's
-        // captured lifecycle fence correctly reject its own continuation. The safe, player-real boundary
-        // is the reciprocal reward screen: retain the complete session and answers, then let the follower
-        // consume them while the host is parked there and before the final ME terminal exists.
+        // This prompt observes the first player-visible quiz surface without choosing. The phase interceptor
+        // keeps running toward the shop while the host is naturally parked for human input.
+        game.onNextPrompt("ErQuizPhase", UiMode.ER_QUIZ, signalHostQuizOpen);
+        await game.phaseInterceptor.to("SelectModifierPhase", false);
+        return hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+      });
+
+      await hostQuizOpen;
+
+      // ===== STEP A2 (guest): start the retained replay while the owner is visibly parked in the quiz.
+      // Capture the exact ErQuizPhase production creates; no synthetic phase or private outcome is injected.
+      await withClient(rig.guestCtx, async () => {
+        const factory = rig.guestScene.phaseManager as unknown as {
+          create: (phaseName: string, ...args: unknown[]) => Phase;
+        };
+        const originalCreate = factory.create;
+        factory.create = function captureMirrorQuiz(phaseName: string, ...args: unknown[]): Phase {
+          const created = originalCreate.call(this, phaseName, ...args);
+          if (phaseName === "ErQuizPhase") {
+            guestQuizPhase = created as unknown as ErQuizPhaseSeam;
+            const originalStart = created.start;
+            created.start = function observeMirrorQuizStart(): void {
+              guestQuizStartObserved = true;
+              originalStart.call(this);
+            };
+          }
+          return created;
+        };
+        try {
+          guestMePhase = await startGuestMeReplay(rig.guestScene);
+        } finally {
+          factory.create = originalCreate;
+        }
+        if (guestQuizPhase == null) {
+          throw new Error("concurrent guest quiz replay created no production ErQuizPhase");
+        }
+        guestQuizQuestions = guestQuizPhase.questions.length;
+      });
+
+      // ===== STEP A3 (host): now answer every real owner question. The outer host scheduler remained parked
+      // on its public input surface while STEP A2 ran and is restored before any owner lifecycle callback.
+      await withClient(rig.hostCtx, async () => {
         for (let q = 0; q < QUIZ_QUESTIONS; q++) {
           game.onNextPrompt(
             "ErQuizPhase",
@@ -909,62 +951,39 @@ describe.skipIf(!RUN)(
             () => game.isCurrentPhase("PostMysteryEncounterPhase"),
           );
         }
-        await game.phaseInterceptor.to("SelectModifierPhase", false);
-        const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+      });
+      const hostShop = await hostToQuizShop;
+      const driveGuestQuizToReward = async (): Promise<void> => {
+        const phase = guestQuizPhase;
+        if (phase == null) {
+          throw new Error("concurrent guest quiz phase was lost before its reward continuation");
+        }
+        if (phase.answered < QUIZ_QUESTIONS) {
+          if (rig.guestScene.phaseManager.getCurrentPhase() !== (phase as unknown as Phase)) {
+            await driveClientPhaseQueueTo(rig.guestScene, "captured mirrored ErQuizPhase", {
+              matches: current => current === (phase as unknown as Phase),
+              maxPhases: 16,
+            });
+          }
+          guestQuizAnswered = await driveGuestMirrorQuiz(rig.guestScene, phase, QUIZ_QUESTIONS, {
+            alreadyStarted: guestQuizStartObserved,
+          });
+        } else {
+          guestQuizAnswered = phase.answered;
+        }
+        guestQuizShop = await startGuestMeShopOwner(rig.guestScene);
+      };
+
+      // ===== STEP A4 (both): cross the reciprocal reward surface, then park both real reward tails at the
+      // final PostMysteryEncounter lifecycle fence before the host publishes the ordered LEAVE. =====
+      await withClient(rig.hostCtx, async () => {
         expect(hostShop.phaseName, "host reached the embedded post-quiz reward shop").toBe("SelectModifierPhase");
         await driveHostRewardShopOwner(hostShop, {
           takeReward: false,
-          // Start the guest's retained replay, consume the complete quiz FIFO, and enter its production
-          // watcher shop before the owner is allowed to commit LEAVE.
+          // Consume the complete quiz FIFO and enter the production watcher shop before the owner commits
+          // the reward LEAVE. The replay and mirror quiz were already created at the concurrent public edge.
           partnerReady: async () => {
-            await withClient(rig.guestCtx, async () => {
-              // Observe the exact phase the replay creates. A real scheduler may already run all three
-              // retained answers before startGuestMeReplay's final drain returns, so current-phase polling
-              // cannot demand that the consumed quiz becomes current again.
-              const factory = rig.guestScene.phaseManager as unknown as {
-                create: (phaseName: string, ...args: unknown[]) => Phase;
-              };
-              const originalCreate = factory.create;
-              let quizPhase: ErQuizPhaseSeam | undefined;
-              let quizStartObserved = false;
-              factory.create = function captureMirrorQuiz(phaseName: string, ...args: unknown[]): Phase {
-                const created = originalCreate.call(this, phaseName, ...args);
-                if (phaseName === "ErQuizPhase") {
-                  quizPhase = created as unknown as ErQuizPhaseSeam;
-                  const originalStart = created.start;
-                  created.start = function observeMirrorQuizStart(): void {
-                    quizStartObserved = true;
-                    originalStart.call(this);
-                  };
-                }
-                return created;
-              };
-              try {
-                guestMePhase = await startGuestMeReplay(rig.guestScene);
-              } finally {
-                factory.create = originalCreate;
-              }
-              if (quizPhase == null) {
-                throw new Error("guest retained quiz session created no production ErQuizPhase");
-              }
-              guestQuizQuestions = quizPhase.questions.length;
-              if (quizPhase.answered < QUIZ_QUESTIONS) {
-                if (rig.guestScene.phaseManager.getCurrentPhase() !== (quizPhase as unknown as Phase)) {
-                  await driveClientPhaseQueueTo(rig.guestScene, "captured mirrored ErQuizPhase", {
-                    matches: phase => phase === (quizPhase as unknown as Phase),
-                    maxPhases: 16,
-                  });
-                }
-                guestQuizAnswered = await driveGuestMirrorQuiz(rig.guestScene, quizPhase, QUIZ_QUESTIONS, {
-                  alreadyStarted: quizStartObserved,
-                });
-              } else {
-                // The production scheduler consumed the complete retained FIFO while the replay handoff was
-                // draining. Preserve that evidence instead of fabricating or re-entering an old quiz.
-                guestQuizAnswered = quizPhase.answered;
-              }
-              guestQuizShop = await startGuestMeShopOwner(rig.guestScene);
-            });
+            await withClient(rig.guestCtx, driveGuestQuizToReward);
           },
           partnerSettle: async () => {
             if (guestQuizShop == null) {
@@ -982,6 +1001,12 @@ describe.skipIf(!RUN)(
         // PostMysteryEncounterPhase.start (STEP C), so the guest's 9M inbox stays empty through STEP B.
         await game.phaseInterceptor.to("PostMysteryEncounterPhase", false);
       });
+      await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "guest post-quiz Mystery terminal surface", {
+          matches: phase => phase.phaseName === "PostMysteryEncounterPhase",
+          maxPhases: 16,
+        }),
+      );
 
       // The host has NOT advanced yet (its terminal is parked, not run).
       expect(
@@ -1257,6 +1282,16 @@ describe.skipIf(!RUN)(
           (game.promptHandler as unknown as { prompts: unknown[] }).prompts.length = 0;
         }
       });
+      // The retained reward-settled transaction declares a `rewards` continuation. Its ordered final LEAVE
+      // is intentionally fenced until the renderer has executed the real reward tail and is parked on the
+      // matching PostMysteryEncounter surface. A browser runs that queue continuously; the cooperative
+      // one-process scheduler must drive it explicitly instead of repeatedly redelivering against EggLapse.
+      await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "guest post-delve Mystery terminal surface", {
+          matches: phase => phase.phaseName === "PostMysteryEncounterPhase",
+          maxPhases: 16,
+        }),
+      );
 
       // The host has NOT advanced yet (its terminal is parked, not run).
       expect(

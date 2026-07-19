@@ -177,7 +177,7 @@ const signalServer = createServer((request, response) => {
   });
 });
 
-async function configurePage(page, label, browserErrors, sourceAssetMisses) {
+async function configurePage(page, label, browserErrors, sourceAssetMisses, bootRecoveries) {
   // Keep references to every native peer connection created by the sealed production bundle. The test later
   // injects a connectionState=failed event while its real DataChannel is still open, reproducing the browser
   // failure shape that previously stayed falsely healthy. This observer does not replace or mock WebRTC.
@@ -257,10 +257,49 @@ async function configurePage(page, label, browserErrors, sourceAssetMisses) {
     }
   });
   await page.goto(`${origin}/?coopdebug=1`, { waitUntil: "domcontentloaded", timeout: 90_000 });
-  await page.waitForFunction(() => globalThis.__coopBrowserBridge?.ready?.() === true, {
-    timeout: 180_000,
-    polling: 250,
-  });
+  const waitForBridge = timeout =>
+    page.waitForFunction(() => globalThis.__coopBrowserBridge?.ready?.() === true, {
+      timeout,
+      polling: 250,
+    });
+  const bootState = () =>
+    page
+      .evaluate(() => ({
+        documentReadyState: document.readyState,
+        bridgeDefined: globalThis.__coopBrowserBridge != null,
+        bridgeReady: globalThis.__coopBrowserBridge?.ready?.() === true,
+        canvasCount: document.querySelectorAll("canvas").length,
+        bodyText: document.body?.innerText?.slice(0, 240) ?? "",
+        location: location.href,
+        visibility: document.visibilityState,
+      }))
+      .catch(error => ({ diagnosticError: String(error) }));
+  try {
+    await waitForBridge(90_000);
+  } catch (firstError) {
+    // This checkpoint owns transport behavior, not simultaneous Phaser boot pressure. A single Chromium
+    // process occasionally leaves one of two concurrently-created contexts on the preloader background
+    // while the sibling initializes normally; six immediately preceding exact-SHA gates completed this
+    // same bridge. Reload only that inert page once, retain the first failure as evidence, and still fail
+    // closed if the normal application cannot initialize on the bounded second attempt.
+    const firstState = await bootState();
+    bootRecoveries.push({ label, firstState, error: String(firstError) });
+    process.stderr.write(
+      `[coop-browser] ${label} bridge boot stalled; one bounded reload ${JSON.stringify(firstState)}\n`,
+    );
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 90_000 });
+    try {
+      await waitForBridge(180_000);
+    } catch (secondError) {
+      const secondState = await bootState();
+      const relatedErrors = browserErrors.filter(error => error.startsWith(`[${label}:`));
+      throw new Error(
+        `${label} sealed page bridge never became ready after one reload: `
+          + `${JSON.stringify({ firstState, secondState, relatedErrors })}`,
+        { cause: secondError },
+      );
+    }
+  }
 }
 
 async function browserStatus(page) {
@@ -419,9 +458,10 @@ try {
   const guestPage = await guestContext.newPage();
   const browserErrors = [];
   const sourceAssetMisses = [];
+  const bootRecoveries = [];
   await Promise.all([
-    configurePage(hostPage, "host", browserErrors, sourceAssetMisses),
-    configurePage(guestPage, "guest", browserErrors, sourceAssetMisses),
+    configurePage(hostPage, "host", browserErrors, sourceAssetMisses, bootRecoveries),
+    configurePage(guestPage, "guest", browserErrors, sourceAssetMisses, bootRecoveries),
   ]);
 
   const connect = (page, role, username) =>
@@ -739,7 +779,7 @@ try {
     );
   }
   process.stdout.write(
-    `[coop-browser] PASS native WebRTC handshake + exact 512KiB UTF-8 mid-chunk restart + transient-PC debounce + failed/closed-PC open-channel recovery + exact lifecycle activation + stale-PC fencing + continued traffic ${JSON.stringify({ checkpointFixture, exactCheckpoint, transientAfter, failedOpenCarrier, closedOpenCarrier, rejoined })}\n`,
+    `[coop-browser] PASS native WebRTC handshake + exact 512KiB UTF-8 mid-chunk restart + transient-PC debounce + failed/closed-PC open-channel recovery + exact lifecycle activation + stale-PC fencing + continued traffic ${JSON.stringify({ checkpointFixture, exactCheckpoint, transientAfter, failedOpenCarrier, closedOpenCarrier, rejoined, bootRecoveries })}\n`,
   );
 } catch (error) {
   process.stderr.write(`[coop-browser] FAIL ${error.stack ?? error}\n`);

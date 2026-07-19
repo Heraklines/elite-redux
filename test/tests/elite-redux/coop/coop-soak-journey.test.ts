@@ -118,9 +118,20 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
 
     expect(result.wavesCompleted, "the campaign continued after the final forced event").toBe(LAST_WAVE);
     expect(result.runEnded, "the campaign did not silently terminal/degrade").toBeUndefined();
-    expect(result.actionScript, "wave 30 used the odd-seat guest as the real biome-market owner").toContain(
-      "wave 30: biome market owner=guest leave",
-    );
+    const biomeMarketActions = result.actionScript.filter(action => action.includes(": biome market owner="));
+    expect(
+      biomeMarketActions.some(action => action.startsWith("wave 30: biome market owner=") && action.endsWith(" leave")),
+      `wave 30 crossed the real biome market terminal: ${JSON.stringify(biomeMarketActions)}`,
+    ).toBe(true);
+    expect(
+      new Set(
+        biomeMarketActions.map(action => {
+          const owner = / owner=(host|guest) /.exec(action)?.[1];
+          return owner ?? "missing-owner";
+        }),
+      ),
+      `the journey exercised both biome-market owner seats: ${JSON.stringify(biomeMarketActions)}`,
+    ).toEqual(new Set(["host", "guest"]));
     expect(result.actionScript, "wave 10 drained its milestone continuation without parking either renderer").toContain(
       "wave 10: drained 1 milestone reward continuation(s)",
     );
