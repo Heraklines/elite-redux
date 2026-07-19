@@ -2999,10 +2999,11 @@ describe("stale-turn finalize mark (#790 + regression fix)", () => {
     // admission is already exact/session-bound, so its material must survive that ambient legacy mismatch
     // and remain addressable by the replay phase's immutable source wave.
     current.turn = 2;
-    stream.ingestAuthoritativeV2Turn(carrier);
+    stream.ingestAuthoritativeV2Turn(carrier, null);
     const awaited = stream.awaitTurn(1, 1);
     const admitted = await awaited;
     expect(admitted).not.toBeNull();
+    expect(admitted?.authorityNextControl, "the renderer receives V2's explicit no-command successor").toBeNull();
     expect(stream.hasFinalizedAuthoritativeV2Turn(carrier), "admitted/buffered material is not applied material").toBe(
       false,
     );
@@ -3020,7 +3021,7 @@ describe("stale-turn finalize mark (#790 + regression fix)", () => {
       checkpoint: { ...carrier.checkpoint, tick: 20 },
       authoritativeState: emptyAuthoritativeState(1, 1, 21),
     } satisfies Extract<CoopMessage, { t: "turnResolution" }>;
-    stream.ingestAuthoritativeV2Turn(newer);
+    stream.ingestAuthoritativeV2Turn(newer, null);
     expect(
       stream.hasFinalizedAuthoritativeV2Turn(newer),
       "a generic same-address finalize mark cannot prove a newer revision",

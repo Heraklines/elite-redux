@@ -24,6 +24,7 @@
 
 import type { TurnResolutionImage } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
 import { resolveCoopV2CommandFrontier } from "#data/elite-redux/coop/authority-v2/command-frontier";
+import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import {
   activeCoopReplacementAuthorityMode,
   suppressesLegacyReplacementAckProgression,
@@ -92,6 +93,14 @@ export interface CoopTurnResolution {
   fullField: CoopFullMonSnapshot[];
   /** Full normal-turn authoritative state. */
   authoritativeState: CoopAuthoritativeBattleStateV1;
+  /**
+   * Authority V2's canonical successor for this exact TURN_COMMIT.
+   *
+   * `undefined` means the resolution arrived through the legacy compatibility carrier. `null` is a
+   * meaningful V2 statement: this turn has no immediate command successor, so the renderer must wait for
+   * the following ordered replacement/wave/interaction entry instead of deriving a phantom CommandPhase.
+   */
+  authorityNextControl?: CoopNextControl;
 }
 
 /** An out-of-turn authoritative checkpoint + the host's matching full-state checksum. */
@@ -3956,12 +3965,12 @@ export class CoopBattleStreamer {
    * identical redelivery is re-ACKed / ignored, never re-applied), so first delivery and every redelivery
    * are equivalent, and racing the cosmetic carrier only settles the same waiter once.
    */
-  ingestAuthoritativeV2Turn(msg: Extract<CoopMessage, { t: "turnResolution" }>): void {
+  ingestAuthoritativeV2Turn(msg: Extract<CoopMessage, { t: "turnResolution" }>, nextControl: CoopNextControl): void {
     // This carrier has already crossed the Authority V2 frame/session/membership/order admission boundary.
     // Retain it independently of the renderer's ambient legacy battle shell: the host may commit while the
     // guest shell has speculatively advanced its local turn but before the exact replay consumer starts.
     // Cosmetic legacy packets still use the ordinary ambient-address rejection below.
-    this.handle(msg, "authority-v2");
+    this.handle(msg, "authority-v2", nextControl);
   }
 
   /**
@@ -4416,7 +4425,11 @@ export class CoopBattleStreamer {
     this.waveEndStateHandler = null;
   }
 
-  private handle(msg: CoopMessage, source: "transport" | "authority-v2" = "transport"): void {
+  private handle(
+    msg: CoopMessage,
+    source: "transport" | "authority-v2" = "transport",
+    authorityNextControl?: CoopNextControl,
+  ): void {
     switch (msg.t) {
       case "enemyPartySync": {
         const floor = this.enemyPartyAuthorityFloorByWave.get(msg.wave);
@@ -4709,21 +4722,27 @@ export class CoopBattleStreamer {
         const exactPending = this.pending.get(waitKey);
         const legacyPending = this.authorityContext == null ? this.pending.get(legacyTurnKey(msg.turn)) : undefined;
         const resolver = exactPending ?? legacyPending;
+        // Keep V2 control metadata out of the legacy material canonicalization above: the cosmetic
+        // turnResolution carries the same material without this local-only projection, and racing it must
+        // classify as an identical carrier rather than conflicting with the authoritative V2 entry. The
+        // renderer still receives the exact host-stated successor on the V2 admission path.
+        const deliveredResolution: CoopTurnResolution =
+          source === "authority-v2" && authorityNextControl !== undefined ? { ...res, authorityNextControl } : res;
         coopLog(
           "replay",
           `guest RECV turnResolution e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} events=${msg.events.length} `
             + `checksum=${msg.checksum} ${resolver ? "-> parked waiter" : "-> buffered (no waiter)"}`,
         );
         if (resolver) {
-          resolver.finish(res);
+          resolver.finish(deliveredResolution);
         } else {
           // No waiter yet: retain this exact immutable revision. A later revision at the same turn gets
           // its own slot; handoff chooses the newest and atomically prunes its superseded predecessors.
-          rememberBounded(this.inbox, bufferKey, res);
+          rememberBounded(this.inbox, bufferKey, deliveredResolution);
         }
         for (const handler of [...this.turnCommitHandlers]) {
           try {
-            handler(res);
+            handler(deliveredResolution);
           } catch (error) {
             coopWarn("stream", `turn commit observer threw turn=${res.turn} (isolated)`, error);
           }

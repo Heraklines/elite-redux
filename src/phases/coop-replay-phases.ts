@@ -32,6 +32,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { Phase } from "#app/phase";
 import { CommonBattleAnim, MoveAnim } from "#data/battle-anims";
+import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2WaveCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-wave";
 import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
@@ -91,6 +92,7 @@ import {
   queueCoopMeBattleVictoryTail,
   registerCoopWaveAdvanceBoundaryWakeFactory,
   resolveCoopPendingWaveTransition,
+  retryCoopV2PendingAuthorityAtSafeBoundary,
   runCoopStateRecovery,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
@@ -939,6 +941,7 @@ export class CoopFinalizeTurnPhase extends Phase {
     private readonly epoch?: number,
     private readonly wave?: number,
     private readonly revision?: number,
+    private readonly authorityNextControl?: CoopNextControl,
   ) {
     super();
     this.turn = turn;
@@ -1094,6 +1097,7 @@ export class CoopFinalizeTurnPhase extends Phase {
       fullField: this.fullField as CoopFullMonSnapshot[],
       authoritativeState: this.authoritativeState as CoopAuthoritativeBattleStateV1,
       events: [],
+      ...(this.authorityNextControl === undefined ? {} : { authorityNextControl: this.authorityNextControl }),
     };
   }
 
@@ -1326,7 +1330,21 @@ export class CoopFinalizeTurnPhase extends Phase {
         if (!streamer.acknowledgeTurnCommit(resolution, "presentationReady", this.turnCommitSupersededBy)) {
           return;
         }
-        const waveEnding = coopWaveAdvanceSignaledFor(resolution.wave) || coopHasPendingWaveAdvance();
+        const statedControl = this.authorityNextControl;
+        if (
+          statedControl !== undefined
+          && statedControl !== null
+          && (statedControl.kind !== "COMMAND_FRONTIER"
+            || statedControl.epoch !== resolution.epoch
+            || statedControl.wave !== resolution.wave
+            || statedControl.turn !== resolution.turn + 1)
+        ) {
+          this.failModernTurnCommit(streamer, `Turn ${this.turn} carried an invalid Authority V2 successor control.`);
+          return;
+        }
+        const legacyWaveEnding = coopWaveAdvanceSignaledFor(resolution.wave) || coopHasPendingWaveAdvance();
+        const v2SharedBoundary = statedControl === null;
+        const waveEnding = statedControl === undefined ? legacyWaveEnding : v2SharedBoundary;
         const meBattleWon = !waveEnding && coopMeHandoffBattleWon();
         const expectation =
           waveEnding || meBattleWon
@@ -1337,7 +1355,17 @@ export class CoopFinalizeTurnPhase extends Phase {
         }
         // Mark replay consumption now so a detached duplicate cannot reconstruct the same turn while the
         // real next UI is still opening.  This does NOT release host retention; only continuationReady does.
-        streamer.markAuthoritativeTurnFinalized(resolution);
+        if (!streamer.markAuthoritativeTurnFinalized(resolution)) {
+          this.failModernTurnCommit(streamer, `Turn ${this.turn} could not prove its exact V2 material identity.`);
+          return;
+        }
+        const completedEntries = retryCoopV2PendingAuthorityAtSafeBoundary();
+        if (completedEntries > 0) {
+          coopLog(
+            "v2-turn",
+            `safe-boundary retry completed ${completedEntries} ordered V2 entr${completedEntries === 1 ? "y" : "ies"} after turn=${this.turn}`,
+          );
+        }
         coopLog(
           "checksum",
           `guest finalize presentationReady e=${resolution.epoch} wave=${resolution.wave} turn=${resolution.turn} rev=${resolution.revision}`,
@@ -1622,6 +1650,14 @@ export class CoopFinalizeTurnPhase extends Phase {
       // freeze). Detect the ME-battle win DIRECTLY (spawned ME battle, all enemies fainted per the host's
       // authoritative checkpoint) and run the ME victory tail instead of looping into a new command.
       const meBattleWon = !waveEnding && coopMeHandoffBattleWon();
+      const v2NoImmediateCommand = this.authorityNextControl === null;
+      const v2ImmediateCommand = this.authorityNextControl?.kind === "COMMAND_FRONTIER";
+      if (v2ImmediateCommand && (waveEnding || meBattleWon)) {
+        throw new Error(
+          `Authority V2 TURN_COMMIT stated command ${this.authorityNextControl?.wave}:${this.authorityNextControl?.turn} `
+            + `while wave ${wave} had already entered a shared boundary`,
+        );
+      }
       // The host's real TurnEndPhase already advanced the settled battle cursor before it captured this
       // turn's authority frame. A renderer must mirror that NUMERIC boundary even when it suppresses the
       // TurnEndPhase itself: incrementTurn() only advances and resets the battle cursor; it does not queue
@@ -1684,6 +1720,17 @@ export class CoopFinalizeTurnPhase extends Phase {
         advanceRenderedTurnBoundary();
         getCoopBattleStreamer()?.clearFinalizedMark();
         queueCoopMeBattleVictoryTail();
+      } else if (v2NoImmediateCommand) {
+        // Authority V2 explicitly stated that this TURN_COMMIT has no immediate COMMAND successor. The
+        // following ordered WAVE_ADVANCE / REPLACEMENT_COMMIT / INTERACTION_COMMIT owns progression. If it
+        // was already buffered, completeModernTurnCommit's safe-boundary retry admitted it synchronously;
+        // otherwise its retained delivery will append the appropriate engine wake. Ending this finalizer
+        // without incrementing is the intentional parked boundary: a renderer may never manufacture turn
+        // N+1 while waiting for the authority's next global revision.
+        coopLog(
+          "v2-turn",
+          `guest finalize turn=${this.turn}: no immediate command successor; waiting for next ordered authority entry`,
+        );
       } else {
         // BUG1 (faint auto-switch premature-victory deadlock): the authoritative guest is a PURE
         // RENDERER and the checkpoint applied at the top of start() already carries the host's

@@ -3962,6 +3962,21 @@ export function isCoopV2AuthorityWaitCreationFrozen(runtime: CoopRuntime | null 
 }
 
 /**
+ * Retry the ordered V2 replica ledger at a real engine safe boundary.
+ *
+ * TURN material is intentionally deferred until CoopFinalizeTurnPhase has applied and verified the full
+ * authoritative image. Once that proof is recorded, retry immediately instead of waiting for a timer-based
+ * redelivery: this retires the TURN entry and admits an already-buffered WAVE/REPLACEMENT successor before
+ * the renderer can manufacture local control.
+ */
+export function retryCoopV2PendingAuthorityAtSafeBoundary(runtime: CoopRuntime | null = active): number {
+  if (runtime == null || runtime !== active) {
+    return 0;
+  }
+  return coopV2ShadowHarnesses.get(runtime)?.retryPendingReplicaEntries() ?? 0;
+}
+
+/**
  * Reconstruct the COMPLETE legacy `turnResolution` carrier from an enriched v2 TURN_COMMIT material image
  * (surface 1). Returns `null` when any cutover companion is missing/mistyped (a bare shadow-parity image or
  * an older host) - the caller then falls back to the checkpoint-only apply, byte-identical to the
@@ -4466,7 +4481,7 @@ function buildCoopV2LiveSeams(
           if (runtime.battleStream.hasFinalizedAuthoritativeV2Turn(resolution)) {
             return true;
           }
-          runtime.battleStream.ingestAuthoritativeV2Turn(resolution);
+          runtime.battleStream.ingestAuthoritativeV2Turn(resolution, entry.nextControl);
           return "deferred";
         }
         // A negotiated cutover peer must carry the complete companions. A numeric checkpoint alone cannot
