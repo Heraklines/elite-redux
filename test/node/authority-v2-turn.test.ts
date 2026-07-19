@@ -136,7 +136,11 @@ function recordingSink(): { sink: ReplicaReceiptSink; stages: () => string[]; re
   return { sink: { emit: r => receipts.push(r) }, stages: () => receipts.map(r => r.stage), receipts };
 }
 
-const CTX = { localSeatId: 0 } as unknown as CoopRuntimeContext;
+const CTX = { localSeatId: 1 } as unknown as CoopRuntimeContext;
+const PIPELINE_BOOKKEEPING = {
+  receiptContext: { ...FRAME, senderSeatId: 1 },
+  recordStage: () => true,
+};
 
 // ---------------------------------------------------------------------------
 // (1) AUTHORITY: entry shape + digest
@@ -253,6 +257,7 @@ describe("TurnResolutionImage cutover companions", () => {
       }),
       projector: fixedProjector({ kind: "installed", controlId: turnCommandControlId(entry) as string }),
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     expect(rec.stages()).toEqual(["admitted", "materialApplied", "controlInstalled"]);
     expect(out.kind).toBe("applied");
@@ -290,6 +295,7 @@ describe("replica pipeline - material feed precedes controlInstalled", () => {
         },
       },
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
 
     expect(order).toEqual(["feed", "install"]);
@@ -313,6 +319,7 @@ describe("replica pipeline - material feed precedes controlInstalled", () => {
         },
       },
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     expect(order).toEqual(["feed"]);
     expect(rec.stages()).toEqual(["admitted"]);
@@ -336,6 +343,7 @@ describe("replica pipeline - redelivery equivalence", () => {
       }),
       projector: fixedProjector({ kind: "installed", controlId } as CoopControlInstallResult),
       receipts: recordingSink().sink,
+      ...PIPELINE_BOOKKEEPING,
     };
 
     const first = applyEntry(CTX, entry, deps);
@@ -366,6 +374,7 @@ describe("replica pipeline - redelivery equivalence", () => {
       }),
       projector: fixedProjector({ kind: "installed", controlId: "x" }),
       receipts: recordingSink().sink,
+      ...PIPELINE_BOOKKEEPING,
     };
     expect(applyEntry(CTX, tampered, deps).kind).toBe("materialRejected");
     expect(applyEntry(CTX, tampered, deps).kind).toBe("materialRejected");
@@ -547,7 +556,7 @@ describe("CommandRequestLeaseBook - scheduler-owned, bounded, zero-leak", () => 
 
     // Drive the entry to its required stage; delivery retries stop + the entry retires.
     const receipt = (stage: CoopAuthorityReceipt["stage"]): CoopAuthorityReceipt => ({
-      context: committed.context,
+      context: { ...committed.context, senderSeatId: 1 },
       revision: committed.revision,
       operationId: committed.operationId,
       stage,
@@ -593,6 +602,7 @@ describe("turnMaterialApplier + applyEntry (replica pipeline)", () => {
       }),
       projector: fixedProjector({ kind: "installed", controlId }),
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
 
     expect(rec.stages()).toEqual(["admitted", "materialApplied", "controlInstalled"]);
@@ -616,6 +626,7 @@ describe("turnMaterialApplier + applyEntry (replica pipeline)", () => {
       }),
       projector: fixedProjector({ kind: "installed", controlId: "x" }),
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
 
     expect(applierCalls).toBe(0);
@@ -637,6 +648,7 @@ describe("turnMaterialApplier + applyEntry (replica pipeline)", () => {
       }),
       projector: fixedProjector({ kind: "installed", controlId: "x" }),
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     expect(applierCalls).toBe(0);
     expect(rec.stages()).toEqual(["admitted"]);

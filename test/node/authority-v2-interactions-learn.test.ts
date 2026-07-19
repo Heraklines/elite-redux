@@ -124,6 +124,11 @@ function frameContext(overrides: Partial<CoopFrameContextV2> = {}): CoopFrameCon
   };
 }
 
+const PIPELINE_BOOKKEEPING = {
+  receiptContext: frameContext({ senderSeatId: 1 }),
+  recordStage: () => true,
+};
+
 function makeLog(scheduler: FakeScheduler, sent: CoopAuthorityWire[], over: Partial<AuthorityLogOptions> = {}) {
   return new AuthorityLog({
     localContext: frameContext(),
@@ -152,7 +157,12 @@ function fixedProjector(result: CoopControlInstallResult): CoopControlProjector 
 }
 
 function receipt(entry: CoopAuthorityEntry, stage: "admitted" | "materialApplied" | "controlInstalled") {
-  return { context: entry.context, revision: entry.revision, operationId: entry.operationId, stage };
+  return {
+    context: { ...entry.context, senderSeatId: 1 },
+    revision: entry.revision,
+    operationId: entry.operationId,
+    stage,
+  };
 }
 
 const base = { context: frameContext(), ownerSeatId: 1 } as const;
@@ -418,10 +428,11 @@ describe("createInteractionApplier (replica adoption)", () => {
       revision: 1,
     };
     const rec = recordingSink();
-    const out = applyEntry(ctxWithSeat(0), entry, {
+    const out = applyEntry(ctxWithSeat(1), entry, {
       applyMaterial: applier,
       projector: fixedProjector({ kind: "installed", controlId: controlIdOf(successor) }),
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     expect(rec.stages).toEqual(["admitted", "materialApplied", "controlInstalled"]);
     expect(out.kind).toBe("applied");
@@ -521,10 +532,11 @@ describe("Colosseum board applier - adopt-or-restore, digest-verified", () => {
     const { log, transaction } = makeTransaction(() => false);
     const applier = createColosseumBoardApplier(transaction);
     const rec = recordingSink();
-    const out = applyEntry(ctxWithSeat(0), boardEntry(), {
+    const out = applyEntry(ctxWithSeat(1), boardEntry(), {
       applyMaterial: applier,
       projector: fixedProjector({ kind: "installed", controlId: "x" }),
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     expect(out.kind).toBe("materialRejected");
     expect(rec.stages).toEqual(["admitted"]); // materialApplied withheld.

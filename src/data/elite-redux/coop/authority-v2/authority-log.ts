@@ -19,8 +19,10 @@
 //  AUTHORITY
 //   - commit(entry) assigns the next global revision, deep-freezes + retains it,
 //     delivers it once, then REDELIVERS on a backoff via an explicit DeliveryLease
-//     until the replica's `admitted` receipt arrives (retries STOP at admitted -
-//     nothing else). Retention itself holds LONGER: until the frozen retirement
+//     until the replica reaches the entry's required mechanical stage. Admission
+//     alone never stops redelivery: a dropped material/control receipt or a failed
+//     local apply must receive another delivery to retry. Retention holds until
+//     the frozen retirement
 //     rule is met (admitted + materialApplied + controlInstalled-where-nextControl
 //     != null); presentationSettled is NEVER required.
 //   - acceptReceipt(receipt) validates per-operation stage ordering, retires the
@@ -32,9 +34,9 @@
 //  REPLICA
 //   - admit(entry) classifies one delivered entry against the local frame context
 //     (epoch + membershipRevision + seatMap) and the ordering cursor: admitted /
-//     duplicate (never re-applied) / gap (requests the tail via send, NO local
-//     retry loop - the authority's redelivery is the only retry) / staleEpoch /
-//     rejected.
+//     duplicate-pending-material (retry material), duplicate-pending-control
+//     (retry only control), duplicate-complete (re-publish final receipt), gap
+//     (requests the tail via send, NO local retry loop), staleEpoch, or rejected.
 //
 // diagnostics() exposes the live lease/timer counts so tests can prove the
 // no-orphan-timer invariant directly.
@@ -57,10 +59,12 @@ import type {
   CoopAuthorityLog,
   CoopAuthorityReceipt,
   CoopFrameContextV2,
+  CoopReplicaMechanicalStage,
   CoopScheduler,
   CoopTimeClass,
   CoopTimerOwner,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 
 /** Monotonic index of each ACK stage. Retirement compares against these; presentationSettled is never required. */
 const STAGE_ORDER: Readonly<Record<CoopAckStage, number>> = {
@@ -120,7 +124,7 @@ export interface AuthorityLogOptions {
   readonly deliveryTimeClass?: CoopTimeClass;
   /**
    * Optional cap on REDELIVERY attempts before a lease goes inert (default unbounded: retries stop only at
-   * `admitted` or dispose). A cap bounds a pathologically dark channel; retention is unaffected.
+   * mechanical retirement or dispose). A cap bounds a pathologically dark channel; retention is unaffected.
    */
   readonly maxDeliveryAttempts?: number;
 }
@@ -140,7 +144,7 @@ interface DeliveryLease {
   attempts: number;
   /** Cancel handle for the currently pending retry timer, or null when none is scheduled. */
   cancelTimer: (() => void) | null;
-  /** Whether redelivery retries are stopped (admitted reached, attempts exhausted, retired, or disposed). */
+  /** Whether redelivery retries are stopped (attempts exhausted, retired, or disposed). */
   stopped: boolean;
   /** Whether this entry's subsumption list has already been actioned (once, on first reaching admitted). */
   subsumptionDone: boolean;
@@ -151,7 +155,9 @@ export interface AuthorityLogDiagnostics {
   readonly retainedEntries: number;
   readonly deliveryLeases: number;
   readonly activeDeliveryTimers: number;
+  readonly receivedThrough: number;
   readonly appliedThrough: number;
+  readonly controlInstalledThrough: number;
   readonly headRevision: number;
   readonly disposed: boolean;
 }
@@ -171,8 +177,10 @@ export class AuthorityLog implements CoopAuthorityLog {
 
   /** AUTHORITY: retained-but-unretired entries, bounded + revision-ordered, keyed by their delivery lease. */
   private readonly retainedWindow: BoundedRevisionWindow<DeliveryLease>;
-  /** REPLICA: the applied-through ordering cursor. */
+  /** REPLICA: separate received, material-applied, and control-installed ordering frontiers. */
   private readonly ledger: AuthorityLedger;
+  /** REPLICA: the one admitted revision that has not yet mechanically completed. */
+  private pendingReplicaEntry: CoopAuthorityEntry | null = null;
   /** AUTHORITY: the highest revision assigned (commit assigns headRevision + 1). */
   private headRevision = 0;
   private disposed = false;
@@ -222,6 +230,16 @@ export class AuthorityLog implements CoopAuthorityLog {
     if (!isValidFrameContext(entry.context)) {
       throw new Error("AuthorityLog.commit: invalid entry frame context");
     }
+    if (
+      !isSameSessionIdentity(entry.context, this.localContext)
+      || entry.context.sessionEpoch !== this.localContext.sessionEpoch
+      || entry.context.membershipRevision !== this.localContext.membershipRevision
+      || this.localContext.senderSeatId !== this.localContext.authoritySeatId
+      || entry.context.senderSeatId !== this.localContext.authoritySeatId
+      || entry.context.authoritySeatId !== this.localContext.authoritySeatId
+    ) {
+      throw new Error("AuthorityLog.commit: entry context is not bound to the local authority");
+    }
     const revision = this.headRevision + 1;
     // Own an immutable, caller-independent copy so a caller reusing/mutating its source object can never
     // rewrite what a later redelivery transmits (the retention immutability boundary).
@@ -234,7 +252,7 @@ export class AuthorityLog implements CoopAuthorityLog {
       owner: {
         ownerId: `${this.ownerBase}:deliver:${revision}`,
         address: `authority-v2/deliver/${revision}`,
-        reason: `redeliver revision ${revision} until admitted`,
+        reason: `redeliver revision ${revision} until mechanically retired`,
       },
       stage: STAGE_NONE,
       attempts: 0,
@@ -247,7 +265,7 @@ export class AuthorityLog implements CoopAuthorityLog {
       this.stopLease(evicted.value);
     }
 
-    // Deliver once immediately, then redeliver on the backoff until admitted.
+    // Deliver once immediately, then redeliver on the backoff until mechanically retired.
     this.send({ kind: "deliver", entry: committed });
     this.scheduleRedelivery(lease);
     return committed;
@@ -276,7 +294,33 @@ export class AuthorityLog implements CoopAuthorityLog {
       // Unknown, already-retired, or identity-mismatched revision: nothing to advance.
       return false;
     }
+    // A receipt is evidence from the receiving replica, never a reflection of the authority's own entry
+    // context. The transport/session binding performs exact peer authentication; the log still rejects a
+    // self-signed/spoofed-authority receipt so copied entry context can never retire its own mutation.
+    if (
+      receipt.context.authoritySeatId !== this.localContext.authoritySeatId
+      || lease.entry.context.senderSeatId !== this.localContext.authoritySeatId
+      || receipt.context.senderSeatId === lease.entry.context.senderSeatId
+      || receipt.context.senderSeatId === receipt.context.authoritySeatId
+    ) {
+      return false;
+    }
+    if (receipt.stage === "controlInstalled") {
+      const expectedControlId = lease.entry.nextControl == null ? null : controlIdOf(lease.entry.nextControl);
+      if (expectedControlId == null || receipt.controlId !== expectedControlId) {
+        return false;
+      }
+    } else if (receipt.controlId != null) {
+      return false;
+    }
     const stageIdx = STAGE_ORDER[receipt.stage];
+    const required = lease.entry.nextControl == null ? STAGE_ORDER.materialApplied : STAGE_ORDER.controlInstalled;
+    // Presentation is intentionally outside the retirement rule. It is not a substitute for the exact
+    // mechanical proof below it (in particular it carries no successor controlId), so it may only be
+    // observed after the required stage was already proven.
+    if (receipt.stage === "presentationSettled" && lease.stage < required) {
+      return false;
+    }
     // Per-operation stage ordering: stages are monotonic. A same/older stage is a duplicate receipt - a safe
     // no-op that never re-advances or re-retires.
     if (stageIdx <= lease.stage) {
@@ -284,10 +328,6 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     lease.stage = stageIdx;
 
-    // Delivery retries STOP at admitted (nothing else). Retention holds until the retirement rule.
-    if (stageIdx >= STAGE_ORDER.admitted) {
-      this.stopLeaseDelivery(lease);
-    }
     // Supersession by log order: when this entry is admitted, retire every revision it explicitly subsumes.
     if (!lease.subsumptionDone) {
       lease.subsumptionDone = true;
@@ -297,7 +337,6 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     // Retirement rule: admitted + materialApplied + (controlInstalled where nextControl != null). Never
     // presentationSettled.
-    const required = lease.entry.nextControl == null ? STAGE_ORDER.materialApplied : STAGE_ORDER.controlInstalled;
     if (lease.stage >= required) {
       return this.retire(receipt.revision);
     }
@@ -334,10 +373,27 @@ export class AuthorityLog implements CoopAuthorityLog {
     if (entry.context.membershipRevision !== this.localContext.membershipRevision) {
       return { kind: "rejected", reason: "membership-mismatch" };
     }
+    if (
+      entry.context.authoritySeatId !== this.localContext.authoritySeatId
+      || entry.context.senderSeatId !== entry.context.authoritySeatId
+      || this.localContext.senderSeatId === this.localContext.authoritySeatId
+    ) {
+      return { kind: "rejected", reason: "authority-sender-mismatch" };
+    }
     switch (this.ledger.classify(entry.revision)) {
-      case "duplicate":
-        // Already applied (a safe redelivery): the caller must NOT re-apply material.
-        return { kind: "duplicate" };
+      case "duplicate-complete":
+        // Mechanical state is complete. The caller republishes the terminal receipt but never re-applies.
+        return { kind: "duplicate-complete" };
+      case "duplicate-pending-material":
+        if (!this.isPendingReplicaEntry(entry)) {
+          return { kind: "rejected", reason: "revision-identity-conflict" };
+        }
+        return { kind: "duplicate-pending-material" };
+      case "duplicate-pending-control":
+        if (!this.isPendingReplicaEntry(entry)) {
+          return { kind: "rejected", reason: "revision-identity-conflict" };
+        }
+        return { kind: "duplicate-pending-control" };
       case "gap": {
         // Request the missing tail via the injected send. No local retry loop - the authority's redelivery
         // is the ONLY retry, so a replica can never spin an orphan request loop (the exact prior hazard).
@@ -346,15 +402,45 @@ export class AuthorityLog implements CoopAuthorityLog {
         return { kind: "gap", missingFrom };
       }
       default:
-        // Exactly the next revision: advance the cursor. The caller applies material after this returns.
-        this.ledger.markApplied(entry.revision);
+        // Exactly the next revision: journal it, but do NOT advance material/control truth yet.
+        if (!this.ledger.markReceived(entry.revision)) {
+          return { kind: "rejected", reason: "replica-ledger-refused-admission" };
+        }
+        this.pendingReplicaEntry = freezeAuthorityEntry(cloneEntry(entry));
         return { kind: "admitted" };
     }
   }
 
-  /** The applied-through revision frontier (replica cursor). */
+  /** Record a mechanical stage only after the real replica operation succeeded. */
+  recordReplicaStage(entry: CoopAuthorityEntry, stage: CoopReplicaMechanicalStage): boolean {
+    if (this.disposed || !this.isPendingReplicaEntry(entry)) {
+      return false;
+    }
+    let advanced = false;
+    if (stage === "materialApplied") {
+      advanced = this.ledger.markMaterialApplied(entry.revision, entry.nextControl != null);
+    } else if (entry.nextControl != null) {
+      advanced = this.ledger.markControlInstalled(entry.revision);
+    }
+    if (advanced && this.ledger.controlInstalledThrough() >= entry.revision) {
+      this.pendingReplicaEntry = null;
+    }
+    return advanced;
+  }
+
+  /** Highest validated-and-journaled revision. */
+  receivedThrough(): number {
+    return this.ledger.receivedThrough();
+  }
+
+  /** Highest revision whose canonical material really applied. */
   appliedThrough(): number {
     return this.ledger.appliedThrough();
+  }
+
+  /** Highest revision mechanically complete through its required successor control. */
+  controlInstalledThrough(): number {
+    return this.ledger.controlInstalledThrough();
   }
 
   // ---------------------------------------------------------------------------
@@ -368,6 +454,9 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     // Replica: fast-forward the applied cursor past any gap the snapshot filled.
     this.ledger.adoptFrontier(revision);
+    if (this.pendingReplicaEntry != null && this.pendingReplicaEntry.revision <= revision) {
+      this.pendingReplicaEntry = null;
+    }
     // Authority: keep the assignment head at/above the frontier so no revision is ever reused.
     if (revision > this.headRevision) {
       this.headRevision = revision;
@@ -400,7 +489,9 @@ export class AuthorityLog implements CoopAuthorityLog {
       retainedEntries: leases.length,
       deliveryLeases: leases.length,
       activeDeliveryTimers: leases.filter(l => l.cancelTimer != null && !l.stopped).length,
+      receivedThrough: this.ledger.receivedThrough(),
       appliedThrough: this.ledger.appliedThrough(),
+      controlInstalledThrough: this.ledger.controlInstalledThrough(),
       headRevision: this.headRevision,
       disposed: this.disposed,
     };
@@ -421,6 +512,20 @@ export class AuthorityLog implements CoopAuthorityLog {
     return true;
   }
 
+  /** Exact identity check for the one unfinished replica entry; a conflicting same-revision frame is hostile. */
+  private isPendingReplicaEntry(entry: CoopAuthorityEntry): boolean {
+    const pending = this.pendingReplicaEntry;
+    return (
+      pending != null
+      && pending.revision === entry.revision
+      && pending.operationId === entry.operationId
+      && pending.kind === entry.kind
+      && pending.material.digest === entry.material.digest
+      && JSON.stringify(pending.nextControl) === JSON.stringify(entry.nextControl)
+      && JSON.stringify(pending.subsumes) === JSON.stringify(entry.subsumes)
+    );
+  }
+
   /** Stop a lease's redelivery loop AND cancel every timer it owns (retirement / subsumption / dispose). */
   private stopLease(lease: DeliveryLease): void {
     this.stopLeaseDelivery(lease);
@@ -428,7 +533,7 @@ export class AuthorityLog implements CoopAuthorityLog {
     this.scheduler.cancelOwner(lease.owner.ownerId);
   }
 
-  /** Stop a lease's redelivery loop (admitted reached): cancel the pending timer + mark it stopped. */
+  /** Stop a lease's redelivery loop: cancel the pending timer + mark it stopped. */
   private stopLeaseDelivery(lease: DeliveryLease): void {
     lease.stopped = true;
     if (lease.cancelTimer != null) {

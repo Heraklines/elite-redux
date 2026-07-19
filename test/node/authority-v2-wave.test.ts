@@ -118,6 +118,11 @@ function frameContext(overrides: Partial<CoopFrameContextV2> = {}): CoopFrameCon
   };
 }
 
+const PIPELINE_BOOKKEEPING = {
+  receiptContext: frameContext({ senderSeatId: 1 }),
+  recordStage: () => true,
+};
+
 function makeLog(scheduler: FakeScheduler, sent: CoopAuthorityWire[], over: Partial<AuthorityLogOptions> = {}) {
   return new AuthorityLog({
     localContext: frameContext(),
@@ -187,7 +192,13 @@ const mystery = (): CoopNextControl => ({ kind: "MYSTERY", operationId: "op-myst
 const command = (): CoopNextControl => ({ kind: "COMMAND", epoch: 1, wave: 4, turn: 1, ownerSeatId: 0, pokemonId: 7 });
 
 function receipt(entry: CoopAuthorityEntry, stage: "admitted" | "materialApplied" | "controlInstalled") {
-  return { context: entry.context, revision: entry.revision, operationId: entry.operationId, stage };
+  return {
+    context: { ...entry.context, senderSeatId: 1 },
+    revision: entry.revision,
+    operationId: entry.operationId,
+    stage,
+    ...(stage === "controlInstalled" && entry.nextControl != null ? { controlId: controlIdOf(entry.nextControl) } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -542,13 +553,14 @@ describe("createWaveTerminalApplier (replica adoption)", () => {
       revision: 1,
     };
     const rec = recordingSink();
-    const out = applyEntry(ctxWithSeat(0), entry, {
+    const out = applyEntry(ctxWithSeat(1), entry, {
       applyMaterial: applier,
       projector: fixedProjector({
         kind: "installed",
         controlId: controlIdOf(reward() as NonNullable<CoopNextControl>),
       }),
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     // The guest ADOPTED the typed transition (never derived it) and then installed the stated control.
     expect(adopted).toEqual([WIN_TRANSITION]);

@@ -11,8 +11,8 @@
 // arithmetic over the ONE global revision domain (frozen decision 1). Split out
 // so the concrete CoopAuthorityLog composes it and the properties below are
 // unit-provable in isolation:
-//   - AuthorityLedger: the replica-side applied-through cursor + duplicate/gap
-//     classification + snapshot high-water adoption.
+//   - AuthorityLedger: the replica-side received/material/control frontiers +
+//     duplicate/gap classification + snapshot high-water adoption.
 //   - BoundedRevisionWindow: a revision-ordered map with a hard capacity, so a
 //     long-lived run cannot grow retention without bound (the safety valve the
 //     prior dual-ledger design lacked - it grew until it raced itself).
@@ -22,68 +22,122 @@
 // NEITHER.
 // =============================================================================
 
-/** How an incoming revision relates to the applied-through cursor. */
-export type RevisionOrder = "duplicate" | "next" | "gap";
+/** How an incoming revision relates to the replica's three mechanical frontiers. */
+export type RevisionOrder =
+  | "duplicate-complete"
+  | "duplicate-pending-material"
+  | "duplicate-pending-control"
+  | "next"
+  | "gap";
 
 /**
- * The replica-side ordering cursor for the ONE global revision domain. A revision is applied EXACTLY once,
- * strictly in order: the next admissible revision is always `appliedThrough + 1`. Anything at/below the
- * cursor is a duplicate (a safe redelivery - never re-applied); anything above `cursor + 1` is a gap (the
- * replica must request the missing tail rather than apply out of order).
+ * The replica-side ordering state for the ONE global revision domain. Receipt admission, canonical material
+ * application, and successor-control installation are deliberately separate facts:
  *
- * Pure: it holds a single integer. The log wraps mutation (`markApplied`) around the real material apply,
- * and wraps classification (`classify`) around the admit decision.
+ * - `receivedThrough`: the entry was validated and journaled in order.
+ * - `materialAppliedThrough`: its canonical material was installed and verified.
+ * - `controlInstalledThrough`: its mechanical successor is installed (or the entry stated no successor).
+ *
+ * At most one revision may sit between these frontiers. Revision N+1 is not admissible until N reaches its
+ * required mechanical terminal stage. A redelivery of N therefore reports the exact unfinished stage:
+ * retry material after a failed apply, retry only control after material succeeded, or re-publish the final
+ * receipt after completion. This prevents the old admission==application lie from turning an apply failure
+ * into a permanently green cursor.
+ *
+ * Pure: it holds only the three scalar frontiers. The log calls `markReceived` at admission and advances
+ * material/control only from the live replica pipeline after those operations actually succeed.
  */
 export class AuthorityLedger {
-  private cursor: number;
+  private receivedCursor: number;
+  private materialCursor: number;
+  private controlCursor: number;
 
   constructor(initialFrontier = 0) {
-    this.cursor = Number.isSafeInteger(initialFrontier) && initialFrontier > 0 ? initialFrontier : 0;
+    const frontier = Number.isSafeInteger(initialFrontier) && initialFrontier > 0 ? initialFrontier : 0;
+    this.receivedCursor = frontier;
+    this.materialCursor = frontier;
+    this.controlCursor = frontier;
   }
 
-  /** The highest revision applied in order (0 before anything has been applied). */
+  /** The highest revision whose canonical material has actually applied in order. */
   appliedThrough(): number {
-    return this.cursor;
+    return this.materialCursor;
   }
 
-  /** The first revision the replica still needs - the revision that fills a gap / the next admissible one. */
+  /** The highest revision validated and journaled in order. */
+  receivedThrough(): number {
+    return this.receivedCursor;
+  }
+
+  /** The highest revision whose required mechanical successor is installed in order. */
+  controlInstalledThrough(): number {
+    return this.controlCursor;
+  }
+
+  /** The unfinished revision, or the next revision when every admitted entry is mechanically complete. */
   missingFrom(): number {
-    return this.cursor + 1;
+    return this.controlCursor + 1;
   }
 
   /**
-   * Classify an incoming revision against the cursor WITHOUT mutating: `duplicate` (revision <= cursor -
-   * already applied), `next` (revision === cursor + 1 - admit + apply), or `gap` (revision > cursor + 1 -
-   * request the tail). A non-positive / non-integer revision is treated as a duplicate (never admissible).
+   * Classify an incoming revision WITHOUT mutating. Completed duplicates must never re-apply material;
+   * duplicates at an unfinished frontier name whether material or only control must be retried. A later
+   * revision is a gap until the unfinished predecessor reaches its required mechanical stage.
    */
   classify(revision: number): RevisionOrder {
-    if (!Number.isSafeInteger(revision) || revision <= this.cursor) {
-      return "duplicate";
+    if (!Number.isSafeInteger(revision) || revision <= 0 || revision <= this.controlCursor) {
+      return "duplicate-complete";
     }
-    return revision === this.cursor + 1 ? "next" : "gap";
+    if (revision === this.receivedCursor && this.receivedCursor > this.controlCursor) {
+      return this.materialCursor < revision ? "duplicate-pending-material" : "duplicate-pending-control";
+    }
+    return revision === this.controlCursor + 1 && this.receivedCursor === this.controlCursor ? "next" : "gap";
   }
 
   /**
-   * Advance the cursor for a revision that was applied in order. Returns true iff it advanced (the revision
-   * was exactly `cursor + 1`); an out-of-order or duplicate revision leaves the cursor untouched and returns
-   * false, so a caller can never silently skip a revision.
+   * Record ordered journal admission. This does NOT claim that material applied.
    */
-  markApplied(revision: number): boolean {
-    if (revision === this.cursor + 1) {
-      this.cursor = revision;
+  markReceived(revision: number): boolean {
+    if (revision === this.controlCursor + 1 && this.receivedCursor === this.controlCursor) {
+      this.receivedCursor = revision;
       return true;
     }
     return false;
   }
 
   /**
-   * Adopt a proven snapshot high-water (recovery): fast-forward the cursor to `revision` if it is ahead.
-   * Unlike {@linkcode markApplied} this deliberately jumps a gap the snapshot has already filled. Monotonic -
-   * a value at/below the cursor is ignored (a stale snapshot can never rewind the applied frontier).
+   * Record a verified canonical material install. Entries with no successor mechanically complete here;
+   * entries with a successor remain at `duplicate-pending-control` until that exact control is recorded.
+   */
+  markMaterialApplied(revision: number, requiresControl: boolean): boolean {
+    if (revision !== this.receivedCursor || revision !== this.materialCursor + 1) {
+      return false;
+    }
+    this.materialCursor = revision;
+    if (!requiresControl) {
+      this.controlCursor = revision;
+    }
+    return true;
+  }
+
+  /** Record the exact stated successor control as installed for the pending material revision. */
+  markControlInstalled(revision: number): boolean {
+    if (revision !== this.receivedCursor || revision !== this.materialCursor || revision !== this.controlCursor + 1) {
+      return false;
+    }
+    this.controlCursor = revision;
+    return true;
+  }
+
+  /**
+   * Adopt a proven snapshot high-water (recovery): a validated recovery bundle proves receipt, material,
+   * and its stated successor through `revision`. Monotonic; a stale snapshot can never rewind a frontier.
    */
   adoptFrontier(revision: number): void {
-    if (Number.isSafeInteger(revision) && revision > this.cursor) {
-      this.cursor = revision;
+    if (Number.isSafeInteger(revision) && revision > this.controlCursor) {
+      this.receivedCursor = revision;
+      this.materialCursor = revision;
+      this.controlCursor = revision;
     }
   }
 }

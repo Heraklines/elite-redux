@@ -429,7 +429,7 @@ export class RefAuthorityLog implements CoopAuthorityLog {
       return { kind: "staleEpoch" };
     }
     if (entry.revision <= this.frontier) {
-      return { kind: "duplicate" };
+      return { kind: "duplicate-complete" };
     }
     if (entry.revision === this.frontier + 1) {
       this.frontier = entry.revision;
@@ -444,7 +444,19 @@ export class RefAuthorityLog implements CoopAuthorityLog {
     return { kind: "gap", missingFrom: this.frontier + 1 };
   }
 
+  recordReplicaStage(_entry: CoopAuthorityEntry, _stage: "materialApplied" | "controlInstalled"): boolean {
+    return true;
+  }
+
+  receivedThrough(): number {
+    return this.frontier;
+  }
+
   appliedThrough(): number {
+    return this.frontier;
+  }
+
+  controlInstalledThrough(): number {
     return this.frontier;
   }
 
@@ -1194,8 +1206,13 @@ export class AuthorityV2Simulator {
         this.applyEntry(entry);
         this.drainBuffer();
         break;
-      case "duplicate":
+      case "duplicate-complete":
         // Idempotent: never re-mutate. Re-send receipts so a lost ack still retires it.
+        this.resendReceiptsFor(entry);
+        break;
+      case "duplicate-pending-material":
+      case "duplicate-pending-control":
+        // The reference simulator applies synchronously, so it cannot retain a partial stage.
         this.resendReceiptsFor(entry);
         break;
       case "gap":
@@ -1274,7 +1291,13 @@ export class AuthorityV2Simulator {
           progressed = true;
           break;
         }
-        if (res.kind === "duplicate" || res.kind === "staleEpoch" || res.kind === "rejected") {
+        if (
+          res.kind === "duplicate-complete"
+          || res.kind === "duplicate-pending-material"
+          || res.kind === "duplicate-pending-control"
+          || res.kind === "staleEpoch"
+          || res.kind === "rejected"
+        ) {
           this.deliveryBuffer.splice(i, 1);
           progressed = true;
           break;

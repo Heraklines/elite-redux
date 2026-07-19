@@ -105,7 +105,16 @@ function makeLog(frontier: number): FakeLog {
     admit() {
       return { kind: "admitted" };
     },
+    recordReplicaStage() {
+      return true;
+    },
+    receivedThrough() {
+      return current;
+    },
     appliedThrough() {
+      return current;
+    },
+    controlInstalledThrough() {
       return current;
     },
     adoptFrontier(revision) {

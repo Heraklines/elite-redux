@@ -11,7 +11,9 @@
 // import), so it runs in the node-pure project in milliseconds. These pin the
 // contract's load-bearing invariants:
 //   - commit -> deliver -> apply -> retire happy path (retirement rule).
-//   - a duplicate is never re-applied (no double-mutate).
+//   - admission never claims material application; failed material and deferred
+//     control are retried at their exact unfinished stage.
+//   - a mechanically-complete duplicate never re-applies (no double-mutate).
 //   - a gap requests the tail (no local retry loop).
 //   - a stale epoch is rejected (staleEpoch), membership/session mismatch too.
 //   - supersession retires subsumed entries AND cancels their timers.
@@ -33,6 +35,7 @@ import type {
   CoopTimeClass,
   CoopTimerOwner,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import { beforeEach, describe, expect, it } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -139,10 +142,11 @@ function receipt(
   overrides: Partial<CoopAuthorityReceipt> = {},
 ): CoopAuthorityReceipt {
   return {
-    context: entry.context,
+    context: { ...entry.context, senderSeatId: 1 },
     revision: entry.revision,
     operationId: entry.operationId,
     stage,
+    ...(stage === "controlInstalled" && entry.nextControl != null ? { controlId: controlIdOf(entry.nextControl) } : {}),
     ...overrides,
   };
 }
@@ -152,6 +156,13 @@ function makeLog(scheduler: FakeScheduler, sent: CoopAuthorityWire[], over: Part
     localContext: frameContext(),
     scheduler,
     send: wire => sent.push(wire),
+    ...over,
+  });
+}
+
+function makeReplicaLog(scheduler: FakeScheduler, sent: CoopAuthorityWire[], over: Partial<AuthorityLogOptions> = {}) {
+  return makeLog(scheduler, sent, {
+    localContext: frameContext({ senderSeatId: 1 }),
     ...over,
   });
 }
@@ -190,11 +201,12 @@ describe("authority-v2 log", () => {
     scheduler.fireAll();
     expect(delivered(sent).length).toBeGreaterThan(1);
 
-    // admitted STOPS delivery retries (nothing else): the entry is still retained.
+    // admitted does NOT stop delivery: a later material/control receipt may be lost, and redelivery is the
+    // replica's retry trigger. The entry remains retained with one owned timer.
     expect(log.acceptReceipt(receipt(committed, "admitted"))).toBe(false);
     diag = log.diagnostics();
-    expect(diag.activeDeliveryTimers).toBe(0);
-    expect(scheduler.ownerCount("authority-v2:session-A:seat0:deliver:1")).toBe(0);
+    expect(diag.activeDeliveryTimers).toBe(1);
+    expect(scheduler.ownerCount("authority-v2:session-A:seat0:deliver:1")).toBe(1);
     expect(log.retained().map(e => e.revision)).toEqual([1]);
 
     // materialApplied alone does not retire an entry that states a nextControl.
@@ -208,31 +220,65 @@ describe("authority-v2 log", () => {
     expect(scheduler.liveCount()).toBe(0);
   });
 
-  it("a duplicate is admitted-once and never re-applied", () => {
+  it("rejects self-signed and address-mismatched control receipts", () => {
     const log = makeLog(scheduler, sent);
-    const entry = fullEntry(1, "op-1");
+    const committed = log.commit(entryInput("op-auth", { nextControl: commandControl() }));
 
-    // A caller applies material ONLY on an `admitted` result. Count how often that would happen.
-    let applyCount = 0;
-    const applyIfAdmitted = (e: CoopAuthorityEntry) => {
-      if (log.admit(e).kind === "admitted") {
-        applyCount += 1;
-      }
-    };
+    expect(
+      log.acceptReceipt(
+        receipt(committed, "admitted", {
+          context: committed.context,
+        }),
+      ),
+    ).toBe(false);
+    expect(log.acceptReceipt(receipt(committed, "admitted"))).toBe(false);
+    expect(log.acceptReceipt(receipt(committed, "materialApplied"))).toBe(false);
+    expect(log.acceptReceipt(receipt(committed, "controlInstalled", { controlId: "wrong-control" }))).toBe(false);
+    expect(log.retained()).toHaveLength(1);
+    expect(log.acceptReceipt(receipt(committed, "controlInstalled"))).toBe(true);
+  });
 
-    applyIfAdmitted(entry);
+  it("never lets presentation proof replace missing mechanical proof", () => {
+    const log = makeLog(scheduler, sent);
+    const committed = log.commit(entryInput("op-presentation", { nextControl: commandControl() }));
+
+    expect(log.acceptReceipt(receipt(committed, "admitted"))).toBe(false);
+    expect(log.acceptReceipt(receipt(committed, "presentationSettled"))).toBe(false);
+    expect(log.retained()).toHaveLength(1);
+    expect(log.acceptReceipt(receipt(committed, "materialApplied"))).toBe(false);
+    expect(log.acceptReceipt(receipt(committed, "presentationSettled"))).toBe(false);
+    expect(log.retained()).toHaveLength(1);
+    expect(log.acceptReceipt(receipt(committed, "controlInstalled"))).toBe(true);
+  });
+
+  it("keeps receipt, material, and control truth separate and retries only the unfinished stage", () => {
+    const log = makeReplicaLog(scheduler, sent);
+    const entry = fullEntry(1, "op-1", { nextControl: commandControl() });
+
+    expect(log.admit(entry)).toEqual({ kind: "admitted" });
+    expect(log.receivedThrough()).toBe(1);
+    expect(log.appliedThrough()).toBe(0);
+    expect(log.controlInstalledThrough()).toBe(0);
+
+    // A failed material apply leaves the entry retryable instead of turning admission into a false green.
+    expect(log.admit(entry)).toEqual({ kind: "duplicate-pending-material" });
+    expect(log.appliedThrough()).toBe(0);
+    expect(log.recordReplicaStage(entry, "materialApplied")).toBe(true);
     expect(log.appliedThrough()).toBe(1);
-    expect(applyCount).toBe(1);
+    expect(log.controlInstalledThrough()).toBe(0);
 
-    // Re-delivery of the same revision classifies as duplicate: NOT admitted, so the caller never re-applies.
-    expect(log.admit(entry)).toEqual({ kind: "duplicate" });
-    applyIfAdmitted(entry);
-    expect(applyCount).toBe(1);
-    expect(log.appliedThrough()).toBe(1);
+    // Material is not re-applied while only control remains unfinished.
+    expect(log.admit(entry)).toEqual({ kind: "duplicate-pending-control" });
+    expect(log.recordReplicaStage(entry, "controlInstalled")).toBe(true);
+    expect(log.controlInstalledThrough()).toBe(1);
+
+    // Once mechanically complete, redelivery only republishes proof.
+    expect(log.admit(entry)).toEqual({ kind: "duplicate-complete" });
+    expect(log.recordReplicaStage(entry, "materialApplied")).toBe(false);
   });
 
   it("a gap requests the tail via send (no local retry loop)", () => {
-    const log = makeLog(scheduler, sent);
+    const log = makeReplicaLog(scheduler, sent);
     const result = log.admit(fullEntry(3, "op-3"));
 
     expect(result).toEqual({ kind: "gap", missingFrom: 1 });
@@ -246,7 +292,7 @@ describe("authority-v2 log", () => {
 
   it("a stale epoch is rejected as staleEpoch; membership/session mismatch reject", () => {
     const log = new AuthorityLog({
-      localContext: frameContext({ sessionEpoch: 2, membershipRevision: 5 }),
+      localContext: frameContext({ sessionEpoch: 2, membershipRevision: 5, senderSeatId: 1 }),
       scheduler,
       send: wire => sent.push(wire),
     });
@@ -285,8 +331,8 @@ describe("authority-v2 log", () => {
     log.acceptReceipt(receipt(b, "admitted"));
     expect(log.retained().map(e => e.revision)).toEqual([2]);
     expect(scheduler.ownerCount("authority-v2:session-A:seat0:deliver:1")).toBe(0);
-    // b itself is only admitted (required = materialApplied since no nextControl) -> still retained, no timer.
-    expect(log.diagnostics().activeDeliveryTimers).toBe(0);
+    // b itself is only admitted (required = materialApplied since no nextControl), so its retry remains live.
+    expect(log.diagnostics().activeDeliveryTimers).toBe(1);
   });
 
   it("presentationSettled is NEVER required for retirement", () => {

@@ -471,6 +471,8 @@ export class CoopAuthorityV2Shadow {
       applyMaterial: (ctx, entry) => this.applyMaterialRouted(ctx, entry),
       projector: this.projector,
       receipts: { emit: receipt => this.sendReceipt(receipt) },
+      receiptContext: this.frameContext,
+      recordStage: (entry, stage) => this.log.recordReplicaStage(entry, stage),
     };
 
     // Per-runtime inbound routing (contract change request 2): register THIS harness's inbound handler on
@@ -869,10 +871,23 @@ export class CoopAuthorityV2Shadow {
         case "authorityEntry": {
           const entry: CoopAuthorityEntry = { context: frame.ctx, ...frame.body };
           const result = this.log.admit(entry);
-          if (result.kind === "admitted") {
-            this.admitted += 1;
-            const outcome = applyEntry(this.ctx, entry, this.replicaDeps);
-            if (outcome.kind === "applied") {
+          if (
+            result.kind === "admitted"
+            || result.kind === "duplicate-pending-material"
+            || result.kind === "duplicate-pending-control"
+            || result.kind === "duplicate-complete"
+          ) {
+            if (result.kind === "admitted") {
+              this.admitted += 1;
+            }
+            const resume =
+              result.kind === "duplicate-pending-control"
+                ? "materialApplied"
+                : result.kind === "duplicate-complete"
+                  ? "controlInstalled"
+                  : "admitted";
+            const outcome = applyEntry(this.ctx, entry, this.replicaDeps, resume);
+            if (outcome.kind === "applied" && result.kind !== "duplicate-complete") {
               this.applied += 1;
             }
           }

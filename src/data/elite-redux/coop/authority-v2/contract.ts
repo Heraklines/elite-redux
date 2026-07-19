@@ -28,8 +28,8 @@
 //     fence BEFORE requesting data and applies material + log frontier +
 //     control atomically before releasing.
 //  6. ONE set of ACK-stage meanings (CoopAckStage):
-//       admitted            - the entry is journaled at the replica (stops
-//                             delivery retries; nothing else).
+//       admitted            - the entry is journaled at the replica (receipt
+//                             only; delivery continues until mechanical proof).
 //       materialApplied     - canonical state installed; digest matches.
 //       controlInstalled    - the stated nextControl exists locally with its
 //                             exact owner/address (mechanical, not visual).
@@ -164,7 +164,7 @@ export interface CoopAuthorityReceipt {
   readonly revision: number;
   readonly operationId: string;
   readonly stage: CoopAckStage;
-  /** Present when stage >= controlInstalled and nextControl != null. */
+  /** Present exactly at controlInstalled when nextControl != null. */
   readonly controlId?: string;
 }
 
@@ -183,8 +183,14 @@ export interface CoopAuthorityLog {
   retained(): readonly CoopAuthorityEntry[];
   /** REPLICA: classify + admit one delivered entry. */
   admit(entry: CoopAuthorityEntry): CoopAdmitResult;
-  /** REPLICA: the applied-through revision frontier. */
+  /** REPLICA: record a stage only after the corresponding live engine action succeeded. */
+  recordReplicaStage(entry: CoopAuthorityEntry, stage: CoopReplicaMechanicalStage): boolean;
+  /** REPLICA: highest validated-and-journaled revision. */
+  receivedThrough(): number;
+  /** REPLICA: highest revision whose canonical material really applied. */
   appliedThrough(): number;
+  /** REPLICA: highest revision mechanically complete through its stated successor control. */
+  controlInstalledThrough(): number;
   /** BOTH: adopt a proven snapshot high-water (recovery). */
   adoptFrontier(revision: number): void;
   /** BOTH: dispose every timer/lease this log owns. */
@@ -193,10 +199,15 @@ export interface CoopAuthorityLog {
 
 export type CoopAdmitResult =
   | { readonly kind: "admitted" }
-  | { readonly kind: "duplicate" }
+  | { readonly kind: "duplicate-pending-material" }
+  | { readonly kind: "duplicate-pending-control" }
+  | { readonly kind: "duplicate-complete" }
   | { readonly kind: "gap"; readonly missingFrom: number }
   | { readonly kind: "staleEpoch" }
   | { readonly kind: "rejected"; readonly reason: string };
+
+/** Replica stages that advance mechanical truth; receipt admission alone never does. */
+export type CoopReplicaMechanicalStage = "materialApplied" | "controlInstalled";
 
 // ---------------------------------------------------------------------------
 // Canonical next control (frozen decision 4)

@@ -597,7 +597,7 @@ describe("owner window + zero timers after retire", () => {
     controlId?: string,
   ): CoopAuthorityReceipt {
     return {
-      context: entry.context,
+      context: { ...entry.context, senderSeatId: 1 },
       revision: entry.revision,
       operationId: entry.operationId,
       stage,

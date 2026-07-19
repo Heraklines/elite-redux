@@ -142,7 +142,7 @@ function receipt(
   controlId?: string,
 ): CoopAuthorityReceipt {
   return {
-    context: entry.context,
+    context: { ...entry.context, senderSeatId: 1 },
     revision: entry.revision,
     operationId: entry.operationId,
     stage,

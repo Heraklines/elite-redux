@@ -391,7 +391,7 @@ jobs:
 
   public-ui-contracts:
     if: github.repository == 'Heraklines/elite-redux'
-    name: Public UI driver and evidence contracts
+    name: Fast public UI and Authority V2 contracts
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -409,6 +409,16 @@ jobs:
 
       - name: Run every public-UI source and evidence contract
         run: node --test test/browser/coop-public-ui/*.test.mjs
+
+      # The Authority V2 protocol suite lives in the node-pure Vitest project.
+      # It is intentionally kept out of process-global Lane A: these tests define
+      # admission/material/control/receipt/recovery semantics and must run with
+      # fresh module state while sharing this already-warm fast-contract runner.
+      - name: Run every Authority V2 node-pure contract
+        run: >-
+          pnpm exec vitest run --config test/node/vitest.config.ts
+          test/node/authority-v2-*.test.ts
+          --pool=forks --isolate --no-file-parallelism
 
   gate:
     if: github.repository == 'Heraklines/elite-redux'

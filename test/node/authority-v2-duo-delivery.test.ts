@@ -33,6 +33,7 @@
 
 import type { BattleScene } from "#app/battle-scene";
 import type { CoopAuthorityEntry, CoopRuntimeContext } from "#data/elite-redux/coop/authority-v2/contract";
+import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import {
   type CoopSchedulerClock,
   type CoopTimerHandle,
@@ -308,6 +309,75 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     // Idempotent: the replica classifies the redelivery a DUPLICATE - admitted stays 1, material applied ONCE.
     expect(duo.guest.diagnostics().admitted).toBe(1);
     expect(sink.applies).toBe(1);
+
+    duo.dispose();
+  });
+
+  it("retries material after admission when the first live apply fails", async () => {
+    const clock = new FakeClock();
+    let applies = 0;
+    const guestLive: CoopV2LiveReplicaSeams = {
+      applyMaterial: () => {
+        applies += 1;
+        return applies > 1;
+      },
+      projectControl: () => null,
+    };
+    const duo = buildDeferredDuo(clock, guestLive);
+
+    duo.host.tapTurnCommit(turnTap("TURN/retry-material"));
+    await flushLoopback();
+    duo.flush("guest");
+    expect(applies).toBe(1);
+    expect(duo.guest.diagnostics().admitted).toBe(1);
+    expect(duo.guest.diagnostics().applied).toBe(0);
+
+    // Admission is not application: the authority keeps delivering until the required stage, and the
+    // duplicate-pending-material path retries the exact live apply.
+    clock.advance(1_000);
+    await flushLoopback();
+    duo.flush("guest");
+    expect(applies).toBe(2);
+    expect(duo.guest.diagnostics().admitted).toBe(1);
+    expect(duo.guest.diagnostics().applied).toBe(1);
+
+    await flushLoopback();
+    duo.flush("host");
+    expect(duo.host.diagnostics().retained).toBe(0);
+    duo.dispose();
+  });
+
+  it("retries a deferred control without applying canonical material twice", async () => {
+    const clock = new FakeClock();
+    let applies = 0;
+    let projections = 0;
+    const guestLive: CoopV2LiveReplicaSeams = {
+      applyMaterial: () => {
+        applies += 1;
+        return true;
+      },
+      projectControl: (_ctx, control) => {
+        projections += 1;
+        return projections === 1
+          ? { kind: "deferred", reason: "phase manager pacing" }
+          : { kind: "installed", controlId: controlIdOf(control) };
+      },
+    };
+    const duo = buildDeferredDuo(clock, guestLive);
+
+    duo.host.tapTurnCommit(turnTap("TURN/retry-control"));
+    await flushLoopback();
+    duo.flush("guest");
+    expect(applies).toBe(1);
+    expect(projections).toBe(1);
+    expect(duo.guest.diagnostics().applied).toBe(0);
+
+    clock.advance(1_000);
+    await flushLoopback();
+    duo.flush("guest");
+    expect(applies).toBe(1);
+    expect(projections).toBe(2);
+    expect(duo.guest.diagnostics().applied).toBe(1);
 
     duo.dispose();
   });

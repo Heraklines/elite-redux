@@ -36,8 +36,12 @@ This smart-sharded workflow is the standing default for all future co-op checkpo
   files at exact SHA `50531b460` with A1/B8/C3/P1/S3/T1 plus browser/static in 4m19s. The second Lane P
   runner is the in-flight T2 addition and must be calibrated by the next exact-SHA aggregate gate. Rebalance
   the slowest shard from green-run timing evidence rather than weakening coverage or environment fidelity.
+- The fast-contract runner must execute both the keyboard/DOM public-browser driver contracts and every
+  `test/node/authority-v2-*.test.ts` file under the isolated node-pure Vitest config. Authority V2 admission,
+  material, control, receipt, recovery, and cutover contracts are deploy-blocking; never rely on Lane A to
+  cover them, and never move them into Lane A's process-global module state.
 - The same workflow runs a browser-native WebRTC checkpoint on its own GitHub-hosted Chrome runner. It must prove two isolated browser contexts complete protocol/fingerprint/identity negotiation and replace a dropped RTCDataChannel through hot rejoin. Keep it separate from the engine shards: the continuous two-engine journey proves gameplay, while this job proves the real browser transport those engines use.
-- Run or inspect one deterministic shard with `node scripts/run-coop-gate.mjs --lane <A|B|C|P|S|T> --shard <index>/<total>`. Use `--list` to see its exact files.
+- Run or inspect one deterministic shard with `node scripts/run-coop-gate.mjs --lane <A|B|C|P|S|T> --shard <index>/<total>`. Use `--list` to see its exact files. Authority V2 node-pure contracts are a separate named step on the fast-contract runner rather than a numbered engine shard.
 - Do not replace external sharding with many concurrent local Vitest processes. Separate runners provide the speedup without recreating CPU/memory contention.
 - Keep `fail-fast: false` so every shard returns evidence. Download the per-shard log artifact, fix all reproducible failures in one batch, and let the next pushed checkpoint rerun the matrix.
 - A red shard blocks staging by default. A stabilization-only staging checkpoint may waive a red test only

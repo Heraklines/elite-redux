@@ -13,7 +13,7 @@
 // signing a receipt at each frozen ACK stage as it goes.
 //
 // The stage meanings + retirement rule are frozen in contract.ts (decision 6):
-//   admitted            - journaled at the replica (delivery retries stop).
+//   admitted            - journaled at the replica (delivery remains live).
 //   materialApplied     - canonical state installed; digest matches.
 //   controlInstalled    - the stated nextControl exists locally with its exact
 //                         owner/address (mechanical, not visual).
@@ -36,6 +36,8 @@ import type {
   CoopAuthorityReceipt,
   CoopControlInstallResult,
   CoopControlProjector,
+  CoopFrameContextV2,
+  CoopReplicaMechanicalStage,
   CoopRuntimeContext,
 } from "#data/elite-redux/coop/authority-v2/contract";
 import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
@@ -72,9 +74,16 @@ export interface ReplicaApplyDeps {
   readonly applyMaterial: ApplyMaterialFn;
   readonly projector: CoopControlProjector;
   readonly receipts: ReplicaReceiptSink;
+  /** Authenticated context of THIS receiving replica; receipts must never reuse the authority entry sender. */
+  readonly receiptContext: CoopFrameContextV2;
+  /** Advance local mechanical truth only after the corresponding live operation succeeded. */
+  readonly recordStage: (entry: CoopAuthorityEntry, stage: CoopReplicaMechanicalStage) => boolean;
   /** Optional; when present, an opportunistic presentationSettled probe. */
   readonly presentation?: PresentationProbeFn;
 }
+
+/** The durable stage already reached before this delivery/re-delivery entered the pipeline. */
+export type ReplicaApplyResume = "admitted" | "materialApplied" | "controlInstalled";
 
 /** The furthest stage the pipeline reached for one entry. */
 export type ReplicaApplyOutcome =
@@ -103,26 +112,51 @@ export function applyEntry(
   ctx: CoopRuntimeContext,
   entry: CoopAuthorityEntry,
   deps: ReplicaApplyDeps,
+  resume: ReplicaApplyResume = "admitted",
 ): ReplicaApplyOutcome {
+  if (!receiptContextMatchesEntry(ctx, deps.receiptContext, entry)) {
+    return { kind: "materialRejected", reason: "receipt context is not the authenticated receiving replica" };
+  }
+
+  if (resume === "controlInstalled") {
+    const controlId = expectedControlId(entry);
+    emitReceipt(
+      deps.receipts,
+      deps.receiptContext,
+      entry,
+      controlId == null ? "materialApplied" : "controlInstalled",
+      controlId ?? undefined,
+    );
+    return { kind: "applied", controlId, presentationSettled: false };
+  }
+
   // --- Stage 1: admitted -------------------------------------------------
   // Signed unconditionally: reaching applyEntry IS the entry being journaled in
-  // log order. This stops the authority's delivery retries and nothing else.
-  emitReceipt(deps.receipts, entry, "admitted");
+  // log order. It proves receipt only; authority delivery remains live until the
+  // required mechanical stage so lost later receipts and failed applies retry.
+  if (resume === "admitted") {
+    emitReceipt(deps.receipts, deps.receiptContext, entry, "admitted");
+  }
 
   // --- Stage 2: materialApplied -----------------------------------------
   // Install canonical state + confirm digest BEFORE any control is projected: a
   // control surface pointing at state that isn't installed yet would be a
   // continuation ahead of its own material (the P0 class, inverted).
-  let materialApplied: boolean;
-  try {
-    materialApplied = deps.applyMaterial(ctx, entry);
-  } catch (error) {
-    return { kind: "materialRejected", reason: describeError(error) };
+  if (resume === "admitted") {
+    let materialApplied: boolean;
+    try {
+      materialApplied = deps.applyMaterial(ctx, entry);
+    } catch (error) {
+      return { kind: "materialRejected", reason: describeError(error) };
+    }
+    if (!materialApplied) {
+      return { kind: "materialRejected", reason: `material digest ${entry.material.digest} did not apply/match` };
+    }
+    if (!deps.recordStage(entry, "materialApplied")) {
+      return { kind: "materialRejected", reason: `replica ledger refused materialApplied revision ${entry.revision}` };
+    }
   }
-  if (!materialApplied) {
-    return { kind: "materialRejected", reason: `material digest ${entry.material.digest} did not apply/match` };
-  }
-  emitReceipt(deps.receipts, entry, "materialApplied");
+  emitReceipt(deps.receipts, deps.receiptContext, entry, "materialApplied");
 
   // --- Stage 3: controlInstalled ----------------------------------------
   const nextControl = entry.nextControl;
@@ -144,7 +178,20 @@ export function applyEntry(
     case "installed":
     case "already-installed": {
       // The stated control exists locally with its exact owner/address.
-      emitReceipt(deps.receipts, entry, "controlInstalled", projection.controlId);
+      const expected = controlIdOf(nextControl);
+      if (projection.controlId !== expected) {
+        return {
+          kind: "controlRejected",
+          reason: `projector installed ${projection.controlId}, expected ${expected}`,
+        };
+      }
+      if (!deps.recordStage(entry, "controlInstalled")) {
+        return {
+          kind: "controlRejected",
+          reason: `replica ledger refused controlInstalled revision ${entry.revision}`,
+        };
+      }
+      emitReceipt(deps.receipts, deps.receiptContext, entry, "controlInstalled", projection.controlId);
       const presentationSettled = probePresentation(ctx, entry, deps);
       return { kind: "applied", controlId: projection.controlId, presentationSettled };
     }
@@ -173,7 +220,7 @@ function probePresentation(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry, d
     return false;
   }
   if (settled) {
-    emitReceipt(deps.receipts, entry, "presentationSettled");
+    emitReceipt(deps.receipts, deps.receiptContext, entry, "presentationSettled");
   }
   return settled;
 }
@@ -186,12 +233,13 @@ function probePresentation(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry, d
  */
 function emitReceipt(
   sink: ReplicaReceiptSink,
+  receiptContext: CoopFrameContextV2,
   entry: CoopAuthorityEntry,
   stage: CoopAckStage,
   controlId?: string,
 ): void {
   const receipt: CoopAuthorityReceipt = {
-    context: entry.context,
+    context: receiptContext,
     revision: entry.revision,
     operationId: entry.operationId,
     stage,
@@ -203,6 +251,26 @@ function emitReceipt(
     // Receipt delivery is the transport/log lane's concern with its own retry;
     // a sink throw must never unwind the replica's ordered material/control apply.
   }
+}
+
+/** Receipts must be signed by the compatible receiving peer, never by the authority entry's sender. */
+function receiptContextMatchesEntry(
+  ctx: CoopRuntimeContext,
+  receipt: CoopFrameContextV2,
+  entry: CoopAuthorityEntry,
+): boolean {
+  return (
+    receipt.sessionId === entry.context.sessionId
+    && receipt.runId === entry.context.runId
+    && receipt.sessionEpoch === entry.context.sessionEpoch
+    && receipt.seatMapId === entry.context.seatMapId
+    && receipt.membershipRevision === entry.context.membershipRevision
+    && receipt.authoritySeatId === entry.context.authoritySeatId
+    && entry.context.senderSeatId === entry.context.authoritySeatId
+    && receipt.senderSeatId === ctx.localSeatId
+    && receipt.senderSeatId !== receipt.authoritySeatId
+    && receipt.senderSeatId !== entry.context.senderSeatId
+  );
 }
 
 /**

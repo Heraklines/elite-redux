@@ -42,6 +42,20 @@ import { describe, expect, it, vi } from "vitest";
 
 type Projectable = NonNullable<CoopNextControl>;
 
+const PIPELINE_BOOKKEEPING = {
+  receiptContext: {
+    sessionId: "s",
+    runId: "r",
+    sessionEpoch: 1,
+    seatMapId: "m",
+    membershipRevision: 1,
+    senderSeatId: 1,
+    authoritySeatId: 0,
+    connectionGeneration: 1,
+  } satisfies CoopFrameContextV2,
+  recordStage: () => true,
+};
+
 const command = (over: Partial<Extract<Projectable, { kind: "COMMAND" }>> = {}): Projectable => ({
   kind: "COMMAND",
   epoch: 1,
@@ -336,7 +350,7 @@ function fixedProjector(result: CoopControlInstallResult): CoopControlProjector 
   return { project: () => result };
 }
 
-const CTX = ctxWithSeat(0);
+const CTX = ctxWithSeat(1);
 
 describe("applyEntry (replica pipeline)", () => {
   it("signs admitted -> materialApplied -> controlInstalled in order on the happy path", () => {
@@ -347,10 +361,34 @@ describe("applyEntry (replica pipeline)", () => {
       applyMaterial: () => true,
       projector: fixedProjector({ kind: "installed", controlId: cid }),
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     expect(rec.stages).toEqual(["admitted", "materialApplied", "controlInstalled"]);
     expect(rec.receipts[2].controlId).toBe(cid);
+    expect(rec.receipts.every(receipt => receipt.context.senderSeatId === 1)).toBe(true);
     expect(out).toEqual({ kind: "applied", controlId: cid, presentationSettled: false });
+  });
+
+  it("refuses to emit self-signed authority receipts or accept an address-mismatched projector result", () => {
+    const selfSigned = applyEntry(CTX, entryWith(command()), {
+      applyMaterial: () => true,
+      projector: fixedProjector({ kind: "installed", controlId: controlIdOf(command()) }),
+      receipts: recordingSink().sink,
+      ...PIPELINE_BOOKKEEPING,
+      receiptContext: FRAME,
+    });
+    expect(selfSigned).toMatchObject({
+      kind: "materialRejected",
+      reason: "receipt context is not the authenticated receiving replica",
+    });
+
+    const wrongControl = applyEntry(CTX, entryWith(command()), {
+      applyMaterial: () => true,
+      projector: fixedProjector({ kind: "installed", controlId: "wrong" }),
+      receipts: recordingSink().sink,
+      ...PIPELINE_BOOKKEEPING,
+    });
+    expect(wrongControl).toMatchObject({ kind: "controlRejected" });
   });
 
   it("stops at admitted and reports materialRejected when material does not apply", () => {
@@ -360,6 +398,7 @@ describe("applyEntry (replica pipeline)", () => {
       applyMaterial: () => false,
       projector: projector as unknown as CoopControlProjector,
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     expect(rec.stages).toEqual(["admitted"]);
     expect(out.kind).toBe("materialRejected");
@@ -374,6 +413,7 @@ describe("applyEntry (replica pipeline)", () => {
       },
       projector: fixedProjector({ kind: "installed", controlId: "x" }),
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     expect(rec.stages).toEqual(["admitted"]);
     expect(out).toMatchObject({ kind: "materialRejected", reason: "boom" });
@@ -385,6 +425,7 @@ describe("applyEntry (replica pipeline)", () => {
       applyMaterial: () => true,
       projector: fixedProjector({ kind: "deferred", reason: "pacing" }),
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     expect(rec.stages).toEqual(["admitted", "materialApplied"]);
     expect(out).toMatchObject({ kind: "controlDeferred", reason: "pacing" });
@@ -396,6 +437,7 @@ describe("applyEntry (replica pipeline)", () => {
       applyMaterial: () => true,
       projector: fixedProjector({ kind: "rejected", reason: "impossible" }),
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     expect(rec.stages).toEqual(["admitted", "materialApplied"]);
     expect(out).toMatchObject({ kind: "controlRejected", reason: "impossible" });
@@ -407,6 +449,7 @@ describe("applyEntry (replica pipeline)", () => {
       applyMaterial: () => true,
       projector: fixedProjector({ kind: "installed", controlId: "unused" }),
       receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     expect(rec.stages).toEqual(["admitted", "materialApplied"]);
     expect(out).toEqual({ kind: "applied", controlId: null, presentationSettled: false });
@@ -416,8 +459,9 @@ describe("applyEntry (replica pipeline)", () => {
     const okRec = recordingSink();
     const okOut = applyEntry(CTX, entryWith(command()), {
       applyMaterial: () => true,
-      projector: fixedProjector({ kind: "installed", controlId: "c" }),
+      projector: fixedProjector({ kind: "installed", controlId: controlIdOf(command()) }),
       receipts: okRec.sink,
+      ...PIPELINE_BOOKKEEPING,
       presentation: () => true,
     });
     expect(okRec.stages).toEqual(["admitted", "materialApplied", "controlInstalled", "presentationSettled"]);
@@ -426,8 +470,9 @@ describe("applyEntry (replica pipeline)", () => {
     const throwRec = recordingSink();
     const throwOut = applyEntry(CTX, entryWith(command()), {
       applyMaterial: () => true,
-      projector: fixedProjector({ kind: "installed", controlId: "c" }),
+      projector: fixedProjector({ kind: "installed", controlId: controlIdOf(command()) }),
       receipts: throwRec.sink,
+      ...PIPELINE_BOOKKEEPING,
       presentation: () => {
         throw new Error("render blew up");
       },
@@ -448,8 +493,9 @@ describe("applyEntry (replica pipeline)", () => {
     };
     const out = applyEntry(CTX, entryWith(command()), {
       applyMaterial: () => true,
-      projector: fixedProjector({ kind: "installed", controlId: "c" }),
+      projector: fixedProjector({ kind: "installed", controlId: controlIdOf(command()) }),
       receipts: sink,
+      ...PIPELINE_BOOKKEEPING,
     });
     expect(calls).toBe(3); // admitted, materialApplied, controlInstalled all attempted
     expect(out.kind).toBe("applied");
