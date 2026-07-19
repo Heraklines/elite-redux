@@ -410,12 +410,12 @@ describe("authority-v2 turn cutover - replica context binding + authority self-a
     duo.dispose();
   });
 
-  it("an AUTHORITY self-loopback that declines its own TURN_COMMIT (returns null) falls through to shadow, no double authority", () => {
+  it("rejects an AUTHORITY self-loopback before it can enter replica or shadow state", () => {
     // Models the Yawn/B-13 corruption: a single-engine spoof peer (or the module-level inbound fallback) routes
-    // the authority's OWN committed TURN_COMMIT back into its own replica pipeline. buildCoopV2TurnLiveSeams
-    // recognizes it is the authority (localSeat == authoritySeat) and returns null, so the numeric checkpoint is
-    // NEVER re-applied onto the authority's own live scene (which would drop companions like sleepTurnsRemaining).
-    // The entry still accounts as pure shadow - never a second authority, never a stuck one.
+    // the authority's OWN committed TURN_COMMIT back into its own inbound path. AuthorityLog admission now
+    // rejects senderSeat===local authority before the replica applier or shadow ledger can observe it. This is
+    // stronger than relying on the later live seam to decline the numeric checkpoint: there is no second
+    // authority, no shadow accounting lie, and no chance to drop companions like sleepTurnsRemaining.
     const applyCalls: number[] = [];
     const engineApplies: number[] = [];
     const authoritySkipSeam: CoopV2LiveReplicaSeams = {
@@ -423,9 +423,7 @@ describe("authority-v2 turn cutover - replica context binding + authority self-a
         if (entry.kind !== "TURN_COMMIT") {
           return null;
         }
-        applyCalls.push(entry.revision); // the self-loopback DID reach the replica applier (as in the B-13 log)
-        // The authority never replicates its own committed turn (the coop-runtime guard, expressed here via the
-        // frame-context seat discriminator equivalent to runtime.controller.authorityRole === "authority").
+        applyCalls.push(entry.revision);
         if (ctx.localSeatId === ctx.authoritySeatId) {
           return null;
         }
@@ -449,11 +447,12 @@ describe("authority-v2 turn cutover - replica context binding + authority self-a
     authority.tapTurnCommit(turnTap());
 
     const diag = authority.diagnostics();
-    // The self-loopback REACHED the applier (proving the guard path is genuinely exercised), the seam declined
-    // (no engine apply), yet the entry is accounted in shadow state exactly like pure shadow.
-    expect(applyCalls).toEqual([1]);
+    // The hostile/self-routed delivery is rejected at the authenticated authority/replica role boundary.
+    expect(applyCalls).toEqual([]);
     expect(engineApplies).toEqual([]);
-    expect(diag.shadowStateSize).toBe(1);
+    expect(diag.admitted).toBe(0);
+    expect(diag.applied).toBe(0);
+    expect(diag.shadowStateSize).toBe(0);
     authority.dispose();
   });
 });
