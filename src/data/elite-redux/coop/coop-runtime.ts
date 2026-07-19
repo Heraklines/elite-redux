@@ -61,6 +61,7 @@ import {
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
 import type { ApplyMaterialResult } from "#data/elite-redux/coop/authority-v2/replica";
+import { resolveCoopV2SessionIdentity } from "#data/elite-redux/coop/authority-v2/session-identity";
 import {
   CoopAuthorityV2Shadow,
   type CoopV2LiveReplicaSeams,
@@ -3771,56 +3772,17 @@ function buildCoopV2LiveSeams(
 /** Resolve the immutable v2 shadow identity from a runtime's session controller, or null if unavailable. */
 function resolveCoopV2ShadowIdentity(runtime: CoopRuntime): CoopV2ShadowIdentity | null {
   const controller = runtime.controller;
-  const localSeatId = controller.localSeatId;
-  const connectionGeneration = runtime.localTransport.connectionGeneration?.() ?? 0;
   const binding = controller.authenticatedBinding;
-  if (binding != null) {
-    const membership = controller.p33MembershipSnapshot();
-    if (membership == null) {
-      return null;
-    }
-    const peerBindings = membership.requiredAckSeats
-      .filter(seatId => seatId !== localSeatId)
-      .map(seatId => membership.members.find(member => member.seatId === seatId))
-      .filter(member => member != null)
-      .map(member => ({ seatId: member.seatId, connectionGeneration: member.connectionGeneration }));
-    if (peerBindings.length !== membership.requiredAckSeats.length - 1 || peerBindings.length === 0) {
-      return null;
-    }
-    return {
-      runtimeId: `${binding.sessionId}:seat${localSeatId}`,
-      sessionId: binding.sessionId,
-      runId: binding.runId ?? controller.runId,
-      epoch: binding.sessionEpoch,
-      localSeatId,
-      authoritySeatId: binding.authoritySeatId,
-      membershipRevision: membership.revision,
-      seatMapId: binding.seatMap.seatMapId,
-      connectionGeneration,
-      peerBindings,
-    };
-  }
-  // Non-authenticated dev/loopback session: synthesize a stable identity from the shared run id + epoch so
-  // both peers derive IDENTICAL session-identity fields (admit's isSameSessionIdentity requires it).
-  const runId = controller.runId;
-  const epoch = controller.sessionEpoch;
-  if (typeof runId !== "string" || runId.length === 0 || !Number.isSafeInteger(epoch) || epoch < 0) {
-    return null;
-  }
-  return {
-    runtimeId: `${runId}:seat${localSeatId}`,
-    sessionId: runId,
-    runId,
-    epoch,
-    localSeatId,
+  return resolveCoopV2SessionIdentity({
+    hasAuthenticatedPairing: controller.hasAuthenticatedPairing,
+    authenticatedBinding: binding,
+    membership: binding == null ? null : controller.p33MembershipSnapshot(),
+    localSeatId: controller.localSeatId,
     authoritySeatId: controller.authoritySeatId,
-    membershipRevision: 1,
-    seatMapId: `coop-v2-shadow-seatmap:${runId}`,
-    connectionGeneration,
-    // The unbound compatibility path is currently a two-seat transport. Both endpoints share the channel
-    // generation; authenticated multi-seat sessions use the membership-derived bindings above.
-    peerBindings: [{ seatId: localSeatId === 0 ? 1 : 0, connectionGeneration }],
-  };
+    runId: controller.runId,
+    sessionEpoch: controller.sessionEpoch,
+    connectionGeneration: runtime.localTransport.connectionGeneration?.() ?? 0,
+  });
 }
 
 /**
