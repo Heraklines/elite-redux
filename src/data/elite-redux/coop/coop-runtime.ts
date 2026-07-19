@@ -4303,6 +4303,39 @@ function completeCoopV2WaveTransaction(runtime: CoopRuntime, transaction: CoopV2
   }
 }
 
+/**
+ * Prove that the current reward-like phase has actually opened its own executable handler.
+ *
+ * `handler.active` alone is insufficient: a freshly-current phase can inherit an active Title/Confirm/
+ * Message handler from the phase it replaced. Accept only the mode owned by this exact phase. The biome
+ * watcher is the one deliberate MESSAGE exception, and it publishes its phase-owned readiness latch only
+ * after authoritative stock and the terminal-consumer loop are both live.
+ */
+function isCoopV2RewardContinuationSurfacePublic(phaseName: string | undefined): boolean {
+  if (globalScene.ui.getHandler()?.active !== true) {
+    return false;
+  }
+  const mode = globalScene.ui.getMode();
+  switch (phaseName) {
+    case "SelectModifierPhase":
+      return mode === UiMode.MODIFIER_SELECT;
+    case "BiomeShopPhase": {
+      const phase = globalScene.phaseManager?.getCurrentPhase() as
+        | { coopBiomeWatcherContinuationReady?: boolean }
+        | undefined;
+      return (
+        mode === UiMode.BIOME_SHOP || (mode === UiMode.MESSAGE && phase?.coopBiomeWatcherContinuationReady === true)
+      );
+    }
+    case "TheBargainPhase":
+      return mode === UiMode.ER_BARGAIN;
+    case "ErCrossroadsPhase":
+      return mode === UiMode.OPTION_SELECT;
+    default:
+      return false;
+  }
+}
+
 function projectCoopV2WaveControl(
   runtime: CoopRuntime,
   control: NonNullable<CoopNextControl>,
@@ -4327,13 +4360,7 @@ function projectCoopV2WaveControl(
   switch (control.kind) {
     case "REWARD": {
       const correctOwner = coopInteractionOwnerSeat(runtime.controller.interactionCounter()) === control.ownerSeatId;
-      return correctOwner
-        && atTransactionWave
-        && handlerActive
-        && (phaseName === "SelectModifierPhase"
-          || phaseName === "BiomeShopPhase"
-          || phaseName === "TheBargainPhase"
-          || phaseName === "ErCrossroadsPhase")
+      return correctOwner && atTransactionWave && isCoopV2RewardContinuationSurfacePublic(phaseName)
         ? installed()
         : { kind: "deferred", reason: `awaiting real reward surface for ${controlId}` };
     }
