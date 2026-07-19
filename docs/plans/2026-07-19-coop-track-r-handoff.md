@@ -63,6 +63,12 @@ Three tracks: **R** (stabilization — ACTIVE, this handoff), **S** (liveness, p
    "guest apply OUT-OF-BAND checkpoint mid-park" (good) vs "guest discard OUT-OF-BAND checkpoint"
    (address mismatch → separate genuine issue). Production unaffected (both browsers pump continuously).
    When it pushes: merge → sentinels (tsc delta 0, test:node) → push integration.
+   AT HANDOFF the agent was directed to wrap up and push WIP immediately (with a per-item report at
+   docs/plans/2026-07-19-residual-gate-reds-wip.md in that branch). If the push never appeared, its local
+   worktree may still exist on disk at
+   `C:\Users\Hafida\pokerogue\.claude\worktrees\agent-a9b5a35e98ff79935` — check there for uncommitted
+   changes before redoing anything. If neither exists, redo items from the two Oracle verdicts above
+   (they contain the full fix recipes); everything else in its scope is re-derivable from §3's ledger.
 
 ## 3. STATE OF THE BOARD (what is fixed, what is red)
 
