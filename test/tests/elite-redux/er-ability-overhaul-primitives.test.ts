@@ -7,7 +7,7 @@
 import { AbAttr } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import type { BattleScene } from "#app/battle-scene";
-import { initGlobalScene } from "#app/global-scene";
+import { globalScene, initGlobalScene } from "#app/global-scene";
 import * as Archetypes from "#data/elite-redux/archetypes/index";
 import { AbilityId } from "#enums/ability-id";
 import { MoveCategory } from "#enums/move-category";
@@ -16,7 +16,7 @@ import { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 import { NumberHolder } from "#utils/common";
-import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 type AttrFactory = () => AbAttr;
 type MutableAbility = Ability & { attrs: AbAttr[] };
@@ -64,6 +64,15 @@ type UpgradeExports = {
 };
 
 const upgrades = Archetypes as unknown as UpgradeExports;
+let previousGlobalScene: BattleScene;
+
+beforeEach(() => {
+  previousGlobalScene = globalScene;
+});
+
+afterEach(() => {
+  initGlobalScene(previousGlobalScene);
+});
 
 class TestAttr extends AbAttr {}
 
