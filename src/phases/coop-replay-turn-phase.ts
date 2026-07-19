@@ -77,6 +77,15 @@ export function abortActiveCoopReplayTurnPhase(reason: string): boolean {
 export class CoopReplayTurnPhase extends Phase {
   public readonly phaseName = "CoopReplayTurnPhase";
 
+  /**
+   * The engine that owns this async renderer pump. `pump()` crosses several
+   * network/timer awaits before it calls {@link end}; resolving through the
+   * ambient `globalScene` at that point can advance a different engine in the
+   * in-process two-browser harness. A real browser has one scene, so capturing
+   * it at construction is behavior-identical there while making the async
+   * ownership explicit.
+   */
+  private readonly ownerScene = globalScene;
   private readonly turn: number;
   /** #782 live pump: how many event POSITIONS (seq 0..rendered-1) this turn has already presented. */
   private readonly rendered: number;
@@ -147,7 +156,7 @@ export class CoopReplayTurnPhase extends Phase {
     if (activeCoopReplayTurnPhase === this) {
       activeCoopReplayTurnPhase = null;
     }
-    super.end();
+    this.ownerScene.phaseManager.shiftPhase();
   }
 
   /** Whether this renderer has installed the exact-address turn/live-event continuation wait. */

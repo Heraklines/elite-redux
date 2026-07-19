@@ -2110,6 +2110,13 @@ interface RetainedWaveBoundaryBridge {
  * winning guest turn. Weak keys prevent a completed rig from becoming process-global test state.
  */
 const retainedWaveBoundaryByGuestScene = new WeakMap<object, RetainedWaveBoundaryBridge>();
+/**
+ * The independently-running peer browser for a guest replay scene. A replay can
+ * emit a tail request while it is parked; production's authority browser
+ * receives and answers that request concurrently. The one-process harness must
+ * explicitly schedule that peer inbox before it can expect the guest's resend.
+ */
+const replayPeerContextByGuestScene = new WeakMap<object, ClientCtx>();
 
 function registerRetainedWaveBoundaryBridge(
   hostGame: GameManager,
@@ -2239,6 +2246,7 @@ export async function buildDuo(
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: () => runtimePair.flush("guest"),
   };
+  replayPeerContextByGuestScene.set(guestScene, hostCtx);
   await withClient(guestCtx, () => {
     toCoopGameMode(guestScene);
     mirrorHostBattleToGuest(hostScene, guestScene);
@@ -2473,6 +2481,7 @@ export async function driveGuestReplayTurn(
     replay.start();
   }
   await drainLoopback();
+  const peerCtx = replayPeerContextByGuestScene.get(guestScene as object);
   // Stall detection by phase IDENTITY (#827): the #782 instant-streaming continuation re-enters as a NEW
   // CoopReplayTurnPhase object each increment, so a real advance resets the counter; only the SAME object
   // stuck is a genuine hang. Equivalent to the old name-based check for the non-continuation callers (their
@@ -2511,6 +2520,15 @@ export async function driveGuestReplayTurn(
       cur.start();
     }
     await drainLoopback();
+    // A parked replica may have just emitted tailRequest / a compatibility ACK
+    // whose authority-side handling produces the frame that unblocks it. Keep
+    // the authority browser's event loop alive exactly as production does, then
+    // restore this guest context and deliver the response. This is scheduling,
+    // never a synthetic authority or direct state mutation.
+    if (guestScene.phaseManager.getCurrentPhase() === cur && peerCtx != null) {
+      await withClient(peerCtx, () => drainLoopback());
+      await drainLoopback();
+    }
     if (wasFinalize) {
       return;
     }
@@ -3416,6 +3434,7 @@ export async function buildDuoForMe(
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: () => runtimePair.flush("guest"),
   };
+  replayPeerContextByGuestScene.set(guestScene, hostCtx);
   await withClient(guestCtx, () => {
     toCoopGameMode(guestScene);
     mirrorHostMeToGuest(hostScene, guestScene);
@@ -4420,6 +4439,7 @@ export async function buildShowdownDuo(
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: pumpInboundFor("guest"),
   };
+  replayPeerContextByGuestScene.set(guestScene, hostCtx);
   await withClient(guestCtx, () => {
     toShowdownGameMode(guestScene);
     // The mirror reconstructs the guest's world in its LOCAL (flipped) orientation (Task F1): its OWN
