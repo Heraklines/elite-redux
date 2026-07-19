@@ -1219,6 +1219,23 @@ function semanticAppearanceIsNew(event, handled) {
   return identity == null || typeof handled !== "string" ? event.index > (handled ?? -1) : identity !== handled;
 }
 
+/** Whether every mirror event refers to the same authoritative surface address. */
+function semanticEventsShareAppearance(events) {
+  const observations = events.map(event => event?.observation);
+  if (observations.some(observation => observation == null)) {
+    return false;
+  }
+  const identities = observations.map(observation =>
+    JSON.stringify([
+      observation.surfaceId,
+      observation.address?.epoch,
+      observation.address?.wave,
+      observation.address?.turn,
+    ]),
+  );
+  return new Set(identities).size === 1;
+}
+
 /**
  * Return the first registered between-wave surface observed since this wave began.
  *
@@ -1321,7 +1338,7 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
     // browser campaign otherwise fails in the few seconds between the watcher's ownerSeat=partner marker
     // and the partner's own ownerSeat===localSeat mirror. Once every browser has published this surface,
     // a missing self-owner is genuinely malformed and still fails loudly.
-    if (strict && semanticEvents.every(event => event != null)) {
+    if (strict && semanticEvents.every(event => event != null) && semanticEventsShareAppearance(semanticEvents)) {
       throw new Error(
         `[campaign-owner-evidence] surface "${driver.name}" is up but its v2 semantic mirror `
           + `(${driver.v2SurfaceId}) never reported an owner (ownerSeat === localSeat); refusing to `

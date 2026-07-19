@@ -342,6 +342,60 @@ test("a delayed reciprocal semantic owner supersedes the provisional watcher sur
   assert.equal(resolveSurfaceOwner(rig, driver, cursors, new Map(), true)?.client, owner);
 });
 
+test("a stale prior-wave owner mirror cannot make a new one-sided reward projection look malformed", () => {
+  const watcher = fakeClient("watcher");
+  const owner = fakeClient("owner");
+  const rig = { host: watcher, clients: { watcher, owner } };
+  const driver = {
+    name: "reward",
+    present: /OWNER drives reward screen/u,
+    v2SurfaceId: "reward-shop",
+    owner: { marker: /OWNER drives reward screen/u },
+  };
+  const cursors = { watcher: 0, owner: 0 };
+  owner.evidence.events.push({
+    index: owner.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "reward-shop",
+      address: { epoch: 9, wave: 1, turn: 2 },
+      localSeat: 1,
+      ownerSeat: 0,
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+    },
+  });
+  watcher.evidence.events.push({
+    index: watcher.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "reward-shop",
+      address: { epoch: 9, wave: 2, turn: 1 },
+      localSeat: 0,
+      ownerSeat: 1,
+      ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: false },
+    },
+  });
+
+  assert.equal(
+    resolveSurfaceOwner(rig, driver, cursors, new Map(), true),
+    null,
+    "different wave addresses are a provisional cross-wave race, not two malformed mirrors of one appearance",
+  );
+
+  owner.evidence.events.push({
+    index: owner.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "reward-shop",
+      address: { epoch: 9, wave: 2, turn: 1 },
+      localSeat: 1,
+      ownerSeat: 1,
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+    },
+  });
+  assert.equal(resolveSurfaceOwner(rig, driver, cursors, new Map(), true)?.client, owner);
+});
+
 test("semantic owner remains driveable when its earlier legacy OWNER line is outside the cursor", () => {
   const authority = fakeClient("authority", ["OWNER drives reward screen"]);
   const renderer = fakeClient("renderer");
