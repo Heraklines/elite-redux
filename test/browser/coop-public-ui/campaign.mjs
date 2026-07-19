@@ -1332,7 +1332,7 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
         },
         {
           timeoutMs: rig.config.timeoutMs,
-          description: `paired actionable Mystery ${stage} surface ${surfaceId}`,
+          description: `paired Mystery ${stage} surface ${surfaceId}`,
         },
       ),
     ),
@@ -1415,6 +1415,154 @@ async function checkpointPairedMysterySurface(rig, surfaceId, cursors, stats, st
   appendMysteryProof(rig, event, proof);
   await Promise.all(clients.map(client => client.checkpoint(`wave-${event.wave}-mystery-${stage}-${surfaceId}`)));
   return false;
+}
+
+const MYSTERY_WATCHER_SURFACES = new Set([
+  "mystery-encounter",
+  "mystery-encounter:message",
+  "mystery-encounter:prompt",
+]);
+
+/**
+ * A generic Mystery secondary prompt is intentionally owner-only. The authoritative host runs the
+ * encounter engine, but only the interaction owner renders the capture selector; a guest owner gets
+ * it from CoopReplayMePhase, while a host owner gets it from MysteryEncounterPhase. The watcher stays
+ * on its already-addressed, input-inert Mystery projection.
+ *
+ * This is not the paired-screen contract used by quizzes/colosseum. Requiring a second
+ * `mystery-encounter:prompt` fabricated a harness timeout after production had correctly delivered
+ * the host-authored sub-prompt (run 29673757003). Prove the stronger real contract instead: exactly
+ * one owner can act, the watcher cannot, and both projections carry one address/digest/encounter.
+ */
+export function assertAsymmetricMysteryPromptProjection(ownerObservation, watcherObservation) {
+  if (
+    ownerObservation?.surfaceId !== "mystery-encounter:prompt"
+    || ownerObservation.ownerSeat !== ownerObservation.localSeat
+    || ownerObservation.seatsWithInput?.length !== 1
+    || ownerObservation.seatsWithInput[0] !== ownerObservation.localSeat
+    || !isActionableSemanticObservation(ownerObservation)
+  ) {
+    throw new Error(
+      `[campaign-mystery] secondary prompt owner was not exclusively actionable: ${JSON.stringify(ownerObservation)}`,
+    );
+  }
+  if (
+    !MYSTERY_WATCHER_SURFACES.has(watcherObservation?.surfaceId)
+    || watcherObservation.localSeat === ownerObservation.localSeat
+    || watcherObservation.ownerSeat !== ownerObservation.ownerSeat
+    || watcherObservation.seatsWithInput?.includes(watcherObservation.localSeat)
+    || watcherObservation.seatsWithInput?.length !== 1
+    || watcherObservation.seatsWithInput[0] !== ownerObservation.ownerSeat
+  ) {
+    throw new Error(
+      `[campaign-mystery] secondary prompt watcher was not input-inert: ${JSON.stringify(watcherObservation)}`,
+    );
+  }
+  const sameAddress = JSON.stringify(watcherObservation.address) === JSON.stringify(ownerObservation.address);
+  if (
+    !sameAddress
+    || ownerObservation.stateDigest == null
+    || watcherObservation.stateDigest !== ownerObservation.stateDigest
+    || watcherObservation.mysteryEncounterType !== ownerObservation.mysteryEncounterType
+  ) {
+    throw new Error(
+      "[campaign-mystery] secondary prompt owner/watcher state diverged: "
+        + `${JSON.stringify({ ownerObservation, watcherObservation })}`,
+    );
+  }
+  if (
+    watcherObservation.surfaceId === ownerObservation.surfaceId
+    && JSON.stringify(watcherObservation.optionIds ?? null) !== JSON.stringify(ownerObservation.optionIds ?? null)
+  ) {
+    throw new Error(
+      "[campaign-mystery] mirrored secondary prompt options diverged: "
+        + `${JSON.stringify({ ownerObservation, watcherObservation })}`,
+    );
+  }
+  return {
+    stage: "subprompt",
+    surfaceId: ownerObservation.surfaceId,
+    watcherSurfaceId: watcherObservation.surfaceId,
+    phase: ownerObservation.phase,
+    uiMode: ownerObservation.uiMode,
+    selectedOptionId: ownerObservation.selectedOptionId ?? null,
+    address: ownerObservation.address,
+    ownerSeat: ownerObservation.ownerSeat,
+    watcherSeat: watcherObservation.localSeat,
+    optionIds: ownerObservation.optionIds ?? null,
+    mysteryEncounterType: ownerObservation.mysteryEncounterType ?? null,
+    stateDigest: ownerObservation.stateDigest,
+  };
+}
+
+async function checkpointAsymmetricMysteryPromptSurface(rig, cursors, stats, owner) {
+  const ownerEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(cursors[owner.label] ?? 0, "mystery-encounter:prompt");
+      const observation = candidate?.observation;
+      return observation?.ownerSeat === owner.publicSeat
+        && observation.localSeat === owner.publicSeat
+        && observation.seatsWithInput?.length === 1
+        && observation.seatsWithInput[0] === owner.publicSeat
+        && isActionableSemanticObservation(observation)
+        ? candidate
+        : null;
+    },
+    {
+      timeoutMs: rig.config.timeoutMs,
+      description: `owner-only actionable Mystery secondary prompt on ${owner.label}`,
+    },
+  );
+  const authority = ownerEvent.observation;
+  const watcher = Object.values(rig.clients).find(client => client !== owner);
+  if (watcher == null) {
+    throw new Error("[campaign-mystery] secondary prompt has no watcher browser");
+  }
+  const watcherEvent = await watcher.evidence.waitForCondition(
+    sink =>
+      sink.events
+        .slice(cursors[watcher.label] ?? 0)
+        .toReversed()
+        .find(traceEvent => {
+          const observation = traceEvent.observation;
+          return (
+            traceEvent.kind === "browser-surface2"
+            && MYSTERY_WATCHER_SURFACES.has(observation.surfaceId)
+            && observation.localSeat === watcher.publicSeat
+            && observation.ownerSeat === authority.ownerSeat
+            && !observation.seatsWithInput?.includes(watcher.publicSeat)
+            && JSON.stringify(observation.address) === JSON.stringify(authority.address)
+            && observation.stateDigest === authority.stateDigest
+            && observation.mysteryEncounterType === authority.mysteryEncounterType
+          );
+        }) ?? null,
+    {
+      timeoutMs: rig.config.timeoutMs,
+      description: `input-inert Mystery secondary watcher projection on ${watcher.label}`,
+    },
+  );
+  const proof = assertAsymmetricMysteryPromptProjection(authority, watcherEvent.observation);
+  const event = stats.mysteryEvents.find(candidate => candidate.wave === authority.address.wave);
+  const presentation = event?.surfaces.find(surface => surface.stage === "presentation");
+  if (
+    event == null
+    || presentation == null
+    || event.ownerSeat !== authority.ownerSeat
+    || event.mysteryEncounterType !== (authority.mysteryEncounterType ?? null)
+    || JSON.stringify(presentation.address) !== JSON.stringify(authority.address)
+    || presentation.stateDigest !== authority.stateDigest
+  ) {
+    throw new Error(
+      "[campaign-mystery] secondary prompt did not descend from its paired presentation: "
+        + `${JSON.stringify({ authority, event })}`,
+    );
+  }
+  appendMysteryProof(rig, event, proof);
+  await Promise.all(
+    Object.values(rig.clients).map(client =>
+      client.checkpoint(`wave-${event.wave}-mystery-subprompt-${authority.surfaceId}`),
+    ),
+  );
 }
 
 async function checkpointAsymmetricBargainSurface(rig, cursors, stats, owner) {
@@ -1839,6 +1987,8 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       // live in driveMysteryPartyPicker below.
     } else if (mysteryStage === "bargain") {
       await checkpointAsymmetricBargainSurface(rig, cursors, stats, client);
+    } else if (driver.name === "mystery-subprompt") {
+      await checkpointAsymmetricMysteryPromptSurface(rig, cursors, stats, client);
     } else if (mysteryStage != null && driver.v2SurfaceId) {
       const targetReached = await checkpointPairedMysterySurface(rig, driver.v2SurfaceId, cursors, stats, mysteryStage);
       if (targetReached) {

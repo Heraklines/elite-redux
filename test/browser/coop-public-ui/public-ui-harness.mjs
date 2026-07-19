@@ -2973,13 +2973,27 @@ export class DuoPublicUiRig {
         if (supersedingCommand != null && supersedingCommand.index >= readyReplacement.index) {
           continue;
         }
+        const replacementKey = replacementPickerCommitKey(client, readyReplacement.observation.address);
+        if (this.committedReplacementPickers.has(replacementKey)) {
+          // Dirty lane run 29673757003: the first replacement drive returned while a later narrated
+          // CoopFaintReplayPhase MessagePhase was already actionable. Re-entering the stale picker and
+          // advancing `from` to the CURRENT evidence cursor hid that unread prompt forever, even though a
+          // real player would press it. Retire only this already-committed picker observation; the
+          // command/prompt paths below must still see every public surface born after it.
+          client.evidence.record("sequential-replacement-already-committed", {
+            replacementKey,
+            pickerEventIndex: readyReplacement.index,
+            scanFloor: from[client.label] ?? 0,
+          });
+          from[client.label] = readyReplacement.index + 1;
+          continue;
+        }
         await this.driveOwnedReplacementPicker(client, from);
-        // Advance this client's scan floor past the just-driven picker. driveOwnedReplacementPicker
-        // short-circuits an already-committed re-entry without emitting a new surface, so leaving the
-        // pre-picker scan cursor would re-detect the same stale actionable party:replacement and busy
-        // loop; a real player resumes from the completed replacement boundary.
-        from[client.label] = client.evidence.cursor();
-        outcomeCursors[client.label] = client.evidence.cursor();
+        // Retire only the picker observation that authorized this drive. The drive can take long enough
+        // for narration or even the next command surface to become actionable before it returns; moving
+        // the floor to the current tail would erase those one-shot public surfaces from the human driver.
+        from[client.label] = readyReplacement.index + 1;
+        outcomeCursors[client.label] = readyReplacement.index + 1;
         droveReplacement = true;
         break;
       }

@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
-import { createMysteryNarrationAdvancer } from "./campaign.mjs";
+import { assertAsymmetricMysteryPromptProjection, createMysteryNarrationAdvancer } from "./campaign.mjs";
 import { chooseAffordableStarterPair, selectOptionById } from "./campaign-nav.mjs";
 import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
 import {
@@ -202,8 +202,70 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   // owner-only party sub-prompt, else the watcher hangs it.
   assert.match(campaign, /if \(driver\.mysteryParty\) \{[\s\S]*OWNER-ONLY/u);
   assert.match(campaign, /await driveMysteryPartyPicker\(rig, client, cursors, stats\)/u);
+  // Track R run 29673757003: a guest-owned Field Trip secondary prompt is intentionally OWNER-ONLY.
+  // The host runs the authoritative encounter engine and remains on its input-inert addressed Mystery
+  // projection; only CoopReplayMePhase renders the host-streamed capture selector on the guest. Requiring
+  // a second actionable `mystery-encounter:prompt` on the host made a correct production handoff time out.
+  assert.match(campaign, /async function checkpointAsymmetricMysteryPromptSurface\(/u);
+  assert.match(campaign, /driver\.name === "mystery-subprompt"/u);
+  assert.match(campaign, /owner-only actionable Mystery secondary prompt/u);
+  assert.match(campaign, /input-inert Mystery secondary watcher projection/u);
+  assert.doesNotMatch(campaign, /paired actionable Mystery \$\{stage\} surface/u);
   // Both advancers use the shared party-picker guard (faint replacement OR ME party sub-prompt).
   assert.equal((campaign.match(/isPartyPickerSurfaceOpen\(latestSurface\?\.observation\)/gu) ?? []).length, 2);
+});
+
+test("a generic Mystery secondary prompt has one actionable owner and one converged inert watcher", () => {
+  const owner = {
+    surfaceId: "mystery-encounter:prompt",
+    phase: "CoopReplayMePhase",
+    uiMode: "OPTION_SELECT",
+    localSeat: 1,
+    ownerSeat: 1,
+    seatsWithInput: [1],
+    selectedOptionId: "slot:0",
+    optionIds: ["slot:0", "slot:1"],
+    ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: false },
+    address: { epoch: 19, wave: 2, turn: 1 },
+    stateDigest: "mechanical-state",
+    mysteryEncounterType: 8,
+  };
+  const watcher = {
+    surfaceId: "mystery-encounter",
+    phase: "MysteryEncounterPhase",
+    uiMode: "MYSTERY_ENCOUNTER",
+    localSeat: 0,
+    ownerSeat: 1,
+    seatsWithInput: [1],
+    selectedOptionId: "cursor:0",
+    optionIds: null,
+    ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: false },
+    address: { epoch: 19, wave: 2, turn: 1 },
+    stateDigest: "mechanical-state",
+    mysteryEncounterType: 8,
+  };
+  assert.deepEqual(assertAsymmetricMysteryPromptProjection(owner, watcher), {
+    stage: "subprompt",
+    surfaceId: "mystery-encounter:prompt",
+    watcherSurfaceId: "mystery-encounter",
+    phase: "CoopReplayMePhase",
+    uiMode: "OPTION_SELECT",
+    selectedOptionId: "slot:0",
+    address: { epoch: 19, wave: 2, turn: 1 },
+    ownerSeat: 1,
+    watcherSeat: 0,
+    optionIds: ["slot:0", "slot:1"],
+    mysteryEncounterType: 8,
+    stateDigest: "mechanical-state",
+  });
+  assert.throws(
+    () => assertAsymmetricMysteryPromptProjection(owner, { ...watcher, seatsWithInput: [0, 1] }),
+    /watcher was not input-inert/u,
+  );
+  assert.throws(
+    () => assertAsymmetricMysteryPromptProjection(owner, { ...watcher, stateDigest: "diverged" }),
+    /owner\/watcher state diverged/u,
+  );
 });
 
 test("the mystery narration driver advances the authoritative selected-option phase once", async () => {

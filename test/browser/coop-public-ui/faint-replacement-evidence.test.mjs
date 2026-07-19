@@ -109,16 +109,24 @@ test("the replacement picker drive short-circuits a committed pick and guards re
   assert.match(drive, /if \(sendOutSurface === REPLACEMENT_DRIVE_SUPERSEDED\) \{/u);
   // The committed key is recorded so the guard fires on any later re-entry for the same window.
   assert.match(drive, /this\.committedReplacementPickers\.add\(committedKey\)/u);
-  // The sequential command round advances its scan floor after a late-picker drive so a short-circuited
-  // re-entry cannot busy-loop on the same stale surface.
+  // Dirty lane run 29673757003: an already-committed picker was re-entered after a later faint narration
+  // had become actionable. Advancing to evidence.cursor() hid that unread public prompt and stranded the
+  // guest on "Chikorita fainted!" until authority retention expired. The round must ignore committed
+  // re-entry without jumping to the evidence tail, and both paths may retire only the picker event itself
+  // so every later one-shot prompt/command remains visible.
   const round = harness.slice(
     harness.indexOf("async driveSequentialCommandRound("),
     harness.indexOf("async waitForPostTurnOutcome("),
   );
   assert.match(
     round,
-    /await this\.driveOwnedReplacementPicker\(client, from\);\s*[\s\S]*?from\[client\.label\] = client\.evidence\.cursor\(\);/u,
+    /const replacementKey = replacementPickerCommitKey\(client, readyReplacement\.observation\.address\);[\s\S]*?this\.committedReplacementPickers\.has\(replacementKey\)[\s\S]*?sequential-replacement-already-committed[\s\S]*?from\[client\.label\] = readyReplacement\.index \+ 1;[\s\S]*?continue;/u,
   );
+  assert.match(
+    round,
+    /await this\.driveOwnedReplacementPicker\(client, from\);[\s\S]*?from\[client\.label\] = readyReplacement\.index \+ 1;[\s\S]*?outcomeCursors\[client\.label\] = readyReplacement\.index \+ 1;/u,
+  );
+  assert.doesNotMatch(round, /from\[client\.label\] = client\.evidence\.cursor\(\);/u);
 });
 
 test("the replacement picker drive completes on a half-wiped close instead of spinning to timeout (depth+dirty lane)", async () => {
