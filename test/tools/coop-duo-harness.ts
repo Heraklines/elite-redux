@@ -1627,6 +1627,8 @@ export async function driveClientPhaseQueueTo(
   const matches = options.matches ?? (phase => phase.phaseName === target);
   const maxPhases = options.maxPhases ?? 128;
   const perPhaseTimeoutMs = options.perPhaseTimeoutMs ?? 10_000;
+  const peerCtx = replayPeerContextByGuestScene.get(scene);
+  const pumpPeer = options.pumpPeer ?? (peerCtx == null ? undefined : () => withClient(peerCtx, () => drainLoopback()));
 
   for (let step = 0; step < maxPhases; step++) {
     await drainLoopback();
@@ -1654,8 +1656,19 @@ export async function driveClientPhaseQueueTo(
     const deadline = Date.now() + perPhaseTimeoutMs;
     while (scene.phaseManager.getCurrentPhase() === phase) {
       await options.drivePublicPhaseInput?.(phase);
-      await options.pumpPeer?.();
+      // A real peer keeps servicing tail requests, delivery leases, and receipts while this client waits.
+      // Directly-constructed duo guests share one event loop, so schedule the registered authority context
+      // unless the caller supplied a more specialized reciprocal pump.
+      await pumpPeer?.();
       await drainLoopback();
+      // A retained V2 boundary can arrive while this one-process fixture is already waiting on its
+      // synthetic boot phase. Production completed login/title before pairing, so cross the exact same
+      // fail-closed seam here as at the outer phase boundary. Without this post-delivery check the real
+      // CoopFinalize/Victory tail is visible in the queue but the driver spends its whole timeout watching
+      // an inert TitlePhase that no browser can still be running at this point.
+      if (scene.phaseManager.getCurrentPhase() === phase && shiftQueuedGuestBootTail(scene)) {
+        break;
+      }
       if (Date.now() >= deadline) {
         const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
         throw new Error(
