@@ -669,8 +669,8 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const startedHostTailPhases = new WeakSet<Phase>();
     let hostMapCommitted = false;
     let guestMapCommitted = false;
-    await withClient(rig.guestCtx, async () => {
-      await driveClientPhaseQueueTo(rig.guestScene, "guest post-ME CommandPhase", {
+    const guestCommand = await withClient(rig.guestCtx, async () =>
+      driveClientPhaseQueueTo(rig.guestScene, "guest post-ME CommandPhase", {
         matches: phase =>
           phase.phaseName === "CommandPhase"
           && rig.guestScene.currentBattle.waveIndex === ME_WAVE + 1
@@ -704,8 +704,33 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
             }
             await drainLoopback();
           }),
-      });
+      }),
+    );
+
+    // driveClientPhaseQueueTo deliberately stops BEFORE its target. Start both real CommandPhase objects
+    // so their reciprocal rendezvous opens the public COMMAND surfaces that publish the two outstanding
+    // continuation proofs. Merely making CommandPhase current is not player-observable and cannot retire
+    // retained authority; the old fixture asserted zero pending immediately before this call chain.
+    await withClient(rig.guestCtx, async () => {
+      guestCommand.start();
+      await drainLoopback();
     });
+    await withClient(rig.hostCtx, async () => {
+      await drainLoopback();
+      const hostCommand = rig.hostScene.phaseManager.getCurrentPhase();
+      expect(hostCommand?.phaseName, "the host tail reached its matching next CommandPhase").toBe("CommandPhase");
+      if (rig.hostScene.ui.getMode() !== UiMode.COMMAND && rig.hostScene.ui.getMode() !== UiMode.FIGHT) {
+        hostCommand!.start();
+      }
+      await drainLoopback();
+    });
+    await withClient(rig.guestCtx, async () => {
+      for (let i = 0; i < 16 && rig.guestScene.ui.getMode() !== UiMode.COMMAND; i++) {
+        await drainLoopback();
+      }
+    });
+    expect(rig.hostScene.ui.getMode(), "host exposed the next public command continuation").toBe(UiMode.COMMAND);
+    expect(rig.guestScene.ui.getMode(), "guest exposed the next public command continuation").toBe(UiMode.COMMAND);
 
     // Both engines converged in lockstep - no pick, reward, or terminal continuation stranded the run.
     expect(rig.hostRuntime.controller.interactionCounter(), "host counter is 2 after the ME").toBe(counterBefore + 1);
