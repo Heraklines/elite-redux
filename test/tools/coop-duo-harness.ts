@@ -1656,6 +1656,15 @@ export async function driveClientPhaseQueueTo(
     const deadline = Date.now() + perPhaseTimeoutMs;
     while (scene.phaseManager.getCurrentPhase() === phase) {
       await options.drivePublicPhaseInput?.(phase);
+      // Let this browser's own promise/timer continuation settle before temporarily installing the
+      // reciprocal browser. In production the two engines have separate globals; in this one-process
+      // fixture an enemy-atlas Promise can otherwise resolve while `pumpPeer` has the other scene
+      // installed. EncounterPhase then (correctly) rejects its stale global-scene completion and the
+      // synthetic guest parks forever on NextEncounterPhase even though both real browsers would advance.
+      await drainLoopback();
+      if (scene.phaseManager.getCurrentPhase() !== phase) {
+        break;
+      }
       // A real peer keeps servicing tail requests, delivery leases, and receipts while this client waits.
       // Directly-constructed duo guests share one event loop, so schedule the registered authority context
       // unless the caller supplied a more specialized reciprocal pump.

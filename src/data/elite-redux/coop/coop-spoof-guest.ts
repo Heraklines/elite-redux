@@ -23,9 +23,11 @@
 
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import {
+  COOP_CAP_AUTHORITY_V2_RECOVERY,
   COOP_CAP_AUTHORITY_V2_REPLACEMENT,
   COOP_CAP_AUTHORITY_V2_SHADOW,
   COOP_CAP_AUTHORITY_V2_TURN,
+  COOP_CAP_AUTHORITY_V2_WAVE,
 } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
@@ -63,6 +65,8 @@ const UNSUPPORTED_SPOOF_CAPABILITIES = new Set<string>([
   COOP_CAP_AUTHORITY_V2_SHADOW,
   COOP_CAP_AUTHORITY_V2_TURN,
   COOP_CAP_AUTHORITY_V2_REPLACEMENT,
+  COOP_CAP_AUTHORITY_V2_WAVE,
+  COOP_CAP_AUTHORITY_V2_RECOVERY,
 ]);
 
 /**
