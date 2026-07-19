@@ -54,7 +54,8 @@ import {
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
-  materializeMirroredGuestInputTurn,
+  materializeGuestInputAfterReplacement,
+  pumpDuoDestinations,
   type ShowdownDuoRig,
   withClient,
   withClientSync,
@@ -180,7 +181,7 @@ describe.skipIf(!RUN)("Showdown versus - HOST-faints replacement ordering (two-e
     // The direct two-engine fixture deliberately skips the real pre-pairing login/title walk. Materialize
     // only that missing boot edge, then let the actual TurnInit -> TurnStart -> CoopReplay queue expose the
     // post-replacement CommandPhase exactly as production does.
-    materializeMirroredGuestInputTurn(rig.guestScene);
+    await materializeGuestInputAfterReplacement(rig.guestScene);
     const command = await driveClientPhaseQueueTo(rig.guestScene, "CommandPhase");
     command.start();
     await drainLoopback();
@@ -223,9 +224,13 @@ describe.skipIf(!RUN)("Showdown versus - HOST-faints replacement ordering (two-e
     // HOST crosses to turn N+1: picks SNORLAX, summons it, streams the out-of-band replacement checkpoint,
     // then opens its own turn-N+1 CommandPhase (requesting the guest's next enemy command).
     driveHostOwnFaintPicker();
+    // Showdown rigs already defer every inbound V2 frame. Explicitly service both destination contexts
+    // after the host commits the replacement; otherwise the helper observes the still-parked Finalize
+    // phase before the guest has had an event-loop turn to admit revision 2.
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CommandPhase");
     });
+    await pumpDuoDestinations(rig, 4);
     expect(rig.hostScene.getPlayerField()[0]?.species.speciesId, "the host summoned its SNORLAX replacement").toBe(
       HOST_BENCH,
     );

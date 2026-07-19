@@ -46,6 +46,7 @@ import {
   arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
+  drainLoopback,
   driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
@@ -58,6 +59,7 @@ import {
   remirrorWave,
   type ShopPhaseSeam,
   setCoopHarnessLiveEvents,
+  settleDuoPromise,
   withClient,
 } from "#test/tools/coop-duo-harness";
 import {
@@ -176,12 +178,27 @@ describe.skipIf(!RUN)(
     async function leaveRewardShop(rig: DuoRig, w: number): Promise<void> {
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       const hostOwns = counterBefore % 2 === 0;
-      await withClient(rig.hostCtx, async () => {
-        await game.phaseInterceptor.to("SelectModifierPhase", false);
-      });
+      let guestShop!: ShopPhaseSeam;
+      // The host's BattleEnd commits the retained V2 WAVE_ADVANCE while the guest is parked behind the
+      // synthetic boot prefix. Two browsers deliver that entry in the guest's own realm. This one-process
+      // fault rig must therefore keep destination scheduling active for the complete wave->reward crossing,
+      // not merely for the preceding command rendezvous.
+      rig.pair.setDestinationContextDelivery?.(true);
+      try {
+        const hostCrossing = withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectModifierPhase", false));
+        await settleDuoPromise(rig, hostCrossing, `wave ${w}: host wave-to-reward crossing`);
+        await pumpDuoDestinations(rig, 4);
+        guestShop = await withClient(rig.guestCtx, () =>
+          reachQueuedRewardShop(rig.guestScene, {
+            pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+          }),
+        );
+        await pumpDuoDestinations(rig, 2);
+      } finally {
+        rig.pair.setDestinationContextDelivery?.(false);
+      }
       const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       expect(hostShop.phaseName, `wave ${w}: host reached SelectModifierPhase`).toBe("SelectModifierPhase");
-      const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
       if (hostOwns) {
         await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: false }));
         await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));

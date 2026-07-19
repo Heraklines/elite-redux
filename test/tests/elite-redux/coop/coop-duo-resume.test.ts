@@ -2430,8 +2430,10 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         value: [new File([fileBytes], "quota-session.prsv", { type: "text/json" })],
       });
       fileInput!.dispatchEvent(new Event("change"));
-      await flush();
-      await flush();
+      // FileReader.onload is a real task, not a promise-only continuation. Waiting for two microtasks let
+      // the test finish first on hosted runners; its late callback then opened the real CONFIRM overlay in
+      // the following test. Bound the actual public callback instead, so cleanup cannot leak across tests.
+      await vi.waitUntil(() => confirmation != null, { timeout: 5_000, interval: 10 });
       expect(confirmation, "the production confirmation callback was reached").not.toBeNull();
       await expect(confirmation!).resolves.toBeUndefined();
       expect(localStorage.getItem(storageKey), "quota failure never exposes partial imported bytes").toBeNull();
