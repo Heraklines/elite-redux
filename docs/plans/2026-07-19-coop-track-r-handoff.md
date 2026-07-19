@@ -31,17 +31,28 @@ Three tracks: **R** (stabilization — ACTIVE, this handoff), **S** (liveness, p
 
 ## 2. IN-FLIGHT RIGHT NOW (check these FIRST)
 
-1. **Cycle-14 requalification pair at SHA `9358f2ed2`** (the first run carrying ALL campaign-lane fixes):
-   - Gate run `29666831660`: **DONE, red** — failing: B5/13, B9/13, S4/8, C1/5 + aggregate.
+1. **Cycle-14 requalification pair at SHA `9358f2ed2`** — BOTH DONE, results:
+   - Gate run `29666831660`: red — failing: B5/13, B9/13, S4/8, C1/5 + aggregate.
      (B5 is likely the resharded location of previously-characterized tests — VERIFY at test level,
      do not assume; see §5 "resharding illusion".)
-   - Campaign run `29666832476`: **IN PROGRESS** when this handoff was written.
-     `gh run view 29666832476 -R Heraklines/elite-redux --json jobs,conclusion`
-     This is the decisive campaign run: mystery watermark fix + depth/dirty half-wipe exit +
-     surface animations budget + all prior fixes. If 4/4 lanes green → go to §6 promotion sequence.
-     If lanes red → download artifacts (`gh run download <id> -D <dir>`), triage per §4 discipline.
-2. **Residual-gate-reds agent** on branch `coop/fix-residual-gate-reds` (NOT yet pushed at handoff time —
-   check `git ls-remote heraklines coop/fix-residual-gate-reds`). Its scope (task #114): showdown (c2) :599
+   - Campaign run `29666832476`: **DIRTY 3w GREEN for the first time** (+ solo green). Red: surface
+     (animations-on), mystery 10w, depth 30w. NEXT ACTION: download artifacts
+     (`gh run download 29666832476 -R Heraklines/elite-redux -D <dir>`) and triage those three lanes'
+     summary.json + per-seat traces against the cycle-13 fixes (watermark / animations ceiling / half-wipe):
+     did each fix engage (grep for its log lines) and what is the NEW failure mechanism per lane?
+     Then fix per §4 discipline and dispatch cycle-15 on the new tip (which already includes the merged
+     residual WIP — see below).
+2. **Residual-gate-reds agent — WRAPPED UP AND MERGED.** Its WIP branch `coop/fix-residual-gate-reds`
+   (commit `5a8d78211`) is merged into integration (tip `32de383f5`, sentinels green: tsc 216 here /
+   test:node 316). Per-item status: item 4 LEG 2b PRIMARY = PRODUCT FIX, verified (guest ME_PICK
+   continuation releases on reconnect/relay path); item 5 final-boss FIXED verified (buildDuo tagged
+   coopOwner by field, missing the benched guest partner in single-field stage-one — now tags by party
+   index; NOT a bleed); item 3 showdown (b) already clear on tip; items 1-2 PARTIAL (assertion relocated
+   + setMode stub fixed + pumpPeer dual-pump applied; guest reaches CoopFinalizeTurnPhase; REMAINING:
+   re-introduce materializeGuestInputAfterReplacement AFTER the checkpoint applies, keep pumpPeer, drive
+   to CommandPhase); item 4 secondary (:654 REWARD+ME_TERMINAL drain) remaining: drive guest to real
+   post-ME CommandPhase via real setMode. FULL DETAIL in `docs/plans/2026-07-19-residual-gate-reds-wip.md`
+   (in-repo, same branch). Original scope (task #114): showdown (c2) :599
    idle-fallback material close; coop-duo-faint-switch test 2 :255 (setMode stub crash then idle-fallback);
    showdown (b) :445 full-file-sequence scene pollution (GameManager shared globalScene, resetScene leak);
    coop-duo-me-operation LEG 2b :525; coop-final-boss-stage-one :64 (bench coopOwner precondition bleed);
