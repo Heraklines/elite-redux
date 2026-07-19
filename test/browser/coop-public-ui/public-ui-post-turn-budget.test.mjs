@@ -417,6 +417,61 @@ test("command wait drains an owned semantic surface buffered as its deadline cal
   assert.equal(result, evidence.events[0]);
 });
 
+test("retained continuation proves the exact Authority V2 turn retirement after cutover", async () => {
+  const hostEvidence = new FakeEvidence("host");
+  const guestEvidence = new FakeEvidence("guest");
+  hostEvidence.push({
+    kind: "console",
+    text: "[coop:v2-turn] turn CUTOVER active role=authority",
+  });
+  hostEvidence.push({
+    kind: "console",
+    text:
+      "[coop:v2-authority] receipt rev=17 op=TURN/e73/w1/t2 stage=controlInstalled "
+      + "sender=1 generation=4 advanced retired=true waiting=[]",
+  });
+  guestEvidence.push({
+    kind: "console",
+    text: "guest ACK turn stage=continuationReady e=73 wave=1 turn=2 rev=91",
+  });
+  const host = { label: "host", evidence: hostEvidence };
+  const guest = { label: "guest", evidence: guestEvidence };
+  const rig = { host, guest, config: { timeoutMs: 0 } };
+
+  assert.equal(
+    await DuoPublicUiRig.prototype.assertRetainedContinuation.call(rig, { host: 0, guest: 0 }, "v2-turn"),
+    "73:1:2:91",
+  );
+  assert.equal(hostEvidence.events.at(-1).side, "v2-retirement");
+  assert.equal(
+    hostEvidence.events.some(event => event.text?.includes("host RELEASE retained turn")),
+    false,
+    "the retired legacy carrier is not a second correctness oracle after V2 cutover",
+  );
+});
+
+test("retained continuation keeps the exact legacy release oracle before V2 cutover", async () => {
+  const hostEvidence = new FakeEvidence("host");
+  const guestEvidence = new FakeEvidence("guest");
+  hostEvidence.push({
+    kind: "console",
+    text: "host RELEASE retained turn after continuationReady key=73:1:2:91",
+  });
+  guestEvidence.push({
+    kind: "console",
+    text: "guest ACK turn stage=continuationReady e=73 wave=1 turn=2 rev=91",
+  });
+  const host = { label: "host", evidence: hostEvidence };
+  const guest = { label: "guest", evidence: guestEvidence };
+  const rig = { host, guest, config: { timeoutMs: 0 } };
+
+  assert.equal(
+    await DuoPublicUiRig.prototype.assertRetainedContinuation.call(rig, { host: 0, guest: 0 }, "legacy-turn"),
+    "73:1:2:91",
+  );
+  assert.equal(hostEvidence.events.at(-1).side, "legacy-release");
+});
+
 test("sequential command driver submits the first owner before waiting for the partner UI", async () => {
   const order = [];
   const firstEvidence = new FakeEvidence("first");

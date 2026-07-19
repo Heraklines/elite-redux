@@ -44,6 +44,7 @@ const REPLACEMENT_HALF_WIPED_CLOSE =
 // Distinct resolution sentinel for the send-out-menu wait: the authority committed the pick under us.
 const REPLACEMENT_DRIVE_SUPERSEDED = Symbol("replacement-drive-superseded");
 const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) wave=(\d+) turn=(\d+) rev=(\d+)/u;
+const V2_TURN_AUTHORITY_CUTOVER = /\[coop:v2-turn\] turn CUTOVER active role=authority\b/u;
 const SHARED_SESSION_TERMINAL = /\[coop:runtime\] shared session (?:terminal requested|stopped safely):/u;
 const LAUNCH_SNAPSHOT_ABORT = /launchSnapshotAbort wave=\d+ reason=/u;
 const DATA_FINGERPRINT =
@@ -2341,14 +2342,35 @@ export class DuoPublicUiRig {
       throw new Error(`${proofName}: malformed guest continuationReady evidence`);
     }
     const retainedAddress = guestMatch.slice(1).join(":");
-    const exactRelease = new RegExp(`host RELEASE retained turn after continuationReady key=${retainedAddress}`, "u");
-    await this.host.evidence.waitFor(exactRelease, {
-      from: cursors[this.host.label],
-      timeoutMs: this.config.timeoutMs,
-      description: `${proofName} host exact-address retained release`,
-    });
+    const [epoch, wave, turn] = guestMatch.slice(1, 4);
+    const v2TurnCutover = this.host.evidence.events.some(event => V2_TURN_AUTHORITY_CUTOVER.test(event.text ?? ""));
+    if (v2TurnCutover) {
+      const operationId = `TURN/e${epoch}/w${wave}/t${turn}`;
+      const exactV2Retirement = new RegExp(
+        `\\[coop:v2-authority\\] receipt rev=\\d+ op=${escapeRegExp(operationId)} `
+          + "stage=(?:materialApplied|controlInstalled) sender=\\d+ generation=\\d+ "
+          + "advanced retired=true waiting=\\[\\]",
+        "u",
+      );
+      await this.host.evidence.waitFor(exactV2Retirement, {
+        from: cursors[this.host.label],
+        timeoutMs: this.config.timeoutMs,
+        description: `${proofName} exact Authority V2 retirement`,
+      });
+    } else {
+      const exactRelease = new RegExp(`host RELEASE retained turn after continuationReady key=${retainedAddress}`, "u");
+      await this.host.evidence.waitFor(exactRelease, {
+        from: cursors[this.host.label],
+        timeoutMs: this.config.timeoutMs,
+        description: `${proofName} host exact-address retained release`,
+      });
+    }
     this.guest.evidence.record("retained-continuation-proof", { proofName, retainedAddress, side: "ack" });
-    this.host.evidence.record("retained-continuation-proof", { proofName, retainedAddress, side: "release" });
+    this.host.evidence.record("retained-continuation-proof", {
+      proofName,
+      retainedAddress,
+      side: v2TurnCutover ? "v2-retirement" : "legacy-release",
+    });
     return retainedAddress;
   }
 

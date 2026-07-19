@@ -992,7 +992,8 @@ export class CoopAuthorityV2Shadow {
                 : `advanced retired=${verdict.retired} waiting=[${verdict.waitingForSeatIds.join(",")}]`;
           coopLog(
             "v2-authority",
-            `receipt rev=${receipt.revision} stage=${receipt.stage} sender=${receipt.context.senderSeatId} `
+            `receipt rev=${receipt.revision} op=${receipt.operationId} stage=${receipt.stage} `
+              + `sender=${receipt.context.senderSeatId} `
               + `generation=${receipt.context.connectionGeneration} ${detail}`,
           );
           break;
