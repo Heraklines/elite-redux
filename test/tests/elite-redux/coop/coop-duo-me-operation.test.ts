@@ -176,7 +176,10 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       expect(terminal.terminal).toBe("leave");
       expect(terminal.destination.kind).toBe("continue");
     }
-    expect(applyOutcomeSpy, "the guest materializes the comprehensive state exactly once").toHaveBeenCalledTimes(1);
+    expect(
+      applyOutcomeSpy,
+      "the guest materializes the pre-reward settlement and final leave state exactly once each",
+    ).toHaveBeenCalledTimes(2);
 
     // Lockstep, same as the legacy suite: both advanced once for the whole ME.
     expect(rig.hostRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
@@ -224,7 +227,10 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       return drainGuestMeReplayToSettle(guestReplayPhase);
     });
     expect(guestReplay.settled, "the durable ME_TERMINAL must settle the real guest replay phase").toBe(true);
-    expect(applyOutcomeSpy, "redelivery applies the retained state image once").toHaveBeenCalledTimes(1);
+    expect(
+      applyOutcomeSpy,
+      "redelivery preserves exactly one apply for each ordered no-battle terminal step",
+    ).toHaveBeenCalledTimes(2);
     expect(rig.guestRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
     logs.flush();
   }, 300_000);
@@ -612,8 +618,8 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     ).toBe(true);
     expect(
       guestDurability.operationContinuationDiagnostics().pending,
-      "the guest owner's pending op:me continuation set drained after the pick",
-    ).toBe(0);
+      "the guest owner's ME_PICK drained; only the already-applied pre-reward terminal awaits its public tail",
+    ).toBe(1);
 
     // STEP C2 (guest): the guest OWNS the reward pick (#828) - open its shop as owner, relay LEAVE sync.
     const guestShop = await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));

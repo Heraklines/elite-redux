@@ -298,9 +298,10 @@ describe.skipIf(!RUN)(
       // The guest left the encounter exactly once (the single `settled` terminal).
       expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
       // The guest applied the host's comprehensive meResync exactly once (its sole convergence path).
-      expect(applyMeOutcomeSpy.mock.calls.length, "guest applied the host's comprehensive meResync exactly once").toBe(
-        1,
-      );
+      expect(
+        applyMeOutcomeSpy.mock.calls.length,
+        "guest applied the pre-reward settlement and final leave state exactly once each",
+      ).toBe(2);
       // CONVERGENCE: the apply actually SUCCEEDED (not silently swallowed) - the guest's RNG seed +
       // ME-save converged to the host's authoritative values. A swallowed apply (e.g. a party/dex apply
       // throwing before the seed/ME-save restore) would leave these DIVERGED, which this assert catches.
@@ -576,9 +577,10 @@ describe.skipIf(!RUN)(
       });
 
       expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
-      expect(applyMeOutcomeSpy.mock.calls.length, "guest applied the host's comprehensive meResync exactly once").toBe(
-        1,
-      );
+      expect(
+        applyMeOutcomeSpy.mock.calls.length,
+        "guest applied the pre-reward settlement and final leave state exactly once each",
+      ).toBe(2);
       // CONVERGENCE: the guest's seed + ME-save converged to the host's via the meResync.
       expect(rig.guestScene.seed, "guest RNG seed converged to the host's via meResync").toBe(hostSeed);
       expect(
@@ -948,11 +950,12 @@ describe.skipIf(!RUN)(
         guestQuizAnswered,
         "guest mirror quiz consumed every owner-relayed answer with zero local input (FOLLOW side, #818)",
       ).toBe(QUIZ_QUESTIONS);
-      // The guest has NOT converged / advanced yet (the host has not sent its terminal meResync + LEAVE).
+      // The guest has adopted the pre-reward settlement but has NOT advanced yet: the host has not sent
+      // the ordered final LEAVE after the public reward surface.
       expect(
         applyMeOutcomeSpy.mock.calls.length,
-        "guest has NOT applied a meResync yet (host terminal still parked)",
-      ).toBe(0);
+        "guest applied exactly the retained pre-reward settlement while the final terminal stays parked",
+      ).toBe(1);
       expect(
         rig.guestRuntime.controller.interactionCounter(),
         "guest has NOT advanced yet (host terminal still parked)",
@@ -1001,11 +1004,11 @@ describe.skipIf(!RUN)(
         (guestMePhase as unknown as { settled: boolean }).settled,
         "guest CoopReplayMePhase settled (quiz handoff + detached leave)",
       ).toBe(true);
-      // The guest applied the host's comprehensive meResync exactly once (its sole convergence path).
+      // The retained lifecycle applies two distinct images: pre-reward preparation, then final leave.
       expect(
         applyMeOutcomeSpy.mock.calls.length,
-        "guest applied the host's comprehensive meResync exactly once (after the mirror quiz)",
-      ).toBe(1);
+        "guest applied the ordered pre-reward and final Mystery state images exactly once each",
+      ).toBe(2);
       // CONVERGENCE: the guest's RNG seed + ME-save converged to the host's authoritative values.
       expect(rig.guestScene.seed, "guest RNG seed converged to the host's via meResync").toBe(hostSeed);
       expect(
@@ -1197,8 +1200,11 @@ describe.skipIf(!RUN)(
         (replay as unknown as { settled: boolean }).settled,
         "guest CoopReplayMePhase settled only into the embedded reward continuation",
       ).toBe(true);
-      // The guest has not converged / advanced yet (no terminal meResync).
-      expect(applyMeOutcomeSpy.mock.calls.length, "guest applied NO meResync yet (host terminal still parked)").toBe(0);
+      // The guest has adopted the pre-reward settlement but has not advanced (the final leave is parked).
+      expect(
+        applyMeOutcomeSpy.mock.calls.length,
+        "guest applied exactly the retained pre-reward settlement while the final terminal stays parked",
+      ).toBe(1);
       expect(
         rig.guestRuntime.controller.interactionCounter(),
         "guest has NOT advanced yet (host terminal still parked)",
@@ -1242,8 +1248,8 @@ describe.skipIf(!RUN)(
       ).toBe(true);
       expect(
         applyMeOutcomeSpy.mock.calls.length,
-        "guest applied the host's comprehensive meResync exactly once (its sole convergence path)",
-      ).toBe(1);
+        "guest applied the ordered pre-reward and final Mystery state images exactly once each",
+      ).toBe(2);
       // CONVERGENCE: the guest's RNG seed + ME-save converged to the host's authoritative post-delve values.
       expect(rig.guestScene.seed, "guest RNG seed converged to the host's via meResync").toBe(hostSeed);
       expect(
@@ -1418,8 +1424,8 @@ describe.skipIf(!RUN)(
       );
       expect(
         applyMeOutcomeSpy.mock.calls.length,
-        "guest applied the host's comprehensive meResync exactly once (its authoritative convergence)",
-      ).toBe(1);
+        "guest applied the pre-reward settlement and final leave state exactly once each",
+      ).toBe(2);
       expect(rig.guestScene.seed, "guest RNG seed converged to the host's via meResync").toBe(hostSeed);
       expect(rig.hostRuntime.controller.interactionCounter(), "host advanced once for the whole ME").toBe(
         counterBefore + 1,
