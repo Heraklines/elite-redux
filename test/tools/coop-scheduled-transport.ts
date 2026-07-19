@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { routeCoopV2InboundFrame } from "#data/elite-redux/coop/authority-v2/shadow";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 /** Deterministic delivery controls used by production-transition journeys. */
@@ -44,6 +45,8 @@ class ScheduledEndpoint implements CoopTransport {
   private peer: ScheduledEndpoint | null = null;
   private readonly messageHandlers = new Set<(message: CoopMessage) => void>();
   private readonly stateHandlers = new Set<(state: CoopConnectionState) => void>();
+  /** Per-endpoint Authority V2 receive seam, matching the real WebRTC and loopback transports. */
+  private v2FrameHandler: ((frame: unknown) => void) | null = null;
   private lastRxAt = 0;
 
   constructor(role: CoopRole, enqueue: (role: CoopRole, message: CoopMessage) => void) {
@@ -81,6 +84,18 @@ class ScheduledEndpoint implements CoopTransport {
       return;
     }
     this.lastRxAt = Date.now();
+    // V2 is a distinct wire envelope. Sending it through legacy onMessage handlers silently discards the
+    // authority entry in the controller's t-discriminant fan-out and leaves the replica waiting forever.
+    // The scheduled transport is the two-engine model of two independent browser event loops, so preserve
+    // the same protocol boundary as WebRtcTransport and LoopbackTransport before any legacy dispatch.
+    if ("v" in message && message.v === 2) {
+      if (this.v2FrameHandler == null) {
+        routeCoopV2InboundFrame(message);
+      } else {
+        this.v2FrameHandler(message);
+      }
+      return;
+    }
     for (const handler of [...this.messageHandlers]) {
       handler(message);
     }
@@ -100,8 +115,18 @@ class ScheduledEndpoint implements CoopTransport {
     return () => this.stateHandlers.delete(handler);
   }
 
+  onV2Frame(handler: (frame: unknown) => void): () => void {
+    this.v2FrameHandler = handler;
+    return () => {
+      if (this.v2FrameHandler === handler) {
+        this.v2FrameHandler = null;
+      }
+    };
+  }
+
   close(): void {
     this.setState("closed");
+    this.v2FrameHandler = null;
     this.messageHandlers.clear();
     this.stateHandlers.clear();
   }

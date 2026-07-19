@@ -3,12 +3,28 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import { describe, expect, it, vi } from "vitest";
 
 const ping = (ts: number): CoopMessage => ({ t: "ping", ts });
+const v2TailRequest = (): CoopFrameV2 => ({
+  v: 2,
+  t: "tailRequest",
+  ctx: {
+    sessionId: "scheduled-session",
+    runId: "scheduled-run",
+    sessionEpoch: 1,
+    seatMapId: "scheduled-seat-map",
+    membershipRevision: 1,
+    senderSeatId: 0,
+    authoritySeatId: 0,
+    connectionGeneration: 1,
+  },
+  body: { fromRevision: 0 },
+});
 
 describe("co-op production-transition scheduled transport", () => {
   it("delivers FIFO only when the destination client is explicitly pumped", () => {
@@ -35,6 +51,24 @@ describe("co-op production-transition scheduled transport", () => {
     pair.flush("guest");
     expect(hostRx.mock.calls.map(([message]) => message.ts)).toEqual([3]);
     expect(guestRx.mock.calls.map(([message]) => message.ts)).toEqual([1, 2]);
+  });
+
+  it("routes Authority V2 frames through the per-endpoint V2 seam, never the legacy message fan-out", () => {
+    const pair = createScheduledCoopPair();
+    const legacyRx = vi.fn();
+    const v2Rx = vi.fn();
+    pair.guest.onMessage(legacyRx);
+    pair.guest.onV2Frame!(v2Rx);
+
+    const frame = v2TailRequest();
+    pair.host.send(frame);
+
+    expect(v2Rx, "send cannot resume the destination browser synchronously").not.toHaveBeenCalled();
+    expect(pair.pending("guest")).toBe(1);
+    expect(pair.flush("guest")).toBe(1);
+    expect(v2Rx).toHaveBeenCalledOnce();
+    expect(v2Rx).toHaveBeenCalledWith(frame);
+    expect(legacyRx, "a v2 envelope must never enter the legacy t-discriminant handlers").not.toHaveBeenCalled();
   });
 
   it("supports declared drop/duplicate/reconnect schedules without reordering surviving frames", () => {
