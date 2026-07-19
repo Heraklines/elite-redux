@@ -113,7 +113,12 @@ function buildCommitted(over: Partial<Parameters<typeof buildTurnCommitEntry>[0]
     context: FRAME,
     operationId: "turn-op-1",
     capture: CAPTURE,
-    nextCommand: { epoch: 1, wave: 3, resolvedTurn: 5, ownerSeatId: 1, pokemonId: 42 },
+    nextCommandFrontier: {
+      epoch: 1,
+      wave: 3,
+      resolvedTurn: 5,
+      commands: [{ ownerSeatId: 1, pokemonId: 42, fieldIndex: 1 }],
+    },
     barrier: barrier(0),
     ...over,
   });
@@ -180,7 +185,7 @@ describe("buildTurnCommitEntry - shape + digest", () => {
   });
 
   it("states no COMMAND across a non-command boundary", () => {
-    const entry = buildCommitted({ nextCommand: null });
+    const entry = buildCommitted({ nextCommandFrontier: null });
     expect(entry.nextControl).toBeNull();
     expect(turnCommandControlId({ ...entry, revision: 1 })).toBeNull();
   });
@@ -395,24 +400,33 @@ describe("replica pipeline - redelivery equivalence", () => {
 describe("buildTurnCommitEntry - stated successor COMMAND", () => {
   it("states the COMMAND for the NEXT turn (N+1) with the authority-stated owner seat", () => {
     const entry = buildCommitted({
-      nextCommand: { epoch: 2, wave: 4, resolvedTurn: 5, ownerSeatId: 1, pokemonId: 77 },
+      nextCommandFrontier: {
+        epoch: 2,
+        wave: 4,
+        resolvedTurn: 5,
+        commands: [{ ownerSeatId: 1, pokemonId: 77, fieldIndex: 1 }],
+      },
     });
     expect(entry.nextControl).toEqual({
-      kind: "COMMAND",
+      kind: "COMMAND_FRONTIER",
       epoch: 2,
       wave: 4,
       turn: 6, // resolvedTurn 5 -> successor 6, NEVER guest-derived
-      ownerSeatId: 1,
-      pokemonId: 77,
+      commands: [{ ownerSeatId: 1, pokemonId: 77, fieldIndex: 1 }],
     });
   });
 
   it("never leaves the successor turn equal to the resolved turn", () => {
     const entry = buildCommitted({
-      nextCommand: { epoch: 1, wave: 1, resolvedTurn: 12, ownerSeatId: 0, pokemonId: 5 },
+      nextCommandFrontier: {
+        epoch: 1,
+        wave: 1,
+        resolvedTurn: 12,
+        commands: [{ ownerSeatId: 0, pokemonId: 5, fieldIndex: 0 }],
+      },
     });
-    expect(entry.nextControl?.kind).toBe("COMMAND");
-    if (entry.nextControl?.kind === "COMMAND") {
+    expect(entry.nextControl?.kind).toBe("COMMAND_FRONTIER");
+    if (entry.nextControl?.kind === "COMMAND_FRONTIER") {
       expect(entry.nextControl.turn).toBe(13);
     }
   });
@@ -428,7 +442,12 @@ describe("buildTurnCommitEntry - mutation barrier", () => {
       context: FRAME,
       operationId: "turn-op-1",
       capture: CAPTURE,
-      nextCommand: { epoch: 1, wave: 3, resolvedTurn: 5, ownerSeatId: 1, pokemonId: 42 },
+      nextCommandFrontier: {
+        epoch: 1,
+        wave: 3,
+        resolvedTurn: 5,
+        commands: [{ ownerSeatId: 1, pokemonId: 42, fieldIndex: 1 }],
+      },
       barrier: barrier(2),
     });
     expect(result).toEqual({ kind: "barred", pendingTokens: 2 });
@@ -439,7 +458,12 @@ describe("buildTurnCommitEntry - mutation barrier", () => {
       context: FRAME,
       operationId: "turn-op-1",
       capture: CAPTURE,
-      nextCommand: { epoch: 1, wave: 3, resolvedTurn: 5, ownerSeatId: 1, pokemonId: 42 },
+      nextCommandFrontier: {
+        epoch: 1,
+        wave: 3,
+        resolvedTurn: 5,
+        commands: [{ ownerSeatId: 1, pokemonId: 42, fieldIndex: 1 }],
+      },
       barrier: barrier(0),
     });
     expect(result.kind).toBe("committed");
@@ -517,7 +541,12 @@ describe("CommandRequestLeaseBook - scheduler-owned, bounded, zero-leak", () => 
     const superseded = fullEntry(1);
     const successor = fullEntry(2, {
       operationId: "turn-op-2",
-      nextCommand: { epoch: 1, wave: 3, resolvedTurn: 6, ownerSeatId: 1, pokemonId: 42 },
+      nextCommandFrontier: {
+        epoch: 1,
+        wave: 3,
+        resolvedTurn: 6,
+        commands: [{ ownerSeatId: 1, pokemonId: 42, fieldIndex: 1 }],
+      },
     });
     book.acquireForEntry(superseded);
     book.acquireForEntry(successor);

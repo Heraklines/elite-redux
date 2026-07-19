@@ -84,7 +84,7 @@ import {
   computeShadowParity,
   computeTurnCommitDigest,
   type MutationBarrier,
-  type TurnCommandTarget,
+  type TurnCommandFrontier,
   type TurnResolutionImage,
 } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
 import {
@@ -215,7 +215,7 @@ export type CoopV2ShadowSuccessorSeatSource = "owner-field" | "local-role-fallba
 export interface CoopV2ShadowTurnTap {
   readonly operationId: string;
   readonly capture: TurnResolutionImage;
-  readonly nextCommand: TurnCommandTarget | null;
+  readonly nextCommandFrontier: TurnCommandFrontier | null;
   /** The raw legacy comparand token (the host full-state checksum) - a DIFFERENT scheme, kept for the log. */
   readonly legacyDigest: string;
   /**
@@ -498,8 +498,8 @@ export class CoopAuthorityV2Shadow {
 
   /** Tap the host's turn-commit emit. Builds a TURN_COMMIT via the turn adapter + records parity. */
   tapTurnCommit(input: CoopV2ShadowTurnTap): CoopAuthorityEntry | null {
-    const observedWave = input.nextCommand?.wave ?? input.capture.wave;
-    const observedTurn = input.nextCommand?.resolvedTurn ?? input.capture.turn;
+    const observedWave = input.nextCommandFrontier?.wave ?? input.capture.wave;
+    const observedTurn = input.nextCommandFrontier?.resolvedTurn ?? input.capture.turn;
     if (typeof observedWave === "number" && Number.isSafeInteger(observedWave) && observedWave >= 1) {
       this.lastObservedWave = observedWave;
     }
@@ -512,7 +512,7 @@ export class CoopAuthorityV2Shadow {
         context: this.frameContext,
         operationId: input.operationId,
         capture: input.capture,
-        nextCommand: input.nextCommand,
+        nextCommandFrontier: input.nextCommandFrontier,
         barrier,
         ...(input.subsumes == null ? {} : { subsumes: input.subsumes }),
       });

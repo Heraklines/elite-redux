@@ -86,12 +86,11 @@ function address(over: Partial<CoopInteractionAddress> = {}): CoopInteractionAdd
 
 const MYSTERY_SUCCESSOR: CoopNextControl = { kind: "MYSTERY", operationId: "me-op-42", ownerSeatId: 0 };
 const BATTLE_SUCCESSOR: CoopNextControl = {
-  kind: "COMMAND",
+  kind: "COMMAND_FRONTIER",
   epoch: 1,
   wave: 12,
   turn: 1,
-  ownerSeatId: 0,
-  pokemonId: 55,
+  commands: [{ ownerSeatId: 0, pokemonId: 55, fieldIndex: 0 }],
 };
 const REWARD_SUCCESSOR: CoopNextControl = { kind: "REWARD", operationId: "rew-op-9", ownerSeatId: 0 };
 

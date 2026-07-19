@@ -128,7 +128,12 @@ function turnTap(operationId = "TURN/w5/t1", legacyDigest = "legacy-turn") {
   return {
     operationId,
     capture,
-    nextCommand: { epoch: SESSION.epoch, wave: 5, resolvedTurn: 1, ownerSeatId: 0, pokemonId: 42 },
+    nextCommandFrontier: {
+      epoch: SESSION.epoch,
+      wave: 5,
+      resolvedTurn: 1,
+      commands: [{ ownerSeatId: 0, pokemonId: 42, fieldIndex: 0 }],
+    },
     legacyDigest,
   };
 }

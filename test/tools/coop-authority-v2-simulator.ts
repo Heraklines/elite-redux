@@ -314,8 +314,14 @@ export function controlKey(control: CoopNextControl): string {
     return "null";
   }
   switch (control.kind) {
-    case "COMMAND":
-      return `COMMAND:${control.epoch}:${control.wave}:${control.turn}:${control.ownerSeatId}:${control.pokemonId}`;
+    case "COMMAND_FRONTIER":
+      return (
+        `COMMAND_FRONTIER:${control.epoch}:${control.wave}:${control.turn}:`
+        + control.commands
+          .map(command => `${command.fieldIndex}:${command.ownerSeatId}:${command.pokemonId}`)
+          .sort()
+          .join(",")
+      );
     case "REPLACEMENT":
       return `REPLACEMENT:${control.epoch}:${control.wave}:${control.turn}:${control.occurrence}:${control.fieldIndex}:${control.ownerSeatId}`;
     case "REWARD":
@@ -1703,7 +1709,13 @@ export function commandControl(
   ownerSeatId: number,
   pokemonId: number,
 ): CoopNextControl {
-  return { kind: "COMMAND", epoch, wave, turn, ownerSeatId, pokemonId };
+  return {
+    kind: "COMMAND_FRONTIER",
+    epoch,
+    wave,
+    turn,
+    commands: [{ ownerSeatId, pokemonId, fieldIndex: 0 }],
+  };
 }
 
 export function replacementControl(

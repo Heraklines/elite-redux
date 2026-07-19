@@ -192,7 +192,10 @@ describe("buildReplacementCommitEntry", () => {
       context: FRAME,
       proposal: proposal(),
       resolution: "owner-pick",
-      successor: { kind: "resume-command", ownerSeatId: 1, pokemonId: 4242 },
+      successor: {
+        kind: "resume-command-frontier",
+        commands: [{ ownerSeatId: 1, pokemonId: 4242, fieldIndex: 1 }],
+      },
     });
     expect(built.kind).toBe("REPLACEMENT_COMMIT");
     // A committed entry (revision assigned) passes the foundation's own guard.
@@ -200,7 +203,13 @@ describe("buildReplacementCommitEntry", () => {
     expect(built.operationId).toBe(replacementOperationId(address(), 1));
     // Material is the typed image, digested deterministically.
     expect(built.material.digest).toBe(replacementImageDigest(toReplacementCommitImage(proposal(), "owner-pick")));
-    expect(built.nextControl).toEqual({ kind: "COMMAND", epoch: 1, wave: 3, turn: 2, ownerSeatId: 1, pokemonId: 4242 });
+    expect(built.nextControl).toEqual({
+      kind: "COMMAND_FRONTIER",
+      epoch: 1,
+      wave: 3,
+      turn: 2,
+      commands: [{ ownerSeatId: 1, pokemonId: 4242, fieldIndex: 1 }],
+    });
   });
 
   it("records the resolution mode in the authoritative image", () => {
@@ -232,7 +241,10 @@ describe("buildReplacementCommitEntry", () => {
         context: FRAME,
         proposal: proposal(),
         resolution: "owner-pick",
-        successor: { kind: "resume-command", ownerSeatId: 1, pokemonId: 0 }, // pokemonId must be positive
+        successor: {
+          kind: "resume-command-frontier",
+          commands: [{ ownerSeatId: 1, pokemonId: 0, fieldIndex: 1 }],
+        }, // pokemonId must be positive
       }),
     ).toThrow();
   });
@@ -270,7 +282,10 @@ describe("double-KO chaining", () => {
       context: FRAME,
       proposal: proposal({ sourceAddress: address({ occurrence: 1, fieldIndex: 1 }), ownerSeatId: 0 }),
       resolution: "owner-pick",
-      successor: { kind: "resume-command", ownerSeatId: 0, pokemonId: 7 },
+      successor: {
+        kind: "resume-command-frontier",
+        commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 1 }],
+      },
     });
 
     const entry0 = log.commit(entry0Input);
@@ -287,7 +302,10 @@ describe("double-KO chaining", () => {
 
     // Successor chaining: entry0 -> REPLACEMENT(occurrence 1), entry1 -> COMMAND.
     expect(entry0.nextControl).toMatchObject({ kind: "REPLACEMENT", occurrence: 1, fieldIndex: 1, ownerSeatId: 0 });
-    expect(entry1.nextControl).toMatchObject({ kind: "COMMAND", ownerSeatId: 0, pokemonId: 7 });
+    expect(entry1.nextControl).toMatchObject({
+      kind: "COMMAND_FRONTIER",
+      commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 1 }],
+    });
 
     // The stated successor of entry0 addresses exactly entry1's own replacement surface.
     const entry0SuccessorId = entry0.nextControl == null ? null : controlIdOf(entry0.nextControl);
@@ -315,7 +333,10 @@ describe("shadow parity seam", () => {
       context: FRAME,
       proposal: proposal(),
       resolution: "owner-pick" as const,
-      successor: { kind: "resume-command" as const, ownerSeatId: 1, pokemonId: 99 },
+      successor: {
+        kind: "resume-command-frontier" as const,
+        commands: [{ ownerSeatId: 1, pokemonId: 99, fieldIndex: 1 }],
+      },
     };
     // Two independent builds of the same resolution must agree byte-for-byte -
     // the property a shadow run asserts of the legacy path vs the v2 adapter.
@@ -369,7 +390,10 @@ describe("replica applier (picker-close semantics)", () => {
       context: FRAME,
       proposal: proposal({ selected: { partySlot: 2, speciesId: 279 } }),
       resolution,
-      successor: { kind: "resume-command", ownerSeatId: 1, pokemonId: 42 },
+      successor: {
+        kind: "resume-command-frontier",
+        commands: [{ ownerSeatId: 1, pokemonId: 42, fieldIndex: 1 }],
+      },
     });
     return { ...built, revision: 9 };
   }
@@ -464,7 +488,10 @@ describe("owner window (fallback-auto)", () => {
       context: FRAME,
       proposal: proposal({ selected: { partySlot: 3, speciesId: 100 } }),
       resolution: "fallback-auto",
-      successor: { kind: "resume-command", ownerSeatId: 1, pokemonId: 55 },
+      successor: {
+        kind: "resume-command-frontier",
+        commands: [{ ownerSeatId: 1, pokemonId: 55, fieldIndex: 1 }],
+      },
     });
     expect((fallbackEntry.material.payload as ReplacementCommitImage).resolution).toBe("fallback-auto");
 
@@ -520,7 +547,10 @@ describe("zero timers after retire", () => {
         context: FRAME,
         proposal: proposal(),
         resolution: "owner-pick",
-        successor: { kind: "resume-command", ownerSeatId: 1, pokemonId: 42 },
+        successor: {
+          kind: "resume-command-frontier",
+          commands: [{ ownerSeatId: 1, pokemonId: 42, fieldIndex: 1 }],
+        },
       }),
     );
 

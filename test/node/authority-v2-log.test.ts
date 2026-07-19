@@ -112,7 +112,13 @@ function frameContext(overrides: Partial<CoopFrameContextV2> = {}): CoopFrameCon
 }
 
 function commandControl(): CoopNextControl {
-  return { kind: "COMMAND", epoch: 1, wave: 1, turn: 1, ownerSeatId: 0, pokemonId: 42 };
+  return {
+    kind: "COMMAND_FRONTIER",
+    epoch: 1,
+    wave: 1,
+    turn: 1,
+    commands: [{ ownerSeatId: 0, pokemonId: 42, fieldIndex: 0 }],
+  };
 }
 
 function entryInput(

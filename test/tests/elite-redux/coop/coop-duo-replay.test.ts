@@ -58,10 +58,10 @@ import {
   driveHostRewardShopOwner,
   pumpDuoDestinations,
   type ReplayGameManager,
+  reachInterceptedRewardShop,
   reachQueuedRewardShop,
   remirrorWave,
   replayCoopTrace,
-  type ShopPhaseSeam,
   withClient,
 } from "#test/tools/coop-duo-harness";
 import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
@@ -370,10 +370,7 @@ describe.skipIf(!RUN)(
         // (sendInteractionChoice / inbound handle) fire here, recording the reward + leave picks.
         const counterBefore = rig.hostRuntime.controller.interactionCounter();
         const hostOwns = counterBefore % 2 === 0;
-        await withClient(rig.hostCtx, async () => {
-          await game.phaseInterceptor.to("SelectModifierPhase", false);
-        });
-        const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+        const hostShop = await withClient(rig.hostCtx, () => reachInterceptedRewardShop(game, rig.hostScene));
         const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
         const takeReward = w === 1 && hostOwns;
         if (hostOwns) {

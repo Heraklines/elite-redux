@@ -74,6 +74,10 @@ function inList(list: readonly string[], value: unknown): boolean {
   return typeof value === "string" && list.includes(value);
 }
 
+function isPosSafeInt(value: unknown): value is number {
+  return isNonNegSafeInt(value) && value > 0;
+}
+
 // ---------------------------------------------------------------------------
 // Nested: CoopNextControl (frozen decision 4). null is valid.
 // ---------------------------------------------------------------------------
@@ -92,13 +96,39 @@ function nextControlIssues(control: unknown): string[] {
     }
   };
   switch (control.kind) {
-    case "COMMAND":
-      req("epoch", isNonNegSafeInt(control.epoch));
-      req("wave", isNonNegSafeInt(control.wave));
-      req("turn", isNonNegSafeInt(control.turn));
-      req("ownerSeatId", isNonNegSafeInt(control.ownerSeatId));
-      req("pokemonId", isNonNegSafeInt(control.pokemonId));
+    case "COMMAND_FRONTIER": {
+      req("epoch", isPosSafeInt(control.epoch));
+      req("wave", isPosSafeInt(control.wave));
+      req("turn", isPosSafeInt(control.turn));
+      if (!Array.isArray(control.commands) || control.commands.length === 0) {
+        issues.push("nextControl.commands");
+        break;
+      }
+      const fields = new Set<number>();
+      const pokemon = new Set<number>();
+      control.commands.forEach((command, index) => {
+        if (!isPlainObject(command)) {
+          issues.push(`nextControl.commands[${index}]`);
+          return;
+        }
+        req(`commands[${index}].ownerSeatId`, isNonNegSafeInt(command.ownerSeatId));
+        req(`commands[${index}].pokemonId`, isPosSafeInt(command.pokemonId));
+        req(`commands[${index}].fieldIndex`, isNonNegSafeInt(command.fieldIndex));
+        if (isNonNegSafeInt(command.fieldIndex)) {
+          if (fields.has(command.fieldIndex)) {
+            issues.push(`nextControl.commands[${index}].fieldIndex: duplicate`);
+          }
+          fields.add(command.fieldIndex);
+        }
+        if (isPosSafeInt(command.pokemonId)) {
+          if (pokemon.has(command.pokemonId)) {
+            issues.push(`nextControl.commands[${index}].pokemonId: duplicate`);
+          }
+          pokemon.add(command.pokemonId);
+        }
+      });
       break;
+    }
     case "REPLACEMENT":
       req("epoch", isNonNegSafeInt(control.epoch));
       req("wave", isNonNegSafeInt(control.wave));

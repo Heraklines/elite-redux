@@ -82,7 +82,7 @@ export type CoopInteractionSurface = "reward" | "market" | "biome";
  */
 export type CoopInteractionSuccessor = Extract<
   ProjectableControl,
-  { kind: "COMMAND" | "REWARD" | "BIOME" | "MYSTERY" }
+  { kind: "COMMAND_FRONTIER" | "REWARD" | "BIOME" | "MYSTERY" }
 > | null;
 
 /** Thrown by the authority-side builders on malformed input: an authority must NEVER commit a malformed entry. */
@@ -175,9 +175,9 @@ function assertInteractionSuccessor(successor: CoopInteractionSuccessor): CoopNe
     return null;
   }
   const kind: string = (successor as ProjectableControl).kind;
-  if (kind !== "COMMAND" && kind !== "REWARD" && kind !== "BIOME" && kind !== "MYSTERY") {
+  if (kind !== "COMMAND_FRONTIER" && kind !== "REWARD" && kind !== "BIOME" && kind !== "MYSTERY") {
     throw new CoopInteractionBuildError(
-      `interaction successor must be COMMAND | REWARD | BIOME | MYSTERY or null (got ${kind})`,
+      `interaction successor must be COMMAND_FRONTIER | REWARD | BIOME | MYSTERY or null (got ${kind})`,
     );
   }
   const validation = validateNextControl(successor);

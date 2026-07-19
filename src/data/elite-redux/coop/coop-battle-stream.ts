@@ -1251,11 +1251,14 @@ export class CoopBattleStreamer {
     );
   }
 
-  private currentAuthorityAddress(turn?: number): { epoch: number; wave: number; turn: number } | null {
+  private currentAuthorityAddress(turn?: number, wave?: number): { epoch: number; wave: number; turn: number } | null {
     if (this.authorityContext == null) {
       return null;
     }
-    if (turn !== undefined && !isSafeAddressPart(turn, false)) {
+    if (
+      (turn !== undefined && !isSafeAddressPart(turn, false))
+      || (wave !== undefined && !isSafeAddressPart(wave, false))
+    ) {
       return null;
     }
     try {
@@ -1268,7 +1271,11 @@ export class CoopBattleStreamer {
       ) {
         return null;
       }
-      return { ...current, ...(turn === undefined ? {} : { turn }) };
+      return {
+        ...current,
+        ...(wave === undefined ? {} : { wave }),
+        ...(turn === undefined ? {} : { turn }),
+      };
     } catch {
       return null;
     }
@@ -1508,8 +1515,8 @@ export class CoopBattleStreamer {
     return { kind: "new", seen };
   }
 
-  private turnWaitAddress(turn: number): { key: string; address: CoopTurnAddress | null } {
-    const address = this.currentAuthorityAddress(turn);
+  private turnWaitAddress(turn: number, sourceWave?: number): { key: string; address: CoopTurnAddress | null } {
+    const address = this.currentAuthorityAddress(turn, sourceWave);
     if (address != null) {
       return { key: pendingTurnKey(address), address };
     }
@@ -1519,8 +1526,8 @@ export class CoopBattleStreamer {
     };
   }
 
-  private bufferedTurnEntry(turn: number): [string, CoopTurnResolution] | undefined {
-    const current = this.currentAuthorityAddress(turn);
+  private bufferedTurnEntry(turn: number, sourceWave?: number): [string, CoopTurnResolution] | undefined {
+    const current = this.currentAuthorityAddress(turn, sourceWave);
     if (this.authorityContext != null) {
       if (current == null) {
         return;
@@ -1530,8 +1537,8 @@ export class CoopBattleStreamer {
     return [...this.inbox.entries()].reverse().find(([, resolution]) => resolution.turn === turn);
   }
 
-  private liveTurnEntry(turn: number): [string, LiveTurnBuffer] | undefined {
-    const current = this.currentAuthorityAddress(turn);
+  private liveTurnEntry(turn: number, sourceWave?: number): [string, LiveTurnBuffer] | undefined {
+    const current = this.currentAuthorityAddress(turn, sourceWave);
     if (this.authorityContext != null) {
       if (current == null) {
         return;
@@ -2249,13 +2256,15 @@ export class CoopBattleStreamer {
       return false;
     }
     const hasImmediateCommand = hasCoopV2ImmediateCommandSuccessor(authoritativeState);
-    const commandSeat = hasImmediateCommand
-      ? authoritativeState.field.find(
-          seat =>
-            seat.side === "player" && seat.pokemonId > 0 && (authoritativeSeatHp(authoritativeState, seat) ?? 1) > 0,
-        )
-      : null;
-    if (hasImmediateCommand && commandSeat == null) {
+    const commandSeats = hasImmediateCommand
+      ? authoritativeState.field
+          .filter(
+            seat =>
+              seat.side === "player" && seat.pokemonId > 0 && (authoritativeSeatHp(authoritativeState, seat) ?? 1) > 0,
+          )
+          .sort((a, b) => a.bi - b.bi)
+      : [];
+    if (hasImmediateCommand && commandSeats.length === 0) {
       return false;
     }
     // Cutover surface 1: the v2 material must carry the COMPLETE legacy turn resolution (not just the
@@ -2275,33 +2284,44 @@ export class CoopBattleStreamer {
       turn,
       revision: authoritativeState.tick,
     };
-    // Deliverable 2: thread the REAL owner seat of the next-command mon. The authoritative field seat carries
-    // its owner ROLE; map it to the seat id (host=0, guest=1). When the seat carries no owner (an older host
-    // payload / genuinely unavailable), keep the best-effort local-role seat and MARK the record so the
-    // successor is never silently degraded.
-    const ownerResolved = commandSeat?.owner != null;
-    const ownerSeatId =
-      commandSeat == null
-        ? null
-        : ownerResolved
-          ? commandSeat.owner === "guest"
-            ? 1
-            : 0
-          : this.transport.role === "host"
+    // State the COMPLETE command frontier. Numeric seat identity is authoritative and scales to N seats.
+    // er-coop-41 still accepts a role-derived 0/1 identity for current persisted two-seat material, but an
+    // unowned field seat cannot be guessed: fail the commit so no partial frontier can retire the turn.
+    const commands = commandSeats.map(seat => {
+      const ownerSeatId =
+        Number.isSafeInteger(seat.ownerSeatId) && (seat.ownerSeatId as number) >= 0
+          ? (seat.ownerSeatId as number)
+          : seat.owner === "host"
             ? 0
-            : 1;
+            : seat.owner === "guest"
+              ? 1
+              : null;
+      return ownerSeatId == null
+        ? null
+        : {
+            ownerSeatId,
+            pokemonId: seat.pokemonId,
+            fieldIndex: seat.bi,
+          };
+    });
+    const completeCommands = commands.filter(
+      (command): command is { ownerSeatId: number; pokemonId: number; fieldIndex: number } => command != null,
+    );
+    if (completeCommands.length !== commandSeats.length) {
+      return false;
+    }
+    const ownerResolved = commandSeats.every(seat => seat.ownerSeatId != null);
     const input: CoopV2ShadowTurnTap = {
       operationId: `TURN/e${epoch}/w${wave}/t${turn}`,
       capture,
-      nextCommand:
-        commandSeat == null || ownerSeatId == null
+      nextCommandFrontier:
+        commandSeats.length === 0
           ? null
           : {
               epoch,
               wave,
               resolvedTurn: turn,
-              ownerSeatId,
-              pokemonId: commandSeat.pokemonId,
+              commands: completeCommands,
             },
       // Deliverable 1: fingerprint the LEGACY turn image (the resolution + checkpoint + companions legacy just
       // committed) through the SAME turn digest so parity compares like-for-like (v2 entry digest vs
@@ -2309,7 +2329,7 @@ export class CoopBattleStreamer {
       legacyImage: capture,
       legacyDigest: checksum,
       successorSeatSource:
-        commandSeat == null ? "none-non-command-boundary" : ownerResolved ? "owner-field" : "local-role-fallback",
+        commandSeats.length === 0 ? "none-non-command-boundary" : ownerResolved ? "owner-field" : "local-role-fallback",
     };
     if (cutoverActive) {
       // CUTOVER: commit the v2 TURN_COMMIT as the sole authority. A non-null entry => committed (legacy becomes
@@ -2323,8 +2343,8 @@ export class CoopBattleStreamer {
   }
 
   /** Newest checkpoint capable of completing the exact replay-turn park, including a bounded N±1 replacement. */
-  private checkpointEntryForTurn(turn: number): [string, CoopCheckpointEnvelope] | undefined {
-    const waitedAddress = this.currentAuthorityAddress(turn);
+  private checkpointEntryForTurn(turn: number, sourceWave?: number): [string, CoopCheckpointEnvelope] | undefined {
+    const waitedAddress = this.currentAuthorityAddress(turn, sourceWave);
     if (this.authorityContext == null) {
       return [...this.pendingCheckpoints.entries()].reverse().find(([, envelope]) => envelope.turn === turn);
     }
@@ -3691,13 +3711,13 @@ export class CoopBattleStreamer {
   }
 
   /** Inspect the checkpoint that can wake one exact replay turn without broadening the ambient inbox. */
-  peekCheckpointForTurn(turn: number): CoopCheckpointEnvelope | null {
-    return this.checkpointEntryForTurn(turn)?.[1] ?? null;
+  peekCheckpointForTurn(turn: number, sourceWave?: number): CoopCheckpointEnvelope | null {
+    return this.checkpointEntryForTurn(turn, sourceWave)?.[1] ?? null;
   }
 
   /** Consume only the checkpoint selected for one exact replay-turn boundary. */
-  consumeCheckpointForTurn(turn: number): CoopCheckpointEnvelope | null {
-    const entry = this.checkpointEntryForTurn(turn);
+  consumeCheckpointForTurn(turn: number, sourceWave?: number): CoopCheckpointEnvelope | null {
+    const entry = this.checkpointEntryForTurn(turn, sourceWave);
     if (entry == null) {
       return null;
     }
@@ -3774,8 +3794,8 @@ export class CoopBattleStreamer {
    * the seqs returned, so no event is ever rendered twice. Clearing also prunes turns older than the
    * retention window so a long run never leaks.
    */
-  consumeLiveEvents(turn: number): { seq: number; event: CoopBattleEvent }[] {
-    const entry = this.liveTurnEntry(turn);
+  consumeLiveEvents(turn: number, sourceWave?: number): { seq: number; event: CoopBattleEvent }[] {
+    const entry = this.liveTurnEntry(turn, sourceWave);
     if (entry == null) {
       coopLog("replay", `guest consume live events turn=${turn} count=0`);
       return [];
@@ -3793,8 +3813,8 @@ export class CoopBattleStreamer {
    * earlier event) stops the drain; the gapped events stay buffered for a later call or the final
    * turn-end merge. Returns the ordered contiguous events (empty when seq `fromSeq` has not arrived).
    */
-  consumeLiveEventsFrom(turn: number, fromSeq: number): CoopBattleEvent[] {
-    const entry = this.liveTurnEntry(turn);
+  consumeLiveEventsFrom(turn: number, fromSeq: number, sourceWave?: number): CoopBattleEvent[] {
+    const entry = this.liveTurnEntry(turn, sourceWave);
     if (entry == null) {
       return [];
     }
@@ -3812,7 +3832,7 @@ export class CoopBattleStreamer {
       // Advance the SHARED per-turn render watermark: these positions are being presented now (the caller
       // renders the returned run). A duplicate replay phase for the same turn then finds them already
       // covered and does not re-render them via the turn-end batch fill (#822 double-render).
-      this.noteRenderedThrough(turn, fromSeq + run.length);
+      this.noteRenderedThrough(turn, fromSeq + run.length, sourceWave);
       if (isCoopDebug()) {
         coopLog("replay", `guest live-pump drain turn=${turn} seq=${fromSeq}..${fromSeq + run.length - 1}`);
       }
@@ -3821,8 +3841,8 @@ export class CoopBattleStreamer {
   }
 
   /** Key the SHARED per-turn render watermark exactly like the live-event buffer so both replay phases agree. */
-  private renderedThroughKey(turn: number): string {
-    const current = this.currentAuthorityAddress(turn);
+  private renderedThroughKey(turn: number, sourceWave?: number): string {
+    const current = this.currentAuthorityAddress(turn, sourceWave);
     if (this.authorityContext != null && current != null) {
       return pendingTurnKey(current);
     }
@@ -3835,16 +3855,16 @@ export class CoopBattleStreamer {
    * this and the phase's own `rendered`, so a duplicate replay phase (its own `rendered=0`) re-renders only
    * positions the live-event stream had not already presented.
    */
-  renderedThroughForTurn(turn: number): number {
-    return this.renderedThrough.get(this.renderedThroughKey(turn)) ?? 0;
+  renderedThroughForTurn(turn: number, sourceWave?: number): number {
+    return this.renderedThrough.get(this.renderedThroughKey(turn, sourceWave)) ?? 0;
   }
 
   /** GUEST (#822 double-render): monotonically advance the shared per-turn render watermark to `throughCount`. */
-  noteRenderedThrough(turn: number, throughCount: number): void {
+  noteRenderedThrough(turn: number, throughCount: number, sourceWave?: number): void {
     if (!Number.isFinite(throughCount) || throughCount <= 0) {
       return;
     }
-    const key = this.renderedThroughKey(turn);
+    const key = this.renderedThroughKey(turn, sourceWave);
     if (throughCount <= (this.renderedThrough.get(key) ?? 0)) {
       return;
     }
@@ -3870,7 +3890,11 @@ export class CoopBattleStreamer {
    * are equivalent, and racing the cosmetic carrier only settles the same waiter once.
    */
   ingestAuthoritativeV2Turn(msg: Extract<CoopMessage, { t: "turnResolution" }>): void {
-    this.handle(msg);
+    // This carrier has already crossed the Authority V2 frame/session/membership/order admission boundary.
+    // Retain it independently of the renderer's ambient legacy battle shell: the host may commit while the
+    // guest shell has speculatively advanced its local turn but before the exact replay consumer starts.
+    // Cosmetic legacy packets still use the ordinary ambient-address rejection below.
+    this.handle(msg, "authority-v2");
   }
 
   /**
@@ -3888,14 +3912,15 @@ export class CoopBattleStreamer {
   awaitTurnOrLiveEvent(
     turn: number,
     fromSeq: number,
+    sourceWave?: number,
   ): Promise<{ kind: "turn"; res: CoopTurnResolution | null } | { kind: "live" } | { kind: "checkpoint" }> {
     // Fast paths: anything already buffered resolves without parking waiters. Replacement authority
     // normally follows the turn commit it repairs, but it can also be captured mid-turn and lose the
     // delivery race to a newer final turn. Both carriers share the monotonic authoritative-state tick,
     // so consume the newest revision instead of assuming one carrier class is always newer.
-    const waitedAddress = this.currentAuthorityAddress(turn);
-    const checkpoint = this.peekCheckpointForTurn(turn);
-    const bufferedTurn = this.bufferedTurnEntry(turn)?.[1];
+    const waitedAddress = this.currentAuthorityAddress(turn, sourceWave);
+    const checkpoint = this.peekCheckpointForTurn(turn, sourceWave);
+    const bufferedTurn = this.bufferedTurnEntry(turn, sourceWave)?.[1];
     if (
       checkpoint != null
       && this.checkpointCanWakeTurn(checkpoint, waitedAddress, turn)
@@ -3904,9 +3929,9 @@ export class CoopBattleStreamer {
       return Promise.resolve({ kind: "checkpoint" as const });
     }
     if (bufferedTurn != null) {
-      return this.awaitTurn(turn).then(res => ({ kind: "turn" as const, res }));
+      return this.awaitTurn(turn, sourceWave).then(res => ({ kind: "turn" as const, res }));
     }
-    const liveEntry = this.liveTurnEntry(turn);
+    const liveEntry = this.liveTurnEntry(turn, sourceWave);
     if (liveEntry != null && liveEntry[1].events.has(fromSeq)) {
       return Promise.resolve({ kind: "live" as const });
     }
@@ -3953,7 +3978,7 @@ export class CoopBattleStreamer {
       };
       this.liveWaiter = settleLive;
       this.checkpointWaiter = settleCheckpoint;
-      void this.awaitTurn(turn).then(res => {
+      void this.awaitTurn(turn, sourceWave).then(res => {
         if (!settled) {
           settled = true;
           cleanup();
@@ -3982,8 +4007,8 @@ export class CoopBattleStreamer {
    * sleeping the full timeout. The caller sets its own aborted flag BEFORE calling this, so the
    * null resolution is interpreted as "aborted", never as a host stall.
    */
-  abortTurnWait(turn: number): boolean {
-    const lookup = this.turnWaitAddress(turn);
+  abortTurnWait(turn: number, sourceWave?: number): boolean {
+    const lookup = this.turnWaitAddress(turn, sourceWave);
     const pending = this.pending.get(lookup.key);
     if (pending == null) {
       return false;
@@ -3993,11 +4018,11 @@ export class CoopBattleStreamer {
     return true;
   }
 
-  awaitTurn(turn: number): Promise<CoopTurnResolution | null> {
+  awaitTurn(turn: number, sourceWave?: number): Promise<CoopTurnResolution | null> {
     if (this.authorityTerminalStarted || this.disposed) {
       return Promise.resolve(null);
     }
-    const lookup = this.turnWaitAddress(turn);
+    const lookup = this.turnWaitAddress(turn, sourceWave);
     // Supersede every stale waiter for this numeric turn. Addressed keys prevent it from resolving the
     // new waiter, while actively dissolving it avoids a prior wave's 20-minute timeout firing later.
     for (const [key, stale] of [...this.pending.entries()]) {
@@ -4023,7 +4048,7 @@ export class CoopBattleStreamer {
     if (lookup.address != null && this.authorityContext != null) {
       this.requestTurnCommit(lookup.address.epoch, lookup.address.wave, lookup.address.turn);
     }
-    const bufferedEntry = this.bufferedTurnEntry(turn);
+    const bufferedEntry = this.bufferedTurnEntry(turn, sourceWave);
     if (bufferedEntry !== undefined) {
       const [, buffered] = bufferedEntry;
       discardAuthorityThrough(this.inbox, buffered);
@@ -4297,7 +4322,7 @@ export class CoopBattleStreamer {
     this.waveEndStateHandler = null;
   }
 
-  private handle(msg: CoopMessage): void {
+  private handle(msg: CoopMessage, source: "transport" | "authority-v2" = "transport"): void {
     switch (msg.t) {
       case "enemyPartySync": {
         const floor = this.enemyPartyAuthorityFloorByWave.get(msg.wave);
@@ -4519,7 +4544,7 @@ export class CoopBattleStreamer {
           this.transport.send(completedAck.value);
           return;
         }
-        if (!this.acceptsAwaitedTurnAddress(res)) {
+        if (source !== "authority-v2" && !this.acceptsAwaitedTurnAddress(res)) {
           // Retained commits may be redelivered after the guest has already crossed the corresponding
           // boundary. They are valid carriers, but they must not be admitted under a different awaited
           // address. Keep this distinct from schema validation: `state=1` in the malformed diagnostic only

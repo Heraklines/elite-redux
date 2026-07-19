@@ -115,15 +115,22 @@ function biomeMaterial(over: Partial<CoopBiomeInteractionMaterialV2> = {}): Coop
   };
 }
 
-/** A COMMAND successor into the next wave (the common interaction successor). */
-function commandSuccessor(over: { wave?: number; turn?: number; ownerSeatId?: number; pokemonId?: number } = {}) {
+/** A command frontier into the next wave (the common interaction successor). */
+function commandSuccessor(
+  over: { wave?: number; turn?: number; ownerSeatId?: number; pokemonId?: number; fieldIndex?: number } = {},
+) {
   return {
-    kind: "COMMAND" as const,
+    kind: "COMMAND_FRONTIER" as const,
     epoch: 1,
     wave: over.wave ?? 6,
     turn: over.turn ?? 1,
-    ownerSeatId: over.ownerSeatId ?? 0,
-    pokemonId: over.pokemonId ?? 42,
+    commands: [
+      {
+        ownerSeatId: over.ownerSeatId ?? 0,
+        pokemonId: over.pokemonId ?? 42,
+        fieldIndex: over.fieldIndex ?? 0,
+      },
+    ],
   };
 }
 
@@ -344,7 +351,7 @@ describe("biome builder + destination validation", () => {
     });
     expect(pick.kind).toBe(INTERACTION_COMMIT_KIND);
     expect(pick.operationId).toBe("IBIO/e1/w5/s1/kb");
-    expect(pick.nextControl).toMatchObject({ kind: "COMMAND", wave: 6 });
+    expect(pick.nextControl).toMatchObject({ kind: "COMMAND_FRONTIER", wave: 6 });
 
     // Crossroads LEAVE (optionIndex 1) chains to another BIOME interaction (legacy: unshift SelectBiomePhase).
     const leave = buildBiomeInteractionEntry({

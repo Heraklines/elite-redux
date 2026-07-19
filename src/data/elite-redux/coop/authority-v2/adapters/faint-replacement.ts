@@ -44,6 +44,7 @@ import { isValidOperationId } from "#data/elite-redux/coop/authority-v2/authorit
 import type {
   CoopAuthoritativeMaterial,
   CoopAuthorityEntry,
+  CoopCommandControlTarget,
   CoopFrameContextV2,
   CoopNextControl,
   CoopRuntimeContext,
@@ -124,8 +125,8 @@ export type ReplacementResolutionMode = "owner-pick" | "fallback-auto";
  * The successor control the AUTHORITY states after this replacement (foundation
  * decision 4 - the authority states, the replica projects). Modelled explicitly
  * per occurrence so a multi-faint chain is unambiguous:
- *   - "resume-command"   - the last faint in the chain resolved; resume the turn
- *                          by commanding the newly-summoned mon (COMMAND control).
+ *   - "resume-command-frontier" - the last faint in the chain resolved; resume
+ *                          every independently-controlled active battler.
  *   - "next-replacement" - another faint remains in the SAME turn; the next
  *                          occurrence's replacement is the successor (REPLACEMENT
  *                          control) - the correct chaining for a double-KO.
@@ -133,7 +134,10 @@ export type ReplacementResolutionMode = "owner-pick" | "fallback-auto";
  *                          retires at materialApplied.
  */
 export type ReplacementSuccessor =
-  | { readonly kind: "resume-command"; readonly ownerSeatId: number; readonly pokemonId: number }
+  | {
+      readonly kind: "resume-command-frontier";
+      readonly commands: readonly CoopCommandControlTarget[];
+    }
   | {
       readonly kind: "next-replacement";
       readonly occurrence: number;
@@ -352,14 +356,13 @@ export function toReplacementCommitImage(
  */
 export function successorControl(address: ReplacementSourceAddress, successor: ReplacementSuccessor): CoopNextControl {
   switch (successor.kind) {
-    case "resume-command":
+    case "resume-command-frontier":
       return {
-        kind: "COMMAND",
+        kind: "COMMAND_FRONTIER",
         epoch: address.epoch,
         wave: address.wave,
         turn: address.turn,
-        ownerSeatId: successor.ownerSeatId,
-        pokemonId: successor.pokemonId,
+        commands: successor.commands,
       };
     case "next-replacement":
       return {

@@ -118,7 +118,11 @@ export type CoopRole = "host" | "guest";
 // the declared reward continuation, then a distinct leave closes the encounter and advances ownership.
 // A cached protocol-39 client treats the first cursor as the terminal and can strand the guest counter,
 // so mixed builds must refuse pairing rather than silently accepting different lifecycle semantics.
-export const COOP_PROTOCOL_VERSION = "er-coop-40";
+// er-coop-41 replaces the single-battler Authority V2 COMMAND successor with one canonical command
+// frontier containing every independently-controlled active battler and its stable seat/field identity.
+// A protocol-40 client can falsely retire a doubles/triples turn after seeing only one CommandPhase, so
+// mixed builds must refuse pairing rather than acknowledge an incomplete control frontier.
+export const COOP_PROTOCOL_VERSION = "er-coop-41";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -971,6 +975,8 @@ export interface CoopAuthoritativeFieldSeat {
    * convergence; presentation must not infer visibility from that logical list.
    */
   presented: boolean;
+  /** Stable participant seat id. Required by Authority V2 command frontiers; role is legacy compatibility. */
+  ownerSeatId?: number;
   owner?: CoopRole;
   /** Enemy boss active segment index, if not covered by PokemonData. */
   bossSegmentIndex?: number;

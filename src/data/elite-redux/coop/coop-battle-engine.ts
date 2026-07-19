@@ -2669,15 +2669,23 @@ function captureCoopModifierBlobs(player: boolean): Record<string, unknown>[] {
 function readAuthoritativeSeat(mon: Pokemon): CoopAuthoritativeFieldSeat {
   const side = mon.isPlayer() ? "player" : "enemy";
   const boss = readBossState(mon);
+  const coopIdentity = mon as { coopOwner?: CoopRole; coopOwnerSeatId?: number };
+  const ownerSeatId =
+    Number.isSafeInteger(coopIdentity.coopOwnerSeatId) && (coopIdentity.coopOwnerSeatId as number) >= 0
+      ? coopIdentity.coopOwnerSeatId
+      : coopIdentity.coopOwner === "host"
+        ? 0
+        : coopIdentity.coopOwner === "guest"
+          ? 1
+          : undefined;
   return {
     side,
     bi: mon.getBattlerIndex(),
     partyIndex: readPartyIndex(mon),
     pokemonId: mon.id,
     presented: mon.isOnField(),
-    ...((mon as { coopOwner?: CoopRole }).coopOwner === undefined
-      ? {}
-      : { owner: (mon as { coopOwner?: CoopRole }).coopOwner }),
+    ...(ownerSeatId === undefined ? {} : { ownerSeatId }),
+    ...(coopIdentity.coopOwner === undefined ? {} : { owner: coopIdentity.coopOwner }),
     ...(side === "enemy" ? { bossSegmentIndex: boss.bossSegmentIndex } : {}),
   };
 }
@@ -3061,6 +3069,10 @@ function reconcileAuthoritativeField(
     }
     if (seat.side === "enemy" && mon instanceof EnemyPokemon && seat.bossSegmentIndex !== undefined) {
       mon.bossSegmentIndex = seat.bossSegmentIndex;
+    }
+    const ownerSeatId = seat.ownerSeatId;
+    if (seat.side === "player" && Number.isSafeInteger(ownerSeatId) && (ownerSeatId as number) >= 0) {
+      (mon as PlayerPokemon & { coopOwnerSeatId?: number }).coopOwnerSeatId = ownerSeatId as number;
     }
     // `field` is logical slot data and intentionally contains pre-intro/just-fainted occupants. Only an
     // explicit host presentation statement may reveal a seat; protocol 30 rejects cached peers that do

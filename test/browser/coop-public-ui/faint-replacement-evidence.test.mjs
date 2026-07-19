@@ -17,10 +17,10 @@ test("faint replacement waits for the owned actionable party surface before pres
     new URL("../../../src/phases/coop-guest-faint-switch-phase.ts", import.meta.url),
     "utf8",
   );
-  const stream = await readFile(
-    new URL("../../../src/data/elite-redux/coop/coop-battle-stream.ts", import.meta.url),
-    "utf8",
-  );
+  const [stream, replayTurn] = await Promise.all([
+    readFile(new URL("../../../src/data/elite-redux/coop/coop-battle-stream.ts", import.meta.url), "utf8"),
+    readFile(new URL("../../../src/phases/coop-replay-turn-phase.ts", import.meta.url), "utf8"),
+  ]);
   const hostSwitch = await readFile(new URL("../../../src/phases/switch-phase.ts", import.meta.url), "utf8");
 
   assert.match(browserEntry, /phase === "SwitchPhase" \|\| phase === "CoopGuestFaintSwitchPhase"/u);
@@ -38,7 +38,9 @@ test("faint replacement waits for the owned actionable party surface before pres
   assert.match(guestPicker, /wave: sourceWave,[\s\S]*turn: sourceTurn/u);
   assert.match(guestPicker, /guest own-faint picker CLOSE from committed authority/u);
   assert.match(stream, /acceptsCheckpointAddress\(envelope: CoopCheckpointEnvelope\)/u);
-  assert.match(stream, /peekCheckpointForTurn\(turn: number\)/u);
+  assert.match(stream, /peekCheckpointForTurn\(turn: number, sourceWave\?: number\)/u);
+  assert.match(replayTurn, /peekCheckpointForTurn\(this\.turn, this\.sourceWave\)/u);
+  assert.match(replayTurn, /consumeCheckpointForTurn\(this\.turn, this\.sourceWave\)/u);
   assert.match(hostSwitch, /const operationSourceAddress = this\.faintSourceAddress \?\? \{[\s\S]*wave:[\s\S]*turn:/u);
   assert.match(hostSwitch, /const sourceAddress = operationSourceAddress/u);
   assert.match(hostSwitch, /waitForOperationMaterialApplied\(operationId\)[\s\S]*releaseAfterPeerMaterial\(\)/u);

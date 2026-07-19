@@ -280,7 +280,13 @@ describe("owner-seat-addressed builders - per surface", () => {
         operationId: "sg-bad-succ",
         weatherIndex: 0,
         weather: 0,
-        successor: { kind: "COMMAND", epoch: 0, wave: 1, turn: 1, ownerSeatId: 0, pokemonId: 1 },
+        successor: {
+          kind: "COMMAND_FRONTIER",
+          epoch: 0,
+          wave: 1,
+          turn: 1,
+          commands: [{ ownerSeatId: 0, pokemonId: 1, fieldIndex: 0 }],
+        },
       }),
     ).toThrow(CoopInteractionBuildError);
     // a subsumes with a non-positive revision is a build error.

@@ -122,7 +122,7 @@ export class CoopReplayTurnPhase extends Phase {
       this.end();
       return true;
     }
-    getCoopBattleStreamer()?.abortTurnWait(this.turn);
+    getCoopBattleStreamer()?.abortTurnWait(this.turn, this.sourceWave);
     return true;
   }
 
@@ -209,7 +209,7 @@ export class CoopReplayTurnPhase extends Phase {
         }
         // 1) Present any contiguous live events buffered right now, then continue via a
         //    continuation phase so the presentations actually play before the next drain.
-        const increment = streamer.consumeLiveEventsFrom(this.turn, this.rendered);
+        const increment = streamer.consumeLiveEventsFrom(this.turn, this.rendered, this.sourceWave);
         if (increment.length > 0) {
           coopLog(
             "replay",
@@ -244,7 +244,7 @@ export class CoopReplayTurnPhase extends Phase {
         // Install the exact waiter before publishing readiness. A half-wiped/automatic guest has no
         // command UI to report, but this live replay pump is still the real next-turn continuation.
         // The dedicated surface cannot release an old/wrong address and never pretends input exists.
-        const authorityWait = streamer.awaitTurnOrLiveEvent(this.turn, this.rendered);
+        const authorityWait = streamer.awaitTurnOrLiveEvent(this.turn, this.rendered, this.sourceWave);
         this.awaitingAuthority = true;
         streamer.notifyContinuationSurface("rendererWait");
         const raced = await authorityWait;
@@ -268,7 +268,7 @@ export class CoopReplayTurnPhase extends Phase {
           // until we send that command.
           // Peek first. Consumption is the transaction COMMIT and is allowed only after every modern
           // companion applies with zero structured failures and its exact checksum converges.
-          const envelope = streamer.peekCheckpointForTurn(this.turn);
+          const envelope = streamer.peekCheckpointForTurn(this.turn, this.sourceWave);
           if (envelope != null) {
             const currentWave = globalScene.currentBattle?.waveIndex ?? 0;
             const checkpointWave = envelope.authoritativeState?.wave;
@@ -301,8 +301,8 @@ export class CoopReplayTurnPhase extends Phase {
                 `guest discard OUT-OF-BAND checkpoint reason=${envelope.reason} wave=${checkpointWave} `
                   + `turn=${envelope.turn} while replaying wave=${currentWave} turn=${this.turn}`,
               );
-              if (streamer.peekCheckpointForTurn(this.turn) === envelope) {
-                streamer.consumeCheckpointForTurn(this.turn);
+              if (streamer.peekCheckpointForTurn(this.turn, this.sourceWave) === envelope) {
+                streamer.consumeCheckpointForTurn(this.turn, this.sourceWave);
               }
               continue;
             }
@@ -335,7 +335,7 @@ export class CoopReplayTurnPhase extends Phase {
             if (!streamer.acknowledgeReplacement(envelope, "presentationReady")) {
               return;
             }
-            if (streamer.peekCheckpointForTurn(this.turn) !== envelope) {
+            if (streamer.peekCheckpointForTurn(this.turn, this.sourceWave) !== envelope) {
               coopWarn(
                 "checkpoint",
                 `guest replacement converged but retained carrier changed before commit turn=${this.turn} -> remain held`,
@@ -343,7 +343,7 @@ export class CoopReplayTurnPhase extends Phase {
               this.parkForReplacementRetry(streamer, envelope);
               return;
             }
-            streamer.consumeCheckpointForTurn(this.turn);
+            streamer.consumeCheckpointForTurn(this.turn, this.sourceWave);
             streamer.retainAppliedOutOfBandCheckpoint(envelope);
             // Showdown versus (Task F1): the versus guest owns its ENTIRE player field (a 1v1 -> field
             // slot 0). The co-op seat map used by coopLocalOwnedPlayerFieldSlot() resolves the fixed
@@ -470,7 +470,7 @@ export class CoopReplayTurnPhase extends Phase {
         // has animated. THE STRUCTURAL GUARANTEE: applyCoopCheckpoint runs ONLY in
         // CoopFinalizeTurnPhase, LAST on this tree level. Never collapse this back to a
         // synchronous applyCoopCheckpoint.
-        const live = streamer.consumeLiveEvents(this.turn);
+        const live = streamer.consumeLiveEvents(this.turn, this.sourceWave);
         // #822 / Track R cycle 13 (duplicate-replay double-render): merge from the SHARED per-turn render
         // watermark, not just THIS instance's `rendered`. A duplicate replay phase (its own `rendered=0`,
         // spawned by the ME-battle boot and resolving BEFORE the real instance's finalize marks the turn
@@ -478,9 +478,9 @@ export class CoopReplayTurnPhase extends Phase {
         // turn again -> double-applied damage/stat stages -> stable enemyParty divergence. Render only the
         // positions past the highest already rendered by ANY phase for this turn; the checkpoint still
         // corrects residual state, and a post-resync re-baseline resets the watermark (fresh turn address).
-        const renderedThrough = Math.max(this.rendered, streamer.renderedThroughForTurn(this.turn));
+        const renderedThrough = Math.max(this.rendered, streamer.renderedThroughForTurn(this.turn, this.sourceWave));
         const remaining = this.mergeLiveAndBatch(live, raced.res.events, renderedThrough);
-        streamer.noteRenderedThrough(this.turn, raced.res.events.length);
+        streamer.noteRenderedThrough(this.turn, raced.res.events.length, this.sourceWave);
         coopLog(
           "replay",
           `guest replay turn=${this.turn}: RESOLVE renderedLive=${renderedThrough} remaining=${remaining.length} batch=${raced.res.events.length}`,

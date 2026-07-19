@@ -127,10 +127,10 @@ export interface CoopTerminalMaterialV2 {
   readonly turn: number;
 }
 
-/** The canonical destination a WAVE_ADVANCE may state (frozen decision 4): REWARD | BIOME | COMMAND | MYSTERY. */
+/** The canonical destination a WAVE_ADVANCE may state: REWARD | BIOME | COMMAND_FRONTIER | MYSTERY. */
 export type CoopWaveAdvanceDestination = Extract<
   ProjectableControl,
-  { kind: "REWARD" | "BIOME" | "COMMAND" | "MYSTERY" }
+  { kind: "REWARD" | "BIOME" | "COMMAND_FRONTIER" | "MYSTERY" }
 >;
 
 /** Thrown by the authority-side builders on malformed input: an authority must NEVER commit a malformed entry. */
@@ -285,17 +285,17 @@ export function buildWaveAdvanceEntry(input: BuildWaveAdvanceEntryInput): Omit<C
   const destinationKind: string = (destination as ProjectableControl).kind;
   if (destinationKind === "TERMINAL" || destinationKind === "REPLACEMENT") {
     throw new CoopWaveTerminalBuildError(
-      `WAVE_ADVANCE destination must be REWARD | BIOME | COMMAND | MYSTERY (got ${destinationKind})`,
+      `WAVE_ADVANCE destination must be REWARD | BIOME | COMMAND_FRONTIER | MYSTERY (got ${destinationKind})`,
     );
   }
   const validation = validateNextControl(destination);
   if (!validation.ok) {
     throw new CoopWaveTerminalBuildError(`WAVE_ADVANCE destination is malformed: ${validation.reason}`);
   }
-  // COMMAND states the next wave, turn 1: a direct advance into the next battle's first command.
-  if (destination.kind === "COMMAND" && (destination.wave !== transition.nextWave || destination.turn !== 1)) {
+  // The command frontier states the next wave, turn 1.
+  if (destination.kind === "COMMAND_FRONTIER" && (destination.wave !== transition.nextWave || destination.turn !== 1)) {
     throw new CoopWaveTerminalBuildError(
-      `WAVE_ADVANCE COMMAND destination must address nextWave=${transition.nextWave} turn=1`
+      `WAVE_ADVANCE COMMAND_FRONTIER destination must address nextWave=${transition.nextWave} turn=1`
         + ` (got wave=${destination.wave} turn=${destination.turn})`,
     );
   }
@@ -392,7 +392,7 @@ export function entryControlWave(entry: CoopAuthorityEntry): number | null {
   if (control == null) {
     return null;
   }
-  return control.kind === "COMMAND" || control.kind === "REPLACEMENT" ? control.wave : null;
+  return control.kind === "COMMAND_FRONTIER" || control.kind === "REPLACEMENT" ? control.wave : null;
 }
 
 /**

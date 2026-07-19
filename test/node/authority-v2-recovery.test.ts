@@ -143,12 +143,11 @@ const FRAME: CoopFrameContextV2 = {
 };
 
 const COMMAND_CONTROL: NonNullable<CoopNextControl> = {
-  kind: "COMMAND",
+  kind: "COMMAND_FRONTIER",
   epoch: 3,
   wave: 4,
   turn: 1,
-  ownerSeatId: 0,
-  pokemonId: 7,
+  commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 0 }],
 };
 
 function entry(revision: number): CoopAuthorityEntry {

@@ -55,6 +55,8 @@ import type {
   CoopRuntimeContext,
 } from "#data/elite-redux/coop/authority-v2/contract";
 import {
+  canonicalCommandTargets,
+  commandControlTargetId,
   controlIdOf,
   isUsableInteger,
   type ProjectableControl,
@@ -171,16 +173,42 @@ export class DefaultCoopControlProjector implements CoopControlProjector {
 
     // 4. PROJECT the exact stated surface.
     switch (projectable.kind) {
-      case "COMMAND": {
-        // The command surface is addressed by the mon to command. If that mon is
-        // not yet materialized on this replica the summon is still pacing (material
-        // apply runs before projection, but an entry-summon can lag) - DEFER, do
-        // not reject: the address is valid, the engine just hasn't caught up.
-        const fieldIndex = surface.fieldSlotOfPokemon(projectable.pokemonId);
-        if (fieldIndex < 0) {
-          return { kind: "deferred", reason: `command actor pokemonId=${projectable.pokemonId} not yet on field` };
+      case "COMMAND_FRONTIER": {
+        // Resolve the WHOLE frontier before installing any component. A partially
+        // projected doubles/triples turn is not an install and must never emit a
+        // receipt for one battler while another actor is still materializing.
+        const resolved = canonicalCommandTargets(projectable.commands).map(command => ({
+          command,
+          fieldIndex: surface.fieldSlotOfPokemon(command.pokemonId),
+        }));
+        for (const { command, fieldIndex } of resolved) {
+          if (fieldIndex < 0) {
+            return {
+              kind: "deferred",
+              reason: `command actor pokemonId=${command.pokemonId} not yet on field`,
+            };
+          }
+          if (fieldIndex !== command.fieldIndex) {
+            return {
+              kind: "deferred",
+              reason:
+                `command actor pokemonId=${command.pokemonId} expected fieldIndex=${command.fieldIndex}`
+                + ` but is at ${fieldIndex}`,
+            };
+          }
+          if (!surface.isPlayerFieldSlot(fieldIndex)) {
+            return {
+              kind: "rejected",
+              reason: `COMMAND_FRONTIER fieldIndex=${fieldIndex} is outside the current battle geometry`,
+            };
+          }
         }
-        surface.installCommand(fieldIndex, controlId);
+        for (const { command, fieldIndex } of resolved) {
+          surface.installCommand(
+            fieldIndex,
+            commandControlTargetId(projectable.epoch, projectable.wave, projectable.turn, command),
+          );
+        }
         return { kind: "installed", controlId };
       }
       case "REPLACEMENT": {

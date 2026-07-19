@@ -40,6 +40,7 @@ import {
   installDuoLogCapture,
   installHeadlessPlayerAtlasCompletionModel,
   mirrorHostBattleToGuest,
+  reachInterceptedRewardShop,
   shiftQueuedGuestBootTail,
   withClient,
 } from "#test/tools/coop-duo-harness";
@@ -328,9 +329,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // ===== HOST reaches the post-battle REWARD SHOP. Continue driving the host past VictoryPhase to
     // its SelectModifierPhase (the reward shop) - proving the won battle traverses to the shop on the
     // sole authoritative engine, which is where the guest (replaying the host's stream) follows. =====
-    await withClient(hostCtx, async () => {
-      await game.phaseInterceptor.to("SelectModifierPhase", false);
-    });
+    await withClient(hostCtx, () => reachInterceptedRewardShop(game, hostScene));
     expect(
       hostScene.phaseManager.getCurrentPhase().is("SelectModifierPhase"),
       "the host reached the post-battle reward shop (SelectModifierPhase)",

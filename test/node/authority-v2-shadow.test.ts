@@ -199,7 +199,12 @@ function turnTap(operationId = "TURN/w5/t1", legacyDigest = "legacy-turn") {
   return {
     operationId,
     capture,
-    nextCommand: { epoch: SESSION.epoch, wave: 5, resolvedTurn: 1, ownerSeatId: 0, pokemonId: 42 },
+    nextCommandFrontier: {
+      epoch: SESSION.epoch,
+      wave: 5,
+      resolvedTurn: 1,
+      commands: [{ ownerSeatId: 0, pokemonId: 42, fieldIndex: 0 }],
+    },
     legacyDigest,
   };
 }
@@ -255,7 +260,12 @@ describe("authority-v2 shadow harness", () => {
     duo.host.tapTurnCommit({
       operationId: "TURN/match",
       capture,
-      nextCommand: { epoch: SESSION.epoch, wave: 6, resolvedTurn: 2, ownerSeatId: 0, pokemonId: 7 },
+      nextCommandFrontier: {
+        epoch: SESSION.epoch,
+        wave: 6,
+        resolvedTurn: 2,
+        commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 0 }],
+      },
       legacyDigest: matchingDigest,
     });
     host = duo.host.diagnostics();
@@ -608,7 +618,12 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
     duo.host.tapTurnCommit({
       operationId: "TURN/parity-true",
       capture,
-      nextCommand: { epoch: SESSION.epoch, wave: 5, resolvedTurn: 1, ownerSeatId: 0, pokemonId: 9 },
+      nextCommandFrontier: {
+        epoch: SESSION.epoch,
+        wave: 5,
+        resolvedTurn: 1,
+        commands: [{ ownerSeatId: 0, pokemonId: 9, fieldIndex: 0 }],
+      },
       legacyImage: capture,
       legacyDigest: "raw-full-state-checksum",
       successorSeatSource: "owner-field",
@@ -629,7 +644,12 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
     duo.host.tapTurnCommit({
       operationId: "TURN/parity-false",
       capture: { turnResolution: { events: [7, 8] }, checkpoint: { hp: 42 } },
-      nextCommand: { epoch: SESSION.epoch, wave: 5, resolvedTurn: 1, ownerSeatId: 0, pokemonId: 9 },
+      nextCommandFrontier: {
+        epoch: SESSION.epoch,
+        wave: 5,
+        resolvedTurn: 1,
+        commands: [{ ownerSeatId: 0, pokemonId: 9, fieldIndex: 0 }],
+      },
       // A legacy image whose checkpoint DIVERGES from the v2 capture -> the two states differ.
       legacyImage: { turnResolution: { events: [7, 8] }, checkpoint: { hp: 999 } },
       legacyDigest: "raw-full-state-checksum",

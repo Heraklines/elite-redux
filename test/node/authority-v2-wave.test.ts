@@ -135,7 +135,13 @@ function makeLog(scheduler: FakeScheduler, sent: CoopAuthorityWire[], over: Part
 
 /** A TURN_COMMIT input whose stated control is a COMMAND on `wave` (an in-wave turn wait). */
 function turnEntryInput(wave: number, turn: number): Omit<CoopAuthorityEntry, "revision"> {
-  const nextControl: CoopNextControl = { kind: "COMMAND", epoch: 1, wave, turn, ownerSeatId: 0, pokemonId: 42 };
+  const nextControl: CoopNextControl = {
+    kind: "COMMAND_FRONTIER",
+    epoch: 1,
+    wave,
+    turn,
+    commands: [{ ownerSeatId: 0, pokemonId: 42, fieldIndex: 0 }],
+  };
   return {
     context: frameContext(),
     operationId: `turn-w${wave}-t${turn}`,
@@ -190,7 +196,13 @@ const GAME_OVER_TERMINAL: CoopTerminalMaterialV2 = {
 const reward = (): CoopNextControl => ({ kind: "REWARD", operationId: "op-reward-w3", ownerSeatId: 0 });
 const biome = (): CoopNextControl => ({ kind: "BIOME", operationId: "op-biome-w3", ownerSeatId: 0 });
 const mystery = (): CoopNextControl => ({ kind: "MYSTERY", operationId: "op-mystery-w3", ownerSeatId: 1 });
-const command = (): CoopNextControl => ({ kind: "COMMAND", epoch: 1, wave: 4, turn: 1, ownerSeatId: 0, pokemonId: 7 });
+const command = (): CoopNextControl => ({
+  kind: "COMMAND_FRONTIER",
+  epoch: 1,
+  wave: 4,
+  turn: 1,
+  commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 0 }],
+});
 
 function receipt(entry: CoopAuthorityEntry, stage: "admitted" | "materialApplied" | "controlInstalled") {
   return {
@@ -252,7 +264,13 @@ describe("buildWaveAdvanceEntry - destination coverage", () => {
         operationId: "wave-adv-bad-command",
         transition: WIN_TRANSITION,
         // nextWave is 4; a COMMAND on wave 5 (or turn 2) is a mis-addressed advance.
-        destination: { kind: "COMMAND", epoch: 1, wave: 5, turn: 1, ownerSeatId: 0, pokemonId: 7 },
+        destination: {
+          kind: "COMMAND_FRONTIER",
+          epoch: 1,
+          wave: 5,
+          turn: 1,
+          commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 0 }],
+        },
       }),
     ).toThrow(CoopWaveTerminalBuildError);
   });

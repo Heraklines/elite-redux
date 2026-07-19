@@ -47,6 +47,7 @@ import type {
   CoopAuthoritativeMaterial,
   CoopAuthorityEntry,
   CoopAuthorityEntryKind,
+  CoopCommandControlTarget,
   CoopFrameContextV2,
   CoopNextControl,
   CoopRuntimeContext,
@@ -141,15 +142,13 @@ export interface TurnCommitMaterial extends CoopAuthoritativeMaterial {
  * the stated control addresses turn N+1. The guest never derives this - the
  * authority states it and the replica projects it (frozen decision 4).
  */
-export interface TurnCommandTarget {
+export interface TurnCommandFrontier {
   readonly epoch: number;
   readonly wave: number;
-  /** The turn just resolved (N). The stated COMMAND control addresses turn N+1. */
+  /** The turn just resolved (N). The stated frontier addresses turn N+1. */
   readonly resolvedTurn: number;
-  /** The seat that owns the next command (seat authorizes, never host/guest role). */
-  readonly ownerSeatId: number;
-  /** The mon to command on the next turn. */
-  readonly pokemonId: number;
+  /** Every living player battler that must expose a real command surface. */
+  readonly commands: readonly CoopCommandControlTarget[];
 }
 
 /**
@@ -173,12 +172,12 @@ export interface BuildTurnCommitInput {
   /** The injected turn-capture image (serialized resolution + checkpoint). */
   readonly capture: TurnResolutionImage;
   /**
-   * The successor COMMAND the authority states for turn N+1, or `null` when the
+   * The successor command frontier the authority states for turn N+1, or `null` when the
    * settled turn crosses a non-command boundary (faint replacement, victory,
    * defeat, reward, Mystery, or terminal progression). A turn commit must never
    * invent a COMMAND merely because a player mon still exists on the field.
    */
-  readonly nextCommand: TurnCommandTarget | null;
+  readonly nextCommandFrontier: TurnCommandFrontier | null;
   /** The mutation barrier gating the capture (must read zero to build). */
   readonly barrier: MutationBarrier;
   /** Revisions this commit explicitly subsumes (supersession by log order). */
@@ -237,16 +236,15 @@ export function buildTurnCommitEntry(input: BuildTurnCommitInput): BuildTurnComm
   }
 
   const nextControl: CoopNextControl =
-    input.nextCommand == null
+    input.nextCommandFrontier == null
       ? null
       : {
-          kind: "COMMAND",
-          epoch: input.nextCommand.epoch,
-          wave: input.nextCommand.wave,
+          kind: "COMMAND_FRONTIER",
+          epoch: input.nextCommandFrontier.epoch,
+          wave: input.nextCommandFrontier.wave,
           // The authority states the NEXT turn (N+1) - the successor, not the resolved turn.
-          turn: input.nextCommand.resolvedTurn + 1,
-          ownerSeatId: input.nextCommand.ownerSeatId,
-          pokemonId: input.nextCommand.pokemonId,
+          turn: input.nextCommandFrontier.resolvedTurn + 1,
+          commands: input.nextCommandFrontier.commands,
         };
 
   const entry: Omit<CoopAuthorityEntry, "revision"> = {

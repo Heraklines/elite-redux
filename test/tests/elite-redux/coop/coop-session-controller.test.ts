@@ -64,10 +64,10 @@ describe("co-op session controller (#633, P1)", () => {
       clearNegotiatedCoopCapabilities();
     });
 
-    it("rejects an er-coop-37 peer without addressed recovery and journal admission", async () => {
-      // er-coop-40: no-battle Mystery settlement and final leave are distinct ordered terminals; a 39
-      // peer can stop at reward-settled and strand its interaction counter, so pairing fails closed.
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-40");
+    it("rejects an older peer without the aggregate Authority V2 command frontier", async () => {
+      // er-coop-41: one command successor states every independently-controlled active battler; a 40
+      // peer can falsely retire a doubles/triples turn after only one CommandPhase, so pairing fails closed.
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-41");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",

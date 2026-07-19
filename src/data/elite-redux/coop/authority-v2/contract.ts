@@ -219,14 +219,28 @@ export type CoopReplicaMechanicalStage = "materialApplied" | "controlInstalled";
 // Canonical next control (frozen decision 4)
 // ---------------------------------------------------------------------------
 
+/**
+ * One independently-controlled active battler in a command frontier.
+ *
+ * A frontier is deliberately a set of addressed battlers rather than one
+ * host/guest owner tag. Doubles, triples, and future six-seat battles can expose
+ * several simultaneous command surfaces, including more than one battler owned
+ * by the same seat.
+ */
+export interface CoopCommandControlTarget {
+  readonly ownerSeatId: number;
+  readonly pokemonId: number;
+  readonly fieldIndex: number;
+}
+
 export type CoopNextControl =
   | {
-      readonly kind: "COMMAND";
+      readonly kind: "COMMAND_FRONTIER";
       readonly epoch: number;
       readonly wave: number;
       readonly turn: number;
-      readonly ownerSeatId: number;
-      readonly pokemonId: number;
+      /** Every living player battler that must reach its real CommandPhase. */
+      readonly commands: readonly CoopCommandControlTarget[];
     }
   | {
       readonly kind: "REPLACEMENT";

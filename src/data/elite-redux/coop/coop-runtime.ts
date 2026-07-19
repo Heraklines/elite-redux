@@ -39,6 +39,7 @@ import {
   setActiveCoopV2TurnCutover,
 } from "#data/elite-redux/coop/authority-v2/cutover-turn";
 import {
+  commandControlTargetId,
   controlIdOf,
   type ProjectableControl,
   validateNextControl,
@@ -3394,7 +3395,7 @@ export interface CoopRuntime {
    * controlInstalled only when the host-stated controlId is present here; projection requests themselves
    * never populate it.
    */
-  readonly v2InstalledCommandControls: Set<string>;
+  readonly v2InstalledCommandTargets: Set<string>;
 }
 
 let active: CoopRuntime | null = null;
@@ -3546,17 +3547,27 @@ function buildCoopV2TurnLiveSeams(runtime: CoopRuntime): CoopV2LiveReplicaSeams 
       _ctx: CoopRuntimeContext,
       control: NonNullable<CoopNextControl>,
     ): CoopControlInstallResult | null => {
-      if (control.kind !== "COMMAND") {
-        return null; // only the successor COMMAND is a turn-cutover control; anything else falls through to shadow.
+      if (control.kind !== "COMMAND_FRONTIER") {
+        return null; // only the successor command frontier is a turn-cutover control; anything else falls through to shadow.
       }
       try {
         const controlId = controlIdOf(control as ProjectableControl);
-        // The command control is materialized by the guest's ordinary phase flow, but REQUESTING projection
-        // is not proof that it exists. CommandPhase records its exact epoch/wave/turn/seat/Pokemon identity
-        // at the real start chokepoint. Until that exact id appears, keep the entry retained and re-project.
-        return runtime.v2InstalledCommandControls.has(controlId)
+        // Every component of the command frontier is materialized by the guest's ordinary phase flow.
+        // REQUESTING projection is not proof that any component exists. Each real CommandPhase records its
+        // exact epoch/wave/turn/field/seat/Pokemon identity at the start chokepoint; the aggregate control is
+        // installed only after ALL stated components have produced that proof.
+        const missing = control.commands.filter(
+          command =>
+            !runtime.v2InstalledCommandTargets.has(
+              commandControlTargetId(control.epoch, control.wave, control.turn, command),
+            ),
+        );
+        return missing.length === 0
           ? { kind: "already-installed", controlId }
-          : { kind: "deferred", reason: `awaiting real CommandPhase proof for ${controlId}` };
+          : {
+              kind: "deferred",
+              reason: `awaiting ${missing.length}/${control.commands.length} real CommandPhase proofs for ${controlId}`,
+            };
       } catch (error) {
         coopWarn("v2-turn", "live projectControl threw", error);
         return null;
@@ -4103,23 +4114,32 @@ export function recordCoopV2CommandControlStarted(fieldIndex: number, pokemonId:
     return;
   }
   const owner = coopOwnerOfPlayerFieldSlot(fieldIndex);
-  // The current two-seat engine persists ownership as host/guest. Authority V2 already emits this same
-  // stable seat mapping. The future N-seat migration must replace the binary Pokemon owner tag itself;
-  // this proof deliberately does not guess additional seats before that data model exists.
-  const ownerSeatId = owner === "host" ? 0 : 1;
-  const control: Extract<NonNullable<CoopNextControl>, { kind: "COMMAND" }> = {
-    kind: "COMMAND",
+  const commandPokemon = globalScene.getPlayerField()[fieldIndex] as { coopOwnerSeatId?: number } | undefined;
+  // Prefer the stable numeric seat identity. The role fallback preserves current two-seat saves while
+  // er-coop-41 introduces the numeric field; N-seat sessions must populate coopOwnerSeatId explicitly.
+  const ownerSeatId =
+    Number.isSafeInteger(commandPokemon?.coopOwnerSeatId) && (commandPokemon?.coopOwnerSeatId as number) >= 0
+      ? (commandPokemon?.coopOwnerSeatId as number)
+      : owner === "host"
+        ? 0
+        : 1;
+  const target = {
+    ownerSeatId,
+    pokemonId,
+    fieldIndex,
+  };
+  const control: Extract<NonNullable<CoopNextControl>, { kind: "COMMAND_FRONTIER" }> = {
+    kind: "COMMAND_FRONTIER",
     epoch: runtime.controller.sessionEpoch,
     wave: battle.waveIndex,
     turn: battle.turn,
-    ownerSeatId,
-    pokemonId,
+    commands: [target],
   };
   const validation = validateNextControl(control);
   if (!validation.ok) {
     return;
   }
-  runtime.v2InstalledCommandControls.add(controlIdOf(control));
+  runtime.v2InstalledCommandTargets.add(commandControlTargetId(control.epoch, control.wave, control.turn, target));
 }
 
 /**
@@ -6314,7 +6334,7 @@ export function assembleCoopRuntime(
     // setCoopRuntime; the migrated surfaces (bargain/stormglass, more to follow) read it fail-loud.
     opState,
     waveOperationBinding,
-    v2InstalledCommandControls: new Set<string>(),
+    v2InstalledCommandTargets: new Set<string>(),
   };
   sharedTerminalStates.set(runtime, {
     frozen: false,

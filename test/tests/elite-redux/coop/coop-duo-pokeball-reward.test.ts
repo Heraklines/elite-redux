@@ -34,9 +34,9 @@ import {
   forceItemRewards,
   installDuoLogCapture,
   pumpDuoDestinations,
+  reachInterceptedRewardShop,
   reachQueuedRewardShop,
   remirrorWave,
-  type ShopPhaseSeam,
   withClient,
 } from "#test/tools/coop-duo-harness";
 import { createScheduledCoopPair, type ScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
@@ -107,10 +107,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
     // until its destination ClientCtx is installed: a real browser can never resume the host watcher's
     // await against the guest's global scene (or vice versa).
     pair.setAutomaticDelivery(false);
-    await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("SelectModifierPhase", false);
-    });
-    const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+    const hostShop = await withClient(rig.hostCtx, () => reachInterceptedRewardShop(game, rig.hostScene));
     expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
     const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     if (hostOwns) {

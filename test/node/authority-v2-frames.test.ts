@@ -58,7 +58,13 @@ const ENTRY_BODY = {
   operationId: "op-1",
   kind: "TURN_COMMIT" as const,
   material: { digest: "digest-1", payload: { foo: 1, nested: [1, 2, 3] } },
-  nextControl: { kind: "COMMAND" as const, epoch: 3, wave: 4, turn: 1, ownerSeatId: 0, pokemonId: 99 },
+  nextControl: {
+    kind: "COMMAND_FRONTIER" as const,
+    epoch: 3,
+    wave: 4,
+    turn: 1,
+    commands: [{ ownerSeatId: 0, pokemonId: 99, fieldIndex: 0 }],
+  },
   subsumes: [3, 4],
 };
 
@@ -105,7 +111,13 @@ describe("authority-v2 frame codec (round-trip)", () => {
   it("validates every next-control kind (incl. null)", () => {
     const controls: unknown[] = [
       null,
-      { kind: "COMMAND", epoch: 3, wave: 4, turn: 1, ownerSeatId: 0, pokemonId: 7 },
+      {
+        kind: "COMMAND_FRONTIER",
+        epoch: 3,
+        wave: 4,
+        turn: 1,
+        commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 0 }],
+      },
       { kind: "REPLACEMENT", epoch: 3, wave: 4, turn: 1, occurrence: 0, fieldIndex: 1, ownerSeatId: 1 },
       { kind: "REWARD", operationId: "op-r", ownerSeatId: 0 },
       { kind: "BIOME", operationId: "op-b", ownerSeatId: 1 },
@@ -171,7 +183,7 @@ describe("authority-v2 boundary - malformed bodies", () => {
         operationId: "",
         kind: "NOT_A_KIND",
         material: {},
-        nextControl: { kind: "COMMAND" },
+        nextControl: { kind: "COMMAND_FRONTIER" },
         subsumes: "not-an-array",
       },
     };

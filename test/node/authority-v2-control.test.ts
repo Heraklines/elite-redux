@@ -26,8 +26,10 @@ import type {
 } from "#data/elite-redux/coop/authority-v2/contract";
 import { type ControlSurface, createCoopControlProjector } from "#data/elite-redux/coop/authority-v2/control-projector";
 import {
+  commandControlTargetId,
   controlIdOf,
   controlOwnerSeatId,
+  controlOwnerSeatIds,
   controlsEqual,
   isValidNextControl,
   sameControlAddress,
@@ -56,15 +58,28 @@ const PIPELINE_BOOKKEEPING = {
   recordStage: () => true,
 };
 
-const command = (over: Partial<Extract<Projectable, { kind: "COMMAND" }>> = {}): Projectable => ({
-  kind: "COMMAND",
-  epoch: 1,
-  wave: 3,
-  turn: 2,
-  ownerSeatId: 0,
-  pokemonId: 42,
-  ...over,
-});
+type CommandFrontier = Extract<Projectable, { kind: "COMMAND_FRONTIER" }>;
+type CommandTarget = CommandFrontier["commands"][number];
+type CommandOverrides = Partial<Omit<CommandFrontier, "kind" | "commands">> &
+  Partial<CommandTarget> & { commands?: readonly CommandTarget[] };
+
+const command = (over: CommandOverrides = {}): CommandFrontier => {
+  const {
+    ownerSeatId = 0,
+    pokemonId = 42,
+    fieldIndex = 0,
+    commands = [{ ownerSeatId, pokemonId, fieldIndex }],
+    ...frontier
+  } = over;
+  return {
+    kind: "COMMAND_FRONTIER",
+    epoch: 1,
+    wave: 3,
+    turn: 2,
+    ...frontier,
+    commands,
+  };
+};
 
 const replacement = (over: Partial<Extract<Projectable, { kind: "REPLACEMENT" }>> = {}): Projectable => ({
   kind: "REPLACEMENT",
@@ -105,6 +120,13 @@ describe("controlIdOf", () => {
     expect(controlIdOf(command({ turn: 3 }))).not.toBe(base);
     expect(controlIdOf(command({ ownerSeatId: 1 }))).not.toBe(base);
     expect(controlIdOf(command({ pokemonId: 43 }))).not.toBe(base);
+    expect(controlIdOf(command({ fieldIndex: 1 }))).not.toBe(base);
+  });
+
+  it("canonicalizes a multi-battler frontier independent of input order", () => {
+    const a = { fieldIndex: 0, ownerSeatId: 0, pokemonId: 42 };
+    const b = { fieldIndex: 1, ownerSeatId: 1, pokemonId: 43 };
+    expect(controlIdOf(command({ commands: [a, b] }))).toBe(controlIdOf(command({ commands: [b, a] })));
   });
 
   it("distinguishes kinds even when scalar fields coincide", () => {
@@ -146,12 +168,24 @@ describe("controlsEqual / sameControlAddress", () => {
   });
 });
 
-describe("controlOwnerSeatId", () => {
+describe("control ownership", () => {
   it("returns the owner seat for owned controls and null for TERMINAL", () => {
     expect(controlOwnerSeatId(command({ ownerSeatId: 0 }))).toBe(0);
     expect(controlOwnerSeatId(replacement({ ownerSeatId: 1 }))).toBe(1);
     expect(controlOwnerSeatId(reward({ ownerSeatId: 0 }))).toBe(0);
     expect(controlOwnerSeatId(terminal())).toBeNull();
+  });
+
+  it("preserves every distinct owner and refuses to collapse a multi-owner frontier", () => {
+    const frontier = command({
+      commands: [
+        { fieldIndex: 0, ownerSeatId: 0, pokemonId: 42 },
+        { fieldIndex: 1, ownerSeatId: 1, pokemonId: 43 },
+        { fieldIndex: 2, ownerSeatId: 1, pokemonId: 44 },
+      ],
+    });
+    expect(controlOwnerSeatIds(frontier)).toEqual([0, 1]);
+    expect(controlOwnerSeatId(frontier)).toBeNull();
   });
 });
 
@@ -187,6 +221,30 @@ describe("validateNextControl", () => {
     expect(validateNextControl(replacement({ fieldIndex: -1 })).ok).toBe(false);
     // occurrence 0 and seat 0 are legal (non-negative).
     expect(validateNextControl(replacement({ occurrence: 0, ownerSeatId: 0, fieldIndex: 0 })).ok).toBe(true);
+  });
+
+  it("rejects empty, duplicate-field, and duplicate-Pokemon command frontiers", () => {
+    expect(validateNextControl(command({ commands: [] })).ok).toBe(false);
+    expect(
+      validateNextControl(
+        command({
+          commands: [
+            { fieldIndex: 0, ownerSeatId: 0, pokemonId: 42 },
+            { fieldIndex: 0, ownerSeatId: 1, pokemonId: 43 },
+          ],
+        }),
+      ).ok,
+    ).toBe(false);
+    expect(
+      validateNextControl(
+        command({
+          commands: [
+            { fieldIndex: 0, ownerSeatId: 0, pokemonId: 42 },
+            { fieldIndex: 1, ownerSeatId: 1, pokemonId: 42 },
+          ],
+        }),
+      ).ok,
+    ).toBe(false);
   });
 
   it("rejects empty opaque ids", () => {
@@ -262,14 +320,41 @@ describe("DefaultCoopControlProjector", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("installs the COMMAND surface at the actor's resolved field slot", () => {
-    const { result, calls } = project(command({ pokemonId: 42 }), { fieldSlots: { 42: 1 } });
+  it("installs every command-frontier component only after all actors resolve", () => {
+    const frontier = command({
+      commands: [
+        { fieldIndex: 0, ownerSeatId: 0, pokemonId: 42 },
+        { fieldIndex: 1, ownerSeatId: 1, pokemonId: 43 },
+      ],
+    });
+    const { result, calls } = project(frontier, { fieldSlots: { 42: 0, 43: 1 } });
     expect(result.kind).toBe("installed");
-    expect(calls).toEqual([{ verb: "installCommand", args: [1, controlIdOf(command({ pokemonId: 42 }))] }]);
+    expect(calls).toEqual([
+      {
+        verb: "installCommand",
+        args: [0, commandControlTargetId(1, 3, 2, frontier.commands[0])],
+      },
+      {
+        verb: "installCommand",
+        args: [1, commandControlTargetId(1, 3, 2, frontier.commands[1])],
+      },
+    ]);
   });
 
   it("defers COMMAND when the actor is not yet on field", () => {
     const { result, calls } = project(command({ pokemonId: 7 }), { fieldSlots: {} });
+    expect(result.kind).toBe("deferred");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("does not partially install a frontier when one actor is missing", () => {
+    const frontier = command({
+      commands: [
+        { fieldIndex: 0, ownerSeatId: 0, pokemonId: 42 },
+        { fieldIndex: 1, ownerSeatId: 1, pokemonId: 43 },
+      ],
+    });
+    const { result, calls } = project(frontier, { fieldSlots: { 42: 0 } });
     expect(result.kind).toBe("deferred");
     expect(calls).toHaveLength(0);
   });

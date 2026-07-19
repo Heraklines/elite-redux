@@ -179,6 +179,10 @@ test("EvidenceSink exempts the two fresh-account save 404s but keeps every other
     assert.equal(sink.failures.length, 2);
     assert.throws(() => sink.assertClean(), /2 fatal browser event\(s\)/u);
   } finally {
+    // EventEmitter callbacks enqueue batched evidence writes synchronously but the file append itself is
+    // serialized. Drain that queue before deleting the fixture directory; otherwise the 150 ms flush can
+    // race cleanup and surface as an unrelated post-test ENOENT/unhandledRejection.
+    await sink.flush();
     await rm(artifactDir, { recursive: true, force: true });
   }
 });
@@ -195,6 +199,7 @@ test("without the fresh-account flag the same two save 404s stay fatal", async (
     page.emit("console", errorAt(notFound, `${api}/savedata/system/get`));
     assert.equal(sink.failures.length, 1);
   } finally {
+    await sink.flush();
     await rm(artifactDir, { recursive: true, force: true });
   }
 });

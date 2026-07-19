@@ -2629,6 +2629,31 @@ export async function reachQueuedRewardShop(
 }
 
 /**
+ * Drive the GameManager-owned scene to its real reward phase while tolerating only the same recognized
+ * synthetic boot prefix as the directly-constructed guest. Phaser headless construction can leave the
+ * manager scene at Login/SelectGender/Title with the authoritative Finalize/Victory tail already queued;
+ * a browser never has that detached prefix. Cross it explicitly and fail closed for every gameplay/UI
+ * phase rather than making PhaseInterceptor spend its timeout watching an inert TitlePhase.
+ */
+export async function reachInterceptedRewardShop(
+  game: {
+    phaseInterceptor: {
+      to(target: "SelectModifierPhase", runTarget?: boolean): Promise<unknown>;
+    };
+  },
+  scene: BattleScene,
+): Promise<ShopPhaseSeam> {
+  for (let crossed = 0; crossed < DIRECT_GUEST_BOOT_PHASES.size; crossed++) {
+    if (!shiftQueuedGuestBootTail(scene)) {
+      break;
+    }
+    await drainLoopback();
+  }
+  await game.phaseInterceptor.to("SelectModifierPhase", false);
+  return scene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+}
+
+/**
  * Drive the HOST's REAL owner reward shop for one interaction: start the phase (it streams its rolled
  * option list to the watcher + opens the owner screen), TAKE reward index 0 (a free reward; relayed),
  * then LEAVE (the terminal that advances the alternating-interaction counter). MUST be called inside
@@ -4223,10 +4248,7 @@ export async function replayCoopTrace(
     const waveInteraction = interactionEvents.find(e => e.seq === counterBefore);
     const takeReward = waveInteraction != null && waveInteraction.choice >= 0 && waveInteraction.kind === "reward";
 
-    await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("SelectModifierPhase", false);
-    });
-    const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+    const hostShop = await withClient(rig.hostCtx, () => reachInterceptedRewardShop(game, rig.hostScene));
     if (hostShop.phaseName === "SelectModifierPhase") {
       const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
       if (hostOwns) {

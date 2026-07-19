@@ -169,7 +169,12 @@ function turnTap(operationId = "TURN/w5/t1") {
   return {
     operationId,
     capture,
-    nextCommand: { epoch: SESSION.epoch, wave: 5, resolvedTurn: 1, ownerSeatId: 0, pokemonId: 42 },
+    nextCommandFrontier: {
+      epoch: SESSION.epoch,
+      wave: 5,
+      resolvedTurn: 1,
+      commands: [{ ownerSeatId: 0, pokemonId: 42, fieldIndex: 0 }],
+    },
     legacyImage: capture,
     legacyDigest: "legacy-turn",
   };
@@ -290,7 +295,7 @@ describe("authority-v2 turn cutover - guest LIVE replica routing", () => {
         return true;
       },
       projectControl(_ctx, control: NonNullable<CoopNextControl>): CoopControlInstallResult | null {
-        if (control.kind !== "COMMAND") {
+        if (control.kind !== "COMMAND_FRONTIER") {
           return null;
         }
         const controlId = controlIdOf(control);
@@ -331,7 +336,7 @@ describe("authority-v2 turn cutover - guest LIVE replica routing", () => {
         return true;
       },
       projectControl(_ctx, control: NonNullable<CoopNextControl>): CoopControlInstallResult | null {
-        if (control.kind !== "COMMAND") {
+        if (control.kind !== "COMMAND_FRONTIER") {
           return null;
         }
         timeline.push("projectControl");
@@ -397,7 +402,7 @@ describe("authority-v2 turn cutover - replica context binding + authority self-a
         return true;
       },
       projectControl: (_ctx, control: NonNullable<CoopNextControl>): CoopControlInstallResult | null =>
-        control.kind === "COMMAND" ? { kind: "installed", controlId: controlIdOf(control) } : null,
+        control.kind === "COMMAND_FRONTIER" ? { kind: "installed", controlId: controlIdOf(control) } : null,
     };
     const clock = new FakeClock();
     const duo = buildDuo(clock, live);

@@ -2973,8 +2973,12 @@ describe("stale-turn finalize mark (#790 + regression fix)", () => {
       authoritativeState: emptyAuthoritativeState(1, 1, 20),
     } satisfies Extract<CoopMessage, { t: "turnResolution" }>;
 
-    const awaited = stream.awaitTurn(1);
+    // The renderer shell can speculatively advance before its real replay consumer starts. Authority V2
+    // admission is already exact/session-bound, so its material must survive that ambient legacy mismatch
+    // and remain addressable by the replay phase's immutable source wave.
+    current.turn = 2;
     stream.ingestAuthoritativeV2Turn(carrier);
+    const awaited = stream.awaitTurn(1, 1);
     const admitted = await awaited;
     expect(admitted).not.toBeNull();
     expect(stream.hasFinalizedAuthoritativeV2Turn(carrier), "admitted/buffered material is not applied material").toBe(

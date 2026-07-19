@@ -24,7 +24,7 @@
 // replica pipeline (replica.ts) build on.
 // =============================================================================
 
-import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
+import type { CoopCommandControlTarget, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 
 /** A control that can actually be projected: any non-null {@linkcode CoopNextControl}. */
 export type ProjectableControl = NonNullable<CoopNextControl>;
@@ -51,8 +51,13 @@ export type ControlKind = ProjectableControl["kind"];
  */
 export function controlIdOf(control: ProjectableControl): string {
   switch (control.kind) {
-    case "COMMAND":
-      return `COMMAND/e${control.epoch}/w${control.wave}/t${control.turn}/s${control.ownerSeatId}/p${control.pokemonId}`;
+    case "COMMAND_FRONTIER":
+      return (
+        `COMMAND_FRONTIER/e${control.epoch}/w${control.wave}/t${control.turn}`
+        + `/${canonicalCommandTargets(control.commands)
+          .map(target => `f${target.fieldIndex}:s${target.ownerSeatId}:p${target.pokemonId}`)
+          .join(",")}`
+      );
     case "REPLACEMENT":
       return (
         `REPLACEMENT/e${control.epoch}/w${control.wave}/t${control.turn}`
@@ -105,8 +110,43 @@ export function sameControlAddress(a: ProjectableControl, b: ProjectableControl)
  * never host/guest roles, authorize ownership decisions (contract ownership
  * rules) - the projector compares this against `ctx.localSeatId`.
  */
+export function controlOwnerSeatIds(control: ProjectableControl): readonly number[] {
+  if (control.kind === "TERMINAL") {
+    return [];
+  }
+  if (control.kind === "COMMAND_FRONTIER") {
+    return [...new Set(control.commands.map(command => command.ownerSeatId))].sort((a, b) => a - b);
+  }
+  return [control.ownerSeatId];
+}
+
+/**
+ * The sole owner of a single-owner surface, or `null` for shared/multi-owner
+ * controls. Callers that authorize a command frontier must use
+ * {@linkcode controlOwnerSeatIds}; collapsing a multi-seat frontier is unsafe.
+ */
 export function controlOwnerSeatId(control: ProjectableControl): number | null {
-  return control.kind === "TERMINAL" ? null : control.ownerSeatId;
+  const owners = controlOwnerSeatIds(control);
+  return owners.length === 1 ? owners[0] : null;
+}
+
+/** Canonical address of one real CommandPhase proof within an aggregate frontier. */
+export function commandControlTargetId(
+  epoch: number,
+  wave: number,
+  turn: number,
+  target: CoopCommandControlTarget,
+): string {
+  return `COMMAND_TARGET/e${epoch}/w${wave}/t${turn}/f${target.fieldIndex}:s${target.ownerSeatId}:p${target.pokemonId}`;
+}
+
+/** Stable order for hashing, wire comparison, projection, and proof aggregation. */
+export function canonicalCommandTargets(
+  commands: readonly CoopCommandControlTarget[],
+): readonly CoopCommandControlTarget[] {
+  return [...commands].sort(
+    (a, b) => a.fieldIndex - b.fieldIndex || a.ownerSeatId - b.ownerSeatId || a.pokemonId - b.pokemonId,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -146,14 +186,46 @@ function isNonEmptyString(value: string): boolean {
  */
 export function validateNextControl(control: ProjectableControl): ControlValidation {
   switch (control.kind) {
-    case "COMMAND":
-      return firstFailure(
-        positiveIntField("COMMAND", "epoch", control.epoch),
-        positiveIntField("COMMAND", "wave", control.wave),
-        positiveIntField("COMMAND", "turn", control.turn),
-        nonNegativeIntField("COMMAND", "ownerSeatId", control.ownerSeatId),
-        positiveIntField("COMMAND", "pokemonId", control.pokemonId),
+    case "COMMAND_FRONTIER": {
+      const coordinateFailure = firstFailure(
+        positiveIntField("COMMAND_FRONTIER", "epoch", control.epoch),
+        positiveIntField("COMMAND_FRONTIER", "wave", control.wave),
+        positiveIntField("COMMAND_FRONTIER", "turn", control.turn),
       );
+      if (!coordinateFailure.ok) {
+        return coordinateFailure;
+      }
+      if (!Array.isArray(control.commands) || control.commands.length === 0) {
+        return { ok: false, reason: "COMMAND_FRONTIER commands must be a non-empty array" };
+      }
+      const seenFields = new Set<number>();
+      const seenPokemon = new Set<number>();
+      for (const [index, command] of control.commands.entries()) {
+        const commandFailure = firstFailure(
+          nonNegativeIntField("COMMAND_FRONTIER", `commands[${index}].ownerSeatId`, command.ownerSeatId),
+          positiveIntField("COMMAND_FRONTIER", `commands[${index}].pokemonId`, command.pokemonId),
+          nonNegativeIntField("COMMAND_FRONTIER", `commands[${index}].fieldIndex`, command.fieldIndex),
+        );
+        if (!commandFailure.ok) {
+          return commandFailure;
+        }
+        if (seenFields.has(command.fieldIndex)) {
+          return {
+            ok: false,
+            reason: `COMMAND_FRONTIER commands contain duplicate fieldIndex=${command.fieldIndex}`,
+          };
+        }
+        if (seenPokemon.has(command.pokemonId)) {
+          return {
+            ok: false,
+            reason: `COMMAND_FRONTIER commands contain duplicate pokemonId=${command.pokemonId}`,
+          };
+        }
+        seenFields.add(command.fieldIndex);
+        seenPokemon.add(command.pokemonId);
+      }
+      return OK;
+    }
     case "REPLACEMENT":
       return firstFailure(
         positiveIntField("REPLACEMENT", "epoch", control.epoch),
