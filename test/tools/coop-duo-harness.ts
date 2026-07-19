@@ -3498,10 +3498,23 @@ export async function startGuestMeReplay(guestScene: MeReplayPumpScene): Promise
   if (current === replay) {
     replay.start();
     await drainLoopback();
+  } else if (activeReplayAfter === replay) {
+    // A production scheduler already started this exact object and handed off to a child/interstitial.
+    // Never re-enter start(): its outcome and terminal arms are single-owner.
   } else if (current === mePhase) {
     throw new Error(
       "guest ME divert STALLED: production queued CoopReplayMePhase but MysteryEncounterPhase remained current - see dev-logs/coop-duo/",
     );
+  } else {
+    // A real pre-replay interstitial (observed: CommonAnimPhase in C1 run 29673971204) can remain ahead
+    // of the queued replay. Execute only those production-queued phases until the exact captured replay
+    // becomes current, then cross its one omitted scheduler edge.
+    await driveClientPhaseQueueTo(guestScene as BattleScene, "created CoopReplayMePhase", {
+      matches: phase => phase === replay,
+      maxPhases: 16,
+    });
+    replay.start();
+    await drainLoopback();
   }
   return replay;
 }
@@ -3736,39 +3749,42 @@ export async function drainGuestMeReplayNewRounds(replay: Phase, expected: numbe
  * after the host streams its options. Drains until the queued phase is current and its adopted options land.
  */
 export async function startGuestMeShopOwner(guestScene: BattleScene): Promise<ShopPhaseSeam> {
-  let shop: ShopPhaseSeam | null = null;
-  let rewardWrapperStarted = false;
-  let shopStarted = false;
+  // The already-running replay owns its asynchronous handoff. Drain it without re-entering start() until
+  // it yields to a production-queued successor; then let the cooperative scheduler execute every real
+  // wrapper/interstitial on the way to the shop. Run 29673971204 proved MysteryEncounterRewardsPhase may
+  // legitimately queue CommonAnimPhase before SelectModifierPhase, which the former phase-name poll ignored.
   for (let i = 0; i < 16; i++) {
     await drainLoopback();
     const current = guestScene.phaseManager.getCurrentPhase();
-    if (!rewardWrapperStarted && current?.phaseName === "MysteryEncounterRewardsPhase") {
-      // A complete retained no-battle settlement now owns the wrapper as well as the concrete reward
-      // surfaces. Production's phase manager starts it automatically; the direct two-engine scene uses
-      // a manual manager, so cross that scheduler edge on the real queued wrapper before looking for the
-      // child SelectModifierPhase.
-      current.start();
-      rewardWrapperStarted = true;
-      continue;
-    }
-    if (current?.phaseName === "SelectModifierPhase") {
-      shop = current as unknown as ShopPhaseSeam;
-      // The direct guest scene deliberately uses a manual phase manager. Production automatically starts
-      // an unshifted phase when it becomes current; reproduce that scheduler edge here on the REAL queued
-      // phase (once), then let startCoopWatch adopt the already-streamed authoritative option pool.
-      if (!shopStarted && shop.typeOptions == null) {
-        current.start();
-        shopStarted = true;
-      }
-    }
-    if (shop != null && Array.isArray(shop.typeOptions) && shop.typeOptions.length > 0) {
+    if (current?.phaseName !== "CoopReplayMePhase") {
       break;
     }
   }
-  if (shop == null) {
+
+  const current = guestScene.phaseManager.getCurrentPhase();
+  if (current?.phaseName === "CoopReplayMePhase") {
     throw new Error(
-      `guest ME shop handoff FAILED: expected production SelectModifierPhase current, got ${guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}`,
+      "guest ME shop handoff FAILED: the running CoopReplayMePhase never queued its production reward tail",
     );
+  }
+
+  const shop = (await driveClientPhaseQueueTo(guestScene, "production SelectModifierPhase", {
+    matches: phase => phase.phaseName === "SelectModifierPhase",
+    maxPhases: 32,
+  })) as unknown as ShopPhaseSeam;
+  // Stop-before-target is the helper's contract. Cross this one real scheduler edge, then wait for the
+  // already-streamed authoritative option pool to materialize on the live current shop.
+  if (shop.typeOptions == null) {
+    shop.start();
+  }
+  for (let i = 0; i < 16; i++) {
+    await drainLoopback();
+    if (Array.isArray(shop.typeOptions) && shop.typeOptions.length > 0) {
+      return shop;
+    }
+  }
+  if (!Array.isArray(shop.typeOptions) || shop.typeOptions.length === 0) {
+    throw new Error("guest ME shop handoff FAILED: production SelectModifierPhase never adopted reward options");
   }
   return shop;
 }
