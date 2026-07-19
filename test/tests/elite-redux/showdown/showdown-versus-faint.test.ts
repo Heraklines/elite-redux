@@ -71,7 +71,6 @@ import {
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
-  materializeGuestInputAfterReplacement,
   presentedFieldMon,
   type ShowdownDuoRig,
   settleDuoPromise,
@@ -702,6 +701,17 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
         await game.phaseInterceptor.to("ShowdownEnemyFaintSwitchPhase", false);
         rig.hostScene.phaseManager.getCurrentPhase().start();
         await vi.waitFor(() => expect(materialBarrier).toHaveBeenCalledTimes(1), { timeout: 2_000 });
+        // The real "no summon before material proof reaches authority" invariant, asserted at its ONLY
+        // valid instant: the host has entered the material barrier but the guest has NOT yet closed its
+        // idle picker, so no peer material ACK exists. (Sibling coop-duo-faint-switch test 2:366-374.)
+        expect(
+          unshiftSpy.mock.calls.filter(([name]) => name === "SwitchSummonPhase"),
+          "no summon may be published before material proof reaches authority",
+        ).toHaveLength(0);
+        expect(
+          unshiftSpy.mock.calls.filter(([name]) => name === "CoopPushReplacementCheckpointPhase"),
+          "no replacement checkpoint may be published before material proof reaches authority",
+        ).toHaveLength(0);
       });
       const retainedOperationId = materialBarrier.mock.calls[0]?.[0];
       expect(retainedOperationId).toMatch(/:FAINT_SWITCH:/u);
@@ -728,10 +738,14 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
         wave: rig.hostScene.currentBattle.waveIndex,
         turn,
       });
-      expect(
-        unshiftSpy.mock.calls.filter(([name]) => name === "SwitchSummonPhase"),
-        "no summon may be published before material proof reaches authority",
-      ).toHaveLength(0);
+      // NB: material PROOF has now arrived (materialAcks populated above). The design releases the summon
+      // the instant the host is active AND proof has arrived - in the two-engine harness the guest's
+      // materialApplied ACK is delivered under the DESTINATION (host) context, which transiently reactivates
+      // the host runtime and flushes the retained-release continuation, so the summon may ALREADY have been
+      // published here (before the manual host pump below). That is exactly correct product behaviour
+      // ("in a real browser the runtime is always active, so this defers nothing live" - switch-phase.ts).
+      // The real no-summon-before-proof invariant is asserted at its only valid instant inside the host
+      // barrier block above; re-asserting quiescence post-proof would contradict the release mechanism.
 
       await withClient(rig.hostCtx, async () => {
         await drainLoopback();
@@ -749,11 +763,17 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
         rig.hostScene.getEnemyField()[0]?.species.speciesId,
         "the first legal concrete enemy fallback was summoned only after material closure",
       ).toBe(GUEST_BENCH_1);
+      // The IDLE-fallback guest reaches its next command via the out-of-band CHECKPOINT route
+      // (coop-replay-turn-phase.ts pump: materialApplied -> presentationReady -> continuationReady), which
+      // needs BOTH engines pumped for that handshake - a guest-only drive starves the guest at its parked
+      // rendererWait. Dual-pump the host via pumpPeer. (No materializeGuestInputAfterReplacement here: that
+      // is the guest-PICK finalize/TurnInit driver and would derail the parked replay - the checkpoint
+      // route opens the guest's own post-replacement CommandPhase directly.)
       await withClient(rig.guestCtx, async () => {
-        await materializeGuestInputAfterReplacement(rig.guestScene);
         await driveClientPhaseQueueTo(rig.guestScene, "Showdown replacement CommandPhase", {
           matches: phase => phase.phaseName === "CommandPhase",
           perPhaseTimeoutMs: 5_000,
+          pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
         });
       });
       expect(
