@@ -889,6 +889,14 @@ export class CoopBattleStreamer {
    * host will never resend. Per-session by construction (a new session builds a new streamer).
    */
   private readonly finalizedMarks = new Map<string, { epoch: number; wave: number; turn: number }>();
+  /**
+   * authority-v2 CUTOVER: exact immutable turn identities whose COMPLETE live finalize path succeeded.
+   * `finalizedMarks` intentionally answers the broader legacy question "is turn N-or-earlier stale?";
+   * it cannot prove which revision/material image finalized. V2 materialApplied receipts require this
+   * address+revision identity so a queued carrier, a superseded revision, or a same-address conflict can
+   * never masquerade as installed material.
+   */
+  private readonly finalizedTurnAuthorities = new Set<string>();
 
   markTurnFinalized(epoch: number, wave: number, turn: number): void {
     if (!isSafeAddressPart(epoch, false) || !isSafeAddressPart(wave, false) || !isSafeAddressPart(turn, false)) {
@@ -899,6 +907,51 @@ export class CoopBattleStreamer {
     if (previous == null || turn > previous.turn) {
       rememberBounded(this.finalizedMarks, key, { epoch, wave, turn });
     }
+  }
+
+  /**
+   * Record exact Authority V2 material completion after the real replay/finalize/checksum path succeeded.
+   * The immutable admission ledger supplies the identity because engine appliers may normalize their
+   * disposable resolution copy in place. Returns false unless this exact revision was admitted.
+   */
+  markAuthoritativeTurnFinalized(resolution: CoopTurnResolution): boolean {
+    const exactKey = authorityKey(resolution);
+    const admitted = this.seenTurnAuthority.get(exactKey);
+    if (admitted == null || !sameAuthorityAckIdentity(admitted.value, resolution)) {
+      return false;
+    }
+    this.finalizedTurnAuthorities.add(exactKey);
+    this.markTurnFinalized(resolution.epoch, resolution.wave, resolution.turn);
+    return true;
+  }
+
+  /**
+   * Whether this exact immutable V2 carrier has completed the REAL live material path. Admission/buffering
+   * alone is deliberately insufficient: the canonical entry must match and its exact revision must have
+   * reached CoopFinalizeTurnPhase's apply + checksum + projection boundary.
+   */
+  hasFinalizedAuthoritativeV2Turn(
+    resolution: CoopTurnResolution | Extract<CoopMessage, { t: "turnResolution" }>,
+  ): boolean {
+    // Strip the wire discriminant when the cutover seam supplies the legacy message shape: admission stores
+    // CoopTurnResolution, so canonical identity must compare like-for-like rather than including `t`.
+    const normalized: CoopTurnResolution = {
+      epoch: resolution.epoch,
+      wave: resolution.wave,
+      turn: resolution.turn,
+      revision: resolution.revision,
+      events: resolution.events,
+      checkpoint: resolution.checkpoint,
+      checksum: resolution.checksum,
+      preimage: resolution.preimage,
+      fullField: resolution.fullField,
+      authoritativeState: resolution.authoritativeState,
+    };
+    const exactKey = authorityKey(normalized);
+    const admitted = this.seenTurnAuthority.get(exactKey);
+    return (
+      admitted != null && admitted.canonical === canonicalize(normalized) && this.finalizedTurnAuthorities.has(exactKey)
+    );
   }
 
   isTurnFinalized(wave: number, turn: number): boolean {
@@ -922,6 +975,7 @@ export class CoopBattleStreamer {
    */
   clearFinalizedMark(): void {
     this.finalizedMarks.clear();
+    this.finalizedTurnAuthorities.clear();
     // Scope the per-turn render watermark to the wave, exactly like finalizedMarks: a fresh wave restarts
     // at turn 1, and (without an authority context to fold the wave into the key) the `t:1` key would
     // otherwise collide with the finished wave's turn 1 and wrongly suppress its first legitimate render.
@@ -2858,7 +2912,7 @@ export class CoopBattleStreamer {
         continue;
       }
       if (this.acknowledgeTurnCommit(pending.resolution, "continuationReady", pending.superseding)) {
-        this.markTurnFinalized(pending.resolution.epoch, pending.resolution.wave, pending.resolution.turn);
+        this.markAuthoritativeTurnFinalized(pending.resolution);
         released++;
       }
     }
@@ -4061,6 +4115,7 @@ export class CoopBattleStreamer {
     this.clearRetainedAuthorityAfterTerminal();
     this.meBattlePartyInbox.clear();
     this.finalizedMarks.clear();
+    this.finalizedTurnAuthorities.clear();
     this.lastEnemyParty = null;
     this.enemyPartyStateByWave.clear();
     this.enemyPartyEncounterByWave.clear();
@@ -4141,6 +4196,7 @@ export class CoopBattleStreamer {
     this.liveEvents.clear();
     this.renderedThrough.clear();
     this.finalizedMarks.clear();
+    this.finalizedTurnAuthorities.clear();
     this.liveEventHandler = null;
     this.liveWaiter = null;
     this.pendingCheckpoints.clear();

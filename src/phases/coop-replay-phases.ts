@@ -1335,7 +1335,7 @@ export class CoopFinalizeTurnPhase extends Phase {
         }
         // Mark replay consumption now so a detached duplicate cannot reconstruct the same turn while the
         // real next UI is still opening.  This does NOT release host retention; only continuationReady does.
-        streamer.markTurnFinalized(resolution.epoch, resolution.wave, resolution.turn);
+        streamer.markAuthoritativeTurnFinalized(resolution);
         coopLog(
           "checksum",
           `guest finalize presentationReady e=${resolution.epoch} wave=${resolution.wave} turn=${resolution.turn} rev=${resolution.revision}`,

@@ -34,6 +34,7 @@ import {
   isVersusSession,
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
+  recordCoopV2CommandControlStarted,
 } from "#data/elite-redux/coop/coop-runtime";
 import type {
   CoopBattleCommandOffer,
@@ -687,11 +688,20 @@ export class CommandPhase extends FieldPhase {
       this.handleFieldIndexLogic();
     }
 
+    const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
+
     this.checkCommander();
+
+    // Authority V2: prove the exact stated successor only from the REAL CommandPhase chokepoint, after
+    // checkpoint adoption + field-index repair. This covers both an owner's interactive menu and the
+    // non-owner's mechanical await/auto-resolve phase; merely requesting a projection never signs it.
+    if (coopController != null) {
+      const commandPokemon = this.getPokemon();
+      recordCoopV2CommandControlStarted(this.fieldIndex, commandPokemon.id);
+    }
 
     const hasGeneratedSkip = globalScene.currentBattle.turnCommands[this.fieldIndex]?.skip === true;
 
-    const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
     const coopSlotOwner = coopController == null ? null : coopOwnerOfPlayerFieldSlot(this.fieldIndex);
     const isLocalCoopSlot = coopController != null && coopSlotOwner === coopController.role;
     const isAuthoritativeGuestPartnerSlot =

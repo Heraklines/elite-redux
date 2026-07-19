@@ -2907,6 +2907,56 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
 });
 
 describe("stale-turn finalize mark (#790 + regression fix)", () => {
+  it("proves Authority V2 material only after the exact admitted revision completes the real finalize path", async () => {
+    const { guest } = createLoopbackPair();
+    const current = { epoch: 7, wave: 1, turn: 1 };
+    const stream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+    const carrier = {
+      t: "turnResolution",
+      epoch: 7,
+      wave: 1,
+      turn: 1,
+      revision: 20,
+      events: [],
+      checkpoint: emptyCheckpoint(),
+      checksum: "deadbeefdeadbeef",
+      preimage: "{}",
+      fullField: emptyFullField(),
+      authoritativeState: emptyAuthoritativeState(1, 1, 20),
+    } satisfies Extract<CoopMessage, { t: "turnResolution" }>;
+
+    const awaited = stream.awaitTurn(1);
+    stream.ingestAuthoritativeV2Turn(carrier);
+    const admitted = await awaited;
+    expect(admitted).not.toBeNull();
+    expect(stream.hasFinalizedAuthoritativeV2Turn(carrier), "admitted/buffered material is not applied material").toBe(
+      false,
+    );
+
+    expect(stream.markAuthoritativeTurnFinalized(admitted!)).toBe(true);
+    expect(stream.hasFinalizedAuthoritativeV2Turn(carrier)).toBe(true);
+    expect(
+      stream.hasFinalizedAuthoritativeV2Turn({ ...carrier, checksum: "feedfacefeedface" }),
+      "same address+revision with different canonical material cannot reuse the proof",
+    ).toBe(false);
+
+    const newer = {
+      ...carrier,
+      revision: 21,
+      checkpoint: { ...carrier.checkpoint, tick: 20 },
+      authoritativeState: emptyAuthoritativeState(1, 1, 21),
+    } satisfies Extract<CoopMessage, { t: "turnResolution" }>;
+    stream.ingestAuthoritativeV2Turn(newer);
+    expect(
+      stream.hasFinalizedAuthoritativeV2Turn(newer),
+      "a generic same-address finalize mark cannot prove a newer revision",
+    ).toBe(false);
+
+    stream.clearFinalizedMark();
+    expect(stream.hasFinalizedAuthoritativeV2Turn(carrier)).toBe(false);
+    stream.dispose();
+  });
+
   it("marks kill same-wave duplicates but NEVER survive the wave boundary (the live 'stuck after normal combat' regression)", () => {
     const { host } = createLoopbackPair();
     const stream = new CoopBattleStreamer(host);

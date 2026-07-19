@@ -38,7 +38,11 @@ import {
   isCoopV2TurnEnabled,
   setActiveCoopV2TurnCutover,
 } from "#data/elite-redux/coop/authority-v2/cutover-turn";
-import { controlIdOf, type ProjectableControl } from "#data/elite-redux/coop/authority-v2/next-control";
+import {
+  controlIdOf,
+  type ProjectableControl,
+  validateNextControl,
+} from "#data/elite-redux/coop/authority-v2/next-control";
 import {
   CoopAuthorityV2Shadow,
   type CoopV2LiveReplicaSeams,
@@ -74,7 +78,6 @@ import {
 import { COOP_CHECKSUM_SENTINEL, canonicalize, fnv1a64 } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopAuthoritativeBattleState,
-  applyCoopCheckpoint,
   applyCoopDexDelta,
   applyCoopFullSnapshot,
   applyCoopMeOutcome,
@@ -3374,6 +3377,12 @@ export interface CoopRuntime {
   opState: CoopRuntimeOpState;
   /** Stable wave-transaction selector captured from this runtime, including its exact durability owner. */
   readonly waveOperationBinding: CoopWaveAdvanceOperationBinding;
+  /**
+   * Address-exact COMMAND controls the REAL CommandPhase started in this runtime. Authority V2 may sign
+   * controlInstalled only when the host-stated controlId is present here; projection requests themselves
+   * never populate it.
+   */
+  readonly v2InstalledCommandControls: Set<string>;
 }
 
 let active: CoopRuntime | null = null;
@@ -3454,10 +3463,10 @@ function reconstructCoopV2TurnResolution(
  * REAL engine: the material applier reconstructs the COMPLETE legacy turn resolution from the enriched
  * material companions and feeds it through the streamer's admission path (so the guest's own non-suppressed
  * presentation flow CoopReplayTurnPhase -> CoopFinalizeTurnPhase -> CommandPhase resolves even when the
- * now-cosmetic legacy carrier is lost/raced), then applies the numeric checkpoint ({@link applyCoopCheckpoint})
- * so materialApplied is honest. The projector reports the stated COMMAND control as installed - that same
- * presentation flow materializes the command on the real phase manager, so the projector's role is to sign
- * controlInstalled (retirement) once the material has applied, never to double-drive the phase queue. A
+ * now-cosmetic legacy carrier is lost/raced). It reports materialApplied ONLY on a later redelivery after
+ * that exact immutable revision completed the real checkpoint/full-state/checksum/finalize path; buffering
+ * is admission, never application. The projector likewise waits for an address-exact CommandPhase proof
+ * recorded by the real engine (it never signs merely because projection was requested). A
  * non-cutover kind / non-COMMAND control returns `null` so the harness falls through to pure shadow. Every
  * verb is guarded so an engine throw becomes a `false`/`null` (material rejected / fall-through), never a
  * crash into the frame handler.
@@ -3503,24 +3512,19 @@ function buildCoopV2TurnLiveSeams(runtime: CoopRuntime): CoopV2LiveReplicaSeams 
         // wakes regardless of which scene is ambient at synchronous-delivery time.
         const resolution = reconstructCoopV2TurnResolution(payload);
         if (resolution != null) {
-          runtime.battleStream.ingestAuthoritativeV2Turn(resolution);
-          // Eager numeric checkpoint apply ONLY when THIS runtime is the live ambient one (its scene is
-          // globalScene). Off-ambient (synchronous cross-context delivery) it would mutate the WRONG scene;
-          // the now-woken guest replay pump reaches CoopFinalizeTurnPhase which re-applies the checkpoint +
-          // full companions under the correct guest ambient. The ingest above is the honest materialApplied
-          // verdict on its own (the authoritative image is installed on the destination replica).
-          if (active === runtime) {
-            applyCoopCheckpoint(checkpoint as Parameters<typeof applyCoopCheckpoint>[0]);
+          // Redelivery after the exact live finalize is the ONLY success proof. In particular, an entry
+          // merely accepted into highestSeen/inbox is still only ADMITTED: signing materialApplied there
+          // retired turns while CoopFinalizeTurnPhase could still fail its full-state/checksum install.
+          if (runtime.battleStream.hasFinalizedAuthoritativeV2Turn(resolution)) {
+            return true;
           }
-          return true;
+          runtime.battleStream.ingestAuthoritativeV2Turn(resolution);
+          return false;
         }
-        // A bare/malformed image (no reconstructable companions - a pure shadow image or an older host):
-        // the numeric checkpoint apply is the materialApplied verdict on its own, preserving the
-        // pre-enrichment behaviour. Still scene-gated so an off-ambient delivery never touches a foreign
-        // scene; off-ambient it declines the material (false) rather than mutating the wrong scene.
-        return active === runtime
-          ? applyCoopCheckpoint(checkpoint as Parameters<typeof applyCoopCheckpoint>[0])
-          : false;
+        // A negotiated cutover peer must carry the complete companions. A numeric checkpoint alone cannot
+        // prove moves/items/tags/terrain/arena state, so fail closed and retain for recovery instead of
+        // emitting a false materialApplied receipt for a partial image.
+        return false;
       } catch (error) {
         coopWarn("v2-turn", `live applyMaterial threw for rev=${entry.revision}`, error);
         return false;
@@ -3535,9 +3539,12 @@ function buildCoopV2TurnLiveSeams(runtime: CoopRuntime): CoopV2LiveReplicaSeams 
       }
       try {
         const controlId = controlIdOf(control as ProjectableControl);
-        // The command control is materialized by the guest's ordinary presentation phase flow (which the
-        // cutover deliberately does NOT suppress); the projector signs controlInstalled so the entry retires.
-        return { kind: "installed", controlId };
+        // The command control is materialized by the guest's ordinary phase flow, but REQUESTING projection
+        // is not proof that it exists. CommandPhase records its exact epoch/wave/turn/seat/Pokemon identity
+        // at the real start chokepoint. Until that exact id appears, keep the entry retained and re-project.
+        return runtime.v2InstalledCommandControls.has(controlId)
+          ? { kind: "already-installed", controlId }
+          : { kind: "deferred", reason: `awaiting real CommandPhase proof for ${controlId}` };
       } catch (error) {
         coopWarn("v2-turn", "live projectControl threw", error);
         return null;
@@ -4061,6 +4068,46 @@ export function isCoopRuntimeActive(): boolean {
 export function coopOwnerOfPlayerFieldSlot(fieldIndex: number): CoopRole {
   const scene = globalScene as typeof globalScene | undefined;
   return coopOwnerOfFieldSlot(scene?.getPlayerField?.() ?? [], fieldIndex);
+}
+
+/**
+ * Authority V2 COMMAND control proof. Called from CommandPhase only after its checkpoint funnel and any
+ * field-index repair have completed, so the recorded identity is a REAL mechanically-active phase, not a
+ * requested/queued projection. Exact owner/address/Pokemon fields make another seat, turn, or actor unable
+ * to satisfy the receipt. Hard no-op outside an active negotiated turn cutover.
+ */
+export function recordCoopV2CommandControlStarted(fieldIndex: number, pokemonId: number): void {
+  const runtime = active;
+  const battle = globalScene.currentBattle;
+  if (
+    runtime == null
+    || battle == null
+    || !coopV2TurnCutovers.has(runtime)
+    || !Number.isSafeInteger(fieldIndex)
+    || fieldIndex < 0
+    || !Number.isSafeInteger(pokemonId)
+    || pokemonId <= 0
+  ) {
+    return;
+  }
+  const owner = coopOwnerOfPlayerFieldSlot(fieldIndex);
+  // The current two-seat engine persists ownership as host/guest. Authority V2 already emits this same
+  // stable seat mapping. The future N-seat migration must replace the binary Pokemon owner tag itself;
+  // this proof deliberately does not guess additional seats before that data model exists.
+  const ownerSeatId = owner === "host" ? 0 : 1;
+  const control: Extract<NonNullable<CoopNextControl>, { kind: "COMMAND" }> = {
+    kind: "COMMAND",
+    epoch: runtime.controller.sessionEpoch,
+    wave: battle.waveIndex,
+    turn: battle.turn,
+    ownerSeatId,
+    pokemonId,
+  };
+  const validation = validateNextControl(control);
+  if (!validation.ok) {
+    return;
+  }
+  runtime.v2InstalledCommandControls.add(controlIdOf(control));
 }
 
 /**
@@ -6255,6 +6302,7 @@ export function assembleCoopRuntime(
     // setCoopRuntime; the migrated surfaces (bargain/stormglass, more to follow) read it fail-loud.
     opState,
     waveOperationBinding,
+    v2InstalledCommandControls: new Set<string>(),
   };
   sharedTerminalStates.set(runtime, {
     frozen: false,
