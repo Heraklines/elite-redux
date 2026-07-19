@@ -170,11 +170,17 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
     expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
 
-    const terminal = submitSpy.mock.calls.map(call => call[0]).find(intent => intent.kind === "ME_TERMINAL")?.payload;
-    expect(meOp.isCompleteCoopMeTerminalPayload(terminal), "the leave is one complete retained transaction").toBe(true);
-    if (meOp.isCompleteCoopMeTerminalPayload(terminal)) {
-      expect(terminal.terminal).toBe("leave");
-      expect(terminal.destination.kind).toBe("continue");
+    const terminals = submitSpy.mock.calls
+      .map(call => call[0])
+      .filter(intent => intent.kind === "ME_TERMINAL")
+      .map(intent => intent.payload);
+    expect(
+      terminals.map(terminal => (meOp.isCompleteCoopMeTerminalPayload(terminal) ? terminal.terminal : null)),
+      "the pre-reward settlement and final leave are two complete, ordered retained transactions",
+    ).toEqual(["reward-settled", "leave"]);
+    const leave = terminals[1];
+    if (meOp.isCompleteCoopMeTerminalPayload(leave)) {
+      expect(leave.destination.kind).toBe("continue");
     }
     expect(
       applyOutcomeSpy,

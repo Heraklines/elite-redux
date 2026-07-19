@@ -1133,11 +1133,16 @@ describe.skipIf(!RUN)(
               await withClient(rig.guestCtx, async () => {
                 replay = await startGuestMeReplay(rig.guestScene);
                 newRounds = await drainGuestMeReplayNewRounds(replay, EXPECTED_NEW_ROUNDS);
-                const current = rig.guestScene.phaseManager.getCurrentPhase();
+                const rewardWrapper = rig.guestScene.phaseManager.getCurrentPhase();
                 expect(
-                  current?.phaseName,
-                  "the repeated-round replay handed off to its real embedded reward watcher",
-                ).toBe("SelectModifierPhase");
+                  rewardWrapper?.phaseName,
+                  "the repeated-round replay handed off to its declared reward wrapper",
+                ).toBe("MysteryEncounterRewardsPhase");
+                rewardWrapper!.start();
+                const current = rig.guestScene.phaseManager.getCurrentPhase();
+                expect(current?.phaseName, "the reward wrapper queued the real embedded watcher").toBe(
+                  "SelectModifierPhase",
+                );
                 guestShop = current as unknown as ShopPhaseSeam;
                 await beginRewardShopWatch(guestShop);
               });

@@ -65,9 +65,9 @@ describe("co-op session controller (#633, P1)", () => {
     });
 
     it("rejects an er-coop-37 peer without addressed recovery and journal admission", async () => {
-      // er-coop-39: status sub-state carried in checkpoints/snapshots; a 38 peer would silently
-      // reproduce the permanent status-digest divergence for mixed pairs, so pairing fails closed.
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-39");
+      // er-coop-40: no-battle Mystery settlement and final leave are distinct ordered terminals; a 39
+      // peer can stop at reward-settled and strand its interaction counter, so pairing fails closed.
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-40");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",

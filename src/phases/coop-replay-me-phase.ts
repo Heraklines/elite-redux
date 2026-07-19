@@ -503,6 +503,10 @@ export class CoopReplayMePhase extends Phase {
       if (!this.boundaryStillLive()) {
         return;
       }
+      if (this.continuationHandedOff) {
+        coopLog("me", "initial presentation resolved after continuation handoff; ignoring", { seq: this.seq });
+        return;
+      }
       if (present == null || present.k !== "mePresent") {
         if (this.initialPresentationEntered) {
           return; // a verified snapshot already supplied + entered this selector
@@ -596,6 +600,14 @@ export class CoopReplayMePhase extends Phase {
 
   /** #821: whether awaitOutcomeThenTerminal has been armed at least once. */
   private raceArmed = false;
+
+  /**
+   * A retained reward settlement hands executable control to its declared continuation but deliberately
+   * keeps this instance registered for the ordered final LEAVE. This is therefore distinct from `settled`:
+   * `settled` means the final mechanical terminal ran, while this flag only retires async presentation /
+   * outcome work owned by the pre-continuation replay shell.
+   */
+  private continuationHandedOff = false;
 
   /**
    * #831 (audit P0#1): the SINGLE live 9M terminal arm, INHERITED by every re-arm (a repeated-option-select
@@ -937,6 +949,10 @@ export class CoopReplayMePhase extends Phase {
       }
       raceDone = true;
       if (!this.boundaryStillLive()) {
+        return;
+      }
+      if (this.continuationHandedOff) {
+        coopLog("me", "outcome/terminal race resolved after continuation handoff; ignoring", { seq: this.seq });
         return;
       }
       if (this.settled && !this.settledDetached) {
@@ -1483,11 +1499,10 @@ export class CoopReplayMePhase extends Phase {
       revision: captureCoopActiveMysteryControl()?.revision ?? 0,
       continuation: destination.continuation,
     };
-    // This replay has handed mechanical control to the declared continuation. Keep it registered as the
-    // durable receiver for the ordered final LEAVE, but retire every presentation/outcome arm owned by the
-    // pre-reward shell. In particular, a delayed initial mePresent must not re-arm the old 8M race after
-    // MysteryEncounterRewardsPhase/SelectModifierPhase has already become the executable surface.
-    this.settled = true;
+    // Keep this replay registered as the durable receiver for the ordered final LEAVE, but retire every
+    // presentation/outcome arm owned by the pre-reward shell. This must NOT set `settled`: doing so makes
+    // completeCommittedLeave's defensive leave a no-op and strands the guest counter one step behind.
+    this.continuationHandedOff = true;
     if (destination.continuation === "encounter") {
       if (this.battleEndDelegateOwnsContinuation) {
         // The Colosseum's detached board driver already owns the between-round surface and next terminal.

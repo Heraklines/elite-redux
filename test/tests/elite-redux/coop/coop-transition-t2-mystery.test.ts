@@ -18,6 +18,7 @@ import {
   captureCoopEnemies,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { isCompleteCoopMeTerminalPayload } from "#data/elite-redux/coop/coop-me-operation";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, isCoopSharedTerminalFrozen, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
@@ -118,6 +119,20 @@ function distinctCommittedMeOperations(calls: readonly (readonly CoopMessage[])[
     }
   }
   return operations;
+}
+
+function distinctCommittedMeTerminals(calls: readonly (readonly CoopMessage[])[]): unknown[] {
+  const terminals = new Map<string, unknown>();
+  for (const [message] of calls) {
+    if (message?.t !== "envelope") {
+      continue;
+    }
+    const operation = message.envelope.pendingOperation;
+    if (operation?.status === "applied" && operation.kind === "ME_TERMINAL") {
+      terminals.set(operation.id, operation.payload);
+    }
+  }
+  return [...terminals.values()];
 }
 
 async function pumpBoth(rig: DuoRig, rounds = 1): Promise<void> {
@@ -573,7 +588,12 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
       const operations = distinctCommittedMeOperations(hostSend.mock.calls);
       expect([...operations.values()].filter(kind => kind === "ME_PRESENT")).toHaveLength(journey.picks.length);
       expect([...operations.values()].filter(kind => kind === "ME_PICK")).toHaveLength(journey.picks.length);
-      expect([...operations.values()].filter(kind => kind === "ME_TERMINAL")).toHaveLength(1);
+      expect(
+        distinctCommittedMeTerminals(hostSend.mock.calls).map(payload =>
+          isCompleteCoopMeTerminalPayload(payload) ? payload.terminal : null,
+        ),
+        "the no-battle settlement and final leave are distinct, ordered retained terminals",
+      ).toEqual(["reward-settled", "leave"]);
       expect(
         hostSend.mock.calls.some(
           ([message]) =>
