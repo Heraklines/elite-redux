@@ -4,7 +4,7 @@
 
 For co-op architecture or gameplay work, use the repository's calibrated gate instead of running the full co-op directory with Vitest's default parallel scheduler. The tests share heavyweight Phaser/module state, so saturating one workstation creates contention and nondeterministic false failures.
 
-This smart-sharded workflow is the standing default for all future co-op checkpoints; agents do not need to ask whether to use it again. Keep quick, focused verification local, and move exhaustive checkpoint verification to independent external runners. A checkpoint is deployable only when the aggregate sharded gate is green.
+This smart-sharded workflow is the standing default for all future co-op checkpoints; agents do not need to ask whether to use it again. Keep quick, focused verification local, and move exhaustive checkpoint verification to independent external runners. Production/release candidates require a green aggregate sharded gate. A stabilization-only staging checkpoint may carry an explicitly ratified harness-only red under the narrow exception below.
 
 - Do not run co-op Vitest files locally on this workstation. Even focused engine-free files have been
   observed importing the heavyweight Phaser graph, exceeding 500 MB, and surviving their command wrapper.
@@ -34,7 +34,14 @@ This smart-sharded workflow is the standing default for all future co-op checkpo
 - Run or inspect one deterministic shard with `node scripts/run-coop-gate.mjs --lane <A|B|C|P|S|T> --shard <index>/<total>`. Use `--list` to see its exact files.
 - Do not replace external sharding with many concurrent local Vitest processes. Separate runners provide the speedup without recreating CPU/memory contention.
 - Keep `fail-fast: false` so every shard returns evidence. Download the per-shard log artifact, fix all reproducible failures in one batch, and let the next pushed checkpoint rerun the matrix.
-- A red shard blocks staging promotion. A green focused test is useful during development but does not replace the checkpoint gate.
+- A red shard blocks staging by default. A stabilization-only staging checkpoint may waive a red test only
+  when all of the following are recorded in `docs/plans/2026-07-18-coop-red-ledger.md`: the exact test and
+  promotion SHA; exact failing run/artifact; a demonstrated harness-only mechanism; the production call
+  chain or exact-SHA public-browser evidence proving the corresponding player path; and a named removal
+  action. Unknown, flaky/unclassified, product, browser-observed, static, mutation, corruption, security,
+  save, pairing, or transport failures are never waivable. The aggregate remains visibly red, the deploy
+  must be labeled STABILIZATION, and the waiver never applies to production. Fix or retire a waived noisy
+  test promptly; a ledger is not permission to accumulate permanent false alarms.
 - For a deterministic long-campaign regression, dispatch `Focused Co-op Soak Replay` once per affected
   profile so unrelated 200-wave campaigns do not delay diagnosis. Different profiles may run concurrently
   on independent GitHub-hosted runners. A focused green replay does not replace the six-profile Nightly

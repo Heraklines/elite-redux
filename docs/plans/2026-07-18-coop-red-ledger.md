@@ -1,4 +1,29 @@
-# Co-op red-test ledger (frozen fold 3f94c36a1, gate 13 = run 29617543966)
+# Co-op red-test ledger
+
+## Stabilization-staging waiver policy (2026-07-19)
+
+An aggregate red remains a real signal. It may be waived only for a **stabilization-only staging**
+checkpoint when the exact failure is proved to be a harness/test defect rather than a player-path defect.
+Every active waiver must name:
+
+1. exact promotion SHA, test name, run, job, and artifact;
+2. the demonstrated harness-only mechanism;
+3. the exact production call chain or exact-SHA public-browser evidence that rules out the corresponding
+   player failure;
+4. the owner/removal action and the next requalification run.
+
+Unknown or flaky-but-unexplained reds are not harness reds. Product, public-browser, static, mutation,
+corruption, security, save, pairing, and transport reds are never waivable. A waiver leaves the aggregate
+visibly red, never applies to production, and expires on the next product-code change touching that surface.
+
+**Active stabilization waivers: none.** The B7/B9 failures from run `29674799408` are being repaired at
+their test mechanisms instead of being added as permanent exceptions.
+
+## Historical Authority-V2 freeze ledger
+
+The table below records the old fold at `3f94c36a1` / gate run `29617543966`. It is historical evidence,
+not an active staging waiver. Several listed mechanisms were subsequently fixed or replaced and must be
+re-proved at the exact promotion SHA before any current classification is inferred from them.
 
 Classification per the authority-v2 build directive: these reds are catalogued, NOT
 repeatedly repaired during the architecture build. Blocking classes remain: compile/type
