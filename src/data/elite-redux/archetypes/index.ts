@@ -23,6 +23,23 @@
 // =============================================================================
 
 // biome-ignore lint/performance/noBarrelFile: archetype layer is intentionally a barrel for Phase C tests + ER ability wiring; small module set
+export {
+  type AbilityAttrFactory,
+  appendAbilityAttrsOnce,
+  BallRecoveryAbAttr,
+  BiomeRevealBonusAbAttr,
+  EncounterTypeWeightAbAttr,
+  ExperienceGainMultiplierAbAttr,
+  FirstEntryPartyHealAbAttr,
+  type FirstEntryPartyHealOptions,
+  FirstTurnDirectDamageMultiplierAbAttr,
+  HolderAndAlliesRecoveryAbAttr,
+  type InnateSlot,
+  isInnateSlotSuppressed,
+  MoneyGainMultiplierAbAttr,
+  replaceAbilityAttrsOnce,
+  suppressInnateSlotUntilSwitch,
+} from "../ability-upgrades/attrs/index";
 export { AbsorbantAbAttr } from "./absorbant";
 // =============================================================================
 // New primitives (round-30+ batch) for remaining bespoke ability wires.

@@ -68,7 +68,10 @@ import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { erLibraryCastIsSpecial, erLibraryDamageMultiplier } from "#data/elite-redux/abilities/library";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
 import { erOmniformRevertOnLeaveField } from "#data/elite-redux/abilities/omniform";
-import { erOmniformOriginalSpecies } from "#data/elite-redux/abilities/omniform-registry";
+import {
+  erOmniformOriginalIdentity,
+  resolveOmniformUnlockOwnerIdentity,
+} from "#data/elite-redux/abilities/omniform-registry";
 import { erShatteredPsycheOnLeaveField } from "#data/elite-redux/abilities/shattered-psyche";
 import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
 import { getGraftedTypes } from "#data/elite-redux/abilities/type-graft";
@@ -3219,17 +3222,25 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (globalScene.gameMode.isCoop && this.customPokemonData?.coopPassiveAttr != null) {
       return this.customPokemonData.coopPassiveAttr[slot] ?? 0;
     }
-    // ER Omniform (5929): a mid-battle-transformed holder (Partner Eevee -> a partner
-    // eeveelution, id 70012+) reads its innate candy-unlock from the PRE-TRANSFORM
-    // SOURCE species, not the transform TARGET. The target species is never candy-
-    // bought, so reading its `passiveAttr` (0) would silently LOCK every innate the
-    // player unlocked on Partner Eevee. Consulting the source snapshot carries that
-    // unlocked-innate set to every form it adapts into (maintainer directive) and,
-    // once the holder reverts on `leaveField`, this returns `undefined` so the gate
-    // falls back to the reverted base species unchanged.
-    const selfSpecies = erOmniformOriginalSpecies(this) ?? this.species;
-    const owner =
-      this.isFusion() && this.fusionSpecies && (slot === 0 || slot === 2) ? this.fusionSpecies : selfSpecies;
+    // ER Omniform (5929): every family member reads candy unlocks from its
+    // registered family HEAD. The transient original snapshot handles a holder
+    // that just transformed; the permanent owner registry additionally handles a
+    // partner Eeveelution loaded or instantiated directly (no snapshot exists).
+    // Fusion slot ownership remains unchanged: slots 0/2 belong to the fusion
+    // species, slot 1 to the base species, and either owner may itself belong to an
+    // Omniform family.
+    const originalIdentity = erOmniformOriginalIdentity(this);
+    const selfIdentity = originalIdentity ?? {
+      speciesId: this.species.speciesId,
+      formIndex: this.formIndex,
+    };
+    const slotOwnerIdentity =
+      this.isFusion() && this.fusionSpecies && (slot === 0 || slot === 2)
+        ? { speciesId: this.fusionSpecies.speciesId, formIndex: this.fusionFormIndex }
+        : selfIdentity;
+    const unlockOwnerIdentity =
+      resolveOmniformUnlockOwnerIdentity(slotOwnerIdentity.speciesId, slotOwnerIdentity.formIndex) ?? slotOwnerIdentity;
+    const owner = getPokemonSpecies(unlockOwnerIdentity.speciesId);
     return globalScene.gameData.starterData[owner.getRootSpeciesId()]?.passiveAttr ?? 0;
   }
 

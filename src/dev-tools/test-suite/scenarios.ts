@@ -47,6 +47,7 @@ import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-red
 import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
+import { ER_PARTNER_VAPOREON_SPECIES_ID } from "#data/elite-redux/er-newcomer-species";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import {
   type ErDifficulty,
@@ -940,6 +941,41 @@ export const DEV_SCENARIOS: DevScenario[] = [
           moveset: [MoveId.WATER_GUN, MoveId.EMBER, MoveId.SWORDS_DANCE, MoveId.TACKLE],
         }),
       ];
+    },
+  },
+  {
+    label: "Partner: Eeveelution innate unlocks",
+    description:
+      "Partner Eevee's three candy-unlock bits belong to the WHOLE Omniform family, even\n"
+      + "when a partner Eeveelution is loaded directly instead of transforming first.\n"
+      + "This scenario starts as Partner Vaporeon and unlocks Partner Eevee innate slots\n"
+      + "1 and 3 only.\n"
+      + "DO: open Info -> Abilities (R, then Abilities) or the Summary ability panel.\n"
+      + "EXPECT: innate rows 1 and 3 are live; row 2 says 'Innate (Locked)'. The panel\n"
+      + "must use Partner Eevee's unlocks rather than Partner Vaporeon's transform-only\n"
+      + "starter data. Before the fix all three rows appeared locked when loaded directly.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(ER_PARTNER_VAPOREON_SPECIES_ID as SpeciesId, {
+          moveset: [MoveId.WATER_GUN, MoveId.ICE_BEAM, MoveId.SHADOW_BALL, MoveId.TACKLE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const eeveeData = globalScene.gameData.starterData[SpeciesId.EEVEE];
+      if (eeveeData) {
+        eeveeData.passiveAttr = unlockSlot(unlockSlot(0, 0), 2);
+      }
+      globalScene.getPlayerPokemon()?.updateInfo();
     },
   },
   // ===========================================================================
