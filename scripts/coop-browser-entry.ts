@@ -21,6 +21,7 @@ const [
   { BattlerTagType },
   { BattleType },
   { Command },
+  { MysteryEncounterOptionMode },
   { MoveId },
   { PokemonModifierType },
   { PartyOption, PartyUiMode },
@@ -34,6 +35,7 @@ const [
   import("../src/enums/battler-tag-type"),
   import("../src/enums/battle-type"),
   import("../src/enums/command"),
+  import("../src/enums/mystery-encounter-option-mode"),
   import("../src/enums/move-id"),
   import("../src/modifier/modifier-type"),
   import("../src/ui/handlers/party-ui-handler"),
@@ -664,6 +666,41 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       const optionIds = modOptions.map((option, index) => option?.modifierTypeOption?.type?.id ?? `slot:${index}`);
       return {
         selectedOptionId: selectedIndex == null ? null : (optionIds[selectedIndex] ?? `cursor:${selectedIndex}`),
+        optionIds,
+        optionCount: optionIds.length,
+      };
+    }
+  }
+  if (uiMode === "MYSTERY_ENCOUNTER") {
+    const mysteryHandler = handler as unknown as {
+      encounterOptions?: Array<{ optionMode?: number }>;
+      optionsMeetsReqs?: boolean[];
+      viewPartyIndex?: number;
+    };
+    const encounterOptions = mysteryHandler.encounterOptions;
+    const meetsRequirements = mysteryHandler.optionsMeetsReqs;
+    if (Array.isArray(encounterOptions) && Array.isArray(meetsRequirements) && encounterOptions.length > 0) {
+      // Labels are localized and may be dynamically resolved, so publish only ordinal identity plus
+      // the production handler's already-computed selectability. The driver remains read-only here:
+      // it still moves the real cursor with arrow keys and submits through the normal ACTION binding.
+      const optionIds = encounterOptions.map((option, index) => {
+        const disabled =
+          meetsRequirements[index] === false
+          && (option.optionMode === MysteryEncounterOptionMode.DISABLED_OR_DEFAULT
+            || option.optionMode === MysteryEncounterOptionMode.DISABLED_OR_SPECIAL);
+        return `mystery-option:${index}:${disabled ? "disabled" : "enabled"}`;
+      });
+      optionIds.push("mystery-action:view-party");
+      const viewPartyIndex = Number.isSafeInteger(mysteryHandler.viewPartyIndex)
+        ? (mysteryHandler.viewPartyIndex as number)
+        : encounterOptions.length;
+      return {
+        selectedOptionId:
+          selectedIndex === viewPartyIndex
+            ? "mystery-action:view-party"
+            : selectedIndex == null
+              ? null
+              : (optionIds[selectedIndex] ?? `cursor:${selectedIndex}`),
         optionIds,
         optionCount: optionIds.length,
       };

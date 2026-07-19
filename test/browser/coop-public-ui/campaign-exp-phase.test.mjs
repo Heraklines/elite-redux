@@ -533,6 +533,17 @@ test("only ready active local battle narration and EXP instances advance once on
     turn: 2,
   });
   assert.equal(await advance(), false, "a ready prompt from a different turn address must never receive input");
+  renderer.evidence.pushConsole("Start Phase BattleEndPhase");
+  renderer.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 4, true, {
+    epoch: 7,
+    wave: 1,
+    turn: 2,
+  });
+  assert.equal(
+    await advance(),
+    true,
+    "the exact next-turn money prompt is drivable only after this browser observes BattleEndPhase",
+  );
   authority.evidence.pushBattleReadiness("battle:exp", "ExpPhase", true, 2);
   assert.equal(await advance(), true);
   assert.equal(await advance(), false);
@@ -543,20 +554,21 @@ test("only ready active local battle narration and EXP instances advance once on
   );
   assert.deepEqual(
     renderer.presses.map(entry => entry.key),
-    ["Space"],
+    ["Space", "Space"],
   );
-  assert.equal(stats.battleMessagePrompts, 2);
+  assert.equal(stats.battleMessagePrompts, 3);
   assert.equal(stats.postBattleExpPrompts, 1);
   const advances = [...authority.evidence.events, ...renderer.evidence.events].filter(
     event => event.kind === "campaign-battle-prompt-advance",
   );
-  assert.equal(advances.length, 3);
+  assert.equal(advances.length, 4);
   assert.deepEqual(
     advances.map(event => [event.inputSeat, event.surfaceId, event.phaseInstance]),
     [
       ["authority", "battle:message", 1],
       ["authority", "battle:exp", 2],
       ["renderer", "battle:message", 1],
+      ["renderer", "battle:message", 4],
     ],
   );
 });

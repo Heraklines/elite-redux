@@ -36,6 +36,7 @@ const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
 const AUTHORITY_MOVE_EFFECT = /Start Phase MoveEffectPhase/u;
 const RENDERER_MOVE_REPLAY = /Start Phase CoopMoveAnimReplayPhase/u;
 const RENDERER_MOVE_SKIPPED = /present move .* NO-OP end \(user=.* anims=false\)/u;
+const BATTLE_END_PHASE = /Start Phase BattleEndPhase/u;
 const POST_MYSTERY_PHASE = /Start Phase PostMysteryEncounterPhase/u;
 const BARGAIN_OWNER_TERMINAL = /bargain OWNER terminal: outcome blob sent/u;
 const BARGAIN_WATCHER_TERMINAL = /bargain WATCHER: outcome blob received -> converging/u;
@@ -548,6 +549,50 @@ function currentSharedCommandAddress(clients, purpose) {
 }
 
 /**
+ * Admit the submitted turn's exact prompt address, plus one production post-battle exception.
+ *
+ * BattleEndPhase increments the public turn before its money/cleanup MessagePhase is displayed. That
+ * visible prompt therefore carries turn N+1 even though it is the terminal narration for submitted
+ * turn N (run 29676344808: "You picked up ₽30!"). Requiring the old address strands a real actionable
+ * human prompt. The exception remains fail-closed: same epoch and wave, exactly the next turn, a
+ * MessagePhase prompt, and this browser must have observed BattleEndPhase between the scan floor and
+ * the prompt. Arbitrary future-turn battle messages still cannot authorize input.
+ */
+function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
+  const observation = event.observation;
+  const address = observation.address;
+  const hasLiveBattleAddress =
+    Number.isSafeInteger(address?.epoch)
+    && Number.isSafeInteger(address?.wave)
+    && address.wave > 0
+    && Number.isSafeInteger(address?.turn)
+    && address.turn > 0;
+  if (expectedAddress == null) {
+    return hasLiveBattleAddress;
+  }
+  const observedAddress = `${address?.epoch}:${address?.wave}:${address?.turn}`;
+  if (observedAddress === expectedAddress) {
+    return true;
+  }
+  const expectedParts = expectedAddress.split(":").map(Number);
+  if (
+    !hasLiveBattleAddress
+    || expectedParts.length !== 3
+    || expectedParts.some(part => !Number.isSafeInteger(part))
+    || observation.surfaceId !== "battle:message"
+    || observation.phase !== "MessagePhase"
+    || address.epoch !== expectedParts[0]
+    || address.wave !== expectedParts[1]
+    || address.turn !== expectedParts[2] + 1
+  ) {
+    return false;
+  }
+  return client.evidence.events
+    .slice(scanFloor, event.index + 1)
+    .some(candidate => BATTLE_END_PHASE.test(candidate.text ?? ""));
+}
+
+/**
  * Public-input driver for readiness-proven per-client battle messages.
  *
  * Both ordinary MessagePhase narration (for example, "Wild Yungoos fainted!") and ExpPhase can
@@ -603,17 +648,10 @@ export function createBattlePromptAdvancer(
         }
         const observation = event.observation;
         const expectedPhase = BATTLE_PROMPT_PHASES.get(observation.surfaceId);
-        const observedAddress = `${observation.address?.epoch}:${observation.address?.wave}:${observation.address?.turn}`;
-        const hasLiveBattleAddress =
-          Number.isSafeInteger(observation.address?.epoch)
-          && Number.isSafeInteger(observation.address?.wave)
-          && observation.address.wave > 0
-          && Number.isSafeInteger(observation.address?.turn)
-          && observation.address.turn > 0;
         const instanceKey = instanceKeyFor(client, observation);
         return (
           BATTLE_PROMPT_PHASES.has(observation.surfaceId)
-          && (expectedAddress == null ? hasLiveBattleAddress : observedAddress === expectedAddress)
+          && battlePromptMatchesAddress(client, cursors.get(client.label) ?? 0, event, expectedAddress)
           && (expectedPhase == null || observation.phase === expectedPhase)
           && observation.uiMode === "MESSAGE"
           && observation.ownerModel === "local"
@@ -1959,6 +1997,48 @@ async function driveMysteryPartyPicker(rig, owner, cursors, stats) {
 }
 
 /**
+ * Choose the first option the production Mystery handler reports as selectable.
+ *
+ * Run 29676344808 opened Hot Spring with option zero visibly disabled because the fresh party had
+ * no berries. A blind Space was swallowed while both browsers correctly waited for the guest owner.
+ * The observer exposes only ordinal option identity plus the handler's computed availability; every
+ * state change here is still a real, verified keyboard action against the public UI.
+ */
+export async function driveMysteryEncounterChoice(rig, owner, cursors) {
+  const fromCursor = cursors[owner.label] ?? 0;
+  const choice = await owner.evidence.waitForCondition(
+    sink => {
+      const event = sink.findLastSemanticSurface(fromCursor, "mystery-encounter");
+      const observation = event?.observation;
+      const targetId = observation?.optionIds?.find(id => /^mystery-option:\d+:enabled$/u.test(id));
+      return event != null
+        && targetId != null
+        && observation.ownerSeat === owner.publicSeat
+        && observation.localSeat === owner.publicSeat
+        && observation.seatsWithInput?.includes(owner.publicSeat)
+        && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
+        ? { event, targetId }
+        : null;
+    },
+    {
+      timeoutMs: rig.config.timeoutMs,
+      description: `${owner.label} actionable enabled Mystery option`,
+    },
+  );
+  await selectOptionById(owner, {
+    surfaceId: "mystery-encounter",
+    targetId: choice.targetId,
+    navKeys: ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"],
+    fromCursor,
+    timeoutMs: rig.config.timeoutMs,
+  });
+  owner.evidence.record("campaign-mystery-option-proof", {
+    targetId: choice.targetId,
+    surfaceEventIndex: choice.event.index,
+  });
+}
+
+/**
  * A leave action is two separate public surfaces, not a timing-based key macro. Open
  * the confirmation, prove that exact addressed handler is actionable, and only then
  * submit the remaining key(s). This is load-bearing on throttled remote Chromium.
@@ -2075,6 +2155,8 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       stats.market = await driveTargetedMarket(rig, cursors, driver.market);
     } else if (driver.name === "reward-target" && mechanicalBoundary != null) {
       await driveRewardPartyTarget(rig, driver, client, mechanicalBoundary);
+    } else if (driver.name === "mystery-encounter") {
+      await driveMysteryEncounterChoice(rig, client, cursors);
     } else if (driver.mysteryParty) {
       await driveMysteryPartyPicker(rig, client, cursors, stats);
     } else if (driver.confirmSurfaceId && mechanicalBoundary != null) {

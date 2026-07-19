@@ -7,7 +7,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
-import { assertAsymmetricMysteryPromptProjection, createMysteryNarrationAdvancer } from "./campaign.mjs";
+import {
+  assertAsymmetricMysteryPromptProjection,
+  createMysteryNarrationAdvancer,
+  driveMysteryEncounterChoice,
+} from "./campaign.mjs";
 import { chooseAffordableStarterPair, selectOptionById } from "./campaign-nav.mjs";
 import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
 import {
@@ -105,9 +109,66 @@ test("workflow builds the staging-only fifth difficulty and fans a fixed ten-wav
   assert.match(workflow, /COOP_UI_REQUIRE_MYSTERY_GAUNTLET: \$\{\{ matrix\.require_mystery \}\}/u);
 });
 
+test("Mystery choice navigation skips a production-disabled default through verified public keys", async () => {
+  const events = [
+    {
+      index: 0,
+      observation: {
+        surfaceId: "mystery-encounter",
+        ownerSeat: 1,
+        localSeat: 1,
+        seatsWithInput: [1],
+        selectedOptionId: "mystery-option:0:disabled",
+        optionIds: ["mystery-option:0:disabled", "mystery-option:1:enabled", "mystery-action:view-party"],
+        ready: { handlerActive: true, inputBlocked: false },
+      },
+    },
+  ];
+  const presses = [];
+  const records = [];
+  const evidence = {
+    events,
+    findLastSemanticSurface(fromCursor, surfaceId) {
+      return events.findLast(event => event.index >= fromCursor && event.observation.surfaceId === surfaceId) ?? null;
+    },
+    async waitForCondition(predicate) {
+      const value = predicate(this);
+      assert.ok(value != null, "the enabled owner option must already be actionable");
+      return value;
+    },
+    record(kind, payload) {
+      records.push({ kind, payload });
+    },
+  };
+  const owner = {
+    label: "guest-seat",
+    publicSeat: 1,
+    evidence,
+    async press(key) {
+      presses.push(key);
+      if (key === "ArrowRight") {
+        events.push({
+          index: events.length,
+          observation: {
+            ...events[0].observation,
+            selectedOptionId: "mystery-option:1:enabled",
+          },
+        });
+      }
+    },
+  };
+
+  await driveMysteryEncounterChoice({ config: { timeoutMs: 500 } }, owner, { "guest-seat": 0 });
+
+  assert.deepEqual(presses, ["ArrowRight", "Space"]);
+  assert.equal(records.at(-1)?.kind, "campaign-mystery-option-proof");
+  assert.equal(records.at(-1)?.payload.targetId, "mystery-option:1:enabled");
+});
+
 test("campaign requires paired runConfig, the exact semantic schedule, and retained terminals", async () => {
   const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");
   const campaign = await readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8");
+  const observer = await readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8");
   assert.match(harness, /targetId: this\.config\.difficultyOptionId/u);
   assert.match(harness, /guest received difficulty=\$\{this\.config\.difficultyId\}/u);
   assert.match(harness, /difficulty-\$\{this\.config\.difficultyId\}-attested/u);
@@ -178,6 +239,9 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /consumedInstances\.add\(`\$\{client\.label\}:\$\{surfaceId\}:\$\{phaseInstance\}`\)/u);
   assert.match(campaign, /const advanceMysteryNarration = createMysteryNarrationAdvancer\(/u);
   assert.match(campaign, /if \(await advanceMysteryNarration\(\)\) \{/u);
+  assert.match(observer, /uiMode === "MYSTERY_ENCOUNTER"/u);
+  assert.match(observer, /mystery-option:\$\{index\}:\$\{disabled \? "disabled" : "enabled"\}/u);
+  assert.match(campaign, /await driveMysteryEncounterChoice\(rig, client, cursors\)/u);
 
   // Track R cycle-11 mystery lane (run 29654429335): a guest-owned PART_TIMER opened a PARTY
   // sub-prompt (surfaceId "party", ownerModel "local", ownerSeat null) with no driver; the owner
