@@ -34,6 +34,7 @@ import {
 import { computeTurnCommitDigest } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
 import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
+import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import {
   type CoopSchedulerClock,
   type CoopTimerHandle,
@@ -299,6 +300,59 @@ describe("authority-v2 shadow harness", () => {
       membershipRevision: 2,
       connectionGeneration: 1,
     });
+
+    host.dispose();
+    guest.dispose();
+  });
+
+  it("routes correlated recovery through live-only snapshot and control seams", async () => {
+    const clock = new FakeClock();
+    const applyMaterial = vi.fn(async () => true);
+    const projectControl = vi.fn((_ctx, control) => ({
+      kind: "installed" as const,
+      controlId: controlIdOf(control),
+    }));
+    const terminal = vi.fn();
+    let host!: CoopAuthorityV2Shadow;
+    let guest!: CoopAuthorityV2Shadow;
+    const deliver = (target: () => CoopAuthorityV2Shadow) => (frame: CoopFrameV2) =>
+      routeCoopV2InboundFrameInto(target(), encodeFrameV2(frame));
+    host = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => deliver(() => guest)(frame),
+      scheduler: createCoopScheduler(clock),
+      liveRecovery: {
+        captureMaterial: () => ({ digest: "full-snapshot", payload: { wave: 5, hp: [100, 100] } }),
+        applyMaterial,
+        projectControl,
+        onTerminal: terminal,
+      },
+    });
+    guest = new CoopAuthorityV2Shadow({
+      identity: identity(1),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => deliver(() => host)(frame),
+      scheduler: createCoopScheduler(clock),
+      liveRecovery: {
+        captureMaterial: () => null,
+        applyMaterial,
+        projectControl,
+        onTerminal: terminal,
+      },
+    });
+    host.tapTurnCommit(turnTap("TURN/recovery-live-seam"));
+
+    const recovery = guest.recover("checksum-mismatch");
+    expect(recovery).not.toBeNull();
+    await expect(recovery).resolves.toBe("recovered");
+    expect(applyMaterial).toHaveBeenCalledTimes(1);
+    expect(projectControl).toHaveBeenCalledTimes(1);
+    expect(terminal).not.toHaveBeenCalled();
+    expect(guest.recoveryFencePredicates()?.isProgressionFrozen()).toBe(false);
+    expect(host.diagnostics().recovery?.activeAuthorityResponses).toBe(0);
 
     host.dispose();
     guest.dispose();

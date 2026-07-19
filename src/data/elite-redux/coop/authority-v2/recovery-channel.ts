@@ -109,6 +109,14 @@ export interface CoopRecoveryChannelV2Diagnostics {
   readonly disposed: boolean;
 }
 
+/** Read-only freeze predicates wired at the four real progression chokepoints. */
+export interface CoopRecoveryFencePredicatesV2 {
+  readonly isCommandAdmissionFrozen: () => boolean;
+  readonly isProgressionFrozen: () => boolean;
+  readonly isMaterializationFrozen: () => boolean;
+  readonly isAuthorityWaitCreationFrozen: () => boolean;
+}
+
 function requestEquals(left: CoopRecoveryRequestV2, right: CoopRecoveryRequestV2): boolean {
   return (
     left.requestId === right.requestId
@@ -311,6 +319,15 @@ export class CoopRecoveryChannelV2 {
       activeAuthorityResponses: this.authorityResponses.size,
       completedReplicaProofs: this.completedReplica.size,
       disposed: this.disposed,
+    };
+  }
+
+  fencePredicates(): CoopRecoveryFencePredicatesV2 {
+    return {
+      isCommandAdmissionFrozen: () => this.fence.isCommandAdmissionFrozen(),
+      isProgressionFrozen: () => this.fence.isProgressionFrozen(),
+      isMaterializationFrozen: () => this.fence.isMaterializationFrozen(),
+      isAuthorityWaitCreationFrozen: () => this.fence.isAuthorityWaitCreationFrozen(),
     };
   }
 

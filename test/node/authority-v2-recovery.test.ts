@@ -356,7 +356,12 @@ describe("authority-v2 recovery transaction", () => {
   });
 
   it("skips control-installed and ACKs materialApplied when nextControl is null", async () => {
-    const h = makeHarness(async () => makeBundle({ nextControl: null }));
+    const h = makeHarness(async () =>
+      makeBundle({
+        nextControl: null,
+        requiredTail: [entry(11), entry(12)],
+      }),
+    );
     const txn = createRecoveryTransaction(h.ctx, h.deps);
 
     expect(await txn.run()).toBe("recovered");

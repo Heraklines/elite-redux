@@ -99,6 +99,7 @@ import {
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import { AuthorityLog, type CoopAuthorityWire } from "#data/elite-redux/coop/authority-v2/authority-log";
 import type {
+  CoopAuthoritativeMaterial,
   CoopAuthorityEntry,
   CoopAuthorityPeerBindingV2,
   CoopAuthorityReceipt,
@@ -124,6 +125,11 @@ import {
   type CoopInboundFrameResultV2,
   validateInboundFrame,
 } from "#data/elite-redux/coop/authority-v2/protocol-validator";
+import {
+  CoopRecoveryChannelV2,
+  type CoopRecoveryChannelV2Diagnostics,
+  type CoopRecoveryFencePredicatesV2,
+} from "#data/elite-redux/coop/authority-v2/recovery-channel";
 import {
   type ApplyMaterialFn,
   type ApplyMaterialResult,
@@ -226,6 +232,22 @@ export interface CoopV2LiveReplicaSeams {
   projectControl(ctx: CoopRuntimeContext, control: NonNullable<CoopNextControl>): CoopControlInstallResult | null;
 }
 
+/**
+ * Complete live recovery verbs. These are separate from entry cutover seams so
+ * a recovery can never fall through to shadow bookkeeping and manufacture
+ * mechanical proof for an engine state it did not install.
+ */
+export interface CoopV2LiveRecoverySeams {
+  /** Authority: return null until the engine is at a complete capture boundary. */
+  captureMaterial(ctx: CoopRuntimeContext): CoopAuthoritativeMaterial | null;
+  /** Replica: transactionally apply + checksum-verify the complete material image. */
+  applyMaterial(ctx: CoopRuntimeContext, material: CoopAuthoritativeMaterial): boolean | Promise<boolean>;
+  /** Replica: prove the host-stated successor on the real engine, never in the shadow ledger. */
+  projectControl(ctx: CoopRuntimeContext, control: NonNullable<CoopNextControl>): CoopControlInstallResult;
+  /** Enter the retained shared terminal synchronously on any recovery invariant failure. */
+  onTerminal(reason: string): void;
+}
+
 /** Everything the harness needs beyond its own foundation objects, all injected. */
 export interface CoopV2ShadowDeps {
   readonly identity: CoopV2ShadowIdentity;
@@ -243,6 +265,8 @@ export interface CoopV2ShadowDeps {
    * pure shadow. An owned entry/control cannot silently fall through when its live verb returns null.
    */
   readonly liveReplica?: CoopV2LiveReplicaSeams;
+  /** Optional complete live recovery seam. Absent means recovery frames are unsupported and never shadow-applied. */
+  readonly liveRecovery?: CoopV2LiveRecoverySeams;
   /**
    * Authoritative-cutover protocol violations must enter the runtime's retained shared terminal. Omitted
    * by pure-shadow/node harnesses, where violations remain evidence-only and cannot affect legacy mechanics.
@@ -362,6 +386,7 @@ export interface CoopV2ShadowDiagnostics {
   readonly controlLedgerSize: number;
   readonly shadowStateSize: number;
   readonly disposed: boolean;
+  readonly recovery: CoopRecoveryChannelV2Diagnostics | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -461,13 +486,16 @@ interface ShadowStateRecord {
 export class CoopAuthorityV2Shadow {
   private readonly ctxHandle: CoopRuntimeContextHandle;
   private readonly ctx: CoopRuntimeContext;
+  private runtimeContext: CoopRuntimeContext;
   private frameContext: CoopFrameContextV2;
+  private peerBindings: readonly CoopAuthorityPeerBindingV2[];
   private readonly scheduler: CoopSchedulerImpl;
   private readonly ownsScheduler: boolean;
   private readonly log: AuthorityLog;
   private readonly lifecycle: CoopLifecycle;
   private readonly ledger = new CoopShadowControlLedger();
   private readonly projector: CoopControlProjector;
+  private readonly recoveryChannel: CoopRecoveryChannelV2 | null;
   private readonly replicaDeps: ReplicaApplyDeps;
   private readonly sendFrame: (frame: CoopFrameV2) => void;
   /** Live replica seams (cutover surface 1); null in pure shadow mode. Consulted FIRST by the applier/projector. */
@@ -513,6 +541,8 @@ export class CoopAuthorityV2Shadow {
       scheduler: this.scheduler,
     });
     this.ctx = this.ctxHandle.context;
+    this.runtimeContext = this.ctx;
+    this.peerBindings = id.peerBindings;
 
     const connection: CoopFrameConnectionBindingV2 = {
       seatMapId: id.seatMapId,
@@ -534,6 +564,21 @@ export class CoopAuthorityV2Shadow {
     this.liveReplica = deps.liveReplica ?? null;
     this.onProtocolViolation = deps.onProtocolViolation;
     this.projector = new CoopShadowControlProjector(this.ledger, this.liveReplica);
+    const liveRecovery = deps.liveRecovery;
+    this.recoveryChannel =
+      liveRecovery == null
+        ? null
+        : new CoopRecoveryChannelV2({
+            frame: () => this.frameContext,
+            peerBindings: () => this.peerBindings,
+            context: () => this.runtimeContext,
+            log: this.log,
+            projector: { project: (ctx, control) => liveRecovery.projectControl(ctx, control) },
+            send: frame => this.sendFrame(frame),
+            captureMaterial: ctx => liveRecovery.captureMaterial(ctx),
+            applyMaterial: (ctx, material) => liveRecovery.applyMaterial(ctx, material),
+            onTerminal: reason => liveRecovery.onTerminal(reason),
+          });
     const harness = this;
     this.replicaDeps = {
       applyMaterial: (ctx, entry) => this.applyMaterialRouted(ctx, entry),
@@ -971,7 +1016,7 @@ export class CoopAuthorityV2Shadow {
                 : result.kind === "duplicate-complete"
                   ? "controlInstalled"
                   : "admitted";
-            const outcome = applyEntry(this.ctx, entry, this.replicaDeps, resume);
+            const outcome = applyEntry(this.runtimeContext, entry, this.replicaDeps, resume);
             this.logReplicaApply(entry, resume, outcome);
             if (outcome.kind === "materialRejected" || outcome.kind === "controlRejected") {
               this.reportOwnedReplicaViolation(entry, `${outcome.kind}.${outcome.reason}`);
@@ -1009,9 +1054,19 @@ export class CoopAuthorityV2Shadow {
           this.redeliverTail(frame.body.fromRevision);
           break;
         }
+        case "recoveryRequest":
+        case "recoveryBundle":
+        case "recoveryApplied": {
+          if (this.recoveryChannel == null) {
+            this.reportUnsupportedRecoveryFrame(frame.t);
+            break;
+          }
+          this.recoveryChannel.handleFrame(frame);
+          break;
+        }
         default:
-          // recoveryRequest / recoveryBundle / terminal frames are not part of the shadow exercise
-          // (shadow never drives recovery or a classified terminal); log + ignore.
+          // The shared-terminal supervisor owns terminal frames. The shadow
+          // harness never interprets a second terminal protocol.
           coopLog("v2-shadow", `inbound ignored frameType=${frame.t}`);
       }
     } catch (error) {
@@ -1023,14 +1078,12 @@ export class CoopAuthorityV2Shadow {
   // Cutover stubs (deliverable 5) - shadow-inert, wired for the authoritative flip.
   // -------------------------------------------------------------------------
 
-  /**
-   * Register recovery-fence predicates. Shadow-inert no-op: in shadow mode the
-   * fence never gates any real progression (legacy owns recovery). The cutover
-   * wires these onto the recovery transaction's fence acquisition.
-   */
-  registerFencePredicates(..._predicates: unknown[]): void {
-    // TODO(cutover): install these onto the CoopRecoveryTransaction fence so authoritative
-    // recovery freezes command admission / control progression while a bundle is in flight.
+  recoveryFencePredicates(): CoopRecoveryFencePredicatesV2 | null {
+    return this.recoveryChannel?.fencePredicates() ?? null;
+  }
+
+  recover(reason: string): Promise<"recovered" | "terminalized"> | null {
+    return this.recoveryChannel?.recover(reason) ?? null;
   }
 
   /** The installed-control ledger (deliverable 5) - the shadow projector's record of controlInstalled. */
@@ -1066,16 +1119,27 @@ export class CoopAuthorityV2Shadow {
       connectionGeneration: identity.connectionGeneration,
     });
     const prior = this.frameContext;
+    const priorRuntimeContext = this.runtimeContext;
+    const priorPeerBindings = this.peerBindings;
+    const nextRuntimeContext = Object.freeze({
+      ...this.ctx,
+      membershipRevision: identity.membershipRevision,
+    });
     // AuthorityLog may synchronously redeliver on loopback. Publish the receiving context first so a receipt
     // that re-enters before rebindConnection returns is checked and signed against the replacement channel.
     this.frameContext = Object.freeze({ ...next });
+    this.runtimeContext = nextRuntimeContext;
+    this.peerBindings = identity.peerBindings;
     let redelivered: number;
     try {
       redelivered = this.log.rebindConnection(next, identity.peerBindings);
     } catch (error) {
       this.frameContext = prior;
+      this.runtimeContext = priorRuntimeContext;
+      this.peerBindings = priorPeerBindings;
       throw error;
     }
+    this.recoveryChannel?.rebind();
     if (redelivered > 0) {
       coopLog(
         "v2-recovery",
@@ -1104,6 +1168,11 @@ export class CoopAuthorityV2Shadow {
       this.fault("dispose(transportV2Unsub)", error);
     }
     this.transportV2Unsub = null;
+    try {
+      this.recoveryChannel?.dispose(reason);
+    } catch (error) {
+      this.fault("dispose(recoveryChannel)", error);
+    }
     try {
       this.log.dispose(reason);
     } catch (error) {
@@ -1135,6 +1204,7 @@ export class CoopAuthorityV2Shadow {
       controlLedgerSize: this.ledger.size,
       shadowStateSize: this.shadowState.size,
       disposed: this.disposed,
+      recovery: this.recoveryChannel?.diagnostics() ?? null,
     };
   }
 
@@ -1198,6 +1268,17 @@ export class CoopAuthorityV2Shadow {
     );
   }
 
+  private reportUnsupportedRecoveryFrame(frameType: CoopFrameV2["t"]): void {
+    reportProtocolViolation(
+      {
+        kind: "protocol-violation",
+        frameType,
+        issues: ["recovery.receiver-not-installed"],
+      },
+      this.onProtocolViolation,
+    );
+  }
+
   /**
    * Best-effort causal predecessor release for a validated gap entry. This intentionally has no shadow
    * fallback: pure shadow has no real modal to release, while a live owned entry must pass its exact
@@ -1209,7 +1290,7 @@ export class CoopAuthorityV2Shadow {
       return;
     }
     try {
-      const released = this.liveReplica.releaseBlockedPredecessor(this.ctx, entry);
+      const released = this.liveReplica.releaseBlockedPredecessor(this.runtimeContext, entry);
       coopLog(
         "v2-replica",
         `gap-release rev=${entry.revision} kind=${entry.kind} result=${released == null ? "unowned" : released}`,
