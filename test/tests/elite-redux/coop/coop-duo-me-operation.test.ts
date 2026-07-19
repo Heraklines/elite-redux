@@ -725,42 +725,46 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     // continuation proofs. Merely making CommandPhase current is not player-observable and cannot retire
     // retained authority; the old fixture asserted zero pending immediately before this call chain.
     // Each client must start its OWN slot. The guest's preceding host-owned slot is a renderer-only
-    // generated skip and driveClientPhaseQueueTo has already advanced past it. Starting those two owned
-    // phases in either order is production-reachable; start the guest first so its real arrival is queued
-    // before the host opens slot 0, matching the canonical soak driver. The former fixture stopped at
-    // slot 0 on BOTH clients, so the guest correctly auto-resolved the host's slot without arriving and
-    // the host waited forever for an owned-slot boundary the test had never started.
-    await withClient(rig.guestCtx, async () => {
-      guestCommand.start();
-      await drainLoopback();
-    });
-    await withClient(rig.hostCtx, async () => {
-      hostCommand.start();
-      await drainLoopback();
-    });
-    // Starting either realm first necessarily parks it at the reciprocal rendezvous.
-    // A fixed one-sided drain loop is not representative of two event loops and races
-    // the guest's enemy-atlas/material apply. Alternate both complete contexts until
-    // both real phase starts expose COMMAND, bounded like the production barrier.
-    const commandSurfacesOpened = (async () => {
-      const deadline = Date.now() + 5_000;
-      while (
-        (rig.hostScene.ui.getMode() !== UiMode.COMMAND || rig.guestScene.ui.getMode() !== UiMode.COMMAND)
-        && Date.now() < deadline
-      ) {
-        await new Promise<void>(resolve => setTimeout(resolve, 10));
-      }
-      if (rig.hostScene.ui.getMode() !== UiMode.COMMAND || rig.guestScene.ui.getMode() !== UiMode.COMMAND) {
-        throw new Error(
-          `post-ME command surfaces did not open: host=${UiMode[rig.hostScene.ui.getMode()]}, `
-            + `guest=${UiMode[rig.guestScene.ui.getMode()]}`,
-        );
-      }
-    })();
-    await settleDuoPromise(rig, commandSurfacesOpened, "post-ME reciprocal command surfaces", {
-      timeoutMs: 5_000,
-      intervalMs: 5,
-    });
+    // generated skip and driveClientPhaseQueueTo has already advanced past it. Queue every rendezvous
+    // frame for its destination ClientCtx during this crossing: ordinary loopback can otherwise resolve
+    // the guest's promise while the HOST's process-global scene is installed, a one-process-only failure
+    // that cannot occur in two browsers. This is the same destination scheduler used by the canonical
+    // production-fidelity driver.
+    rig.pair.setDestinationContextDelivery?.(true);
+    try {
+      await withClient(rig.guestCtx, async () => {
+        guestCommand.start();
+        await drainLoopback();
+      });
+      await withClient(rig.hostCtx, async () => {
+        hostCommand.start();
+        await drainLoopback();
+      });
+      // Starting either realm first necessarily parks it at the reciprocal rendezvous.
+      // A fixed one-sided drain loop is not representative of two event loops. Alternate both complete
+      // destination contexts until both real phase starts expose COMMAND, bounded like production.
+      const commandSurfacesOpened = (async () => {
+        const deadline = Date.now() + 5_000;
+        while (
+          (rig.hostScene.ui.getMode() !== UiMode.COMMAND || rig.guestScene.ui.getMode() !== UiMode.COMMAND)
+          && Date.now() < deadline
+        ) {
+          await new Promise<void>(resolve => setTimeout(resolve, 10));
+        }
+        if (rig.hostScene.ui.getMode() !== UiMode.COMMAND || rig.guestScene.ui.getMode() !== UiMode.COMMAND) {
+          throw new Error(
+            `post-ME command surfaces did not open: host=${UiMode[rig.hostScene.ui.getMode()]}, `
+              + `guest=${UiMode[rig.guestScene.ui.getMode()]}`,
+          );
+        }
+      })();
+      await settleDuoPromise(rig, commandSurfacesOpened, "post-ME reciprocal command surfaces", {
+        timeoutMs: 5_000,
+        intervalMs: 5,
+      });
+    } finally {
+      rig.pair.setDestinationContextDelivery?.(false);
+    }
     expect(rig.hostScene.ui.getMode(), "host exposed the next public command continuation").toBe(UiMode.COMMAND);
     expect(rig.guestScene.ui.getMode(), "guest exposed the next public command continuation").toBe(UiMode.COMMAND);
 
