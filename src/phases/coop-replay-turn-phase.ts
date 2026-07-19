@@ -373,16 +373,21 @@ export class CoopReplayTurnPhase extends Phase {
               ? globalScene.getPlayerField().findIndex(m => m?.isActive() === true)
               : coopLocalOwnedPlayerFieldSlot();
             const ownMon = ownSlot < 0 ? undefined : globalScene.getPlayerField()[ownSlot];
-            const hasLivingLocalMon = globalScene.getPlayerParty().some(mon => {
-              if (mon == null || mon.isFainted()) {
-                return false;
-              }
-              const numericSeat = (mon as { coopOwnerSeatId?: number }).coopOwnerSeatId;
-              return Number.isSafeInteger(numericSeat)
-                ? numericSeat === controller?.localSeatId
-                : (mon as { coopOwner?: string }).coopOwner === controller?.role;
-            });
             const hasLocalCommandSlot = ownSlot >= 0 && ownMon?.isActive() === true;
+            // The live active slot is already conclusive ownership/liveness evidence. Consult the full
+            // party only when no local actor is on the field, both avoiding unnecessary reconstruction
+            // dependencies and distinguishing a legitimately wiped seat from a missed replacement.
+            const hasLivingLocalMon =
+              hasLocalCommandSlot
+              || globalScene.getPlayerParty().some(mon => {
+                if (mon == null || mon.isFainted()) {
+                  return false;
+                }
+                const numericSeat = (mon as { coopOwnerSeatId?: number }).coopOwnerSeatId;
+                return Number.isSafeInteger(numericSeat)
+                  ? numericSeat === controller?.localSeatId
+                  : (mon as { coopOwner?: string }).coopOwner === controller?.role;
+              });
             if (!hasLocalCommandSlot && hasLivingLocalMon) {
               this.failAuthority(
                 streamer,
