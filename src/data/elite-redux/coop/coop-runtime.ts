@@ -3946,6 +3946,15 @@ export function commitCoopV2ReplacementAuthority(
     })
     .filter((command): command is { ownerSeatId: number; pokemonId: number; fieldIndex: number } => command != null);
   if (commands.length !== commandSeats.length) {
+    const unmapped = commandSeats
+      .filter(seat => !Number.isSafeInteger(seat.ownerSeatId) && seat.owner !== "host" && seat.owner !== "guest")
+      .map(seat => `${seat.side}:bi${seat.bi}:pokemon${seat.pokemonId}`)
+      .join(",");
+    coopWarn(
+      "v2-replacement",
+      `host refused replacement COMMAND frontier: ${commandSeats.length - commands.length} seat(s) lack stable ownership`
+        + ` [${unmapped || "unknown"}]`,
+    );
     return { kind: "failed-clean" };
   }
   return cutover.commitStagedHostReplacements({ authorityCarrier, commands });

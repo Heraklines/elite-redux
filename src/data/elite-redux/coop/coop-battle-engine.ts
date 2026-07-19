@@ -54,6 +54,7 @@ import {
   getActuallyFieldedCoopPokemon,
   settleCoopFieldPresentation,
 } from "#data/elite-redux/coop/coop-field-presentation";
+import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopAuthoritativeFieldSeat,
@@ -2670,12 +2671,21 @@ function readAuthoritativeSeat(mon: Pokemon): CoopAuthoritativeFieldSeat {
   const side = mon.isPlayer() ? "player" : "enemy";
   const boss = readBossState(mon);
   const coopIdentity = mon as { coopOwner?: CoopRole; coopOwnerSeatId?: number };
+  // The live command router has always treated an untagged classic-co-op field occupant through the
+  // launch slot map (field 0 = host, field 1 = guest). The authoritative carrier must serialize that
+  // SAME resolved ownership. Serializing only a raw bench mon tag made a perfectly valid replacement
+  // commandable in the engine but ownerless in Authority V2 after it was summoned, so a double faint
+  // failed closed before the replacement entries could commit. Showdown has no merged co-op field and
+  // deliberately receives no fallback here; its two human sides need their dedicated seat mapper.
+  const resolvedOwner =
+    coopIdentity.coopOwner
+    ?? (side === "player" && globalScene.gameMode.isCoop ? coopOwnerOfFieldIndex(mon.getFieldIndex()) : undefined);
   const ownerSeatId =
     Number.isSafeInteger(coopIdentity.coopOwnerSeatId) && (coopIdentity.coopOwnerSeatId as number) >= 0
       ? coopIdentity.coopOwnerSeatId
-      : coopIdentity.coopOwner === "host"
+      : resolvedOwner === "host"
         ? 0
-        : coopIdentity.coopOwner === "guest"
+        : resolvedOwner === "guest"
           ? 1
           : undefined;
   return {
@@ -2685,7 +2695,7 @@ function readAuthoritativeSeat(mon: Pokemon): CoopAuthoritativeFieldSeat {
     pokemonId: mon.id,
     presented: mon.isOnField(),
     ...(ownerSeatId === undefined ? {} : { ownerSeatId }),
-    ...(coopIdentity.coopOwner === undefined ? {} : { owner: coopIdentity.coopOwner }),
+    ...(resolvedOwner === undefined ? {} : { owner: resolvedOwner }),
     ...(side === "enemy" ? { bossSegmentIndex: boss.bossSegmentIndex } : {}),
   };
 }

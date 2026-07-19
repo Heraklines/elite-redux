@@ -67,9 +67,11 @@ import {
   type CoopResyncProbe,
   type DuoRig,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
+  materializeGuestInputAfterReplacement,
   pumpDuoDestinations,
   setCoopHarnessLiveEvents,
   withClient,
@@ -80,6 +82,7 @@ import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+const V2_REPLACEMENT_CUTOVER = process.env.COOP_AUTHORITY_V2_REPLACEMENT === "on";
 
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
@@ -214,16 +217,25 @@ describe.skipIf(!RUN)(
       expect(hostOrderAfter[0], "host swapped FENNEKIN into the front (field) slot").toBe(SpeciesId.FENNEKIN);
       expect(hostOrderAfter[2], "host moved the fainted CHIKORITA to the vacated bench slot").toBe(SpeciesId.CHIKORITA);
 
-      // GUEST consumes the out-of-band replacement checkpoint: materializes FENNEKIN + mirrors the SAME array
-      // swap. PRE-FIX no replacement checkpoint is pushed for a host-owned faint (envelope is null) and the
-      // guest keeps the STALE transposed order.
+      // GUEST consumes the authoritative replacement transaction: Authority V2 admits its retained
+      // REPLACEMENT_COMMIT through the live replay/finalize seam; a legacy-only build consumes the
+      // compatibility checkpoint directly. Both paths must materialize FENNEKIN and the SAME array swap.
       await withClient(rig.guestCtx, async () => {
-        const envelope = rig.guestRuntime.battleStream.consumeCheckpoint();
-        expect(envelope?.reason, "the host pushed the replacement checkpoint for its OWN faint (SOURCE fix)").toBe(
-          "replacement",
-        );
-        if (envelope != null) {
-          applyCoopCheckpoint(envelope.checkpoint);
+        if (V2_REPLACEMENT_CUTOVER) {
+          await driveClientPhaseQueueTo(rig.guestScene, "host-owned replacement CoopFinalizeTurnPhase", {
+            matches: phase => phase.phaseName === "CoopFinalizeTurnPhase",
+            perPhaseTimeoutMs: 5_000,
+            pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+          });
+          await materializeGuestInputAfterReplacement(rig.guestScene);
+        } else {
+          const envelope = rig.guestRuntime.battleStream.consumeCheckpoint();
+          expect(envelope?.reason, "the host pushed the replacement checkpoint for its OWN faint (SOURCE fix)").toBe(
+            "replacement",
+          );
+          if (envelope != null) {
+            applyCoopCheckpoint(envelope.checkpoint);
+          }
         }
       });
 

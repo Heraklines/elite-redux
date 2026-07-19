@@ -64,6 +64,7 @@ import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+const V2_REPLACEMENT_CUTOVER = process.env.COOP_AUTHORITY_V2_REPLACEMENT === "on";
 
 /** The guest picks party slot 3 (CHARIZARD) as its own faint replacement (a guest-owned bench mon). */
 const GUEST_PICK_SLOT = 3;
@@ -181,7 +182,7 @@ describe.skipIf(!RUN)(
       // guest's turn-2 CoopReplayTurnPhase reaches its `awaitTurn(2)` PARK (arming the requestTurnCommit retry
       // loop) BEFORE the host's retained re-send delivers the checkpoint. Production hits this naturally -
       // the guest reaches its next-turn await before the auto-summon checkpoint arrives.
-      pair.armNextDrop("battleCheckpoint", "host");
+      pair.armNextDrop(V2_REPLACEMENT_CUTOVER ? "authorityEntry" : "battleCheckpoint", "host");
 
       // HOST: summon the guest's pick and push the out-of-band replacement checkpoint. Settle the
       // material ACK under both destination contexts (two independent browser event loops).
@@ -212,7 +213,10 @@ describe.skipIf(!RUN)(
         });
       });
 
-      expect(pair.faultsInjected(), "the mid-park checkpoint delivery was actually delayed").toBe(1);
+      expect(
+        pair.faultsInjected(),
+        `the mid-park ${V2_REPLACEMENT_CUTOVER ? "V2 replacement entry" : "legacy checkpoint"} delivery was actually delayed`,
+      ).toBe(1);
 
       // RED (pre-fix) -> GREEN (post-fix): at the replay->command PIVOT the guest was passively awaiting the
       // host's turn-2 resolution (`awaitTurn(2)` armed `requestTurnCommit(2)` + its retry timer). Now that the

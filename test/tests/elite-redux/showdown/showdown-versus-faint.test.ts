@@ -38,6 +38,7 @@ import {
 import {
   type CoopRuntime,
   clearCoopRuntime,
+  getCoopV2Shadow,
   isCoopSharedTerminalFrozen,
   setCoopRuntime,
   wireCoopStallWatchdog,
@@ -82,6 +83,7 @@ import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+const V2_REPLACEMENT_CUTOVER = process.env.COOP_AUTHORITY_V2_REPLACEMENT === "on";
 
 /** The guest's OWN team: a frail MAGIKARP lead + two distinct benches (LAPRAS, GYARADOS). */
 const GUEST_LEAD = SpeciesId.MAGIKARP;
@@ -537,8 +539,8 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
     logs.flush();
   }, 300_000);
 
-  it("(c) the guest never materializes its picker: timeout retains fallback but host stays parked", async () => {
-    // Short host wait so the retained concrete fallback reaches its peer-material barrier quickly.
+  it("(c) the guest never materializes its picker: replacement remains unacknowledged without false convergence", async () => {
+    // Short host wait so the concrete fallback reaches its negotiated authority quickly.
     setCoopFaintSwitchWaitMs(100);
     await startHostShowdown(guestTeam(), [MoveId.THUNDERBOLT, MoveId.TACKLE, MoveId.THUNDER_WAVE, MoveId.QUICK_ATTACK]);
     const pair = createLoopbackPair();
@@ -550,6 +552,7 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       throw new Error("missing authoritative Showdown durability barrier");
     }
     const materialBarrier = vi.spyOn(hostDurability, "waitForOperationMaterialApplied");
+    const unshiftSpy = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew");
 
     rig.hostScene.getEnemyField()[0].hp = 1;
 
@@ -560,47 +563,80 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
     expect(rig.hostScene.getEnemyField()[0]?.isFainted() ?? true, "the guest's lead fainted on the host").toBe(true);
+    const hostCommittedBefore = getCoopV2Shadow(rig.hostRuntime)?.diagnostics().committed ?? 0;
+    const guestAppliedBefore = getCoopV2Shadow(rig.guestRuntime)?.diagnostics().applied ?? 0;
 
-    // Stop on the authoritative replacement phase, start its real bounded await, and wait until production
-    // has retained the concrete fallback and installed the durability barrier. We intentionally do not
-    // drive to CommandPhase: doing so would recreate the old test's one-sided-success assumption.
+    // Stop on the authoritative replacement phase and start its real bounded await.
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("ShowdownEnemyFaintSwitchPhase", false);
       rig.hostScene.phaseManager.getCurrentPhase().start();
-      await vi.waitFor(() => expect(materialBarrier).toHaveBeenCalledTimes(1), { timeout: 2_000 });
+      if (V2_REPLACEMENT_CUTOVER) {
+        await vi.waitUntil(
+          () =>
+            unshiftSpy.mock.calls.some(([name]) => name === "SwitchSummonPhase")
+            && unshiftSpy.mock.calls.some(([name]) => name === "CoopPushReplacementCheckpointPhase"),
+          { timeout: 2_000, interval: 10 },
+        );
+      } else {
+        await vi.waitFor(() => expect(materialBarrier).toHaveBeenCalledTimes(1), { timeout: 2_000 });
+      }
     });
 
-    expect(
-      rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
-      "the host remains on the old-address replacement phase until the peer materially closes its picker",
-    ).toBe("ShowdownEnemyFaintSwitchPhase");
-    expect(
-      rig.hostScene.getEnemyField()[0]?.isFainted() ?? true,
-      "the concrete fallback is retained but not summoned before peer material proof",
-    ).toBe(true);
-    expect(
-      rig.hostScene.phaseManager.getQueuedPhaseNames().includes("CoopPushReplacementCheckpointPhase"),
-      "no newer replacement checkpoint is allowed to race ahead of the unmaterialized old-address terminal",
-    ).toBe(false);
+    if (V2_REPLACEMENT_CUTOVER) {
+      expect(materialBarrier, "V2 never starts the retired operation-journal material barrier").not.toHaveBeenCalled();
+      await withClient(rig.hostCtx, async () => {
+        await game.phaseInterceptor.to("CommandPhase", false);
+      });
+      expect(
+        getCoopV2Shadow(rig.hostRuntime)?.diagnostics().committed ?? 0,
+        "the authority committed one complete post-summon carrier",
+      ).toBeGreaterThan(hostCommittedBefore);
+      expect(
+        rig.hostScene.getEnemyField()[0]?.species.speciesId,
+        "the host's authoritative field advanced to its concrete fallback",
+      ).toBe(GUEST_BENCH_1);
 
-    // Let the retained envelope reach the real guest runtime. With no registered picker terminal, its live
-    // sink returns false, so no materialApplied ACK is emitted. A retry may remain armed, but host gameplay
-    // must still be frozen at the exact same phase and field state.
-    await withClient(rig.guestCtx, () => drainLoopback());
-    await withClient(rig.hostCtx, () => drainLoopback());
-    expect(
-      rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
-      "delivery without guest picker materialization cannot release the host barrier",
-    ).toBe("ShowdownEnemyFaintSwitchPhase");
-    expect(
-      rig.hostScene.getEnemyField()[0]?.isFainted() ?? true,
-      "the host still has not applied the fallback after an unacknowledged delivery",
-    ).toBe(true);
+      // Delivery without the exact old-address picker must remain retained/unapplied. V2 decouples host
+      // simulation from replica latency, but it never signs false material convergence.
+      await withClient(rig.guestCtx, () => drainLoopback());
+      await withClient(rig.hostCtx, () => drainLoopback());
+      expect(
+        getCoopV2Shadow(rig.guestRuntime)?.diagnostics().applied ?? 0,
+        "the picker-less replica emitted no false materialApplied proof",
+      ).toBe(guestAppliedBefore);
+      expect(
+        rig.guestScene.getPlayerField()[0]?.species.speciesId,
+        "the picker-less replica did not install post-summon state beneath a missing UI boundary",
+      ).toBe(GUEST_LEAD);
+      expect(
+        getCoopV2Shadow(rig.hostRuntime)?.diagnostics().retained ?? 0,
+        "the unacknowledged replacement remains retained for redelivery/recovery",
+      ).toBeGreaterThan(0);
+    } else {
+      expect(
+        rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
+        "legacy remains on the old-address replacement phase until peer material closure",
+      ).toBe("ShowdownEnemyFaintSwitchPhase");
+      expect(
+        rig.hostScene.getEnemyField()[0]?.isFainted() ?? true,
+        "legacy retains but does not summon the fallback before peer material proof",
+      ).toBe(true);
+      expect(
+        rig.hostScene.phaseManager.getQueuedPhaseNames().includes("CoopPushReplacementCheckpointPhase"),
+        "legacy cannot race a newer checkpoint ahead of the unmaterialized old-address terminal",
+      ).toBe(false);
+      await withClient(rig.guestCtx, () => drainLoopback());
+      await withClient(rig.hostCtx, () => drainLoopback());
+      expect(
+        rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
+        "unacknowledged legacy delivery cannot release the host barrier",
+      ).toBe("ShowdownEnemyFaintSwitchPhase");
+    }
 
     logs.flush();
   }, 300_000);
 
-  it("(c2) an idle real guest picker materially closes the timeout fallback before host progression", async () => {
+  it("(c2) an idle real guest picker closes exactly once before replacement material is applied", async () => {
     setCoopFaintSwitchWaitMs(30);
     await startHostShowdown(guestTeam(), [MoveId.THUNDERBOLT, MoveId.TACKLE, MoveId.THUNDER_WAVE, MoveId.QUICK_ATTACK]);
     const pair = createLoopbackPair();
@@ -623,6 +659,7 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
       await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
+    const hostCommittedBefore = getCoopV2Shadow(rig.hostRuntime)?.diagnostics().committed ?? 0;
 
     let pickerOpens = 0;
     let pickerCloses = 0;
@@ -691,57 +728,92 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       await withClient(rig.hostCtx, async () => {
         await game.phaseInterceptor.to("ShowdownEnemyFaintSwitchPhase", false);
         rig.hostScene.phaseManager.getCurrentPhase().start();
-        await vi.waitFor(() => expect(materialBarrier).toHaveBeenCalledTimes(1), { timeout: 2_000 });
-        // The real "no summon before material proof reaches authority" invariant, asserted at its ONLY
-        // valid instant: the host has entered the material barrier but the guest has NOT yet closed its
-        // idle picker, so no peer material ACK exists. (Sibling coop-duo-faint-switch test 2:366-374.)
-        expect(
-          unshiftSpy.mock.calls.filter(([name]) => name === "SwitchSummonPhase"),
-          "no summon may be published before material proof reaches authority",
-        ).toHaveLength(0);
-        expect(
-          unshiftSpy.mock.calls.filter(([name]) => name === "CoopPushReplacementCheckpointPhase"),
-          "no replacement checkpoint may be published before material proof reaches authority",
-        ).toHaveLength(0);
+        if (V2_REPLACEMENT_CUTOVER) {
+          await vi.waitUntil(
+            () =>
+              unshiftSpy.mock.calls.some(([name]) => name === "SwitchSummonPhase")
+              && unshiftSpy.mock.calls.some(([name]) => name === "CoopPushReplacementCheckpointPhase"),
+            { timeout: 2_000, interval: 10 },
+          );
+          expect(
+            materialBarrier,
+            "V2 never starts the retired operation-journal peer-material barrier",
+          ).not.toHaveBeenCalled();
+        } else {
+          await vi.waitFor(() => expect(materialBarrier).toHaveBeenCalledTimes(1), { timeout: 2_000 });
+          // Legacy cannot publish a successor until the old-address picker has materially closed.
+          expect(
+            unshiftSpy.mock.calls.filter(([name]) => name === "SwitchSummonPhase"),
+            "legacy cannot publish a summon before material proof reaches authority",
+          ).toHaveLength(0);
+          expect(
+            unshiftSpy.mock.calls.filter(([name]) => name === "CoopPushReplacementCheckpointPhase"),
+            "legacy cannot publish a checkpoint before material proof reaches authority",
+          ).toHaveLength(0);
+        }
       });
       const retainedOperationId = materialBarrier.mock.calls[0]?.[0];
-      expect(retainedOperationId).toMatch(/:FAINT_SWITCH:/u);
-      expect(
-        rig.hostScene.getEnemyField()[0]?.isFainted() ?? true,
-        "the host cannot summon its timeout fallback before peer material proof",
-      ).toBe(true);
+      if (V2_REPLACEMENT_CUTOVER) {
+        expect(retainedOperationId, "V2 creates no second legacy faint-operation authority").toBeUndefined();
+      } else {
+        expect(retainedOperationId).toMatch(/:FAINT_SWITCH:/u);
+      }
+      if (!V2_REPLACEMENT_CUTOVER) {
+        expect(
+          rig.hostScene.getEnemyField()[0]?.isFainted() ?? true,
+          "legacy keeps the fallback out of the field until peer material proof",
+        ).toBe(true);
+      }
+
+      if (V2_REPLACEMENT_CUTOVER) {
+        // Execute the summon and the post-summon carrier capture. The V2 log, not a legacy material ACK,
+        // now owns delivery and closes the guest's exact idle picker before replica application.
+        await withClient(rig.hostCtx, async () => {
+          await game.phaseInterceptor.to("CommandPhase", false);
+        });
+        expect(
+          getCoopV2Shadow(rig.hostRuntime)?.diagnostics().committed ?? 0,
+          "the authority committed only after the complete post-summon carrier existed",
+        ).toBeGreaterThan(hostCommittedBefore);
+      }
 
       await withClient(rig.guestCtx, async () => {
-        for (let attempt = 0; attempt < 100 && materialAcks.length === 0; attempt++) {
+        for (
+          let attempt = 0;
+          attempt < 100 && (V2_REPLACEMENT_CUTOVER ? pickerCloses === 0 : materialAcks.length === 0);
+          attempt++
+        ) {
           await drainLoopback();
           await new Promise<void>(resolve => setTimeout(resolve, 10));
         }
         expect(pickerCloses, "the retained fallback closed the idle picker through MESSAGE").toBe(1);
         expect(rig.guestScene.phaseManager.getCurrentPhase()?.phaseName).not.toBe("CoopGuestFaintSwitchPhase");
       });
-      expect(materialAcks.length, "the real picker emitted material proof").toBeGreaterThanOrEqual(1);
-      expect(
-        materialAcks.every(ack => ack.operationId === retainedOperationId),
-        "every idempotent ACK stays scoped to the exact retained terminal",
-      ).toBe(true);
-      expect(materialAcks[0]).toMatchObject({
-        operationId: retainedOperationId,
-        wave: rig.hostScene.currentBattle.waveIndex,
-        turn,
-      });
-      // NB: material PROOF has now arrived (materialAcks populated above). The design releases the summon
-      // the instant the host is active AND proof has arrived - in the two-engine harness the guest's
-      // materialApplied ACK is delivered under the DESTINATION (host) context, which transiently reactivates
-      // the host runtime and flushes the retained-release continuation, so the summon may ALREADY have been
-      // published here (before the manual host pump below). That is exactly correct product behaviour
-      // ("in a real browser the runtime is always active, so this defers nothing live" - switch-phase.ts).
-      // The real no-summon-before-proof invariant is asserted at its only valid instant inside the host
-      // barrier block above; re-asserting quiescence post-proof would contradict the release mechanism.
-
-      await withClient(rig.hostCtx, async () => {
-        await drainLoopback();
-        await game.phaseInterceptor.to("CommandPhase");
-      });
+      if (V2_REPLACEMENT_CUTOVER) {
+        expect(
+          materialAcks,
+          "the retired faint-operation carrier emits no material ACK while V2 owns replacement",
+        ).toHaveLength(0);
+      } else {
+        expect(materialAcks.length, "the real picker emitted material proof").toBeGreaterThanOrEqual(1);
+        expect(
+          materialAcks.every(ack => ack.operationId === retainedOperationId),
+          "every idempotent ACK stays scoped to the exact retained terminal",
+        ).toBe(true);
+        expect(materialAcks[0]).toMatchObject({
+          operationId: retainedOperationId,
+          wave: rig.hostScene.currentBattle.waveIndex,
+          turn,
+        });
+      }
+      // Legacy releases its queued summon after the exact material ACK. V2 already authored the local
+      // summon before committing the complete carrier and is now waiting only for replica receipts.
+      if (!V2_REPLACEMENT_CUTOVER) {
+        await withClient(rig.hostCtx, async () => {
+          await drainLoopback();
+          await game.phaseInterceptor.to("CommandPhase");
+        });
+      }
       expect(
         unshiftSpy.mock.calls.filter(([name]) => name === "SwitchSummonPhase"),
         "authority published exactly one replacement summon",
