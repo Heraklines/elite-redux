@@ -666,10 +666,33 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     // phase-manager path so the guest observes both still-retained public continuations (REWARD and
     // ME_TERMINAL) at wave+1/turn-1. Never notify the durability layer directly: this regression must fail
     // if a future real UI-to-relay call chain stops being wired.
-    const startedHostTailPhases = new WeakSet<Phase>();
     let hostMapCommitted = false;
     let guestMapCommitted = false;
-    const guestCommand = await withClient(rig.guestCtx, async () =>
+    // Production ordering is host materialization/publication first, then guest carrier consumption.
+    // Do not nest a host phase drive inside an outer guest withClient window: Promise continuations from
+    // EncounterPhase assets/save/tweens can otherwise resume after the nested window restores the guest's
+    // process-global scene, turning a host NextEncounterPhase into a correctly blocked guest renderer tail.
+    const hostCommand = await withClient(rig.hostCtx, () =>
+      driveClientPhaseQueueTo(rig.hostScene, "host post-ME CommandPhase", {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && rig.hostScene.currentBattle.waveIndex === ME_WAVE + 1
+          && rig.hostScene.currentBattle.turn === 1,
+        perPhaseTimeoutMs: 5_000,
+        drivePublicPhaseInput: phase => {
+          if (
+            phase.phaseName === "SelectBiomePhase"
+            && rig.hostScene.ui.getMode() === UiMode.ER_MAP
+            && !hostMapCommitted
+          ) {
+            hostMapCommitted = rig.hostScene.ui.processInput(Button.ACTION);
+            return hostMapCommitted;
+          }
+          return false;
+        },
+      }),
+    );
+    const guestCommand = await withClient(rig.guestCtx, () =>
       driveClientPhaseQueueTo(rig.guestScene, "guest post-ME CommandPhase", {
         matches: phase =>
           phase.phaseName === "CommandPhase"
@@ -687,23 +710,6 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
           }
           return false;
         },
-        pumpPeer: () =>
-          withClient(rig.hostCtx, async () => {
-            await drainLoopback();
-            const phase = rig.hostScene.phaseManager.getCurrentPhase();
-            if (phase != null && phase.phaseName !== "CommandPhase" && !startedHostTailPhases.has(phase)) {
-              startedHostTailPhases.add(phase);
-              phase.start();
-            }
-            if (
-              phase?.phaseName === "SelectBiomePhase"
-              && rig.hostScene.ui.getMode() === UiMode.ER_MAP
-              && !hostMapCommitted
-            ) {
-              hostMapCommitted = rig.hostScene.ui.processInput(Button.ACTION);
-            }
-            await drainLoopback();
-          }),
       }),
     );
 
@@ -715,36 +721,6 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       guestCommand.start();
       await drainLoopback();
     });
-    const hostCommand = await withClient(rig.hostCtx, () =>
-      driveClientPhaseQueueTo(rig.hostScene, "host post-ME CommandPhase", {
-        matches: phase =>
-          phase.phaseName === "CommandPhase"
-          && rig.hostScene.currentBattle.waveIndex === ME_WAVE + 1
-          && rig.hostScene.currentBattle.turn === 1,
-        perPhaseTimeoutMs: 5_000,
-        // The guest-side drive above may have started the host's async NewBattlePhase while it was
-        // waiting for reciprocal carriers. Continue that exact invocation; never start it twice.
-        startedPhases: startedHostTailPhases,
-        drivePublicPhaseInput: phase => {
-          if (phase.phaseName === "NextEncounterPhase" && rig.hostScene.ui.getMode() === UiMode.MESSAGE) {
-            // NextEncounterPhase can expose more than one sequential narration prompt. Each accepted
-            // ACTION consumes exactly the currently-visible public prompt; a one-shot latch strands the
-            // second prompt even though a browser player would press through it normally.
-            return rig.hostScene.ui.processInput(Button.ACTION);
-          }
-          if (
-            phase.phaseName === "SelectBiomePhase"
-            && rig.hostScene.ui.getMode() === UiMode.ER_MAP
-            && !hostMapCommitted
-          ) {
-            hostMapCommitted = rig.hostScene.ui.processInput(Button.ACTION);
-            return hostMapCommitted;
-          }
-          return false;
-        },
-        pumpPeer: () => withClient(rig.guestCtx, () => drainLoopback()),
-      }),
-    );
     await withClient(rig.hostCtx, async () => {
       hostCommand.start();
       await drainLoopback();
