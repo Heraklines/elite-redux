@@ -3463,19 +3463,46 @@ export async function startGuestMeReplay(guestScene: MeReplayPumpScene): Promise
   const mePhase = guestScene.phaseManager.create("MysteryEncounterPhase");
   guestScene.phaseManager.pushPhase(mePhase);
   guestScene.phaseManager.shiftPhase();
-  mePhase.start();
-  // Capture the production-queued replay synchronously at the divert edge. A complete retained
-  // ME_PRESENT/ME_PICK may already be buffered, so draining first can legitimately advance this real
-  // replay into a CommonAnimPhase (C1 run 29673281666). The old late observation then rejected a valid
-  // handoff merely because the manually scheduled guest was faster than the harness.
-  const replay = guestScene.phaseManager.getCurrentPhase();
+  // Observe the exact replay object that production creates during the divert. Current-phase sampling
+  // alone has two valid races: before a loopback drain it can still be MysteryEncounterPhase, while a
+  // complete retained ME tail can advance it beyond CoopReplayMePhase during that drain. Capturing create()
+  // is passive (the real factory still constructs and queues the phase) and gives the cooperative scheduler
+  // a stable identity without fabricating a phase or a successful handoff.
+  const factory = guestScene.phaseManager as unknown as {
+    create: (phaseName: string, ...args: unknown[]) => Phase;
+  };
+  const originalCreate = factory.create;
+  const activeReplayBefore = getActiveCoopReplayMePhaseForHarness();
+  let createdReplay: Phase | null = null;
+  factory.create = function captureCreatedReplay(phaseName: string, ...args: unknown[]): Phase {
+    const created = originalCreate.call(this, phaseName, ...args);
+    if (phaseName === "CoopReplayMePhase") {
+      createdReplay = created;
+    }
+    return created;
+  };
+  try {
+    mePhase.start();
+  } finally {
+    factory.create = originalCreate;
+  }
+  await drainLoopback();
+  const current = guestScene.phaseManager.getCurrentPhase();
+  const activeReplayAfter = getActiveCoopReplayMePhaseForHarness();
+  const replay = createdReplay ?? (activeReplayAfter === activeReplayBefore ? null : activeReplayAfter);
   if (replay == null || replay.phaseName !== "CoopReplayMePhase") {
     throw new Error(
-      `guest ME divert FAILED: expected CoopReplayMePhase current, got ${replay?.phaseName ?? "none"} - see dev-logs/coop-duo/`,
+      `guest ME divert FAILED: production created no CoopReplayMePhase (current=${current?.phaseName ?? "none"}) - see dev-logs/coop-duo/`,
     );
   }
-  replay.start();
-  await drainLoopback();
+  if (current === replay) {
+    replay.start();
+    await drainLoopback();
+  } else if (current === mePhase) {
+    throw new Error(
+      "guest ME divert STALLED: production queued CoopReplayMePhase but MysteryEncounterPhase remained current - see dev-logs/coop-duo/",
+    );
+  }
   return replay;
 }
 
