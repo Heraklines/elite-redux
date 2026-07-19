@@ -113,6 +113,14 @@ function makeFinalizePhase(turn: number): CoopFinalizeTurnPhase {
   return phase;
 }
 
+/** Model the retained N commit being materially superseded by an out-of-band N+1 replacement image. */
+function markSupersededByNextTurnReplacement(phase: CoopFinalizeTurnPhase, turn: number): void {
+  (phase as unknown as Record<string, unknown>).turnCommitSupersededBy = {
+    reason: "replacement",
+    turn: turn + 1,
+  };
+}
+
 describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory deadlock)", () => {
   let prevGlobalScene: BattleScene;
 
@@ -158,6 +166,36 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
     expect(rec.pushedPhases).not.toContain("FaintPhase");
     expect(rec.pushedPhases).not.toContain("VictoryPhase");
     expect(rec.pushedPhases).toHaveLength(0);
+  });
+
+  it("advances the LIVE cursor when an N+1 replacement superseded material but did not advance currentBattle.turn", () => {
+    startAuthoritativeGuestSession();
+
+    const phase = makeFinalizePhase(1);
+    markSupersededByNextTurnReplacement(phase, 1);
+    // This is the public-browser dirty-account failure: replacement state tick N+1 converged while the
+    // mutable Battle cursor remained N. Envelope metadata must not masquerade as a cursor mutation.
+    expect(rec.turn).toBe(1);
+    callPrivate(phase, "finishTurn");
+
+    expect(rec.incrementTurnCalls).toBe(1);
+    expect(rec.turn).toBe(2);
+    expect(rec.clearLastTurnOrderCalls).toBe(1);
+    expect(rec.queueTurnEndCalls).toBe(0);
+  });
+
+  it("does not double-increment when the LIVE cursor already reached the replacement's N+1 boundary", () => {
+    startAuthoritativeGuestSession();
+    rec.turn = 2;
+
+    const phase = makeFinalizePhase(1);
+    markSupersededByNextTurnReplacement(phase, 1);
+    callPrivate(phase, "finishTurn");
+
+    expect(rec.incrementTurnCalls).toBe(0);
+    expect(rec.turn).toBe(2);
+    expect(rec.clearLastTurnOrderCalls).toBe(1);
+    expect(rec.queueTurnEndCalls).toBe(0);
   });
 
   it("CoopFinalizeTurnPhase.finishTurn(): solo / host / lockstep keeps queueTurnEndPhases (byte-identical)", () => {

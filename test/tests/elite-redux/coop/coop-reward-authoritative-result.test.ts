@@ -175,30 +175,43 @@ describe("P33 retained reward/shop authoritative results", () => {
   });
 
   it("retains only a typed Mystery reward result until its crossing terminal releases it", () => {
-    const prepared = commitRewardOwnerIntent({
-      surface: "reward",
-      rewardSurface: { surfaceId: "modifier:0", ordinal: 0 },
-      pinned: 2,
-      label: "skip",
-      choice: COOP_INTERACTION_LEAVE,
-      data: undefined,
-      terminal: true,
-      localRole: "host",
-      wave: 7,
-      turn: 3,
-    })!;
-    expect(commitRewardAuthoritativeResult(prepared.operationId, state(13, 850, "leave"))).not.toBeNull();
+    // This seam exists only in the P33 journaled path. Without a durability manager,
+    // commitRewardOwnerIntent deliberately takes its compatibility one-stage commit and leaves no prepared
+    // intent for commitRewardAuthoritativeResult. The old fixture accidentally asserted a two-stage result
+    // after selecting that one-stage path, making Lane A red while production and every wired result test
+    // remained green.
+    const pair = createLoopbackPair();
+    const hostManager = new CoopDurabilityManager(pair.host);
+    setCoopOperationDurability(hostManager);
+    try {
+      const prepared = commitRewardOwnerIntent({
+        surface: "reward",
+        rewardSurface: { surfaceId: "modifier:0", ordinal: 0 },
+        pinned: 2,
+        label: "skip",
+        choice: COOP_INTERACTION_LEAVE,
+        data: undefined,
+        terminal: true,
+        localRole: "host",
+        wave: 7,
+        turn: 3,
+      })!;
+      expect(commitRewardAuthoritativeResult(prepared.operationId, state(13, 850, "leave"))).not.toBeNull();
 
-    expect(captureCoopRewardResultState(2)).toEqual(state(13, 850, "leave"));
-    const detached = captureCoopRewardResultState(2)!;
-    (detached as { money: number }).money = 0;
-    expect(
-      captureCoopRewardResultState(2)?.money,
-      "a crossing caller cannot mutate the reward journal's immutable retry image",
-    ).toBe(850);
+      expect(captureCoopRewardResultState(2)).toEqual(state(13, 850, "leave"));
+      const detached = captureCoopRewardResultState(2)!;
+      (detached as { money: number }).money = 0;
+      expect(
+        captureCoopRewardResultState(2)?.money,
+        "a crossing caller cannot mutate the reward journal's immutable retry image",
+      ).toBe(850);
 
-    releaseCoopRewardResultState(2);
-    expect(captureCoopRewardResultState(2)).toBeUndefined();
+      releaseCoopRewardResultState(2);
+      expect(captureCoopRewardResultState(2)).toBeUndefined();
+    } finally {
+      hostManager.dispose();
+      pair.guest.close();
+    }
   });
 
   it("parks host terminal advance at material apply while retaining through public continuation", async () => {

@@ -1626,20 +1626,32 @@ export class CoopFinalizeTurnPhase extends Phase {
       // TurnInit/Command or execute damaging end-of-turn mechanics. Omitting it left a real browser pair
       // on reward:<wave>:hostTurn+1 vs reward:<wave>:guestTurn with otherwise byte-identical state.
       const advanceRenderedTurnBoundary = (): void => {
-        const renderedCursorAlreadyAdvanced = globalScene.currentBattle.turn > this.turn;
-        const supersedingReplacementAlreadyOpenedNextTurn =
-          this.turnCommitSupersededBy?.reason === "replacement" && this.turnCommitSupersededBy.turn === this.turn + 1;
-        if (renderedCursorAlreadyAdvanced || supersedingReplacementAlreadyOpenedNextTurn) {
-          // A retained N+1 faint-replacement checkpoint or an already-adopted authoritative image supplied
-          // the exact numeric successor boundary. The latter can precede the out-of-band checkpoint itself
-          // while an idle replacement picker is open. Incrementing either cursor again opens phantom N+2 on
-          // the renderer while the authority remains on N+1. Same-turn replays still take the normal advance.
+        const settledTurn = this.turn;
+        const successorTurn = settledTurn + 1;
+        const renderedTurn = globalScene.currentBattle.turn;
+        if (renderedTurn === successorTurn) {
+          // The live Battle cursor is the only proof that the numeric boundary was already adopted. An N+1
+          // replacement envelope can supersede this retained N commit's MATERIAL without mutating
+          // currentBattle.turn; treating envelope metadata as cursor state left the renderer on N while the
+          // authority opened N+1, so continuationReady could never be emitted.
           coopLog(
             "replay",
-            `guest finalize turn=${this.turn}: rendered cursor already at turn=${globalScene.currentBattle.turn}; skipping duplicate increment`,
+            `guest finalize turn=${settledTurn}: rendered cursor already at turn=${renderedTurn}; skipping duplicate increment`,
           );
-        } else {
+        } else if (renderedTurn === settledTurn) {
           globalScene.currentBattle.incrementTurn();
+        } else {
+          // A retained commit may be re-delivered, but it may never silently manufacture or skip multiple
+          // battle turns. Fail immediately with the precise cursor split instead of waiting for the host's
+          // continuation-retention deadline to expire.
+          throw new Error(
+            `authoritative turn cursor cannot advance ${settledTurn}->${successorTurn} from live turn ${renderedTurn}`,
+          );
+        }
+        if (globalScene.currentBattle.turn !== successorTurn) {
+          throw new Error(
+            `authoritative turn cursor advance ${settledTurn}->${successorTurn} ended at ${globalScene.currentBattle.turn}`,
+          );
         }
         globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
       };
