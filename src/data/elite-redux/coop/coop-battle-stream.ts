@@ -153,6 +153,20 @@ function rememberBounded<K, V>(map: Map<K, V>, key: K, value: V): void {
   }
 }
 
+function rememberBoundedValue<T>(set: Set<T>, value: T): void {
+  // Refresh insertion order as well as membership: a recently re-proven identity
+  // is the last one that should be evicted from the duplicate/redelivery window.
+  set.delete(value);
+  set.add(value);
+  while (set.size > AUTHORITY_ACK_RETENTION) {
+    const oldest = set.values().next().value as T | undefined;
+    if (oldest === undefined) {
+      break;
+    }
+    set.delete(oldest);
+  }
+}
+
 function isSafeAddressPart(value: unknown, allowZero = true): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && (allowZero ? value >= 0 : value > 0);
 }
@@ -910,6 +924,13 @@ export class CoopBattleStreamer {
    * so a legitimate post-resync/checkpoint-reapply re-render of a fresh turn address always starts at zero.
    */
   private readonly renderedThrough = new Map<string, number>();
+  /**
+   * Exact addressed waits cancelled because the renderer opened the same numeric
+   * turn in a newer wave/epoch. The replay pump distinguishes this benign stale
+   * continuation from a real authority timeout; otherwise cancelling wave N's
+   * orphaned turn-1 pump terminalizes the healthy wave N+1 pump.
+   */
+  private readonly supersededTurnWaits = new Set<string>();
   /** GUEST: live-event arrival handler (optional; lets a live pump react the instant one lands). */
   private liveEventHandler: ((turn: number, seq: number, event: CoopBattleEvent) => void) | null = null;
   /** GUEST: one-shot live-arrival waiter for the pump race ({@linkcode awaitTurnOrLiveEvent}). */
@@ -954,7 +975,7 @@ export class CoopBattleStreamer {
     if (admitted == null || !sameAuthorityAckIdentity(admitted.value, resolution)) {
       return false;
     }
-    this.finalizedTurnAuthorities.add(exactKey);
+    rememberBoundedValue(this.finalizedTurnAuthorities, exactKey);
     this.markTurnFinalized(resolution.epoch, resolution.wave, resolution.turn);
     return true;
   }
@@ -1009,7 +1030,12 @@ export class CoopBattleStreamer {
    */
   clearFinalizedMark(): void {
     this.finalizedMarks.clear();
-    this.finalizedTurnAuthorities.clear();
+    // `finalizedMarks` is a wave-local renderer duplicate guard. The exact
+    // Authority V2 proof is different: the retained log may redeliver the final
+    // turn only AFTER this wave transition, and that redelivery must observe the
+    // completed material boundary so it can emit materialApplied and retire.
+    // Its keys contain epoch+wave+turn+revision and are independently bounded by
+    // rememberBoundedValue, so retaining them cannot collide with next-wave turn 1.
     // Scope the per-turn render watermark to the wave, exactly like finalizedMarks: a fresh wave restarts
     // at turn 1, and (without an authority context to fold the wave into the key) the `t:1` key would
     // otherwise collide with the finished wave's turn 1 and wrongly suppress its first legitimate render.
@@ -3913,7 +3939,12 @@ export class CoopBattleStreamer {
     turn: number,
     fromSeq: number,
     sourceWave?: number,
-  ): Promise<{ kind: "turn"; res: CoopTurnResolution | null } | { kind: "live" } | { kind: "checkpoint" }> {
+  ): Promise<
+    | { kind: "turn"; res: CoopTurnResolution | null }
+    | { kind: "live" }
+    | { kind: "checkpoint" }
+    | { kind: "superseded" }
+  > {
     // Fast paths: anything already buffered resolves without parking waiters. Replacement authority
     // normally follows the turn commit it repairs, but it can also be captured mid-turn and lose the
     // delivery race to a newer final turn. Both carriers share the monotonic authoritative-state tick,
@@ -3935,6 +3966,7 @@ export class CoopBattleStreamer {
     if (liveEntry != null && liveEntry[1].events.has(fromSeq)) {
       return Promise.resolve({ kind: "live" as const });
     }
+    const waitKey = this.turnWaitAddress(turn, sourceWave).key;
     return new Promise(resolve => {
       let settled = false;
       const cleanup = () => {
@@ -3979,10 +4011,11 @@ export class CoopBattleStreamer {
       this.liveWaiter = settleLive;
       this.checkpointWaiter = settleCheckpoint;
       void this.awaitTurn(turn, sourceWave).then(res => {
+        const superseded = res == null && this.supersededTurnWaits.delete(waitKey);
         if (!settled) {
           settled = true;
           cleanup();
-          resolve({ kind: "turn", res });
+          resolve(superseded ? { kind: "superseded" } : { kind: "turn", res });
           return;
         }
         // The live/checkpoint leg already won this race; a resolution landing on the stale
@@ -4028,7 +4061,13 @@ export class CoopBattleStreamer {
     for (const [key, stale] of [...this.pending.entries()]) {
       if (key !== lookup.key && stale.turn === turn) {
         coopWarn("stream", `guest awaitTurn turn=${turn} superseding stale addressed waiter key=${key}`);
+        rememberBoundedValue(this.supersededTurnWaits, key);
         stale.finish(null);
+        // `awaitTurnOrLiveEvent` consumes this marker in the already-registered
+        // promise reaction. Clear it one microtask later as well so a direct
+        // awaitTurn caller cannot leave evidence that a future, unrelated wait
+        // at the reused address could mistake for its own supersession.
+        queueMicrotask(() => this.supersededTurnWaits.delete(key));
         if (stale.address != null) {
           this.clearTurnCommitRequestsAtAddress(stale.address);
         }
@@ -4186,6 +4225,7 @@ export class CoopBattleStreamer {
     this.cancelAuthorityGameplayWaiters();
     this.clearRetainedAuthorityAfterTerminal();
     this.meBattlePartyInbox.clear();
+    this.supersededTurnWaits.clear();
     this.finalizedMarks.clear();
     this.finalizedTurnAuthorities.clear();
     this.lastEnemyParty = null;
@@ -4267,6 +4307,7 @@ export class CoopBattleStreamer {
     this.inbox.clear();
     this.liveEvents.clear();
     this.renderedThrough.clear();
+    this.supersededTurnWaits.clear();
     this.finalizedMarks.clear();
     this.finalizedTurnAuthorities.clear();
     this.liveEventHandler = null;

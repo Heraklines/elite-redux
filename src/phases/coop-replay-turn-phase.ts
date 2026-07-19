@@ -453,6 +453,19 @@ export class CoopReplayTurnPhase extends Phase {
           }
           continue;
         }
+        if (raced.kind === "superseded") {
+          // The same numeric turn was opened at a newer immutable wave/epoch
+          // while this old continuation was still parked. That is cancellation
+          // of obsolete renderer work, not missing host authority. A detached
+          // old phase must not shift the newer phase manager queue when its
+          // promise resumes.
+          coopWarn(
+            "replay",
+            `guest replay turn=${this.turn} sourceWave=${this.sourceWave}: superseded by a newer address -> dissolve`,
+          );
+          this.retireSupersededWait();
+          return;
+        }
         if (raced.res == null) {
           const failure = streamer.consumeAuthorityFailure();
           if (failure == null) {
@@ -505,6 +518,22 @@ export class CoopReplayTurnPhase extends Phase {
     } catch (error) {
       coopWarn("replay", `guest replay turn=${this.turn}: payload error -> authority terminal`, error);
       this.failAuthority(streamer, "turnResolution", `Turn ${this.turn} authority replay failed.`);
+    }
+  }
+
+  /** Retire an obsolete async continuation without shifting an unrelated newer queue. */
+  private retireSupersededWait(): void {
+    if (globalScene.phaseManager.getCurrentPhase() === this) {
+      this.end();
+      return;
+    }
+    this.ended = true;
+    this.awaitingAuthority = false;
+    this.clearReplacementRetryWake();
+    this.authorityFailureUnsubscribe?.();
+    this.authorityFailureUnsubscribe = null;
+    if (activeCoopReplayTurnPhase === this) {
+      activeCoopReplayTurnPhase = null;
     }
   }
 

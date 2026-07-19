@@ -1439,6 +1439,28 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("classifies a cross-address replay wait as superseded instead of a host stall", async () => {
+      const { guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 1, turn: 1 };
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+
+      const oldReplay = guestStream.awaitTurnOrLiveEvent(1, 0, 1);
+      current.wave = 2;
+      const currentReplay = guestStream.awaitTurnOrLiveEvent(1, 0, 2);
+
+      await expect(
+        oldReplay,
+        "opening wave 2 turn 1 benignly dissolves the orphaned wave 1 turn-1 replay",
+      ).resolves.toEqual({ kind: "superseded" });
+      expect(
+        guestStream.retainedAuthorityDiagnostics().waiters,
+        "only the current wave's exact authority wait remains",
+      ).toBe(1);
+
+      guestStream.dispose();
+      await expect(currentReplay).resolves.toEqual({ kind: "turn", res: null });
+    });
+
     it("keeps the newest buffered revision, ignores an identical duplicate, and rejects a reordered older one", async () => {
       const { host, guest } = createLoopbackPair();
       const guestStream = new CoopBattleStreamer(guest, {
@@ -3005,7 +3027,10 @@ describe("stale-turn finalize mark (#790 + regression fix)", () => {
     ).toBe(false);
 
     stream.clearFinalizedMark();
-    expect(stream.hasFinalizedAuthoritativeV2Turn(carrier)).toBe(false);
+    expect(
+      stream.hasFinalizedAuthoritativeV2Turn(carrier),
+      "wave-local renderer cleanup must retain the exact V2 proof for post-boundary reliable redelivery",
+    ).toBe(true);
     stream.dispose();
   });
 
