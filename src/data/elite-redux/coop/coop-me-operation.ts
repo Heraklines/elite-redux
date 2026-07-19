@@ -601,6 +601,57 @@ export interface CoopMeCommittedTerminalCursor {
   readonly step: number;
 }
 
+function canonicalMeOutcomeWithoutAuthority(outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>): string {
+  const { authoritativeState: _crossingState, ...projection } = outcome;
+  if (!isPlainObject(projection.base)) {
+    return canonicalize(projection);
+  }
+  // Both capture paths advance the publication clock. It is transport ordering, not game material.
+  const { tick: _publicationOrder, ...base } = projection.base;
+  return canonicalize({ ...projection, base });
+}
+
+/**
+ * Repair the one safe fieldless-finalization case without weakening the complete-terminal contract.
+ *
+ * A no-battle encounter first commits a complete `reward-settled` image, then runs its public reward
+ * tail, and finally captures the `leave` image. Some fieldless engine boundaries cannot reconstruct the
+ * id-addressable `authoritativeState` even though every other final projection is byte-identical to the
+ * already-retained settlement. Reuse only that missing state image, and only when the complete remainder
+ * of the fresh outcome is canonically identical. Any real reward/post-option mutation changes `base`,
+ * `party`, save data, RNG, or dex and therefore remains fail-closed instead of being hidden by stale data.
+ */
+export function completeCoopMeFinalOutcomeFromRetainedSettlement(
+  pinned: number,
+  outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>,
+): Extract<CoopInteractionOutcome, { k: "meResync" }> {
+  if (outcome.authoritativeState != null) {
+    return outcome;
+  }
+  const s = state();
+  const cursor = s.committedTerminalByPinned.get(pinned);
+  if (cursor == null || (cursor.terminal !== "battle-settled" && cursor.terminal !== "reward-settled")) {
+    return outcome;
+  }
+  const retained = s.retainedTerminalPayloads.get(cursor.operationId);
+  if (
+    retained == null
+    || (retained.terminal !== "battle-settled" && retained.terminal !== "reward-settled")
+    || retained.outcome.authoritativeState == null
+  ) {
+    return outcome;
+  }
+  const retainedState = retained.outcome.authoritativeState;
+  if (canonicalMeOutcomeWithoutAuthority(outcome) !== canonicalMeOutcomeWithoutAuthority(retained.outcome)) {
+    return outcome;
+  }
+  coopLog("me", `final terminal reuses byte-identical settled authoritativeState pinned=${pinned}`);
+  return {
+    ...outcome,
+    authoritativeState: JSON.parse(JSON.stringify(retainedState)) as CoopAuthoritativeBattleStateV1,
+  };
+}
+
 /**
  * Return the host journal's latest committed terminal for one pinned encounter. Unlike the presentation
  * control snapshot, this state belongs to the explicit runtime operation log and therefore survives a
@@ -979,7 +1030,36 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
   try {
     const s = state();
     if (params.kind === "ME_TERMINAL" && !isCompleteCoopMeTerminalPayload(params.payload)) {
-      coopWarn("me", "ME_TERMINAL commit rejected: terminal transaction is incomplete");
+      const value = params.payload as Partial<CoopMeTerminalPayload>;
+      const outcome =
+        value.outcome != null && typeof value.outcome === "object"
+          ? (value.outcome as Partial<Extract<CoopInteractionOutcome, { k: "meResync" }>>)
+          : undefined;
+      const authoritativeState =
+        outcome?.authoritativeState != null && typeof outcome.authoritativeState === "object"
+          ? (outcome.authoritativeState as Partial<CoopAuthoritativeBattleStateV1>)
+          : undefined;
+      const destination =
+        value.destination != null && typeof value.destination === "object"
+          ? (value.destination as Partial<CoopMeTerminalDestination>)
+          : undefined;
+      coopWarn("me", "ME_TERMINAL commit rejected: terminal transaction is incomplete", {
+        terminal: value.terminal ?? null,
+        outcomeKind: outcome?.k ?? null,
+        base: outcome?.base === null ? "null" : typeof outcome?.base,
+        party: Array.isArray(outcome?.party),
+        meSaveData: typeof outcome?.meSaveData,
+        seed: typeof outcome?.seed,
+        waveSeed: typeof outcome?.waveSeed,
+        dex: typeof outcome?.dex,
+        authoritativeStateMissing: authoritativeState == null,
+        stateVersion: authoritativeState?.version ?? null,
+        stateWave: authoritativeState?.wave ?? null,
+        stateTurn: authoritativeState?.turn ?? null,
+        playerParty: Array.isArray(authoritativeState?.playerParty),
+        enemyParty: Array.isArray(authoritativeState?.enemyParty),
+        destinationKind: destination?.kind ?? null,
+      });
       return null;
     }
     const ownerSeat = ownerSeatFor(params.kind, params.pinned);

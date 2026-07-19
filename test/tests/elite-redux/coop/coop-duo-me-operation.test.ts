@@ -715,13 +715,32 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       guestCommand.start();
       await drainLoopback();
     });
+    const hostCommand = await withClient(rig.hostCtx, () =>
+      driveClientPhaseQueueTo(rig.hostScene, "host post-ME CommandPhase", {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && rig.hostScene.currentBattle.waveIndex === ME_WAVE + 1
+          && rig.hostScene.currentBattle.turn === 1,
+        perPhaseTimeoutMs: 5_000,
+        // The guest-side drive above may have started the host's async NewBattlePhase while it was
+        // waiting for reciprocal carriers. Continue that exact invocation; never start it twice.
+        startedPhases: startedHostTailPhases,
+        drivePublicPhaseInput: phase => {
+          if (
+            phase.phaseName === "SelectBiomePhase"
+            && rig.hostScene.ui.getMode() === UiMode.ER_MAP
+            && !hostMapCommitted
+          ) {
+            hostMapCommitted = rig.hostScene.ui.processInput(Button.ACTION);
+            return hostMapCommitted;
+          }
+          return false;
+        },
+        pumpPeer: () => withClient(rig.guestCtx, () => drainLoopback()),
+      }),
+    );
     await withClient(rig.hostCtx, async () => {
-      await drainLoopback();
-      const hostCommand = rig.hostScene.phaseManager.getCurrentPhase();
-      expect(hostCommand?.phaseName, "the host tail reached its matching next CommandPhase").toBe("CommandPhase");
-      if (rig.hostScene.ui.getMode() !== UiMode.COMMAND && rig.hostScene.ui.getMode() !== UiMode.FIGHT) {
-        hostCommand!.start();
-      }
+      hostCommand.start();
       await drainLoopback();
     });
     await withClient(rig.guestCtx, async () => {

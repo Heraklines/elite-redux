@@ -1598,6 +1598,12 @@ export async function driveClientPhaseQueueTo(
     matches?: (phase: Phase) => boolean;
     maxPhases?: number;
     perPhaseTimeoutMs?: number;
+    /**
+     * Real phases that a reciprocal client pump has already started. A one-process duo scheduler can
+     * observe one of these phases still current while its async start() is waiting on the other client;
+     * it must keep pumping that exact invocation instead of re-entering start().
+     */
+    startedPhases?: WeakSet<Phase>;
     /** Pump the other browser's scheduled inbox while this client's real phase awaits a reciprocal route. */
     pumpPeer?: () => Promise<void>;
     /** Drive an explicitly-recognized public prompt while the current phase remains blocked on human input. */
@@ -1627,7 +1633,10 @@ export async function driveClientPhaseQueueTo(
     // installation, so refresh the completion model at each real phase boundary before that phase can
     // exercise the exact launch-ready gate. This wraps only newly seen Pokemon and remains idempotent.
     installHeadlessPlayerAtlasCompletionModel(scene);
-    phase.start();
+    if (!options.startedPhases?.has(phase)) {
+      options.startedPhases?.add(phase);
+      phase.start();
+    }
     const deadline = Date.now() + perPhaseTimeoutMs;
     while (scene.phaseManager.getCurrentPhase() === phase) {
       await options.drivePublicPhaseInput?.(phase);
@@ -3863,9 +3872,13 @@ export async function driveGuestMirrorQuiz(
   options: {
     /** Pump the owner browser while the follower waits for each relayed answer. */
     pumpPeer?: () => Promise<void>;
+    /** The production scheduler already invoked this exact phase's start() before the harness observed it. */
+    alreadyStarted?: boolean;
   } = {},
 ): Promise<number> {
-  quizPhase.start();
+  if (!options.alreadyStarted) {
+    quizPhase.start();
+  }
   for (let i = 0; i < 600; i++) {
     await options.pumpPeer?.();
     await drainLoopback();

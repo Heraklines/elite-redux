@@ -5376,8 +5376,10 @@ export function captureCoopMeOutcome(): Extract<CoopInteractionOutcome, { k: "me
     base: captureCoopFullSnapshot(),
     party: globalScene.getPlayerParty().map(p => JSON.stringify(new PokemonData(p))),
     meSaveData: JSON.stringify(globalScene.mysteryEncounterSaveData.encounteredEvents),
-    seed: globalScene.seed,
-    waveSeed: globalScene.waveSeed,
+    // Crossing capture must remain structurally complete even while a phase boundary is between seed
+    // initializers. Empty strings are already the receiver's explicit no-op representation.
+    seed: globalScene.seed ?? "",
+    waveSeed: globalScene.waveSeed ?? "",
     dex: captureCoopDexDelta(),
     // #838 UNIFY: the id-based authoritative full-state (captured off-field too, unlike `base` which is
     // null with no live field). The guest adopts THIS instead of the species-based `party` reconcile.

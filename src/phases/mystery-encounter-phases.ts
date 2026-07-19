@@ -15,6 +15,7 @@ import {
   commitMeAuthorityGuestIntent,
   commitMeAuthorityLocalPick,
   commitMeOwnerIntent,
+  completeCoopMeFinalOutcomeFromRetainedSettlement,
   isCoopMeOperationEnabled,
   isCoopMeOperationJournalActive,
   nextCoopMePresentationStep,
@@ -1582,7 +1583,10 @@ export class PostMysteryEncounterPhase extends Phase {
           counter: coopMeInteractionStartValue(),
         });
         try {
-          terminalOutcome = this.terminalOutcomeLatch.getOrCapture(captureCoopMeOutcome);
+          const pinned = coopMeInteractionStartValue();
+          terminalOutcome = this.terminalOutcomeLatch.getOrCapture(() =>
+            completeCoopMeFinalOutcomeFromRetainedSettlement(pinned, captureCoopMeOutcome()),
+          );
         } catch (error) {
           coopWarn("me", "host terminal outcome capture failed; retaining Mystery boundary", error);
           failCoopSharedSession("Mystery terminal outcome could not be captured");

@@ -434,6 +434,46 @@ describe.skipIf(!RUN)(
       logs.flush();
     }, 300_000);
 
+    it("DUO ME live repro: fieldless CLEANSING_FONT retains a complete final leave after its no-shop reward tail", async () => {
+      await game.runToMysteryEncounter(MysteryEncounterType.ER_CLEANSING_FONT, [
+        SpeciesId.SNORLAX,
+        SpeciesId.GENGAR,
+        SpeciesId.BLASTOISE,
+        SpeciesId.CHARIZARD,
+        SpeciesId.VENUSAUR,
+        SpeciesId.PIKACHU,
+      ]);
+      const hostScene = game.scene;
+      const pair = createLoopbackPair();
+      const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+      const counterBefore = rig.hostRuntime.controller.interactionCounter();
+      let replay!: Phase;
+
+      await withClient(rig.hostCtx, async () => {
+        await runMysteryEncounterToEnd(game, 1);
+        // Cleansing Font option 1 queues PartyHeal -> MysteryEncounterRewards -> EggLapse -> PostME,
+        // but deliberately opens no modifier shop. Park the true terminal before start so the guest can
+        // consume the retained reward-settled image through its real replay phase first.
+        await game.phaseInterceptor.to("PostMysteryEncounterPhase", false);
+      });
+      replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+      await withClient(rig.hostCtx, () => {
+        hostScene.phaseManager.getCurrentPhase().start();
+      });
+
+      expect(
+        rig.hostRuntime.controller.interactionCounter(),
+        "the fieldless no-shop terminal committed instead of terminating the shared session",
+      ).toBe(counterBefore + 1);
+      const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
+      expect(guestReplay.settled, "the guest adopted the final complete terminal and left once").toBe(true);
+      expect(rig.guestRuntime.controller.interactionCounter(), "both clients advanced the same ME exactly once").toBe(
+        counterBefore + 1,
+      );
+
+      logs.flush();
+    }, 300_000);
+
     // ===========================================================================================
     // IT #2 - GUEST-OWNED non-battle ME (counter 1, odd). DISTINCT code path from the host-owned case,
     // and the #828 REWARD-OWNERSHIP fix's home test. TWO relayed picks, both owned by the GUEST:
@@ -878,13 +918,51 @@ describe.skipIf(!RUN)(
           // watcher shop before the owner is allowed to commit LEAVE.
           partnerReady: async () => {
             await withClient(rig.guestCtx, async () => {
-              guestMePhase = await startGuestMeReplay(rig.guestScene);
-              const quizPhase = (await driveClientPhaseQueueTo(rig.guestScene, "mirrored ErQuizPhase", {
-                matches: phase => phase.phaseName === "ErQuizPhase",
-                maxPhases: 16,
-              })) as unknown as ErQuizPhaseSeam;
+              // Observe the exact phase the replay creates. A real scheduler may already run all three
+              // retained answers before startGuestMeReplay's final drain returns, so current-phase polling
+              // cannot demand that the consumed quiz becomes current again.
+              const factory = rig.guestScene.phaseManager as unknown as {
+                create: (phaseName: string, ...args: unknown[]) => Phase;
+              };
+              const originalCreate = factory.create;
+              let quizPhase: ErQuizPhaseSeam | undefined;
+              let quizStartObserved = false;
+              factory.create = function captureMirrorQuiz(phaseName: string, ...args: unknown[]): Phase {
+                const created = originalCreate.call(this, phaseName, ...args);
+                if (phaseName === "ErQuizPhase") {
+                  quizPhase = created as unknown as ErQuizPhaseSeam;
+                  const originalStart = created.start;
+                  created.start = function observeMirrorQuizStart(): void {
+                    quizStartObserved = true;
+                    originalStart.call(this);
+                  };
+                }
+                return created;
+              };
+              try {
+                guestMePhase = await startGuestMeReplay(rig.guestScene);
+              } finally {
+                factory.create = originalCreate;
+              }
+              if (quizPhase == null) {
+                throw new Error("guest retained quiz session created no production ErQuizPhase");
+              }
               guestQuizQuestions = quizPhase.questions.length;
-              guestQuizAnswered = await driveGuestMirrorQuiz(rig.guestScene, quizPhase, QUIZ_QUESTIONS);
+              if (quizPhase.answered < QUIZ_QUESTIONS) {
+                if (rig.guestScene.phaseManager.getCurrentPhase() !== (quizPhase as unknown as Phase)) {
+                  await driveClientPhaseQueueTo(rig.guestScene, "captured mirrored ErQuizPhase", {
+                    matches: phase => phase === (quizPhase as unknown as Phase),
+                    maxPhases: 16,
+                  });
+                }
+                guestQuizAnswered = await driveGuestMirrorQuiz(rig.guestScene, quizPhase, QUIZ_QUESTIONS, {
+                  alreadyStarted: quizStartObserved,
+                });
+              } else {
+                // The production scheduler consumed the complete retained FIFO while the replay handoff was
+                // draining. Preserve that evidence instead of fabricating or re-entering an old quiz.
+                guestQuizAnswered = quizPhase.answered;
+              }
               guestQuizShop = await startGuestMeShopOwner(rig.guestScene);
             });
           },
@@ -1213,12 +1291,12 @@ describe.skipIf(!RUN)(
       expect(newRounds, "guest re-rendered BOTH repeated option-select rounds (two adopted presentations) (#831)").toBe(
         EXPECTED_NEW_ROUNDS,
       );
-      // The replay is settled because it handed control to the REAL embedded reward watcher. This is a
-      // continuation handoff, not an ME terminal: no outcome was applied and neither counter advanced.
+      // The real embedded reward continuation has taken control, but the replay's exactly-once terminal
+      // guard must remain open until the final PostMysteryEncounter terminal actually exists.
       expect(
         (replay as unknown as { settled: boolean }).settled,
-        "guest CoopReplayMePhase settled only into the embedded reward continuation",
-      ).toBe(true);
+        "guest CoopReplayMePhase remains live before the final Mystery terminal",
+      ).toBe(false);
       // The guest has adopted the pre-reward settlement but has not advanced (the final leave is parked).
       expect(
         applyMeOutcomeSpy.mock.calls.length,

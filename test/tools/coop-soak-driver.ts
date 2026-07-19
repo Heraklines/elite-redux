@@ -55,6 +55,7 @@
 
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
+import type { Phase } from "#app/phase";
 import {
   applyCoopAuthoritativeBattleState,
   applyCoopCaptureParty,
@@ -3251,20 +3252,84 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     hitMode(UiMode.MYSTERY_ENCOUNTER);
 
     let mePath: "host-owned" | "guest-owned" | "battle-handoff";
-    if (hostOwns && battleSpawning) {
+    if (battleSpawning) {
       // BATTLE-HANDOFF: the selected option terminates the ME pump with the dedicated 9M sentinel instead of
       // a non-battle meResync/LEAVE. Park the host after it has generated + streamed the authoritative enemy
       // manifest, let the guest's real replay terminal adopt that manifest and boot its own ME battle, then
       // drive the same bounded multi-turn battle/reward machinery used by normal waves. This is the production
       // path that used to be absent from the continuous campaign, allowing an ME->battle strand to hide behind
       // focused handoff tests.
-      await withClient(rig.hostCtx, async () => {
-        await runSelectMysteryEncounterOption(game, option);
-        await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
-      });
-      const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+      let replay: Phase;
+      if (hostOwns) {
+        await withClient(rig.hostCtx, async () => {
+          await runSelectMysteryEncounterOption(game, option);
+          await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
+        });
+        replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+      } else {
+        // A guest-owned battle option needs the same public proposal ordering as a flat guest-owned ME,
+        // followed by the battle terminal rather than a reward/leave terminal. The former soak driver had
+        // no branch for this ownership combination: it drove the guest pick but never let the host finish
+        // MysteryEncounterBattlePhase or let the guest consume the retained battle manifest. Real browsers
+        // therefore continued while the exploration harness disconnected both transports at wave 32.
+        await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
+        replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+        const setDestinationDelivery = rig.pair.setDestinationContextDelivery;
+        if (setDestinationDelivery == null) {
+          fail("no-park", wave, "guest-owned ME battle handoff requires destination-context transport scheduling");
+        }
+        const deliverInDestinationContext = setDestinationDelivery as (enabled: boolean) => void;
+        let hostReachedBattle = false;
+        let hostBattleDriveError: unknown;
+
+        deliverInDestinationContext(true);
+        try {
+          const hostBattleDrive = withClient(rig.hostCtx, () =>
+            game.phaseInterceptor.to("MysteryEncounterBattlePhase", false),
+          ).then(
+            () => {
+              hostReachedBattle = true;
+            },
+            error => {
+              hostBattleDriveError = error;
+            },
+          );
+          withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, option - 1));
+          const hostBattleDeadline = Date.now() + 10_000;
+          while (!hostReachedBattle && Date.now() < hostBattleDeadline) {
+            // hostBattleDrive keeps the host realm installed. Deliver the queued owner proposal and all
+            // authoritative option continuations there; nesting guest context during that async chain can
+            // end the wrong scene's phase in this one-process fixture.
+            await drainLoopback();
+            if (hostBattleDriveError != null) {
+              throw hostBattleDriveError;
+            }
+          }
+          if (hostBattleDriveError != null) {
+            throw hostBattleDriveError;
+          }
+          if (!hostReachedBattle) {
+            throw new Error(
+              `wave ${wave} ${MysteryEncounterType[type]} guest-owned battle pick did not reach its handoff; `
+                + `host=${rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}`,
+            );
+          }
+          await hostBattleDrive;
+        } finally {
+          deliverInDestinationContext(false);
+        }
+        // The host has retained the exact battle terminal and manifest. Arm the owner's deferred race only
+        // under the guest realm so adoption and the production MysteryEncounterBattlePhase boot affect the
+        // guest engine, exactly as two independent browser event loops would.
+        await withClient(rig.guestCtx, async () => {
+          startGuestMeOutcomeRace(replay);
+          await drainGuestMeReplayToSettle(replay);
+        });
+      }
       await withClient(rig.guestCtx, async () => {
-        await drainGuestMeReplayToSettle(replay);
+        if (hostOwns) {
+          await drainGuestMeReplayToSettle(replay);
+        }
         if (rig.guestScene.phaseManager.getCurrentPhase()?.phaseName !== "MysteryEncounterBattlePhase") {
           fail(
             "no-park",
