@@ -52,6 +52,7 @@ import {
   driveHostRewardShopOwner,
   installDuoLogCapture,
   installHeadlessPlayerAtlasCompletionModel,
+  materializeMirroredGuestInputTurn,
   pumpDuoDestinations,
   reachQueuedRewardShop,
   remirrorWave,
@@ -155,8 +156,15 @@ describe.skipIf(!RUN)(
      * production Command/Fight/Target handlers before the host chooses its own move.
      */
     async function hostPlayWave(rig: DuoRig): Promise<void> {
+      const preRuntimeInitialCommand = hasPreRuntimeInitialCommand(rig);
+      if (preRuntimeInitialCommand) {
+        // buildDuo mirrors an already-open host battle into a fresh renderer whose login/title prefix never
+        // ran. A paired browser completed that prefix before entering co-op; materialize only the omitted
+        // TurnInit boundary so this test reaches the same real guest-owned Command/Fight/Target handlers.
+        await withClient(rig.guestCtx, () => materializeMirroredGuestInputTurn(rig.guestScene));
+      }
       await driveDuoGuestTackleThroughPublicUi(game, rig, {
-        restartAlreadyOpenHost: hasPreRuntimeInitialCommand(rig),
+        restartAlreadyOpenHost: preRuntimeInitialCommand,
       });
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
