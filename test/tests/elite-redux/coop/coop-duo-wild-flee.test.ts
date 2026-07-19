@@ -19,9 +19,8 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, getCoopWaveBoundaryStatus, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { getCoopStagedWaveAdvanceTransaction } from "#data/elite-redux/coop/coop-wave-operation";
 import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -136,8 +135,11 @@ describe.skipIf(!RUN)("#838 VERIFY-1: co-op wild-flee wave-advance broadcast", (
     expect(rig.hostScene.currentBattle.waveIndex, "the host advanced beyond the fled wave").toBe(2);
     expect(rig.guestScene.currentBattle.waveIndex, "the guest advanced beyond the fled wave").toBe(2);
 
-    const stagedBeforeCommand = getCoopStagedWaveAdvanceTransaction(1, rig.guestRuntime.waveOperationBinding);
-    expect(stagedBeforeCommand?.dataApplied, "BattleEnd applied the exact retained wave-1 DATA image").toBe(true);
+    const stagedBeforeCommand = getCoopWaveBoundaryStatus(1, rig.guestRuntime);
+    expect(stagedBeforeCommand, "BattleEnd applied the ordered Authority V2 wave-1 DATA image").toMatchObject({
+      authority: "v2",
+      dataApplied: true,
+    });
     expect(
       stagedBeforeCommand?.continuationReady,
       "a merely-current CommandPhase is not public continuation evidence",
@@ -148,8 +150,8 @@ describe.skipIf(!RUN)("#838 VERIFY-1: co-op wild-flee wave-advance broadcast", (
     // production Ui.coopAuthoritySurfaceReady -> battle-stream notification chain under test.
     await driveDuoGuestTackleThroughPublicUi(game, rig);
 
-    const stagedAfterCommand = getCoopStagedWaveAdvanceTransaction(1, rig.guestRuntime.waveOperationBinding);
-    expect(stagedAfterCommand?.dataApplied).toBe(true);
+    const stagedAfterCommand = getCoopWaveBoundaryStatus(1, rig.guestRuntime);
+    expect(stagedAfterCommand).toMatchObject({ authority: "v2", dataApplied: true });
     expect(
       stagedAfterCommand?.continuationReady,
       "the real wave-2 COMMAND handler completes retained flee continuation readiness",

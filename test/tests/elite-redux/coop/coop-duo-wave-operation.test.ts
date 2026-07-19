@@ -363,11 +363,13 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
 
     await withClient(rig.guestCtx, () => {
       const phase = new BattleEndPhase(true);
-      // This fixture deliberately keeps the live sink unresolved so BattleEnd captures the durable
-      // wave-11 identity before ambient state speculates ahead. Mark the already-delivered retained
-      // image applied at that exact identity; otherwise the fixture would ask the guest applier to
-      // rewind an unrelated, manually-mutated wave-12 scene and correctly enter shared recovery.
-      markCoopWaveAdvanceDataApplied(11, rig.guestRuntime.waveOperationBinding);
+      // Make the phase the real active boundary before ambient state speculates ahead. V2 deliberately
+      // rejects a detached BattleEnd instance: merely calling start() on an object that the phase manager
+      // does not own is not a state either browser can reach.
+      rig.guestScene.phaseManager.clearPhaseQueue();
+      rig.guestScene.phaseManager.unshiftPhase(phase);
+      rig.guestScene.phaseManager.shiftPhase();
+      expect(rig.guestScene.phaseManager.getCurrentPhase()).toBe(phase);
       // The next battle has speculated ahead to an ME. The addressed retained source is still wave 11.
       rig.guestScene.currentBattle.waveIndex = 12;
       rig.guestScene.currentBattle.battleType = BattleType.MYSTERY_ENCOUNTER;

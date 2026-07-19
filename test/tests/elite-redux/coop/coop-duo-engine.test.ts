@@ -36,6 +36,7 @@ import {
   buildRuntime,
   type ClientCtx,
   drainLoopback,
+  driveClientPhaseQueueTo,
   emptyGhostSnapshot,
   installDuoLogCapture,
   installHeadlessPlayerAtlasCompletionModel,
@@ -288,17 +289,17 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     await withClient(guestCtx, () => drainLoopback());
 
     // ===== Pump the GUEST: run its REAL CoopReplayTurnPhase for the host's turn. The host won the
-    // wave (it broadcast waveResolved "win"), so the guest's deferred CoopFinalizeTurnPhase consumes
-    // the pending wave-advance and queues the VictoryPhase tail - the guest's path to the SAME post-
-    // battle reward shop the host reaches. We assert it queues that tail (no infinite TurnInit loop).
-    const guestVictoryQueued: string[] = [];
+    // wave (it broadcast waveResolved "win"), so the guest's ordered WAVE_ADVANCE entry owns the
+    // VictoryPhase tail - the guest's path to the SAME post-battle reward shop the host reaches.
+    // We assert the real phase queue reaches that tail (no infinite TurnInit loop).
+    let guestVictoryPhase = "";
     await withClient(guestCtx, async () => {
-      const pushNewSpy = vi.spyOn(guestScene.phaseManager, "pushNew");
       const turn = guestScene.currentBattle.turn;
       await driveGuestReplayTurn(guestScene, turn);
-      for (const call of pushNewSpy.mock.calls) {
-        guestVictoryQueued.push(call[0] as string);
-      }
+      // A null TURN successor deliberately cannot manufacture this tail. The following ordered
+      // WAVE_ADVANCE entry owns it, first through CoopWaveAdvanceBoundaryPhase and then VictoryPhase.
+      const victory = await driveClientPhaseQueueTo(guestScene, "VictoryPhase");
+      guestVictoryPhase = victory.phaseName;
     });
 
     // The guest RESOLVEd + applied the host's authoritative material (rendered the host's outcome). The
@@ -322,7 +323,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // PHASE PROGRESS / no hang: the guest's finalize queued its OWN turn-end (the run loops) AND the
     // VictoryPhase tail (the wave advances toward the post-battle reward shop). This is the exact path
     // that softlocked in the field before #698/#697 - here it surfaces organically across two engines.
-    expect(guestVictoryQueued, "the guest queued the VictoryPhase wave-advance tail (path to reward shop)").toContain(
+    expect(guestVictoryPhase, "the ordered WAVE_ADVANCE exposed the guest's VictoryPhase path to the shop").toBe(
       "VictoryPhase",
     );
 

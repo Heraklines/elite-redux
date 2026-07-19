@@ -26,7 +26,6 @@ import { initGlobalScene } from "#app/global-scene";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
-  awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
   broadcastCoopWaveResolved,
   clearCoopRuntime,
@@ -41,6 +40,7 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { PokemonMove } from "#moves/pokemon-move";
+import { BattleEndPhase } from "#phases/battle-end-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -51,7 +51,7 @@ import {
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -151,12 +151,19 @@ describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest conve
 
     // ===== GUEST BattleEndPhase branch: apply the V2 material at the real retained boundary. =====
     let released = 0;
-    const owned = withClientSync(rig.guestCtx, () =>
-      awaitCoopSettledWaveAdvanceAtBattleEnd(() => {
+    await withClient(rig.guestCtx, () => {
+      const boundary = new BattleEndPhase(true);
+      rig.guestScene.phaseManager.clearPhaseQueue();
+      rig.guestScene.phaseManager.unshiftPhase(boundary);
+      rig.guestScene.phaseManager.shiftPhase();
+      expect(rig.guestScene.phaseManager.getCurrentPhase(), "the retained BattleEnd is the active boundary").toBe(
+        boundary,
+      );
+      vi.spyOn(boundary, "end").mockImplementation(() => {
         released += 1;
-      }),
-    );
-    expect(owned, "Authority V2 owns the guest's BattleEnd boundary").toBe(true);
+      });
+      boundary.start();
+    });
     expect(released, "the boundary releases only after V2 material applies").toBe(1);
     expect(
       withClientSync(rig.guestCtx, () => getCoopWaveBoundaryStatus(1, rig.guestRuntime)),

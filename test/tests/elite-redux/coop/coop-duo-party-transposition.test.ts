@@ -40,25 +40,26 @@ import { adoptCoopHostPlayerPartyOrder, captureCoopChecksumState } from "#data/e
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
-  awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
   broadcastCoopWaveResolved,
   clearCoopRuntime,
   getCoopWaveBoundaryStatus,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { Move } from "#moves/move";
+import { BattleEndPhase } from "#phases/battle-end-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
   type CoopResyncProbe,
   type DuoRig,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
@@ -220,6 +221,25 @@ describe.skipIf(!RUN)(
         "guest party order matches the host",
       ).toEqual(hostOrderAfter);
 
+      // Start both real turn-N+1 command surfaces. This is the mechanical proof that retires the ordered
+      // replacement entry; merely constructing/replaying up to CommandPhase is intentionally insufficient.
+      const guestCommand = await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "post-replacement guest CommandPhase", {
+          matches: phase =>
+            phase.phaseName === "CommandPhase"
+            && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+        }),
+      );
+      await withClient(rig.guestCtx, () => {
+        guestCommand.start();
+      });
+      await withClient(rig.hostCtx, () => {
+        const hostCommand = rig.hostScene.phaseManager.getCurrentPhase();
+        expect(hostCommand.phaseName, "the host retained its prepared post-replacement command").toBe("CommandPhase");
+        hostCommand.start();
+      });
+      await pumpDuoDestinations(rig, 4);
+
       // The bench mon that took the field (FENNEKIN, host slot 0) fights on + levels up: settle it on the host,
       // then commit the host's complete settled image into an ordered V2 WAVE_ADVANCE and apply it at the
       // guest's retained BattleEnd boundary.
@@ -232,12 +252,17 @@ describe.skipIf(!RUN)(
       });
       await pumpDuoDestinations(rig, 4);
       let released = 0;
-      const waveBoundaryOwned = withClientSync(rig.guestCtx, () =>
-        awaitCoopSettledWaveAdvanceAtBattleEnd(() => {
+      await withClient(rig.guestCtx, () => {
+        const boundary = new BattleEndPhase(true);
+        rig.guestScene.phaseManager.clearPhaseQueue();
+        rig.guestScene.phaseManager.unshiftPhase(boundary);
+        rig.guestScene.phaseManager.shiftPhase();
+        expect(rig.guestScene.phaseManager.getCurrentPhase(), "the V2 BattleEnd boundary is current").toBe(boundary);
+        vi.spyOn(boundary, "end").mockImplementation(() => {
           released += 1;
-        }),
-      );
-      expect(waveBoundaryOwned, "Authority V2 owns the guest's retained wave boundary").toBe(true);
+        });
+        boundary.start();
+      });
       expect(released, "the V2 boundary releases only after the settled image applies").toBe(1);
       expect(
         withClientSync(rig.guestCtx, () => getCoopWaveBoundaryStatus(1, rig.guestRuntime)),

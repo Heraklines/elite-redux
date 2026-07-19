@@ -35,10 +35,9 @@ import {
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -47,6 +46,7 @@ import {
   arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
@@ -74,6 +74,10 @@ const RUN = process.env.ER_SCENARIO === "1";
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+function hasPreRuntimeInitialCommand(rig: DuoRig): boolean {
+  return rig.hostScene.currentBattle.waveIndex === 1 && rig.hostScene.currentBattle.turn === 1;
 }
 
 // #827: the continuation-aware replay driver now lives in the shared harness ({@linkcode driveGuestReplayTurn}
@@ -142,21 +146,20 @@ describe.skipIf(!RUN)(
       // best-effort
     });
 
-    /** Wire the guest's OWN-slot command answer (the genuine production CoopBattleSync relay). */
-    function wireGuestCommand(rig: DuoRig): void {
-      rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-        command: Command.FIGHT,
-        cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-        moveId: MoveId.TACKLE,
-        targets: [BattlerIndex.ENEMY_2],
-      }));
-    }
-
-    /** Drive ONE host wave to a win (both player slots FIGHT the frail enemies) under the host ctx. */
+    /**
+     * Drive one wave through both players' real input surfaces.
+     *
+     * The previous helper injected the guest-owned move into the host engine and left the guest's actual
+     * CommandPhase open. That is not a state two browsers can reach: the next V2 reward entry then correctly
+     * refused to attest a shop hidden behind the unclosed command UI. Submit the guest choice through its
+     * production Command/Fight/Target handlers before the host chooses its own move.
+     */
     async function hostPlayWave(rig: DuoRig): Promise<void> {
+      await driveDuoGuestTackleThroughPublicUi(game, rig, {
+        restartAlreadyOpenHost: hasPreRuntimeInitialCommand(rig),
+      });
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-        game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
         await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
     }
@@ -196,7 +199,6 @@ describe.skipIf(!RUN)(
     async function driveFaultRun(faultPair: CoopFaultPair, WAVES: number): Promise<FaultRunResult> {
       const rig = await buildDuo(game, faultPair, setCoopRuntime, toCoop);
       installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
-      wireGuestCommand(rig);
 
       // Count the guest's auto-resyncs: a converged run under CUE-ONLY faults should force NONE (the
       // authoritative checkpoint is never faulted), so any storm is a real regression.
@@ -220,9 +222,7 @@ describe.skipIf(!RUN)(
         const hostStart = await withClient(rig.hostCtx, () => captureCoopChecksum());
         const guestStart = await withClient(rig.guestCtx, () => captureCoopChecksum());
         expect(guestStart, `wave ${w}: guest wave-start checksum matches host`).toBe(hostStart);
-        if (guestStart === hostStart) {
-          result.waveStartMatches += 1;
-        }
+        result.waveStartMatches += Number(guestStart === hostStart);
 
         // (2) Host plays the wave to a win (emits its turnResolution/checkpoint + streams LIVE cues, which the
         // faulting transport drops/reorders/delays); the guest replays through whatever cues survived.
@@ -251,9 +251,7 @@ describe.skipIf(!RUN)(
           guestPostState.saveDataDigest,
           `wave ${w}: guest post-turn getSessionSaveData digest is byte-identical to host (cue loss healed)`,
         ).toBe(hostPostState.saveDataDigest);
-        if (guestPostState.saveDataDigest === hostPostState.saveDataDigest) {
-          result.postTurnMatches += 1;
-        }
+        result.postTurnMatches += Number(guestPostState.saveDataDigest === hostPostState.saveDataDigest);
         // STRONGER byte-identical proof: the ENTIRE checksum state (field hp/status/stat-stages/tags + per-move
         // ppUsed + party/money/balls/modifiers/biome/seed) is identical, not just the save digest. This holds
         // because the guest reaches CoopFinalizeTurnPhase (the checkpoint apply) via driveGuestReplayTurn, and
@@ -262,9 +260,7 @@ describe.skipIf(!RUN)(
           JSON.stringify(guestPostState),
           `wave ${w}: guest post-turn FULL checksum state is byte-identical to host despite faulted cues`,
         ).toBe(JSON.stringify(hostPostState));
-        if (JSON.stringify(guestPostState) === JSON.stringify(hostPostState)) {
-          result.postTurnStateMatches += 1;
-        }
+        result.postTurnStateMatches += Number(JSON.stringify(guestPostState) === JSON.stringify(hostPostState));
 
         // (4) Reward shop: interaction alternation stays lockstep (counters advance together).
         await leaveRewardShop(rig, w);
@@ -364,7 +360,6 @@ describe.skipIf(!RUN)(
 
       const rig = await buildDuo(game, faultPair, setCoopRuntime, toCoop);
       installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
-      wireGuestCommand(rig);
       const resyncSpy = vi.spyOn(CoopBattleStreamer.prototype, "requestStateSync");
 
       const WAVES = 3;
@@ -493,7 +488,6 @@ describe.skipIf(!RUN)(
       const faultPair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 0xa07 });
       const rig = await buildDuo(game, faultPair, setCoopRuntime, toCoop);
       installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
-      wireGuestCommand(rig);
       const resyncSpy = vi.spyOn(CoopBattleStreamer.prototype, "requestStateSync");
 
       const convergedNow = async (): Promise<boolean> => {
