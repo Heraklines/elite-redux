@@ -33,6 +33,14 @@ const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 // waiting for a send-out menu after it would hang forever (run 29644735938, 30-wave lane).
 const REPLACEMENT_PICK_COMMITTED = /faint picker PICK|Start Phase SwitchSummonPhase/u;
 const REPLACEMENT_PICKER_OPEN = /Start Phase (?:SwitchPhase|CoopGuestFaintSwitchPhase)|guest own-faint picker OPEN/u;
+// A forced faint-replacement CLOSES with the slot left EMPTY when the owner's whole half is wiped (no
+// legal same-owner bench): the host's own SwitchPhase logs the no-legal-same-owner close (switch-phase.ts
+// OWNER branch) and the guest's picker closes from committed authority with a NO-PICK sentinel (partySlot
+// -1). Either way NO human pick is owed - the slot stays empty and the run continues asymmetric (#828, the
+// coop-duo-half-wiped product path). The drive must complete like a real seat at that picker instead of
+// spinning to its timeout waiting for an actionable picker that (by design) never becomes selectable.
+const REPLACEMENT_HALF_WIPED_CLOSE =
+  /no legal same-owner replacement \(half wiped\)|own-faint picker CLOSE from committed authority[^\n]*party\[-1\]/u;
 // Distinct resolution sentinel for the send-out-menu wait: the authority committed the pick under us.
 const REPLACEMENT_DRIVE_SUPERSEDED = Symbol("replacement-drive-superseded");
 const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) wave=(\d+) turn=(\d+) rev=(\d+)/u;
@@ -3279,6 +3287,19 @@ export class DuoPublicUiRig {
       replacementSurface = findOwnedReadyReplacement(owner, replacementCursors[owner.label]);
       if (replacementSurface != null) {
         break;
+      }
+      // HALF-WIPED CLOSE (drive-layer parity with the product, coop-duo-half-wiped): the owner's whole
+      // half is wiped, so NO actionable same-owner picker will EVER open - the product relays a no-pick
+      // sentinel and closes the phase with the slot left empty, advancing to the next CommandPhase. Mirror
+      // the awaitConcurrentOwnedReplacement close exit here: complete the drive (no pick owed, no
+      // replacementCount bump) instead of spinning to the timeout below. Probed from the picker-open cursor
+      // so it can only match this faint window's close.
+      const halfWipedClose = owner.evidence.find(REPLACEMENT_HALF_WIPED_CLOSE, replacementCursors[owner.label]);
+      if (halfWipedClose != null) {
+        owner.evidence.record("replacement-drive-half-wiped-close", {
+          close: halfWipedClose.text ?? null,
+        });
+        return;
       }
       const terminal =
         owner.evidence.find(SHARED_SESSION_TERMINAL, replacementCursors[owner.label])

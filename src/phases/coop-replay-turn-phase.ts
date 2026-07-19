@@ -460,10 +460,19 @@ export class CoopReplayTurnPhase extends Phase {
         // CoopFinalizeTurnPhase, LAST on this tree level. Never collapse this back to a
         // synchronous applyCoopCheckpoint.
         const live = streamer.consumeLiveEvents(this.turn);
-        const remaining = this.mergeLiveAndBatch(live, raced.res.events, this.rendered);
+        // #822 / Track R cycle 13 (duplicate-replay double-render): merge from the SHARED per-turn render
+        // watermark, not just THIS instance's `rendered`. A duplicate replay phase (its own `rendered=0`,
+        // spawned by the ME-battle boot and resolving BEFORE the real instance's finalize marks the turn
+        // finalized) whose live events were already drained+deleted would otherwise batch-refill the whole
+        // turn again -> double-applied damage/stat stages -> stable enemyParty divergence. Render only the
+        // positions past the highest already rendered by ANY phase for this turn; the checkpoint still
+        // corrects residual state, and a post-resync re-baseline resets the watermark (fresh turn address).
+        const renderedThrough = Math.max(this.rendered, streamer.renderedThroughForTurn(this.turn));
+        const remaining = this.mergeLiveAndBatch(live, raced.res.events, renderedThrough);
+        streamer.noteRenderedThrough(this.turn, raced.res.events.length);
         coopLog(
           "replay",
-          `guest replay turn=${this.turn}: RESOLVE renderedLive=${this.rendered} remaining=${remaining.length} batch=${raced.res.events.length}`,
+          `guest replay turn=${this.turn}: RESOLVE renderedLive=${renderedThrough} remaining=${remaining.length} batch=${raced.res.events.length}`,
         );
         this.renderEvents(remaining);
         coopLog("replay", `guest replay turn=${this.turn}: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)`);

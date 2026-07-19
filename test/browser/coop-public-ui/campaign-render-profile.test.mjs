@@ -4,6 +4,7 @@
  */
 
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { loadCampaignPolicy } from "./campaign-policy.mjs";
 import { EvidenceSink } from "./evidence.mjs";
@@ -81,4 +82,29 @@ test("browser render-profile markers are validated and indexed as evidence", () 
 
   emitConsole('[coop-browser:render-profile] {"version":1,"moveAnimations":"false","gameSpeed":10}');
   assert.equal(sink.failures.at(-1)?.kind, "browser-surface-invalid");
+});
+
+test("the animations-on turn budget is a per-event-derived ceiling scoped to the animations-on profile only", async () => {
+  const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
+  // Track R cycle 13: the animations-on-surface lane spent ~440s on a dense 24-event turn (~18s/event)
+  // on the GPU-less SwiftShader runner while sync stayed byte-correct, so the 360s default ceiling
+  // expired a CORRECT turn. The calibrated ceiling is DERIVED from the measured per-event cost times a
+  // bounded max turn-event count - it is not a hand-picked round number, and it must not touch any other
+  // profile's budget.
+  assert.match(campaign, /const ANIMATIONS_ON_MEASURED_PER_EVENT_MS = 18_000;/u);
+  assert.match(campaign, /const ANIMATIONS_ON_MAX_TURN_EVENTS = 32;/u);
+  assert.match(
+    campaign,
+    /const ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS =\s*ANIMATIONS_ON_MEASURED_PER_EVENT_MS \* ANIMATIONS_ON_MAX_TURN_EVENTS;/u,
+  );
+  // The default OUTCOME_HARD_CEILING_MS is UNCHANGED - every non-animations profile keeps it.
+  assert.match(campaign, /const OUTCOME_HARD_CEILING_MS = 360_000;/u);
+  // The calibrated ceiling is passed ONLY when the profile expects animations (policy.moveAnimationsExpected);
+  // otherwise null flows through to the default. Asserted at BOTH turn-outcome waits.
+  const gated =
+    /animationHardCeilingMs: policy\.moveAnimationsExpected \? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : null,/gu;
+  assert.equal((campaign.match(gated) ?? []).length, 2, "both turn-outcome waits gate the ceiling on the profile");
+  // waitForOutcomeBounded threads the override into createAnimationProgressBudget only when non-null, so a
+  // null (any other profile) leaves the default OUTCOME_HARD_CEILING_MS in force.
+  assert.match(campaign, /animationHardCeilingMs == null \? \{\} : \{ hardCeilingMs: animationHardCeilingMs \}/u);
 });

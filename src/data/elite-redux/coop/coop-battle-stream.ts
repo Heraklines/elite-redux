@@ -862,6 +862,20 @@ export class CoopBattleStreamer {
    * silently dropped while old turns never leak.
    */
   private readonly liveEvents = new Map<string, LiveTurnBuffer>();
+  /**
+   * GUEST (#822 / Track R cycle 13 duplicate-replay double-render): the highest number of event POSITIONS
+   * (seq 0..N-1) already RENDERED for a turn address, SHARED across every {@linkcode CoopReplayTurnPhase}
+   * instance for the same turn. {@linkcode consumeLiveEventsFrom} DELETES the live events it drains, so a
+   * DUPLICATE replay phase (spawned by the ME-battle boot, resolving with its OWN instance watermark
+   * `rendered=0` BEFORE the real instance's finalize marks the turn finalized) finds the live buffer empty
+   * and {@linkcode CoopReplayTurnPhase.mergeLiveAndBatch} batch-FILLS the whole turn again -> double-applied
+   * damage/stat stages -> stable enemyParty.hp/statStages divergence. This watermark scopes the
+   * exactly-once render to the LIVE-EVENT STREAM: whichever phase renders a position advances it, so a
+   * second phase for the same turn re-renders nothing already covered. Keyed like {@linkcode liveEvents};
+   * cleared with them on every session/authority reset and on wave advance ({@linkcode clearFinalizedMark}),
+   * so a legitimate post-resync/checkpoint-reapply re-render of a fresh turn address always starts at zero.
+   */
+  private readonly renderedThrough = new Map<string, number>();
   /** GUEST: live-event arrival handler (optional; lets a live pump react the instant one lands). */
   private liveEventHandler: ((turn: number, seq: number, event: CoopBattleEvent) => void) | null = null;
   /** GUEST: one-shot live-arrival waiter for the pump race ({@linkcode awaitTurnOrLiveEvent}). */
@@ -908,6 +922,10 @@ export class CoopBattleStreamer {
    */
   clearFinalizedMark(): void {
     this.finalizedMarks.clear();
+    // Scope the per-turn render watermark to the wave, exactly like finalizedMarks: a fresh wave restarts
+    // at turn 1, and (without an authority context to fold the wave into the key) the `t:1` key would
+    // otherwise collide with the finished wave's turn 1 and wrongly suppress its first legitimate render.
+    this.renderedThrough.clear();
   }
 
   private enemyPartyHandler: ((wave: number, enemies: CoopSerializedEnemy[]) => void) | null = null;
@@ -1503,6 +1521,7 @@ export class CoopBattleStreamer {
     this.inbox.clear();
     this.pendingSince.clear();
     this.liveEvents.clear();
+    this.renderedThrough.clear();
     this.pendingCheckpoints.clear();
     this.appliedOutOfBandCheckpoints.clear();
     this.highestSeenTurnAuthority.clear();
@@ -3685,10 +3704,54 @@ export class CoopBattleStreamer {
       run.push(event);
       perTurn.delete(seq);
     }
-    if (run.length > 0 && isCoopDebug()) {
-      coopLog("replay", `guest live-pump drain turn=${turn} seq=${fromSeq}..${fromSeq + run.length - 1}`);
+    if (run.length > 0) {
+      // Advance the SHARED per-turn render watermark: these positions are being presented now (the caller
+      // renders the returned run). A duplicate replay phase for the same turn then finds them already
+      // covered and does not re-render them via the turn-end batch fill (#822 double-render).
+      this.noteRenderedThrough(turn, fromSeq + run.length);
+      if (isCoopDebug()) {
+        coopLog("replay", `guest live-pump drain turn=${turn} seq=${fromSeq}..${fromSeq + run.length - 1}`);
+      }
     }
     return run;
+  }
+
+  /** Key the SHARED per-turn render watermark exactly like the live-event buffer so both replay phases agree. */
+  private renderedThroughKey(turn: number): string {
+    const current = this.currentAuthorityAddress(turn);
+    if (this.authorityContext != null && current != null) {
+      return pendingTurnKey(current);
+    }
+    return `t:${turn}`;
+  }
+
+  /**
+   * GUEST (#822 double-render): how many event POSITIONS (seq 0..N-1) have already been rendered for `turn`
+   * by ANY {@linkcode CoopReplayTurnPhase} instance (0 when none). The turn-end merge starts from the MAX of
+   * this and the phase's own `rendered`, so a duplicate replay phase (its own `rendered=0`) re-renders only
+   * positions the live-event stream had not already presented.
+   */
+  renderedThroughForTurn(turn: number): number {
+    return this.renderedThrough.get(this.renderedThroughKey(turn)) ?? 0;
+  }
+
+  /** GUEST (#822 double-render): monotonically advance the shared per-turn render watermark to `throughCount`. */
+  noteRenderedThrough(turn: number, throughCount: number): void {
+    if (!Number.isFinite(throughCount) || throughCount <= 0) {
+      return;
+    }
+    const key = this.renderedThroughKey(turn);
+    if (throughCount <= (this.renderedThrough.get(key) ?? 0)) {
+      return;
+    }
+    rememberBounded(this.renderedThrough, key, throughCount);
+    while (this.renderedThrough.size > LIVE_EVENT_TURN_RETENTION + 1) {
+      const oldest = this.renderedThrough.keys().next().value as string | undefined;
+      if (oldest === undefined || oldest === key) {
+        break;
+      }
+      this.renderedThrough.delete(oldest);
+    }
   }
 
   /**
@@ -4073,6 +4136,7 @@ export class CoopBattleStreamer {
     this.stateSyncWaiters.clear();
     this.inbox.clear();
     this.liveEvents.clear();
+    this.renderedThrough.clear();
     this.finalizedMarks.clear();
     this.liveEventHandler = null;
     this.liveWaiter = null;
