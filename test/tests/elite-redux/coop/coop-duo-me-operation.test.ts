@@ -545,6 +545,9 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
 
     const pair = createLoopbackPair();
     const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+    // runToMysteryEncounter forces a 100% rate for its target wave. This leg crosses into wave 13 to
+    // prove the real next-command continuation, so restore the ordinary-wave rate after wave 12 is built.
+    game.override.mysteryEncounterChance(0);
 
     // Seed the interaction counter to 1 (ODD -> guest owns the ME).
     await withClient(rig.hostCtx, () => rig.hostRuntime.controller.advanceInteraction());
