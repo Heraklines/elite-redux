@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  allClientsAtCurrentCommandFrontier,
   allClientsAtOwnedCommandFrontier,
   clientsAwaitingTurnProgress,
   createAnimationProgressBudget,
@@ -192,6 +193,61 @@ test("between-wave completion accepts both semantic command frontiers without le
     false,
   );
   assert.equal(allClientsAtOwnedCommandFrontier(clients, { "seat-0": 0, "seat-1": 0 }), true);
+  assert.equal(allClientsAtCurrentCommandFrontier(clients, { "seat-0": 0, "seat-1": 0 }), true);
+});
+
+test("a one-sided next-wave command does not preempt its partner's current learn-move continuation", () => {
+  const host = fakeClient("host");
+  host.publicSeat = 0;
+  const guest = fakeClient("guest");
+  guest.publicSeat = 1;
+  const command = (localSeat, phaseInstance) => ({
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:command",
+      operationClass: "command",
+      phase: "CommandPhase",
+      phaseInstance,
+      uiMode: "COMMAND",
+      localSeat,
+      seatsWithInput: [localSeat],
+      ready: { handlerActive: true },
+    },
+  });
+  guest.evidence.events.push(command(1, 31));
+  host.evidence.events.push({
+    index: host.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "battle:message",
+      operationClass: "battle-progress",
+      phase: "LearnMovePhase",
+      phaseInstance: 40,
+      uiMode: "MESSAGE",
+      localSeat: 0,
+      seatsWithInput: [0],
+      ready: { handlerActive: true, awaitingActionInput: true },
+    },
+  });
+  const clients = [host, guest];
+  const cursors = { host: 0, guest: 0 };
+
+  assert.equal(
+    allClientsAtCurrentCommandFrontier(clients, cursors),
+    false,
+    "the campaign must keep dispatching the host's visible continuation instead of blocking on command convergence",
+  );
+
+  host.evidence.events.push({
+    ...command(0, 41),
+    index: host.evidence.events.length,
+  });
+  assert.equal(
+    allClientsAtCurrentCommandFrontier(clients, cursors),
+    true,
+    "only the host's later current command projection admits the shared frontier proof",
+  );
 });
 
 function fakeClient(label, texts = []) {

@@ -480,6 +480,51 @@ export function allClientsAtOwnedCommandFrontier(clients, from) {
 }
 
 /**
+ * Whether every browser's CURRENT semantic projection belongs to the same command-frontier class.
+ *
+ * Between waves, one browser can legitimately reach the next CommandPhase while its partner is still
+ * resolving a public LearnMove/egg/reward continuation. Historical command evidence is insufficient:
+ * entering the blocking shared-frontier proof at that moment prevents the campaign from driving the
+ * partner's visible continuation. Accept owner and renderer/partner-wait projections, but only when each
+ * is the latest semantic UI after this wave's cursor. The full shared proof still validates address,
+ * membership, generation, digest, and at least one actionable owner.
+ */
+export function allClientsAtCurrentCommandFrontier(clients, from) {
+  return clients.every(client => {
+    const cursor = from[client.label] ?? 0;
+    const event = client.evidence.findLastSemanticSurface(cursor);
+    const observation = event?.observation;
+    if (observation == null) {
+      return findOwnedCommandFrontier(client, cursor) != null;
+    }
+    const owner =
+      observation.surfaceId === "command:command"
+      && observation.operationClass === "command"
+      && observation.phase === "CommandPhase"
+      && observation.uiMode === "COMMAND"
+      && observation.ready?.handlerActive === true
+      && observation.localSeat === client.publicSeat
+      && observation.seatsWithInput?.includes(client.publicSeat);
+    const rendererWatcher =
+      observation.surfaceId === "command:watcher"
+      && observation.operationClass === "command"
+      && observation.phase === "CoopReplayTurnPhase"
+      && observation.seatsWithInput?.length === 0
+      && observation.ready?.handlerActive === false
+      && observation.ready?.awaitingActionInput === false
+      && observation.ready?.inputBlocked === true;
+    const partnerWaiting =
+      observation.surfaceId === "battle:message"
+      && observation.operationClass === "battle-progress"
+      && observation.phase === "CommandPhase"
+      && observation.uiMode === "MESSAGE"
+      && observation.ready?.handlerActive === true
+      && observation.ready?.awaitingActionInput === true;
+    return owner || rendererWatcher || partnerWaiting;
+  });
+}
+
+/**
  * Drive only the clients whose first command never entered the turn path. A valid but CPU-starved
  * browser turn can take much longer than the short fallback window. Run 29312876722 proved that
  * blindly replaying the whole fallback on BOTH clients in that state smears its keys across damage,
@@ -2158,7 +2203,7 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
       return { status: "terminal" };
     }
 
-    if (clients.some(client => findOwnedCommandFrontier(client, commandCursors[client.label]) != null)) {
+    if (allClientsAtCurrentCommandFrontier(clients, commandCursors)) {
       const boundary = await rig.assertSharedCommandFrontier(commandCursors, `wave-${waveOrdinal}-advance`, {
         allowAddressRepeat: true,
       });
