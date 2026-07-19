@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { resetCoopStateTicks } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   CoopMeTerminalTransactionReceiver,
   captureCoopMeCommittedTerminalCursor,
   commitMeOwnerIntent,
+  completeCoopMeFinalOutcomeFromRetainedSettlement,
   coopMeTerminalSanctionedTails,
   isCompleteCoopMeTerminalPayload,
   nextCoopMePresentationStep,
@@ -166,6 +168,30 @@ function eggReward(overrides: Record<string, unknown> = {}): CoopMeRewardSurface
 }
 
 describe("complete retained Mystery terminal transaction", () => {
+  it("republishes the exact post-reward result when the final live crossing capture is fieldless", () => {
+    resetCoopStateTicks();
+    try {
+      const fieldless = { ...outcome(12), authoritativeState: undefined };
+      const rewardResult = {
+        ...authoritativeState(12),
+        tick: 44,
+        pokeballCounts: [[1, 99]] as [number, number][],
+      };
+
+      const completed = completeCoopMeFinalOutcomeFromRetainedSettlement(7, fieldless, rewardResult);
+
+      expect(completed.authoritativeState).toEqual({
+        ...rewardResult,
+        tick: 1,
+        pokeballCounts: [],
+      });
+      expect(fieldless.authoritativeState, "the fresh final outcome remains immutable").toBeUndefined();
+      expect(rewardResult.tick, "the retained reward retry image remains immutable").toBe(44);
+    } finally {
+      resetCoopStateTicks();
+    }
+  });
+
   it("keeps an explicit monotonic host terminal cursor and releases the whole pinned lifecycle", () => {
     const runtime = createCoopRuntimeOpState("host");
     const pinned = 7;

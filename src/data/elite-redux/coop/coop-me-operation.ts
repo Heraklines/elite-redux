@@ -51,7 +51,7 @@
 // =============================================================================
 
 import { canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
-import { captureCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
+import { captureCoopAuthoritativeBattleState, coopNextStateTick } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_CAP_OP_ME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
@@ -624,9 +624,26 @@ function canonicalMeOutcomeWithoutAuthority(outcome: Extract<CoopInteractionOutc
 export function completeCoopMeFinalOutcomeFromRetainedSettlement(
   pinned: number,
   outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>,
+  latestRewardState?: CoopAuthoritativeBattleStateV1,
 ): Extract<CoopInteractionOutcome, { k: "meResync" }> {
   if (outcome.authoritativeState != null) {
     return outcome;
+  }
+  if (latestRewardState != null) {
+    coopLog(
+      "me",
+      `final terminal republishes exact post-reward authoritativeState pinned=${pinned} sourceTick=${latestRewardState.tick}`,
+    );
+    return {
+      ...outcome,
+      authoritativeState: {
+        ...(JSON.parse(JSON.stringify(latestRewardState)) as CoopAuthoritativeBattleStateV1),
+        // This image already crossed in the reward result. Publish it at a NEW tick so the terminal
+        // transaction is an admissible idempotent reassertion, and keep crossing ball ownership disabled.
+        tick: coopNextStateTick(),
+        pokeballCounts: [],
+      },
+    };
   }
   const s = state();
   const cursor = s.committedTerminalByPinned.get(pinned);
@@ -1043,7 +1060,7 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
         value.destination != null && typeof value.destination === "object"
           ? (value.destination as Partial<CoopMeTerminalDestination>)
           : undefined;
-      coopWarn("me", "ME_TERMINAL commit rejected: terminal transaction is incomplete", {
+      const diagnostics = {
         terminal: value.terminal ?? null,
         outcomeKind: outcome?.k ?? null,
         base: outcome?.base === null ? "null" : typeof outcome?.base,
@@ -1059,7 +1076,10 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
         playerParty: Array.isArray(authoritativeState?.playerParty),
         enemyParty: Array.isArray(authoritativeState?.enemyParty),
         destinationKind: destination?.kind ?? null,
-      });
+      };
+      // Browser evidence recorders preserve primitive console arguments. Inline the structured reason so a
+      // campaign failure says which field was incomplete instead of flattening the object to `[object Object]`.
+      coopWarn("me", `ME_TERMINAL commit rejected: terminal transaction is incomplete ${JSON.stringify(diagnostics)}`);
       return null;
     }
     const ownerSeat = ownerSeatFor(params.kind, params.pinned);

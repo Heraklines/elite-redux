@@ -36,6 +36,10 @@ import type {
   CoopMeTerminalPayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  captureCoopRewardResultState,
+  releaseCoopRewardResultState,
+} from "#data/elite-redux/coop/coop-reward-operation";
+import {
   type CoopMeBattleSettlementPlan,
   commitCoopMeBattleSettlementAtBattleEnd as commitCoopMeBattleSettlementAfterRewardPreparation,
   commitCoopMeNoBattleRewardSettlementAfterPreparation,
@@ -305,6 +309,7 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
     return false;
   }
   releaseCoopMeRetainedTerminal(terminalOperationId);
+  releaseCoopRewardResultState(pinned);
   setCoopMeInteractionStart(-1);
   hideCoopControllerTag(); // #817: never outlive the encounter
   // Clear the ME battle handoff key now the encounter is fully over (#633).
@@ -1585,7 +1590,13 @@ export class PostMysteryEncounterPhase extends Phase {
         try {
           const pinned = coopMeInteractionStartValue();
           terminalOutcome = this.terminalOutcomeLatch.getOrCapture(() =>
-            completeCoopMeFinalOutcomeFromRetainedSettlement(pinned, captureCoopMeOutcome()),
+            completeCoopMeFinalOutcomeFromRetainedSettlement(
+              pinned,
+              captureCoopMeOutcome(),
+              // A post-option callback can mutate engine state after the reward result. Never cover that
+              // unknown delta with an older image; those encounters remain fail-closed if live capture fails.
+              this.onPostOptionSelect == null ? captureCoopRewardResultState(pinned) : undefined,
+            ),
           );
         } catch (error) {
           coopWarn("me", "host terminal outcome capture failed; retaining Mystery boundary", error);

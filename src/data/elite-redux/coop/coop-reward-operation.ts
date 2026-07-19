@@ -330,6 +330,12 @@ interface RewardOpState {
   readonly preparedIntents: Map<string, PreparedRewardIntent>;
   /** Exact immutable host results survive a journal failure/retry without recapturing a later state tick. */
   readonly committedResultEnvelopes: Map<string, CoopAuthoritativeEnvelopeV1>;
+  /**
+   * Newest complete post-action authority image for each pinned reward interaction. Mystery finalization
+   * can run after the battle renderer has torn down enough live objects that a fresh full-state capture is
+   * unavailable; this exact already-committed image is its only sanctioned fallback.
+   */
+  readonly latestResultStateByPinned: Map<number, CoopAuthoritativeBattleStateV1>;
 }
 
 registerCoopOpSurfaceState(
@@ -347,6 +353,7 @@ registerCoopOpSurfaceState(
     ownerTerminalOperations: new Map(),
     preparedIntents: new Map(),
     committedResultEnvelopes: new Map(),
+    latestResultStateByPinned: new Map(),
   }),
 );
 
@@ -365,6 +372,28 @@ export interface CoopRewardOperationBinding {
 export function captureCoopRewardOperationBinding(): CoopRewardOperationBinding | null {
   const opState = getActiveCoopRuntimeOpState();
   return opState == null ? null : { opState, durability: getActiveCoopOperationDurability() };
+}
+
+/**
+ * Return the newest immutable result state that the host actually committed for this exact interaction.
+ * The clone prevents a later crossing carrier from mutating the reward journal's retry image.
+ */
+export function captureCoopRewardResultState(
+  pinned: number,
+  binding?: CoopRewardOperationBinding | null,
+): CoopAuthoritativeBattleStateV1 | undefined {
+  if (!Number.isSafeInteger(pinned) || pinned < 0) {
+    return;
+  }
+  const retained = state(binding).latestResultStateByPinned.get(pinned);
+  return retained == null ? undefined : (JSON.parse(JSON.stringify(retained)) as CoopAuthoritativeBattleStateV1);
+}
+
+/** Release the crossing-only reward image once its Mystery terminal has committed. */
+export function releaseCoopRewardResultState(pinned: number, binding?: CoopRewardOperationBinding | null): void {
+  if (Number.isSafeInteger(pinned) && pinned >= 0) {
+    state(binding).latestResultStateByPinned.delete(pinned);
+  }
 }
 
 function state(binding?: CoopRewardOperationBinding | null): RewardOpState {
@@ -455,6 +484,7 @@ export function resetCoopRewardOperationState(): void {
   s.stateAppliedOperations.clear();
   s.preparedIntents.clear();
   s.committedResultEnvelopes.clear();
+  s.latestResultStateByPinned.clear();
   s.watcherStateByRole.host = freshWatcherRoleState();
   s.watcherStateByRole.guest = freshWatcherRoleState();
   s.ownerOrdinalsByStream.clear();
@@ -822,6 +852,7 @@ export function commitRewardAuthoritativeResult(
     if (!retainEnvelope(retained, binding)) {
       return null;
     }
+    retainLatestRewardResultState(s, prepared, retained.authoritativeState);
     advancePreparedWatcher(prepared);
     return { operationId, revision: retained.revision };
   }
@@ -852,6 +883,7 @@ export function commitRewardAuthoritativeResult(
     return null;
   }
   s.committedResultEnvelopes.set(operationId, res.envelope);
+  retainLatestRewardResultState(s, prepared, resultState);
   if (!retainEnvelope(res.envelope, binding)) {
     return null;
   }
@@ -861,6 +893,27 @@ export function commitRewardAuthoritativeResult(
     `${prepared.surface} authoritative RESULT retained rev=${res.envelope.revision} tick=${resultState.tick} id=${operationId}`,
   );
   return { operationId, revision: res.envelope.revision };
+}
+
+function retainLatestRewardResultState(
+  s: RewardOpState,
+  prepared: PreparedRewardIntent,
+  authoritativeState: CoopAuthoritativeBattleStateV1,
+): void {
+  // Only a typed Mystery reward surface needs to bridge into a later ME terminal. Normal wave rewards
+  // and markets have their own terminal carrier and must not accumulate full state for the whole run.
+  if (prepared.surface !== "reward" || prepared.rewardSurface == null) {
+    return;
+  }
+  const pinned = prepared.pinned;
+  const prior = s.latestResultStateByPinned.get(pinned);
+  if (prior != null && prior.tick > authoritativeState.tick) {
+    return;
+  }
+  s.latestResultStateByPinned.set(
+    pinned,
+    JSON.parse(JSON.stringify(authoritativeState)) as CoopAuthoritativeBattleStateV1,
+  );
 }
 
 function advancePreparedWatcher(prepared: PreparedRewardIntent): void {

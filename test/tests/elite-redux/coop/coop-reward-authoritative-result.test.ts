@@ -17,8 +17,10 @@ import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/eli
 import {
   adoptRewardWatcherChoice,
   captureCoopRewardOperationBinding,
+  captureCoopRewardResultState,
   commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
+  releaseCoopRewardResultState,
   resetCoopRewardOperationState,
   setCoopRewardAuthorityStateHooksForTest,
   setCoopRewardOperationEnabled,
@@ -170,6 +172,33 @@ describe("P33 retained reward/shop authoritative results", () => {
     expect(hostManager.unackedCount(), "the exact reward continuation releases the dense result stream").toBe(0);
     hostManager.dispose();
     guestManager.dispose();
+  });
+
+  it("retains only a typed Mystery reward result until its crossing terminal releases it", () => {
+    const prepared = commitRewardOwnerIntent({
+      surface: "reward",
+      rewardSurface: { surfaceId: "modifier:0", ordinal: 0 },
+      pinned: 2,
+      label: "skip",
+      choice: COOP_INTERACTION_LEAVE,
+      data: undefined,
+      terminal: true,
+      localRole: "host",
+      wave: 7,
+      turn: 3,
+    })!;
+    expect(commitRewardAuthoritativeResult(prepared.operationId, state(13, 850, "leave"))).not.toBeNull();
+
+    expect(captureCoopRewardResultState(2)).toEqual(state(13, 850, "leave"));
+    const detached = captureCoopRewardResultState(2)!;
+    (detached as { money: number }).money = 0;
+    expect(
+      captureCoopRewardResultState(2)?.money,
+      "a crossing caller cannot mutate the reward journal's immutable retry image",
+    ).toBe(850);
+
+    releaseCoopRewardResultState(2);
+    expect(captureCoopRewardResultState(2)).toBeUndefined();
   });
 
   it("parks host terminal advance at material apply while retaining through public continuation", async () => {
@@ -476,6 +505,7 @@ describe("P33 retained reward/shop authoritative results", () => {
     // revision, which is valid in separate client runtimes; neither cursor/journal may consume the other.
     const params = {
       surface: "reward" as const,
+      rewardSurface: { surfaceId: "modifier:0", ordinal: 0 },
       pinned: 0,
       label: "reward",
       choice: 0,
@@ -495,6 +525,8 @@ describe("P33 retained reward/shop authoritative results", () => {
       operationId: preparedB.operationId,
       revision: 1,
     });
+    expect(captureCoopRewardResultState(0, bindingA)?.tick).toBe(61);
+    expect(captureCoopRewardResultState(0, bindingB)?.tick).toBe(62);
     await flushWire();
 
     expect(receivedA.map(result => result.tick)).toEqual([61]);
