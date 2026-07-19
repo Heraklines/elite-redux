@@ -247,6 +247,50 @@ describe("authority-v2 log", () => {
     expect(log.acceptReceipt(receipt(committed, "controlInstalled"))).toBe(true);
   });
 
+  it("classifies receipt progress and every authentication failure without changing boolean retirement", () => {
+    const log = makeLog(scheduler, sent, {
+      peerBindings: [{ seatId: 1, connectionGeneration: 5 }],
+    });
+    const committed = log.commit(entryInput("op-verdict", { nextControl: commandControl() }));
+
+    expect(
+      log.acceptReceiptDetailed(
+        receipt(committed, "admitted", {
+          context: { ...committed.context, senderSeatId: 1, connectionGeneration: 4 },
+        }),
+      ),
+    ).toEqual({ kind: "rejected", reason: "connection-generation-mismatch" });
+    expect(
+      log.acceptReceiptDetailed(
+        receipt(committed, "admitted", {
+          context: { ...committed.context, senderSeatId: 1, connectionGeneration: 5 },
+        }),
+      ),
+    ).toEqual({ kind: "advanced", retired: false, waitingForSeatIds: [1] });
+    expect(
+      log.acceptReceiptDetailed(
+        receipt(committed, "admitted", {
+          context: { ...committed.context, senderSeatId: 1, connectionGeneration: 5 },
+        }),
+      ),
+    ).toEqual({ kind: "duplicate", highestStage: 0 });
+    expect(
+      log.acceptReceiptDetailed(
+        receipt(committed, "controlInstalled", {
+          context: { ...committed.context, senderSeatId: 1, connectionGeneration: 5 },
+          controlId: "wrong-control",
+        }),
+      ),
+    ).toEqual({ kind: "rejected", reason: "control-id-mismatch" });
+    expect(
+      log.acceptReceiptDetailed(
+        receipt(committed, "controlInstalled", {
+          context: { ...committed.context, senderSeatId: 1, connectionGeneration: 5 },
+        }),
+      ),
+    ).toEqual({ kind: "advanced", retired: true, waitingForSeatIds: [] });
+  });
+
   it("never lets presentation proof replace missing mechanical proof", () => {
     const log = makeLog(scheduler, sent);
     const committed = log.commit(entryInput("op-presentation", { nextControl: commandControl() }));

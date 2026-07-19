@@ -215,6 +215,36 @@ export interface AuthorityLogDiagnostics {
   readonly disposed: boolean;
 }
 
+/** Exact classification of one authority-side receipt intake attempt. */
+export type AuthorityReceiptVerdict =
+  | {
+      readonly kind: "rejected";
+      readonly reason:
+        | "disposed"
+        | "malformed-receipt"
+        | "malformed-context"
+        | "session-mismatch"
+        | "epoch-mismatch"
+        | "unknown-revision"
+        | "operation-mismatch"
+        | "authority-mismatch"
+        | "entry-authority-mismatch"
+        | "self-signed"
+        | "authority-signed"
+        | "membership-mismatch"
+        | "unbound-peer"
+        | "connection-generation-mismatch"
+        | "control-id-mismatch"
+        | "unexpected-control-id"
+        | "presentation-before-mechanical";
+    }
+  | { readonly kind: "duplicate"; readonly highestStage: number }
+  | {
+      readonly kind: "advanced";
+      readonly retired: boolean;
+      readonly waitingForSeatIds: readonly number[];
+    };
+
 /**
  * The concrete {@linkcode CoopAuthorityLog}. One per live session; the authority side and the replica side
  * each hold one (the same class, different methods exercised).
@@ -345,51 +375,68 @@ export class AuthorityLog implements CoopAuthorityLog {
     return committed;
   }
 
-  /** Receipt intake: validate stage ordering, retire on required stage, action subsumption on admitted. */
-  acceptReceipt(receipt: CoopAuthorityReceipt): boolean {
+  /**
+   * Receipt intake with a lossless verdict. The public contract retains its historical boolean wrapper below,
+   * while the runtime uses this classification so an authenticated receipt can never be rejected silently.
+   */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: every branch names one fail-closed authentication or ordered-stage verdict
+  acceptReceiptDetailed(receipt: CoopAuthorityReceipt): AuthorityReceiptVerdict {
     if (this.disposed) {
-      return false;
+      return { kind: "rejected", reason: "disposed" };
     }
     if (!isValidRevision(receipt.revision) || !isValidOperationId(receipt.operationId) || !isAckStage(receipt.stage)) {
-      return false;
+      return { kind: "rejected", reason: "malformed-receipt" };
     }
     if (!isValidFrameContext(receipt.context)) {
-      return false;
+      return { kind: "rejected", reason: "malformed-context" };
     }
     // A receipt from a different session identity or epoch can never advance a retained entry's stage.
-    if (
-      !isSameSessionIdentity(receipt.context, this.localContext)
-      || receipt.context.sessionEpoch !== this.localContext.sessionEpoch
-    ) {
-      return false;
+    if (!isSameSessionIdentity(receipt.context, this.localContext)) {
+      return { kind: "rejected", reason: "session-mismatch" };
+    }
+    if (receipt.context.sessionEpoch !== this.localContext.sessionEpoch) {
+      return { kind: "rejected", reason: "epoch-mismatch" };
     }
     const lease = this.retainedWindow.get(receipt.revision);
-    if (lease == null || !receiptMatchesEntry(receipt, lease.entry)) {
-      // Unknown, already-retired, or identity-mismatched revision: nothing to advance.
-      return false;
+    if (lease == null) {
+      // Unknown or already-retired revision: nothing to advance.
+      return { kind: "rejected", reason: "unknown-revision" };
+    }
+    if (!receiptMatchesEntry(receipt, lease.entry)) {
+      return { kind: "rejected", reason: "operation-mismatch" };
     }
     // A receipt is evidence from the receiving replica, never a reflection of the authority's own entry
     // context. The transport/session binding performs exact peer authentication; the log still rejects a
     // self-signed/spoofed-authority receipt so copied entry context can never retire its own mutation.
     const peerStage = lease.peerStages.get(receipt.context.senderSeatId);
-    if (
-      receipt.context.authoritySeatId !== this.localContext.authoritySeatId
-      || lease.entry.context.senderSeatId !== this.localContext.authoritySeatId
-      || receipt.context.senderSeatId === lease.entry.context.senderSeatId
-      || receipt.context.senderSeatId === receipt.context.authoritySeatId
-      || receipt.context.membershipRevision !== lease.entry.context.membershipRevision
-      || peerStage == null
-      || receipt.context.connectionGeneration !== peerStage.connectionGeneration
-    ) {
-      return false;
+    if (receipt.context.authoritySeatId !== this.localContext.authoritySeatId) {
+      return { kind: "rejected", reason: "authority-mismatch" };
+    }
+    if (lease.entry.context.senderSeatId !== this.localContext.authoritySeatId) {
+      return { kind: "rejected", reason: "entry-authority-mismatch" };
+    }
+    if (receipt.context.senderSeatId === lease.entry.context.senderSeatId) {
+      return { kind: "rejected", reason: "self-signed" };
+    }
+    if (receipt.context.senderSeatId === receipt.context.authoritySeatId) {
+      return { kind: "rejected", reason: "authority-signed" };
+    }
+    if (receipt.context.membershipRevision !== lease.entry.context.membershipRevision) {
+      return { kind: "rejected", reason: "membership-mismatch" };
+    }
+    if (peerStage == null) {
+      return { kind: "rejected", reason: "unbound-peer" };
+    }
+    if (receipt.context.connectionGeneration !== peerStage.connectionGeneration) {
+      return { kind: "rejected", reason: "connection-generation-mismatch" };
     }
     if (receipt.stage === "controlInstalled") {
       const expectedControlId = lease.entry.nextControl == null ? null : controlIdOf(lease.entry.nextControl);
       if (expectedControlId == null || receipt.controlId !== expectedControlId) {
-        return false;
+        return { kind: "rejected", reason: "control-id-mismatch" };
       }
     } else if (receipt.controlId != null) {
-      return false;
+      return { kind: "rejected", reason: "unexpected-control-id" };
     }
     const stageIdx = STAGE_ORDER[receipt.stage];
     const required = lease.entry.nextControl == null ? STAGE_ORDER.materialApplied : STAGE_ORDER.controlInstalled;
@@ -397,12 +444,12 @@ export class AuthorityLog implements CoopAuthorityLog {
     // mechanical proof below it (in particular it carries no successor controlId), so it may only be
     // observed after the required stage was already proven.
     if (receipt.stage === "presentationSettled" && peerStage.stage < required) {
-      return false;
+      return { kind: "rejected", reason: "presentation-before-mechanical" };
     }
     // Per-operation stage ordering: stages are monotonic. A same/older stage is a duplicate receipt - a safe
     // no-op that never re-advances or re-retires.
     if (stageIdx <= peerStage.stage) {
-      return false;
+      return { kind: "duplicate", highestStage: peerStage.stage };
     }
     peerStage.stage = stageIdx;
 
@@ -416,9 +463,23 @@ export class AuthorityLog implements CoopAuthorityLog {
     // Retirement rule: admitted + materialApplied + (controlInstalled where nextControl != null). Never
     // presentationSettled.
     if (allPeersReached(lease, required)) {
-      return this.retire(receipt.revision);
+      return {
+        kind: "advanced",
+        retired: this.retire(receipt.revision),
+        waitingForSeatIds: [],
+      };
     }
-    return false;
+    return {
+      kind: "advanced",
+      retired: false,
+      waitingForSeatIds: [...lease.peerStages].filter(([, stage]) => stage.stage < required).map(([seatId]) => seatId),
+    };
+  }
+
+  /** Receipt intake contract: true only when this receipt newly retires its retained entry. */
+  acceptReceipt(receipt: CoopAuthorityReceipt): boolean {
+    const verdict = this.acceptReceiptDetailed(receipt);
+    return verdict.kind === "advanced" && verdict.retired;
   }
 
   /** Retained-but-unretired entries in revision order (contract). */

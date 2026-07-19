@@ -538,13 +538,11 @@ export class CoopAuthorityV2Shadow {
       recordStage: (entry, stage) => this.log.recordReplicaStage(entry, stage),
     };
 
-    // Per-runtime inbound routing (contract change request 2): register THIS harness's inbound handler on
-    // its OWN transport endpoint via the additive onV2Frame seam. This is what makes the two-peers-in-one-
-    // process duo harness routable - each harness owns a distinct transport endpoint, so the two never
-    // collide on the single module-level handler (which the runtime keeps as the compat fallback). A
-    // transport that has not adopted the seam (a bare stub, an older transport) leaves this null and the
-    // module-level fallback drives routing, so this stays additive-optional. The raw frame is routed through
-    // the SAME boundary validator the module-level path uses (never a cast).
+    // Per-runtime inbound routing: register THIS harness's inbound handler on its OWN transport endpoint.
+    // Concrete loopback/WebRTC endpoints never borrow the module-level compatibility handler: an endpoint
+    // without a receiver rejects V2 delivery, preventing one runtime from consuming another's frame. A bare
+    // legacy test stub may omit the optional seam and explicitly install the module-level handler instead.
+    // Both paths use the SAME boundary validator (never a cast).
     this.transportV2Unsub =
       deps.transport.onV2Frame?.(raw =>
         routeCoopV2InboundFrameTo(raw, frame => this.handleInboundFrame(frame), deps.onProtocolViolation),
@@ -985,7 +983,18 @@ export class CoopAuthorityV2Shadow {
         }
         case "authorityReceipt": {
           const receipt: CoopAuthorityReceipt = { context: frame.ctx, ...frame.body };
-          this.log.acceptReceipt(receipt);
+          const verdict = this.log.acceptReceiptDetailed(receipt);
+          const detail =
+            verdict.kind === "rejected"
+              ? `rejected reason=${verdict.reason}`
+              : verdict.kind === "duplicate"
+                ? `duplicate highestStage=${verdict.highestStage}`
+                : `advanced retired=${verdict.retired} waiting=[${verdict.waitingForSeatIds.join(",")}]`;
+          coopLog(
+            "v2-authority",
+            `receipt rev=${receipt.revision} stage=${receipt.stage} sender=${receipt.context.senderSeatId} `
+              + `generation=${receipt.context.connectionGeneration} ${detail}`,
+          );
           break;
         }
         case "tailRequest": {
