@@ -28,6 +28,7 @@ import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-
 import {
   awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
+  broadcastCoopWaveResolved,
   clearCoopRuntime,
   getCoopWaveBoundaryStatus,
   setCoopRuntime,
@@ -140,6 +141,9 @@ describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest conve
 
     // ===== HOST BattleEndPhase emit: commit the post-exp image into Authority V2. =====
     await withClient(rig.hostCtx, () => {
+      // Production stages the host-authored outcome in VictoryPhase before BattleEnd seals the complete
+      // post-exp carrier. The focused test must traverse the same two-part boundary.
+      broadcastCoopWaveResolved("win");
       broadcastCoopWaveEndState();
     });
     // Deliver the ordered WAVE_ADVANCE and its predecessor/receipts only under their destination realms.
