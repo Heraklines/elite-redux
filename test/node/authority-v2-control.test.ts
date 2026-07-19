@@ -27,6 +27,7 @@ import type {
 import { type ControlSurface, createCoopControlProjector } from "#data/elite-redux/coop/authority-v2/control-projector";
 import {
   commandControlTargetId,
+  commandTargetsOwnedBySeat,
   controlIdOf,
   controlOwnerSeatId,
   controlOwnerSeatIds,
@@ -187,6 +188,21 @@ describe("control ownership", () => {
     expect(controlOwnerSeatIds(frontier)).toEqual([0, 1]);
     expect(controlOwnerSeatId(frontier)).toBeNull();
   });
+
+  it("partitions a complete frontier by numeric seat for N-seat replica projection", () => {
+    const frontier = command({
+      commands: [
+        { fieldIndex: 4, ownerSeatId: 2, pokemonId: 44 },
+        { fieldIndex: 0, ownerSeatId: 0, pokemonId: 42 },
+        { fieldIndex: 3, ownerSeatId: 2, pokemonId: 43 },
+      ],
+    });
+    expect(commandTargetsOwnedBySeat(frontier, 2)).toEqual([
+      { fieldIndex: 3, ownerSeatId: 2, pokemonId: 43 },
+      { fieldIndex: 4, ownerSeatId: 2, pokemonId: 44 },
+    ]);
+    expect(commandTargetsOwnedBySeat(frontier, 1)).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -339,20 +355,33 @@ describe("DefaultCoopControlProjector", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("installs every command-frontier component only after all actors resolve", () => {
+  it("installs every local-seat frontier component without fabricating another seat's input", () => {
     const frontier = command({
       commands: [
         { fieldIndex: 0, ownerSeatId: 0, pokemonId: 42 },
         { fieldIndex: 1, ownerSeatId: 1, pokemonId: 43 },
       ],
     });
-    const { result, calls } = project(frontier, { fieldSlots: { 42: 0, 43: 1 } });
+    const { result, calls } = project(frontier, { fieldSlots: { 42: 0, 43: 1 } }, /*localSeatId*/ 0);
     expect(result.kind).toBe("installed");
     expect(calls).toEqual([
       {
         verb: "installCommand",
         args: [0, commandControlTargetId(1, 3, 2, frontier.commands[0])],
       },
+    ]);
+  });
+
+  it("projects the authenticated replica seat's partition even when a remote actor is absent locally", () => {
+    const frontier = command({
+      commands: [
+        { fieldIndex: 0, ownerSeatId: 0, pokemonId: 42 },
+        { fieldIndex: 1, ownerSeatId: 1, pokemonId: 43 },
+      ],
+    });
+    const { result, calls } = project(frontier, { fieldSlots: { 43: 1 } }, /*localSeatId*/ 1);
+    expect(result.kind).toBe("installed");
+    expect(calls).toEqual([
       {
         verb: "installCommand",
         args: [1, commandControlTargetId(1, 3, 2, frontier.commands[1])],
@@ -370,7 +399,7 @@ describe("DefaultCoopControlProjector", () => {
     const frontier = command({
       commands: [
         { fieldIndex: 0, ownerSeatId: 0, pokemonId: 42 },
-        { fieldIndex: 1, ownerSeatId: 1, pokemonId: 43 },
+        { fieldIndex: 1, ownerSeatId: 0, pokemonId: 43 },
       ],
     });
     const { result, calls } = project(frontier, { fieldSlots: { 42: 0 } });
@@ -506,6 +535,23 @@ describe("applyEntry (replica pipeline)", () => {
     });
     expect(rec.stages).toEqual(["admitted"]);
     expect(out.kind).toBe("materialRejected");
+    expect(projector.project).not.toHaveBeenCalled();
+  });
+
+  it("classifies admitted live material pacing as deferred without signing or projecting", () => {
+    const rec = recordingSink();
+    const projector = { project: vi.fn() };
+    const out = applyEntry(CTX, entryWith(command()), {
+      applyMaterial: () => "deferred",
+      projector: projector as unknown as CoopControlProjector,
+      receipts: rec.sink,
+      ...PIPELINE_BOOKKEEPING,
+    });
+    expect(rec.stages).toEqual(["admitted"]);
+    expect(out).toMatchObject({
+      kind: "materialDeferred",
+      reason: expect.stringContaining("awaiting live completion"),
+    });
     expect(projector.project).not.toHaveBeenCalled();
   });
 

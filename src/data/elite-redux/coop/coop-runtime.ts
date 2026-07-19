@@ -55,10 +55,12 @@ import {
 } from "#data/elite-redux/coop/authority-v2/cutover-turn";
 import {
   commandControlTargetId,
+  commandTargetsOwnedBySeat,
   controlIdOf,
   type ProjectableControl,
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
+import type { ApplyMaterialResult } from "#data/elite-redux/coop/authority-v2/replica";
 import {
   CoopAuthorityV2Shadow,
   type CoopV2LiveReplicaSeams,
@@ -3631,7 +3633,7 @@ function buildCoopV2LiveSeams(
       }
       return materializeCoopV2ReplacementPickerTerminal(image, runtime.controller.localSeatId, runtime.opState);
     },
-    applyMaterial: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null => {
+    applyMaterial: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): ApplyMaterialResult | null => {
       if (
         (entry.kind !== "TURN_COMMIT" || !surfaces.turn)
         && (entry.kind !== "REPLACEMENT_COMMIT" || !surfaces.replacement)
@@ -3659,7 +3661,7 @@ function buildCoopV2LiveSeams(
           // install the post-summon state under a still-open modal; redelivery retries after its bounded
           // MESSAGE transition reaches the exact source address.
           if (!materializeCoopV2ReplacementPickerTerminal(image, runtime.controller.localSeatId, runtime.opState)) {
-            return false;
+            return "deferred";
           }
           const checkpoint = reconstructCoopV2ReplacementCheckpoint(entry);
           if (checkpoint == null) {
@@ -3669,7 +3671,7 @@ function buildCoopV2LiveSeams(
             return true;
           }
           runtime.battleStream.ingestAuthoritativeV2Replacement(checkpoint);
-          return false;
+          return "deferred";
         }
         const payload = entry.material.payload as TurnResolutionImage | undefined;
         const checkpoint = payload?.checkpoint;
@@ -3701,7 +3703,7 @@ function buildCoopV2LiveSeams(
             return true;
           }
           runtime.battleStream.ingestAuthoritativeV2Turn(resolution);
-          return false;
+          return "deferred";
         }
         // A negotiated cutover peer must carry the complete companions. A numeric checkpoint alone cannot
         // prove moves/items/tags/terrain/arena state, so fail closed and retain for recovery instead of
@@ -3739,11 +3741,12 @@ function buildCoopV2LiveSeams(
       }
       try {
         const controlId = controlIdOf(control as ProjectableControl);
-        // Every component of the command frontier is materialized by the guest's ordinary phase flow.
-        // REQUESTING projection is not proof that any component exists. Each real CommandPhase records its
-        // exact epoch/wave/turn/field/seat/Pokemon identity at the start chokepoint; the aggregate control is
-        // installed only after ALL stated components have produced that proof.
-        const missing = control.commands.filter(
+        // The entry states every human actor, while this authenticated replica proves only its numeric-seat
+        // partition. Authority retirement requires every required peer's receipt, so the union is the complete
+        // frontier; one renderer never fabricates another player's input phase. A seat controlling multiple
+        // mons must still cross every one of its real CommandPhase chokepoints before it can sign.
+        const localCommands = commandTargetsOwnedBySeat(control, _ctx.localSeatId);
+        const missing = localCommands.filter(
           command =>
             !runtime.v2InstalledCommandTargets.has(
               commandControlTargetId(control.epoch, control.wave, control.turn, command),
@@ -3753,7 +3756,9 @@ function buildCoopV2LiveSeams(
           ? { kind: "already-installed", controlId }
           : {
               kind: "deferred",
-              reason: `awaiting ${missing.length}/${control.commands.length} real CommandPhase proofs for ${controlId}`,
+              reason:
+                `awaiting ${missing.length}/${localCommands.length} local-seat real CommandPhase proofs `
+                + `(frontier=${control.commands.length}) for ${controlId}`,
             };
       } catch (error) {
         coopWarn("v2-turn", "live projectControl threw", error);

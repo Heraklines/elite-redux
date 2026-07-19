@@ -55,8 +55,8 @@ import type {
   CoopRuntimeContext,
 } from "#data/elite-redux/coop/authority-v2/contract";
 import {
-  canonicalCommandTargets,
   commandControlTargetId,
+  commandTargetsOwnedBySeat,
   controlIdOf,
   isUsableInteger,
   type ProjectableControl,
@@ -174,10 +174,13 @@ export class DefaultCoopControlProjector implements CoopControlProjector {
     // 4. PROJECT the exact stated surface.
     switch (projectable.kind) {
       case "COMMAND_FRONTIER": {
-        // Resolve the WHOLE frontier before installing any component. A partially
-        // projected doubles/triples turn is not an install and must never emit a
-        // receipt for one battler while another actor is still materializing.
-        const resolved = canonicalCommandTargets(projectable.commands).map(command => ({
+        // The entry states the WHOLE frontier; this authenticated replica installs its numeric-seat
+        // partition. Authority retirement requires every required peer's receipt, so a doubles/triples/N-seat
+        // frontier remains complete without making one renderer fabricate another seat's public input.
+        // Resolve this seat's whole partition before installing any component: a seat controlling multiple
+        // battlers may never emit a partial receipt.
+        const localCommands = commandTargetsOwnedBySeat(projectable, ctx.localSeatId);
+        const resolved = localCommands.map(command => ({
           command,
           fieldIndex: surface.fieldSlotOfPokemon(command.pokemonId),
         }));

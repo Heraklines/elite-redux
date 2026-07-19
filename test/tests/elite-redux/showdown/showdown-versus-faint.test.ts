@@ -405,18 +405,6 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
           }
         }
         await drainLoopback();
-        // Authority V2 states the COMPLETE Showdown command frontier: the guest-owned player command and
-        // the host-owned enemy command. Production starts both real chokepoints before TurnStart diverts
-        // the renderer into replay. The old focused fixture stopped immediately after shipping the guest
-        // command, so revision N's replacement material was complete but its two-actor control could never
-        // retire; revision N+1 was then correctly held as a gap. Drive the real queued EnemyCommandPhase
-        // (which records the host-side proof and exits inertly on the authoritative guest), then stop on the
-        // production replay frontier without starting it. The final drive below reuses that exact phase.
-        await driveClientPhaseQueueTo(rig.guestScene, "Showdown turn N+1 CoopReplayTurnPhase", {
-          matches: phase => phase.phaseName === "CoopReplayTurnPhase",
-          perPhaseTimeoutMs: 5_000,
-          pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
-        });
       } finally {
         ui.setMode = realSetMode;
       }

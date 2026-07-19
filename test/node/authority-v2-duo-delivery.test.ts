@@ -174,6 +174,7 @@ function recordingLiveReplica(sink: { last: CoopAuthorityEntry | null; applies: 
 function buildDeferredDuo(
   clock: FakeClock,
   guestLive?: CoopV2LiveReplicaSeams,
+  onGuestProtocolViolation?: (violation: { readonly issues: readonly string[] }) => void,
 ): {
   host: CoopAuthorityV2Shadow;
   guest: CoopAuthorityV2Shadow;
@@ -204,6 +205,7 @@ function buildDeferredDuo(
     send: frame => pair.guest.send(frame),
     scheduler: createCoopScheduler(clock),
     ...(guestLive == null ? {} : { liveReplica: guestLive }),
+    ...(onGuestProtocolViolation == null ? {} : { onProtocolViolation: onGuestProtocolViolation }),
   });
 
   return {
@@ -321,7 +323,7 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     duo.dispose();
   });
 
-  it("retries material after admission when the first live apply fails", async () => {
+  it("retries material after admission when the first live apply is deferred", async () => {
     const clock = new FakeClock();
     let applies = 0;
     const guestLive: CoopV2LiveReplicaSeams = {
@@ -329,7 +331,7 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
       ownsControl: () => false,
       applyMaterial: () => {
         applies += 1;
-        return applies > 1;
+        return applies > 1 ? true : "deferred";
       },
       projectControl: () => null,
     };
@@ -357,6 +359,49 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     duo.dispose();
   });
 
+  it("routes an owned structural material rejection to the shared protocol terminal", async () => {
+    const clock = new FakeClock();
+    const violations: string[][] = [];
+    const guestLive: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: () => false,
+      applyMaterial: () => false,
+      projectControl: () => null,
+    };
+    const duo = buildDeferredDuo(clock, guestLive, violation => violations.push([...violation.issues]));
+
+    duo.host.tapTurnCommit(turnTap("TURN/structural-rejection"));
+    await flushLoopback();
+    duo.flush("guest");
+
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 0 });
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.join(".")).toContain("materialRejected");
+
+    duo.dispose();
+  });
+
+  it("does not terminalize healthy owned material deferral", async () => {
+    const clock = new FakeClock();
+    const violations: string[][] = [];
+    const guestLive: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: () => false,
+      applyMaterial: () => "deferred",
+      projectControl: () => null,
+    };
+    const duo = buildDeferredDuo(clock, guestLive, violation => violations.push([...violation.issues]));
+
+    duo.host.tapTurnCommit(turnTap("TURN/healthy-deferral"));
+    await flushLoopback();
+    duo.flush("guest");
+
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 0 });
+    expect(violations).toEqual([]);
+
+    duo.dispose();
+  });
+
   it("lets an authenticated replacement gap release its predecessor picker without applying out of order", async () => {
     const clock = new FakeClock();
     let predecessorReleased = false;
@@ -375,7 +420,7 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
       },
       applyMaterial: (_ctx, entry) => {
         if (entry.revision === 1 && !predecessorReleased) {
-          return false;
+          return "deferred";
         }
         appliedRevisions.push(entry.revision);
         return true;

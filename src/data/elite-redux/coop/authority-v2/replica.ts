@@ -46,11 +46,14 @@ import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
  * Install the entry's canonical authoritative material into the replica's engine
  * state and confirm the digest. Injected (not implemented here) because the
  * concrete apply is engine + payload specific and owned by the material/adapter
- * lanes; the pipeline only sequences it. Returns whether the material was applied
- * AND its digest matched - a `false` (or a throw) stops the pipeline before it
- * would sign materialApplied for state that is not actually installed.
+ * lanes; the pipeline only sequences it. `true` means the material applied AND
+ * its digest matched. `"deferred"` means the real engine has admitted the work
+ * but has not reached its exact material boundary yet; redelivery retries without
+ * classifying healthy pacing as corruption. `false` (or a throw) is a structural
+ * rejection and stops the pipeline before it could sign materialApplied.
  */
-export type ApplyMaterialFn = (ctx: CoopRuntimeContext, entry: CoopAuthorityEntry) => boolean;
+export type ApplyMaterialResult = boolean | "deferred";
+export type ApplyMaterialFn = (ctx: CoopRuntimeContext, entry: CoopAuthorityEntry) => ApplyMaterialResult;
 
 /**
  * The injected receipt sink. `emit` is fire-and-forget from the pipeline's point
@@ -87,6 +90,7 @@ export type ReplicaApplyResume = "admitted" | "materialApplied" | "controlInstal
 
 /** The furthest stage the pipeline reached for one entry. */
 export type ReplicaApplyOutcome =
+  | { readonly kind: "materialDeferred"; readonly reason: string }
   | { readonly kind: "materialRejected"; readonly reason: string }
   | { readonly kind: "controlDeferred"; readonly reason: string }
   | { readonly kind: "controlRejected"; readonly reason: string }
@@ -143,11 +147,14 @@ export function applyEntry(
   // control surface pointing at state that isn't installed yet would be a
   // continuation ahead of its own material (the P0 class, inverted).
   if (resume === "admitted") {
-    let materialApplied: boolean;
+    let materialApplied: ApplyMaterialResult;
     try {
       materialApplied = deps.applyMaterial(ctx, entry);
     } catch (error) {
       return { kind: "materialRejected", reason: describeError(error) };
+    }
+    if (materialApplied === "deferred") {
+      return { kind: "materialDeferred", reason: `material revision ${entry.revision} is awaiting live completion` };
     }
     if (!materialApplied) {
       return { kind: "materialRejected", reason: `material digest ${entry.material.digest} did not apply/match` };

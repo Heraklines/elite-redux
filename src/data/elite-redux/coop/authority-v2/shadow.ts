@@ -122,6 +122,7 @@ import {
 } from "#data/elite-redux/coop/authority-v2/protocol-validator";
 import {
   type ApplyMaterialFn,
+  type ApplyMaterialResult,
   applyEntry,
   type ReplicaApplyDeps,
   type ReplicaApplyOutcome,
@@ -191,7 +192,7 @@ export interface CoopV2ShadowIdentity {
 export interface CoopV2LiveReplicaSeams {
   /**
    * Whether this live cutover owns the entry kind. Once owned, `null` from
-   * applyMaterial is a failed/deferred real-engine apply, never permission to
+   * applyMaterial is an invalid seam result, never permission to
    * let the shadow ledger manufacture materialApplied.
    */
   ownsEntry(entry: CoopAuthorityEntry): boolean;
@@ -212,8 +213,11 @@ export interface CoopV2LiveReplicaSeams {
    * `null` means the live cutover does not own this entry kind.
    */
   releaseBlockedPredecessor?(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null;
-  /** Install material into REAL engine state, or `null` only when {@link ownsEntry} is false. */
-  applyMaterial(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null;
+  /**
+   * Install material into REAL engine state. `"deferred"` is healthy engine pacing, `false` is structural
+   * rejection, and `null` is permitted only when {@link ownsEntry} is false.
+   */
+  applyMaterial(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): ApplyMaterialResult | null;
   /** Project control onto the REAL phase manager, or `null` only when {@link ownsControl} is false. */
   projectControl(ctx: CoopRuntimeContext, control: NonNullable<CoopNextControl>): CoopControlInstallResult | null;
 }
@@ -464,6 +468,9 @@ export class CoopAuthorityV2Shadow {
   private readonly sendFrame: (frame: CoopFrameV2) => void;
   /** Live replica seams (cutover surface 1); null in pure shadow mode. Consulted FIRST by the applier/projector. */
   private readonly liveReplica: CoopV2LiveReplicaSeams | null;
+  private readonly onProtocolViolation:
+    | ((violation: Extract<CoopInboundFrameResultV2, { kind: "protocol-violation" }>) => void)
+    | undefined;
   private readonly shadowState = new Map<number, ShadowStateRecord>();
 
   private disposed = false;
@@ -521,6 +528,7 @@ export class CoopAuthorityV2Shadow {
     });
 
     this.liveReplica = deps.liveReplica ?? null;
+    this.onProtocolViolation = deps.onProtocolViolation;
     this.projector = new CoopShadowControlProjector(this.ledger, this.liveReplica);
     this.replicaDeps = {
       applyMaterial: (ctx, entry) => this.applyMaterialRouted(ctx, entry),
@@ -940,6 +948,9 @@ export class CoopAuthorityV2Shadow {
           const entry: CoopAuthorityEntry = { context: frame.ctx, ...frame.body };
           const result = this.log.admit(entry);
           this.logReplicaAdmission(entry, result.kind);
+          if (result.kind === "rejected") {
+            this.reportOwnedReplicaViolation(entry, `entry.${result.reason}`);
+          }
           if (
             result.kind === "admitted"
             || result.kind === "duplicate-pending-material"
@@ -957,6 +968,9 @@ export class CoopAuthorityV2Shadow {
                   : "admitted";
             const outcome = applyEntry(this.ctx, entry, this.replicaDeps, resume);
             this.logReplicaApply(entry, resume, outcome);
+            if (outcome.kind === "materialRejected" || outcome.kind === "controlRejected") {
+              this.reportOwnedReplicaViolation(entry, `${outcome.kind}.${outcome.reason}`);
+            }
             if (outcome.kind === "applied" && result.kind !== "duplicate-complete") {
               this.applied += 1;
             }
@@ -1097,18 +1111,35 @@ export class CoopAuthorityV2Shadow {
    * state (`null` falls through only for an explicitly unowned kind). In pure shadow mode the
    * live seam is absent, so this is exactly the in-memory shadow applier - byte-identical to before.
    */
-  private applyMaterialRouted(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean {
+  private applyMaterialRouted(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): ApplyMaterialResult {
     const live = this.liveReplica?.applyMaterial(ctx, entry) ?? null;
     if (live != null) {
-      // Still record the applied revision into the shadow state so the diagnostics + duplicate-idempotency
-      // bookkeeping hold; the live install is the authoritative one, this Map is observability.
-      this.shadowApplyMaterial(ctx, entry);
+      // Record observability only after real material applied. Deferred/rejected work must never inflate the
+      // shadowStateSize counter into claiming a mechanically-applied revision.
+      if (live === true) {
+        this.shadowApplyMaterial(ctx, entry);
+      }
       return live;
     }
     if (this.liveReplica?.ownsEntry(entry) === true) {
       return false;
     }
     return this.shadowApplyMaterial(ctx, entry);
+  }
+
+  /** Structural failure on a cut-over kind is a shared protocol terminal, never an infinite retained stall. */
+  private reportOwnedReplicaViolation(entry: CoopAuthorityEntry, issue: string): void {
+    if (this.liveReplica?.ownsEntry(entry) !== true) {
+      return;
+    }
+    reportProtocolViolation(
+      {
+        kind: "protocol-violation",
+        frameType: "authorityEntry",
+        issues: [issue],
+      },
+      this.onProtocolViolation,
+    );
   }
 
   /**

@@ -149,6 +149,22 @@ export function canonicalCommandTargets(
   );
 }
 
+/**
+ * The exact partition of a complete command frontier this replica seat must install.
+ *
+ * The authority entry always states every human actor, but each authenticated replica signs only the
+ * controls owned by its numeric seat. Authority-log retirement requires a receipt from every required peer,
+ * so the union of seat-scoped receipts proves the complete frontier without making one renderer fabricate
+ * another player's input surface. This is the N-seat rule: adding players adds peer partitions, not fake
+ * command phases on every browser.
+ */
+export function commandTargetsOwnedBySeat(
+  control: Extract<ProjectableControl, { kind: "COMMAND_FRONTIER" }>,
+  localSeatId: number,
+): readonly CoopCommandControlTarget[] {
+  return canonicalCommandTargets(control.commands.filter(command => command.ownerSeatId === localSeatId));
+}
+
 // ---------------------------------------------------------------------------
 // Validation guards
 // ---------------------------------------------------------------------------
