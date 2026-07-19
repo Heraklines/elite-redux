@@ -331,6 +331,35 @@ describe("authority-v2 log", () => {
     expect(log.appliedThrough()).toBe(0);
   });
 
+  it("coalesces repeated later revisions into one tail request until the missing frontier completes", () => {
+    const log = makeReplicaLog(scheduler, sent);
+
+    // A full authority tail may replay several later retained entries while revision 1 is still missing.
+    // Every one classifies as the same gap, but exactly one tail request may leave the replica.
+    expect(log.admit(fullEntry(3, "op-3"))).toEqual({ kind: "gap", missingFrom: 1 });
+    expect(log.admit(fullEntry(4, "op-4"))).toEqual({ kind: "gap", missingFrom: 1 });
+    expect(log.admit(fullEntry(3, "op-3"))).toEqual({ kind: "gap", missingFrom: 1 });
+    expect(sent.filter(wire => wire.kind === "requestTail")).toHaveLength(1);
+
+    // Merely admitting the predecessor does not re-arm the request: a later entry is still a gap until the
+    // predecessor's real material/control terminal stage completes.
+    const first = fullEntry(1, "op-1");
+    expect(log.admit(first)).toEqual({ kind: "admitted" });
+    expect(log.admit(fullEntry(2, "op-2"))).toEqual({ kind: "gap", missingFrom: 1 });
+    expect(sent.filter(wire => wire.kind === "requestTail")).toHaveLength(1);
+    expect(log.recordReplicaStage(first, "materialApplied")).toBe(true);
+
+    // Revision 1 had no nextControl, so materialApplied completes its mechanical frontier. A new, genuinely
+    // different gap can now request from revision 2 once; repeats coalesce again.
+    expect(log.admit(fullEntry(3, "op-3"))).toEqual({ kind: "gap", missingFrom: 2 });
+    expect(log.admit(fullEntry(4, "op-4"))).toEqual({ kind: "gap", missingFrom: 2 });
+    expect(
+      sent
+        .filter(wire => wire.kind === "requestTail")
+        .map(wire => (wire.kind === "requestTail" ? wire.missingFrom : 0)),
+    ).toEqual([1, 2]);
+  });
+
   it("a stale epoch is rejected as staleEpoch; membership/session mismatch reject", () => {
     const log = new AuthorityLog({
       localContext: frameContext({ sessionEpoch: 2, membershipRevision: 5, senderSeatId: 1 }),

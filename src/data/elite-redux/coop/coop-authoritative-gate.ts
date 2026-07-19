@@ -30,6 +30,13 @@ let showdownFlipPredicate: (() => boolean) | null = null;
  * lockstep run reads `false`.
  */
 export function setCoopAuthoritativeGuestPredicate(fn: (() => boolean) | null): void {
+  // The two-engine harness swaps its process-global runtime for each synthetic
+  // browser pump. The registered predicate is the same stable function and reads
+  // the active runtime dynamically, so reassigning/logging it thousands of times
+  // is neither a state change nor useful evidence.
+  if (predicate === fn) {
+    return;
+  }
   // One-shot (session register / teardown) - log install vs clear so a stale-gate bug (a predicate
   // surviving into a later solo / lockstep run) is visible in the captured log.
   coopLog(

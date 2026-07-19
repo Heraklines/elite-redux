@@ -377,17 +377,29 @@ import { compressToBase64, decompressFromBase64 } from "lz-string";
  * reconciliation is handled. Cleared in {@linkcode clearCoopRuntime}.
  */
 function wireCoopGhostPoolSync(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
+  installCoopRuntimeGhostProcessHooks(controller, battleStream);
+  battleStream.onGhostPool(pool => {
+    if (controller.role === "guest") {
+      setCoopGhostPool(pool);
+    }
+  });
+}
+
+/**
+ * Install only the two last-write-wins process globals. Unlike the stream's
+ * receive handler these genuinely must follow the active synthetic browser in
+ * the in-process duo harness.
+ */
+function installCoopRuntimeGhostProcessHooks(
+  controller: CoopSessionController,
+  battleStream: CoopBattleStreamer,
+): void {
   setGhostPoolPublisher(pool => {
     if (controller.role === "host") {
       battleStream.sendGhostPool(pool);
     }
   });
   setCoopGhostFetchSuppressed(() => controller.role === "guest");
-  battleStream.onGhostPool(pool => {
-    if (controller.role === "guest") {
-      setCoopGhostPool(pool);
-    }
-  });
 }
 
 /**
@@ -6481,7 +6493,11 @@ export function installCoopRuntimeProcessHooks(runtime: CoopRuntime): void {
  * production.
  */
 export function installCoopRuntimeGhostHooks(runtime: CoopRuntime): void {
-  wireCoopGhostPoolSync(runtime.controller, runtime.battleStream);
+  // The battleStream receiver is runtime-owned and was registered once during
+  // assembly. Re-registering it on every harness context swap only overwrote the
+  // same handler and flooded captured logs; only the role-gated process globals
+  // need to follow the active synthetic browser.
+  installCoopRuntimeGhostProcessHooks(runtime.controller, runtime.battleStream);
 }
 
 /**

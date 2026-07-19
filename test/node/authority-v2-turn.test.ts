@@ -178,6 +178,12 @@ describe("buildTurnCommitEntry - shape + digest", () => {
   it("carries an explicit subsumes list through to the entry", () => {
     expect(buildCommitted({ subsumes: [7, 9] }).subsumes).toEqual([7, 9]);
   });
+
+  it("states no COMMAND across a non-command boundary", () => {
+    const entry = buildCommitted({ nextCommand: null });
+    expect(entry.nextControl).toBeNull();
+    expect(turnCommandControlId({ ...entry, revision: 1 })).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

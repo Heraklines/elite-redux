@@ -209,13 +209,13 @@ export interface CoopV2ShadowDeps {
 // the harness stamps its own authenticated context on every entry.
 // ---------------------------------------------------------------------------
 
-/** Where the turn tap's next-command successor seat came from (deliverable 2 - never a silent degrade). */
-export type CoopV2ShadowSuccessorSeatSource = "owner-field" | "local-role-fallback";
+/** Where the turn tap's successor came from (deliverable 2 - never a silent degrade). */
+export type CoopV2ShadowSuccessorSeatSource = "owner-field" | "local-role-fallback" | "none-non-command-boundary";
 
 export interface CoopV2ShadowTurnTap {
   readonly operationId: string;
   readonly capture: TurnResolutionImage;
-  readonly nextCommand: TurnCommandTarget;
+  readonly nextCommand: TurnCommandTarget | null;
   /** The raw legacy comparand token (the host full-state checksum) - a DIFFERENT scheme, kept for the log. */
   readonly legacyDigest: string;
   /**
@@ -498,9 +498,13 @@ export class CoopAuthorityV2Shadow {
 
   /** Tap the host's turn-commit emit. Builds a TURN_COMMIT via the turn adapter + records parity. */
   tapTurnCommit(input: CoopV2ShadowTurnTap): CoopAuthorityEntry | null {
-    this.lastObservedWave = input.nextCommand.wave;
-    if (input.nextCommand.resolvedTurn >= 1) {
-      this.lastObservedTurn = input.nextCommand.resolvedTurn;
+    const observedWave = input.nextCommand?.wave ?? input.capture.wave;
+    const observedTurn = input.nextCommand?.resolvedTurn ?? input.capture.turn;
+    if (typeof observedWave === "number" && Number.isSafeInteger(observedWave) && observedWave >= 1) {
+      this.lastObservedWave = observedWave;
+    }
+    if (typeof observedTurn === "number" && Number.isSafeInteger(observedTurn) && observedTurn >= 1) {
+      this.lastObservedTurn = observedTurn;
     }
     return this.runTap("TURN_COMMIT", () => {
       const barrier: MutationBarrier = { pendingTokens: () => input.pendingTokens ?? 0 };

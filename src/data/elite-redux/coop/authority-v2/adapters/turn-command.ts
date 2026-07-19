@@ -172,8 +172,13 @@ export interface BuildTurnCommitInput {
   readonly operationId: string;
   /** The injected turn-capture image (serialized resolution + checkpoint). */
   readonly capture: TurnResolutionImage;
-  /** The successor COMMAND the authority states for turn N+1. */
-  readonly nextCommand: TurnCommandTarget;
+  /**
+   * The successor COMMAND the authority states for turn N+1, or `null` when the
+   * settled turn crosses a non-command boundary (faint replacement, victory,
+   * defeat, reward, Mystery, or terminal progression). A turn commit must never
+   * invent a COMMAND merely because a player mon still exists on the field.
+   */
+  readonly nextCommand: TurnCommandTarget | null;
   /** The mutation barrier gating the capture (must read zero to build). */
   readonly barrier: MutationBarrier;
   /** Revisions this commit explicitly subsumes (supersession by log order). */
@@ -231,15 +236,18 @@ export function buildTurnCommitEntry(input: BuildTurnCommitInput): BuildTurnComm
     return { kind: "barred", pendingTokens };
   }
 
-  const nextControl: CoopNextControl = {
-    kind: "COMMAND",
-    epoch: input.nextCommand.epoch,
-    wave: input.nextCommand.wave,
-    // The authority states the NEXT turn (N+1) - the successor, not the resolved turn.
-    turn: input.nextCommand.resolvedTurn + 1,
-    ownerSeatId: input.nextCommand.ownerSeatId,
-    pokemonId: input.nextCommand.pokemonId,
-  };
+  const nextControl: CoopNextControl =
+    input.nextCommand == null
+      ? null
+      : {
+          kind: "COMMAND",
+          epoch: input.nextCommand.epoch,
+          wave: input.nextCommand.wave,
+          // The authority states the NEXT turn (N+1) - the successor, not the resolved turn.
+          turn: input.nextCommand.resolvedTurn + 1,
+          ownerSeatId: input.nextCommand.ownerSeatId,
+          pokemonId: input.nextCommand.pokemonId,
+        };
 
   const entry: Omit<CoopAuthorityEntry, "revision"> = {
     context: input.context,

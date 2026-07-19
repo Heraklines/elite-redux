@@ -362,6 +362,40 @@ function isStrictAuthoritativeState(
   );
 }
 
+function authoritativeSeatHp(
+  state: CoopAuthoritativeBattleStateV1,
+  seat: CoopAuthoritativeBattleStateV1["field"][number],
+): number | null {
+  const party = seat.side === "player" ? state.playerParty : state.enemyParty;
+  const hp = party[seat.partyIndex]?.hp;
+  return typeof hp === "number" && Number.isFinite(hp) ? hp : null;
+}
+
+function authoritativePartyIsDefeated(party: readonly Record<string, unknown>[]): boolean {
+  return party.length > 0 && party.every(mon => typeof mon.hp === "number" && Number.isFinite(mon.hp) && mon.hp <= 0);
+}
+
+/**
+ * Whether a settled turn can truthfully state an immediate COMMAND successor.
+ *
+ * A living player mon is not sufficient: victory/defeat crosses into wave or
+ * terminal progression, while any just-fainted active seat crosses through a
+ * REPLACEMENT authority entry first. The authoritative state deliberately keeps
+ * just-fainted occupants in `field`, so the party HP image can distinguish those
+ * boundaries without inspecting a mutable phase-name queue. Unknown legacy HP
+ * shapes fail open to the legacy-compatible command path; complete V2 carriers
+ * always contain PokemonData HP.
+ */
+export function hasCoopV2ImmediateCommandSuccessor(state: CoopAuthoritativeBattleStateV1): boolean {
+  if (authoritativePartyIsDefeated(state.playerParty) || authoritativePartyIsDefeated(state.enemyParty)) {
+    return false;
+  }
+  return !state.field.some(seat => {
+    const hp = authoritativeSeatHp(state, seat);
+    return hp != null && hp <= 0;
+  });
+}
+
 function hasCompleteAuthorityCompanions(
   msg: Pick<
     CoopCheckpointEnvelope,
@@ -2195,9 +2229,9 @@ export class CoopBattleStreamer {
    * authority-v2 surface 1: build the v2 TURN_COMMIT input from the just-published turn image and drive the
    * v2 authority path. In CUTOVER mode (authority.v2turn negotiated) the commit is the SOLE authority for the
    * turn and this returns whether it committed; in shadow-only mode it runs the parity tap and returns false
-   * (legacy stays the authority). The stated next-command successor names the first live player field mon (a
-   * valid COMMAND address); when none is resolvable the v2 path is skipped (returns false) rather than
-   * committing a malformed successor - so legacy remains the fallback authority for that turn.
+   * (legacy stays the authority). A COMMAND successor is stated only when the settled state has an immediate
+   * command frontier. Faint, victory, defeat, reward, and terminal boundaries state `null`; their following
+   * replacement/wave/interaction entry owns the next control instead.
    */
   private emitCoopV2TurnAuthority(
     epoch: number,
@@ -2214,8 +2248,14 @@ export class CoopBattleStreamer {
     if (!cutoverActive && !isCoopV2ShadowActive()) {
       return false;
     }
-    const commandSeat = authoritativeState.field.find(seat => seat.side === "player" && seat.pokemonId > 0);
-    if (commandSeat == null) {
+    const hasImmediateCommand = hasCoopV2ImmediateCommandSuccessor(authoritativeState);
+    const commandSeat = hasImmediateCommand
+      ? authoritativeState.field.find(
+          seat =>
+            seat.side === "player" && seat.pokemonId > 0 && (authoritativeSeatHp(authoritativeState, seat) ?? 1) > 0,
+        )
+      : null;
+    if (hasImmediateCommand && commandSeat == null) {
       return false;
     }
     // Cutover surface 1: the v2 material must carry the COMPLETE legacy turn resolution (not just the
@@ -2239,30 +2279,37 @@ export class CoopBattleStreamer {
     // its owner ROLE; map it to the seat id (host=0, guest=1). When the seat carries no owner (an older host
     // payload / genuinely unavailable), keep the best-effort local-role seat and MARK the record so the
     // successor is never silently degraded.
-    const ownerResolved = commandSeat.owner != null;
-    const ownerSeatId = ownerResolved
-      ? commandSeat.owner === "guest"
-        ? 1
-        : 0
-      : this.transport.role === "host"
-        ? 0
-        : 1;
+    const ownerResolved = commandSeat?.owner != null;
+    const ownerSeatId =
+      commandSeat == null
+        ? null
+        : ownerResolved
+          ? commandSeat.owner === "guest"
+            ? 1
+            : 0
+          : this.transport.role === "host"
+            ? 0
+            : 1;
     const input: CoopV2ShadowTurnTap = {
       operationId: `TURN/e${epoch}/w${wave}/t${turn}`,
       capture,
-      nextCommand: {
-        epoch,
-        wave,
-        resolvedTurn: turn,
-        ownerSeatId,
-        pokemonId: commandSeat.pokemonId,
-      },
+      nextCommand:
+        commandSeat == null || ownerSeatId == null
+          ? null
+          : {
+              epoch,
+              wave,
+              resolvedTurn: turn,
+              ownerSeatId,
+              pokemonId: commandSeat.pokemonId,
+            },
       // Deliverable 1: fingerprint the LEGACY turn image (the resolution + checkpoint + companions legacy just
       // committed) through the SAME turn digest so parity compares like-for-like (v2 entry digest vs
       // v2-digest-of-legacy-image); the full-state checksum stays as the raw legacy token for the log.
       legacyImage: capture,
       legacyDigest: checksum,
-      successorSeatSource: ownerResolved ? "owner-field" : "local-role-fallback",
+      successorSeatSource:
+        commandSeat == null ? "none-non-command-boundary" : ownerResolved ? "owner-field" : "local-role-fallback",
     };
     if (cutoverActive) {
       // CUTOVER: commit the v2 TURN_COMMIT as the sole authority. A non-null entry => committed (legacy becomes

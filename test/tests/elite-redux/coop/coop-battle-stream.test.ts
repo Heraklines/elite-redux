@@ -8,7 +8,11 @@
 // the guest awaits each turn and renders it, never computing. Verified over a
 // LoopbackTransport (the same "test via spoofing" path the rest of the suite uses).
 
-import { CoopBattleStreamer, type CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
+import {
+  CoopBattleStreamer,
+  type CoopCheckpointEnvelope,
+  hasCoopV2ImmediateCommandSuccessor,
+} from "#data/elite-redux/coop/coop-battle-stream";
 import type { CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
 import type {
   CoopAuthoritativeBattleStateV1,
@@ -59,6 +63,50 @@ const emptyAuthoritativeState = (wave: number, turn = 1, tick = 20): CoopAuthori
   pokeballCounts: [],
   playerModifiers: [],
   enemyModifiers: [],
+});
+
+describe("Authority V2 turn successor classification", () => {
+  it("states COMMAND only when no active seat or complete party crossed a non-command boundary", () => {
+    const ordinary = {
+      ...emptyAuthoritativeState(3),
+      playerParty: [{ id: 1, hp: 20 }],
+      enemyParty: [{ id: 2, hp: 20 }],
+      field: [
+        { side: "player" as const, bi: 0, partyIndex: 0, pokemonId: 1, presented: true },
+        { side: "enemy" as const, bi: 2, partyIndex: 0, pokemonId: 2, presented: true },
+      ],
+    };
+    expect(hasCoopV2ImmediateCommandSuccessor(ordinary)).toBe(true);
+
+    // A just-fainted active mon with a living reserve crosses REPLACEMENT first.
+    expect(
+      hasCoopV2ImmediateCommandSuccessor({
+        ...ordinary,
+        enemyParty: [
+          { id: 2, hp: 0 },
+          { id: 3, hp: 20 },
+        ],
+      }),
+    ).toBe(false);
+
+    // A completed victory/defeat crosses wave/terminal progression, never COMMAND.
+    expect(
+      hasCoopV2ImmediateCommandSuccessor({
+        ...ordinary,
+        enemyParty: [{ id: 2, hp: 0 }],
+      }),
+    ).toBe(false);
+    expect(
+      hasCoopV2ImmediateCommandSuccessor({
+        ...ordinary,
+        playerParty: [{ id: 1, hp: 0 }],
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps incomplete legacy PokemonData shapes on the compatible command path", () => {
+    expect(hasCoopV2ImmediateCommandSuccessor(emptyAuthoritativeState(3))).toBe(true);
+  });
 });
 
 const emptyFullField = (): CoopFullMonSnapshot[] => [

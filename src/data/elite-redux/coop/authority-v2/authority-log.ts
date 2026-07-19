@@ -236,6 +236,16 @@ export class AuthorityLog implements CoopAuthorityLog {
   private readonly ledger: AuthorityLedger;
   /** REPLICA: the one admitted revision that has not yet mechanically completed. */
   private pendingReplicaEntry: CoopAuthorityEntry | null = null;
+  /**
+   * REPLICA: one outstanding gap request. A tail response can contain the
+   * missing entry followed by later retained entries. Until the missing entry
+   * reaches its required mechanical stage those later entries are still gaps;
+   * re-requesting the same tail from each one creates a synchronous
+   * request/redelivery feedback loop on loopback and a packet storm on WebRTC.
+   * The authority already owns a retry lease for the missing revision, so one
+   * request remains sufficient until this frontier advances.
+   */
+  private pendingTailRequestFrom: number | null = null;
   /** AUTHORITY: the highest revision assigned (commit assigns headRevision + 1). */
   private headRevision = 0;
   private retentionRefusals = 0;
@@ -468,8 +478,11 @@ export class AuthorityLog implements CoopAuthorityLog {
       case "gap": {
         // Request the missing tail via the injected send. No local retry loop - the authority's redelivery
         // is the ONLY retry, so a replica can never spin an orphan request loop (the exact prior hazard).
+        // Suppress an identical request until that exact mechanical frontier completes. A full tail response
+        // necessarily contains later entries that remain gaps while the predecessor is awaiting material or
+        // control; echoing a request for each of those entries recursively replays the same tail forever.
         const missingFrom = this.ledger.missingFrom();
-        this.sendGuarded({ kind: "requestTail", context: this.localContext, missingFrom });
+        this.requestTailOnce(missingFrom);
         return { kind: "gap", missingFrom };
       }
       default:
@@ -495,6 +508,9 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     if (advanced && this.ledger.controlInstalledThrough() >= entry.revision) {
       this.pendingReplicaEntry = null;
+      if (this.pendingTailRequestFrom != null && this.ledger.controlInstalledThrough() >= this.pendingTailRequestFrom) {
+        this.pendingTailRequestFrom = null;
+      }
     }
     return advanced;
   }
@@ -525,6 +541,9 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     // Replica: fast-forward the applied cursor past any gap the snapshot filled.
     this.ledger.adoptFrontier(revision);
+    if (this.pendingTailRequestFrom != null && revision >= this.pendingTailRequestFrom) {
+      this.pendingTailRequestFrom = null;
+    }
     if (this.pendingReplicaEntry != null && this.pendingReplicaEntry.revision <= revision) {
       this.pendingReplicaEntry = null;
     }
@@ -551,6 +570,7 @@ export class AuthorityLog implements CoopAuthorityLog {
       this.stopLease(lease);
     }
     this.retainedWindow.clear();
+    this.pendingTailRequestFrom = null;
   }
 
   /** Live counts for the no-orphan-timer + bounded-retention invariants (tests assert these directly). */
@@ -574,6 +594,15 @@ export class AuthorityLog implements CoopAuthorityLog {
   // ---------------------------------------------------------------------------
   // Internals
   // ---------------------------------------------------------------------------
+
+  /** Emit at most one request for an unchanged unfinished mechanical frontier. */
+  private requestTailOnce(missingFrom: number): void {
+    if (this.pendingTailRequestFrom === missingFrom) {
+      return;
+    }
+    this.pendingTailRequestFrom = missingFrom;
+    this.sendGuarded({ kind: "requestTail", context: this.localContext, missingFrom });
+  }
 
   /** Retire one revision: stop its lease (cancel timers) and drop it from retention. Returns true iff present. */
   private retire(revision: number): boolean {
