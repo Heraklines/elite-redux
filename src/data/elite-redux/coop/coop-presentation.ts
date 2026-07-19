@@ -169,7 +169,15 @@ export async function settleCoopAuthoritativeProjection(state: CoopAuthoritative
   const adapter = projectionAdapters.get(scene);
   if (adapter != null) {
     try {
-      const ready = await adapter(scene, state);
+      const result = adapter(scene, state);
+      // The headless two-client oracle is deliberately synchronous: yielding here would let its
+      // process-global scene pointer move to the peer between observation and verdict, a scheduling
+      // artifact that cannot occur across real browser processes. Real asynchronous adapters retain
+      // the destination-owned post-await fence below.
+      if (typeof result === "boolean") {
+        return result && globalScene === scene;
+      }
+      const ready = await result;
       // A verifier is destination-owned just like the real asset wait: a scene swap while it was pending
       // invalidates the result instead of ACKing a continuation from another client context.
       return ready === true && globalScene === scene;

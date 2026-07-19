@@ -56,6 +56,8 @@ describe("Mystery battle reward preparation boundary", () => {
 
     expect(runtime).toContain("export function commitCoopMeNoBattleRewardSettlementAfterPreparation");
     expect(runtime).toContain('terminal: "reward-settled"');
+    expect(runtime).toContain("battle.mysteryEncounter?.encounterMode !== MysteryEncounterMode.NO_BATTLE");
+    expect(runtime).toContain("battle.mysteryEncounter?.encounterMode === MysteryEncounterMode.NO_BATTLE");
     expect(utilities).toMatch(
       /encounter\.encounterMode === MysteryEncounterMode\.NO_BATTLE[\s\S]*?mysteryEncounterRewardSurfaces\(encounter, "rewards", addHealPhase\)[\s\S]*?"MysteryEncounterRewardsPhase", addHealPhase, null, settlementPlan/u,
     );

@@ -61,10 +61,7 @@ function hasReadySemanticNodes(pokemon: Pokemon): boolean {
  * atlas, animation, and pixel evidence exclusively to the built-client browser lane.
  */
 export function installHeadlessCoopSemanticProjectionOracle(scene: BattleScene = globalScene): () => void {
-  const semanticProjection = async (
-    destination: BattleScene,
-    state: CoopAuthoritativeBattleStateV1,
-  ): Promise<boolean> => {
+  const semanticProjection = (destination: BattleScene, state: CoopAuthoritativeBattleStateV1): boolean => {
     if (destination !== scene || globalScene !== scene) {
       return false;
     }

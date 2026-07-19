@@ -360,6 +360,7 @@ import { ShowdownSpoof } from "#data/elite-redux/showdown/showdown-spoof";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
+import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { UiMode } from "#enums/ui-mode";
 import { PokemonData } from "#system/pokemon-data";
 import { compressToBase64, decompressFromBase64 } from "lz-string";
@@ -5560,7 +5561,8 @@ export function shouldDeferCoopMeBattleSettlementUntilRewardPreparation(): boole
     || !isCoopMeOperationEnabled()
     || !isCoopOperationJournalActive()
     || battle == null
-    || !battle.isBattleMysteryEncounter?.()
+    || battle.mysteryEncounter == null
+    || battle.mysteryEncounter?.encounterMode === MysteryEncounterMode.NO_BATTLE
   ) {
     return false;
   }
@@ -5579,7 +5581,8 @@ export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettle
     || !isCoopMeOperationEnabled()
     || !isCoopOperationJournalActive()
     || battle == null
-    || !battle.isBattleMysteryEncounter?.()
+    || battle.mysteryEncounter == null
+    || battle.mysteryEncounter?.encounterMode === MysteryEncounterMode.NO_BATTLE
   ) {
     return false;
   }
@@ -5638,8 +5641,7 @@ export function commitCoopMeNoBattleRewardSettlementAfterPreparation(plan: CoopM
     || !isCoopMeOperationEnabled()
     || !isCoopOperationJournalActive()
     || battle == null
-    || battle.mysteryEncounter == null
-    || battle.isBattleMysteryEncounter?.()
+    || battle.mysteryEncounter?.encounterMode !== MysteryEncounterMode.NO_BATTLE
   ) {
     return false;
   }
