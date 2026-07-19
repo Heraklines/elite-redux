@@ -4317,14 +4317,19 @@ function isCoopV2RewardContinuationSurfacePublic(phaseName: string | undefined):
   }
   const mode = globalScene.ui.getMode();
   switch (phaseName) {
-    case "SelectModifierPhase":
-      return mode === UiMode.MODIFIER_SELECT;
-    case "BiomeShopPhase": {
+    case "SelectModifierPhase": {
+      // BiomeShopPhase deliberately inherits SelectModifierPhase.phaseName because the party/item
+      // continuation machinery keys off it. Its non-owner never opens BIOME_SHOP: after reconstructing
+      // authoritative stock it keeps an executable MESSAGE handler alive and sets this phase-owned latch.
+      // Recognize that exact tuple here so the V2 WAVE_ADVANCE can install its REWARD control before the
+      // following Crossroads interaction advances the owner counter and later entries become a permanent gap.
       const phase = globalScene.phaseManager?.getCurrentPhase() as
         | { coopBiomeWatcherContinuationReady?: boolean }
         | undefined;
       return (
-        mode === UiMode.BIOME_SHOP || (mode === UiMode.MESSAGE && phase?.coopBiomeWatcherContinuationReady === true)
+        mode === UiMode.MODIFIER_SELECT
+        || mode === UiMode.BIOME_SHOP
+        || (mode === UiMode.MESSAGE && phase?.coopBiomeWatcherContinuationReady === true)
       );
     }
     case "TheBargainPhase":
