@@ -701,20 +701,34 @@ export class CoopReplayMePhase extends Phase {
    * non-owner (no pick sent), non-journal, or pre-apply path. This does NOT widen
    * `coopAuthorityContinuationSurface` (that registry stays MESSAGE->null by design).
    */
-  public releaseAppliedPickContinuationSurface(): void {
-    if (this.pickContinuationReleased || !this.pickSent || !isCoopMeOperationJournalActive()) {
+  public releaseAppliedPickContinuationSurface(applied?: { step: number; wave: number }): void {
+    if (this.pickContinuationReleased || !isCoopMeOperationJournalActive()) {
       return;
     }
-    // The committed top-level pick is at (pickStep - 1); handleGuestOptionSelect (and the harness relay seam)
-    // advanced pickStep past it. A repeated Delve/Safari round mints a distinct op at its own step, so this
-    // always addresses the latest committed pick.
-    const pickStep = this.pickStep - 1;
+    // The narration caller (no `applied`) is COSMETIC - it must observe a locally-sent pick before it may
+    // release, so it stays gated on pickSent. The material-apply hook passes the applied op's exact
+    // step/wave as PROOF the pick committed + applied, so it releases even on a FRESH phase that never ran
+    // handleGuestOptionSelect (reconnect / two-engine relay path) - where pickSent stays false and pickStep
+    // stays 0, which previously stranded the retained pick's continuation deadline -> exhaust -> Title.
+    if (applied == null && !this.pickSent) {
+      return;
+    }
+    // The committed top-level pick is at (pickStep - 1) on the local-send path; handleGuestOptionSelect
+    // advanced pickStep past it. The applied-hook path passes the applied op's own step directly. A
+    // repeated Delve/Safari round mints a distinct op at its own step, so this always addresses the latest
+    // committed pick.
+    const pickStep = applied == null ? this.pickStep - 1 : applied.step;
     if (pickStep < 0) {
       return;
     }
-    // The op-derived wave: captured at commit (handleGuestOptionSelect); the stable ME wave is the exact
-    // fallback for the two-engine harness relay path, which mints the intent without that capture.
-    const wave = this.pickWave >= 0 ? this.pickWave : (globalScene.currentBattle?.waveIndex ?? -1);
+    // The op-derived wave: the applied hook carries the committed op's wave; else the local capture from
+    // handleGuestOptionSelect, with the stable ME wave as the final fallback.
+    const wave =
+      applied != null && applied.wave >= 0
+        ? applied.wave
+        : this.pickWave >= 0
+          ? this.pickWave
+          : (globalScene.currentBattle?.waveIndex ?? -1);
     const address = coopMeGuestAppliedPickContinuationAddress(this.seq, pickStep, this.interactionCounter, wave);
     if (address == null) {
       return; // not materially applied yet (or off the migrated path) - a harmless no-op; a later call retries
@@ -2303,8 +2317,8 @@ setOnMeSnapshotRebind(snapshot => {
 // on the guest, so a zero-narration option or a narration line that raced ahead of the apply can never leave
 // the retained pick's authority-continuation deadline to exhaust -> Title. Scoped to the live retained phase
 // on the exact pinned counter; releaseAppliedPickContinuationSurface self-gates the rest (once-only + apply).
-setOnCoopMeGuestOwnerPickApplied(pinned => {
+setOnCoopMeGuestOwnerPickApplied((pinned, step, wave) => {
   if (activeCoopReplayMePhase != null && coopMeInteractionStartValue() === pinned) {
-    activeCoopReplayMePhase.releaseAppliedPickContinuationSurface();
+    activeCoopReplayMePhase.releaseAppliedPickContinuationSurface({ step, wave });
   }
 });

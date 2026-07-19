@@ -313,7 +313,10 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
           }
           if (args[0] === UiMode.MESSAGE && pickerOpens > 0) {
             pickerCloses++;
-            return;
+            // Match the real UI.setMode contract: it returns a Promise. A genuine guest-side
+            // setMode(MESSAGE).then(...) (e.g. CommandPhase.end, which runs under guest ctx while this
+            // one-shot stub is still installed) would otherwise chain .then on undefined and throw.
+            return Promise.resolve();
           }
           return realSetMode(...args);
         };
@@ -424,17 +427,19 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
         "the host used the deterministic first-legal fallback after the idle timeout",
       ).toBe(SpeciesId.LAPRAS);
 
-      // The detached headless replay has no production NewBattle/TurnInit tail. Recreate exactly
-      // that omitted input boundary through the real phase manager, then require the guest-owned
-      // public CommandPhase. The replacement checkpoint was already consumed while the retained
-      // fallback closed the picker.
+      // The IDLE-fallback guest reaches its own post-replacement CommandPhase via the out-of-band
+      // CHECKPOINT route (coop-replay-turn-phase.ts pump: materialApplied -> presentationReady ->
+      // continuationReady, own CommandPhase opened there). That handshake needs BOTH engines pumped, so a
+      // guest-only drive starves the guest at its parked rendererWait; dual-pump the host via pumpPeer.
+      // (No materializeGuestInputAfterReplacement here - that is the guest-PICK finalize/TurnInit driver
+      // and would derail the parked replay; the checkpoint route materializes + opens the command itself.)
       await withClient(rig.guestCtx, async () => {
-        await materializeGuestInputAfterReplacement(rig.guestScene);
         await driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase after timeout replacement", {
           matches: phase =>
             phase.phaseName === "CommandPhase"
             && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
           perPhaseTimeoutMs: 5_000,
+          pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
         });
       });
       withClientSync(rig.guestCtx, () => {

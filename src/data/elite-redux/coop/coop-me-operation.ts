@@ -773,10 +773,12 @@ export function adoptCoopMeCommittedOwnerOrdinal(op: CoopPendingOperation): bool
  * zero-narration option or a single narration line that raced ahead of the apply. Registered by the replay
  * phase module (no import cycle: adapter -> phase seam). Null off the migrated path / with no live replay.
  */
-let onGuestOwnerPickApplied: ((pinned: number) => void) | null = null;
+let onGuestOwnerPickApplied: ((pinned: number, step: number, wave: number) => void) | null = null;
 
 /** Register (or clear) the guest-owned ME_PICK material-apply release hook (Track R). Last registration wins. */
-export function setOnCoopMeGuestOwnerPickApplied(fn: ((pinned: number) => void) | null): () => void {
+export function setOnCoopMeGuestOwnerPickApplied(
+  fn: ((pinned: number, step: number, wave: number) => void) | null,
+): () => void {
   const previous = onGuestOwnerPickApplied;
   onGuestOwnerPickApplied = fn;
   return () => {
@@ -1281,9 +1283,14 @@ function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopAp
   if (op.kind === "ME_PICK") {
     const parsed = parseCoopOperationId(op.id);
     if (parsed != null && parsed.owner === 1) {
-      const pinned = Math.floor(parsed.pinnedSeq / 8000) - COOP_ME_PUMP_SEQ_BASE;
-      if (Number.isSafeInteger(pinned) && pinned >= 0) {
-        onGuestOwnerPickApplied?.(pinned);
+      const seq = Math.floor(parsed.pinnedSeq / 8000);
+      const pinned = seq - COOP_ME_PUMP_SEQ_BASE;
+      // The applied op carries its EXACT committed step (meOpAddr encoding) and wave. Pass both so the
+      // release addresses the pick by the APPLIED op - not the phase's local pickStep/pickWave, which a
+      // fresh phase that never ran handleGuestOptionSelect (reconnect / two-engine relay) leaves at 0/-1.
+      const step = parsed.pinnedSeq - seq * 8000 - ME_KIND_TAG.ME_PICK * 1000;
+      if (Number.isSafeInteger(pinned) && pinned >= 0 && Number.isSafeInteger(step) && step >= 0) {
+        onGuestOwnerPickApplied?.(pinned, step, envelope.wave);
       }
     }
   }

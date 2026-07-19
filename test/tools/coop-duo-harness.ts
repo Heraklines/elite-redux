@@ -2171,14 +2171,18 @@ export async function buildDuo(
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
 
-  // Flip the host engine into co-op + tag the field leads host/guest.
+  // Flip the host engine into co-op + tag the party leads host/guest. Tag by PARTY index, not field: in a
+  // final-boss STAGE-ONE the player field is single (only slot 0 is summoned), yet the co-op party still
+  // holds the guest partner's mon on the BENCH (slot 1). A field-only tag left that benched partner
+  // untagged, so a stage-one rig had "no healthy guest-owned bench mon" (coop-final-boss-stage-one). Slots
+  // 0/1 ARE field 0/1 in a normal double battle, so this is byte-identical for every doubles rig.
   toCoopGameMode(hostScene);
-  const hostField = hostScene.getPlayerField();
-  if (hostField[0] != null) {
-    hostField[0].coopOwner = "host";
+  const hostParty = hostScene.getPlayerParty();
+  if (hostParty[0] != null) {
+    hostParty[0].coopOwner = "host";
   }
-  if (hostField[1] != null) {
-    hostField[1].coopOwner = "guest";
+  if (hostParty[1] != null) {
+    hostParty[1].coopOwner = "guest";
   }
 
   const hostCtx: ClientCtx = {
@@ -3315,14 +3319,18 @@ export async function buildDuoForMe(
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
 
-  // Flip the host engine into co-op + tag the field leads host/guest.
+  // Flip the host engine into co-op + tag the party leads host/guest. Tag by PARTY index, not field: in a
+  // final-boss STAGE-ONE the player field is single (only slot 0 is summoned), yet the co-op party still
+  // holds the guest partner's mon on the BENCH (slot 1). A field-only tag left that benched partner
+  // untagged, so a stage-one rig had "no healthy guest-owned bench mon" (coop-final-boss-stage-one). Slots
+  // 0/1 ARE field 0/1 in a normal double battle, so this is byte-identical for every doubles rig.
   toCoopGameMode(hostScene);
-  const hostField = hostScene.getPlayerField();
-  if (hostField[0] != null) {
-    hostField[0].coopOwner = "host";
+  const hostParty = hostScene.getPlayerParty();
+  if (hostParty[0] != null) {
+    hostParty[0].coopOwner = "host";
   }
-  if (hostField[1] != null) {
-    hostField[1].coopOwner = "guest";
+  if (hostParty[1] != null) {
+    hostParty[1].coopOwner = "guest";
   }
 
   const hostCtx: ClientCtx = {
