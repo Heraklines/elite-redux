@@ -101,6 +101,14 @@ export interface CoopTurnResolution {
    * the following ordered replacement/wave/interaction entry instead of deriving a phantom CommandPhase.
    */
   authorityNextControl?: CoopNextControl;
+  /**
+   * Authority V2's global log revision for this exact TURN_COMMIT.
+   *
+   * This is intentionally distinct from `revision`, which is the legacy turn-carrier schema revision.
+   * Successor ordering must use this single V2 ordering domain and must never compare against the carrier
+   * revision (for example, first TURN log revision 1 followed by WAVE revision 2 while carrier revision is 3).
+   */
+  authorityRevision?: number;
 }
 
 /** An out-of-turn authoritative checkpoint + the host's matching full-state checksum. */
@@ -3965,12 +3973,16 @@ export class CoopBattleStreamer {
    * identical redelivery is re-ACKed / ignored, never re-applied), so first delivery and every redelivery
    * are equivalent, and racing the cosmetic carrier only settles the same waiter once.
    */
-  ingestAuthoritativeV2Turn(msg: Extract<CoopMessage, { t: "turnResolution" }>, nextControl: CoopNextControl): void {
+  ingestAuthoritativeV2Turn(
+    msg: Extract<CoopMessage, { t: "turnResolution" }>,
+    nextControl: CoopNextControl,
+    authorityRevision: number,
+  ): void {
     // This carrier has already crossed the Authority V2 frame/session/membership/order admission boundary.
     // Retain it independently of the renderer's ambient legacy battle shell: the host may commit while the
     // guest shell has speculatively advanced its local turn but before the exact replay consumer starts.
     // Cosmetic legacy packets still use the ordinary ambient-address rejection below.
-    this.handle(msg, "authority-v2", nextControl);
+    this.handle(msg, "authority-v2", nextControl, authorityRevision);
   }
 
   /**
@@ -4429,6 +4441,7 @@ export class CoopBattleStreamer {
     msg: CoopMessage,
     source: "transport" | "authority-v2" = "transport",
     authorityNextControl?: CoopNextControl,
+    authorityRevision?: number,
   ): void {
     switch (msg.t) {
       case "enemyPartySync": {
@@ -4727,7 +4740,9 @@ export class CoopBattleStreamer {
         // classify as an identical carrier rather than conflicting with the authoritative V2 entry. The
         // renderer still receives the exact host-stated successor on the V2 admission path.
         const deliveredResolution: CoopTurnResolution =
-          source === "authority-v2" && authorityNextControl !== undefined ? { ...res, authorityNextControl } : res;
+          source === "authority-v2" && authorityNextControl !== undefined && authorityRevision !== undefined
+            ? { ...res, authorityNextControl, authorityRevision }
+            : res;
         coopLog(
           "replay",
           `guest RECV turnResolution e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} events=${msg.events.length} `

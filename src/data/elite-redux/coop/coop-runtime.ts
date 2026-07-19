@@ -4544,7 +4544,7 @@ function buildCoopV2LiveSeams(
           if (runtime.battleStream.hasFinalizedAuthoritativeV2Turn(resolution)) {
             return true;
           }
-          runtime.battleStream.ingestAuthoritativeV2Turn(resolution, entry.nextControl);
+          runtime.battleStream.ingestAuthoritativeV2Turn(resolution, entry.nextControl, entry.revision);
           return "deferred";
         }
         // A negotiated cutover peer must carry the complete companions. A numeric checkpoint alone cannot

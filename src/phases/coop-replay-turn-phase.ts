@@ -573,6 +573,7 @@ export class CoopReplayTurnPhase extends Phase {
           raced.res.wave,
           raced.res.revision,
           raced.res.authorityNextControl,
+          raced.res.authorityRevision,
         );
         this.end();
         return;

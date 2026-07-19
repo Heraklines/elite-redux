@@ -945,6 +945,7 @@ export class CoopFinalizeTurnPhase extends Phase {
     private readonly wave?: number,
     private readonly revision?: number,
     private readonly authorityNextControl?: CoopNextControl,
+    private readonly authorityRevision?: number,
   ) {
     super();
     this.turn = turn;
@@ -1081,14 +1082,15 @@ export class CoopFinalizeTurnPhase extends Phase {
       !this.awaitingAuthoritySuccessor
       || this.ended
       || successor.sessionEpoch !== this.epoch
-      || this.revision == null
-      || successor.revision <= this.revision
+      || this.authorityRevision == null
+      || successor.revision <= this.authorityRevision
     ) {
       return false;
     }
     coopLog(
       "v2-turn",
-      `guest release parked turn=${this.turn} rev=${this.revision} for ${successor.kind} rev=${successor.revision}`,
+      `guest release parked turn=${this.turn} authorityRev=${this.authorityRevision} `
+        + `for ${successor.kind} rev=${successor.revision}`,
     );
     this.end();
     return true;
@@ -1682,6 +1684,12 @@ export class CoopFinalizeTurnPhase extends Phase {
       const meBattleWon = !waveEnding && coopMeHandoffBattleWon();
       const v2NoImmediateCommand = this.authorityNextControl === null;
       const v2ImmediateCommand = this.authorityNextControl?.kind === "COMMAND_FRONTIER";
+      if (
+        v2NoImmediateCommand
+        && (!Number.isSafeInteger(this.authorityRevision) || (this.authorityRevision as number) <= 0)
+      ) {
+        throw new Error("Authority V2 TURN_COMMIT omitted its global log revision");
+      }
       if (v2ImmediateCommand && (waveEnding || meBattleWon)) {
         throw new Error(
           `Authority V2 TURN_COMMIT stated command ${this.authorityNextControl?.wave}:${this.authorityNextControl?.turn} `

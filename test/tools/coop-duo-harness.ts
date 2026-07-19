@@ -1904,53 +1904,62 @@ export async function driveDuoGuestTackleThroughPublicUi(
         && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
     }),
   );
-  await withClient(rig.guestCtx, async () => {
-    guestOwnCommand.start();
-    await drainLoopback();
-  });
-
-  await withClient(rig.hostCtx, async () => {
-    await drainLoopback();
-    if (options.restartAlreadyOpenHost) {
-      // Wave 1 opened before buildDuo installed the live runtime. Re-enter that untouched public phase
-      // once so it participates in the now-live reciprocal rendezvous.
-      rig.hostScene.phaseManager.getCurrentPhase().start();
+  // Promise continuations from a reciprocal rendezvous must resume in the RECEIVER's realm. In two
+  // browsers that is automatic; in this shared-process harness an automatically delivered host arrival
+  // can otherwise resolve the guest's pending barrier while the host owns globalScene. Queue the complete
+  // handshake and let each drain below deliver only that client's inbox under its installed ClientCtx.
+  rig.pair.setDestinationContextDelivery?.(true);
+  try {
+    await withClient(rig.guestCtx, async () => {
+      guestOwnCommand.start();
       await drainLoopback();
-    } else if (rig.hostScene.phaseManager.getCurrentPhase().phaseName === "CommandPhase") {
-      // Between-wave callers deliberately stop BEFORE this exact phase so both clients can materialize
-      // before either input surface opens. Start the prepared host phase here, alongside the prepared guest
-      // phase above. Treating a merely-current phase as already started omitted the host rendezvous arrival
-      // and left the guest correctly sealed at MESSAGE on every wave after the first. A few older journeys
-      // intentionally ran the target CommandPhase before the next loop; preserve that already-open surface
-      // instead of starting the same phase twice.
-      if (rig.hostScene.ui.getMode() !== UiMode.COMMAND && rig.hostScene.ui.getMode() !== UiMode.FIGHT) {
+    });
+
+    await withClient(rig.hostCtx, async () => {
+      await drainLoopback();
+      if (options.restartAlreadyOpenHost) {
+        // Wave 1 opened before buildDuo installed the live runtime. Re-enter that untouched public phase
+        // once so it participates in the now-live reciprocal rendezvous.
         rig.hostScene.phaseManager.getCurrentPhase().start();
+        await drainLoopback();
+      } else if (rig.hostScene.phaseManager.getCurrentPhase().phaseName === "CommandPhase") {
+        // Between-wave callers deliberately stop BEFORE this exact phase so both clients can materialize
+        // before either input surface opens. Start the prepared host phase here, alongside the prepared guest
+        // phase above. Treating a merely-current phase as already started omitted the host rendezvous arrival
+        // and left the guest correctly sealed at MESSAGE on every wave after the first. A few older journeys
+        // intentionally ran the target CommandPhase before the next loop; preserve that already-open surface
+        // instead of starting the same phase twice.
+        if (rig.hostScene.ui.getMode() !== UiMode.COMMAND && rig.hostScene.ui.getMode() !== UiMode.FIGHT) {
+          rig.hostScene.phaseManager.getCurrentPhase().start();
+        }
+        await drainLoopback();
+      } else {
+        await hostGame.phaseInterceptor.to("CommandPhase");
       }
+    });
+
+    await withClient(rig.guestCtx, async () => {
       await drainLoopback();
-    } else {
-      await hostGame.phaseInterceptor.to("CommandPhase");
-    }
-  });
+      expect(rig.guestScene.ui.getMode(), "guest command UI opens only after both clients arrive").toBe(UiMode.COMMAND);
+      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Fight through COMMAND UI").toBe(true);
+      expect(rig.guestScene.ui.getMode(), "guest reaches the move picker").toBe(UiMode.FIGHT);
+      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Tackle through FIGHT UI").toBe(true);
 
-  await withClient(rig.guestCtx, async () => {
-    await drainLoopback();
-    expect(rig.guestScene.ui.getMode(), "guest command UI opens only after both clients arrive").toBe(UiMode.COMMAND);
-    expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Fight through COMMAND UI").toBe(true);
-    expect(rig.guestScene.ui.getMode(), "guest reaches the move picker").toBe(UiMode.FIGHT);
-    expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Tackle through FIGHT UI").toBe(true);
-
-    // The direct guest scene uses a manual phase manager. The Fight click queues the production target
-    // phase, so start that real queued phase before sending the target inputs.
-    const targetPhase = await driveClientPhaseQueueTo(rig.guestScene, "SelectTargetPhase");
-    targetPhase.start();
-    await drainLoopback();
-    expect(rig.guestScene.ui.getMode(), "guest reaches the real target picker").toBe(UiMode.TARGET_SELECT);
-    expect(rig.guestScene.ui.processInput(Button.RIGHT), "guest moves to the second enemy target").toBe(true);
-    expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the second enemy target").toBe(true);
-    await drainLoopback();
-    await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase");
-  });
-  await withClient(rig.hostCtx, () => drainLoopback());
+      // The direct guest scene uses a manual phase manager. The Fight click queues the production target
+      // phase, so start that real queued phase before sending the target inputs.
+      const targetPhase = await driveClientPhaseQueueTo(rig.guestScene, "SelectTargetPhase");
+      targetPhase.start();
+      await drainLoopback();
+      expect(rig.guestScene.ui.getMode(), "guest reaches the real target picker").toBe(UiMode.TARGET_SELECT);
+      expect(rig.guestScene.ui.processInput(Button.RIGHT), "guest moves to the second enemy target").toBe(true);
+      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the second enemy target").toBe(true);
+      await drainLoopback();
+      await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase");
+    });
+    await withClient(rig.hostCtx, () => drainLoopback());
+  } finally {
+    rig.pair.setDestinationContextDelivery?.(false);
+  }
 }
 
 /** Every in-process duo assembled by this module and not yet fully torn down. */
