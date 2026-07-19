@@ -16,11 +16,17 @@ This smart-sharded workflow is the standing default for all future co-op checkpo
   locally; dispatch them to GitHub Actions and inspect their per-shard artifacts. If a co-op test process is
   started accidentally, terminate its whole process tree promptly and move the reproduction to an isolated
   external runner.
-- Before declaring a co-op checkpoint deployable, push `feat/elite-redux-port` and require the `Co-op Gate (Sharded)` workflow (`.github/workflows/coop-gate-sharded.yml`) to finish green.
-- The same external workflow must also pass its independent TypeScript and Biome static job. A green test
-  matrix with a red static or aggregate job is not deployable.
-- The external gate is the default checkpoint gate. Its integration layout is A1/B8/C3/P2/S3/T1 (18 test
-  shards): Lane A stays process-global, Lane B is historically weighted, Lane C owns soak campaigns, each
+- Before declaring a normal staging checkpoint or any release candidate deployable, push
+  `feat/elite-redux-port` and require the `Co-op Gate (Sharded)` workflow
+  (`.github/workflows/coop-gate-sharded.yml`) to finish green. The only exception is a stabilization-only
+  staging checkpoint carrying an exact, active harness-only waiver under the rules below.
+- The same external workflow must always pass its independent TypeScript and Biome static job; static is
+  never waivable. A red aggregate is eligible only for the exact stabilization exception below, never for
+  a normal staging checkpoint or release candidate.
+- The external gate is the default checkpoint gate. Its current planner-derived integration layout is
+  A1/B13/C5/P2/S8/T4 (33 test shards), plus parallel static, browser, contract, and mutation jobs that can
+  fill the account's 40 concurrent hosted-runner slots: Lane A stays process-global, Lane B is historically
+  weighted, Lane C owns soak campaigns, each
   Lane P production-fidelity file owns a runner, Lane S covers Showdown, and Lane T covers triples/topology.
   Preserve the production-like checkout, including recursive asset submodules. The proven controller model
   is `--pool=forks --isolate --no-file-parallelism`, reusing Vite transforms while keeping test module state
