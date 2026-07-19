@@ -31,10 +31,8 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { applyCoopAuthoritativeBattleState, applyCoopCheckpoint } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type {
@@ -209,34 +207,16 @@ describe.skipIf(!RUN)(
       );
       expect(hostReplacement?.isFainted(), "the replacement is battle-ready on the host").toBe(false);
 
-      // GUEST consumes the OUT-OF-BAND replacement checkpoint mid-park (the exact production path:
-      // CoopReplayTurnPhase's raced.kind === "checkpoint" branch), summoning CHARIZARD into bi1 (tick N+1).
+      // GUEST consumes the Authority V2 REPLACEMENT_COMMIT through the real turn-N+1 replay pump. Do not
+      // reach into the retired legacy battleCheckpoint inbox here: with replacement cut over, the ordered
+      // V2 projector materializes the compatibility carrier and the replay phase owns apply/settlement/ACK
+      // plus the command-continuation pivot. This is the same public phase chain the browser runs.
       await withClient(rig.guestCtx, async () => {
-        const envelope = rig.guestRuntime.battleStream.consumeCheckpoint();
-        expect(envelope?.reason, "the guest received the out-of-band replacement checkpoint").toBe("replacement");
-        if (envelope != null) {
-          const checkpointApplied = applyCoopCheckpoint(envelope.checkpoint);
-          const authoritativeApplied =
-            checkpointApplied && applyCoopAuthoritativeBattleState(envelope.authoritativeState, true);
-          if (authoritativeApplied) {
-            expect(
-              await settleCoopAuthoritativeProjection(envelope.authoritativeState),
-              "the replacement's sprite and battle-info projection became usable before presentationReady",
-            ).toBe(true);
-            rig.guestRuntime.battleStream.retainAppliedOutOfBandCheckpoint(envelope);
-            rig.guestRuntime.battleStream.acknowledgeReplacement(envelope, "materialApplied");
-            rig.guestRuntime.battleStream.acknowledgeReplacement(envelope, "presentationReady");
-            expect(
-              rig.guestRuntime.battleStream.registerReplacementContinuation(envelope, {
-                kind: "command",
-                epoch: envelope.epoch,
-                wave: envelope.wave,
-                turn: envelope.turn,
-              }),
-              "the low-level apply cannot release host retention before its later real command UI",
-            ).toBe(true);
-          }
-        }
+        await driveGuestReplayTurn(rig.guestScene, turn + 1);
+        expect(
+          rig.guestScene.phaseManager.getCurrentPhase()?.phaseName,
+          "the V2 replacement projection opened the guest-owned command continuation",
+        ).toBe("CommandPhase");
       });
 
       expect(

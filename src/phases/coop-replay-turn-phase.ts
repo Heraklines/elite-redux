@@ -6,6 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import type { PhaseManager } from "#app/phase-manager";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
@@ -78,14 +79,13 @@ export class CoopReplayTurnPhase extends Phase {
   public readonly phaseName = "CoopReplayTurnPhase";
 
   /**
-   * The engine that owns this async renderer pump. `pump()` crosses several
-   * network/timer awaits before it calls {@link end}; resolving through the
-   * ambient `globalScene` at that point can advance a different engine in the
-   * in-process two-browser harness. A real browser has one scene, so capturing
-   * it at construction is behavior-identical there while making the async
-   * ownership explicit.
+   * The queue that created this async renderer pump. `pump()` crosses network/timer awaits before it
+   * calls {@link end}; neither construction-time nor completion-time `globalScene` is a sound ownership
+   * witness in the two-engine scheduler. The factory is the one boundary that knows which queue owns the
+   * phase, so {@linkcode PhaseManager.create} binds it explicitly. Directly-constructed focused fixtures
+   * retain the single-engine fallback in {@link end}.
    */
-  private readonly ownerScene = globalScene;
+  private ownerPhaseManager: PhaseManager | null = null;
   private readonly turn: number;
   /** #782 live pump: how many event POSITIONS (seq 0..rendered-1) this turn has already presented. */
   private readonly rendered: number;
@@ -111,6 +111,12 @@ export class CoopReplayTurnPhase extends Phase {
     this.rendered = rendered;
     this.fromHpByBi = new Map(hpChain ?? []);
     this.sourceWave = sourceWave ?? globalScene.currentBattle?.waveIndex ?? 0;
+  }
+
+  /** Bind this async phase to the exact phase tree that created it. */
+  public bindOwnerPhaseManager(phaseManager: PhaseManager): this {
+    this.ownerPhaseManager = phaseManager;
+    return this;
   }
 
   /**
@@ -156,7 +162,7 @@ export class CoopReplayTurnPhase extends Phase {
     if (activeCoopReplayTurnPhase === this) {
       activeCoopReplayTurnPhase = null;
     }
-    this.ownerScene.phaseManager.shiftPhase();
+    (this.ownerPhaseManager ?? globalScene.phaseManager).shiftPhase();
   }
 
   /** Whether this renderer has installed the exact-address turn/live-event continuation wait. */
