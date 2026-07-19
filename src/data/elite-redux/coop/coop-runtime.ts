@@ -6455,6 +6455,21 @@ export function assembleCoopRuntime(
   let opState!: CoopRuntimeOpState;
   let waveOperationBinding: CoopWaveAdvanceOperationBinding;
   let runtime!: CoopRuntime;
+  let authorityV2Epoch: number | null = null;
+  const applyOperationEpoch = (epoch: number): void => {
+    // An epoch advance is an explicit hard control-plane boundary (cold resume/new run), not a hot
+    // connection rebind. The retained V2 log belongs to exactly one immutable epoch, so retire it before
+    // the controller can renegotiate capabilities or accept a replacement P33 binding. A same-epoch hot
+    // rejoin deliberately keeps the log and flows through rebindIdentity instead.
+    if (authorityV2Epoch != null && authorityV2Epoch !== epoch) {
+      disposeCoopV2Shadow(runtime);
+      runtime.v2InstalledCommandTargets.clear();
+      runtime.v2InstalledReplacementTargets.clear();
+      coopLog("v2-recovery", `hard epoch boundary ${authorityV2Epoch}->${epoch}; retired prior authoritative log`);
+    }
+    authorityV2Epoch = epoch;
+    withActiveCoopRuntimeOpState(opState, () => applyCoopOperationEpoch(epoch, waveOperationBinding));
+  };
   const installAuthorityV2 = (): void => {
     try {
       getCoopV2Shadow(runtime);
@@ -6474,8 +6489,7 @@ export function assembleCoopRuntime(
     requireFunctionalFingerprint: true,
     // The callback runs after assembly, on handshake/rejoin. Its stable binding cannot drift to the other
     // in-process engine while the peer's transport is being pumped.
-    onEpochNegotiated: epoch =>
-      withActiveCoopRuntimeOpState(opState, () => applyCoopOperationEpoch(epoch, waveOperationBinding)),
+    onEpochNegotiated: applyOperationEpoch,
     // authority-v2: EAGERLY build the shadow harness (and the turn cutover, when authority.v2turn is
     // negotiated) the moment capabilities are frozen, so the turn-surface cutover is ACTIVE before the first
     // turn commit - otherwise a lazy first-tap build would leave wave-1 turns on legacy authority (a window

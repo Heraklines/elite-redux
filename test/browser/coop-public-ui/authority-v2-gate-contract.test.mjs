@@ -63,3 +63,21 @@ test("an existing Authority V2 runtime rebinds only after the replacement channe
   assert.ok(existing > unavailable && rebind > existing, "a retained harness is rebound only after identity proof");
   assert.match(resolver, /reasonCode:\s*"binding-mismatch"/u, "a rejected rebind fails the shared session closed");
 });
+
+test("a cold-resume or new-run epoch boundary replaces the V2 log instead of hot-rebinding it", () => {
+  const start = coopRuntime.indexOf("const applyOperationEpoch = (epoch: number): void => {");
+  const end = coopRuntime.indexOf("\n  };", start);
+  assert.notEqual(start, -1, "runtime owns one epoch-boundary callback");
+  assert.notEqual(end, -1, "epoch-boundary callback has a bounded source block");
+  const callback = coopRuntime.slice(start, end);
+  const detectsAdvance = callback.indexOf("authorityV2Epoch !== epoch");
+  const disposes = callback.indexOf("disposeCoopV2Shadow(runtime);");
+  const publishesEpoch = callback.indexOf("authorityV2Epoch = epoch;");
+  const appliesEpoch = callback.indexOf("applyCoopOperationEpoch(epoch, waveOperationBinding)");
+  assert.ok(detectsAdvance >= 0, "the callback distinguishes a hard epoch advance from same-epoch hot rejoin");
+  assert.ok(disposes > detectsAdvance, "the prior epoch log is retired at the hard boundary");
+  assert.ok(
+    publishesEpoch > disposes && appliesEpoch > publishesEpoch,
+    "the replacement epoch is published only after the old V2 authority is gone",
+  );
+});
