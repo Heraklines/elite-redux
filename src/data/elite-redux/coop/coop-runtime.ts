@@ -216,7 +216,11 @@ import type {
   CoopStormglassPayload,
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
-import { COOP_ME_BATTLE_SETTLED_CHOICE, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  COOP_ME_BATTLE_SETTLED_CHOICE,
+  COOP_ME_REWARD_SETTLED_CHOICE,
+  parseCoopOperationId,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import { applyCoopOperationEpoch } from "#data/elite-redux/coop/coop-operation-epoch";
 import {
   coopOperationDurabilityHooks,
@@ -5059,7 +5063,9 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
             ? COOP_ME_BATTLE_HANDOFF
             : payload.terminal === "battle-settled"
               ? COOP_ME_BATTLE_SETTLED_CHOICE
-              : COOP_INTERACTION_LEAVE,
+              : payload.terminal === "reward-settled"
+                ? COOP_ME_REWARD_SETTLED_CHOICE
+                : COOP_INTERACTION_LEAVE,
       });
       const retainedControl = captureCoopActiveMysteryControl();
       if (
@@ -5614,6 +5620,72 @@ export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettle
     choice: COOP_ME_BATTLE_SETTLED_CHOICE,
   });
   coopLog("me", `host retained post-BattleEnd settlement step=${step} id=${operationId}`);
+  return true;
+}
+
+/**
+ * Retain a no-battle ME's complete post-effect state before its standard reward UI is exposed. This is
+ * deliberately a distinct lifecycle cursor from `battle-settled`: no BattleEnd exists to park or infer
+ * from, and reconnect control must not enable the battle-handoff renderer exemption.
+ */
+export function commitCoopMeNoBattleRewardSettlementAfterPreparation(plan: CoopMeBattleSettlementPlan): boolean {
+  const runtime = active;
+  const battle = globalScene.currentBattle;
+  if (
+    runtime == null
+    || runtime.controller.role !== "host"
+    || runtime.controller.netcodeMode !== "authoritative"
+    || !isCoopMeOperationEnabled()
+    || !isCoopOperationJournalActive()
+    || battle == null
+    || battle.mysteryEncounter == null
+    || battle.isBattleMysteryEncounter?.()
+  ) {
+    return false;
+  }
+  const pinned = coopMeInteractionStartValue();
+  const prior = captureCoopActiveMysteryControl();
+  if (
+    pinned < 0
+    || prior?.interactionCounter !== pinned
+    || prior.terminal !== "pending"
+    || plan.continuation !== "rewards"
+    || plan.trainerVictory
+  ) {
+    failCoopSharedSession("Mystery no-battle reward settlement had no retained pending encounter");
+    return true;
+  }
+  const step = 0;
+  const payload = {
+    terminal: "reward-settled",
+    outcome: captureCoopMeOutcome(),
+    destination: {
+      kind: "reward",
+      hostTurn: battle.turn,
+      ...plan,
+    },
+  } satisfies CoopMeTerminalPayload;
+  const operationId = commitMeOwnerIntent({
+    kind: "ME_TERMINAL",
+    seq: COOP_ME_TERM_SEQ_BASE + pinned,
+    pinned,
+    step,
+    payload,
+    localRole: "host",
+    wave: battle.waveIndex,
+    turn: battle.turn,
+  });
+  if (operationId == null) {
+    runtime.durability?.reconnect();
+    failCoopSharedSession("Mystery no-battle reward settlement could not be retained");
+    return true;
+  }
+  setCoopMeTerminalControl("reward-settled", battle.turn, {
+    operationId,
+    step,
+    choice: COOP_ME_REWARD_SETTLED_CHOICE,
+  });
+  coopLog("me", `host retained no-battle pre-reward settlement step=${step} id=${operationId}`);
   return true;
 }
 

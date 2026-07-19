@@ -1546,7 +1546,19 @@ export function handleMysteryEncounterVictory(addHealPhase = false, doNotContinu
     return;
   }
   if (encounter.encounterMode === MysteryEncounterMode.NO_BATTLE) {
-    globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase);
+    const rewardSurfaces = mysteryEncounterRewardSurfaces(encounter, "rewards", addHealPhase);
+    if (rewardSurfaces == null && globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
+      failCoopSharedSession("A no-battle Mystery reward callback had no typed reward-surface plan.");
+      return;
+    }
+    const settlementPlan = {
+      result: "victory",
+      continuation: "rewards",
+      trainerVictory: false,
+      rewardSurfaces: rewardSurfaces ?? [],
+      eggLapse: true,
+    } as const;
+    globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase, null, settlementPlan);
     globalScene.phaseManager.pushNew("EggLapsePhase");
   } else if (
     !globalScene
@@ -1619,7 +1631,19 @@ export function handleMysteryEncounterBattleFailed(addHealPhase = false, doNotCo
     return;
   }
   if (encounter.encounterMode === MysteryEncounterMode.NO_BATTLE) {
-    globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase);
+    const rewardSurfaces = mysteryEncounterRewardSurfaces(encounter, "rewards", addHealPhase);
+    if (rewardSurfaces == null && globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
+      failCoopSharedSession("A failed no-battle Mystery reward callback had no typed reward-surface plan.");
+      return;
+    }
+    const settlementPlan = {
+      result: "failure",
+      continuation: "rewards",
+      trainerVictory: false,
+      rewardSurfaces: rewardSurfaces ?? [],
+      eggLapse: true,
+    } as const;
+    globalScene.phaseManager.pushNew("MysteryEncounterRewardsPhase", addHealPhase, null, settlementPlan);
   } else {
     const continuation = encounter.doContinueEncounter ? "encounter" : "rewards";
     const rewardSurfaces = mysteryEncounterRewardSurfaces(encounter, continuation, addHealPhase);

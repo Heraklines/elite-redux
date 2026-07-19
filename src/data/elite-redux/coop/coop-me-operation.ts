@@ -201,7 +201,10 @@ function isCompleteCoopMeRewardSurfacePlan(value: unknown): value is CoopMeRewar
 export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMeTerminalPayload {
   if (
     !isPlainObject(value)
-    || (value.terminal !== "leave" && value.terminal !== "battle" && value.terminal !== "battle-settled")
+    || (value.terminal !== "leave"
+      && value.terminal !== "battle"
+      && value.terminal !== "battle-settled"
+      && value.terminal !== "reward-settled")
   ) {
     return false;
   }
@@ -236,7 +239,7 @@ export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMe
       && outcome.authoritativeState.enemyParty.length > 0
     );
   }
-  if (value.terminal === "battle-settled") {
+  if (value.terminal === "battle-settled" || value.terminal === "reward-settled") {
     const rewardSurfaces = destination.rewardSurfaces;
     if (
       destination.kind !== "reward"
@@ -251,10 +254,12 @@ export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMe
     ) {
       return false;
     }
-    return (
+    const commonValid =
       (!destination.trainerVictory || destination.result === "victory")
-      && ((rewardSurfaces.length === 0 && !destination.eggLapse) || destination.continuation === "rewards")
-    );
+      && ((rewardSurfaces.length === 0 && !destination.eggLapse) || destination.continuation === "rewards");
+    return value.terminal === "reward-settled"
+      ? commonValid && destination.continuation === "rewards" && destination.trainerVictory === false
+      : commonValid;
   }
   return (
     destination.kind === "continue"
@@ -295,9 +300,10 @@ interface CoopMeTerminalPinnedState {
 /**
  * Durable ME terminal admission/once gate. DATA and CONTROL have separate progress bits so a late replay
  * phase or hot-rejoin can retry destination execution without reapplying a monotonic state tick. A pinned
- * ME accepts step 0 first, then the ordered lifecycle `battle -> battle-settled -> (battle | leave)`.
- * Repeating the settled-to-battle pair supports multi-battle encounters without a separately timed party
- * or post-BattleEnd carrier.
+ * ME accepts step 0 first, then either the ordered battle lifecycle
+ * `battle -> battle-settled -> (battle | leave)` or the no-battle lifecycle
+ * `reward-settled -> leave`. Repeating the settled-to-battle pair supports multi-battle encounters
+ * without a separately timed party or post-BattleEnd carrier.
  */
 export class CoopMeTerminalTransactionReceiver {
   private readonly receipts = new Map<string, CoopMeTerminalReceiptState>();
@@ -340,7 +346,8 @@ export class CoopMeTerminalTransactionReceiver {
         && receipt.step === priorPinned.step + 1
         && ((priorPinned.terminal === "battle" && receipt.payload.terminal === "battle-settled")
           || (priorPinned.terminal === "battle-settled"
-            && (receipt.payload.terminal === "battle" || receipt.payload.terminal === "leave")));
+            && (receipt.payload.terminal === "battle" || receipt.payload.terminal === "leave"))
+          || (priorPinned.terminal === "reward-settled" && receipt.payload.terminal === "leave"));
       if (!validInitial && !validNext) {
         return "rejected";
       }
@@ -418,7 +425,9 @@ export function coopMeTerminalSanctionedTails(
   if (terminal === "battle") {
     return ["MysteryEncounterBattlePhase", "MysteryEncounterBattleStartCleanupPhase", "VictoryPhase", "BattleEndPhase"];
   }
-  return terminal === "battle-settled" ? [] : ["MysteryEncounterRewardsPhase", "PostMysteryEncounterPhase"];
+  return terminal === "battle-settled" || terminal === "reward-settled"
+    ? []
+    : ["MysteryEncounterRewardsPhase", "PostMysteryEncounterPhase"];
 }
 
 /** The typed per-kind payload the owner mints (invariant 2) / the host commits (invariant 4). */

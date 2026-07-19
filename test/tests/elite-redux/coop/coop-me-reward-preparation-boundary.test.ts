@@ -35,13 +35,35 @@ describe("Mystery battle reward preparation boundary", () => {
     const prepareCall = method.indexOf("const preparation = rewardPlan.prepareAutomaticEffects();");
     const prepareAwait = method.indexOf("await preparation;");
     const capture = method.indexOf("commitCoopMeBattleSettlementAfterRewardPreparation(this.meSettlementPlan);");
+    const noBattleCapture = method.indexOf(
+      "commitCoopMeNoBattleRewardSettlementAfterPreparation(this.meSettlementPlan);",
+    );
     const picker = method.indexOf("encounter.doEncounterRewards();");
 
     expect(methodStart).toBeGreaterThanOrEqual(0);
     expect(prepareCall).toBeGreaterThanOrEqual(0);
     expect(prepareAwait).toBeGreaterThan(prepareCall);
     expect(capture).toBeGreaterThan(prepareAwait);
+    expect(noBattleCapture).toBeGreaterThan(capture);
     expect(picker).toBeGreaterThan(capture);
+    expect(picker).toBeGreaterThan(noBattleCapture);
+  });
+
+  it("requires a retained no-battle state image before a typed raw reward carrier can open UI", () => {
+    const replay = source("src/phases/coop-replay-me-phase.ts");
+    const utilities = source("src/data/mystery-encounters/utils/encounter-phase-utils.ts");
+    const runtime = source("src/data/elite-redux/coop/coop-runtime.ts");
+
+    expect(runtime).toContain("export function commitCoopMeNoBattleRewardSettlementAfterPreparation");
+    expect(runtime).toContain('terminal: "reward-settled"');
+    expect(utilities).toMatch(
+      /encounter\.encounterMode === MysteryEncounterMode\.NO_BATTLE[\s\S]*?mysteryEncounterRewardSurfaces\(encounter, "rewards", addHealPhase\)[\s\S]*?"MysteryEncounterRewardsPhase", addHealPhase, null, settlementPlan/u,
+    );
+    expect(replay).toContain("typed reward options buffered behind retained no-battle settlement");
+    expect(replay).toContain('terminal === "reward-settled" ? current === this');
+    expect(replay).toMatch(
+      /terminal === "reward-settled"[\s\S]*?globalScene\.phaseManager\.clearPhaseQueue\(\)[\s\S]*?"MysteryEncounterRewardsPhase"/u,
+    );
   });
 
   it("keeps setEncounterRewards callsites on a typed preparation/surface adapter", () => {

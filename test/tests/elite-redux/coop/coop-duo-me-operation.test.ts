@@ -65,6 +65,7 @@ import {
   buildDuoForMe,
   drainGuestMeReplayToSettle,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestMeReplay,
   driveHostMeRewardShopWithGuestReplay,
   installDuoLogCapture,
@@ -643,7 +644,23 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     });
     expect(guestReplay.settled, "guest CoopReplayMePhase reached its terminal (left once) - no Title").toBe(true);
 
-    // Both engines converged in lockstep - the pick continuation never stranded the shared session.
+    // The raw relay seam above intentionally stops at the ME terminal. Production does not: its real
+    // PostMysteryEncounter/reward tail calls UI.setMode and reaches the next CommandPhase. Drive that exact
+    // phase-manager path so the guest observes both still-retained public continuations (REWARD and
+    // ME_TERMINAL) at wave+1/turn-1. Never notify the durability layer directly: this regression must fail
+    // if a future real UI-to-relay call chain stops being wired.
+    await withClient(rig.guestCtx, async () => {
+      await driveClientPhaseQueueTo(rig.guestScene, "guest post-ME CommandPhase", {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && rig.guestScene.currentBattle.waveIndex === ME_WAVE + 1
+          && rig.guestScene.currentBattle.turn === 1,
+        perPhaseTimeoutMs: 5_000,
+        pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+      });
+    });
+
+    // Both engines converged in lockstep - no pick, reward, or terminal continuation stranded the run.
     expect(rig.hostRuntime.controller.interactionCounter(), "host counter is 2 after the ME").toBe(counterBefore + 1);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest counter is 2 after the ME (lockstep)").toBe(
       counterBefore + 1,

@@ -19,7 +19,11 @@ import {
   setOnMePinCleared,
   setOnMeSnapshotRebind,
 } from "#data/elite-redux/coop/coop-me-pin-state";
-import { COOP_ME_BATTLE_SETTLED_CHOICE, makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  COOP_ME_BATTLE_SETTLED_CHOICE,
+  COOP_ME_REWARD_SETTLED_CHOICE,
+  makeCoopOperationId,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopActiveMysteryEncounterSnapshotV1 } from "#data/elite-redux/coop/coop-transport";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -316,6 +320,36 @@ describe("co-op Mystery active-control snapshot/rejoin", () => {
         terminalChoice: -1,
       }),
     ).toBe(false);
+  });
+
+  it("retains a no-battle pre-reward cursor and accepts only its step-1 final leave", () => {
+    setCoopMeInteractionStart(67);
+    setCoopMeTerminalControl("reward-settled", 3, {
+      operationId: terminalOp(67, 0),
+      step: 0,
+      choice: COOP_ME_REWARD_SETTLED_CHOICE,
+    });
+    expect(captureCoopActiveMysteryControl()).toMatchObject({
+      interactionCounter: 67,
+      terminal: "reward-settled",
+      terminalStep: 0,
+      hostTurn: 3,
+    });
+    setCoopMeTerminalControl("battle", 3, {
+      operationId: terminalOp(67, 1),
+      step: 1,
+      choice: -1000,
+    });
+    expect(captureCoopActiveMysteryControl()?.terminal).toBe("reward-settled");
+    setCoopMeTerminalControl("leave", undefined, {
+      operationId: terminalOp(67, 1),
+      step: 1,
+      choice: -1,
+    });
+    expect(captureCoopActiveMysteryControl()).toMatchObject({
+      terminal: "leave",
+      terminalStep: 1,
+    });
   });
 
   it("harness pin swaps are raw and never fire the other client's pin-clear hook", () => {

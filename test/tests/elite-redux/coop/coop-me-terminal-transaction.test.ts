@@ -117,6 +117,29 @@ function settledPayload(
   };
 }
 
+function rewardSettledPayload(
+  wave: number,
+  options: {
+    result?: "victory" | "failure";
+    rewardSurfaces?: CoopMeRewardSurfaceProjection[];
+    eggLapse?: boolean;
+  } = {},
+): Extract<CoopMeTerminalPayload, { terminal: "reward-settled" }> {
+  return {
+    terminal: "reward-settled",
+    outcome: outcome(wave),
+    destination: {
+      kind: "reward",
+      hostTurn: 3,
+      result: options.result ?? "victory",
+      continuation: "rewards",
+      trainerVictory: false,
+      rewardSurfaces: options.rewardSurfaces ?? [makeCoopMeModifierRewardSurfaceProjection("modifier:heal", -1)],
+      eggLapse: options.eggLapse ?? true,
+    },
+  };
+}
+
 function terminalId(pinned: number, step: number, epoch = 1): string {
   return makeCoopOperationId(epoch, 0, (COOP_ME_TERM_SEQ_BASE + pinned) * 8000 + 4000 + step, "ME_TERMINAL");
 }
@@ -251,6 +274,17 @@ describe("complete retained Mystery terminal transaction", () => {
         }),
       ),
     ).toBe(true);
+    expect(isCompleteCoopMeTerminalPayload(rewardSettledPayload(12))).toBe(true);
+    expect(
+      isCompleteCoopMeTerminalPayload({
+        ...rewardSettledPayload(12),
+        destination: {
+          ...rewardSettledPayload(12).destination,
+          continuation: "encounter",
+        },
+      }),
+      "a no-battle settlement cannot authorize a battle/encounter continuation",
+    ).toBe(false);
     expect(makeCoopMeModifierRewardSurfaceProjection("modifier:default").rerollMultiplier).toBe(1);
     const missingRewardSurfacePlan = settledPayload(12);
     delete (missingRewardSurfacePlan.destination as { rewardSurfaces?: unknown }).rewardSurfaces;
@@ -406,6 +440,59 @@ describe("complete retained Mystery terminal transaction", () => {
     ).toBe("executed");
     expect(
       receiver.receive({ operationId: terminalId(pinned, 2), pinned, step: 2, payload: leavePayload(20, true) }, hooks),
+    ).toBe("executed");
+  });
+
+  it("applies a no-battle state image before rewards, then admits only its exact final leave", () => {
+    const receiver = new CoopMeTerminalTransactionReceiver();
+    const hooks = { applyMaterial: () => true, executeDestination: () => true };
+    const pinned = 15;
+
+    expect(
+      receiver.receive(
+        {
+          operationId: terminalId(pinned, 1),
+          pinned,
+          step: 1,
+          payload: leavePayload(24),
+        },
+        hooks,
+      ),
+      "final leave cannot overtake the no-battle pre-reward state image",
+    ).toBe("rejected");
+    expect(
+      receiver.receive(
+        {
+          operationId: terminalId(pinned, 0),
+          pinned,
+          step: 0,
+          payload: rewardSettledPayload(24),
+        },
+        hooks,
+      ),
+    ).toBe("executed");
+    expect(
+      receiver.receive(
+        {
+          operationId: terminalId(pinned, 1),
+          pinned,
+          step: 1,
+          payload: battlePayload(24),
+        },
+        hooks,
+      ),
+      "a no-battle reward settlement cannot transition into a battle",
+    ).toBe("rejected");
+    expect(
+      receiver.receive(
+        {
+          operationId: terminalId(pinned, 1),
+          pinned,
+          step: 1,
+          payload: leavePayload(24),
+        },
+        hooks,
+      ),
     ).toBe("executed");
   });
 

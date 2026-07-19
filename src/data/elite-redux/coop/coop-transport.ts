@@ -936,10 +936,10 @@ export interface CoopActiveMysteryEncounterSnapshotV1 {
       }
     | undefined;
   /** `pending` means the exact terminal is not committed yet; the guest must remain in the event. */
-  terminal: "pending" | "leave" | "battle" | "battle-settled";
+  terminal: "pending" | "leave" | "battle" | "battle-settled" | "reward-settled";
   /** Exact committed ME_TERMINAL operation. Required for a non-pending terminal. */
   terminalOperationId?: string | undefined;
-  /** Ordered ME_TERMINAL step (battle -> battle-settled -> next battle or final leave). */
+  /** Ordered ME_TERMINAL step (battle lifecycle, or reward-settled -> final leave). */
   terminalStep?: number | undefined;
   /** Exact choice delivered by the journal materializer for this terminal. */
   terminalChoice?: number | undefined;

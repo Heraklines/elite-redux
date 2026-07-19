@@ -10,7 +10,11 @@ import { applyCoopMeOutcome, consumeCoopMeOutcomeRollbackFatal } from "#data/eli
 import { openGuestMeEmbeddedShop } from "#data/elite-redux/coop/coop-biome-shop";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
-import { COOP_INTERACTION_LEAVE, type CoopInteractionChoice } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  COOP_INTERACTION_LEAVE,
+  type CoopInteractionChoice,
+  parseCoopRewardOptionsKey,
+} from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
   adoptMeWatcherChoice,
@@ -449,6 +453,18 @@ export class CoopReplayMePhase extends Phase {
     if (!this.boundaryStillLive()) {
       return;
     }
+    const rewardAddress = parseCoopRewardOptionsKey(key)?.rewardSurface;
+    if (isCoopMeOperationJournalActive() && rewardAddress != null && this.acceptedTerminal.kind === "pending") {
+      // Typed standard reward surfaces are declared by a complete retained settlement. The raw options
+      // may arrive first on the relay channel, but are only DATA for the eventual SelectModifierPhase;
+      // they are never authority to leave this replay phase or expose pre-settlement shared state.
+      coopLog("me", "typed reward options buffered behind retained no-battle settlement", {
+        counter: this.interactionCounter,
+        key,
+        rewardSurface: rewardAddress.surfaceId,
+      });
+      return;
+    }
     // #860 (Professor quiz stuck, sibling of #859): dissolve only when the shop actually becomes the
     // executable surface. Doing it on carrier arrival could preempt buffered quiz/repeated-round surfaces.
     if (!coopMeHandoffBattleStarted()) {
@@ -600,7 +616,7 @@ export class CoopReplayMePhase extends Phase {
   private acceptedTerminal:
     | { kind: "pending" }
     | {
-        kind: "battle-handoff" | "battle-settled" | "leave";
+        kind: "battle-handoff" | "battle-settled" | "reward-settled" | "leave";
         operationId: string;
         step: number;
         revision: number;
@@ -1311,7 +1327,8 @@ export class CoopReplayMePhase extends Phase {
       !this.boundaryStillLive()
       || transaction.pinned !== this.interactionCounter
       || (transaction.payload.terminal === "battle") !== (transaction.payload.destination.kind === "battle")
-      || (transaction.payload.terminal === "battle-settled") !== (transaction.payload.destination.kind === "reward")
+      || (transaction.payload.terminal === "battle-settled" || transaction.payload.terminal === "reward-settled")
+        !== (transaction.payload.destination.kind === "reward")
     ) {
       return false;
     }
@@ -1346,9 +1363,16 @@ export class CoopReplayMePhase extends Phase {
         && globalScene.phaseManager.getCurrentPhase()?.phaseName === "BattleEndPhase"
       );
     }
+    if (transaction.payload.terminal === "reward-settled") {
+      return (
+        this.acceptedTerminal.kind === "pending"
+        && transaction.step === 0
+        && globalScene.phaseManager.getCurrentPhase() === this
+      );
+    }
     const currentPhaseName = globalScene.phaseManager.getCurrentPhase()?.phaseName;
     const leaveSurfaceReady =
-      this.acceptedTerminal.kind !== "battle-settled"
+      (this.acceptedTerminal.kind !== "battle-settled" && this.acceptedTerminal.kind !== "reward-settled")
       || (this.acceptedTerminal.continuation === "rewards"
         ? currentPhaseName === "PostMysteryEncounterPhase"
         : this.battleEndDelegateOwnsContinuation
@@ -1356,7 +1380,7 @@ export class CoopReplayMePhase extends Phase {
           : globalScene.phaseManager.getCurrentPhase() === this);
     return (
       (this.acceptedTerminal.kind === "pending" && transaction.step === 0)
-      || (this.acceptedTerminal.kind === "battle-settled"
+      || ((this.acceptedTerminal.kind === "battle-settled" || this.acceptedTerminal.kind === "reward-settled")
         && transaction.step === this.acceptedTerminal.step + 1
         && leaveSurfaceReady)
       || (this.acceptedTerminal.kind === "leave"
@@ -1405,12 +1429,23 @@ export class CoopReplayMePhase extends Phase {
         return true;
       }
       if (payload.destination.kind === "reward") {
-        if (this.acceptedTerminal.kind !== "battle-handoff" || step !== this.acceptedTerminal.step + 1) {
+        const rewardTerminal = payload.terminal;
+        if (rewardTerminal !== "battle-settled" && rewardTerminal !== "reward-settled") {
           return false;
         }
-        return this.completeCommittedBattleSettlement(operationId, step, payload.destination);
+        if (rewardTerminal === "reward-settled") {
+          if (this.acceptedTerminal.kind !== "pending" || step !== 0) {
+            return false;
+          }
+        } else if (this.acceptedTerminal.kind !== "battle-handoff" || step !== this.acceptedTerminal.step + 1) {
+          return false;
+        }
+        return this.completeCommittedRewardSettlement(operationId, step, rewardTerminal, payload.destination);
       }
-      const expectedStep = this.acceptedTerminal.kind === "battle-settled" ? this.acceptedTerminal.step + 1 : 0;
+      const expectedStep =
+        this.acceptedTerminal.kind === "battle-settled" || this.acceptedTerminal.kind === "reward-settled"
+          ? this.acceptedTerminal.step + 1
+          : 0;
       if (step !== expectedStep) {
         return false;
       }
@@ -1427,17 +1462,19 @@ export class CoopReplayMePhase extends Phase {
   }
 
   /** Release an exact held BattleEnd only after the retained post-battle image has applied. */
-  private completeCommittedBattleSettlement(
+  private completeCommittedRewardSettlement(
     operationId: string,
     step: number,
+    terminal: "battle-settled" | "reward-settled",
     destination: CoopMeRewardDestination,
   ): boolean {
     const current = globalScene.phaseManager.getCurrentPhase();
-    if (current?.phaseName !== "BattleEndPhase" || globalScene.currentBattle?.turn !== destination.hostTurn) {
+    const exactSurface = terminal === "battle-settled" ? current?.phaseName === "BattleEndPhase" : current === this;
+    if (!exactSurface || globalScene.currentBattle?.turn !== destination.hostTurn) {
       return false;
     }
     this.acceptedTerminal = {
-      kind: "battle-settled",
+      kind: terminal,
       operationId,
       step,
       revision: captureCoopActiveMysteryControl()?.revision ?? 0,
@@ -1479,8 +1516,18 @@ export class CoopReplayMePhase extends Phase {
       return true;
     }
     if (destination.continuation === "none") {
-      failCoopSharedSession("A retained Mystery battle settlement had no executable continuation.");
+      failCoopSharedSession("A retained Mystery reward settlement had no executable continuation.");
       return true;
+    }
+    if (terminal === "reward-settled") {
+      // A raw reward-options carrier can arrive before the durable operation on another channel. It may
+      // remain buffered for the declared SelectModifierPhase to consume, but it cannot itself authorize
+      // leaving the replay shell or exposing UI before this complete state image applies.
+      const relay = getCoopInteractionRelay();
+      if (relay?.onRewardOptionsBuffered != null) {
+        relay.onRewardOptionsBuffered = null;
+      }
+      globalScene.phaseManager.clearPhaseQueue();
     }
     if (destination.trainerVictory) {
       globalScene.phaseManager.pushNew("TrainerVictoryPhase");
@@ -1569,7 +1616,7 @@ export class CoopReplayMePhase extends Phase {
       getCoopRuntime()?.durability?.reconnect();
       return;
     }
-    if (snapshot.terminal === "battle-settled") {
+    if (snapshot.terminal === "battle-settled" || snapshot.terminal === "reward-settled") {
       // The settlement is a lifecycle cursor, not a leave. Its complete journal transaction (including
       // continuation) must rearm the renderer; a diagnostics-only snapshot cannot invent that destination.
       return;
@@ -1663,12 +1710,13 @@ export class CoopReplayMePhase extends Phase {
       coopMeHostPresentation = snapshot.presentation;
     }
     if (
-      snapshot.terminal === "battle-settled"
+      (snapshot.terminal === "battle-settled" || snapshot.terminal === "reward-settled")
       && snapshot.terminalOperationId != null
       && snapshot.terminalStep != null
     ) {
       const sameSettlement =
-        this.acceptedTerminal.kind === "battle-settled"
+        (this.acceptedTerminal.kind === "battle-settled" || this.acceptedTerminal.kind === "reward-settled")
+        && this.acceptedTerminal.kind === snapshot.terminal
         && this.acceptedTerminal.operationId === snapshot.terminalOperationId
         && this.acceptedTerminal.step === snapshot.terminalStep;
       // Diagnostics-only recovery control does not contain the settlement DATA or continuation. Only the
@@ -1681,7 +1729,10 @@ export class CoopReplayMePhase extends Phase {
       this.applyVerifiedSnapshotTerminal(snapshot);
       return;
     }
-    if (this.acceptedTerminal.kind === "battle-settled" && globalScene.phaseManager.getCurrentPhase() !== this) {
+    if (
+      (this.acceptedTerminal.kind === "battle-settled" || this.acceptedTerminal.kind === "reward-settled")
+      && globalScene.phaseManager.getCurrentPhase() !== this
+    ) {
       return; // retain the carrier while a declared interstitial still owns the executable surface
     }
     this.disposeRecoveryTimer();

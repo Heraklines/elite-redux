@@ -16,6 +16,7 @@
 
 import {
   COOP_ME_BATTLE_SETTLED_CHOICE,
+  COOP_ME_REWARD_SETTLED_CHOICE,
   type CoopMeTerminalPayload,
   parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -232,7 +233,8 @@ export function isValidCoopActiveMysteryControl(snapshot: unknown): snapshot is 
     || (snapshot.terminal !== "pending"
       && snapshot.terminal !== "leave"
       && snapshot.terminal !== "battle"
-      && snapshot.terminal !== "battle-settled")
+      && snapshot.terminal !== "battle-settled"
+      && snapshot.terminal !== "reward-settled")
     || (snapshot.presentation != null && !isValidPresentation(snapshot.presentation))
     || (snapshot.colosseum != null
       && !isValidColosseumControl(snapshot.colosseum, snapshot.interactionCounter as number))
@@ -261,8 +263,13 @@ export function isValidCoopActiveMysteryControl(snapshot: unknown): snapshot is 
       ? snapshot.terminalChoice === -1000
       : snapshot.terminal === "battle-settled"
         ? snapshot.terminalChoice === COOP_ME_BATTLE_SETTLED_CHOICE
-        : snapshot.terminalChoice === -1)
-    && (snapshot.terminal === "battle" || snapshot.terminal === "battle-settled" || snapshot.hostTurn == null)
+        : snapshot.terminal === "reward-settled"
+          ? snapshot.terminalChoice === COOP_ME_REWARD_SETTLED_CHOICE
+          : snapshot.terminalChoice === -1)
+    && (snapshot.terminal === "battle"
+      || snapshot.terminal === "battle-settled"
+      || snapshot.terminal === "reward-settled"
+      || snapshot.hostTurn == null)
   );
 }
 
@@ -332,7 +339,8 @@ export function canRestoreCoopActiveMysteryControl(
     nextStep
     && ((coopMeActiveControl.terminal === "battle" && snapshot.terminal === "battle-settled")
       || (coopMeActiveControl.terminal === "battle-settled"
-        && (snapshot.terminal === "battle" || snapshot.terminal === "leave")))
+        && (snapshot.terminal === "battle" || snapshot.terminal === "leave"))
+      || (coopMeActiveControl.terminal === "reward-settled" && snapshot.terminal === "leave"))
   );
 }
 
@@ -510,7 +518,7 @@ export function resolveCoopMeOwnerIntentRebind(
 
 /** Record an exact host terminal before it is put on the 9M carrier. Null/timeout never calls this seam. */
 export function setCoopMeTerminalControl(
-  terminal: "leave" | "battle" | "battle-settled",
+  terminal: "leave" | "battle" | "battle-settled" | "reward-settled",
   hostTurn?: number,
   identity?: CoopMeTerminalIdentity,
 ): void {
@@ -534,7 +542,8 @@ export function setCoopMeTerminalControl(
     }
     const validTransition =
       (prior.terminal === "battle" && terminal === "battle-settled")
-      || (prior.terminal === "battle-settled" && (terminal === "battle" || terminal === "leave"));
+      || (prior.terminal === "battle-settled" && (terminal === "battle" || terminal === "leave"))
+      || (prior.terminal === "reward-settled" && terminal === "leave");
     if (!validTransition || identity.step !== (prior.terminalStep ?? -1) + 1) {
       return; // leave is final; every new battle/leave after a battle consumes the next exact step
     }

@@ -71,6 +71,7 @@ import {
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
+  materializeGuestInputAfterReplacement,
   presentedFieldMon,
   type ShowdownDuoRig,
   settleDuoPromise,
@@ -763,13 +764,18 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
         rig.hostScene.getEnemyField()[0]?.species.speciesId,
         "the first legal concrete enemy fallback was summoned only after material closure",
       ).toBe(GUEST_BENCH_1);
-      // The IDLE-fallback guest reaches its next command via the out-of-band CHECKPOINT route
-      // (coop-replay-turn-phase.ts pump: materialApplied -> presentationReady -> continuationReady), which
-      // needs BOTH engines pumped for that handshake - a guest-only drive starves the guest at its parked
-      // rendererWait. Dual-pump the host via pumpPeer. (No materializeGuestInputAfterReplacement here: that
-      // is the guest-PICK finalize/TurnInit driver and would derail the parked replay - the checkpoint
-      // route opens the guest's own post-replacement CommandPhase directly.)
+      // The IDLE-fallback guest reaches the replacement checkpoint via the out-of-band CHECKPOINT route
+      // (coop-replay-turn-phase.ts pump: materialApplied -> presentationReady -> continuationReady). That
+      // handshake needs BOTH engines pumped, so first prove the checkpoint has advanced the guest to its
+      // real CoopFinalizeTurnPhase. Only then recreate the abbreviated headless NewBattle/TurnInit input
+      // tail; doing that while the replay is still parked would discard the checkpoint at the wrong address.
       await withClient(rig.guestCtx, async () => {
+        await driveClientPhaseQueueTo(rig.guestScene, "Showdown replacement CoopFinalizeTurnPhase", {
+          matches: phase => phase.phaseName === "CoopFinalizeTurnPhase",
+          perPhaseTimeoutMs: 5_000,
+          pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+        });
+        await materializeGuestInputAfterReplacement(rig.guestScene);
         await driveClientPhaseQueueTo(rig.guestScene, "Showdown replacement CommandPhase", {
           matches: phase => phase.phaseName === "CommandPhase",
           perPhaseTimeoutMs: 5_000,

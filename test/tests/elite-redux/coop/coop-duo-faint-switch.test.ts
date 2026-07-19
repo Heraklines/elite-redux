@@ -427,13 +427,18 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
         "the host used the deterministic first-legal fallback after the idle timeout",
       ).toBe(SpeciesId.LAPRAS);
 
-      // The IDLE-fallback guest reaches its own post-replacement CommandPhase via the out-of-band
-      // CHECKPOINT route (coop-replay-turn-phase.ts pump: materialApplied -> presentationReady ->
-      // continuationReady, own CommandPhase opened there). That handshake needs BOTH engines pumped, so a
-      // guest-only drive starves the guest at its parked rendererWait; dual-pump the host via pumpPeer.
-      // (No materializeGuestInputAfterReplacement here - that is the guest-PICK finalize/TurnInit driver
-      // and would derail the parked replay; the checkpoint route materializes + opens the command itself.)
+      // The IDLE-fallback guest reaches the replacement checkpoint via the out-of-band CHECKPOINT route
+      // (coop-replay-turn-phase.ts pump: materialApplied -> presentationReady -> continuationReady). That
+      // handshake needs BOTH engines pumped, so first prove the checkpoint has advanced the guest to its
+      // real CoopFinalizeTurnPhase. Only then recreate the abbreviated headless NewBattle/TurnInit input
+      // tail; doing that while the replay is still parked would discard the checkpoint at the wrong address.
       await withClient(rig.guestCtx, async () => {
+        await driveClientPhaseQueueTo(rig.guestScene, "timeout replacement CoopFinalizeTurnPhase", {
+          matches: phase => phase.phaseName === "CoopFinalizeTurnPhase",
+          perPhaseTimeoutMs: 5_000,
+          pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+        });
+        await materializeGuestInputAfterReplacement(rig.guestScene);
         await driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase after timeout replacement", {
           matches: phase =>
             phase.phaseName === "CommandPhase"

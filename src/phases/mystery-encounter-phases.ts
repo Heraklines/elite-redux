@@ -36,6 +36,7 @@ import type {
 import {
   type CoopMeBattleSettlementPlan,
   commitCoopMeBattleSettlementAtBattleEnd as commitCoopMeBattleSettlementAfterRewardPreparation,
+  commitCoopMeNoBattleRewardSettlementAfterPreparation,
   coopSessionGeneration,
   failCoopSharedSession,
   getCoopBattleStreamer,
@@ -205,13 +206,12 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
     return false;
   }
   coopLog("me", "coopEndMePump: close pump + advance alternation", { counter: coopMeInteractionStartValue() });
-  const handoff = coopMeHandoffBattleStarted();
   const activeControl = captureCoopActiveMysteryControl();
-  const terminalStep = handoff
-    ? activeControl?.interactionCounter === coopMeInteractionStartValue() && activeControl.terminal === "battle-settled"
-      ? (activeControl.terminalStep ?? -1) + 1
-      : -1
-    : 0;
+  const handoff = coopMeHandoffBattleStarted();
+  const retainedSettlement =
+    activeControl?.interactionCounter === coopMeInteractionStartValue()
+    && (activeControl.terminal === "battle-settled" || activeControl.terminal === "reward-settled");
+  const terminalStep = retainedSettlement ? (activeControl.terminalStep ?? -1) + 1 : handoff ? -1 : 0;
   let terminalOperationId: string | null = null;
   if (controller.role === "host" && isCoopMeOperationEnabled()) {
     if (outcome == null) {
@@ -1420,17 +1420,29 @@ export class MysteryEncounterRewardsPhase extends Phase {
     // Capture the complete P36 ordered plan after automatic preparation and before any standard modifier
     // picker becomes interactive.
     if (this.meSettlementPlan != null) {
-      commitCoopMeBattleSettlementAfterRewardPreparation(this.meSettlementPlan);
+      const battleSettlementRetained = commitCoopMeBattleSettlementAfterRewardPreparation(this.meSettlementPlan);
+      if (!battleSettlementRetained) {
+        commitCoopMeNoBattleRewardSettlementAfterPreparation(this.meSettlementPlan);
+      }
     }
 
     if (encounter.doEncounterRewards) {
       encounter.doEncounterRewards();
     } else if (this.addHealPhase) {
       globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
-      globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
-        fillRemaining: false,
-        rerollMultiplier: -1,
-      });
+      const declaredSurface = this.meSettlementPlan?.rewardSurfaces[0];
+      globalScene.phaseManager.unshiftNew(
+        "SelectModifierPhase",
+        0,
+        undefined,
+        {
+          fillRemaining: false,
+          rerollMultiplier: -1,
+        },
+        false,
+        { kind: "ambient" },
+        declaredSurface?.kind === "modifier" ? { surfaceId: declaredSurface.surfaceId, ordinal: 0 } : undefined,
+      );
     }
 
     globalScene.phaseManager.pushNew("PostMysteryEncounterPhase");

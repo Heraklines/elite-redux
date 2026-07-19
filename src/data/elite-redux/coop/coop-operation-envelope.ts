@@ -279,10 +279,14 @@ export type CoopLearnMoveBatchPayload =
 export type CoopMeTerminalKind =
   | "leave" // the ME ended (non-battle): the watcher leaves the encounter + advances the alternation
   | "battle" // an option spawned a battle: the watcher finishes WITHOUT leaving (the battle runs host-authoritative)
-  | "battle-settled"; // that battle's post-BattleEnd image is retained and its reward tail is executable
+  | "battle-settled" // that battle's post-BattleEnd image is retained and its reward tail is executable
+  | "reward-settled"; // a no-battle ME's post-effect image is retained before its reward tail is executable
 
 /** Durable control sentinel for the ME battle-settled terminal; never carried as a raw input choice. */
 export const COOP_ME_BATTLE_SETTLED_CHOICE = -1001;
+
+/** Durable control sentinel for a no-battle ME's pre-reward settlement; never a raw input choice. */
+export const COOP_ME_REWARD_SETTLED_CHOICE = -1002;
 
 /** Maximum number of post-battle reward surfaces one retained Mystery transaction may project. */
 export const COOP_ME_REWARD_SURFACE_LIMIT = 16;
@@ -419,6 +423,14 @@ export type CoopMeTerminalPayload =
       /** Comprehensive state after every automatic BattleEnd mutation. */
       readonly outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>;
       /** Exact deterministic reward presentation opened from that state. */
+      readonly destination: Extract<CoopMeTerminalDestination, { kind: "reward" }>;
+    }
+  | {
+      /** A no-battle encounter applied its option effects and reached its exact pre-reward boundary. */
+      readonly terminal: "reward-settled";
+      /** Comprehensive state after every option effect and automatic reward preparation. */
+      readonly outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>;
+      /** Exact reward presentation opened only after that state is adopted. */
       readonly destination: Extract<CoopMeTerminalDestination, { kind: "reward" }>;
     }
   | {
