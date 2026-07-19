@@ -49,6 +49,7 @@ import {
   isNonNegSafeInt,
   isPlainObject,
 } from "#data/elite-redux/coop/authority-v2/frame-context";
+import { nextControlIssues as canonicalNextControlIssues } from "#data/elite-redux/coop/authority-v2/next-control";
 
 /** The one public boundary result. */
 export type CoopInboundFrameResultV2 =
@@ -74,10 +75,6 @@ function inList(list: readonly string[], value: unknown): boolean {
   return typeof value === "string" && list.includes(value);
 }
 
-function isPosSafeInt(value: unknown): value is number {
-  return isNonNegSafeInt(value) && value > 0;
-}
-
 // ---------------------------------------------------------------------------
 // Nested: CoopNextControl (frozen decision 4). null is valid.
 // ---------------------------------------------------------------------------
@@ -86,70 +83,7 @@ function nextControlIssues(control: unknown): string[] {
   if (control === null) {
     return [];
   }
-  if (!isPlainObject(control)) {
-    return ["nextControl: not an object or null"];
-  }
-  const issues: string[] = [];
-  const req = (field: string, ok: boolean): void => {
-    if (!ok) {
-      issues.push(`nextControl.${field}`);
-    }
-  };
-  switch (control.kind) {
-    case "COMMAND_FRONTIER": {
-      req("epoch", isPosSafeInt(control.epoch));
-      req("wave", isPosSafeInt(control.wave));
-      req("turn", isPosSafeInt(control.turn));
-      if (!Array.isArray(control.commands) || control.commands.length === 0) {
-        issues.push("nextControl.commands");
-        break;
-      }
-      const fields = new Set<number>();
-      const pokemon = new Set<number>();
-      control.commands.forEach((command, index) => {
-        if (!isPlainObject(command)) {
-          issues.push(`nextControl.commands[${index}]`);
-          return;
-        }
-        req(`commands[${index}].ownerSeatId`, isNonNegSafeInt(command.ownerSeatId));
-        req(`commands[${index}].pokemonId`, isPosSafeInt(command.pokemonId));
-        req(`commands[${index}].fieldIndex`, isNonNegSafeInt(command.fieldIndex));
-        if (isNonNegSafeInt(command.fieldIndex)) {
-          if (fields.has(command.fieldIndex)) {
-            issues.push(`nextControl.commands[${index}].fieldIndex: duplicate`);
-          }
-          fields.add(command.fieldIndex);
-        }
-        if (isPosSafeInt(command.pokemonId)) {
-          if (pokemon.has(command.pokemonId)) {
-            issues.push(`nextControl.commands[${index}].pokemonId: duplicate`);
-          }
-          pokemon.add(command.pokemonId);
-        }
-      });
-      break;
-    }
-    case "REPLACEMENT":
-      req("epoch", isNonNegSafeInt(control.epoch));
-      req("wave", isNonNegSafeInt(control.wave));
-      req("turn", isNonNegSafeInt(control.turn));
-      req("occurrence", isNonNegSafeInt(control.occurrence));
-      req("fieldIndex", isNonNegSafeInt(control.fieldIndex));
-      req("ownerSeatId", isNonNegSafeInt(control.ownerSeatId));
-      break;
-    case "REWARD":
-    case "BIOME":
-    case "MYSTERY":
-      req("operationId", isNonEmptyString(control.operationId));
-      req("ownerSeatId", isNonNegSafeInt(control.ownerSeatId));
-      break;
-    case "TERMINAL":
-      req("terminalId", isNonEmptyString(control.terminalId));
-      break;
-    default:
-      issues.push("nextControl.kind: unknown control kind");
-  }
-  return issues;
+  return canonicalNextControlIssues(control).map(issue => `nextControl.${issue}`);
 }
 
 // ---------------------------------------------------------------------------

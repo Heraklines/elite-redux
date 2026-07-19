@@ -251,6 +251,23 @@ describe("validateNextControl", () => {
     expect(validateNextControl(reward({ operationId: "" })).ok).toBe(false);
     expect(validateNextControl(terminal("")).ok).toBe(false);
   });
+
+  it("rejects malformed and retired wire shapes without throwing", () => {
+    const untrusted: readonly unknown[] = [
+      null,
+      [],
+      "COMMAND_FRONTIER",
+      { kind: "COMMAND" },
+      { kind: "COMMAND", epoch: 1, wave: 1, turn: 1, ownerSeatId: 0, pokemonId: 42, fieldIndex: 0 },
+      { kind: "COMMAND_FRONTIER", epoch: 1, wave: 1, turn: 1, commands: [null] },
+      { kind: "REPLACEMENT", epoch: 1, wave: 1, turn: 1, occurrence: 0, fieldIndex: 0 },
+    ];
+
+    for (const candidate of untrusted) {
+      expect(() => validateNextControl(candidate)).not.toThrow();
+      expect(isValidNextControl(candidate)).toBe(false);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

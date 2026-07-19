@@ -28,6 +28,7 @@ import type {
   CoopFrameContextV2,
   CoopNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import { isValidNextControl as isCanonicalNextControl } from "#data/elite-redux/coop/authority-v2/next-control";
 
 /** Max length of a wire operationId - bounds the identity so a malformed frame cannot balloon memory. */
 export const COOP_OPERATION_ID_MAX_LENGTH = 256;
@@ -73,25 +74,12 @@ const AUTHORITY_ENTRY_KINDS: ReadonlySet<string> = new Set([
   "TERMINAL_COMMIT",
 ]);
 
-const NEXT_CONTROL_KINDS: ReadonlySet<string> = new Set([
-  "COMMAND_FRONTIER",
-  "REPLACEMENT",
-  "REWARD",
-  "BIOME",
-  "MYSTERY",
-  "TERMINAL",
-]);
-
 /** Whether a value is a structurally valid CoopNextControl (null is valid - a terminal step has no successor). */
 export function isValidNextControl(control: unknown): control is CoopNextControl {
   if (control === null) {
     return true;
   }
-  if (control == null || typeof control !== "object") {
-    return false;
-  }
-  const kind = (control as { kind?: unknown }).kind;
-  return typeof kind === "string" && NEXT_CONTROL_KINDS.has(kind);
+  return isCanonicalNextControl(control);
 }
 
 /** Whether a value is a structurally valid CoopFrameContextV2 (mandatory on every mechanical frame, decision 3). */

@@ -158,126 +158,129 @@ export type ControlValidation = { readonly ok: true } | { readonly ok: false; re
 
 const OK: ControlValidation = { ok: true };
 
-function isInt(value: number): boolean {
-  return Number.isSafeInteger(value);
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value);
 }
 
 /** A 1-based mechanical coordinate (epoch / wave / turn) must be a positive integer. */
-function isPositiveInt(value: number): boolean {
-  return Number.isSafeInteger(value) && value > 0;
+function isPositiveInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
 /** A seat id / field index / occurrence is a non-negative integer. */
-function isNonNegativeInt(value: number): boolean {
-  return Number.isSafeInteger(value) && value >= 0;
+function isNonNegativeInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
-function isNonEmptyString(value: string): boolean {
+function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
-/**
- * Validate that a stated control is STRUCTURALLY well-formed - the guard the
- * projector runs first so a malformed address is a named "rejected" (structural
- * impossibility) rather than a mid-projection engine crash. This checks SHAPE
- * only (finite coordinates, non-empty ids); it does NOT decide whether the
- * control is APPROPRIATE (the authority already did) and does not touch the
- * engine.
- */
-export function validateNextControl(control: ProjectableControl): ControlValidation {
-  switch (control.kind) {
-    case "COMMAND_FRONTIER": {
-      const coordinateFailure = firstFailure(
-        positiveIntField("COMMAND_FRONTIER", "epoch", control.epoch),
-        positiveIntField("COMMAND_FRONTIER", "wave", control.wave),
-        positiveIntField("COMMAND_FRONTIER", "turn", control.turn),
-      );
-      if (!coordinateFailure.ok) {
-        return coordinateFailure;
-      }
-      if (!Array.isArray(control.commands) || control.commands.length === 0) {
-        return { ok: false, reason: "COMMAND_FRONTIER commands must be a non-empty array" };
-      }
-      const seenFields = new Set<number>();
-      const seenPokemon = new Set<number>();
-      for (const [index, command] of control.commands.entries()) {
-        const commandFailure = firstFailure(
-          nonNegativeIntField("COMMAND_FRONTIER", `commands[${index}].ownerSeatId`, command.ownerSeatId),
-          positiveIntField("COMMAND_FRONTIER", `commands[${index}].pokemonId`, command.pokemonId),
-          nonNegativeIntField("COMMAND_FRONTIER", `commands[${index}].fieldIndex`, command.fieldIndex),
-        );
-        if (!commandFailure.ok) {
-          return commandFailure;
-        }
-        if (seenFields.has(command.fieldIndex)) {
-          return {
-            ok: false,
-            reason: `COMMAND_FRONTIER commands contain duplicate fieldIndex=${command.fieldIndex}`,
-          };
-        }
-        if (seenPokemon.has(command.pokemonId)) {
-          return {
-            ok: false,
-            reason: `COMMAND_FRONTIER commands contain duplicate pokemonId=${command.pokemonId}`,
-          };
-        }
-        seenFields.add(command.fieldIndex);
-        seenPokemon.add(command.pokemonId);
-      }
-      return OK;
+function addIssue(issues: string[], field: string, valid: boolean): void {
+  if (!valid) {
+    issues.push(field);
+  }
+}
+
+function commandFrontierIssues(control: Record<string, unknown>): string[] {
+  const issues: string[] = [];
+  addIssue(issues, "epoch", isPositiveInt(control.epoch));
+  addIssue(issues, "wave", isPositiveInt(control.wave));
+  addIssue(issues, "turn", isPositiveInt(control.turn));
+  if (!Array.isArray(control.commands) || control.commands.length === 0) {
+    issues.push("commands");
+    return issues;
+  }
+
+  const seenFields = new Set<number>();
+  const seenPokemon = new Set<number>();
+  for (const [index, command] of control.commands.entries()) {
+    if (!isPlainObject(command)) {
+      issues.push(`commands[${index}]`);
+      continue;
     }
+    addIssue(issues, `commands[${index}].ownerSeatId`, isNonNegativeInt(command.ownerSeatId));
+    addIssue(issues, `commands[${index}].pokemonId`, isPositiveInt(command.pokemonId));
+    addIssue(issues, `commands[${index}].fieldIndex`, isNonNegativeInt(command.fieldIndex));
+    if (isNonNegativeInt(command.fieldIndex)) {
+      if (seenFields.has(command.fieldIndex)) {
+        issues.push(`commands[${index}].fieldIndex: duplicate`);
+      }
+      seenFields.add(command.fieldIndex);
+    }
+    if (isPositiveInt(command.pokemonId)) {
+      if (seenPokemon.has(command.pokemonId)) {
+        issues.push(`commands[${index}].pokemonId: duplicate`);
+      }
+      seenPokemon.add(command.pokemonId);
+    }
+  }
+  return issues;
+}
+
+function replacementIssues(control: Record<string, unknown>): string[] {
+  const issues: string[] = [];
+  addIssue(issues, "epoch", isPositiveInt(control.epoch));
+  addIssue(issues, "wave", isPositiveInt(control.wave));
+  addIssue(issues, "turn", isPositiveInt(control.turn));
+  addIssue(issues, "occurrence", isNonNegativeInt(control.occurrence));
+  addIssue(issues, "fieldIndex", isNonNegativeInt(control.fieldIndex));
+  addIssue(issues, "ownerSeatId", isNonNegativeInt(control.ownerSeatId));
+  return issues;
+}
+
+function interactionIssues(control: Record<string, unknown>): string[] {
+  const issues: string[] = [];
+  addIssue(issues, "operationId", isNonEmptyString(control.operationId));
+  addIssue(issues, "ownerSeatId", isNonNegativeInt(control.ownerSeatId));
+  return issues;
+}
+
+function terminalIssues(control: Record<string, unknown>): string[] {
+  return isNonEmptyString(control.terminalId) ? [] : ["terminalId"];
+}
+
+/**
+ * Return every structural issue in an untrusted stated control. This is the ONE
+ * validator shared by wire admission, authority-entry admission, and projection;
+ * a new control kind or field therefore cannot be accepted by one boundary and
+ * silently rejected by another.
+ */
+export function nextControlIssues(control: unknown): string[] {
+  if (!isPlainObject(control)) {
+    return ["not an object"];
+  }
+  switch (control.kind) {
+    case "COMMAND_FRONTIER":
+      return commandFrontierIssues(control);
     case "REPLACEMENT":
-      return firstFailure(
-        positiveIntField("REPLACEMENT", "epoch", control.epoch),
-        positiveIntField("REPLACEMENT", "wave", control.wave),
-        positiveIntField("REPLACEMENT", "turn", control.turn),
-        nonNegativeIntField("REPLACEMENT", "occurrence", control.occurrence),
-        nonNegativeIntField("REPLACEMENT", "fieldIndex", control.fieldIndex),
-        nonNegativeIntField("REPLACEMENT", "ownerSeatId", control.ownerSeatId),
-      );
+      return replacementIssues(control);
     case "REWARD":
     case "BIOME":
     case "MYSTERY":
-      return firstFailure(
-        nonEmptyStringField(control.kind, "operationId", control.operationId),
-        nonNegativeIntField(control.kind, "ownerSeatId", control.ownerSeatId),
-      );
+      return interactionIssues(control);
     case "TERMINAL":
-      return firstFailure(nonEmptyStringField("TERMINAL", "terminalId", control.terminalId));
+      return terminalIssues(control);
+    default:
+      return ["kind: unknown control kind"];
   }
 }
 
-/** Return the first failing field verdict, or {@link OK} when every field passed. */
-function firstFailure(...checks: (ControlValidation | null)[]): ControlValidation {
-  for (const check of checks) {
-    if (check != null) {
-      return check;
-    }
-  }
-  return OK;
-}
-
-/** A positive-integer field check: `null` when it passes, else a named failure. */
-function positiveIntField(kind: ControlKind, field: string, value: number): ControlValidation | null {
-  return isPositiveInt(value)
-    ? null
-    : { ok: false, reason: `${kind} ${field} must be a positive integer (got ${value})` };
-}
-
-/** A non-negative-integer field check: `null` when it passes, else a named failure. */
-function nonNegativeIntField(kind: ControlKind, field: string, value: number): ControlValidation | null {
-  return isNonNegativeInt(value)
-    ? null
-    : { ok: false, reason: `${kind} ${field} must be a non-negative integer (got ${value})` };
-}
-
-/** A non-empty-string field check: `null` when it passes, else a named failure. */
-function nonEmptyStringField(kind: ControlKind, field: string, value: string): ControlValidation | null {
-  return isNonEmptyString(value) ? null : { ok: false, reason: `${kind} ${field} must be a non-empty string` };
+/**
+ * Validate that a stated control is STRUCTURALLY well formed. Accepts unknown
+ * input so every admission boundary can call it without an unsafe cast.
+ */
+export function validateNextControl(control: unknown): ControlValidation {
+  const issues = nextControlIssues(control);
+  return issues.length === 0 ? OK : { ok: false, reason: issues[0] };
 }
 
 /** Boolean convenience over {@linkcode validateNextControl}. */
-export function isValidNextControl(control: ProjectableControl): boolean {
+export function isValidNextControl(control: unknown): control is ProjectableControl {
   return validateNextControl(control).ok;
 }
 
@@ -286,6 +289,6 @@ export function isValidNextControl(control: ProjectableControl): boolean {
  * the projector's own seat/field-index guards so both halves share one notion of
  * "a usable integer" (avoids a projector rejecting a value this module accepts).
  */
-export function isUsableInteger(value: number): boolean {
+export function isUsableInteger(value: unknown): value is number {
   return isInt(value);
 }
