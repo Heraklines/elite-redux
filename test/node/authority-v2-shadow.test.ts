@@ -429,6 +429,27 @@ describe("authority-v2 shadow transport routing seam", () => {
     expect(routeCoopV2InboundFrame({ hello: "world" })).toBe("protocol-violation");
   });
 
+  it("never reports a valid mechanical frame as routed when no replica receiver is installed", () => {
+    clearCoopV2ShadowInbound();
+    expect(
+      routeCoopV2InboundFrame({
+        v: 2,
+        t: "tailRequest",
+        ctx: {
+          sessionId: SESSION.sessionId,
+          runId: SESSION.runId,
+          sessionEpoch: SESSION.epoch,
+          seatMapId: SESSION.seatMapId,
+          membershipRevision: SESSION.membershipRevision,
+          senderSeatId: 0,
+          authoritySeatId: SESSION.authoritySeatId,
+          connectionGeneration: 0,
+        },
+        body: { fromRevision: 0 },
+      }),
+    ).toBe("protocol-violation");
+  });
+
   it("the thin cycle-free tap free functions route to the active harness (emit-seam entry points)", () => {
     const clock = new FakeClock();
     const host = new CoopAuthorityV2Shadow({

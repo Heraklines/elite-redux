@@ -116,8 +116,17 @@ import {
   type ProjectableControl,
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
-import { validateInboundFrame } from "#data/elite-redux/coop/authority-v2/protocol-validator";
-import { type ApplyMaterialFn, applyEntry, type ReplicaApplyDeps } from "#data/elite-redux/coop/authority-v2/replica";
+import {
+  type CoopInboundFrameResultV2,
+  validateInboundFrame,
+} from "#data/elite-redux/coop/authority-v2/protocol-validator";
+import {
+  type ApplyMaterialFn,
+  applyEntry,
+  type ReplicaApplyDeps,
+  type ReplicaApplyOutcome,
+  type ReplicaApplyResume,
+} from "#data/elite-redux/coop/authority-v2/replica";
 import {
   type CoopRuntimeContextHandle,
   createCoopRuntimeContext,
@@ -226,6 +235,11 @@ export interface CoopV2ShadowDeps {
    * pure shadow. An owned entry/control cannot silently fall through when its live verb returns null.
    */
   readonly liveReplica?: CoopV2LiveReplicaSeams;
+  /**
+   * Authoritative-cutover protocol violations must enter the runtime's retained shared terminal. Omitted
+   * by pure-shadow/node harnesses, where violations remain evidence-only and cannot affect legacy mechanics.
+   */
+  readonly onProtocolViolation?: (violation: Extract<CoopInboundFrameResultV2, { kind: "protocol-violation" }>) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -524,8 +538,9 @@ export class CoopAuthorityV2Shadow {
     // module-level fallback drives routing, so this stays additive-optional. The raw frame is routed through
     // the SAME boundary validator the module-level path uses (never a cast).
     this.transportV2Unsub =
-      deps.transport.onV2Frame?.(raw => routeCoopV2InboundFrameTo(raw, frame => this.handleInboundFrame(frame)))
-      ?? null;
+      deps.transport.onV2Frame?.(raw =>
+        routeCoopV2InboundFrameTo(raw, frame => this.handleInboundFrame(frame), deps.onProtocolViolation),
+      ) ?? null;
   }
 
   // -------------------------------------------------------------------------
@@ -910,9 +925,10 @@ export class CoopAuthorityV2Shadow {
   // -------------------------------------------------------------------------
 
   /**
-   * Handle one validated inbound v2 frame. Fully guarded: any fault is logged as a
-   * shadow FAULT and swallowed - a malformed or hostile peer can never crash the
-   * game through the shadow path. Returns whether the frame was actioned.
+   * Handle one validated inbound v2 frame. Fully guarded: any internal fault is
+   * logged and swallowed at this callback boundary; validation/protocol failures
+   * are classified before this method and the authoritative runtime's injected
+   * violation hook enters the retained shared terminal.
    */
   handleInboundFrame(frame: CoopFrameV2): void {
     if (this.disposed) {
@@ -923,6 +939,7 @@ export class CoopAuthorityV2Shadow {
         case "authorityEntry": {
           const entry: CoopAuthorityEntry = { context: frame.ctx, ...frame.body };
           const result = this.log.admit(entry);
+          this.logReplicaAdmission(entry, result.kind);
           if (
             result.kind === "admitted"
             || result.kind === "duplicate-pending-material"
@@ -939,6 +956,7 @@ export class CoopAuthorityV2Shadow {
                   ? "controlInstalled"
                   : "admitted";
             const outcome = applyEntry(this.ctx, entry, this.replicaDeps, resume);
+            this.logReplicaApply(entry, resume, outcome);
             if (outcome.kind === "applied" && result.kind !== "duplicate-complete") {
               this.applied += 1;
             }
@@ -1104,10 +1122,37 @@ export class CoopAuthorityV2Shadow {
       return;
     }
     try {
-      this.liveReplica.releaseBlockedPredecessor(this.ctx, entry);
+      const released = this.liveReplica.releaseBlockedPredecessor(this.ctx, entry);
+      coopLog(
+        "v2-replica",
+        `gap-release rev=${entry.revision} kind=${entry.kind} result=${released == null ? "unowned" : released}`,
+      );
     } catch (error) {
       this.fault(`releaseBlockedPredecessor(rev=${entry.revision})`, error);
     }
+  }
+
+  /** Compact ordered-ledger evidence: enough to diagnose a stall without dumping canonical material. */
+  private logReplicaAdmission(entry: CoopAuthorityEntry, result: string): void {
+    const diagnostics = this.log.diagnostics();
+    coopLog(
+      "v2-replica",
+      `admit rev=${entry.revision} kind=${entry.kind} result=${result} `
+        + `frontier=${diagnostics.receivedThrough}/${diagnostics.appliedThrough}/`
+        + `${diagnostics.controlInstalledThrough}`,
+    );
+  }
+
+  /** Record the exact live-apply stage/reason; payloads remain out of logs. */
+  private logReplicaApply(entry: CoopAuthorityEntry, resume: ReplicaApplyResume, outcome: ReplicaApplyOutcome): void {
+    const detail = outcome.kind === "applied" ? ` control=${outcome.controlId ?? "none"}` : ` reason=${outcome.reason}`;
+    const diagnostics = this.log.diagnostics();
+    coopLog(
+      "v2-replica",
+      `apply rev=${entry.revision} kind=${entry.kind} resume=${resume} outcome=${outcome.kind}${detail} `
+        + `frontier=${diagnostics.receivedThrough}/${diagnostics.appliedThrough}/`
+        + `${diagnostics.controlInstalledThrough}`,
+    );
   }
 
   /** The shadow material applier: record the admitted entry into shadow state (never engine state). */
@@ -1310,14 +1355,15 @@ export function clearCoopV2ShadowInbound(handler?: (frame: CoopFrameV2) => void)
 
 /** The classification a routed inbound frame received. */
 export type CoopV2InboundRouting = "routed" | "cosmetic-drop" | "protocol-violation";
+type CoopV2ProtocolViolation = Extract<CoopInboundFrameResultV2, { kind: "protocol-violation" }>;
 
 /**
  * THE transport boundary for a v===2 frame. Validates via the ONE boundary
  * validator (never the legacy cast). A valid frame is handed to the registered
- * shadow harness inbound handler; a cosmetic drop is logged; a protocol violation
- * is logged LOUDLY. In shadow mode a violation is LOG-ONLY - it must never
- * terminal a session whose mechanics legacy still fully controls. Total over all
- * inputs - never throws back into the transport.
+ * harness inbound handler; a cosmetic drop is logged; a protocol violation is
+ * logged loudly. Pure-shadow callers omit a violation hook and therefore retain
+ * evidence-only behavior. Authoritative-cutover runtimes inject a hook that enters
+ * the retained shared terminal. Total over all inputs: never throws into transport.
  */
 export function routeCoopV2InboundFrame(raw: unknown): CoopV2InboundRouting {
   return routeValidatedInboundFrame(raw, inboundHandler);
@@ -1329,38 +1375,58 @@ export function routeCoopV2InboundFrame(raw: unknown): CoopV2InboundRouting {
  * targeted at the passed handler instead of the module-level one, so two harnesses in one process each admit
  * only the frames delivered on THEIR OWN transport endpoint.
  */
-export function routeCoopV2InboundFrameTo(raw: unknown, handler: (frame: CoopFrameV2) => void): CoopV2InboundRouting {
-  return routeValidatedInboundFrame(raw, handler);
+export function routeCoopV2InboundFrameTo(
+  raw: unknown,
+  handler: (frame: CoopFrameV2) => void,
+  onProtocolViolation?: (violation: CoopV2ProtocolViolation) => void,
+): CoopV2InboundRouting {
+  return routeValidatedInboundFrame(raw, handler, onProtocolViolation);
 }
 
 /** The shared validate-then-route body for both the module-level handler and the per-instance seam. */
 function routeValidatedInboundFrame(
   raw: unknown,
   handler: ((frame: CoopFrameV2) => void) | null,
+  onProtocolViolation?: (violation: CoopV2ProtocolViolation) => void,
 ): CoopV2InboundRouting {
   const result = validateInboundFrame(raw);
   switch (result.kind) {
     case "valid":
-      if (handler != null) {
-        try {
-          handler(result.frame);
-        } catch (error) {
-          coopWarn("v2-shadow", `FAULT route: ${describeError(error)}`);
-        }
+      if (handler == null) {
+        const violation: CoopV2ProtocolViolation = {
+          kind: "protocol-violation",
+          frameType: result.frame.t,
+          issues: ["receiver.not-installed"],
+        };
+        reportProtocolViolation(violation, onProtocolViolation);
+        return "protocol-violation";
+      }
+      try {
+        handler(result.frame);
+      } catch (error) {
+        coopWarn("v2-shadow", `FAULT route: ${describeError(error)}`);
       }
       return "routed";
     case "cosmetic-drop":
       coopLog("v2", `cosmetic-drop ${result.reason}`);
       return "cosmetic-drop";
     case "protocol-violation":
-      // TODO(cutover): AUTHORITATIVE mode wires this to the classified shared terminal
-      // (failCoopSharedSession) so a malformed mechanically-relevant frame ends the shared
-      // session. In SHADOW mode it is LOG-ONLY: legacy controls all mechanics, so a v2
-      // protocol violation is evidence, never a session terminal.
-      coopWarn(
-        "v2",
-        `PROTOCOL VIOLATION frameType=${result.frameType ?? "(unknown)"} issues=[${result.issues.join(", ")}]`,
-      );
+      reportProtocolViolation(result, onProtocolViolation);
       return "protocol-violation";
+  }
+}
+
+function reportProtocolViolation(
+  violation: CoopV2ProtocolViolation,
+  onProtocolViolation?: (violation: CoopV2ProtocolViolation) => void,
+): void {
+  coopWarn(
+    "v2",
+    `PROTOCOL VIOLATION frameType=${violation.frameType ?? "(unknown)"} issues=[${violation.issues.join(", ")}]`,
+  );
+  try {
+    onProtocolViolation?.(violation);
+  } catch (error) {
+    coopWarn("v2-shadow", `FAULT protocol terminal route: ${describeError(error)}`);
   }
 }

@@ -471,15 +471,27 @@ describe("authenticated P33 browser client", () => {
     expect(replicaContext).not.toBeNull();
 
     const pair = createLoopbackPair();
-    const host = new CoopSessionController(pair.host, {
+    const hostBindingReady = vi.fn();
+    const guestBindingReady = vi.fn();
+    let host!: CoopSessionController;
+    let guest!: CoopSessionController;
+    host = new CoopSessionController(pair.host, {
       version: COOP_PROTOCOL_VERSION,
       p33: authorityContext!,
       localCapabilities: [],
+      onAuthenticatedBindingReady: () => {
+        expect(host.p33MembershipSnapshot(), "authority binding-ready publishes complete frame axes").not.toBeNull();
+        hostBindingReady();
+      },
     });
-    const guest = new CoopSessionController(pair.guest, {
+    guest = new CoopSessionController(pair.guest, {
       version: COOP_PROTOCOL_VERSION,
       p33: replicaContext!,
       localCapabilities: [],
+      onAuthenticatedBindingReady: () => {
+        expect(guest.p33MembershipSnapshot(), "replica binding-ready publishes complete frame axes").not.toBeNull();
+        guestBindingReady();
+      },
     });
     let offeredWave = -1;
     guest.armResumeOfferHandler(commitment => {
@@ -526,6 +538,8 @@ describe("authenticated P33 browser client", () => {
     }
     expect(guest.authenticatedBinding?.source).toBe("resume");
     expect(guest.authenticatedBinding?.sessionEpoch).toBe(host.sessionEpoch);
+    expect(hostBindingReady, "the authority receives a post-capability binding lifecycle edge").toHaveBeenCalled();
+    expect(guestBindingReady, "the replica receives a post-capability binding lifecycle edge").toHaveBeenCalled();
 
     host.dispose();
     guest.dispose();

@@ -226,6 +226,13 @@ export interface CoopSessionOptions {
    * set. The runtime uses it to drive the per-surface activation from the negotiated intersection.
    */
   onCapabilitiesNegotiated?: ((negotiated: ReadonlySet<string>) => void) | undefined;
+  /**
+   * Invoked whenever the authenticated P33 binding becomes usable on this channel generation. Capability
+   * negotiation deliberately precedes binding construction, so mechanically addressed runtimes (Authority
+   * V2, recovery, retained terminals) must install from this later lifecycle edge rather than assuming the
+   * first capability callback already has a frame context.
+   */
+  onAuthenticatedBindingReady?: (() => void) | undefined;
   /** Publishes the host-negotiated operation epoch into every surface adapter. */
   onEpochNegotiated?: ((epoch: number) => void) | undefined;
   /** Production launch requires a matching functional data fingerprint before `bothReady` can open. */
@@ -286,6 +293,7 @@ export class CoopSessionController {
   private partnerCapabilities: string[] | undefined;
   /** #896 W2e-R2: the callback invoked with the frozen effective set each time it is (re)negotiated. */
   private readonly onCapabilitiesNegotiated: ((negotiated: ReadonlySet<string>) => void) | undefined;
+  private readonly onAuthenticatedBindingReady: (() => void) | undefined;
   private readonly onEpochNegotiated: ((epoch: number) => void) | undefined;
   private readonly requireFunctionalFingerprint: boolean;
   private readonly partnerInteractionRecoveryMaxAttempts: number;
@@ -502,6 +510,7 @@ export class CoopSessionController {
     this.localCapabilities = opts.localCapabilities;
     this.requiredCapabilities = [...(opts.requiredCapabilities ?? [])];
     this.onCapabilitiesNegotiated = opts.onCapabilitiesNegotiated;
+    this.onAuthenticatedBindingReady = opts.onAuthenticatedBindingReady;
     this.onEpochNegotiated = opts.onEpochNegotiated;
     this.requireFunctionalFingerprint = opts.requireFunctionalFingerprint ?? false;
     this.partnerInteractionRecoveryMaxAttempts = opts.partnerInteractionRecoveryMaxAttempts ?? 3;
@@ -2449,6 +2458,7 @@ export class CoopSessionController {
         accepted: true,
       });
       this.p33BindingReady = true;
+      this.onAuthenticatedBindingReady?.();
       this.notifyCompatibilityLifecycle();
     }
     this.emit();
@@ -2647,6 +2657,7 @@ export class CoopSessionController {
       accountId: context.account.accountId,
       accepted: true,
     });
+    this.onAuthenticatedBindingReady?.();
     this.sendHello();
     this.notifyCompatibilityLifecycle();
     this.emit();
@@ -2671,6 +2682,9 @@ export class CoopSessionController {
     this.p33BindingRejected = !msg.accepted;
     this.p33BindingReady = msg.accepted;
     this.clearP33BindingRetry();
+    if (msg.accepted) {
+      this.onAuthenticatedBindingReady?.();
+    }
     this.notifyCompatibilityLifecycle();
     this.emit();
   }

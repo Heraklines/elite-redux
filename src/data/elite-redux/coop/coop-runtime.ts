@@ -3438,12 +3438,12 @@ const runtimeSceneBindings = new WeakMap<CoopRuntime, object>();
 
 // ---------------------------------------------------------------------------
 // authority-v2 SHADOW harness (src/data/elite-redux/coop/authority-v2/shadow.ts).
-// Per-runtime, built LAZILY on first tap once authority.v2shadow is negotiated (a
-// hot-path capability gate becomes available only after the hello handshake, which
-// runs AFTER assembly). A build failure (incomplete identity) is remembered so we
-// never retry-thrash, and leaves the harness null - so a tap is a pure no-op. This
-// is the ship-safety boundary: when the capability is off, getCoopV2Shadow returns
-// null and every `getCoopV2Shadow()?.tapX(...)` short-circuits with zero side effect.
+// Per-runtime, installed from BOTH negotiated-capability and authenticated-binding
+// lifecycle edges. P33 capability negotiation intentionally precedes binding
+// construction, so an identity that is not ready is a DEFER (retry at binding-ready),
+// not a permanent build failure. Only a constructor fault is remembered to avoid
+// retry-thrash. When the capability is off, getCoopV2Shadow returns null and every
+// `getCoopV2Shadow()?.tapX(...)` short-circuits with zero side effect.
 // ---------------------------------------------------------------------------
 const coopV2ShadowHarnesses = new WeakMap<CoopRuntime, CoopAuthorityV2Shadow>();
 const coopV2ShadowBuildFailed = new WeakSet<CoopRuntime>();
@@ -3847,7 +3847,6 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
   }
   const identity = resolveCoopV2ShadowIdentity(runtime);
   if (identity == null) {
-    coopV2ShadowBuildFailed.add(runtime);
     return null;
   }
   try {
@@ -3871,6 +3870,23 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
       },
       ...(turnCutover || replacementCutover
         ? { liveReplica: buildCoopV2LiveSeams(runtime, { turn: turnCutover, replacement: replacementCutover }) }
+        : {}),
+      ...(turnCutover || replacementCutover
+        ? {
+            onProtocolViolation: (violation: { frameType: string | null; issues: readonly string[] }) => {
+              const point = readCoopBattlePoint();
+              failCoopRuntimeSharedSession(
+                runtime,
+                `Invalid Authority V2 frame ${violation.frameType ?? "(unknown)"}: ${violation.issues.join(", ")}.`,
+                {
+                  boundary: "protocol",
+                  reasonCode: "invalid-authority",
+                  wave: point.wave,
+                  turn: point.turn,
+                },
+              );
+            },
+          }
         : {}),
     });
     registerCoopV2ShadowInbound(frame => harness.handleInboundFrame(frame));
@@ -6452,6 +6468,13 @@ export function assembleCoopRuntime(
   let opState!: CoopRuntimeOpState;
   let waveOperationBinding: CoopWaveAdvanceOperationBinding;
   let runtime!: CoopRuntime;
+  const installAuthorityV2 = (): void => {
+    try {
+      getCoopV2Shadow(runtime);
+    } catch (error) {
+      coopWarn("v2-shadow", "eager harness build on session lifecycle threw", error);
+    }
+  };
   const controller = new CoopSessionController(transport, {
     username: opts.username,
     version: COOP_PROTOCOL_VERSION,
@@ -6471,13 +6494,11 @@ export function assembleCoopRuntime(
     // turn commit - otherwise a lazy first-tap build would leave wave-1 turns on legacy authority (a window
     // of dual authority the frozen cutover rule forbids). A pure no-op when neither v2 capability negotiated
     // (getCoopV2Shadow returns null); guarded so a build failure never unwinds the negotiation callback.
-    onCapabilitiesNegotiated: () => {
-      try {
-        getCoopV2Shadow(runtime);
-      } catch (error) {
-        coopWarn("v2-shadow", "eager harness build on negotiation threw", error);
-      }
-    },
+    onCapabilitiesNegotiated: installAuthorityV2,
+    // Public P33 negotiation fires before its authenticated frame axes exist. Retry at the exact later edge
+    // where p33MembershipSnapshot/p33FrameContext become usable, so the replica installs its inbound V2
+    // receiver before the authority can publish the first retained entry.
+    onAuthenticatedBindingReady: installAuthorityV2,
     onPartnerInteractionRecoveryExhausted: failure => {
       const point = readCoopBattlePoint();
       failCoopRuntimeSharedSession(
