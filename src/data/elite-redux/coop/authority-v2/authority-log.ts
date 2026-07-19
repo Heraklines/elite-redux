@@ -107,6 +107,20 @@ export const COOP_DEFAULT_DELIVERY_BACKOFF: DeliveryBackoff = { initialMs: 250, 
 /** Default hard cap on retained-but-unretired entries (safety valve against unbounded growth). */
 export const COOP_DEFAULT_RETAIN_CAPACITY = 512;
 
+/** A bounded log refuses a new commit rather than evicting an unresolved authoritative revision. */
+export class AuthorityRetentionOverflowError extends Error {
+  readonly code = "authority-retention-overflow";
+  readonly capacity: number;
+  readonly attemptedRevision: number;
+
+  constructor(capacity: number, attemptedRevision: number) {
+    super(`AuthorityLog retention capacity ${capacity} reached before revision ${attemptedRevision}`);
+    this.name = "AuthorityRetentionOverflowError";
+    this.capacity = capacity;
+    this.attemptedRevision = attemptedRevision;
+  }
+}
+
 export interface AuthorityLogOptions {
   /** Local frame identity - admit() classifies inbound entries against this (epoch / membership / seatMap). */
   readonly localContext: CoopFrameContextV2;
@@ -159,6 +173,9 @@ export interface AuthorityLogDiagnostics {
   readonly appliedThrough: number;
   readonly controlInstalledThrough: number;
   readonly headRevision: number;
+  readonly retentionCapacity: number;
+  readonly retentionRefusals: number;
+  readonly wireSendFailures: number;
   readonly disposed: boolean;
 }
 
@@ -174,6 +191,7 @@ export class AuthorityLog implements CoopAuthorityLog {
   private readonly backoff: DeliveryBackoff;
   private readonly deliveryTimeClass: CoopTimeClass;
   private readonly maxDeliveryAttempts: number | null;
+  private readonly retentionCapacity: number;
 
   /** AUTHORITY: retained-but-unretired entries, bounded + revision-ordered, keyed by their delivery lease. */
   private readonly retainedWindow: BoundedRevisionWindow<DeliveryLease>;
@@ -183,6 +201,8 @@ export class AuthorityLog implements CoopAuthorityLog {
   private pendingReplicaEntry: CoopAuthorityEntry | null = null;
   /** AUTHORITY: the highest revision assigned (commit assigns headRevision + 1). */
   private headRevision = 0;
+  private retentionRefusals = 0;
+  private wireSendFailures = 0;
   private disposed = false;
 
   constructor(options: AuthorityLogOptions) {
@@ -200,9 +220,8 @@ export class AuthorityLog implements CoopAuthorityLog {
       options.maxDeliveryAttempts != null && Number.isSafeInteger(options.maxDeliveryAttempts)
         ? options.maxDeliveryAttempts
         : null;
-    this.retainedWindow = new BoundedRevisionWindow<DeliveryLease>(
-      options.retainCapacity ?? COOP_DEFAULT_RETAIN_CAPACITY,
-    );
+    this.retentionCapacity = options.retainCapacity ?? COOP_DEFAULT_RETAIN_CAPACITY;
+    this.retainedWindow = new BoundedRevisionWindow<DeliveryLease>(this.retentionCapacity);
     this.ledger = new AuthorityLedger();
     if (
       !Number.isSafeInteger(this.backoff.initialMs)
@@ -244,7 +263,6 @@ export class AuthorityLog implements CoopAuthorityLog {
     // Own an immutable, caller-independent copy so a caller reusing/mutating its source object can never
     // rewrite what a later redelivery transmits (the retention immutability boundary).
     const committed = freezeAuthorityEntry(cloneEntry({ ...entry, revision }));
-    this.headRevision = revision;
 
     const lease: DeliveryLease = {
       revision,
@@ -260,13 +278,16 @@ export class AuthorityLog implements CoopAuthorityLog {
       stopped: false,
       subsumptionDone: false,
     };
-    const evicted = this.retainedWindow.set(revision, lease);
-    if (evicted != null) {
-      this.stopLease(evicted.value);
+    if (!this.retainedWindow.set(revision, lease)) {
+      this.retentionRefusals += 1;
+      throw new AuthorityRetentionOverflowError(this.retentionCapacity, revision);
     }
+    // A revision exists only after retention accepted it. An overflow therefore
+    // never burns a number and cannot create an unfillable replica gap.
+    this.headRevision = revision;
 
     // Deliver once immediately, then redeliver on the backoff until mechanically retired.
-    this.send({ kind: "deliver", entry: committed });
+    this.sendGuarded({ kind: "deliver", entry: committed });
     this.scheduleRedelivery(lease);
     return committed;
   }
@@ -398,7 +419,7 @@ export class AuthorityLog implements CoopAuthorityLog {
         // Request the missing tail via the injected send. No local retry loop - the authority's redelivery
         // is the ONLY retry, so a replica can never spin an orphan request loop (the exact prior hazard).
         const missingFrom = this.ledger.missingFrom();
-        this.send({ kind: "requestTail", context: this.localContext, missingFrom });
+        this.sendGuarded({ kind: "requestTail", context: this.localContext, missingFrom });
         return { kind: "gap", missingFrom };
       }
       default:
@@ -493,6 +514,9 @@ export class AuthorityLog implements CoopAuthorityLog {
       appliedThrough: this.ledger.appliedThrough(),
       controlInstalledThrough: this.ledger.controlInstalledThrough(),
       headRevision: this.headRevision,
+      retentionCapacity: this.retentionCapacity,
+      retentionRefusals: this.retentionRefusals,
+      wireSendFailures: this.wireSendFailures,
       disposed: this.disposed,
     };
   }
@@ -565,8 +589,17 @@ export class AuthorityLog implements CoopAuthorityLog {
       return;
     }
     lease.attempts += 1;
-    this.send({ kind: "deliver", entry: lease.entry });
+    this.sendGuarded({ kind: "deliver", entry: lease.entry });
     this.scheduleRedelivery(lease);
+  }
+
+  /** A carrier throw never loses a committed entry or kills its owned redelivery loop. */
+  private sendGuarded(wire: CoopAuthorityWire): void {
+    try {
+      this.send(wire);
+    } catch {
+      this.wireSendFailures += 1;
+    }
   }
 
   /** Exponential backoff for the Nth attempt, capped at maxMs. */

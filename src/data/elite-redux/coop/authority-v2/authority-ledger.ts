@@ -14,8 +14,8 @@
 //   - AuthorityLedger: the replica-side received/material/control frontiers +
 //     duplicate/gap classification + snapshot high-water adoption.
 //   - BoundedRevisionWindow: a revision-ordered map with a hard capacity, so a
-//     long-lived run cannot grow retention without bound (the safety valve the
-//     prior dual-ledger design lacked - it grew until it raced itself).
+//     long-lived run cannot grow retention without bound. Capacity pressure
+//     REFUSES the new value; it never evicts unresolved authoritative truth.
 //
 // It replaces the receiver-idempotency + high-water logic of the retired
 // coop-durability / coop-battle-stream retention systems; it imports from
@@ -145,9 +145,9 @@ export class AuthorityLedger {
 /**
  * A revision-keyed map with a hard capacity, kept in ascending revision order. The concrete log uses it for
  * the authority's retained-but-unretired frontier: retention normally drains via the retirement rule, but a
- * pathological run (a peer that never acks) must not grow memory without bound - so the OLDEST retained
- * revision is evicted when the window overflows. Eviction is surfaced (returned from {@linkcode set}) so the
- * log can cancel the evicted entry's delivery lease and never leak a timer.
+ * pathological run (a peer that never acks) must not grow memory without bound. A new value is REFUSED at
+ * capacity; the oldest unresolved revision is never evicted. The authority can therefore freeze/terminal on
+ * pressure without silently deleting the exact mutation a replica still needs.
  *
  * Pure: no timers, no side effects beyond the map. Ordering is maintained on insert so iteration + oldest
  * lookup are O(n)/O(1) without re-sorting.
@@ -156,11 +156,13 @@ export class BoundedRevisionWindow<T> {
   /** Ascending-by-revision list of retained keys (parallel to {@linkcode byRevision}). */
   private readonly order: number[] = [];
   private readonly byRevision = new Map<number, T>();
+  private readonly capacity: number;
 
-  constructor(private readonly capacity = 512) {
+  constructor(capacity = 512) {
     if (!Number.isSafeInteger(capacity) || capacity <= 0) {
       throw new Error(`BoundedRevisionWindow capacity must be a positive integer (got ${capacity})`);
     }
+    this.capacity = capacity;
   }
 
   /** Whether a revision is currently retained. */
@@ -174,28 +176,20 @@ export class BoundedRevisionWindow<T> {
   }
 
   /**
-   * Retain a value under a revision, keeping ascending order. If the window is at capacity and this is a NEW
-   * revision, the oldest retained revision is evicted and returned (its key + value) so the caller can
-   * cancel its lease; otherwise null. Re-setting an existing revision overwrites in place (no eviction).
+   * Retain a value under a revision, keeping ascending order. Returns false when a NEW revision would exceed
+   * capacity and leaves every existing value untouched. Re-setting an existing revision overwrites in place.
    */
-  set(revision: number, value: T): { readonly revision: number; readonly value: T } | null {
+  set(revision: number, value: T): boolean {
     if (this.byRevision.has(revision)) {
       this.byRevision.set(revision, value);
-      return null;
+      return true;
     }
-    let evicted: { revision: number; value: T } | null = null;
     if (this.order.length >= this.capacity) {
-      const oldest = this.order[0];
-      const oldestValue = this.byRevision.get(oldest);
-      this.order.shift();
-      this.byRevision.delete(oldest);
-      if (oldestValue !== undefined) {
-        evicted = { revision: oldest, value: oldestValue };
-      }
+      return false;
     }
     this.insertOrdered(revision);
     this.byRevision.set(revision, value);
-    return evicted;
+    return true;
   }
 
   /** Remove a retained revision (retirement / subsumption). Returns true iff it was present. */

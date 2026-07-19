@@ -24,6 +24,7 @@
 import {
   AuthorityLog,
   type AuthorityLogOptions,
+  AuthorityRetentionOverflowError,
   type CoopAuthorityWire,
 } from "#data/elite-redux/coop/authority-v2/authority-log";
 import type {
@@ -53,7 +54,7 @@ interface FakeTimer {
 /** A deterministic CoopScheduler: timers are inspectable + fireable; cancellation is exact. */
 class FakeScheduler implements CoopScheduler {
   private seq = 0;
-  private clock = 0;
+  private readonly clock = 0;
   readonly timers = new Map<number, FakeTimer>();
 
   now(_timeClass: CoopTimeClass): number {
@@ -367,6 +368,50 @@ describe("authority-v2 log", () => {
     expect(diag.activeDeliveryTimers).toBe(0);
     expect(diag.disposed).toBe(true);
     expect(scheduler.liveCount()).toBe(0);
+  });
+
+  it("refuses capacity overflow without evicting truth or burning a revision", () => {
+    const log = makeLog(scheduler, sent, { retainCapacity: 2 });
+    const first = log.commit(entryInput("op-1"));
+    const second = log.commit(entryInput("op-2"));
+
+    expect(() => log.commit(entryInput("op-refused"))).toThrow(AuthorityRetentionOverflowError);
+    expect(log.retained().map(entry => entry.revision)).toEqual([1, 2]);
+    expect(log.diagnostics()).toMatchObject({
+      headRevision: 2,
+      retainedEntries: 2,
+      retentionCapacity: 2,
+      retentionRefusals: 1,
+    });
+    expect(scheduler.liveCount()).toBe(2);
+
+    // Once exact proof retires the oldest truth, the next real commit receives revision 3. The refused
+    // attempt never existed and therefore cannot create a gap at the replica.
+    expect(log.acceptReceipt(receipt(first, "materialApplied"))).toBe(true);
+    const third = log.commit(entryInput("op-3"));
+    expect(third.revision).toBe(3);
+    expect(log.retained().map(entry => entry.revision)).toEqual([second.revision, third.revision]);
+  });
+
+  it("keeps a committed entry retryable when the carrier throws synchronously", () => {
+    let attempts = 0;
+    const log = makeLog(scheduler, [], {
+      send: () => {
+        attempts += 1;
+        throw new Error("carrier unavailable");
+      },
+    });
+
+    const committed = log.commit(entryInput("op-send-fault"));
+    expect(committed.revision).toBe(1);
+    expect(attempts).toBe(1);
+    expect(log.retained()).toHaveLength(1);
+    expect(log.diagnostics()).toMatchObject({ activeDeliveryTimers: 1, wireSendFailures: 1 });
+
+    scheduler.fireAll();
+    expect(attempts).toBeGreaterThan(1);
+    expect(log.retained()).toHaveLength(1);
+    expect(log.diagnostics().activeDeliveryTimers).toBe(1);
   });
 
   it("retention immutability: mutating the committed return cannot rewrite the delivered/retained entry", () => {
