@@ -3486,6 +3486,8 @@ function reconstructCoopV2TurnResolution(
  */
 function buildCoopV2TurnLiveSeams(runtime: CoopRuntime): CoopV2LiveReplicaSeams {
   return {
+    ownsEntry: entry => entry.kind === "TURN_COMMIT",
+    ownsControl: control => control.kind === "COMMAND_FRONTIER",
     applyMaterial: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null => {
       if (entry.kind !== "TURN_COMMIT") {
         return null; // only the TURN surface is cut over; every other kind stays shadow.

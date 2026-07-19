@@ -152,6 +152,8 @@ async function flushLoopback(): Promise<void> {
  */
 function recordingLiveReplica(sink: { last: CoopAuthorityEntry | null; applies: number }): CoopV2LiveReplicaSeams {
   return {
+    ownsEntry: entry => entry.kind === "TURN_COMMIT",
+    ownsControl: () => false,
     applyMaterial: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean => {
       sink.applies += 1;
       sink.last = entry;
@@ -323,6 +325,8 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     const clock = new FakeClock();
     let applies = 0;
     const guestLive: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: () => false,
       applyMaterial: () => {
         applies += 1;
         return applies > 1;
@@ -358,6 +362,8 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     let applies = 0;
     let projections = 0;
     const guestLive: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: control => control.kind === "COMMAND_FRONTIER",
       applyMaterial: () => {
         applies += 1;
         return true;

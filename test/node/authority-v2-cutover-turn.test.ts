@@ -287,6 +287,8 @@ describe("authority-v2 turn cutover - guest LIVE replica routing", () => {
     const applied: number[] = [];
     const projected: string[] = [];
     const live: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: control => control.kind === "COMMAND_FRONTIER",
       applyMaterial(_ctx, entry: CoopAuthorityEntry): boolean | null {
         if (entry.kind !== "TURN_COMMIT") {
           return null; // only TURN is cut over on the guest.
@@ -328,6 +330,8 @@ describe("authority-v2 turn cutover - guest LIVE replica routing", () => {
     // the projector signed first, retirement would race a checkpoint that had not yet reconciled guest state.
     const timeline: string[] = [];
     const live: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: control => control.kind === "COMMAND_FRONTIER",
       applyMaterial(_ctx, entry: CoopAuthorityEntry): boolean | null {
         if (entry.kind !== "TURN_COMMIT") {
           return null;
@@ -361,6 +365,8 @@ describe("authority-v2 turn cutover - guest LIVE replica routing", () => {
     // A fall-through seam (returns null for every kind/control) must leave the harness behaving exactly like
     // a harness with NO live seams at all - the capability-off / non-cutover-kind guarantee.
     const fallThrough: CoopV2LiveReplicaSeams = {
+      ownsEntry: () => false,
+      ownsControl: () => false,
       applyMaterial: () => null,
       projectControl: () => null,
     };
@@ -382,6 +388,41 @@ describe("authority-v2 turn cutover - guest LIVE replica routing", () => {
     expect(seamGuest.shadowStateSize).toBe(pureGuest.shadowStateSize);
     expect(seamGuest.receiptsSent).toBe(pureGuest.receiptsSent);
   });
+
+  it("never signs shadow materialApplied when an owned live material verb returns null", () => {
+    const live: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: control => control.kind === "COMMAND_FRONTIER",
+      applyMaterial: () => null,
+      projectControl: () => null,
+    };
+    const duo = buildDuo(new FakeClock(), live);
+
+    duo.host.tapTurnCommit(turnTap("TURN/owned-null-material"));
+
+    expect(duo.guest.diagnostics().shadowStateSize).toBe(0);
+    expect(duo.guest.diagnostics().applied).toBe(0);
+    expect(duo.host.diagnostics().retained).toBe(1);
+    duo.dispose();
+  });
+
+  it("never signs shadow controlInstalled when an owned live projector returns null", () => {
+    const live: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: control => control.kind === "COMMAND_FRONTIER",
+      applyMaterial: () => true,
+      projectControl: () => null,
+    };
+    const duo = buildDuo(new FakeClock(), live);
+
+    duo.host.tapTurnCommit(turnTap("TURN/owned-null-control"));
+
+    expect(duo.guest.diagnostics().shadowStateSize).toBe(1);
+    expect(duo.guest.diagnostics().controlLedgerSize).toBe(0);
+    expect(duo.guest.diagnostics().applied).toBe(0);
+    expect(duo.host.diagnostics().retained).toBe(1);
+    duo.dispose();
+  });
 });
 
 describe("authority-v2 turn cutover - replica context binding + authority self-apply guard", () => {
@@ -394,6 +435,8 @@ describe("authority-v2 turn cutover - replica context binding + authority self-a
     // decline to replicate its own committed turn - the Yawn self-apply corruption guard).
     const seenCtx: { localSeatId: number; authoritySeatId: number }[] = [];
     const live: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: control => control.kind === "COMMAND_FRONTIER",
       applyMaterial(ctx, entry: CoopAuthorityEntry): boolean | null {
         if (entry.kind !== "TURN_COMMIT") {
           return null;
@@ -425,6 +468,8 @@ describe("authority-v2 turn cutover - replica context binding + authority self-a
     const applyCalls: number[] = [];
     const engineApplies: number[] = [];
     const authoritySkipSeam: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: control => control.kind === "COMMAND_FRONTIER",
       applyMaterial(ctx, entry: CoopAuthorityEntry): boolean | null {
         if (entry.kind !== "TURN_COMMIT") {
           return null;

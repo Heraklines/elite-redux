@@ -172,15 +172,27 @@ export interface CoopV2ShadowIdentity {
 
 /**
  * The LIVE replica seams (cutover surface 1). When injected, the harness's replica pipeline routes a
- * CUTOVER-kind delivered entry through these REAL engine verbs instead of its in-memory shadow ones; a
- * `null` return falls through to shadow behaviour, so a non-cutover kind stays shadow. Absent => the
+ * CUTOVER-kind delivered entry through these REAL engine verbs instead of its in-memory shadow ones. The
+ * ownership predicates make the boundary explicit: `null` falls through only for an unowned kind; an owned
+ * kind may never obtain a mechanical receipt from shadow bookkeeping. Absent => the
  * harness is pure shadow (byte-identical to the pre-cutover build). Defined here (where the harness
  * consumes it) so the engine-free cutover switchboard imports it from the harness without a cycle.
  */
 export interface CoopV2LiveReplicaSeams {
-  /** Install the entry's material into REAL engine state (checkpoint-apply seam), or `null` to fall through to shadow. */
+  /**
+   * Whether this live cutover owns the entry kind. Once owned, `null` from
+   * applyMaterial is a failed/deferred real-engine apply, never permission to
+   * let the shadow ledger manufacture materialApplied.
+   */
+  ownsEntry(entry: CoopAuthorityEntry): boolean;
+  /**
+   * Whether this live cutover owns the successor control kind. Once owned,
+   * `null` from projectControl must not sign a shadow controlInstalled receipt.
+   */
+  ownsControl(control: NonNullable<CoopNextControl>): boolean;
+  /** Install material into REAL engine state, or `null` only when {@link ownsEntry} is false. */
   applyMaterial(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean | null;
-  /** Project the stated control onto the REAL phase manager, or `null` to fall through to the shadow projector. */
+  /** Project control onto the REAL phase manager, or `null` only when {@link ownsControl} is false. */
   projectControl(ctx: CoopRuntimeContext, control: NonNullable<CoopNextControl>): CoopControlInstallResult | null;
 }
 
@@ -198,7 +210,7 @@ export interface CoopV2ShadowDeps {
   /**
    * Optional LIVE replica seams (cutover surface 1). When present, a delivered CUTOVER-kind entry is applied
    * against REAL engine state + the real phase manager instead of the in-memory shadow ledger. Absent =>
-   * pure shadow. Never touched unless a frame is actually delivered AND the seam recognizes the kind.
+   * pure shadow. An owned entry/control cannot silently fall through when its live verb returns null.
    */
   readonly liveReplica?: CoopV2LiveReplicaSeams;
 }
@@ -362,8 +374,8 @@ class CoopShadowControlProjector implements CoopControlProjector {
   }
 
   project(ctx: CoopRuntimeContext, control: NonNullable<CoopNextControl>): CoopControlInstallResult {
-    // Cutover: a live projector installs the stated control on the REAL phase manager. A `null` result means
-    // "not a cutover kind here" and we record into the in-memory ledger exactly as pure shadow does.
+    // Cutover: a live projector installs the stated control on the REAL phase manager. A `null` result falls
+    // through only when the seam explicitly says it does not own this control kind.
     const liveResult = this.live?.projectControl(ctx, control) ?? null;
     if (liveResult != null) {
       // Mirror the installed controlId into the ledger too, so a redelivered entry is idempotent and the
@@ -372,6 +384,12 @@ class CoopShadowControlProjector implements CoopControlProjector {
         this.ledger.record(liveResult.controlId);
       }
       return liveResult;
+    }
+    if (this.live?.ownsControl(control) === true) {
+      return {
+        kind: "rejected",
+        reason: `live cutover owned ${control.kind} but did not return a control-install verdict`,
+      };
     }
     const projectable = control as ProjectableControl;
     const validation = validateNextControl(projectable);
@@ -1026,7 +1044,7 @@ export class CoopAuthorityV2Shadow {
 
   /**
    * The routed material applier: in CUTOVER mode a live seam installs a cutover-kind entry into REAL engine
-   * state (a `null` return means "not a cutover kind here" and we fall through). In pure shadow mode the
+   * state (`null` falls through only for an explicitly unowned kind). In pure shadow mode the
    * live seam is absent, so this is exactly the in-memory shadow applier - byte-identical to before.
    */
   private applyMaterialRouted(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean {
@@ -1036,6 +1054,9 @@ export class CoopAuthorityV2Shadow {
       // bookkeeping hold; the live install is the authoritative one, this Map is observability.
       this.shadowApplyMaterial(ctx, entry);
       return live;
+    }
+    if (this.liveReplica?.ownsEntry(entry) === true) {
+      return false;
     }
     return this.shadowApplyMaterial(ctx, entry);
   }
