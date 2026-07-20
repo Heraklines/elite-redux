@@ -55,6 +55,71 @@ export interface TournamentRecord {
   champion: Participant | null;
 }
 
+/**
+ * The entrant's ghost-trainer APPEARANCE SUMMARY (P1.5 board). A tiny, presentation-only
+ * blob carried in the registration payload and stored additively on the entrant row, so
+ * the board can draw each slot's ghost-trainer icon + name + title. Untrusted (authored by
+ * the registering client) — sanitized on receipt here AND re-sanitized client-side (the
+ * ghost-profile rule). Mirrored client-side in tournament-types.ts (worker <-> client shape).
+ */
+export interface GhostIconSummary {
+  /** Trainer atlas key (TrainerConfig.getSpriteKey), e.g. "veteran" / "ace_trainer_f". */
+  spriteKey?: string;
+  /** Authored display name (falls back to the username client-side when absent). */
+  name?: string;
+  /** Authored title prefix. */
+  title?: string;
+}
+
+/** Field caps for the ghost summary (mirror er-ghost-profile's GHOST_NAME_MAX / GHOST_TITLE_MAX). */
+const GHOST_ICON_NAME_MAX = 24;
+const GHOST_ICON_TITLE_MAX = 32;
+const GHOST_ICON_KEY_MAX = 40;
+
+/** Strip control chars, trim, clamp to `max`; returns undefined when empty. */
+function clampSummaryLine(value: unknown, max: number): string | undefined {
+  if (typeof value !== "string") {
+    return;
+  }
+  const cleaned = [...value]
+    .filter(ch => ch.charCodeAt(0) >= 0x20 && ch.charCodeAt(0) !== 0x7f)
+    .join("")
+    .trim();
+  return cleaned.length === 0 ? undefined : cleaned.slice(0, max);
+}
+
+/**
+ * Normalize an untrusted ghost-icon summary into a safe shape. The sprite KEY is clamped
+ * to a strict `[a-z0-9_]` token (a trainer atlas basename can never be smuggled into an
+ * arbitrary path); name/title are length-clamped + control-stripped. Returns null when
+ * nothing meaningful survives.
+ */
+export function sanitizeGhostIcon(raw: unknown): GhostIconSummary | null {
+  if (typeof raw !== "object" || raw === null) {
+    return null;
+  }
+  const r = raw as Record<string, unknown>;
+  const out: GhostIconSummary = {};
+  if (typeof r.spriteKey === "string") {
+    const key = r.spriteKey
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, "")
+      .slice(0, GHOST_ICON_KEY_MAX);
+    if (key.length > 0) {
+      out.spriteKey = key;
+    }
+  }
+  const name = clampSummaryLine(r.name, GHOST_ICON_NAME_MAX);
+  if (name) {
+    out.name = name;
+  }
+  const title = clampSummaryLine(r.title, GHOST_ICON_TITLE_MAX);
+  if (title) {
+    out.title = title;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 /** One entrant row (plain data; persisted to D1). Seed assigned at bracket gen. */
 export interface EntrantRecord {
   tournamentId: string;
@@ -65,6 +130,10 @@ export interface EntrantRecord {
   presetName: string;
   seed: number | null;
   registeredAt: number;
+  /** P1.5: ghost-trainer appearance summary (additive; null for old registrations). */
+  ghost?: GhostIconSummary | null;
+  /** P1.5: epoch ms of this entrant's last presence ping (additive; null = never seen). */
+  lastSeen?: number | null;
 }
 
 export type Ok<T> = { ok: true } & T;
@@ -115,7 +184,16 @@ export function createTournament(
   };
 }
 
-/** Register an entrant. Registration-state only; no dup; under cap; preset required. */
+/**
+ * Register an entrant. No dup; under cap; registration open; preset required.
+ *
+ * Guard ORDER matters for the auto-close-at-cap flow (P1.5): the CAP check runs
+ * BEFORE the state check so that once the field fills and the worker auto-closes
+ * registration (state -> in_progress), a later would-be entrant gets the exact
+ * "tournament is full" message rather than a generic "registration is closed".
+ * An admin who closes registration EARLY (under cap) still yields "registration is
+ * closed" (cap not reached, so the state guard fires).
+ */
 export function registerEntrant(
   tournament: TournamentRecord,
   entrants: EntrantRecord[],
@@ -123,20 +201,20 @@ export function registerEntrant(
   presetName: string,
   now: number,
 ): Result<{ entrant: EntrantRecord }> {
-  if (tournament.state !== "registration") {
-    return { ok: false, error: "registration is closed" };
-  }
   if (!participant) {
     return { ok: false, error: "missing participant" };
-  }
-  if (!nameOk(presetName)) {
-    return { ok: false, error: "a saved team preset is required to register" };
   }
   if (entrants.some(e => e.participant === participant)) {
     return { ok: false, error: "already registered" };
   }
   if (entrants.length >= tournament.maxEntrants) {
     return { ok: false, error: "tournament is full" };
+  }
+  if (tournament.state !== "registration") {
+    return { ok: false, error: "registration is closed" };
+  }
+  if (!nameOk(presetName)) {
+    return { ok: false, error: "a saved team preset is required to register" };
   }
   return {
     ok: true,
