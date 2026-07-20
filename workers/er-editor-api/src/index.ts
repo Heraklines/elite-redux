@@ -840,6 +840,23 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
       ) {
         return { ok: false, error: `${key}: heldItems must be up to 6 { item NAME, count? }` };
       }
+      if (mm.vitamins !== undefined) {
+        if (!isPlainObject(mm.vitamins)) {
+          return { ok: false, error: `${key}: vitamins must be an object` };
+        }
+        const vitamins = mm.vitamins as Record<string, unknown>;
+        const vitaminFields = new Set(["hp", "atk", "def", "spatk", "spdef", "spd"]);
+        if (Object.keys(vitamins).some(field => !vitaminFields.has(field))) {
+          return { ok: false, error: `${key}: vitamins has an unknown stat` };
+        }
+        if (
+          Object.values(vitamins).some(
+            count => !Number.isInteger(count) || (count as number) < 0 || (count as number) > 31,
+          )
+        ) {
+          return { ok: false, error: `${key}: vitamin counts must be integers from 0-31` };
+        }
+      }
       // `sanityOff` is EDITOR metadata (move-legality enforcement toggle): the
       // game-side parser ignores it. Accept it, but keep it a clean boolean.
       if (mm.sanityOff !== undefined && typeof mm.sanityOff !== "boolean") {

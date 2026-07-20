@@ -1843,9 +1843,33 @@ const CTR_MEMBER_FIELDS = [
   "insanity",
   "fusion",
   "heldItems",
+  "vitamins",
   "shiny",
   "sanityOff",
 ];
+
+const CTR_VITAMIN_OPTIONS = [
+  { key: "hp", item: "HP Up", stat: "HP" },
+  { key: "atk", item: "Protein", stat: "Attack" },
+  { key: "def", item: "Iron", stat: "Defense" },
+  { key: "spatk", item: "Calcium", stat: "Sp. Atk" },
+  { key: "spdef", item: "Zinc", stat: "Sp. Def" },
+  { key: "spd", item: "Carbos", stat: "Speed" },
+];
+
+function clampCtrVitaminCount(value) {
+  const count = Number(value);
+  return Number.isFinite(count) ? Math.max(0, Math.min(31, Math.floor(count))) : 0;
+}
+
+function ctrNormVitamins(value) {
+  const raw = value && typeof value === "object" ? value : {};
+  const out = {};
+  for (const { key } of CTR_VITAMIN_OPTIONS) {
+    out[key] = clampCtrVitaminCount(raw[key]);
+  }
+  return out;
+}
 
 /** Coerce a raw/edit shiny value into the editor shape { palette, surface, around, name }
  *  (strings; empty = none). Accepts null/undefined and the saved JSON shape alike. */
@@ -1902,6 +1926,7 @@ function blankCtrMemberFields() {
     insanity: null,
     fusion: null,
     heldItems: [],
+    vitamins: ctrNormVitamins(null),
     // Shiny Lab visual effect the mon fields with (empty = none).
     shiny: ctrNormShiny(null),
     // Editor metadata: when true, this member's moves are NOT legality-checked.
@@ -1921,6 +1946,7 @@ function ctrCopyMemberFields(src) {
     insanity: ctrNormInsanity(src.insanity),
     fusion: src.fusion ? { ...src.fusion } : null,
     heldItems: (src.heldItems || []).map(h => ({ item: h.item || "", count: Number.isInteger(h.count) ? h.count : 1 })),
+    vitamins: ctrNormVitamins(src.vitamins),
     shiny: ctrNormShiny(src.shiny),
     sanityOff: src.sanityOff === true,
   };
@@ -2082,6 +2108,7 @@ function ctrLiveMemberFieldsToEdit(m) {
       item: h.item || "",
       count: Number.isInteger(h.count) ? h.count : 1,
     })),
+    vitamins: ctrNormVitamins(m.vitamins),
     shiny: ctrNormShiny(m.shiny),
     sanityOff: m.sanityOff === true,
   };
@@ -2729,6 +2756,14 @@ function ctrMemberHtml(m, i) {
         <button type="button" class="ctr-held-del" data-idx="${i}" data-heldidx="${hi}">✕</button></span>`,
     )
     .join("");
+  m.vitamins = ctrNormVitamins(m.vitamins);
+  const vitaminInputs = CTR_VITAMIN_OPTIONS.map(
+    ({ key, item, stat }) =>
+      `<label class="ctr-vitamin" title="${item} raises ${stat}; maximum 31 per Pokemon.">
+        <span>${item}</span><small>${stat}</small>
+        <input type="number" class="ctr-vitamin-count" data-idx="${i}" data-stat="${key}" value="${m.vitamins[key]}" min="0" max="31" step="1" />
+      </label>`,
+  ).join("");
   const fus = m.fusion;
   const insanity = ctrNormInsanity(m.insanity);
   const insanityInput = (label, value, slot) => {
@@ -2775,6 +2810,10 @@ function ctrMemberHtml(m, i) {
       }
     </div>
     <div class="ctr-held">Held items: ${heldRows}<button type="button" class="ctr-held-add" data-idx="${i}">＋ item</button></div>
+    <div class="ctr-vitamins">
+      <span class="ctr-vitamins-title">Vitamins</span>
+      <div class="ctr-vitamin-grid">${vitaminInputs}</div>
+    </div>
     ${ctrShinyPickerHtml(m, i)}
   </fieldset>`;
 }
@@ -3329,6 +3368,9 @@ function onCustomTrainerInput(el) {
     if (h) {
       h.count = Number(el.value) || 1;
     }
+  } else if (el.classList.contains("ctr-vitamin-count") && m) {
+    m.vitamins = ctrNormVitamins(m.vitamins);
+    m.vitamins[el.dataset.stat] = el.value === "" ? 0 : clampCtrVitaminCount(el.value);
   } else if (el.classList.contains("ctr-shiny-name") && m) {
     m.shiny = ctrNormShiny(m.shiny);
     m.shiny.name = el.value;
@@ -3505,6 +3547,10 @@ function onCustomTrainerChange(el) {
   } else if (el.classList.contains("ctr-move") && m) {
     // Blur after a manual move edit: re-render so the error line + set dropdown
     // reflect the change (the live red border already updated on input).
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-vitamin-count") && m) {
+    m.vitamins = ctrNormVitamins(m.vitamins);
     render();
     return true;
   } else if (el.classList.contains("ctr-diff")) {
@@ -5118,6 +5164,16 @@ function buildDeltas() {
         .map(h => ({ item: h.item.trim().toUpperCase(), count: h.count || 1 }));
       if (held.length > 0) {
         out.heldItems = held;
+      }
+      const vitamins = ctrNormVitamins(m.vitamins);
+      const savedVitamins = {};
+      for (const { key: vitaminKey } of CTR_VITAMIN_OPTIONS) {
+        if (vitamins[vitaminKey] > 0) {
+          savedVitamins[vitaminKey] = vitamins[vitaminKey];
+        }
+      }
+      if (Object.keys(savedVitamins).length > 0) {
+        out.vitamins = savedVitamins;
       }
       // Shiny Lab look: serialize only the non-empty categories (+ trimmed name)
       // when at least one effect is picked; otherwise omit (renders normally).

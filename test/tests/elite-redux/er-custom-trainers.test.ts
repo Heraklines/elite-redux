@@ -68,10 +68,12 @@ import { Challenges } from "#enums/challenges";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { PERMANENT_STATS } from "#enums/stat";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerVariant } from "#enums/trainer-variant";
 import { Trainer } from "#field/trainer";
-import { PokemonHeldItemModifier } from "#modifiers/modifier";
+import { BaseStatModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { BaseStatBoosterModifierType } from "#modifiers/modifier-type";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -969,6 +971,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
       abilitySlot: 0,
       fusion: null,
       heldItemKeys: [],
+      vitaminCounts: [0, 0, 0, 0, 0, 0],
       shinyLook: null,
       shinyName: "",
     };
@@ -1291,6 +1294,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
         { key: "ER_FIRE_GEM", count: 2 }, // plain ER elemental-gem key (already resolved)
         { key: "LEFTOVERS", count: 1 }, // plain fixed held item (back-compat)
       ],
+      vitaminCounts: [0, 0, 0, 0, 0, 0],
       shinyLook: null,
       shinyName: "",
     };
@@ -1307,6 +1311,41 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // berry/booster typo does too (never crashes, never a phantom item).
     const bogus: ErCustomTrainerMemberResolved = { ...member, heldItemKeys: [{ key: "NOT_A_REAL_ITEM", count: 1 }] };
     expect(erCustomTrainerHeldModifierConfigs(bogus).length).toBe(0);
+  });
+
+  it("vitamins resolve all six authored stat counts into serializable base-stat modifiers", () => {
+    const VITAMINS = {
+      VITAMIN_USER: {
+        id: 70031,
+        name: "Vitamin User",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [
+          {
+            species: SpeciesId.PIKACHU,
+            vitamins: { hp: 1, atk: 2, def: 3, spatk: 4, spdef: 40, spd: 6 },
+          },
+        ],
+      },
+    };
+    setErCustomTrainersForTesting(VITAMINS as never);
+    const member = getErCustomTrainers()[0].members[0];
+    expect(member.vitaminCounts).toEqual([1, 2, 3, 4, 31, 6]);
+
+    const configs = erCustomTrainerHeldModifierConfigs(member);
+    expect(configs.map(config => config.stackCount)).toEqual([1, 2, 3, 4, 31, 6]);
+    expect(configs.every(config => config.modifier instanceof BaseStatBoosterModifierType)).toBe(true);
+    expect(configs.every(config => config.isTransferable === false)).toBe(true);
+
+    const enemy = buildErCustomTrainerMember(member, 0, 50, false)!;
+    const modifiers = configs.map(config => {
+      const modifier = (config.modifier as BaseStatBoosterModifierType).newModifier(enemy);
+      modifier.stackCount = config.stackCount!;
+      return modifier;
+    });
+    expect(modifiers.every(modifier => modifier instanceof BaseStatModifier)).toBe(true);
+    expect(modifiers.map(modifier => modifier.getArgs().at(-1))).toEqual(PERMANENT_STATS);
+    expect(modifiers.every(modifier => modifier.type.id === "BASE_STAT_BOOSTER")).toBe(true);
   });
 
   // ---- ROUND 10 / FEATURE 7: fusion move-pool union (RLA/RLNA) --------------
@@ -1329,6 +1368,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
       abilitySlot: 0,
       fusion,
       heldItemKeys: [],
+      vitaminCounts: [0, 0, 0, 0, 0, 0],
       shinyLook: null,
       shinyName: "",
     });

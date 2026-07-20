@@ -162,8 +162,15 @@
       .ctr-form legend { color: var(--muted); font-size: 12px; padding: 0 6px; }
       .ctr-form label { font-size: 12px; margin-right: 10px; display: inline-block; }
       .ctr-member { background: var(--panel2); }
-      .ctr-member .ctr-moves, .ctr-member .ctr-fusion, .ctr-member .ctr-held { margin-top: 6px; }
+      .ctr-member .ctr-moves, .ctr-member .ctr-fusion, .ctr-member .ctr-held, .ctr-member .ctr-vitamins { margin-top: 6px; }
       .ctr-held-row { display: inline-flex; gap: 3px; align-items: center; margin-right: 8px; }
+      .ctr-vitamins { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+      .ctr-vitamins-title { color: var(--muted); font-size: 12px; }
+      .ctr-vitamin-grid { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 6px; flex: 1; max-width: 780px; }
+      .ctr-form label.ctr-vitamin { display: grid; grid-template-columns: minmax(0, 1fr) 46px; gap: 2px 5px; align-items: center; margin: 0; padding: 5px 6px; border-left: 2px solid var(--line); background: rgba(255,255,255,.025); }
+      .ctr-vitamin > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+      .ctr-vitamin > small { grid-column: 1; color: var(--muted); }
+      .ctr-vitamin input { grid-column: 2; grid-row: 1 / span 2; width: 46px; min-width: 0; padding: 4px; }
       .ctr-sprite-preview { display: inline-flex; gap: 8px; align-items: flex-end; vertical-align: bottom; margin-left: 8px; min-height: 48px; }
       .ctr-sprite-frame { background-color: var(--panel2); border: 1px solid var(--line); border-radius: 4px; image-rendering: pixelated; color: var(--muted); font-size: 12px; display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; }
       .ctr-warn { color: var(--warn, #d68910); font-size: 12px; margin-top: 8px; line-height: 1.5; }
@@ -195,6 +202,8 @@
       @media (max-width: 760px) {
         .ctr-insanity-fields label { width: 100%; display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; }
         .ctr-insanity-fields input { width: 100%; min-width: 0; }
+        .ctr-vitamins { align-items: flex-start; }
+        .ctr-vitamin-grid { grid-template-columns: repeat(2, minmax(112px, 1fr)); width: 100%; }
       }
       /* Per-member Shiny Lab effect picker + swatch approximation. */
       .ctr-shiny { margin-top: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }

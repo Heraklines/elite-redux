@@ -49,6 +49,7 @@
 //         "abilitySlot": 0,            // 0 | 1 | 2
 //         "fusion": { "species": 384, "formIndex": 0, "abilitySlot": 0 }, // optional
 //         "heldItems": [{ "item": "LEFTOVERS", "count": 1 }], // enemy-legal keys
+//         "vitamins": { "hp": 3, "atk": 5, "spd": 2 }, // each stat 0-31
 //         "slotChance": 100            // slots 2-6 only: integer 1-100 chance the slot
 //                                      // is FILLED this run (absent/slot-1 => 100). A
 //                                      // failed roll omits the slot (party shrinks).
@@ -128,10 +129,12 @@ import { Challenges } from "#enums/challenges";
 import { Gender } from "#data/gender";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
+import { PERMANENT_STATS } from "#enums/stat";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
 import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
+import { BaseStatBoosterModifierType } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import { resolveHeldItemKey } from "#system/llm-director/held-item-resolver";
 import type { HeldModifierConfig } from "#types/held-modifier-config";
@@ -251,6 +254,16 @@ export interface ErCustomTrainerHeldItem {
   count?: number;
 }
 
+/** Per-stat vitamin stack counts authored for one team member (0-31 each). */
+export interface ErCustomTrainerVitamins {
+  hp?: number;
+  atk?: number;
+  def?: number;
+  spatk?: number;
+  spdef?: number;
+  spd?: number;
+}
+
 /**
  * Per-battle ability substitutions for one authored team member. Missing slots
  * keep the species/form's normal ability. These are copied onto the spawned
@@ -283,6 +296,8 @@ export interface ErCustomTrainerMember {
   insanity?: ErCustomTrainerInsanity | null;
   fusion?: ErCustomTrainerFusion | null;
   heldItems?: readonly ErCustomTrainerHeldItem[];
+  /** HP Up, Protein, Iron, Calcium, Zinc and Carbos stack counts. */
+  vitamins?: ErCustomTrainerVitamins;
   /** Shiny Lab visual effect the mon fields with (see {@linkcode ErCustomTrainerShiny}). */
   shiny?: ErCustomTrainerShiny | null;
   /**
@@ -434,6 +449,8 @@ export interface ErCustomTrainerMemberResolved {
   } | null;
   fusion: { speciesId: number; formIndex: number; abilitySlot: number } | null;
   heldItemKeys: readonly { key: string; count: number }[];
+  /** Vitamin counts in Stat.HP, ATK, DEF, SPATK, SPDEF, SPD order. */
+  vitaminCounts: readonly [number, number, number, number, number, number];
   /** Serialized Shiny Lab look this member fields with, or `null` (renders normally). */
   shinyLook: ErShinyLabSavedLook | null;
   /** Sanitized name-prefix carried by the shiny look ("" when none). */
@@ -785,6 +802,16 @@ function resolveMember(m: ErCustomTrainerMember): ErCustomTrainerMemberResolved 
   const heldItemKeys = (m.heldItems ?? [])
     .filter(h => h && typeof h.item === "string" && h.item.length > 0)
     .map(h => ({ key: h.item, count: Number.isInteger(h.count) && (h.count as number) > 0 ? (h.count as number) : 1 }));
+  const vitaminCount = (value: unknown): number =>
+    Number.isInteger(value) ? Math.max(0, Math.min(31, value as number)) : 0;
+  const vitaminCounts = [
+    vitaminCount(m.vitamins?.hp),
+    vitaminCount(m.vitamins?.atk),
+    vitaminCount(m.vitamins?.def),
+    vitaminCount(m.vitamins?.spatk),
+    vitaminCount(m.vitamins?.spdef),
+    vitaminCount(m.vitamins?.spd),
+  ] as const;
   const shiny = resolveShinyLook(m.shiny);
   const rawInsanity = m.insanity && typeof m.insanity === "object" ? m.insanity : null;
   const resolveAbilityId = (value: unknown): AbilityId | null =>
@@ -810,6 +837,7 @@ function resolveMember(m: ErCustomTrainerMember): ErCustomTrainerMemberResolved 
     insanity,
     fusion,
     heldItemKeys,
+    vitaminCounts,
     shinyLook: shiny ? shiny.look : null,
     shinyName: shiny ? shiny.name : "",
   };
@@ -1602,13 +1630,23 @@ export function applyErCustomTrainerDisplayName(trainer: Trainer, authoredName: 
   trainer.getName = (_slot: TrainerSlot = TrainerSlot.NONE, _includeTitle = false): string => customName;
 }
 
-/** Resolve one member's authored held items to `HeldModifierConfig[]` (enemy-legal pool). */
+/** Resolve one member's authored held items and vitamins to enemy modifier configs. */
 export function erCustomTrainerHeldModifierConfigs(member: ErCustomTrainerMemberResolved): HeldModifierConfig[] {
   const out: HeldModifierConfig[] = [];
   for (const held of member.heldItemKeys) {
     const config = resolveHeldItemKey(held.key);
     if (config) {
       out.push({ ...config, stackCount: held.count });
+    }
+  }
+  for (const stat of PERMANENT_STATS) {
+    const stackCount = member.vitaminCounts[stat];
+    if (stackCount > 0) {
+      out.push({
+        modifier: new BaseStatBoosterModifierType(stat),
+        stackCount,
+        isTransferable: false,
+      });
     }
   }
   return out;
