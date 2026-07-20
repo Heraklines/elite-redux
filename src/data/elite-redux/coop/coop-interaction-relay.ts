@@ -25,6 +25,7 @@
 // LoopbackTransport, exactly like CoopBattleStreamer.
 // =============================================================================
 
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { isCoopV2ShadowActive, tapCoopV2ShadowInteractionChoice } from "#data/elite-redux/coop/authority-v2/shadow";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { setCoopMeActivePresentation } from "#data/elite-redux/coop/coop-me-pin-state";
@@ -221,6 +222,8 @@ export interface CoopInteractionChoice {
   kind?: string;
   /** Local-only durable carrier correlation. Never serialized on the legacy interactionChoice wire arm. */
   operationId?: string | undefined;
+  /** Local-only complete result material carried by an immutable V2 entry (for example market stock). */
+  resultData?: number[] | undefined;
   /** Ordered retained Mystery reward surface carried by reward actions. */
   rewardSurface?: CoopRewardSurfaceIdentity | undefined;
 }
@@ -250,6 +253,31 @@ export interface CoopInteractionRelayOptions {
   resolveFieldSlotOwner?: (fieldIndex: number) => CoopRole;
   /** Authority V2 recovery fence; buffered results remain consumable, but no new wire wait may be armed. */
   isAuthorityWaitCreationFrozen?: () => boolean;
+  /** Per-runtime Authority V2 interaction cutover predicate (avoids process-global duo-harness ambiguity). */
+  isInteractionAuthorityV2?: () => boolean;
+  /** Whether this relay endpoint is the authenticated mechanical authority. */
+  isLocalAuthority?: () => boolean;
+  /**
+   * Authenticate the sole non-mechanical V2 choice carrier. The enclosing
+   * Mystery presentation retains mechanical control; this only lets its exact
+   * watcher render the authority's quiz answer.
+   */
+  validateV2QuizAnswerObservation?: (input: {
+    readonly seq: number;
+    readonly choice: number;
+    readonly questionIndex: number;
+    readonly operationId: string;
+  }) => boolean;
+  /**
+   * Authority-owned option-pool commit. Called before a V2 reward/market surface is exposed; success means
+   * the immutable INTERACTION_COMMIT is retained and replaces the raw rewardOptions carrier.
+   */
+  publishRewardOptions?: (
+    seq: number,
+    reroll: number,
+    options: readonly CoopSerializedRewardOption[],
+    rewardSurface?: CoopRewardSurfaceIdentity,
+  ) => string | null;
 }
 
 // The owner is a human shopping / reading an ME, so the watcher's wait must comfortably
@@ -370,12 +398,27 @@ export class CoopInteractionRelay {
   private readonly isVersus: () => boolean;
   private readonly resolveFieldSlotOwner: (fieldIndex: number) => CoopRole;
   private readonly isAuthorityWaitCreationFrozen: () => boolean;
+  private readonly isInteractionAuthorityV2: () => boolean;
+  private readonly isLocalAuthority: () => boolean;
+  private readonly validateV2QuizAnswerObservation: NonNullable<
+    CoopInteractionRelayOptions["validateV2QuizAnswerObservation"]
+  >;
+  private readonly publishRewardOptions:
+    | ((
+        seq: number,
+        reroll: number,
+        options: readonly CoopSerializedRewardOption[],
+        rewardSurface?: CoopRewardSurfaceIdentity,
+      ) => string | null)
+    | null;
   private readonly offMessage: () => void;
   private readonly offState: () => void;
   /** Raw outcomes awaiting their matching journal carrier; keyed by seq + exact JSON payload. */
   private readonly rawOutcomeCredits = new Map<string, number>();
   /** Journal outcomes awaiting a later raw legacy echo, which must be dropped rather than double-applied. */
   private readonly committedOutcomeCredits = new Map<string, number>();
+  /** Exact V2 operation paired with a committed outcome until its real phase consumes it. */
+  private readonly committedOutcomeOperationIds = new Map<string, string>();
   /** Raw choices awaiting a same-delivery-turn journal carrier; keyed by seq + kind + exact payload. */
   private readonly rawChoiceCredits = new Map<string, number>();
   /** Journal choices awaiting a later raw legacy echo, which must be dropped rather than double-applied. */
@@ -404,6 +447,8 @@ export class CoopInteractionRelay {
 
   /** "seq:reroll" -> the owner's rolled reward-option list that arrived before its waiter (#633 Fix #2). */
   private readonly rewardOptionsInbox = new Map<string, CoopSerializedRewardOption[]>();
+  /** Exact V2 presentation operation paired with a buffered or just-delivered option pool. */
+  private readonly committedRewardOptionsOperationIds = new Map<string, string>();
   /** "seq:reroll" -> resolver for the in-flight {@linkcode awaitRewardOptions}. */
   private readonly rewardOptionsPending = new Map<string, (res: CoopSerializedRewardOption[] | null) => void>();
   /** Owner-side replay cache for exact option payloads. Bounded; cleared at session boundaries. */
@@ -425,9 +470,13 @@ export class CoopInteractionRelay {
     this.isVersus = opts.isVersus ?? (() => false);
     this.resolveFieldSlotOwner = opts.resolveFieldSlotOwner ?? coopOwnerOfFieldIndex;
     this.isAuthorityWaitCreationFrozen = opts.isAuthorityWaitCreationFrozen ?? (() => false);
+    this.isInteractionAuthorityV2 = opts.isInteractionAuthorityV2 ?? isCoopV2InteractionCutoverActive;
+    this.isLocalAuthority = opts.isLocalAuthority ?? (() => transport.role === "host");
+    this.validateV2QuizAnswerObservation = opts.validateV2QuizAnswerObservation ?? (() => false);
+    this.publishRewardOptions = opts.publishRewardOptions ?? null;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offState = transport.onStateChange(state => {
-      if (state !== "connected") {
+      if (state !== "connected" || this.isInteractionAuthorityV2()) {
         return;
       }
       for (const key of this.rewardOptionsPending.keys()) {
@@ -442,6 +491,14 @@ export class CoopInteractionRelay {
   /** #809: ask the partner to open its Revival Blessing picker for `fieldIndex`. */
   promptRevival(fieldIndex: number, operationId?: string): void {
     coopLog("relay", `SEND revivalPrompt fieldIndex=${fieldIndex} (#809)`);
+    if (this.isInteractionAuthorityV2()) {
+      coopLog(
+        "v2-interaction",
+        `${this.isLocalAuthority() ? "suppressed" : "refused non-authority"} raw revivalPrompt `
+          + `operation=${operationId ?? "missing"}`,
+      );
+      return;
+    }
     this.transport.send({
       t: "revivalPrompt",
       fieldIndex,
@@ -455,12 +512,20 @@ export class CoopInteractionRelay {
       return;
     }
     this.addEchoCredit(this.committedRevivalPromptCredits, operationId);
-    this.onRevivalPrompt?.(fieldIndex);
+    this.onRevivalPrompt?.(fieldIndex, operationId);
   }
 
   /** #856: ask the CATCHER partner to open its full-party keep/release picker for a wild catch. */
   promptCatchFull(pokemonName: string, speciesId: number, operationId?: string): void {
     coopLog("relay", `SEND catchFullPrompt sp=${speciesId} name=${pokemonName} (#856)`);
+    if (this.isInteractionAuthorityV2()) {
+      coopLog(
+        "v2-interaction",
+        `${this.isLocalAuthority() ? "suppressed" : "refused non-authority"} raw catchFullPrompt `
+          + `operation=${operationId ?? "missing"}`,
+      );
+      return;
+    }
     this.transport.send({
       t: "catchFullPrompt",
       pokemonName,
@@ -475,7 +540,7 @@ export class CoopInteractionRelay {
       return;
     }
     this.addEchoCredit(this.committedCatchFullPromptCredits, operationId);
-    this.onCatchFullPrompt?.(pokemonName, speciesId);
+    this.onCatchFullPrompt?.(pokemonName, speciesId, operationId);
   }
 
   /** OWNER: send one pick for interaction `seq` (`kind` is routing/logging only). */
@@ -490,14 +555,21 @@ export class CoopInteractionRelay {
     if (isCoopDebug()) {
       coopLog("relay", `SEND interactionChoice seq=${seq} kind=${kind} ${summarizeChoice({ choice, data })}`);
     }
-    this.transport.send({
-      t: "interactionChoice",
-      seq,
-      kind,
-      choice,
-      ...(data === undefined ? {} : { data }),
-      ...(rewardSurface == null ? {} : { rewardSurface }),
-    });
+    const v2ResultCarrierSuppressed = this.isInteractionAuthorityV2() && this.isLocalAuthority();
+    if (v2ResultCarrierSuppressed) {
+      coopLog("v2-interaction", `suppressed raw authority interactionChoice seq=${seq} kind=${kind}`);
+    } else {
+      // A non-authority owner's pick remains an input proposal. The authority's own resolved pick/result is
+      // carried only by the complete immutable V2 entry.
+      this.transport.send({
+        t: "interactionChoice",
+        seq,
+        kind,
+        choice,
+        ...(data === undefined ? {} : { data }),
+        ...(rewardSurface == null ? {} : { rewardSurface }),
+      });
+    }
     // #record-replay: capture this OWNER-sent interaction pick (no-op unless recording on the host).
     recordReplayInteraction({
       type: "interaction",
@@ -511,7 +583,7 @@ export class CoopInteractionRelay {
     // REPLACEMENT tap's domain - tapping them here would double-count a faint replacement). Null-guarded
     // (no-op unless a harness is active) + the tap runs under the harness's own try/catch, so a shadow fault
     // is logged, never thrown back into the relay send. Legacy owns the interaction entirely.
-    if (isCoopV2ShadowActive() && kind !== "switch" && kind !== "revival") {
+    if (isCoopV2ShadowActive() && !isCoopV2InteractionCutoverActive() && kind !== "switch" && kind !== "revival") {
       tapCoopV2ShadowInteractionChoice({
         seq,
         kind,
@@ -520,6 +592,53 @@ export class CoopInteractionRelay {
         ownerSeatId: this.transport.role === "host" ? 0 : 1,
       });
     }
+  }
+
+  /**
+   * AUTHORITY: mirror one answer inside an already-installed V2 quiz control.
+   *
+   * This is deliberately not a generic V2 interaction result carrier. It is a
+   * presentation observation bound to the exact QUIZ_ANSWER operation ID; it
+   * cannot mutate state, advance a revision, release a wait, or select the next
+   * control. The retained ME presentation/terminal entries remain the only
+   * mechanical authority.
+   */
+  sendV2QuizAnswerObservation(seq: number, choice: number, questionIndex: number, operationId: string): boolean {
+    if (
+      !this.isInteractionAuthorityV2()
+      || !this.isLocalAuthority()
+      || !Number.isSafeInteger(seq)
+      || seq < 0
+      || !Number.isSafeInteger(choice)
+      || choice < 0
+      || choice >= 64
+      || !Number.isSafeInteger(questionIndex)
+      || questionIndex < 0
+      || questionIndex >= 16
+      || operationId.length === 0
+    ) {
+      return false;
+    }
+    recordCoopUiRelayCarrier(
+      "interactionChoice",
+      `seq=${seq} kind=quizAns choice=${choice} cosmeticOperationId=${operationId}`,
+    );
+    this.transport.send({
+      t: "interactionChoice",
+      seq,
+      kind: "quizAns",
+      choice,
+      data: [questionIndex],
+      cosmeticOperationId: operationId,
+    });
+    recordReplayInteraction({
+      type: "interaction",
+      seq,
+      kind: "quizAns",
+      choice,
+      data: [questionIndex],
+    });
+    return true;
   }
 
   /**
@@ -536,9 +655,10 @@ export class CoopInteractionRelay {
     data?: number[],
     operationId?: string | undefined,
     rewardSurface?: CoopRewardSurfaceIdentity,
+    resultData?: number[] | undefined,
   ): void {
     if (!COOP_DURABLE_CHOICE_ECHO_KINDS.has(kind)) {
-      this.deliverInteractionChoice(seq, { choice, data, kind, operationId, rewardSurface });
+      this.deliverInteractionChoice(seq, { choice, data, kind, operationId, rewardSurface, resultData });
       return;
     }
     const key = this.choiceCreditKey(seq, kind, choice, data, rewardSurface);
@@ -546,7 +666,7 @@ export class CoopInteractionRelay {
       return;
     }
     this.addEchoCredit(this.committedChoiceCredits, key);
-    this.deliverInteractionChoice(seq, { choice, data, kind, operationId, rewardSurface });
+    this.deliverInteractionChoice(seq, { choice, data, kind, operationId, rewardSurface, resultData });
   }
 
   /**
@@ -665,6 +785,10 @@ export class CoopInteractionRelay {
     if (isCoopDebug()) {
       coopLog("relay", `SEND interactionOutcome seq=${seq} kind=${kind} ${summarizeOutcome(outcome)}`);
     }
+    if (this.isInteractionAuthorityV2() && this.isLocalAuthority()) {
+      coopLog("v2-interaction", `suppressed raw authority interactionOutcome seq=${seq} kind=${kind}`);
+      return;
+    }
     this.transport.send({ t: "interactionOutcome", seq, kind, outcome });
   }
 
@@ -673,13 +797,24 @@ export class CoopInteractionRelay {
    * legacy frame may arrive before or after the envelope; one credit on either side suppresses that echo,
    * so the phase observes exactly one presentation without caring which carrier won the race.
    */
-  materializeCommittedInteractionOutcome(seq: number, outcome: CoopInteractionOutcome): void {
+  materializeCommittedInteractionOutcome(seq: number, outcome: CoopInteractionOutcome, operationId?: string): void {
     const key = `${seq}:${JSON.stringify(outcome)}`;
     if (this.consumeEchoCredit(this.rawOutcomeCredits, key)) {
       return;
     }
+    if (operationId != null && operationId.length > 0) {
+      this.committedOutcomeOperationIds.set(key, operationId);
+    }
     this.addEchoCredit(this.committedOutcomeCredits, key);
     this.deliverInteractionOutcome(seq, outcome, "JOURNAL");
+  }
+
+  /** Consume the immutable operation address paired with one exact outcome delivery. */
+  consumeCommittedInteractionOutcomeOperationId(seq: number, outcome: CoopInteractionOutcome): string | null {
+    const key = `${seq}:${JSON.stringify(outcome)}`;
+    const operationId = this.committedOutcomeOperationIds.get(key) ?? null;
+    this.committedOutcomeOperationIds.delete(key);
+    return operationId;
   }
 
   /**
@@ -759,7 +894,7 @@ export class CoopInteractionRelay {
     reroll: number,
     options: CoopSerializedRewardOption[],
     rewardSurface?: CoopRewardSurfaceIdentity,
-  ): void {
+  ): string | null {
     const key = rewardOptionsKey(seq, reroll, rewardSurface);
     this.sentRewardOptions.set(key, options);
     if (this.sentRewardOptions.size > 64) {
@@ -774,6 +909,19 @@ export class CoopInteractionRelay {
         `SEND rewardOptions seq=${seq} reroll=${reroll} count=${options.length} ids=[${options.map(o => o.id).join(",")}]`,
       );
     }
+    if (this.isInteractionAuthorityV2()) {
+      if (!this.isLocalAuthority()) {
+        coopWarn("v2-interaction", `refused non-authority rewardOptions key=${key}`);
+        return null;
+      }
+      const operationId = this.publishRewardOptions?.(seq, reroll, options, rewardSurface) ?? null;
+      if (operationId == null) {
+        coopWarn("v2-interaction", `could not retain authoritative rewardOptions key=${key}`);
+        return null;
+      }
+      coopLog("v2-interaction", `suppressed raw rewardOptions key=${key}; immutable entry retained`);
+      return operationId;
+    }
     this.transport.send({
       t: "rewardOptions",
       seq,
@@ -781,6 +929,7 @@ export class CoopInteractionRelay {
       options,
       ...(rewardSurface == null ? {} : { rewardSurface }),
     });
+    return null;
   }
 
   /**
@@ -848,14 +997,57 @@ export class CoopInteractionRelay {
       };
       this.rewardOptionsPending.set(key, finish);
       cancelTimer = this.schedule(() => finish(null), timeoutMs);
-      coopLog("relay", `SEND requestRewardOptions key=${key} (authoritative replay)`);
-      this.transport.send({
-        t: "requestRewardOptions",
-        seq,
-        reroll,
-        ...(rewardSurface == null ? {} : { rewardSurface }),
-      });
+      if (!this.isInteractionAuthorityV2()) {
+        coopLog("relay", `SEND requestRewardOptions key=${key} (authoritative replay)`);
+        this.transport.send({
+          t: "requestRewardOptions",
+          seq,
+          reroll,
+          ...(rewardSurface == null ? {} : { rewardSurface }),
+        });
+      }
     });
+  }
+
+  /** Install one immutable V2 option-pool presentation through the same exact waiter/inbox seam. */
+  materializeCommittedRewardOptions(
+    seq: number,
+    reroll: number,
+    options: CoopSerializedRewardOption[],
+    rewardSurface?: CoopRewardSurfaceIdentity,
+    operationId?: string,
+  ): void {
+    const key = rewardOptionsKey(seq, reroll, rewardSurface);
+    const copy = structuredClone(options);
+    if (operationId != null && operationId.length > 0) {
+      this.committedRewardOptionsOperationIds.set(key, operationId);
+    }
+    const waiter = this.rewardOptionsPending.get(key);
+    if (waiter != null) {
+      waiter(copy);
+      return;
+    }
+    this.rewardOptionsInbox.set(key, copy);
+    try {
+      this.onRewardOptionsBuffered?.(key);
+    } catch {
+      /* notification is advisory; immutable material remains buffered */
+    }
+  }
+
+  /**
+   * Consume the immutable presentation address paired with the option pool just adopted by a real phase.
+   * Raw legacy pools deliberately return null; a V2 projector requires the exact operation ID.
+   */
+  consumeCommittedRewardOptionsOperationId(
+    seq: number,
+    reroll: number,
+    rewardSurface?: CoopRewardSurfaceIdentity,
+  ): string | null {
+    const key = rewardOptionsKey(seq, reroll, rewardSurface);
+    const operationId = this.committedRewardOptionsOperationIds.get(key) ?? null;
+    this.committedRewardOptionsOperationIds.delete(key);
+    return operationId;
   }
 
   /**
@@ -1022,6 +1214,7 @@ export class CoopInteractionRelay {
     this.outcomeInbox.clear();
     this.rawOutcomeCredits.clear();
     this.committedOutcomeCredits.clear();
+    this.committedOutcomeOperationIds.clear();
     this.rawChoiceCredits.clear();
     this.committedChoiceCredits.clear();
     this.rawRevivalPromptCredits.clear();
@@ -1030,6 +1223,7 @@ export class CoopInteractionRelay {
     this.committedCatchFullPromptCredits.clear();
     this.rewardOptionsPending.clear();
     this.rewardOptionsInbox.clear();
+    this.committedRewardOptionsOperationIds.clear();
     this.sentRewardOptions.clear();
     this.cancelledSeqs.clear();
   }
@@ -1060,6 +1254,7 @@ export class CoopInteractionRelay {
     this.outcomeInbox.clear();
     this.rawOutcomeCredits.clear();
     this.committedOutcomeCredits.clear();
+    this.committedOutcomeOperationIds.clear();
     this.rawChoiceCredits.clear();
     this.committedChoiceCredits.clear();
     this.rawRevivalPromptCredits.clear();
@@ -1067,6 +1262,7 @@ export class CoopInteractionRelay {
     this.rawCatchFullPromptCredits.clear();
     this.committedCatchFullPromptCredits.clear();
     this.rewardOptionsInbox.clear();
+    this.committedRewardOptionsOperationIds.clear();
     this.sentRewardOptions.clear();
     // A seq sticky-cancelled in the PRIOR epoch must not keep resolving null in the NEW epoch (seqs reuse
     // low counters), so clear the cancel marks alongside the buffers.
@@ -1077,21 +1273,24 @@ export class CoopInteractionRelay {
    * #809: fired when the partner asks THIS client to pick a Revival Blessing target for its
    * own mon. Wired by the runtime (queues CoopGuestRevivalPhase); null in engine-free tests.
    */
-  onRevivalPrompt: ((fieldIndex: number) => void) | null = null;
+  onRevivalPrompt: ((fieldIndex: number, operationId?: string) => void) | null = null;
 
   /** Host-forwarded per-move picker presentation; runtime wires the authoritative guest opener. */
-  onLearnMoveForward: ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveForward" }>) => void) | null = null;
+  onLearnMoveForward:
+    | ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveForward" }>, operationId?: string) => void)
+    | null = null;
 
   /** Host-forwarded batch picker presentation; runtime wires the authoritative guest opener. */
-  onLearnMoveBatchForward: ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveBatchForward" }>) => void) | null =
-    null;
+  onLearnMoveBatchForward:
+    | ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveBatchForward" }>, operationId?: string) => void)
+    | null = null;
 
   /**
    * #856: fired when the partner (the sole-engine host) asks THIS client - the CATCHER - to drive the
    * full-party keep/release picker for a wild catch it threw. Wired by the runtime (queues
    * CoopGuestCatchFullPhase on the guest); null in engine-free tests.
    */
-  onCatchFullPrompt: ((pokemonName: string, speciesId: number) => void) | null = null;
+  onCatchFullPrompt: ((pokemonName: string, speciesId: number, operationId?: string) => void) | null = null;
 
   /**
    * #829 malicious-peer hardening: whether a received `interactionChoice` at `seq` is a FORGED
@@ -1165,6 +1364,10 @@ export class CoopInteractionRelay {
 
   private handle(msg: CoopMessage): void {
     if (msg.t === "revivalPrompt") {
+      if (this.isInteractionAuthorityV2() && !this.isLocalAuthority()) {
+        coopLog("v2-interaction", "dropped raw revivalPrompt; awaiting immutable V2 entry");
+        return;
+      }
       coopLog("relay", `RECV revivalPrompt fieldIndex=${msg.fieldIndex} (#809)`);
       if (msg.operationId !== undefined) {
         if (this.consumeEchoCredit(this.committedRevivalPromptCredits, msg.operationId)) {
@@ -1172,10 +1375,14 @@ export class CoopInteractionRelay {
         }
         this.addEchoCredit(this.rawRevivalPromptCredits, msg.operationId);
       }
-      this.onRevivalPrompt?.(msg.fieldIndex);
+      this.onRevivalPrompt?.(msg.fieldIndex, msg.operationId);
       return;
     }
     if (msg.t === "catchFullPrompt") {
+      if (this.isInteractionAuthorityV2() && !this.isLocalAuthority()) {
+        coopLog("v2-interaction", "dropped raw catchFullPrompt; awaiting immutable V2 entry");
+        return;
+      }
       coopLog("relay", `RECV catchFullPrompt sp=${msg.speciesId} name=${msg.pokemonName} (#856)`);
       if (msg.operationId !== undefined) {
         if (this.consumeEchoCredit(this.committedCatchFullPromptCredits, msg.operationId)) {
@@ -1183,10 +1390,14 @@ export class CoopInteractionRelay {
         }
         this.addEchoCredit(this.rawCatchFullPromptCredits, msg.operationId);
       }
-      this.onCatchFullPrompt?.(msg.pokemonName, msg.speciesId);
+      this.onCatchFullPrompt?.(msg.pokemonName, msg.speciesId, msg.operationId);
       return;
     }
     if (msg.t === "interactionOutcome") {
+      if (this.isInteractionAuthorityV2() && !this.isLocalAuthority()) {
+        coopLog("v2-interaction", `dropped raw interactionOutcome seq=${msg.seq}; awaiting immutable V2 entry`);
+        return;
+      }
       const key = `${msg.seq}:${JSON.stringify(msg.outcome)}`;
       if (this.consumeEchoCredit(this.committedOutcomeCredits, key)) {
         return;
@@ -1196,6 +1407,10 @@ export class CoopInteractionRelay {
       return;
     }
     if (msg.t === "rewardOptions") {
+      if (this.isInteractionAuthorityV2() && !this.isLocalAuthority()) {
+        coopLog("v2-interaction", "dropped raw rewardOptions; awaiting immutable V2 entry");
+        return;
+      }
       if (msg.rewardSurface != null && !isWireRewardSurfaceIdentity(msg.rewardSurface)) {
         coopWarn("relay", "RECV rewardOptions -> invalid ordered reward surface");
         return;
@@ -1230,6 +1445,10 @@ export class CoopInteractionRelay {
       return;
     }
     if (msg.t === "requestRewardOptions") {
+      if (this.isInteractionAuthorityV2()) {
+        coopLog("v2-interaction", "dropped legacy requestRewardOptions under V2 authority");
+        return;
+      }
       if (msg.rewardSurface != null && !isWireRewardSurfaceIdentity(msg.rewardSurface)) {
         coopWarn("relay", "RECV requestRewardOptions -> invalid ordered reward surface");
         return;
@@ -1252,6 +1471,26 @@ export class CoopInteractionRelay {
     }
     if (msg.t !== "interactionChoice") {
       return;
+    }
+    if (this.isInteractionAuthorityV2() && !this.isLocalAuthority()) {
+      const questionIndex =
+        msg.kind === "quizAns" && msg.data?.length === 1 && Number.isSafeInteger(msg.data[0]) ? msg.data[0] : null;
+      const acceptsObservation =
+        msg.cosmeticOperationId != null
+        && questionIndex != null
+        && Number.isSafeInteger(msg.choice)
+        && msg.choice >= 0
+        && msg.choice < 64
+        && this.validateV2QuizAnswerObservation({
+          seq: msg.seq,
+          choice: msg.choice,
+          questionIndex,
+          operationId: msg.cosmeticOperationId,
+        });
+      if (!acceptsObservation) {
+        coopLog("v2-interaction", `dropped raw interactionChoice seq=${msg.seq}; awaiting immutable V2 entry`);
+        return;
+      }
     }
     if (msg.rewardSurface != null && !isWireRewardSurfaceIdentity(msg.rewardSurface)) {
       coopWarn("relay", "RECV interactionChoice -> invalid ordered reward surface");
@@ -1283,6 +1522,7 @@ export class CoopInteractionRelay {
       choice: msg.choice,
       data: msg.data,
       kind: msg.kind,
+      operationId: msg.cosmeticOperationId,
       rewardSurface: msg.rewardSurface,
     });
   }
@@ -1325,11 +1565,14 @@ export class CoopInteractionRelay {
     // Forward-only presentations are consumed by persistent runtime openers rather than a phase-local
     // outcome waiter. Routing them here lets raw and durable carriers share the relay's echo suppression.
     if (outcome.k === "learnMoveForward" && this.onLearnMoveForward != null) {
-      this.onLearnMoveForward(outcome);
+      this.onLearnMoveForward(outcome, this.consumeCommittedInteractionOutcomeOperationId(seq, outcome) ?? undefined);
       return;
     }
     if (outcome.k === "learnMoveBatchForward" && this.onLearnMoveBatchForward != null) {
-      this.onLearnMoveBatchForward(outcome);
+      this.onLearnMoveBatchForward(
+        outcome,
+        this.consumeCommittedInteractionOutcomeOperationId(seq, outcome) ?? undefined,
+      );
       return;
     }
     const waiter = this.outcomePending.get(seq);

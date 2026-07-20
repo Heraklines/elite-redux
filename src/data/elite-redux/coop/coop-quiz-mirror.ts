@@ -26,6 +26,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   commitMeOwnerIntent,
@@ -52,10 +53,11 @@ import {
   COOP_ME_PUMP_SEQ_BASE,
   COOP_ME_QUIZ_SEQ_BASE,
   COOP_QUIZ_CHOICE_KINDS,
+  coopQuizAnswerSeq,
 } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome, CoopQuizWireQuestion } from "#data/elite-redux/coop/coop-transport";
 
-export { COOP_ME_QUIZ_SEQ_BASE };
+export { COOP_ME_QUIZ_SEQ_BASE, coopQuizAnswerSeq };
 
 /**
  * Same ME sub-prompt seq base the pump / party / secondary relays key off
@@ -78,17 +80,6 @@ const COOP_QUIZ_WAIT_MS = 1_200_000;
  * terminal seq family, so a quiz answer can never FIFO-collide with the session stream, the
  * party / secondary sub-picks, or the ME terminal.
  */
-
-/**
- * The relay seq for the answer to question `index` of the ME pinned on `counter`. PER-QUESTION
- * seqs (not one shared seq) make answer delivery ORDER-PROOF and collision-free: a stale answer for
- * an earlier question can never be mistaken for the current one, and each question's answer sits on
- * its own key. `counter % 2048` and `index % 16` bound the whole band well below the 9_000_000
- * terminal seq family (max offset 2048 * 16 = 32_768 -> 8_532_768 < 9_000_000).
- */
-export function coopQuizAnswerSeq(counter: number, index: number): number {
-  return COOP_ME_QUIZ_SEQ_BASE + (counter % 2048) * 16 + (index % 16);
-}
 
 /**
  * Which side of a mirrored quiz THIS client is on:
@@ -144,6 +135,13 @@ export function coopQuizPublishAnswer(index: number, choice: number): void {
   });
   if (operationId == null && isCoopMeOperationEnabled()) {
     failCoopSharedSession(`Quiz answer ${index} could not enter authoritative control`);
+    return;
+  }
+  const v2Cutover = isCoopV2InteractionCutoverActive(getCoopRuntime()?.durability ?? null);
+  if (localRole === "host" && v2Cutover) {
+    if (operationId == null || relay?.sendV2QuizAnswerObservation(seq, choice, index, operationId) !== true) {
+      failCoopSharedSession(`Quiz answer ${index} could not reach the exact V2 presentation watcher`);
+    }
     return;
   }
   // Guest-owned answers are proposals and must reach the host. Host-owned answers are journal-led;

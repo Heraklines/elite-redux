@@ -59,6 +59,15 @@ export const COOP_COLOSSEUM_SEQ_BASE = 7_600_000;
 export const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
 /** Mystery-encounter quiz answers: `BASE + (counter % 2048) * 16 + (index % 16)` (bounded). */
 export const COOP_ME_QUIZ_SEQ_BASE = 8_500_000;
+
+/**
+ * Address one question inside the currently pinned Mystery quiz. Keeping this
+ * derivation beside the registered band lets both the UI relay and the
+ * Authority V2 identity validator use the exact same collision-bounded address.
+ */
+export function coopQuizAnswerSeq(counter: number, index: number): number {
+  return COOP_ME_QUIZ_SEQ_BASE + (counter % 2048) * 16 + (index % 16);
+}
 /** Mystery-encounter terminal (LEAVE / battle-handoff): `BASE + interactionCounter`. */
 export const COOP_ME_TERM_SEQ_BASE = 9_000_000;
 /**

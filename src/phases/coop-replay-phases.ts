@@ -1365,17 +1365,23 @@ export class CoopFinalizeTurnPhase extends Phase {
         const statedControl = this.authorityNextControl;
         if (
           statedControl !== undefined
-          && statedControl !== null
-          && (statedControl.kind !== "COMMAND_FRONTIER"
-            || statedControl.epoch !== resolution.epoch
-            || statedControl.wave !== resolution.wave
-            || statedControl.turn !== resolution.turn + 1)
+          && (statedControl === null
+            || (statedControl.kind === "COMMAND_FRONTIER"
+              ? statedControl.epoch !== resolution.epoch
+                || statedControl.wave !== resolution.wave
+                || statedControl.turn !== resolution.turn + 1
+              : statedControl.kind !== "AWAIT_SUCCESSOR"
+                || statedControl.afterOperationId
+                  !== `TURN/e${resolution.epoch}/w${resolution.wave}/t${resolution.turn}`
+                || statedControl.epoch !== resolution.epoch
+                || statedControl.wave !== resolution.wave
+                || statedControl.turn !== resolution.turn))
         ) {
           this.failModernTurnCommit(streamer, `Turn ${this.turn} carried an invalid Authority V2 successor control.`);
           return;
         }
         const legacyWaveEnding = coopWaveAdvanceSignaledFor(resolution.wave) || coopHasPendingWaveAdvance();
-        const v2SharedBoundary = statedControl === null;
+        const v2SharedBoundary = statedControl?.kind === "AWAIT_SUCCESSOR";
         const waveEnding = statedControl === undefined ? legacyWaveEnding : v2SharedBoundary;
         const meBattleWon = !waveEnding && coopMeHandoffBattleWon();
         const expectation =
@@ -1682,7 +1688,7 @@ export class CoopFinalizeTurnPhase extends Phase {
       // freeze). Detect the ME-battle win DIRECTLY (spawned ME battle, all enemies fainted per the host's
       // authoritative checkpoint) and run the ME victory tail instead of looping into a new command.
       const meBattleWon = !waveEnding && coopMeHandoffBattleWon();
-      const v2NoImmediateCommand = this.authorityNextControl === null;
+      const v2NoImmediateCommand = this.authorityNextControl?.kind === "AWAIT_SUCCESSOR";
       const v2ImmediateCommand = this.authorityNextControl?.kind === "COMMAND_FRONTIER";
       if (
         v2NoImmediateCommand

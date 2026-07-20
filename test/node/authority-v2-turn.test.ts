@@ -184,10 +184,21 @@ describe("buildTurnCommitEntry - shape + digest", () => {
     expect(buildCommitted({ subsumes: [7, 9] }).subsumes).toEqual([7, 9]);
   });
 
-  it("states no COMMAND across a non-command boundary", () => {
-    const entry = buildCommitted({ nextCommandFrontier: null });
-    expect(entry.nextControl).toBeNull();
-    expect(turnCommandControlId({ ...entry, revision: 1 })).toBeNull();
+  it("states an explicit ordered wait across a non-command boundary", () => {
+    const entry = buildCommitted({ capture: CAPTURE_WITH_COMPANIONS, nextCommandFrontier: null });
+    expect(entry.nextControl).toEqual({
+      kind: "AWAIT_SUCCESSOR",
+      afterOperationId: "turn-op-1",
+      epoch: 1,
+      wave: 3,
+      turn: 5,
+      allowedKinds: ["REPLACEMENT_COMMIT", "INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      expectedOperationId: null,
+    });
+    expect(
+      turnCommandControlId({ ...entry, revision: 1 }),
+      "an ordered successor wait is not a command-request lease",
+    ).toBeNull();
   });
 });
 

@@ -25,9 +25,11 @@
 // =============================================================================
 
 import type { CoopCommandControlTarget, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
+import type { CoopOperationKind } from "#data/elite-redux/coop/coop-operation-envelope";
+import type { CoopOperationSurfaceClass } from "#data/elite-redux/coop/coop-operation-surface-registry";
 
-/** A control that can actually be projected: any non-null {@linkcode CoopNextControl}. */
-export type ProjectableControl = NonNullable<CoopNextControl>;
+/** Every committed {@linkcode CoopNextControl} is projectable; nullable recovery frontier zero is separate. */
+export type ProjectableControl = CoopNextControl;
 
 /** The discriminant of a projectable control. */
 export type ControlKind = ProjectableControl["kind"];
@@ -58,17 +60,31 @@ export function controlIdOf(control: ProjectableControl): string {
           .map(target => `f${target.fieldIndex}:s${target.ownerSeatId}:p${target.pokemonId}`)
           .join(",")}`
       );
-    case "REPLACEMENT":
-      return (
-        `REPLACEMENT/e${control.epoch}/w${control.wave}/t${control.turn}`
-        + `/o${control.occurrence}/f${control.fieldIndex}/s${control.ownerSeatId}`
-      );
     case "REWARD":
       return `REWARD/${encodeURIComponent(control.operationId)}/s${control.ownerSeatId}`;
     case "BIOME":
       return `BIOME/${encodeURIComponent(control.operationId)}/s${control.ownerSeatId}`;
     case "MYSTERY":
       return `MYSTERY/${encodeURIComponent(control.operationId)}/s${control.ownerSeatId}`;
+    case "SHARED_INTERACTION":
+      return (
+        `SHARED_INTERACTION/${encodeURIComponent(control.surfaceClass)}`
+        + `/${encodeURIComponent(control.operationKind)}`
+        + `/${encodeURIComponent(control.operationId)}/s${control.ownerSeatId}`
+        + `/results:${canonicalInteractionKinds(control.successor.operationKinds).join(",")}`
+        + `/resultIds:${
+          control.successor.operationIds == null
+            ? "*"
+            : canonicalOpaqueIds(control.successor.operationIds).map(encodeURIComponent).join(",")
+        }`
+      );
+    case "AWAIT_SUCCESSOR":
+      return (
+        `AWAIT_SUCCESSOR/${encodeURIComponent(control.afterOperationId)}`
+        + `/e${control.epoch}/w${control.wave}/t${control.turn}`
+        + `/${canonicalSuccessorKinds(control.allowedKinds).join(",")}`
+        + `/next:${control.expectedOperationId == null ? "*" : encodeURIComponent(control.expectedOperationId)}`
+      );
     case "TERMINAL":
       return `TERMINAL/${encodeURIComponent(control.terminalId)}`;
   }
@@ -79,11 +95,11 @@ export function controlIdOf(control: ProjectableControl): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Structural equality of two stated controls (either may be `null`). Because
+ * Structural equality of two stated controls (recovery frontier zero may be `null`). Because
  * {@linkcode controlIdOf} is a complete encoding, address equality IS structural
  * equality for two non-null controls - so this is exact, not a heuristic.
  */
-export function controlsEqual(a: CoopNextControl, b: CoopNextControl): boolean {
+export function controlsEqual(a: CoopNextControl | null, b: CoopNextControl | null): boolean {
   if (a == null || b == null) {
     return a == null && b == null;
   }
@@ -100,6 +116,92 @@ export function sameControlAddress(a: ProjectableControl, b: ProjectableControl)
   return controlIdOf(a) === controlIdOf(b);
 }
 
+/** Whether the immediate next mechanical entry satisfies an explicit address-constrained successor wait. */
+export function successorWaitAllows(
+  wait: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>,
+  predecessorOperationId: string,
+  nextKind: AuthorityEntryKind,
+  nextOperationId: string,
+  sessionEpoch: number,
+): boolean {
+  return (
+    wait.afterOperationId === predecessorOperationId
+    && wait.epoch === sessionEpoch
+    && wait.allowedKinds.includes(nextKind)
+    && (wait.expectedOperationId == null || wait.expectedOperationId === nextOperationId)
+  );
+}
+
+/** Extract the closed operation subtype carried by the live V2 interaction-envelope material. */
+export function interactionOperationKindOfEntry(entry: {
+  readonly kind: AuthorityEntryKind;
+  readonly material: { readonly payload: unknown };
+}): V2InteractionOperationKind | null {
+  if (
+    entry.kind !== "INTERACTION_COMMIT"
+    || entry.material.payload == null
+    || typeof entry.material.payload !== "object"
+  ) {
+    return null;
+  }
+  const wrapper = entry.material.payload as Record<string, unknown>;
+  const envelope = wrapper.envelope;
+  if (envelope == null || typeof envelope !== "object") {
+    return null;
+  }
+  const operation = (envelope as Record<string, unknown>).pendingOperation;
+  if (operation == null || typeof operation !== "object") {
+    return null;
+  }
+  const kind = (operation as Record<string, unknown>).kind;
+  return typeof kind === "string" && kind in V2_INTERACTION_OPERATION_SURFACES
+    ? (kind as V2InteractionOperationKind)
+    : null;
+}
+
+/**
+ * One total predecessor-control -> immediate-entry admission rule, shared by the authority log and the
+ * replica control ledger. No executable control can be silently skipped by an unrelated later entry.
+ */
+export function controlAllowsSuccessorEntry(
+  control: ProjectableControl,
+  predecessorOperationId: string,
+  next: {
+    readonly kind: AuthorityEntryKind;
+    readonly operationId: string;
+    readonly context: { readonly sessionEpoch: number };
+    readonly material: { readonly payload: unknown };
+  },
+): boolean {
+  switch (control.kind) {
+    case "AWAIT_SUCCESSOR":
+      return successorWaitAllows(
+        control,
+        predecessorOperationId,
+        next.kind,
+        next.operationId,
+        next.context.sessionEpoch,
+      );
+    case "COMMAND_FRONTIER":
+      return next.kind === "TURN_COMMIT";
+    case "SHARED_INTERACTION": {
+      const resultKind = interactionOperationKindOfEntry(next);
+      return (
+        next.kind === "INTERACTION_COMMIT"
+        && resultKind != null
+        && control.successor.operationKinds.includes(resultKind)
+        && (control.successor.operationIds == null || control.successor.operationIds.includes(next.operationId))
+      );
+    }
+    case "REWARD":
+    case "BIOME":
+    case "MYSTERY":
+      return next.kind === "INTERACTION_COMMIT";
+    case "TERMINAL":
+      return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Ownership
 // ---------------------------------------------------------------------------
@@ -111,7 +213,7 @@ export function sameControlAddress(a: ProjectableControl, b: ProjectableControl)
  * rules) - the projector compares this against `ctx.localSeatId`.
  */
 export function controlOwnerSeatIds(control: ProjectableControl): readonly number[] {
-  if (control.kind === "TERMINAL") {
+  if (control.kind === "TERMINAL" || control.kind === "AWAIT_SUCCESSOR") {
     return [];
   }
   if (control.kind === "COMMAND_FRONTIER") {
@@ -231,21 +333,174 @@ function commandFrontierIssues(control: Record<string, unknown>): string[] {
   return issues;
 }
 
-function replacementIssues(control: Record<string, unknown>): string[] {
-  const issues: string[] = [];
-  addIssue(issues, "epoch", isPositiveInt(control.epoch));
-  addIssue(issues, "wave", isPositiveInt(control.wave));
-  addIssue(issues, "turn", isPositiveInt(control.turn));
-  addIssue(issues, "occurrence", isNonNegativeInt(control.occurrence));
-  addIssue(issues, "fieldIndex", isNonNegativeInt(control.fieldIndex));
-  addIssue(issues, "ownerSeatId", isNonNegativeInt(control.ownerSeatId));
-  return issues;
-}
-
 function interactionIssues(control: Record<string, unknown>): string[] {
   const issues: string[] = [];
   addIssue(issues, "operationId", isNonEmptyString(control.operationId));
   addIssue(issues, "ownerSeatId", isNonNegativeInt(control.ownerSeatId));
+  return issues;
+}
+
+type V2InteractionSurface = Exclude<CoopOperationSurfaceClass, "op:faintSwitch" | "op:wave">;
+
+const V2_INTERACTION_SURFACES: Readonly<Record<V2InteractionSurface, true>> = {
+  "op:ability": true,
+  "op:bargain": true,
+  "op:biome": true,
+  "op:catchFull": true,
+  "op:colosseum": true,
+  "op:learnMove": true,
+  "op:me": true,
+  "op:revival": true,
+  "op:reward": true,
+  "op:stormglass": true,
+};
+
+type V2InteractionOperationKind = Exclude<CoopOperationKind, "FAINT_SWITCH" | "WAVE_ADVANCE">;
+
+const V2_INTERACTION_OPERATION_SURFACES: Readonly<Record<V2InteractionOperationKind, readonly V2InteractionSurface[]>> =
+  {
+    ABILITY_PRESENT: ["op:ability"],
+    ABILITY_PICK: ["op:ability"],
+    BARGAIN_PRESENT: ["op:bargain"],
+    BARGAIN: ["op:bargain"],
+    BIOME_PICK: ["op:biome"],
+    CATCH_FULL: ["op:catchFull"],
+    COLO_PICK: ["op:colosseum"],
+    CROSSROADS_PICK: ["op:biome"],
+    LEARN_MOVE: ["op:learnMove"],
+    LEARN_MOVE_BATCH: ["op:learnMove"],
+    ME_BUTTON: ["op:me"],
+    ME_PICK: ["op:me"],
+    ME_PRESENT: ["op:me"],
+    ME_SUB: ["op:me"],
+    ME_TERMINAL: ["op:me", "op:reward", "op:biome"],
+    QUIZ_ANSWER: ["op:me"],
+    REVIVAL: ["op:revival"],
+    REWARD: ["op:reward"],
+    REWARD_PRESENT: ["op:reward"],
+    SHOP_BUY: ["op:reward"],
+    SHOP_PRESENT: ["op:reward"],
+    STORMGLASS_PRESENT: ["op:stormglass"],
+    STORMGLASS: ["op:stormglass"],
+  };
+
+function sharedInteractionIssues(control: Record<string, unknown>): string[] {
+  const issues = interactionIssues(control);
+  if (typeof control.surfaceClass !== "string" || !(control.surfaceClass in V2_INTERACTION_SURFACES)) {
+    issues.push("surfaceClass");
+  }
+  if (typeof control.operationKind !== "string" || !(control.operationKind in V2_INTERACTION_OPERATION_SURFACES)) {
+    issues.push("operationKind");
+  } else if (
+    typeof control.surfaceClass === "string"
+    && control.surfaceClass in V2_INTERACTION_SURFACES
+    && !V2_INTERACTION_OPERATION_SURFACES[control.operationKind as V2InteractionOperationKind].includes(
+      control.surfaceClass as V2InteractionSurface,
+    )
+  ) {
+    issues.push("surfaceClass/operationKind");
+  }
+  if (!isPlainObject(control.successor)) {
+    issues.push("successor");
+    return issues;
+  }
+  if (!Array.isArray(control.successor.operationKinds) || control.successor.operationKinds.length === 0) {
+    issues.push("successor.operationKinds");
+  } else {
+    const seenKinds = new Set<string>();
+    for (const [index, kind] of control.successor.operationKinds.entries()) {
+      if (typeof kind !== "string" || !(kind in V2_INTERACTION_OPERATION_SURFACES)) {
+        issues.push(`successor.operationKinds[${index}]`);
+      } else if (seenKinds.has(kind)) {
+        issues.push(`successor.operationKinds[${index}]: duplicate`);
+      }
+      if (typeof kind === "string") {
+        seenKinds.add(kind);
+      }
+    }
+  }
+  if (control.successor.operationIds !== null) {
+    if (!Array.isArray(control.successor.operationIds) || control.successor.operationIds.length === 0) {
+      issues.push("successor.operationIds");
+    } else {
+      const seenIds = new Set<string>();
+      for (const [index, operationId] of control.successor.operationIds.entries()) {
+        if (!isNonEmptyString(operationId)) {
+          issues.push(`successor.operationIds[${index}]`);
+        } else if (seenIds.has(operationId)) {
+          issues.push(`successor.operationIds[${index}]: duplicate`);
+        }
+        if (typeof operationId === "string") {
+          seenIds.add(operationId);
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+const AUTHORITY_ENTRY_KINDS = [
+  "TURN_COMMIT",
+  "REPLACEMENT_COMMIT",
+  "INTERACTION_COMMIT",
+  "CONTROL_COMMIT",
+  "WAVE_ADVANCE",
+  "TERMINAL_COMMIT",
+] as const;
+
+type AuthorityEntryKind = (typeof AUTHORITY_ENTRY_KINDS)[number];
+
+const AUTHORITY_ENTRY_KIND_ORDER: Readonly<Record<AuthorityEntryKind, number>> = {
+  TURN_COMMIT: 0,
+  REPLACEMENT_COMMIT: 1,
+  INTERACTION_COMMIT: 2,
+  CONTROL_COMMIT: 3,
+  WAVE_ADVANCE: 4,
+  TERMINAL_COMMIT: 5,
+};
+
+function isAuthorityEntryKind(value: unknown): value is AuthorityEntryKind {
+  return typeof value === "string" && value in AUTHORITY_ENTRY_KIND_ORDER;
+}
+
+function canonicalSuccessorKinds(kinds: readonly AuthorityEntryKind[]): readonly AuthorityEntryKind[] {
+  return [...new Set(kinds)].sort((a, b) => AUTHORITY_ENTRY_KIND_ORDER[a] - AUTHORITY_ENTRY_KIND_ORDER[b]);
+}
+
+function canonicalInteractionKinds(
+  kinds: readonly V2InteractionOperationKind[],
+): readonly V2InteractionOperationKind[] {
+  return [...new Set(kinds)].sort();
+}
+
+function canonicalOpaqueIds(ids: readonly string[]): readonly string[] {
+  return [...new Set(ids)].sort();
+}
+
+function successorWaitIssues(control: Record<string, unknown>): string[] {
+  const issues: string[] = [];
+  addIssue(issues, "afterOperationId", isNonEmptyString(control.afterOperationId));
+  addIssue(issues, "epoch", isPositiveInt(control.epoch));
+  addIssue(issues, "wave", isNonNegativeInt(control.wave));
+  addIssue(issues, "turn", isNonNegativeInt(control.turn));
+  if (!Array.isArray(control.allowedKinds) || control.allowedKinds.length === 0) {
+    issues.push("allowedKinds");
+  } else {
+    const seen = new Set<string>();
+    for (const [index, kind] of control.allowedKinds.entries()) {
+      if (!isAuthorityEntryKind(kind)) {
+        issues.push(`allowedKinds[${index}]`);
+      } else if (seen.has(kind)) {
+        issues.push(`allowedKinds[${index}]: duplicate`);
+      }
+      if (typeof kind === "string") {
+        seen.add(kind);
+      }
+    }
+  }
+  if (control.expectedOperationId !== null && !isNonEmptyString(control.expectedOperationId)) {
+    issues.push("expectedOperationId");
+  }
   return issues;
 }
 
@@ -266,12 +521,14 @@ export function nextControlIssues(control: unknown): string[] {
   switch (control.kind) {
     case "COMMAND_FRONTIER":
       return commandFrontierIssues(control);
-    case "REPLACEMENT":
-      return replacementIssues(control);
     case "REWARD":
     case "BIOME":
     case "MYSTERY":
       return interactionIssues(control);
+    case "SHARED_INTERACTION":
+      return sharedInteractionIssues(control);
+    case "AWAIT_SUCCESSOR":
+      return successorWaitIssues(control);
     case "TERMINAL":
       return terminalIssues(control);
     default:

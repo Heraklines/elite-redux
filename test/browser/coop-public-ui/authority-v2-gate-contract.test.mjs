@@ -41,11 +41,12 @@ test("every real-engine shard qualifies Authority V2 instead of hiding behind le
   assert.match(gate, /COOP_AUTHORITY_V2_TURN:\s*"on"/u);
   assert.match(gate, /COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
   assert.match(gate, /COOP_AUTHORITY_V2_WAVE:\s*"on"/u);
+  assert.match(gate, /COOP_AUTHORITY_V2_INTERACTION:\s*"on"/u);
   assert.match(gate, /COOP_AUTHORITY_V2_RECOVERY:\s*"on"/u);
   assert.match(gate, /node scripts\/run-coop-gate\.mjs/u);
   assert.doesNotMatch(
     gate,
-    /COOP_AUTHORITY_V2_(?:TURN|REPLACEMENT|WAVE):\s*"(?:off|false|0)"/u,
+    /COOP_AUTHORITY_V2_(?:TURN|REPLACEMENT|WAVE|INTERACTION|RECOVERY):\s*"(?:off|false|0)"/u,
     "the exhaustive gameplay matrix may never downgrade the production architecture",
   );
 });
@@ -55,14 +56,17 @@ test("public-browser campaign and staging bundle qualify the same V2 cutover", (
   assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_TURN:\s*"on"/u);
   assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
   assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_WAVE:\s*"on"/u);
+  assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_INTERACTION:\s*"on"/u);
   assert.match(browserBuild, /VITE_COOP_AUTHORITY_V2_RECOVERY:\s*"on"/u);
   assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_TURN:\s*"on"/u);
   assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_REPLACEMENT:\s*"on"/u);
   assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_WAVE:\s*"on"/u);
+  assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_INTERACTION:\s*"on"/u);
   assert.match(campaignWorkflow, /VITE_COOP_AUTHORITY_V2_RECOVERY:\s*"on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_TURN=on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_REPLACEMENT=on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_WAVE=on"/u);
+  assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_INTERACTION=on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_RECOVERY=on"/u);
 });
 
@@ -70,7 +74,10 @@ test("wave/terminal cutover carries full settled state and retires every legacy 
   assert.match(waveAdapter, /interface CoopWaveTerminalAuthorityCarrierV2[\s\S]*authoritativeState: unknown/u);
   assert.match(waveAdapter, /interface CoopWaveTerminalAuthorityCarrierV2[\s\S]*transition: unknown/u);
   assert.match(coopRuntime, /entry\.kind === "WAVE_ADVANCE" \|\| entry\.kind === "TERMINAL_COMMIT"/u);
-  assert.match(coopRuntime, /return surfaces\.wave \? applyCoopV2WaveEntry\(runtime, entry\) : null/u);
+  assert.match(
+    coopRuntime,
+    /if \(entry\.kind === "WAVE_ADVANCE" \|\| entry\.kind === "TERMINAL_COMMIT"\)[\s\S]*?applyCoopV2WaveEntry\(runtime, entry\)[\s\S]*?markCoopV2ControlMaterialApplied\(runtime, entry\)/u,
+  );
   assert.match(coopRuntime, /if \(isCoopV2WaveCutoverActive\(\)\)[\s\S]*commitCoopV2SettledWaveAdvance/u);
   assert.match(
     coopRuntime,

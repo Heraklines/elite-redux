@@ -4,11 +4,14 @@ import { globalScene } from "#app/global-scene";
 import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
 import { SubstituteTag } from "#data/battler-tags";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
-import { coopHostAwaitWildCatchFullSlot } from "#data/elite-redux/coop/coop-catch-full";
+import { coopHostPrepareWildCatchFullDecision } from "#data/elite-redux/coop/coop-catch-full";
 import {
   broadcastCoopWaveResolved,
+  failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
+  getCoopRuntime,
+  notifyCoopV2InteractionSurfaceReady,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopAttributeNewMon, setCoopCatchThrowerHint } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
@@ -43,6 +46,8 @@ import i18next from "i18next";
 // TODO: Refactor and split up to allow for overriding capture chance
 export class AttemptCapturePhase extends PokemonPhase {
   public readonly phaseName = "AttemptCapturePhase";
+  public coopV2ControlOperationId: string | null = null;
+  private readonly coopOwningRuntime = getCoopRuntime();
   private pokeballType: PokeballType;
   private pokeball: Phaser.GameObjects.Sprite;
   private originalY: number;
@@ -355,7 +360,7 @@ export class AttemptCapturePhase extends PokemonPhase {
           globalScene.clearEnemyHeldItemModifiers();
           pokemon.leaveField(true, true, true);
         };
-        const addToParty = (slotIndex?: number) => {
+        const addToParty = (slotIndex?: number, afterMutation?: () => boolean) => {
           const newPokemon = pokemon.addToParty(this.pokeballType, slotIndex);
           const modifiers = globalScene.findModifiers(m => m instanceof PokemonHeldItemModifier, false);
           if (globalScene.getPlayerParty().filter(p => p.isShiny()).length === PLAYER_PARTY_MAX_SIZE) {
@@ -364,6 +369,10 @@ export class AttemptCapturePhase extends PokemonPhase {
           Promise.all(modifiers.map(m => globalScene.addModifier(m, true))).then(() => {
             globalScene.updateModifiers(true);
             removePokemon();
+            if (afterMutation != null && !afterMutation()) {
+              failCoopSharedSession("Catch-full result could not retain its complete post-add authority state.");
+              return;
+            }
             if (newPokemon) {
               newPokemon.leaveField(true, true, false);
               newPokemon.loadAssets().then(end);
@@ -404,27 +413,43 @@ export class AttemptCapturePhase extends PokemonPhase {
             && getCoopController()?.role === "host"
             && getCoopInteractionRelay() != null
           ) {
-            void coopHostAwaitWildCatchFullSlot(pokemon.getNameToRender(), pokemon.species.getRootSpeciesId(true)).then(
-              slot => {
-                const releaseParty = globalScene.getPlayerParty();
-                if (slot != null && slot >= 0 && slot < releaseParty.length) {
-                  // The catcher picked a slot to REPLACE. Free it exactly as PartyUiHandler.doRelease does
-                  // (strip its held-item modifiers, splice it out, record the release achievement, destroy),
-                  // then addToParty into the now-freed slot - the freed half lets coopAttributeNewMon
-                  // attribute the caught mon. This is the solo RELEASE flow's release-then-add, driven by
-                  // the relayed slot instead of the host's (undrivable-for-a-guest-catch) local UI.
-                  void globalScene.removePartyMemberModifiers(slot);
-                  const released = releaseParty.splice(slot, 1)[0];
-                  erRecordAchievementRelease(released.species.speciesId);
-                  released.destroy();
-                  addToParty(slot);
-                } else {
-                  // The catcher cancelled / timed out / disconnected: the caught mon is NOT kept.
-                  removePokemon();
-                  end();
-                }
+            void coopHostPrepareWildCatchFullDecision(
+              pokemon.getNameToRender(),
+              pokemon.species.getRootSpeciesId(true),
+              operationId => {
+                this.coopV2ControlOperationId = operationId;
+                const mode = globalScene.ui.setMode(UiMode.PARTY, PartyUiMode.SELECT, -1, () => {});
+                Promise.resolve(mode).then(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
               },
-            );
+            ).then(prepared => {
+              if (prepared == null) {
+                failCoopSharedSession("Catch-full decision could not open an authoritative transaction.");
+                return;
+              }
+              void globalScene.ui.setMode(UiMode.MESSAGE);
+              const slot = prepared.slot;
+              const releaseParty = globalScene.getPlayerParty();
+              if (slot != null && slot >= 0 && slot < releaseParty.length) {
+                // The catcher picked a slot to REPLACE. Free it exactly as PartyUiHandler.doRelease does
+                // (strip its held-item modifiers, splice it out, record the release achievement, destroy),
+                // then addToParty into the now-freed slot - the freed half lets coopAttributeNewMon
+                // attribute the caught mon. This is the solo RELEASE flow's release-then-add, driven by
+                // the relayed slot instead of the host's (undrivable-for-a-guest-catch) local UI.
+                void globalScene.removePartyMemberModifiers(slot);
+                const released = releaseParty.splice(slot, 1)[0];
+                erRecordAchievementRelease(released.species.speciesId);
+                released.destroy();
+                addToParty(slot, prepared.commitAfterApply);
+              } else {
+                // The catcher cancelled / timed out / disconnected: the caught mon is NOT kept.
+                removePokemon();
+                if (!prepared.commitAfterApply()) {
+                  failCoopSharedSession("Catch-full decline could not retain its complete authority state.");
+                  return;
+                }
+                end();
+              }
+            });
             return;
           }
           if (partyFull) {

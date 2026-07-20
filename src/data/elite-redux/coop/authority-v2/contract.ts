@@ -36,7 +36,8 @@
 //       presentationSettled - optional local rendering completed. NEVER a
 //                             retirement requirement for mechanical liveness.
 //     RETIREMENT: an entry retires when the required replica has reached
-//     admitted + materialApplied + (controlInstalled where nextControl != null).
+//     admitted + materialApplied + controlInstalled. Every mechanical entry has
+//     a successor; AWAIT_SUCCESSOR is the explicit installed ordered-wait state.
 //     A later entry may supersede an earlier one ONLY by log order under
 //     the rule: if revision N+1 is admitted, it either explicitly subsumes N
 //     or N has already reached its required stage.
@@ -54,6 +55,8 @@
 // =============================================================================
 
 import type { BattleScene } from "#app/battle-scene";
+import type { CoopOperationKind } from "#data/elite-redux/coop/coop-operation-envelope";
+import type { CoopOperationSurfaceClass } from "#data/elite-redux/coop/coop-operation-surface-registry";
 import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 // ---------------------------------------------------------------------------
@@ -136,6 +139,7 @@ export type CoopAuthorityEntryKind =
   | "TURN_COMMIT"
   | "REPLACEMENT_COMMIT"
   | "INTERACTION_COMMIT"
+  | "CONTROL_COMMIT"
   | "WAVE_ADVANCE"
   | "TERMINAL_COMMIT";
 
@@ -170,7 +174,7 @@ export interface CoopAuthorityReceipt {
   readonly revision: number;
   readonly operationId: string;
   readonly stage: CoopAckStage;
-  /** Present exactly at controlInstalled when nextControl != null. */
+  /** Present exactly at controlInstalled. Every mechanical entry has a stated successor control. */
   readonly controlId?: string;
 }
 
@@ -181,8 +185,18 @@ export interface CoopAuthorityReceipt {
  * duplicates/gaps, requests tails, and reports receipts.
  */
 export interface CoopAuthorityLog {
-  /** AUTHORITY: commit the next entry (assigns the next global revision). */
-  commit(entry: Omit<CoopAuthorityEntry, "revision">): CoopAuthorityEntry;
+  /**
+   * AUTHORITY: commit the next entry (assigns the next global revision).
+   *
+   * A live engine may reserve the exact local successor claim before the entry
+   * becomes visible on the wire. Returning `null` rejects the commit without
+   * consuming a revision; the returned rollback is used if publication cannot
+   * be finalized after reservation.
+   */
+  commit(
+    entry: Omit<CoopAuthorityEntry, "revision">,
+    prepare?: (entry: CoopAuthorityEntry) => (() => void) | null,
+  ): CoopAuthorityEntry;
   /** AUTHORITY: receipt intake; returns whether the entry newly retired. */
   acceptReceipt(receipt: CoopAuthorityReceipt): boolean;
   /** AUTHORITY: retained-but-unretired entries in revision order. */
@@ -197,8 +211,11 @@ export interface CoopAuthorityLog {
   appliedThrough(): number;
   /** REPLICA: highest revision mechanically complete through its stated successor control. */
   controlInstalledThrough(): number;
-  /** BOTH: adopt a proven snapshot high-water (recovery). */
-  adoptFrontier(revision: number): void;
+  /** BOTH: adopt a proven snapshot high-water and, when supplied, its exact terminal control address. */
+  adoptFrontier(
+    revision: number,
+    terminal?: { readonly operationId: string; readonly nextControl: CoopNextControl },
+  ): void;
   /** BOTH: dispose every timer/lease this log owns. */
   dispose(reason: string): void;
 }
@@ -242,20 +259,56 @@ export type CoopNextControl =
       /** Every living player battler that must reach its real CommandPhase. */
       readonly commands: readonly CoopCommandControlTarget[];
     }
-  | {
-      readonly kind: "REPLACEMENT";
-      readonly epoch: number;
-      readonly wave: number;
-      readonly turn: number;
-      readonly occurrence: number;
-      readonly fieldIndex: number;
-      readonly ownerSeatId: number;
-    }
   | { readonly kind: "REWARD"; readonly operationId: string; readonly ownerSeatId: number }
   | { readonly kind: "BIOME"; readonly operationId: string; readonly ownerSeatId: number }
   | { readonly kind: "MYSTERY"; readonly operationId: string; readonly ownerSeatId: number }
-  | { readonly kind: "TERMINAL"; readonly terminalId: string }
-  | null;
+  | {
+      /**
+       * Exact shared-input surface authorized after immutable interaction material applies. The operation
+       * class selects a closed projector registration; operationId and owner make the address exact.
+       */
+      readonly kind: "SHARED_INTERACTION";
+      readonly operationId: string;
+      readonly ownerSeatId: number;
+      readonly surfaceClass: Exclude<CoopOperationSurfaceClass, "op:faintSwitch" | "op:wave">;
+      /** Exact UI/projection subtype; a broad surface class is never sufficient control proof. */
+      readonly operationKind: Exclude<CoopOperationKind, "FAINT_SWITCH" | "WAVE_ADVANCE">;
+      /**
+       * Closed mechanical-result constraint authored with this control. This is deliberately independent
+       * from `operationKind`: the phase proving a Mystery catch-full picker is CATCH_FULL, while the next
+       * mechanical result is an ME presentation/terminal after its non-authoritative choice proposal.
+       */
+      readonly successor: {
+        readonly operationKinds: readonly Exclude<CoopOperationKind, "FAINT_SWITCH" | "WAVE_ADVANCE">[];
+        /**
+         * Exact permitted operation addresses when they are predictable at presentation construction.
+         * Null is an explicit address wildcard over the closed `operationKinds`, never a local successor.
+         */
+        readonly operationIds: readonly string[] | null;
+      };
+    }
+  | {
+      /**
+       * No UI is authorized by this entry. The replica is parked at this exact source address until the
+       * immediately-following ordered entry has one of the stated kinds. This is an explicit sequencing
+       * contract, never a nullable/locally-derived tail and never an executable input surface.
+       */
+      readonly kind: "AWAIT_SUCCESSOR";
+      readonly afterOperationId: string;
+      readonly epoch: number;
+      readonly wave: number;
+      readonly turn: number;
+      readonly allowedKinds: readonly CoopAuthorityEntryKind[];
+      /** Exact next operation when predictable (for example a chained faint); null is an explicit wildcard. */
+      readonly expectedOperationId: string | null;
+    }
+  | { readonly kind: "TERMINAL"; readonly terminalId: string };
+
+/**
+ * Recovery alone may describe the empty revision-zero frontier, which has no predecessor entry and therefore
+ * no successor control. A committed mechanical entry must always use {@linkcode CoopNextControl}.
+ */
+export type CoopRecoveryNextControl = CoopNextControl | null;
 
 export type CoopControlInstallResult =
   | { readonly kind: "installed"; readonly controlId: string }

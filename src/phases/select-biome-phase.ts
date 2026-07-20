@@ -11,6 +11,7 @@ import {
   type CoopBiomeRelayResult,
   captureCoopBiomeOperationBinding,
   commitAuthoritativeBiomeTransition,
+  commitBiomeAuthoritativeResult,
   commitBiomeOwnerIntent,
   coopAuthoritativeBiomeTransitionOperationId,
   coopBiomeCommitRequired,
@@ -40,6 +41,7 @@ import {
   getCoopUiMirror,
   notifyCoopWaveContinuationSurfaceReady,
   resolveCoopRetainedWaveContinuationIdentity,
+  settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_PICK_CHOICE_KINDS, COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
@@ -123,6 +125,8 @@ interface CoopBiomeContinuationRecovery {
 
 export class SelectBiomePhase extends BattlePhase {
   public readonly phaseName = "SelectBiomePhase";
+  /** Exact Authority V2 operation whose public map handler this phase proves. */
+  public coopV2ControlOperationId: string | null = null;
   /** Immutable wave that created this biome transition; never re-read from a speculative next Battle. */
   private coopSourceWave: number | null;
   /**
@@ -166,8 +170,12 @@ export class SelectBiomePhase extends BattlePhase {
   private coopRouteRecoveryShown = false;
   private coopCommitRecovery: CoopBiomeContinuationRecovery | null = null;
   private coopCommitRecoveryToken = 0;
+  /** The local transition terminal is applied once even when immutable-result publication must retry. */
+  private coopAppliedTerminal: { readonly destination: BiomeId; readonly operationId?: string } | null = null;
   /** Runtime/durability selectors captured before any rendezvous, timer, or Phaser UI callback can resume. */
   private coopBiomeOperationBinding: CoopBiomeOperationBinding | null = null;
+  /** Exact runtime retained across UI/network callbacks in the two-engine topology. */
+  private readonly coopOwningRuntime = getCoopRuntime();
 
   constructor(coopSourceWave: number | null = null) {
     super();
@@ -480,6 +488,12 @@ export class SelectBiomePhase extends BattlePhase {
       this.coopAdvancePinned = controller.interactionCounter();
     }
     const pinned = this.coopAdvancePinned;
+    this.coopV2ControlOperationId = coopBiomeOperationId(
+      "BIOME_PICK",
+      COOP_BIOME_PICK_SEQ_BASE + pinned,
+      pinned,
+      this.requireCoopBiomeOperationBinding(),
+    );
     const owns = spoofed || controller.isLocalOwnerAtCounter(pinned);
     // Co-op (#864): record ownership + the node set so the single terminal funnel (setNextBiomeAndEnd)
     // relays whatever biome the owner ends up travelling to - the picker pick OR a fallback.
@@ -787,7 +801,12 @@ export class SelectBiomePhase extends BattlePhase {
       coopWarn("reward", "deterministic biome watcher map teardown failed (continuing exact commit)", error);
     }
     this.coopDeterministicDestination = payload.biomeId as BiomeId;
-    if (this.applyNextBiomeAndEnd(payload.biomeId as BiomeId)) {
+    if (
+      this.applyNextBiomeAndEnd(payload.biomeId as BiomeId, {
+        operationId: receipt.operationId,
+        authoritativeProjection: true,
+      })
+    ) {
       releaseCoopBiomeCommitReceipt(receipt.operationId, this.requireCoopBiomeOperationBinding());
     }
   }
@@ -887,7 +906,16 @@ export class SelectBiomePhase extends BattlePhase {
     } catch (e) {
       coopWarn("reward", "biome pick WATCHER map teardown failed (continuing committed transition)", e);
     }
-    const applied = this.setNextBiomeAndEnd(biome);
+    const applied = this.setNextBiomeAndEnd(
+      biome,
+      decision.adopt
+        ? {
+            operationId: decision.operationId ?? operationId,
+            authorityCommit: decision.requiresAuthorityCommit === true,
+            authoritativeProjection: decision.authoritativeProjection === true,
+          }
+        : undefined,
+    );
     if (committed && applied) {
       releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
     }
@@ -982,7 +1010,8 @@ export class SelectBiomePhase extends BattlePhase {
       );
       const canonical = commit?.payload as CoopBiomePickPayload | undefined;
       if (
-        canonical == null
+        commit == null
+        || canonical == null
         || canonical.nodeIndex !== -1
         || canonical.sourceBiomeId !== globalScene.arena.biomeId
         || canonical.nextWave !== sourceWave + 1
@@ -991,7 +1020,10 @@ export class SelectBiomePhase extends BattlePhase {
         return;
       }
       this.coopDeterministicDestination = canonical.biomeId as BiomeId;
-      this.applyNextBiomeAndEnd(canonical.biomeId as BiomeId);
+      this.applyNextBiomeAndEnd(canonical.biomeId as BiomeId, {
+        operationId: commit.operationId,
+        authorityCommit: commit.revision === 0,
+      });
       return;
     }
     this.setNextBiomeAndEnd(nextBiome);
@@ -1084,12 +1116,24 @@ export class SelectBiomePhase extends BattlePhase {
       return;
     }
     this.coopDeterministicDestination = payload.biomeId as BiomeId;
-    if (this.applyNextBiomeAndEnd(payload.biomeId as BiomeId)) {
+    if (
+      this.applyNextBiomeAndEnd(payload.biomeId as BiomeId, {
+        operationId: receipt.operationId,
+        authoritativeProjection: true,
+      })
+    ) {
       releaseCoopBiomeCommitReceipt(receipt.operationId, this.requireCoopBiomeOperationBinding());
     }
   }
 
-  private setNextBiomeAndEnd(nextBiome: BiomeId): boolean {
+  private setNextBiomeAndEnd(
+    nextBiome: BiomeId,
+    completion?: {
+      readonly operationId: string;
+      readonly authorityCommit?: boolean;
+      readonly authoritativeProjection?: boolean;
+    },
+  ): boolean {
     if (this.coopCommitPending) {
       return false;
     }
@@ -1100,7 +1144,7 @@ export class SelectBiomePhase extends BattlePhase {
     // onSelect died uncaught and the phase never ended). Solo needs none of the relay/commit
     // machinery - apply the biome directly, exactly the pre-P33 behavior.
     if (!globalScene.gameMode.isCoop) {
-      return this.applyNextBiomeAndEnd(nextBiome);
+      return this.applyNextBiomeAndEnd(nextBiome, completion);
     }
     // Runtime loss during a genuine shared run is categorically different from solo. Applying this
     // choice locally would create a one-sided biome transition and defer the visible failure until a
@@ -1127,11 +1171,24 @@ export class SelectBiomePhase extends BattlePhase {
     const authoritativeNextBiome = relay.destination;
     const role = this.requireCoopBiomeOperationRole();
     if (operationId != null && coopBiomeCommitRequired(role, this.requireCoopBiomeOperationBinding())) {
+      const generation = coopSessionGeneration();
+      const wave = this.requireCoopSourceWave();
+      void globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.boundaryStillLive(generation, wave));
+      settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
       this.coopCommitPending = true;
       void this.finishGuestOwnedBiomeAfterCommit(operationId, authoritativeNextBiome);
       return false;
     }
-    return this.applyNextBiomeAndEnd(authoritativeNextBiome);
+    return this.applyNextBiomeAndEnd(
+      authoritativeNextBiome,
+      completion
+        ?? (operationId == null
+          ? undefined
+          : {
+              operationId,
+              authorityCommit: relay.requiresAuthorityCommit,
+            }),
+    );
   }
 
   private async finishGuestOwnedBiomeAfterCommit(operationId: string, nextBiome: BiomeId): Promise<void> {
@@ -1156,7 +1213,12 @@ export class SelectBiomePhase extends BattlePhase {
       return;
     }
     this.coopCommitPending = false;
-    if (this.applyNextBiomeAndEnd(nextBiome)) {
+    if (
+      this.applyNextBiomeAndEnd(nextBiome, {
+        operationId,
+        authoritativeProjection: true,
+      })
+    ) {
       releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
     }
   }
@@ -1299,8 +1361,39 @@ export class SelectBiomePhase extends BattlePhase {
   }
 
   /** Apply the transition only after authority is established (or immediately for host/solo/legacy). */
-  private applyNextBiomeAndEnd(nextBiome: BiomeId): boolean {
+  private applyNextBiomeAndEnd(
+    nextBiome: BiomeId,
+    completion?: {
+      readonly operationId: string;
+      readonly authorityCommit?: boolean;
+      readonly authoritativeProjection?: boolean;
+    },
+  ): boolean {
     try {
+      if (
+        this.coopAppliedTerminal != null
+        && (this.coopAppliedTerminal.destination !== nextBiome
+          || this.coopAppliedTerminal.operationId !== completion?.operationId)
+      ) {
+        throw new Error(
+          `Biome terminal conflict existing=${this.coopAppliedTerminal.destination}:${this.coopAppliedTerminal.operationId ?? "none"} next=${nextBiome}:${completion?.operationId ?? "none"}`,
+        );
+      }
+      if (this.coopAppliedTerminal != null) {
+        if (completion?.operationId != null) {
+          settleCoopV2InteractionOperation(completion.operationId, this.coopOwningRuntime);
+        }
+        if (
+          completion?.authorityCommit === true
+          && commitBiomeAuthoritativeResult(completion.operationId, undefined, this.requireCoopBiomeOperationBinding())
+            == null
+        ) {
+          this.parkBiomeCommitRecovery(() => this.applyNextBiomeAndEnd(nextBiome, completion));
+          return false;
+        }
+        this.end();
+        return true;
+      }
       const gameMode = globalScene.gameMode;
       const currentWaveIndex = this.requireCoopSourceWave();
       const nextWaveIndex = currentWaveIndex + 1;
@@ -1312,7 +1405,7 @@ export class SelectBiomePhase extends BattlePhase {
         clearMapTravelTarget(nextBiome);
       }
 
-      if (isCoopAuthoritativeGuestGated()) {
+      if (completion?.authoritativeProjection === true || isCoopAuthoritativeGuestGated()) {
         // The renderer owns no between-biome run mutation. The committed BIOME_PICK already armed the exact
         // transition permit; queue only its presentation tail and wait for the next complete host carrier.
         globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome, currentWaveIndex);
@@ -1325,6 +1418,13 @@ export class SelectBiomePhase extends BattlePhase {
           if (this.coopChained) {
             clearCoopBiomeInteractionStart();
           }
+        }
+        this.coopAppliedTerminal =
+          completion == null
+            ? { destination: nextBiome }
+            : { destination: nextBiome, operationId: completion.operationId };
+        if (completion?.operationId != null) {
+          settleCoopV2InteractionOperation(completion.operationId, this.coopOwningRuntime);
         }
         this.end();
         return true;
@@ -1378,6 +1478,21 @@ export class SelectBiomePhase extends BattlePhase {
           clearCoopBiomeInteractionStart();
         }
       }
+      this.coopAppliedTerminal =
+        completion == null
+          ? { destination: nextBiome }
+          : { destination: nextBiome, operationId: completion.operationId };
+      if (completion?.operationId != null) {
+        settleCoopV2InteractionOperation(completion.operationId, this.coopOwningRuntime);
+      }
+      if (
+        completion?.authorityCommit === true
+        && commitBiomeAuthoritativeResult(completion.operationId, undefined, this.requireCoopBiomeOperationBinding())
+          == null
+      ) {
+        this.parkBiomeCommitRecovery(() => this.applyNextBiomeAndEnd(nextBiome, completion));
+        return false;
+      }
       this.end();
       return true;
     } catch (error) {
@@ -1403,9 +1518,10 @@ export class SelectBiomePhase extends BattlePhase {
     readonly operationId: string | null;
     readonly destination: BiomeId;
     readonly rejected: boolean;
+    readonly requiresAuthorityCommit: boolean;
   } {
     if (!this.coopIsBiomeOwner || this.coopAdvancePinned < 0 || this.coopBiomeRelaySent) {
-      return { operationId: null, destination: nextBiome, rejected: false };
+      return { operationId: null, destination: nextBiome, rejected: false, requiresAuthorityCommit: false };
     }
     this.coopBiomeRelaySent = true;
     const idx = this.coopRevealed?.findIndex(n => n.biome === nextBiome) ?? -1;
@@ -1463,7 +1579,7 @@ export class SelectBiomePhase extends BattlePhase {
       this.requireCoopBiomeOperationBinding(),
     );
     if (isCoopBiomeOperationEnabled() && commit == null) {
-      return { operationId: null, destination: nextBiome, rejected: true };
+      return { operationId: null, destination: nextBiome, rejected: true, requiresAuthorityCommit: false };
     }
     if (coopBiomeCommitRequired(role, this.requireCoopBiomeOperationBinding())) {
       const generation = coopSessionGeneration();
@@ -1484,6 +1600,7 @@ export class SelectBiomePhase extends BattlePhase {
       operationId: commit?.operationId ?? operationId,
       destination: (canonical?.biomeId ?? nextBiome) as BiomeId,
       rejected: false,
+      requiresAuthorityCommit: role === "host" && commit?.revision === 0,
     };
   }
 }

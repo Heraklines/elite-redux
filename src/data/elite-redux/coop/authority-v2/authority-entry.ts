@@ -70,15 +70,24 @@ const AUTHORITY_ENTRY_KINDS: ReadonlySet<string> = new Set([
   "TURN_COMMIT",
   "REPLACEMENT_COMMIT",
   "INTERACTION_COMMIT",
+  "CONTROL_COMMIT",
   "WAVE_ADVANCE",
   "TERMINAL_COMMIT",
 ]);
 
-/** Whether a value is a structurally valid CoopNextControl (null is valid - a terminal step has no successor). */
-export function isValidNextControl(control: unknown): control is CoopNextControl {
-  if (control === null) {
-    return true;
+/**
+ * A shared terminal is itself a mechanical boundary, never an incidental successor of another entry kind.
+ * Conversely, TERMINAL_COMMIT must close the graph with TERMINAL.
+ */
+export function isAuthorityEntryControlCompatible(kind: unknown, control: unknown): boolean {
+  if (typeof kind !== "string" || !AUTHORITY_ENTRY_KINDS.has(kind) || !isCanonicalNextControl(control)) {
+    return false;
   }
+  return kind === "TERMINAL_COMMIT" ? control.kind === "TERMINAL" : control.kind !== "TERMINAL";
+}
+
+/** Whether a value is a structurally valid, non-null CoopNextControl. */
+export function isValidNextControl(control: unknown): control is CoopNextControl {
   return isCanonicalNextControl(control);
 }
 
@@ -122,6 +131,7 @@ export function isValidAuthorityEntry(entry: unknown): entry is CoopAuthorityEnt
     && hasValidDigest(candidate as { material?: { digest?: unknown } })
     && isValidFrameContext(candidate.context)
     && isValidNextControl(candidate.nextControl)
+    && isAuthorityEntryControlCompatible(candidate.kind, candidate.nextControl)
     && Array.isArray(candidate.subsumes)
     && candidate.subsumes.every(isValidRevision)
   );

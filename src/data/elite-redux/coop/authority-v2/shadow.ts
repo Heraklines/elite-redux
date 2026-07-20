@@ -43,6 +43,10 @@
 
 import type { BattleScene } from "#app/battle-scene";
 import {
+  buildCommandOpenEntry,
+  type CoopCommandOpenMaterialV2,
+} from "#data/elite-redux/coop/authority-v2/adapters/control-open";
+import {
   buildReplacementCommitEntry,
   type ReplacementAuthorityCarrier,
   type ReplacementProposal,
@@ -127,6 +131,7 @@ import {
   type CoopInboundFrameResultV2,
   validateInboundFrame,
 } from "#data/elite-redux/coop/authority-v2/protocol-validator";
+import type { CoopRecoveryBundle } from "#data/elite-redux/coop/authority-v2/recovery-bundle";
 import {
   CoopRecoveryChannelV2,
   type CoopRecoveryChannelV2Diagnostics,
@@ -193,6 +198,13 @@ export interface CoopV2ShadowIdentity {
   readonly peerBindings: readonly CoopAuthorityPeerBindingV2[];
 }
 
+/** Read-only head of the authority's one global mechanical log. */
+export interface CoopV2AuthorityFrontier {
+  readonly revision: number;
+  readonly operationId: string;
+  readonly nextControl: CoopNextControl;
+}
+
 /**
  * The LIVE replica seams (cutover surface 1). When injected, the harness's replica pipeline routes a
  * CUTOVER-kind delivered entry through these REAL engine verbs instead of its in-memory shadow ones. The
@@ -213,6 +225,19 @@ export interface CoopV2LiveReplicaSeams {
    * `null` from projectControl must not sign a shadow controlInstalled receipt.
    */
   ownsControl(control: NonNullable<CoopNextControl>): boolean;
+  /**
+   * Reserve the authority-local ledger claim before an owned entry is visible on the wire. `null` refuses
+   * the commit without consuming a revision. The returned closure restores the exact prior ledger if the
+   * log cannot finalize publication.
+   */
+  prepareAuthorityEntry?(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): (() => void) | null;
+  /** Retry/prove the authority's real successor after the immutable entry has been published. */
+  authorityEntryCommitted?(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): void;
+  /**
+   * Notify the runtime-owned control ledger after the ordered log newly admits an entry and before its
+   * materializer runs. This consumes the exact prior UI/wait lease; false is an authority invariant fault.
+   */
+  admitEntry?(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean;
   /**
    * Release an exact local interaction surface that prevents the currently-admitted predecessor from
    * reaching materialApplied. This is invoked only for an authenticated later entry that the ordered log
@@ -244,6 +269,8 @@ export interface CoopV2LiveRecoverySeams {
   captureMaterial(ctx: CoopRuntimeContext): CoopAuthoritativeMaterial | null;
   /** Replica: transactionally apply + checksum-verify the complete material image. */
   applyMaterial(ctx: CoopRuntimeContext, material: CoopAuthoritativeMaterial): boolean | Promise<boolean>;
+  /** Adopt the validated recovery frontier into the ordinary runtime control ledger. */
+  prepareControl(ctx: CoopRuntimeContext, bundle: CoopRecoveryBundle): boolean;
   /** Replica: prove the host-stated successor on the real engine, never in the shadow ledger. */
   projectControl(ctx: CoopRuntimeContext, control: NonNullable<CoopNextControl>): CoopControlInstallResult;
   /** Enter the retained shared terminal synchronously on any recovery invariant failure. */
@@ -590,6 +617,7 @@ export class CoopAuthorityV2Shadow {
             send: frame => this.sendFrame(frame),
             captureMaterial: ctx => liveRecovery.captureMaterial(ctx),
             applyMaterial: (ctx, material) => liveRecovery.applyMaterial(ctx, material),
+            prepareControl: (ctx, bundle) => liveRecovery.prepareControl(ctx, bundle),
             onTerminal: reason => liveRecovery.onTerminal(reason),
             onRecovered: () => liveRecovery.onRecovered(),
           });
@@ -654,6 +682,34 @@ export class CoopAuthorityV2Shadow {
       // best-effort local-role fallback, so a degraded successor is recorded, never silently accepted.
       const note = input.successorSeatSource == null ? undefined : `successor=${input.successorSeatSource}`;
       this.logParity("TURN_COMMIT", entry.revision, parity.digestsMatch, "materialDigest", note);
+      return entry;
+    });
+  }
+
+  /**
+   * Commit the explicit boundary that opens command authority after an ordered
+   * wave/interaction wait. The complete state is captured at the real
+   * post-entry-effects CommandPhase chokepoint, not derived from the old wave.
+   */
+  tapCommandOpen(input: {
+    readonly operationId: string;
+    readonly material: CoopCommandOpenMaterialV2;
+    readonly command: Extract<CoopNextControl, { kind: "COMMAND_FRONTIER" }>;
+    readonly subsumes?: readonly number[];
+  }): CoopAuthorityEntry | null {
+    this.lastObservedWave = input.material.wave;
+    this.lastObservedTurn = input.material.turn;
+    return this.runTap("CONTROL_COMMIT", () => {
+      const entry = this.commit(
+        buildCommandOpenEntry({
+          context: this.frameContext,
+          operationId: input.operationId,
+          material: input.material,
+          command: input.command,
+          ...(input.subsumes == null ? {} : { subsumes: input.subsumes }),
+        }),
+      );
+      this.logParity("CONTROL_COMMIT", entry.revision, true, "materialDigest");
       return entry;
     });
   }
@@ -763,6 +819,17 @@ export class CoopAuthorityV2Shadow {
    * revival kinds (those are the REPLACEMENT tap's domain), so this never double-taps a faint replacement.
    */
   tapInteractionChoice(input: CoopV2ShadowInteractionChoiceTap): CoopAuthorityEntry | null {
+    // A live Authority V2 cutover reuses this harness's ONE mechanical log. A lossy relay choice is only
+    // shadow telemetry and must never consume a revision beside live TURN/REPLACEMENT/WAVE entries; the
+    // complete immutable interaction-envelope path below is the sole INTERACTION_COMMIT authority. Pure
+    // shadow sessions retain the historical adapter exercise because their log owns no mechanics.
+    if (this.liveReplica != null) {
+      coopLog(
+        "v2-shadow",
+        `TELEMETRY interaction-choice kind=${input.kind} seq=${input.seq} (mechanical commit suppressed)`,
+      );
+      return null;
+    }
     return this.runTap("INTERACTION_COMMIT", () => {
       // Deliverable 3: route the relayed pick to its MATCHING adapter builder by kind, so the committed entry
       // is surface-correct (its material digest is that surface's scheme) instead of a generic reward entry
@@ -811,6 +878,15 @@ export class CoopAuthorityV2Shadow {
     const seqOrdinal = input.seq >= 0 ? input.seq : 0;
     // A wire-safe synthetic operationId for the learn/mystery builders that require an explicit identity.
     const relayOpId = `IX/RELAY/${input.kind}/e${epoch}/w${wave}/t${turn}/s${ownerSeatId}/q${input.seq}`;
+    const shadowSuccessor = (operationId: string): Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> => ({
+      kind: "AWAIT_SUCCESSOR",
+      afterOperationId: operationId,
+      epoch,
+      wave,
+      turn,
+      allowedKinds: ["TURN_COMMIT", "REPLACEMENT_COMMIT", "INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      expectedOperationId: null,
+    });
 
     const generic = (): { built: Omit<CoopAuthorityEntry, "revision">; surface: string } => {
       // The relay seam carries no separate legacy species; `1` is a documented placeholder used only where the
@@ -821,9 +897,10 @@ export class CoopAuthorityV2Shadow {
       return {
         built: buildRewardInteractionEntry({
           context,
+          operationId: relayOpId,
           address: { epoch, wave, ownerSeatId, actionOrdinal: input.seq },
           material: { kind: "reward", wave, ownerSeatId, choice: rewardChoice, terminal: true },
-          successor: null,
+          successor: shadowSuccessor(relayOpId),
         }),
         surface: `reward/generic(${input.kind})`,
       };
@@ -843,9 +920,10 @@ export class CoopAuthorityV2Shadow {
           return {
             built: buildMarketInteractionEntry({
               context,
+              operationId: relayOpId,
               address: { epoch, wave, ownerSeatId, actionOrdinal: input.seq },
               material: { kind: "market", wave, ownerSeatId, action, terminal: sentinel },
-              successor: null,
+              successor: shadowSuccessor(relayOpId),
             }),
             surface: "market",
           };
@@ -862,9 +940,10 @@ export class CoopAuthorityV2Shadow {
           return {
             built: buildBiomeInteractionEntry({
               context,
+              operationId: relayOpId,
               address: { epoch, wave, ownerSeatId, selection: "biome-pick" },
               material: { kind: "biome", wave, ownerSeatId, selection },
-              successor: null,
+              successor: shadowSuccessor(relayOpId),
             }),
             surface: "biome/biome-pick",
           };
@@ -877,9 +956,10 @@ export class CoopAuthorityV2Shadow {
           return {
             built: buildBiomeInteractionEntry({
               context,
+              operationId: relayOpId,
               address: { epoch, wave, ownerSeatId, selection: "crossroads-pick" },
               material: { kind: "biome", wave, ownerSeatId, selection },
-              successor: null,
+              successor: shadowSuccessor(relayOpId),
             }),
             surface: "biome/crossroads",
           };
@@ -887,7 +967,13 @@ export class CoopAuthorityV2Shadow {
         // --- interactions-learn: ability / colosseum / stormglass / learn-move (single + batch). ---
         case "abilityPicker":
           return {
-            built: buildAbilityPickInteractionEntry({ context, operationId: relayOpId, ownerSeatId, data }),
+            built: buildAbilityPickInteractionEntry({
+              context,
+              operationId: relayOpId,
+              ownerSeatId,
+              data,
+              successor: shadowSuccessor(relayOpId),
+            }),
             surface: "learn/ability-pick",
           };
         case "coloPick": {
@@ -901,6 +987,7 @@ export class CoopAuthorityV2Shadow {
               operationId: relayOpId,
               ownerSeatId,
               board: { type: "decision", pinned: seqOrdinal, round, index: choice },
+              successor: shadowSuccessor(relayOpId),
             }),
             surface: "learn/colosseum-decision",
           };
@@ -916,6 +1003,7 @@ export class CoopAuthorityV2Shadow {
               ownerSeatId,
               weatherIndex: choice,
               weather: data[0] ?? 0,
+              successor: shadowSuccessor(relayOpId),
             }),
             surface: "learn/stormglass",
           };
@@ -935,6 +1023,7 @@ export class CoopAuthorityV2Shadow {
                 forgetSlot: choice,
                 maxMoveCount: 4,
               },
+              successor: shadowSuccessor(relayOpId),
             }),
             surface: "learn/learn-move",
           };
@@ -945,6 +1034,7 @@ export class CoopAuthorityV2Shadow {
               operationId: relayOpId,
               ownerSeatId,
               choice: { phase: "decision", partySlot: 0, assignments: pairwiseSafe(data), fallback: sentinel },
+              successor: shadowSuccessor(relayOpId),
             }),
             surface: "learn/learn-move-batch",
           };
@@ -956,13 +1046,26 @@ export class CoopAuthorityV2Shadow {
           if (sentinel) {
             // A LEAVE / handoff sentinel closes the encounter: route to the terminal, not an option pick.
             return {
-              built: buildMysteryTerminalEntry({ context, address, outcome: "leave" }),
+              built: buildMysteryTerminalEntry({
+                context,
+                address,
+                outcome: "leave",
+                operationId: relayOpId,
+                successor: shadowSuccessor(relayOpId),
+              }),
               surface: "mystery/me-terminal",
             };
           }
           const step = data[0] != null && data[0] >= 0 ? data[0] : 0;
           return {
-            built: buildMysteryOptionPickEntry({ context, address, optionIndex: choice, step }).entry,
+            built: buildMysteryOptionPickEntry({
+              context,
+              address,
+              optionIndex: choice,
+              step,
+              operationId: relayOpId,
+              successor: shadowSuccessor(relayOpId),
+            }).entry,
             surface: "mystery/me-option-pick",
           };
         }
@@ -977,6 +1080,8 @@ export class CoopAuthorityV2Shadow {
               partySlot: keep ? choice : -1,
               // The caught species is not on the relay seam; `1` is a documented placeholder identity.
               speciesId: 1,
+              operationId: relayOpId,
+              successor: shadowSuccessor(relayOpId),
             }),
             surface: "mystery/catch-full",
           };
@@ -1086,6 +1191,11 @@ export class CoopAuthorityV2Shadow {
     return this.recoveryChannel?.fencePredicates() ?? null;
   }
 
+  /** Exact recovery phase-start fence; separate from human command admission during control proof. */
+  recoveryControlSurfaceStartFrozen(): boolean {
+    return this.recoveryChannel?.controlSurfaceStartFrozen() ?? false;
+  }
+
   recover(reason: string): Promise<"recovered" | "terminalized"> | null {
     return this.recoveryChannel?.recover(reason) ?? null;
   }
@@ -1102,6 +1212,28 @@ export class CoopAuthorityV2Shadow {
    */
   get authenticatedFrameContext(): CoopFrameContextV2 {
     return this.frameContext;
+  }
+
+  /**
+   * Return a structural copy of the exact authority-log head. This is a query
+   * over the one log, not a second cursor; callers use it only to avoid minting
+   * a redundant control-open entry when the predecessor already states the
+   * same command frontier.
+   */
+  authorityFrontier(): CoopV2AuthorityFrontier | null {
+    const head = this.log.diagnostics().headRevision;
+    if (head === 0) {
+      return null;
+    }
+    const slice = this.log.recoverySlice(head);
+    if (slice == null || slice.frontier !== head || slice.frontierOperationId == null || slice.nextControl == null) {
+      return null;
+    }
+    return {
+      revision: head,
+      operationId: slice.frontierOperationId,
+      nextControl: structuredClone(slice.nextControl),
+    };
   }
 
   /**
@@ -1255,6 +1387,10 @@ export class CoopAuthorityV2Shadow {
       return false;
     }
     if (result.kind === "admitted") {
+      if (this.liveReplica?.admitEntry?.(this.runtimeContext, entry) === false) {
+        this.reportOwnedReplicaViolation(entry, "entry.control-ledger-admission-refused");
+        return false;
+      }
       this.admitted += 1;
       this.pendingReplicaEntries.set(entry.revision, entry);
     } else if (result.kind === "duplicate-pending-material" || result.kind === "duplicate-pending-control") {
@@ -1284,8 +1420,19 @@ export class CoopAuthorityV2Shadow {
 
   /** Commit an entry to the shadow log (which delivers it over the wire) and count it. */
   private commit(entry: Omit<CoopAuthorityEntry, "revision">): CoopAuthorityEntry {
-    const committed = this.log.commit(entry);
+    const committed = this.log.commit(
+      entry,
+      this.liveReplica == null
+        ? undefined
+        : candidate => {
+            if (!this.liveReplica?.ownsEntry(candidate)) {
+              return null;
+            }
+            return this.liveReplica.prepareAuthorityEntry?.(this.runtimeContext, candidate) ?? null;
+          },
+    );
     this.committed += 1;
+    this.liveReplica?.authorityEntryCommitted?.(this.runtimeContext, committed);
     return committed;
   }
 

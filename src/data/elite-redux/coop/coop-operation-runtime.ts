@@ -28,6 +28,7 @@
 // surface copies.
 // =============================================================================
 
+import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import type {
   CoopAuthoritativeEnvelopeV1,
   CoopLogicalPhase,
@@ -45,6 +46,9 @@ import {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
 
+// biome-ignore lint/performance/noBarrelFile: retained compatibility export for existing operation callers
+export { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
+
 // -----------------------------------------------------------------------------
 // HOST commit log (§1.3-§1.5).
 // -----------------------------------------------------------------------------
@@ -56,6 +60,74 @@ export interface CoopCommitContext {
   readonly logicalPhase: CoopLogicalPhase;
   /** The existing authoritative DATA plane, embedded UNCHANGED (§1.2). */
   readonly authoritativeState: CoopAuthoritativeBattleStateV1;
+}
+
+// -----------------------------------------------------------------------------
+// Complete Authority V2 interaction state capture.
+// -----------------------------------------------------------------------------
+
+/**
+ * Legacy operation adapters are intentionally engine-free, so they cannot import the battle-state
+ * capturer directly. The assembled runtime installs this narrow provider once; focused operation tests
+ * that do not boot an engine retain the historical placeholder context and therefore cannot accidentally
+ * manufacture a mechanically valid Authority V2 entry.
+ */
+export type CoopOperationAuthorityStateProvider = (turn: number) => CoopAuthoritativeBattleStateV1 | null;
+
+let authorityStateProvider: CoopOperationAuthorityStateProvider | null = null;
+
+export function setCoopOperationAuthorityStateProvider(provider: CoopOperationAuthorityStateProvider | null): void {
+  authorityStateProvider = provider;
+}
+
+function placeholderAuthorityState(wave: number, turn: number): CoopAuthoritativeBattleStateV1 {
+  return {
+    version: 1,
+    tick: 0,
+    wave,
+    turn,
+    playerParty: [],
+    enemyParty: [],
+    field: [],
+    weather: 0,
+    weatherTurnsLeft: 0,
+    terrain: 0,
+    terrainTurnsLeft: 0,
+    arenaTags: [],
+    money: 0,
+    pokeballCounts: [],
+    playerModifiers: [],
+    enemyModifiers: [],
+  };
+}
+
+/**
+ * Construct an operation context from a complete immutable engine image. A supplied state (for example
+ * an ME/Bargain terminal outcome) wins; otherwise the active authority scene is captured. The tick-zero
+ * fallback preserves legacy/unit behavior but is deliberately rejected by the Authority V2 registry.
+ */
+export function coopOperationCommitContext(
+  wave: number,
+  turn: number,
+  logicalPhase: CoopLogicalPhase,
+  suppliedState?: CoopAuthoritativeBattleStateV1 | null,
+): CoopCommitContext {
+  const supplied = isCompleteCoopOperationAuthorityState(suppliedState, wave, turn) ? suppliedState : null;
+  let captured: CoopAuthoritativeBattleStateV1 | null = null;
+  if (supplied == null && authorityStateProvider != null) {
+    try {
+      const candidate = authorityStateProvider(turn);
+      captured = isCompleteCoopOperationAuthorityState(candidate, wave, turn) ? candidate : null;
+    } catch {
+      captured = null;
+    }
+  }
+  return {
+    wave,
+    turn,
+    logicalPhase,
+    authoritativeState: structuredClone(supplied ?? captured ?? placeholderAuthorityState(wave, turn)),
+  };
 }
 
 /** The host's validation verdict for one proposed intent (owner correct, choice legal, epoch matches). */
@@ -233,6 +305,8 @@ export interface CoopRuntimeOpState {
   guestClock: CoopOperationRevisionClock | null;
   /** surfaceKey -> that surface's opaque state record (each surface owns + casts its own type). */
   readonly surfaces: Map<string, unknown>;
+  /** Live interaction results already materialized for this runtime, keyed by exact operation identity. */
+  readonly materializedOperationKeys: Set<string>;
 }
 
 /** Registered per-surface factories, run by {@linkcode initCoopRuntimeOpState} to populate a fresh runtime. */
@@ -253,7 +327,7 @@ export function createCoopRuntimeOpState(localRole: CoopRole | null = null): Coo
   for (const [surface, factory] of opSurfaceFactories) {
     surfaces.set(surface, factory());
   }
-  return { localRole, hostClock: null, guestClock: null, surfaces };
+  return { localRole, hostClock: null, guestClock: null, surfaces, materializedOperationKeys: new Set() };
 }
 
 /** The op-state of the currently-installed runtime, set by setCoopRuntime; null when no run is active. */
@@ -676,10 +750,14 @@ const COOP_OPERATION_ORDERING_CLASS: Record<CoopOperationKind, CoopOperationOrde
   BIOME_PICK: "applyAtDelivery",
   CROSSROADS_PICK: "applyAtDelivery",
   REWARD: "applyAtDelivery",
+  REWARD_PRESENT: "applyAtDelivery",
   SHOP_BUY: "applyAtDelivery",
+  SHOP_PRESENT: "applyAtDelivery",
   FAINT_SWITCH: "applyAtDelivery",
   REVIVAL: "applyAtDelivery",
+  ABILITY_PRESENT: "applyAtDelivery",
   ABILITY_PICK: "applyAtDelivery",
+  BARGAIN_PRESENT: "applyAtDelivery",
   BARGAIN: "applyAtDelivery",
   COLO_PICK: "applyAtDelivery",
   ME_PRESENT: "applyAtDelivery",
@@ -690,6 +768,7 @@ const COOP_OPERATION_ORDERING_CLASS: Record<CoopOperationKind, CoopOperationOrde
   QUIZ_ANSWER: "applyAtDelivery",
   LEARN_MOVE: "applyAtDelivery",
   LEARN_MOVE_BATCH: "applyAtDelivery",
+  STORMGLASS_PRESENT: "applyAtDelivery",
   STORMGLASS: "applyAtDelivery",
   CATCH_FULL: "applyAtDelivery",
 };
@@ -785,8 +864,11 @@ export class CoopOperationGuest {
     return this.lastGoodEnvelope;
   }
 
-  /** Classify an envelope without advancing the cursor; live sinks must pass this before mutating engine state. */
-  public inspectEnvelope(env: CoopAuthoritativeEnvelopeV1): CoopGuestApplyResult {
+  /**
+   * Validate immutable envelope identity and terminal status without consulting the legacy revision or
+   * applied-id domain. Authority V2 calls this only after its one global log admitted the entry.
+   */
+  public inspectEnvelopeIdentity(env: CoopAuthoritativeEnvelopeV1): CoopGuestApplyResult {
     // 1. Epoch guard (§1.6 rule 1): an envelope from another epoch is DROPPED.
     if (env.sessionEpoch !== this.epoch) {
       return { kind: "dropped-epoch" };
@@ -821,6 +903,17 @@ export class CoopOperationGuest {
     }
 
     // 4. Revision handling for an APPLIED (or quiescent) envelope (§1.6 rules 2-3).
+    return { kind: "applied", envelope: env, op };
+  }
+
+  /** Classify an envelope without advancing the cursor; legacy sinks call this before mutating engine state. */
+  public inspectEnvelope(env: CoopAuthoritativeEnvelopeV1): CoopGuestApplyResult {
+    const identity = this.inspectEnvelopeIdentity(env);
+    if (identity.kind !== "applied") {
+      return identity;
+    }
+    const op = identity.op;
+
     if (op != null && op.status === "applied" && this.appliedIds.has(op.id)) {
       return { kind: "duplicate" }; // id-dedupe (§1.6 rule 3): applied at most once per id.
     }
@@ -831,7 +924,7 @@ export class CoopOperationGuest {
       return { kind: "gap", missingFrom: this.revisionClock.revision + 1 }; // a hole: request the tail (§4.4).
     }
 
-    return { kind: "applied", envelope: env, op };
+    return identity;
   }
 
   public applyEnvelope(env: CoopAuthoritativeEnvelopeV1): CoopGuestApplyResult {

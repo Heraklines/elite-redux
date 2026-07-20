@@ -172,10 +172,9 @@ export interface BuildTurnCommitInput {
   /** The injected turn-capture image (serialized resolution + checkpoint). */
   readonly capture: TurnResolutionImage;
   /**
-   * The successor command frontier the authority states for turn N+1, or `null` when the
-   * settled turn crosses a non-command boundary (faint replacement, victory,
-   * defeat, reward, Mystery, or terminal progression). A turn commit must never
-   * invent a COMMAND merely because a player mon still exists on the field.
+   * The successor command frontier the authority states for turn N+1, or `null` when the settled turn
+   * crosses a non-command boundary. The builder translates that boundary into an explicit ordered wait;
+   * an Authority V2 entry never delegates successor choice back to a local phase queue.
    */
   readonly nextCommandFrontier: TurnCommandFrontier | null;
   /** The mutation barrier gating the capture (must read zero to build). */
@@ -235,9 +234,28 @@ export function buildTurnCommitEntry(input: BuildTurnCommitInput): BuildTurnComm
     return { kind: "barred", pendingTokens };
   }
 
+  const sourceWave = input.capture.wave;
+  const sourceTurn = input.capture.turn;
+  if (
+    input.nextCommandFrontier == null
+    && (!Number.isSafeInteger(sourceWave)
+      || (sourceWave as number) <= 0
+      || !Number.isSafeInteger(sourceTurn)
+      || (sourceTurn as number) <= 0)
+  ) {
+    throw new Error("[authority-v2/turn-command] a non-command successor requires exact source wave/turn");
+  }
   const nextControl: CoopNextControl =
     input.nextCommandFrontier == null
-      ? null
+      ? {
+          kind: "AWAIT_SUCCESSOR",
+          afterOperationId: input.operationId,
+          epoch: input.context.sessionEpoch,
+          wave: sourceWave as number,
+          turn: sourceTurn as number,
+          allowedKinds: ["REPLACEMENT_COMMIT", "INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+          expectedOperationId: null,
+        }
       : {
           kind: "COMMAND_FRONTIER",
           epoch: input.nextCommandFrontier.epoch,
@@ -294,12 +312,12 @@ export function turnMaterialApplier(applyTurnMaterial: ApplyTurnMaterialFn): App
 }
 
 /**
- * The controlId the replica would request/project for an entry's stated command
- * control, or `null` when the entry states no successor. The lease is keyed by this
- * exact address so at most one lease exists per stated nextControl.
+ * The controlId the replica would request for a stated command frontier, or
+ * `null` when the entry explicitly awaits a non-command successor. The lease is
+ * keyed by this exact address so at most one lease exists per command control.
  */
 export function turnCommandControlId(entry: CoopAuthorityEntry): string | null {
-  return entry.nextControl == null ? null : controlIdOf(entry.nextControl as ProjectableControl);
+  return entry.nextControl.kind === "COMMAND_FRONTIER" ? controlIdOf(entry.nextControl as ProjectableControl) : null;
 }
 
 /** A consumer's handle on a command-request lease. Releasing is idempotent. */
@@ -501,9 +519,8 @@ export class CommandRequestLeaseBook {
   }
 
   /**
-   * Acquire a consumer on the lease for an entry's stated command control, or `null`
-   * when the entry states no successor. Convenience over {@link acquire} that derives
-   * the exact control address from the entry.
+   * Acquire a consumer on the lease for an entry's stated command control, or
+   * `null` when it explicitly awaits a non-command successor.
    */
   acquireForEntry(entry: CoopAuthorityEntry): CommandRequestHandle | null {
     const controlId = turnCommandControlId(entry);

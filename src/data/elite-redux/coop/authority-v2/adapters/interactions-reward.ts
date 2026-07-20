@@ -76,14 +76,14 @@ export type CoopInteractionSurface = "reward" | "market" | "biome";
  * decision 4). It is a plain {@link CoopNextControl} restricted to the destinations
  * an interaction can legally chain to: COMMAND (the next wave's first command),
  * REWARD / BIOME / MYSTERY (another between-wave interaction in the chain), or
- * `null` (the interaction states no successor and retires at materialApplied). A
+ * AWAIT_SUCCESSOR (an explicit ordered wait). A
  * TERMINAL is NEVER an interaction's job (that is the wave-terminal adapter) and a
  * REPLACEMENT is a faint's, so both are excluded by construction.
  */
 export type CoopInteractionSuccessor = Extract<
   ProjectableControl,
-  { kind: "COMMAND_FRONTIER" | "REWARD" | "BIOME" | "MYSTERY" }
-> | null;
+  { kind: "COMMAND_FRONTIER" | "REWARD" | "BIOME" | "MYSTERY" | "AWAIT_SUCCESSOR" }
+>;
 
 /** Thrown by the authority-side builders on malformed input: an authority must NEVER commit a malformed entry. */
 export class CoopInteractionBuildError extends Error {
@@ -172,12 +172,18 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  */
 function assertInteractionSuccessor(successor: CoopInteractionSuccessor): CoopNextControl {
   if (successor == null) {
-    return null;
+    throw new CoopInteractionBuildError("interaction successor is required; use AWAIT_SUCCESSOR for an ordered wait");
   }
   const kind: string = (successor as ProjectableControl).kind;
-  if (kind !== "COMMAND_FRONTIER" && kind !== "REWARD" && kind !== "BIOME" && kind !== "MYSTERY") {
+  if (
+    kind !== "COMMAND_FRONTIER"
+    && kind !== "REWARD"
+    && kind !== "BIOME"
+    && kind !== "MYSTERY"
+    && kind !== "AWAIT_SUCCESSOR"
+  ) {
     throw new CoopInteractionBuildError(
-      `interaction successor must be COMMAND_FRONTIER | REWARD | BIOME | MYSTERY or null (got ${kind})`,
+      `interaction successor must be COMMAND_FRONTIER | REWARD | BIOME | MYSTERY | AWAIT_SUCCESSOR (got ${kind})`,
     );
   }
   const validation = validateNextControl(successor);

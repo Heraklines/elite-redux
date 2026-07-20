@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import { COOP_CAP_OP_CATCH_FULL, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
@@ -12,10 +13,13 @@ import {
   type CoopCatchFullPayload,
   type CoopPendingOperation,
   makeCoopOperationId,
+  parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
+  type CoopOperationEnvelopeApplyContext,
   getActiveCoopOperationDurability,
+  isCoopOperationAuthorityV2Apply,
   registerCoopOperationApplier,
   tryJournalCoopCommittedEnvelope,
   tryJournalCoopCommittedEnvelopeFor,
@@ -24,6 +28,7 @@ import {
   CoopOperationGuest,
   CoopOperationHost,
   type CoopRuntimeOpState,
+  coopOperationCommitContext,
   getActiveCoopRuntimeOpState,
   maybeCoopOpSurfaceState,
   registerCoopOpSurfaceState,
@@ -32,7 +37,7 @@ import {
   resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
-import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
+import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_CATCH_FULL_OP === "off");
 
@@ -46,6 +51,7 @@ interface CatchFullOpState {
   authorityHost: CoopOperationHost | null;
   receiverGuest: CoopOperationGuest | null;
   readonly retries: Map<string, ReturnType<typeof setTimeout>>;
+  readonly stateAppliedOperations: Set<string>;
 }
 
 registerCoopOpSurfaceState(
@@ -57,6 +63,7 @@ registerCoopOpSurfaceState(
     authorityHost: null,
     receiverGuest: null,
     retries: new Map(),
+    stateAppliedOperations: new Set(),
   }),
 );
 
@@ -124,6 +131,7 @@ export function resetCoopCatchFullOperationState(): void {
     clearTimeout(timer);
   }
   s.retries.clear();
+  s.stateAppliedOperations.clear();
   s.authorityHost = null;
   s.receiverGuest = null;
   s.revisionFloor = 0;
@@ -169,25 +177,7 @@ function guest(binding?: CoopCatchFullOperationBinding | null): CoopOperationGue
 }
 
 function context(wave: number, turn: number) {
-  const authoritativeState: CoopAuthoritativeBattleStateV1 = {
-    version: 1,
-    tick: 0,
-    wave,
-    turn,
-    playerParty: [],
-    enemyParty: [],
-    field: [],
-    weather: 0,
-    weatherTurnsLeft: 0,
-    terrain: 0,
-    terrainTurnsLeft: 0,
-    arenaTags: [],
-    money: 0,
-    pokeballCounts: [],
-    playerModifiers: [],
-    enemyModifiers: [],
-  };
-  return { wave, turn, logicalPhase: "TURN_RESOLVE" as const, authoritativeState };
+  return coopOperationCommitContext(wave, turn, "TURN_RESOLVE");
 }
 
 function commitAction(
@@ -197,6 +187,7 @@ function commitAction(
     localRole: CoopRole;
     wave: number;
     turn: number;
+    operationId?: string;
   },
   binding?: CoopCatchFullOperationBinding | null,
 ): string | undefined {
@@ -206,8 +197,22 @@ function commitAction(
   try {
     const s = state(binding);
     const owner = coopSeatOfRole(params.ownerRole);
+    const suppliedAddress = params.operationId == null ? null : parseCoopOperationId(params.operationId);
+    if (
+      params.operationId != null
+      && (suppliedAddress == null
+        || suppliedAddress.epoch !== s.epoch
+        || suppliedAddress.owner !== owner
+        || suppliedAddress.kind !== "CATCH_FULL"
+        || suppliedAddress.pinnedSeq <= s.revisionFloor)
+    ) {
+      return;
+    }
+    if (suppliedAddress != null) {
+      s.ordinal = Math.max(s.ordinal, suppliedAddress.pinnedSeq - s.revisionFloor);
+    }
     const operation: CoopPendingOperation = {
-      id: makeCoopOperationId(s.epoch, owner, s.revisionFloor + ++s.ordinal, "CATCH_FULL"),
+      id: params.operationId ?? makeCoopOperationId(s.epoch, owner, s.revisionFloor + ++s.ordinal, "CATCH_FULL"),
       kind: "CATCH_FULL",
       owner,
       status: "proposed",
@@ -235,17 +240,26 @@ function commitAction(
   return;
 }
 
+/** The decision immediately succeeds one exact catch-full prompt; no local ordinal may be guessed. */
+export function coopCatchFullDecisionOperationId(promptOperationId: string): string | null {
+  const parsed = parseCoopOperationId(promptOperationId);
+  if (parsed == null || parsed.kind !== "CATCH_FULL" || parsed.owner !== coopSeatOfRole("guest")) {
+    return null;
+  }
+  return makeCoopOperationId(parsed.epoch, parsed.owner, parsed.pinnedSeq + 1, "CATCH_FULL");
+}
+
 /** Journal the presentation before sending its low-latency legacy carrier. */
-export function sendCoopCatchFullPrompt(
+export function sendCoopCatchFullPromptWithOperationId(
   relay: CoopInteractionRelay,
   pokemonName: string,
   speciesId: number,
   params: { localRole: CoopRole; wave: number; turn: number },
   binding?: CoopCatchFullOperationBinding | null,
-): boolean {
+): string | null {
   if (!isCoopCatchFullOperationEnabled()) {
     relay.promptCatchFull(pokemonName, speciesId);
-    return true;
+    return "legacy";
   }
   const operationId = commitAction(
     {
@@ -256,10 +270,20 @@ export function sendCoopCatchFullPrompt(
     binding,
   );
   if (operationId == null) {
-    return false;
+    return null;
   }
   relay.promptCatchFull(pokemonName, speciesId, operationId);
-  return true;
+  return operationId;
+}
+
+export function sendCoopCatchFullPrompt(
+  relay: CoopInteractionRelay,
+  pokemonName: string,
+  speciesId: number,
+  params: { localRole: CoopRole; wave: number; turn: number },
+  binding?: CoopCatchFullOperationBinding | null,
+): boolean {
+  return sendCoopCatchFullPromptWithOperationId(relay, pokemonName, speciesId, params, binding) != null;
 }
 
 export function commitCoopCatchFullAuthorityDecision(
@@ -269,6 +293,7 @@ export function commitCoopCatchFullAuthorityDecision(
     localRole: CoopRole;
     wave: number;
     turn: number;
+    operationId?: string;
   },
   binding?: CoopCatchFullOperationBinding | null,
 ): boolean {
@@ -340,7 +365,10 @@ function validPayload(value: unknown): value is CoopCatchFullPayload {
   );
 }
 
-function applyJournaledCatchFullEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
+function applyJournaledCatchFullEnvelope(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  applyContext?: CoopOperationEnvelopeApplyContext,
+): CoopApplyOutcome {
   if (!isCoopCatchFullOperationEnabled()) {
     return "rejected";
   }
@@ -353,10 +381,18 @@ function applyJournaledCatchFullEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
   }
   const s = state();
   const g = guest();
-  if (g.hasApplied(operation.id)) {
+  if (!isCoopOperationAuthorityV2Apply(applyContext) && g.hasApplied(operation.id)) {
     return "duplicate";
   }
-  const result = applyCoopOperationEnvelope(g, "op:catchFull", envelope);
+  if (isCoopOperationAuthorityV2Apply(applyContext)) {
+    if (!isCompleteCoopOperationAuthorityState(envelope.authoritativeState, envelope.wave, envelope.turn)) {
+      return "rejected";
+    }
+    // Authority V2 owns one central immutable-state transaction. The surface applier only records that
+    // result for its UI adoption seam; applying the same tick again would reject it as stale.
+    s.stateAppliedOperations.add(operation.id);
+  }
+  const result = applyCoopOperationEnvelope(g, "op:catchFull", envelope, applyContext);
   if (result !== "applied") {
     return result;
   }

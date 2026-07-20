@@ -22,6 +22,7 @@
 
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import {
   applyCoopAuthoritativeBattleState,
   captureCoopAuthoritativeBattleState,
@@ -283,11 +284,14 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // OPTION axis (not the pick axis) so the host on a guest-owned ME - option owner, pick watcher - streams
     // from coopBiomeWatch instead, and a guest pick-owner does NOT double-stream an adopted list.
     if (this.coopBiomeOptionOwner && getCoopRuntime()?.spoof == null) {
-      getCoopInteractionRelay()?.sendRewardOptions(
+      const operationId = getCoopInteractionRelay()?.sendRewardOptions(
         this.coopBiomeStart,
         COOP_BIOME_STOCK_REROLL,
         serializeRewardOptions(this.shopOptions),
       );
+      if (operationId != null) {
+        this.coopV2ControlOperationId = operationId;
+      }
     }
     if (this.shopOptions.length === 0) {
       void this.finishEmptyCoopBiomeShop();
@@ -639,6 +643,24 @@ export class BiomeShopPhase extends SelectModifierPhase {
     }
   }
 
+  /** Install the exact post-action stock vector carried by the immutable market result. */
+  private applyCoopAuthoritativeMarketStock(resultData: readonly number[] | undefined, operationId: string): boolean {
+    if (
+      !Array.isArray(resultData)
+      || resultData.length !== this.qtys.length
+      || resultData.some(stock => !Number.isSafeInteger(stock) || stock < 0)
+    ) {
+      failCoopSharedSession(`Biome market result ${operationId} carried an invalid stock vector`);
+      return false;
+    }
+    this.qtys = [...resultData];
+    const handler = globalScene.ui.getHandler() as { setStock?: (index: number, remaining: number) => void };
+    for (const [index, remaining] of this.qtys.entries()) {
+      handler.setStock?.(index, remaining);
+    }
+    return true;
+  }
+
   /**
    * After a confirmed purchase (cost !== -1), decrement that slot's stock and
    * refresh the grid. The party-CANCEL path goes through resetModifierSelect
@@ -687,6 +709,21 @@ export class BiomeShopPhase extends SelectModifierPhase {
           this.coopRewardOperationBinding,
         );
         if (!isCoopRewardOperationEnabled() || commit != null) {
+          const v2 = isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability);
+          let v2HostAdvanced = false;
+          if (v2 && commit != null) {
+            if (role === "host") {
+              // The immutable terminal state includes the ownership advance. Close that local control
+              // before capture so the result and its ordered wait describe one complete transaction.
+              if (!this.advanceCoopBiomeTerminal(pinned)) {
+                return false;
+              }
+              v2HostAdvanced = true;
+            }
+            // A guest owner has already closed/reset its market input chain at the confirmed-leave seam;
+            // its deterministic operation ID can therefore prove the local terminal before proposal send.
+            this.coopProveV2RewardOperationComplete(commit.operationId);
+          }
           const resend = (): void =>
             relay?.sendInteractionChoice(coopBiomeShopSeq(pinned), "biomeShop", COOP_INTERACTION_LEAVE);
           // The authority must retain the complete terminal result before exposing the legacy companion.
@@ -698,9 +735,14 @@ export class BiomeShopPhase extends SelectModifierPhase {
             role === "host"
             && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
             && (commit == null
-              || commitRewardAuthoritativeResult(commit.operationId, undefined, this.coopRewardOperationBinding)
-                == null)
+              || commitRewardAuthoritativeResult(commit.operationId, undefined, this.coopRewardOperationBinding, {
+                remainingStock: this.qtys,
+              }) == null)
           ) {
+            if (v2HostAdvanced) {
+              failCoopSharedSession(`Biome market terminal ${commit?.operationId ?? pinned} failed after V2 close`);
+              return false;
+            }
             getCoopRuntime()?.durability?.reconnect();
             continue;
           }
@@ -763,7 +805,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
               continue;
             }
           }
-          return this.advanceCoopBiomeTerminal(pinned);
+          return v2HostAdvanced ? true : this.advanceCoopBiomeTerminal(pinned);
         }
         getCoopRuntime()?.durability?.reconnect();
         await new Promise(resolve => setTimeout(resolve, 250));
@@ -835,6 +877,13 @@ export class BiomeShopPhase extends SelectModifierPhase {
       this.coopBiomeAuthoritativeStockUnavailable("guest owner could not recover/reconstruct streamed stock");
       return;
     }
+    const presentationOperationId = relay.consumeCommittedRewardOptionsOperationId(
+      this.coopBiomeStart,
+      COOP_BIOME_STOCK_REROLL,
+    );
+    if (presentationOperationId != null) {
+      this.coopV2ControlOperationId = presentationOperationId;
+    }
     if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
       return;
     }
@@ -885,7 +934,14 @@ export class BiomeShopPhase extends SelectModifierPhase {
       // watcher (SelectModifierPhase's #828 host-option-owner-but-pick-watcher case).
       this.buildStock();
       if (runtime?.spoof == null) {
-        relay.sendRewardOptions(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL, serializeRewardOptions(this.shopOptions));
+        const operationId = relay.sendRewardOptions(
+          this.coopBiomeStart,
+          COOP_BIOME_STOCK_REROLL,
+          serializeRewardOptions(this.shopOptions),
+        );
+        if (operationId != null) {
+          this.coopV2ControlOperationId = operationId;
+        }
       }
     } else {
       const streamed = await relay.awaitRewardOptions(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL, COOP_BIOME_WAIT_MS);
@@ -896,6 +952,13 @@ export class BiomeShopPhase extends SelectModifierPhase {
       if (rebuilt == null) {
         this.coopBiomeAuthoritativeStockUnavailable("watcher could not recover/reconstruct streamed stock");
         return;
+      }
+      const presentationOperationId = relay.consumeCommittedRewardOptionsOperationId(
+        this.coopBiomeStart,
+        COOP_BIOME_STOCK_REROLL,
+      );
+      if (presentationOperationId != null) {
+        this.coopV2ControlOperationId = presentationOperationId;
       }
       if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
         return;
@@ -916,6 +979,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
     const seq = coopBiomeShopSeq(this.coopBiomeStart);
     this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
     let missingTerminalAttempts = 0;
+    let terminalOperationId: string | null = null;
+    let terminalAlreadyAdvanced = false;
     for (;;) {
       const action = await awaitCoopChoiceWithOrphanBackstop(
         relay,
@@ -969,13 +1034,30 @@ export class BiomeShopPhase extends SelectModifierPhase {
         this.coopPendingAuthorityOperationId = decision.operationId ?? null;
       }
       if (terminal) {
+        terminalOperationId = decision.operationId ?? null;
         if (
-          decision.authoritativeProjection !== true
+          decision.authoritativeProjection === true
           && decision.operationId != null
-          && commitRewardAuthoritativeResult(decision.operationId!, undefined, this.coopRewardOperationBinding) == null
+          && !this.applyCoopAuthoritativeMarketStock(action.resultData, decision.operationId)
         ) {
-          failCoopSharedSession(`Biome market terminal result ${decision.operationId} could not be retained`);
           return;
+        }
+        if (decision.authoritativeProjection !== true && decision.operationId != null) {
+          if (isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
+            if (!this.advanceCoopBiomeTerminal(this.coopBiomeStart)) {
+              return;
+            }
+            terminalAlreadyAdvanced = true;
+            this.coopProveV2RewardOperationComplete(decision.operationId);
+          }
+          if (
+            commitRewardAuthoritativeResult(decision.operationId, undefined, this.coopRewardOperationBinding, {
+              remainingStock: this.qtys,
+            }) == null
+          ) {
+            failCoopSharedSession(`Biome market terminal result ${decision.operationId} could not be retained`);
+            return;
+          }
         }
         break;
       }
@@ -1008,6 +1090,13 @@ export class BiomeShopPhase extends SelectModifierPhase {
           ) {
             return;
           }
+          if (
+            decision.operationId == null
+            || !this.applyCoopAuthoritativeMarketStock(action.resultData, decision.operationId)
+          ) {
+            return;
+          }
+          this.coopProveV2RewardOperationComplete(decision.operationId);
           continue;
         }
         if (opt?.type == null) {
@@ -1058,7 +1147,9 @@ export class BiomeShopPhase extends SelectModifierPhase {
         !retainedHostResultCommitted
         && decision.requiresAuthorityCommit
         && decision.operationId != null
-        && commitRewardAuthoritativeResult(decision.operationId!, undefined, this.coopRewardOperationBinding) == null
+        && commitRewardAuthoritativeResult(decision.operationId!, undefined, this.coopRewardOperationBinding, {
+          remainingStock: this.qtys,
+        }) == null
       ) {
         failCoopSharedSession(`Biome market buy result ${decision.operationId} could not be retained`);
         return;
@@ -1068,9 +1159,10 @@ export class BiomeShopPhase extends SelectModifierPhase {
     if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
       return;
     }
-    if (!this.advanceCoopBiomeTerminal(this.coopBiomeStart)) {
+    if (!terminalAlreadyAdvanced && !this.advanceCoopBiomeTerminal(this.coopBiomeStart)) {
       return;
     }
+    this.coopProveV2RewardOperationComplete(terminalOperationId);
     scene.ui.clearText();
     this.finishCoopBiomeShopLeave();
   }
@@ -1287,13 +1379,15 @@ export class BiomeShopPhase extends SelectModifierPhase {
         this.pendingIndex = -1;
       }
 
-      if (
-        operationIdToCommit != null
-        && controller?.role === "host"
-        && retainedResultMode
-        && commitRewardAuthoritativeResult(operationIdToCommit, undefined, this.coopRewardOperationBinding) == null
-      ) {
-        throw new Error(`authoritative result ${operationIdToCommit} could not be retained`);
+      if (operationIdToCommit != null && controller?.role === "host" && retainedResultMode) {
+        this.coopProveV2RewardOperationComplete(operationIdToCommit);
+        if (
+          commitRewardAuthoritativeResult(operationIdToCommit, undefined, this.coopRewardOperationBinding, {
+            remainingStock: this.qtys,
+          }) == null
+        ) {
+          throw new Error(`authoritative result ${operationIdToCommit} could not be retained`);
+        }
       }
       queueBoundary?.commit();
       if (pendingAuthorityOperationId != null) {
@@ -1407,9 +1501,13 @@ export class BiomeShopPhase extends SelectModifierPhase {
       if (!this.applyCoopProjectedMarketBuy(slot, modifierType, partySlot, nestedOption, validatedCost, operationId)) {
         return;
       }
+      if (!this.applyCoopAuthoritativeMarketStock(action.resultData, operationId)) {
+        return;
+      }
       this.pendingIndex = -1;
       this.coopPendingAuthorityOperationId = null;
       this.openBiomeShop();
+      this.coopProveV2RewardOperationComplete(operationId);
       return;
     }
   }

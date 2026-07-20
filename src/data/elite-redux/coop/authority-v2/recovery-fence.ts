@@ -41,6 +41,7 @@ export type CoopRecoveryFenceState = "open" | "held" | "terminal";
 export interface CoopRecoveryFenceView {
   readonly state: CoopRecoveryFenceState;
   readonly commandAdmissionFrozen: boolean;
+  readonly controlSurfaceStartFrozen: boolean;
   readonly progressionFrozen: boolean;
   readonly materializationFrozen: boolean;
   readonly authorityWaitCreationFrozen: boolean;
@@ -60,6 +61,11 @@ export interface CoopRecoveryFence {
 
   /** open -> held. Returns true only on the transition; false if already held/terminal. */
   acquire(): boolean;
+  /**
+   * Keep the recovery fence held while allowing only the authority-stated control phase to start. Human
+   * command admission, retained materialization, unrelated progression, and wait creation remain frozen.
+   */
+  allowControlProjection(): boolean;
   /** held -> open (happy path). No-op on open; a terminal fence NEVER re-opens. */
   release(): void;
   /** any -> terminal. Records the reason and freezes permanently. Idempotent. */
@@ -68,6 +74,7 @@ export interface CoopRecoveryFence {
   // The four freeze predicates the integration owner wires at the real sites.
   // Every surface is frozen whenever the fence is not `open`.
   isCommandAdmissionFrozen(): boolean;
+  isControlSurfaceStartFrozen(): boolean;
   isProgressionFrozen(): boolean;
   isMaterializationFrozen(): boolean;
   isAuthorityWaitCreationFrozen(): boolean;
@@ -81,6 +88,7 @@ export interface CoopRecoveryFence {
 export function createRecoveryFence(): CoopRecoveryFence {
   let state: CoopRecoveryFenceState = "open";
   let terminalReason: string | undefined;
+  let controlProjectionAllowed = false;
   const listeners = new Set<(view: CoopRecoveryFenceView) => void>();
 
   const frozen = (): boolean => state !== "open";
@@ -88,6 +96,7 @@ export function createRecoveryFence(): CoopRecoveryFence {
   const view = (): CoopRecoveryFenceView => ({
     state,
     commandAdmissionFrozen: frozen(),
+    controlSurfaceStartFrozen: frozen() && !controlProjectionAllowed,
     progressionFrozen: frozen(),
     materializationFrozen: frozen(),
     authorityWaitCreationFrozen: frozen(),
@@ -119,6 +128,15 @@ export function createRecoveryFence(): CoopRecoveryFence {
         return false;
       }
       state = "held";
+      controlProjectionAllowed = false;
+      notify();
+      return true;
+    },
+    allowControlProjection(): boolean {
+      if (state !== "held" || controlProjectionAllowed) {
+        return false;
+      }
+      controlProjectionAllowed = true;
       notify();
       return true;
     },
@@ -128,6 +146,7 @@ export function createRecoveryFence(): CoopRecoveryFence {
         return;
       }
       state = "open";
+      controlProjectionAllowed = false;
       notify();
     },
     terminalize(reason: string): void {
@@ -135,10 +154,12 @@ export function createRecoveryFence(): CoopRecoveryFence {
         return;
       }
       state = "terminal";
+      controlProjectionAllowed = false;
       terminalReason = reason;
       notify();
     },
     isCommandAdmissionFrozen: frozen,
+    isControlSurfaceStartFrozen: () => frozen() && !controlProjectionAllowed,
     isProgressionFrozen: frozen,
     isMaterializationFrozen: frozen,
     isAuthorityWaitCreationFrozen: frozen,

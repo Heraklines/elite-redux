@@ -82,17 +82,6 @@ const command = (over: CommandOverrides = {}): CommandFrontier => {
   };
 };
 
-const replacement = (over: Partial<Extract<Projectable, { kind: "REPLACEMENT" }>> = {}): Projectable => ({
-  kind: "REPLACEMENT",
-  epoch: 1,
-  wave: 3,
-  turn: 2,
-  occurrence: 0,
-  fieldIndex: 1,
-  ownerSeatId: 1,
-  ...over,
-});
-
 const reward = (over: Partial<Extract<Projectable, { kind: "REWARD" }>> = {}): Projectable => ({
   kind: "REWARD",
   operationId: "op-reward-1",
@@ -109,7 +98,6 @@ const terminal = (terminalId = "term-1"): Projectable => ({ kind: "TERMINAL", te
 describe("controlIdOf", () => {
   it("is a stable, complete encoding - identical inputs give identical ids", () => {
     expect(controlIdOf(command())).toBe(controlIdOf(command()));
-    expect(controlIdOf(replacement())).toBe(controlIdOf(replacement()));
     expect(controlIdOf(reward())).toBe(controlIdOf(reward()));
     expect(controlIdOf(terminal())).toBe(controlIdOf(terminal()));
   });
@@ -160,7 +148,7 @@ describe("controlsEqual / sameControlAddress", () => {
   it("is exact structural equality for non-null controls", () => {
     expect(controlsEqual(command(), command())).toBe(true);
     expect(controlsEqual(command(), command({ pokemonId: 99 }))).toBe(false);
-    expect(controlsEqual(command(), replacement())).toBe(false);
+    expect(controlsEqual(command(), reward())).toBe(false);
   });
 
   it("sameControlAddress matches controlId equality", () => {
@@ -172,7 +160,6 @@ describe("controlsEqual / sameControlAddress", () => {
 describe("control ownership", () => {
   it("returns the owner seat for owned controls and null for TERMINAL", () => {
     expect(controlOwnerSeatId(command({ ownerSeatId: 0 }))).toBe(0);
-    expect(controlOwnerSeatId(replacement({ ownerSeatId: 1 }))).toBe(1);
     expect(controlOwnerSeatId(reward({ ownerSeatId: 0 }))).toBe(0);
     expect(controlOwnerSeatId(terminal())).toBeNull();
   });
@@ -212,10 +199,30 @@ describe("control ownership", () => {
 describe("validateNextControl", () => {
   it("accepts well-formed controls of every kind", () => {
     expect(isValidNextControl(command())).toBe(true);
-    expect(isValidNextControl(replacement())).toBe(true);
     expect(isValidNextControl(reward())).toBe(true);
     expect(isValidNextControl({ kind: "BIOME", operationId: "b", ownerSeatId: 0 })).toBe(true);
     expect(isValidNextControl({ kind: "MYSTERY", operationId: "m", ownerSeatId: 2 })).toBe(true);
+    expect(
+      isValidNextControl({
+        kind: "SHARED_INTERACTION",
+        operationId: "i",
+        ownerSeatId: 1,
+        surfaceClass: "op:learnMove",
+        operationKind: "LEARN_MOVE",
+        successor: { operationKinds: ["LEARN_MOVE"], operationIds: ["result-i"] },
+      }),
+    ).toBe(true);
+    expect(
+      isValidNextControl({
+        kind: "AWAIT_SUCCESSOR",
+        afterOperationId: "i",
+        epoch: 1,
+        wave: 2,
+        turn: 3,
+        allowedKinds: ["INTERACTION_COMMIT", "WAVE_ADVANCE"],
+        expectedOperationId: null,
+      }),
+    ).toBe(true);
     expect(isValidNextControl(terminal())).toBe(true);
   });
 
@@ -230,13 +237,9 @@ describe("validateNextControl", () => {
     }
   });
 
-  it("rejects a negative pokemonId / seat and a non-integer occurrence", () => {
+  it("rejects a negative pokemonId / seat", () => {
     expect(validateNextControl(command({ pokemonId: 0 })).ok).toBe(false);
     expect(validateNextControl(command({ ownerSeatId: -1 })).ok).toBe(false);
-    expect(validateNextControl(replacement({ occurrence: 1.2 })).ok).toBe(false);
-    expect(validateNextControl(replacement({ fieldIndex: -1 })).ok).toBe(false);
-    // occurrence 0 and seat 0 are legal (non-negative).
-    expect(validateNextControl(replacement({ occurrence: 0, ownerSeatId: 0, fieldIndex: 0 })).ok).toBe(true);
   });
 
   it("rejects empty and duplicate-field command frontiers while allowing side-scoped Pokemon ids", () => {
@@ -268,6 +271,24 @@ describe("validateNextControl", () => {
   it("rejects empty opaque ids", () => {
     expect(validateNextControl(reward({ operationId: "" })).ok).toBe(false);
     expect(validateNextControl(terminal("")).ok).toBe(false);
+  });
+
+  it("rejects a shared surface without a closed mechanical successor contract", () => {
+    const base = {
+      kind: "SHARED_INTERACTION",
+      operationId: "presentation",
+      ownerSeatId: 1,
+      surfaceClass: "op:learnMove",
+      operationKind: "LEARN_MOVE",
+    } as const;
+    expect(validateNextControl(base).ok).toBe(false);
+    expect(validateNextControl({ ...base, successor: { operationKinds: [], operationIds: null } }).ok).toBe(false);
+    expect(
+      validateNextControl({
+        ...base,
+        successor: { operationKinds: ["LEARN_MOVE"], operationIds: [] },
+      }).ok,
+    ).toBe(false);
   });
 
   it("rejects malformed and retired wire shapes without throwing", () => {
@@ -307,11 +328,14 @@ function fakeSurface(script: FakeSurfaceScript = {}) {
     fieldSlotOfPokemon: pid => script.fieldSlots?.[pid] ?? -1,
     isPlayerFieldSlot: fi => script.validFieldSlots?.has(fi) ?? true,
     installCommand: (...args) => calls.push({ verb: "installCommand", args }),
-    installReplacementPicker: (...args) => calls.push({ verb: "installReplacementPicker", args }),
-    installReplacementAwait: (...args) => calls.push({ verb: "installReplacementAwait", args }),
     installReward: (...args) => calls.push({ verb: "installReward", args }),
     installBiome: (...args) => calls.push({ verb: "installBiome", args }),
     installMystery: (...args) => calls.push({ verb: "installMystery", args }),
+    installSharedInteraction: (...args) => {
+      calls.push({ verb: "installSharedInteraction", args });
+      return true;
+    },
+    installSuccessorWait: (...args) => calls.push({ verb: "installSuccessorWait", args }),
     installTerminal: (...args) => calls.push({ verb: "installTerminal", args }),
   };
   return { surface, calls };
@@ -407,31 +431,40 @@ describe("DefaultCoopControlProjector", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("projects REPLACEMENT to the owner's picker when local seat owns it", () => {
-    const c = replacement({ ownerSeatId: 1, fieldIndex: 1 });
-    const { result, calls } = project(c, { validFieldSlots: new Set([1]) }, /*localSeatId*/ 1);
-    expect(result.kind).toBe("installed");
-    expect(calls[0].verb).toBe("installReplacementPicker");
-  });
-
-  it("projects REPLACEMENT to the non-owner's await when a different seat owns it", () => {
-    const c = replacement({ ownerSeatId: 1, fieldIndex: 1 });
-    const { result, calls } = project(c, { validFieldSlots: new Set([1]) }, /*localSeatId*/ 0);
-    expect(result.kind).toBe("installed");
-    expect(calls[0].verb).toBe("installReplacementAwait");
-  });
-
-  it("rejects REPLACEMENT whose field slot is outside the battle geometry", () => {
-    const c = replacement({ fieldIndex: 5 });
-    const { result, calls } = project(c, { validFieldSlots: new Set([0, 1]) });
-    expect(result.kind).toBe("rejected");
-    expect(calls).toHaveLength(0);
-  });
-
   it("installs the owning interaction surface for REWARD / BIOME / MYSTERY", () => {
     expect(project(reward(), {}).calls[0].verb).toBe("installReward");
     expect(project({ kind: "BIOME", operationId: "b", ownerSeatId: 0 }, {}).calls[0].verb).toBe("installBiome");
     expect(project({ kind: "MYSTERY", operationId: "m", ownerSeatId: 0 }, {}).calls[0].verb).toBe("installMystery");
+  });
+
+  it("projects registered shared interactions and explicit address-constrained successor waits", () => {
+    expect(
+      project(
+        {
+          kind: "SHARED_INTERACTION",
+          operationId: "learn-1",
+          ownerSeatId: 1,
+          surfaceClass: "op:learnMove",
+          operationKind: "LEARN_MOVE",
+          successor: { operationKinds: ["LEARN_MOVE"], operationIds: ["learn-result-1"] },
+        },
+        {},
+      ).calls[0].verb,
+    ).toBe("installSharedInteraction");
+    expect(
+      project(
+        {
+          kind: "AWAIT_SUCCESSOR",
+          afterOperationId: "done-1",
+          epoch: 1,
+          wave: 2,
+          turn: 3,
+          allowedKinds: ["WAVE_ADVANCE", "TERMINAL_COMMIT"],
+          expectedOperationId: null,
+        },
+        {},
+      ).calls[0].verb,
+    ).toBe("installSuccessorWait");
   });
 
   it("installs the shared terminal freeze for TERMINAL", () => {
@@ -583,7 +616,7 @@ describe("applyEntry (replica pipeline)", () => {
 
   it("surfaces a rejected control without retiring (no controlInstalled)", () => {
     const rec = recordingSink();
-    const out = applyEntry(CTX, entryWith(replacement()), {
+    const out = applyEntry(CTX, entryWith(reward()), {
       applyMaterial: () => true,
       projector: fixedProjector({ kind: "rejected", reason: "impossible" }),
       receipts: rec.sink,
@@ -591,18 +624,6 @@ describe("applyEntry (replica pipeline)", () => {
     });
     expect(rec.stages).toEqual(["admitted", "materialApplied"]);
     expect(out).toMatchObject({ kind: "controlRejected", reason: "impossible" });
-  });
-
-  it("treats a null nextControl as complete at materialApplied", () => {
-    const rec = recordingSink();
-    const out = applyEntry(CTX, entryWith(null), {
-      applyMaterial: () => true,
-      projector: fixedProjector({ kind: "installed", controlId: "unused" }),
-      receipts: rec.sink,
-      ...PIPELINE_BOOKKEEPING,
-    });
-    expect(rec.stages).toEqual(["admitted", "materialApplied"]);
-    expect(out).toEqual({ kind: "applied", controlId: null, presentationSettled: false });
   });
 
   it("emits presentationSettled opportunistically and never blocks on a throwing probe", () => {
@@ -653,8 +674,7 @@ describe("applyEntry (replica pipeline)", () => {
 });
 
 describe("expectedControlId", () => {
-  it("mirrors the projected controlId for a stated control and null for none", () => {
+  it("mirrors the projected controlId for the mandatory stated control", () => {
     expect(expectedControlId(entryWith(command()))).toBe(controlIdOf(command()));
-    expect(expectedControlId(entryWith(null))).toBeNull();
   });
 });

@@ -5,17 +5,24 @@
  */
 
 import { globalScene } from "#app/global-scene";
+import { Phase } from "#app/phase";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   armCoopLearnMoveBatchIntentResend,
   captureCoopLearnMoveOperationBinding,
+  coopLearnMoveDecisionOperationId,
+  isCoopLearnMoveAuthorityV2Active,
 } from "#data/elite-redux/coop/coop-learn-move-operation";
 import {
   clearCoopLearnMoveBatchInFlight,
+  failCoopSharedSession,
   getCoopInteractionRelay,
+  getCoopRuntime,
   getCoopUiMirror,
+  notifyCoopV2InteractionSurfaceReady,
   setCoopLearnMoveBatchPickerOpener,
+  settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import {
   COOP_LEARN_MOVE_BATCH_CHOICE_KINDS,
@@ -42,6 +49,82 @@ const LEARN_MOVE_BATCH_CHOICE_KIND = "learnMoveBatch";
 const COOP_LEARN_MOVE_BATCH_WAIT_MS = 1_200_000;
 
 /**
+ * Queue-owned batch presentation. `overridePhase` makes it the real current phase while preserving the
+ * parked renderer underneath, so Authority V2 can bind control to an exact phase/handler generation.
+ */
+export class CoopReplayLearnMoveBatchPhase extends Phase {
+  public readonly phaseName = "CoopReplayLearnMoveBatchPhase";
+  public coopV2ControlOperationId: string | null;
+  private readonly coopOwningRuntime = getCoopRuntime();
+  private closed = false;
+
+  constructor(
+    private readonly partySlot: number,
+    private readonly learnableIds: number[],
+    private readonly ownerIsGuest: boolean,
+    operationId: string | null = null,
+  ) {
+    super();
+    this.coopV2ControlOperationId = operationId;
+  }
+
+  public override start(): void {
+    super.start();
+    runCoopLearnMoveBatchPicker(this);
+  }
+
+  public installCoopV2LearnMoveBatchPresentation(
+    operationId: string,
+    partySlot: number,
+    learnableIds: readonly number[],
+    ownerIsGuest: boolean,
+  ): boolean {
+    if (
+      operationId.length === 0
+      || partySlot !== this.partySlot
+      || ownerIsGuest !== this.ownerIsGuest
+      || learnableIds.length !== this.learnableIds.length
+      || learnableIds.some((id, index) => id !== this.learnableIds[index])
+      || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
+    ) {
+      return false;
+    }
+    this.coopV2ControlOperationId = operationId;
+    notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+    return true;
+  }
+
+  public presentation(): {
+    readonly partySlot: number;
+    readonly learnableIds: readonly number[];
+    readonly ownerIsGuest: boolean;
+  } {
+    return {
+      partySlot: this.partySlot,
+      learnableIds: this.learnableIds,
+      ownerIsGuest: this.ownerIsGuest,
+    };
+  }
+
+  public owningRuntime(): ReturnType<typeof getCoopRuntime> {
+    return this.coopOwningRuntime;
+  }
+
+  /** Close the overlay and synchronously resume its exact standby phase once MESSAGE is installed. */
+  public closePanel(): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+    clearCoopLearnMoveBatchInFlight(this.partySlot);
+    globalScene.ui.setMode(UiMode.MESSAGE).then(
+      () => this.end(),
+      () => this.end(),
+    );
+  }
+}
+
+/**
  * INLINE batch Move Learn panel opener (#848), the GUEST half of the shared co-op level-up path. The host
  * streams a `learnMoveBatchForward` present when its {@linkcode LearnMoveBatchPhase} opens the panel; the
  * guest opens the SAME panel over its current (parked-renderer) screen:
@@ -58,7 +141,17 @@ export function openCoopLearnMoveBatchPickerInline(
   partySlot: number,
   learnableIds: number[],
   ownerIsGuest: boolean,
+  operationId?: string,
 ): void {
+  const phase = new CoopReplayLearnMoveBatchPhase(partySlot, [...learnableIds], ownerIsGuest, operationId ?? null);
+  if (!globalScene.phaseManager.overridePhase(phase)) {
+    clearCoopLearnMoveBatchInFlight(partySlot);
+    coopWarn("learnmove", `batch phase override refused slot=${partySlot}; retained presentation will retry`);
+  }
+}
+
+function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void {
+  const { partySlot, learnableIds, ownerIsGuest } = phase.presentation();
   const relay = getCoopInteractionRelay();
   const pokemon = globalScene.getPlayerParty()[partySlot];
   const seq = COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE + partySlot;
@@ -67,7 +160,7 @@ export function openCoopLearnMoveBatchPickerInline(
       partySlot,
       hasRelay: relay != null,
     });
-    clearCoopLearnMoveBatchInFlight(partySlot);
+    phase.closePanel();
     return;
   }
   const operationBinding = captureCoopLearnMoveOperationBinding("guest");
@@ -87,7 +180,7 @@ export function openCoopLearnMoveBatchPickerInline(
   // opened with setModeWithoutClear WITHOUT a chained mode, so revertMode would find an empty modeChain and
   // NOT close it (the panel would strand). setMode(MESSAGE) reliably tears it down.
   const closePanel = (): void => {
-    void globalScene.ui.setMode(UiMode.MESSAGE);
+    phase.closePanel();
   };
 
   coopLog("learnmove", "guest inline batch Move Learn panel OPEN", {
@@ -135,7 +228,19 @@ export function openCoopLearnMoveBatchPickerInline(
           },
           operationBinding,
         );
-        clearCoopLearnMoveBatchInFlight(partySlot);
+        if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
+          const decisionOperationId =
+            phase.coopV2ControlOperationId == null
+              ? null
+              : coopLearnMoveDecisionOperationId(phase.coopV2ControlOperationId);
+          if (
+            decisionOperationId == null
+            || !settleCoopV2InteractionOperation(decisionOperationId, phase.owningRuntime())
+          ) {
+            failCoopSharedSession(`Guest batch learn result for slot ${partySlot} lost its exact V2 address`);
+            return;
+          }
+        }
         closePanel();
       },
       fallback: () => {
@@ -158,12 +263,25 @@ export function openCoopLearnMoveBatchPickerInline(
           },
           operationBinding,
         );
-        clearCoopLearnMoveBatchInFlight(partySlot);
+        if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
+          const decisionOperationId =
+            phase.coopV2ControlOperationId == null
+              ? null
+              : coopLearnMoveDecisionOperationId(phase.coopV2ControlOperationId);
+          if (
+            decisionOperationId == null
+            || !settleCoopV2InteractionOperation(decisionOperationId, phase.owningRuntime())
+          ) {
+            failCoopSharedSession(`Guest batch fallback for slot ${partySlot} lost its exact V2 address`);
+            return;
+          }
+        }
         closePanel();
       },
     };
     void globalScene.ui.setModeWithoutClear(UiMode.LEARN_MOVE_BATCH, deps).then(() => {
       mirror?.beginSession("owner", UiMode.LEARN_MOVE_BATCH, seq);
+      notifyCoopV2InteractionSurfaceReady(phase.owningRuntime());
     });
     return;
   }
@@ -177,7 +295,7 @@ export function openCoopLearnMoveBatchPickerInline(
     }
     settled = true;
     mirror?.endSession();
-    if (applyTerminal != null) {
+    if (applyTerminal != null && !isCoopLearnMoveAuthorityV2Active(operationBinding)) {
       // Converge the guest's cosmetic moveset to the host's authoritative final set (the per-turn
       // checkpoint would also heal it, but applying now avoids a visible flicker).
       restoreSnapshot();
@@ -186,7 +304,6 @@ export function openCoopLearnMoveBatchPickerInline(
         initMoveAnim(moveId).then(() => loadMoveAnimAssets([moveId], true));
       }
     }
-    clearCoopLearnMoveBatchInFlight(partySlot);
     closePanel();
   };
   const watchDeps: LearnMoveBatchDeps = {
@@ -201,14 +318,35 @@ export function openCoopLearnMoveBatchPickerInline(
     done: () => {
       /* the authoritative close is the awaited terminal, not the replayed button */
     },
-    fallback: () => finishWatch(null),
+    fallback: () => {
+      if (!isCoopLearnMoveAuthorityV2Active(operationBinding)) {
+        finishWatch(null);
+      }
+      // Under V2 a cosmetic handler cannot retire the exact control. The retained immutable result (or
+      // shared-session failure) remains the only terminal for this queue-owned replay phase.
+    },
   };
   void globalScene.ui.setModeWithoutClear(UiMode.LEARN_MOVE_BATCH, watchDeps).then(() => {
     mirror?.beginSession("watcher", UiMode.LEARN_MOVE_BATCH, seq);
+    notifyCoopV2InteractionSurfaceReady(phase.owningRuntime());
   });
   void relay
     .awaitInteractionChoice(seq, COOP_LEARN_MOVE_BATCH_WAIT_MS, COOP_LEARN_MOVE_BATCH_CHOICE_KINDS)
     .then(res => {
+      if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
+        const expectedOperationId =
+          phase.coopV2ControlOperationId == null
+            ? null
+            : coopLearnMoveDecisionOperationId(phase.coopV2ControlOperationId);
+        if (
+          expectedOperationId == null
+          || res?.operationId !== expectedOperationId
+          || !settleCoopV2InteractionOperation(expectedOperationId, phase.owningRuntime())
+        ) {
+          failCoopSharedSession(`Guest batch watcher for slot ${partySlot} could not settle its exact V2 result`);
+          return;
+        }
+      }
       if (res == null || res.choice === COOP_LEARN_MOVE_BATCH_FALLBACK) {
         coopLog("learnmove", "guest watcher batch terminal null/fallback -> close (moveset converges via checkpoint)", {
           seq,

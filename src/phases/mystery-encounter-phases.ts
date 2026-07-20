@@ -53,6 +53,7 @@ import {
   getCoopRuntime,
   isCoopAuthoritativeGuest,
   setCoopMeBattleInteractionCounter,
+  settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ME_PICK_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
@@ -263,6 +264,7 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
       localRole: "host",
       wave,
       turn: 0,
+      beforeAuthorityCommit: operationId => settleCoopV2InteractionOperation(operationId, getCoopRuntime()),
     });
     if (terminalOperationId == null) {
       coopWarn("me", "coopEndMePump HOLD: exact authoritative leave did not commit");

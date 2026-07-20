@@ -147,6 +147,7 @@ jobs:
           VITE_COOP_AUTHORITY_V2_TURN: "on"
           VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"
           VITE_COOP_AUTHORITY_V2_WAVE: "on"
+          VITE_COOP_AUTHORITY_V2_INTERACTION: "on"
           VITE_COOP_AUTHORITY_V2_RECOVERY: "on"
           BUNDLE_CACHE_HIT: ${{ steps.bundle-cache.outputs.cache-hit }}
         shell: bash
@@ -462,6 +463,9 @@ jobs:
           # Surface 3: the settled state, executable post-battle transition, and destination control live
           # in the same retained V2 entry; legacy wave carriers/journal remain cosmetic only.
           COOP_AUTHORITY_V2_WAVE: "on"
+          # Surface 4: every registered shared interaction is a complete immutable result with a typed
+          # successor. Recovery is intentionally unadvertised unless this all-or-nothing cutover is active.
+          COOP_AUTHORITY_V2_INTERACTION: "on"
           COOP_AUTHORITY_V2_RECOVERY: "on"
         shell: bash
         run: |

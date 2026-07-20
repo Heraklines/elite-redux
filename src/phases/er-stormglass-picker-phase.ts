@@ -27,16 +27,28 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
+import type { CoopStormglassPresentationPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
+  notifyCoopV2InteractionSurfaceReady,
+  settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_STORMGLASS_CHOICE_KINDS, COOP_STORMGLASS_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
-import { commitCoopStormglassDecision } from "#data/elite-redux/coop/coop-stormglass-operation";
+import {
+  type CoopStormglassOperationBinding,
+  captureCoopStormglassOperationBinding,
+  commitCoopStormglassDecision,
+  commitCoopStormglassPresentation,
+  coopStormglassDecisionOperationId,
+  coopStormglassPresentationOperationId,
+  settleCoopStormglassOperation,
+} from "#data/elite-redux/coop/coop-stormglass-operation";
 import {
   erStormglassApplyChosenWeather,
   getStormglassWeather,
@@ -54,11 +66,23 @@ const STORMGLASS_WATCH_PROMPT = "The Stormglass hums. Your partner is choosing t
 
 export class ErStormglassPickerPhase extends Phase {
   public readonly phaseName = "ErStormglassPickerPhase";
+  /** Exact V2 presentation address owned by this phase generation. */
+  public coopV2ControlOperationId: string | null = null;
 
   /** Guards against a double input resolving the prompt twice. */
   private resolving = false;
   /** Co-op (#130): this client drives the real picker (host / solo); the guest watches + adopts. */
   private coopOwner = true;
+  /** Exact runtime that owns this picker across its async UI/watcher tails. */
+  private readonly coopOwningRuntime;
+  /** Per-runtime operation state captured before any picker callback/await. */
+  private readonly coopOperationBinding: CoopStormglassOperationBinding | null;
+
+  constructor() {
+    super();
+    this.coopOwningRuntime = getCoopRuntime();
+    this.coopOperationBinding = this.coopOwningRuntime == null ? null : captureCoopStormglassOperationBinding();
+  }
 
   start(): void {
     super.start();
@@ -89,8 +113,45 @@ export class ErStormglassPickerPhase extends Phase {
         void this.coopWatch();
         return;
       }
+      this.coopV2ControlOperationId = coopStormglassPresentationOperationId(this.coopOperationBinding);
+      const presented = commitCoopStormglassPresentation(
+        STORMGLASS_WEATHER_CHOICES.map((choice, weatherIndex) => ({
+          weatherIndex,
+          weather: choice.weather,
+        })),
+        {
+          localRole: controller.role,
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+        },
+        this.coopOperationBinding,
+      );
+      if (!presented) {
+        failCoopSharedSession("Stormglass presentation could not enter durable authority");
+        return;
+      }
     }
     this.openPicker();
+  }
+
+  /** Bind the authority-authored weather board to this exact phase generation. */
+  public installCoopV2StormglassPresentation(
+    operationId: string,
+    presentation: CoopStormglassPresentationPayload,
+  ): boolean {
+    const expected = STORMGLASS_WEATHER_CHOICES.map((choice, weatherIndex) => ({
+      weatherIndex,
+      weather: choice.weather,
+    }));
+    if (
+      operationId.length === 0
+      || JSON.stringify(presentation.options) !== JSON.stringify(expected)
+      || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
+    ) {
+      return false;
+    }
+    this.coopV2ControlOperationId = operationId;
+    return true;
   }
 
   /** Show the prompt line, then the 5-weather option select. */
@@ -100,7 +161,9 @@ export class ErStormglassPickerPhase extends Phase {
         label: choice.label,
         handler: () => this.pick(choice.weather, index),
       }));
-      globalScene.ui.setMode(UiMode.OPTION_SELECT, { options });
+      Promise.resolve(globalScene.ui.setMode(UiMode.OPTION_SELECT, { options })).then(() =>
+        notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime),
+      );
     });
   }
 
@@ -116,31 +179,45 @@ export class ErStormglassPickerPhase extends Phase {
     }
     this.resolving = true;
     setStormglassWeather(weather);
-    // Co-op OWNER: relay the chosen weather index so the guest applies the identical weather.
-    if (globalScene.gameMode.isCoop && this.coopOwner) {
-      try {
-        const relay = getCoopInteractionRelay();
-        if (relay != null) {
-          const retained = commitCoopStormglassDecision(relay, index, weather, {
-            localRole: "host",
-            wave: globalScene.currentBattle?.waveIndex ?? 0,
-            turn: globalScene.currentBattle?.turn ?? 0,
-          });
-          if (!retained) {
-            failCoopSharedSession("Stormglass decision could not enter durable authority");
-            return true;
-          }
-        }
-        coopLog("reward", `stormglass OWNER commit weather=${weather} index=${index} (#130)`);
-      } catch {
-        coopWarn("reward", "stormglass OWNER relay send threw (handled - watcher heals on checkpoint) (#130)");
-      }
-    }
     // Tear the option menu back down to MESSAGE before applying + ending so the
     // following encounter flow doesn't race the dead OPTION_SELECT (the bargain
     // sub-menu softlock class). The chosen weather wins over the biome ambient.
     globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
       erStormglassApplyChosenWeather();
+      // The result entry is authored only after the local picker and weather application are complete.
+      if (globalScene.gameMode.isCoop && this.coopOwner) {
+        try {
+          const relay = getCoopInteractionRelay();
+          const operationId =
+            this.coopV2ControlOperationId == null
+              ? null
+              : coopStormglassDecisionOperationId(this.coopV2ControlOperationId);
+          if (
+            relay == null
+            || operationId == null
+            || !settleCoopStormglassOperation(operationId, this.coopOperationBinding)
+            || !settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime)
+            || !commitCoopStormglassDecision(
+              relay,
+              index,
+              weather,
+              {
+                localRole: "host",
+                wave: globalScene.currentBattle?.waveIndex ?? 0,
+                turn: globalScene.currentBattle?.turn ?? 0,
+              },
+              this.coopOperationBinding,
+            )
+          ) {
+            failCoopSharedSession("Stormglass decision could not enter durable authority");
+            return;
+          }
+          coopLog("reward", `stormglass OWNER commit weather=${weather} index=${index} (#130)`);
+        } catch {
+          failCoopSharedSession("Stormglass decision threw before entering durable authority");
+          return;
+        }
+      }
       this.end();
     });
     return true;
@@ -154,6 +231,7 @@ export class ErStormglassPickerPhase extends Phase {
   private async coopWatch(): Promise<void> {
     try {
       globalScene.ui.showText(STORMGLASS_WATCH_PROMPT);
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
     } catch {
       /* cosmetic */
     }
@@ -164,14 +242,35 @@ export class ErStormglassPickerPhase extends Phase {
         : await relay.awaitInteractionChoice(COOP_STORMGLASS_SEQ, COOP_BIOME_WAIT_MS, COOP_STORMGLASS_CHOICE_KINDS);
     const choice = STORMGLASS_WEATHER_CHOICES[res?.choice ?? -1];
     if (choice == null) {
+      if (isCoopV2InteractionCutoverActive(this.coopOperationBinding?.durability)) {
+        failCoopSharedSession("Stormglass watcher did not receive its exact retained decision");
+        return;
+      }
       coopWarn(
         "reward",
         `stormglass WATCHER: ${res == null ? "TIMEOUT" : "bad index"} -> leave unset, checkpoint heals (#130)`,
       );
     } else {
-      setStormglassWeather(choice.weather);
+      if (!isCoopV2InteractionCutoverActive(this.coopOperationBinding?.durability)) {
+        setStormglassWeather(choice.weather);
+      }
       coopLog("reward", `stormglass WATCHER adopt weather=${choice.weather} index=${res?.choice} (#130)`);
-      erStormglassApplyChosenWeather();
+      if (!isCoopV2InteractionCutoverActive(this.coopOperationBinding?.durability)) {
+        erStormglassApplyChosenWeather();
+      }
+    }
+    const expectedOperationId =
+      this.coopV2ControlOperationId == null ? null : coopStormglassDecisionOperationId(this.coopV2ControlOperationId);
+    if (
+      isCoopV2InteractionCutoverActive(this.coopOperationBinding?.durability)
+      && (expectedOperationId == null || res?.operationId !== expectedOperationId)
+    ) {
+      failCoopSharedSession("Stormglass watcher received a decision outside its exact V2 presentation address");
+      return;
+    }
+    if (typeof res?.operationId === "string") {
+      settleCoopStormglassOperation(res.operationId, this.coopOperationBinding);
+      settleCoopV2InteractionOperation(res.operationId, this.coopOwningRuntime);
     }
     void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
   }

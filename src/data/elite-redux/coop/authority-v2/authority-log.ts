@@ -61,12 +61,18 @@ import type {
   CoopAuthorityReceipt,
   CoopFrameContextV2,
   CoopNextControl,
+  CoopRecoveryNextControl,
   CoopReplicaMechanicalStage,
   CoopScheduler,
   CoopTimeClass,
   CoopTimerOwner,
 } from "#data/elite-redux/coop/authority-v2/contract";
-import { controlIdOf, controlsEqual } from "#data/elite-redux/coop/authority-v2/next-control";
+import {
+  controlAllowsSuccessorEntry,
+  controlIdOf,
+  controlsEqual,
+  validateNextControl,
+} from "#data/elite-redux/coop/authority-v2/next-control";
 
 /** Monotonic index of each ACK stage. Retirement compares against these; presentationSettled is never required. */
 const STAGE_ORDER: Readonly<Record<CoopAckStage, number>> = {
@@ -225,7 +231,9 @@ export interface AuthorityLogDiagnostics {
  */
 export interface CoopAuthorityRecoverySliceV2 {
   readonly frontier: number;
-  readonly nextControl: CoopNextControl;
+  /** Exact operation at `frontier`; null only for the empty revision-zero log. */
+  readonly frontierOperationId: string | null;
+  readonly nextControl: CoopRecoveryNextControl;
   readonly requiredTail: readonly CoopAuthorityEntry[];
 }
 
@@ -293,7 +301,13 @@ export class AuthorityLog implements CoopAuthorityLog {
   /** AUTHORITY: the highest revision assigned (commit assigns headRevision + 1). */
   private headRevision = 0;
   /** AUTHORITY: constant-size successor metadata for a snapshot taken after the head entry retired. */
-  private latestNextControl: CoopNextControl = null;
+  private latestNextControl: CoopNextControl | null = null;
+  private latestCommittedOperationId: string | null = null;
+  private pendingReplicaSuccessorControl: {
+    readonly revision: number;
+    readonly operationId: string;
+    readonly control: CoopNextControl;
+  } | null = null;
   private retentionRefusals = 0;
   private wireSendFailures = 0;
   private disposed = false;
@@ -463,8 +477,15 @@ export class AuthorityLog implements CoopAuthorityLog {
   // AUTHORITY side
   // ---------------------------------------------------------------------------
 
-  /** Commit the next entry: assign the next global revision, freeze + retain it, deliver + start redelivery. */
-  commit(entry: Omit<CoopAuthorityEntry, "revision">): CoopAuthorityEntry {
+  /**
+   * Commit the next entry: assign the next global revision, freeze + retain it, reserve the authority-local
+   * successor, then publish + start redelivery. A failed local reservation is indistinguishable from a
+   * failed retention admission: it consumes no revision and emits no frame.
+   */
+  commit(
+    entry: Omit<CoopAuthorityEntry, "revision">,
+    prepare?: (entry: CoopAuthorityEntry) => (() => void) | null,
+  ): CoopAuthorityEntry {
     if (this.disposed) {
       throw new Error("AuthorityLog.commit after dispose");
     }
@@ -484,10 +505,27 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       throw new Error("AuthorityLog.commit: entry context is not bound to the local authority");
     }
+    if (this.latestNextControl?.kind === "TERMINAL") {
+      throw new Error("AuthorityLog.commit: terminal frontier is final");
+    }
+    if (
+      this.latestNextControl != null
+      && (this.latestCommittedOperationId == null
+        || !controlAllowsSuccessorEntry(this.latestNextControl, this.latestCommittedOperationId, entry))
+    ) {
+      throw new Error(
+        `AuthorityLog.commit: ${entry.kind} is not authorized by predecessor control after `
+          + `${this.latestCommittedOperationId ?? "(missing predecessor)"}`,
+      );
+    }
     const revision = this.headRevision + 1;
+    const candidate = { ...entry, revision };
+    if (!isValidAuthorityEntry(candidate)) {
+      throw new Error("AuthorityLog.commit: malformed mechanical entry or missing successor control");
+    }
     // Own an immutable, caller-independent copy so a caller reusing/mutating its source object can never
     // rewrite what a later redelivery transmits (the retention immutability boundary).
-    const committed = freezeAuthorityEntry(cloneEntry({ ...entry, revision }));
+    const committed = freezeAuthorityEntry(cloneEntry(candidate));
 
     const lease: DeliveryLease = {
       revision,
@@ -512,10 +550,25 @@ export class AuthorityLog implements CoopAuthorityLog {
       this.retentionRefusals += 1;
       throw new AuthorityRetentionOverflowError(this.retentionCapacity, revision);
     }
+    let rollback: (() => void) | null = null;
+    try {
+      rollback = prepare?.(committed) ?? null;
+      if (prepare != null && rollback == null) {
+        throw new Error("AuthorityLog.commit: authority-local successor reservation refused");
+      }
+    } catch (error) {
+      // No timer or wire egress exists yet. Remove the provisional lease and ask a successful reservation
+      // to restore its local ledger snapshot before propagating the clean commit failure.
+      this.retainedWindow.delete(revision);
+      rollback?.();
+      throw error;
+    }
     // A revision exists only after retention accepted it. An overflow therefore
-    // never burns a number and cannot create an unfillable replica gap.
+    // never burns a number and cannot create an unfillable replica gap. The same is now true of a local
+    // successor-reservation refusal above.
     this.headRevision = revision;
     this.latestNextControl = structuredClone(committed.nextControl);
+    this.latestCommittedOperationId = committed.operationId;
 
     // Deliver once immediately, then redeliver on the backoff until mechanically retired.
     this.sendGuarded({ kind: "deliver", entry: committed });
@@ -579,15 +632,15 @@ export class AuthorityLog implements CoopAuthorityLog {
       return { kind: "rejected", reason: "connection-generation-mismatch" };
     }
     if (receipt.stage === "controlInstalled") {
-      const expectedControlId = lease.entry.nextControl == null ? null : controlIdOf(lease.entry.nextControl);
-      if (expectedControlId == null || receipt.controlId !== expectedControlId) {
+      const expectedControlId = controlIdOf(lease.entry.nextControl);
+      if (receipt.controlId !== expectedControlId) {
         return { kind: "rejected", reason: "control-id-mismatch" };
       }
     } else if (receipt.controlId != null) {
       return { kind: "rejected", reason: "unexpected-control-id" };
     }
     const stageIdx = STAGE_ORDER[receipt.stage];
-    const required = lease.entry.nextControl == null ? STAGE_ORDER.materialApplied : STAGE_ORDER.controlInstalled;
+    const required = STAGE_ORDER.controlInstalled;
     // Presentation is intentionally outside the retirement rule. It is not a substitute for the exact
     // mechanical proof below it (in particular it carries no successor controlId), so it may only be
     // observed after the required stage was already proven.
@@ -608,8 +661,8 @@ export class AuthorityLog implements CoopAuthorityLog {
         this.retire(subsumed);
       }
     }
-    // Retirement rule: admitted + materialApplied + (controlInstalled where nextControl != null). Never
-    // presentationSettled.
+    // Retirement rule: admitted + materialApplied + controlInstalled. AWAIT_SUCCESSOR is a real, addressed
+    // ordering control whose ledger proof is required just like an executable UI successor.
     if (allPeersReached(lease, required)) {
       return {
         kind: "advanced",
@@ -653,8 +706,15 @@ export class AuthorityLog implements CoopAuthorityLog {
       return null;
     }
     if (capturedFrontier === this.headRevision) {
+      if (
+        (this.headRevision === 0 && (this.latestCommittedOperationId !== null || this.latestNextControl !== null))
+        || (this.headRevision > 0 && (this.latestCommittedOperationId === null || this.latestNextControl === null))
+      ) {
+        return null;
+      }
       return Object.freeze({
         frontier: this.headRevision,
+        frontierOperationId: this.latestCommittedOperationId,
         nextControl: structuredClone(this.latestNextControl),
         requiredTail: Object.freeze([]),
       });
@@ -670,11 +730,12 @@ export class AuthorityLog implements CoopAuthorityLog {
       requiredTail.push(entry);
     }
     const last = requiredTail.at(-1);
-    if (last == null || !controlsEqual(last.nextControl, this.latestNextControl)) {
+    if (last == null || this.latestNextControl == null || !controlsEqual(last.nextControl, this.latestNextControl)) {
       return null;
     }
     return Object.freeze({
       frontier: this.headRevision,
+      frontierOperationId: last.operationId,
       nextControl: structuredClone(this.latestNextControl),
       requiredTail: Object.freeze(requiredTail),
     });
@@ -741,9 +802,21 @@ export class AuthorityLog implements CoopAuthorityLog {
       }
       default:
         // Exactly the next revision: journal it, but do NOT advance material/control truth yet.
+        if (
+          this.pendingReplicaSuccessorControl != null
+          && (entry.revision !== this.pendingReplicaSuccessorControl.revision + 1
+            || !controlAllowsSuccessorEntry(
+              this.pendingReplicaSuccessorControl.control,
+              this.pendingReplicaSuccessorControl.operationId,
+              entry,
+            ))
+        ) {
+          return { kind: "rejected", reason: "predecessor-control-mismatch" };
+        }
         if (!this.ledger.markReceived(entry.revision)) {
           return { kind: "rejected", reason: "replica-ledger-refused-admission" };
         }
+        this.pendingReplicaSuccessorControl = null;
         this.pendingReplicaEntry = freezeAuthorityEntry(cloneEntry(entry));
         return { kind: "admitted" };
     }
@@ -756,11 +829,16 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     let advanced = false;
     if (stage === "materialApplied") {
-      advanced = this.ledger.markMaterialApplied(entry.revision, entry.nextControl != null);
-    } else if (entry.nextControl != null) {
+      advanced = this.ledger.markMaterialApplied(entry.revision, true);
+    } else {
       advanced = this.ledger.markControlInstalled(entry.revision);
     }
     if (advanced && this.ledger.controlInstalledThrough() >= entry.revision) {
+      this.pendingReplicaSuccessorControl = {
+        revision: entry.revision,
+        operationId: entry.operationId,
+        control: structuredClone(entry.nextControl),
+      };
       this.pendingReplicaEntry = null;
       if (this.pendingTailRequestFrom != null && this.ledger.controlInstalledThrough() >= this.pendingTailRequestFrom) {
         this.pendingTailRequestFrom = null;
@@ -789,12 +867,30 @@ export class AuthorityLog implements CoopAuthorityLog {
   // ---------------------------------------------------------------------------
 
   /** Adopt a proven snapshot high-water (recovery): fast-forward the cursor; retire entries it has proven. */
-  adoptFrontier(revision: number): void {
+  adoptFrontier(
+    revision: number,
+    terminal?: { readonly operationId: string; readonly nextControl: CoopNextControl },
+  ): void {
     if (this.disposed || !Number.isSafeInteger(revision) || revision <= 0) {
+      return;
+    }
+    if (
+      terminal !== undefined
+      && (!isValidOperationId(terminal.operationId) || !validateNextControl(terminal.nextControl).ok)
+    ) {
       return;
     }
     // Replica: fast-forward the applied cursor past any gap the snapshot filled.
     this.ledger.adoptFrontier(revision);
+    if (terminal !== undefined) {
+      this.latestCommittedOperationId = terminal.operationId;
+      this.latestNextControl = structuredClone(terminal.nextControl);
+      this.pendingReplicaSuccessorControl = {
+        revision,
+        operationId: terminal.operationId,
+        control: structuredClone(terminal.nextControl),
+      };
+    }
     if (this.pendingTailRequestFrom != null && revision >= this.pendingTailRequestFrom) {
       this.pendingTailRequestFrom = null;
     }
@@ -825,6 +921,10 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     this.retainedWindow.clear();
     this.pendingTailRequestFrom = null;
+    this.pendingReplicaEntry = null;
+    this.pendingReplicaSuccessorControl = null;
+    this.latestCommittedOperationId = null;
+    this.latestNextControl = null;
   }
 
   /** Live counts for the no-orphan-timer + bounded-retention invariants (tests assert these directly). */
@@ -950,7 +1050,7 @@ function cloneEntry(entry: CoopAuthorityEntry): CoopAuthorityEntry {
     operationId: entry.operationId,
     kind: entry.kind,
     material: { digest: entry.material.digest, payload: clonePayload(entry.material.payload) },
-    nextControl: entry.nextControl == null ? null : { ...entry.nextControl },
+    nextControl: { ...entry.nextControl },
     subsumes: [...entry.subsumes],
   };
 }

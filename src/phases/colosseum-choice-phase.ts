@@ -20,14 +20,25 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import {
+  coopColosseumActiveBoardOperationId,
   coopColosseumAwaitDecision,
   coopColosseumBoardIsCoop,
   coopColosseumBoardOwnedLocally,
   coopColosseumSendDecision,
   coopColosseumStreamBoard,
 } from "#data/elite-redux/coop/coop-colosseum";
+import {
+  coopColosseumDecisionOperationId,
+  isCoopColosseumAuthorityV2Active,
+} from "#data/elite-redux/coop/coop-colosseum-operation";
 import { coopMeInteractionStartValue, setCoopMeColosseumControl } from "#data/elite-redux/coop/coop-me-pin-state";
-import { coopSessionGeneration, failCoopSharedSession, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  coopSessionGeneration,
+  failCoopSharedSession,
+  getCoopRuntime,
+  notifyCoopV2InteractionSurfaceReady,
+  settleCoopV2InteractionOperation,
+} from "#data/elite-redux/coop/coop-runtime";
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
@@ -56,11 +67,13 @@ const TIER_TAG: Record<ColosseumChallenger["tier"], string> = {
 
 export class ColosseumChoicePhase extends Phase {
   public readonly phaseName = "ColosseumChoicePhase";
+  public coopV2ControlOperationId: string | null = null;
 
   /** Battles won so far (1..MAX_ROUNDS - 1); the banked grade is TIER_LADDER[wins-1]. */
   private readonly wins: number;
   /** Guards against a double input firing the resolution twice. */
   private resolving = false;
+  private readonly coopOwningRuntime = getCoopRuntime();
 
   constructor(wins: number) {
     super();
@@ -121,6 +134,11 @@ export class ColosseumChoicePhase extends Phase {
     ) {
       return;
     }
+    this.coopV2ControlOperationId = coopColosseumActiveBoardOperationId(pinned);
+    if (isCoopColosseumAuthorityV2Active() && this.coopV2ControlOperationId == null) {
+      failCoopSharedSession(`Colosseum board ${pinned}/${data.round} lost its exact V2 presentation address`);
+      return;
+    }
     // Co-op (#829): on a GUEST-OWNED board the partner (guest) drives the CONTINUE / CASH-OUT decision on
     // its own capture UI + relays it; the host (sole engine) AWAITS the relayed index and applies it, taking
     // NO local input (mirrors coopHostAwaitGuestIndex for the top-level ME pick). A null resolution retains
@@ -128,7 +146,17 @@ export class ColosseumChoicePhase extends Phase {
     // local input below - coopColosseumBoardIsCoop() is false in solo, so solo is byte-identical.
     if (coopColosseumBoardIsCoop() && !coopColosseumBoardOwnedLocally()) {
       showCoopControllerTagFor(false); // amber: the partner is deciding
-      const idx = await coopColosseumAwaitDecision();
+      const watcherOpened = await globalScene.ui.setModeBoundedWhen(UiMode.COLOSSEUM, 2_000, live, data, () => {
+        /* watcher: only the immutable decision may close this board */
+      });
+      if (watcherOpened === "superseded" || !live()) {
+        failCoopSharedSession(`Colosseum watcher UI could not bind for ${pinned}`);
+        return;
+      }
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+      const idx = await coopColosseumAwaitDecision(undefined, data.round, undefined, operationId =>
+        settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime),
+      );
       if (!live()) {
         return;
       }
@@ -148,7 +176,23 @@ export class ColosseumChoicePhase extends Phase {
     });
     if (opened === "superseded" && live()) {
       failCoopSharedSession(`Colosseum board UI could not bind for ${pinned}`);
+    } else if (opened !== "superseded") {
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
     }
+  }
+
+  /** Mark the deterministic board-result address at the real local choice edge, before host commit. */
+  private settleLocalV2Decision(): boolean {
+    if (!isCoopColosseumAuthorityV2Active()) {
+      return true;
+    }
+    const operationId =
+      this.coopV2ControlOperationId == null ? null : coopColosseumDecisionOperationId(this.coopV2ControlOperationId);
+    if (operationId == null || !settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime)) {
+      failCoopSharedSession(`Colosseum board round ${this.wins} could not settle its exact V2 decision`);
+      return false;
+    }
+    return true;
   }
 
   private async onChoice(choice: number): Promise<void> {
@@ -161,7 +205,10 @@ export class ColosseumChoicePhase extends Phase {
     // SAME branch - but ONLY when the LOCAL client owns the board (host-owned, or solo where the send is a
     // hard no-op anyway). On a GUEST-owned board the guest already relayed its pick and the host is APPLYING
     // it here (open() awaited it), so re-sending would echo a second pick onto the board seq. FIRE-AND-FORGET.
-    if ((!coopColosseumBoardIsCoop() || coopColosseumBoardOwnedLocally()) && !coopColosseumSendDecision(choice)) {
+    if (
+      (!coopColosseumBoardIsCoop() || coopColosseumBoardOwnedLocally())
+      && (!this.settleLocalV2Decision() || !coopColosseumSendDecision(choice))
+    ) {
       return;
     }
 

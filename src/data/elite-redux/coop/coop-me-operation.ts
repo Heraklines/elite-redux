@@ -50,21 +50,23 @@
 // cross-ME stale ordering still runs on the pinned counter (which advances once per whole ME).
 // =============================================================================
 
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import { captureCoopAuthoritativeBattleState, coopNextStateTick } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_CAP_OP_ME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
 import { setCoopMeOwnerIntentOrdinals } from "#data/elite-redux/coop/coop-me-pin-state";
+import { isCompleteCoopMeTerminalPayload } from "#data/elite-redux/coop/coop-me-terminal-validator";
+
+// biome-ignore lint/performance/noBarrelFile: retained compatibility export for existing co-op surface imports
+export { isCompleteCoopMeTerminalPayload } from "#data/elite-redux/coop/coop-me-terminal-validator";
+
 import {
-  COOP_ME_REROLL_MULTIPLIER_MAX,
-  COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
-  COOP_ME_REWARD_SURFACE_LIMIT,
   type CoopAuthoritativeEnvelopeV1,
   type CoopMeButtonPayload,
   type CoopMePickPayload,
   type CoopMePresentPayload,
-  type CoopMeRewardSurfaceProjection,
   type CoopMeSubPayload,
   type CoopMeTerminalDestination,
   type CoopMeTerminalKind,
@@ -77,6 +79,8 @@ import {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
+  type CoopOperationEnvelopeApplyContext,
+  isCoopOperationAuthorityV2Apply,
   isCoopOperationJournalActive,
   registerCoopOperationApplier,
   tryJournalCoopCommittedEnvelope,
@@ -87,22 +91,24 @@ import {
   CoopOperationGuest,
   CoopOperationHost,
   type CoopRuntimeOpState,
+  coopOperationCommitContext,
   maybeCoopOpSurfaceState,
   registerCoopOpSurfaceState,
   requireCoopOpSurfaceState,
   requireCoopOpSurfaceStateFor,
   resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
-import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_ME_PUMP_SEQ_BASE,
+  COOP_ME_TERM_SEQ_BASE,
+  coopQuizAnswerSeq,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopInteractionOutcome,
   CoopRole,
 } from "#data/elite-redux/coop/coop-transport";
-import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
-import { EggSourceType } from "#enums/egg-source-types";
-import { VariantTier } from "#enums/variant-tier";
 
 /** First-success latch for the immutable terminal DATA image reused by every journal retry. */
 export class CoopMeTerminalOutcomeLatch {
@@ -124,148 +130,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function isSafeNonNegativeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0;
-}
-
-function isBoundedNonNegativeInteger(value: unknown, maximum: number): value is number {
-  return isSafeNonNegativeInteger(value) && value <= maximum;
-}
-
-const COOP_ME_REWARD_SURFACE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$/;
-const COOP_ME_EGG_DESCRIPTOR_MAX_LENGTH = 256;
-const REGISTERED_EGG_SPECIES = new Set<number>(Object.values(ER_ID_MAP.species));
-const VALID_EGG_SOURCE_TYPES = new Set<number>(
-  Object.values(EggSourceType).filter((value): value is number => typeof value === "number"),
-);
-const VALID_VARIANT_TIERS = new Set<number>(
-  Object.values(VariantTier).filter((value): value is number => typeof value === "number"),
-);
-
-function isCanonicalCoopMeRewardSurfaceId(value: unknown): value is string {
-  return (
-    typeof value === "string"
-    && value.length <= COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH
-    && COOP_ME_REWARD_SURFACE_ID_PATTERN.test(value)
-  );
-}
-
-function isExecutableCoopMeRerollMultiplier(value: unknown): value is number {
-  return (
-    typeof value === "number"
-    && Number.isFinite(value)
-    && (value === -1 || (value >= 0 && value <= COOP_ME_REROLL_MULTIPLIER_MAX))
-  );
-}
-
-function isCompleteCoopMeRewardSurfacePlan(value: unknown): value is CoopMeRewardSurfaceProjection[] {
-  if (!Array.isArray(value) || value.length > COOP_ME_REWARD_SURFACE_LIMIT) {
-    return false;
-  }
-  const surfaceIds = new Set<string>();
-  for (const surface of value) {
-    if (!isPlainObject(surface) || !isCanonicalCoopMeRewardSurfaceId(surface.surfaceId)) {
-      return false;
-    }
-    const validSurface =
-      surface.kind === "modifier"
-        ? isExecutableCoopMeRerollMultiplier(surface.rerollMultiplier)
-        : surface.kind === "egg"
-          && isSafeNonNegativeInteger(surface.id)
-          && isSafeNonNegativeInteger(surface.timestamp)
-          && (surface.sourceType === null
-            || (isSafeNonNegativeInteger(surface.sourceType) && VALID_EGG_SOURCE_TYPES.has(surface.sourceType)))
-          && isBoundedNonNegativeInteger(surface.tier, 3)
-          && isBoundedNonNegativeInteger(surface.hatchWaves, 1_000_000)
-          && isSafeNonNegativeInteger(surface.species)
-          && REGISTERED_EGG_SPECIES.has(surface.species)
-          && typeof surface.isShiny === "boolean"
-          && isSafeNonNegativeInteger(surface.variantTier)
-          && VALID_VARIANT_TIERS.has(surface.variantTier)
-          && isBoundedNonNegativeInteger(surface.eggMoveIndex, 3)
-          && typeof surface.overrideHiddenAbility === "boolean"
-          && (surface.eggDescriptor === null
-            || (typeof surface.eggDescriptor === "string"
-              && surface.eggDescriptor.length <= COOP_ME_EGG_DESCRIPTOR_MAX_LENGTH));
-    if (!validSurface || surfaceIds.has(surface.surfaceId)) {
-      return false;
-    }
-    surfaceIds.add(surface.surfaceId);
-  }
-  return true;
-}
-
-/**
- * Validate the P33 all-in-one terminal transaction before any scene mutation. A modern transaction must
- * carry the id-addressable authoritative state for both leave and battle destinations; accepting the old
- * split `{battle}` control shape here would recreate the raw-party/terminal race this contract removes.
- */
-export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMeTerminalPayload {
-  if (
-    !isPlainObject(value)
-    || (value.terminal !== "leave"
-      && value.terminal !== "battle"
-      && value.terminal !== "battle-settled"
-      && value.terminal !== "reward-settled")
-  ) {
-    return false;
-  }
-  const outcome = value.outcome;
-  const destination = value.destination;
-  if (
-    !isPlainObject(outcome)
-    || outcome.k !== "meResync"
-    || (outcome.base !== null && !isPlainObject(outcome.base))
-    || !Array.isArray(outcome.party)
-    || !outcome.party.every(item => typeof item === "string")
-    || typeof outcome.meSaveData !== "string"
-    || typeof outcome.seed !== "string"
-    || typeof outcome.waveSeed !== "string"
-    || typeof outcome.dex !== "string"
-    || !isPlainObject(outcome.authoritativeState)
-    || outcome.authoritativeState.version !== 1
-    || !isSafeNonNegativeInteger(outcome.authoritativeState.wave)
-    || !isSafeNonNegativeInteger(outcome.authoritativeState.turn)
-    || !Array.isArray(outcome.authoritativeState.playerParty)
-    || !Array.isArray(outcome.authoritativeState.enemyParty)
-    || !isPlainObject(destination)
-  ) {
-    return false;
-  }
-  if (value.terminal === "battle") {
-    return (
-      destination.kind === "battle"
-      && isSafeNonNegativeInteger(destination.hostTurn)
-      && isSafeNonNegativeInteger(destination.encounterMode)
-      && typeof destination.disableSwitch === "boolean"
-      && outcome.authoritativeState.enemyParty.length > 0
-    );
-  }
-  if (value.terminal === "battle-settled" || value.terminal === "reward-settled") {
-    const rewardSurfaces = destination.rewardSurfaces;
-    if (
-      destination.kind !== "reward"
-      || !isSafeNonNegativeInteger(destination.hostTurn)
-      || (destination.result !== "victory" && destination.result !== "failure")
-      || (destination.continuation !== "rewards"
-        && destination.continuation !== "encounter"
-        && destination.continuation !== "none")
-      || typeof destination.trainerVictory !== "boolean"
-      || !isCompleteCoopMeRewardSurfacePlan(rewardSurfaces)
-      || typeof destination.eggLapse !== "boolean"
-    ) {
-      return false;
-    }
-    const commonValid =
-      (!destination.trainerVictory || destination.result === "victory")
-      && ((rewardSurfaces.length === 0 && !destination.eggLapse) || destination.continuation === "rewards");
-    return value.terminal === "reward-settled"
-      ? commonValid && destination.continuation === "rewards" && destination.trainerVictory === false
-      : commonValid;
-  }
-  return (
-    destination.kind === "continue"
-    && isSafeNonNegativeInteger(destination.nextWave)
-    && typeof destination.selectBiome === "boolean"
-  );
 }
 
 export type CoopMeTerminalReceiveResult = "executed" | "duplicate" | "retry" | "rejected";
@@ -866,6 +730,42 @@ function meOpAddr(kind: CoopMeOperationKind, seq: number, step: number): number 
   return seq * 8000 + ME_KIND_TAG[kind] * 1000 + (((step % 1000) + 1000) % 1000);
 }
 
+/**
+ * Validate the exact immutable identity attached to a V2 quiz presentation
+ * carrier without consulting the legacy operation revision/deduplication
+ * cursor. All ordering still belongs to the enclosing V2 ME presentation and
+ * its retained terminal entry.
+ */
+export function isCoopMeQuizAnswerOperationId(params: {
+  readonly operationId: string;
+  readonly epoch: number;
+  readonly pinned: number;
+  readonly questionIndex: number;
+  readonly seq: number;
+}): boolean {
+  if (
+    !Number.isSafeInteger(params.epoch)
+    || params.epoch <= 0
+    || !Number.isSafeInteger(params.pinned)
+    || params.pinned < 0
+    || !Number.isSafeInteger(params.questionIndex)
+    || params.questionIndex < 0
+    || params.questionIndex >= 16
+    || params.seq !== coopQuizAnswerSeq(params.pinned, params.questionIndex)
+  ) {
+    return false;
+  }
+  return (
+    params.operationId
+    === makeCoopOperationId(
+      params.epoch,
+      ownerSeatFor("QUIZ_ANSWER", params.pinned),
+      meOpAddr("QUIZ_ANSWER", params.seq, params.questionIndex),
+      "QUIZ_ANSWER",
+    )
+  );
+}
+
 /** Project one newly applied owner intent into the reconnect control snapshot. */
 export function adoptCoopMeCommittedOwnerOrdinal(op: CoopPendingOperation): boolean {
   if ((op.kind !== "ME_PICK" && op.kind !== "ME_SUB") || op.status !== "applied") {
@@ -964,26 +864,12 @@ function seatValidator(expectedSeat: number): CoopIntentValidator {
  * DATA image in the typed payload. The embedded authoritativeState stays an operation-order placeholder (it
  * classifies on the CONTROL fields only). The real adopt-by-id state apply is UNCHANGED (§1.2).
  */
-function controlContext(wave: number, turn: number): CoopCommitContext {
-  const placeholder: CoopAuthoritativeBattleStateV1 = {
-    version: 1,
-    tick: 0,
-    wave,
-    turn,
-    playerParty: [],
-    enemyParty: [],
-    field: [],
-    weather: 0,
-    weatherTurnsLeft: 0,
-    terrain: 0,
-    terrainTurnsLeft: 0,
-    arenaTags: [],
-    money: 0,
-    pokeballCounts: [],
-    playerModifiers: [],
-    enemyModifiers: [],
-  };
-  return { wave, turn, logicalPhase: "MYSTERY_ENCOUNTER", authoritativeState: placeholder };
+function controlContext(
+  wave: number,
+  turn: number,
+  authoritativeState?: CoopAuthoritativeBattleStateV1 | null,
+): CoopCommitContext {
+  return coopOperationCommitContext(wave, turn, "MYSTERY_ENCOUNTER", authoritativeState);
 }
 
 /** Capture the mechanical image described by the accompanying retained ME presentation. */
@@ -1033,6 +919,11 @@ export interface CoopMeOwnerCommitParams {
   readonly turn: number;
   /** Re-send the identical guest->host relay proposal until its committed envelope confirms receipt. */
   readonly resend?: (() => void) | undefined;
+  /**
+   * V2 terminal-only proof at the exact local no-more-input edge. The operation ID is constructed first so
+   * the caller proves the same address that will enter the global log; a queued destination is insufficient.
+   */
+  readonly beforeAuthorityCommit?: ((operationId: string) => boolean) | undefined;
 }
 
 /**
@@ -1113,6 +1004,15 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
     }
     const addr = meOpAddr(params.kind, params.seq, step);
     const operationId = makeCoopOperationId(s.epoch, ownerSeat, addr, params.kind);
+    if (
+      params.localRole === "host"
+      && params.kind === "ME_TERMINAL"
+      && isCoopV2InteractionCutoverActive()
+      && params.beforeAuthorityCommit?.(operationId) !== true
+    ) {
+      coopWarn("me", `ME_TERMINAL ${operationId} had no exact Authority V2 terminal proof`);
+      return null;
+    }
     let payload = params.payload;
     if (params.localRole === "host" && params.kind === "ME_TERMINAL") {
       const retained = s.retainedTerminalPayloads.get(operationId);
@@ -1137,7 +1037,13 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
       const context =
         params.kind === "ME_PRESENT"
           ? presentationContext(params.wave, params.turn)
-          : controlContext(params.wave, params.turn);
+          : controlContext(
+              params.wave,
+              params.turn,
+              params.kind === "ME_TERMINAL"
+                ? (params.payload as CoopMeTerminalPayload).outcome.authoritativeState
+                : null,
+            );
       if (context == null) {
         coopWarn("me", `ME_PRESENT ${intent.id} had no complete authoritative state image`);
         return null;
@@ -1442,7 +1348,10 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
  * by operationId (invariant 5): a dual-run duplicate (the live relay already adopted it) is a no-op.
  * Returns true iff the step was NEWLY applied. No-op when the surface flag is OFF (pure legacy).
  */
-function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
+function applyJournaledMeEnvelope(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  applyContext?: CoopOperationEnvelopeApplyContext,
+): CoopApplyOutcome {
   if (!isCoopMeOperationEnabled()) {
     return "rejected";
   }
@@ -1454,10 +1363,10 @@ function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopAp
   // dual-run path already applied this operation and this journal delivery is therefore a duplicate.
   cancelOwnerIntentRetry(op.id);
   const g = guest();
-  if (g.hasApplied(op.id)) {
+  if (!isCoopOperationAuthorityV2Apply(applyContext) && g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
-  const meApply = applyCoopOperationEnvelope(g, "op:me", envelope);
+  const meApply = applyCoopOperationEnvelope(g, "op:me", envelope, applyContext);
   if (meApply !== "applied") {
     return meApply; // transient non-applicable (retriable/deferred); never a permanent condition (that is a duplicate above).
   }

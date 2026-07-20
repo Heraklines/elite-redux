@@ -3,11 +3,13 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import { COOP_CAP_OP_ABILITY, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
 import {
   type CoopAbilityPickPayload,
+  type CoopAbilityPresentationPayload,
   type CoopAuthoritativeEnvelopeV1,
   type CoopPendingOperation,
   makeCoopOperationId,
@@ -15,7 +17,9 @@ import {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
+  type CoopOperationEnvelopeApplyContext,
   getActiveCoopOperationDurability,
+  isCoopOperationAuthorityV2Apply,
   isCoopOperationJournalActive,
   isCoopOperationJournalActiveFor,
   registerCoopOperationApplier,
@@ -26,6 +30,7 @@ import {
   CoopOperationGuest,
   CoopOperationHost,
   type CoopRuntimeOpState,
+  coopOperationCommitContext,
   getActiveCoopRuntimeOpState,
   maybeCoopOpSurfaceState,
   registerCoopOpSurfaceState,
@@ -34,7 +39,7 @@ import {
   resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
-import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
+import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 export const COOP_ABILITY_ACTION_STRIDE = 100;
 const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_ABILITY_OP === "off");
@@ -53,6 +58,10 @@ interface AbilityOpState {
   watcherOrdinal: number;
   readonly retries: Map<string, ReturnType<typeof setTimeout>>;
   readonly pendingMaterializations: Set<string>;
+  /** Exact retained results whose complete authority image has been installed on this renderer. */
+  readonly stateAppliedOperations: Set<string>;
+  /** Results whose exact local ability phase consumed the outcome and reached its terminal. */
+  readonly settledOperations: Set<string>;
 }
 
 registerCoopOpSurfaceState(
@@ -68,6 +77,8 @@ registerCoopOpSurfaceState(
     watcherOrdinal: 0,
     retries: new Map(),
     pendingMaterializations: new Set(),
+    stateAppliedOperations: new Set(),
+    settledOperations: new Set(),
   }),
 );
 
@@ -113,6 +124,11 @@ export function isCoopAbilityOperationEnabled(): boolean {
   return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_ABILITY);
 }
 
+/** Whether this phase must consume an authority-owned presentation instead of deriving it locally. */
+export function isCoopAbilityPresentationAuthorityActive(binding?: CoopAbilityOperationBinding | null): boolean {
+  return isCoopAbilityOperationEnabled() && journalActive(binding);
+}
+
 export function setCoopAbilityOperationEnabled(value: boolean): void {
   enabled = value;
 }
@@ -149,6 +165,8 @@ export function resetCoopAbilityOperationState(): void {
   }
   s.retries.clear();
   s.pendingMaterializations.clear();
+  s.stateAppliedOperations.clear();
+  s.settledOperations.clear();
   s.authorityHost = null;
   s.receiverGuest = null;
   s.authorityOrdinalPin = -1;
@@ -186,12 +204,12 @@ function guest(binding?: CoopAbilityOperationBinding | null): CoopOperationGuest
   return s.receiverGuest;
 }
 
-function nextAuthorityOrdinal(s: AbilityOpState, pinned: number): number {
+function peekAuthorityOrdinal(s: AbilityOpState, pinned: number): number {
   if (s.authorityOrdinalPin !== pinned) {
     s.authorityOrdinalPin = pinned;
     s.authorityOrdinal = 0;
   }
-  return s.authorityOrdinal++;
+  return s.authorityOrdinal;
 }
 
 function peekWatcherOrdinal(s: AbilityOpState, pinned: number): number {
@@ -211,26 +229,91 @@ function opId(s: AbilityOpState, pinned: number, ordinal: number): string {
   );
 }
 
+function presentationOpId(s: AbilityOpState, pinned: number): string {
+  return makeCoopOperationId(
+    s.epoch,
+    coopInteractionOwnerSeat(pinned),
+    pinned * COOP_ABILITY_ACTION_STRIDE,
+    "ABILITY_PRESENT",
+  );
+}
+
 function context(wave: number, turn: number) {
-  const authoritativeState: CoopAuthoritativeBattleStateV1 = {
-    version: 1,
-    tick: 0,
-    wave,
-    turn,
-    playerParty: [],
-    enemyParty: [],
-    field: [],
-    weather: 0,
-    weatherTurnsLeft: 0,
-    terrain: 0,
-    terrainTurnsLeft: 0,
-    arenaTags: [],
-    money: 0,
-    pokeballCounts: [],
-    playerModifiers: [],
-    enemyModifiers: [],
-  };
-  return { wave, turn, logicalPhase: "INTERACTION" as const, authoritativeState };
+  return coopOperationCommitContext(wave, turn, "INTERACTION");
+}
+
+/**
+ * Authority-owned presentation boundary. Every ability workflow states its exact phase address before input
+ * opens; the randomizer additionally carries the literal authority-rolled choices so a guest owner never
+ * advances RNG or derives a different menu.
+ */
+export function commitCoopAbilityPresentation(
+  params: {
+    readonly pinned: number;
+    readonly partyIndex: number;
+    readonly workflow: CoopAbilityPresentationPayload["workflow"];
+    readonly rolledAbilityIds?: readonly number[] | undefined;
+    readonly localRole: CoopRole;
+    readonly wave: number;
+    readonly turn: number;
+  },
+  binding?: CoopAbilityOperationBinding | null,
+): string | null {
+  if (!isCoopAbilityOperationEnabled() || params.localRole !== "host") {
+    return null;
+  }
+  const randomizer = params.workflow === "greater-randomizer";
+  if (
+    !Number.isSafeInteger(params.pinned)
+    || params.pinned < 0
+    || !Number.isSafeInteger(params.partyIndex)
+    || params.partyIndex < 0
+    || (randomizer
+      ? !Array.isArray(params.rolledAbilityIds)
+        || params.rolledAbilityIds.length !== 4
+        || !params.rolledAbilityIds.every(id => Number.isSafeInteger(id) && id > 0)
+        || new Set(params.rolledAbilityIds).size !== params.rolledAbilityIds.length
+      : params.rolledAbilityIds !== undefined)
+  ) {
+    return null;
+  }
+  try {
+    const s = state(binding);
+    const owner = coopInteractionOwnerSeat(params.pinned);
+    const operationId = presentationOpId(s, params.pinned);
+    const operation: CoopPendingOperation = {
+      id: operationId,
+      kind: "ABILITY_PRESENT",
+      owner,
+      status: "proposed",
+      payload: {
+        pinned: params.pinned,
+        partyIndex: params.partyIndex,
+        workflow: params.workflow,
+        ...(randomizer ? { rolledAbilityIds: [...(params.rolledAbilityIds ?? [])] } : {}),
+      } satisfies CoopAbilityPresentationPayload,
+    };
+    const result = host(binding).submit(operation, context(params.wave, params.turn), intent =>
+      intent.owner === owner ? { ok: true } : { ok: false, reason: "wrong-owner" },
+    );
+    const acceptedOperation =
+      result.kind === "committed" ? result.envelope.pendingOperation : result.kind === "reack" ? result.op : null;
+    if (
+      (result.kind !== "committed" && result.kind !== "reack")
+      || acceptedOperation?.id !== operationId
+      || JSON.stringify(acceptedOperation.payload) !== JSON.stringify(operation.payload)
+      || !retainEnvelope(result.envelope, binding)
+    ) {
+      return null;
+    }
+    return operationId;
+  } catch (error) {
+    if (isCoopOpRuntimeError(error)) {
+      throw error;
+    }
+    coopWarn("ability", "ability presentation commit threw", error);
+    return null;
+  }
 }
 
 function commit(
@@ -239,22 +322,40 @@ function commit(
   wave: number,
   turn: number,
   binding?: CoopAbilityOperationBinding | null,
-): void {
+  expectedOperationId?: string,
+): boolean {
   const s = state(binding);
   const owner = coopInteractionOwnerSeat(pinned);
+  const ordinal = peekAuthorityOrdinal(s, pinned);
   const operation: CoopPendingOperation = {
-    id: opId(s, pinned, nextAuthorityOrdinal(s, pinned)),
+    id: opId(s, pinned, ordinal),
     kind: "ABILITY_PICK",
     owner,
     status: "proposed",
     payload: { data: [...data] } satisfies CoopAbilityPickPayload,
   };
+  if (expectedOperationId != null && operation.id !== expectedOperationId) {
+    return false;
+  }
   const result = host(binding).submit(operation, context(wave, turn), intent =>
     intent.owner === owner ? { ok: true } : { ok: false, reason: "wrong-owner" },
   );
   if (result.kind === "committed") {
-    retainEnvelope(result.envelope, binding);
+    if (!retainEnvelope(result.envelope, binding)) {
+      return false;
+    }
+    s.authorityOrdinal = ordinal + 1;
+    return true;
   }
+  if (
+    result.kind === "reack"
+    && result.op.id === operation.id
+    && JSON.stringify(result.op.payload) === JSON.stringify(operation.payload)
+  ) {
+    s.authorityOrdinal = ordinal + 1;
+    return true;
+  }
+  return false;
 }
 
 export function commitAbilityOwnerOutcome(
@@ -266,19 +367,47 @@ export function commitAbilityOwnerOutcome(
     turn?: number;
   },
   binding?: CoopAbilityOperationBinding | null,
-): void {
+): boolean {
   if (!isCoopAbilityOperationEnabled() || params.localRole !== "host" || params.pinned < 0) {
-    return;
+    return true;
   }
   try {
-    commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding);
+    if (!commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding)) {
+      coopWarn("ability", "ability owner result could not be retained");
+      return false;
+    }
+    return true;
   } catch (error) {
     if (isCoopOpRuntimeError(error)) {
       throw error;
     }
     coopWarn("ability", "ability op commit threw; legacy carrier remains active", error);
+    return false;
   }
 }
+
+export type CoopAbilityWatcherAdoption =
+  | {
+      readonly accepted: true;
+      /** Complete host image already installed; close/continue the UI but do not execute the ability mutation. */
+      readonly projectionApplied: boolean;
+      /** Host watcher must execute once, then retain the resulting complete image through the named operation. */
+      readonly requiresAuthorityCommit: boolean;
+      readonly operationId: string;
+    }
+  | {
+      readonly accepted: false;
+      readonly projectionApplied: false;
+      readonly requiresAuthorityCommit: false;
+      readonly operationId: null;
+    };
+
+const REJECTED_ABILITY_ADOPTION: CoopAbilityWatcherAdoption = {
+  accepted: false,
+  projectionApplied: false,
+  requiresAuthorityCommit: false,
+  operationId: null,
+};
 
 export function adoptAbilityWatcherOutcome(
   params: {
@@ -289,30 +418,61 @@ export function adoptAbilityWatcherOutcome(
     turn?: number;
   },
   binding?: CoopAbilityOperationBinding | null,
-): boolean {
+): CoopAbilityWatcherAdoption {
   if (!isCoopAbilityOperationEnabled()) {
-    return params.data != null;
+    return params.data == null
+      ? REJECTED_ABILITY_ADOPTION
+      : {
+          accepted: true,
+          projectionApplied: false,
+          requiresAuthorityCommit: false,
+          operationId: "",
+        };
   }
   if (params.data == null || params.pinned < 0) {
-    return false;
+    return REJECTED_ABILITY_ADOPTION;
   }
   const s = state(binding);
   if (params.localRole === "host") {
-    commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding);
-    return true;
+    const id = opId(s, params.pinned, peekAuthorityOrdinal(s, params.pinned));
+    if (journalActive(binding)) {
+      // The raw guest carrier is a proposal only. The host phase executes it exactly once and calls
+      // commitAbilityWatcherOutcome afterwards, so the retained image is post-action rather than pre-action.
+      return {
+        accepted: true,
+        projectionApplied: false,
+        requiresAuthorityCommit: true,
+        operationId: id,
+      };
+    }
+    return commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding, id)
+      ? {
+          accepted: true,
+          projectionApplied: false,
+          requiresAuthorityCommit: false,
+          operationId: id,
+        }
+      : REJECTED_ABILITY_ADOPTION;
   }
   const ordinal = peekWatcherOrdinal(s, params.pinned);
   const id = opId(s, params.pinned, ordinal);
   const g = guest(binding);
+  // V2 never advances the legacy guest applied-id cursor. This runtime-owned proof is armed only after
+  // the complete host image applied, so consume it before consulting legacy deduplication.
+  if (s.pendingMaterializations.delete(id)) {
+    s.watcherOrdinal++;
+    return {
+      accepted: true,
+      projectionApplied: s.stateAppliedOperations.has(id),
+      requiresAuthorityCommit: false,
+      operationId: id,
+    };
+  }
   if (g.hasApplied(id)) {
-    if (s.pendingMaterializations.delete(id)) {
-      s.watcherOrdinal++;
-      return true;
-    }
-    return false;
+    return REJECTED_ABILITY_ADOPTION;
   }
   if (journalActive(binding)) {
-    return false;
+    return REJECTED_ABILITY_ADOPTION;
   }
   const operation: CoopPendingOperation = {
     id,
@@ -330,9 +490,39 @@ export function adoptAbilityWatcherOutcome(
   });
   if (result.kind === "applied") {
     s.watcherOrdinal++;
-    return true;
+    return {
+      accepted: true,
+      projectionApplied: false,
+      requiresAuthorityCommit: false,
+      operationId: id,
+    };
   }
-  return false;
+  return REJECTED_ABILITY_ADOPTION;
+}
+
+/** Host watcher post-action seam: retain the exact immutable result only after the local mutation succeeded. */
+export function commitAbilityWatcherOutcome(
+  operationId: string,
+  params: {
+    readonly pinned: number;
+    readonly data: number[];
+    readonly wave: number;
+    readonly turn?: number;
+  },
+  binding?: CoopAbilityOperationBinding | null,
+): boolean {
+  if (!isCoopAbilityOperationEnabled() || operationId.length === 0 || params.pinned < 0) {
+    return false;
+  }
+  try {
+    return commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding, operationId);
+  } catch (error) {
+    if (isCoopOpRuntimeError(error)) {
+      throw error;
+    }
+    coopWarn("ability", `ability watcher result commit threw id=${operationId}`, error);
+    return false;
+  }
 }
 
 function retryKey(pinned: number, data: number[]): string {
@@ -382,29 +572,113 @@ export function armCoopAbilityJournalMaterialization(id: string, binding?: CoopA
   state(binding).pendingMaterializations.add(id);
 }
 
-function applyJournaledAbilityEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
+/** Prove the exact ability result phase ended after consuming the authoritative outcome. */
+export function settleCoopAbilityOperation(operationId: string, binding?: CoopAbilityOperationBinding | null): boolean {
+  if (operationId.length === 0) {
+    return false;
+  }
+  state(binding).settledOperations.add(operationId);
+  return true;
+}
+
+/** A guest owner closes before the host commits its proposal; retain that deterministic result address. */
+export function settleCoopAbilityOwnerProposal(
+  pinned: number,
+  binding?: CoopAbilityOperationBinding | null,
+): string | null {
+  if (pinned < 0) {
+    return null;
+  }
+  const s = state(binding);
+  const operationId = opId(s, pinned, peekWatcherOrdinal(s, pinned));
+  s.settledOperations.add(operationId);
+  return operationId;
+}
+
+/**
+ * A host-owned picker has already reached its real phase terminal before the authority result is
+ * published. Address that result from the authority ordinal (the guest-owner proposal path above uses the
+ * watcher ordinal) so Authority V2 can require the exact terminal proof without guessing in the phase.
+ */
+export function settleCoopAbilityAuthorityResult(
+  pinned: number,
+  binding?: CoopAbilityOperationBinding | null,
+): string | null {
+  if (pinned < 0) {
+    return null;
+  }
+  const s = state(binding);
+  const operationId = opId(s, pinned, peekAuthorityOrdinal(s, pinned));
+  s.settledOperations.add(operationId);
+  return operationId;
+}
+
+/** Live materializer proof: queue injection alone is not material completion. */
+export function isCoopAbilityOperationSettled(
+  operationId: string,
+  binding?: CoopAbilityOperationBinding | null,
+): boolean {
+  return state(binding).settledOperations.has(operationId);
+}
+
+function applyJournaledAbilityEnvelope(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  applyContext?: CoopOperationEnvelopeApplyContext,
+): CoopApplyOutcome {
   if (!isCoopAbilityOperationEnabled()) {
     return "rejected";
   }
   const operation = envelope.pendingOperation;
-  if (operation?.kind !== "ABILITY_PICK" || operation.status !== "applied") {
+  if ((operation?.kind !== "ABILITY_PICK" && operation?.kind !== "ABILITY_PRESENT") || operation.status !== "applied") {
     return "rejected";
   }
-  const payload = operation.payload as CoopAbilityPickPayload | undefined;
-  if (payload == null || !Array.isArray(payload.data) || !payload.data.every(Number.isFinite)) {
-    return "rejected";
+  if (operation.kind === "ABILITY_PICK") {
+    const payload = operation.payload as CoopAbilityPickPayload | undefined;
+    if (payload == null || !Array.isArray(payload.data) || !payload.data.every(Number.isFinite)) {
+      return "rejected";
+    }
+  } else {
+    const payload = operation.payload as CoopAbilityPresentationPayload | undefined;
+    const randomizer = payload?.workflow === "greater-randomizer";
+    if (
+      payload == null
+      || !Number.isSafeInteger(payload.pinned)
+      || payload.pinned < 0
+      || !Number.isSafeInteger(payload.partyIndex)
+      || payload.partyIndex < 0
+      || (payload.workflow !== "capsule"
+        && payload.workflow !== "greater-capsule"
+        && payload.workflow !== "greater-randomizer")
+      || (randomizer
+        ? !Array.isArray(payload.rolledAbilityIds)
+          || payload.rolledAbilityIds.length !== 4
+          || !payload.rolledAbilityIds.every(id => Number.isSafeInteger(id) && id > 0)
+          || new Set(payload.rolledAbilityIds).size !== payload.rolledAbilityIds.length
+        : payload.rolledAbilityIds !== undefined)
+    ) {
+      return "rejected";
+    }
   }
   const s = state();
   const g = guest();
-  if (g.hasApplied(operation.id)) {
+  if (!isCoopOperationAuthorityV2Apply(applyContext) && g.hasApplied(operation.id)) {
     return "duplicate";
   }
-  const result = applyCoopOperationEnvelope(g, "op:ability", envelope);
+  if (isCoopOperationAuthorityV2Apply(applyContext)) {
+    if (!isCompleteCoopOperationAuthorityState(envelope.authoritativeState, envelope.wave, envelope.turn)) {
+      return "rejected";
+    }
+    // The V2 replica applies the immutable state once, centrally, before entering a surface applier. This
+    // surface record is projection evidence for the UI adopter; it must not run a second state apply.
+    s.stateAppliedOperations.add(operation.id);
+  }
+  const result = applyCoopOperationEnvelope(g, "op:ability", envelope, applyContext);
   if (result !== "applied") {
     return result;
   }
   const parsed = parseCoopOperationId(operation.id);
-  if (parsed != null) {
+  if (operation.kind === "ABILITY_PICK" && parsed != null) {
+    const payload = operation.payload as CoopAbilityPickPayload;
     const pinned = Math.floor(parsed.pinnedSeq / COOP_ABILITY_ACTION_STRIDE);
     cancelRetry(s, pinned, payload.data);
   }

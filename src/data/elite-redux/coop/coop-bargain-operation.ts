@@ -3,17 +3,22 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { applyCoopMeOutcome, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_CAP_OP_BARGAIN, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
+import { isCompleteCoopMeResyncOutcome } from "#data/elite-redux/coop/coop-me-terminal-validator";
 import {
   type CoopAuthoritativeEnvelopeV1,
   type CoopBargainPayload,
+  type CoopBargainPresentationPayload,
   type CoopPendingOperation,
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
+  type CoopOperationEnvelopeApplyContext,
+  isCoopOperationAuthorityV2Apply,
   isCoopOperationJournalActive,
   registerCoopOperationApplier,
   tryJournalCoopCommittedEnvelope,
@@ -21,19 +26,17 @@ import {
 import {
   CoopOperationGuest,
   CoopOperationHost,
+  coopOperationCommitContext,
   maybeCoopOpSurfaceState,
   registerCoopOpSurfaceState,
   requireCoopOpSurfaceState,
   resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
-import type {
-  CoopAuthoritativeBattleStateV1,
-  CoopInteractionOutcome,
-  CoopRole,
-} from "#data/elite-redux/coop/coop-transport";
+import type { CoopInteractionOutcome, CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_BARGAIN_OP === "off");
+export const COOP_BARGAIN_PRESENT_KIND = "bargain-present";
 
 let enabled = DEFAULT_ENABLED;
 
@@ -123,38 +126,30 @@ function guest(): CoopOperationGuest {
   return s.watcherGuest;
 }
 
-function bargainOperationId(pinned: number): string {
+export function coopBargainOperationId(pinned: number): string {
   return makeCoopOperationId(state().epoch, coopInteractionOwnerSeat(pinned), pinned, "BARGAIN");
+}
+
+export function coopBargainPresentationOperationId(pinned: number): string {
+  return makeCoopOperationId(state().epoch, coopInteractionOwnerSeat(pinned), pinned, "BARGAIN_PRESENT");
 }
 
 function controlContext(
   wave: number,
   turn: number,
+  outcome?: CoopInteractionOutcome,
 ): Omit<CoopAuthoritativeEnvelopeV1, "version" | "sessionEpoch" | "revision" | "pendingOperation"> {
-  const authoritativeState: CoopAuthoritativeBattleStateV1 = {
-    version: 1,
-    tick: 0,
+  return coopOperationCommitContext(
     wave,
     turn,
-    playerParty: [],
-    enemyParty: [],
-    field: [],
-    weather: 0,
-    weatherTurnsLeft: 0,
-    terrain: 0,
-    terrainTurnsLeft: 0,
-    arenaTags: [],
-    money: 0,
-    pokeballCounts: [],
-    playerModifiers: [],
-    enemyModifiers: [],
-  };
-  return { wave, turn, logicalPhase: "INTERACTION", authoritativeState };
+    "INTERACTION",
+    outcome?.k === "meResync" ? outcome.authoritativeState : null,
+  );
 }
 
 function intentFor(pinned: number, outcome: CoopInteractionOutcome): CoopPendingOperation {
   return {
-    id: bargainOperationId(pinned),
+    id: coopBargainOperationId(pinned),
     kind: "BARGAIN",
     owner: coopInteractionOwnerSeat(pinned),
     status: "proposed",
@@ -164,7 +159,7 @@ function intentFor(pinned: number, outcome: CoopInteractionOutcome): CoopPending
 
 function commit(pinned: number, outcome: CoopInteractionOutcome, wave: number, turn: number): boolean {
   const intent = intentFor(pinned, outcome);
-  const result = host().submit(intent, controlContext(wave, turn), proposed =>
+  const result = host().submit(intent, controlContext(wave, turn, outcome), proposed =>
     proposed.owner === coopInteractionOwnerSeat(pinned) ? { ok: true } : { ok: false, reason: "wrong-owner" },
   );
   if (result.kind === "committed" || result.kind === "reack") {
@@ -176,6 +171,55 @@ function commit(pinned: number, outcome: CoopInteractionOutcome, wave: number, t
     return true;
   }
   return false;
+}
+
+/** Authority commits the exact stable Sin keys before either peer may render or act. */
+export function commitCoopBargainPresentation(params: {
+  readonly pinned: number;
+  readonly sins: readonly string[];
+  readonly localRole: CoopRole;
+  readonly wave: number;
+  readonly turn: number;
+}): boolean {
+  if (!isCoopBargainOperationEnabled() || params.localRole !== "host") {
+    return true;
+  }
+  if (
+    !Number.isSafeInteger(params.pinned)
+    || params.pinned < 0
+    || params.sins.length > 3
+    || params.sins.some(sin => typeof sin !== "string" || sin.length === 0)
+  ) {
+    return false;
+  }
+  try {
+    const owner = coopInteractionOwnerSeat(params.pinned);
+    const operation: CoopPendingOperation = {
+      id: coopBargainPresentationOperationId(params.pinned),
+      kind: "BARGAIN_PRESENT",
+      owner,
+      status: "proposed",
+      payload: {
+        pinned: params.pinned,
+        sins: [...params.sins],
+      } satisfies CoopBargainPresentationPayload,
+    };
+    const result = host().submit(operation, controlContext(params.wave, params.turn), proposed =>
+      proposed.owner === owner ? { ok: true } : { ok: false, reason: "wrong-owner" },
+    );
+    if (result.kind !== "committed" && result.kind !== "reack") {
+      return false;
+    }
+    if (!tryJournalCoopCommittedEnvelope(result.envelope)) {
+      coopWarn("reward", `bargain presentation could not retain id=${operation.id}`);
+      return false;
+    }
+    coopLog("reward", `bargain presentation retained pinned=${params.pinned} sins=${params.sins.join(",")}`);
+    return true;
+  } catch (error) {
+    coopWarn("reward", "bargain presentation commit threw", error);
+    return false;
+  }
 }
 
 /** Owner-side commit. Guest-owned outcomes are committed when the host watcher receives the proposal. */
@@ -206,32 +250,86 @@ export function commitBargainOwnerOutcome(params: {
 }
 
 /** Gate the real watcher apply through the single operation ledger. */
+export interface CoopBargainWatcherAdoption {
+  /** The terminal was durably accepted and the phase may leave its watcher surface. */
+  readonly accepted: boolean;
+  /** The complete authoritative image already reached the live engine; the phase must not apply it again. */
+  readonly projectionApplied: boolean;
+  /** Host watcher must commit the post-apply complete image only after its local phase ends. */
+  readonly requiresAuthorityCommit: boolean;
+  readonly operationId: string | null;
+  readonly authoritativeOutcome: CoopInteractionOutcome | null;
+}
+
+const REJECTED_BARGAIN_ADOPTION: CoopBargainWatcherAdoption = {
+  accepted: false,
+  projectionApplied: false,
+  requiresAuthorityCommit: false,
+  operationId: null,
+  authoritativeOutcome: null,
+};
+
+/** Gate the real watcher apply through the single operation ledger. */
 export function adoptBargainWatcherOutcome(params: {
   pinned: number;
   outcome: CoopInteractionOutcome | null;
   localRole: CoopRole;
   wave: number;
   turn?: number;
-}): boolean {
+}): CoopBargainWatcherAdoption {
   if (!isCoopBargainOperationEnabled()) {
-    return params.outcome?.k === "meResync";
+    return {
+      accepted: params.outcome?.k === "meResync",
+      projectionApplied: false,
+      requiresAuthorityCommit: false,
+      operationId: null,
+      authoritativeOutcome: null,
+    };
   }
-  if (params.outcome?.k !== "meResync" || params.pinned < 0) {
-    return false;
+  if (!isCompleteCoopMeResyncOutcome(params.outcome) || params.pinned < 0) {
+    return REJECTED_BARGAIN_ADOPTION;
   }
   try {
-    const id = bargainOperationId(params.pinned);
+    const id = coopBargainOperationId(params.pinned);
     if (params.localRole === "host") {
-      // Guest owner -> host authority: the legacy outcome is the typed proposal carrier.
-      return commit(params.pinned, params.outcome, params.wave, params.turn ?? 0);
+      // Guest owner -> host authority: the raw outcome is only a typed proposal. Apply it transactionally
+      // to the authoritative engine FIRST, then capture and commit the host's resulting complete image.
+      // Committing the proposal before this projection let a receipt retire DATA the authority had not
+      // installed yet and made reconnect replay dependent on whichever peer happened to mutate first.
+      if (!applyCoopMeOutcome(params.outcome)) {
+        return REJECTED_BARGAIN_ADOPTION;
+      }
+      const authoritativeOutcome = captureCoopMeOutcome();
+      if (!isCompleteCoopMeResyncOutcome(authoritativeOutcome)) {
+        return REJECTED_BARGAIN_ADOPTION;
+      }
+      return {
+        accepted: true,
+        projectionApplied: true,
+        requiresAuthorityCommit: true,
+        operationId: id,
+        authoritativeOutcome,
+      };
     }
     const s = state();
     const g = guest();
+    // The live sink sets this proof only after applyCoopMeOutcome returned true. Under Authority V2 the
+    // legacy guest applied-id/revision domain is intentionally bypassed, so this runtime-owned proof must
+    // be consulted before that legacy cursor.
+    if (s.pendingJournalMaterializations.delete(id)) {
+      return {
+        accepted: true,
+        projectionApplied: true,
+        requiresAuthorityCommit: false,
+        operationId: id,
+        authoritativeOutcome: null,
+      };
+    }
     if (g.hasApplied(id)) {
-      return s.pendingJournalMaterializations.delete(id);
+      return REJECTED_BARGAIN_ADOPTION;
     }
     if (isCoopOperationJournalActive()) {
-      return false;
+      return REJECTED_BARGAIN_ADOPTION;
     }
     const intent = intentFor(params.pinned, params.outcome);
     const result = g.applyEnvelope({
@@ -241,30 +339,61 @@ export function adoptBargainWatcherOutcome(params: {
       ...controlContext(params.wave, params.turn ?? 0),
       pendingOperation: { ...intent, status: "applied" },
     });
-    return result.kind === "applied";
+    return {
+      accepted: result.kind === "applied",
+      projectionApplied: false,
+      requiresAuthorityCommit: false,
+      operationId: result.kind === "applied" ? id : null,
+      authoritativeOutcome: null,
+    };
   } catch (error) {
     coopWarn("reward", "bargain watcher op apply threw; rejecting unsafe local derivation", error);
-    return false;
+    return REJECTED_BARGAIN_ADOPTION;
   }
+}
+
+/** Host watcher post-terminal seam for a guest-owned Bargain proposal. */
+export function commitBargainWatcherOutcome(
+  operationId: string,
+  params: { readonly pinned: number; readonly wave: number; readonly turn: number },
+  outcome: CoopInteractionOutcome,
+): boolean {
+  return (
+    operationId === coopBargainOperationId(params.pinned)
+    && isCompleteCoopMeResyncOutcome(outcome)
+    && commit(params.pinned, outcome, params.wave, params.turn)
+  );
 }
 
 export function armCoopBargainJournalMaterialization(operationId: string): void {
   state().pendingJournalMaterializations.add(operationId);
 }
 
-function applyJournaledBargainEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
+function applyJournaledBargainEnvelope(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  applyContext?: CoopOperationEnvelopeApplyContext,
+): CoopApplyOutcome {
   if (!isCoopBargainOperationEnabled()) {
     return "rejected";
   }
   const op = envelope.pendingOperation;
-  if (op?.kind !== "BARGAIN" || op.status !== "applied") {
+  if ((op?.kind !== "BARGAIN" && op?.kind !== "BARGAIN_PRESENT") || op.status !== "applied") {
+    return "rejected";
+  }
+  if (
+    op.kind === "BARGAIN_PRESENT"
+    && (typeof (op.payload as CoopBargainPresentationPayload | undefined)?.pinned !== "number"
+      || !Array.isArray((op.payload as CoopBargainPresentationPayload).sins)
+      || (op.payload as CoopBargainPresentationPayload).sins.length > 3
+      || (op.payload as CoopBargainPresentationPayload).sins.some(sin => typeof sin !== "string" || sin.length === 0))
+  ) {
     return "rejected";
   }
   const g = guest();
-  if (g.hasApplied(op.id)) {
+  if (!isCoopOperationAuthorityV2Apply(applyContext) && g.hasApplied(op.id)) {
     return "duplicate";
   }
-  const result = applyCoopOperationEnvelope(g, "op:bargain", envelope);
+  const result = applyCoopOperationEnvelope(g, "op:bargain", envelope, applyContext);
   if (result !== "applied") {
     return result;
   }

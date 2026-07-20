@@ -112,6 +112,7 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "CoopFinalizeTurnPhase", // guest turn-finalize + checksum verify
   "CoopReplayMePhase", // mystery-encounter render on the guest
   "CoopReplayLearnMovePhase", // learn-move render on the guest
+  "CoopReplayLearnMoveBatchPhase", // queue-owned batch learn-move render on the guest
   "CoopMoveAnimReplayPhase", // move-anim replay (renders the denied MovePhase)
   "CoopHpDrainReplayPhase", // hp tween replay
   "CoopStatStageReplayPhase", // stat tween replay (renders the denied StatStageChangePhase)
@@ -152,6 +153,7 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "TurnInitPhase",
   "RevivalBlessingPhase", // revival PICK intent (the APPLY half is host-authoritative)
   "CoopGuestCatchFullPhase", // guest-catcher CATCH_FULL intent driver
+  "CoopGuestColosseumChoicePhase", // exact between-round Colosseum board
   "CoopGuestFaintSwitchPhase", // guest faint-switch intent driver
   "CoopGuestRevivalPhase", // guest revival intent driver
   // Pre-run roster input after the host's Resume/New Game decision. This is local input whose

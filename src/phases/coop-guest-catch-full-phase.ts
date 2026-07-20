@@ -9,10 +9,17 @@ import { Phase } from "#app/phase";
 import {
   armCoopCatchFullIntentResend,
   captureCoopCatchFullOperationBinding,
+  coopCatchFullDecisionOperationId,
 } from "#data/elite-redux/coop/coop-catch-full-operation";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_CATCH_FULL_SEQ } from "#data/elite-redux/coop/coop-interaction-relay";
-import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import {
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopRuntime,
+  notifyCoopV2InteractionSurfaceReady,
+  settleCoopV2InteractionOperation,
+} from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
 import { PartyUiMode } from "#ui/handlers/party-ui-handler";
 import i18next from "i18next";
@@ -35,16 +42,19 @@ import i18next from "i18next";
  */
 export class CoopGuestCatchFullPhase extends Phase {
   public readonly phaseName = "CoopGuestCatchFullPhase";
+  public readonly coopV2ControlOperationId: string | null;
 
   private readonly pokemonName: string;
   private readonly speciesId: number;
+  private readonly coopOwningRuntime = getCoopRuntime();
   /** Re-entrant guard: a drive loop may call start() again while the picker is open. */
   private opened = false;
 
-  constructor(pokemonName: string, speciesId: number) {
+  constructor(pokemonName: string, speciesId: number, operationId?: string) {
     super();
     this.pokemonName = pokemonName;
     this.speciesId = speciesId;
+    this.coopV2ControlOperationId = operationId ?? null;
   }
 
   public override start(): void {
@@ -68,7 +78,7 @@ export class CoopGuestCatchFullPhase extends Phase {
       globalScene.ui.showText(i18next.t("battle:partyFull", { pokemonName: this.pokemonName }), null, () => {
         // NON-mutating PARTY/SELECT so the pure-renderer guest never splices its own party (the host owns
         // the release+add); the callback relays the chosen slot, or an out-of-range slot on cancel (skip).
-        void globalScene.ui.setMode(UiMode.PARTY, PartyUiMode.SELECT, -1, (slotIndex: number) => {
+        const mode = globalScene.ui.setMode(UiMode.PARTY, PartyUiMode.SELECT, -1, (slotIndex: number) => {
           coopLog("replay", `guest catch-full picker PICK slot=${slotIndex} seq=${seq}`);
           const partySlot = slotIndex >= 0 && slotIndex < 6 ? slotIndex : -1;
           const wave = globalScene.currentBattle?.waveIndex ?? 0;
@@ -84,8 +94,16 @@ export class CoopGuestCatchFullPhase extends Phase {
             },
             operationBinding,
           );
+          const decisionOperationId =
+            this.coopV2ControlOperationId == null
+              ? null
+              : coopCatchFullDecisionOperationId(this.coopV2ControlOperationId);
+          if (decisionOperationId != null) {
+            settleCoopV2InteractionOperation(decisionOperationId, this.coopOwningRuntime);
+          }
           void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => this.end());
         });
+        Promise.resolve(mode).then(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
       });
     } catch {
       // A UI failure must never hang the replay; the host declines the grant after its wait.

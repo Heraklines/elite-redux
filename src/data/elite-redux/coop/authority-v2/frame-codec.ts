@@ -32,7 +32,7 @@ import type {
   CoopAuthorityEntry,
   CoopAuthorityReceipt,
   CoopFrameContextV2,
-  CoopNextControl,
+  CoopRecoveryNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
 import type { CoopRecoveryAppliedProofV2 } from "#data/elite-redux/coop/authority-v2/recovery-bundle";
 
@@ -95,8 +95,9 @@ export interface CoopRecoveryBundleBodyV2 {
   readonly requestId: string;
   readonly material: CoopAuthoritativeMaterial;
   readonly frontier: number;
+  readonly frontierOperationId: string | null;
   readonly membershipRevision: number;
-  readonly nextControl: CoopNextControl;
+  readonly nextControl: CoopRecoveryNextControl;
   readonly requiredTail: readonly CoopAuthorityEntryBodyV2[];
 }
 

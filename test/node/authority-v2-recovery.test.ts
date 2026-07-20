@@ -156,7 +156,7 @@ const COMMAND_CONTROL: NonNullable<CoopNextControl> = {
   commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 0 }],
 };
 
-function entry(revision: number, nextControl: CoopNextControl = null): CoopAuthorityEntry {
+function entry(revision: number, nextControl: CoopNextControl = COMMAND_CONTROL): CoopAuthorityEntry {
   return {
     context: FRAME,
     revision,
@@ -174,6 +174,7 @@ function makeBundle(overrides: Partial<CoopRecoveryBundle> = {}): CoopRecoveryBu
     context: FRAME,
     material: { digest: "material-digest", payload: { hp: 42 } },
     frontier: 12,
+    frontierOperationId: "op-12",
     membershipRevision: 2,
     nextControl: COMMAND_CONTROL,
     requiredTail: [entry(11), entry(12, COMMAND_CONTROL)],
@@ -218,6 +219,7 @@ function makeHarness(
     fence?: ReturnType<typeof createRecoveryFence>;
     frontier?: number;
     projectResult?: CoopControlInstallResult;
+    project?: () => CoopControlInstallResult;
     applyResult?: boolean;
     applyMaterial?: CoopRecoveryTransactionDeps["applyMaterial"];
     frame?: () => CoopFrameContextV2;
@@ -229,7 +231,7 @@ function makeHarness(
   const phases: CoopRecoveryPhase[] = [];
   const applyMaterial = vi.fn(opts.applyMaterial ?? (async () => opts.applyResult ?? true));
   const acknowledge = vi.fn((_ctx: CoopRuntimeContext, _proof: CoopRecoveryAppliedProofV2) => {});
-  const project = vi.fn((): CoopControlInstallResult => opts.projectResult ?? INSTALLED);
+  const project = vi.fn(opts.project ?? ((): CoopControlInstallResult => opts.projectResult ?? INSTALLED));
   const projector: CoopControlProjector = { project };
   const fence = opts.fence ?? createRecoveryFence();
   const deps: CoopRecoveryTransactionDeps = {
@@ -281,6 +283,14 @@ describe("authority-v2 recovery bundle validation", () => {
   it("rejects a non-contiguous required tail", () => {
     const bundle = makeBundle({ requiredTail: [entry(11), entry(14)] });
     expect(validateRecoveryBundle(bundle, REPLICA_FRAME, 10, "recovery-1").kind).toBe("mismatch");
+  });
+
+  it("rejects a frontier operation identity that does not match the proven tail", () => {
+    const bundle = makeBundle({ frontierOperationId: "another-operation" });
+    expect(validateRecoveryBundle(bundle, REPLICA_FRAME, 10, "recovery-1")).toMatchObject({
+      kind: "mismatch",
+      reason: expect.stringContaining("frontier operation"),
+    });
   });
 
   it("rejects a delayed bundle from another request before applying material", () => {
@@ -355,7 +365,7 @@ describe("authority-v2 recovery transaction", () => {
     });
   });
 
-  it("skips control-installed and ACKs materialApplied when nextControl is null", async () => {
+  it("terminalizes a non-empty recovery frontier with no successor control", async () => {
     const h = makeHarness(async () =>
       makeBundle({
         nextControl: null,
@@ -364,11 +374,11 @@ describe("authority-v2 recovery transaction", () => {
     );
     const txn = createRecoveryTransaction(h.ctx, h.deps);
 
-    expect(await txn.run()).toBe("recovered");
-    expect(h.phases).not.toContain("control-installed");
+    expect(await txn.run()).toBe("terminalized");
+    expect(h.phases).toContain("terminalized");
+    expect(h.applyMaterial).not.toHaveBeenCalled();
     expect(h.project).not.toHaveBeenCalled();
-    const proof = h.acknowledge.mock.calls[0][1] as CoopRecoveryAppliedProofV2;
-    expect(proof.controlId).toBeUndefined();
+    expect(h.acknowledge).not.toHaveBeenCalled();
   });
 
   it("freezes every progression surface while the fence is held, then releases", async () => {
@@ -398,6 +408,34 @@ describe("authority-v2 recovery transaction", () => {
     // Released open: progression resumes.
     expect(fence.state).toBe("open");
     expect(fence.isProgressionFrozen()).toBe(false);
+  });
+
+  it("keeps the fence held and withholds recoveryApplied until a deferred real control becomes actionable", async () => {
+    let actionable = false;
+    const h = makeHarness(async () => makeBundle(), {
+      project: () =>
+        actionable
+          ? { kind: "installed", controlId: "ctrl-1" }
+          : { kind: "deferred", reason: "real CommandPhase handler not started" },
+    });
+    const txn = createRecoveryTransaction(h.ctx, h.deps);
+    const running = txn.run();
+
+    for (let i = 0; i < 8 && h.project.mock.calls.length === 0; i++) {
+      await Promise.resolve();
+    }
+    expect(h.project).toHaveBeenCalledTimes(1);
+    expect(h.acknowledge).not.toHaveBeenCalled();
+    expect(h.deps.fence.state).toBe("held");
+    expect(h.deps.fence.isCommandAdmissionFrozen()).toBe(true);
+    expect(h.deps.fence.isControlSurfaceStartFrozen()).toBe(false);
+
+    actionable = true;
+    h.scheduler.fireAll();
+    expect(await running).toBe("recovered");
+    expect(h.project).toHaveBeenCalledTimes(2);
+    expect(h.acknowledge).toHaveBeenCalledTimes(1);
+    expect(h.deps.fence.state).toBe("open");
   });
 
   it("terminalizes (never applies) when the frontier advances elsewhere mid-request", async () => {

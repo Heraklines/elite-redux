@@ -39,7 +39,7 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import { applyCoopCaptureParty, captureCoopCaptureParty } from "#data/elite-redux/coop/coop-battle-engine";
-import { coopHostAwaitWildCatchFullSlot } from "#data/elite-redux/coop/coop-catch-full";
+import { coopHostPrepareWildCatchFullDecision } from "#data/elite-redux/coop/coop-catch-full";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { setCoopCatchThrowerHint } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -205,7 +205,9 @@ describe.skipIf(!RUN)(
       // await on COOP_CATCH_FULL_SEQ. We do NOT drain here (draining under the host ctx would deliver the
       // prompt while the HOST runtime is live, and the guest's onCatchFullPrompt no-ops unless the GUEST
       // runtime is the live one). =====
-      const hostAwait = withClientSync(rig.hostCtx, () => coopHostAwaitWildCatchFullSlot("Venusaur", releasedSpecies));
+      const hostAwait = withClientSync(rig.hostCtx, () =>
+        coopHostPrepareWildCatchFullDecision("Venusaur", releasedSpecies),
+      );
 
       // ===== (B) GUEST: drain so the queued `catchFullPrompt` is delivered while the GUEST runtime is live ->
       // onCatchFullPrompt unshifts a real CoopGuestCatchFullPhase onto the guest queue (the wiring under test). =====
@@ -249,12 +251,13 @@ describe.skipIf(!RUN)(
 
       // ===== (D) HOST: drain so the relayed pick is delivered while the HOST runtime is live -> the helper's
       // awaitInteractionChoice resolves UNDER the host ctx. Assert it resolved to the CATCHER'S slot (4). =====
-      const resolvedSlot = await withClient(rig.hostCtx, async () => {
+      const preparedDecision = await withClient(rig.hostCtx, async () => {
         for (let i = 0; i < 8; i++) {
           await drainLoopback();
         }
         return hostAwait;
       });
+      const resolvedSlot = preparedDecision?.slot ?? null;
       expect(
         resolvedSlot,
         "the host received EXACTLY the slot the guest CATCHER relayed (the recipient drove the pick) (#856)",
@@ -273,6 +276,9 @@ describe.skipIf(!RUN)(
           throw new Error("no live enemy to catch");
         }
         const added = enemy.addToParty(PokeballType.MASTER_BALL, resolvedSlot!);
+        if (preparedDecision?.commitAfterApply() !== true) {
+          throw new Error("post-catch authority result did not commit");
+        }
         setCoopCatchThrowerHint(null);
         return {
           addedSpecies: added?.species.speciesId,

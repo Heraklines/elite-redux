@@ -175,6 +175,7 @@ jobs:
             # staging-only until its exact-SHA gate and public-browser campaign qualify it.
             echo "VITE_COOP_AUTHORITY_V2_REPLACEMENT=on"
             echo "VITE_COOP_AUTHORITY_V2_WAVE=on"
+            echo "VITE_COOP_AUTHORITY_V2_INTERACTION=on"
             echo "VITE_COOP_AUTHORITY_V2_RECOVERY=on"
             # Showdown battle telemetry (D5): dedicated worker + er-telemetry D1.
             # Without this the client falls back to VITE_SERVER_URL (404 no-op).

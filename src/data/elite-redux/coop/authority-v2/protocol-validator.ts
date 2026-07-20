@@ -30,6 +30,7 @@
 // frame-context module.
 // =============================================================================
 
+import { isAuthorityEntryControlCompatible } from "#data/elite-redux/coop/authority-v2/authority-entry";
 import type { CoopAckStage, CoopAuthorityEntryKind } from "#data/elite-redux/coop/authority-v2/contract";
 import type {
   CoopAuthorityEntryBodyV2,
@@ -66,6 +67,7 @@ const ENTRY_KINDS: readonly CoopAuthorityEntryKind[] = [
   "TURN_COMMIT",
   "REPLACEMENT_COMMIT",
   "INTERACTION_COMMIT",
+  "CONTROL_COMMIT",
   "WAVE_ADVANCE",
   "TERMINAL_COMMIT",
 ];
@@ -77,14 +79,24 @@ function inList(list: readonly string[], value: unknown): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Nested: CoopNextControl (frozen decision 4). null is valid.
+// Nested: CoopNextControl (frozen decision 4).
 // ---------------------------------------------------------------------------
 
-function nextControlIssues(control: unknown): string[] {
+function recoveryNextControlIssues(control: unknown): string[] {
   if (control === null) {
     return [];
   }
   return canonicalNextControlIssues(control).map(issue => `nextControl.${issue}`);
+}
+
+function mechanicalNextControlIssues(control: unknown): string[] {
+  return control === null
+    ? ["nextControl: required"]
+    : canonicalNextControlIssues(control).map(issue => `nextControl.${issue}`);
+}
+
+function isPositiveSafeInt(value: unknown): value is number {
+  return isNonNegSafeInt(value) && value > 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +127,7 @@ function authorityEntryBodyIssues(body: unknown): string[] {
     return ["not an object"];
   }
   const issues: string[] = [];
-  if (!isNonNegSafeInt(body.revision)) {
+  if (!isPositiveSafeInt(body.revision)) {
     issues.push("revision");
   }
   if (!isNonEmptyString(body.operationId)) {
@@ -125,8 +137,15 @@ function authorityEntryBodyIssues(body: unknown): string[] {
     issues.push("kind");
   }
   issues.push(...materialIssues(body.material));
-  issues.push(...nextControlIssues(body.nextControl));
-  if (!Array.isArray(body.subsumes) || !body.subsumes.every(isNonNegSafeInt)) {
+  issues.push(...mechanicalNextControlIssues(body.nextControl));
+  if (
+    inList(ENTRY_KINDS, body.kind)
+    && canonicalNextControlIssues(body.nextControl).length === 0
+    && !isAuthorityEntryControlCompatible(body.kind, body.nextControl)
+  ) {
+    issues.push("nextControl: incompatible with entry kind");
+  }
+  if (!Array.isArray(body.subsumes) || !body.subsumes.every(isPositiveSafeInt)) {
     issues.push("subsumes");
   }
   return issues;
@@ -189,10 +208,26 @@ function recoveryBundleBodyIssues(body: unknown): string[] {
   if (!isNonNegSafeInt(body.frontier)) {
     issues.push("frontier");
   }
+  if (
+    !isNonNegSafeInt(body.frontier)
+    || (body.frontier === 0 ? body.frontierOperationId !== null : !isNonEmptyString(body.frontierOperationId))
+  ) {
+    issues.push("frontierOperationId");
+  }
   if (!isNonNegSafeInt(body.membershipRevision)) {
     issues.push("membershipRevision");
   }
-  issues.push(...nextControlIssues(body.nextControl));
+  if (isNonNegSafeInt(body.frontier)) {
+    if (body.frontier === 0) {
+      if (body.nextControl !== null) {
+        issues.push("nextControl: must be null at frontier zero");
+      }
+    } else {
+      issues.push(...mechanicalNextControlIssues(body.nextControl));
+    }
+  } else {
+    issues.push(...recoveryNextControlIssues(body.nextControl));
+  }
   if (Array.isArray(body.requiredTail)) {
     body.requiredTail.forEach((entry, index) => {
       for (const entryIssue of authorityEntryBodyIssues(entry)) {

@@ -43,6 +43,7 @@ test("staging browser and signaling deployment are pinned to P33 without product
   assert.match(workflow, /echo "VITE_COOP_AUTHORITY_V2_TURN=on"/u);
   assert.match(workflow, /echo "VITE_COOP_AUTHORITY_V2_REPLACEMENT=on"/u);
   assert.match(workflow, /echo "VITE_COOP_AUTHORITY_V2_WAVE=on"/u);
+  assert.match(workflow, /echo "VITE_COOP_AUTHORITY_V2_INTERACTION=on"/u);
   assert.match(workflow, /echo "VITE_COOP_AUTHORITY_V2_RECOVERY=on"/u);
   assert.match(workflow, /node scripts\/materialize-coop-staging-config\.mjs/u);
   assert.match(workflow, /command: deploy --config workers\/er-coop-api\/wrangler\.generated\.staging\.toml/u);

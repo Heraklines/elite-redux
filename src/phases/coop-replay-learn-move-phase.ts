@@ -13,16 +13,25 @@ import {
   armCoopLearnMoveIntentResend,
   type CoopLearnMoveOperationBinding,
   captureCoopLearnMoveOperationBinding,
+  coopLearnMoveDecisionOperationId,
+  isCoopLearnMoveAuthorityV2Active,
 } from "#data/elite-redux/coop/coop-learn-move-operation";
 import {
   clearCoopLearnMoveForwardInFlight,
   failCoopSharedSession,
   getCoopInteractionRelay,
+  getCoopRuntime,
   getCoopUiMirror,
+  notifyCoopV2InteractionSurfaceReady,
   setCoopLearnMovePickerOpener,
+  settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
+import {
+  COOP_LEARN_MOVE_CHOICE_KINDS,
+  COOP_LEARN_MOVE_FWD_SEQ_BASE,
+  COOP_LEARN_MOVE_SEQ,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import { UiMode } from "#enums/ui-mode";
-import { COOP_LEARN_MOVE_FWD_SEQ_BASE, COOP_LEARN_MOVE_SEQ } from "#phases/learn-move-phase";
 import { SummaryUiMode } from "#ui/summary-ui-handler";
 
 /** Routing tag for the guest->host relayed move-forget pick (distinguishes it on the wire / in logs). */
@@ -111,6 +120,8 @@ setCoopLearnMovePickerOpener(openCoopLearnMovePickerInline);
  */
 export class CoopReplayLearnMovePhase extends Phase {
   public readonly phaseName = "CoopReplayLearnMovePhase";
+  /** Exact immutable presentation address required by the V2 public-control ledger. */
+  public coopV2ControlOperationId: string | null;
 
   private readonly partySlot: number;
   private readonly moveId: number;
@@ -121,13 +132,46 @@ export class CoopReplayLearnMovePhase extends Phase {
   private settled = false;
   private operationBinding: CoopLearnMoveOperationBinding | null = null;
   private relay: CoopInteractionRelay | null = null;
+  private readonly ownerIsGuest: boolean;
+  private readonly coopOwningRuntime = getCoopRuntime();
 
-  constructor(partySlot: number, moveId: number, maxMoveCount: number) {
+  constructor(
+    partySlot: number,
+    moveId: number,
+    maxMoveCount: number,
+    operationId: string | null = null,
+    ownerIsGuest = true,
+  ) {
     super();
     this.partySlot = partySlot;
     this.moveId = moveId;
     this.maxMoveCount = maxMoveCount;
     this.seq = COOP_LEARN_MOVE_FWD_SEQ_BASE + partySlot;
+    this.coopV2ControlOperationId = operationId;
+    this.ownerIsGuest = ownerIsGuest;
+  }
+
+  /** Idempotently bind a redelivered presentation to this exact phase generation. */
+  public installCoopV2LearnMovePresentation(
+    operationId: string,
+    partySlot: number,
+    moveId: number,
+    maxMoveCount: number,
+    ownerIsGuest: boolean,
+  ): boolean {
+    if (
+      partySlot !== this.partySlot
+      || moveId !== this.moveId
+      || maxMoveCount !== this.maxMoveCount
+      || ownerIsGuest !== this.ownerIsGuest
+      || operationId.length === 0
+      || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
+    ) {
+      return false;
+    }
+    this.coopV2ControlOperationId = operationId;
+    notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+    return true;
   }
 
   public override start(): void {
@@ -156,6 +200,10 @@ export class CoopReplayLearnMovePhase extends Phase {
     this.relay = relay;
 
     const move = allMoves[this.moveId];
+    if (!this.ownerIsGuest) {
+      void this.watchHostOwnedDecision(pokemon, move);
+      return;
+    }
     // Open the REAL interactive move-forget picker (the same shared #563 screen the lockstep owner
     // drives). beginSession("owner", ...) so the HOST mirrors this client's live cursor (cosmetic).
     void globalScene.ui
@@ -165,7 +213,40 @@ export class CoopReplayLearnMovePhase extends Phase {
       })
       .then(() => {
         getCoopUiMirror()?.beginSession("owner", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
+        notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
       });
+  }
+
+  /** Host-owned presentation: show the same picker read-only until the immutable result closes it. */
+  private async watchHostOwnedDecision(
+    pokemon: ReturnType<typeof globalScene.getPlayerParty>[number],
+    move: (typeof allMoves)[number],
+  ): Promise<void> {
+    const relay = this.relay;
+    if (relay == null) {
+      failCoopSharedSession(`Learn-move watcher for slot ${this.partySlot} lost its relay`);
+      return;
+    }
+    await globalScene.ui.setModeWithoutClear(UiMode.SUMMARY, pokemon, SummaryUiMode.LEARN_MOVE, move, () => {
+      /* watcher: immutable result is the sole close authority */
+    });
+    getCoopUiMirror()?.beginSession("watcher", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
+    notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+    const result = await relay.awaitInteractionChoice(this.seq, 1_200_000, COOP_LEARN_MOVE_CHOICE_KINDS);
+    getCoopUiMirror()?.endSession();
+    const expectedOperationId =
+      this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
+    if (
+      isCoopLearnMoveAuthorityV2Active(this.operationBinding)
+      && (expectedOperationId == null
+        || result?.operationId !== expectedOperationId
+        || !settleCoopV2InteractionOperation(expectedOperationId, this.coopOwningRuntime))
+    ) {
+      failCoopSharedSession(`Learn-move watcher for slot ${this.partySlot} could not settle its exact V2 result`);
+      return;
+    }
+    clearCoopLearnMoveForwardInFlight(this.partySlot);
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
   }
 
   /**
@@ -203,6 +284,17 @@ export class CoopReplayLearnMovePhase extends Phase {
       },
       operationBinding,
     );
+    if (isCoopLearnMoveAuthorityV2Active(operationBinding)) {
+      const decisionOperationId =
+        this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
+      if (
+        decisionOperationId == null
+        || !settleCoopV2InteractionOperation(decisionOperationId, this.coopOwningRuntime)
+      ) {
+        failCoopSharedSession(`Learn-move replay for slot ${this.partySlot} lost its exact V2 result address`);
+        return;
+      }
+    }
     void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
   }
 }

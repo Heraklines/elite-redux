@@ -2579,6 +2579,7 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       arenaTags: readArenaTagViews(),
       party: globalScene.getPlayerParty().map(p => p.species.speciesId),
       money: globalScene.money,
+      lockModifierTiers: globalScene.lockModifierTiers,
       modifiers: readModifiers(),
       // Player-wide persistent modifier BLOBS (#698 / #633 BUG 2): the full ModifierData of the
       // NON-held-item PersistentModifiers, so the gated guest heal can RECONSTRUCT a player-wide
@@ -2766,6 +2767,7 @@ function captureCoopAuthoritativeBattleMaterial(turn: number): CoopAuthoritative
       terrainTurnsLeft: arena.terrain?.turnsLeft ?? 0,
       arenaTags: readArenaTagViews(),
       money: globalScene.money,
+      lockModifierTiers: globalScene.lockModifierTiers,
       score: globalScene.score,
       pokeballCounts: readPokeballCounts(),
       playerModifiers: captureCoopModifierBlobs(true),
@@ -3846,6 +3848,9 @@ function applyCoopAuthoritativeBattleStateInternal(
     }
     reconcileArenaTags(state.arenaTags, true);
     globalScene.money = state.money;
+    if (typeof state.lockModifierTiers === "boolean") {
+      globalScene.lockModifierTiers = state.lockModifierTiers;
+    }
     if (typeof state.score === "number") {
       globalScene.score = state.score;
     }
@@ -4734,6 +4739,9 @@ export function applyCoopFullSnapshot(
       coopWarn("heal", `money host=${snapshot.money} guest=${globalScene.money} -> applied`);
     }
     globalScene.money = snapshot.money;
+    if (typeof snapshot.lockModifierTiers === "boolean") {
+      globalScene.lockModifierTiers = snapshot.lockModifierTiers;
+    }
     // Ball inventory is NOT healed here (#843). The host decrements the ball count host-only in
     // AttemptCapturePhase (the pure-renderer guest never runs it) and grants ball rewards through the
     // reward shop; the guest converges to the host's count via the END-OF-TURN authoritative state
@@ -5436,6 +5444,7 @@ export function captureCoopMeOutcome(): Extract<CoopInteractionOutcome, { k: "me
 function applyCoopMeOutcomeUnchecked(
   o: Extract<CoopInteractionOutcome, { k: "meResync" }>,
   rollbackReassert = false,
+  authoritativeStateAlreadyApplied = false,
 ): void {
   // #838 UNIFY: a modern host carries the id-based authoritative full-state (captured off-field too).
   // Adopt it via the SAME apply the live turns use - mutate-in-place by Pokemon.id, reconstruct/remove
@@ -5443,7 +5452,11 @@ function applyCoopMeOutcomeUnchecked(
   // `base` species-order/benchParty heal. authoritativeGuest=true: applyCoopMeOutcome is definitionally
   // the GUEST adopting the host's ME terminal (no runtime import needed to know that), so the full
   // modifier / enemy-boss reconcile runs. Falls back to base + species party only for an older host.
-  if (o.authoritativeState === undefined) {
+  if (authoritativeStateAlreadyApplied) {
+    if (o.authoritativeState === undefined || o.authoritativeState.tick !== coopLastAppliedStateTick) {
+      throw new Error("pre-applied authoritative Mystery state does not match the accepted tick");
+    }
+  } else if (o.authoritativeState === undefined) {
     if (o.base != null) {
       applyCoopFullSnapshot(o.base);
     }
@@ -5484,7 +5497,10 @@ export function consumeCoopMeOutcomeRollbackFatal(): boolean {
   return fatal;
 }
 
-export function applyCoopMeOutcome(o: Extract<CoopInteractionOutcome, { k: "meResync" }>): boolean {
+export function applyCoopMeOutcome(
+  o: Extract<CoopInteractionOutcome, { k: "meResync" }>,
+  options: { readonly authoritativeStateAlreadyApplied?: boolean } = {},
+): boolean {
   coopMeOutcomeRollbackFatal = false;
   let rollback: Extract<CoopInteractionOutcome, { k: "meResync" }>;
   const priorTickCounter = coopStateTickCounter;
@@ -5495,7 +5511,7 @@ export function applyCoopMeOutcome(o: Extract<CoopInteractionOutcome, { k: "meRe
     return false;
   }
   try {
-    applyCoopMeOutcomeUnchecked(o);
+    applyCoopMeOutcomeUnchecked(o, false, options.authoritativeStateAlreadyApplied === true);
     // Capturing the rollback is observational on the receiver; do not advance its producer-side tick.
     coopStateTickCounter = priorTickCounter;
     return true;
@@ -5505,7 +5521,7 @@ export function applyCoopMeOutcome(o: Extract<CoopInteractionOutcome, { k: "meRe
     // the journal ACK and terminal materialization so durability can retry or terminate the shared session.
     let rollbackApplied = false;
     try {
-      applyCoopMeOutcomeUnchecked(rollback, true);
+      applyCoopMeOutcomeUnchecked(rollback, true, options.authoritativeStateAlreadyApplied === true);
       rollbackApplied = true;
     } catch {
       // The caller will fail the shared session; there is no safe terminal wake-up after rollback failure.

@@ -12,6 +12,7 @@
 //
 //   - material : the canonical state image to install (opaque to the log).
 //   - frontier : the log high-water this image proves (frozen decision 2).
+//   - frontierOperationId : the exact operation at that high-water.
 //   - context  : the exact CoopFrameContextV2 the image was cut on.
 //   - membershipRevision : the membership the image is valid under.
 //   - nextControl : the canonical successor control to project (decision 4).
@@ -33,7 +34,7 @@ import type {
   CoopAuthoritativeMaterial,
   CoopAuthorityEntry,
   CoopFrameContextV2,
-  CoopNextControl,
+  CoopRecoveryNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
 import { controlsEqual, validateNextControl } from "#data/elite-redux/coop/authority-v2/next-control";
 
@@ -65,10 +66,12 @@ export interface CoopRecoveryBundle {
   readonly material: CoopAuthoritativeMaterial;
   /** The proven log high-water this image installs (adopted on apply). */
   readonly frontier: number;
+  /** Exact operation at `frontier`; null only when the log frontier is zero. */
+  readonly frontierOperationId: string | null;
   /** Membership the image is valid under (must match the live frame). */
   readonly membershipRevision: number;
   /** The canonical successor control the replica projects after material. */
-  readonly nextControl: CoopNextControl;
+  readonly nextControl: CoopRecoveryNextControl;
   /** Contiguous entries covering (capturedFrontier, frontier], in revision order. */
   readonly requiredTail: readonly CoopAuthorityEntry[];
 }
@@ -114,7 +117,8 @@ function frameMismatchReason(bundle: CoopFrameContextV2, live: CoopFrameContextV
 function tailInconsistencyReason(
   tail: readonly CoopAuthorityEntry[],
   bundleContext: CoopFrameContextV2,
-  nextControl: CoopNextControl,
+  frontierOperationId: string | null,
+  nextControl: CoopRecoveryNextControl,
   capturedFrontier: number,
   frontier: number,
 ): string | undefined {
@@ -154,6 +158,9 @@ function tailInconsistencyReason(
   if (finalEntry == null || !controlsEqual(finalEntry.nextControl, nextControl)) {
     return "tail final nextControl does not match the recovery successor";
   }
+  if (finalEntry.operationId !== frontierOperationId) {
+    return `tail final operation ${finalEntry.operationId} != frontier operation ${String(frontierOperationId)}`;
+  }
   return;
 }
 
@@ -186,9 +193,14 @@ export function validateRecoveryBundle(
   if (
     !Number.isSafeInteger(bundle.frontier)
     || bundle.frontier < 0
+    || (bundle.frontier === 0
+      ? bundle.frontierOperationId !== null || bundle.nextControl !== null
+      : typeof bundle.frontierOperationId !== "string"
+        || bundle.frontierOperationId.length === 0
+        || bundle.nextControl == null
+        || !validateNextControl(bundle.nextControl).ok)
     || typeof bundle.material?.digest !== "string"
     || bundle.material.digest.length === 0
-    || (bundle.nextControl != null && !validateNextControl(bundle.nextControl).ok)
   ) {
     return { kind: "mismatch", reason: "bundle frontier, material, or nextControl is malformed" };
   }
@@ -208,6 +220,7 @@ export function validateRecoveryBundle(
   const tailReason = tailInconsistencyReason(
     bundle.requiredTail,
     bundle.context,
+    bundle.frontierOperationId,
     bundle.nextControl,
     capturedFrontier,
     bundle.frontier,

@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
+import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import { COOP_CAP_OP_REVIVAL, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
@@ -12,10 +14,13 @@ import {
   type CoopPendingOperation,
   type CoopRevivalPayload,
   makeCoopOperationId,
+  parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
+  type CoopOperationEnvelopeApplyContext,
   getActiveCoopOperationDurability,
+  isCoopOperationAuthorityV2Apply,
   registerCoopOperationApplier,
   tryJournalCoopCommittedEnvelope,
   tryJournalCoopCommittedEnvelopeFor,
@@ -24,6 +29,7 @@ import {
   CoopOperationGuest,
   CoopOperationHost,
   type CoopRuntimeOpState,
+  coopOperationCommitContext,
   getActiveCoopRuntimeOpState,
   maybeCoopOpSurfaceState,
   registerCoopOpSurfaceState,
@@ -32,7 +38,7 @@ import {
   resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
-import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
+import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_REVIVAL_OP === "off");
 const WAVE_STRIDE = 1_000_000;
@@ -49,6 +55,7 @@ interface RevivalOpState {
   authorityHost: CoopOperationHost | null;
   receiverGuest: CoopOperationGuest | null;
   readonly retries: Map<string, ReturnType<typeof setTimeout>>;
+  readonly stateAppliedOperations: Set<string>;
 }
 
 registerCoopOpSurfaceState(
@@ -59,6 +66,7 @@ registerCoopOpSurfaceState(
     authorityHost: null,
     receiverGuest: null,
     retries: new Map(),
+    stateAppliedOperations: new Set(),
   }),
 );
 
@@ -150,6 +158,7 @@ export function resetCoopRevivalOperationState(binding?: CoopRevivalOperationBin
     clearTimeout(timer);
   }
   s.retries.clear();
+  s.stateAppliedOperations.clear();
   s.authorityHost = null;
   s.receiverGuest = null;
   s.revisionFloor = 0;
@@ -190,6 +199,46 @@ function actionAddress(payload: CoopRevivalPayload, wave: number, turn: number):
   return payload.type === "prompt" ? base : base + Math.max(1, Math.trunc(payload.partySlot) + 1);
 }
 
+export function isCoopRevivalAuthorityV2Active(binding?: CoopRevivalOperationBinding | null): boolean {
+  return isCoopV2InteractionCutoverActive(binding?.durability);
+}
+
+/** Stable prompt/decision identity used by the public picker and its exact terminal proof. */
+export function coopRevivalOperationId(
+  payload: CoopRevivalPayload,
+  wave: number,
+  turn: number,
+  ownerRole: CoopRole,
+  binding?: CoopRevivalOperationBinding | null,
+): string {
+  return makeCoopOperationId(
+    state(binding).epoch,
+    coopSeatOfRole(ownerRole),
+    actionAddress(payload, wave, turn),
+    "REVIVAL",
+  );
+}
+
+/**
+ * Derive the exact immutable result address from the presentation that opened a Revival Blessing picker.
+ * This is intentionally independent of ambient wave/turn/runtime state so a replica watcher can prove that
+ * the result closing its public UI is the direct successor of the authenticated prompt it observed.
+ */
+export function coopRevivalDecisionOperationId(promptOperationId: string, partySlot: number): string | null {
+  const parsed = parseCoopOperationId(promptOperationId);
+  if (
+    parsed == null
+    || parsed.kind !== "REVIVAL"
+    || !Number.isSafeInteger(partySlot)
+    || partySlot < 0
+    || partySlot >= 6
+    || parsed.pinnedSeq % FIELD_STRIDE !== 0
+  ) {
+    return null;
+  }
+  return makeCoopOperationId(parsed.epoch, parsed.owner, parsed.pinnedSeq + partySlot + 1, "REVIVAL");
+}
+
 function host(binding?: CoopRevivalOperationBinding | null): CoopOperationHost {
   const s = state(binding);
   s.authorityHost ??=
@@ -209,25 +258,7 @@ function guest(binding?: CoopRevivalOperationBinding | null): CoopOperationGuest
 }
 
 function context(wave: number, turn: number) {
-  const authoritativeState: CoopAuthoritativeBattleStateV1 = {
-    version: 1,
-    tick: 0,
-    wave,
-    turn,
-    playerParty: [],
-    enemyParty: [],
-    field: [],
-    weather: 0,
-    weatherTurnsLeft: 0,
-    terrain: 0,
-    terrainTurnsLeft: 0,
-    arenaTags: [],
-    money: 0,
-    pokeballCounts: [],
-    playerModifiers: [],
-    enemyModifiers: [],
-  };
-  return { wave, turn, logicalPhase: "TURN_RESOLVE" as const, authoritativeState };
+  return coopOperationCommitContext(wave, turn, "TURN_RESOLVE");
 }
 
 function commitAction(
@@ -248,10 +279,9 @@ function commitAction(
     return;
   }
   try {
-    const s = state(binding);
     const owner = coopSeatOfRole(params.ownerRole);
     const operation: CoopPendingOperation = {
-      id: makeCoopOperationId(s.epoch, owner, actionAddress(params.payload, params.wave, params.turn), "REVIVAL"),
+      id: coopRevivalOperationId(params.payload, params.wave, params.turn, params.ownerRole, binding),
       kind: "REVIVAL",
       owner,
       status: "proposed",
@@ -279,30 +309,58 @@ function commitAction(
   return;
 }
 
+/** Commit a local or remote Revival picker presentation before its public UI becomes actionable. */
+export function commitCoopRevivalPrompt(
+  params: {
+    fieldIndex: number;
+    ownerRole: CoopRole;
+    localRole: CoopRole;
+    wave: number;
+    turn: number;
+  },
+  binding?: CoopRevivalOperationBinding | null,
+): string | null {
+  return (
+    commitAction(
+      {
+        payload: { type: "prompt", fieldIndex: params.fieldIndex },
+        ownerRole: params.ownerRole,
+        localRole: params.localRole,
+        wave: params.wave,
+        turn: params.turn,
+      },
+      binding,
+    ) ?? null
+  );
+}
+
 /** Journal the prompt first, then send the low-latency legacy carrier. */
+export function sendCoopRevivalPromptWithOperationId(
+  relay: CoopInteractionRelay,
+  fieldIndex: number,
+  params: { localRole: CoopRole; wave: number; turn: number },
+  binding?: CoopRevivalOperationBinding | null,
+): string | null {
+  if (!isCoopRevivalOperationEnabled()) {
+    relay.promptRevival(fieldIndex);
+    return "legacy";
+  }
+  const operationId = commitCoopRevivalPrompt({ fieldIndex, ownerRole: "guest", ...params }, binding);
+  if (operationId == null) {
+    return null;
+  }
+  relay.promptRevival(fieldIndex, operationId);
+  return operationId;
+}
+
+/** Compatibility boolean wrapper for callers that do not need the exact V2 presentation address. */
 export function sendCoopRevivalPrompt(
   relay: CoopInteractionRelay,
   fieldIndex: number,
   params: { localRole: CoopRole; wave: number; turn: number },
   binding?: CoopRevivalOperationBinding | null,
 ): boolean {
-  if (!isCoopRevivalOperationEnabled()) {
-    relay.promptRevival(fieldIndex);
-    return true;
-  }
-  const operationId = commitAction(
-    {
-      payload: { type: "prompt", fieldIndex },
-      ownerRole: "guest",
-      ...params,
-    },
-    binding,
-  );
-  if (operationId == null) {
-    return false;
-  }
-  relay.promptRevival(fieldIndex, operationId);
-  return true;
+  return sendCoopRevivalPromptWithOperationId(relay, fieldIndex, params, binding) != null;
 }
 
 export function commitRevivalAuthorityDecision(
@@ -395,7 +453,10 @@ function validPayload(value: unknown): value is CoopRevivalPayload {
   );
 }
 
-function applyJournaledRevivalEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
+function applyJournaledRevivalEnvelope(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  applyContext?: CoopOperationEnvelopeApplyContext,
+): CoopApplyOutcome {
   if (!isCoopRevivalOperationEnabled()) {
     return "rejected";
   }
@@ -409,10 +470,17 @@ function applyJournaledRevivalEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
   assertBindingRole(undefined, "guest");
   const s = state();
   const g = guest();
-  if (g.hasApplied(operation.id)) {
+  if (!isCoopOperationAuthorityV2Apply(applyContext) && g.hasApplied(operation.id)) {
     return "duplicate";
   }
-  const result = applyCoopOperationEnvelope(g, "op:revival", envelope);
+  if (isCoopOperationAuthorityV2Apply(applyContext)) {
+    if (!isCompleteCoopOperationAuthorityState(envelope.authoritativeState, envelope.wave, envelope.turn)) {
+      return "rejected";
+    }
+    // The V2 replica already committed this complete state before dispatching the surface materializer.
+    s.stateAppliedOperations.add(operation.id);
+  }
+  const result = applyCoopOperationEnvelope(g, "op:revival", envelope, applyContext);
   if (result !== "applied") {
     return result;
   }

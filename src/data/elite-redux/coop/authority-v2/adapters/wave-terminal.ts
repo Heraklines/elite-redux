@@ -141,10 +141,12 @@ export interface CoopTerminalMaterialV2 {
   readonly authorityCarrier?: CoopWaveTerminalAuthorityCarrierV2;
 }
 
-/** The canonical destination a WAVE_ADVANCE may state: REWARD | BIOME | COMMAND_FRONTIER | MYSTERY. */
+/** The canonical destination a WAVE_ADVANCE may state after full interaction cutover. */
 export type CoopWaveAdvanceDestination = Extract<
   ProjectableControl,
-  { kind: "REWARD" | "BIOME" | "COMMAND_FRONTIER" | "MYSTERY" }
+  {
+    kind: "REWARD" | "BIOME" | "COMMAND_FRONTIER" | "MYSTERY" | "SHARED_INTERACTION" | "AWAIT_SUCCESSOR";
+  }
 >;
 
 /** Thrown by the authority-side builders on malformed input: an authority must NEVER commit a malformed entry. */
@@ -292,7 +294,7 @@ export interface BuildWaveAdvanceEntryInput {
   readonly operationId: string;
   /** The COMPLETE stated transition. */
   readonly transition: CoopWaveTransitionMaterialV2;
-  /** The canonical successor control (REWARD | BIOME | COMMAND | MYSTERY). */
+  /** The canonical successor control (direct command/input surface or explicit ordered presentation wait). */
   readonly destination: CoopWaveAdvanceDestination;
   /**
    * Revisions this advance explicitly subsumes - the unretired same-wave
@@ -320,10 +322,8 @@ export function buildWaveAdvanceEntry(input: BuildWaveAdvanceEntryInput): Omit<C
   // Runtime guard against a mistyped caller: the type excludes TERMINAL, but a control minted
   // dynamically could still carry it; a wave-advance never seals the session (that is the terminal builder).
   const destinationKind: string = (destination as ProjectableControl).kind;
-  if (destinationKind === "TERMINAL" || destinationKind === "REPLACEMENT") {
-    throw new CoopWaveTerminalBuildError(
-      `WAVE_ADVANCE destination must be REWARD | BIOME | COMMAND_FRONTIER | MYSTERY (got ${destinationKind})`,
-    );
+  if (destinationKind === "TERMINAL") {
+    throw new CoopWaveTerminalBuildError(`WAVE_ADVANCE destination cannot be TERMINAL (got ${destinationKind})`);
   }
   const validation = validateNextControl(destination);
   if (!validation.ok) {
@@ -429,7 +429,7 @@ export function entryControlWave(entry: CoopAuthorityEntry): number | null {
   if (control == null) {
     return null;
   }
-  return control.kind === "COMMAND_FRONTIER" || control.kind === "REPLACEMENT" ? control.wave : null;
+  return control.kind === "COMMAND_FRONTIER" || control.kind === "AWAIT_SUCCESSOR" ? control.wave : null;
 }
 
 /**

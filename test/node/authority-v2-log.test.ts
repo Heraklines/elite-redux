@@ -121,16 +121,33 @@ function commandControl(): CoopNextControl {
   };
 }
 
+function successorWait(afterOperationId: string, allowedKinds: readonly CoopAuthorityEntry["kind"][]): CoopNextControl {
+  return {
+    kind: "AWAIT_SUCCESSOR",
+    afterOperationId,
+    epoch: 1,
+    wave: 1,
+    turn: 1,
+    allowedKinds,
+    expectedOperationId: null,
+  };
+}
+
 function entryInput(
   operationId: string,
-  opts: { nextControl?: CoopNextControl; subsumes?: number[]; context?: CoopFrameContextV2 } = {},
+  opts: {
+    kind?: CoopAuthorityEntry["kind"];
+    nextControl?: CoopNextControl;
+    subsumes?: number[];
+    context?: CoopFrameContextV2;
+  } = {},
 ): Omit<CoopAuthorityEntry, "revision"> {
   return {
     context: opts.context ?? frameContext(),
     operationId,
-    kind: "TURN_COMMIT",
+    kind: opts.kind ?? "TURN_COMMIT",
     material: { digest: `digest-${operationId}`, payload: { op: operationId } },
-    nextControl: opts.nextControl ?? null,
+    nextControl: opts.nextControl ?? commandControl(),
     subsumes: opts.subsumes ?? [],
   };
 }
@@ -138,7 +155,11 @@ function entryInput(
 function fullEntry(
   revision: number,
   operationId: string,
-  opts: { context?: CoopFrameContextV2; nextControl?: CoopNextControl } = {},
+  opts: {
+    kind?: CoopAuthorityEntry["kind"];
+    context?: CoopFrameContextV2;
+    nextControl?: CoopNextControl;
+  } = {},
 ): CoopAuthorityEntry {
   return { ...entryInput(operationId, opts), revision };
 }
@@ -497,6 +518,55 @@ describe("authority-v2 log", () => {
     expect(log.appliedThrough()).toBe(0);
   });
 
+  it("admits an explicit CONTROL_COMMIT only from its ordered wait and closes on the stated command", () => {
+    const log = makeLog(scheduler, sent);
+    log.commit(
+      entryInput("interaction-result", {
+        kind: "INTERACTION_COMMIT",
+        nextControl: successorWait("interaction-result", ["CONTROL_COMMIT"]),
+      }),
+    );
+
+    const opened = log.commit(
+      entryInput("command-open", {
+        kind: "CONTROL_COMMIT",
+        nextControl: commandControl(),
+      }),
+    );
+    expect(opened).toMatchObject({
+      revision: 2,
+      kind: "CONTROL_COMMIT",
+      nextControl: { kind: "COMMAND_FRONTIER" },
+    });
+
+    expect(() =>
+      log.commit(
+        entryInput("unrelated-interaction", {
+          kind: "INTERACTION_COMMIT",
+          nextControl: successorWait("unrelated-interaction", ["CONTROL_COMMIT"]),
+        }),
+      ),
+    ).toThrow(/not authorized by predecessor control/u);
+  });
+
+  it("rejects CONTROL_COMMIT when the predecessor wait did not explicitly permit it", () => {
+    const log = makeLog(scheduler, sent);
+    log.commit(
+      entryInput("interaction-result", {
+        kind: "INTERACTION_COMMIT",
+        nextControl: successorWait("interaction-result", ["WAVE_ADVANCE"]),
+      }),
+    );
+    expect(() =>
+      log.commit(
+        entryInput("command-open", {
+          kind: "CONTROL_COMMIT",
+          nextControl: commandControl(),
+        }),
+      ),
+    ).toThrow(/not authorized by predecessor control/u);
+  });
+
   it("coalesces repeated later revisions into one tail request until the missing frontier completes", () => {
     const log = makeReplicaLog(scheduler, sent);
 
@@ -605,11 +675,13 @@ describe("authority-v2 log", () => {
 
     expect(log.recoverySlice(0)).toEqual({
       frontier: 2,
+      frontierOperationId: "op-recovery-2",
       nextControl: commandControl(),
       requiredTail: [first, second],
     });
     expect(log.recoverySlice(1)).toEqual({
       frontier: 2,
+      frontierOperationId: "op-recovery-2",
       nextControl: commandControl(),
       requiredTail: [second],
     });
@@ -620,9 +692,56 @@ describe("authority-v2 log", () => {
     expect(log.retained()).toHaveLength(0);
     expect(log.recoverySlice(2)).toEqual({
       frontier: 2,
+      frontierOperationId: "op-recovery-2",
       nextControl: commandControl(),
       requiredTail: [],
     });
+  });
+
+  it("allows only the immediate entry kind named by an authority successor wait", () => {
+    const log = makeLog(scheduler, sent);
+    log.commit(
+      entryInput("op-wait", {
+        nextControl: successorWait("op-wait", ["INTERACTION_COMMIT"]),
+      }),
+    );
+
+    expect(() => log.commit(entryInput("op-wrong", { kind: "WAVE_ADVANCE" }))).toThrow(
+      /not authorized by predecessor control/,
+    );
+    const successor = log.commit(entryInput("op-right", { kind: "INTERACTION_COMMIT" }));
+    expect(successor.revision).toBe(2);
+  });
+
+  it("keeps a replica successor wait until an exact allowed next revision is admitted", () => {
+    const log = makeReplicaLog(scheduler, sent);
+    const predecessor = fullEntry(1, "op-wait", {
+      nextControl: successorWait("op-wait", ["INTERACTION_COMMIT"]),
+    });
+    expect(log.admit(predecessor)).toEqual({ kind: "admitted" });
+    expect(log.recordReplicaStage(predecessor, "materialApplied")).toBe(true);
+    expect(log.recordReplicaStage(predecessor, "controlInstalled")).toBe(true);
+
+    expect(log.admit(fullEntry(2, "op-wrong", { kind: "WAVE_ADVANCE" }))).toEqual({
+      kind: "rejected",
+      reason: "predecessor-control-mismatch",
+    });
+    expect(log.receivedThrough()).toBe(1);
+    expect(log.admit(fullEntry(2, "op-right", { kind: "INTERACTION_COMMIT" }))).toEqual({ kind: "admitted" });
+  });
+
+  it("reconstructs an exact successor wait from an empty-tail recovery frontier", () => {
+    const log = makeReplicaLog(scheduler, sent);
+    log.adoptFrontier(7, {
+      operationId: "op-frontier",
+      nextControl: successorWait("op-frontier", ["WAVE_ADVANCE"]),
+    });
+
+    expect(log.admit(fullEntry(8, "op-wrong", { kind: "TURN_COMMIT" }))).toEqual({
+      kind: "rejected",
+      reason: "predecessor-control-mismatch",
+    });
+    expect(log.admit(fullEntry(8, "op-wave", { kind: "WAVE_ADVANCE" }))).toEqual({ kind: "admitted" });
   });
 
   it("refuses a recovery slice with an impossible hole or a frontier ahead of authority", () => {
@@ -676,6 +795,30 @@ describe("authority-v2 log", () => {
     const third = log.commit(entryInput("op-3"));
     expect(third.revision).toBe(3);
     expect(log.retained().map(entry => entry.revision)).toEqual([second.revision, third.revision]);
+  });
+
+  it("publishes nothing and burns no revision when authority-local successor reservation fails", () => {
+    const log = makeLog(scheduler, sent);
+    const prepared: number[] = [];
+
+    expect(() =>
+      log.commit(entryInput("op-refused-local"), entry => {
+        prepared.push(entry.revision);
+        return null;
+      }),
+    ).toThrow("authority-local successor reservation refused");
+    expect(prepared).toEqual([1]);
+    expect(delivered(sent)).toEqual([]);
+    expect(log.retained()).toEqual([]);
+    expect(log.diagnostics()).toMatchObject({
+      headRevision: 0,
+      retainedEntries: 0,
+      activeDeliveryTimers: 0,
+    });
+
+    const committed = log.commit(entryInput("op-after-refusal"), () => () => {});
+    expect(committed.revision).toBe(1);
+    expect(delivered(sent).map(entry => entry.operationId)).toEqual(["op-after-refusal"]);
   });
 
   it("keeps a committed entry retryable when the carrier throws synchronously", () => {

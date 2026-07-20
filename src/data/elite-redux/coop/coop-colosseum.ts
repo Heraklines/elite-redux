@@ -59,6 +59,7 @@ import {
   captureCoopColosseumOperationBinding,
   commitColosseumBoard,
   commitColosseumDecision,
+  coopColosseumDecisionOperationId,
   isCoopColosseumOperationEnabled,
 } from "#data/elite-redux/coop/coop-colosseum-operation";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -84,6 +85,7 @@ import {
   getCoopInteractionRelay,
   getCoopNetcodeMode,
   getCoopRuntime,
+  getCoopV2ActiveSharedInteractionOperationId,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
 import {
@@ -99,14 +101,11 @@ import type {
 } from "#data/elite-redux/coop/coop-transport";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
-import { UiMode } from "#enums/ui-mode";
 import { leaveEncounterWithoutBattle } from "#mystery-encounters/encounter-phase-utils";
 import type { CoopMeBattleEndDelegate } from "#phases/coop-replay-me-phase";
 import { setCoopMeBattleEndDelegate, setCoopMeSnapshotRebindDelegate } from "#phases/coop-replay-me-phase";
 import { COLOSSEUM_CASH_OUT, COLOSSEUM_CONTINUE } from "#ui/colosseum-ui-handler";
 import { hideCoopControllerTag, showCoopControllerTagFor } from "#ui/coop-controller-tag";
-import type { OptionSelectConfig } from "#ui/handlers/abstract-option-select-ui-handler";
-import i18next from "i18next";
 
 /**
  * #829: DEDICATED seq band for the Colosseum board decision, keyed by the pinned ME
@@ -124,7 +123,32 @@ const COOP_COLOSSEUM_BOARD_KIND = "coloBoard";
 /** #829: routing tag for the owner's relayed board decision index (choice inbox). */
 const COOP_COLOSSEUM_PICK_KIND = "coloPick";
 const COOP_COLOSSEUM_ROUND_TOKEN = "coopColosseumRound";
-const activeBoardRoundByPin = new Map<number, number>();
+const activeBoardByPin = new Map<number, { readonly round: number; readonly operationId: string | null }>();
+type CoopColosseumBoardPhaseOpener = (
+  labels: readonly string[],
+  round: number,
+  owner: boolean,
+  operationId?: string,
+) => Promise<number>;
+let coopColosseumBoardPhaseOpener: CoopColosseumBoardPhaseOpener | null = null;
+
+/** Cycle-free phase registration seam; the phase manager eagerly loads the concrete guest board phase. */
+export function setCoopColosseumBoardPhaseOpener(opener: CoopColosseumBoardPhaseOpener): void {
+  coopColosseumBoardPhaseOpener = opener;
+}
+
+function openCoopColosseumBoardPhase(
+  labels: readonly string[],
+  round: number,
+  owner: boolean,
+  operationId?: string,
+): Promise<number> {
+  if (coopColosseumBoardPhaseOpener == null) {
+    failCoopSharedSession(`Colosseum board phase for round ${round} was not registered`);
+    return Promise.resolve(-1);
+  }
+  return coopColosseumBoardPhaseOpener(labels, round, owner, operationId);
+}
 
 /**
  * #829: the board seq for the pinned ME interaction counter. Both clients derive it from the
@@ -134,6 +158,11 @@ const activeBoardRoundByPin = new Map<number, number>();
  */
 export function coopColosseumSeq(pinnedCounter: number): number {
   return COOP_COLOSSEUM_SEQ_BASE + Math.max(0, pinnedCounter);
+}
+
+/** Exact active board address, used only to bind the real public phase/recovery generation. */
+export function coopColosseumActiveBoardOperationId(pinned = coopMeInteractionStartValue()): string | null {
+  return activeBoardByPin.get(pinned)?.operationId ?? null;
 }
 
 /**
@@ -197,7 +226,7 @@ export function coopColosseumStreamBoard(labels: string[], roundOverride?: numbe
     failCoopSharedSession(`Colosseum board ${seq} could not enter authoritative control`);
     return false;
   }
-  activeBoardRoundByPin.set(pinned, committed.round);
+  activeBoardByPin.set(pinned, { round: committed.round, operationId: committed.operationId });
   if (!setCoopMeColosseumControl(pinned, { expectedRound: committed.round, boardRound: committed.round })) {
     failCoopSharedSession(`Colosseum board ${seq}/${committed.round} could not retain recovery control`);
     return false;
@@ -233,7 +262,7 @@ export function coopColosseumSendDecision(index: number, roundOverride?: number)
   const pinned = coopMeInteractionStartValue();
   const seq = coopColosseumSeq(pinned);
   const controller = getCoopController();
-  const round = roundOverride ?? activeBoardRoundByPin.get(pinned);
+  const round = roundOverride ?? activeBoardByPin.get(pinned)?.round;
   if (controller == null || round == null) {
     failCoopSharedSession(`Colosseum decision ${seq} has no committed board round`);
     return false;
@@ -307,6 +336,7 @@ export async function coopColosseumAwaitDecision(
   timeoutMs?: number,
   expectedRound?: number,
   relayOverride?: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+  beforeHostCommit?: (operationId: string, index: number) => boolean,
 ): Promise<number | null> {
   const relay = relayOverride ?? getCoopInteractionRelay();
   if (relay == null) {
@@ -314,7 +344,7 @@ export async function coopColosseumAwaitDecision(
   }
   const pinned = coopMeInteractionStartValue();
   const seq = coopColosseumSeq(pinned);
-  const round = expectedRound ?? activeBoardRoundByPin.get(pinned);
+  const round = expectedRound ?? activeBoardByPin.get(pinned)?.round;
   if (round == null) {
     return null;
   }
@@ -351,6 +381,16 @@ export async function coopColosseumAwaitDecision(
       if (controller?.role === "host") {
         if ((carriedRound as number) > round) {
           failCoopSharedSession(`Colosseum decision ${seq} carried future round ${String(carriedRound)}/${round}`);
+          return null;
+        }
+        const boardOperationId = activeBoardByPin.get(pinned)?.operationId ?? null;
+        const decisionOperationId =
+          boardOperationId == null ? null : coopColosseumDecisionOperationId(boardOperationId);
+        if (
+          decisionOperationId == null
+          || (beforeHostCommit != null && !beforeHostCommit(decisionOperationId, index))
+        ) {
+          failCoopSharedSession(`Colosseum decision ${seq}/${round} could not prove its phase terminal`);
           return null;
         }
         const committed = commitColosseumDecision(
@@ -445,7 +485,9 @@ export interface CoopColosseumRoundOps {
   /** Whether the LOCAL guest OWNS the board decision (drives it) vs watches it (pinned-counter parity). */
   boardOwnedLocally(): boolean;
   /** GUEST-OWNED board: open the local CONTINUE/CASH-OUT capture UI, relay the pick, resolve its index. */
-  driveBoard(labels: string[], round: number): Promise<number>;
+  driveBoard(labels: string[], round: number, operationId?: string): Promise<number>;
+  /** HOST-owned board: open the same exact board read-only and close on its committed decision. */
+  watchBoard?(labels: string[], round: number, operationId?: string): Promise<number>;
   /** Await the host's re-streamed boss party for the NEXT round (keyed `me:wave:counter`). */
   awaitBoss(timeoutMs: number): Promise<CoopSerializedEnemy[] | null>;
   /** CONTINUE: purge the stale battle loop, adopt the host's boss, boot the round's ME battle. */
@@ -595,6 +637,10 @@ export async function runColosseumGuestRoundLoop(
       present?.k === "mePresent" && Number.isSafeInteger(Number(present.tokens[COOP_COLOSSEUM_ROUND_TOKEN]))
         ? Number(present.tokens[COOP_COLOSSEUM_ROUND_TOKEN])
         : -1;
+    const boardOperationId =
+      (present == null ? null : relay.consumeCommittedInteractionOutcomeOperationId(boardSeq, present))
+      ?? coopColosseumActiveBoardOperationId(counter)
+      ?? getCoopV2ActiveSharedInteractionOperationId("op:colosseum", "COLO_PICK");
     if (
       labels == null
       || labels.length !== 2
@@ -617,10 +663,13 @@ export async function runColosseumGuestRoundLoop(
       resumedDecision = undefined;
     } else if (ops.boardOwnedLocally()) {
       ops.showTag(true);
-      decision = await ops.driveBoard(labels, round);
+      decision = await ops.driveBoard(labels, round, boardOperationId ?? undefined);
     } else {
       ops.showTag(false);
-      decision = await coopColosseumAwaitDecision(COOP_COLOSSEUM_WAIT_MS, round, relay);
+      decision =
+        ops.watchBoard == null
+          ? await coopColosseumAwaitDecision(COOP_COLOSSEUM_WAIT_MS, round, relay)
+          : await ops.watchBoard(labels, round, boardOperationId ?? undefined);
     }
     if (!boundaryLive()) {
       return;
@@ -732,63 +781,12 @@ function makeRealColosseumRoundOps(counter: number): CoopColosseumRoundOps {
       return coopColosseumBoardOwnedLocally();
     },
 
-    driveBoard(labels: string[], round: number): Promise<number> {
-      // GUEST-OWNED board: the guest's own encounter.misc.gauntlet is empty (it never ran the engine), so
-      // it cannot render the full COLOSSEUM standings board - it opens the SECONDARY-capture OPTION_SELECT
-      // pattern (the ME sub-pick template) over the HOST-streamed labels, captures the index, and relays it
-      // via coopColosseumSendDecision (the host adopts it). A CANCEL maps to CASH OUT (the safe exit).
-      const generation = coopSessionGeneration();
-      const runtime = getCoopRuntime();
-      const live = (): boolean =>
-        coopSessionGeneration() === generation
-        && getCoopRuntime() === runtime
-        && coopColosseumStillPinned(counter)
-        && isCoopAuthoritativeGuest();
-      return new Promise<number>(resolve => {
-        let finished = false;
-        const finish = (index: number): void => {
-          if (finished || !live()) {
-            return;
-          }
-          // UI handlers can fire twice in one frame (confirm + cancel, or a stale pointer callback). Claim
-          // this board before touching UI/transport so one round can publish at most one semantic choice.
-          finished = true;
-          try {
-            globalScene.ui.clearText();
-          } catch {
-            /* clearing the message box must not block the relay */
-          }
-          if (coopColosseumSendDecision(index, round)) {
-            resolve(index);
-          }
-        };
-        void globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, live).then(opened => {
-          if (opened === "superseded" || !live()) {
-            failCoopSharedSession(`Colosseum UI could not bind to live session ${counter}`);
-            return;
-          }
-          const options = labels.map((label, idx) => ({
-            label,
-            handler: () => {
-              finish(idx);
-              return true;
-            },
-          }));
-          options.push({
-            label: i18next.t("menu:cancel"),
-            handler: () => {
-              finish(COLOSSEUM_CASH_OUT);
-              return true;
-            },
-          });
-          const config: OptionSelectConfig = { options, maxOptions: 7, yOffset: 0 };
-          void globalScene.ui.setModeBoundedWhen(UiMode.OPTION_SELECT, 2_000, live, config, null, true).then(ok => {
-            if (ok === "superseded" && live()) {
-              failCoopSharedSession(`Colosseum option UI could not bind to live session ${counter}`);
-            }
-          });
-        });
-      });
+    driveBoard(labels: string[], round: number, operationId?: string): Promise<number> {
+      return openCoopColosseumBoardPhase(labels, round, true, operationId);
+    },
+
+    watchBoard(labels: string[], round: number, operationId?: string): Promise<number> {
+      return openCoopColosseumBoardPhase(labels, round, false, operationId);
     },
 
     awaitBoss(timeoutMs: number): Promise<CoopSerializedEnemy[] | null> {

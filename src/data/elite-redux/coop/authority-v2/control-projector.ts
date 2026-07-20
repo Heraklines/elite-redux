@@ -58,11 +58,10 @@ import {
   commandControlTargetId,
   commandTargetsOwnedBySeat,
   controlIdOf,
-  isUsableInteger,
   type ProjectableControl,
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
-import { SwitchType } from "#enums/switch-type";
+import { coopV2InteractionUiProofContract } from "#data/elite-redux/coop/coop-operation-surface-registry";
 
 // ---------------------------------------------------------------------------
 // The thin engine seam
@@ -105,12 +104,6 @@ export interface ControlSurface {
   /** Install the owner-seat COMMAND surface for the resolved field slot. */
   installCommand(fieldIndex: number, controlId: string): void;
 
-  /** Install the OWNER's replacement picker for `fieldIndex`. */
-  installReplacementPicker(fieldIndex: number, occurrence: number, controlId: string): void;
-
-  /** Install the NON-OWNER's replacement await for `fieldIndex`. */
-  installReplacementAwait(fieldIndex: number, occurrence: number, controlId: string): void;
-
   /** Install the reward interaction surface for `operationId`. */
   installReward(operationId: string, controlId: string): void;
 
@@ -119,6 +112,22 @@ export interface ControlSurface {
 
   /** Install the mystery-encounter interaction surface for `operationId`. */
   installMystery(operationId: string, controlId: string): void;
+
+  /** Prove/install one registered shared-input surface after its immutable result materialized. */
+  installSharedInteraction(
+    surfaceClass: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>["surfaceClass"],
+    operationKind: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>["operationKind"],
+    operationId: string,
+    controlId: string,
+  ): boolean;
+
+  /** Park progression at an address-constrained wait for the next ordered authority entry. */
+  installSuccessorWait(
+    afterOperationId: string,
+    allowedKinds: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedKinds"],
+    expectedOperationId: string | null,
+    controlId: string,
+  ): void;
 
   /** Engage the shared terminal freeze for `terminalId`. */
   installTerminal(terminalId: string, controlId: string): void;
@@ -214,25 +223,6 @@ export class DefaultCoopControlProjector implements CoopControlProjector {
         }
         return { kind: "installed", controlId };
       }
-      case "REPLACEMENT": {
-        // The field slot must exist in the current battle geometry; a slot outside
-        // it can never host a replacement -> structural impossibility (rejected).
-        if (!isUsableInteger(projectable.fieldIndex) || !surface.isPlayerFieldSlot(projectable.fieldIndex)) {
-          return {
-            kind: "rejected",
-            reason: `REPLACEMENT fieldIndex=${projectable.fieldIndex} is outside the current battle geometry`,
-          };
-        }
-        // Seat authorizes the surface (NOT host/guest role): the OWNER gets the
-        // picker, everyone else gets the await. The entry stated the owner; this is
-        // projection of that statement onto the local seat, not a decision.
-        if (ctx.localSeatId === projectable.ownerSeatId) {
-          surface.installReplacementPicker(projectable.fieldIndex, projectable.occurrence, controlId);
-        } else {
-          surface.installReplacementAwait(projectable.fieldIndex, projectable.occurrence, controlId);
-        }
-        return { kind: "installed", controlId };
-      }
       case "REWARD":
         surface.installReward(projectable.operationId, controlId);
         return { kind: "installed", controlId };
@@ -241,6 +231,26 @@ export class DefaultCoopControlProjector implements CoopControlProjector {
         return { kind: "installed", controlId };
       case "MYSTERY":
         surface.installMystery(projectable.operationId, controlId);
+        return { kind: "installed", controlId };
+      case "SHARED_INTERACTION":
+        return surface.installSharedInteraction(
+          projectable.surfaceClass,
+          projectable.operationKind,
+          projectable.operationId,
+          controlId,
+        )
+          ? { kind: "installed", controlId }
+          : {
+              kind: "deferred",
+              reason: `awaiting registered public UI for ${controlId}`,
+            };
+      case "AWAIT_SUCCESSOR":
+        surface.installSuccessorWait(
+          projectable.afterOperationId,
+          projectable.allowedKinds,
+          projectable.expectedOperationId,
+          controlId,
+        );
         return { kind: "installed", controlId };
       case "TERMINAL":
         surface.installTerminal(projectable.terminalId, controlId);
@@ -315,18 +325,6 @@ export function sceneControlSurface(ctx: CoopRuntimeContext): ControlSurface {
         pm.unshiftNew("CommandPhase", fieldIndex);
       }
     },
-    installReplacementPicker(fieldIndex: number): void {
-      if (!pm.hasPhaseOfType("SwitchPhase")) {
-        // Modal faint-switch (isModal=true), the mon has already left the field
-        // (doReturn=false) - the owner-picker geometry FaintPhase drives.
-        pm.unshiftNew("SwitchPhase", SwitchType.SWITCH, fieldIndex, true, false);
-      }
-    },
-    installReplacementAwait(): void {
-      if (!pm.hasPhaseOfType("CoopPartnerSyncPhase")) {
-        pm.unshiftNew("CoopPartnerSyncPhase");
-      }
-    },
     installReward(): void {
       if (!pm.hasPhaseOfType("SelectModifierPhase")) {
         pm.unshiftNew("SelectModifierPhase");
@@ -341,6 +339,20 @@ export function sceneControlSurface(ctx: CoopRuntimeContext): ControlSurface {
       if (!pm.hasPhaseOfType("MysteryEncounterPhase")) {
         pm.unshiftNew("MysteryEncounterPhase");
       }
+    },
+    installSharedInteraction(surfaceClass, operationKind): boolean {
+      const contract = coopV2InteractionUiProofContract(surfaceClass, operationKind);
+      const phaseName = pm.getCurrentPhase()?.phaseName;
+      return (
+        contract != null
+        && scene.ui?.getHandler()?.active === true
+        && typeof phaseName === "string"
+        && (contract.phaseNames as readonly string[]).includes(phaseName)
+        && (contract.uiModes as readonly number[]).includes(scene.ui.getMode())
+      );
+    },
+    installSuccessorWait(): void {
+      // Intentionally no phase: this address authorizes only the next ordered log entry.
     },
     installTerminal(): void {
       // The shared terminal freeze from THIS lane's reach: stop the local engine

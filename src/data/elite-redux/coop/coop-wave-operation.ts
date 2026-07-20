@@ -1215,4 +1215,4 @@ export function applyCoopWaveAdvanceEnvelopeForBinding(
 
 // Register the wave-advance guest applier so the durability manager can route a resent / reconnect-tail
 // `op:wave` envelope into it (one-way dep: adapter -> journal bridge; runs at import).
-registerCoopOperationApplier("op:wave", applyJournaledWaveEnvelope);
+registerCoopOperationApplier("op:wave", envelope => applyJournaledWaveEnvelope(envelope));

@@ -86,6 +86,8 @@ export interface CoopRecoveryTransactionDeps {
   ) => Promise<CoopRecoveryBundle>;
   /** Install the canonical material image; returns whether it applied exactly. */
   readonly applyMaterial: (ctx: CoopRuntimeContext, material: CoopAuthoritativeMaterial) => boolean | Promise<boolean>;
+  /** Bind the validated frontier entry into the ordinary runtime control ledger before projection. */
+  readonly prepareControl?: (ctx: CoopRuntimeContext, bundle: CoopRecoveryBundle) => boolean;
   /**
    * Prove this correlated bundle completed. This closes response retransmission only; AuthorityLog entries
    * remain governed by their ordinary exact-operation receipts.
@@ -93,11 +95,17 @@ export interface CoopRecoveryTransactionDeps {
   readonly acknowledge: (ctx: CoopRuntimeContext, proof: CoopRecoveryAppliedProofV2) => void;
   /** Recovery request deadline in "recovery"-class ms. Default 300_000. */
   readonly requestTimeoutMs?: number;
+  /** Exact real-control proof deadline after material/frontier adoption. Default 30_000. */
+  readonly controlInstallTimeoutMs?: number;
+  /** Scheduler-owned retry cadence for a deferred real-control proof. Default 16ms. */
+  readonly controlRetryMs?: number;
   /** Optional phase observer (fires on every reached phase, in order). */
   readonly onPhase?: (phase: CoopRecoveryPhase) => void;
 }
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 300_000;
+const DEFAULT_CONTROL_INSTALL_TIMEOUT_MS = 30_000;
+const DEFAULT_CONTROL_RETRY_MS = 16;
 
 class RecoveryTransaction implements CoopRecoveryTransaction {
   public readonly ctx: CoopRuntimeContext;
@@ -289,13 +297,32 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
     }
 
     try {
-      this.deps.log.adoptFrontier(bundle.frontier);
+      const frontierOperationId = bundle.frontierOperationId;
+      const frontierControl = bundle.nextControl;
+      if (frontierOperationId != null && frontierControl == null) {
+        return this.terminalize("non-empty recovery frontier has no successor control");
+      }
+      const terminal =
+        frontierOperationId == null || frontierControl == null
+          ? undefined
+          : { operationId: frontierOperationId, nextControl: frontierControl };
+      this.deps.log.adoptFrontier(bundle.frontier, terminal);
     } catch (error) {
       return this.terminalize(`adoptFrontier threw: ${describeError(error)}`);
     }
+    try {
+      if (this.deps.prepareControl?.(this.ctx, bundle) === false) {
+        return this.terminalize("ordinary control ledger refused the recovery frontier");
+      }
+    } catch (error) {
+      return this.terminalize(`control-ledger frontier adoption threw: ${describeError(error)}`);
+    }
     this.enter("frontier-installed");
 
-    const control = this.installControl(bundle);
+    if (bundle.nextControl != null && !this.deps.fence.allowControlProjection()) {
+      return this.terminalize("recovery fence refused the exact control-projection window");
+    }
+    const control = await this.installControl(bundle);
     if (!control.ok) {
       return this.terminalize(control.reason);
     }
@@ -348,20 +375,79 @@ class RecoveryTransaction implements CoopRecoveryTransaction {
    * control mechanically, so a deferred/rejected projection is a hard stop here,
    * not engine pacing.
    */
-  private installControl(bundle: CoopRecoveryBundle): { ok: true; controlId?: string } | { ok: false; reason: string } {
+  private async installControl(
+    bundle: CoopRecoveryBundle,
+  ): Promise<{ ok: true; controlId?: string } | { ok: false; reason: string }> {
     if (bundle.nextControl == null) {
       return { ok: true };
     }
-    let result: ReturnType<CoopControlProjector["project"]>;
-    try {
-      result = this.deps.projector.project(this.ctx, bundle.nextControl);
-    } catch (error) {
-      return { ok: false, reason: `control projection threw: ${describeError(error)}` };
+    const timeoutMs = this.deps.controlInstallTimeoutMs ?? DEFAULT_CONTROL_INSTALL_TIMEOUT_MS;
+    const retryMs = this.deps.controlRetryMs ?? DEFAULT_CONTROL_RETRY_MS;
+    const startedAt = this.ctx.scheduler.now("recovery");
+    let lastDeferredReason = "control proof has not been attempted";
+    while (this.ctx.scheduler.now("recovery") - startedAt <= timeoutMs) {
+      if (this.abortController.signal.aborted) {
+        return { ok: false, reason: `control projection aborted: ${this.abortReason().message}` };
+      }
+      if (this.deps.fence.state !== "held") {
+        return { ok: false, reason: "control projection lost the held recovery fence" };
+      }
+      const verdict = validateRecoveryBundle(bundle, this.deps.frame(), this.frontier, this.deps.requestId);
+      if (verdict.kind !== "valid") {
+        return { ok: false, reason: `control projection bundle ${verdict.kind}: ${verdict.reason}` };
+      }
+      let result: ReturnType<CoopControlProjector["project"]>;
+      try {
+        result = this.deps.projector.project(this.ctx, bundle.nextControl);
+      } catch (error) {
+        return { ok: false, reason: `control projection threw: ${describeError(error)}` };
+      }
+      if (result.kind === "installed" || result.kind === "already-installed") {
+        return { ok: true, controlId: result.controlId };
+      }
+      if (result.kind === "rejected") {
+        return { ok: false, reason: `control projection rejected: ${result.reason}` };
+      }
+      lastDeferredReason = result.reason;
+      if (!(await this.waitForControlProofPace(retryMs))) {
+        return { ok: false, reason: `control projection aborted while deferred: ${lastDeferredReason}` };
+      }
     }
-    if (result.kind === "installed" || result.kind === "already-installed") {
-      return { ok: true, controlId: result.controlId };
-    }
-    return { ok: false, reason: `control projection ${result.kind}: ${result.reason}` };
+    return {
+      ok: false,
+      reason: `control projection exceeded ${timeoutMs}ms while deferred: ${lastDeferredReason}`,
+    };
+  }
+
+  private waitForControlProofPace(delayMs: number): Promise<boolean> {
+    const signal = this.abortController.signal;
+    return new Promise(resolve => {
+      let settled = false;
+      const finish = (value: boolean): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancelTimer();
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      };
+      const onAbort = (): void => finish(false);
+      const cancelTimer = this.ctx.scheduler.schedule(
+        {
+          ownerId: `recovery-control:${this.ctx.runtimeId}:${this.ctx.epoch}`,
+          address: `recovery-control/${this.ctx.sessionId}/${this.ctx.runId}/${this.deps.requestId}`,
+          reason: "await exact Authority V2 recovery control proof",
+        },
+        Math.max(1, delayMs),
+        "recovery",
+        () => finish(true),
+      );
+      signal.addEventListener("abort", onAbort, { once: true });
+      if (signal.aborted) {
+        finish(false);
+      }
+    });
   }
 
   /**

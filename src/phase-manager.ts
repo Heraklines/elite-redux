@@ -30,16 +30,14 @@ import { ColosseumChoicePhase } from "#phases/colosseum-choice-phase";
 import { CommandPhase } from "#phases/command-phase";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
 import { CoopGuestCatchFullPhase } from "#phases/coop-guest-catch-full-phase";
+import { CoopGuestColosseumChoicePhase } from "#phases/coop-guest-colosseum-choice-phase";
 import { CoopGuestFaintSwitchPhase } from "#phases/coop-guest-faint-switch-phase";
 import { CoopGuestRevivalPhase } from "#phases/coop-guest-revival-phase";
 import { CoopInertPhase } from "#phases/coop-inert-phase";
 import { CoopPartnerSyncPhase } from "#phases/coop-partner-sync-phase";
 import { CoopPushReplacementCheckpointPhase } from "#phases/coop-push-replacement-checkpoint-phase";
+import { CoopReplayLearnMoveBatchPhase } from "#phases/coop-replay-learn-move-batch";
 import { CoopReplayLearnMovePhase } from "#phases/coop-replay-learn-move-phase";
-import { CoopTurnCommitPhase } from "#phases/coop-turn-commit-phase";
-// #848: side-effect import so the guest's INLINE batch Move Learn panel opener registers with the coop
-// runtime at boot (the shared co-op level-up path). It exports no phase, so it needs an explicit import.
-import "#phases/coop-replay-learn-move-batch";
 import { CoopReplayMePhase } from "#phases/coop-replay-me-phase";
 import {
   CoopApplyResyncPhase,
@@ -52,6 +50,7 @@ import {
   CoopStatusReplayPhase,
 } from "#phases/coop-replay-phases";
 import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
+import { CoopTurnCommitPhase } from "#phases/coop-turn-commit-phase";
 import { CoopVictorySealPhase } from "#phases/coop-victory-seal-phase";
 import { DamageAnimPhase } from "#phases/damage-anim-phase";
 import { DynamicPhaseMarker } from "#phases/dynamic-phase-marker";
@@ -200,7 +199,9 @@ const PHASES = Object.freeze({
   CoopReplayTurnPhase,
   CoopReplayMePhase,
   CoopReplayLearnMovePhase,
+  CoopReplayLearnMoveBatchPhase,
   CoopGuestCatchFullPhase,
+  CoopGuestColosseumChoicePhase,
   CoopGuestFaintSwitchPhase,
   CoopGuestRevivalPhase,
   CoopPartnerSyncPhase,
@@ -352,6 +353,8 @@ export class PhaseManager {
    * The predicate is injected by the co-op runtime so this engine-level queue owner stays cycle-free.
    */
   private coopRecoveryProgressionFrozen: () => boolean = () => false;
+  /** One synchronous, consumed-on-first-shift permit for the recovery transaction's exact stated control. */
+  private coopRecoveryControlShiftPermitted = false;
 
   /**
    * Clear all previously set phases, then add a new {@linkcode TitlePhase} to transition to the title screen.
@@ -465,6 +468,25 @@ export class PhaseManager {
   /** Install or clear the cycle-free Authority V2 recovery progression fence. */
   public setCoopRecoveryProgressionFence(predicate: (() => boolean) | null): void {
     this.coopRecoveryProgressionFrozen = predicate ?? (() => false);
+    this.coopRecoveryControlShiftPermitted = false;
+  }
+
+  /**
+   * End the parked recovery phase and permit exactly its first synchronous shift to the authority-stated
+   * control. The permit is consumed before that control starts, so a phase that immediately ends cannot
+   * cascade into a second locally-derived phase while the recovery fence remains held.
+   */
+  public releaseCoopRecoveryControlPhase(release: () => void): boolean {
+    if (!this.coopRecoveryProgressionFrozen() || this.coopRecoveryControlShiftPermitted) {
+      return false;
+    }
+    this.coopRecoveryControlShiftPermitted = true;
+    try {
+      release();
+      return !this.coopRecoveryControlShiftPermitted;
+    } finally {
+      this.coopRecoveryControlShiftPermitted = false;
+    }
   }
 
   /**
@@ -487,8 +509,14 @@ export class PhaseManager {
    * This is called by {@linkcode Phase.end} by default, and should not be called by other methods.
    */
   public shiftPhase(): void {
-    if (this.coopTerminalProgressionFrozen || this.coopRecoveryProgressionFrozen()) {
+    if (this.coopTerminalProgressionFrozen) {
       return;
+    }
+    if (this.coopRecoveryProgressionFrozen()) {
+      if (!this.coopRecoveryControlShiftPermitted) {
+        return;
+      }
+      this.coopRecoveryControlShiftPermitted = false;
     }
     if (this.standbyPhase) {
       this.currentPhase = this.standbyPhase;

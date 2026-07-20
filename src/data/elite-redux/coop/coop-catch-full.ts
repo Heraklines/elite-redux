@@ -23,13 +23,20 @@
 
 import { globalScene } from "#app/global-scene";
 import {
+  type CoopCatchFullOperationBinding,
   captureCoopCatchFullOperationBinding,
   commitCoopCatchFullAuthorityDecision,
-  sendCoopCatchFullPrompt,
+  coopCatchFullDecisionOperationId,
+  sendCoopCatchFullPromptWithOperationId,
 } from "#data/elite-redux/coop/coop-catch-full-operation";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_CATCH_FULL_SEQ, getCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { failCoopSharedSession, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import {
+  failCoopSharedSession,
+  getCoopInteractionRelay,
+  getCoopRuntime,
+  settleCoopV2InteractionOperation,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_CATCH_FULL_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 
 /**
@@ -39,7 +46,59 @@ import { COOP_CATCH_FULL_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-re
  * (disconnect / timeout). The caller MUST have gated on a GUEST-thrown catch first - this opens no local
  * UI and is a bare relay off the awaiting host, so solo / host-thrown never reach it and stay byte-identical.
  */
-export function coopHostAwaitWildCatchFullSlot(pokemonName: string, speciesId: number): Promise<number | null> {
+export interface CoopPreparedWildCatchFullDecision {
+  readonly slot: number | null;
+  /**
+   * Capture and retain the complete post-decision image. The caller must invoke this only after release/add
+   * (or decline cleanup) has settled. It is idempotent for the exact prepared decision.
+   */
+  readonly commitAfterApply: () => boolean;
+}
+
+function preparedDecision(
+  speciesId: number,
+  slot: number | null,
+  wave: number,
+  turn: number,
+  operationBinding: CoopCatchFullOperationBinding,
+  promptOperationId: string | null,
+  settleDecision: (operationId: string) => void,
+): CoopPreparedWildCatchFullDecision {
+  let committed = false;
+  const decisionOperationId =
+    promptOperationId == null || promptOperationId === "legacy"
+      ? null
+      : coopCatchFullDecisionOperationId(promptOperationId);
+  return {
+    slot,
+    commitAfterApply: () => {
+      if (committed) {
+        return true;
+      }
+      if (decisionOperationId != null) {
+        settleDecision(decisionOperationId);
+      }
+      committed = commitCoopCatchFullAuthorityDecision(
+        {
+          payload: { type: "decision", speciesId, partySlot: slot ?? -1 },
+          ownerRole: "guest",
+          localRole: "host",
+          wave,
+          turn,
+          ...(decisionOperationId == null ? {} : { operationId: decisionOperationId }),
+        },
+        operationBinding,
+      );
+      return committed;
+    },
+  };
+}
+
+export function coopHostPrepareWildCatchFullDecision(
+  pokemonName: string,
+  speciesId: number,
+  onPromptCommitted?: (operationId: string) => void,
+): Promise<CoopPreparedWildCatchFullDecision | null> {
   const relay = getCoopInteractionRelay();
   if (relay == null) {
     return Promise.resolve(null);
@@ -54,9 +113,20 @@ export function coopHostAwaitWildCatchFullSlot(pokemonName: string, speciesId: n
   // scheduling host's op-state + durability manager before opening the prompt/await and use only this stable
   // binding for both retained commits.
   const operationBinding = captureCoopCatchFullOperationBinding();
-  if (!sendCoopCatchFullPrompt(relay, pokemonName, speciesId, { localRole: "host", wave, turn }, operationBinding)) {
+  const owningRuntime = getCoopRuntime();
+  const promptOperationId = sendCoopCatchFullPromptWithOperationId(
+    relay,
+    pokemonName,
+    speciesId,
+    { localRole: "host", wave, turn },
+    operationBinding,
+  );
+  if (promptOperationId == null) {
     failCoopSharedSession(`Catch-full prompt for species ${speciesId} could not enter durable authority`);
     return Promise.resolve(null);
+  }
+  if (promptOperationId !== "legacy") {
+    onPromptCommitted?.(promptOperationId);
   }
   return relay
     .awaitInteractionChoice(COOP_CATCH_FULL_SEQ, getCoopFaintSwitchWaitMs(), COOP_CATCH_FULL_CHOICE_KINDS)
@@ -64,21 +134,6 @@ export function coopHostAwaitWildCatchFullSlot(pokemonName: string, speciesId: n
       const slot = pick?.choice ?? null;
       const partySize = globalScene.getPlayerParty().length;
       if (slot == null || slot < 0 || slot >= partySize) {
-        if (
-          !commitCoopCatchFullAuthorityDecision(
-            {
-              payload: { type: "decision", speciesId, partySlot: -1 },
-              ownerRole: "guest",
-              localRole: "host",
-              wave,
-              turn,
-            },
-            operationBinding,
-          )
-        ) {
-          failCoopSharedSession(`Catch-full decline for species ${speciesId} could not enter durable authority`);
-          return null;
-        }
         coopWarn(
           "replay",
           "host: catch-full catcher declined/out-of-range/timeout; the caught mon is NOT kept (#856)",
@@ -89,24 +144,13 @@ export function coopHostAwaitWildCatchFullSlot(pokemonName: string, speciesId: n
             fromNull: pick == null,
           },
         );
-        return null;
-      }
-      if (
-        !commitCoopCatchFullAuthorityDecision(
-          {
-            payload: { type: "decision", speciesId, partySlot: slot },
-            ownerRole: "guest",
-            localRole: "host",
-            wave,
-            turn,
-          },
-          operationBinding,
-        )
-      ) {
-        failCoopSharedSession(`Catch-full decision for species ${speciesId} could not enter durable authority`);
-        return null;
+        return preparedDecision(speciesId, null, wave, turn, operationBinding, promptOperationId, operationId =>
+          settleCoopV2InteractionOperation(operationId, owningRuntime),
+        );
       }
       coopLog("replay", "host received catcher catch-full replace slot (#856)", { seq: COOP_CATCH_FULL_SEQ, slot });
-      return slot;
+      return preparedDecision(speciesId, slot, wave, turn, operationBinding, promptOperationId, operationId =>
+        settleCoopV2InteractionOperation(operationId, owningRuntime),
+      );
     });
 }

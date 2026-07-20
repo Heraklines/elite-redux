@@ -42,6 +42,7 @@ import {
 } from "#data/elite-redux/coop/authority-v2/scheduler";
 import {
   CoopAuthorityV2Shadow,
+  type CoopV2LiveReplicaSeams,
   type CoopV2ShadowIdentity,
   clearActiveCoopV2Shadow,
   clearCoopV2ShadowInbound,
@@ -327,6 +328,7 @@ describe("authority-v2 shadow harness", () => {
       liveRecovery: {
         captureMaterial: () => ({ digest: "full-snapshot", payload: { wave: 5, hp: [100, 100] } }),
         applyMaterial,
+        prepareControl: () => true,
         projectControl,
         onTerminal: terminal,
         onRecovered: recovered,
@@ -341,6 +343,7 @@ describe("authority-v2 shadow harness", () => {
       liveRecovery: {
         captureMaterial: () => null,
         applyMaterial,
+        prepareControl: () => true,
         projectControl,
         onTerminal: terminal,
         onRecovered: recovered,
@@ -460,7 +463,7 @@ describe("authority-v2 shadow harness", () => {
       context: duo.host.authenticatedFrameContext,
       address: { epoch: SESSION.epoch, wave: 6, ownerSeatId: 0, actionOrdinal: 0 },
       material: { kind: "reward", wave: 6, ownerSeatId: 0, choice: { kind: "leave" }, terminal: true },
-      successor: null,
+      successor: { kind: "REWARD", operationId: "TAP/reward/successor", ownerSeatId: 0 },
     });
     duo.host.tapInteraction({ entry: rewardEntry, legacyDigest: "legacy-interaction" });
 
@@ -625,7 +628,7 @@ describe("authority-v2 shadow transport routing seam", () => {
         context: host.authenticatedFrameContext,
         address: { epoch: SESSION.epoch, wave: 5, ownerSeatId: 0, actionOrdinal: 1 },
         material: { kind: "reward", wave: 5, ownerSeatId: 0, choice: { kind: "skip" }, terminal: true },
-        successor: null,
+        successor: { kind: "REWARD", operationId: "THIN/reward/successor", ownerSeatId: 0 },
       }),
       legacyDigest: "legacy",
     });
@@ -941,7 +944,7 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
         context: duo.host.authenticatedFrameContext,
         address: { epoch: SESSION.epoch, wave: 6, ownerSeatId: 0, actionOrdinal: 0 },
         material: { kind: "reward", wave: 6, ownerSeatId: 0, choice, terminal: true },
-        successor: null,
+        successor: { kind: "REWARD", operationId: "PARITY/reward/successor", ownerSeatId: 0 },
       });
     // Identical legacy image -> match=true.
     duo.host.tapInteraction({
@@ -1011,5 +1014,37 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
     expect(line).toContain("surface=market");
     expect(line).toContain("kind=biomeShop");
     duo.dispose();
+  });
+
+  it("keeps lossy relay-choice shadow telemetry out of a live mechanical V2 log", () => {
+    const clock = new FakeClock();
+    const liveReplica: CoopV2LiveReplicaSeams = {
+      ownsEntry: () => false,
+      ownsControl: () => false,
+      admitEntry: () => true,
+      applyMaterial: () => null,
+      projectControl: () => null,
+    };
+    const harness = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: () => {},
+      scheduler: createCoopScheduler(clock),
+      liveReplica,
+    });
+
+    expect(
+      harness.tapInteractionChoice({
+        seq: 4,
+        kind: "biomeShop",
+        choice: 0,
+        data: [0, 50],
+        ownerSeatId: 0,
+        wave: 8,
+      }),
+    ).toBeNull();
+    expect(harness.diagnostics()).toMatchObject({ committed: 0, retained: 0, parityChecks: 0 });
+    harness.dispose();
   });
 });

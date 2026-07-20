@@ -29,6 +29,12 @@ import {
   adoptAbilityWatcherOutcome,
   type CoopAbilityOperationBinding,
   captureCoopAbilityOperationBinding,
+  commitAbilityWatcherOutcome,
+  commitCoopAbilityPresentation,
+  isCoopAbilityPresentationAuthorityActive,
+  settleCoopAbilityAuthorityResult,
+  settleCoopAbilityOperation,
+  settleCoopAbilityOwnerProposal,
 } from "#data/elite-redux/coop/coop-ability-operation";
 import {
   COOP_ABILITY_OP,
@@ -38,10 +44,16 @@ import {
   sendCoopAbilityPickerOutcome,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import type { CoopAbilityPresentationPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   advanceCoopInteractionForContinuation,
+  failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
+  getCoopRuntime,
+  isCoopV2InteractionHumanInputFrozen,
+  notifyCoopV2InteractionSurfaceReady,
+  settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ABILITY_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
@@ -63,17 +75,21 @@ const ns = "modifierType";
 
 export class ErGreaterAbilityCapsulePhase extends Phase {
   public readonly phaseName = "ErGreaterAbilityCapsulePhase";
+  /** Exact V2 presentation address owned by this phase generation. */
+  public coopV2ControlOperationId: string | null = null;
 
   /** Index into the player party of the mon the capsule was used on. */
-  private readonly partyIndex: number;
+  public readonly partyIndex: number;
   /** The UI mode active when this phase started; sub-menus restore to it. */
   private baseMode: UiMode = UiMode.MESSAGE;
 
   // ---- Co-op (#633 B9c): owner-drives / watcher-applies (see ErAbilityCapsulePhase) ----
-  private readonly coopSeq: number;
+  public readonly coopSeq: number;
   private readonly coopIsWatcher: boolean;
   /** Stable owner-runtime selectors carried across every picker callback / watcher await. */
   private readonly coopOperationBinding: CoopAbilityOperationBinding | null;
+  /** Exact runtime that owns this phase; never re-read after a picker callback or await. */
+  private readonly coopOwningRuntime = getCoopRuntime();
   private coopOutcome: number[] = [COOP_ABILITY_OP.CANCEL];
 
   constructor(partyIndex: number, coopSeq = -1, coopIsWatcher = false) {
@@ -94,12 +110,32 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
       this.cancelAndEnd();
       return;
     }
+    const controller = this.coopSeq >= 0 ? getCoopController() : null;
+    if (controller?.role === "host" && isCoopAbilityPresentationAuthorityActive(this.coopOperationBinding)) {
+      const operationId = commitCoopAbilityPresentation(
+        {
+          pinned: this.coopSeq,
+          partyIndex: this.partyIndex,
+          workflow: "greater-capsule",
+          localRole: "host",
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+        },
+        this.coopOperationBinding,
+      );
+      if (operationId == null) {
+        failCoopSharedSession(`Ability presentation ${this.coopSeq} could not enter durable authority`);
+        return;
+      }
+      this.coopV2ControlOperationId = operationId;
+    }
     // Co-op (#633 B9c) WATCHER: apply the owner's literal outcome, never opening a picker.
     if (this.coopIsWatcher) {
       coopLog(
         "ability",
         `greaterCapsule WATCHER-APPLIES-RELAYED seq=${this.coopSeq} slot=${this.partyIndex} mon=${mon.name} (no local picker)`,
       );
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
       void this.coopApplyRelayedOutcome(mon);
       return;
     }
@@ -110,6 +146,22 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
       );
     }
     this.openChoice(mon);
+  }
+
+  /** Install the authority presentation before this phase can satisfy a V2 input lease. */
+  public installCoopV2AbilityPresentation(operationId: string, presentation: CoopAbilityPresentationPayload): boolean {
+    if (
+      operationId.length === 0
+      || presentation.workflow !== "greater-capsule"
+      || presentation.pinned !== this.coopSeq
+      || presentation.partyIndex !== this.partyIndex
+      || presentation.rolledAbilityIds !== undefined
+      || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
+    ) {
+      return false;
+    }
+    this.coopV2ControlOperationId = operationId;
+    return true;
   }
 
   /** The top-level "Permanently unlock an innate" / "Run-unlock two innates" menu. */
@@ -152,7 +204,9 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
       },
     });
 
-    globalScene.ui.setMode(UiMode.OPTION_SELECT, { options });
+    Promise.resolve(globalScene.ui.setMode(UiMode.OPTION_SELECT, { options })).then(() =>
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime),
+    );
   }
 
   /**
@@ -269,25 +323,26 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
    * choice was committed), then end this phase.
    */
   private commitAndEnd(): void {
-    // Co-op (#633 B9c): OWNER relays the committed outcome before consuming the copy.
-    if (!this.coopIsWatcher) {
-      this.relayEnd();
-    }
+    const relayOutcome = !this.coopIsWatcher;
     globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
     // #789 (same hole as the regular capsule, probe-verified there): a committed capsule ends
     // the whole alternating interaction, but nothing advanced the counter - rotation stalled.
     advanceCoopInteractionForContinuation(this.coopSeq);
     this.end();
+    if (relayOutcome) {
+      this.relayEnd();
+    }
   }
 
   /** Co-op (#633 B9c): every NON-committing owner end-path relays a CANCEL so the watcher never
    *  stalls; leaves the continuation copy so the capsule is re-offered (back-out safe #25). */
   private cancelAndEnd(): void {
     this.coopOutcome = [COOP_ABILITY_OP.CANCEL];
-    if (!this.coopIsWatcher) {
+    const relayOutcome = !this.coopIsWatcher;
+    this.end();
+    if (relayOutcome) {
       this.relayEnd();
     }
-    this.end();
   }
 
   /** OWNER (#633 B9c): relay the buffered outcome on the shop seq exactly once. No-op in solo. */
@@ -300,23 +355,37 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
       `greaterCapsule OWNER relay OUTCOME seq=${this.coopSeq} op=${coopAbilityOpName(this.coopOutcome[0])} data=[${this.coopOutcome.join(",")}]`,
     );
     const controller = getCoopController();
-    sendCoopAbilityPickerOutcome(
-      getCoopInteractionRelay(),
-      this.coopSeq,
-      this.coopOutcome,
-      controller == null
-        ? undefined
-        : {
-            localRole: controller.role,
-            wave: globalScene.currentBattle?.waveIndex ?? 0,
-            turn: globalScene.currentBattle?.turn ?? 0,
-          },
-      this.coopOperationBinding,
-    );
+    const operationId =
+      controller?.role === "host"
+        ? settleCoopAbilityAuthorityResult(this.coopSeq, this.coopOperationBinding)
+        : controller?.role === "guest"
+          ? settleCoopAbilityOwnerProposal(this.coopSeq, this.coopOperationBinding)
+          : null;
+    if (operationId != null) {
+      settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
+    }
+    if (
+      !sendCoopAbilityPickerOutcome(
+        getCoopInteractionRelay(),
+        this.coopSeq,
+        this.coopOutcome,
+        controller == null
+          ? undefined
+          : {
+              localRole: controller.role,
+              wave: globalScene.currentBattle?.waveIndex ?? 0,
+              turn: globalScene.currentBattle?.turn ?? 0,
+            },
+        this.coopOperationBinding,
+      )
+    ) {
+      failCoopSharedSession(`Ability result ${this.coopSeq} could not enter durable authority`);
+    }
   }
 
   /** WATCHER (#633 B9c): await + apply the owner's literal outcome; never opens a picker. */
   private async coopApplyRelayedOutcome(mon: PlayerPokemon): Promise<void> {
+    isCoopV2InteractionHumanInputFrozen();
     const relay = getCoopInteractionRelay();
     if (this.coopSeq < 0 || relay == null) {
       this.end();
@@ -329,26 +398,29 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
     );
     const controller = getCoopController();
     const relayedData = action?.data ?? null;
-    const adopted =
-      controller != null
-      && adoptAbilityWatcherOutcome(
-        {
-          pinned: this.coopSeq,
-          data: relayedData,
-          localRole: controller.role,
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
-        },
-        this.coopOperationBinding,
-      );
-    const data = adopted && relayedData != null ? relayedData : [COOP_ABILITY_OP.CANCEL];
+    const adoption =
+      controller == null
+        ? null
+        : adoptAbilityWatcherOutcome(
+            {
+              pinned: this.coopSeq,
+              data: relayedData,
+              localRole: controller.role,
+              wave: globalScene.currentBattle?.waveIndex ?? 0,
+              turn: globalScene.currentBattle?.turn ?? 0,
+            },
+            this.coopOperationBinding,
+          );
+    const data = adoption?.accepted === true && relayedData != null ? relayedData : [COOP_ABILITY_OP.CANCEL];
     const op = data[0];
     coopLog(
       "ability",
       `greaterCapsule WATCHER apply OUTCOME seq=${this.coopSeq} op=${coopAbilityOpName(op)} data=[${data.join(",")}] timedOut=${action == null} mon=${mon.name}`,
     );
     if (op !== COOP_ABILITY_OP.CANCEL) {
-      if (op === COOP_ABILITY_OP.GCAP_PERM) {
+      if (adoption?.projectionApplied === true) {
+        // Complete authority state already carries the permanent/run unlock result.
+      } else if (op === COOP_ABILITY_OP.GCAP_PERM) {
         greaterCapsulePermanentlyUnlockInnate(mon, data[1]);
       } else if (op === COOP_ABILITY_OP.GCAP_RUN2) {
         greaterCapsuleRunUnlockInnates(mon, [data[1], data[2]]);
@@ -358,6 +430,26 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
       advanceCoopInteractionForContinuation(this.coopSeq);
     }
     this.end();
+    if (adoption?.accepted === true) {
+      settleCoopAbilityOperation(adoption.operationId, this.coopOperationBinding);
+      settleCoopV2InteractionOperation(adoption.operationId);
+    }
+    if (
+      adoption?.accepted === true
+      && adoption.requiresAuthorityCommit
+      && !commitAbilityWatcherOutcome(
+        adoption.operationId,
+        {
+          pinned: this.coopSeq,
+          data,
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+        },
+        this.coopOperationBinding,
+      )
+    ) {
+      failCoopSharedSession(`Ability result ${adoption.operationId} could not retain complete authority state`);
+    }
   }
 
   /**

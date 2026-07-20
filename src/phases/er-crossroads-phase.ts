@@ -41,7 +41,10 @@ import {
   armCoopBiomeIntentResend,
   awaitCoopBiomeCommitReceipt,
   type CoopBiomeCommitReceipt,
+  type CoopBiomeOperationBinding,
   type CoopBiomeRelayResult,
+  captureCoopBiomeOperationBinding,
+  commitBiomeAuthoritativeResult,
   commitBiomeOwnerIntent,
   coopBiomeCommitRequired,
   coopBiomeOperationId,
@@ -67,6 +70,7 @@ import {
   getCoopUiMirror,
   notifyCoopWaveContinuationSurfaceReady,
   runWhenCoopRuntimeActive,
+  settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_CROSSROADS_CHOICE_KINDS, COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
@@ -135,6 +139,8 @@ interface CoopCrossroadsContinuationRecovery {
 
 export class ErCrossroadsPhase extends Phase {
   public readonly phaseName = "ErCrossroadsPhase";
+  /** Exact Authority V2 operation whose public Stay/Leave handler this phase proves. */
+  public coopV2ControlOperationId: string | null = null;
 
   /**
    * Crossroads is queued from the completed wave's Victory tail. A renderer can expose the next speculative
@@ -146,6 +152,8 @@ export class ErCrossroadsPhase extends Phase {
   private readonly coopSourceBiomeId: BiomeId;
   /** Runtime that constructed this phase; async picker completion may resume under the other harness client. */
   private readonly coopOwningRuntime = getCoopRuntime();
+  /** Exact operation runtime retained across UI/network callbacks. */
+  private coopBiomeOperationBinding: CoopBiomeOperationBinding | null = null;
 
   constructor(sourceWave: number | null = null) {
     super();
@@ -169,6 +177,13 @@ export class ErCrossroadsPhase extends Phase {
   private coopStartCounter = -1;
   private coopCommitRecovery: CoopCrossroadsContinuationRecovery | null = null;
   private coopCommitRecoveryToken = 0;
+  /** The local terminal mutation is applied once even if publishing its immutable result must retry. */
+  private coopAppliedTerminal: { readonly pinned: number; readonly moveOn: boolean } | null = null;
+
+  private requireCoopBiomeOperationBinding(): CoopBiomeOperationBinding {
+    this.coopBiomeOperationBinding ??= captureCoopBiomeOperationBinding();
+    return this.coopBiomeOperationBinding;
+  }
 
   /** Exact completed-wave identity retained across speculative next-battle projection. */
   public requireCoopSourceWave(): number {
@@ -280,6 +295,12 @@ export class ErCrossroadsPhase extends Phase {
       this.coopStartCounter = controller.interactionCounter();
     }
     const pinned = this.coopStartCounter;
+    this.coopV2ControlOperationId = coopBiomeOperationId(
+      "CROSSROADS_PICK",
+      COOP_CROSSROADS_SEQ_BASE + pinned,
+      pinned,
+      this.requireCoopBiomeOperationBinding(),
+    );
     const owns = spoofed || controller.isLocalOwnerAtCounter(pinned);
     coopLog(
       "reward",
@@ -422,59 +443,69 @@ export class ErCrossroadsPhase extends Phase {
     getCoopUiMirror()?.endSession();
     const seq = COOP_CROSSROADS_SEQ_BASE + pinned;
     const choice = moveOn ? 1 : 0;
-    const operationId = coopBiomeOperationId("CROSSROADS_PICK", seq, pinned);
+    const binding = this.requireCoopBiomeOperationBinding();
+    const operationId = coopBiomeOperationId("CROSSROADS_PICK", seq, pinned, binding);
     const relay = getCoopInteractionRelay();
     const resend = (): void => {
       relay?.sendInteractionChoice(seq, "crossroads", choice);
     };
+    const role = getCoopController()?.role ?? "guest";
+    // Freeze and validate the typed intent before publishing the compatibility proposal. Under Authority
+    // V2 this does not consume a revision; the complete result is committed only after coopApply reaches
+    // the real post-mutation terminal below.
+    const commit = commitBiomeOwnerIntent(
+      {
+        kind: "CROSSROADS_PICK",
+        seq,
+        pinned,
+        choice,
+        payload: { optionIndex: choice },
+        localRole: role,
+        wave: this.requireCoopSourceWave(),
+        turn: 0,
+        boundarySourceBiomeId: this.coopSourceBiomeId,
+        boundaryNextWave: this.requireCoopSourceWave() + 1,
+        allowedRoutes: [],
+        deterministicDestination: null,
+      },
+      binding,
+    );
+    if (isCoopBiomeOperationEnabled() && commit == null) {
+      this.parkCrossroadsCommitRecovery(() => this.coopOwnerCommit(pinned, moveOn));
+      return;
+    }
     try {
       resend();
       coopLog("reward", `crossroads OWNER commit moveOn=${moveOn} pinnedStart=${pinned} (#848)`);
     } catch {
       coopWarn("reward", "crossroads OWNER relay send threw (handled - deterministic resend remains armed) (#848)");
     }
-    // Wave-2a: DUAL-RUN - additionally COMMIT the typed Stay/Leave intent through the authoritative
-    // operation primitive. No-op when the flag is OFF; the legacy relay above stays the fallback.
-    const role = getCoopController()?.role ?? "guest";
-    const commit = commitBiomeOwnerIntent({
-      kind: "CROSSROADS_PICK",
-      seq,
-      pinned,
-      choice,
-      payload: { optionIndex: choice },
-      localRole: role,
-      wave: this.requireCoopSourceWave(),
-      turn: 0,
-      boundarySourceBiomeId: this.coopSourceBiomeId,
-      boundaryNextWave: this.requireCoopSourceWave() + 1,
-      allowedRoutes: [],
-      deterministicDestination: null,
-    });
-    if (isCoopBiomeOperationEnabled() && commit == null) {
-      this.parkCrossroadsCommitRecovery(() => this.coopOwnerCommit(pinned, moveOn));
-      return;
-    }
     const committedMoveOn =
       commit?.payload != null && "optionIndex" in commit.payload ? commit.payload.optionIndex === 1 : moveOn;
-    if (coopBiomeCommitRequired(role)) {
+    if (coopBiomeCommitRequired(role, binding)) {
       const generation = coopSessionGeneration();
       const wave = this.requireCoopSourceWave();
-      armCoopBiomeIntentResend({
-        operationId,
-        wave,
-        phaseName: "ErCrossroadsPhase",
-        sessionGeneration: generation,
-        resend,
-        isCurrent: () =>
-          coopSessionGeneration() === generation
-          && this.coopSourceWave === wave
-          && globalScene.phaseManager.getCurrentPhase() === this,
-      });
+      armCoopBiomeIntentResend(
+        {
+          operationId,
+          wave,
+          phaseName: "ErCrossroadsPhase",
+          sessionGeneration: generation,
+          resend,
+          isCurrent: () =>
+            coopSessionGeneration() === generation
+            && this.coopSourceWave === wave
+            && globalScene.phaseManager.getCurrentPhase() === this,
+        },
+        binding,
+      );
+      void globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.boundaryStillLive(generation, wave));
+      settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
       this.coopCommitPending = true;
       void this.finishGuestOwnedCrossroadsAfterCommit(operationId, pinned, committedMoveOn);
       return;
     }
-    this.coopApply(pinned, committedMoveOn);
+    this.coopApply(pinned, committedMoveOn, operationId, commit?.revision === 0, false);
   }
 
   /** WATCHER: open a read-only mirrored copy, await the owner's pick, apply it. (Not reached under the
@@ -542,8 +573,9 @@ export class ErCrossroadsPhase extends Phase {
     // rejecting, the #861 shape). Flag OFF -> pass-through (legacy). A reject falls to the deterministic
     // backstop below, exactly like a relay timeout.
     const role = getCoopController()?.role ?? "guest";
-    const operationId = coopBiomeOperationId("CROSSROADS_PICK", COOP_CROSSROADS_SEQ_BASE + pinned, pinned);
-    if (coopBiomeCommitRequired(role)) {
+    const binding = this.requireCoopBiomeOperationBinding();
+    const operationId = coopBiomeOperationId("CROSSROADS_PICK", COOP_CROSSROADS_SEQ_BASE + pinned, pinned, binding);
+    if (coopBiomeCommitRequired(role, binding)) {
       await this.finishCommittedCrossroadsWatcher(operationId, pinned);
       return;
     }
@@ -567,7 +599,7 @@ export class ErCrossroadsPhase extends Phase {
   private async finishCommittedCrossroadsWatcher(operationId: string, pinned: number): Promise<void> {
     const generation = coopSessionGeneration();
     const wave = this.requireCoopSourceWave();
-    const receipt = await awaitCoopBiomeCommitReceipt(operationId);
+    const receipt = await awaitCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
     if (!this.boundaryStillLive(generation, wave)) {
       return;
     }
@@ -590,19 +622,22 @@ export class ErCrossroadsPhase extends Phase {
     res: CoopBiomeRelayResult | null,
     committed: boolean,
   ): void {
-    const decision = adoptBiomeWatcherChoice({
-      kind: "CROSSROADS_PICK",
-      seq: COOP_CROSSROADS_SEQ_BASE + pinned,
-      pinned,
-      res,
-      localRole: role,
-      wave: this.requireCoopSourceWave(),
-      turn: 0,
-      sourceBiomeId: this.coopSourceBiomeId,
-      nextWave: this.requireCoopSourceWave() + 1,
-      allowedRoutes: [],
-      deterministicDestination: null,
-    });
+    const decision = adoptBiomeWatcherChoice(
+      {
+        kind: "CROSSROADS_PICK",
+        seq: COOP_CROSSROADS_SEQ_BASE + pinned,
+        pinned,
+        res,
+        localRole: role,
+        wave: this.requireCoopSourceWave(),
+        turn: 0,
+        sourceBiomeId: this.coopSourceBiomeId,
+        nextWave: this.requireCoopSourceWave() + 1,
+        allowedRoutes: [],
+        deterministicDestination: null,
+      },
+      this.requireCoopBiomeOperationBinding(),
+    );
     if (committed && !decision.adopt) {
       coopWarn(
         "reward",
@@ -641,9 +676,15 @@ export class ErCrossroadsPhase extends Phase {
         `crossroads WATCHER: owner pick TIMEOUT/disconnect/reject(${decision.reason}) -> deterministic fallback moveOn=${moveOn} (#848)`,
       );
     }
-    const applied = this.coopApply(pinned, moveOn);
+    const applied = this.coopApply(
+      pinned,
+      moveOn,
+      decision.adopt ? (decision.operationId ?? operationId) : undefined,
+      decision.adopt && decision.requiresAuthorityCommit === true,
+      decision.adopt && decision.authoritativeProjection === true,
+    );
     if (committed && applied) {
-      releaseCoopBiomeCommitReceipt(operationId);
+      releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
     }
   }
 
@@ -654,7 +695,7 @@ export class ErCrossroadsPhase extends Phase {
   ): Promise<void> {
     const generation = coopSessionGeneration();
     const wave = this.requireCoopSourceWave();
-    const receipt = await awaitCoopBiomeCommitReceipt(operationId);
+    const receipt = await awaitCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
     if (!this.boundaryStillLive(generation, wave)) {
       return;
     }
@@ -669,8 +710,8 @@ export class ErCrossroadsPhase extends Phase {
       return;
     }
     this.coopCommitPending = false;
-    if (this.coopApply(pinned, moveOn)) {
-      releaseCoopBiomeCommitReceipt(operationId);
+    if (this.coopApply(pinned, moveOn, operationId, false, true)) {
+      releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
     }
   }
 
@@ -826,30 +867,65 @@ export class ErCrossroadsPhase extends Phase {
    * terminal to the chained SelectBiomePhase - it pins the interaction counter so that phase
    * completes the SAME interaction with the single advance at the map pick.
    */
-  private coopApply(pinned: number, moveOn: boolean): boolean {
-    if (this.resolving || this.coopCommitPending) {
+  private coopApply(
+    pinned: number,
+    moveOn: boolean,
+    operationId?: string,
+    authorityCommit = false,
+    authoritativeProjection = false,
+  ): boolean {
+    if (this.coopCommitPending) {
       return false;
     }
-    this.resolving = true;
     try {
-      const generation = coopSessionGeneration();
-      const wave = this.requireCoopSourceWave();
-      void globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.boundaryStillLive(generation, wave));
-      if (moveOn) {
-        // End the biome now; open the World Map picker ahead of the queued NewBattlePhase. The
-        // chained SelectBiomePhase owns the single terminal advance for the whole decision.
-        setErLeaveBiomeNow();
-        setCoopBiomeInteractionStart(pinned);
-        globalScene.phaseManager.unshiftNew("SelectBiomePhase", this.coopSourceWave);
-      } else {
-        // STAY: arm the overstay anchor (a no-op inside the free window) and terminate the
-        // interaction here with the single from-pinned advance.
-        erMarkBiomeStay(this.coopSourceWave);
-        const controller = getCoopController();
-        advanceCoopInteractionForContinuation(pinned);
-        if (controller != null && controller.interactionCounter() <= pinned) {
-          throw new Error(`Crossroads interaction ${pinned} did not advance`);
+      if (
+        this.coopAppliedTerminal != null
+        && (this.coopAppliedTerminal.pinned !== pinned || this.coopAppliedTerminal.moveOn !== moveOn)
+      ) {
+        throw new Error(
+          `Crossroads terminal conflict existing=${this.coopAppliedTerminal.pinned}:${Number(this.coopAppliedTerminal.moveOn)} next=${pinned}:${Number(moveOn)}`,
+        );
+      }
+      if (this.coopAppliedTerminal == null) {
+        if (this.resolving) {
+          return false;
         }
+        this.resolving = true;
+        const generation = coopSessionGeneration();
+        const wave = this.requireCoopSourceWave();
+        void globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.boundaryStillLive(generation, wave));
+        if (moveOn) {
+          // The complete V2 state already contains the authority's biome-structure mutation on replicas.
+          // Local control projection still installs the exact chained map phase and pinned ownership.
+          if (!authoritativeProjection) {
+            setErLeaveBiomeNow();
+          }
+          setCoopBiomeInteractionStart(pinned);
+          globalScene.phaseManager.unshiftNew("SelectBiomePhase", this.coopSourceWave);
+        } else {
+          if (!authoritativeProjection) {
+            erMarkBiomeStay(this.coopSourceWave);
+          }
+          const controller = getCoopController();
+          advanceCoopInteractionForContinuation(pinned);
+          if (controller != null && controller.interactionCounter() <= pinned) {
+            throw new Error(`Crossroads interaction ${pinned} did not advance`);
+          }
+        }
+        this.coopAppliedTerminal = { pinned, moveOn };
+      }
+      if (operationId != null) {
+        settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
+      }
+      if (
+        authorityCommit
+        && operationId != null
+        && commitBiomeAuthoritativeResult(operationId, undefined, this.requireCoopBiomeOperationBinding()) == null
+      ) {
+        this.parkCrossroadsCommitRecovery(() =>
+          this.coopApply(pinned, moveOn, operationId, true, authoritativeProjection),
+        );
+        return false;
       }
       this.end();
       return true;

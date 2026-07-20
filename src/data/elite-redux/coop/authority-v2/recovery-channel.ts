@@ -105,6 +105,8 @@ export interface CoopRecoveryChannelV2Deps {
   readonly captureMaterial: (ctx: CoopRuntimeContext) => CoopAuthoritativeMaterial | null;
   /** Replica-only: atomically install and verify the full snapshot. */
   readonly applyMaterial: (ctx: CoopRuntimeContext, material: CoopAuthoritativeMaterial) => boolean | Promise<boolean>;
+  /** Install the validated final tail entry in the same control ledger ordinary delivery uses. */
+  readonly prepareControl?: (ctx: CoopRuntimeContext, bundle: CoopRecoveryBundle) => boolean;
   /** Synchronous fail-closed integration hook. */
   readonly onTerminal: (reason: string) => void;
   /** Resume the engine boundary only after frontier + control + proof completed and the fence reopened. */
@@ -151,6 +153,7 @@ function bundleFingerprint(bundle: CoopRecoveryBundle): string {
   return JSON.stringify({
     requestId: bundle.requestId,
     frontier: bundle.frontier,
+    frontierOperationId: bundle.frontierOperationId,
     material: bundle.material,
     nextControl: bundle.nextControl,
     tail: bundle.requiredTail.map(withoutEntryContext),
@@ -233,6 +236,7 @@ export class CoopRecoveryChannelV2 {
       reason,
       request: (_ctx, request, signal) => this.openReplicaRequest(request, signal),
       applyMaterial: (_ctx, material) => this.deps.applyMaterial(this.deps.context(), material),
+      prepareControl: (_ctx, bundle) => this.deps.prepareControl?.(this.deps.context(), bundle) ?? true,
       acknowledge: (_ctx, proof) => this.completeReplicaRecovery(proof),
       requestTimeoutMs: this.deps.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
     });
@@ -359,6 +363,10 @@ export class CoopRecoveryChannelV2 {
       isMaterializationFrozen: () => this.fence.isMaterializationFrozen(),
       isAuthorityWaitCreationFrozen: () => this.fence.isAuthorityWaitCreationFrozen(),
     };
+  }
+
+  controlSurfaceStartFrozen(): boolean {
+    return this.fence.isControlSurfaceStartFrozen();
   }
 
   // -------------------------------------------------------------------------
@@ -539,6 +547,7 @@ export class CoopRecoveryChannelV2 {
       context: cloneFrozen(frame),
       material: cloneFrozen(material),
       frontier: slice.frontier,
+      frontierOperationId: slice.frontierOperationId,
       membershipRevision: frame.membershipRevision,
       nextControl: cloneFrozen(slice.nextControl),
       requiredTail: slice.requiredTail.map(entry => cloneFrozen({ ...entry, context: frame })),
@@ -559,6 +568,7 @@ export class CoopRecoveryChannelV2 {
           requestId: bundle.requestId,
           material: bundle.material,
           frontier: bundle.frontier,
+          frontierOperationId: bundle.frontierOperationId,
           membershipRevision: bundle.membershipRevision,
           nextControl: bundle.nextControl,
           requiredTail: bundle.requiredTail.map(withoutEntryContext),
@@ -609,6 +619,7 @@ export class CoopRecoveryChannelV2 {
       context: ctx,
       material: body.material,
       frontier: body.frontier,
+      frontierOperationId: body.frontierOperationId,
       membershipRevision: body.membershipRevision,
       nextControl: body.nextControl,
       requiredTail: body.requiredTail.map(entry => ({ context: ctx, ...entry })),

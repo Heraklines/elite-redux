@@ -152,16 +152,16 @@ function turnEntryInput(wave: number, turn: number): Omit<CoopAuthorityEntry, "r
   };
 }
 
-/** A REPLACEMENT_COMMIT input whose stated control is a REPLACEMENT on `wave`. */
+/** A REPLACEMENT_COMMIT input whose stated control is an ordered same-wave replacement wait. */
 function replacementEntryInput(wave: number): Omit<CoopAuthorityEntry, "revision"> {
   const nextControl: CoopNextControl = {
-    kind: "REPLACEMENT",
+    kind: "AWAIT_SUCCESSOR",
+    afterOperationId: `repl-w${wave}`,
     epoch: 1,
     wave,
     turn: 1,
-    occurrence: 0,
-    fieldIndex: 0,
-    ownerSeatId: 0,
+    allowedKinds: ["REPLACEMENT_COMMIT"],
+    expectedOperationId: null,
   };
   return {
     context: frameContext(),

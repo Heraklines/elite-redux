@@ -226,13 +226,21 @@ describe("reward builder + material validation", () => {
         context: FRAME,
         material: { ...rewardMaterial(), choice: { kind: "pick" } } as unknown as CoopRewardInteractionMaterialV2,
         address: windowAddress(),
-        successor: null,
+        successor: commandSuccessor(),
       }),
     ).toThrow();
     // No operationId and no address => no wire-safe identity.
     expect(() =>
-      buildRewardInteractionEntry({ context: FRAME, material: rewardMaterial(), successor: null }),
+      buildRewardInteractionEntry({ context: FRAME, material: rewardMaterial(), successor: commandSuccessor() }),
     ).toThrow();
+    expect(() =>
+      buildRewardInteractionEntry({
+        context: FRAME,
+        address: windowAddress(),
+        material: rewardMaterial(),
+        successor: null as never,
+      }),
+    ).toThrow("interaction successor is required");
     // A TERMINAL successor is never an interaction's job.
     expect(() =>
       buildRewardInteractionEntry({
@@ -307,11 +315,11 @@ describe("market builder + atomic outcome validation", () => {
       context: FRAME,
       address: windowAddress(),
       material: marketMaterial(),
-      successor: null,
+      successor: commandSuccessor(),
     });
     expect(built.kind).toBe(INTERACTION_COMMIT_KIND);
     expect(built.operationId).toBe(marketOperationId(windowAddress()));
-    expect(built.nextControl).toBeNull();
+    expect(built.nextControl).toEqual(commandSuccessor());
     expect(isValidAuthorityEntry({ ...built, revision: 3 })).toBe(true);
   });
 });
@@ -407,7 +415,7 @@ describe("applier adoption + digest defense", () => {
         context: FRAME,
         address: windowAddress(),
         material: marketMaterial(),
-        successor: null,
+        successor: commandSuccessor(),
       }),
       revision: 12,
     };
@@ -437,7 +445,7 @@ describe("applier adoption + digest defense", () => {
         material: marketMaterial({
           action: { kind: "buy", slot: 2, outcome: { kind: "rolled-back", reason: "insufficient-funds" } },
         }),
-        successor: null,
+        successor: commandSuccessor(),
       }),
       revision: 13,
     };
@@ -558,7 +566,7 @@ describe("shadow parity seam", () => {
       operationId: "op-turn",
       kind: "TURN_COMMIT",
       material: { digest: "d", payload: {} },
-      nextControl: null,
+      nextControl: { kind: "TERMINAL", terminalId: "foreign-turn-terminal" },
       subsumes: [],
     };
     expect(shadowOfInteractionEntry(turn)).toBeNull();
@@ -568,7 +576,7 @@ describe("shadow parity seam", () => {
         context: FRAME,
         address: windowAddress(),
         material: marketMaterial(),
-        successor: null,
+        successor: commandSuccessor(),
       }),
     );
     const biomeShadow = shadowOfInteractionEntry(

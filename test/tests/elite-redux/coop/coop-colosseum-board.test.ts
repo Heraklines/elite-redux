@@ -65,6 +65,7 @@ import {
   getCoopInteractionRelay,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
+import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type {
   CoopActiveMysteryEncounterSnapshotV1,
   CoopInteractionOutcome,
@@ -82,6 +83,7 @@ const BOARD_LABELS = ["CONTINUE (risk for S+)", "CASH OUT (claim S)"];
 function retainedBoardEnvelope(pinned: number): CoopAuthoritativeEnvelopeV1 {
   const wave = 10;
   const turn = 0;
+  const owner = coopInteractionOwnerSeat(pinned);
   return {
     version: 1,
     sessionEpoch: 1,
@@ -90,9 +92,9 @@ function retainedBoardEnvelope(pinned: number): CoopAuthoritativeEnvelopeV1 {
     turn,
     logicalPhase: "INTERACTION",
     pendingOperation: {
-      id: makeCoopOperationId(1, 0, pinned * 100, "COLO_PICK"),
+      id: makeCoopOperationId(1, owner, pinned * 100, "COLO_PICK"),
       kind: "COLO_PICK",
-      owner: 0,
+      owner,
       status: "applied",
       payload: { type: "board", round: 0, labels: [...BOARD_LABELS] },
     },

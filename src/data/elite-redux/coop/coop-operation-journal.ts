@@ -50,6 +50,10 @@
 // so there is no circular import.
 // =============================================================================
 
+import {
+  commitCoopV2InteractionEnvelope,
+  isCoopV2InteractionCutoverActive,
+} from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { recordCoopCausalEvent } from "#data/elite-redux/coop/coop-causal-trace";
 import type {
   CoopApplyOutcome,
@@ -58,7 +62,7 @@ import type {
   CoopOperationContinuationAddress,
 } from "#data/elite-redux/coop/coop-durability";
 import type { CoopAuthoritativeEnvelopeV1, CoopLogicalPhase } from "#data/elite-redux/coop/coop-operation-envelope";
-import type { CoopOperationGuest } from "#data/elite-redux/coop/coop-operation-runtime";
+import { type CoopOperationGuest, getActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   type CoopOperationSurfaceClass,
   isCoopOperationSurfaceClass,
@@ -107,12 +111,15 @@ export function coopOperationClassForEnvelope(envelope: CoopAuthoritativeEnvelop
   }
   if (envelope.logicalPhase === "INTERACTION") {
     switch (envelope.pendingOperation?.kind) {
+      case "BARGAIN_PRESENT":
       case "BARGAIN":
         return "op:bargain";
       case "COLO_PICK":
         return "op:colosseum";
+      case "ABILITY_PRESENT":
       case "ABILITY_PICK":
         return "op:ability";
+      case "STORMGLASS_PRESENT":
       case "STORMGLASS":
         return "op:stormglass";
       default:
@@ -129,7 +136,26 @@ export function coopOperationClassForEnvelope(envelope: CoopAuthoritativeEnvelop
  * `duplicate` (already consumed / non-applicable frame - ACK + advance so a resend cannot spin), or
  * `rejected` (a transient failure - do NOT ACK, stays retriable). Registered by each adapter at import.
  */
-export type CoopOperationEnvelopeApplier = (envelope: CoopAuthoritativeEnvelopeV1) => CoopApplyOutcome;
+export interface CoopOperationAuthorityV2ApplyContext {
+  readonly authority: "v2";
+  /** The one global Authority V2 revision that admitted this material. */
+  readonly revision: number;
+  readonly operationId: string;
+  readonly sessionEpoch: number;
+}
+
+export type CoopOperationEnvelopeApplyContext = CoopOperationAuthorityV2ApplyContext | undefined;
+
+export function isCoopOperationAuthorityV2Apply(
+  context: CoopOperationEnvelopeApplyContext,
+): context is CoopOperationAuthorityV2ApplyContext {
+  return context?.authority === "v2";
+}
+
+export type CoopOperationEnvelopeApplier = (
+  envelope: CoopAuthoritativeEnvelopeV1,
+  context?: CoopOperationEnvelopeApplyContext,
+) => CoopApplyOutcome;
 
 /**
  * A surface's LIVE-MUTATION SINK (W2e-R P0-1): the ONE seam a journal-delivered committed op routes INTO to
@@ -150,11 +176,15 @@ const appliers = new Map<string, CoopOperationEnvelopeApplier>();
 /** Per-class LIVE-MUTATION sinks (the runtime/engine layer registers at session assembly; keyed by class). */
 const liveSinks = new Map<string, CoopOperationLiveSink>();
 
-/** Operations whose production sink already succeeded but whose sidecar ledger may still be retrying. */
-const liveMaterialized = new Set<string>();
+/** Legacy/unit fallback when no assembled runtime owns the materialization ledger. */
+const legacyLiveMaterialized = new Set<string>();
 
 function materializationKey(cls: string, envelope: CoopAuthoritativeEnvelopeV1): string {
   return `${cls}:${envelope.pendingOperation?.id ?? `${envelope.sessionEpoch}:${envelope.revision}`}`;
+}
+
+function liveMaterializedLedger(): Set<string> {
+  return getActiveCoopRuntimeOpState()?.materializedOperationKeys ?? legacyLiveMaterialized;
 }
 
 /**
@@ -211,6 +241,9 @@ export function notifyCoopOperationContinuationSurface(
   surface: CoopOperationContinuationSurface,
   address: CoopOperationContinuationAddress,
 ): number {
+  if (isCoopV2InteractionCutoverActive(activeDurability)) {
+    return 0;
+  }
   return activeDurability?.notifyOperationContinuationSurface(surface, address) ?? 0;
 }
 
@@ -222,6 +255,9 @@ export function notifyCoopOperationAuthorityContinuationSurface(
   surface: CoopOperationContinuationSurface,
   address: CoopOperationContinuationAddress,
 ): number {
+  if (isCoopV2InteractionCutoverActive(activeDurability)) {
+    return 0;
+  }
   return activeDurability?.notifyOperationAuthorityContinuationSurface(surface, address) ?? 0;
 }
 
@@ -245,12 +281,16 @@ export function tryJournalCoopCommittedEnvelopeFor(
   manager: CoopDurabilityManager | null,
   envelope: CoopAuthoritativeEnvelopeV1,
 ): boolean {
-  if (manager == null) {
-    return true;
-  }
   const cls = coopOperationClassForEnvelope(envelope);
   if (cls == null) {
     return false;
+  }
+  const v2Result = commitCoopV2InteractionEnvelope(cls, envelope, manager);
+  if (v2Result !== "not-cutover") {
+    return v2Result === "committed";
+  }
+  if (manager == null) {
+    return true;
   }
   let retained = false;
   try {
@@ -319,6 +359,23 @@ export function registerCoopOperationLiveSink(cls: string, sink: CoopOperationLi
   }
 }
 
+export interface CoopOperationRegistrationStatus {
+  readonly surfaceClass: CoopOperationSurfaceClass;
+  readonly applierRegistered: boolean;
+  readonly liveSinkRegistered: boolean;
+}
+
+/** Read-only cutover preflight: a mechanical V2 surface needs both its validator/applier and live materializer. */
+export function coopOperationRegistrationStatus(
+  surfaceClass: CoopOperationSurfaceClass,
+): CoopOperationRegistrationStatus {
+  return {
+    surfaceClass,
+    applierRegistered: appliers.has(surfaceClass),
+    liveSinkRegistered: liveSinks.has(surfaceClass),
+  };
+}
+
 /**
  * Route a NEWLY-consumed journal-delivered committed op INTO its class's live-mutation sink (W2e-R P0-1).
  * Called by a surface applier the moment it newly consumes a journal op. Records the routing for the proof
@@ -328,7 +385,8 @@ export function registerCoopOperationLiveSink(cls: string, sink: CoopOperationLi
  */
 export function routeCoopOperationToLiveSink(cls: string, envelope: CoopAuthoritativeEnvelopeV1): boolean {
   const key = materializationKey(cls, envelope);
-  if (liveMaterialized.has(key)) {
+  const materializedLedger = liveMaterializedLedger();
+  if (materializedLedger.has(key)) {
     return true;
   }
   liveSinkInvoked.push(envelope);
@@ -339,7 +397,7 @@ export function routeCoopOperationToLiveSink(cls: string, envelope: CoopAuthorit
   try {
     const materialized = sink(envelope);
     if (materialized) {
-      liveMaterialized.add(key);
+      materializedLedger.add(key);
       recordCoopCausalEvent({
         domain: "operation",
         stage: "materialized",
@@ -368,8 +426,24 @@ export function applyCoopOperationEnvelope(
   guest: CoopOperationGuest,
   cls: string,
   envelope: CoopAuthoritativeEnvelopeV1,
+  context?: CoopOperationEnvelopeApplyContext,
 ): CoopApplyOutcome {
-  const inspected = guest.inspectEnvelope(envelope);
+  const operation = envelope.pendingOperation;
+  if (
+    isCoopOperationAuthorityV2Apply(context)
+    && (context.revision < 1
+      || context.sessionEpoch !== envelope.sessionEpoch
+      || operation?.id !== context.operationId
+      || operation.status !== "applied")
+  ) {
+    return "rejected";
+  }
+
+  // V2 has already ordered and deduplicated this result in the one authority log. Only immutable envelope
+  // identity remains relevant here; reading or advancing envelope.revision would recreate a second clock.
+  const inspected = isCoopOperationAuthorityV2Apply(context)
+    ? guest.inspectEnvelopeIdentity(envelope)
+    : guest.inspectEnvelope(envelope);
   if (inspected.kind === "duplicate") {
     return "duplicate";
   }
@@ -383,6 +457,9 @@ export function applyCoopOperationEnvelope(
     // whose exhaustion escalates a transient ordering race into a shared session terminal.
     return "deferred";
   }
+  if (isCoopOperationAuthorityV2Apply(context)) {
+    return "applied";
+  }
   return guest.applyEnvelope(envelope).kind === "applied" ? "applied" : "rejected";
 }
 
@@ -393,9 +470,18 @@ export function applyCoopOperationEnvelope(
  * (invariant 5) and records a NEWLY-applied op for the convergence proof. A phase with no migrated class,
  * or an envelope for a surface with no registered applier, is ignored (the manager treats it as not-a-op).
  */
-export function coopOperationDurabilityHooks(): CoopDurabilityHooks {
+export interface CoopOperationDurabilityHookOptions {
+  /** V2 owns ordering/material/control; the legacy journal becomes an inert compatibility carrier. */
+  readonly suppressLegacyAuthority?: () => boolean;
+}
+
+export function coopOperationDurabilityHooks(options: CoopOperationDurabilityHookOptions = {}): CoopDurabilityHooks {
+  const suppressed = (): boolean => options.suppressLegacyAuthority?.() === true;
   return {
     extractKey: msg => {
+      if (suppressed()) {
+        return null;
+      }
       if (msg.t === "envelope") {
         const cls = coopOperationClassForEnvelope(msg.envelope);
         return cls == null ? null : { cls: "op:global", seq: msg.envelope.revision };
@@ -403,6 +489,11 @@ export function coopOperationDurabilityHooks(): CoopDurabilityHooks {
       return null;
     },
     apply: entry => {
+      if (suppressed()) {
+        // A frame already parked before atomic cutover is drained without mutation, continuation release, or
+        // legacy revision inspection. New frames are excluded by extractKey above.
+        return "duplicate";
+      }
       if (entry.msg.t !== "envelope") {
         // Not an operation frame: nothing to apply, but ACK it so the committer's resend loop terminates.
         return "duplicate";
@@ -437,6 +528,20 @@ export function coopOperationDurabilityHooks(): CoopDurabilityHooks {
   };
 }
 
+/**
+ * Authority V2 replica bridge: route a decoded, authenticated interaction envelope through the exact
+ * surface applier the old durability carrier used. This owns no transport/ACK behavior; V2 sequences and
+ * receipts the result. Unknown classes fail closed.
+ */
+export function applyCoopOperationEnvelopeThroughRegisteredApplier(
+  surfaceClass: CoopOperationSurfaceClass,
+  envelope: CoopAuthoritativeEnvelopeV1,
+  context: CoopOperationAuthorityV2ApplyContext,
+): CoopApplyOutcome {
+  const applier = appliers.get(surfaceClass);
+  return applier == null ? "rejected" : applier(envelope, context);
+}
+
 /** The committed envelopes NEWLY applied via the journal this session (proof observability). */
 export function getCoopOperationJournalApplied(): readonly CoopAuthoritativeEnvelopeV1[] {
   return journalApplied;
@@ -456,6 +561,7 @@ export function getCoopOperationJournalCommittedClasses(): readonly CoopOperatio
 export function resetCoopOperationJournalLog(): void {
   journalApplied.length = 0;
   liveSinkInvoked.length = 0;
-  liveMaterialized.clear();
+  legacyLiveMaterialized.clear();
+  getActiveCoopRuntimeOpState()?.materializedOperationKeys.clear();
   journalCommittedClasses.clear();
 }

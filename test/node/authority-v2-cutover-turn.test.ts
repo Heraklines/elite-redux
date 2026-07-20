@@ -470,6 +470,7 @@ describe("authority-v2 turn cutover - replica context binding + authority self-a
     const authoritySkipSeam: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: control => control.kind === "COMMAND_FRONTIER",
+      prepareAuthorityEntry: () => () => {},
       applyMaterial(ctx, entry: CoopAuthorityEntry): boolean | null {
         if (entry.kind !== "TURN_COMMIT") {
           return null;

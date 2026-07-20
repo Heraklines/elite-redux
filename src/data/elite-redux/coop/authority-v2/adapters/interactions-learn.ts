@@ -411,13 +411,8 @@ export interface BuildInteractionEntryBase {
   readonly operationId: string;
   /** The seat that owns this interaction surface (seat ids authorize ownership, never host/guest role). */
   readonly ownerSeatId: number;
-  /**
-   * The successor control the authority states after this interaction, or `null`
-   * (the default): the interaction resolves and retires at materialApplied. A
-   * caller that hands off to an enclosing REWARD / BIOME / MYSTERY / COMMAND owner
-   * control passes it here; the guest never derives it (frozen decision 4).
-   */
-  readonly successor?: CoopNextControl;
+  /** The successor control the authority states after this interaction. Missing/null fails construction. */
+  readonly successor: CoopNextControl;
   /** Revisions this commit explicitly subsumes (supersession by log order); default none. */
   readonly subsumes?: readonly number[];
 }
@@ -471,12 +466,13 @@ function assembleInteractionEntry(
   if (!isValidOperationId(base.operationId)) {
     throw new CoopInteractionBuildError(`invalid operationId ${String(base.operationId)}`);
   }
-  const nextControl: CoopNextControl = base.successor ?? null;
-  if (nextControl != null) {
-    const controlCheck = validateNextControl(nextControl as ProjectableControl);
-    if (!controlCheck.ok) {
-      throw new CoopInteractionBuildError(`invalid successor control: ${controlCheck.reason}`);
-    }
+  const nextControl = base.successor;
+  if (nextControl == null) {
+    throw new CoopInteractionBuildError("interaction successor is required; use AWAIT_SUCCESSOR for an ordered wait");
+  }
+  const controlCheck = validateNextControl(nextControl as ProjectableControl);
+  if (!controlCheck.ok) {
+    throw new CoopInteractionBuildError(`invalid successor control: ${controlCheck.reason}`);
   }
   const commitMaterial: CoopInteractionCommitMaterial = {
     digest: interactionMaterialDigest(material),

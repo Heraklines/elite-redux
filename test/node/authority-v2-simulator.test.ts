@@ -35,7 +35,6 @@ import {
   type FaultConfig,
   makeRng,
   noFault,
-  replacementControl,
   SimInvariantError,
   type StoryAct,
   standardStory,
@@ -183,7 +182,15 @@ describe("authority-v2 simulator - directed scenarios", () => {
       },
       {
         kind: "REPLACEMENT_COMMIT",
-        control: replacementControl(epoch, 1, 2, 1, 0, 0),
+        control: {
+          kind: "AWAIT_SUCCESSOR",
+          afterOperationId: "op-3",
+          epoch,
+          wave: 1,
+          turn: 2,
+          allowedKinds: ["TURN_COMMIT"],
+          expectedOperationId: "op-4",
+        },
         delta: 5,
         checkpoint: false,
         subsumePrior: false,
@@ -351,8 +358,16 @@ describe("authority-v2 simulator - sentinels", () => {
     expect(sim.report().replicaControl).toBe(controlKey(control));
   });
 
-  it("replacement installs exact successor control", () => {
-    const control: Control = replacementControl(EPOCH, 2, 3, 2, 1, 1);
+  it("replacement installs an exact ordered successor wait", () => {
+    const control: Control = {
+      kind: "AWAIT_SUCCESSOR",
+      afterOperationId: "op-2",
+      epoch: EPOCH,
+      wave: 2,
+      turn: 3,
+      allowedKinds: ["TURN_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      expectedOperationId: null,
+    };
     const story: StoryAct[] = [
       {
         kind: "TURN_COMMIT",

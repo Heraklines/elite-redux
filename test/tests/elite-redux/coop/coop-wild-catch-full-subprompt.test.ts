@@ -9,7 +9,7 @@
 // the MERGED party (releasing the host's own mons + mis-attributing the guest's catch - the #800 class).
 //
 // The fix is the recipient-drives twin of the #855 ME catch-full sub-prompt, on the live wild-catch path:
-//   1. HOST side - coopHostAwaitWildCatchFullSlot sends a `catchFullPrompt` message + AWAITS the guest's
+//   1. HOST side - coopHostPrepareWildCatchFullDecision sends a `catchFullPrompt` message + AWAITS the guest's
 //      relayed slot on COOP_CATCH_FULL_SEQ (kind "catchFull"), resolving to that slot (0..partySize-1) on a
 //      live pick, or `null` on cancel (out-of-range) / disconnect / timeout (the host then declines the grant).
 //   2. GUEST side - CoopGuestCatchFullPhase opens a NON-mutating PARTY/SELECT picker off the streamed prompt
@@ -24,7 +24,7 @@
 
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
-import { coopHostAwaitWildCatchFullSlot } from "#data/elite-redux/coop/coop-catch-full";
+import { coopHostPrepareWildCatchFullDecision } from "#data/elite-redux/coop/coop-catch-full";
 import {
   captureCoopCatchFullOperationBinding,
   commitCoopCatchFullAuthorityDecision,
@@ -91,7 +91,7 @@ describe("co-op wild-catch FULL-party keep/release owner-pick relay (#856)", () 
     };
 
     // The host (sole engine) reaches the catch on a GUEST-thrown catch with a full party and calls the helper.
-    const hostAwait = coopHostAwaitWildCatchFullSlot("Rattata", 19);
+    const hostAwait = coopHostPrepareWildCatchFullDecision("Rattata", 19);
     await flush();
 
     expect(seenPrompt, "the catcher received the catchFullPrompt").toEqual({ name: "Rattata", sp: 19 });
@@ -100,17 +100,21 @@ describe("co-op wild-catch FULL-party keep/release owner-pick relay (#856)", () 
     guestRelay.sendInteractionChoice(COOP_CATCH_FULL_SEQ, "catchFull", 2);
 
     // The helper resolves to exactly the catcher's slot (the host then releases slot 2 + adds the caught mon).
-    expect(await hostAwait).toBe(2);
+    const prepared = await hostAwait;
+    expect(prepared?.slot).toBe(2);
+    expect(prepared?.commitAfterApply()).toBe(true);
   });
 
   it("HOST LOUDLY declines (resolves null) when the catcher cancels / relays an out-of-range slot (skip)", async () => {
     // A full party is 6 mons; the catcher's SELECT cancel relays an out-of-range slot (== party length, 6).
     const { guestRelay } = hostRig(6);
-    const hostAwait = coopHostAwaitWildCatchFullSlot("Rattata", 19);
+    const hostAwait = coopHostPrepareWildCatchFullDecision("Rattata", 19);
     await flush();
 
     guestRelay.sendInteractionChoice(COOP_CATCH_FULL_SEQ, "catchFull", 6); // cancel / out-of-range -> skip
-    expect(await hostAwait).toBeNull();
+    const prepared = await hostAwait;
+    expect(prepared?.slot).toBeNull();
+    expect(prepared?.commitAfterApply()).toBe(true);
   });
 
   it("HOST anti-hang: a null await (disconnect / timeout ceiling) resolves to null (declines, never hangs)", async () => {
@@ -119,7 +123,9 @@ describe("co-op wild-catch FULL-party keep/release owner-pick relay (#856)", () 
     expect(relay).not.toBeNull();
     vi.spyOn(relay!, "awaitInteractionChoice").mockResolvedValue(null);
 
-    expect(await coopHostAwaitWildCatchFullSlot("Rattata", 19)).toBeNull();
+    const prepared = await coopHostPrepareWildCatchFullDecision("Rattata", 19);
+    expect(prepared?.slot).toBeNull();
+    expect(prepared?.commitAfterApply()).toBe(true);
   });
 
   it("HOST ASYNC BINDING: its real await tail stays on the host ledger while the guest is ambient", async () => {
@@ -132,12 +138,14 @@ describe("co-op wild-catch FULL-party keep/release owner-pick relay (#856)", () 
       getPlayerParty: () => new Array(6).fill({}),
     } as unknown as BattleScene);
 
-    const hostAwait = coopHostAwaitWildCatchFullSlot("Rattata", 19);
+    const hostAwait = coopHostPrepareWildCatchFullDecision("Rattata", 19);
     // Resolve the real helper's await after the harness has installed the peer. The decision commit must use
     // the host binding captured before the await, never this ambient guest selector.
     setCoopRuntime(guestRuntime);
     guestRuntime.interactionRelay.sendInteractionChoice(COOP_CATCH_FULL_SEQ, "catchFull", 2);
-    expect(await hostAwait).toBe(2);
+    const prepared = await hostAwait;
+    expect(prepared?.slot).toBe(2);
+    expect(prepared?.commitAfterApply()).toBe(true);
     await flush();
 
     expect(hostRuntime.durability?.highWaterMarks()["op:global"], "prompt + decision stayed host-owned").toBe(2);
@@ -154,7 +162,7 @@ describe("co-op wild-catch FULL-party keep/release owner-pick relay (#856)", () 
       gameMode: { isCoop: true },
       getPlayerParty: () => new Array(6).fill({}),
     } as unknown as BattleScene);
-    expect(await coopHostAwaitWildCatchFullSlot("Rattata", 19)).toBeNull();
+    expect(await coopHostPrepareWildCatchFullDecision("Rattata", 19)).toBeNull();
   });
 
   it("GUEST opens a PARTY/SELECT replace picker off the catchFull prompt and relays the chosen slot", async () => {

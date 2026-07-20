@@ -94,7 +94,7 @@ export type ReplicaApplyOutcome =
   | { readonly kind: "materialRejected"; readonly reason: string }
   | { readonly kind: "controlDeferred"; readonly reason: string }
   | { readonly kind: "controlRejected"; readonly reason: string }
-  | { readonly kind: "applied"; readonly controlId: string | null; readonly presentationSettled: boolean };
+  | { readonly kind: "applied"; readonly controlId: string; readonly presentationSettled: boolean };
 
 /**
  * Apply one admitted authoritative entry at the replica, in stage order.
@@ -109,8 +109,8 @@ export type ReplicaApplyOutcome =
  *                          surfaced to the caller, never a silent retirement.
  *   4. presentationSettled - opportunistic, NEVER blocking.
  *
- * A `null` nextControl is legal (the entry stated no successor): materialApplied
- * is the terminal required stage and no controlInstalled receipt is due.
+ * Every entry has a successor. A phase with no executable UI installs the
+ * explicit `AWAIT_SUCCESSOR` control and still proves `controlInstalled`.
  */
 export function applyEntry(
   ctx: CoopRuntimeContext,
@@ -124,13 +124,7 @@ export function applyEntry(
 
   if (resume === "controlInstalled") {
     const controlId = expectedControlId(entry);
-    emitReceipt(
-      deps.receipts,
-      deps.receiptContext,
-      entry,
-      controlId == null ? "materialApplied" : "controlInstalled",
-      controlId ?? undefined,
-    );
+    emitReceipt(deps.receipts, deps.receiptContext, entry, "controlInstalled", controlId);
     return { kind: "applied", controlId, presentationSettled: false };
   }
 
@@ -167,10 +161,6 @@ export function applyEntry(
 
   // --- Stage 3: controlInstalled ----------------------------------------
   const nextControl = entry.nextControl;
-  if (nextControl == null) {
-    // No stated successor: materialApplied is the required terminal stage.
-    return { kind: "applied", controlId: null, presentationSettled: false };
-  }
 
   const projection: CoopControlInstallResult = deps.projector.project(ctx, nextControl);
   switch (projection.kind) {
@@ -234,8 +224,7 @@ function probePresentation(ctx: CoopRuntimeContext, entry: CoopAuthorityEntry, d
 
 /**
  * Sign + emit one receipt for an entry at a stage. `controlId` is present only at
- * `controlInstalled` (and only when nextControl != null - the contract's rule for
- * the receipt field). The sink must not throw back into the ordered apply; a
+ * `controlInstalled`. The sink must not throw back into the ordered apply; a
  * throwing sink is contained here so one bad receipt can't abort the pipeline.
  */
 function emitReceipt(
@@ -281,12 +270,11 @@ function receiptContextMatchesEntry(
 }
 
 /**
- * The controlId the replica WOULD report for an entry's stated control, or `null`
- * when the entry states no successor. Exposed so the log/recovery lane can compare
+ * The controlId the replica WOULD report for an entry's stated control. Exposed so the log/recovery lane can compare
  * a signed receipt's controlId against the entry without re-deriving the scheme.
  */
-export function expectedControlId(entry: CoopAuthorityEntry): string | null {
-  return entry.nextControl == null ? null : controlIdOf(entry.nextControl);
+export function expectedControlId(entry: CoopAuthorityEntry): string {
+  return controlIdOf(entry.nextControl);
 }
 
 function describeError(error: unknown): string {

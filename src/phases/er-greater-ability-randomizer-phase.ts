@@ -30,6 +30,12 @@ import {
   adoptAbilityWatcherOutcome,
   type CoopAbilityOperationBinding,
   captureCoopAbilityOperationBinding,
+  commitAbilityWatcherOutcome,
+  commitCoopAbilityPresentation,
+  isCoopAbilityPresentationAuthorityActive,
+  settleCoopAbilityAuthorityResult,
+  settleCoopAbilityOperation,
+  settleCoopAbilityOwnerProposal,
 } from "#data/elite-redux/coop/coop-ability-operation";
 import {
   COOP_ABILITY_OP,
@@ -39,11 +45,22 @@ import {
   sendCoopAbilityPickerOutcome,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopAbilityPresentationPayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  advanceCoopInteractionForContinuation,
+  failCoopSharedSession,
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopRuntime,
+  isCoopV2InteractionHumanInputFrozen,
+  notifyCoopV2InteractionSurfaceReady,
+  settleCoopV2InteractionOperation,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ABILITY_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import type { BargainAbilityChoice } from "#data/elite-redux/er-bargain-sins";
 import {
   greaterRandomizerReplaceSlot,
+  resolveGreaterRandomizerAbilityIds,
   rollGreaterRandomizerAbilities,
 } from "#data/elite-redux/er-greater-ability-randomizer";
 import { UiMode } from "#enums/ui-mode";
@@ -55,9 +72,11 @@ const ns = "modifierType";
 
 export class ErGreaterAbilityRandomizerPhase extends Phase {
   public readonly phaseName = "ErGreaterAbilityRandomizerPhase";
+  /** Exact V2 presentation address owned by this phase generation. */
+  public coopV2ControlOperationId: string | null = null;
 
   /** Index into the player party of the mon the item was used on. */
-  private readonly partyIndex: number;
+  public readonly partyIndex: number;
   /** The UI mode active when this phase started; sub-menus restore to it. */
   private baseMode: UiMode = UiMode.MESSAGE;
   /**
@@ -69,10 +88,12 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
   private rolledChoices: BargainAbilityChoice[] | null = null;
 
   // ---- Co-op (#633 B9c): owner-drives / watcher-applies (see ErAbilityCapsulePhase) ----
-  private readonly coopSeq: number;
+  public readonly coopSeq: number;
   private readonly coopIsWatcher: boolean;
   /** Stable owner-runtime selectors carried across every picker callback / watcher await. */
   private readonly coopOperationBinding: CoopAbilityOperationBinding | null;
+  /** Exact runtime that owns this phase; never re-read after a picker callback or await. */
+  private readonly coopOwningRuntime = getCoopRuntime();
   private coopOutcome: number[] = [COOP_ABILITY_OP.CANCEL];
 
   constructor(partyIndex: number, coopSeq = -1, coopIsWatcher = false) {
@@ -103,6 +124,28 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
       this.cancelAndEnd();
       return;
     }
+    const controller = this.coopSeq >= 0 ? getCoopController() : null;
+    if (controller?.role === "host" && isCoopAbilityPresentationAuthorityActive(this.coopOperationBinding)) {
+      const choices = rollGreaterRandomizerAbilities(mon);
+      const operationId = commitCoopAbilityPresentation(
+        {
+          pinned: this.coopSeq,
+          partyIndex: this.partyIndex,
+          workflow: "greater-randomizer",
+          rolledAbilityIds: choices.map(choice => choice.abilityId),
+          localRole: "host",
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+        },
+        this.coopOperationBinding,
+      );
+      if (choices.length === 0 || operationId == null) {
+        failCoopSharedSession(`Ability presentation ${this.coopSeq} could not enter durable authority`);
+        return;
+      }
+      this.rolledChoices = choices;
+      this.coopV2ControlOperationId = operationId;
+    }
     // Co-op (#633 B9c) WATCHER: apply the owner's literal outcome - never opening a picker AND
     // never rolling RNG (the host rolled once; the watcher must not advance its seed cursor).
     if (this.coopIsWatcher) {
@@ -110,6 +153,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
         "ability",
         `greaterRandomizer WATCHER-APPLIES-RELAYED seq=${this.coopSeq} slot=${this.partyIndex} mon=${mon.name} (no local picker, NO reroll)`,
       );
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
       void this.coopApplyRelayedOutcome(mon);
       return;
     }
@@ -122,36 +166,60 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
     this.openSlotPicker(mon);
   }
 
+  /** Adopt the authority's literal board without consuming RNG on the replica. */
+  public installCoopV2AbilityPresentation(operationId: string, presentation: CoopAbilityPresentationPayload): boolean {
+    const mon = globalScene.getPlayerParty()[this.partyIndex];
+    const choices =
+      mon == null || presentation.rolledAbilityIds == null
+        ? null
+        : resolveGreaterRandomizerAbilityIds(mon, presentation.rolledAbilityIds);
+    if (
+      operationId.length === 0
+      || presentation.workflow !== "greater-randomizer"
+      || presentation.pinned !== this.coopSeq
+      || presentation.partyIndex !== this.partyIndex
+      || choices == null
+      || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
+    ) {
+      return false;
+    }
+    this.rolledChoices = choices;
+    this.coopV2ControlOperationId = operationId;
+    return true;
+  }
+
   /**
    * Step 1: pick ANY of the mon's ability/innate slots. Cancelling (or picking a
    * different mon) backs out without consuming the item.
    */
   private openSlotPicker(mon: PlayerPokemon): void {
     this.log(`openSlotPicker -> setMode(PARTY, ABILITY_MODIFIER) for ${mon.name}`);
-    globalScene.ui.setMode(
-      UiMode.PARTY,
-      PartyUiMode.ABILITY_MODIFIER,
-      -1,
-      (slotIndex: number, option: PartyOption) => {
-        const party = globalScene.getPlayerParty();
-        const picked = slotIndex >= 0 && slotIndex < party.length ? party[slotIndex] : null;
-        this.log(`slot callback slotIndex=${slotIndex} option=${option} pickedIsMon=${picked === mon}`);
-        if (picked !== mon || option < PartyOption.ABILITY_SLOT_0) {
-          // Backed out of the slot pick - nothing applied, capsule kept.
-          // Co-op (#633 B9c): relay a CANCEL so a parked watcher re-offers in parity.
-          globalScene.ui.setMode(this.baseMode).then(() => this.cancelAndEnd());
-          return;
-        }
-        const slot = option - PartyOption.ABILITY_SLOT_0;
-        // Open the 4-ability picker DIRECTLY (one setMode replaces the party slot picker).
-        // Do NOT bounce through baseMode (the reward-shop MODIFIER_SELECT) first: re-showing
-        // the live reward shop here makes its SelectModifierPhase advance and tear the Bargain
-        // picker down the instant it opens (the reported "options flash + vanish" bug). Curiosity
-        // opens its identical picker the same way - a clean handoff, not via the shop.
-        this.openAbilityPicker(mon, slot);
-      },
-      (p: PlayerPokemon) => (p === mon ? null : i18next.t(`${ns}:erGreaterAbilityRandomizer.chooseSameMon`)),
-    );
+    Promise.resolve(
+      globalScene.ui.setMode(
+        UiMode.PARTY,
+        PartyUiMode.ABILITY_MODIFIER,
+        -1,
+        (slotIndex: number, option: PartyOption) => {
+          const party = globalScene.getPlayerParty();
+          const picked = slotIndex >= 0 && slotIndex < party.length ? party[slotIndex] : null;
+          this.log(`slot callback slotIndex=${slotIndex} option=${option} pickedIsMon=${picked === mon}`);
+          if (picked !== mon || option < PartyOption.ABILITY_SLOT_0) {
+            // Backed out of the slot pick - nothing applied, capsule kept.
+            // Co-op (#633 B9c): relay a CANCEL so a parked watcher re-offers in parity.
+            globalScene.ui.setMode(this.baseMode).then(() => this.cancelAndEnd());
+            return;
+          }
+          const slot = option - PartyOption.ABILITY_SLOT_0;
+          // Open the 4-ability picker DIRECTLY (one setMode replaces the party slot picker).
+          // Do NOT bounce through baseMode (the reward-shop MODIFIER_SELECT) first: re-showing
+          // the live reward shop here makes its SelectModifierPhase advance and tear the Bargain
+          // picker down the instant it opens (the reported "options flash + vanish" bug). Curiosity
+          // opens its identical picker the same way - a clean handoff, not via the shop.
+          this.openAbilityPicker(mon, slot);
+        },
+        (p: PlayerPokemon) => (p === mon ? null : i18next.t(`${ns}:erGreaterAbilityRandomizer.chooseSameMon`)),
+      ),
+    ).then(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
   }
 
   /**
@@ -205,13 +273,13 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
    */
   private commitAndEnd(): void {
     this.log("commit -> slot replaced, item consumed");
-    // Co-op (#633 B9c): OWNER relays the committed outcome (slot + literal abilityId) before
-    // consuming the copy, so the watcher replaces the SAME slot with the SAME ability.
-    if (!this.coopIsWatcher) {
+    const relayOutcome = !this.coopIsWatcher;
+    globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    advanceCoopInteractionForContinuation(this.coopSeq);
+    this.end();
+    if (relayOutcome) {
       this.relayEnd();
     }
-    globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
-    this.end();
   }
 
   /** Co-op (#633 B9c): every NON-committing owner end-path relays a CANCEL so the watcher never
@@ -219,10 +287,11 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
   private cancelAndEnd(): void {
     this.log("cancel/back-out -> item kept, no change applied");
     this.coopOutcome = [COOP_ABILITY_OP.CANCEL];
-    if (!this.coopIsWatcher) {
+    const relayOutcome = !this.coopIsWatcher;
+    this.end();
+    if (relayOutcome) {
       this.relayEnd();
     }
-    this.end();
   }
 
   /** OWNER (#633 B9c): relay the buffered outcome on the shop seq exactly once. No-op in solo. */
@@ -237,19 +306,32 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
       `greaterRandomizer OWNER relay OUTCOME seq=${this.coopSeq} op=${coopAbilityOpName(this.coopOutcome[0])} slot=${this.coopOutcome[1] ?? "-"} abilityId=${this.coopOutcome[2] ?? "-"} data=[${this.coopOutcome.join(",")}]`,
     );
     const controller = getCoopController();
-    sendCoopAbilityPickerOutcome(
-      getCoopInteractionRelay(),
-      this.coopSeq,
-      this.coopOutcome,
-      controller == null
-        ? undefined
-        : {
-            localRole: controller.role,
-            wave: globalScene.currentBattle?.waveIndex ?? 0,
-            turn: globalScene.currentBattle?.turn ?? 0,
-          },
-      this.coopOperationBinding,
-    );
+    const operationId =
+      controller?.role === "host"
+        ? settleCoopAbilityAuthorityResult(this.coopSeq, this.coopOperationBinding)
+        : controller?.role === "guest"
+          ? settleCoopAbilityOwnerProposal(this.coopSeq, this.coopOperationBinding)
+          : null;
+    if (operationId != null) {
+      settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
+    }
+    if (
+      !sendCoopAbilityPickerOutcome(
+        getCoopInteractionRelay(),
+        this.coopSeq,
+        this.coopOutcome,
+        controller == null
+          ? undefined
+          : {
+              localRole: controller.role,
+              wave: globalScene.currentBattle?.waveIndex ?? 0,
+              turn: globalScene.currentBattle?.turn ?? 0,
+            },
+        this.coopOperationBinding,
+      )
+    ) {
+      failCoopSharedSession(`Ability result ${this.coopSeq} could not enter durable authority`);
+    }
   }
 
   /**
@@ -259,6 +341,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
    * ME terminal / next stateSync - same contract as the reward-options watcher-doesn't-reroll path).
    */
   private async coopApplyRelayedOutcome(mon: PlayerPokemon): Promise<void> {
+    isCoopV2InteractionHumanInputFrozen();
     const relay = getCoopInteractionRelay();
     if (this.coopSeq < 0 || relay == null) {
       this.end();
@@ -271,29 +354,53 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
     );
     const controller = getCoopController();
     const relayedData = action?.data ?? null;
-    const adopted =
-      controller != null
-      && adoptAbilityWatcherOutcome(
-        {
-          pinned: this.coopSeq,
-          data: relayedData,
-          localRole: controller.role,
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
-        },
-        this.coopOperationBinding,
-      );
-    const data = adopted && relayedData != null ? relayedData : [COOP_ABILITY_OP.CANCEL];
+    const adoption =
+      controller == null
+        ? null
+        : adoptAbilityWatcherOutcome(
+            {
+              pinned: this.coopSeq,
+              data: relayedData,
+              localRole: controller.role,
+              wave: globalScene.currentBattle?.waveIndex ?? 0,
+              turn: globalScene.currentBattle?.turn ?? 0,
+            },
+            this.coopOperationBinding,
+          );
+    const data = adoption?.accepted === true && relayedData != null ? relayedData : [COOP_ABILITY_OP.CANCEL];
     const op = data[0];
     coopLog(
       "ability",
       `greaterRandomizer WATCHER apply OUTCOME seq=${this.coopSeq} op=${coopAbilityOpName(op)} slot=${data[1] ?? "-"} abilityId=${data[2] ?? "-"} timedOut=${action == null} mon=${mon.name}`,
     );
     if (op === COOP_ABILITY_OP.GRAND) {
-      greaterRandomizerReplaceSlot(mon, data[1], data[2]);
+      if (adoption?.projectionApplied !== true) {
+        greaterRandomizerReplaceSlot(mon, data[1], data[2]);
+      }
       globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+      advanceCoopInteractionForContinuation(this.coopSeq);
     }
     this.end();
+    if (adoption?.accepted === true) {
+      settleCoopAbilityOperation(adoption.operationId, this.coopOperationBinding);
+      settleCoopV2InteractionOperation(adoption.operationId);
+    }
+    if (
+      adoption?.accepted === true
+      && adoption.requiresAuthorityCommit
+      && !commitAbilityWatcherOutcome(
+        adoption.operationId,
+        {
+          pinned: this.coopSeq,
+          data,
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+        },
+        this.coopOperationBinding,
+      )
+    ) {
+      failCoopSharedSession(`Ability result ${adoption.operationId} could not retain complete authority state`);
+    }
   }
 
   /**

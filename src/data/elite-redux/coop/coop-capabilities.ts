@@ -115,6 +115,12 @@ export const COOP_CAP_AUTHORITY_V2_REPLACEMENT: CoopCapabilityKey = "authority.v
  */
 export const COOP_CAP_AUTHORITY_V2_WAVE: CoopCapabilityKey = "authority.v2wave";
 /**
+ * The Authority V2 shared-interaction cutover. Complete settled results for every migrated shop, biome,
+ * Mystery, learn, ability, bargain, colosseum, revival, catch, and Stormglass surface live in the one V2
+ * log; the old `op:global` journal is no longer retained authority for those operations.
+ */
+export const COOP_CAP_AUTHORITY_V2_INTERACTION: CoopCapabilityKey = "authority.v2interaction";
+/**
  * The Authority V2 full-state recovery transaction. Requires the V2 turn and replacement cutovers because
  * a recovery frontier cannot be complete while either progression class still lives in a second legacy log.
  */

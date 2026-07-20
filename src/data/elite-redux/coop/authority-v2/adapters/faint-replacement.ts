@@ -127,11 +127,11 @@ export type ReplacementResolutionMode = "owner-pick" | "fallback-auto";
  * per occurrence so a multi-faint chain is unambiguous:
  *   - "resume-command-frontier" - the last faint in the chain resolved; resume
  *                          every independently-controlled active battler.
- *   - "next-replacement" - another faint remains in the SAME turn; the next
- *                          occurrence's replacement is the successor (REPLACEMENT
- *                          control) - the correct chaining for a double-KO.
- *   - "terminal"         - no successor is stated (null nextControl); the entry
- *                          retires at materialApplied.
+ *   - "next-replacement" - another faint remains in the SAME turn; the current
+ *                          entry installs an exact ordered wait for that next
+ *                          REPLACEMENT_COMMIT operation.
+ *   - "terminal"         - no executable control follows the replacement; the
+ *                          entry waits explicitly for interaction/wave/terminal authority.
  */
 export type ReplacementSuccessor =
   | {
@@ -393,10 +393,14 @@ export function toReplacementCommitImage(
 /**
  * Map an authority-stated successor onto a canonical {@link CoopNextControl}. The
  * successor rides the CURRENT faint's epoch/wave/turn (a same-turn resume / the
- * next same-turn faint); only the occurrence + field + actor change. Returns
- * `null` for a terminal successor (the entry retires at materialApplied).
+ * next same-turn faint); only the occurrence + field + actor change. Non-executable
+ * successors are explicit ordered waits, never nullable local-continuation holes.
  */
-export function successorControl(address: ReplacementSourceAddress, successor: ReplacementSuccessor): CoopNextControl {
+export function successorControl(
+  address: ReplacementSourceAddress,
+  sourceOperationId: string,
+  successor: ReplacementSuccessor,
+): CoopNextControl {
   switch (successor.kind) {
     case "resume-command-frontier":
       return {
@@ -408,16 +412,33 @@ export function successorControl(address: ReplacementSourceAddress, successor: R
       };
     case "next-replacement":
       return {
-        kind: "REPLACEMENT",
+        kind: "AWAIT_SUCCESSOR",
+        afterOperationId: sourceOperationId,
         epoch: address.epoch,
         wave: address.wave,
         turn: address.turn,
-        occurrence: successor.occurrence,
-        fieldIndex: successor.fieldIndex,
-        ownerSeatId: successor.ownerSeatId,
+        allowedKinds: ["REPLACEMENT_COMMIT"],
+        expectedOperationId: replacementOperationId(
+          {
+            epoch: address.epoch,
+            wave: address.wave,
+            turn: address.turn,
+            occurrence: successor.occurrence,
+            fieldIndex: successor.fieldIndex,
+          },
+          successor.ownerSeatId,
+        ),
       };
     case "terminal":
-      return null;
+      return {
+        kind: "AWAIT_SUCCESSOR",
+        afterOperationId: sourceOperationId,
+        epoch: address.epoch,
+        wave: address.wave,
+        turn: address.turn,
+        allowedKinds: ["INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+        expectedOperationId: null,
+      };
   }
 }
 
@@ -467,12 +488,10 @@ export function buildReplacementCommitEntry(
     throw new Error(`[authority-v2/faint-replacement] invalid operationId ${String(operationId)}`);
   }
 
-  const nextControl = successorControl(image.sourceAddress, input.successor);
-  if (nextControl != null) {
-    const controlCheck = validateNextControl(nextControl as ProjectableControl);
-    if (!controlCheck.ok) {
-      throw new Error(`[authority-v2/faint-replacement] invalid successor control: ${controlCheck.reason}`);
-    }
+  const nextControl = successorControl(image.sourceAddress, operationId, input.successor);
+  const controlCheck = validateNextControl(nextControl as ProjectableControl);
+  if (!controlCheck.ok) {
+    throw new Error(`[authority-v2/faint-replacement] invalid successor control: ${controlCheck.reason}`);
   }
 
   const material: CoopAuthoritativeMaterial = {

@@ -54,6 +54,8 @@ export interface ColosseumViewData {
   nextTierLabel: string;
   /** The full roster (length === totalRounds), revealed/secret per entry. */
   challengers: ColosseumChallengerView[];
+  /** Exact authority-authored button labels when the replica does not own the full challenger roster. */
+  choiceLabels?: readonly [string, string];
 }
 
 /** continue (0) / cash out (1). */
@@ -234,8 +236,8 @@ export class ColosseumUiHandler extends UiHandler {
 
     this.statusText.setText(`Round ${data.round} of ${data.totalRounds} cleared`);
     this.gradeText.setText(data.tierLabel);
-    this.buttons[0].label.setText(`CONTINUE\n(risk for ${data.nextTierLabel})`);
-    this.buttons[1].label.setText(`CASH OUT\n(claim ${data.tierLabel})`);
+    this.buttons[0].label.setText(data.choiceLabels?.[0] ?? `CONTINUE\n(risk for ${data.nextTierLabel})`);
+    this.buttons[1].label.setText(data.choiceLabels?.[1] ?? `CASH OUT\n(claim ${data.tierLabel})`);
 
     this.layoutRoster(data);
 

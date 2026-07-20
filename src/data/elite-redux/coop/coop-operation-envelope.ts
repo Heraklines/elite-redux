@@ -26,6 +26,7 @@ import type {
   CoopAuthoritativeBattleStateV1,
   CoopInteractionOutcome,
   CoopRewardSurfaceIdentity,
+  CoopSerializedRewardOption,
 } from "#data/elite-redux/coop/coop-transport";
 
 /** A co-op player seat id (0..N-1). The host/authority is a specific id, conventionally 0. */
@@ -77,10 +78,14 @@ export type CoopOperationKind =
   | "CROSSROADS_PICK" // crossroads Stay/Leave route choice (#14)
   // --- Later waves (declared for the closed union; not wired in Wave-2a) ---
   | "REWARD" // reward shop pick/skip/reroll/etc (#1, REWARD_SELECT)
+  | "REWARD_PRESENT" // complete authoritative reward/market option pool before input opens
   | "SHOP_BUY" // biome/black-market/exotic/bazaar buy (#5, SHOP)
+  | "SHOP_PRESENT" // complete authoritative market/shop stock before input opens
   | "FAINT_SWITCH" // faint replacement / voluntary switch (#2)
   | "REVIVAL" // revival blessing target (#3)
+  | "ABILITY_PRESENT" // immutable ability-picker workflow/options before input opens
   | "ABILITY_PICK" // ability capsule pick (#4)
+  | "BARGAIN_PRESENT" // immutable Giratina offer list before input opens
   | "BARGAIN" // Giratina bargain (#6)
   | "COLO_PICK" // colosseum board pick (#7)
   | "ME_PRESENT" // ME presentation handoff (#8)
@@ -91,6 +96,7 @@ export type CoopOperationKind =
   | "QUIZ_ANSWER" // ER quiz answer (#9)
   | "LEARN_MOVE" // learn-move accept/decline (#11)
   | "LEARN_MOVE_BATCH" // batch level-up learn panel (#12)
+  | "STORMGLASS_PRESENT" // immutable weather list before input opens
   | "STORMGLASS" // one-time weather pick (#16)
   | "CATCH_FULL" // wild-catch full-party release (#17)
   // --- Wave-2f: the KEYSTONE post-battle wave-advance tail (§2.5 item 4, not a relay kind) ---
@@ -178,6 +184,22 @@ export interface CoopRewardActionPayload {
   readonly data: number[] | undefined;
   /** True iff this action LEAVES the interaction for good (skip / leave) - the late-after-leave watermark trigger. */
   readonly terminal: boolean;
+  /** Complete reward-surface state after this action; proposals omit it, committed results require it. */
+  readonly result?: {
+    readonly lockModifierTiers: boolean;
+  };
+}
+
+/**
+ * Authority-owned option presentation. Option pools affect valid indices, costs, RNG consumption, and the
+ * resulting mutation, so they are immutable mechanical material rather than a lossy cosmetic relay.
+ */
+export interface CoopRewardPresentationPayload {
+  readonly surface: "reward" | "market";
+  readonly pinned: number;
+  readonly reroll: number;
+  readonly options: readonly CoopSerializedRewardOption[];
+  readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
 }
 
 /**
@@ -193,11 +215,21 @@ export interface CoopShopBuyPayload {
   readonly data: number[] | undefined;
   /** True iff this action LEAVES the market for good - the late-after-leave watermark trigger. */
   readonly terminal: boolean;
+  /** Exact post-action stock vector; committed results apply it verbatim instead of decrementing locally. */
+  readonly result?: {
+    readonly remainingStock: readonly number[];
+  };
 }
 
 /** BARGAIN outcome: the host-stated full run-state blob applied by the watcher verbatim. */
 export interface CoopBargainPayload {
   readonly outcome: CoopInteractionOutcome;
+}
+
+/** Authority-selected Giratina offers. Keys are stable domain ids; localized labels stay client-local. */
+export interface CoopBargainPresentationPayload {
+  readonly pinned: number;
+  readonly sins: readonly string[];
 }
 
 /** COLO_PICK stream: repeated host-stated boards and owner decisions within one pinned gauntlet. */
@@ -208,6 +240,14 @@ export type CoopColosseumPayload =
 /** ABILITY_PICK outcome: literal operation code and resolved slots/ability id. */
 export interface CoopAbilityPickPayload {
   readonly data: number[];
+}
+
+/** Whole ability-picker workflow presentation; random choices are literal host-authored ids. */
+export interface CoopAbilityPresentationPayload {
+  readonly pinned: number;
+  readonly partyIndex: number;
+  readonly workflow: "capsule" | "greater-capsule" | "greater-randomizer";
+  readonly rolledAbilityIds?: readonly number[] | undefined;
 }
 
 /** FAINT_SWITCH intent: exact owner-selected party slot plus legacy baton/species identity metadata. */
@@ -236,6 +276,14 @@ export type CoopCatchFullPayload =
 export interface CoopStormglassPayload {
   readonly weatherIndex: number;
   readonly weather: number;
+}
+
+/** Complete stable option list shown by the one-time Stormglass picker. */
+export interface CoopStormglassPresentationPayload {
+  readonly options: readonly {
+    readonly weatherIndex: number;
+    readonly weather: number;
+  }[];
 }
 
 export type CoopLearnMovePayload =
@@ -571,10 +619,14 @@ const KNOWN_OPERATION_KINDS: ReadonlySet<CoopOperationKind> = new Set<CoopOperat
   "BIOME_PICK",
   "CROSSROADS_PICK",
   "REWARD",
+  "REWARD_PRESENT",
   "SHOP_BUY",
+  "SHOP_PRESENT",
   "FAINT_SWITCH",
   "REVIVAL",
+  "ABILITY_PRESENT",
   "ABILITY_PICK",
+  "BARGAIN_PRESENT",
   "BARGAIN",
   "COLO_PICK",
   "ME_PRESENT",
@@ -585,6 +637,7 @@ const KNOWN_OPERATION_KINDS: ReadonlySet<CoopOperationKind> = new Set<CoopOperat
   "QUIZ_ANSWER",
   "LEARN_MOVE",
   "LEARN_MOVE_BATCH",
+  "STORMGLASS_PRESENT",
   "STORMGLASS",
   "CATCH_FULL",
   "WAVE_ADVANCE",

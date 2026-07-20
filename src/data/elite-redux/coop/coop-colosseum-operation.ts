@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { COOP_CAP_OP_COLOSSEUM, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
@@ -20,7 +21,9 @@ import {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
+  type CoopOperationEnvelopeApplyContext,
   getActiveCoopOperationDurability,
+  isCoopOperationAuthorityV2Apply,
   registerCoopOperationApplier,
   tryJournalCoopCommittedEnvelope,
   tryJournalCoopCommittedEnvelopeFor,
@@ -29,6 +32,7 @@ import {
   CoopOperationGuest,
   CoopOperationHost,
   type CoopRuntimeOpState,
+  coopOperationCommitContext,
   getActiveCoopRuntimeOpState,
   maybeCoopOpSurfaceState,
   registerCoopOpSurfaceState,
@@ -37,7 +41,7 @@ import {
   resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
-import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
+import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 export const COOP_COLOSSEUM_ACTION_STRIDE = 100;
 const COOP_COLOSSEUM_MAX_ROUND = Math.floor((COOP_COLOSSEUM_ACTION_STRIDE - 2) / 2);
@@ -195,6 +199,10 @@ export function isCoopColosseumOperationEnabled(): boolean {
   return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_COLOSSEUM);
 }
 
+export function isCoopColosseumAuthorityV2Active(binding?: CoopColosseumOperationBinding | null): boolean {
+  return isCoopV2InteractionCutoverActive(binding?.durability);
+}
+
 export function setCoopColosseumOperationEnabled(value: boolean): void {
   enabled = value;
 }
@@ -273,25 +281,7 @@ function guest(binding?: CoopColosseumOperationBinding | null): CoopOperationGue
 }
 
 function context(wave: number, turn: number) {
-  const authoritativeState: CoopAuthoritativeBattleStateV1 = {
-    version: 1,
-    tick: 0,
-    wave,
-    turn,
-    playerParty: [],
-    enemyParty: [],
-    field: [],
-    weather: 0,
-    weatherTurnsLeft: 0,
-    terrain: 0,
-    terrainTurnsLeft: 0,
-    arenaTags: [],
-    money: 0,
-    pokeballCounts: [],
-    playerModifiers: [],
-    enemyModifiers: [],
-  };
-  return { wave, turn, logicalPhase: "INTERACTION" as const, authoritativeState };
+  return coopOperationCommitContext(wave, turn, "INTERACTION");
 }
 
 function commit(
@@ -390,7 +380,7 @@ export function commitColosseumBoard(
       {
         pinned: params.pinned,
         payload: { type: "board", round: slot.round, labels: [...params.labels] },
-        owner: 0,
+        owner: coopInteractionOwnerSeat(params.pinned),
         actionOrdinal: slot.round * 2,
         wave: params.wave,
         turn: params.turn ?? 0,
@@ -411,6 +401,15 @@ export function commitColosseumBoard(
     coopWarn("me", "colosseum board op commit/retention failed", error);
     return null;
   }
+}
+
+/** The decision is the immediate deterministic successor to its exact committed board presentation. */
+export function coopColosseumDecisionOperationId(boardOperationId: string): string | null {
+  const parsed = parseCoopOperationId(boardOperationId);
+  if (parsed == null || parsed.kind !== "COLO_PICK" || (parsed.pinnedSeq % COOP_COLOSSEUM_ACTION_STRIDE) % 2 !== 0) {
+    return null;
+  }
+  return makeCoopOperationId(parsed.epoch, parsed.owner, parsed.pinnedSeq + 1, "COLO_PICK");
 }
 
 /** Called directly for a host-owned pick and by the host awaiter for a guest-owned proposal. */
@@ -508,7 +507,7 @@ function validatedColosseumEnvelope(
   }
   if (payload.type === "board") {
     if (
-      parsed.owner !== 0
+      parsed.owner !== coopInteractionOwnerSeat(pinned)
       || actionOrdinal !== payload.round * 2
       || !Array.isArray(payload.labels)
       || payload.labels.some(label => typeof label !== "string")
@@ -526,7 +525,10 @@ function validatedColosseumEnvelope(
   return { op, payload, pinned };
 }
 
-function applyJournaledColosseumEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
+function applyJournaledColosseumEnvelope(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  applyContext?: CoopOperationEnvelopeApplyContext,
+): CoopApplyOutcome {
   if (!isCoopColosseumOperationEnabled()) {
     return "rejected";
   }
@@ -538,7 +540,9 @@ function applyJournaledColosseumEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
   const s = state();
   const { op, payload, pinned } = validated;
   const g = guest();
-  const inspected = g.inspectEnvelope(envelope);
+  const inspected = isCoopOperationAuthorityV2Apply(applyContext)
+    ? g.inspectEnvelopeIdentity(envelope)
+    : g.inspectEnvelope(envelope);
   if (inspected.kind === "duplicate") {
     return "duplicate";
   }
@@ -565,7 +569,7 @@ function applyJournaledColosseumEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
     if (!controlRetained) {
       return "rejected";
     }
-    const colosseumApply = applyCoopOperationEnvelope(g, "op:colosseum", envelope);
+    const colosseumApply = applyCoopOperationEnvelope(g, "op:colosseum", envelope, applyContext);
     if (colosseumApply !== "applied") {
       return colosseumApply;
     }

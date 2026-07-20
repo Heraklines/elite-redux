@@ -10,6 +10,7 @@
 // Pure logic over LoopbackTransport - no game engine.
 
 import {
+  COOP_CAP_AUTHORITY_V2_INTERACTION,
   COOP_CAP_AUTHORITY_V2_RECOVERY,
   COOP_CAP_AUTHORITY_V2_REPLACEMENT,
   COOP_CAP_AUTHORITY_V2_SHADOW,
@@ -70,17 +71,17 @@ describe("co-op session controller (#633, P1)", () => {
       clearNegotiatedCoopCapabilities();
     });
 
-    it("rejects an older peer without the aggregate Authority V2 command frontier", async () => {
-      // er-coop-41: one command successor states every independently-controlled active battler; a 40
-      // peer can falsely retire a doubles/triples turn after only one CommandPhase, so pairing fails closed.
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-41");
+    it("rejects an older peer without authenticated V2 quiz presentation carriers", async () => {
+      // er-coop-42: a 41 peer drops a host-owned quiz answer after suppressing the raw legacy authority
+      // stream, so pairing must fail closed instead of hanging one browser inside ErQuizPhase.
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-42");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",
         version: COOP_PROTOCOL_VERSION,
       });
       controller.connect();
-      guest.send({ t: "hello", version: "er-coop-37", username: "Cached", role: "guest", epoch: 0 });
+      guest.send({ t: "hello", version: "er-coop-41", username: "Cached", role: "guest", epoch: 0 });
       await flush();
 
       expect(controller.versionMismatch).toBe(true);
@@ -145,6 +146,7 @@ describe("co-op session controller (#633, P1)", () => {
         COOP_CAP_AUTHORITY_V2_TURN,
         COOP_CAP_AUTHORITY_V2_REPLACEMENT,
         COOP_CAP_AUTHORITY_V2_WAVE,
+        COOP_CAP_AUTHORITY_V2_INTERACTION,
         COOP_CAP_AUTHORITY_V2_RECOVERY,
       ];
       const controller = new CoopSessionController(host, {

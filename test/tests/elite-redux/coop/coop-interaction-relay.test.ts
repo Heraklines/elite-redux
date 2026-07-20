@@ -29,6 +29,41 @@ describe("co-op alternating-interaction relay (#633)", () => {
     expect(res?.data).toBeUndefined();
   });
 
+  it("admits only an exact V2 quiz presentation observation while raw authority choices stay suppressed", async () => {
+    const { host, guest } = createLoopbackPair();
+    const operationId = "7:0:680000005000:QUIZ_ANSWER";
+    const owner = new CoopInteractionRelay(host, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => true,
+    });
+    const watcher = new CoopInteractionRelay(guest, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => false,
+      validateV2QuizAnswerObservation: input =>
+        input.seq === 8_500_000 && input.choice === 2 && input.questionIndex === 0 && input.operationId === operationId,
+    });
+
+    const awaited = watcher.awaitInteractionChoice(8_500_000, undefined, ["quizAns"]);
+    owner.sendInteractionChoice(8_500_000, "quizAns", 2, [0]);
+    host.send({
+      t: "interactionChoice",
+      seq: 8_500_000,
+      kind: "quizAns",
+      choice: 2,
+      data: [0],
+      cosmeticOperationId: `${operationId}:forged`,
+    });
+    expect(owner.sendV2QuizAnswerObservation(8_500_000, 2, 0, operationId)).toBe(true);
+
+    await expect(awaited).resolves.toEqual({
+      choice: 2,
+      data: [0],
+      kind: "quizAns",
+      operationId,
+      rewardSurface: undefined,
+    });
+  });
+
   it("delivers a multi-pick shop sequence FIFO, ending in the leave sentinel", async () => {
     const { host, guest } = createLoopbackPair();
     const owner = new CoopInteractionRelay(host);

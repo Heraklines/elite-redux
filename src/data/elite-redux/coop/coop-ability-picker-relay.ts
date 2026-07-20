@@ -28,6 +28,7 @@
 // well clear of the COOP_ACT_* range (defense-in-depth). The `choice` is also a dedicated sentinel.
 // =============================================================================
 
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import {
   armCoopAbilityOutcomeResend,
   type CoopAbilityOperationBinding,
@@ -122,9 +123,16 @@ export function sendCoopAbilityPickerOutcome(
   data: number[],
   context?: { localRole: CoopRole; wave: number; turn?: number },
   operationBinding?: CoopAbilityOperationBinding | null,
-): void {
-  if (context != null) {
-    commitAbilityOwnerOutcome({ pinned: shopSeq, data, ...context }, operationBinding);
+): boolean {
+  const committed =
+    context == null || commitAbilityOwnerOutcome({ pinned: shopSeq, data, ...context }, operationBinding);
+  if (!committed) {
+    return false;
+  }
+  if (context?.localRole === "host" && isCoopV2InteractionCutoverActive(operationBinding?.durability)) {
+    // The retained V2 result is the only host->guest correctness carrier. Sending the raw result as well can
+    // leave a duplicate CANCEL in the reused picker FIFO and make the next same-window phase self-cancel.
+    return true;
   }
   const derivedSeq = coopAbilityPickerSeq(shopSeq);
   relay?.sendInteractionChoice(derivedSeq, COOP_ABILITY_KIND, COOP_ABILITY_OUTCOME, [...data]);
@@ -138,4 +146,5 @@ export function sendCoopAbilityPickerOutcome(
       operationBinding,
     );
   }
+  return true;
 }

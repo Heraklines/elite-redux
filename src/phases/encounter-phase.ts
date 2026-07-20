@@ -9,6 +9,7 @@ import { handleTutorial, Tutorial } from "#app/tutorial";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
 import { fieldPositionForSlot, formatById } from "#data/battle-format";
 import { getCharVariantFromDialogue } from "#data/dialogue";
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import {
   applyCoopAuthoritativeBattleState,
   applyCoopEnemies,
@@ -1325,7 +1326,11 @@ export class EncounterPhase extends BattlePhase {
             // pick via setStormglassWeather, then applies it - so the choice takes effect
             // this same battle). Path-independent: this single chokepoint fires no matter
             // how the relic was granted, so no per-grant-site prompt is needed.
-            if (hasErRelic("stormglass") && getStormglassWeather() == null) {
+            if (
+              hasErRelic("stormglass")
+              && getStormglassWeather() == null
+              && !(isCoopAuthoritativeGuest() && isCoopV2InteractionCutoverActive())
+            ) {
               globalScene.phaseManager.unshiftNew("ErStormglassPickerPhase");
             } else {
               erStormglassApplyChosenWeather();

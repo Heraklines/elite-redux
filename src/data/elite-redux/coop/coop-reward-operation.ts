@@ -20,6 +20,7 @@
 // author state or advance its ordinal.
 // =============================================================================
 
+import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import {
   applyCoopAuthoritativeBattleState,
   captureCoopAuthoritativeBattleState,
@@ -36,12 +37,15 @@ import {
   type CoopOperationKind,
   type CoopPendingOperation,
   type CoopRewardActionPayload,
+  type CoopRewardPresentationPayload,
   type CoopShopBuyPayload,
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
+  type CoopOperationEnvelopeApplyContext,
   getActiveCoopOperationDurability,
+  isCoopOperationAuthorityV2Apply,
   isCoopOperationJournalActive,
   isCoopOperationJournalActiveFor,
   registerCoopOperationApplier,
@@ -66,6 +70,7 @@ import type {
   CoopAuthoritativeBattleStateV1,
   CoopRewardSurfaceIdentity,
   CoopRole,
+  CoopSerializedRewardOption,
 } from "#data/elite-redux/coop/coop-transport";
 
 /** The two shop surfaces this adapter serves: the reward screen (#1) and the biome market (#5). */
@@ -614,23 +619,10 @@ function isCompleteRewardAuthorityState(
   state: CoopAuthoritativeBattleStateV1 | null | undefined,
   wave: number,
   turn: number,
-): state is CoopAuthoritativeBattleStateV1 {
-  return (
-    state?.version === 1
-    && Number.isSafeInteger(state.tick)
-    && state.tick > 0
-    && state.wave === wave
-    && state.turn === turn
-    && Array.isArray(state.playerParty)
-    && state.playerParty.length > 0
-    && Array.isArray(state.enemyParty)
-    && Array.isArray(state.field)
-    && Array.isArray(state.arenaTags)
-    && Array.isArray(state.pokeballCounts)
-    && Array.isArray(state.playerModifiers)
-    && Array.isArray(state.enemyModifiers)
-    && Number.isFinite(state.money)
-  );
+): state is CoopAuthoritativeBattleStateV1 & {
+  readonly lockModifierTiers: boolean;
+} {
+  return isCompleteCoopOperationAuthorityState(state, wave, turn) && state.playerParty.length > 0;
 }
 
 function samePayload(left: CoopPendingOperation["payload"], right: CoopPendingOperation["payload"]): boolean {
@@ -715,6 +707,11 @@ export interface CoopRewardOwnerCommitParams {
 export interface CoopRewardOwnerCommitResult {
   readonly operationId: string;
   readonly revision: number;
+}
+
+/** Phase-local mechanical state not represented by the shared battle snapshot. */
+export interface CoopRewardSurfaceResultState {
+  readonly remainingStock?: readonly number[];
 }
 
 /**
@@ -835,6 +832,7 @@ export function commitRewardAuthoritativeResult(
   operationId: string,
   authoritativeState?: CoopAuthoritativeBattleStateV1 | null,
   binding?: CoopRewardOperationBinding | null,
+  surfaceResult?: CoopRewardSurfaceResultState,
 ): CoopRewardOwnerCommitResult | null {
   if (!isCoopRewardOperationEnabled() || !journalActive(binding)) {
     return null;
@@ -865,8 +863,23 @@ export function commitRewardAuthoritativeResult(
     );
     return null;
   }
+  const resultPayload =
+    prepared.surface === "reward"
+      ? ({
+          ...(prepared.intent.payload as CoopRewardActionPayload),
+          result: { lockModifierTiers: resultState.lockModifierTiers },
+        } satisfies CoopRewardActionPayload)
+      : buildCompleteMarketResultPayload(prepared.intent.payload, surfaceResult);
+  if (resultPayload == null) {
+    coopWarn("reward", `authoritative market result refused incomplete surface state id=${operationId}`);
+    return null;
+  }
+  const resultIntent: CoopPendingOperation = {
+    ...prepared.intent,
+    payload: resultPayload,
+  };
   const res = host(binding).submit(
-    prepared.intent,
+    resultIntent,
     authoritativeResultContext(prepared.surface, prepared.wave, prepared.turn, resultState),
     ownerParityValidator(prepared.pinned),
   );
@@ -875,10 +888,7 @@ export function commitRewardAuthoritativeResult(
     return null;
   }
   if (
-    !samePayload(
-      res.kind === "reack" ? res.op.payload : res.envelope.pendingOperation?.payload,
-      prepared.intent.payload,
-    )
+    !samePayload(res.kind === "reack" ? res.op.payload : res.envelope.pendingOperation?.payload, resultIntent.payload)
   ) {
     return null;
   }
@@ -893,6 +903,135 @@ export function commitRewardAuthoritativeResult(
     `${prepared.surface} authoritative RESULT retained rev=${res.envelope.revision} tick=${resultState.tick} id=${operationId}`,
   );
   return { operationId, revision: res.envelope.revision };
+}
+
+function buildCompleteMarketResultPayload(
+  payload: unknown,
+  surfaceResult: CoopRewardSurfaceResultState | undefined,
+): CoopShopBuyPayload | null {
+  const remainingStock = surfaceResult?.remainingStock;
+  if (!Array.isArray(remainingStock) || remainingStock.some(stock => !Number.isSafeInteger(stock) || stock < 0)) {
+    return null;
+  }
+  return {
+    ...(payload as CoopShopBuyPayload),
+    result: { remainingStock: [...remainingStock] },
+  };
+}
+
+/**
+ * AUTHORITY: retain the complete option pool before any reward/market input is exposed. This is a
+ * mechanical presentation entry: valid indices, prices, pre-generated arguments, and RNG-derived upgrades
+ * are immutable result material in the global V2 log, never a best-effort `rewardOptions` frame.
+ */
+export function commitCoopRewardOptionsPresentation(
+  params: {
+    readonly surface: CoopShopSurface;
+    readonly pinned: number;
+    readonly reroll: number;
+    readonly options: readonly CoopSerializedRewardOption[];
+    readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
+    readonly localRole: CoopRole;
+    readonly wave: number;
+    readonly turn: number;
+  },
+  binding?: CoopRewardOperationBinding | null,
+): CoopRewardOwnerCommitResult | null {
+  if (
+    !isCoopRewardOperationEnabled()
+    || !journalActive(binding)
+    || params.localRole !== "host"
+    || !Number.isSafeInteger(params.pinned)
+    || params.pinned < 0
+    || !Number.isSafeInteger(params.reroll)
+    || params.reroll < 0
+    || !Array.isArray(params.options)
+    || params.options.some(
+      option =>
+        typeof option?.id !== "string"
+        || option.id.length === 0
+        || !Number.isFinite(option.tier)
+        || !Number.isFinite(option.upgradeCount)
+        || !Number.isFinite(option.cost)
+        || (option.pregenArgs !== undefined
+          && (!Array.isArray(option.pregenArgs) || !option.pregenArgs.every(Number.isFinite))),
+    )
+    || (params.rewardSurface !== undefined && !isValidCoopRewardSurfaceIdentity(params.rewardSurface))
+  ) {
+    return null;
+  }
+  try {
+    const s = state(binding);
+    const actionSlot = coopRewardOperationActionSlot(params.pinned, params.reroll, params.rewardSurface);
+    if (actionSlot == null) {
+      return null;
+    }
+    const presentationKind = params.surface === "reward" ? "REWARD_PRESENT" : "SHOP_PRESENT";
+    // The authority authors the immutable pool, but the pinned interaction owner controls the screen.
+    // These are deliberately separate identities (and may differ for guest-owned Mystery rewards).
+    const inputOwnerSeat = coopInteractionOwnerSeat(params.pinned);
+    const operationId = makeCoopOperationId(s.epoch, inputOwnerSeat, actionSlot, presentationKind);
+    const payload: CoopRewardPresentationPayload = {
+      surface: params.surface,
+      pinned: params.pinned,
+      reroll: params.reroll,
+      options: structuredClone(params.options),
+      ...(params.rewardSurface == null ? {} : { rewardSurface: params.rewardSurface }),
+    };
+    const retained = s.committedResultEnvelopes.get(operationId);
+    if (retained != null) {
+      if (samePayload(retained.pendingOperation?.payload, payload) && retainEnvelope(retained, binding)) {
+        return { operationId, revision: retained.revision };
+      }
+      return null;
+    }
+    const authoritativeState = authorityStateHooks.capture(params.turn);
+    if (!isCompleteRewardAuthorityState(authoritativeState, params.wave, params.turn)) {
+      return null;
+    }
+    const intent: CoopPendingOperation = {
+      id: operationId,
+      kind: presentationKind,
+      owner: inputOwnerSeat,
+      status: "proposed",
+      payload,
+    };
+    const result = host(binding).submit(
+      intent,
+      authoritativeResultContext(params.surface, params.wave, params.turn, authoritativeState),
+      proposed =>
+        proposed.owner === inputOwnerSeat
+          ? { ok: true }
+          : { ok: false, reason: "reward presentation has the wrong pinned input owner" },
+    );
+    if (
+      (result.kind !== "committed" && result.kind !== "reack")
+      || !samePayload(result.kind === "reack" ? result.op.payload : result.envelope.pendingOperation?.payload, payload)
+    ) {
+      return null;
+    }
+    const envelope = result.kind === "committed" ? result.envelope : s.committedResultEnvelopes.get(operationId);
+    if (envelope == null) {
+      // A reack can occur only after the original immutable envelope was cached below.
+      return null;
+    }
+    s.committedResultEnvelopes.set(operationId, envelope);
+    if (!retainEnvelope(envelope, binding)) {
+      return null;
+    }
+    coopLog(
+      "reward",
+      `authoritative options retained surface=${params.surface} pin=${params.pinned} reroll=${params.reroll} `
+        + `count=${params.options.length} rev=${envelope.revision} id=${operationId}`,
+    );
+    return { operationId, revision: envelope.revision };
+  } catch (error) {
+    if (isCoopOpRuntimeError(error)) {
+      throw error;
+    }
+    coopWarn("reward", "authoritative reward-options commit threw", error);
+    return null;
+  }
 }
 
 function retainLatestRewardResultState(
@@ -1098,21 +1237,26 @@ export function adoptRewardWatcherChoice(
       return { adopt: false, reason: "await-journal" };
     }
 
-    // The journal consumes the ONE shared ledger before the safe phase loop resumes. A tagged durable action
-    // with the matching one-shot marker is therefore legitimate materialization, not a duplicate.
-    if (guest(binding).hasApplied(opId)) {
-      if (params.action.operationId === opId && s.pendingJournalMaterializations.delete(opId)) {
-        ws.ordinal += 1;
-        roleState.lastAdoptedStart = Math.max(roleState.lastAdoptedStart, params.pinned);
-        if (params.terminal) {
-          ws.lastLeftStart = Math.max(ws.lastLeftStart, params.pinned);
-        }
-        coopLog(
-          "reward",
-          `${params.surface} op WATCHER materialize JOURNAL choice=${params.action.choice} terminal=${params.terminal} id=${opId}`,
-        );
-        return { adopt: true, operationId: opId, authoritativeProjection: true };
+    // The live sink sets this one-shot proof only after the complete result state was installed. Authority
+    // V2 deliberately bypasses the legacy guest revision/applied-id cursor, so the proof MUST be consumed
+    // before consulting that cursor. Reversing this order stranded V2 reward actions in
+    // "await-authoritative-envelope" even though their immutable result had already materialized.
+    if (params.action.operationId === opId && s.pendingJournalMaterializations.delete(opId)) {
+      ws.ordinal += 1;
+      roleState.lastAdoptedStart = Math.max(roleState.lastAdoptedStart, params.pinned);
+      if (params.terminal) {
+        ws.lastLeftStart = Math.max(ws.lastLeftStart, params.pinned);
       }
+      coopLog(
+        "reward",
+        `${params.surface} op WATCHER materialize retained choice=${params.action.choice} terminal=${params.terminal} id=${opId}`,
+      );
+      return { adopt: true, operationId: opId, authoritativeProjection: true };
+    }
+
+    // The legacy journal consumes its surface-local ledger before the safe phase loop resumes. An untagged
+    // replay after that point is a duplicate; V2 never reaches this branch because it owns deduplication.
+    if (guest(binding).hasApplied(opId)) {
       coopWarn("reward", `${params.surface} op WATCHER REJECT duplicate id=${opId} (Wave-2d)`);
       return { adopt: false, reason: "duplicate" };
     }
@@ -1174,7 +1318,10 @@ export function adoptRewardWatcherChoice(
  * no-op. Returns true iff the action was NEWLY applied. No-op when the surface flag is OFF (pure legacy).
  * Both the reward screen and the biome market ride this one class ("op:reward"), sharing one applier.
  */
-function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
+function applyJournaledRewardEnvelope(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  applyContext?: CoopOperationEnvelopeApplyContext,
+): CoopApplyOutcome {
   if (!isCoopRewardOperationEnabled()) {
     return "rejected";
   }
@@ -1184,10 +1331,12 @@ function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Co
   }
   const s = state();
   const g = guest();
-  if (g.hasApplied(op.id)) {
+  if (!isCoopOperationAuthorityV2Apply(applyContext) && g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
-  const inspected = g.inspectEnvelope(envelope);
+  const inspected = isCoopOperationAuthorityV2Apply(applyContext)
+    ? g.inspectEnvelopeIdentity(envelope)
+    : g.inspectEnvelope(envelope);
   if (inspected.kind !== "applied") {
     return inspected.kind === "duplicate" ? "duplicate" : "rejected";
   }
@@ -1195,18 +1344,21 @@ function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Co
     coopWarn("reward", `shop result rejected empty/incomplete authoritative state id=${op.id}`);
     return "rejected";
   }
-  if (!s.stateAppliedOperations.has(op.id)) {
-    const stateApplied = authorityStateHooks.apply(envelope.authoritativeState);
-    if (!stateApplied) {
+  if (isCoopOperationAuthorityV2Apply(applyContext)) {
+    // V2 has one central immutable-state transaction. Record the proof consumed by the reward UI adopter,
+    // but never re-enter the state applier from a surface-specific compatibility adapter.
+    s.stateAppliedOperations.add(op.id);
+  } else if (!s.stateAppliedOperations.has(op.id)) {
+    if (!authorityStateHooks.apply(envelope.authoritativeState)) {
       return "rejected";
     }
     s.stateAppliedOperations.add(op.id);
   } else if (!authorityStateHooks.reapply(envelope.authoritativeState)) {
-    // A retry after the state seam succeeded but before the live UI sink accepted must reassert exactly the
-    // same immutable result. It never executes the reward/shop action locally a second time.
+    // A legacy retry after the state seam succeeded but before the live UI sink accepted must reassert
+    // exactly the same immutable result. It never executes the reward/shop action locally a second time.
     return "rejected";
   }
-  const rewardApply = applyCoopOperationEnvelope(g, "op:reward", envelope);
+  const rewardApply = applyCoopOperationEnvelope(g, "op:reward", envelope, applyContext);
   if (rewardApply !== "applied") {
     return rewardApply; // transient non-applicable (retriable/deferred); never a permanent condition (that is a duplicate above).
   }

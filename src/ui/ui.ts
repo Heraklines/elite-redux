@@ -20,6 +20,7 @@ import {
   getCoopNetcodeMode,
   getCoopUiMirror,
   isCoopAuthoritativeGuest,
+  isCoopV2InteractionHumanInputFrozen,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
 // #840: the total UiMode co-op classification + the unmirrored-screen tripwire decision.
@@ -378,6 +379,12 @@ export class UI extends Phaser.GameObjects.Container {
     // short-circuits in solo, and `isActive(this.mode)` is false on any non-shared screen
     // (incl. the battle command menu), so the dispatch below is byte-for-byte unchanged.
     if (globalScene.gameMode.isCoop) {
+      // Authority V2 grants a shared interaction to one exact phase/handler generation. An ordered successor
+      // wait, stale handler, wrong owner, or merely queued phase is not a human-input lease. Programmatic peer
+      // replay uses processInputInner and therefore remains able to drive the watcher after authenticated input.
+      if (isCoopV2InteractionHumanInputFrozen()) {
+        return false;
+      }
       // Co-op (#633): inside a MYSTERY-ENCOUNTER interactive phase, the input PUMP governs
       // input AUTHORITATIVELY - the WATCHER's local presses are blocked, and the OWNER relays
       // every handler-READY press (never a scroll-skip) for the partner to replay in lockstep,

@@ -237,11 +237,21 @@ describe("ME option pick", () => {
   });
 
   it("rejects a malformed pick (non-finite optionIndex / bad address)", () => {
-    expect(() => buildMysteryOptionPickEntry({ context: FRAME, address: address(), optionIndex: Number.NaN })).toThrow(
-      CoopInteractionBuildError,
-    );
     expect(() =>
-      buildMysteryOptionPickEntry({ context: FRAME, address: address({ epoch: 0 }), optionIndex: 0 }),
+      buildMysteryOptionPickEntry({
+        context: FRAME,
+        address: address(),
+        optionIndex: Number.NaN,
+        successor: MYSTERY_SUCCESSOR,
+      }),
+    ).toThrow(CoopInteractionBuildError);
+    expect(() =>
+      buildMysteryOptionPickEntry({
+        context: FRAME,
+        address: address({ epoch: 0 }),
+        optionIndex: 0,
+        successor: MYSTERY_SUCCESSOR,
+      }),
     ).toThrow(CoopInteractionBuildError);
   });
 });
@@ -450,6 +460,7 @@ describe("catch-full keep/release", () => {
       decision: "release",
       partySlot: -1,
       speciesId: 100,
+      successor: BATTLE_SUCCESSOR,
     });
     expect((release.material.payload as { decision: string }).decision).toBe("release");
     // release MUST carry partySlot -1; a keep MUST carry a 0..5 slot.
@@ -472,7 +483,14 @@ describe("catch-full keep/release", () => {
       }),
     ).toBe(false);
     expect(() =>
-      buildCatchFullDecisionEntry({ context: FRAME, address: address(), decision: "keep", partySlot: 6, speciesId: 1 }),
+      buildCatchFullDecisionEntry({
+        context: FRAME,
+        address: address(),
+        decision: "keep",
+        partySlot: 6,
+        speciesId: 1,
+        successor: BATTLE_SUCCESSOR,
+      }),
     ).toThrow(CoopInteractionBuildError);
   });
 });
@@ -508,7 +526,14 @@ describe("revival pick", () => {
       isValidRevivalMaterial({ kind: "revival", address: address(), fieldIndex: 0, partySlot: 0, speciesId: 0 }),
     ).toBe(false);
     expect(() =>
-      buildRevivalPickEntry({ context: FRAME, address: address(), fieldIndex: 9, partySlot: 0, speciesId: 1 }),
+      buildRevivalPickEntry({
+        context: FRAME,
+        address: address(),
+        fieldIndex: 9,
+        partySlot: 0,
+        speciesId: 1,
+        successor: BATTLE_SUCCESSOR,
+      }),
     ).toThrow(CoopInteractionBuildError);
   });
 });
@@ -575,7 +600,7 @@ describe("replica applier (watcher-close semantics)", () => {
       operationId: "op-turn",
       kind: "TURN_COMMIT",
       material: { digest: "d", payload: {} },
-      nextControl: null,
+      nextControl: { kind: "TERMINAL", terminalId: "foreign-turn-terminal" },
       subsumes: [],
     };
     expect(decodeInteractionMaterial(turn)).toBeNull();
@@ -613,6 +638,7 @@ describe("shadow parity seam", () => {
         decision: "keep",
         partySlot: 2,
         speciesId: 279,
+        successor: BATTLE_SUCCESSOR,
       }),
     );
     const release = shadowOfInteractionEntry(
@@ -622,6 +648,7 @@ describe("shadow parity seam", () => {
         decision: "release",
         partySlot: -1,
         speciesId: 279,
+        successor: BATTLE_SUCCESSOR,
       }),
     );
     expect(interactionShadowsAgree(keep!, release!)).toBe(false);

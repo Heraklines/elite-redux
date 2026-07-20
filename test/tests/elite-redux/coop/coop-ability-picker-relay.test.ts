@@ -25,6 +25,7 @@
 import {
   adoptAbilityWatcherOutcome,
   captureCoopAbilityOperationBinding,
+  commitAbilityWatcherOutcome,
   resetCoopAbilityOperationFlag,
   resetCoopAbilityOutcomeRetryMs,
   setCoopAbilityOperationEnabled,
@@ -227,7 +228,7 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
         guestBinding,
       ),
       "the watcher phase admits the journal-materialized result through its ledger gate",
-    ).toBe(true);
+    ).toMatchObject({ accepted: true, projectionApplied: false });
   });
 
   it("EXACTLY ONCE: the journal and raw carriers produce only one consumable ability action", async () => {
@@ -264,7 +265,7 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
         },
         guestBinding,
       ),
-    ).toBe(true);
+    ).toMatchObject({ accepted: true, projectionApplied: false });
     expect(
       await guestRuntime.interactionRelay.awaitInteractionChoice(SEQ, 10),
       "the second carrier is an echo, not a second purchase",
@@ -309,17 +310,24 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
     const action = await hostAwait;
     expect(pair.faultsInjected(), "the first guest intent was actually dropped").toBe(1);
     expect(action?.data, "the resend reached the host authority").toEqual(data);
+    const adoption = adoptAbilityWatcherOutcome(
+      {
+        pinned: GUEST_SHOP_SEQ,
+        data: action?.data ?? null,
+        localRole: "host",
+        wave: 1,
+      },
+      hostBinding,
+    );
+    expect(adoption, "the host accepted the guest-owned intent as a proposal").toMatchObject({
+      accepted: true,
+      projectionApplied: false,
+      requiresAuthorityCommit: true,
+    });
     expect(
-      adoptAbilityWatcherOutcome(
-        {
-          pinned: GUEST_SHOP_SEQ,
-          data: action?.data ?? null,
-          localRole: "host",
-          wave: 1,
-        },
-        hostBinding,
-      ),
-      "the host authority committed the guest-owned result",
+      adoption.accepted
+        && commitAbilityWatcherOutcome(adoption.operationId, { pinned: GUEST_SHOP_SEQ, data, wave: 1 }, hostBinding),
+      "the post-action seam retained the guest-owned result",
     ).toBe(true);
   });
 
@@ -356,7 +364,7 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
           },
           guestBinding,
         ),
-      ).toBe(true);
+      ).toMatchObject({ accepted: true, projectionApplied: false });
       expect(
         adoptAbilityWatcherOutcome(
           {
@@ -368,7 +376,7 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
           guestBinding,
         ),
         "the receiving runtime owns its own exactly-once cursor",
-      ).toBe(false);
+      ).toMatchObject({ accepted: false });
     }
   });
 });

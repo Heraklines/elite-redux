@@ -40,10 +40,14 @@ This smart-sharded workflow is the standing default for all future co-op checkpo
   `test/node/authority-v2-*.test.ts` file under the isolated node-pure Vitest config. Authority V2 admission,
   material, control, receipt, recovery, and cutover contracts are deploy-blocking; never rely on Lane A to
   cover them, and never move them into Lane A's process-global module state.
-- The complete real-engine matrix must run with `COOP_AUTHORITY_V2_TURN=on`. Authority V2 is the playable
-  architecture being qualified, not an optional focused experiment. Never silence a cutover failure by
-  turning the full matrix back to legacy. Keep any legacy/capability-fallback checks explicit and narrowly
-  named; every gameplay, transition, Showdown, topology, and production-fidelity lane qualifies V2.
+- The complete real-engine matrix must run with the full playable Authority V2 graph enabled:
+  `COOP_AUTHORITY_V2_TURN=on`, `COOP_AUTHORITY_V2_REPLACEMENT=on`,
+  `COOP_AUTHORITY_V2_WAVE=on`, `COOP_AUTHORITY_V2_INTERACTION=on`, and
+  `COOP_AUTHORITY_V2_RECOVERY=on`. Recovery is not qualified at all unless the all-or-nothing interaction
+  cutover negotiates, because the runtime deliberately refuses a mixed legacy/V2 recovery frontier. Never
+  silence a cutover failure by turning the full matrix back to legacy. Keep any legacy/capability-fallback
+  checks explicit and narrowly named; every gameplay, transition, Showdown, topology, and
+  production-fidelity lane qualifies the complete V2 graph.
 - The same workflow runs a browser-native WebRTC checkpoint on its own GitHub-hosted Chrome runner. It must prove two isolated browser contexts complete protocol/fingerprint/identity negotiation and replace a dropped RTCDataChannel through hot rejoin. Keep it separate from the engine shards: the continuous two-engine journey proves gameplay, while this job proves the real browser transport those engines use.
 - Run or inspect one deterministic shard with `node scripts/run-coop-gate.mjs --lane <A|B|C|P|S|T> --shard <index>/<total>`. Use `--list` to see its exact files. Authority V2 node-pure contracts are a separate named step on the fast-contract runner rather than a numbered engine shard.
 - Do not replace external sharding with many concurrent local Vitest processes. Separate runners provide the speedup without recreating CPU/memory contention.

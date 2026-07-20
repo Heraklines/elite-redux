@@ -463,9 +463,6 @@ export function revivalOperationId(address: CoopInteractionAddress, fieldIndex: 
 // ---------------------------------------------------------------------------
 
 function validateSuccessor(control: CoopNextControl): void {
-  if (control == null) {
-    return;
-  }
   const check = validateNextControl(control as ProjectableControl);
   if (!check.ok) {
     throw new CoopInteractionBuildError(`successor control is malformed: ${check.reason}`);
@@ -509,9 +506,9 @@ export interface BuildMysteryOptionPickInput {
   /**
    * The stated successor. For a non-handoff pick this is the ME's own MYSTERY
    * continuation (the encounter proceeds to its terminal); for a battle-handoff
-   * it is the battle's COMMAND. Validated structurally; null is legal (no successor).
+   * it is the battle's COMMAND. Missing/null fails construction; use AWAIT_SUCCESSOR for an ordered wait.
    */
-  readonly successor?: CoopNextControl;
+  readonly successor: CoopNextControl;
   /**
    * Revisions this pick subsumes - for a battle-handoff, the prior ME waits on
    * this window it closes. Compute via {@link mysteryWindowSubsumes}; default none.
@@ -567,7 +564,10 @@ export function buildMysteryOptionPickEntry(input: BuildMysteryOptionPickInput):
   if (!isValidOperationId(operationId)) {
     throw new CoopInteractionBuildError(`ME option-pick operationId invalid: ${String(operationId)}`);
   }
-  const successor = input.successor ?? null;
+  const successor = input.successor;
+  if (successor == null) {
+    throw new CoopInteractionBuildError("ME option-pick successor is required");
+  }
   validateSuccessor(successor);
 
   const entry: Omit<CoopAuthorityEntry, "revision"> = {
@@ -587,8 +587,8 @@ export interface BuildMysteryTerminalInput {
   /** The window's address (the terminal closes the encounter opened at this address). */
   readonly address: CoopInteractionAddress;
   readonly outcome: CoopMysteryOutcome;
-  /** The stated successor (battle -> COMMAND, leave/battle-settled -> REWARD | BIOME | COMMAND | null). */
-  readonly successor?: CoopNextControl;
+  /** The stated successor (battle -> COMMAND, leave/battle-settled -> REWARD | BIOME | COMMAND | AWAIT). */
+  readonly successor: CoopNextControl;
   /**
    * Revisions this terminal subsumes - the unretired ME waits on its window.
    * Compute via {@link mysteryWindowSubsumes} over the log's retained frontier;
@@ -624,7 +624,10 @@ export function buildMysteryTerminalEntry(input: BuildMysteryTerminalInput): Omi
   if (!isValidOperationId(operationId)) {
     throw new CoopInteractionBuildError(`ME terminal operationId invalid: ${String(operationId)}`);
   }
-  const successor = input.successor ?? null;
+  const successor = input.successor;
+  if (successor == null) {
+    throw new CoopInteractionBuildError("ME terminal successor is required");
+  }
   validateSuccessor(successor);
 
   return {
@@ -648,7 +651,7 @@ export interface BuildMysteryEmbeddedAdvanceInput {
    */
   readonly openWindow: CoopMysteryWindow | null;
   /** The stated successor (the reward/biome destination this advance heads to). */
-  readonly successor?: CoopNextControl;
+  readonly successor: CoopNextControl;
   readonly subsumes?: readonly number[];
   readonly operationId?: string;
 }
@@ -682,7 +685,10 @@ export function buildMysteryEmbeddedAdvanceEntry(
   if (!isValidOperationId(operationId)) {
     throw new CoopInteractionBuildError(`embedded-advance operationId invalid: ${String(operationId)}`);
   }
-  const successor = input.successor ?? null;
+  const successor = input.successor;
+  if (successor == null) {
+    throw new CoopInteractionBuildError("embedded-advance successor is required");
+  }
   validateSuccessor(successor);
 
   return {
@@ -704,7 +710,7 @@ export interface BuildCatchFullDecisionInput {
   readonly partySlot: number;
   /** The species id of the caught mon (positive). */
   readonly speciesId: number;
-  readonly successor?: CoopNextControl;
+  readonly successor: CoopNextControl;
   readonly subsumes?: readonly number[];
   readonly operationId?: string;
 }
@@ -729,7 +735,10 @@ export function buildCatchFullDecisionEntry(input: BuildCatchFullDecisionInput):
   if (!isValidOperationId(operationId)) {
     throw new CoopInteractionBuildError(`catch-full operationId invalid: ${String(operationId)}`);
   }
-  const successor = input.successor ?? null;
+  const successor = input.successor;
+  if (successor == null) {
+    throw new CoopInteractionBuildError("catch-full successor is required");
+  }
   validateSuccessor(successor);
 
   return {
@@ -752,7 +761,7 @@ export interface BuildRevivalPickInput {
   readonly partySlot: number;
   /** The species id of the revived mon (positive). */
   readonly speciesId: number;
-  readonly successor?: CoopNextControl;
+  readonly successor: CoopNextControl;
   readonly subsumes?: readonly number[];
   readonly operationId?: string;
 }
@@ -777,7 +786,10 @@ export function buildRevivalPickEntry(input: BuildRevivalPickInput): Omit<CoopAu
   if (!isValidOperationId(operationId)) {
     throw new CoopInteractionBuildError(`revival operationId invalid: ${String(operationId)}`);
   }
-  const successor = input.successor ?? null;
+  const successor = input.successor;
+  if (successor == null) {
+    throw new CoopInteractionBuildError("revival successor is required");
+  }
   validateSuccessor(successor);
 
   return {

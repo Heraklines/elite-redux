@@ -92,10 +92,25 @@ function committedMeOperations(calls: readonly (readonly CoopMessage[])[]): {
   const byId = new Map<string, { id: string; kind: string; payload: unknown }>();
   for (const call of calls) {
     const message = call[0];
-    if (message?.t !== "envelope") {
-      continue;
-    }
-    const operation = message.envelope.pendingOperation;
+    const operation =
+      message?.t === "envelope"
+        ? message.envelope.pendingOperation
+        : message?.t === "authorityEntry"
+          ? message.body.kind === "INTERACTION_COMMIT"
+            && message.body.material.payload != null
+            && typeof message.body.material.payload === "object"
+            && "envelope" in message.body.material.payload
+            && message.body.material.payload.envelope != null
+            && typeof message.body.material.payload.envelope === "object"
+            && "pendingOperation" in message.body.material.payload.envelope
+            ? (message.body.material.payload.envelope.pendingOperation as {
+                id: string;
+                kind: string;
+                status: string;
+                payload: unknown;
+              } | null)
+            : null
+          : null;
     if (operation?.status !== "applied" || (!operation.kind.startsWith("ME_") && operation.kind !== "QUIZ_ANSWER")) {
       continue;
     }
@@ -805,9 +820,9 @@ describe.skipIf(!RUN)(
     // Unown CIPHER) runs its embedded ErQuizPhase on BOTH real engines. This is a DISTINCT authoritative
     // path from IT #1: the option chain unshifts an ErQuizPhase, and the mini-game is a whole multi-
     // question sub-phase whose ENGINE outcome only the HOST owns. So:
-    //   - HOST (drive side, counter 0): ErQuizPhase.start streams the whole SESSION to the guest as a
-    //     `mePresent` subPrompt { kind:"quiz" } on the 8M pump seq, then each committed answer relays out
-    //     as a bare "quizAns" integer on the disjoint 8_500_000 family (coopQuizAnswerSeq).
+    //   - HOST (drive side, counter 0): ErQuizPhase.start commits the whole SESSION as an authoritative
+    //     `mePresent` subPrompt { kind:"quiz" }, then each answer crosses as a non-mechanical, exact
+    //     operation-addressed "quizAns" observation on the disjoint 8_500_000 family (coopQuizAnswerSeq).
     //   - GUEST (follow side): its CoopReplayMePhase RACES the 8M outcome, sees the quiz subPrompt, and
     //     settleForWatcherQuiz DETACHES + unshifts a mirror ErQuizPhase off the identical streamed
     //     questions. That mirror FOLLOWS - each question arms coopQuizAwaitRemoteAnswer, buffer-hits the
@@ -850,8 +865,9 @@ describe.skipIf(!RUN)(
 
       // Spy the guest's sole convergence mechanism (fires EXACTLY once at the host's terminal meResync).
       const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
-      // Tap the retained host transport. P33 carries the quiz session and every host-owned answer as
-      // addressed operations; the raw mePresent/quizAns relays are intentionally absent in journal mode.
+      // Tap the retained host transport. P33 carries the mechanically authoritative quiz session and
+      // terminal. Per-question answers are exact operation-addressed presentation observations: they let
+      // the follower render the open quiz, but never consume a mechanical global revision.
       let guestMePhase: Phase | undefined;
       let guestQuizQuestions = 0;
       let guestQuizAnswered = 0;
@@ -1014,7 +1030,9 @@ describe.skipIf(!RUN)(
         "host has NOT advanced yet (terminal parked before PostMysteryEncounterPhase.start)",
       ).toBe(counterBefore);
 
-      // ===== DRIVE-SIDE PROOF (host): one retained quiz SESSION plus one addressed answer per question.
+      // ===== DRIVE-SIDE PROOF (host): one retained quiz SESSION plus one addressed presentation
+      // observation per question. Answers do not become mechanical log entries; the enclosing presentation
+      // remains the installed control until the retained reward/terminal successor supersedes it.
       const quizSessionSends = committedMePresentations(hostTransportSendSpy.mock.calls).filter(
         outcome => outcome.subPrompt?.kind === "quiz",
       );
@@ -1031,25 +1049,35 @@ describe.skipIf(!RUN)(
       const quizAnswerOperations = committedMeOperations(hostTransportSendSpy.mock.calls).filter(
         operation => operation.kind === "QUIZ_ANSWER",
       );
-      expect(quizAnswerOperations.length, "host retained one addressed QUIZ_ANSWER operation per question (#818)").toBe(
-        QUIZ_QUESTIONS,
-      );
-      // Each answer retains its own per-question address (seq*8000 + QUIZ_ANSWER tag + question index)
-      // and carries the fixed committed choice.
       expect(
-        quizAnswerOperations.map(operation => parseCoopOperationId(operation.id)?.pinnedSeq),
-        "quiz answers use exact per-question retained addresses (order-proof, collision-free)",
+        quizAnswerOperations,
+        "quiz presentation observations never consume a mechanical Authority V2 revision",
+      ).toEqual([]);
+      const quizAnswerObservations = hostTransportSendSpy.mock.calls.flatMap(call => {
+        const message = call[0];
+        return message?.t === "interactionChoice" && message.kind === "quizAns" && message.cosmeticOperationId != null
+          ? [message]
+          : [];
+      });
+      expect(
+        quizAnswerObservations.length,
+        "host sent one authenticated V2 quiz presentation observation per question",
+      ).toBe(QUIZ_QUESTIONS);
+      // Each answer carries its own per-question immutable operation address
+      // (seq*8000 + QUIZ_ANSWER tag + question index) and the fixed choice.
+      expect(
+        quizAnswerObservations.map(message => parseCoopOperationId(message.cosmeticOperationId!)?.pinnedSeq),
+        "quiz observations use exact per-question addresses (order-proof, collision-free)",
       ).toEqual([
         QUIZ_ANSWER_SEQ_BASE * 8000 + 5000,
         (QUIZ_ANSWER_SEQ_BASE + 1) * 8000 + 5001,
         (QUIZ_ANSWER_SEQ_BASE + 2) * 8000 + 5002,
       ]);
       expect(
-        quizAnswerOperations.every((operation, questionIndex) => {
-          const payload = operation.payload as { questionIndex: number; choice: number };
-          return payload.questionIndex === questionIndex && payload.choice === HOST_ANSWER;
-        }),
-        "every retained quiz answer carries the exact question and committed choice",
+        quizAnswerObservations.every(
+          (message, questionIndex) => message.data?.[0] === questionIndex && message.choice === HOST_ANSWER,
+        ),
+        "every quiz observation carries the exact question and authority choice",
       ).toBe(true);
 
       // ===== STEP B (guest): start the divert, drain to the quiz handoff (the first outcome/terminal race

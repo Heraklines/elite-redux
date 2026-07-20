@@ -118,11 +118,9 @@ export type CoopRole = "host" | "guest";
 // the declared reward continuation, then a distinct leave closes the encounter and advances ownership.
 // A cached protocol-39 client treats the first cursor as the terminal and can strand the guest counter,
 // so mixed builds must refuse pairing rather than silently accepting different lifecycle semantics.
-// er-coop-41 replaces the single-battler Authority V2 COMMAND successor with one canonical command
-// frontier containing every independently-controlled active battler and its stable seat/field identity.
-// A protocol-40 client can falsely retire a doubles/triples turn after seeing only one CommandPhase, so
-// mixed builds must refuse pairing rather than acknowledge an incomplete control frontier.
-export const COOP_PROTOCOL_VERSION = "er-coop-41";
+// er-coop-42 authenticates non-mechanical quiz presentation carriers by their exact Authority V2 operation
+// identity. Older builds drop host-owned quiz answers after V2 suppresses the raw legacy authority stream.
+export const COOP_PROTOCOL_VERSION = "er-coop-42";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -766,6 +764,8 @@ export interface CoopFullBattleSnapshot {
   /** Player party `speciesId`s in slot order. */
   party: number[];
   money: number;
+  /** Reward/shop reroll-lock is mechanical RNG input and must converge with the authoritative pool. */
+  lockModifierTiers?: boolean;
   /** Persistent modifiers as `[typeId, stackCount]`. */
   modifiers: [string, number][];
   /**
@@ -1002,6 +1002,8 @@ export interface CoopAuthoritativeBattleStateV1 {
   terrainTurnsLeft: number;
   arenaTags: CoopSerializedArenaTag[];
   money: number;
+  /** Reward/shop reroll-lock is mechanical RNG input and must converge with the authoritative pool. */
+  lockModifierTiers?: boolean;
   score?: number;
   pokeballCounts: [number, number][];
   /** Full PersistentModifier blobs, including held items. */
@@ -1176,7 +1178,14 @@ export type CoopInteractionOutcome =
    *  - `moveId`       the move id being learned (cosmetic on the guest; the host applies it).
    *  - `maxMoveCount` the mon's move-slot cap == the "did not learn" sentinel index.
    */
-  | { k: "learnMoveForward"; partySlot: number; moveId: number; maxMoveCount: number }
+  | {
+      k: "learnMoveForward";
+      partySlot: number;
+      moveId: number;
+      maxMoveCount: number;
+      /** Present on committed V2 presentations; raw legacy forwards always belong to the guest. */
+      ownerIsGuest?: boolean;
+    }
   /**
    * Co-op AUTHORITATIVE batch level-up Move Learn present (#848): the HOST is the sole engine, but the
    * ER batch Move Learn panel is now the SHARED co-op level-up path (owner drives, watcher mirrors) instead
@@ -1746,6 +1755,11 @@ export type CoopMessage =
       choice: number;
       data?: number[];
       rewardSurface?: CoopRewardSurfaceIdentity | undefined;
+      /**
+       * Exact non-mechanical V2 presentation observation. Only the narrowly registered quiz-answer
+       * carrier may set this; it never advances the authority log or chooses a successor.
+       */
+      cosmeticOperationId?: string | undefined;
     }
   /**
    * Owner -> watcher (#633, TRACK-2 Phase C): the HOST-resolved AUTHORITATIVE outcome of one
@@ -2135,7 +2149,10 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "sharedTerminalAck":
       return `id=${msg.terminalId} rev=${msg.terminalRevision} seat=${msg.ctx.fromSeatId} generation=${msg.ctx.connectionGeneration}`;
     case "interactionChoice":
-      return `seq=${msg.seq} kind=${msg.kind} choice=${msg.choice}`;
+      return (
+        `seq=${msg.seq} kind=${msg.kind} choice=${msg.choice}`
+        + (msg.cosmeticOperationId == null ? "" : ` cosmeticOp=${msg.cosmeticOperationId}`)
+      );
     case "interactionOutcome":
       return `seq=${msg.seq} kind=${msg.kind} outcome=${msg.outcome.k}`;
     case "meChecksum":

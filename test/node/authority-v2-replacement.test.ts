@@ -246,8 +246,13 @@ describe("buildReplacementCommitEntry", () => {
     expect(owner.operationId).toBe(fallback.operationId);
     // ...but the resolution changes the image, so the digest differs.
     expect(owner.material.digest).not.toBe(fallback.material.digest);
-    // A terminal successor states no control.
-    expect(owner.nextControl).toBeNull();
+    // A non-executable terminal boundary is still explicit: local phases may not derive the successor.
+    expect(owner.nextControl).toMatchObject({
+      kind: "AWAIT_SUCCESSOR",
+      afterOperationId: owner.operationId,
+      allowedKinds: ["INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      expectedOperationId: null,
+    });
   });
 
   it("carries and digests every complete post-summon companion for live cutover", () => {
@@ -315,8 +320,7 @@ describe("double-KO chaining", () => {
     const sent: CoopAuthorityWire[] = [];
     const log = makeAuthorityLog(sent, scheduler);
 
-    // Occurrence 0 faints on field slot 0; its successor is the NEXT faint
-    // (occurrence 1 on field slot 1) - a REPLACEMENT control.
+    // Occurrence 0 faints on field slot 0; its successor is an exact ordered wait for the NEXT faint.
     const entry0Input = buildReplacementCommitEntry({
       context: FRAME,
       proposal: proposal({ sourceAddress: address({ occurrence: 0, fieldIndex: 0 }), ownerSeatId: 1 }),
@@ -349,17 +353,29 @@ describe("double-KO chaining", () => {
     expect(entry0.operationId).toBe(replacementOperationId(address({ occurrence: 0, fieldIndex: 0 }), 1));
     expect(entry1.operationId).toBe(replacementOperationId(address({ occurrence: 1, fieldIndex: 1 }), 0));
 
-    // Successor chaining: entry0 -> REPLACEMENT(occurrence 1), entry1 -> COMMAND.
-    expect(entry0.nextControl).toMatchObject({ kind: "REPLACEMENT", occurrence: 1, fieldIndex: 1, ownerSeatId: 0 });
+    // Successor chaining: entry0 -> exact REPLACEMENT_COMMIT operation, entry1 -> COMMAND.
+    expect(entry0.nextControl).toMatchObject({
+      kind: "AWAIT_SUCCESSOR",
+      allowedKinds: ["REPLACEMENT_COMMIT"],
+      expectedOperationId: entry1.operationId,
+    });
     expect(entry1.nextControl).toMatchObject({
       kind: "COMMAND_FRONTIER",
       commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 1 }],
     });
 
-    // The stated successor of entry0 addresses exactly entry1's own replacement surface.
+    // The stated successor of entry0 addresses exactly entry1's own replacement operation.
     const entry0SuccessorId = entry0.nextControl == null ? null : controlIdOf(entry0.nextControl);
     expect(entry0SuccessorId).toBe(
-      controlIdOf({ kind: "REPLACEMENT", epoch: 1, wave: 3, turn: 2, occurrence: 1, fieldIndex: 1, ownerSeatId: 0 }),
+      controlIdOf({
+        kind: "AWAIT_SUCCESSOR",
+        afterOperationId: entry0.operationId,
+        epoch: 1,
+        wave: 3,
+        turn: 2,
+        allowedKinds: ["REPLACEMENT_COMMIT"],
+        expectedOperationId: entry1.operationId,
+      }),
     );
 
     // Shadow parity distinguishes the two occurrences.
@@ -425,7 +441,7 @@ describe("shadow parity seam", () => {
       operationId: "op-turn",
       kind: "TURN_COMMIT",
       material: { digest: "d", payload: {} },
-      nextControl: null,
+      nextControl: { kind: "TERMINAL", terminalId: "foreign-turn-terminal" },
       subsumes: [],
     };
     expect(shadowParityOfEntry(turn)).toBeNull();

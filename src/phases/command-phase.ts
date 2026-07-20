@@ -22,6 +22,7 @@ import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous"
 import {
   coopHasPendingWaveAdvance,
   coopOwnerOfPlayerFieldSlot,
+  enterCoopV2CommandControlBoundary,
   failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopBattleSync,
@@ -32,6 +33,7 @@ import {
   isCoopAuthoritativeGuest,
   isCoopSharedTerminalFrozen,
   isCoopV2CommandAdmissionFrozen,
+  isCoopV2ControlSurfaceStartFrozen,
   isVersusSession,
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
@@ -671,9 +673,23 @@ export class CommandPhase extends FieldPhase {
   }
 
   public override start(): void {
+    const boundaryPokemon = globalScene.getPlayerField()[this.fieldIndex];
+    if (boundaryPokemon != null) {
+      const boundary = enterCoopV2CommandControlBoundary(this.fieldIndex, boundaryPokemon.id, () => this.start());
+      if (boundary === "deferred") {
+        return;
+      }
+      if (boundary === "failed") {
+        failCoopSharedSession(
+          `Authority V2 could not install command control for field ${this.fieldIndex} `
+            + `at wave ${globalScene.currentBattle?.waveIndex ?? 0} turn ${globalScene.currentBattle?.turn ?? 0}`,
+        );
+        return;
+      }
+    }
     super.start();
 
-    if (isCoopV2CommandAdmissionFrozen()) {
+    if (isCoopV2ControlSurfaceStartFrozen()) {
       coopWarn("v2-recovery", `CommandPhase start held field=${this.fieldIndex}: recovery owns the frontier`);
       return;
     }

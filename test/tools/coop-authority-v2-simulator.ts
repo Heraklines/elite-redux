@@ -309,7 +309,7 @@ function digestFor(revision: number, accumulator: number): string {
 // ---------------------------------------------------------------------------
 
 /** Mechanical control identity (owner/address exact). Two controls are compatible iff equal. */
-export function controlKey(control: CoopNextControl): string {
+export function controlKey(control: CoopNextControl | null): string {
   if (control === null) {
     return "null";
   }
@@ -322,14 +322,19 @@ export function controlKey(control: CoopNextControl): string {
           .sort()
           .join(",")
       );
-    case "REPLACEMENT":
-      return `REPLACEMENT:${control.epoch}:${control.wave}:${control.turn}:${control.occurrence}:${control.fieldIndex}:${control.ownerSeatId}`;
     case "REWARD":
       return `REWARD:${control.operationId}:${control.ownerSeatId}`;
     case "BIOME":
       return `BIOME:${control.operationId}:${control.ownerSeatId}`;
     case "MYSTERY":
       return `MYSTERY:${control.operationId}:${control.ownerSeatId}`;
+    case "SHARED_INTERACTION":
+      return `SHARED_INTERACTION:${control.surfaceClass}:${control.operationKind}:${control.operationId}:${control.ownerSeatId}`;
+    case "AWAIT_SUCCESSOR":
+      return (
+        `AWAIT_SUCCESSOR:${control.afterOperationId}:e${control.epoch}:w${control.wave}:t${control.turn}:`
+        + `${control.allowedKinds.join(",")}:next=${control.expectedOperationId ?? "*"}`
+      );
     case "TERMINAL":
       return `TERMINAL:${control.terminalId}`;
   }
@@ -498,7 +503,7 @@ export class RefAuthorityLog implements CoopAuthorityLog {
     return e === undefined ? 0 : readPayload(e).cumulative;
   }
 
-  latestControl(): CoopNextControl {
+  latestControl(): CoopNextControl | null {
     const e = this.committed.at(-1);
     return e === undefined ? null : e.nextControl;
   }
@@ -572,13 +577,13 @@ type RecoveryReply =
       readonly kind: "snapshot";
       readonly frontier: number;
       readonly cumulative: number;
-      readonly control: CoopNextControl;
+      readonly control: CoopNextControl | null;
     }
   | {
       readonly kind: "terminalize";
       readonly frontier: number;
       readonly cumulative: number;
-      readonly control: CoopNextControl;
+      readonly control: CoopNextControl | null;
       readonly terminalId: string;
     };
 
@@ -698,7 +703,7 @@ class Endpoint {
   // Local simulated material/control state:
   materialAccumulator = 0;
   materialRevision = 0;
-  installedControl: CoopNextControl = null;
+  installedControl: CoopNextControl | null = null;
   installedControlId = "null";
   terminal: string | null = null;
 
@@ -1718,17 +1723,6 @@ export function commandControl(
   };
 }
 
-export function replacementControl(
-  epoch: number,
-  wave: number,
-  turn: number,
-  occurrence: number,
-  fieldIndex: number,
-  ownerSeatId: number,
-): CoopNextControl {
-  return { kind: "REPLACEMENT", epoch, wave, turn, occurrence, fieldIndex, ownerSeatId };
-}
-
 /** A realistic multi-progression story: turns, a replacement, an interaction, a wave, optional terminal. */
 export function standardStory(rng: SeededRng, opts: { readonly terminal: boolean }): StoryAct[] {
   const epoch = 7;
@@ -1751,7 +1745,15 @@ export function standardStory(rng: SeededRng, opts: { readonly terminal: boolean
   // A forced replacement mid-wave.
   acts.push({
     kind: "REPLACEMENT_COMMIT",
-    control: replacementControl(epoch, 1, 2, 1, 0, 0),
+    control: {
+      kind: "AWAIT_SUCCESSOR",
+      afterOperationId: "op-3",
+      epoch,
+      wave: 1,
+      turn: 2,
+      allowedKinds: ["INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      expectedOperationId: null,
+    },
     delta: rng.int(1, 9),
     checkpoint: false,
     subsumePrior: false,

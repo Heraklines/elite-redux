@@ -163,10 +163,12 @@ function receipt(entry: CoopAuthorityEntry, stage: "admitted" | "materialApplied
     revision: entry.revision,
     operationId: entry.operationId,
     stage,
+    ...(stage === "controlInstalled" ? { controlId: controlIdOf(entry.nextControl) } : {}),
   };
 }
 
-const base = { context: frameContext(), ownerSeatId: 1 } as const;
+const TEST_SUCCESSOR: CoopNextControl = { kind: "REWARD", operationId: "test-reward-successor", ownerSeatId: 1 };
+const base = { context: frameContext(), ownerSeatId: 1, successor: TEST_SUCCESSOR } as const;
 
 // ---------------------------------------------------------------------------
 // Owner-seat-addressed builder validation - per surface
@@ -180,7 +182,7 @@ describe("owner-seat-addressed builders - per surface", () => {
       choice: { phase: "prompt", partySlot: 2, moveId: 33, maxMoveCount: 4 },
     });
     expect(prompt.kind).toBe(INTERACTION_COMMIT_KIND);
-    expect(prompt.nextControl).toBeNull();
+    expect(prompt.nextControl).toEqual(TEST_SUCCESSOR);
     expect(prompt.material.payload).toEqual({
       surface: "learn-move/prompt",
       ownerSeatId: 1,
@@ -235,7 +237,7 @@ describe("owner-seat-addressed builders - per surface", () => {
     } satisfies StormglassChoiceMaterial);
   });
 
-  it("carries an optional stated successor control (validated) and defaults it to null", () => {
+  it("carries and validates the mandatory stated successor control", () => {
     const successor: CoopNextControl = { kind: "REWARD", operationId: "op-reward", ownerSeatId: 1 };
     const withSuccessor = buildStormglassInteractionEntry({
       ...base,
@@ -699,9 +701,10 @@ describe("zero-leak teardown through the authority log", () => {
     expect(log.retained().map(e => e.revision)).toEqual([stormglass.revision, colosseum.revision]);
     expect(scheduler.liveCount()).toBeGreaterThan(0);
 
-    // A null-successor interaction retires at materialApplied (no controlInstalled due).
+    // Every interaction retires only after its exact successor control is installed.
     log.acceptReceipt(receipt(stormglass, "admitted"));
-    expect(log.acceptReceipt(receipt(stormglass, "materialApplied"))).toBe(true);
+    expect(log.acceptReceipt(receipt(stormglass, "materialApplied"))).toBe(false);
+    expect(log.acceptReceipt(receipt(stormglass, "controlInstalled"))).toBe(true);
     expect(log.retained().map(e => e.revision)).toEqual([colosseum.revision]);
 
     log.dispose("teardown");
