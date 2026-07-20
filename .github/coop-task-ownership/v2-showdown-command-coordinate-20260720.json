@@ -13,6 +13,7 @@
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
     "test/node/authority-v2-command-frontier.test.ts",
     "test/node/authority-v2-control-open.test.ts",
-    "test/tests/elite-redux/showdown/showdown-versus-faint.test.ts"
+    "test/tests/elite-redux/showdown/showdown-versus-faint.test.ts",
+    "test/tools/coop-duo-harness.ts"
   ]
 }

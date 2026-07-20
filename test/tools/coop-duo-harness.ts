@@ -1911,11 +1911,12 @@ export async function settleDuoPromise<T>(
 }
 
 /**
- * Finish the real replay/finalize tail left by a replacement picker, then recreate the one omitted
- * TurnInit boundary of a directly mirrored headless guest.
+ * Finish the real replay/finalize tail left by a replacement picker, then preserve an already-materialized
+ * TurnInit boundary or recreate the one omitted by a directly mirrored headless guest.
  *
- * The helper is deliberately strict: it only accepts the replay tail or untouched boot shape produced by
- * the duo builders. It never clears an arbitrary live queue to make a test green.
+ * The helper is deliberately strict: it only accepts the replay tail, the exact real TurnInit successor,
+ * or untouched boot shape produced by the duo builders. It never clears an arbitrary live queue to make a
+ * test green.
  */
 export async function materializeGuestInputAfterReplacement(scene: BattleScene): Promise<void> {
   const current = scene.phaseManager.getCurrentPhase();
@@ -1936,6 +1937,13 @@ export async function materializeGuestInputAfterReplacement(scene: BattleScene):
         throw new Error("replacement CoopFinalizeTurnPhase did not finish");
       }
     }
+  }
+  // Authority V2 replacement material can release the parked finalizer directly into its ordinary
+  // TurnInit successor. That phase is already the production structural route to CommandPhase; replacing
+  // it with a synthetic boot edge both loses identity and makes the one-process fixture reject a state two
+  // real browsers advance automatically. Leave it current for driveClientPhaseQueueTo to start exactly once.
+  if (scene.phaseManager.getCurrentPhase()?.phaseName === "TurnInitPhase") {
+    return;
   }
   materializeMirroredGuestInputTurn(scene);
 }

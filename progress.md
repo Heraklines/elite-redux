@@ -214,4 +214,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The common Showdown guest-pick driver now advances the real queued reconstruction after replay/finalize,
   and the idle-fallback race explicitly proves the speculative generation exposes no input before opening
   exactly one ordered picker. No production authority rule or timeout was relaxed.
+- S5 failed for the reciprocal harness error: replacement material had already advanced the guest to its
+  real `TurnInitPhase`, but `materializeGuestInputAfterReplacement` rejected that valid successor and tried
+  to synthesize another boot edge. The helper now preserves the existing production phase for the ordinary
+  phase-queue driver to start exactly once; arbitrary gameplay queues still fail closed.
 - Local verification remains static-only under `AGENTS.md`; exact-SHA remote S4 qualification is required.
