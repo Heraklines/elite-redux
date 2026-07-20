@@ -412,13 +412,8 @@ export function successorControl(
       };
     case "next-replacement":
       return {
-        kind: "AWAIT_SUCCESSOR",
-        afterOperationId: sourceOperationId,
-        epoch: address.epoch,
-        wave: address.wave,
-        turn: address.turn,
-        allowedKinds: ["REPLACEMENT_COMMIT"],
-        expectedOperationId: replacementOperationId(
+        kind: "REPLACEMENT",
+        operationId: replacementOperationId(
           {
             epoch: address.epoch,
             wave: address.wave,
@@ -428,6 +423,12 @@ export function successorControl(
           },
           successor.ownerSeatId,
         ),
+        ownerSeatId: successor.ownerSeatId,
+        epoch: address.epoch,
+        wave: address.wave,
+        turn: address.turn,
+        occurrence: successor.occurrence,
+        fieldIndex: successor.fieldIndex,
       };
     case "terminal":
       return {

@@ -142,11 +142,33 @@ function entryInput(
     context?: CoopFrameContextV2;
   } = {},
 ): Omit<CoopAuthorityEntry, "revision"> {
+  const kind = opts.kind ?? "TURN_COMMIT";
+  const payload = (() => {
+    switch (kind) {
+      case "TURN_COMMIT":
+        return { epoch: 1, wave: 1, turn: 1 };
+      case "REPLACEMENT_COMMIT":
+        return { sourceAddress: { epoch: 1, wave: 1, turn: 1 } };
+      case "INTERACTION_COMMIT":
+        return {
+          envelope: {
+            sessionEpoch: 1,
+            wave: 1,
+            turn: 1,
+            pendingOperation: { kind: "REWARD" },
+          },
+        };
+      case "CONTROL_COMMIT":
+      case "WAVE_ADVANCE":
+      case "TERMINAL_COMMIT":
+        return { wave: 1, turn: 1 };
+    }
+  })();
   return {
     context: opts.context ?? frameContext(),
     operationId,
-    kind: opts.kind ?? "TURN_COMMIT",
-    material: { digest: `digest-${operationId}`, payload: { op: operationId } },
+    kind,
+    material: { digest: `digest-${operationId}`, payload },
     nextControl: opts.nextControl ?? commandControl(),
     subsumes: opts.subsumes ?? [],
   };
@@ -241,10 +263,15 @@ describe("authority-v2 log", () => {
 
     // materialApplied alone does not retire an entry that states a nextControl.
     expect(log.acceptReceipt(receipt(committed, "materialApplied"))).toBe(false);
+    expect(log.peerStageQuorum(committed.operationId, "materialApplied")).toBe(true);
+    expect(log.peerStageQuorum(committed.operationId, "controlInstalled")).toBe(false);
     expect(log.retained()).toHaveLength(1);
 
     // controlInstalled reaches the required stage -> NEWLY retired.
     expect(log.acceptReceipt(receipt(committed, "controlInstalled"))).toBe(true);
+    // A continuation registered after synchronous loopback retirement still sees the authenticated quorum.
+    expect(log.peerStageQuorum(committed.operationId, "materialApplied")).toBe(true);
+    expect(log.peerStageQuorum(committed.operationId, "controlInstalled")).toBe(true);
     expect(log.retained()).toHaveLength(0);
     expect(log.diagnostics().retainedEntries).toBe(0);
     expect(scheduler.liveCount()).toBe(0);
@@ -717,7 +744,7 @@ describe("authority-v2 log", () => {
       frontier: 2,
       frontierOperationId: "op-recovery-2",
       nextControl: commandControl(),
-      requiredTail: [],
+      requiredTail: [second],
     });
   });
 
@@ -734,6 +761,29 @@ describe("authority-v2 log", () => {
     );
     const successor = log.commit(entryInput("op-right", { kind: "INTERACTION_COMMIT" }));
     expect(successor.revision).toBe(2);
+  });
+
+  it("rejects a right-kind successor carrying the wrong live wave/turn coordinate", () => {
+    const log = makeLog(scheduler, sent);
+    log.commit(
+      entryInput("op-coordinate-wait", {
+        nextControl: successorWait("op-coordinate-wait", ["INTERACTION_COMMIT"]),
+      }),
+    );
+    const wrongCoordinate = {
+      ...entryInput("1:0:REWARD:1", { kind: "INTERACTION_COMMIT" }),
+      material: {
+        digest: "coordinate-digest",
+        payload: {
+          envelope: {
+            sessionEpoch: 1,
+            wave: 2,
+            turn: 1,
+          },
+        },
+      },
+    };
+    expect(() => log.commit(wrongCoordinate)).toThrow(/not authorized by predecessor control/);
   });
 
   it("keeps a replica successor wait until an exact allowed next revision is admitted", () => {

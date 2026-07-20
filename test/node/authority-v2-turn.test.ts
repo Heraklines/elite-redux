@@ -200,6 +200,25 @@ describe("buildTurnCommitEntry - shape + digest", () => {
       "an ordered successor wait is not a command-request lease",
     ).toBeNull();
   });
+
+  it("states an executable replacement picker instead of freezing visible PARTY input behind a wait", () => {
+    const replacement = {
+      kind: "REPLACEMENT" as const,
+      operationId: "RC/e1/w3/t5/o2/f1/s1",
+      ownerSeatId: 1,
+      epoch: 1,
+      wave: 3,
+      turn: 5,
+      occurrence: 2,
+      fieldIndex: 1,
+    };
+    const entry = buildCommitted({
+      capture: CAPTURE_WITH_COMPANIONS,
+      nextCommandFrontier: null,
+      nextReplacementControl: replacement,
+    });
+    expect(entry.nextControl).toEqual(replacement);
+  });
 });
 
 // ---------------------------------------------------------------------------

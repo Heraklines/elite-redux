@@ -23,7 +23,10 @@
 // =============================================================================
 
 import type { TurnResolutionImage } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
-import { resolveCoopV2CommandFrontier } from "#data/elite-redux/coop/authority-v2/command-frontier";
+import {
+  resolveCoopV2CommandFrontier,
+  resolveCoopV2ReplacementControl,
+} from "#data/elite-redux/coop/authority-v2/command-frontier";
 import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import {
   activeCoopReplacementAuthorityMode,
@@ -2378,6 +2381,9 @@ export class CoopBattleStreamer {
     // post-replacement commits. This includes Showdown's explicitly-owned authoritative enemy side while
     // omitting ordinary AI enemies; an unowned human seat fails the whole commit instead of being guessed.
     const completeCommands = [...commandFrontier.commands];
+    const replacementControl = hasImmediateCommand
+      ? null
+      : resolveCoopV2ReplacementControl(epoch, authoritativeState, events);
     const input: CoopV2ShadowTurnTap = {
       operationId: `TURN/e${epoch}/w${wave}/t${turn}`,
       capture,
@@ -2390,12 +2396,14 @@ export class CoopBattleStreamer {
               resolvedTurn: turn,
               commands: completeCommands,
             },
+      nextReplacementControl: replacementControl,
       // Deliverable 1: fingerprint the LEGACY turn image (the resolution + checkpoint + companions legacy just
       // committed) through the SAME turn digest so parity compares like-for-like (v2 entry digest vs
       // v2-digest-of-legacy-image); the full-state checksum stays as the raw legacy token for the log.
       legacyImage: capture,
       legacyDigest: checksum,
-      successorSeatSource: completeCommands.length === 0 ? "none-non-command-boundary" : "owner-field",
+      successorSeatSource:
+        replacementControl != null || completeCommands.length === 0 ? "none-non-command-boundary" : "owner-field",
     };
     if (cutoverActive) {
       // CUTOVER: commit the v2 TURN_COMMIT as the sole authority. A non-null entry => committed (legacy becomes

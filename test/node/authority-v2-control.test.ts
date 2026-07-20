@@ -328,6 +328,10 @@ function fakeSurface(script: FakeSurfaceScript = {}) {
     fieldSlotOfPokemon: pid => script.fieldSlots?.[pid] ?? -1,
     isPlayerFieldSlot: fi => script.validFieldSlots?.has(fi) ?? true,
     installCommand: (...args) => calls.push({ verb: "installCommand", args }),
+    installReplacement: (...args) => {
+      calls.push({ verb: "installReplacement", args });
+      return true;
+    },
     installReward: (...args) => calls.push({ verb: "installReward", args }),
     installBiome: (...args) => calls.push({ verb: "installBiome", args }),
     installMystery: (...args) => calls.push({ verb: "installMystery", args }),
@@ -444,6 +448,9 @@ describe("DefaultCoopControlProjector", () => {
           kind: "SHARED_INTERACTION",
           operationId: "learn-1",
           ownerSeatId: 1,
+          epoch: 1,
+          wave: 2,
+          turn: 3,
           surfaceClass: "op:learnMove",
           operationKind: "LEARN_MOVE",
           successor: { operationKinds: ["LEARN_MOVE"], operationIds: ["learn-result-1"] },

@@ -1,5 +1,6 @@
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
+import { replacementOperationId } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 import { isCoopV2ReplacementCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
@@ -27,6 +28,7 @@ import {
   getCoopNetcodeMode,
   getCoopRuntime,
   isVersusSession,
+  notifyCoopV2InteractionSurfaceReady,
   runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SWITCH_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
@@ -45,6 +47,7 @@ const COOP_SWITCH_WAIT_MS = 300_000;
  */
 export class SwitchPhase extends BattlePhase {
   public readonly phaseName = "SwitchPhase";
+  public coopV2ControlOperationId: string | null = null;
   protected readonly fieldIndex: number;
   private readonly switchType: SwitchType;
   private readonly isModal: boolean;
@@ -157,6 +160,18 @@ export class SwitchPhase extends BattlePhase {
         turn: scene.currentBattle.turn ?? 0,
         occurrence: 0,
       };
+      const ownerRole = coopOwnerOfPlayerFieldSlot(this.fieldIndex);
+      const ownerSeatId = ownerRole === "host" ? 0 : 1;
+      if (authoritative && isCoopV2ReplacementCutoverActive()) {
+        this.coopV2ControlOperationId = replacementOperationId(
+          {
+            epoch: coopController.sessionEpoch,
+            ...operationSourceAddress,
+            fieldIndex: this.fieldIndex,
+          },
+          ownerSeatId,
+        );
+      }
       const seq = (globalScene.currentBattle.turn ?? 0) * 4 + this.fieldIndex;
       if (coopOwnerOfPlayerFieldSlot(this.fieldIndex) !== coopController.role) {
         // AUTHORITATIVE netcode (#633 partner-death sync, HALF B): the WATCHER here is the HOST
@@ -531,6 +546,13 @@ export class SwitchPhase extends BattlePhase {
         },
         PartyUiHandler.FilterNonFainted,
       );
+      if (authoritative && this.coopV2ControlOperationId != null) {
+        queueMicrotask(() => {
+          if (ownerRuntime != null) {
+            runWhenCoopRuntimeActive(ownerRuntime, () => notifyCoopV2InteractionSurfaceReady(ownerRuntime));
+          }
+        });
+      }
       return;
     }
 

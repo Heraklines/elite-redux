@@ -320,7 +320,7 @@ describe("double-KO chaining", () => {
     const sent: CoopAuthorityWire[] = [];
     const log = makeAuthorityLog(sent, scheduler);
 
-    // Occurrence 0 faints on field slot 0; its successor is an exact ordered wait for the NEXT faint.
+    // Occurrence 0 faints on field slot 0; its successor is the exact executable NEXT picker.
     const entry0Input = buildReplacementCommitEntry({
       context: FRAME,
       proposal: proposal({ sourceAddress: address({ occurrence: 0, fieldIndex: 0 }), ownerSeatId: 1 }),
@@ -353,11 +353,13 @@ describe("double-KO chaining", () => {
     expect(entry0.operationId).toBe(replacementOperationId(address({ occurrence: 0, fieldIndex: 0 }), 1));
     expect(entry1.operationId).toBe(replacementOperationId(address({ occurrence: 1, fieldIndex: 1 }), 0));
 
-    // Successor chaining: entry0 -> exact REPLACEMENT_COMMIT operation, entry1 -> COMMAND.
+    // Successor chaining: entry0 -> exact REPLACEMENT picker/commit operation, entry1 -> COMMAND.
     expect(entry0.nextControl).toMatchObject({
-      kind: "AWAIT_SUCCESSOR",
-      allowedKinds: ["REPLACEMENT_COMMIT"],
-      expectedOperationId: entry1.operationId,
+      kind: "REPLACEMENT",
+      operationId: entry1.operationId,
+      ownerSeatId: 0,
+      occurrence: 1,
+      fieldIndex: 1,
     });
     expect(entry1.nextControl).toMatchObject({
       kind: "COMMAND_FRONTIER",
@@ -368,13 +370,14 @@ describe("double-KO chaining", () => {
     const entry0SuccessorId = entry0.nextControl == null ? null : controlIdOf(entry0.nextControl);
     expect(entry0SuccessorId).toBe(
       controlIdOf({
-        kind: "AWAIT_SUCCESSOR",
-        afterOperationId: entry0.operationId,
+        kind: "REPLACEMENT",
+        operationId: entry1.operationId,
+        ownerSeatId: 0,
         epoch: 1,
         wave: 3,
         turn: 2,
-        allowedKinds: ["REPLACEMENT_COMMIT"],
-        expectedOperationId: entry1.operationId,
+        occurrence: 1,
+        fieldIndex: 1,
       }),
     );
 

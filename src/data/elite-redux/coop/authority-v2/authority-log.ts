@@ -225,9 +225,9 @@ export interface AuthorityLogDiagnostics {
 /**
  * Exact log proof an authority may attach to one recovery snapshot.
  *
- * `requiredTail` is complete for `(capturedFrontier, frontier]`; a missing retired revision makes the
- * request unprovable and therefore returns `null` instead of inventing history. `nextControl` is the last
- * control the authority actually stated, retained as constant-size log metadata after delivery retirement.
+ * `requiredTail` is complete for `(capturedFrontier, frontier]`. When the frontiers are equal and nonzero,
+ * it contains the exact frontier entry as a one-entry reconstruction proof; recovery destroys the old phase
+ * generation and therefore needs the immutable body even though no revision is missing.
  */
 export interface CoopAuthorityRecoverySliceV2 {
   readonly frontier: number;
@@ -303,11 +303,15 @@ export class AuthorityLog implements CoopAuthorityLog {
   /** AUTHORITY: constant-size successor metadata for a snapshot taken after the head entry retired. */
   private latestNextControl: CoopNextControl | null = null;
   private latestCommittedOperationId: string | null = null;
+  /** AUTHORITY: one immutable frontier body retained after delivery retirement for exact recovery rebuild. */
+  private latestCommittedEntry: CoopAuthorityEntry | null = null;
   private pendingReplicaSuccessorControl: {
     readonly revision: number;
     readonly operationId: string;
     readonly control: CoopNextControl;
   } | null = null;
+  /** Bounded quorum-stage tombstones so a waiter registered after synchronous loopback retirement is sound. */
+  private readonly retiredOperationStages = new Map<string, number>();
   private retentionRefusals = 0;
   private wireSendFailures = 0;
   private disposed = false;
@@ -428,6 +432,10 @@ export class AuthorityLog implements CoopAuthorityLog {
               },
             }),
           );
+    const reboundLatestCommittedEntry =
+      this.latestCommittedEntry == null
+        ? null
+        : freezeAuthorityEntry(cloneEntry({ ...this.latestCommittedEntry, context: reboundLocalContext }));
     const reboundLeases: {
       readonly lease: DeliveryLease;
       readonly entry: CoopAuthorityEntry;
@@ -456,6 +464,7 @@ export class AuthorityLog implements CoopAuthorityLog {
     this.peerBindings = peers;
     this.pendingTailRequestFrom = null;
     this.pendingReplicaEntry = reboundReplicaEntry;
+    this.latestCommittedEntry = reboundLatestCommittedEntry;
     for (const rebound of reboundLeases) {
       rebound.lease.entry = rebound.entry;
       rebound.lease.peerStages.clear();
@@ -569,6 +578,7 @@ export class AuthorityLog implements CoopAuthorityLog {
     this.headRevision = revision;
     this.latestNextControl = structuredClone(committed.nextControl);
     this.latestCommittedOperationId = committed.operationId;
+    this.latestCommittedEntry = committed;
 
     // Deliver once immediately, then redeliver on the backoff until mechanically retired.
     this.sendGuarded({ kind: "deliver", entry: committed });
@@ -683,6 +693,25 @@ export class AuthorityLog implements CoopAuthorityLog {
     return verdict.kind === "advanced" && verdict.retired;
   }
 
+  /**
+   * Whether every authenticated peer reached at least `stage` for this exact operation.
+   *
+   * Retired entries remain queryable through a bounded tombstone, which closes the synchronous-loopback
+   * race where a phase registers its continuation barrier immediately after commit but the final receipt
+   * already retired the lease in the commit stack.
+   */
+  peerStageQuorum(operationId: string, stage: CoopReplicaMechanicalStage): boolean {
+    if (this.disposed) {
+      return false;
+    }
+    const required = STAGE_ORDER[stage];
+    const live = this.retainedWindow.values().find(lease => lease.entry.operationId === operationId);
+    if (live != null) {
+      return allPeersReached(live, required);
+    }
+    return (this.retiredOperationStages.get(operationId) ?? STAGE_NONE) >= required;
+  }
+
   /** Retained-but-unretired entries in revision order (contract). */
   retained(): readonly CoopAuthorityEntry[] {
     return this.retainedWindow.values().map(lease => lease.entry);
@@ -693,8 +722,9 @@ export class AuthorityLog implements CoopAuthorityLog {
    *
    * A peer that is genuinely behind keeps every missing entry retained because authority retirement requires
    * that peer's own mechanical receipt. Consequently, a hole here means the request/frontier cannot be
-   * reconciled with this live log and must fail closed. The head-equal case legitimately has an empty tail:
-   * a full snapshot may be repairing state after all log operations were already mechanically acknowledged.
+   * reconciled with this live log and must fail closed. The head-equal case carries the constant-size latest
+   * entry as reconstruction material: revision delivery is complete, but recovery intentionally destroyed
+   * the old control generation and must build a new one from the exact immutable result.
    */
   recoverySlice(capturedFrontier: number): CoopAuthorityRecoverySliceV2 | null {
     if (
@@ -707,8 +737,15 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     if (capturedFrontier === this.headRevision) {
       if (
-        (this.headRevision === 0 && (this.latestCommittedOperationId !== null || this.latestNextControl !== null))
-        || (this.headRevision > 0 && (this.latestCommittedOperationId === null || this.latestNextControl === null))
+        (this.headRevision === 0
+          && (this.latestCommittedOperationId !== null
+            || this.latestNextControl !== null
+            || this.latestCommittedEntry !== null))
+        || (this.headRevision > 0
+          && (this.latestCommittedOperationId === null
+            || this.latestNextControl === null
+            || this.latestCommittedEntry == null
+            || this.latestCommittedEntry.revision !== this.headRevision))
       ) {
         return null;
       }
@@ -716,7 +753,7 @@ export class AuthorityLog implements CoopAuthorityLog {
         frontier: this.headRevision,
         frontierOperationId: this.latestCommittedOperationId,
         nextControl: structuredClone(this.latestNextControl),
-        requiredTail: Object.freeze([]),
+        requiredTail: Object.freeze(this.latestCommittedEntry == null ? [] : [this.latestCommittedEntry]),
       });
     }
 
@@ -963,6 +1000,15 @@ export class AuthorityLog implements CoopAuthorityLog {
     const lease = this.retainedWindow.get(revision);
     if (lease == null) {
       return false;
+    }
+    const quorumStage = Math.min(...[...lease.peerStages.values()].map(peer => peer.stage));
+    this.retiredOperationStages.set(lease.entry.operationId, quorumStage);
+    while (this.retiredOperationStages.size > this.retentionCapacity) {
+      const oldest = this.retiredOperationStages.keys().next().value as string | undefined;
+      if (oldest == null) {
+        break;
+      }
+      this.retiredOperationStages.delete(oldest);
     }
     this.stopLease(lease);
     this.retainedWindow.delete(revision);

@@ -6,6 +6,7 @@
 
 import {
   resolveCoopV2CommandFrontier,
+  resolveCoopV2ReplacementControl,
   resolveCoopV2ShowdownCommandProof,
 } from "#data/elite-redux/coop/authority-v2/command-frontier";
 import { validateNextControl } from "#data/elite-redux/coop/authority-v2/next-control";
@@ -168,6 +169,58 @@ describe("resolveCoopV2CommandFrontier", () => {
 
     expect(result.commands).toEqual([{ ownerSeatId: 0, pokemonId: 12, fieldIndex: 0 }]);
     expect(result.unresolved.map(issue => issue.reason)).toEqual(["invalid-field-index", "invalid-pokemon-id"]);
+  });
+});
+
+describe("resolveCoopV2ReplacementControl", () => {
+  it("states the exact event occurrence and owner-addressed classic co-op picker", () => {
+    const result = resolveCoopV2ReplacementControl(
+      4,
+      state(
+        [fieldSeat("player", 1, 11, { ownerSeatId: 7 })],
+        [
+          { id: 11, hp: 0, coopOwnerSeatId: 7 },
+          { id: 12, hp: 20, coopOwnerSeatId: 7 },
+        ],
+        [],
+      ),
+      [
+        { k: "message", text: "before" },
+        { k: "faint", bi: 1 },
+      ],
+    );
+
+    expect(result).toEqual({
+      kind: "REPLACEMENT",
+      operationId: "RC/e4/w1/t1/o1/f1/s7",
+      ownerSeatId: 7,
+      epoch: 4,
+      wave: 1,
+      turn: 1,
+      occurrence: 1,
+      fieldIndex: 1,
+    });
+  });
+
+  it("derives the enemy-side field offset from the authoritative geometry", () => {
+    const result = resolveCoopV2ReplacementControl(
+      2,
+      state(
+        [fieldSeat("player", 0, 10, { ownerSeatId: 3 }), fieldSeat("enemy", 1, 90, { ownerSeatId: 9 })],
+        [{ id: 10, hp: 30, coopOwnerSeatId: 3 }],
+        [
+          { id: 90, hp: 0 },
+          { id: 91, hp: 20 },
+        ],
+      ),
+      [{ k: "faint", bi: 1 }],
+    );
+
+    expect(result).toMatchObject({
+      operationId: "RC/e2/w1/t1/o0/f0/s9",
+      ownerSeatId: 9,
+      fieldIndex: 0,
+    });
   });
 });
 

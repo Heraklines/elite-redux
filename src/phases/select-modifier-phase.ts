@@ -34,8 +34,10 @@ import {
   getCoopUiMirror,
   notifyCoopWaveContinuationSurfaceReady,
   resolveCoopRetainedWaveContinuationIdentity,
+  retainCoopV2InteractionProposal,
   runWhenCoopRuntimeActive,
   settleCoopV2InteractionOperation,
+  waitForCoopV2PeerMaterialApplied,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REWARD_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import {
@@ -1616,27 +1618,66 @@ export class SelectModifierPhase extends BattlePhase {
       }
       return false;
     }
+    const sendProposal = () =>
+      getCoopInteractionRelay()?.sendInteractionChoice(
+        this.coopInteractionStart,
+        label,
+        choice,
+        wire,
+        this.coopRewardSurface,
+      );
+    if (
+      controller.role === "guest"
+      && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
+      && prepared != null
+    ) {
+      const v2 = isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability);
+      if (v2) {
+        const runtime = getCoopRuntime();
+        const generation = coopSessionGeneration();
+        const lease = retainCoopV2InteractionProposal(
+          {
+            operationId: prepared.operationId,
+            fingerprint: JSON.stringify([
+              this.coopInteractionStart,
+              label,
+              choice,
+              wire ?? null,
+              this.coopRewardSurface ?? null,
+            ]),
+            resend: sendProposal,
+            onExhausted: operationId => {
+              if (coopSessionGeneration() === generation && getCoopRuntime() === runtime) {
+                failCoopSharedSession(`Reward proposal ${operationId} exhausted before Authority V2 commit`);
+              }
+            },
+          },
+          runtime,
+        );
+        if (lease === "conflict" || lease === "invalid" || lease === "disposed") {
+          failCoopSharedSession(
+            `Reward proposal ${prepared.operationId} could not obtain an Authority V2 resend lease (${lease})`,
+          );
+          return true;
+        }
+        coopLog(
+          "v2-proposal",
+          `retained reward proposal seq=${this.coopInteractionStart} id=${prepared.operationId} status=${lease}`,
+        );
+        this.coopAwaitAuthoritativeResult(prepared.operationId);
+        return true;
+      }
+      sendProposal();
+      this.coopAwaitAuthoritativeResult(prepared.operationId);
+      return true;
+    }
     if (isCoopDebug()) {
       coopLog(
         "relay",
         `OWNER send raw seq=${this.coopInteractionStart} kind=${label} choice=${choice} role=${controller.role}`,
       );
     }
-    getCoopInteractionRelay()?.sendInteractionChoice(
-      this.coopInteractionStart,
-      label,
-      choice,
-      wire,
-      this.coopRewardSurface,
-    );
-    if (
-      controller.role === "guest"
-      && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
-      && prepared != null
-    ) {
-      this.coopAwaitAuthoritativeResult(prepared.operationId);
-      return true;
-    }
+    sendProposal();
     return false;
   }
 
@@ -1673,14 +1714,17 @@ export class SelectModifierPhase extends BattlePhase {
     }
     const runtime = getCoopRuntime();
     const durability = runtime?.durability;
-    if (runtime == null || durability == null || runtime.controller.role !== "host") {
+    const v2 = isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability);
+    if (runtime == null || runtime.controller.role !== "host" || (!v2 && durability == null)) {
       failCoopSharedSession(`Reward terminal ${operationId} has no host material-apply barrier`);
       return;
     }
     const generation = coopSessionGeneration();
     this.coopAwaitingMaterialResults.add(operationId);
-    void durability
-      .waitForOperationMaterialApplied(operationId)
+    const peerMaterialApplied = v2
+      ? waitForCoopV2PeerMaterialApplied(operationId, runtime)
+      : durability!.waitForOperationMaterialApplied(operationId);
+    void peerMaterialApplied
       .then(applied => {
         if (!applied) {
           this.coopAwaitingMaterialResults.delete(operationId);

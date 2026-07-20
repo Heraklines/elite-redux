@@ -250,6 +250,19 @@ export interface CoopCommandControlTarget {
   readonly fieldIndex: number;
 }
 
+/** Exact human replacement picker authorized by the mechanical log. */
+export interface CoopReplacementControlAddress {
+  readonly operationId: string;
+  readonly ownerSeatId: number;
+  readonly epoch: number;
+  readonly wave: number;
+  readonly turn: number;
+  /** Authority-issued per-turn faint-event sequence. */
+  readonly occurrence: number;
+  /** Field slot within the fainted side (player or Showdown remote-human side). */
+  readonly fieldIndex: number;
+}
+
 export type CoopNextControl =
   | {
       readonly kind: "COMMAND_FRONTIER";
@@ -259,6 +272,7 @@ export type CoopNextControl =
       /** Every living player battler that must reach its real CommandPhase. */
       readonly commands: readonly CoopCommandControlTarget[];
     }
+  | ({ readonly kind: "REPLACEMENT" } & CoopReplacementControlAddress)
   | { readonly kind: "REWARD"; readonly operationId: string; readonly ownerSeatId: number }
   | { readonly kind: "BIOME"; readonly operationId: string; readonly ownerSeatId: number }
   | { readonly kind: "MYSTERY"; readonly operationId: string; readonly ownerSeatId: number }
@@ -270,6 +284,10 @@ export type CoopNextControl =
       readonly kind: "SHARED_INTERACTION";
       readonly operationId: string;
       readonly ownerSeatId: number;
+      /** Exact mechanical coordinate of the public surface. */
+      readonly epoch: number;
+      readonly wave: number;
+      readonly turn: number;
       readonly surfaceClass: Exclude<CoopOperationSurfaceClass, "op:faintSwitch" | "op:wave">;
       /** Exact UI/projection subtype; a broad surface class is never sufficient control proof. */
       readonly operationKind: Exclude<CoopOperationKind, "FAINT_SWITCH" | "WAVE_ADVANCE">;

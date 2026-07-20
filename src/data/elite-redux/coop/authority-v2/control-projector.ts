@@ -62,6 +62,7 @@ import {
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
 import { coopV2InteractionUiProofContract } from "#data/elite-redux/coop/coop-operation-surface-registry";
+import { UiMode } from "#enums/ui-mode";
 
 // ---------------------------------------------------------------------------
 // The thin engine seam
@@ -103,6 +104,9 @@ export interface ControlSurface {
 
   /** Install the owner-seat COMMAND surface for the resolved field slot. */
   installCommand(fieldIndex: number, controlId: string): void;
+
+  /** Prove the exact naturally-created faint replacement picker; never fabricate one from ambient state. */
+  installReplacement(operationId: string, ownerSeatId: number, controlId: string): boolean;
 
   /** Install the reward interaction surface for `operationId`. */
   installReward(operationId: string, controlId: string): void;
@@ -223,6 +227,10 @@ export class DefaultCoopControlProjector implements CoopControlProjector {
         }
         return { kind: "installed", controlId };
       }
+      case "REPLACEMENT":
+        return surface.installReplacement(projectable.operationId, projectable.ownerSeatId, controlId)
+          ? { kind: "installed", controlId }
+          : { kind: "deferred", reason: `awaiting exact replacement picker for ${controlId}` };
       case "REWARD":
         surface.installReward(projectable.operationId, controlId);
         return { kind: "installed", controlId };
@@ -324,6 +332,20 @@ export function sceneControlSurface(ctx: CoopRuntimeContext): ControlSurface {
       if (!pm.hasPhaseOfType("CommandPhase")) {
         pm.unshiftNew("CommandPhase", fieldIndex);
       }
+    },
+    installReplacement(operationId, ownerSeatId): boolean {
+      if (ctx.localSeatId !== ownerSeatId) {
+        return true;
+      }
+      const phase = pm.getCurrentPhase() as { phaseName?: string; coopV2ControlOperationId?: string } | undefined;
+      return (
+        (phase?.phaseName === "SwitchPhase"
+          || phase?.phaseName === "CoopGuestFaintSwitchPhase"
+          || phase?.phaseName === "ShowdownEnemyFaintSwitchPhase")
+        && phase.coopV2ControlOperationId === operationId
+        && scene.ui?.getHandler()?.active === true
+        && scene.ui.getMode() === UiMode.PARTY
+      );
     },
     installReward(): void {
       if (!pm.hasPhaseOfType("SelectModifierPhase")) {

@@ -60,6 +60,12 @@ export function controlIdOf(control: ProjectableControl): string {
           .map(target => `f${target.fieldIndex}:s${target.ownerSeatId}:p${target.pokemonId}`)
           .join(",")}`
       );
+    case "REPLACEMENT":
+      return (
+        `REPLACEMENT/${encodeURIComponent(control.operationId)}/s${control.ownerSeatId}`
+        + `/e${control.epoch}/w${control.wave}/t${control.turn}`
+        + `/o${control.occurrence}/f${control.fieldIndex}`
+      );
     case "REWARD":
       return `REWARD/${encodeURIComponent(control.operationId)}/s${control.ownerSeatId}`;
     case "BIOME":
@@ -71,6 +77,7 @@ export function controlIdOf(control: ProjectableControl): string {
         `SHARED_INTERACTION/${encodeURIComponent(control.surfaceClass)}`
         + `/${encodeURIComponent(control.operationKind)}`
         + `/${encodeURIComponent(control.operationId)}/s${control.ownerSeatId}`
+        + `/e${control.epoch}/w${control.wave}/t${control.turn}`
         + `/results:${canonicalInteractionKinds(control.successor.operationKinds).join(",")}`
         + `/resultIds:${
           control.successor.operationIds == null
@@ -123,13 +130,103 @@ export function successorWaitAllows(
   nextKind: AuthorityEntryKind,
   nextOperationId: string,
   sessionEpoch: number,
+  nextMaterial: unknown,
 ): boolean {
-  return (
-    wait.afterOperationId === predecessorOperationId
-    && wait.epoch === sessionEpoch
-    && wait.allowedKinds.includes(nextKind)
-    && (wait.expectedOperationId == null || wait.expectedOperationId === nextOperationId)
-  );
+  if (
+    wait.afterOperationId !== predecessorOperationId
+    || wait.epoch !== sessionEpoch
+    || !wait.allowedKinds.includes(nextKind)
+    || (wait.expectedOperationId != null && wait.expectedOperationId !== nextOperationId)
+  ) {
+    return false;
+  }
+  const address = mechanicalAddressOf(nextKind, sessionEpoch, nextMaterial);
+  if (address == null) {
+    return false;
+  }
+  if (address.epoch !== wait.epoch) {
+    return false;
+  }
+  // A turn result parks at turn N before the real post-effects CommandPhase can author CONTROL_COMMIT
+  // for turn N+1. A wave boundary states its already-advanced command coordinate and permits only that
+  // CONTROL_COMMIT, so it remains exact. Every other immediate successor is at the wait's exact address.
+  const controlOnly = wait.allowedKinds.length === 1 && wait.allowedKinds[0] === "CONTROL_COMMIT";
+  const expectedTurn = nextKind === "CONTROL_COMMIT" && !controlOnly ? wait.turn + 1 : wait.turn;
+  return address.wave === wait.wave && address.turn === expectedTurn;
+}
+
+interface MechanicalAddress {
+  readonly epoch: number;
+  readonly wave: number;
+  readonly turn: number;
+}
+
+function safeCoordinate(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | null {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/**
+ * Decode the common mechanical coordinate every committed entry already carries in its immutable payload.
+ * Admission uses this before a successor can consume its predecessor, so right-kind/wrong-wave entries fail
+ * closed even when an adapter-specific applier would only discover the mismatch later.
+ */
+function mechanicalAddressOf(
+  kind: AuthorityEntryKind,
+  contextEpoch: number,
+  material: unknown,
+): MechanicalAddress | null {
+  const payload = objectRecord(material);
+  if (payload == null) {
+    return null;
+  }
+  let epoch: unknown = contextEpoch;
+  let wave: unknown;
+  let turn: unknown;
+  switch (kind) {
+    case "TURN_COMMIT":
+      epoch = payload.epoch ?? contextEpoch;
+      wave = payload.wave;
+      turn = payload.turn;
+      break;
+    case "REPLACEMENT_COMMIT": {
+      const source = objectRecord(payload.sourceAddress);
+      if (source == null) {
+        return null;
+      }
+      epoch = source.epoch;
+      wave = source.wave;
+      turn = source.turn;
+      break;
+    }
+    case "INTERACTION_COMMIT": {
+      const envelope = objectRecord(payload.envelope);
+      if (envelope == null) {
+        return null;
+      }
+      epoch = envelope.sessionEpoch;
+      wave = envelope.wave;
+      turn = envelope.turn;
+      break;
+    }
+    case "CONTROL_COMMIT":
+      wave = payload.wave;
+      turn = payload.turn;
+      break;
+    case "WAVE_ADVANCE":
+    case "TERMINAL_COMMIT":
+      wave = payload.wave;
+      turn = payload.turn;
+      break;
+  }
+  return safeCoordinate(epoch) && epoch > 0 && safeCoordinate(wave) && safeCoordinate(turn)
+    ? { epoch, wave, turn }
+    : null;
 }
 
 /** Extract the closed operation subtype carried by the live V2 interaction-envelope material. */
@@ -181,14 +278,36 @@ export function controlAllowsSuccessorEntry(
         next.kind,
         next.operationId,
         next.context.sessionEpoch,
+        next.material.payload,
       );
-    case "COMMAND_FRONTIER":
-      return next.kind === "TURN_COMMIT";
+    case "COMMAND_FRONTIER": {
+      const address = mechanicalAddressOf(next.kind, next.context.sessionEpoch, next.material.payload);
+      return (
+        next.kind === "TURN_COMMIT"
+        && address?.epoch === control.epoch
+        && address.wave === control.wave
+        && address.turn === control.turn
+      );
+    }
+    case "REPLACEMENT": {
+      const address = mechanicalAddressOf(next.kind, next.context.sessionEpoch, next.material.payload);
+      return (
+        next.kind === "REPLACEMENT_COMMIT"
+        && next.operationId === control.operationId
+        && address?.epoch === control.epoch
+        && address.wave === control.wave
+        && address.turn === control.turn
+      );
+    }
     case "SHARED_INTERACTION": {
       const resultKind = interactionOperationKindOfEntry(next);
+      const address = mechanicalAddressOf(next.kind, next.context.sessionEpoch, next.material.payload);
       return (
         next.kind === "INTERACTION_COMMIT"
         && resultKind != null
+        && address?.epoch === control.epoch
+        && address.wave === control.wave
+        && address.turn === control.turn
         && control.successor.operationKinds.includes(resultKind)
         && (control.successor.operationIds == null || control.successor.operationIds.includes(next.operationId))
       );
@@ -340,6 +459,16 @@ function interactionIssues(control: Record<string, unknown>): string[] {
   return issues;
 }
 
+function replacementControlIssues(control: Record<string, unknown>): string[] {
+  const issues = interactionIssues(control);
+  addIssue(issues, "epoch", isPositiveInt(control.epoch));
+  addIssue(issues, "wave", isPositiveInt(control.wave));
+  addIssue(issues, "turn", isPositiveInt(control.turn));
+  addIssue(issues, "occurrence", isNonNegativeInt(control.occurrence));
+  addIssue(issues, "fieldIndex", isNonNegativeInt(control.fieldIndex));
+  return issues;
+}
+
 type V2InteractionSurface = Exclude<CoopOperationSurfaceClass, "op:faintSwitch" | "op:wave">;
 
 const V2_INTERACTION_SURFACES: Readonly<Record<V2InteractionSurface, true>> = {
@@ -386,6 +515,9 @@ const V2_INTERACTION_OPERATION_SURFACES: Readonly<Record<V2InteractionOperationK
 
 function sharedInteractionIssues(control: Record<string, unknown>): string[] {
   const issues = interactionIssues(control);
+  addIssue(issues, "epoch", isPositiveInt(control.epoch));
+  addIssue(issues, "wave", isNonNegativeInt(control.wave));
+  addIssue(issues, "turn", isNonNegativeInt(control.turn));
   if (typeof control.surfaceClass !== "string" || !(control.surfaceClass in V2_INTERACTION_SURFACES)) {
     issues.push("surfaceClass");
   }
@@ -525,6 +657,8 @@ export function nextControlIssues(control: unknown): string[] {
     case "BIOME":
     case "MYSTERY":
       return interactionIssues(control);
+    case "REPLACEMENT":
+      return replacementControlIssues(control);
     case "SHARED_INTERACTION":
       return sharedInteractionIssues(control);
     case "AWAIT_SUCCESSOR":

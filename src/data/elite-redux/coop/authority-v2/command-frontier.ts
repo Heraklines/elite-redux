@@ -20,8 +20,13 @@
 // is human too (Showdown); an unowned enemy remains AI.
 // =============================================================================
 
-import type { CoopCommandControlTarget } from "#data/elite-redux/coop/authority-v2/contract";
-import type { CoopAuthoritativeBattleStateV1, CoopAuthoritativeFieldSeat } from "#data/elite-redux/coop/coop-transport";
+import { replacementOperationId } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
+import type { CoopCommandControlTarget, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopAuthoritativeFieldSeat,
+  CoopBattleEvent,
+} from "#data/elite-redux/coop/coop-transport";
 
 export interface CoopCommandFrontierIssue {
   readonly seat: CoopAuthoritativeFieldSeat;
@@ -54,6 +59,13 @@ function roleSeatId(seat: CoopAuthoritativeFieldSeat): number | null {
     return 1;
   }
   return null;
+}
+
+function partyRecordOwnerSeatId(record: Record<string, unknown>): number | null {
+  if (Number.isSafeInteger(record.coopOwnerSeatId) && (record.coopOwnerSeatId as number) >= 0) {
+    return record.coopOwnerSeatId as number;
+  }
+  return record.coopOwner === "host" ? 0 : record.coopOwner === "guest" ? 1 : null;
 }
 
 function seatHp(state: CoopAuthoritativeBattleStateV1, seat: CoopAuthoritativeFieldSeat): number | null {
@@ -114,6 +126,74 @@ export function resolveCoopV2CommandFrontier(state: CoopAuthoritativeBattleState
   }
 
   return { commands, unresolved };
+}
+
+function hasLegalHumanReplacement(
+  state: CoopAuthoritativeBattleStateV1,
+  seat: CoopAuthoritativeFieldSeat,
+  ownerSeatId: number,
+): boolean {
+  const party = seat.side === "player" ? state.playerParty : state.enemyParty;
+  const activeIds = new Set(
+    state.field.filter(fieldSeat => fieldSeat.side === seat.side).map(fieldSeat => fieldSeat.pokemonId),
+  );
+  return party.some(record => {
+    const hp = record.hp;
+    if (typeof hp !== "number" || !Number.isFinite(hp) || hp <= 0 || activeIds.has(record.id as number)) {
+      return false;
+    }
+    // Showdown's authoritative enemy party is wholly owned by its explicitly-owned human seat. Ordinary
+    // co-op player parties carry per-mon ownership and must match it exactly.
+    return seat.side === "enemy" ? true : partyRecordOwnerSeatId(record) === ownerSeatId;
+  });
+}
+
+/**
+ * Resolve the first exact human replacement picker made necessary by a settled turn image.
+ *
+ * The faint event's stable batch index is the same occurrence consumed by FaintPhase. AI-enemy faints and
+ * wiped human halves are deliberately omitted: neither opens a human picker, so they remain explicit ordered
+ * waits for their later wave/terminal authority.
+ */
+export function resolveCoopV2ReplacementControl(
+  epoch: number,
+  state: CoopAuthoritativeBattleStateV1,
+  events: readonly CoopBattleEvent[],
+): Extract<CoopNextControl, { kind: "REPLACEMENT" }> | null {
+  const enemyOffset = state.field
+    .filter(candidate => candidate.side === "enemy")
+    .reduce((lowest, candidate) => Math.min(lowest, candidate.bi), Number.POSITIVE_INFINITY);
+  for (const [occurrence, event] of events.entries()) {
+    if (event.k !== "faint") {
+      continue;
+    }
+    const seat = state.field.find(candidate => candidate.bi === event.bi);
+    if (seat == null || !isHumanSeat(seat) || (seatHp(state, seat) ?? 1) > 0) {
+      continue;
+    }
+    const ownerSeatId = roleSeatId(seat);
+    if (ownerSeatId == null || !hasLegalHumanReplacement(state, seat, ownerSeatId)) {
+      continue;
+    }
+    const fieldIndex = seat.side === "enemy" ? seat.bi - enemyOffset : seat.bi;
+    if (!Number.isSafeInteger(fieldIndex) || fieldIndex < 0) {
+      continue;
+    }
+    const address = {
+      epoch,
+      wave: state.wave,
+      turn: state.turn,
+      occurrence,
+      fieldIndex,
+    };
+    return {
+      kind: "REPLACEMENT",
+      operationId: replacementOperationId(address, ownerSeatId),
+      ownerSeatId,
+      ...address,
+    };
+  }
+  return null;
 }
 
 /**

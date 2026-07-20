@@ -6,6 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { replacementOperationId } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   addressCoopFaintSwitchChoiceData,
@@ -28,6 +29,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
+  notifyCoopV2InteractionSurfaceReady,
   runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
@@ -48,6 +50,7 @@ import { PartyUiHandler, PartyUiMode } from "#ui/handlers/party-ui-handler";
  */
 export class CoopGuestFaintSwitchPhase extends Phase {
   public readonly phaseName = "CoopGuestFaintSwitchPhase";
+  public coopV2ControlOperationId: string | null = null;
 
   private readonly fieldIndex: number;
   private readonly faintSourceAddress: CoopFaintSourceAddress | undefined;
@@ -102,6 +105,16 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       failCoopSharedSession("The replacement picker lost its active runtime.");
       return;
     }
+    this.coopV2ControlOperationId = replacementOperationId(
+      {
+        epoch: controller.sessionEpoch,
+        wave: sourceWave,
+        turn: sourceTurn,
+        occurrence,
+        fieldIndex: this.fieldIndex,
+      },
+      controller.localSeatId,
+    );
     const boundaryStillLive = (): boolean =>
       coopSessionGeneration() === sourceGeneration
       && getCoopRuntime() === runtime
@@ -230,6 +243,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
         },
         PartyUiHandler.FilterNonFainted,
       );
+      queueMicrotask(() => runWhenCoopRuntimeActive(runtime, () => notifyCoopV2InteractionSurfaceReady(runtime)));
     } catch {
       // A UI failure must never hang the guest's replay; the host auto-picks after its wait.
       endCoopFaintSwitchWindow();

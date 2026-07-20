@@ -551,6 +551,9 @@ function sharedInteraction(
   surfaceClass: Exclude<CoopOperationSurfaceClass, "op:faintSwitch" | "op:wave">,
   operationId: string,
   ownerSeatId: number,
+  epoch: number,
+  wave: number,
+  turn: number,
   operationKind: CoopV2InteractionOperationKind,
   successorOperationKinds: readonly CoopV2InteractionOperationKind[],
   successorOperationIds: readonly string[] | null = null,
@@ -560,6 +563,9 @@ function sharedInteraction(
     surfaceClass,
     operationId,
     ownerSeatId,
+    epoch,
+    wave,
+    turn,
     operationKind,
     successor: {
       operationKinds: [...successorOperationKinds],
@@ -616,7 +622,17 @@ export function successorOfCoopV2InteractionEnvelope(
     successorOperationKinds: readonly CoopV2InteractionOperationKind[],
     successorOperationIds: readonly string[] | null = null,
   ): ProjectableControl =>
-    sharedInteraction(cls, operationId, ownerSeatId, operationKind, successorOperationKinds, successorOperationIds);
+    sharedInteraction(
+      cls,
+      operationId,
+      ownerSeatId,
+      envelope.sessionEpoch,
+      envelope.wave,
+      envelope.turn,
+      operationKind,
+      successorOperationKinds,
+      successorOperationIds,
+    );
 
   switch (operation.kind) {
     case "ABILITY_PRESENT": {
@@ -688,6 +704,9 @@ export function successorOfCoopV2InteractionEnvelope(
           "BIOME_PICK",
         ),
         ownerSeatId: operation.owner,
+        epoch: envelope.sessionEpoch,
+        wave: envelope.wave,
+        turn: envelope.turn,
         operationKind: "BIOME_PICK",
         successor: {
           operationKinds: ["BIOME_PICK"],

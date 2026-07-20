@@ -72,7 +72,10 @@ export interface CoopRecoveryBundle {
   readonly membershipRevision: number;
   /** The canonical successor control the replica projects after material. */
   readonly nextControl: CoopRecoveryNextControl;
-  /** Contiguous entries covering (capturedFrontier, frontier], in revision order. */
+  /**
+   * Contiguous entries covering (capturedFrontier, frontier]. At an equal nonzero frontier this contains
+   * the exact frontier entry as a one-entry control-reconstruction proof, not as a missing revision.
+   */
   readonly requiredTail: readonly CoopAuthorityEntry[];
 }
 
@@ -123,10 +126,15 @@ function tailInconsistencyReason(
   frontier: number,
 ): string | undefined {
   if (tail.length === 0) {
-    // A no-op fast-forward (frontier === captured) legitimately carries no tail.
-    return frontier === capturedFrontier ? undefined : `empty tail cannot span (${capturedFrontier}, ${frontier}]`;
+    return frontier === 0 && capturedFrontier === 0
+      ? undefined
+      : "nonzero recovery frontier requires its immutable reconstruction entry";
   }
-  let previous = capturedFrontier;
+  const reconstructionOnly = frontier === capturedFrontier;
+  if (reconstructionOnly && (tail.length !== 1 || tail[0]?.revision !== frontier || frontier === 0)) {
+    return `equal frontier ${frontier} requires exactly its one reconstruction entry`;
+  }
+  let previous = reconstructionOnly ? capturedFrontier - 1 : capturedFrontier;
   const operationIds = new Set<string>();
   for (const entry of tail) {
     if (!isValidAuthorityEntry(entry)) {

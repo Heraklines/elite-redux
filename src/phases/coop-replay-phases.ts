@@ -1077,7 +1077,12 @@ export class CoopFinalizeTurnPhase extends Phase {
    * TurnInit/CommandPhase for the old wave; ending later leaves the installed successor stuck behind this
    * finalizer. The global revision and authenticated epoch are the causal fence.
    */
-  public releaseForCoopV2Successor(successor: { sessionEpoch: number; revision: number; kind: string }): boolean {
+  public releaseForCoopV2Successor(successor: {
+    sessionEpoch: number;
+    revision: number;
+    kind: string;
+    nextControl: CoopNextControl;
+  }): boolean {
     if (
       !this.awaitingAuthoritySuccessor
       || this.ended
@@ -1087,6 +1092,19 @@ export class CoopFinalizeTurnPhase extends Phase {
     ) {
       return false;
     }
+    if (successor.nextControl.kind === "COMMAND_FRONTIER") {
+      if (
+        successor.nextControl.epoch !== this.epoch
+        || successor.nextControl.wave !== this.wave
+        || successor.nextControl.turn !== this.turn + 1
+      ) {
+        throw new Error(
+          `Authority V2 ${successor.kind} cannot release settled turn ${this.wave}:${this.turn} `
+            + `to command ${successor.nextControl.wave}:${successor.nextControl.turn}`,
+        );
+      }
+      this.advanceRenderedTurnBoundary();
+    }
     coopLog(
       "v2-turn",
       `guest release parked turn=${this.turn} authorityRev=${this.authorityRevision} `
@@ -1094,6 +1112,37 @@ export class CoopFinalizeTurnPhase extends Phase {
     );
     this.end();
     return true;
+  }
+
+  /**
+   * Adopt the one legal numeric successor of this settled turn without executing local turn-end mechanics.
+   *
+   * Both the ordinary immediate-command path and a later ordered successor use this same live-cursor proof.
+   * Applying a V2 state image does not mutate `currentBattle.turn`, so envelope metadata is never accepted as
+   * evidence that the renderer crossed the boundary.
+   */
+  private advanceRenderedTurnBoundary(): void {
+    const settledTurn = this.turn;
+    const successorTurn = settledTurn + 1;
+    const renderedTurn = globalScene.currentBattle.turn;
+    if (renderedTurn === successorTurn) {
+      coopLog(
+        "replay",
+        `guest finalize turn=${settledTurn}: rendered cursor already at turn=${renderedTurn}; skipping duplicate increment`,
+      );
+    } else if (renderedTurn === settledTurn) {
+      globalScene.currentBattle.incrementTurn();
+    } else {
+      throw new Error(
+        `authoritative turn cursor cannot advance ${settledTurn}->${successorTurn} from live turn ${renderedTurn}`,
+      );
+    }
+    if (globalScene.currentBattle.turn !== successorTurn) {
+      throw new Error(
+        `authoritative turn cursor advance ${settledTurn}->${successorTurn} ended at ${globalScene.currentBattle.turn}`,
+      );
+    }
+    globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
   }
 
   private isModernTurnCommit(): boolean {
@@ -1370,12 +1419,16 @@ export class CoopFinalizeTurnPhase extends Phase {
               ? statedControl.epoch !== resolution.epoch
                 || statedControl.wave !== resolution.wave
                 || statedControl.turn !== resolution.turn + 1
-              : statedControl.kind !== "AWAIT_SUCCESSOR"
-                || statedControl.afterOperationId
-                  !== `TURN/e${resolution.epoch}/w${resolution.wave}/t${resolution.turn}`
-                || statedControl.epoch !== resolution.epoch
-                || statedControl.wave !== resolution.wave
-                || statedControl.turn !== resolution.turn))
+              : statedControl.kind === "REPLACEMENT"
+                ? statedControl.epoch !== resolution.epoch
+                  || statedControl.wave !== resolution.wave
+                  || statedControl.turn !== resolution.turn
+                : statedControl.kind !== "AWAIT_SUCCESSOR"
+                  || statedControl.afterOperationId
+                    !== `TURN/e${resolution.epoch}/w${resolution.wave}/t${resolution.turn}`
+                  || statedControl.epoch !== resolution.epoch
+                  || statedControl.wave !== resolution.wave
+                  || statedControl.turn !== resolution.turn))
         ) {
           this.failModernTurnCommit(streamer, `Turn ${this.turn} carried an invalid Authority V2 successor control.`);
           return;
@@ -1688,7 +1741,8 @@ export class CoopFinalizeTurnPhase extends Phase {
       // freeze). Detect the ME-battle win DIRECTLY (spawned ME battle, all enemies fainted per the host's
       // authoritative checkpoint) and run the ME victory tail instead of looping into a new command.
       const meBattleWon = !waveEnding && coopMeHandoffBattleWon();
-      const v2NoImmediateCommand = this.authorityNextControl?.kind === "AWAIT_SUCCESSOR";
+      const v2NoImmediateCommand =
+        this.authorityNextControl?.kind === "AWAIT_SUCCESSOR" || this.authorityNextControl?.kind === "REPLACEMENT";
       const v2ImmediateCommand = this.authorityNextControl?.kind === "COMMAND_FRONTIER";
       if (
         v2NoImmediateCommand
@@ -1702,41 +1756,6 @@ export class CoopFinalizeTurnPhase extends Phase {
             + `while wave ${wave} had already entered a shared boundary`,
         );
       }
-      // The host's real TurnEndPhase already advanced the settled battle cursor before it captured this
-      // turn's authority frame. A renderer must mirror that NUMERIC boundary even when it suppresses the
-      // TurnEndPhase itself: incrementTurn() only advances and resets the battle cursor; it does not queue
-      // TurnInit/Command or execute damaging end-of-turn mechanics. Omitting it left a real browser pair
-      // on reward:<wave>:hostTurn+1 vs reward:<wave>:guestTurn with otherwise byte-identical state.
-      const advanceRenderedTurnBoundary = (): void => {
-        const settledTurn = this.turn;
-        const successorTurn = settledTurn + 1;
-        const renderedTurn = globalScene.currentBattle.turn;
-        if (renderedTurn === successorTurn) {
-          // The live Battle cursor is the only proof that the numeric boundary was already adopted. An N+1
-          // replacement envelope can supersede this retained N commit's MATERIAL without mutating
-          // currentBattle.turn; treating envelope metadata as cursor state left the renderer on N while the
-          // authority opened N+1, so continuationReady could never be emitted.
-          coopLog(
-            "replay",
-            `guest finalize turn=${settledTurn}: rendered cursor already at turn=${renderedTurn}; skipping duplicate increment`,
-          );
-        } else if (renderedTurn === settledTurn) {
-          globalScene.currentBattle.incrementTurn();
-        } else {
-          // A retained commit may be re-delivered, but it may never silently manufacture or skip multiple
-          // battle turns. Fail immediately with the precise cursor split instead of waiting for the host's
-          // continuation-retention deadline to expire.
-          throw new Error(
-            `authoritative turn cursor cannot advance ${settledTurn}->${successorTurn} from live turn ${renderedTurn}`,
-          );
-        }
-        if (globalScene.currentBattle.turn !== successorTurn) {
-          throw new Error(
-            `authoritative turn cursor advance ${settledTurn}->${successorTurn} ended at ${globalScene.currentBattle.turn}`,
-          );
-        }
-        globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
-      };
       if (waveEnding) {
         // FINAL turn of an already-/about-to-be-resolved wave: be TERMINAL. Run the wave-advance tail
         // (VictoryPhase / BattleEnd / GameOver - exactly once, one-shot + wave-guarded), mirror the host's
@@ -1746,7 +1765,7 @@ export class CoopFinalizeTurnPhase extends Phase {
           "replay",
           `guest finalize turn=${this.turn}: suppressing phantom turn after wave-advance signaled wave=${wave} (terminal final turn, NOT queuing turn-end)`,
         );
-        advanceRenderedTurnBoundary();
+        this.advanceRenderedTurnBoundary();
         // #790 regression fix: the stale-duplicate mark is scoped to the wave it was set in.
         // waveIndex may not tick before the next wave's first replay phase starts, so clear the
         // mark NOW (the wave boundary) or the new wave's turn 1 is killed as a "stale duplicate".
@@ -1761,7 +1780,7 @@ export class CoopFinalizeTurnPhase extends Phase {
           "replay",
           `guest finalize turn=${this.turn}: suppressing phantom turn after ME battle-handoff WIN (running ME victory tail, NOT queuing turn-end)`,
         );
-        advanceRenderedTurnBoundary();
+        this.advanceRenderedTurnBoundary();
         getCoopBattleStreamer()?.clearFinalizedMark();
         queueCoopMeBattleVictoryTail();
       } else if (v2NoImmediateCommand) {
@@ -1792,7 +1811,7 @@ export class CoopFinalizeTurnPhase extends Phase {
         // TurnStartPhase -> CoopReplayTurnPhase for turn N+1. Victory still arrives ONLY via the host's
         // waveResolved -> maybeRunCoopWaveAdvance. Solo / host / lockstep keep the original turn-end run.
         if (isCoopAuthoritativeGuest()) {
-          advanceRenderedTurnBoundary();
+          this.advanceRenderedTurnBoundary();
         } else {
           globalScene.phaseManager.queueTurnEndPhases();
         }

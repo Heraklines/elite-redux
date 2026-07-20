@@ -17,7 +17,7 @@ const [
   { globalScene },
   { captureCoopSaveDataDigest },
   { canonicalize, fnv1a64 },
-  { getCoopRuntime },
+  { getCoopRuntime, isCoopV2InteractionHumanInputFrozen },
   { BattlerTagType },
   { BattleType },
   { Command },
@@ -1310,12 +1310,18 @@ function observeSemanticSurface(): void {
             : null;
     const promptGeneration =
       uiMode === "MESSAGE" && typeof readPromptGeneration === "function" ? readPromptGeneration.call(handler) : null;
-    const inputBlocked =
+    const handlerInputBlocked =
       typeof readInputBlocked === "function"
         ? readInputBlocked.call(handler)
         : typeof inputBlockedRaw === "boolean"
           ? inputBlockedRaw
           : null;
+    // Report the same Authority V2 lease gate that production Ui.processInput enforces. A visible PARTY
+    // picker without its exact replacement control is not actionable; publishing it as ready made the
+    // two-browser driver hammer keys that the game correctly rejected and mislabeled the product freeze
+    // as cursor geometry.
+    const v2InputFrozen = runtime == null ? false : isCoopV2InteractionHumanInputFrozen(runtime);
+    const inputBlocked = v2InputFrozen || handlerInputBlocked === true ? true : handlerInputBlocked;
     const surfaceGeneration = typeof readSurfaceGeneration === "function" ? readSurfaceGeneration.call(handler) : null;
     const semanticSurfaceInstance =
       Number.isSafeInteger(promptGeneration) && (promptGeneration ?? 0) > 0

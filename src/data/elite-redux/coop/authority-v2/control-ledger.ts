@@ -25,7 +25,10 @@ import {
   type ProjectableControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
 
-export type CoopV2InteractionControl = Extract<ProjectableControl, { kind: "SHARED_INTERACTION" | "AWAIT_SUCCESSOR" }>;
+export type CoopV2InteractionControl = Extract<
+  ProjectableControl,
+  { kind: "SHARED_INTERACTION" | "REPLACEMENT" | "AWAIT_SUCCESSOR" }
+>;
 export type CoopV2ClaimedControl = ProjectableControl;
 
 export interface CoopV2InteractionSurfaceObservation {
@@ -182,7 +185,7 @@ export class CoopV2ControlLedger {
   project(
     control: CoopV2InteractionControl,
     observation: CoopV2InteractionSurfaceObservation | null,
-    localSeatId = control.kind === "SHARED_INTERACTION" ? control.ownerSeatId : -1,
+    localSeatId = control.kind === "SHARED_INTERACTION" || control.kind === "REPLACEMENT" ? control.ownerSeatId : -1,
   ): CoopControlInstallResult {
     const controlId = controlIdOf(control);
     const claim = this.claims.get(controlId);
@@ -201,6 +204,14 @@ export class CoopV2ControlLedger {
       return alreadyInstalled ? { kind: "already-installed", controlId } : { kind: "installed", controlId };
     }
     const isOwner = localSeatId === control.ownerSeatId;
+    if (control.kind === "REPLACEMENT" && !isOwner) {
+      const alreadyInstalled = claim.installed != null;
+      if (!alreadyInstalled) {
+        claim.installed = { controlId, observation: { kind: "ordered-wait" } };
+      }
+      this.activeControlId = controlId;
+      return alreadyInstalled ? { kind: "already-installed", controlId } : { kind: "installed", controlId };
+    }
     if (observation == null || !observation.handlerActive || (isOwner && !observation.actionable)) {
       return {
         kind: "deferred",
@@ -296,7 +307,7 @@ export class CoopV2ControlLedger {
     const claim = this.claims.get(this.activeControlId);
     const installed = claim?.installed?.observation;
     return (
-      claim?.control.kind === "SHARED_INTERACTION"
+      (claim?.control.kind === "SHARED_INTERACTION" || claim?.control.kind === "REPLACEMENT")
       && claim.control.ownerSeatId === localSeatId
       && installed?.kind === "executable"
       && installed.phaseToken === observation.phaseToken
@@ -333,7 +344,35 @@ export class CoopV2ControlLedger {
    */
   adoptRecoveryFrontier(entry: CoopAuthorityEntry | null): boolean {
     this.clear();
-    return entry == null || (this.registerEntry(entry) && this.markMaterialApplied(entry));
+    return entry == null || this.adoptRecoveryControl(entry.revision, entry.operationId, entry.nextControl);
+  }
+
+  /**
+   * Replace every old engine-generation proof with one materially-applied, deliberately uninstalled claim.
+   *
+   * Empty-tail recovery has only the retained frontier identity/control, not the retired entry body. It must
+   * still invalidate the destroyed phase tree instead of reusing an old `mechanical` marker.
+   */
+  adoptRecoveryControl(revision: number, sourceOperationId: string, control: CoopV2ClaimedControl): boolean {
+    this.clear();
+    if (
+      !Number.isSafeInteger(revision)
+      || revision <= 0
+      || sourceOperationId.length === 0
+      || (control.kind === "AWAIT_SUCCESSOR" && control.afterOperationId !== sourceOperationId)
+    ) {
+      return false;
+    }
+    const controlId = controlIdOf(control);
+    this.claims.set(controlId, {
+      revision,
+      sourceOperationId,
+      control: structuredClone(control),
+      materialApplied: true,
+      superseded: false,
+      installed: null,
+    });
+    return true;
   }
 
   clear(): void {

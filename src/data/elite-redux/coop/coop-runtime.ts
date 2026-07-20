@@ -93,6 +93,10 @@ import {
   type ProjectableControl,
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
+import type {
+  CoopV2InteractionProposalLease,
+  CoopV2ProposalLeaseArmResult,
+} from "#data/elite-redux/coop/authority-v2/proposal-lease";
 import {
   type CoopRecoveryFencePredicatesV2,
   isCoopV2RecoveryEnabled,
@@ -4060,6 +4064,8 @@ export interface CoopRuntime {
   readonly v2ControlLedger: CoopV2ControlLedger;
   /** Successor that may release a recovered ordered-wait phase only after its immutable material applies. */
   v2RecoveryWaitSuccessorOperationId: string | null;
+  /** Exact control whose new engine generation was queued under the current correlated recovery fence. */
+  v2RecoveryPreparedControlId: string | null;
   /** Runtime-owned V2 wave/terminal transactions awaiting safe DATA and real destination proof. */
   readonly v2WaveTransactions: Map<number, CoopV2WaveLiveTransaction>;
   /**
@@ -4451,7 +4457,12 @@ function releaseCoopV2ParkedTurnBoundary(runtime: CoopRuntime, entry: CoopAuthor
   }
   const phase = globalScene.phaseManager?.getCurrentPhase() as
     | {
-        releaseForCoopV2Successor?: (successor: { sessionEpoch: number; revision: number; kind: string }) => boolean;
+        releaseForCoopV2Successor?: (successor: {
+          sessionEpoch: number;
+          revision: number;
+          kind: string;
+          nextControl: CoopNextControl;
+        }) => boolean;
       }
     | undefined;
   return (
@@ -4459,6 +4470,7 @@ function releaseCoopV2ParkedTurnBoundary(runtime: CoopRuntime, entry: CoopAuthor
       sessionEpoch: entry.context.sessionEpoch,
       revision: entry.revision,
       kind: entry.kind,
+      nextControl: entry.nextControl,
     }) === true
   );
 }
@@ -4705,7 +4717,7 @@ function projectCoopV2WaveControl(
 
 function projectCoopV2InteractionControl(
   runtime: CoopRuntime,
-  control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" | "AWAIT_SUCCESSOR" }>,
+  control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" | "REPLACEMENT" | "AWAIT_SUCCESSOR" }>,
 ): CoopControlInstallResult {
   const controlId = controlIdOf(control);
   if (control.kind === "AWAIT_SUCCESSOR") {
@@ -4720,27 +4732,39 @@ function projectCoopV2InteractionControl(
     return result;
   }
 
-  const contract = coopV2InteractionUiProofContract(control.surfaceClass, control.operationKind);
+  const contract =
+    control.kind === "REPLACEMENT"
+      ? {
+          phaseNames: ["SwitchPhase", "CoopGuestFaintSwitchPhase", "ShowdownEnemyFaintSwitchPhase"] as const,
+          uiModes: [UiMode.PARTY] as const,
+        }
+      : coopV2InteractionUiProofContract(control.surfaceClass, control.operationKind);
   const observation = observeCoopV2InteractionSurface();
   const messageShopWatcherReady =
-    observation?.uiMode !== UiMode.MESSAGE
+    control.kind === "REPLACEMENT"
+    || observation?.uiMode !== UiMode.MESSAGE
     || ((control.operationKind === "SHOP_PRESENT" || control.operationKind === "SHOP_BUY")
       && runtime.controller.localSeatId !== control.ownerSeatId
       && (observation.phaseToken as { coopBiomeWatcherContinuationReady?: boolean }).coopBiomeWatcherContinuationReady
         === true);
   const publicSurface =
-    contract != null
-    && observation != null
-    && (contract.phaseNames as readonly string[]).includes(observation.phaseName)
-    && (contract.uiModes as readonly number[]).includes(observation.uiMode)
-    && messageShopWatcherReady;
-  if (!publicSurface || observation == null) {
+    (control.kind === "REPLACEMENT" && runtime.controller.localSeatId !== control.ownerSeatId)
+    || (contract != null
+      && observation != null
+      && (contract.phaseNames as readonly string[]).includes(observation.phaseName)
+      && (contract.uiModes as readonly number[]).includes(observation.uiMode)
+      && messageShopWatcherReady);
+  if (!publicSurface || (control.kind !== "REPLACEMENT" && observation == null)) {
     return {
       kind: "deferred",
       reason: `awaiting exact public interaction surface for ${controlId}`,
     };
   }
-  const result = runtime.v2ControlLedger.project(control, observation, runtime.controller.localSeatId);
+  const result = runtime.v2ControlLedger.project(
+    control,
+    control.kind === "REPLACEMENT" && runtime.controller.localSeatId !== control.ownerSeatId ? null : observation,
+    runtime.controller.localSeatId,
+  );
   if (result.kind === "installed" || result.kind === "already-installed") {
     runtime.v2InstalledInteractionTargets.add(result.controlId);
     const waveTransaction = matchingCoopV2WaveTransaction(runtime, control);
@@ -4808,12 +4832,15 @@ function observeCoopV2InteractionSurface(): CoopV2InteractionSurfaceObservation 
  * and bypasses this gate; a local human is authorized only by the exact active phase/handler generation.
  */
 export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null = active): boolean {
-  if (runtime == null || !coopV2InteractionCutovers.has(runtime)) {
+  if (runtime == null || !coopV2ShadowHarnesses.has(runtime)) {
     return false;
   }
   const ledger = runtime.v2ControlLedger;
   const pending = ledger.latestControl;
-  if (pending == null || (pending.kind !== "SHARED_INTERACTION" && pending.kind !== "AWAIT_SUCCESSOR")) {
+  if (
+    pending == null
+    || (pending.kind !== "SHARED_INTERACTION" && pending.kind !== "REPLACEMENT" && pending.kind !== "AWAIT_SUCCESSOR")
+  ) {
     // Until wave/reward/command controls share this ledger, an absence of an interaction claim is not proof
     // that the current screen belongs to the interaction domain. Once a claim exists, enforcement is strict.
     return false;
@@ -4824,11 +4851,11 @@ export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null 
 
 /** Retry the exact retained interaction claim after a real phase reports that its public handler is active. */
 export function notifyCoopV2InteractionSurfaceReady(runtime: CoopRuntime | null = active): boolean {
-  if (runtime == null || !coopV2InteractionCutovers.has(runtime)) {
+  if (runtime == null || !coopV2ShadowHarnesses.has(runtime)) {
     return false;
   }
   const control = runtime.v2ControlLedger.latestControl;
-  if (control?.kind !== "SHARED_INTERACTION") {
+  if (control?.kind !== "SHARED_INTERACTION" && control?.kind !== "REPLACEMENT") {
     return false;
   }
   const projected = projectCoopV2InteractionControl(runtime, control);
@@ -4906,6 +4933,7 @@ function buildCoopV2LiveSeams(
       ((surfaces.turn || surfaces.replacement || surfaces.wave || surfaces.interaction)
         && control.kind === "AWAIT_SUCCESSOR")
       || ((surfaces.turn || surfaces.control) && control.kind === "COMMAND_FRONTIER")
+      || (surfaces.replacement && control.kind === "REPLACEMENT")
       || (surfaces.interaction && control.kind === "SHARED_INTERACTION")
       || (surfaces.wave
         && (control.kind === "REWARD"
@@ -5190,7 +5218,11 @@ function buildCoopV2LiveSeams(
       _ctx: CoopRuntimeContext,
       control: NonNullable<CoopNextControl>,
     ): CoopControlInstallResult | null => {
-      if (control.kind === "AWAIT_SUCCESSOR" || (surfaces.interaction && control.kind === "SHARED_INTERACTION")) {
+      if (
+        control.kind === "AWAIT_SUCCESSOR"
+        || (surfaces.replacement && control.kind === "REPLACEMENT")
+        || (surfaces.interaction && control.kind === "SHARED_INTERACTION")
+      ) {
         try {
           return projectCoopV2InteractionControl(runtime, control);
         } catch (error) {
@@ -5255,6 +5287,75 @@ function buildCoopV2LiveSeams(
 }
 
 /**
+ * Construct the exact engine generation recovery will subsequently prove.
+ *
+ * Ordinary projection is observation-only: it must never invent a UI from ambient state. Recovery is the
+ * one exception because it deliberately destroyed the obsolete phase tree under a held fence. Command
+ * frontiers are fully reconstructible from their immutable actor addresses plus the recovered snapshot, so
+ * queue those exact CommandPhases before opening the one-shift projection window. Replacement controls are
+ * likewise complete in their own address, so an owning replica can reconstruct the exact guest picker.
+ * Shared interactions remain owned by their immutable frontier entry material and ordinary exact observer.
+ */
+function prepareCoopV2RecoveryControlSurface(runtime: CoopRuntime, control: NonNullable<CoopNextControl>): boolean {
+  const controlId = controlIdOf(control as ProjectableControl);
+  if (runtime.v2RecoveryPreparedControlId === controlId) {
+    return true;
+  }
+  if (control.kind === "REPLACEMENT") {
+    if (runtime.controller.localSeatId !== control.ownerSeatId) {
+      runtime.v2RecoveryPreparedControlId = controlId;
+      return true;
+    }
+    const battle = globalScene.currentBattle;
+    if (
+      battle == null
+      || control.epoch !== runtime.controller.sessionEpoch
+      || battle.waveIndex !== control.wave
+      || battle.turn !== control.turn
+    ) {
+      return false;
+    }
+    globalScene.phaseManager.pushNew("CoopGuestFaintSwitchPhase", control.fieldIndex, {
+      wave: control.wave,
+      turn: control.turn,
+      occurrence: control.occurrence,
+    });
+    runtime.v2RecoveryPreparedControlId = controlId;
+    coopLog("v2-recovery", `queued exact replacement picker for ${controlId}`);
+    return true;
+  }
+  if (control.kind !== "COMMAND_FRONTIER") {
+    runtime.v2RecoveryPreparedControlId = controlId;
+    return true;
+  }
+  const battle = globalScene.currentBattle;
+  if (
+    battle == null
+    || control.epoch !== runtime.controller.sessionEpoch
+    || battle.waveIndex !== control.wave
+    || battle.turn !== control.turn
+  ) {
+    return false;
+  }
+  const localCommands = commandTargetsOwnedBySeat(control, runtime.controller.localSeatId);
+  const playerField = globalScene.getPlayerField();
+  const localFieldIndices: number[] = [];
+  for (const command of localCommands) {
+    const localFieldIndex = playerField.findIndex(pokemon => pokemon?.id === command.pokemonId);
+    if (localFieldIndex < 0) {
+      return false;
+    }
+    localFieldIndices.push(localFieldIndex);
+  }
+  for (const fieldIndex of localFieldIndices) {
+    globalScene.phaseManager.pushNew("CommandPhase", fieldIndex);
+  }
+  runtime.v2RecoveryPreparedControlId = controlId;
+  coopLog("v2-recovery", `queued ${localFieldIndices.length} exact CommandPhase generation(s) for ${controlId}`);
+  return true;
+}
+
+/**
  * Complete recovery integration over the same full snapshot transaction used by V1. Unlike ordinary entry
  * cutover, recovery projection may enqueue the authority-stated successor while the recovery phase is
  * deliberately current; that queued control cannot execute until the channel reopens the fence and invokes
@@ -5301,17 +5402,29 @@ function buildCoopV2LiveRecoverySeams(
       ) {
         return false;
       }
+      // replaceWithCoopRecoveryPhase destroyed every phase/handler generation. No command or interaction
+      // side token from that old tree may satisfy the reconstructed frontier.
+      runtime.v2InstalledCommandTargets.clear();
+      runtime.v2InstalledInteractionTargets.clear();
+      runtime.v2RecoveryPreparedControlId = null;
       const finalEntry = bundle.requiredTail.at(-1) ?? null;
-      if (finalEntry == null) {
-        return bundle.frontier === 0
-          ? bundle.nextControl == null && runtime.v2ControlLedger.adoptRecoveryFrontier(null)
-          : bundle.nextControl != null && controlsEqual(runtime.v2ControlLedger.latestControl, bundle.nextControl);
-      }
+      const adopted =
+        finalEntry == null
+          ? bundle.frontier === 0
+            ? bundle.nextControl == null && runtime.v2ControlLedger.adoptRecoveryFrontier(null)
+            : bundle.nextControl != null
+              && bundle.frontierOperationId != null
+              && runtime.v2ControlLedger.adoptRecoveryControl(
+                bundle.frontier,
+                bundle.frontierOperationId,
+                bundle.nextControl,
+              )
+          : finalEntry.revision === bundle.frontier
+            && finalEntry.operationId === bundle.frontierOperationId
+            && controlsEqual(finalEntry.nextControl, bundle.nextControl)
+            && runtime.v2ControlLedger.adoptRecoveryFrontier(finalEntry);
       return (
-        finalEntry.revision === bundle.frontier
-        && finalEntry.operationId === bundle.frontierOperationId
-        && controlsEqual(finalEntry.nextControl, bundle.nextControl)
-        && runtime.v2ControlLedger.adoptRecoveryFrontier(finalEntry)
+        adopted && (bundle.nextControl == null || prepareCoopV2RecoveryControlSurface(runtime, bundle.nextControl))
       );
     },
     projectControl: (ctx, control) => {
@@ -5337,11 +5450,13 @@ function buildCoopV2LiveRecoverySeams(
       );
     },
     onRecovered: () => {
+      runtime.v2RecoveryPreparedControlId = null;
       if (runtime.v2ControlLedger.activeControl?.kind !== "AWAIT_SUCCESSOR") {
         releaseCoopV2RecoveryPhase(runtime);
       }
     },
     onTerminal: reason => {
+      runtime.v2RecoveryPreparedControlId = null;
       abandonCoopV2RecoveryPhase(runtime);
       const point = readCoopBattlePoint();
       failCoopRuntimeSharedSession(runtime, reason, {
@@ -5574,6 +5689,48 @@ export function getCoopV2Shadow(runtime: CoopRuntime | null = active): CoopAutho
     }
     return null;
   }
+}
+
+/**
+ * Host-phase continuation barrier backed only by authenticated Authority V2 receipt quorum.
+ *
+ * This deliberately does not consult the retired V1 durability journal: interaction cutover suppresses that
+ * journal, so an operation-id waiter there can never prove peer materialization.
+ */
+export function waitForCoopV2PeerMaterialApplied(
+  operationId: string,
+  runtime: CoopRuntime | null = active,
+): Promise<boolean> {
+  if (
+    runtime == null
+    || runtime.controller.authorityRole !== "authority"
+    || runtime.controller.localSeatId !== runtime.controller.authoritySeatId
+  ) {
+    return Promise.resolve(false);
+  }
+  return (
+    coopV2ShadowHarnesses.get(runtime)?.waitForAuthorityPeerStage(operationId, "materialApplied")
+    ?? Promise.resolve(false)
+  );
+}
+
+/**
+ * Retain a non-authority interaction proposal until its exact immutable V2
+ * result enters the ordered log. The lease is not an authority entry and can
+ * neither allocate a revision nor release progression.
+ */
+export function retainCoopV2InteractionProposal(
+  input: CoopV2InteractionProposalLease,
+  runtime: CoopRuntime | null = active,
+): CoopV2ProposalLeaseArmResult {
+  if (
+    runtime == null
+    || !isCoopV2InteractionCutoverActive(runtime.durability)
+    || runtime.controller.localSeatId === runtime.controller.authoritySeatId
+  ) {
+    return "invalid";
+  }
+  return coopV2ShadowHarnesses.get(runtime)?.retainInteractionProposal(input) ?? "invalid";
 }
 
 /**
@@ -9203,6 +9360,7 @@ export function assembleCoopRuntime(
     v2SettledInteractionOperations: new Set<string>(),
     v2ControlLedger: new CoopV2ControlLedger(),
     v2RecoveryWaitSuccessorOperationId: null,
+    v2RecoveryPreparedControlId: null,
     v2WaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
     v2CompletedWaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
   };

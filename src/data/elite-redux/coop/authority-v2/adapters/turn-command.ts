@@ -177,6 +177,8 @@ export interface BuildTurnCommitInput {
    * an Authority V2 entry never delegates successor choice back to a local phase queue.
    */
   readonly nextCommandFrontier: TurnCommandFrontier | null;
+  /** Exact human replacement surface when this turn ends at a faint picker. */
+  readonly nextReplacementControl?: Extract<CoopNextControl, { kind: "REPLACEMENT" }> | null;
   /** The mutation barrier gating the capture (must read zero to build). */
   readonly barrier: MutationBarrier;
   /** Revisions this commit explicitly subsumes (supersession by log order). */
@@ -246,34 +248,36 @@ export function buildTurnCommitEntry(input: BuildTurnCommitInput): BuildTurnComm
     throw new Error("[authority-v2/turn-command] a non-command successor requires exact source wave/turn");
   }
   const nextControl: CoopNextControl =
-    input.nextCommandFrontier == null
-      ? {
-          kind: "AWAIT_SUCCESSOR",
-          afterOperationId: input.operationId,
-          epoch: input.context.sessionEpoch,
-          wave: sourceWave as number,
-          turn: sourceTurn as number,
-          // The absence of an immediate command frontier means the turn capture occurred before the engine
-          // could know which boundary comes next. A normal surviving battle opens the next turn through an
-          // explicit CONTROL_COMMIT; faint, interaction, wave, and terminal successors remain legal too.
-          // Omitting CONTROL_COMMIT made turn N's closed wait reject turn N+1's command-open by design.
-          allowedKinds: [
-            "CONTROL_COMMIT",
-            "REPLACEMENT_COMMIT",
-            "INTERACTION_COMMIT",
-            "WAVE_ADVANCE",
-            "TERMINAL_COMMIT",
-          ],
-          expectedOperationId: null,
-        }
-      : {
-          kind: "COMMAND_FRONTIER",
-          epoch: input.nextCommandFrontier.epoch,
-          wave: input.nextCommandFrontier.wave,
-          // The authority states the NEXT turn (N+1) - the successor, not the resolved turn.
-          turn: input.nextCommandFrontier.resolvedTurn + 1,
-          commands: input.nextCommandFrontier.commands,
-        };
+    input.nextReplacementControl == null
+      ? input.nextCommandFrontier == null
+        ? {
+            kind: "AWAIT_SUCCESSOR",
+            afterOperationId: input.operationId,
+            epoch: input.context.sessionEpoch,
+            wave: sourceWave as number,
+            turn: sourceTurn as number,
+            // The absence of an immediate command frontier means the turn capture occurred before the engine
+            // could know which boundary comes next. A normal surviving battle opens the next turn through an
+            // explicit CONTROL_COMMIT; faint, interaction, wave, and terminal successors remain legal too.
+            // Omitting CONTROL_COMMIT made turn N's closed wait reject turn N+1's command-open by design.
+            allowedKinds: [
+              "CONTROL_COMMIT",
+              "REPLACEMENT_COMMIT",
+              "INTERACTION_COMMIT",
+              "WAVE_ADVANCE",
+              "TERMINAL_COMMIT",
+            ],
+            expectedOperationId: null,
+          }
+        : {
+            kind: "COMMAND_FRONTIER",
+            epoch: input.nextCommandFrontier.epoch,
+            wave: input.nextCommandFrontier.wave,
+            // The authority states the NEXT turn (N+1) - the successor, not the resolved turn.
+            turn: input.nextCommandFrontier.resolvedTurn + 1,
+            commands: input.nextCommandFrontier.commands,
+          }
+      : input.nextReplacementControl;
 
   const entry: Omit<CoopAuthorityEntry, "revision"> = {
     context: input.context,

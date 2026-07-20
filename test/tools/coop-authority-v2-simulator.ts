@@ -322,6 +322,11 @@ export function controlKey(control: CoopNextControl | null): string {
           .sort()
           .join(",")
       );
+    case "REPLACEMENT":
+      return (
+        `REPLACEMENT:${control.operationId}:${control.ownerSeatId}:`
+        + `e${control.epoch}:w${control.wave}:t${control.turn}:o${control.occurrence}:f${control.fieldIndex}`
+      );
     case "REWARD":
       return `REWARD:${control.operationId}:${control.ownerSeatId}`;
     case "BIOME":

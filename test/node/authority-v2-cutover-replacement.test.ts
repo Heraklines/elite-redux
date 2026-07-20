@@ -303,13 +303,14 @@ describe("authority-v2 replacement staged transaction", () => {
       expect.objectContaining({ sourceAddress: expect.objectContaining({ occurrence: 9, fieldIndex: 1 }) }),
     ]);
     expect(result.entries[0].nextControl).toEqual({
-      kind: "AWAIT_SUCCESSOR",
-      afterOperationId: result.entries[0].operationId,
+      kind: "REPLACEMENT",
+      operationId: result.entries[1].operationId,
+      ownerSeatId: 1,
       epoch: SESSION.epoch,
       wave: 8,
       turn: 4,
-      allowedKinds: ["REPLACEMENT_COMMIT"],
-      expectedOperationId: result.entries[1].operationId,
+      occurrence: 9,
+      fieldIndex: 1,
     });
     expect(result.entries[1].nextControl?.kind).toBe("COMMAND_FRONTIER");
     expect(duo.host.diagnostics().retained).toBe(0);

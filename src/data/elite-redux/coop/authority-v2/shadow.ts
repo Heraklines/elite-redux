@@ -113,6 +113,7 @@ import type {
   CoopControlProjector,
   CoopFrameContextV2,
   CoopNextControl,
+  CoopReplicaMechanicalStage,
   CoopRuntimeContext,
 } from "#data/elite-redux/coop/authority-v2/contract";
 import { COOP_FRAME_PROTOCOL_VERSION, type CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
@@ -127,6 +128,11 @@ import {
   type ProjectableControl,
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
+import {
+  type CoopV2InteractionProposalLease,
+  type CoopV2ProposalLeaseArmResult,
+  CoopV2ProposalLeaseManager,
+} from "#data/elite-redux/coop/authority-v2/proposal-lease";
 import {
   type CoopInboundFrameResultV2,
   validateInboundFrame,
@@ -318,6 +324,7 @@ export interface CoopV2ShadowTurnTap {
   readonly operationId: string;
   readonly capture: TurnResolutionImage;
   readonly nextCommandFrontier: TurnCommandFrontier | null;
+  readonly nextReplacementControl?: Extract<CoopNextControl, { kind: "REPLACEMENT" }> | null;
   /** The raw legacy comparand token (the host full-state checksum) - a DIFFERENT scheme, kept for the log. */
   readonly legacyDigest: string;
   /**
@@ -514,6 +521,13 @@ interface ShadowStateRecord {
   readonly digest: string;
 }
 
+interface AuthorityPeerStageWaiter {
+  readonly operationId: string;
+  readonly stage: CoopReplicaMechanicalStage;
+  readonly resolve: (reached: boolean) => void;
+  cancelTimeout: () => void;
+}
+
 export class CoopAuthorityV2Shadow {
   private readonly ctxHandle: CoopRuntimeContextHandle;
   private readonly ctx: CoopRuntimeContext;
@@ -544,6 +558,11 @@ export class CoopAuthorityV2Shadow {
    * mechanically incomplete revision, so this cannot become a second journal.
    */
   private readonly pendingReplicaEntries = new Map<number, CoopAuthorityEntry>();
+  /** V2-native phase barriers resolved exclusively from authenticated authority-log receipt quorum. */
+  private readonly authorityPeerStageWaiters = new Set<AuthorityPeerStageWaiter>();
+  /** Guest proposals retained until their exact ordered V2 result is admitted. Never progression authority. */
+  private readonly proposalLeases: CoopV2ProposalLeaseManager;
+  private nextAuthorityPeerStageWaiterId = 1;
 
   private disposed = false;
   private committed = 0;
@@ -567,6 +586,7 @@ export class CoopAuthorityV2Shadow {
     this.sendFrame = deps.send;
     this.scheduler = deps.scheduler ?? createCoopScheduler();
     this.ownsScheduler = deps.scheduler == null;
+    this.proposalLeases = new CoopV2ProposalLeaseManager(this.scheduler);
 
     this.ctxHandle = createCoopRuntimeContext({
       runtimeId: id.runtimeId,
@@ -665,6 +685,7 @@ export class CoopAuthorityV2Shadow {
         operationId: input.operationId,
         capture: input.capture,
         nextCommandFrontier: input.nextCommandFrontier,
+        ...(input.nextReplacementControl === undefined ? {} : { nextReplacementControl: input.nextReplacementControl }),
         barrier,
         ...(input.subsumes == null ? {} : { subsumes: input.subsumes }),
       });
@@ -1133,6 +1154,9 @@ export class CoopAuthorityV2Shadow {
               + `sender=${receipt.context.senderSeatId} `
               + `generation=${receipt.context.connectionGeneration} ${detail}`,
           );
+          if (verdict.kind !== "rejected") {
+            this.flushAuthorityPeerStageWaiters();
+          }
           break;
         }
         case "tailRequest": {
@@ -1157,6 +1181,79 @@ export class CoopAuthorityV2Shadow {
     } catch (error) {
       this.fault(`inbound(${frame.t})`, error);
     }
+  }
+
+  /**
+   * Wait for every authenticated replica to reach a real V2 mechanical stage for one exact operation.
+   *
+   * The authority log owns the truth and retains/redelivers the entry. This waiter adds no authority and no
+   * resend path; it is only a bounded continuation notification for a host phase that must not tear down
+   * before peer material exists.
+   */
+  waitForAuthorityPeerStage(
+    operationId: string,
+    stage: CoopReplicaMechanicalStage,
+    timeoutMs = 30_000,
+  ): Promise<boolean> {
+    if (
+      this.disposed
+      || this.frameContext.senderSeatId !== this.frameContext.authoritySeatId
+      || typeof operationId !== "string"
+      || operationId.length === 0
+      || !Number.isSafeInteger(timeoutMs)
+      || timeoutMs <= 0
+    ) {
+      return Promise.resolve(false);
+    }
+    if (this.log.peerStageQuorum(operationId, stage)) {
+      return Promise.resolve(true);
+    }
+    return new Promise(resolve => {
+      const waiter: AuthorityPeerStageWaiter = {
+        operationId,
+        stage,
+        resolve,
+        cancelTimeout: () => {},
+      };
+      const waiterId = this.nextAuthorityPeerStageWaiterId++;
+      waiter.cancelTimeout = this.scheduler.schedule(
+        {
+          ownerId: `authority-v2:peer-stage:${this.frameContext.sessionEpoch}:${waiterId}`,
+          address: operationId,
+          reason: `wait for peer ${stage}`,
+        },
+        timeoutMs,
+        "connected",
+        () => this.settleAuthorityPeerStageWaiter(waiter, false),
+      );
+      this.authorityPeerStageWaiters.add(waiter);
+      // Covers a synchronous receipt delivered between the caller's commit return and waiter construction.
+      this.flushAuthorityPeerStageWaiters();
+    });
+  }
+
+  /** Retain one non-authority human proposal until its exact V2 result enters the ordered log. */
+  retainInteractionProposal(input: CoopV2InteractionProposalLease): CoopV2ProposalLeaseArmResult {
+    if (this.disposed || this.frameContext.senderSeatId === this.frameContext.authoritySeatId) {
+      return "invalid";
+    }
+    return this.proposalLeases.arm(input);
+  }
+
+  private flushAuthorityPeerStageWaiters(): void {
+    for (const waiter of [...this.authorityPeerStageWaiters]) {
+      if (this.log.peerStageQuorum(waiter.operationId, waiter.stage)) {
+        this.settleAuthorityPeerStageWaiter(waiter, true);
+      }
+    }
+  }
+
+  private settleAuthorityPeerStageWaiter(waiter: AuthorityPeerStageWaiter, reached: boolean): void {
+    if (!this.authorityPeerStageWaiters.delete(waiter)) {
+      return;
+    }
+    waiter.cancelTimeout();
+    waiter.resolve(reached);
   }
 
   /**
@@ -1276,11 +1373,19 @@ export class CoopAuthorityV2Shadow {
       throw error;
     }
     this.recoveryChannel?.rebind();
+    const proposalsRedelivered = this.proposalLeases.resendRetained();
     if (redelivered > 0) {
       coopLog(
         "v2-recovery",
         `rebound seat=${identity.localSeatId} membership=${identity.membershipRevision} `
           + `generation=${identity.connectionGeneration} redelivered=${redelivered}`,
+      );
+    }
+    if (proposalsRedelivered > 0) {
+      coopLog(
+        "v2-proposal",
+        `rebound seat=${identity.localSeatId} generation=${identity.connectionGeneration} `
+          + `redelivered=${proposalsRedelivered}`,
       );
     }
     return redelivered;
@@ -1296,6 +1401,10 @@ export class CoopAuthorityV2Shadow {
       return;
     }
     this.disposed = true;
+    for (const waiter of [...this.authorityPeerStageWaiters]) {
+      this.settleAuthorityPeerStageWaiter(waiter, false);
+    }
+    this.proposalLeases.dispose();
     // Drop the per-instance transport inbound registration first, so no late frame routes into a
     // half-disposed harness (handleInboundFrame also self-guards on `disposed`).
     try {
@@ -1385,6 +1494,12 @@ export class CoopAuthorityV2Shadow {
     }
     if (result.kind === "staleEpoch") {
       return false;
+    }
+    if (entry.kind === "INTERACTION_COMMIT") {
+      // Admission into the one ordered log is the first authoritative proof
+      // that this exact proposal was accepted. Close its non-mechanical resend
+      // lease before materialization; redelivery of the entry now owns liveness.
+      this.proposalLeases.observeCommitted(entry.operationId);
     }
     if (result.kind === "admitted") {
       if (this.liveReplica?.admitEntry?.(this.runtimeContext, entry) === false) {
