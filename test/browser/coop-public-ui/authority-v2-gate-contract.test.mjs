@@ -418,7 +418,7 @@ test("TURN_RESOLVE prompts form a closed command-to-turn Authority V2 path", () 
 test("Crossroads result envelopes retain the exact V2 control turn instead of a legacy turn-zero sentinel", () => {
   assert.match(
     victoryPhase,
-    /pushNew\(\s*"ErCrossroadsPhase",\s*currentWaveIndex,\s*globalScene\.currentBattle\.turn \+ 1,\s*\)/u,
+    /pushNew\(\s*"ErCrossroadsPhase",\s*currentWaveIndex,\s*globalScene\.currentBattle\.turn \+ 1,?\s*\)/u,
     "Victory freezes Crossroads at the post-BattleEnd settlement turn shared by the terminal reward",
   );
   const ownerStart = crossroadsPhase.indexOf("private coopOwnerCommit(");
