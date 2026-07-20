@@ -65,8 +65,8 @@ describe.runIf(RUN)("showdown tournament board - real-path acceptance", () => {
 
     // The viewer's live match + its bracket opponent (worker-authoritative), the exact fight A must open.
     const bracket = cfg.tournament.bracket!;
-    const mine = bracket.rounds.flat().find(m => m.winner === null && (m.a === "carla" || m.b === "carla"))!;
-    const opponent = mine.a === "carla" ? mine.b : mine.a;
+    const mine = bracket.rounds.flat().find(m => m.winner === null && (m.a === "Carla" || m.b === "Carla"))!;
+    const opponent = mine.a === "Carla" ? mine.b : mine.a;
 
     handler().processInput(Button.ACTION);
     await wait(20);
@@ -105,6 +105,18 @@ describe.runIf(RUN)("showdown tournament board - real-path acceptance", () => {
     handler().processInput(Button.CANCEL);
     await wait(20);
     expect(backed, "B fired onBack").toBe(true);
+  });
+
+  it("deep-link: initialBrowse opens the board ON the target match (challenge-notification realpath)", async () => {
+    // A challenge notification deep-links to a specific match via initialBrowse (the title flow
+    // passes it into the board config). The board must land its browse cursor there on show().
+    const cfg = buildTournamentBracketDemoConfig({ size: 16, advancedRounds: 2, card: "playable" });
+    cfg.initialBrowse = { round: 0, slot: 3 };
+    await openBoard(cfg);
+    const h = handler();
+    expect(h.container.visible, "the deep-linked board is shown").toBe(true);
+    expect(h.browse, "the browse cursor lands on the deep-link target").toEqual({ round: 0, slot: 3 });
+    expect(h.browsedMatch.id).toBe(cfg.tournament.bracket!.rounds[0][3].id);
   });
 
   it("d-pad browse moves the cursor to another match (its pairing card follows)", async () => {

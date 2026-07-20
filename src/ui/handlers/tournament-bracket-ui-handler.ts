@@ -6,20 +6,23 @@
 // =============================================================================
 // Showdown TOURNAMENTS — THE BOARD (Showdown Tournament P1.5). The showpiece: a
 // Pokemon World Tournament bracket board over the worker's authoritative bracket.
-//   - real CONNECTING LINES (semis -> final -> champion slot), drawn in the game's
-//     chrome language (thin gold/navy rects), scaling 4/8/16 cleanly.
-//   - each slot carries the entrant's GHOST-TRAINER ICON (their authored ghost
-//     identity: sprite key + name + seed chip), with a neutral fallback avatar for
-//     old registrations that carry no summary.
-//   - YOUR next fight is gold-highlighted with a VS marker; the d-pad browses every
+//   - BW2 PWT identity: the gold crest header band, a subtle stadium backdrop, the
+//     gold trophy, and navy/gold beveled plates throughout (the same chrome language
+//     as the Colosseum + tournament LIST screens).
+//   - each match is a styled CARD: two entrant plates with a framed GHOST-TRAINER
+//     ICON, a gold SEED chip, the real player USERNAME, win/loss colour language,
+//     and a styled VS badge. Names truncate with an ellipsis at the 16-field scale;
+//     the browsed match's card + the opponent card always show the full name.
+//   - real CONNECTING LINES: elbow segments with clean joins, bright gold along
+//     RESOLVED paths, dim along pending ones — scaling 4 / 8 / 16 cleanly.
+//   - YOUR next fight is gold-highlighted with the VS badge; the d-pad browses every
 //     match (each surfaces its pairing card); A on YOUR playable match enters the
 //     constrained tournament lobby; B returns to the list.
-//   - the bottom card is the OPPONENT card for your fight (ghost portrait + custom
-//     title + deadline countdown + presence line) or the browsed match's pairing.
-//   - RESOLUTION visuals: the winner's icon advances along the line into the next
-//     slot (server-fed), the loser's slot dims with an X; an eliminated player keeps
-//     a read-only spectator view; the CHAMPION state renders the winner's trainer
-//     art center-stage with "CHAMPION - <name>".
+//   - the bottom OPPONENT card frames the opponent portrait, their custom TITLE as
+//     flavor, the deadline countdown + a live presence chip, and the FIGHT prompt.
+//   - RESOLUTION visuals: the winner's icon advances into the next slot (server-fed),
+//     the loser's slot dims with an X; the CHAMPION state renders the winner's
+//     trainer art center-stage over a gold banner, "CHAMPION - <name>".
 //   - the board POLLS the worker (live refresh) and pings presence while open.
 // Pure presentation over the worker's authoritative bracket; no derived state.
 // =============================================================================
@@ -42,17 +45,24 @@ import { UiMode } from "#enums/ui-mode";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 
+// --- PWT navy/gold palette --------------------------------------------------
 const GOLD = 0xf8d030;
-const NEXT = 0x48c8f8;
-const TODO = 0x8a93b4;
-const BOARD = 0x0b1838;
+const GOLD_DEEP = 0xc79a1e;
+const NEXT = 0x48c8f8; // browse cursor / your-turn cyan
+const SUBTLE = 0xc0c8e0; // soft off-white for secondary text
+const WHITE = 0xffffff;
+const BOARD = 0x0a1430; // deep navy backdrop
+const PLATE = 0x142248; // card plate fill
+const PLATE_HI = 0x2a3d76; // bevel highlight
+const PLATE_LO = 0x070c22; // bevel shadow
+const HEADER_FILL = 0x101d40;
+const TODO = 0x8a93b4; // not-yet-decided text
 const BYE = 0x5a6488;
 const DUE_SOON = 0xf85040;
-const LINE_DIM = 0x394874;
-const CELL_FILL = 0x111a38;
-const WHITE = 0xffffff;
+const LINE_DIM = 0x35406e;
 const PRESENT_GREEN = 0x78e08a;
 const ELIM_RED = 0xf85040;
+const CHIP_NAVY = 0x0a1430;
 
 /** Poll cadence for the live board refresh (ms). */
 const POLL_INTERVAL_MS = 6000;
@@ -76,45 +86,24 @@ export interface TournamentBracketConfig {
   initialBrowse?: { round: number; slot: number };
 }
 
-/** A guaranteed-DARK navy content panel with a gold border (legible in-game AND headless). */
-function darkPanel(
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  color = CELL_FILL,
-  alpha = 0.94,
-): Phaser.GameObjects.Rectangle {
-  const r = globalScene.add.rectangle(x, y, w, h, color, alpha).setOrigin(0, 0);
-  r.setStrokeStyle(1, GOLD, 0.7);
-  return r;
-}
-
-/** Optional PWT 9-slice chrome (border only) when the CDN texture is present. */
-function pwtFrame(x: number, y: number, w: number, h: number): Phaser.GameObjects.NineSlice | null {
-  if (globalScene.textures.exists("er_pwt_panel")) {
-    const n = globalScene.add.nineslice(x, y, "er_pwt_panel", undefined, w, h, 4, 4, 4, 4);
-    n.setOrigin(0, 0);
-    return n;
-  }
-  return null;
-}
-
 /** 2D browse cursor over the bracket matches. */
 interface BrowseCursor {
   round: number;
   slot: number;
 }
 
+const BOTTOM_CARD_H = 40;
+
 export class TournamentBracketUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   private board: Phaser.GameObjects.Rectangle;
-  private frame: Phaser.GameObjects.NineSlice | null = null;
   private title: Phaser.GameObjects.Text;
-  private cardPanel: Phaser.GameObjects.Rectangle;
+  private headerStatus: Phaser.GameObjects.Text;
   private cardTitle: Phaser.GameObjects.Text;
   private cardBody: Phaser.GameObjects.Text;
   private cardHint: Phaser.GameObjects.Text;
+  /** Persistent chrome (backdrop, header band, bottom panel) built once in setup(). */
+  private chrome: Phaser.GameObjects.GameObject[] = [];
   private nodes: Phaser.GameObjects.GameObject[] = [];
   private cardNodes: Phaser.GameObjects.GameObject[] = [];
 
@@ -140,36 +129,113 @@ export class TournamentBracketUiHandler extends UiHandler {
     this.container.setVisible(false);
     ui.add(this.container);
 
+    // --- backdrop: deep navy + subtle PWT stadium texture + gold frame -----
     this.board = globalScene.add.rectangle(0, 0, w, h, BOARD, 1).setOrigin(0);
-    this.board.setStrokeStyle(2, GOLD, 0.8);
     this.container.add(this.board);
-    this.frame = pwtFrame(0, 0, w, h);
-    if (this.frame) {
-      this.container.add(this.frame);
+    if (globalScene.textures.exists("er_colosseum_bg")) {
+      const bg = globalScene.add.image(0, 0, "er_colosseum_bg").setOrigin(0, 0);
+      bg.setDisplaySize(w, h);
+      bg.setAlpha(0.12);
+      bg.setTint(0x3a5a9a);
+      this.container.add(bg);
+    }
+    // gold double frame around the whole board
+    const frame = globalScene.add.rectangle(1, 1, w - 2, h - 2, WHITE, 0).setOrigin(0);
+    frame.setStrokeStyle(1.5, GOLD, 0.85);
+    this.container.add(frame);
+    if (globalScene.textures.exists("er_pwt_panel")) {
+      const n = globalScene.add.nineslice(0, 0, "er_pwt_panel", undefined, w, h, 4, 4, 4, 4).setOrigin(0, 0);
+      n.setAlpha(0.85);
+      this.container.add(n);
     }
 
-    this.title = addTextObject(w / 2, 3, "", TextStyle.WINDOW, { fontSize: "38px" });
-    this.title.setOrigin(0.5, 0);
-    this.title.setTint(GOLD);
-    this.container.add(this.title);
+    // --- header band: crest + tournament name + status --------------------
+    this.buildHeaderBand(w);
 
-    // Bottom pairing / opponent card.
-    const cardH = 34;
-    const cardY = h - cardH - 3;
-    this.cardPanel = darkPanel(6, cardY, w - 12, cardH, 0x0a1230);
-    this.container.add(this.cardPanel);
-    this.cardTitle = addTextObject(11, cardY + 3, "", TextStyle.WINDOW, { fontSize: "32px" });
+    // --- bottom opponent / pairing panel (persistent plate) ---------------
+    const cardY = h - BOTTOM_CARD_H - 2;
+    this.buildBottomPanel(w, cardY);
+
+    this.cardTitle = addTextObject(12, cardY + 4, "", TextStyle.WINDOW, { fontSize: "36px" });
     this.cardTitle.setOrigin(0, 0);
     this.cardTitle.setTint(NEXT);
     this.container.add(this.cardTitle);
-    this.cardBody = addTextObject(11, cardY + 12, "", TextStyle.PARTY, { fontSize: "30px" });
+    this.cardBody = addTextObject(12, cardY + 16, "", TextStyle.PARTY, { fontSize: "32px" });
     this.cardBody.setOrigin(0, 0);
     this.cardBody.setTint(WHITE);
     this.container.add(this.cardBody);
-    this.cardHint = addTextObject(w - 11, cardY + 3, "", TextStyle.PARTY, { fontSize: "30px" });
+    this.cardHint = addTextObject(w - 12, cardY + 4, "", TextStyle.PARTY, { fontSize: "32px" });
     this.cardHint.setOrigin(1, 0);
     this.cardHint.setTint(GOLD);
     this.container.add(this.cardHint);
+  }
+
+  /** The gold crest header band across the top. */
+  private buildHeaderBand(w: number): void {
+    const bandH = 20;
+    this.plate(this.chrome, 4, 2, w - 8, bandH, { fill: HEADER_FILL, border: GOLD, borderW: 1.4 });
+    // a thin gold underline rule under the band
+    const rule = globalScene.add.rectangle(6, 2 + bandH, w - 12, 1, GOLD, 0.5).setOrigin(0, 0);
+    this.container.add(rule);
+    this.chrome.push(rule);
+
+    if (globalScene.textures.exists("er_pwt_crest")) {
+      const crestL = globalScene.add
+        .image(16, 3, "er_pwt_crest")
+        .setOrigin(0.5, 0)
+        .setScale(17 / 123);
+      const crestR = globalScene.add
+        .image(w - 16, 3, "er_pwt_crest")
+        .setOrigin(0.5, 0)
+        .setScale(17 / 123);
+      this.container.add(crestL);
+      this.container.add(crestR);
+      this.chrome.push(crestL, crestR);
+    }
+
+    this.title = addTextObject(w / 2, 4, "", TextStyle.WINDOW, { fontSize: "44px" });
+    this.title.setOrigin(0.5, 0);
+    this.title.setTint(GOLD);
+    this.container.add(this.title);
+    this.headerStatus = addTextObject(w / 2, 15, "Pokemon World Tournament", TextStyle.PARTY, { fontSize: "24px" });
+    this.headerStatus.setOrigin(0.5, 0);
+    this.headerStatus.setTint(SUBTLE);
+    this.container.add(this.headerStatus);
+  }
+
+  /** The persistent bottom panel plate (contents filled per-state in layoutCard). */
+  private buildBottomPanel(w: number, cardY: number): void {
+    this.plate(this.chrome, 4, cardY, w - 8, BOTTOM_CARD_H, { fill: 0x0d1836, border: GOLD, borderW: 1.4 });
+    // gold accent strip down the left edge of the panel
+    const accent = globalScene.add.rectangle(4, cardY, 2, BOTTOM_CARD_H, GOLD, 0.85).setOrigin(0, 0);
+    this.container.add(accent);
+    this.chrome.push(accent);
+  }
+
+  /**
+   * A navy/gold BEVELED plate (fill + border + a 1px highlight top / shadow bottom). Rendered
+   * with pure primitives so it looks identical in-game AND in the headless golden harness.
+   * Pushes every piece to `sink` (chrome for persistent, nodes for per-layout) + the container.
+   */
+  private plate(
+    sink: Phaser.GameObjects.GameObject[],
+    x: number,
+    y: number,
+    ww: number,
+    hh: number,
+    opts: { fill?: number; alpha?: number; border?: number; borderW?: number; borderAlpha?: number } = {},
+  ): Phaser.GameObjects.Rectangle {
+    const fill = opts.fill ?? PLATE;
+    const base = globalScene.add.rectangle(x, y, ww, hh, fill, opts.alpha ?? 1).setOrigin(0, 0);
+    base.setStrokeStyle(opts.borderW ?? 1, opts.border ?? GOLD_DEEP, opts.borderAlpha ?? 0.85);
+    this.container.add(base);
+    sink.push(base);
+    const hi = globalScene.add.rectangle(x + 1, y + 1, ww - 2, 1, PLATE_HI, 0.55).setOrigin(0, 0);
+    const lo = globalScene.add.rectangle(x + 1, y + hh - 2, ww - 2, 1, PLATE_LO, 0.7).setOrigin(0, 0);
+    this.container.add(hi);
+    this.container.add(lo);
+    sink.push(hi, lo);
+    return base;
   }
 
   show(args: any[]): boolean {
@@ -178,6 +244,7 @@ export class TournamentBracketUiHandler extends UiHandler {
     }
     this.config = args[0] as TournamentBracketConfig;
     this.title.setText(this.config.tournament.name);
+    this.updateHeaderStatus();
     this.resetBrowseToOwnMatch();
     const forced = this.config.initialBrowse;
     const rounds = this.config.tournament.bracket?.rounds;
@@ -191,6 +258,21 @@ export class TournamentBracketUiHandler extends UiHandler {
     this.active = true;
     this.startPolling();
     return true;
+  }
+
+  private updateHeaderStatus(): void {
+    const cfg = this.config;
+    if (cfg == null) {
+      return;
+    }
+    const t = cfg.tournament;
+    if (isBracketComplete(t.bracket ?? { size: 0, rounds: [] })) {
+      this.headerStatus.setText("Champion crowned");
+      this.headerStatus.setTint(GOLD);
+      return;
+    }
+    this.headerStatus.setTint(SUBTLE);
+    this.headerStatus.setText(`${t.entrantCount} entrants  •  Pokemon World Tournament`);
   }
 
   // #region entrant / seed lookups
@@ -209,11 +291,22 @@ export class TournamentBracketUiHandler extends UiHandler {
     return this.config.tournament.entrants.find(e => e.participant === participant) ?? null;
   }
 
+  /**
+   * The name shown on a slot / card is the REAL player USERNAME (the `participant`), never the
+   * authored ghost name — that keeps identity unambiguous across the board. The worker mirrors
+   * the username into `entrant.name`, so prefer that (identical to `participant`); the ghost
+   * NAME/TITLE are flavor surfaced only on the opponent card ({@linkcode ghostTitleOf}).
+   */
   private displayName(participant: string | null): string {
     if (participant == null) {
       return "";
     }
-    return this.entrantOf(participant)?.ghost?.name ?? participant;
+    return this.entrantOf(participant)?.name ?? participant;
+  }
+
+  /** The opponent's authored ghost TITLE (flavor only), or null. */
+  private ghostTitleOf(participant: string | null): string | null {
+    return this.entrantOf(participant)?.ghost?.title ?? null;
   }
 
   // #endregion
@@ -254,37 +347,29 @@ export class TournamentBracketUiHandler extends UiHandler {
     const h = globalScene.scaledCanvas.height;
     const rounds = bracket.rounds.length;
     const cols = rounds + 1; // +1 for the champion slot column
-    const marginX = 6;
-    const gapX = 6;
-    const areaTop = 26;
-    const areaBottom = h - 34 - 8;
+    const marginX = 5;
+    const areaTop = 32;
+    const areaBottom = h - BOTTOM_CARD_H - 6;
     const areaH = areaBottom - areaTop;
     const colW = (w - 2 * marginX) / cols;
-    const cellW = colW - gapX;
-    const cellLeft = (c: number) => marginX + c * colW + gapX / 2;
+    const cellW = colW - 6;
+    const cellLeft = (c: number) => marginX + c * colW + 3;
     const cellRight = (c: number) => cellLeft(c) + cellW;
     const centerY = (m: number, count: number) => areaTop + ((m + 0.5) * areaH) / count;
+
+    // A fixed comfortable cell height (derived from round 0), so later rounds do NOT balloon
+    // into giant empty boxes (the old dead-space problem) — the tree stays evenly rhythmed.
+    const n0 = bracket.rounds[0]?.length ?? 1;
+    const cellH = Phaser.Math.Clamp(areaH / n0 - 3, 13, 22);
 
     const own = cfg.ownParticipant;
     const yourMatch = nextMatchFor(bracket, own);
 
-    // round headers
+    // round header banners
     for (let r = 0; r < rounds; r++) {
-      const rl = addTextObject(cellLeft(r) + cellW / 2, 16, roundLabel(r, rounds), TextStyle.PARTY, {
-        fontSize: "24px",
-      });
-      rl.setOrigin(0.5, 0);
-      rl.setTint(TODO);
-      this.container.add(rl);
-      this.nodes.push(rl);
+      this.drawRoundBanner(cellLeft(r), cellW, roundLabel(r, rounds), false);
     }
-    const champHeader = addTextObject(cellLeft(cols - 1) + cellW / 2, 16, "Champion", TextStyle.PARTY, {
-      fontSize: "24px",
-    });
-    champHeader.setOrigin(0.5, 0);
-    champHeader.setTint(GOLD);
-    this.container.add(champHeader);
-    this.nodes.push(champHeader);
+    this.drawRoundBanner(cellLeft(cols - 1), cellW, "Champion", true);
 
     // --- CONNECTING LINES (drawn beneath the cells) ---
     for (let r = 0; r < rounds; r++) {
@@ -293,13 +378,11 @@ export class TournamentBracketUiHandler extends UiHandler {
       for (let m = 0; m < count; m++) {
         const childY = centerY(m, count);
         const decided = matches[m].winner !== null;
-        const lineColor = decided ? GOLD : LINE_DIM;
-        // target: parent match (next round) or the champion slot (after the final)
         const targetCol = r + 1;
         const targetCount = r + 1 < rounds ? bracket.rounds[r + 1].length : 1;
         const targetSlot = Math.floor(m / 2);
         const targetY = centerY(targetSlot, targetCount);
-        this.drawConnector(cellRight(r), childY, cellLeft(targetCol), targetY, lineColor, decided);
+        this.drawConnector(cellRight(r), childY, cellLeft(targetCol), targetY, decided);
       }
     }
 
@@ -307,7 +390,6 @@ export class TournamentBracketUiHandler extends UiHandler {
     for (let r = 0; r < rounds; r++) {
       const matches = bracket.rounds[r];
       const count = matches.length;
-      const cellH = Math.max(11, Math.min(24, areaH / count - 3));
       for (let m = 0; m < count; m++) {
         const cy = centerY(m, count);
         const match = matches[m];
@@ -318,7 +400,7 @@ export class TournamentBracketUiHandler extends UiHandler {
     }
 
     // --- CHAMPION SLOT (far-right column) ---
-    this.drawChampionSlot(cellLeft(cols - 1), centerY(0, 1), cellW, own);
+    this.drawChampionPedestal(cellLeft(cols - 1), centerY(0, 1), cellW, own);
 
     // record the browsed match for the card + input
     this.browsedMatch = this.matchAt(this.browse.round, this.browse.slot);
@@ -331,33 +413,60 @@ export class TournamentBracketUiHandler extends UiHandler {
     this.layoutCard();
   }
 
-  /** A bracket elbow connector: child stub -> mid vertical -> parent stub. Thin rects. */
+  /** A small gold-accented banner over a round column. */
+  private drawRoundBanner(x: number, cw: number, label: string, champion: boolean): void {
+    const y = 23;
+    const bw = Math.min(cw, 58);
+    const bx = x + (cw - bw) / 2;
+    this.plate(this.nodes, bx, y, bw, 8, {
+      fill: champion ? 0x2a2410 : HEADER_FILL,
+      border: champion ? GOLD : GOLD_DEEP,
+      borderW: champion ? 1.2 : 0.9,
+      borderAlpha: champion ? 1 : 0.7,
+    });
+    const t = addTextObject(x + cw / 2, y + 1.5, label, TextStyle.PARTY, { fontSize: "22px" });
+    t.setOrigin(0.5, 0);
+    t.setTint(champion ? GOLD : SUBTLE);
+    this.container.add(t);
+    this.nodes.push(t);
+  }
+
+  /** A bracket elbow connector: child stub -> mid vertical -> parent stub, with clean joins. */
   private drawConnector(
     childRight: number,
     childY: number,
     parentLeft: number,
     parentY: number,
-    color: number,
     strong: boolean,
   ): void {
-    const midX = (childRight + parentLeft) / 2;
-    const th = strong ? 1.4 : 1;
-    const alpha = strong ? 0.95 : 0.55;
+    const color = strong ? GOLD : LINE_DIM;
+    const midX = Math.round((childRight + parentLeft) / 2);
+    const th = strong ? 1.6 : 1.1;
+    const alpha = strong ? 0.95 : 0.6;
     const add = (x: number, y: number, ww: number, hh: number) => {
-      const r = globalScene.add.rectangle(x, y, ww, hh, color, alpha).setOrigin(0, 0.5);
+      const r = globalScene.add.rectangle(x, y, Math.max(1, ww), Math.max(1, hh), color, alpha).setOrigin(0, 0.5);
       this.container.add(r);
       this.nodes.push(r);
+      return r;
     };
     // horizontal stub out of the child
-    add(childRight, childY, Math.max(1, midX - childRight), th);
-    // vertical segment at the mid column
+    add(childRight, childY, midX - childRight, th);
+    // vertical riser at the mid column
     const y0 = Math.min(childY, parentY);
     const y1 = Math.max(childY, parentY);
     const v = globalScene.add.rectangle(midX - th / 2, y0, th, Math.max(1, y1 - y0), color, alpha).setOrigin(0, 0);
     this.container.add(v);
     this.nodes.push(v);
     // horizontal stub into the parent
-    add(midX, parentY, Math.max(1, parentLeft - midX), th);
+    add(midX, parentY, parentLeft - midX, th);
+    // join dots (a small square where the stub meets the riser + enters the parent)
+    const dot = (cx: number, cy: number) => {
+      const d = globalScene.add.rectangle(cx, cy, th + 1.4, th + 1.4, color, alpha).setOrigin(0.5, 0.5);
+      this.container.add(d);
+      this.nodes.push(d);
+    };
+    dot(midX, childY);
+    dot(parentLeft, parentY);
   }
 
   private drawMatchCell(
@@ -370,40 +479,64 @@ export class TournamentBracketUiHandler extends UiHandler {
     isYour: boolean,
     isBrowsed: boolean,
   ): void {
-    const panel = darkPanel(x, y, cw, ch);
-    this.container.add(panel);
-    this.nodes.push(panel);
+    // the plate
+    this.plate(this.nodes, x, y, cw, ch, {
+      fill: isYour ? 0x1a2c5e : PLATE,
+      border: isYour ? GOLD : GOLD_DEEP,
+      borderW: isYour ? 1.3 : 0.9,
+      borderAlpha: isYour ? 1 : 0.75,
+    });
 
-    // YOUR next fight: persistent gold glow border + VS marker.
+    // YOUR next fight: persistent gold glow border.
     if (isYour) {
-      const glow = globalScene.add.rectangle(x - 1, y - 1, cw + 2, ch + 2, WHITE, 0).setOrigin(0, 0);
-      glow.setStrokeStyle(1.6, GOLD, 1);
+      const glow = globalScene.add.rectangle(x - 1.5, y - 1.5, cw + 3, ch + 3, WHITE, 0).setOrigin(0, 0);
+      glow.setStrokeStyle(1, GOLD, 0.9);
       this.container.add(glow);
       this.nodes.push(glow);
     }
-    // Browse cursor: a distinct cyan ring around the currently-inspected match.
+    // Browse cursor: a cyan ring around the currently-inspected match.
     if (isBrowsed) {
-      const cur = globalScene.add.rectangle(x - 2, y - 2, cw + 4, ch + 4, WHITE, 0).setOrigin(0, 0);
+      const cur = globalScene.add.rectangle(x - 2.5, y - 2.5, cw + 5, ch + 5, WHITE, 0).setOrigin(0, 0);
       cur.setStrokeStyle(1, NEXT, 1);
       this.container.add(cur);
       this.nodes.push(cur);
     }
 
     const half = ch / 2;
+    // divider between the two slots
+    const div = globalScene.add.rectangle(x + 2, y + half, cw - 4, 0.8, GOLD_DEEP, 0.4).setOrigin(0, 0.5);
+    this.container.add(div);
+    this.nodes.push(div);
+
     const emptyLabel = match.round === 0 ? "bye" : "TBD";
     const aLoser = match.winner !== null && match.a !== null && match.a !== match.winner;
     const bLoser = match.winner !== null && match.b !== null && match.b !== match.winner;
-    this.drawSlot(match.a, match.winner, own, x, y, half, emptyLabel, aLoser);
-    this.drawSlot(match.b, match.winner, own, x, y + half, half, emptyLabel, bLoser);
+    const full = isYour || isBrowsed;
+    this.drawSlot(match.a, match.winner, own, x, y, cw, half, emptyLabel, aLoser, full);
+    this.drawSlot(match.b, match.winner, own, x, y + half, cw, half, emptyLabel, bLoser, full);
 
-    // VS marker centered between the two slots of your fight (or the browsed one).
-    if (isYour || isBrowsed) {
-      const vs = addTextObject(x + cw - 2, y + half, "VS", TextStyle.WINDOW, { fontSize: "22px" });
-      vs.setOrigin(1, 0.5);
-      vs.setTint(isYour ? GOLD : NEXT);
-      this.container.add(vs);
-      this.nodes.push(vs);
+    // VS badge on the right edge — only for a LIVE pairing (both present, undecided).
+    if ((isYour || isBrowsed) && match.a != null && match.b != null && match.winner == null) {
+      this.drawVsBadge(x + cw - 1, y + half, isYour);
     }
+  }
+
+  /** A small gold/cyan VS badge (a bordered navy pill) anchored at (rightX, cy). */
+  private drawVsBadge(rightX: number, cy: number, gold: boolean): void {
+    const col = gold ? GOLD : NEXT;
+    const bw = 12;
+    const bh = 8;
+    const bx = rightX - bw + 2;
+    const by = cy - bh / 2;
+    const badge = globalScene.add.rectangle(bx, by, bw, bh, CHIP_NAVY, 1).setOrigin(0, 0);
+    badge.setStrokeStyle(1, col, 1);
+    this.container.add(badge);
+    this.nodes.push(badge);
+    const t = addTextObject(bx + bw / 2, cy, "VS", TextStyle.WINDOW, { fontSize: "20px" });
+    t.setOrigin(0.5, 0.5);
+    t.setTint(col);
+    this.container.add(t);
+    this.nodes.push(t);
   }
 
   private drawSlot(
@@ -412,37 +545,64 @@ export class TournamentBracketUiHandler extends UiHandler {
     own: string,
     x: number,
     y: number,
+    cw: number,
     sh: number,
     emptyLabel: string,
     isLoser: boolean,
+    full: boolean,
   ): void {
     const isEmpty = participant === null;
     const isWinner = participant !== null && participant === winner;
     const isOwn = participant === own;
-    const iconH = Math.max(7, Math.min(sh - 1, 15));
-    const iconCx = x + 1 + iconH * 0.42;
-    const iconTop = y + (sh - iconH) / 2;
 
-    // ghost-trainer icon (or fallback avatar), dimmed when this slot lost.
+    // winner accent bar down the slot's left edge
+    if (isWinner) {
+      const bar = globalScene.add.rectangle(x + 1, y + 1, 1.6, sh - 2, GOLD, 0.9).setOrigin(0, 0);
+      this.container.add(bar);
+      this.nodes.push(bar);
+    }
+
+    const iconH = Math.max(7, Math.min(sh - 1, 14));
+    const iconCx = x + 4 + iconH * 0.42;
+    const iconTop = y + (sh - iconH) / 2;
     const spriteKey = isEmpty ? null : (this.entrantOf(participant)?.ghost?.spriteKey ?? null);
     this.drawTrainerIcon(iconCx, iconTop + iconH, iconH, spriteKey, { dim: isLoser, empty: isEmpty });
 
-    const textX = x + 2 + iconH * 0.9;
     const seed = this.seedOf(participant);
+    let textX = x + 5 + iconH * 0.9;
+    // gold SEED chip
+    if (!isEmpty && seed != null) {
+      const chipW = seed >= 10 ? 11 : 8;
+      const chipH = Math.min(7, sh - 2);
+      const chipY = y + (sh - chipH) / 2;
+      const chip = globalScene.add.rectangle(textX, chipY, chipW, chipH, isLoser ? BYE : GOLD, 1).setOrigin(0, 0);
+      chip.setStrokeStyle(0.6, GOLD_DEEP, 0.9);
+      this.container.add(chip);
+      this.nodes.push(chip);
+      const st = addTextObject(textX + chipW / 2, y + sh / 2, String(seed), TextStyle.WINDOW, { fontSize: "20px" });
+      st.setOrigin(0.5, 0.5);
+      st.setTint(CHIP_NAVY);
+      this.container.add(st);
+      this.nodes.push(st);
+      textX += chipW + 2;
+    }
+
     const nm = isEmpty ? emptyLabel : this.displayName(participant);
-    const label = isEmpty ? emptyLabel : `${seed == null ? "" : `${seed}. `}${nm}`;
-    const t = addTextObject(textX, y + sh / 2, label, TextStyle.WINDOW, { fontSize: "26px" });
+    const t = addTextObject(textX, y + sh / 2, nm, TextStyle.WINDOW, { fontSize: "26px" });
     t.setOrigin(0, 0.5);
     t.setTint(isWinner ? GOLD : isEmpty ? BYE : isLoser ? BYE : isOwn ? NEXT : WHITE);
     if (isLoser) {
-      t.setAlpha(0.5);
+      t.setAlpha(0.55);
     }
     this.container.add(t);
     this.nodes.push(t);
+    // truncate the name to the plate; the browsed/your card shows a bit more room
+    const maxNameW = x + cw - 3 - textX - (full ? 12 : 3);
+    this.fitText(t, maxNameW);
 
     // eliminated: a red X over the icon.
     if (isLoser) {
-      const cross = addTextObject(iconCx, y + sh / 2, "x", TextStyle.WINDOW, { fontSize: "34px" });
+      const cross = addTextObject(iconCx, y + sh / 2, "x", TextStyle.WINDOW, { fontSize: "30px" });
       cross.setOrigin(0.5, 0.5);
       cross.setTint(ELIM_RED);
       this.container.add(cross);
@@ -450,39 +610,64 @@ export class TournamentBracketUiHandler extends UiHandler {
     }
   }
 
-  /** The far-right champion slot: the trophy pedestal + (once decided) the champion's icon. */
-  private drawChampionSlot(x: number, cy: number, cw: number, own: string): void {
+  /** Trim a text object with an ellipsis until it fits `maxW` logical px. */
+  private fitText(t: Phaser.GameObjects.Text, maxW: number): void {
+    if (maxW <= 0 || t.displayWidth <= maxW) {
+      return;
+    }
+    const full = t.text;
+    let s = full;
+    while (s.length > 1 && t.displayWidth > maxW) {
+      s = s.slice(0, -1);
+      t.setText(`${s}…`);
+    }
+  }
+
+  /** The far-right champion pedestal: the gold trophy over a plinth + (once decided) the champ. */
+  private drawChampionPedestal(x: number, cy: number, cw: number, _own: string): void {
     const bracket = this.config?.tournament.bracket;
     const champ = bracket ? (isBracketComplete(bracket) ? (this.config?.tournament.champion ?? null) : null) : null;
-    const slotH = 20;
-    const y = cy - slotH / 2;
-    const panel = darkPanel(x, y, cw, slotH, 0x1a1330, 0.96);
-    panel.setStrokeStyle(1.4, GOLD, 1);
-    this.container.add(panel);
-    this.nodes.push(panel);
+    const plinthH = 30;
+    const y = cy - plinthH / 2;
+    this.plate(this.nodes, x, y, cw, plinthH, { fill: 0x201a34, border: GOLD, borderW: 1.4 });
 
-    const iconH = 15;
-    const spriteKey = champ ? (this.entrantOf(champ)?.ghost?.spriteKey ?? null) : null;
-    this.drawTrainerIcon(x + 2 + iconH * 0.42, y + (slotH - iconH) / 2 + iconH, iconH, spriteKey, {
-      dim: false,
-      empty: champ === null,
-    });
-    const label = champ ? this.displayName(champ) : "TBD";
-    const t = addTextObject(x + 2 + iconH, cy, label, TextStyle.WINDOW, { fontSize: "26px" });
-    t.setOrigin(0, 0.5);
-    t.setTint(champ ? GOLD : TODO);
-    if (champ === own) {
-      t.setText(`${label}`);
+    // trophy at the top of the plinth
+    if (globalScene.textures.exists("er_pwt_trophy")) {
+      const trophy = globalScene.add
+        .image(x + cw / 2, y + 3, "er_pwt_trophy")
+        .setOrigin(0.5, 0)
+        .setScale(12 / 62);
+      this.container.add(trophy);
+      this.nodes.push(trophy);
+    } else {
+      const cup = globalScene.add.ellipse(x + cw / 2, y + 8, 10, 8, GOLD, 1).setOrigin(0.5, 0.5);
+      this.container.add(cup);
+      this.nodes.push(cup);
     }
+
+    // champion identity row (icon + name) or TBD
+    const iconH = 12;
+    const rowY = y + plinthH - 10;
+    const spriteKey = champ ? (this.entrantOf(champ)?.ghost?.spriteKey ?? null) : null;
+    if (champ != null) {
+      this.drawTrainerIcon(x + 4 + iconH * 0.42, rowY + iconH / 2, iconH, spriteKey, { dim: false, empty: false });
+    }
+    const label = champ ? this.displayName(champ) : "TBD";
+    const t = addTextObject(champ ? x + 4 + iconH : x + cw / 2, rowY, label, TextStyle.WINDOW, { fontSize: "24px" });
+    t.setOrigin(champ ? 0 : 0.5, 0);
+    t.setTint(champ ? GOLD : TODO);
     this.container.add(t);
     this.nodes.push(t);
+    if (champ != null) {
+      this.fitText(t, x + cw - 3 - (x + 4 + iconH));
+    }
   }
 
   /**
-   * Draw a small trainer icon at (cx, feetY) of the given height, or a neutral fallback
+   * Draw a small trainer icon at (cx, feetY) of the given height, or a neutral framed fallback
    * avatar. Two-pass-harness friendly: `add.sprite(key)` is called even when the texture is
    * missing so pass 1 RECORDS the key for injection; if it stays unresolved we drop the probe
-   * and draw the fallback (real trainers appear on pass 2 / after the on-demand atlas load).
+   * and draw the fallback disc.
    */
   private drawTrainerIcon(
     cx: number,
@@ -491,13 +676,24 @@ export class TournamentBracketUiHandler extends UiHandler {
     spriteKey: string | null,
     opts: { dim: boolean; empty: boolean },
   ): void {
+    // framed disc behind the icon (navy well + gold ring) — reads as a portrait mount.
+    const cyMid = feetY - iconH / 2;
+    const well = globalScene.add.ellipse(cx, cyMid, iconH * 0.95, iconH * 1.02, 0x0c1738, 0.9);
+    well.setStrokeStyle(0.8, opts.dim ? BYE : GOLD_DEEP, opts.dim ? 0.5 : 0.85);
+    well.setOrigin(0.5, 0.5);
+    if (opts.dim) {
+      well.setAlpha(0.55);
+    }
+    this.container.add(well);
+    this.nodes.push(well);
+
     if (spriteKey) {
       const probe = globalScene.add.sprite(cx, feetY, spriteKey);
       if (globalScene.textures.exists(spriteKey)) {
         probe.setFrame(0);
         const fh = probe.height || 64;
         probe.setOrigin(0.5, 1);
-        probe.setScale(iconH / fh);
+        probe.setScale((iconH * 1.05) / fh);
         if (opts.dim) {
           probe.setTintFill(0x2a3352);
           probe.setAlpha(0.7);
@@ -509,13 +705,11 @@ export class TournamentBracketUiHandler extends UiHandler {
       probe.destroy();
       this.ensureTrainerAtlas(spriteKey);
     }
-    // fallback neutral avatar: a filled disc + ring (always renders, no texture needed).
-    const cyMid = feetY - iconH / 2;
-    const disc = globalScene.add.ellipse(cx, cyMid, iconH * 0.8, iconH * 0.9, opts.empty ? 0x2a3352 : 0x394874, 1);
-    disc.setStrokeStyle(1, opts.dim ? BYE : GOLD, opts.dim ? 0.5 : 0.85);
+    // fallback: a filled inner disc (empty slots read dimmer).
+    const disc = globalScene.add.ellipse(cx, cyMid, iconH * 0.6, iconH * 0.7, opts.empty ? 0x2a3352 : 0x3a4a7a, 1);
     disc.setOrigin(0.5, 0.5);
     if (opts.dim) {
-      disc.setAlpha(0.6);
+      disc.setAlpha(0.5);
     }
     this.container.add(disc);
     this.nodes.push(disc);
@@ -546,14 +740,25 @@ export class TournamentBracketUiHandler extends UiHandler {
   private drawChampionOverlay(champion: string | null, _own: string): void {
     const w = globalScene.scaledCanvas.width;
     const h = globalScene.scaledCanvas.height;
-    const scrim = globalScene.add.rectangle(0, 0, w, h - 40, 0x05091c, 0.62).setOrigin(0, 0);
+    const scrim = globalScene.add.rectangle(0, 22, w, h - 22 - BOTTOM_CARD_H - 4, 0x040814, 0.72).setOrigin(0, 0);
     this.container.add(scrim);
     this.nodes.push(scrim);
 
     const spriteKey = champion ? (this.entrantOf(champion)?.ghost?.spriteKey ?? null) : null;
-    const artH = 84;
+    const artH = 80;
     const cx = w / 2;
-    const feetY = 30 + artH;
+    const feetY = 34 + artH;
+
+    // twin crests flanking the trophy
+    if (globalScene.textures.exists("er_pwt_trophy")) {
+      const trophy = globalScene.add
+        .image(cx, 26, "er_pwt_trophy")
+        .setOrigin(0.5, 0)
+        .setScale(20 / 62);
+      this.container.add(trophy);
+      this.nodes.push(trophy);
+    }
+
     // big center-stage art (probe + fallback, same two-pass discipline)
     if (spriteKey) {
       const probe = globalScene.add.sprite(cx, feetY, spriteKey);
@@ -573,21 +778,18 @@ export class TournamentBracketUiHandler extends UiHandler {
       this.drawChampionFallbackArt(cx, feetY, artH);
     }
 
-    if (globalScene.textures.exists("er_pwt_trophy")) {
-      const trophy = globalScene.add.image(cx, 24, "er_pwt_trophy");
-      trophy.setOrigin(0.5, 0);
-      trophy.setScale(0.14);
-      this.container.add(trophy);
-      this.nodes.push(trophy);
-    }
-
-    const banner = addTextObject(cx, feetY + 4, `CHAMPION - ${this.displayName(champion)}`, TextStyle.WINDOW, {
-      fontSize: "44px",
+    // gold banner plate with the champion name
+    const bannerW = 150;
+    const bannerY = feetY + 3;
+    this.plate(this.nodes, cx - bannerW / 2, bannerY, bannerW, 15, { fill: 0x241d0a, border: GOLD, borderW: 1.6 });
+    const banner = addTextObject(cx, bannerY + 3, `CHAMPION - ${this.displayName(champion)}`, TextStyle.WINDOW, {
+      fontSize: "40px",
     });
     banner.setOrigin(0.5, 0);
     banner.setTint(GOLD);
     this.container.add(banner);
     this.nodes.push(banner);
+    this.fitText(banner, bannerW - 8);
   }
 
   private drawChampionFallbackArt(cx: number, feetY: number, artH: number): void {
@@ -609,6 +811,9 @@ export class TournamentBracketUiHandler extends UiHandler {
     this.cardNodes = [];
     const cfg = this.config;
     this.playableOpponent = null;
+    // Default the hint to the far-right edge; the opponent card (which frames a portrait
+    // there) shifts it left so it never collides with the portrait + presence chip.
+    this.cardHint.setX(globalScene.scaledCanvas.width - 12);
     if (cfg == null || cfg.tournament.bracket == null) {
       this.cardTitle.setText("");
       this.cardBody.setText("");
@@ -633,12 +838,10 @@ export class TournamentBracketUiHandler extends UiHandler {
     const yourMatch = nextMatchFor(bracket, own);
     const entered = cfg.tournament.entrants.some(e => e.participant === own);
 
-    // Is the browsed match YOUR playable fight?
     const isYourBrowsed = match != null && yourMatch != null && match.id === yourMatch.id;
     const opponent = isYourBrowsed ? opponentOf(match, own) : null;
 
     if (isYourBrowsed && opponent != null) {
-      // OPPONENT CARD: portrait + title + deadline + presence.
       this.drawOpponentCard(match, opponent);
       return;
     }
@@ -652,7 +855,6 @@ export class TournamentBracketUiHandler extends UiHandler {
       return;
     }
 
-    // Browsing another match (or you are eliminated / not entered): show its pairing, read-only.
     if (match != null) {
       this.drawPairingCard(match, entered, yourMatch != null);
       return;
@@ -669,45 +871,48 @@ export class TournamentBracketUiHandler extends UiHandler {
     if (cfg == null) {
       return;
     }
+    const w = globalScene.scaledCanvas.width;
     const h = globalScene.scaledCanvas.height;
-    const cardY = h - 34 - 3;
+    const cardY = h - BOTTOM_CARD_H - 2;
     const ent = this.entrantOf(opponent);
     const seed = ent?.seed ?? null;
-    const oppName = ent?.ghost?.name ?? opponent;
-    const oppTitle = ent?.ghost?.title;
+    const oppName = this.displayName(opponent);
+    const oppTitle = this.ghostTitleOf(opponent);
 
-    // opponent portrait on the card's right side
+    // framed opponent portrait pinned to the far-right of the panel
     const spriteKey = ent?.ghost?.spriteKey ?? null;
-    this.drawCardPortrait(spriteKey);
+    const portraitCx = w - 24;
+    this.drawCardPortrait(spriteKey, portraitCx, cardY);
 
     this.cardTitle.setTint(NEXT);
-    this.cardTitle.setText(`YOUR MATCH  vs ${seed == null ? "" : `#${seed} `}${oppName}`);
+    this.cardTitle.setText(`YOUR MATCH   vs ${seed == null ? "" : `#${seed} `}${oppName}`);
 
     const dueSoon = match.deadline != null && match.deadline - cfg.now <= 3_600_000;
     const countdown = formatDeadline(match.deadline, cfg.now);
     const present = isPresent(ent?.lastSeen, cfg.now);
     const presence = present ? "In lobby now" : `Last seen ${formatLastSeen(ent?.lastSeen, cfg.now)}`;
     this.cardBody.setTint(dueSoon ? DUE_SOON : WHITE);
-    const titlePart = oppTitle ? `${oppTitle}   ` : "";
+    const titlePart = oppTitle ? `"${oppTitle}"   ` : "";
     this.cardBody.setText(`${titlePart}${countdown}   ${presence}`);
 
-    // presence chip line just above the hint
-    const chip = addTextObject(
-      globalScene.scaledCanvas.width - 11,
-      cardY + 12,
-      present ? "ONLINE" : "OFFLINE",
-      TextStyle.PARTY,
-      {
-        fontSize: "26px",
-      },
-    );
-    chip.setOrigin(1, 0);
-    chip.setTint(present ? PRESENT_GREEN : TODO);
+    // presence chip above the portrait
+    const chip = globalScene.add.rectangle(portraitCx, cardY + 2, 30, 8, CHIP_NAVY, 1).setOrigin(0.5, 0);
+    chip.setStrokeStyle(1, present ? PRESENT_GREEN : TODO, 1);
     this.container.add(chip);
     this.cardNodes.push(chip);
+    const chipT = addTextObject(portraitCx, cardY + 3.5, present ? "ONLINE" : "OFFLINE", TextStyle.PARTY, {
+      fontSize: "22px",
+    });
+    chipT.setOrigin(0.5, 0);
+    chipT.setTint(present ? PRESENT_GREEN : TODO);
+    this.container.add(chipT);
+    this.cardNodes.push(chipT);
 
     this.playableOpponent = opponent;
-    this.cardHint.setText(present ? "A: FIGHT    B: Back" : "A: FIGHT    B: Back");
+    // gold FIGHT prompt, shifted LEFT of the portrait so nothing overlaps.
+    this.cardHint.setX(portraitCx - 24);
+    this.cardHint.setTint(present ? GOLD : SUBTLE);
+    this.cardHint.setText("A: FIGHT   B: Back");
   }
 
   private drawPairingCard(match: BracketMatchView, entered: boolean, hasUpcoming: boolean): void {
@@ -742,17 +947,21 @@ export class TournamentBracketUiHandler extends UiHandler {
       status = "Awaiting entrants";
     }
     this.cardBody.setText(`${label(a, emptyLabel)}  vs  ${label(b, emptyLabel)}    ${status}`);
+    this.cardHint.setTint(GOLD);
     this.cardHint.setText("B: Back");
   }
 
-  /** A small opponent portrait on the card (right side), probe + fallback discipline. */
-  private drawCardPortrait(spriteKey: string | null): void {
-    const w = globalScene.scaledCanvas.width;
-    const h = globalScene.scaledCanvas.height;
-    const cardY = h - 34 - 3;
-    const cx = w - 60;
-    const artH = 30;
-    const feetY = cardY + 33;
+  /** A framed opponent portrait on the card (right side), probe + fallback discipline. */
+  private drawCardPortrait(spriteKey: string | null, cx: number, cardY: number): void {
+    const artH = 26;
+    const feetY = cardY + BOTTOM_CARD_H - 3;
+    const cyMid = feetY - artH / 2;
+    // portrait well
+    const well = globalScene.add.ellipse(cx, cyMid + 2, artH * 0.95, artH * 1.05, 0x0c1738, 0.95);
+    well.setStrokeStyle(1, GOLD, 0.85);
+    well.setOrigin(0.5, 0.5);
+    this.container.add(well);
+    this.cardNodes.push(well);
     if (spriteKey) {
       const probe = globalScene.add.sprite(cx, feetY, spriteKey);
       if (globalScene.textures.exists(spriteKey)) {
@@ -767,8 +976,7 @@ export class TournamentBracketUiHandler extends UiHandler {
       probe.destroy();
       this.ensureTrainerAtlas(spriteKey);
     }
-    const disc = globalScene.add.ellipse(cx, feetY - artH / 2, artH * 0.7, artH * 0.9, 0x394874, 1);
-    disc.setStrokeStyle(1, GOLD, 0.85);
+    const disc = globalScene.add.ellipse(cx, cyMid + 2, artH * 0.55, artH * 0.65, 0x394874, 1);
     disc.setOrigin(0.5, 0.5);
     this.container.add(disc);
     this.cardNodes.push(disc);
@@ -797,13 +1005,13 @@ export class TournamentBracketUiHandler extends UiHandler {
     if (fresh != null && this.active && this.config != null) {
       this.config.tournament = fresh;
       this.config.now = Date.now();
-      // keep the browse cursor in-bounds against the (possibly advanced) bracket
       const rounds = fresh.bracket?.rounds;
       if (rounds != null) {
         this.browse.round = Math.min(this.browse.round, rounds.length - 1);
         this.browse.slot = Math.min(this.browse.slot, (rounds[this.browse.round]?.length ?? 1) - 1);
       }
       this.title.setText(fresh.name);
+      this.updateHeaderStatus();
       this.layout();
     }
   }
@@ -890,9 +1098,11 @@ export class TournamentBracketUiHandler extends UiHandler {
 // =============================================================================
 // Demo config builders for the render harness (golden-gated board states). Each
 // entrant carries a real trainer-atlas ghost icon (resolved via trainerConfigs,
-// the two-pass injector then loads it) + name/title, so the goldens show the real
-// PWT board — connecting lines, ghost-trainer slot icons, VS marker, resolution
-// dims, and the champion center-stage.
+// the two-pass injector then loads it), plus HONEST field mapping that mirrors the
+// live worker row: `participant`/`name` is the account USERNAME (what the board
+// shows), while the ghost summary carries a DISTINCT authored name + title (flavor
+// only, surfaced on the opponent card). This keeps the goldens honest about the
+// name path — the board must render the username, never the ghost name.
 // =============================================================================
 
 import { resolveGhostSpriteKey } from "#data/elite-redux/showdown/tournament-ghost-icon";
@@ -933,7 +1143,45 @@ const DEMO_TRAINER_TYPES: TrainerType[] = [
   TrainerType.PARASOL_LADY,
   TrainerType.POKEFAN,
 ];
-const DEMO_TITLES = ["The Bold", "Storm Caller", "Iron Will", "Trick Master", "", "Old Guard", "", ""];
+// Account USERNAMES (what the board renders) — realistic mixed-case handles.
+const DEMO_USERNAMES = [
+  "Carla",
+  "AshK",
+  "MistyW",
+  "BrockH",
+  "GaryO",
+  "MayB",
+  "DawnP",
+  "IrisU",
+  "CyrusT",
+  "Cynthia",
+  "LanceD",
+  "StevenS",
+  "WallaceM",
+  "RedT",
+  "BlueO",
+  "LeafG",
+];
+// DISTINCT authored ghost display names (flavor; NOT shown as identity) + titles.
+const DEMO_GHOST_NAMES = [
+  "Sky Warden",
+  "Emberfist",
+  "Tidecaller",
+  "Stoneheart",
+  "Nightblade",
+  "Petalstorm",
+  "Frostpin",
+  "Voltcrest",
+  "Voidwalker",
+  "Dragonsong",
+  "Skyfury",
+  "Ironclad",
+  "Wavecrest",
+  "Crimson",
+  "Azure",
+  "Verdant",
+];
+const DEMO_TITLES = ["The Bold", "Storm Caller", "Iron Will", "Trick Master", "", "Old Guard", "", "The Swift"];
 
 function demoSpriteKey(i: number): string {
   const type = DEMO_TRAINER_TYPES[i % DEMO_TRAINER_TYPES.length];
@@ -942,31 +1190,16 @@ function demoSpriteKey(i: number): string {
 
 function makeBracketView(opts: DemoOpts, own: string, now: number): TournamentView {
   const n = opts.byes ? (opts.size === 8 ? 5 : opts.size === 16 ? 11 : 3) : opts.size;
-  const names = [
-    "carla",
-    "ash",
-    "misty",
-    "brock",
-    "gary",
-    "may",
-    "dawn",
-    "iris",
-    "cyrus",
-    "cynthia",
-    "lance",
-    "steven",
-    "wallace",
-    "red",
-    "blue",
-    "leaf",
-  ];
+  const names = DEMO_USERNAMES;
   const entrants = Array.from({ length: n }, (_, i) => ({
     participant: names[i],
+    // worker mirrors the account username into `name` — the board renders THIS.
     name: names[i],
     seed: i + 1,
     ghost: {
       spriteKey: demoSpriteKey(i),
-      name: names[i].charAt(0).toUpperCase() + names[i].slice(1),
+      // DISTINCT authored ghost name (flavor only, never used as identity on the board).
+      name: DEMO_GHOST_NAMES[i],
       ...(DEMO_TITLES[i] ? { title: DEMO_TITLES[i] } : {}),
     },
     lastSeen: null as number | null,
@@ -1100,7 +1333,7 @@ function makeBracketView(opts: DemoOpts, own: string, now: number): TournamentVi
 export function buildTournamentBracketDemoConfig(
   opts: DemoOpts = { size: 8, advancedRounds: 1, card: "playable" },
 ): TournamentBracketConfig {
-  const own = "carla";
+  const own = "Carla";
   const now = 1_700_000_000_000;
   const tournament = makeBracketView(opts, own, now);
   let renderNow = now;
