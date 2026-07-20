@@ -100,3 +100,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `git diff --check` clean, and TypeScript remains at 213 unrelated diagnostics with zero in touched paths.
   No local co-op Vitest or browser process was run. Remote exact-SHA contracts, full gate, and four-profile
   two-browser campaign remain required before any staging decision.
+
+2026-07-20 — Authority V2 representative initial-control closure
+
+- Exact full gate `29740495798` at `78179cd7f` passed planner/static/browser build, Lane A 1161/1161,
+  multiple S/T shards, and mutation coverage, but every B/C shard plus P1/P2 and S4/S5 went red behind one
+  synthetic-boot defect. The host adopted and committed the already-open wave-1 command boundary while the
+  second in-process scene remained in Login/Title, so revision 1 stayed at `1/1/0` awaiting the guest's real
+  CommandPhase proof; all later entries were correctly rejected as gaps. This was a harness lifecycle mismatch,
+  not evidence for dozens of independent production failures.
+- `buildDuo` now crosses the omitted guest TurnInit -> real guest-owned CommandPhase lifecycle, starts that
+  public control, records its address-exact proof, then re-enters only the verified pre-pair host CommandPhase
+  once so the reciprocal pacing arrival omitted before runtime construction is emitted. Public move driving no
+  longer restarts an already-actionable guest command.
+- A real production liveness seam was closed at the same proof edge: completing all local command proofs now
+  schedules one coalesced microtask retry of retained replica entries under the destination runtime. This avoids
+  recursive application before the original CONTROL_COMMIT records `materialApplied`, while removing reliance
+  on the authority's later 250 ms redelivery timer.
+- Static contracts pin both causal orders. The focused Node contract is 7/7 green, scoped Biome has no new
+  errors after formatting, `git diff --check` is clean, and the prior full TypeScript run remains at 213
+  unrelated diagnostics with zero in touched paths. No local co-op Vitest/browser execution was used.
+- The older exact-SHA two-browser campaign `29740497493` remains in flight and is intentionally preserved:
+  its real browser boot does not share the in-process fixture defect and therefore remains useful independent
+  production evidence. Next: push the child checkpoint, rerun the complete gate, and triage only survivors.

@@ -1955,7 +1955,9 @@ export async function driveDuoGuestTackleThroughPublicUi(
   rig.pair.setDestinationContextDelivery?.(true);
   try {
     await withClient(rig.guestCtx, async () => {
-      guestOwnCommand.start();
+      if (rig.guestScene.ui.getMode() !== UiMode.COMMAND && rig.guestScene.ui.getMode() !== UiMode.FIGHT) {
+        guestOwnCommand.start();
+      }
       await drainLoopback();
     });
 
@@ -2351,12 +2353,32 @@ export async function buildDuo(
 
   const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair: runtimePair };
   // `buildDuo` is handed an already-open solo host input phase, while production negotiates before battle
-  // construction. Adopt only that exact live phase, then deliver its CONTROL_COMMIT under each destination
-  // context before any test is allowed to select a move.
+  // construction. Adopt only that exact live phase, then materialize the guest's omitted real TurnInit ->
+  // Command chain. Starting the guest-owned CommandPhase supplies the replica's address-exact proof; restarting
+  // the already-open host phase once supplies the reciprocal pacing arrival it could not emit before a runtime
+  // existed. This leaves both synthetic browsers at the same actionable public boundary production reaches.
   const adoptedPrePairCommand = await withClient(hostCtx, () => adoptAlreadyOpenHostCommandBoundary(hostScene));
   if (adoptedPrePairCommand) {
-    await withClient(guestCtx, () => drainLoopback());
-    await withClient(hostCtx, () => drainLoopback());
+    await withClient(guestCtx, async () => {
+      await drainLoopback();
+      materializeMirroredGuestInputTurn(guestScene);
+      const guestOwnCommand = await driveClientPhaseQueueTo(guestScene, "initial guest-owned CommandPhase", {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+      });
+      guestOwnCommand.start();
+      await drainLoopback();
+      markRealGuestCommandBoundary(guestScene, guestScene.currentBattle.waveIndex, guestScene.currentBattle.turn);
+    });
+    await withClient(hostCtx, async () => {
+      await drainLoopback();
+      // The phase opened before rendezvous/runtime wiring existed. Re-enter exactly this verified phase once,
+      // matching the production start edge rather than fabricating an arrival from the harness.
+      hostScene.phaseManager.getCurrentPhase().start();
+      await drainLoopback();
+    });
+    await pumpDuoDestinations(rig, 2);
   }
   installDuoCtxOwnershipPins(rig, hostGame);
   liveDuoRigs.add(rig);

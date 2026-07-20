@@ -4151,6 +4151,29 @@ const coopV2WaveCutovers = new WeakMap<CoopRuntime, CoopV2WaveCutover>();
 const coopV2InteractionCutovers = new WeakMap<CoopRuntime, CoopV2InteractionCutover>();
 /** Explicit command-open boundary; present only for the complete turn/replacement/wave/interaction graph. */
 const coopV2ControlCutovers = new WeakMap<CoopRuntime, CoopV2ControlCutover>();
+/**
+ * Coalesce proof-edge replica retries per runtime. A CommandPhase can start synchronously while the original
+ * CONTROL_COMMIT applier is still on the stack; retrying inline would recursively re-enter that same entry
+ * before its foundation materialApplied stage is recorded. One microtask preserves stage order while still
+ * removing any dependency on the authority's later network-redelivery timer.
+ */
+const coopV2CommandProofRetryQueued = new WeakSet<CoopRuntime>();
+
+function scheduleCoopV2CommandProofRetry(runtime: CoopRuntime): void {
+  if (coopV2CommandProofRetryQueued.has(runtime)) {
+    return;
+  }
+  coopV2CommandProofRetryQueued.add(runtime);
+  queueMicrotask(() => {
+    runWhenCoopRuntimeActive(runtime, () => {
+      coopV2CommandProofRetryQueued.delete(runtime);
+      const completed = coopV2ShadowHarnesses.get(runtime)?.retryPendingReplicaEntries() ?? 0;
+      if (completed > 0) {
+        coopLog("v2-control", `real command proof completed ${completed} retained V2 entry`);
+      }
+    });
+  });
+}
 
 /**
  * Swap every cycle-free V2 selector with the active runtime. Production has one runtime; the two-engine
@@ -6804,7 +6827,7 @@ export function recordCoopV2CommandControlStarted(
       command =>
         !runtime.v2InstalledCommandTargets.has(commandControlTargetId(stated.epoch, stated.wave, stated.turn, command)),
     );
-    runtime.v2ControlLedger.projectMechanical(stated, () =>
+    const projected = runtime.v2ControlLedger.projectMechanical(stated, () =>
       missing.length === 0
         ? { kind: "installed", controlId: controlIdOf(stated) }
         : {
@@ -6812,6 +6835,9 @@ export function recordCoopV2CommandControlStarted(
             reason: `awaiting ${missing.length}/${localCommands.length} local command proofs`,
           },
     );
+    if (missing.length === 0 && (projected.kind === "installed" || projected.kind === "already-installed")) {
+      scheduleCoopV2CommandProofRetry(runtime);
+    }
   }
 }
 

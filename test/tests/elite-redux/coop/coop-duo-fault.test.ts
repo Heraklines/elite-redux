@@ -80,7 +80,12 @@ function toCoop(scene: BattleScene): void {
 }
 
 function hasPreRuntimeInitialCommand(rig: DuoRig): boolean {
-  return rig.hostScene.currentBattle.waveIndex === 1 && rig.hostScene.currentBattle.turn === 1;
+  const guestPhase = rig.guestScene.phaseManager.getCurrentPhase()?.phaseName;
+  return (
+    rig.hostScene.currentBattle.waveIndex === 1
+    && rig.hostScene.currentBattle.turn === 1
+    && (guestPhase === "LoginPhase" || guestPhase === "SelectGenderPhase" || guestPhase === "TitlePhase")
+  );
 }
 
 // #827: the continuation-aware replay driver now lives in the shared harness ({@linkcode driveGuestReplayTurn}

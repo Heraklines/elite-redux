@@ -12,6 +12,7 @@ const gateWorkflow = readFileSync(new URL(".github/workflows/coop-gate-sharded.y
 const campaignWorkflow = readFileSync(new URL(".github/workflows/coop-public-ui-campaign.yml", root), "utf8");
 const stagingWorkflow = readFileSync(new URL(".github/workflows/deploy-staging.yml", root), "utf8");
 const coopRuntime = readFileSync(new URL("src/data/elite-redux/coop/coop-runtime.ts", root), "utf8");
+const duoHarness = readFileSync(new URL("test/tools/coop-duo-harness.ts", root), "utf8");
 const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
@@ -129,5 +130,49 @@ test("a cold-resume or new-run epoch boundary replaces the V2 log instead of hot
   assert.ok(
     publishesEpoch > disposes && appliesEpoch > publishesEpoch,
     "the replacement epoch is published only after the old V2 authority is gone",
+  );
+});
+
+test("the real command proof edge eagerly completes V2 and the duo fixture creates both browser controls", () => {
+  const proofStart = coopRuntime.indexOf("export function recordCoopV2CommandControlStarted(");
+  const proofEnd = coopRuntime.indexOf("\nexport function ", proofStart + 1);
+  assert.notEqual(proofStart, -1, "runtime exposes the real CommandPhase proof chokepoint");
+  assert.notEqual(proofEnd, -1, "command proof chokepoint has a bounded source block");
+  const proof = coopRuntime.slice(proofStart, proofEnd);
+  const records = proof.indexOf("v2InstalledCommandTargets.add");
+  const schedulesRetry = proof.indexOf("scheduleCoopV2CommandProofRetry");
+  assert.ok(records >= 0, "the real phase records its exact command target");
+  assert.ok(schedulesRetry > records, "the real proof schedules replica completion after projection");
+
+  const retryStart = coopRuntime.indexOf("function scheduleCoopV2CommandProofRetry(");
+  const retryEnd = coopRuntime.indexOf("\n}\n", retryStart) + 2;
+  assert.notEqual(retryStart, -1, "runtime exposes a coalesced command-proof retry helper");
+  assert.ok(retryEnd > retryStart, "command-proof retry helper has a bounded source block");
+  const retry = coopRuntime.slice(retryStart, retryEnd);
+  const defersRetry = retry.indexOf("queueMicrotask");
+  const waitsForRuntime = retry.indexOf("runWhenCoopRuntimeActive");
+  const retriesReplica = retry.indexOf("retryPendingReplicaEntries");
+  assert.ok(
+    defersRetry >= 0 && waitsForRuntime > defersRetry && retriesReplica > waitsForRuntime,
+    "replica completion is coalesced after the in-flight apply stack and runs under its destination runtime",
+  );
+
+  const buildStart = duoHarness.indexOf("export async function buildDuo(");
+  const buildEnd = duoHarness.indexOf("\nexport async function remirrorWave(", buildStart);
+  assert.notEqual(buildStart, -1, "duo harness exposes its shared builder");
+  assert.notEqual(buildEnd, -1, "duo builder has a bounded source block");
+  const build = duoHarness.slice(buildStart, buildEnd);
+  const adoptsHost = build.indexOf("adoptAlreadyOpenHostCommandBoundary");
+  const materializesGuest = build.indexOf("materializeMirroredGuestInputTurn");
+  const startsGuest = build.indexOf("guestOwnCommand.start()");
+  const marksGuest = build.indexOf("markRealGuestCommandBoundary");
+  const restartsHost = build.indexOf("hostScene.phaseManager.getCurrentPhase().start()");
+  assert.ok(adoptsHost >= 0, "the already-real host control is adopted");
+  assert.ok(
+    materializesGuest > adoptsHost
+      && startsGuest > materializesGuest
+      && marksGuest > startsGuest
+      && restartsHost > marksGuest,
+    "the synthetic second browser crosses the same TurnInit/Command/proof/pacing order as production",
   );
 });
