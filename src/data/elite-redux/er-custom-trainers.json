@@ -2979,5 +2979,483 @@
     ],
     "trainerClass": "SCHOOL_KID",
     "weight": 100
+  },
+  "TRAINER_70019": {
+    "battleBgm": "battle_trainer_afd",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "I see you also know about bonds and hard work",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70019,
+    "introDialogue": "I'll show you the efforts of our bonds and hard work",
+    "maxWave": 130,
+    "minWave": 45,
+    "name": "Salt",
+    "team": [
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "ER_OMNI_GEM"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "RLNA",
+              "ZIPPY_ZAP",
+              "BABY_DOLL_EYES",
+              "SURF"
+            ],
+            "species": 134,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 2,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "ER_OMNI_GEM"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "THUNDER_WAVE",
+              "FLY",
+              "EXTREME_SPEED",
+              "SURF"
+            ],
+            "species": 25,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 1,
+              "formIndex": 0,
+              "species": 706
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              },
+              {
+                "count": 1,
+                "item": "SITRUS_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "RLA",
+              "THIEF",
+              "FRUSTRATION",
+              "BABY_DOLL_EYES"
+            ],
+            "species": 571,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "fusion": {
+              "abilitySlot": 2,
+              "formIndex": 0,
+              "species": 10852
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "MYSTIC_WATER"
+              },
+              {
+                "count": 1,
+                "item": "ER_WATER_GEM"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "RLA",
+              "RLNA",
+              "WAVE_CRASH",
+              "SCALD"
+            ],
+            "shiny": {
+              "palette": "glacier",
+              "surface": "aurora"
+            },
+            "species": 10852,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 2,
+              "formIndex": 0,
+              "species": 10852
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "TWISTED_SPOON"
+              },
+              {
+                "count": 1,
+                "item": "ER_FAIRY_GEM"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "ATTRACT",
+              "WISH",
+              "CAPTIVATE",
+              "LUMINA_CRASH"
+            ],
+            "species": 282,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 0,
+            "fusion": {
+              "abilitySlot": 1,
+              "formIndex": 0,
+              "species": 428
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "ENIGMA_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "BIG_BANG",
+              "DESTINY_BOND",
+              "DRAINING_KISS",
+              "EXTREME_SPEED"
+            ],
+            "shiny": {
+              "around": "hearts",
+              "palette": "pastelize"
+            },
+            "species": 10117,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 2,
+            "level": null,
+            "moves": [
+              "EXTREME_SPEED",
+              "SAFE_PASSAGE",
+              "BODY_SLAM",
+              "ROCK_TOMB"
+            ],
+            "species": 59,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "SITRUS_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "KINGS_ROCK"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "KNOCK_OFF",
+              "PLAY_ROUGH",
+              "KOWTOW_CLEAVE",
+              "ATTRACT"
+            ],
+            "species": 359,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 2,
+              "formIndex": 0,
+              "species": 497
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "CHARCOAL"
+              },
+              {
+                "count": 1,
+                "item": "LIECHI_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "BATON"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "DRACO_METEOR",
+              "BURNING_JEALOUSY",
+              "LEAF_STORM",
+              "THIEF"
+            ],
+            "species": 10127,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 2,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "SILK_SCARF"
+              },
+              {
+                "count": 1,
+                "item": "BLACK_BELT"
+              },
+              {
+                "count": 1,
+                "item": "LUM_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "SITRUS_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "FAKE_OUT",
+              "TRIPLE_KICK",
+              "MEGA_KICK",
+              "VICTORY_DANCE"
+            ],
+            "species": 428,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 2,
+            "fusion": {
+              "abilitySlot": 0,
+              "formIndex": 0,
+              "species": 10115
+            },
+            "heldItems": [
+              {
+                "count": 2,
+                "item": "WIDE_LENS"
+              },
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "LUM_BERRY"
+              },
+              {
+                "count": 2,
+                "item": "SCOPE_LENS"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "HIGH_JUMP_KICK",
+              "BLAZE_KICK",
+              "QUICK_ATTACK",
+              "SWORDS_DANCE"
+            ],
+            "species": 257,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 0,
+              "formIndex": 0,
+              "species": 730
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "LANSAT_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "LUM_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              },
+              {
+                "count": 1,
+                "item": "SHELL_BELL"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "SLEEP_TALK",
+              "REST",
+              "CAPTIVATE",
+              "ATTRACT"
+            ],
+            "species": 10341,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "TWISTED_SPOON"
+              },
+              {
+                "count": 1,
+                "item": "ER_OMNI_GEM"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "ATTRACT",
+              "BIG_BANG",
+              "HYPNOSIS",
+              "CONFUSE_RAY"
+            ],
+            "species": 654,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 0,
+            "fusion": {
+              "abilitySlot": 2,
+              "formIndex": 0,
+              "species": 10572
+            },
+            "level": null,
+            "moves": [
+              "TOXIC",
+              "SLUDGE_BOMB",
+              "BLAZE_KICK",
+              "DRAGON_PULSE"
+            ],
+            "shiny": {
+              "surface": "spiritflame"
+            },
+            "species": 758,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 0,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "KINGS_ROCK"
+              },
+              {
+                "count": 1,
+                "item": "WIDE_LENS"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "BLACK_MAGIC",
+              "RLA",
+              "RLA",
+              "RLNA"
+            ],
+            "species": 197,
+            "weight": 100
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "QUICK_ATTACK",
+              "ASTRAL_HAND",
+              "LOW_KICK",
+              "BULK_UP"
+            ],
+            "species": 448,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 0,
+            "fusion": {
+              "abilitySlot": 0,
+              "formIndex": 0,
+              "species": 471
+            },
+            "level": null,
+            "moves": [
+              "EXPANDING_FORCE",
+              "NASTY_PLOT",
+              "RLA",
+              "RLNA"
+            ],
+            "species": 196,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "DRAINING_KISS",
+              "AGILITY",
+              "LOVELY_BITE",
+              "SWEET_KISS"
+            ],
+            "species": 700,
+            "weight": 1
+          }
+        ]
+      }
+    ],
+    "trainerClass": "BREEDER",
+    "trainerEffect": "holyrays",
+    "victoryDialogue": "oof",
+    "weight": 100
   }
 }
