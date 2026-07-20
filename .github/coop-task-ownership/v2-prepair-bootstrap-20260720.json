@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "v2-prepair-bootstrap-20260720",
+  "branch": "ci/coop/v2-prepair-bootstrap-20260720",
+  "trainRef": "coop/integration-20260718",
+  "baseSha": "179f47d4584fe1a298908fcafaf0917fd90c7df3",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-prepair-bootstrap-20260720.json",
+    "test/node/authority-v2-frames.test.ts",
+    "test/tools/coop-duo-harness.ts"
+  ]
+}
