@@ -527,3 +527,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   the one-sided fixture consumed the very boundary it meant to assert and later
   compared the inert `TitlePhase` tail to Command. It now stops before running
   that successor; a source contract prevents this false-red pattern returning.
+- Requalification at `c4a7f972d` proved the first Crossroads correction fixed
+  the authority but exposed the reciprocal retained-tail error. The authority
+  opened `CROSSROADS_PICK` at wave 5/turn 2; the guest had already applied that
+  settlement turn, then its reconstructed Victory added one again and parked a
+  wave 5/turn 3 phase behind the turn-2 control. `settledTurn` was already in
+  the V2 wave transaction but was discarded by `consumeCoopPendingWaveAdvance`.
+  It now reaches the retained Victory constructor explicitly. That exact turn
+  is passed to both Crossroads and the natural World Map successor, while only
+  the locally-resolved authority/solo path computes the single TurnEnd advance.
+- The stricter C2 learn-move seam also produced the intended diagnostic instead
+  of its former false green. Revision 15 installed the exact
+  `CoopReplayLearnMoveBatchPhase` over the guest CommandPhase, but the engine
+  test's `PhaseInterceptor` intentionally disables
+  `PhaseManager.startCurrentPhase`; production browsers would start the
+  override immediately, while the driver waited for a UI that only `start()`
+  can create. The driver now first proves the exact retained phase, starts that
+  one phase to model the production dispatcher, then proves and drives the real
+  handler and still requires the full authority terminal.

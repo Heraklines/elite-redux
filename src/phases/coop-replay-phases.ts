@@ -2040,7 +2040,7 @@ export class CoopFinalizeTurnPhase extends Phase {
           // (e.g. a capture that cleared the slot), so getPokemon() always resolves a live mon.
           const lastEnemy = globalScene.getEnemyParty().at(-1);
           const battlerArg = lastEnemy == null ? BattlerIndex.PLAYER : lastEnemy.id;
-          globalScene.phaseManager.pushNew("VictoryPhase", battlerArg, false, pending.wave);
+          globalScene.phaseManager.pushNew("VictoryPhase", battlerArg, false, pending.wave, pending.settledTurn);
           break;
         }
         case "flee": {

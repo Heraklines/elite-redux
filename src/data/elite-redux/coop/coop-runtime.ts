@@ -2340,6 +2340,7 @@ export function registerCoopActiveReplayTurnAborter(
 export function consumeCoopPendingWaveAdvance(): {
   wave: number;
   outcome: CoopWaveOutcome;
+  settledTurn?: number | undefined;
   captureParty?: string[] | undefined;
   capturePresentation?: CoopCapturePresentation | undefined;
   transition?: CoopWaveAdvancePayload | undefined;

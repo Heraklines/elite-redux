@@ -4240,17 +4240,32 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       });
       await pumpDuoDestinations(rig, 2);
 
-      // GUEST: the retained presentation must override its parked renderer with the exact queue-owned replay
-      // phase and expose the real public handler before any input is legal.
-      await awaitClientUiMode(rig.guestCtx, UiMode.LEARN_MOVE_BATCH, "guest-owned learn-move batch");
-      const guestLearnPhase = withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.getCurrentPhase());
+      // GUEST: the retained presentation must first override its parked renderer with the exact queue-owned
+      // replay phase. PhaseInterceptor deliberately disables PhaseManager.startCurrentPhase in engine tests;
+      // production browsers start this override immediately, so this representative seam starts that one
+      // proven phase before waiting for the handler it creates.
+      let guestLearnPhase: Phase | null = null;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        await pumpDuoDestinations(rig, 1);
+        const current = withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.getCurrentPhase());
+        if (current?.phaseName === "CoopReplayLearnMoveBatchPhase") {
+          guestLearnPhase = current;
+          break;
+        }
+        await new Promise<void>(resolve => setTimeout(resolve, 10));
+      }
       if (guestLearnPhase?.phaseName !== "CoopReplayLearnMoveBatchPhase") {
         fail(
           "no-park",
           wave,
-          `learn-move UI opened without its exact replay phase (current=${guestLearnPhase?.phaseName ?? "none"})`,
+          `learn-move presentation never installed its exact replay phase (current=${guestLearnPhase?.phaseName ?? "none"})`,
         );
       }
+      await withClient(rig.guestCtx, async () => {
+        guestLearnPhase.start();
+        await drainLoopback();
+      });
+      await awaitClientUiMode(rig.guestCtx, UiMode.LEARN_MOVE_BATCH, "guest-owned learn-move batch");
       hitMode(UiMode.LEARN_MOVE_BATCH);
 
       // GUEST (mon owner) drives the real panel through the public input layer. The first ACTION selects the

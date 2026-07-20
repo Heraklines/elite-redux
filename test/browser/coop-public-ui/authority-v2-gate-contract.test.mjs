@@ -419,8 +419,23 @@ test("TURN_RESOLVE prompts form a closed command-to-turn Authority V2 path", () 
 test("Crossroads result envelopes retain the exact V2 control turn instead of a legacy turn-zero sentinel", () => {
   assert.match(
     victoryPhase,
-    /pushNew\(\s*"ErCrossroadsPhase",\s*currentWaveIndex,\s*globalScene\.currentBattle\.turn \+ 1,?\s*\)/u,
-    "Victory freezes Crossroads at the post-BattleEnd settlement turn shared by the terminal reward",
+    /const postBattleSettlementTurn = this\.coopSourceTurn \?\? globalScene\.currentBattle\.turn \+ 1/u,
+    "local Victory advances once while retained Victory preserves its immutable V2 settlement turn",
+  );
+  assert.match(
+    replayPhases,
+    /pushNew\("VictoryPhase", battlerArg, false, pending\.wave, pending\.settledTurn\)/u,
+    "the retained WAVE_ADVANCE turn reaches the guest Victory capsule without ambient re-derivation",
+  );
+  assert.match(
+    victoryPhase,
+    /pushNew\("ErCrossroadsPhase", currentWaveIndex, postBattleSettlementTurn\)/u,
+    "Victory freezes Crossroads at the settlement turn shared by the terminal reward",
+  );
+  assert.match(
+    victoryPhase,
+    /pushNew\("SelectBiomePhase", currentWaveIndex, postBattleSettlementTurn\)/u,
+    "the natural World Map successor uses the same exact settlement coordinate",
   );
   const ownerStart = crossroadsPhase.indexOf("private coopOwnerCommit(");
   const ownerEnd = crossroadsPhase.indexOf("\n  /**", ownerStart);
@@ -468,20 +483,21 @@ test("the learn-move soak proves the real guest UI-to-relay terminal before rebu
   assert.ok(end > start, "the learn-move wave has a bounded source block");
   const learnMove = soakDriver.slice(start, end);
   const schedulesDestinations = learnMove.indexOf("setDestinationContextDelivery?.(destinationScheduled)");
+  const provesPhase = learnMove.indexOf('guestLearnPhase?.phaseName !== "CoopReplayLearnMoveBatchPhase"');
+  const startsProvenPhase = learnMove.indexOf("guestLearnPhase.start()");
   const provesMode = learnMove.indexOf(
     'awaitClientUiMode(rig.guestCtx, UiMode.LEARN_MOVE_BATCH, "guest-owned learn-move batch")',
   );
-  const provesPhase = learnMove.indexOf('guestLearnPhase?.phaseName !== "CoopReplayLearnMoveBatchPhase"');
   const firstInput = learnMove.indexOf('"learn-move select offered move"');
   const secondInput = learnMove.indexOf('"learn-move overwrite slot zero"');
   const provesTerminal = learnMove.indexOf("isCoopLearnMoveForwardInFlightEmpty()");
   assert.ok(schedulesDestinations >= 0, "transport callbacks are pinned to their destination browser");
   assert.ok(
-    provesMode > schedulesDestinations && provesPhase > provesMode,
-    "input waits for the exact public handler and its queue-owned replay phase",
+    provesPhase > schedulesDestinations && startsProvenPhase > provesPhase && provesMode > startsProvenPhase,
+    "the interceptor starts only the exact queue-owned replay phase before proving its public handler",
   );
   assert.ok(
-    firstInput > provesPhase && secondInput > firstInput,
+    firstInput > provesMode && secondInput > firstInput,
     "both human button presses traverse the public input layer in order",
   );
   assert.ok(

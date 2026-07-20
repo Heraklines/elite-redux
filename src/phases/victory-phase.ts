@@ -48,12 +48,23 @@ export class VictoryPhase extends PokemonPhase {
    * the next Battle object. Never let that mutable ambient object re-address the retained tail.
    */
   private readonly coopSourceWave: number | null;
+  /** Exact retained WAVE_ADVANCE settlement turn; null only for the authority/solo locally resolved tail. */
+  private readonly coopSourceTurn: number | null;
 
-  constructor(battlerIndex: BattlerIndex | number, isExpOnly = false, coopSourceWave: number | null = null) {
+  constructor(
+    battlerIndex: BattlerIndex | number,
+    isExpOnly = false,
+    coopSourceWave: number | null = null,
+    coopSourceTurn: number | null = null,
+  ) {
     super(battlerIndex);
+    if (coopSourceTurn != null && (!Number.isSafeInteger(coopSourceTurn) || coopSourceTurn < 0)) {
+      throw new Error(`[coop-v2] VictoryPhase received invalid source turn ${coopSourceTurn}`);
+    }
 
     this.isExpOnly = isExpOnly;
     this.coopSourceWave = coopSourceWave;
+    this.coopSourceTurn = coopSourceTurn;
   }
 
   start() {
@@ -277,6 +288,10 @@ export class VictoryPhase extends PokemonPhase {
           && erRouting
           && erShouldRaiseCrossroads(currentWaveIndex)
           && !gameMode.isFixedBattle(currentWaveIndex + 1);
+        // A locally-resolved Victory runs before TurnEnd increments the battle. A retained guest Victory
+        // runs after WAVE_ADVANCE has applied its immutable settled state. Preserve the transaction's exact
+        // turn when present; only the local authority/solo path computes the one known TurnEnd successor.
+        const postBattleSettlementTurn = this.coopSourceTurn ?? globalScene.currentBattle.turn + 1;
         if (globalScene.gameMode.isCoop) {
           console.info(
             `[coop-diag] VictoryTail role=${getCoopController()?.role ?? "none"} wave=${currentWaveIndex} source=${authoritativeTransition == null ? "legacy-local" : "host-stated"} trainer=${isTrainerWin} egg=${tailControl.eggLapse} biomeShop=${fireBiomeShop} biomeChange=${biomeEnding} crossroads=${raiseCrossroads} nextWave=${authoritativeTransition?.nextWave ?? currentWaveIndex + 1}`,
@@ -325,7 +340,7 @@ export class VictoryPhase extends PokemonPhase {
         }
 
         if (biomeEnding) {
-          globalScene.phaseManager.pushNew("SelectBiomePhase", currentWaveIndex);
+          globalScene.phaseManager.pushNew("SelectBiomePhase", currentWaveIndex, postBattleSettlementTurn);
         } else if (raiseCrossroads) {
           // ER (#486): not a biome end, but a 5-wave Crossroads tick - raise the
           // "Stay / Move on" choice AFTER the reward and BEFORE the next battle.
@@ -335,7 +350,7 @@ export class VictoryPhase extends PokemonPhase {
           // the pre-BattleEnd turn from VictoryPhase. The terminal reward result and the following
           // interaction-open must share this w/t coordinate; otherwise the global V2 log correctly rejects
           // reward(w/t+1) -> Crossroads(w/t) as a backwards control edge.
-          globalScene.phaseManager.pushNew("ErCrossroadsPhase", currentWaveIndex, globalScene.currentBattle.turn + 1);
+          globalScene.phaseManager.pushNew("ErCrossroadsPhase", currentWaveIndex, postBattleSettlementTurn);
         }
 
         // ER (#504): warn ONCE, exactly on the wave the player crosses into
