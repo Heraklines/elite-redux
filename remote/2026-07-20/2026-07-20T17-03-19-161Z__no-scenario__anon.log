@@ -1,0 +1,250 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:7fc28604c45cc51a0435fdd7903e088ecf5ccc9b:run-29757856250.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
+platform: Win32
+screen:   1920x1080 @1x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@20603ms -> title-shown@39668ms
+lastSess: n/a (first load / storage blocked)
+mode:     7  wave:1
+seed:     KoeajlC1fCF10LLiLG2NHHP3
+party:    Simsala(L100 251hp f1)
+enemy:    Vulnona(L100), Arkani(L100)
+
+----- COMMENT -----
+showdown rn is not syncing combat
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:7fc28604c45cc51a0435fdd7903e088ecf5ccc9b:run-29757856250.1","source":"github","sha":"7fc28604c45cc51a0435fdd7903e088ecf5ccc9b","workflow":{"provider":"github-actions","runId":"29757856250","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CO-OP REPORT CORRELATION (JSON) -----
+{"version":1,"pairKey":"coop-v1|session=-|run=-|epoch=0|seed=KoeajlC1fCF10LLiLG2NHHP3","runId":null,"epoch":0,"seed":"KoeajlC1fCF10LLiLG2NHHP3","binding":null,"membership":{"revision":1,"connectionGeneration":0},"local":{"role":"guest","seat":1},"partner":{"role":"host","seat":0},"build":{"version":1,"id":"github:7fc28604c45cc51a0435fdd7903e088ecf5ccc9b:run-29757856250.1","source":"github","sha":"7fc28604c45cc51a0435fdd7903e088ecf5ccc9b","workflow":{"provider":"github-actions","runId":"29757856250","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}}
+
+----- CO-OP CONTROL PLANE -----
+session:  role=guest seat=1 gen=0g epoch=0 run=- binding=- sessionId=- netcode=authoritative PRESENTATION-FINGERPRINT-MISMATCH
+members:  rev=1 state=active connectionGen=0 present=[0:host=true, 1:guest=true]
+phase:    running=CoopReplayTurnPhase queue=[]
+interact: counter=0 awaiting=none
+commands: pending=[]
+rendez:   awaiting=[] localArrived=[showdown-ready, showdown-wager-commit] partnerArrived=[showdown-ready, showdown-wager-commit]
+transport(local): state=connected generation=0 lastRx=8s
+causal:   8/8 most-recent edges
+  #1 recovery:local-arrival id=rendezvous:e0:showdown-ready role=guest @e0
+  #2 recovery:wait-open id=rendezvous:e0:showdown-ready role=guest @e0
+  #3 recovery:peer-arrival id=rendezvous:e0:showdown-ready role=guest @e0
+  #4 recovery:release id=rendezvous:e0:showdown-ready role=guest @e0 outcome=exact
+  #5 recovery:peer-arrival id=rendezvous:e0:showdown-wager-commit role=guest @e0
+  #6 recovery:local-arrival id=rendezvous:e0:showdown-wager-commit role=guest @e0
+  #7 recovery:wait-open id=rendezvous:e0:showdown-wager-commit role=guest @e0
+  #8 recovery:release id=rendezvous:e0:showdown-wager-commit role=guest @e0 outcome=exact
+uiRelay:  none
+
+----- CONSOLE -----
+[16:59:01.054] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[16:59:01.749] LOG: [ER] build {"version":1,"id":"github:7fc28604c45cc51a0435fdd7903e088ecf5ccc9b:run-29757856250.1","source":"github","sha":"7fc28604c45cc51a0435fdd7903e088ecf5ccc9b","workflow":{"provider":"github-actions","runId":"29757856250","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[16:59:02.028] LOG: [dev-tools] loaded — 646 scenarios + Send Logs button
+[16:59:19.483] DEBUG: Destroying loading scene
+[16:59:19.483] DEBUG: Destroyed loading scene
+[16:59:19.596] LOG: Seed: oyYdBw3V7vivV1RtpmoaqCzJ
+[16:59:19.596] LOG: Wave Seed: oyYdBw3V7vivV1RtpmoaqCzJ 0
+[16:59:29.408] LOG: %cStart Phase LoginPhase color:green;
+[16:59:37.577] LOG: Client Session: kVHhS22F3spsyImVYKkSZbdCHnrjCJZE
+[16:59:38.527] LOG: %cStart Phase TitlePhase color:green;
+[16:59:38.529] LOG: Getting Session Slot id: %d 2
+[16:59:38.947] LOG: use seasonal splash messages true
+[16:59:48.758] LOG: [showdown-build] MESSAGE settled -> opening starter-select (seed=0)
+[16:59:49.638] LOG: [showdown-build] starter-select OPEN
+[17:00:06.146] WARN: Texture "%s" has no frame "%s" items er_steel_gem
+[17:00:06.147] WARN: Texture "%s" has no frame "%s" items er_sticky_barb
+[17:00:06.147] WARN: Texture "%s" has no frame "%s" items er_throat_spray
+[17:00:06.390] WARN: Texture "%s" has no frame "%s" items er_steel_gem
+[17:00:06.391] WARN: Texture "%s" has no frame "%s" items er_sticky_barb
+[17:00:06.392] WARN: Texture "%s" has no frame "%s" items er_throat_spray
+[17:00:06.393] WARN: Texture "%s" has no frame "%s" items er_utility_umbrella
+[17:00:06.507] WARN: Texture "%s" has no frame "%s" items er_utility_umbrella
+[17:00:06.642] WARN: Texture "%s" has no frame "%s" items er_utility_umbrella
+[17:00:06.650] WARN: Texture "%s" has no frame "%s" items er_steel_gem
+[17:00:06.651] WARN: Texture "%s" has no frame "%s" items er_sticky_barb
+[17:00:06.652] WARN: Texture "%s" has no frame "%s" items er_throat_spray
+[17:00:06.653] WARN: Texture "%s" has no frame "%s" items er_utility_umbrella
+[17:00:06.874] WARN: Texture "%s" has no frame "%s" items er_utility_umbrella
+[17:00:07.127] WARN: Texture "%s" has no frame "%s" items er_utility_umbrella
+[17:00:07.135] WARN: Texture "%s" has no frame "%s" items er_steel_gem
+[17:00:07.136] WARN: Texture "%s" has no frame "%s" items er_sticky_barb
+[17:00:07.137] WARN: Texture "%s" has no frame "%s" items er_throat_spray
+[17:00:07.139] WARN: Texture "%s" has no frame "%s" items er_utility_umbrella
+[17:00:07.186] WARN: Texture "%s" has no frame "%s" items er_utility_umbrella
+[17:00:07.192] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:07.379] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:07.630] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:07.638] WARN: Texture "%s" has no frame "%s" items er_eject_button
+[17:00:07.640] WARN: Texture "%s" has no frame "%s" items er_eject_pack
+[17:00:07.640] WARN: Texture "%s" has no frame "%s" items er_electric_gem
+[17:00:07.641] WARN: Texture "%s" has no frame "%s" items er_electric_seed
+[17:00:07.643] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:07.877] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:08.160] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:08.174] WARN: Texture "%s" has no frame "%s" items er_eject_button
+[17:00:08.175] WARN: Texture "%s" has no frame "%s" items er_eject_pack
+[17:00:08.177] WARN: Texture "%s" has no frame "%s" items er_electric_gem
+[17:00:08.178] WARN: Texture "%s" has no frame "%s" items er_electric_seed
+[17:00:08.179] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:08.207] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:08.217] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:08.308] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:08.468] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:08.601] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:09.800] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:09.975] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:10.146] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:10.155] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:10.308] WARN: Texture "%s" has no frame "%s" items er_expert_belt
+[17:00:10.316] WARN: Texture "%s" has no frame "%s" items er_ability_shield
+[17:00:10.317] WARN: Texture "%s" has no frame "%s" items er_absorb_bulb
+[17:00:10.319] WARN: Texture "%s" has no frame "%s" items er_adrenaline_orb
+[17:00:10.320] WARN: Texture "%s" has no frame "%s" items er_air_balloon
+[17:00:10.320] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[17:00:10.451] WARN: Texture "%s" has no frame "%s" items er_ability_shield
+[17:01:57.810] WARN: cry/63 not found
+[17:02:09.760] LOG: [coop:lobby] start announce name=test4 protocol=p33
+[17:02:10.764] LOG: [coop:lobby] poll players=1
+[17:02:12.392] LOG: [coop:lobby] request target=p33_a6uPGAxcJWcd0F63BHzJXMbq0D5kHLPV (self=p33_RP-L7lEVpgAQx1f3DaN6wWD7JECfawgn)
+[17:02:12.528] LOG: [coop:lobby] poll players=1
+[17:02:12.984] LOG: [coop:lobby] poll players=1
+[17:02:14.718] LOG: [coop:lobby] poll players=1
+[17:02:16.484] LOG: [coop:lobby] poll matched code=7CX6ZD transportRole=answerer -> connect
+[17:02:16.773] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[17:02:18.723] LOG: [coop:launch] data channel already open
+[17:02:18.723] LOG: [coop:webrtc] peer connection state role=guest state=connected channel=open
+[17:02:18.723] LOG: [coop:webrtc] ICE connection state role=guest state=connected channel=open
+[17:02:18.723] LOG: [coop:webrtc] ctor role=guest readyState=open state=connected
+[17:02:18.742] LOG: [coop:webrtc] channel OPEN role=guest gen=0
+[17:02:18.862] LOG: [coop:launch] connectCoopSession role=guest state=connected username=test4 netcode=authoritative
+[17:02:18.867] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[17:02:18.870] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[17:02:18.871] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[17:02:18.871] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[17:02:18.871] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[17:02:18.871] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[17:02:18.871] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[17:02:18.872] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[17:02:18.874] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[17:02:18.875] LOG: [coop:launch] peer session ready role=guest netcode=authoritative -> connecting
+[17:02:18.875] LOG: [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=test4 version=er-coop-37 tiebreak=0.21065874483120006
+[17:02:18.877] LOG: [coop:webrtc] raw tx QUEUE role=guest t=hello bytes=531
+[17:02:18.917] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=d934626e515c046f(1108) movesName=12be97f97ecdc120(1108) movesets=44374aedf908f2ff(1920) abilitiesData=484720164af0dd92(1115) abilitiesName=1581743383868012(1115)
+[17:02:18.922] LOG: [coop:webrtc] raw tx QUEUE role=guest t=dataFingerprint bytes=329
+[17:02:18.925] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:02:18.926] LOG: %cStart Phase SelectStarterPhase color:green;
+[17:02:18.930] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownTeam bytes=295
+[17:02:18.930] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownReady bytes=51
+[17:02:18.932] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=542 handlers=13
+[17:02:18.934] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[17:02:18.934] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[17:02:18.934] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[17:02:19.009] LOG: [coop:webrtc] raw rx role=guest t=dataFingerprint bytes=329 handlers=13
+[17:02:19.013] WARN: [coop:checksum] PRESENTATION MISMATCH sections=movesName,abilitiesName - simulation compatible - movesName local=12be97f97ecdc120(1108) peer=c262a065143b9028(1108) abilitiesName local=1581743383868012(1115) peer=0dc202b994a0ebe5(1115)
+[17:02:19.013] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[17:02:19.013] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[17:02:19.051] LOG: [coop:webrtc] raw rx role=guest t=showdownTeam bytes=793 handlers=13
+[17:02:19.052] LOG: [coop:webrtc] raw rx role=guest t=showdownReady bytes=51 handlers=13
+[17:02:19.053] LOG: [coop:rendezvous] ARRIVE point=showdown-ready (send) role=guest
+[17:02:19.053] LOG: [coop:webrtc] raw tx QUEUE role=guest t=rendezvous bytes=43
+[17:02:19.053] LOG: [coop:rendezvous] AWAIT point=showdown-ready timeoutMs=600000 -> network-wait role=guest
+[17:02:19.056] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=43 handlers=13
+[17:02:19.056] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> deliver-to-waiter role=guest
+[17:02:19.056] LOG: [coop:webrtc] raw tx QUEUE role=guest t=rendezvous bytes=43
+[17:02:19.056] LOG: [coop:rendezvous] AWAIT point=showdown-ready RESOLVE both-arrived role=guest
+[17:02:19.072] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownStakeOffer bytes=106
+[17:02:19.108] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=43 handlers=13
+[17:02:19.108] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> DUPLICATE (already seen) role=guest
+[17:02:19.110] LOG: [coop:webrtc] raw rx role=guest t=showdownStakeOffer bytes=106 handlers=13
+[17:02:21.953] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=50 handlers=13
+[17:02:21.953] LOG: [coop:rendezvous] RECV arrival point=showdown-wager-commit -> BUFFER (no waiter yet) role=guest
+[17:02:23.630] LOG: [coop:rendezvous] ARRIVE point=showdown-wager-commit (send) role=guest
+[17:02:23.630] LOG: [coop:webrtc] raw tx QUEUE role=guest t=rendezvous bytes=50
+[17:02:23.635] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit -> partner already arrived (buffer-hit) role=guest
+[17:02:23.764] LOG: [coop-launch] guest: awaiting host launch snapshot (push-snapshot boot, no poll)
+[17:02:23.764] LOG: [coop:stream] guest awaitLaunchSnapshot wave=1 START timeout=1200000ms
+[17:02:23.764] LOG: [coop:stream] guest SEND requestLaunchSnapshot wave=1
+[17:02:23.764] LOG: [coop:webrtc] raw tx QUEUE role=guest t=requestLaunchSnapshot bytes=38
+[17:02:23.767] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=50 handlers=12
+[17:02:23.768] LOG: [coop:rendezvous] RECV arrival point=showdown-wager-commit -> DUPLICATE (already seen) role=guest
+[17:02:23.875] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[17:02:23.875] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms machineWaits=- peerBeat=- lastRx=0s transport=connected journal=0/0 queue=0
+[17:02:24.767] WARN: [coop:stream] guest awaitLaunchSnapshot wave=1 no snapshot yet, RE-REQUEST attempt 1/12
+[17:02:24.768] LOG: [coop:webrtc] raw tx QUEUE role=guest t=requestLaunchSnapshot bytes=38
+[17:02:25.769] WARN: [coop:stream] guest awaitLaunchSnapshot wave=1 no snapshot yet, RE-REQUEST attempt 2/12
+[17:02:25.770] LOG: [coop:webrtc] raw tx QUEUE role=guest t=requestLaunchSnapshot bytes=38
+[17:02:26.568] LOG: [coop:webrtc] raw rx role=guest t=launchSnapshot bytes=8135 handlers=12
+[17:02:26.568] LOG: [coop:replay] guest RECV launchSnapshot wave=1 sessionLen=7279 -> parked waiter
+[17:02:26.568] LOG: [coop:stream] guest awaitLaunchSnapshot wave=1 RESOLVE len=7279
+[17:02:26.715] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=8311 handlers=12
+[17:02:26.716] LOG: [coop:replay] guest RECV enemyPartySync wave=1 count=1 -> buffered (no waiter)
+[17:02:27.368] LOG: Wave Seed: KoeajlC1fCF10LLiLG2NHHP3 0
+[17:02:27.368] LOG: Seed: KoeajlC1fCF10LLiLG2NHHP3
+[17:02:27.372] LOG: Wave Seed: LpfbkmD2gDG21MMjMH3OIIQ4 1
+[17:02:27.405] LOG: [coop-launch] guest: booted from host snapshot -> LOADED EncounterPhase (no generation)
+[17:02:27.405] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:02:27.406] LOG: %cStart Phase EncounterPhase color:green;
+[17:02:27.417] LOG: Pokemon: Vulnona (Gegner) | Species ID: 38 | Level: 100 | Nature: Mäßig (+SpAng/-Ang)
+[17:02:27.417] LOG: Stats (IVs): HP: 287 (31), Atk: 169 (31), Def: 186 (31), Spatk: 240 (31), Spdef: 236 (31), Spd: 236 (31)
+[17:02:27.417] LOG: Ability: Dürre | Passive Ability: Pyromancy 
+[17:02:27.417] LOG: Moveset: ["Schweifglanz","Magieflamme","Mondgewalt","Phantomparade"]
+[17:02:27.418] LOG: Pokemon: Arkani (Gegner) | Species ID: 59 | Level: 100 | Nature: Robust (-)
+[17:02:27.419] LOG: Stats (IVs): HP: 321 (31), Atk: 316 (31), Def: 256 (31), Spatk: 256 (31), Spdef: 256 (31), Spd: 316 (31)
+[17:02:27.419] LOG: Ability: Krallenwucht | Passive Ability: Steinhaupt 
+[17:02:27.419] LOG: Moveset: ["Silberblick","Glut","Läuterfeuer","Doppelkick"]
+[17:02:27.622] LOG: Generated AI funcs
+[17:02:27.641] LOG: Wave Seed: LpfbkmD2gDG21MMjMH3OIIQ4 1
+[17:02:27.867] LOG: Tänzer Heraklines1
+[17:02:29.746] LOG: Tänzer Heraklines1
+[17:02:30.402] LOG: [coop:renderer] authoritative trainer intro cleared pokeball trays player=true enemy=true
+[17:02:30.408] LOG: [coop:resync] presentation settle boundary=encounter-summon side=enemy desired=visible ids=[548653877] changed=1 phase=EncounterPhase
+[17:02:30.408] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:02:30.770] LOG: [coop:resync] presentation settle boundary=launch-ready side=player desired=visible ids=[2665569753] changed=1 phase=EncounterPhase
+[17:02:30.772] LOG: %cStart Phase ShinySparklePhase color:green;
+[17:02:30.850] LOG: %cStart Phase TurnInitPhase color:green;
+[17:02:30.851] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:02:30.851] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:02:30.851] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:02:30.852] LOG: %cStart Phase CommandPhase color:green;
+[17:02:51.185] LOG: [coop:relay] showdown peer sendCommand turn=1 command=0 cursor=3
+[17:02:51.186] LOG: [coop:webrtc] raw tx QUEUE role=guest t=showdownCommand bytes=106
+[17:02:51.189] LOG: %cStart Phase TurnStartPhase color:green;
+[17:02:51.190] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:02:51.191] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[17:02:51.191] LOG: [coop:replay] guest replay turn=1: live pump start (awaiting host events/resolution)
+[17:02:51.192] LOG: [coop:replay] guest awaitTurn turn=1 START timeout=1200000ms
+[17:02:53.875] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[17:02:53.875] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=2683ms machineWaits=- peerBeat=- lastRx=0s transport=connected journal=0/0 queue=0
+[17:02:54.076] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=129 handlers=12
+[17:02:54.076] WARN: [coop:replay] guest DROP cross-address/malformed battleEvent e=1827396545435366 wave=1 turn=1 seq=0
+[17:02:54.077] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=118 handlers=12
+[17:02:54.077] WARN: [coop:replay] guest DROP cross-address/malformed battleEvent e=1827396545435366 wave=1 turn=1 seq=1
+[17:02:55.584] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=129 handlers=12
+[17:02:55.584] WARN: [coop:replay] guest DROP cross-address/malformed battleEvent e=1827396545435366 wave=1 turn=1 seq=2
+[17:02:58.786] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=141 handlers=12
+[17:02:58.786] WARN: [coop:replay] guest DROP cross-address/malformed battleEvent e=1827396545435366 wave=1 turn=1 seq=3
+[17:02:58.786] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=122 handlers=12
+[17:02:58.787] WARN: [coop:replay] guest DROP cross-address/malformed battleEvent e=1827396545435366 wave=1 turn=1 seq=4
+[17:03:00.970] LOG: [coop:webrtc] raw rx REASSEMBLED role=guest bytes=10339 chunks=2
+[17:03:00.971] LOG: [coop:webrtc] raw rx role=guest t=turnResolution bytes=10337 handlers=12
+[17:03:00.972] WARN: [coop:stream] guest DROP unawaited turnResolution e=1827396545435366 wave=1 turn=1 rev=3
+[17:03:02.965] LOG: [coop:webrtc] raw rx REASSEMBLED role=guest bytes=10339 chunks=2
+[17:03:02.965] LOG: [coop:webrtc] raw rx role=guest t=turnResolution bytes=10337 handlers=12
+[17:03:02.965] WARN: [coop:stream] guest DROP unawaited turnResolution e=1827396545435366 wave=1 turn=1 rev=3
+[17:03:03.873] LOG: [coop:webrtc] raw tx QUEUE role=guest t=stallBeat bytes=35
+[17:03:04.965] LOG: [coop:webrtc] raw rx REASSEMBLED role=guest bytes=10339 chunks=2
+[17:03:04.965] LOG: [coop:webrtc] raw rx role=guest t=turnResolution bytes=10337 handlers=12
+[17:03:04.966] WARN: [coop:stream] guest DROP unawaited turnResolution e=1827396545435366 wave=1 turn=1 rev=3
+[17:03:06.971] LOG: [coop:webrtc] raw rx REASSEMBLED role=guest bytes=10339 chunks=2
+[17:03:06.972] LOG: [coop:webrtc] raw rx role=guest t=turnResolution bytes=10337 handlers=12
+[17:03:06.972] WARN: [coop:stream] guest DROP unawaited turnResolution e=1827396545435366 wave=1 turn=1 rev=3
+[17:03:08.874] LOG: [coop:webrtc] raw tx QUEUE role=guest t=stallBeat bytes=35
+[17:03:08.971] LOG: [coop:webrtc] raw rx REASSEMBLED role=guest bytes=10339 chunks=2
+[17:03:08.971] LOG: [coop:webrtc] raw rx role=guest t=turnResolution bytes=10337 handlers=12
+[17:03:08.971] WARN: [coop:stream] guest DROP unawaited turnResolution e=1827396545435366 wave=1 turn=1 rev=3
+[17:03:17.184] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+
+----- REPLAY TRACE (JSON) -----
+(none)
