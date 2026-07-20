@@ -338,7 +338,6 @@ export class CoopReplayMePhase extends Phase {
     // replacing the address here is the required generation handoff, not local successor derivation.
     this.coopV2ControlOperationId = operationId;
     setCoopMeHostPresentation(structuredClone(presentation));
-    notifyCoopV2InteractionSurfaceReady(this.boundRuntime);
     return true;
   }
 

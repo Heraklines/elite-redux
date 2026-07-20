@@ -627,3 +627,28 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   scoped formatting has no errors, `git diff --check` is clean, and full
   TypeScript has 222 repository-baseline diagnostics with zero touched-path
   diagnostics. Behavioral qualification remains GitHub-hosted.
+
+2026-07-20 - Mystery projector recursion and stale readiness oracle
+
+- Exact-SHA gate `29787230444` exposed a real V2 Mystery defect in B7, B9, C1,
+  and C3. While constructing a `CoopReplayMePhase` from the immutable
+  `ME_PRESENT` capsule, `installCoopV2MePresentation` synchronously announced
+  surface readiness. The phase was not current and
+  `v2ProjectedInteractionControlId` had not yet been installed, so the
+  announcement recursively re-entered the same projector until
+  `Maximum call stack size exceeded`. Downstream null-battle failures were
+  consequences of that destroyed projection, not independent Mystery bugs.
+- Presentation installation is now data-only. The sole readiness edge remains
+  `openV2MysterySurface`: after the exact phase is current, its bounded
+  `MYSTERY_ENCOUNTER` handler has opened, the phase/runtime/generation fence is
+  still live, and the operation ID is bound. A source contract forbids
+  construction-time attestation and pins the real handler edge.
+- A1's only failure was a stale string oracle. Production owner and watcher
+  World Map paths already delegated to
+  `publishCoopBiomeSurfaceWhenActionable`, which proves exact ER_MAP mode,
+  active handler, and executable input before releasing V2 interaction and
+  retained-wave authority. The contract now verifies that centralized proof
+  instead of searching each path for the retired direct notifier.
+- Local static validation is 23/23 Authority contracts, scoped formatting has
+  no errors, and `git diff --check` is clean. Runtime qualification remains
+  GitHub-hosted.

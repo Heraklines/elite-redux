@@ -20,6 +20,7 @@
     "src/data/elite-redux/coop/coop-session-controller.ts",
     "src/dev-tools/registry.ts",
     "src/phases/coop-guest-faint-switch-phase.ts",
+    "src/phases/coop-replay-me-phase.ts",
     "src/phases/coop-replay-phases.ts",
     "src/phases/er-crossroads-phase.ts",
     "src/phases/select-biome-phase.ts",
@@ -49,6 +50,7 @@
     "test/tests/elite-redux/coop/coop-soak-host-faint.test.ts",
     "test/tests/elite-redux/coop/coop-stall-asymmetric-watchdog.test.ts",
     "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts",
+    "test/tests/elite-redux/coop/coop-wiring-completeness.test.ts",
     "test/tests/elite-redux/showdown/showdown-versus-faint.test.ts",
     "test/tools/coop-duo-harness.ts",
     "test/tools/coop-soak-driver.ts"

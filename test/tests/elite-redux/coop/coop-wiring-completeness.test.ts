@@ -439,16 +439,34 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       const modeOpen = body.search(/setModeBoundedWhen\(\s*UiMode\.ER_MAP/);
       const supersededGuard = body.search(/===\s*"superseded"/);
       const mirrorOpen = body.search(new RegExp(`beginSession\\(\\s*"${mirrorRole}"\\s*,\\s*UiMode\\.ER_MAP`));
-      const readiness = body.indexOf("notifyCoopWaveContinuationSurfaceReady(");
+      const readiness = body.indexOf("publishCoopBiomeSurfaceWhenActionable(");
       expect(modeOpen, `${label} opens ER_MAP through the bounded live-phase seam`).toBeGreaterThanOrEqual(0);
       expect(supersededGuard, `${label} rejects a replaced UI transition`).toBeGreaterThan(modeOpen);
       expect(mirrorOpen, `${label} starts its real ER_MAP mirror only after replacement rejection`).toBeGreaterThan(
         supersededGuard,
       );
-      expect(readiness, `${label} publishes retained readiness from the open public surface`).toBeGreaterThan(
+      expect(readiness, `${label} delegates retained readiness from the open public surface`).toBeGreaterThan(
         mirrorOpen,
       );
     }
+
+    const publisherStart = source.indexOf("private publishCoopBiomeSurfaceWhenActionable(");
+    const publisherEnd = source.indexOf("private generateNextBiome(", publisherStart);
+    const publisher = source.slice(publisherStart, publisherEnd);
+    expect(publisherStart, "the centralized World Map actionability publisher exists").toBeGreaterThanOrEqual(0);
+    expect(publisherEnd, "the actionability publisher has a bounded source section").toBeGreaterThan(publisherStart);
+    const exactMode = publisher.indexOf("globalScene.ui.getMode() === UiMode.ER_MAP");
+    const liveHandler = publisher.indexOf("handler?.active === true");
+    const actionableHandler = publisher.indexOf("handler.isCoopV2InputActionable?.() === true");
+    const interactionReady = publisher.indexOf("notifyCoopV2InteractionSurfaceReady(");
+    const continuationReady = publisher.indexOf("notifyCoopWaveContinuationSurfaceReady(");
+    expect(exactMode, "readiness requires the exact World Map UI mode").toBeGreaterThanOrEqual(0);
+    expect(liveHandler, "readiness requires the live World Map handler").toBeGreaterThan(exactMode);
+    expect(actionableHandler, "readiness requires executable public input").toBeGreaterThan(liveHandler);
+    expect(interactionReady, "the actionable map releases its V2 interaction claim").toBeGreaterThan(actionableHandler);
+    expect(continuationReady, "the actionable map releases retained wave authority last").toBeGreaterThan(
+      interactionReady,
+    );
   });
 
   it("retries retained reward and market claims from their real public-handler readiness edges", () => {

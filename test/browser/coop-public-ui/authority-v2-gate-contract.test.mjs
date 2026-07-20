@@ -21,6 +21,7 @@ const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", ro
 const victoryPhase = readFileSync(new URL("src/phases/victory-phase.ts", root), "utf8");
 const guestFaintSwitchPhase = readFileSync(new URL("src/phases/coop-guest-faint-switch-phase.ts", root), "utf8");
 const replayPhases = readFileSync(new URL("src/phases/coop-replay-phases.ts", root), "utf8");
+const replayMePhase = readFileSync(new URL("src/phases/coop-replay-me-phase.ts", root), "utf8");
 const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts", root), "utf8");
 const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
 const soakDriver = readFileSync(new URL("test/tools/coop-soak-driver.ts", root), "utf8");
@@ -264,6 +265,32 @@ test("ME_PRESENT DATA cannot wait on the successor phase that V2 projection must
     projector,
     /projected exact mystery generation/u,
     "the authenticated successor replaces a stuck local predecessor",
+  );
+});
+
+test("Mystery projection construction cannot recursively attest an unopened handler", () => {
+  const installerStart = replayMePhase.indexOf("public installCoopV2MePresentation(");
+  const installerEnd = replayMePhase.indexOf("/**", installerStart + 1);
+  assert.ok(installerStart >= 0, "the V2 Mystery presentation installer exists");
+  assert.ok(installerEnd > installerStart, "the V2 Mystery presentation installer has a bounded source section");
+  const installer = replayMePhase.slice(installerStart, installerEnd);
+  assert.doesNotMatch(
+    installer,
+    /notifyCoopV2InteractionSurfaceReady/u,
+    "constructing a replay phase must not re-enter projection before that phase owns a public handler",
+  );
+
+  const readinessStart = replayMePhase.indexOf("private openV2MysterySurface(");
+  const readinessEnd = replayMePhase.indexOf("constructor(", readinessStart);
+  assert.ok(readinessStart >= 0, "the live Mystery surface opener exists");
+  assert.ok(readinessEnd > readinessStart, "the live Mystery surface opener has a bounded source section");
+  const readiness = replayMePhase.slice(readinessStart, readinessEnd);
+  assert.match(readiness, /openModeBounded\(UiMode\.MYSTERY_ENCOUNTER/u);
+  assert.match(readiness, /boundaryStillLive\(\)/u);
+  assert.match(
+    readiness,
+    /notifyCoopV2InteractionSurfaceReady\(this\.boundRuntime\)/u,
+    "only the opened, still-live Mystery handler may attest control",
   );
 });
 
