@@ -182,3 +182,40 @@ test("the real command proof edge eagerly completes V2 and the duo fixture creat
     "the synthetic second browser crosses the same TurnInit/Command/proof/pacing order as production",
   );
 });
+
+test("ME_PRESENT DATA cannot wait on the successor phase that V2 projection must create", () => {
+  const materialStart = coopRuntime.indexOf("function materializeCoopMeOperationFromOp(");
+  const materialEnd = coopRuntime.indexOf("\ntype CoopV2InteractionLiveMaterializer", materialStart);
+  assert.notEqual(materialStart, -1, "runtime exposes the registered Mystery materializer");
+  assert.ok(materialEnd > materialStart, "Mystery materializer has a bounded source block");
+  const materializer = coopRuntime.slice(materialStart, materialEnd);
+  assert.match(materializer, /setCoopMeInteractionStart\(pinned\)/u);
+  assert.match(
+    materializer,
+    /materializeCommittedInteractionOutcome\(seq,\s*payload\.presentation,\s*op\.id\)/u,
+    "DATA installs the exact immutable presentation into the addressed relay",
+  );
+  assert.doesNotMatch(
+    materializer,
+    /installCoopV2MePresentation/u,
+    "DATA must not require the successor phase before materialApplied",
+  );
+
+  const projectionStart = coopRuntime.indexOf("function prepareCoopV2OrdinaryInteractionControlSurface(");
+  const projectionEnd = coopRuntime.indexOf(
+    "\n/**\n * Construct the exact engine generation recovery",
+    projectionStart,
+  );
+  assert.notEqual(projectionStart, -1, "runtime exposes the ordinary immutable interaction projector");
+  assert.ok(projectionEnd > projectionStart, "ordinary interaction projector has a bounded source block");
+  const projector = coopRuntime.slice(projectionStart, projectionEnd);
+  assert.match(projector, /plan\.kind !== "mystery"/u);
+  assert.match(projector, /materializeCoopV2InteractionProjection\(runtime, control, plan\)/u);
+  assert.match(projector, /phaseManager\.clearPhaseQueue\(\)/u);
+  assert.match(projector, /current\.end\(\)/u);
+  assert.match(
+    projector,
+    /projected exact mystery generation/u,
+    "the authenticated successor replaces a stuck local predecessor",
+  );
+});

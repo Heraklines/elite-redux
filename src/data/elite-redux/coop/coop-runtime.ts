@@ -4096,6 +4096,14 @@ export interface CoopRuntime {
   v2RecoveryWaitSuccessorOperationId: string | null;
   /** Exact control whose new engine generation was queued under the current correlated recovery fence. */
   v2RecoveryPreparedControlId: string | null;
+  /**
+   * Exact ordinary (non-recovery) shared-interaction generation installed directly from immutable V2
+   * material. This closes the gap where a replica's obsolete predecessor phase never locally reaches the
+   * successor the authority already committed (for example NextEncounterPhase waiting forever before an
+   * ME_PRESENT). The value is only a duplicate-construction guard; public phase+handler proof still owns
+   * controlInstalled.
+   */
+  v2ProjectedInteractionControlId: string | null;
   /** Runtime-owned V2 wave/terminal transactions awaiting safe DATA and real destination proof. */
   readonly v2WaveTransactions: Map<number, CoopV2WaveLiveTransaction>;
   /**
@@ -4846,12 +4854,14 @@ function projectCoopV2InteractionControl(
   }
   if (control.kind === "SHARED_INTERACTION") {
     const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
-    if (sourceEntry == null || projectionPlanOfCoopV2InteractionEntry(sourceEntry) == null) {
+    const plan = sourceEntry == null ? null : projectionPlanOfCoopV2InteractionEntry(sourceEntry);
+    if (plan == null) {
       return {
         kind: "rejected",
         reason: `shared interaction ${controlId} has no complete immutable projection capsule`,
       };
     }
+    prepareCoopV2OrdinaryInteractionControlSurface(runtime, control, plan);
   }
 
   const contract = coopV2InteractionProofContract(control);
@@ -5505,7 +5515,7 @@ function buildCoopV2LiveSeams(
   return seams;
 }
 
-function materializeCoopV2RecoveryProjection(
+function materializeCoopV2InteractionProjection(
   runtime: CoopRuntime,
   control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>,
   plan: CoopV2InteractionProjectionPlan,
@@ -5675,6 +5685,69 @@ function materializeCoopV2RecoveryProjection(
 }
 
 /**
+ * Install an ordinary replica's exact V2 successor when the obsolete local phase tree cannot reach it.
+ *
+ * Most interaction phases still arrive naturally at their committed successor and are proven in place. A
+ * Mystery presentation is different: its immutable state can arrive while the replica is still inside the
+ * previous wave's asynchronous NextEncounter tween. Waiting for that local tween to independently construct
+ * MysteryEncounterPhase makes CPU/tween timing part of consensus and, in the observed browser failure, the
+ * tween never completed after the authoritative state adoption. Only the authenticated ME_PRESENT capsule
+ * may replace that predecessor with CoopReplayMePhase. DATA remains separate: this function runs from the
+ * control projector after materialApplied, and the new phase must still open its real handler before
+ * controlInstalled can be signed.
+ */
+function prepareCoopV2OrdinaryInteractionControlSurface(
+  runtime: CoopRuntime,
+  control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>,
+  plan: CoopV2InteractionProjectionPlan,
+): boolean {
+  if (
+    plan.kind !== "mystery"
+    || runtime.controller.authorityRole === "authority"
+    || runtime.controller.role !== "guest"
+  ) {
+    return false;
+  }
+  const controlId = controlIdOf(control);
+  if (runtime.v2ProjectedInteractionControlId === controlId || runtime.v2RecoveryPreparedControlId === controlId) {
+    return true;
+  }
+  const receiverScene = runtimeSceneBindings.get(runtime);
+  if (receiverScene != null && receiverScene !== globalScene) {
+    return false;
+  }
+  const phaseManager = globalScene.phaseManager;
+  const current = phaseManager?.getCurrentPhase();
+  if (current == null) {
+    return false;
+  }
+  const currentOperationId =
+    typeof (current as { coopV2ControlOperationId?: unknown }).coopV2ControlOperationId === "string"
+      ? (current as unknown as { coopV2ControlOperationId: string }).coopV2ControlOperationId
+      : null;
+  if (current.is("CoopReplayMePhase") && currentOperationId === control.operationId) {
+    runtime.v2ProjectedInteractionControlId = controlId;
+    return true;
+  }
+  if (!current.is("NextEncounterPhase") && !current.is("MysteryEncounterPhase")) {
+    return false;
+  }
+  const phase = materializeCoopV2InteractionProjection(runtime, control, plan);
+  if (phase == null) {
+    return false;
+  }
+  // The V2 entry is now the sole progression authority. Purge locally-derived siblings before ending the
+  // obsolete predecessor; its async callback is identity-fenced and cannot mutate after the synchronous
+  // shift. The exact replay phase then publishes readiness only after its real Mystery handler opens.
+  phaseManager.clearPhaseQueue();
+  phaseManager.pushPhase(phase);
+  runtime.v2ProjectedInteractionControlId = controlId;
+  current.end();
+  coopLog("v2-interaction", `projected exact mystery generation for ${controlId} from ${current.phaseName}`);
+  return true;
+}
+
+/**
  * Construct the exact engine generation recovery will subsequently prove.
  *
  * Recovery deliberately destroyed the obsolete phase tree under a held fence. Every executable shared
@@ -5716,7 +5789,7 @@ function prepareCoopV2RecoveryControlSurface(runtime: CoopRuntime, control: NonN
     if (plan == null) {
       return false;
     }
-    const phase = materializeCoopV2RecoveryProjection(runtime, control, plan);
+    const phase = materializeCoopV2InteractionProjection(runtime, control, plan);
     if (phase == null) {
       return false;
     }
@@ -5810,6 +5883,7 @@ function buildCoopV2LiveRecoverySeams(
       runtime.v2DeferredInteractionStarts.clear();
       runtime.v2InstalledInteractionTargets.clear();
       runtime.v2RecoveryPreparedControlId = null;
+      runtime.v2ProjectedInteractionControlId = null;
       const finalEntry = bundle.requiredTail.at(-1) ?? null;
       const adopted =
         finalEntry == null
@@ -8404,7 +8478,12 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     ) {
       return false;
     }
-    if (coopMeInteractionStartValue() !== pinned) {
+    const activePin = coopMeInteractionStartValue();
+    if (activePin < 0) {
+      if (runtime.controller.interactionCounter() !== pinned) {
+        return false;
+      }
+    } else if (activePin !== pinned) {
       return false;
     }
     const immutableState = structuredClone(envelope.authoritativeState);
@@ -8422,34 +8501,27 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     if (!stateApplied) {
       return false;
     }
-    setCoopMeActivePresentation(payload.presentation);
-    const current = globalScene.phaseManager?.getCurrentPhase() as
-      | {
-          is?: (phaseName: string) => boolean;
-          installCoopV2MePresentation?: (
-            operationId: string,
-            interactionCounter: number,
-            presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }>,
-          ) => boolean;
-        }
-      | undefined;
-    if (
-      current?.is?.("CoopReplayMePhase") !== true
-      || current.installCoopV2MePresentation?.(op.id, pinned, payload.presentation) !== true
-    ) {
-      // Do not sign DATA for a presentation whose exact queue-owned phase generation is not bindable yet.
-      // The retained entry will retry once MysteryEncounterPhase has diverted into CoopReplayMePhase.
-      return false;
+    const priorMysteryControl = captureCoopMeControlTransactionState();
+    if (activePin < 0) {
+      // The authenticated global entry, not a locally rolled MysteryEncounterPhase, establishes this
+      // replica's exact ME generation. Without this pin the immutable projection capsule cannot construct
+      // CoopReplayMePhase when delivery races the previous wave's NextEncounter tween.
+      setCoopMeInteractionStart(pinned);
     }
+    setCoopMeActivePresentation(payload.presentation);
     const retained = captureCoopActiveMysteryControl();
     if (
       retained?.interactionCounter !== pinned
       || (retained.terminal !== "pending" && retained.terminal !== "battle-settled")
       || JSON.stringify(retained.presentation) !== JSON.stringify(payload.presentation)
     ) {
+      restoreCoopMeControlTransactionState(priorMysteryControl);
       return false;
     }
-    runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, payload.presentation);
+    // DATA application deliberately does not require or install a phase. The ordered V2 control projector
+    // reconstructs CoopReplayMePhase from this same immutable entry and separately proves its real handler.
+    // This removes the former circular dependency (DATA waited for the phase; projection waited for DATA).
+    runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, payload.presentation, op.id);
     return true;
   }
   if (op.kind === "ME_PICK") {
@@ -9832,6 +9904,7 @@ export function assembleCoopRuntime(
       runtime.v2SettledInteractionOperations.clear();
       runtime.v2ControlLedger.clear();
       runtime.v2RecoveryWaitSuccessorOperationId = null;
+      runtime.v2ProjectedInteractionControlId = null;
       runtime.v2WaveTransactions.clear();
       coopLog("v2-recovery", `hard epoch boundary ${authorityV2Epoch}->${epoch}; retired prior authoritative log`);
     }
@@ -10115,6 +10188,7 @@ export function assembleCoopRuntime(
     v2ControlLedger: new CoopV2ControlLedger(),
     v2RecoveryWaitSuccessorOperationId: null,
     v2RecoveryPreparedControlId: null,
+    v2ProjectedInteractionControlId: null,
     v2WaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
     v2CompletedWaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
   };

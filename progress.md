@@ -243,3 +243,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   boundary contract now require the current semantic proof.
 - Local validation remains static-only per `AGENTS.md`; no co-op Vitest or browser game was run locally.
   Exact-SHA remote contracts, full gate, and focused public browser profiles remain required.
+
+2026-07-20 — Authority V2 Mystery DATA/control projection deadlock
+
+- Exact-SHA two-browser mystery campaign `29765183668` reached wave 2 with both engines mechanically
+  converged, then retained global revision 6 forever at frontier `6/5/5`. The authority had committed a
+  complete `ME_PRESENT`, while the replica remained in `NextEncounterPhase`. Its registered DATA
+  materializer required an already-live `CoopReplayMePhase`, but that phase was the entry's stated successor
+  and could only be projected after `materialApplied`: each stage waited on the other.
+- `ME_PRESENT` DATA now transactionally establishes its authenticated interaction pin, records the immutable
+  presentation, and seeds the addressed relay without consulting any phase. The ordinary V2 control
+  projector can then reconstruct the exact `CoopReplayMePhase` capsule from the retained entry, supersede
+  only the stale `NextEncounterPhase`/`MysteryEncounterPhase` predecessor, and wait for the real Mystery
+  handler before signing `controlInstalled`.
+- A static architecture contract prevents the phase dependency from returning and requires the immutable
+  ordinary projection edge. Local validation remains static-only; the exact-SHA mystery browser campaign is
+  the required production-fidelity regression proof.
