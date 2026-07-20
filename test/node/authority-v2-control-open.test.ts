@@ -228,6 +228,42 @@ describe("authority-v2 explicit command-open boundary", () => {
     expect(decodeInteractionOpenEntry(committed)).toEqual(open);
   });
 
+  it("admits same-turn interaction-open control from a broad interaction-result wait", () => {
+    const open = interactionMaterial();
+    const committed = {
+      ...buildInteractionOpenEntry({
+        context,
+        operationId: "V2/CONTROL/INTERACTION/3:1:CROSSROADS_PICK:9600007",
+        material: open,
+      }),
+      revision: 6,
+    } satisfies CoopAuthorityEntry;
+    const predecessor = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: "reward-terminal",
+      epoch: context.sessionEpoch,
+      wave: open.wave,
+      turn: open.turn,
+      allowedKinds: ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"] as const,
+      allowNextWaveStart: true,
+      expectedOperationId: null,
+    };
+
+    expect(controlAllowsSuccessorEntry(predecessor, "reward-terminal", committed)).toBe(true);
+    expect(
+      controlAllowsSuccessorEntry(predecessor, "reward-terminal", {
+        ...committed,
+        material: {
+          ...committed.material,
+          payload: {
+            ...open,
+            kind: "command-open",
+          },
+        },
+      }),
+    ).toBe(false);
+  });
+
   it("rejects a Crossroads control whose recovery capsule or exact result address drifts", () => {
     expect(() =>
       buildInteractionOpenEntry({

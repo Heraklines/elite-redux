@@ -172,7 +172,7 @@ export function successorWaitAllows(
     return false;
   }
   if (nextKind === "CONTROL_COMMIT" && !controlOnly) {
-    return address.turn === wait.turn + 1;
+    return broadWaitAllowsControlCommitTurn(nextMaterial, address.turn, wait.turn);
   }
   if (turnBoundaryWait && (nextKind === "WAVE_ADVANCE" || nextKind === "TERMINAL_COMMIT")) {
     return address.turn === wait.turn || address.turn === wait.turn + 1;
@@ -216,6 +216,27 @@ interface MechanicalAddress {
   readonly epoch: number;
   readonly wave: number;
   readonly turn: number;
+}
+
+function broadWaitAllowsControlCommitTurn(nextMaterial: unknown, nextTurn: number, waitTurn: number): boolean {
+  const controlMaterial = objectRecord(nextMaterial);
+  // CONTROL_COMMIT closes two different authority boundaries:
+  //
+  // - command-open is authored after settlement advances into the next turn;
+  // - interaction-open authorizes a real picker (currently Crossroads) at the
+  //   same settlement address as the interaction result that led to it.
+  //
+  // Treating both as command-open rejected a legitimate reward -> Crossroads
+  // successor even though the reward's wait explicitly allowed CONTROL_COMMIT.
+  // Unknown material remains fail-closed here; the adapter performs the full
+  // digest/schema validation if admission succeeds.
+  const expectedTurn =
+    controlMaterial?.kind === "interaction-open"
+      ? waitTurn
+      : controlMaterial?.kind === "command-open"
+        ? waitTurn + 1
+        : null;
+  return expectedTurn != null && nextTurn === expectedTurn;
 }
 
 function safeCoordinate(value: unknown): value is number {
