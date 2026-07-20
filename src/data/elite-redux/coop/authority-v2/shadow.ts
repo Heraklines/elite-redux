@@ -906,6 +906,7 @@ export class CoopAuthorityV2Shadow {
       wave,
       turn,
       allowedKinds: ["TURN_COMMIT", "REPLACEMENT_COMMIT", "INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      allowNextWaveStart: false,
       expectedOperationId: null,
     });
 

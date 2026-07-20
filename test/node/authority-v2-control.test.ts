@@ -223,10 +223,37 @@ describe("validateNextControl", () => {
         wave: 2,
         turn: 3,
         allowedKinds: ["INTERACTION_COMMIT", "WAVE_ADVANCE"],
+        allowNextWaveStart: false,
         expectedOperationId: null,
       }),
     ).toBe(true);
     expect(isValidNextControl(terminal())).toBe(true);
+  });
+
+  it("requires the cross-wave permission only on successor waits", () => {
+    const shared = {
+      kind: "SHARED_INTERACTION",
+      operationId: "i",
+      ownerSeatId: 1,
+      epoch: 1,
+      wave: 1,
+      turn: 1,
+      surfaceClass: "op:learnMove",
+      operationKind: "LEARN_MOVE",
+      successor: { operationKinds: ["LEARN_MOVE"], operationIds: ["result-i"] },
+    } as const;
+    expect(validateNextControl(shared)).toEqual({ ok: true });
+    expect(
+      validateNextControl({
+        kind: "AWAIT_SUCCESSOR",
+        afterOperationId: "i",
+        epoch: 1,
+        wave: 1,
+        turn: 1,
+        allowedKinds: ["CONTROL_COMMIT"],
+        expectedOperationId: null,
+      }),
+    ).toMatchObject({ ok: false, reason: "allowNextWaveStart" });
   });
 
   it("rejects non-positive mechanical coordinates with a named reason", () => {
@@ -470,6 +497,7 @@ describe("DefaultCoopControlProjector", () => {
           wave: 2,
           turn: 3,
           allowedKinds: ["WAVE_ADVANCE", "TERMINAL_COMMIT"],
+          allowNextWaveStart: false,
           expectedOperationId: null,
         },
         {},

@@ -498,6 +498,34 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
+/**
+ * Freeze the exact JSON image that will cross WebRTC before deriving either its digest or successor.
+ *
+ * `structuredClone` preserves object properties whose value is `undefined`, while JSON transport drops
+ * them. Reward Leave results legitimately contain optional undefined fields, so hashing the pre-wire object
+ * made the authority retain one digest and the replica receive another. Building from the round-tripped
+ * image makes the locally retained entry, redeliveries, recovery tail, and remote replica byte-semantic
+ * copies of one immutable carrier.
+ */
+function freezeInteractionWireMaterial(
+  material: CoopV2InteractionEnvelopeMaterial,
+): CoopV2InteractionEnvelopeMaterial | null {
+  try {
+    const wire = JSON.parse(JSON.stringify(material)) as unknown;
+    if (
+      !isPlainObject(wire)
+      || wire.kind !== COOP_V2_INTERACTION_ENVELOPE_KIND
+      || !isCoopOperationSurfaceClass(wire.surfaceClass as string)
+      || !isPlainObject(wire.envelope)
+    ) {
+      return null;
+    }
+    return wire as unknown as CoopV2InteractionEnvelopeMaterial;
+  } catch {
+    return null;
+  }
+}
+
 function isCompleteInteractionEnvelope(
   envelope: CoopAuthoritativeEnvelopeV1,
   surfaceClass: CoopOperationSurfaceClass,
@@ -562,6 +590,7 @@ type ProjectableControl = NonNullable<CoopNextControl>;
 function successorWait(
   envelope: CoopAuthoritativeEnvelopeV1,
   allowedKinds: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedKinds"],
+  allowNextWaveStart: boolean,
 ): ProjectableControl {
   const operation = envelope.pendingOperation;
   if (operation == null) {
@@ -574,6 +603,7 @@ function successorWait(
     wave: envelope.wave,
     turn: envelope.turn,
     allowedKinds,
+    allowNextWaveStart,
     expectedOperationId: null,
   };
 }
@@ -644,7 +674,8 @@ export function successorOfCoopV2InteractionEnvelope(
   const payload = isPlainObject(operation.payload) ? operation.payload : null;
   const wait = (
     allowedKinds: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>["allowedKinds"],
-  ): ProjectableControl => successorWait(envelope, allowedKinds);
+    allowNextWaveStart: boolean,
+  ): ProjectableControl => successorWait(envelope, allowedKinds, allowNextWaveStart);
   const shared = (
     cls: Exclude<CoopOperationSurfaceClass, "op:faintSwitch" | "op:wave">,
     operationKind: CoopV2InteractionOperationKind,
@@ -674,7 +705,7 @@ export function successorOfCoopV2InteractionEnvelope(
     }
     case "BARGAIN_PRESENT":
       if (!Array.isArray(payload?.sins) || payload.sins.length === 0) {
-        return wait(["INTERACTION_COMMIT"]);
+        return wait(["INTERACTION_COMMIT"], false);
       }
       {
         const resultOperationId = operationIdAtSameAddress(operation.id, "BARGAIN");
@@ -705,20 +736,20 @@ export function successorOfCoopV2InteractionEnvelope(
           || payload?.label === "transfer"
           || payload?.label === "lock")
         ? shared("op:reward", "REWARD", operation.id, operation.owner, ["REWARD", "REWARD_PRESENT"])
-        : wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"]);
+        : wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], payload?.terminal === true);
     case "SHOP_BUY":
       return payload?.terminal === false
         ? shared("op:reward", "SHOP_BUY", operation.id, operation.owner, ["SHOP_BUY", "SHOP_PRESENT"])
-        : wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"]);
+        : wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], payload?.terminal === true);
     case "REWARD_PRESENT":
       return shared("op:reward", "REWARD_PRESENT", operation.id, operation.owner, ["REWARD"]);
     case "SHOP_PRESENT":
       return shared("op:reward", "SHOP_PRESENT", operation.id, operation.owner, ["SHOP_BUY"]);
     case "BIOME_PICK":
-      return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"]);
+      return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], true);
     case "CROSSROADS_PICK": {
       if (payload?.optionIndex !== 1) {
-        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"]);
+        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], true);
       }
       const parsed = parseCoopOperationId(operation.id);
       const pinned = parsed == null ? -1 : parsed.pinnedSeq - COOP_CROSSROADS_SEQ_BASE;
@@ -754,7 +785,7 @@ export function successorOfCoopV2InteractionEnvelope(
     }
     case "REVIVAL": {
       if (payload?.type !== "prompt") {
-        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"]);
+        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
       }
       const resultOperationIds = operationIdsAfterPrompt(operation.id, "REVIVAL", [1, 2, 3, 4, 5, 6]);
       return resultOperationIds == null
@@ -763,7 +794,7 @@ export function successorOfCoopV2InteractionEnvelope(
     }
     case "CATCH_FULL": {
       if (payload?.type !== "prompt") {
-        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"]);
+        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
       }
       const resultOperationIds = operationIdsAfterPrompt(operation.id, "CATCH_FULL", [1]);
       return resultOperationIds == null
@@ -773,7 +804,7 @@ export function successorOfCoopV2InteractionEnvelope(
     case "LEARN_MOVE":
     case "LEARN_MOVE_BATCH": {
       if (payload?.type !== "prompt") {
-        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"]);
+        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
       }
       const resultOperationIds = operationIdsAfterPrompt(operation.id, operation.kind, [1]);
       return resultOperationIds == null
@@ -782,7 +813,7 @@ export function successorOfCoopV2InteractionEnvelope(
     }
     case "ME_PRESENT": {
       if (payload?.present !== true) {
-        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"]);
+        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
       }
       const presentation = payload != null && isPlainObject(payload.presentation) ? payload.presentation : null;
       const subPrompt = presentation != null && isPlainObject(presentation.subPrompt) ? presentation.subPrompt : null;
@@ -813,12 +844,17 @@ export function successorOfCoopV2InteractionEnvelope(
     case "ME_SUB":
     case "ME_BUTTON":
     case "QUIZ_ANSWER":
-      return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"]);
-    case "ME_TERMINAL":
-      return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"]);
+      return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
+    case "ME_TERMINAL": {
+      const destination = payload != null && isPlainObject(payload.destination) ? payload.destination : null;
+      return wait(
+        ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+        destination?.kind === "continue",
+      );
+    }
     case "COLO_PICK": {
       if (payload?.type !== "board") {
-        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"]);
+        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
       }
       const resultOperationIds = operationIdsAfterPrompt(operation.id, "COLO_PICK", [1]);
       return resultOperationIds == null
@@ -828,7 +864,7 @@ export function successorOfCoopV2InteractionEnvelope(
     case "ABILITY_PICK":
     case "BARGAIN":
     case "STORMGLASS":
-      return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"]);
+      return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
     case "FAINT_SWITCH":
     case "WAVE_ADVANCE":
       return null;
@@ -866,18 +902,26 @@ export function buildCoopV2InteractionEnvelopeEntry(input: {
   if (operation == null) {
     return null;
   }
-  const material: CoopV2InteractionEnvelopeMaterial = {
+  const material = freezeInteractionWireMaterial({
     kind: COOP_V2_INTERACTION_ENVELOPE_KIND,
     surfaceClass: input.surfaceClass,
     envelope: input.envelope,
-  };
-  const nextControl = successorOfCoopV2InteractionEnvelope(input.surfaceClass, input.envelope);
+  });
+  const wireOperation = material?.envelope.pendingOperation;
+  if (
+    material == null
+    || wireOperation == null
+    || !isCompleteInteractionEnvelope(material.envelope, material.surfaceClass, input.context)
+  ) {
+    return null;
+  }
+  const nextControl = successorOfCoopV2InteractionEnvelope(material.surfaceClass, material.envelope);
   if (nextControl == null || !validateNextControl(nextControl).ok) {
     return null;
   }
   return {
     context: input.context,
-    operationId: operation.id,
+    operationId: wireOperation.id,
     kind: "INTERACTION_COMMIT",
     material: {
       digest: digestOfCoopV2InteractionEnvelope(material),

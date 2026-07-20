@@ -90,6 +90,7 @@ export function controlIdOf(control: ProjectableControl): string {
         `AWAIT_SUCCESSOR/${encodeURIComponent(control.afterOperationId)}`
         + `/e${control.epoch}/w${control.wave}/t${control.turn}`
         + `/${canonicalSuccessorKinds(control.allowedKinds).join(",")}`
+        + `/nextWave:${control.allowNextWaveStart ? "1" : "0"}`
         + `/next:${control.expectedOperationId == null ? "*" : encodeURIComponent(control.expectedOperationId)}`
       );
     case "TERMINAL":
@@ -164,6 +165,9 @@ export function successorWaitAllows(
   const turnBoundaryWait =
     wait.allowedKinds.length === turnBoundaryKinds.length
     && turnBoundaryKinds.every(kind => wait.allowedKinds.includes(kind));
+  if (address.wave === wait.wave + 1) {
+    return wait.allowNextWaveStart && address.turn === 1;
+  }
   if (address.wave !== wait.wave) {
     return false;
   }
@@ -636,6 +640,7 @@ function successorWaitIssues(control: Record<string, unknown>): string[] {
   addIssue(issues, "epoch", isPositiveInt(control.epoch));
   addIssue(issues, "wave", isNonNegativeInt(control.wave));
   addIssue(issues, "turn", isNonNegativeInt(control.turn));
+  addIssue(issues, "allowNextWaveStart", typeof control.allowNextWaveStart === "boolean");
   if (!Array.isArray(control.allowedKinds) || control.allowedKinds.length === 0) {
     issues.push("allowedKinds");
   } else {

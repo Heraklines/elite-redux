@@ -169,6 +169,7 @@ function turnAwaitEntryInput(
       wave,
       turn,
       allowedKinds,
+      allowNextWaveStart: false,
       expectedOperationId: null,
     },
   };
@@ -186,6 +187,7 @@ function replacementEntryInput(
     wave,
     turn: 1,
     allowedKinds,
+    allowNextWaveStart: false,
     expectedOperationId: null,
   };
   return {

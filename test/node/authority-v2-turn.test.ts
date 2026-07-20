@@ -193,6 +193,7 @@ describe("buildTurnCommitEntry - shape + digest", () => {
       wave: 3,
       turn: 5,
       allowedKinds: ["CONTROL_COMMIT", "REPLACEMENT_COMMIT", "INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      allowNextWaveStart: false,
       expectedOperationId: null,
     });
     expect(

@@ -438,6 +438,7 @@ export function successorControl(
         wave: address.wave,
         turn: address.turn,
         allowedKinds: ["INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+        allowNextWaveStart: false,
         expectedOperationId: null,
       };
   }

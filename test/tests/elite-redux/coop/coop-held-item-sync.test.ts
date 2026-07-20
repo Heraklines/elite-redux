@@ -111,6 +111,7 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   benchHp: [[1, 120, 0]],
   benchMoves: [[1, "aaaaaaaaaaaaaaaa"]],
   money: 1000,
+  lockModifierTiers: false,
   modifiers: [["EXP_CHARM", 1]],
   heldItems: [[0, "LEFTOVERS", 1]],
   pokeballCounts: [

@@ -55,6 +55,7 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   benchHp: [[1, 120, 0]],
   benchMoves: [[1, "aaaaaaaaaaaaaaaa"]],
   money: 1000,
+  lockModifierTiers: false,
   modifiers: [["EXP_CHARM", 1]],
   heldItems: [[0, "LEFTOVERS", 1]],
   pokeballCounts: [
@@ -133,6 +134,7 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         benchHp: [[1, 120, 0]],
         benchMoves: [[1, "aaaaaaaaaaaaaaaa"]],
         arenaTags: [],
+        lockModifierTiers: false,
         modifiers: [["EXP_CHARM", 1]],
         heldItems: [[0, "LEFTOVERS", 1]],
         pokeballCounts: [
@@ -154,6 +156,7 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         partyLevels: [50, 48],
         benchHp: [[1, 120, 0]],
         benchMoves: [[1, "aaaaaaaaaaaaaaaa"]],
+        lockModifierTiers: false,
         modifiers: [["EXP_CHARM", 1]],
         pokeballCounts: [
           [0, 5],
@@ -199,6 +202,9 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
           }),
         ),
       ).not.toBe(base);
+    });
+    it("a changed modifier-tier lock", () => {
+      expect(checksumState(state({ lockModifierTiers: true }))).not.toBe(base);
     });
     it("a changed battler tag set", () => {
       expect(checksumState(state({ field: [mon({ tags: ["ENCORE"] })] }))).not.toBe(base);

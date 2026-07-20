@@ -121,7 +121,11 @@ function commandControl(): CoopNextControl {
   };
 }
 
-function successorWait(afterOperationId: string, allowedKinds: readonly CoopAuthorityEntry["kind"][]): CoopNextControl {
+function successorWait(
+  afterOperationId: string,
+  allowedKinds: readonly CoopAuthorityEntry["kind"][],
+  allowNextWaveStart = false,
+): CoopNextControl {
   return {
     kind: "AWAIT_SUCCESSOR",
     afterOperationId,
@@ -129,6 +133,7 @@ function successorWait(afterOperationId: string, allowedKinds: readonly CoopAuth
     wave: 1,
     turn: 1,
     allowedKinds,
+    allowNextWaveStart,
     expectedOperationId: null,
   };
 }
@@ -804,6 +809,43 @@ describe("authority-v2 log", () => {
       },
     };
     expect(() => log.commit(wrongCoordinate)).toThrow(/not authorized by predecessor control/);
+  });
+
+  it("admits exactly wave N+1 turn 1 only when the predecessor explicitly authorizes that crossing", () => {
+    const nextWaveCommand = {
+      ...entryInput("wave-2-command", { kind: "CONTROL_COMMIT" }),
+      material: { digest: "wave-2-command", payload: { wave: 2, turn: 1 } },
+    };
+
+    const closed = makeLog(scheduler, []);
+    closed.commit(
+      entryInput("reward-result-closed", {
+        nextControl: successorWait("reward-result-closed", ["CONTROL_COMMIT"]),
+      }),
+    );
+    expect(() => closed.commit(nextWaveCommand)).toThrow(/not authorized by predecessor control/);
+
+    const open = makeLog(scheduler, []);
+    open.commit(
+      entryInput("reward-result-open", {
+        nextControl: successorWait("reward-result-open", ["CONTROL_COMMIT"], true),
+      }),
+    );
+    expect(open.commit(nextWaveCommand).revision).toBe(2);
+
+    const tooFar = makeLog(scheduler, []);
+    tooFar.commit(
+      entryInput("reward-result-too-far", {
+        nextControl: successorWait("reward-result-too-far", ["CONTROL_COMMIT"], true),
+      }),
+    );
+    expect(() =>
+      tooFar.commit({
+        ...nextWaveCommand,
+        operationId: "wave-2-command-turn-2",
+        material: { digest: "wave-2-command-turn-2", payload: { wave: 2, turn: 2 } },
+      }),
+    ).toThrow(/not authorized by predecessor control/);
   });
 
   it("admits only the bounded settlement-turn advance from an exact turn-boundary wait", () => {

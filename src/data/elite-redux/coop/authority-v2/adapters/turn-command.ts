@@ -267,6 +267,7 @@ export function buildTurnCommitEntry(input: BuildTurnCommitInput): BuildTurnComm
               "WAVE_ADVANCE",
               "TERMINAL_COMMIT",
             ],
+            allowNextWaveStart: false,
             expectedOperationId: null,
           }
         : {

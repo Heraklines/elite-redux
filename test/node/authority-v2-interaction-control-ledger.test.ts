@@ -106,6 +106,7 @@ function wait(
     wave: 5,
     turn: 1,
     allowedKinds,
+    allowNextWaveStart: false,
     expectedOperationId,
   };
 }

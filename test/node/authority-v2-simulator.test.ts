@@ -189,6 +189,7 @@ describe("authority-v2 simulator - directed scenarios", () => {
           wave: 1,
           turn: 2,
           allowedKinds: ["TURN_COMMIT"],
+          allowNextWaveStart: false,
           expectedOperationId: "op-4",
         },
         delta: 5,
@@ -366,6 +367,7 @@ describe("authority-v2 simulator - sentinels", () => {
       wave: 2,
       turn: 3,
       allowedKinds: ["TURN_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      allowNextWaveStart: false,
       expectedOperationId: null,
     };
     const story: StoryAct[] = [

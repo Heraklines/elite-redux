@@ -7,6 +7,7 @@
 import type { CoopFrameContextV2 } from "#data/elite-redux/coop/authority-v2/contract";
 import {
   buildCoopV2InteractionEnvelopeEntry,
+  decodeCoopV2InteractionEnvelope,
   requiresCoopV2InteractionTerminalProof,
   successorOfCoopV2InteractionEnvelope,
 } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
@@ -364,6 +365,55 @@ describe("Authority V2 interaction cutover", () => {
       kind: "AWAIT_SUCCESSOR",
       afterOperationId: value.pendingOperation?.id,
     });
+  });
+
+  it("authorizes an exact next-wave start only for terminal reward and market results", () => {
+    const terminalReward = successorOfCoopV2InteractionEnvelope(
+      "op:reward",
+      envelope(
+        "REWARD",
+        { label: "skip", choice: -1, terminal: true, result: { lockModifierTiers: false } },
+        "REWARD_SELECT",
+      ),
+    );
+    const reroll = successorOfCoopV2InteractionEnvelope(
+      "op:reward",
+      envelope(
+        "REWARD",
+        { label: "reroll", choice: -2, terminal: false, result: { lockModifierTiers: false } },
+        "REWARD_SELECT",
+      ),
+    );
+    const terminalMarket = successorOfCoopV2InteractionEnvelope(
+      "op:reward",
+      envelope("SHOP_BUY", { slot: -1, terminal: true, result: { remainingStock: [] } }, "SHOP"),
+    );
+
+    expect(terminalReward).toMatchObject({ kind: "AWAIT_SUCCESSOR", allowNextWaveStart: true });
+    expect(reroll).toMatchObject({ kind: "AWAIT_SUCCESSOR", allowNextWaveStart: false });
+    expect(terminalMarket).toMatchObject({ kind: "AWAIT_SUCCESSOR", allowNextWaveStart: true });
+  });
+
+  it("freezes terminal reward material to its exact JSON wire image before digesting it", () => {
+    const built = buildCoopV2InteractionEnvelopeEntry({
+      context: FRAME,
+      surfaceClass: "op:reward",
+      envelope: envelope(
+        "REWARD",
+        {
+          label: "skip",
+          choice: -1,
+          data: undefined,
+          terminal: true,
+          result: { lockModifierTiers: false },
+        },
+        "REWARD_SELECT",
+      ),
+    });
+    expect(built).not.toBeNull();
+    const delivered = JSON.parse(JSON.stringify({ ...built, revision: 1 }));
+    expect(delivered.material.payload.envelope.pendingOperation.payload).not.toHaveProperty("data");
+    expect(decodeCoopV2InteractionEnvelope(delivered)).not.toBeNull();
   });
 
   it.each([

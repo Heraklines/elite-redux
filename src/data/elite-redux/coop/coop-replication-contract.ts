@@ -147,6 +147,11 @@ export const COOP_AUTHORITATIVE_WIRE_FIELDS: readonly CoopWireFieldDescriptor[] 
   { name: "arenaTags", applied: true, hash: { kind: "direct", into: ["arenaTags"] } },
   { name: "money", applied: true, hash: { kind: "direct", into: ["money"] } },
   {
+    name: "lockModifierTiers",
+    applied: true,
+    hash: { kind: "direct", into: ["lockModifierTiers"] },
+  },
+  {
     name: "score",
     applied: true, // globalScene.score is set.
     hash: {
@@ -240,6 +245,7 @@ export const COOP_CHECKSUM_FIELDS: readonly CoopChecksumFieldDescriptor[] = [
   // then miss `benchMoves` and the contract test's exact-set assertion FAILS.
   { name: "benchMoves", source: ["playerParty"] },
   { name: "money", source: ["money"] },
+  { name: "lockModifierTiers", source: ["lockModifierTiers"] },
   { name: "modifiers", source: ["playerModifiers"] },
   { name: "heldItems", source: ["playerParty", "playerModifiers"] },
   { name: "pokeballCounts", source: ["pokeballCounts"] },

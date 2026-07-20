@@ -9,7 +9,11 @@
 // FIFO per-interaction delivery (multi-buy shops), race buffering, timeout->null, and
 // stale-seq isolation.
 
-import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  COOP_DEX_SYNC_SEQ,
+  COOP_INTERACTION_LEAVE,
+  CoopInteractionRelay,
+} from "#data/elite-redux/coop/coop-interaction-relay";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { describe, expect, it } from "vitest";
@@ -62,6 +66,50 @@ describe("co-op alternating-interaction relay (#633)", () => {
       operationId,
       rewardSurface: undefined,
     });
+  });
+
+  it("carries only exact account-local dexSync telemetry outside the V2 mechanical log", async () => {
+    const { host, guest } = createLoopbackPair();
+    const timer: { fire?: () => void } = {};
+    const received: string[] = [];
+    const authorityReceived: string[] = [];
+    guest.onMessage(msg => {
+      if (msg.t === "interactionOutcome") {
+        received.push(msg.outcome.k);
+      }
+    });
+    host.onMessage(msg => {
+      if (msg.t === "interactionOutcome") {
+        authorityReceived.push(msg.outcome.k);
+      }
+    });
+    const owner = new CoopInteractionRelay(host, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => true,
+    });
+    const watcher = new CoopInteractionRelay(guest, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => false,
+      schedule: cb => {
+        timer.fire = cb;
+        return () => {};
+      },
+    });
+
+    owner.sendInteractionOutcome(COOP_DEX_SYNC_SEQ, "dexSync", { k: "dexSync", dex: "account-merge" });
+    owner.sendInteractionOutcome(0, "reward", { k: "leave" });
+    owner.sendInteractionOutcome(COOP_DEX_SYNC_SEQ, "reward", { k: "dexSync", dex: "wrong-kind" });
+    owner.sendInteractionOutcome(0, "dexSync", { k: "dexSync", dex: "wrong-address" });
+    watcher.sendInteractionOutcome(COOP_DEX_SYNC_SEQ, "dexSync", { k: "dexSync", dex: "forged-replica" });
+    watcher.sendInteractionOutcome(0, "reward", { k: "leave" });
+    await Promise.resolve();
+
+    expect(received).toEqual(["dexSync"]);
+    expect(authorityReceived).toEqual([]);
+    expect(watcher.hasBufferedInteractionOutcomeFor(COOP_DEX_SYNC_SEQ)).toBe(false);
+    const legacyWait = watcher.awaitInteractionOutcome(COOP_DEX_SYNC_SEQ, 1);
+    timer.fire?.();
+    await expect(legacyWait).resolves.toBeNull();
   });
 
   it("delivers a multi-pick shop sequence FIFO, ending in the leave sentinel", async () => {

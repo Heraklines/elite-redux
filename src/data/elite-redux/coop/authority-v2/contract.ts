@@ -317,6 +317,12 @@ export type CoopNextControl =
       readonly wave: number;
       readonly turn: number;
       readonly allowedKinds: readonly CoopAuthorityEntryKind[];
+      /**
+       * Whether one of the stated kinds may be addressed at exactly wave N+1, turn 1. False keeps the wait
+       * within its source wave. This is explicit because reward/market terminals cross the wave boundary,
+       * while turn/replacement and mid-interaction waits must not.
+       */
+      readonly allowNextWaveStart: boolean;
       /** Exact next operation when predictable (for example a chained faint); null is an explicit wildcard. */
       readonly expectedOperationId: string | null;
     }

@@ -113,6 +113,20 @@ function rewardOptionsKey(seq: number, reroll: number, rewardSurface?: CoopRewar
   return rewardSurface == null ? `${seq}:${reroll}` : `${seq}:${reroll}:${rewardSurfaceKey(rewardSurface)}`;
 }
 
+/**
+ * The one raw interaction-outcome carrier that is intentionally outside the mechanical Authority V2 log.
+ * Dex acquisition is an account-local, commutative merge; it cannot advance a phase, release a wait, or
+ * choose a successor. Keep the exemption address- and payload-exact so no gameplay outcome can reopen the
+ * retired legacy authority channel.
+ */
+function isCoopV2AccountMergeOutcome(
+  seq: number,
+  kind: string,
+  outcome: CoopInteractionOutcome,
+): outcome is Extract<CoopInteractionOutcome, { k: "dexSync" }> {
+  return seq === COOP_DEX_SYNC_SEQ && kind === "dexSync" && outcome.k === "dexSync";
+}
+
 /** Decode an internally canonical reward-options inbox key without accepting a malformed surface address. */
 export function parseCoopRewardOptionsKey(
   key: string,
@@ -793,9 +807,15 @@ export class CoopInteractionRelay {
     if (isCoopDebug()) {
       coopLog("relay", `SEND interactionOutcome seq=${seq} kind=${kind} ${summarizeOutcome(outcome)}`);
     }
-    if (this.isInteractionAuthorityV2() && this.isLocalAuthority()) {
-      coopLog("v2-interaction", `suppressed raw authority interactionOutcome seq=${seq} kind=${kind}`);
-      return;
+    if (this.isInteractionAuthorityV2()) {
+      if (!this.isLocalAuthority()) {
+        coopLog("v2-interaction", `refused non-authority raw interactionOutcome seq=${seq} kind=${kind}`);
+        return;
+      }
+      if (!isCoopV2AccountMergeOutcome(seq, kind, outcome)) {
+        coopLog("v2-interaction", `suppressed raw authority interactionOutcome seq=${seq} kind=${kind}`);
+        return;
+      }
     }
     this.transport.send({ t: "interactionOutcome", seq, kind, outcome });
   }
@@ -1429,8 +1449,19 @@ export class CoopInteractionRelay {
       return;
     }
     if (msg.t === "interactionOutcome") {
-      if (this.isInteractionAuthorityV2() && !this.isLocalAuthority()) {
-        coopLog("v2-interaction", `dropped raw interactionOutcome seq=${msg.seq}; awaiting immutable V2 entry`);
+      if (this.isInteractionAuthorityV2()) {
+        if (!this.isLocalAuthority() && isCoopV2AccountMergeOutcome(msg.seq, msg.kind, msg.outcome)) {
+          // `wireCoopDexSync` consumes this merge-only account telemetry directly from the transport.
+          // Do not place it in a phase-local legacy outcome FIFO.
+          coopLog("v2-interaction", `accepted account-local dexSync carrier seq=${msg.seq}`);
+          return;
+        }
+        coopLog(
+          "v2-interaction",
+          this.isLocalAuthority()
+            ? `dropped non-authority raw interactionOutcome seq=${msg.seq}`
+            : `dropped raw interactionOutcome seq=${msg.seq}; awaiting immutable V2 entry`,
+        );
         return;
       }
       const key = `${msg.seq}:${JSON.stringify(msg.outcome)}`;

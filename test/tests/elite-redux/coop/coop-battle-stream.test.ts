@@ -3006,6 +3006,7 @@ describe("stale-turn finalize mark (#790 + regression fix)", () => {
       wave: 1,
       turn: 1,
       allowedKinds: ["REPLACEMENT_COMMIT", "INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      allowNextWaveStart: false,
       expectedOperationId: null,
     } as const;
     stream.ingestAuthoritativeV2Turn(carrier, awaitedSuccessor, 1);

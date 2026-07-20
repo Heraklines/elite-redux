@@ -2354,6 +2354,7 @@ export function captureCoopChecksumState(): CoopChecksumState {
     // it recomputes this, so a healthy run hashes identical values (adopt-then-hash, no resync noise).
     benchMoves: readBenchMovesDigest(),
     money: globalScene.money,
+    lockModifierTiers: globalScene.lockModifierTiers,
     modifiers: readModifiers(),
     // On-field per-mon held-item digest (#633 RISKY #2/#3): a stack change (Bug-Bite/Knock-Off) or a
     // wrong-holder rebind (Grip Claw/Covet) among on-field mons - same global total, invisible to the
@@ -2446,6 +2447,7 @@ function captureVersusGuestChecksumState(): CoopChecksumState {
     // authoritative orientation - the egress mirror of the player-side benchMoves above.
     benchMoves: readEnemyBenchMovesDigest(),
     money: globalScene.money,
+    lockModifierTiers: globalScene.lockModifierTiers,
     modifiers,
     heldItems,
     pokeballCounts: readPokeballCounts(),

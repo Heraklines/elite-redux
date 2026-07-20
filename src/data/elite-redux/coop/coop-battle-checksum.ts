@@ -162,6 +162,11 @@ export interface CoopChecksumState {
    */
   benchMoves: [number, string][];
   money: number;
+  /**
+   * Whether reward modifier tiers are locked. This changes reroll/shop mechanics and must therefore be
+   * detectable independently of the current option pool.
+   */
+  lockModifierTiers: boolean;
   /** Persistent modifiers as `[typeId, stackCount]`, sorted by `typeId`. */
   modifiers: [string, number][];
   /**

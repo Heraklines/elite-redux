@@ -8417,6 +8417,7 @@ function commitCoopV2SettledWaveAdvance(
       wave: transition.wave,
       turn: state.turn,
       allowedKinds: ["INTERACTION_COMMIT"],
+      allowNextWaveStart: false,
       expectedOperationId: null,
     };
   } else {
@@ -8427,6 +8428,7 @@ function commitCoopV2SettledWaveAdvance(
       wave: transition.nextWave,
       turn: 1,
       allowedKinds: ["CONTROL_COMMIT"],
+      allowNextWaveStart: false,
       expectedOperationId: null,
     };
   }

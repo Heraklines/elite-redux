@@ -136,3 +136,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   another opaque `materialRejected` digest.
 - Local verification is static-only per `AGENTS.md`; the diagnostic checkpoint requires a remote real-browser
   Mystery rerun. No staging or production deployment is authorized.
+
+2026-07-20 — Authority V2 wire-image and successor closure
+
+- Exact-SHA public campaign `29742878562` reproduced the terminal reward rejection at revision 5, but the new
+  transaction diagnostic did not fire. That proves rejection preceded the DATA transaction. The retained
+  result was a Leave payload with optional `undefined` fields: the interaction digest canonicalizer hashed
+  those fields as explicit nulls, while JSON/WebRTC removed the object properties. The replica therefore
+  decoded a different material image and failed closed before state application. Interaction entries now
+  JSON-freeze the exact wire image before deriving their digest, operation identity, and typed successor;
+  a failure-first terminal-Leave contract round-trips the entry through JSON and requires replica decode.
+- Terminal reward/market and explicit biome continuations may now authorize only exact wave N+1, turn 1
+  successors. Every `AWAIT_SUCCESSOR` states that permission explicitly, its value participates in the
+  control identity, and malformed/missing permissions fail central validation. Static review caught and
+  corrected an initial validator placement error that would have applied the new field to
+  `SHARED_INTERACTION`; a direct negative contract now pins the distinction.
+- The full-V2 raw interaction channel remains mechanically closed while preserving the one exact account-only
+  dex merge (`COOP_DEX_SYNC_SEQ` + `dexSync` kind/payload) from authority to replica. The carrier cannot enter
+  the phase FIFO or advance progression. `lockModifierTiers`, which changes reward/reroll mechanics, is now
+  included in both normal and Showdown checksums and in the replication contract.
+- Local verification remains static-only under `AGENTS.md`: scoped Biome has no errors (baseline warnings/info
+  only), and the full TypeScript rerun remains at 213 unrelated diagnostics with zero in touched paths.
+  The complete batch still requires exact-SHA remote contracts/gate and public two-browser campaign proof.

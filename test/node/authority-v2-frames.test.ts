@@ -167,6 +167,7 @@ describe("authority-v2 frame codec (round-trip)", () => {
         wave: 4,
         turn: 1,
         allowedKinds: ["INTERACTION_COMMIT", "WAVE_ADVANCE"],
+        allowNextWaveStart: false,
         expectedOperationId: null,
       },
       { kind: "TERMINAL", terminalId: "the-end" },

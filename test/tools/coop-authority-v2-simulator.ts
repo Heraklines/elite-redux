@@ -338,7 +338,8 @@ export function controlKey(control: CoopNextControl | null): string {
     case "AWAIT_SUCCESSOR":
       return (
         `AWAIT_SUCCESSOR:${control.afterOperationId}:e${control.epoch}:w${control.wave}:t${control.turn}:`
-        + `${control.allowedKinds.join(",")}:next=${control.expectedOperationId ?? "*"}`
+        + `${control.allowedKinds.join(",")}:nextWave=${control.allowNextWaveStart ? "1" : "0"}:`
+        + `next=${control.expectedOperationId ?? "*"}`
       );
     case "TERMINAL":
       return `TERMINAL:${control.terminalId}`;
@@ -1757,6 +1758,7 @@ export function standardStory(rng: SeededRng, opts: { readonly terminal: boolean
       wave: 1,
       turn: 2,
       allowedKinds: ["INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+      allowNextWaveStart: false,
       expectedOperationId: null,
     },
     delta: rng.int(1, 9),
