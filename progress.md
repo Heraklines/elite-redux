@@ -483,3 +483,33 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   for a second command-open entry that could never legally exist. Every
   non-control entry that itself states `COMMAND_FRONTIER` now releases only its
   exact addressed starts at the shared material-terminal seam.
+
+2026-07-20 - Settlement-address closure and perspective-canonical Showdown proof
+
+- Exact-SHA C1/C5 evidence at `768133771` showed the terminal reward result
+  correctly installed `AWAIT_SUCCESSOR` at wave 5/turn 2, while Victory had
+  constructed the subsequent Crossroads capsule at the still-live battle turn
+  1. The phase consistently used its immutable address, so its otherwise-valid
+  `CONTROL_COMMIT` was rejected as a backwards successor. Victory now freezes
+  Crossroads at the one post-TurnEnd settlement coordinate (`turn + 1`) shared
+  with the terminal reward; control, result, ordinary projection, and recovery
+  retain that exact address.
+- C2's learn-move soak had been reporting object-level moveset convergence
+  without completing the production UI-to-relay chain. It started an async
+  host watcher under a short-lived ambient client context, sent two unchecked
+  synchronous guest inputs, and rebuilt combat even though no guest decision
+  terminal entered the V2 log. The representative seam now schedules every
+  delivery onto its destination client, proves the exact replay phase and real
+  handler, accepts both public inputs individually, and waits for the
+  relay/authority terminal before rebuilding the synthetic combat boundary.
+- The dedicated Showdown artifact rendered both wave-1 battle menus but rejected
+  their command proof. At turn 1 the only digest difference was account-local
+  save state; after the first reciprocal turn the two party and field digests
+  were exact perspective swaps. The browser observer now excludes Showdown-only
+  account state and canonicalizes both teams by authenticated seat. Ordinary
+  co-op retains its previous player/enemy and battler-index digest semantics.
+- Local validation remains static-only: 23/23 Authority/Showdown source
+  contracts pass, scoped Biome reports no errors, `git diff --check` is clean,
+  and full TypeScript remains at 584 baseline lines with zero touched-path
+  diagnostics. Exact-SHA GitHub-hosted Showdown and sharded-gate runs are the
+  required behavioral proof.

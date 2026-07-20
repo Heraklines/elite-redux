@@ -329,7 +329,13 @@ export class VictoryPhase extends PokemonPhase {
         } else if (raiseCrossroads) {
           // ER (#486): not a biome end, but a 5-wave Crossroads tick - raise the
           // "Stay / Move on" choice AFTER the reward and BEFORE the next battle.
-          globalScene.phaseManager.pushNew("ErCrossroadsPhase", currentWaveIndex);
+          //
+          // BattleEnd advances the resolving battle exactly once before any reward/crossroads
+          // interaction opens. Freeze that settlement address here instead of letting Crossroads retain
+          // the pre-BattleEnd turn from VictoryPhase. The terminal reward result and the following
+          // interaction-open must share this w/t coordinate; otherwise the global V2 log correctly rejects
+          // reward(w/t+1) -> Crossroads(w/t) as a backwards control edge.
+          globalScene.phaseManager.pushNew("ErCrossroadsPhase", currentWaveIndex, globalScene.currentBattle.turn + 1);
         }
 
         // ER (#504): warn ONCE, exactly on the wave the player crosses into

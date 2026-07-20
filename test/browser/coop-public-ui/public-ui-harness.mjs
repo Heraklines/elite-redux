@@ -1733,7 +1733,7 @@ export class DuoPublicUiRig {
         allowAddressRepeat: true,
       }) == null
     ) {
-      throw new Error(`${purpose}: timed out waiting for an addressed command owner/watcher frontier`);
+      throw new Error(`${purpose}: timed out waiting for an addressed command frontier`);
     }
   }
 
@@ -2437,8 +2437,8 @@ export class DuoPublicUiRig {
   /**
    * Prove one addressed command frontier without assuming both players have a living
    * battler. Each browser must publish the same epoch/revision/generation/wave/turn and
-   * mechanical digest. At least one side must own an actionable command UI; a side with
-   * no legal battler is represented by its real CommandPhase partner-waiting message.
+   * mechanical digest. Ordinary co-op permits owner+watcher; Showdown permits reciprocal
+   * local owners after its observer canonicalizes the two perspective-swapped teams by seat.
    */
   async assertSharedCommandFrontier(
     cursors,
@@ -2489,7 +2489,7 @@ export class DuoPublicUiRig {
     if (match == null) {
       const latest = client => observedCommandFrontiers(client, cursors[client.label] ?? 0)[0] ?? null;
       throw new Error(
-        `${proofName}: clients never converged on one addressed command owner/watcher frontier; `
+        `${proofName}: clients never converged on one addressed command frontier; `
           + `host=${JSON.stringify(latest(host)?.observation ?? null)} `
           + `guest=${JSON.stringify(latest(guest)?.observation ?? null)}`,
       );

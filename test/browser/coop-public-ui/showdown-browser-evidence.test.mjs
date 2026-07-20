@@ -115,3 +115,17 @@ test("the journey executes a reciprocal turn and requires the next retained fron
   assert.match(turn, /assertRetainedContinuation\(outcomeCursors, "showdown-turn-1-next-command"/u);
   assert.match(turn, /showdown-turn-1-synchronized/u);
 });
+
+test("Showdown command convergence excludes account-local state and canonicalizes both battle perspectives by seat", () => {
+  assert.match(observer, /const versus = runtime\?\.controller\.isVersusSession\(\) === true/u);
+  assert.match(observer, /saveDataDigest = versus \? "versus-account-local-excluded"/u);
+  assert.match(observer, /const localIsSeatOne = versus && runtime\?\.controller\.seat === 1/u);
+  assert.match(observer, /playerParty: localIsSeatOne \? opponentParty : localParty/u);
+  assert.match(observer, /enemyParty: localIsSeatOne \? localParty : opponentParty/u);
+  assert.match(observer, /playerField: localIsSeatOne \? opponentField : localField/u);
+  assert.match(observer, /enemyField: localIsSeatOne \? localField : opponentField/u);
+  assert.match(
+    harness,
+    /Showdown permits reciprocal[\s\S]*local owners after its observer canonicalizes the two perspective-swapped teams by seat/u,
+  );
+});

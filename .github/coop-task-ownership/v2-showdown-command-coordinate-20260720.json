@@ -23,6 +23,7 @@
     "src/phases/select-biome-phase.ts",
     "src/phases/switch-phase.ts",
     "src/phases/title-phase.ts",
+    "src/phases/victory-phase.ts",
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
     "test/browser/coop-public-ui/blocked-instrumentation.md",
     "test/browser/coop-public-ui/browser-workflow-fanout.test.mjs",
@@ -43,6 +44,7 @@
     "test/tests/elite-redux/coop/coop-p33-client.test.ts",
     "test/tests/elite-redux/coop/coop-stall-asymmetric-watchdog.test.ts",
     "test/tests/elite-redux/showdown/showdown-versus-faint.test.ts",
-    "test/tools/coop-duo-harness.ts"
+    "test/tools/coop-duo-harness.ts",
+    "test/tools/coop-soak-driver.ts"
   ]
 }

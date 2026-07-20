@@ -18,10 +18,12 @@ const duoHarness = readFileSync(new URL("test/tools/coop-duo-harness.ts", root),
 const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
+const victoryPhase = readFileSync(new URL("src/phases/victory-phase.ts", root), "utf8");
 const guestFaintSwitchPhase = readFileSync(new URL("src/phases/coop-guest-faint-switch-phase.ts", root), "utf8");
 const replayPhases = readFileSync(new URL("src/phases/coop-replay-phases.ts", root), "utf8");
 const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts", root), "utf8");
 const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
+const soakDriver = readFileSync(new URL("test/tools/coop-soak-driver.ts", root), "utf8");
 const switchPhase = readFileSync(new URL("src/phases/switch-phase.ts", root), "utf8");
 const titlePhase = readFileSync(new URL("src/phases/title-phase.ts", root), "utf8");
 const shadow = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/shadow.ts", root), "utf8");
@@ -414,6 +416,11 @@ test("TURN_RESOLVE prompts form a closed command-to-turn Authority V2 path", () 
 });
 
 test("Crossroads result envelopes retain the exact V2 control turn instead of a legacy turn-zero sentinel", () => {
+  assert.match(
+    victoryPhase,
+    /pushNew\(\s*"ErCrossroadsPhase",\s*currentWaveIndex,\s*globalScene\.currentBattle\.turn \+ 1,\s*\)/u,
+    "Victory freezes Crossroads at the post-BattleEnd settlement turn shared by the terminal reward",
+  );
   const ownerStart = crossroadsPhase.indexOf("private coopOwnerCommit(");
   const ownerEnd = crossroadsPhase.indexOf("\n  /**", ownerStart);
   assert.notEqual(ownerStart, -1, "Crossroads exposes the owner result seam");
@@ -447,6 +454,38 @@ test("Crossroads result envelopes retain the exact V2 control turn instead of a 
     coopRuntime,
     /create\("ErCrossroadsPhase", plan\.sourceWave, control\.turn\)[\s\S]*installCoopV2CrossroadsProjection\(plan\.operationId, plan\.sourceWave, control\.turn\)/u,
     "ordinary and recovery projection pass the authority-stated turn into Crossroads",
+  );
+});
+
+test("the learn-move soak proves the real guest UI-to-relay terminal before rebuilding combat", () => {
+  const start = soakDriver.indexOf("const processLearnMoveWave = async");
+  const end = soakDriver.indexOf(
+    "\n  // ---------------------------------------------------------------------------",
+    start + 1,
+  );
+  assert.notEqual(start, -1, "the representative soak exposes its learn-move wave");
+  assert.ok(end > start, "the learn-move wave has a bounded source block");
+  const learnMove = soakDriver.slice(start, end);
+  const schedulesDestinations = learnMove.indexOf("setDestinationContextDelivery?.(destinationScheduled)");
+  const provesMode = learnMove.indexOf(
+    'awaitClientUiMode(rig.guestCtx, UiMode.LEARN_MOVE_BATCH, "guest-owned learn-move batch")',
+  );
+  const provesPhase = learnMove.indexOf('guestLearnPhase?.phaseName !== "CoopReplayLearnMoveBatchPhase"');
+  const firstInput = learnMove.indexOf('"learn-move select offered move"');
+  const secondInput = learnMove.indexOf('"learn-move overwrite slot zero"');
+  const provesTerminal = learnMove.indexOf("isCoopLearnMoveForwardInFlightEmpty()");
+  assert.ok(schedulesDestinations >= 0, "transport callbacks are pinned to their destination browser");
+  assert.ok(
+    provesMode > schedulesDestinations && provesPhase > provesMode,
+    "input waits for the exact public handler and its queue-owned replay phase",
+  );
+  assert.ok(
+    firstInput > provesPhase && secondInput > firstInput,
+    "both human button presses traverse the public input layer in order",
+  );
+  assert.ok(
+    provesTerminal > secondInput,
+    "the driver waits for the UI-to-relay-to-authority terminal instead of trusting shared fixture objects",
   );
 });
 

@@ -6436,11 +6436,10 @@ export function enterCoopV2CrossroadsControlBoundary(input: {
   ) {
     return "failed";
   }
-  // Crossroads is enqueued during turn settlement and may start only after the engine increments its
-  // ambient battle turn. Its constructor-captured source coordinate is the durable phase address used by
-  // the eventual result envelope; opening control from the later ambient turn creates an impossible
-  // SHARED_INTERACTION(w/t+1) -> INTERACTION_COMMIT(w/t) edge. Capture the complete live state at the
-  // phase address so open, result, recovery, and replay all share one coordinate.
+  // Crossroads is enqueued by Victory at the exact post-BattleEnd settlement turn and starts only after
+  // the terminal reward result has installed its wait at that same address. Its constructor-captured
+  // coordinate is also used by the eventual result envelope, so open, result, recovery, and replay remain
+  // one ordered w/t boundary instead of consulting a later speculative battle.
   const state = captureCoopAuthoritativeBattleState(input.sourceTurn);
   if (state == null || state.wave !== input.sourceWave || state.turn !== input.sourceTurn) {
     return "failed";

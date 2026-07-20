@@ -171,26 +171,49 @@ function observedPokemon(pokemon: Pokemon, slot: number) {
   };
 }
 
+/** Active party slots, independent of each Showdown browser's local player/enemy battler-index orientation. */
+function observedActivePartySlots(party: readonly Pokemon[], field: readonly Pokemon[]): number[] {
+  return field.map(pokemon => party.indexOf(pokemon)).filter(slot => slot >= 0);
+}
+
 /** The canonical component object the mechanical digest hashes. Read once, reused for the breakdown. */
 function mechanicalDigestComponents(): Record<string, unknown> {
-  const saveDataDigest = captureCoopSaveDataDigest();
+  const runtime = getCoopRuntime();
+  const versus = runtime?.controller.isVersusSession() === true;
+  // Save data and money belong to each Showdown account, not to the shared battle. Comparing them made two
+  // perfectly synchronized players diverge at the first command solely because their account blobs differ.
+  // Ordinary co-op still includes both fields because its shared run owns them mechanically.
+  const saveDataDigest = versus ? "versus-account-local-excluded" : captureCoopSaveDataDigest();
   if (saveDataDigest === CHECKSUM_SENTINEL) {
     throw new Error("save-data observer could not capture a stable digest");
   }
   const playerParty = globalScene.getPlayerParty();
   const enemyParty = globalScene.getEnemyParty();
+  const playerField = globalScene.getPlayerField();
+  const enemyField = globalScene.getEnemyField();
+  const localParty = playerParty.map(observedPokemon);
+  const opponentParty = enemyParty.map(observedPokemon);
+  const localField = versus
+    ? observedActivePartySlots(playerParty, playerField)
+    : playerField.map(pokemon => pokemon.getBattlerIndex());
+  const opponentField = versus
+    ? observedActivePartySlots(enemyParty, enemyField)
+    : enemyField.map(pokemon => pokemon.getBattlerIndex());
+  // Each Showdown browser renders its own team as `playerParty`. Canonicalize by authenticated seat so both
+  // observers hash seat 0 then seat 1, while retaining the ordinary co-op player/enemy projection unchanged.
+  const localIsSeatOne = versus && runtime?.controller.seat === 1;
   return {
     wave: globalScene.currentBattle.waveIndex,
     turn: globalScene.currentBattle.turn,
-    money: globalScene.money,
+    money: versus ? 0 : globalScene.money,
     seed: globalScene.seed ?? "",
     biome: globalScene.arena.biomeId ?? 0,
     weather: globalScene.arena.weather?.weatherType ?? 0,
     terrain: globalScene.arena.terrain?.terrainType ?? 0,
-    playerParty: playerParty.map(observedPokemon),
-    enemyParty: enemyParty.map(observedPokemon),
-    playerField: globalScene.getPlayerField().map(pokemon => pokemon.getBattlerIndex()),
-    enemyField: globalScene.getEnemyField().map(pokemon => pokemon.getBattlerIndex()),
+    playerParty: localIsSeatOne ? opponentParty : localParty,
+    enemyParty: localIsSeatOne ? localParty : opponentParty,
+    playerField: localIsSeatOne ? opponentField : localField,
+    enemyField: localIsSeatOne ? localField : opponentField,
     saveDataDigest,
   };
 }

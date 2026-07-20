@@ -4225,24 +4225,62 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
     const forgotten = targetHost.moveset[0]?.moveId;
 
-    // HOST (sole engine): force the batch phase on the GUEST-owned mon. withClientSync = SEND-ONLY: it streams
-    // the present (queued, not yet delivered) + opens the host's read-only WATCHER panel; the await is parked.
-    withClientSync(rig.hostCtx, () => {
-      rig.hostScene.phaseManager.create("LearnMoveBatchPhase", LEARN_SLOT, [LEARN_NEW_MOVE]).start();
-    });
-    hitMode(UiMode.LEARN_MOVE_BATCH);
-    // GUEST: draining under the guest ctx delivers the present -> the persistent listener opens the OWNER panel.
-    await withClient(rig.guestCtx, () => drainLoopback());
-    // GUEST (mon owner) drives the real panel: ACTION selects the learnable move -> full moveset -> pickSlot;
-    // ACTION assigns it over slot 0 -> learned, list empties -> finish/done relays the terminal + closes.
-    withClientSync(rig.guestCtx, () => {
-      if (rig.guestScene.ui.getMode() === UiMode.LEARN_MOVE_BATCH) {
-        rig.guestScene.ui.processInput(Button.ACTION);
-        rig.guestScene.ui.processInput(Button.ACTION);
+    // A real pair owns one JS realm per browser. Keep every transport callback on its destination client and
+    // retain the host context until the asynchronous watcher UI has actually opened. The old direct seam
+    // restored ambient globals immediately after start(), then pressed two buttons without proving that the
+    // guest replay phase/handler existed. It could mutate the shared fixture objects while never producing
+    // the real guest terminal, yielding a false "movesets converged" followed by a parked V2 interaction.
+    const destinationScheduled = rig.pair.setDestinationContextDelivery != null;
+    rig.pair.setDestinationContextDelivery?.(destinationScheduled);
+    try {
+      await withClient(rig.hostCtx, async () => {
+        rig.hostScene.phaseManager.create("LearnMoveBatchPhase", LEARN_SLOT, [LEARN_NEW_MOVE]).start();
+        await drainLoopback();
+        await new Promise<void>(resolve => setTimeout(resolve, 10));
+      });
+      await pumpDuoDestinations(rig, 2);
+
+      // GUEST: the retained presentation must override its parked renderer with the exact queue-owned replay
+      // phase and expose the real public handler before any input is legal.
+      await awaitClientUiMode(rig.guestCtx, UiMode.LEARN_MOVE_BATCH, "guest-owned learn-move batch");
+      const guestLearnPhase = withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.getCurrentPhase());
+      if (guestLearnPhase?.phaseName !== "CoopReplayLearnMoveBatchPhase") {
+        fail(
+          "no-park",
+          wave,
+          `learn-move UI opened without its exact replay phase (current=${guestLearnPhase?.phaseName ?? "none"})`,
+        );
       }
-    });
-    // HOST: the relayed terminal resolves the parked await under the HOST ctx; the host applies + closes.
-    await withClient(rig.hostCtx, () => drainLoopback());
+      hitMode(UiMode.LEARN_MOVE_BATCH);
+
+      // GUEST (mon owner) drives the real panel through the public input layer. The first ACTION selects the
+      // learnable move; on a full moveset the second selects slot 0. Each press is separately accepted and
+      // destination-pumped, matching two human key presses rather than two unchecked synchronous callbacks.
+      await pressClientUiUntilAccepted(rig.guestCtx, Button.ACTION, "learn-move select offered move");
+      await pressClientUiUntilAccepted(rig.guestCtx, Button.ACTION, "learn-move overwrite slot zero");
+
+      // The terminal must traverse guest UI -> relay proposal -> host authoritative apply -> immutable
+      // decision entry -> both exact phase terminals. Do not rebuild combat merely because local objects
+      // happen to show the move; wait for the production authority chain itself to finish.
+      for (let attempt = 0; attempt < 320; attempt++) {
+        await pumpDuoDestinations(rig, 1);
+        const completed =
+          isCoopLearnMoveForwardInFlightEmpty()
+          && withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.getCurrentPhase() !== guestLearnPhase);
+        if (completed) {
+          break;
+        }
+        await new Promise<void>(resolve => setTimeout(resolve, 10));
+      }
+      if (
+        !isCoopLearnMoveForwardInFlightEmpty()
+        || withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.getCurrentPhase() === guestLearnPhase)
+      ) {
+        fail("no-park", wave, "learn-move UI->relay->authority terminal did not complete on both clients");
+      }
+    } finally {
+      rig.pair.setDestinationContextDelivery?.(false);
+    }
 
     hitSituation(COOP_SOAK_SITUATIONS.levelUpLearn);
     // ASSERT convergence: the host applied the guest's pick (NEW_MOVE learned over the forgotten slot), the
