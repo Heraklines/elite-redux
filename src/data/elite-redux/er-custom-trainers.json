@@ -3457,5 +3457,196 @@
     "trainerEffect": "holyrays",
     "victoryDialogue": "oof",
     "weight": 40
+  },
+  "TRAINER_70020": {
+    "battleType": "triple",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70020,
+    "maxWave": 125,
+    "minWave": 50,
+    "name": "Suggest a name 004",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "SHOCK_WAVE",
+          "MUDDY_WATER",
+          "RLA",
+          "RLNA"
+        ],
+        "species": 939
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SHARP_BEAK"
+          },
+          {
+            "count": 1,
+            "item": "GRIP_CLAW"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "AIR_CUTTER",
+          "QUICK_ATTACK",
+          "ZEPHYR_RUSH",
+          "FAKE_OUT"
+        ],
+        "species": 10711
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "KINGS_ROCK"
+              },
+              {
+                "count": 1,
+                "item": "GRIP_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "LUM_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "BULLET_SEED",
+              "PECK",
+              "ENDURE",
+              "POPPING_MAYHEM"
+            ],
+            "species": 10021,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 2,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "KINGS_ROCK"
+              },
+              {
+                "count": 1,
+                "item": "GRIP_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "LUM_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "REVIVER_SEED"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "BULLET_SEED",
+              "PECK",
+              "SLEEP_POWDER",
+              "POPPING_MAYHEM"
+            ],
+            "species": 10021,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "RECOVER",
+          "COUNTER",
+          "TAUNT",
+          "GASTRO_ACID"
+        ],
+        "slotChance": 80,
+        "species": 771
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "CARBOS"
+          },
+          {
+            "count": 1,
+            "item": "IRON"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BELLY_DRUM",
+          "PLAY_ROUGH",
+          "WATERFALL",
+          "STRENGTH"
+        ],
+        "slotChance": 75,
+        "species": 184
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 3,
+            "item": "PROTEIN"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "NUZZLE",
+          "BULLDOZE",
+          "REFLECT",
+          "LIGHT_SCREEN"
+        ],
+        "slotChance": 75,
+        "species": 26
+      }
+    ],
+    "trainerClass": "ACE_TRAINER",
+    "weight": 100
   }
 }
