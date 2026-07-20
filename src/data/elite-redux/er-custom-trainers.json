@@ -2803,5 +2803,181 @@
     ],
     "trainerClass": "MUSICIAN",
     "weight": 100
+  },
+  "TRAINER_70018": {
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70018,
+    "maxWave": 25,
+    "minWave": 5,
+    "name": "Suggest a name 003",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "ENIGMA_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "STARF_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "DUAL_WINGBEAT",
+          "RLNA",
+          "RLA",
+          "RLNA"
+        ],
+        "species": 821
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "LANSAT_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "THUNDER_PUNCH",
+          "FAKE_OUT",
+          "JET_PUNCH",
+          "RETALIATE"
+        ],
+        "species": 921
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "IRON"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BRINE",
+          "ICE_BEAM",
+          "TAILWIND",
+          "SURF"
+        ],
+        "species": 278
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 2,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "EVIOLITE"
+              },
+              {
+                "count": 1,
+                "item": "IRON"
+              },
+              {
+                "count": 1,
+                "item": "CARBOS"
+              },
+              {
+                "count": 1,
+                "item": "CALCIUM"
+              },
+              {
+                "count": 1,
+                "item": "SITRUS_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "HAIL",
+              "FROST_BREATH",
+              "SQUEAKY_HAMMER",
+              "FREEZY_FROST"
+            ],
+            "species": 10623,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 2,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "EVIOLITE"
+              },
+              {
+                "count": 1,
+                "item": "SITRUS_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "HAIL",
+              "FROST_BREATH",
+              "SQUEAKY_HAMMER",
+              "FREEZY_FROST"
+            ],
+            "species": 10623,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 0,
+            "fusion": {
+              "abilitySlot": 1,
+              "formIndex": 0,
+              "species": 924
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "EVIOLITE"
+              },
+              {
+                "count": 2,
+                "item": "IRON"
+              },
+              {
+                "count": 2,
+                "item": "CALCIUM"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "HAIL",
+              "BLIZZARD",
+              "SQUEAKY_HAMMER",
+              "POPULATION_BOMB"
+            ],
+            "species": 10623,
+            "weight": 1
+          }
+        ]
+      }
+    ],
+    "trainerClass": "SCHOOL_KID",
+    "weight": 100
   }
 }
