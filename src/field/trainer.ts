@@ -83,6 +83,17 @@ export class Trainer extends Phaser.GameObjects.Container {
    */
   public erIsGhost?: boolean | undefined;
 
+  /**
+   * ER editor-created custom trainer (er-custom-trainers.json): the authored display
+   * name. Set by {@linkcode applyErCustomTrainerDisplayName} at install from the
+   * editor-sourced trainer record. When present it robustly marks this instance as an
+   * editor custom trainer and its {@linkcode getName} is overridden to return ONLY this
+   * name on every surface — the trainer class / sprite title is SUPPRESSED (maintainer
+   * directive). A plain (vanilla / non-editor) trainer never has this field, so its
+   * naming stays byte-identical.
+   */
+  public erCustomTrainerName?: string | undefined;
+
   private erAuraFx: ErTrainerAuraFx | null = null;
   /** Per-instance counter used to namespace generated aura-FX texture keys. */
   private static erAuraFxSeq = 0;

@@ -1217,6 +1217,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Custom trainers show ONLY their authored name (no class/sprite prefix)",
+    description:
+      "NAMING fix (not a battle behavior) - an editor-created custom trainer (the Custom Trainers tab\n"
+      + "of the team's balancing editor) used to render its CLASS / sprite title in front of the authored\n"
+      + "name everywhere: 'Ace Trainer <Name>' / 'Youngster <Name>', and for a named-class sprite the\n"
+      + "canonical NPC name ('Leader Sabrina'). The maintainer wants JUST the custom name on EVERY surface.\n"
+      + "DO (this is a CUSTOM-TRAINERS-PICKER check, ignore the throwaway battle you spawn into): from the\n"
+      + "title, Dev Scenarios -> 👤 Custom Trainers -> pick any staff trainer -> Fight with random ghost\n"
+      + "team. Read the 'wants to battle!' intro line, the intro dialogue speaker box, and the victory /\n"
+      + "defeat lines when the fight ends.\n"
+      + "EXPECT: every one shows ONLY the trainer's authored name (e.g. 'Ace Rico wants to battle!'), with\n"
+      + "NO 'Ace Trainer' / 'Youngster' / 'Leader <name>' prefix. Vanilla + ghost trainers keep their class\n"
+      + "labels unchanged. Unit-tested (incl. red-proof) in\n"
+      + "test/tests/elite-redux/er-custom-trainers.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Held-item icons align in the summary items row (vanilla + ER)",
     description:
       "UI ALIGNMENT fix (not a battle behavior) - the ER-custom held items (tactical / reactive /\n"

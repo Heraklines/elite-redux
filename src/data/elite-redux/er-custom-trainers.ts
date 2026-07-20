@@ -1576,30 +1576,30 @@ export function applyErCustomTrainerPresentation(trainer: Trainer, resolved: ErC
 }
 
 /**
- * Apply the authored custom-trainer name without reversing named NPC titles.
- * Generic classes keep the engine's normal "class + authored name" behavior.
- * Named classes (Gym Leaders, Elite Four, Champions, etc.) already own a
- * canonical personal name, so the authored value is their prefix/title:
- * `Leader + Sabrina` must render as `Leader Sabrina`, never `Sabrina Leader`.
+ * Apply the authored custom-trainer name. Editor-created custom trainers show ONLY
+ * their authored name on EVERY surface (the "wants to battle!" intro, the in-battle
+ * trainer title, the intro/victory/defeat dialogue attributions, and every other
+ * place that composes class + name) — the trainer CLASS / sprite title is SUPPRESSED,
+ * for both generic classes (no "Ace Trainer <Name>") and named NPC classes (no
+ * "Leader Sabrina"), per the maintainer directive.
+ *
+ * All those surfaces funnel through the single {@linkcode Trainer.getName} seam, so
+ * we mark the instance ({@linkcode Trainer.erCustomTrainerName}) and override that one
+ * getter to return the authored name for every slot/title combination. A plain
+ * (vanilla / non-editor) trainer never reaches this function, so its naming stays
+ * byte-identical.
  */
 export function applyErCustomTrainerDisplayName(trainer: Trainer, authoredName: string): void {
   const customName = authoredName.trim();
   if (!customName) {
     return;
   }
-  if (!trainer.config.title) {
-    trainer.name = customName;
-    return;
-  }
-
-  const config = trainer.config;
-  const variant = trainer.variant;
-  trainer.name = config.getTitle(TrainerSlot.TRAINER, variant);
-  trainer.partnerName = config.getTitle(TrainerSlot.TRAINER_PARTNER, variant);
-  trainer.getName = (slot: TrainerSlot = TrainerSlot.NONE, includeTitle = false): string => {
-    const name = config.getTitle(slot, variant);
-    return includeTitle ? `${customName} ${name}`.trim() : name;
-  };
+  // Robust editor-custom marker (not a string heuristic): its presence is what the
+  // suppression keys off, and it keeps the instance introspectable/testable.
+  trainer.erCustomTrainerName = customName;
+  trainer.name = customName;
+  trainer.partnerName = customName;
+  trainer.getName = (_slot: TrainerSlot = TrainerSlot.NONE, _includeTitle = false): string => customName;
 }
 
 /** Resolve one member's authored held items to `HeldModifierConfig[]` (enemy-legal pool). */

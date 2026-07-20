@@ -70,7 +70,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerVariant } from "#enums/trainer-variant";
-import type { Trainer } from "#field/trainer";
+import { Trainer } from "#field/trainer";
 import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -231,33 +231,63 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     expect(translatePreparedGhostLevels(members, 150)).toEqual([150, 147, 136]);
   });
 
-  it("renders an authored title before a named trainer class", () => {
-    const namedTrainer = {
-      config: {
-        title: "Gym Leader",
-        getTitle: () => "Sabrina",
-      },
+  it("suppresses the CLASS prefix for a generic-class custom trainer on every surface", () => {
+    // Vanilla baseline (the RED half): the real getName composes "<class> <name>".
+    const trainer = {
+      config: { title: undefined, getTitle: () => "Ace Trainer" },
       variant: TrainerVariant.DEFAULT,
-      name: "",
+      name: "Ace Rico",
       partnerName: "",
     } as unknown as Trainer;
+    trainer.getName = Trainer.prototype.getName;
+    expect(trainer.getName(TrainerSlot.NONE, true)).toBe("Ace Trainer Ace Rico");
 
-    applyErCustomTrainerDisplayName(namedTrainer, "Leader");
+    // Flip the flag: applying the custom-trainer name suppresses the class prefix.
+    applyErCustomTrainerDisplayName(trainer, "Ace Rico");
 
-    expect(namedTrainer.getName(TrainerSlot.NONE, false)).toBe("Sabrina");
-    expect(namedTrainer.getName(TrainerSlot.NONE, true)).toBe("Leader Sabrina");
+    expect(trainer.erCustomTrainerName).toBe("Ace Rico");
+    expect(trainer.name).toBe("Ace Rico");
+    // Every (slot, includeTitle) combination now renders ONLY the authored name.
+    expect(trainer.getName(TrainerSlot.NONE, false)).toBe("Ace Rico");
+    expect(trainer.getName(TrainerSlot.NONE, true)).toBe("Ace Rico");
+    expect(trainer.getName(TrainerSlot.TRAINER, true)).toBe("Ace Rico");
+    expect(trainer.getName(TrainerSlot.TRAINER_PARTNER, true)).toBe("Ace Rico");
   });
 
-  it("keeps generic trainer classes on their normal naming path", () => {
-    const genericTrainer = {
-      config: { title: undefined },
-      name: "",
+  it("suppresses the named-NPC title for a named-class custom trainer on every surface", () => {
+    // Vanilla baseline (the RED half): a named class renders "<title> <personal name>".
+    const namedTrainer = {
+      config: { title: "Gym Leader", getTitle: () => "Sabrina" },
+      variant: TrainerVariant.DEFAULT,
+      name: "Sabrina",
+      partnerName: "",
     } as unknown as Trainer;
+    namedTrainer.getName = Trainer.prototype.getName;
+    expect(namedTrainer.getName(TrainerSlot.NONE, true)).toContain("Sabrina");
 
-    applyErCustomTrainerDisplayName(genericTrainer, "Calvin");
+    // Flip the flag: only the authored custom name shows; "Sabrina" / the title vanish.
+    applyErCustomTrainerDisplayName(namedTrainer, "Rico");
 
-    expect(genericTrainer.name).toBe("Calvin");
-    expect(Object.hasOwn(genericTrainer, "getName")).toBe(false);
+    expect(namedTrainer.erCustomTrainerName).toBe("Rico");
+    expect(namedTrainer.getName(TrainerSlot.NONE, false)).toBe("Rico");
+    expect(namedTrainer.getName(TrainerSlot.NONE, true)).toBe("Rico");
+    expect(namedTrainer.getName(TrainerSlot.TRAINER, true)).toBe("Rico");
+  });
+
+  it("leaves a vanilla (non-editor) trainer's class+name composition untouched", () => {
+    // The suppression is gated on going THROUGH applyErCustomTrainerDisplayName: a
+    // trainer that never does keeps the real class+name composition (byte-identical).
+    const vanilla = {
+      config: { title: undefined, getTitle: () => "Veteran" },
+      variant: TrainerVariant.DEFAULT,
+      name: "Cliff",
+      partnerName: "",
+    } as unknown as Trainer;
+    vanilla.getName = Trainer.prototype.getName;
+
+    expect(vanilla.erCustomTrainerName).toBeUndefined();
+    expect(vanilla.getName(TrainerSlot.NONE, true)).toBe("Veteran Cliff");
+    expect(vanilla.getName(TrainerSlot.NONE, false)).toBe("Cliff");
   });
 
   it("restores sampled ghost held items with their stack counts", () => {
