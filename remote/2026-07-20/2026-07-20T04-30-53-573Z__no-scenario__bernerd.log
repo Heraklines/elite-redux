@@ -1,0 +1,1502 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:bcca4844c0a65cc0857dfdd5a7ee496f6bdd5880:run-29698851416.1
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36
+platform: Linux armv81
+screen:   384x832 @2.8125x  devmem:8 GB
+boot:     boot-start@0ms -> loading-complete@32466ms -> title-shown@35341ms
+lastSess: crashed after boot-start
+mode:     4  wave:8
+seed:     ZZHfCy9pZ8TY8h9a8dhXPkgi
+party:    Partner Espeon(L9 25hp f0), Scream Tail(L5 28hp f0), Cyclizar(L5 23hp f0), Burmy(L5 22hp f0), Aipom(L5 22hp f0), Combee(L5 20hp f0)
+enemy:    Fletchling(L6), Bulbasaur(L7)
+
+----- COMMENT -----
+Espeon's Soul-Heart did not activate after switching from Eevee
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:bcca4844c0a65cc0857dfdd5a7ee496f6bdd5880:run-29698851416.1","source":"github","sha":"bcca4844c0a65cc0857dfdd5a7ee496f6bdd5880","workflow":{"provider":"github-actions","runId":"29698851416","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[21:02:40.325] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[21:02:40.562] LOG: [ER] build {"version":1,"id":"github:bcca4844c0a65cc0857dfdd5a7ee496f6bdd5880:run-29698851416.1","source":"github","sha":"bcca4844c0a65cc0857dfdd5a7ee496f6bdd5880","workflow":{"provider":"github-actions","runId":"29698851416","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[21:02:40.753] LOG: [dev-tools] loaded — 644 scenarios + Send Logs button
+[21:03:11.761] DEBUG: Destroying loading scene
+[21:03:11.761] DEBUG: Destroyed loading scene
+[21:03:11.824] LOG: Seed: 2U1nzpUfYT6P1D2clZVYy8Qi
+[21:03:11.824] LOG: Wave Seed: 2U1nzpUfYT6P1D2clZVYy8Qi 0
+[21:03:13.514] LOG: %cStart Phase LoginPhase color:green;
+[21:03:14.197] LOG: Client Session: 6eNnHxm1r2ZqnQ6vvL4OCapIrkc6YRCc
+[21:03:14.570] DEBUG: Using cached system data
+[21:03:14.627] LOG: %cStart Phase TitlePhase color:green;
+[21:03:14.627] LOG: Getting Session Slot id: %d 2
+[21:03:14.641] LOG: use seasonal splash messages true
+[21:09:29.658] WARN: Could not get game title stats! AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:22456
+[21:10:29.654] WARN: Could not get game title stats! AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:22456
+[21:11:29.654] WARN: Could not get game title stats! AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:22456
+[21:12:29.653] WARN: Could not get game title stats! AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:22456
+[21:18:52.903] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:22484)
+    at PokerogueApi.doGet (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:21546)
+    at PokerogueApi.getGameTitleStats (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:32852)
+    at TitleUiHandler.updateTitleStats (https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1051:39732)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1052:1627
+[21:19:29.657] WARN: Could not get game title stats! AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:22456
+[21:20:14.660] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:22484)
+    at PokerogueApi.doGet (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:21546)
+    at PokerogueApi.getGameTitleStats (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:32852)
+    at TitleUiHandler.updateTitleStats (https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1051:39732)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1052:1627
+[21:21:14.659] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:22484)
+    at PokerogueApi.doGet (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:21546)
+    at PokerogueApi.getGameTitleStats (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:32852)
+    at TitleUiHandler.updateTitleStats (https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1051:39732)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1052:1627
+[21:22:14.661] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:22484)
+    at PokerogueApi.doGet (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:21546)
+    at PokerogueApi.getGameTitleStats (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:32852)
+    at TitleUiHandler.updateTitleStats (https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1051:39732)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1052:1627
+[21:23:14.749] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:22484)
+    at PokerogueApi.doGet (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:21546)
+    at PokerogueApi.getGameTitleStats (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:32852)
+    at TitleUiHandler.updateTitleStats (https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1051:39732)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1052:1627
+[22:25:14.688] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:22484)
+    at PokerogueApi.doGet (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:21546)
+    at PokerogueApi.getGameTitleStats (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:32852)
+    at TitleUiHandler.updateTitleStats (https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1051:39732)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1052:1627
+[04:00:41.285] LOG: Getting Session Slot id: %d 0
+[04:00:41.316] LOG: Getting Session Slot id: %d 1
+[04:00:41.317] LOG: Getting Session Slot id: %d 2
+[04:00:41.325] LOG: Getting Session Slot id: %d 3
+[04:00:41.330] LOG: Getting Session Slot id: %d 4
+[04:00:42.532] ERROR: Session read failed (missing).
+[04:00:42.533] ERROR: Session read failed (missing).
+[04:03:30.680] WARN: Attempted to load save slot of -1 through load game menu!
+[04:03:30.716] LOG: use seasonal splash messages true
+[04:03:32.554] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:22484)
+    at PokerogueApi.doGet (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:21546)
+    at PokerogueApi.getGameTitleStats (https://elite-redux-staging.pages.dev/assets/BBCodeText-Clq3JsLG.js:1:32852)
+    at TitleUiHandler.updateTitleStats (https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1051:39732)
+    at TitleUiHandler.show (https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1052:1565)
+    at doSetMode (https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1053:2631)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1053:3115
+    at new Promise (<anonymous>)
+    at UI.setModeInternal (https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1053:2058)
+    at UI.setMode (https://elite-redux-staging.pages.dev/assets/battle-scene-BKtjdLPn.js:1053:3713)
+[04:03:33.581] LOG: %cStart Phase SelectChallengePhase color:green;
+[04:04:00.761] LOG: %cStart Phase SelectStarterPhase color:green;
+[04:04:16.755] WARN: cry/133 not found
+[04:05:07.459] WARN: cry/967 not found
+[04:05:09.447] LOG: %cSaving starter preferences color: blue
+[04:05:11.271] LOG: %cSaving starter preferences color: blue
+[04:05:11.597] LOG: %cSaving starter preferences color: blue
+[04:06:10.526] LOG: %cSaving starter preferences color: blue
+[04:06:22.183] WARN: cry/10612 not found
+[04:06:23.899] WARN: cry/352 not found
+[04:07:36.958] WARN: Missing animation: pkmn__929
+[04:07:46.813] LOG: %cSaving starter preferences color: blue
+[04:07:48.181] LOG: %cSaving starter preferences color: blue
+[04:08:43.347] LOG: Mew's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[04:08:45.947] LOG: Mew's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[04:08:52.844] LOG: Scatterbug's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[04:08:56.748] LOG: Mew's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[04:09:02.018] LOG: Mew's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[04:09:09.912] LOG: %cSaving starter preferences color: blue
+[04:09:10.331] LOG: %cSaving starter preferences color: blue
+[04:09:43.979] LOG: Getting Session Slot id: %d 0
+[04:09:43.984] LOG: Getting Session Slot id: %d 1
+[04:09:43.985] LOG: Getting Session Slot id: %d 2
+[04:09:43.987] LOG: Getting Session Slot id: %d 3
+[04:09:43.989] LOG: Getting Session Slot id: %d 4
+[04:09:45.301] ERROR: Session read failed (missing).
+[04:09:45.302] ERROR: Session read failed (missing).
+[04:09:48.816] DEBUG: %cSending a request to delete session in slot %d color: blue 2
+[04:09:56.670] LOG: Wave Seed: 3V2o{qVgZU7Q2E3dm[WZz9Rj 1
+[04:09:56.674] LOG: %cStart Phase EncounterPhase color:green;
+[04:09:56.682] LOG: Starting species pool tier: COMMON
+[04:09:56.694] LOG: Pokemon: Wild Pidgey | Species ID: 16 | Level: 2 | Nature: Brave (+Atk/-Spd)
+[04:09:56.694] LOG: Stats (IVs): HP: 14 (23), Atk: 8 (31), Def: 6 (0), Spatk: 7 (24), Spdef: 6 (10), Spd: 6 (27)
+[04:09:56.694] LOG: Ability: No Guard | Passive Ability: Flock 
+[04:09:56.694] LOG: Moveset: ["Air Cutter","Steel Wing","Sand Attack","Gust"]
+[04:09:58.043] DEBUG: Session data saved to slot 2!
+[04:09:59.793] LOG: Wave Seed: 3V2o{qVgZU7Q2E3dm[WZz9Rj 1
+[04:10:00.232] LOG: %cStart Phase SummonPhase color:green;
+[04:10:00.422] WARN: cry/133 not found
+[04:10:00.530] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:10:00.532] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:10:01.071] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:10:01.074] LOG: %cStart Phase PostSummonPhase color:green;
+[04:10:01.074] LOG: Ran PSP for: Eevee
+[04:10:01.075] LOG: %cStart Phase PostSummonPhase color:green;
+[04:10:01.076] LOG: %cStart Phase PostSummonPhase color:green;
+[04:10:01.079] LOG: %cStart Phase PostSummonPhase color:green;
+[04:10:01.079] LOG: Ran PSP for: Pidgey
+[04:10:01.079] LOG: %cStart Phase PostSummonPhase color:green;
+[04:10:01.079] LOG: %cStart Phase PostSummonPhase color:green;
+[04:10:01.079] LOG: %cStart Phase TurnInitPhase color:green;
+[04:10:01.080] LOG: %cStart Phase CommandPhase color:green;
+[04:10:01.980] DEBUG: Session data saved to slot 2!
+[04:10:03.152] LOG: Seed: GM8coDlz2VdYwJMgwctHFDOe
+[04:10:03.152] LOG: Wave Seed: GM8coDlz2VdYwJMgwctHFDOe 0
+[04:10:03.285] WARN: AnimationManager key already exists: prompt
+[04:10:03.285] WARN: AnimationManager key already exists: tera_sparkle
+[04:10:03.285] LOG: Seed: ZZHfCy9pZ8TY8h9a8dhXPkgi
+[04:10:03.285] LOG: Wave Seed: ZZHfCy9pZ8TY8h9a8dhXPkgi 0
+[04:10:05.039] LOG: %cStart Phase LoginPhase color:green;
+[04:10:05.703] LOG: Client Session: 6eNnHxm1r2ZqnQ6vvL4OCapIrkc6YRCc
+[04:10:06.137] LOG: %cStart Phase TitlePhase color:green;
+[04:10:06.138] LOG: Getting Session Slot id: %d 2
+[04:10:06.148] LOG: use seasonal splash messages true
+[04:11:07.311] LOG: %cStart Phase SelectChallengePhase color:green;
+[04:11:08.348] LOG: %cStart Phase SelectStarterPhase color:green;
+[04:11:13.052] WARN: cry/133 not found
+[04:11:13.070] WARN: cry/10612 not found
+[04:11:13.087] WARN: cry/352 not found
+[04:11:13.104] WARN: cry/985 not found
+[04:16:06.951] WARN: cry/216 not found
+[04:16:14.267] WARN: cry/412 not found
+[04:16:15.058] LOG: %cSaving starter preferences color: blue
+[04:16:15.288] LOG: %cSaving starter preferences color: blue
+[04:16:15.648] LOG: %cSaving starter preferences color: blue
+[04:16:15.797] LOG: %cSaving starter preferences color: blue
+[04:16:16.104] LOG: %cSaving starter preferences color: blue
+[04:16:26.393] WARN: cry/190 not found
+[04:16:29.649] WARN: Missing animation: pkmn__female__190
+[04:16:43.051] WARN: cry/415 not found
+[04:17:59.075] LOG: %cSaving starter preferences color: blue
+[04:18:09.606] LOG: %cSaving starter preferences color: blue
+[04:18:30.905] LOG: %cSaving starter preferences color: blue
+[04:18:43.409] LOG: %cSaving starter preferences color: blue
+[04:19:04.659] WARN: cry/413 not found
+[04:19:04.899] WARN: cry/413 not found
+[04:19:16.499] WARN: cry/412 not found
+[04:19:29.600] LOG: %cSaving starter preferences color: blue
+[04:19:49.672] LOG: Getting Session Slot id: %d 0
+[04:19:49.677] LOG: Getting Session Slot id: %d 1
+[04:19:49.680] LOG: Getting Session Slot id: %d 2
+[04:19:49.681] LOG: Getting Session Slot id: %d 3
+[04:19:49.683] LOG: Getting Session Slot id: %d 4
+[04:19:50.800] ERROR: Session read failed (missing).
+[04:19:50.821] ERROR: Session read failed (missing).
+[04:19:52.855] DEBUG: %cSending a request to delete session in slot %d color: blue 2
+[04:20:36.004] LOG: Wave Seed: [[IgDz:q[9UZ9i:b9eiYQlhj 1
+[04:20:36.019] LOG: %cStart Phase EncounterPhase color:green;
+[04:20:36.022] LOG: Starting species pool tier: UNCOMMON
+[04:20:36.033] LOG: Pokemon: Wild Ekans | Species ID: 23 | Level: 2 | Nature: Lax (+Def/-SpDef)
+[04:20:36.033] LOG: Stats (IVs): HP: 14 (17), Atk: 7 (26), Def: 8 (2), Spatk: 6 (7), Spdef: 6 (19), Spd: 7 (29)
+[04:20:36.033] LOG: Ability: Grappler | Passive Ability: Solenoglyphs 
+[04:20:36.033] LOG: Moveset: ["Poison Fang","Coil","Glare","Wrap"]
+[04:20:37.217] DEBUG: Session data saved to slot 2!
+[04:20:38.862] LOG: Wave Seed: [[IgDz:q[9UZ9i:b9eiYQlhj 1
+[04:20:39.074] WARN: cry/23 not found
+[04:20:39.290] LOG: %cStart Phase SummonPhase color:green;
+[04:20:39.481] WARN: cry/133 not found
+[04:20:39.589] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:20:39.591] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:20:39.687] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:20:39.689] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:39.689] LOG: Ran PSP for: Eevee
+[04:20:39.690] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:39.691] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:39.694] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:39.694] LOG: Ran PSP for: Ekans
+[04:20:39.694] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:39.694] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:39.694] LOG: %cStart Phase TurnInitPhase color:green;
+[04:20:39.695] LOG: %cStart Phase CommandPhase color:green;
+[04:20:43.637] LOG: Move: GROWL Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Eevee
+[04:20:43.639] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:20:43.645] LOG: Battle Seed: 2Y30PYgerEMgMHvC
+[04:20:43.648] LOG: Move Pool: ["Poison Fang","Coil","Glare","Wrap"]
+[04:20:43.648] LOG: Move Scores: [28.5,6,10,13]
+[04:20:43.648] LOG: Sorted Move Pool: ["Poison Fang","Wrap","Glare","Coil"]
+[04:20:43.648] LOG: Chosen Move: Wrap
+[04:20:43.648] LOG: %cStart Phase TurnStartPhase color:green;
+[04:20:43.650] LOG: %cStart Phase MovePhase color:green;
+[04:20:43.650] LOG: %cUser: Eevee
+Move: GROWL
+Use Mode: NORMAL color:orchid
+[04:20:43.653] LOG: %cStart Phase MessagePhase color:green;
+[04:20:43.751] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:20:43.766] WARN: cry/133 not found
+[04:20:43.991] LOG: crit stage: +0
+[04:20:43.993] LOG: Move: Growl | Base damage: 12.4 | Power: 60 | Source attack: 13 | Target defense: 6
+[04:20:43.994] LOG: Move: Growl | Attack damage: 27
+[04:20:43.998] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:20:44.024] LOG: %cStart Phase MessagePhase color:green;
+[04:20:44.221] LOG: %cStart Phase FaintPhase color:green;
+[04:20:44.225] WARN: cry/23 not found
+[04:20:44.282] LOG: %cStart Phase MessagePhase color:green;
+[04:20:44.887] LOG: %cStart Phase VictoryPhase color:green;
+[04:20:44.891] LOG: %cStart Phase ExpPhase color:green;
+[04:20:45.174] LOG: %cStart Phase MoveEndPhase color:green;
+[04:20:45.175] LOG: %cStart Phase MovePhase color:green;
+[04:20:45.175] LOG: %cStart Phase MoveEndPhase color:green;
+[04:20:45.175] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:20:45.175] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:20:45.175] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:20:45.176] LOG: %cStart Phase BerryPhase color:green;
+[04:20:45.176] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:20:45.176] LOG: %cStart Phase TurnEndPhase color:green;
+[04:20:45.177] LOG: %cStart Phase BattleEndPhase color:green;
+[04:20:45.178] LOG: Battle Score: 12 (1 Turns x1)
+[04:20:45.178] LOG: Total Score: 12
+[04:20:45.193] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:20:45.193] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:20:45.223] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:20:45.223] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:20:45.265] LOG: %cStart Phase MessagePhase color:green;
+[04:20:45.385] LOG: %cStart Phase EggLapsePhase color:green;
+[04:20:45.386] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:20:45.387] LOG: Wave Seed: [[IgDz:q[9UZ9i:b9eiYQlhj 1
+[04:20:45.394] LOG: 1 0 [2,3,4,5]
+[04:20:45.394] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[04:20:45.394] LOG: 0 0 [2,3,4,5]
+[04:20:45.394] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:20:45.395] LOG: 0 0 [2,3,4,5]
+[04:20:45.395] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:20:45.395] LOG: 0 0 [2,3,4,5]
+[04:20:45.395] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:20:45.395] LOG: 9 4 [2,3,4,5]
+[04:20:45.395] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[04:20:45.395] LOG: 0 0 [2,3,4,5]
+[04:20:45.395] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:20:45.395] LOG: 7 4 [2,3,4,5]
+[04:20:45.395] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[04:20:45.395] LOG: 6 4 [2,3,4,5]
+[04:20:45.395] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[04:20:47.509] LOG: %cStart Phase LevelUpPhase color:green;
+[04:20:47.511] LOG: %cStart Phase NewBattlePhase color:green;
+[04:20:47.511] LOG: Wave Seed: \\JhE{;r\:V[:j;c:fjZRmik 2
+[04:20:47.517] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:20:47.518] LOG: Starting species pool tier: UNCOMMON
+[04:20:47.526] LOG: Pokemon: Wild Fidough | Species ID: 926 | Level: 2 | Nature: Rash (+SpAtk/-SpDef)
+[04:20:47.526] LOG: Stats (IVs): HP: 13 (2), Atk: 7 (3), Def: 8 (29), Spatk: 7 (13), Spdef: 6 (22), Spd: 7 (12)
+[04:20:47.526] LOG: Ability: Gluttony | Passive Ability: Well-Baked Body 
+[04:20:47.526] LOG: Moveset: ["Lovely Bite","Growl","Howl"]
+[04:20:49.187] DEBUG: Session data saved to slot 2!
+[04:20:49.187] LOG: Wave Seed: \\JhE{;r\:V[:j;c:fjZRmik 2
+[04:20:49.631] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:20:49.631] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:20:50.071] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:20:50.071] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:50.072] LOG: Ran PSP for: Fidough
+[04:20:50.072] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:50.072] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:50.072] LOG: %cStart Phase TurnInitPhase color:green;
+[04:20:50.072] LOG: %cStart Phase CommandPhase color:green;
+[04:20:51.894] LOG: Move: BADDY_BAD Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Eevee
+[04:20:51.896] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:20:51.900] LOG: Battle Seed: sY9iAvuz5obTUUKj
+[04:20:51.901] LOG: Move Pool: ["Lovely Bite","Growl","Howl"]
+[04:20:51.901] LOG: Move Scores: [27,2,2]
+[04:20:51.901] LOG: Sorted Move Pool: ["Lovely Bite","Growl","Howl"]
+[04:20:51.901] LOG: Chosen Move: Growl
+[04:20:51.901] LOG: %cStart Phase TurnStartPhase color:green;
+[04:20:51.903] LOG: %cStart Phase MovePhase color:green;
+[04:20:51.903] LOG: %cUser: Eevee
+Move: BADDY_BAD
+Use Mode: NORMAL color:orchid
+[04:20:51.920] LOG: %cStart Phase MessagePhase color:green;
+[04:20:52.157] LOG: %cStart Phase ErOmniformTransformWaitPhase color:green;
+[04:20:52.309] LOG: %cStart Phase MessagePhase color:green;
+[04:20:52.446] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:20:53.274] LOG: crit stage: +0
+[04:20:53.275] LOG: Move: Baddy Bad | Base damage: 18.426666666666666 | Power: 80 | Source attack: 14 | Target defense: 6
+[04:20:53.276] LOG: Move: Baddy Bad | Attack damage: 54
+[04:20:53.282] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:20:53.298] LOG: %cStart Phase MessagePhase color:green;
+[04:20:53.519] LOG: %cStart Phase MessagePhase color:green;
+[04:20:53.813] LOG: %cStart Phase FaintPhase color:green;
+[04:20:54.590] LOG: %cStart Phase MessagePhase color:green;
+[04:20:54.835] LOG: %cStart Phase VictoryPhase color:green;
+[04:20:54.836] LOG: %cStart Phase ExpPhase color:green;
+[04:20:55.064] LOG: %cStart Phase MoveEndPhase color:green;
+[04:20:55.064] LOG: %cStart Phase MovePhase color:green;
+[04:20:55.065] LOG: %cStart Phase MoveEndPhase color:green;
+[04:20:55.065] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:20:55.065] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:20:55.065] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:20:55.065] LOG: %cStart Phase BerryPhase color:green;
+[04:20:55.065] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:20:55.065] LOG: %cStart Phase TurnEndPhase color:green;
+[04:20:55.067] LOG: %cStart Phase BattleEndPhase color:green;
+[04:20:55.067] LOG: Battle Score: 13 (1 Turns x1)
+[04:20:55.067] LOG: Total Score: 25
+[04:20:55.073] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:20:55.073] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:20:55.109] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:20:55.110] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:20:55.156] LOG: %cStart Phase MessagePhase color:green;
+[04:20:55.418] LOG: %cStart Phase EggLapsePhase color:green;
+[04:20:55.419] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:20:55.419] LOG: Wave Seed: \\JhE{;r\:V[:j;c:fjZRmik 2
+[04:20:55.424] LOG: 7 4 [2,3,4,5]
+[04:20:55.424] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[04:20:55.424] LOG: 19 9 [2,3,4,5,6,7,8,9,10,27,30]
+[04:20:55.424] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[04:20:55.425] LOG: 13 9 [2,3,4,5,6,7,8,9,10,27,30]
+[04:20:55.425] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[04:20:55.425] LOG: 6 4 [2,3,4,5]
+[04:20:55.425] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[04:20:56.748] LOG: %cStart Phase NewBattlePhase color:green;
+[04:20:56.748] LOG: Wave Seed: ]]KiF|<s];W\;k<d;gk[Snjl 3
+[04:20:56.749] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:20:56.751] LOG: Starting species pool tier: RARE
+[04:20:56.759] LOG: Pokemon: Wild Rookidee | Species ID: 821 | Level: 3 | Nature: Docile (-)
+[04:20:56.759] LOG: Stats (IVs): HP: 16 (24), Atk: 7 (3), Def: 7 (2), Spatk: 8 (7), Spdef: 7 (20), Spd: 9 (27)
+[04:20:56.759] LOG: Ability: Intimidate | Passive Ability: Flock 
+[04:20:56.759] LOG: Moveset: ["Gust","Hone Claws","Peck","Leer"]
+[04:20:57.993] DEBUG: Session data saved to slot 2!
+[04:20:57.993] LOG: Wave Seed: ]]KiF|<s];W\;k<d;gk[Snjl 3
+[04:20:58.427] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:20:58.427] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:20:58.527] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:20:58.528] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:58.528] LOG: Ran PSP for: Rookidee
+[04:20:58.528] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:58.529] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:20:58.715] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:20:58.912] LOG: %cStart Phase MessagePhase color:green;
+[04:20:59.138] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:20:59.173] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:59.173] LOG: %cStart Phase TurnInitPhase color:green;
+[04:20:59.173] LOG: %cStart Phase CommandPhase color:green;
+[04:21:02.994] LOG: Move: PLAY_NICE Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Partner Umbreon
+[04:21:02.997] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:21:03.001] LOG: Battle Seed: 9oEqmO4BkkKGSLmB
+[04:21:03.004] LOG: Move Pool: ["Gust","Hone Claws","Peck","Leer"]
+[04:21:03.004] LOG: Move Scores: [12,4,30,2]
+[04:21:03.004] LOG: Sorted Move Pool: ["Peck","Gust","Hone Claws","Leer"]
+[04:21:03.004] LOG: Chosen Move: Peck
+[04:21:03.004] LOG: %cStart Phase TurnStartPhase color:green;
+[04:21:03.006] LOG: %cStart Phase MovePhase color:green;
+[04:21:03.006] LOG: %cUser: Partner Umbreon
+Move: PLAY_NICE
+Use Mode: NORMAL color:orchid
+[04:21:03.014] LOG: %cStart Phase MessagePhase color:green;
+[04:21:03.241] LOG: %cStart Phase ErOmniformTransformWaitPhase color:green;
+[04:21:03.412] LOG: %cStart Phase MessagePhase color:green;
+[04:21:03.521] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:21:03.931] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:21:04.107] LOG: %cStart Phase MessagePhase color:green;
+[04:21:04.338] LOG: %cStart Phase MoveEndPhase color:green;
+[04:21:04.338] LOG: %cStart Phase MovePhase color:green;
+[04:21:04.338] LOG: %cUser: Rookidee
+Move: PECK
+Use Mode: NORMAL color:orchid
+[04:21:04.341] LOG: %cStart Phase MessagePhase color:green;
+[04:21:04.480] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:21:04.665] LOG: crit stage: +0
+[04:21:04.666] LOG: Move: Peck | Base damage: 2.5907692307692307 | Power: 30 | Source attack: 4 | Target defense: 13
+[04:21:04.667] LOG: Move: Peck | Attack damage: 1
+[04:21:04.668] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:21:04.700] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:21:04.914] LOG: crit stage: +0
+[04:21:04.915] LOG: Move: Peck | Base damage: 2.5907692307692307 | Power: 30 | Source attack: 4 | Target defense: 13
+[04:21:04.916] LOG: Move: Peck | Attack damage: 1
+[04:21:04.918] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:21:04.948] LOG: %cStart Phase MessagePhase color:green;
+[04:21:05.147] LOG: %cStart Phase MoveEndPhase color:green;
+[04:21:05.147] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:21:05.147] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:21:05.148] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:21:05.148] LOG: %cStart Phase BerryPhase color:green;
+[04:21:05.149] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:21:05.149] LOG: %cStart Phase TurnEndPhase color:green;
+[04:21:05.152] LOG: %cStart Phase TurnInitPhase color:green;
+[04:21:05.152] LOG: %cStart Phase CommandPhase color:green;
+[04:21:05.985] LOG: Move: NO_RETREAT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Eevee
+[04:21:05.987] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:21:05.991] LOG: Battle Seed: 9oEqmO4BkkKGSLmB
+[04:21:05.993] LOG: Move Pool: ["Gust","Hone Claws","Peck","Leer"]
+[04:21:05.993] LOG: Move Scores: [12,4,30,2]
+[04:21:05.993] LOG: Sorted Move Pool: ["Peck","Gust","Hone Claws","Leer"]
+[04:21:05.993] LOG: Chosen Move: Peck
+[04:21:05.993] LOG: %cStart Phase TurnStartPhase color:green;
+[04:21:05.994] LOG: %cStart Phase MovePhase color:green;
+[04:21:05.994] LOG: %cUser: Eevee
+Move: NO_RETREAT
+Use Mode: NORMAL color:orchid
+[04:21:05.996] LOG: %cStart Phase MessagePhase color:green;
+[04:21:06.083] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:21:06.314] WARN: cry/133 not found
+[04:21:06.516] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:21:06.517] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:21:06.700] LOG: %cStart Phase MessagePhase color:green;
+[04:21:06.930] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:21:07.115] LOG: %cStart Phase MessagePhase color:green;
+[04:21:07.347] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:21:07.533] LOG: %cStart Phase MessagePhase color:green;
+[04:21:07.764] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:21:07.948] LOG: %cStart Phase MessagePhase color:green;
+[04:21:08.163] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:21:08.349] LOG: %cStart Phase MessagePhase color:green;
+[04:21:08.580] LOG: %cStart Phase MessagePhase color:green;
+[04:21:08.813] LOG: %cStart Phase MoveEndPhase color:green;
+[04:21:08.814] LOG: %cStart Phase MovePhase color:green;
+[04:21:08.814] LOG: %cUser: Rookidee
+Move: PECK
+Use Mode: NORMAL color:orchid
+[04:21:08.817] LOG: %cStart Phase MessagePhase color:green;
+[04:21:08.947] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:21:09.148] LOG: crit stage: +0
+[04:21:09.149] LOG: Move: Peck | Base damage: 2.4042105263157896 | Power: 30 | Source attack: 4 | Target defense: 19
+[04:21:09.150] LOG: Move: Peck | Attack damage: 1
+[04:21:09.151] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:21:09.182] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:21:09.398] LOG: crit stage: +0
+[04:21:09.399] LOG: Move: Peck | Base damage: 2.4042105263157896 | Power: 30 | Source attack: 4 | Target defense: 19
+[04:21:09.400] LOG: Move: Peck | Attack damage: 1
+[04:21:09.401] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:21:09.432] LOG: %cStart Phase MessagePhase color:green;
+[04:21:09.648] LOG: %cStart Phase MoveEndPhase color:green;
+[04:21:09.648] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:21:09.648] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:21:09.648] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:21:09.648] LOG: %cStart Phase BerryPhase color:green;
+[04:21:09.649] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:21:09.650] LOG: %cStart Phase TurnEndPhase color:green;
+[04:21:09.653] LOG: %cStart Phase TurnInitPhase color:green;
+[04:21:09.653] LOG: %cStart Phase CommandPhase color:green;
+[04:21:10.668] LOG: Move: GLITZY_GLOW Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Eevee
+[04:21:10.670] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:21:10.673] LOG: Battle Seed: 9oEqmO4BkkKGSLmB
+[04:21:10.675] LOG: Move Pool: ["Gust","Hone Claws","Peck","Leer"]
+[04:21:10.675] LOG: Move Scores: [12,4,30,2]
+[04:21:10.675] LOG: Sorted Move Pool: ["Peck","Gust","Hone Claws","Leer"]
+[04:21:10.675] LOG: Chosen Move: Peck
+[04:21:10.675] LOG: %cStart Phase TurnStartPhase color:green;
+[04:21:10.676] LOG: %cStart Phase MovePhase color:green;
+[04:21:10.676] LOG: %cUser: Eevee
+Move: GLITZY_GLOW
+Use Mode: NORMAL color:orchid
+[04:21:10.682] LOG: %cStart Phase MessagePhase color:green;
+[04:21:10.915] LOG: %cStart Phase ErOmniformTransformWaitPhase color:green;
+[04:21:11.069] LOG: %cStart Phase MessagePhase color:green;
+[04:21:11.196] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:21:12.483] LOG: crit stage: +0
+[04:21:12.485] LOG: Move: Glitzy Glow | Base damage: 35.18857142857143 | Power: 80 | Source attack: 33 | Target defense: 7
+[04:21:12.485] LOG: Move: Glitzy Glow | Attack damage: 47
+[04:21:12.489] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:21:12.518] LOG: %cStart Phase MessagePhase color:green;
+[04:21:12.813] LOG: %cStart Phase FaintPhase color:green;
+[04:21:14.716] LOG: %cStart Phase MessagePhase color:green;
+[04:21:16.758] LOG: %cStart Phase VictoryPhase color:green;
+[04:21:16.759] LOG: %cStart Phase ExpPhase color:green;
+[04:21:17.081] LOG: %cStart Phase MoveEndPhase color:green;
+[04:21:17.081] LOG: %cStart Phase MovePhase color:green;
+[04:21:17.082] LOG: %cStart Phase MoveEndPhase color:green;
+[04:21:17.082] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:21:17.082] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:21:17.082] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:21:17.082] LOG: %cStart Phase BerryPhase color:green;
+[04:21:17.082] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:21:17.082] LOG: %cStart Phase TurnEndPhase color:green;
+[04:21:17.084] LOG: %cStart Phase BattleEndPhase color:green;
+[04:21:17.084] LOG: Battle Score: 11 (3 Turns x0.69)
+[04:21:17.084] LOG: Total Score: 36
+[04:21:17.090] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:21:17.090] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:21:17.131] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:21:17.131] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:21:17.173] LOG: %cStart Phase MessagePhase color:green;
+[04:21:17.344] LOG: %cStart Phase EggLapsePhase color:green;
+[04:21:17.344] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:21:17.344] LOG: Wave Seed: ]]KiF|<s];W\;k<d;gk[Snjl 3
+[04:21:17.348] LOG: 0 0 [2,3,4,5]
+[04:21:17.348] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:21:17.348] LOG: 7 4 [2,3,4,5]
+[04:21:17.348] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[04:21:17.349] LOG: 7 4 [2,3,4,5]
+[04:21:17.349] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[04:21:17.349] LOG: 7 4 [2,3,4,5]
+[04:21:17.349] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[04:21:17.349] LOG: 6 4 [2,3,4,5]
+[04:21:17.349] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[04:22:30.716] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:22:30.719] LOG: 7 4 [2,3,4,5]
+[04:22:30.719] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[04:22:30.719] LOG: 26 9 [2,3,4,5,6,7,8,9,10,27,30,31]
+[04:22:30.719] LOG: {"id":"ER_BLUNDER_POLICY","localeKey":"","iconImage":"er_blunder_policy","soundName":"se/restore","tier":1} 
+[04:22:30.720] LOG: 26 9 [2,3,4,5,6,7,8,9,10,27,30,31]
+[04:22:30.720] LOG: {"id":"ER_BLUNDER_POLICY","localeKey":"","iconImage":"er_blunder_policy","soundName":"se/restore","tier":1} 
+[04:22:30.720] LOG: 28 10 [2,3,4,5,6,7,8,9,10,27,30,31]
+[04:22:30.720] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"carbos","soundName":"se/restore","tier":1,"stat":5,"key":"carbos"} 
+[04:22:30.720] LOG: 20 9 [2,3,4,5,6,7,8,9,10,27,30,31]
+[04:22:30.720] LOG: {"id":"ER_EJECT_BUTTON","localeKey":"","iconImage":"er_eject_button","soundName":"se/restore","tier":1} 
+[04:22:30.720] LOG: 20 9 [2,3,4,5,6,7,8,9,10,27,30,31]
+[04:22:30.720] LOG: {"id":"ER_EJECT_BUTTON","localeKey":"","iconImage":"er_eject_button","soundName":"se/restore","tier":1} 
+[04:22:30.720] LOG: 16 9 [2,3,4,5,6,7,8,9,10,27,30,31]
+[04:22:30.720] LOG: {"id":"ER_UPGRADED_MAP","localeKey":"","iconImage":"map","iconTint":16765514,"soundName":"se/restore","tier":1} 
+[04:22:30.720] LOG: 13 9 [2,3,4,5,6,7,8,9,10,27,30,31]
+[04:22:30.720] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[04:22:30.720] LOG: 24 9 [2,3,4,5,6,7,8,9,10,27,30,31]
+[04:22:30.720] LOG: {"id":"ER_ROOM_SERVICE","localeKey":"","iconImage":"er_room_service","soundName":"se/restore","tier":1} 
+[04:22:30.720] LOG: 1 0 [2,3,4,5,6,7,8,9,10,27,30,31]
+[04:22:30.720] LOG: {"id":"PP_UP","localeKey":"modifierType:ModifierType.PP_UP","iconImage":"pp_up","group":"ppUp","soundName":"se/restore","tier":1,"upPoints":1} 
+[04:22:37.449] LOG: %cStart Phase NewBattlePhase color:green;
+[04:22:37.449] LOG: Wave Seed: ^^LjG}=t^<X]<l=e<hl\Tokm 4
+[04:22:37.449] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:22:37.451] LOG: Starting species pool tier: COMMON
+[04:22:37.460] LOG: Pokemon: Wild Blipbug | Species ID: 824 | Level: 4 | Nature: Bold (+Def/-Atk)
+[04:22:37.460] LOG: Stats (IVs): HP: 16 (6), Atk: 6 (27), Def: 8 (19), Spatk: 8 (29), Spdef: 9 (26), Spd: 9 (20)
+[04:22:37.460] LOG: Ability: Compound Eyes | Passive Ability: Simple 
+[04:22:37.460] LOG: Moveset: ["Lunge","Infestation","Ally Switch"]
+[04:22:37.460] LOG: Starting species pool tier: COMMON
+[04:22:37.466] LOG: Pokemon: Wild Poochyena | Species ID: 261 | Level: 4 | Nature: Careful (+SpDef/-SpAtk)
+[04:22:37.466] LOG: Stats (IVs): HP: 18 (31), Atk: 11 (14), Def: 8 (20), Spatk: 7 (28), Spdef: 10 (20), Spd: 12 (22)
+[04:22:37.466] LOG: Ability: Moxie | Passive Ability: Nocturnal 
+[04:22:37.466] LOG: Moveset: ["Hyper Fang","Odor Sleuth","Roar","Howl"]
+[04:22:39.207] DEBUG: Session data saved to slot 2!
+[04:22:39.207] LOG: Wave Seed: ^^LjG}=t^<X]<l=e<hl\Tokm 4
+[04:22:39.421] WARN: cry/824 not found
+[04:22:39.673] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:22:39.748] LOG: %cStart Phase SummonPhase color:green;
+[04:22:40.038] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:22:40.142] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:22:40.144] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:22:40.296] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:22:40.298] LOG: %cStart Phase PostSummonPhase color:green;
+[04:22:40.298] LOG: Ran PSP for: Cyclizar
+[04:22:40.301] LOG: %cStart Phase PostSummonPhase color:green;
+[04:22:40.303] LOG: %cStart Phase PostSummonPhase color:green;
+[04:22:40.303] LOG: %cStart Phase PostSummonPhase color:green;
+[04:22:40.303] LOG: Ran PSP for: Poochyena
+[04:22:40.304] LOG: %cStart Phase PostSummonPhase color:green;
+[04:22:40.305] LOG: %cStart Phase PostSummonPhase color:green;
+[04:22:40.305] LOG: %cStart Phase PostSummonPhase color:green;
+[04:22:40.305] LOG: Ran PSP for: Blipbug
+[04:22:40.306] LOG: %cStart Phase PostSummonPhase color:green;
+[04:22:40.306] LOG: %cStart Phase PostSummonPhase color:green;
+[04:22:40.306] LOG: %cStart Phase TurnInitPhase color:green;
+[04:22:40.306] LOG: %cStart Phase CommandPhase color:green;
+[04:22:41.269] WARN: cry/70015 not found
+[04:22:45.861] LOG: Move: GLITZY_GLOW Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Partner Espeon
+[04:22:45.863] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:22:46.345] LOG: %cStart Phase CommandPhase color:green;
+[04:22:46.836] LOG: %cStart Phase CommandPhase color:green;
+[04:22:47.210] LOG: Move: GLITZY_GLOW Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Partner Espeon
+[04:22:47.213] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:22:47.919] LOG: %cStart Phase CommandPhase color:green;
+[04:22:49.052] LOG: Move: DRACONIC_FANGS Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Cyclizar
+[04:22:49.054] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:22:49.578] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:22:49.588] LOG: Battle Seed: bHtdqPSCRFJX8ZB7
+[04:22:49.594] LOG: Move Pool: ["Lunge","Infestation","Ally Switch"]
+[04:22:49.594] LOG: Move Scores: [21,8.25,0]
+[04:22:49.594] LOG: Sorted Move Pool: ["Lunge","Infestation","Ally Switch"]
+[04:22:49.594] LOG: Chosen Move: Infestation
+[04:22:49.594] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:22:49.599] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[04:22:49.600] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[04:22:49.600] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[04:22:49.602] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[04:22:49.602] LOG: Move Pool: ["Hyper Fang","Odor Sleuth","Roar","Howl"]
+[04:22:49.602] LOG: Move Scores: [19,0,-20,2]
+[04:22:49.602] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[04:22:49.603] LOG: Chosen Move: Hyper Fang
+[04:22:49.603] LOG: %cStart Phase TurnStartPhase color:green;
+[04:22:49.611] LOG: %cStart Phase MovePhase color:green;
+[04:22:49.611] LOG: %cUser: Partner Espeon
+Move: GLITZY_GLOW
+Use Mode: NORMAL color:orchid
+[04:22:49.614] LOG: %cStart Phase MessagePhase color:green;
+[04:22:49.705] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:22:50.990] LOG: crit stage: +0
+[04:22:50.992] LOG: Move: Glitzy Glow | Base damage: 25.232 | Power: 80 | Source attack: 33 | Target defense: 10
+[04:22:50.993] LOG: Move: Glitzy Glow | Attack damage: 67
+[04:22:50.995] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:22:51.025] LOG: %cStart Phase MessagePhase color:green;
+[04:22:51.255] LOG: %cStart Phase FaintPhase color:green;
+[04:22:52.092] LOG: %cStart Phase MessagePhase color:green;
+[04:23:08.090] LOG: %cStart Phase VictoryPhase color:green;
+[04:23:08.090] LOG: %cStart Phase ExpPhase color:green;
+[04:25:36.390] LOG: %cStart Phase ExpPhase color:green;
+[04:25:36.606] LOG: %cStart Phase MoveEndPhase color:green;
+[04:25:36.608] LOG: %cStart Phase MovePhase color:green;
+[04:25:36.608] LOG: %cUser: Cyclizar
+Move: DRACONIC_FANGS
+Use Mode: NORMAL color:orchid
+[04:25:36.612] LOG: %cStart Phase MessagePhase color:green;
+[04:25:36.747] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:25:37.314] LOG: crit stage: +0
+[04:25:37.315] LOG: Move: Draconic Fangs | Base damage: 15.6 | Power: 85 | Source attack: 16 | Target defense: 8
+[04:25:37.316] LOG: Move: Draconic Fangs | Attack damage: 22
+[04:25:37.322] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:25:37.348] LOG: %cStart Phase FaintPhase color:green;
+[04:25:37.350] WARN: cry/824 not found
+[04:25:37.414] LOG: %cStart Phase MessagePhase color:green;
+[04:25:37.904] LOG: %cStart Phase VictoryPhase color:green;
+[04:25:37.905] LOG: %cStart Phase ExpPhase color:green;
+[04:25:38.273] LOG: %cStart Phase ExpPhase color:green;
+[04:25:38.589] LOG: %cStart Phase MoveEndPhase color:green;
+[04:25:38.590] LOG: %cStart Phase MovePhase color:green;
+[04:25:38.590] LOG: %cStart Phase MoveEndPhase color:green;
+[04:25:38.590] LOG: %cStart Phase MovePhase color:green;
+[04:25:38.590] LOG: %cStart Phase MoveEndPhase color:green;
+[04:25:38.590] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:25:38.590] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:25:38.590] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:25:38.590] LOG: %cStart Phase BerryPhase color:green;
+[04:25:38.590] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:25:38.591] LOG: %cStart Phase TurnEndPhase color:green;
+[04:25:38.620] LOG: %cStart Phase MessagePhase color:green;
+[04:25:38.838] LOG: %cStart Phase BattleEndPhase color:green;
+[04:25:38.839] LOG: Battle Score: 41 (1 Turns x1)
+[04:25:38.839] LOG: Total Score: 77
+[04:25:38.858] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:25:38.858] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:25:38.889] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:25:38.889] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:25:38.940] LOG: %cStart Phase MessagePhase color:green;
+[04:25:39.020] LOG: %cStart Phase EggLapsePhase color:green;
+[04:25:39.020] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:25:39.020] LOG: Wave Seed: ^^LjG}=t^<X]<l=e<hl\Tokm 4
+[04:25:39.036] LOG: 6 4 [2,3,4,5]
+[04:25:39.036] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[04:25:39.036] LOG: 1 0 [2,3,4,5]
+[04:25:39.036] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[04:25:39.036] LOG: 9 4 [2,3,4,5]
+[04:25:39.036] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[04:25:39.036] LOG: 7 4 [2,3,4,5]
+[04:25:39.036] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[04:25:39.037] LOG: 9 4 [2,3,4,5]
+[04:25:39.037] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[04:25:39.037] LOG: 1 0 [2,3,4,5]
+[04:25:39.037] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[04:25:39.037] LOG: 6 4 [2,3,4,5]
+[04:25:39.037] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[04:25:39.037] LOG: 7 4 [2,3,4,5]
+[04:25:39.037] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[04:25:39.037] LOG: 9 4 [2,3,4,5]
+[04:25:39.037] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[04:25:39.037] LOG: 0 0 [2,3,4,5]
+[04:25:39.037] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:25:50.094] LOG: %cStart Phase LevelUpPhase color:green;
+[04:25:50.098] LOG: %cStart Phase NewBattlePhase color:green;
+[04:25:50.098] LOG: Wave Seed: __MkH~>u_=Y^=m>f=im]Upln 5
+[04:25:50.104] LOG: %cStart Phase MessagePhase color:green;
+[04:25:50.339] LOG: %cStart Phase ReturnPhase color:green;
+[04:25:50.449] LOG: %cStart Phase ReturnPhase color:green;
+[04:25:50.556] LOG: %cStart Phase ShowTrainerPhase color:green;
+[04:25:50.664] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:25:50.671] LOG: COMMON
+[04:25:50.671] LOG: Caterpie
+[04:25:50.694] LOG: Pokemon: Foe Caterpie | Species ID: 10 | Level: 4 | Nature: Docile (-)
+[04:25:50.694] LOG: Stats (IVs): HP: 18 (22), Atk: 8 (11), Def: 8 (21), Spatk: 6 (16), Spdef: 7 (4), Spd: 9 (6)
+[04:25:50.695] LOG: Ability: Web Spinner | Passive Ability: Swarm 
+[04:25:50.695] LOG: Moveset: ["Skitter Smack","Tackle"]
+[04:25:50.695] LOG: COMMON
+[04:25:50.695] LOG: Caterpie
+[04:25:50.695] LOG: Duplicate species detected, prompting reroll...
+[04:25:50.695] LOG: Rerolling party member...
+[04:25:50.695] LOG: COMMON
+[04:25:50.695] LOG: Sentret
+[04:25:50.702] LOG: Pokemon: Foe Sentret | Species ID: 161 | Level: 4 | Nature: Relaxed (+Def/-Spd)
+[04:25:50.703] LOG: Stats (IVs): HP: 18 (0), Atk: 9 (3), Def: 9 (19), Spatk: 9 (24), Spdef: 10 (21), Spd: 9 (4)
+[04:25:50.703] LOG: Ability: Run Away | Passive Ability: Frisk 
+[04:25:50.703] LOG: Moveset: ["Scratch","Defense Curl","Fury Swipes"]
+[04:25:51.683] LOG: Generated AI funcs
+[04:25:51.773] DEBUG: Session data saved to slot 2!
+[04:25:51.774] LOG: Wave Seed: __MkH~>u_=Y^=m>f=im]Upln 5
+[04:25:51.997] LOG: Youngster Anthony
+[04:25:51.998] LOG: Dialogue dialogue:youngster.encounter.10 skipped
+[04:25:52.051] LOG: Youngster Anthony
+[04:25:52.433] LOG: %cStart Phase SummonPhase color:green;
+[04:25:52.434] LOG: Anthony
+[04:25:52.614] WARN: cry/10 not found
+[04:25:52.722] LOG: %cStart Phase SummonPhase color:green;
+[04:25:52.914] WARN: cry/133 not found
+[04:25:53.022] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:25:53.024] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:25:53.025] LOG: %cStart Phase PostSummonPhase color:green;
+[04:25:53.025] LOG: Ran PSP for: Eevee
+[04:25:53.027] LOG: %cStart Phase PostSummonPhase color:green;
+[04:25:53.028] LOG: %cStart Phase PostSummonPhase color:green;
+[04:25:53.031] LOG: %cStart Phase PostSummonPhase color:green;
+[04:25:53.031] LOG: Ran PSP for: Caterpie
+[04:25:53.032] LOG: %cStart Phase PostSummonPhase color:green;
+[04:25:53.032] LOG: %cStart Phase MovePhase color:green;
+[04:25:53.032] LOG: %cUser: Caterpie
+Move: STRING_SHOT
+Use Mode: INDIRECT color:orchid
+[04:25:53.033] LOG: %cStart Phase MessagePhase color:green;
+[04:25:53.155] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:25:53.157] LOG: Battle Seed: 0D6jv6A0f5KAunaz
+[04:25:53.173] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:25:53.361] LOG: %cStart Phase MessagePhase color:green;
+[04:25:53.588] LOG: %cStart Phase MoveEndPhase color:green;
+[04:25:53.588] LOG: %cStart Phase PostSummonPhase color:green;
+[04:25:53.589] LOG: %cStart Phase TurnInitPhase color:green;
+[04:25:53.590] LOG: %cStart Phase CommandPhase color:green;
+[04:25:56.345] LOG: Move: NO_RETREAT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Eevee
+[04:25:56.349] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:25:56.357] LOG: Move Pool: ["Skitter Smack","Tackle"]
+[04:25:56.358] LOG: Move Scores: [21,8]
+[04:25:56.358] LOG: Sorted Move Pool: ["Skitter Smack","Tackle"]
+[04:25:56.358] LOG: Chosen Move: Skitter Smack
+[04:25:56.358] LOG: %cStart Phase TurnStartPhase color:green;
+[04:25:56.360] LOG: %cStart Phase MovePhase color:green;
+[04:25:56.360] LOG: %cUser: Eevee
+Move: NO_RETREAT
+Use Mode: NORMAL color:orchid
+[04:25:56.361] LOG: %cStart Phase MessagePhase color:green;
+[04:25:56.455] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:25:56.689] WARN: cry/133 not found
+[04:25:56.891] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:25:56.891] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:25:57.074] LOG: %cStart Phase MessagePhase color:green;
+[04:25:57.305] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:25:57.490] LOG: %cStart Phase MessagePhase color:green;
+[04:25:57.722] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:25:57.908] LOG: %cStart Phase MessagePhase color:green;
+[04:25:58.138] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:25:58.324] LOG: %cStart Phase MessagePhase color:green;
+[04:25:58.555] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:25:58.741] LOG: %cStart Phase MessagePhase color:green;
+[04:25:58.955] LOG: %cStart Phase MessagePhase color:green;
+[04:25:59.189] LOG: %cStart Phase MoveEndPhase color:green;
+[04:25:59.189] LOG: %cStart Phase MovePhase color:green;
+[04:25:59.189] LOG: %cUser: Caterpie
+Move: SKITTER_SMACK
+Use Mode: NORMAL color:orchid
+[04:25:59.193] LOG: %cStart Phase MessagePhase color:green;
+[04:25:59.339] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:25:59.973] LOG: crit stage: +0
+[04:25:59.975] LOG: Move: Skitter Smack | Base damage: 3.344 | Power: 72 | Source attack: 7 | Target defense: 27
+[04:25:59.976] LOG: Move: Skitter Smack | Attack damage: 1
+[04:25:59.978] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:26:00.008] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:26:00.191] LOG: %cStart Phase MessagePhase color:green;
+[04:26:00.422] LOG: %cStart Phase MoveEndPhase color:green;
+[04:26:00.422] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:26:00.422] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:26:00.422] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:26:00.422] LOG: %cStart Phase BerryPhase color:green;
+[04:26:00.423] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:26:00.424] LOG: %cStart Phase TurnEndPhase color:green;
+[04:26:00.425] LOG: %cStart Phase TurnInitPhase color:green;
+[04:26:00.425] LOG: %cStart Phase CommandPhase color:green;
+[04:26:01.846] LOG: Move: GLITZY_GLOW Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Eevee
+[04:26:01.848] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:26:01.853] LOG: Battle Seed: 0D6jv6A0f5KAunaz
+[04:26:01.855] LOG: Move Pool: ["Skitter Smack","Tackle"]
+[04:26:01.855] LOG: Move Scores: [21,8]
+[04:26:01.855] LOG: Sorted Move Pool: ["Skitter Smack","Tackle"]
+[04:26:01.855] LOG: Chosen Move: Skitter Smack
+[04:26:01.855] LOG: %cStart Phase TurnStartPhase color:green;
+[04:26:01.856] LOG: %cStart Phase MovePhase color:green;
+[04:26:01.856] LOG: %cUser: Eevee
+Move: GLITZY_GLOW
+Use Mode: NORMAL color:orchid
+[04:26:01.865] LOG: %cStart Phase MessagePhase color:green;
+[04:26:02.082] LOG: %cStart Phase ErOmniformTransformWaitPhase color:green;
+[04:26:02.253] LOG: %cStart Phase MessagePhase color:green;
+[04:26:02.380] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:26:03.665] LOG: crit stage: +0
+[04:26:03.666] LOG: Move: Glitzy Glow | Base damage: 34 | Power: 80 | Source attack: 25 | Target defense: 6
+[04:26:03.666] LOG: Move: Glitzy Glow | Attack damage: 44
+[04:26:03.668] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:26:03.698] LOG: %cStart Phase MessagePhase color:green;
+[04:26:03.996] LOG: %cStart Phase FaintPhase color:green;
+[04:26:03.998] WARN: cry/10 not found
+[04:26:04.064] LOG: %cStart Phase MessagePhase color:green;
+[04:26:06.838] LOG: %cStart Phase VictoryPhase color:green;
+[04:26:06.838] LOG: %cStart Phase ExpPhase color:green;
+[04:26:09.539] LOG: %cStart Phase MoveEndPhase color:green;
+[04:26:09.540] LOG: %cStart Phase MovePhase color:green;
+[04:26:09.540] LOG: %cStart Phase MoveEndPhase color:green;
+[04:26:09.540] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:26:09.540] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:26:09.540] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:26:09.540] LOG: %cStart Phase BerryPhase color:green;
+[04:26:09.540] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:26:09.540] LOG: %cStart Phase TurnEndPhase color:green;
+[04:26:09.542] LOG: %cStart Phase SwitchSummonPhase color:green;
+[04:26:09.797] LOG: Anthony
+[04:26:10.015] LOG: %cStart Phase PostSummonPhase color:green;
+[04:26:10.015] LOG: Ran PSP for: Sentret
+[04:26:10.015] LOG: %cStart Phase PostSummonPhase color:green;
+[04:26:10.015] LOG: %cStart Phase PostSummonPhase color:green;
+[04:26:10.016] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:26:10.181] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:26:10.231] LOG: %cStart Phase TurnInitPhase color:green;
+[04:26:10.232] LOG: %cStart Phase CommandPhase color:green;
+[04:26:12.020] LOG: Move: GLITZY_GLOW Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Partner Espeon
+[04:26:12.022] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:26:12.025] LOG: Battle Seed: 0D6jv6A0f5KAunaz
+[04:26:12.027] LOG: Move Pool: ["Scratch","Defense Curl","Fury Swipes"]
+[04:26:12.027] LOG: Move Scores: [12,2,34.5]
+[04:26:12.027] LOG: Sorted Move Pool: ["Fury Swipes","Scratch","Defense Curl"]
+[04:26:12.027] LOG: Chosen Move: Scratch
+[04:26:12.027] LOG: %cStart Phase TurnStartPhase color:green;
+[04:26:12.028] LOG: %cStart Phase MovePhase color:green;
+[04:26:12.029] LOG: %cUser: Partner Espeon
+Move: GLITZY_GLOW
+Use Mode: NORMAL color:orchid
+[04:26:12.030] LOG: %cStart Phase MessagePhase color:green;
+[04:26:12.163] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:26:13.406] LOG: crit stage: +0
+[04:26:13.407] LOG: Move: Glitzy Glow | Base damage: 21.2 | Power: 80 | Source attack: 25 | Target defense: 10
+[04:26:13.408] LOG: Move: Glitzy Glow | Attack damage: 27
+[04:26:13.409] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:26:13.440] LOG: %cStart Phase FaintPhase color:green;
+[04:26:13.930] LOG: %cStart Phase MessagePhase color:green;
+[04:26:14.150] LOG: %cStart Phase VictoryPhase color:green;
+[04:26:14.151] LOG: %cStart Phase ExpPhase color:green;
+[04:26:14.372] LOG: %cStart Phase MoveEndPhase color:green;
+[04:26:14.372] LOG: %cStart Phase MovePhase color:green;
+[04:26:14.372] LOG: %cStart Phase MoveEndPhase color:green;
+[04:26:14.372] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:26:14.372] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:26:14.373] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:26:14.373] LOG: %cStart Phase BerryPhase color:green;
+[04:26:14.373] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:26:14.373] LOG: %cStart Phase TurnEndPhase color:green;
+[04:26:14.374] LOG: %cStart Phase BattleEndPhase color:green;
+[04:26:14.374] LOG: Battle Score: 27 (3 Turns x0.79)
+[04:26:14.374] LOG: Total Score: 104
+[04:26:14.379] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:26:14.379] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:26:14.422] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:26:14.422] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:26:14.464] LOG: %cStart Phase MessagePhase color:green;
+[04:26:14.750] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[04:26:14.751] LOG: Youngster Anthony
+[04:26:14.751] LOG: Youngster Anthony
+[04:26:15.061] LOG: Dialogue dialogue:youngster.victory.10 skipped
+[04:26:15.061] LOG: %cStart Phase MoneyRewardPhase color:green;
+[04:26:15.293] LOG: %cStart Phase EggLapsePhase color:green;
+[04:26:15.293] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:26:15.293] LOG: Wave Seed: __MkH~>u_=Y^=m>f=im]Upln 5
+[04:26:15.298] LOG: 7 4 [2,3,4,5]
+[04:26:15.298] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[04:26:15.298] LOG: 9 4 [2,3,4,5]
+[04:26:15.298] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[04:26:15.298] LOG: 0 0 [2,3,4,5]
+[04:26:15.298] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:26:15.298] LOG: 6 4 [2,3,4,5]
+[04:26:15.298] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[04:26:18.216] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:26:18.218] LOG: 25 9 [2,3,4,5,6,7,8,9,10,27,30,31]
+[04:26:18.218] LOG: {"id":"ER_MENTAL_HERB","localeKey":"","iconImage":"er_mental_herb","soundName":"se/restore","tier":1} 
+[04:26:18.218] LOG: 0 0 [2,3,4,5]
+[04:26:18.218] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:26:18.219] LOG: 9 4 [2,3,4,5]
+[04:26:18.219] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[04:26:18.219] LOG: 0 0 [2,3,4,5]
+[04:26:18.219] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:26:18.219] LOG: 0 0 [2,3,4,5]
+[04:26:18.219] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:26:18.219] LOG: 9 4 [2,3,4,5]
+[04:26:18.219] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[04:26:18.219] LOG: 6 4 [2,3,4,5]
+[04:26:18.219] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[04:26:20.366] LOG: %cStart Phase NewBattlePhase color:green;
+[04:26:20.366] LOG: Wave Seed: ``NlI?v`>Z_>n?g>jn^Vqmo 6
+[04:26:20.368] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:26:20.369] LOG: Starting species pool tier: COMMON
+[04:26:20.376] LOG: Pokemon: Wild Lillipup | Species ID: 506 | Level: 5 | Nature: Serious (-)
+[04:26:20.376] LOG: Stats (IVs): HP: 20 (21), Atk: 12 (1), Def: 10 (14), Spatk: 8 (17), Spdef: 10 (21), Spd: 13 (30)
+[04:26:20.376] LOG: Ability: Vital Spirit | Passive Ability: Fluffy 
+[04:26:20.376] LOG: Moveset: ["Tackle","Howl","Growl","Roar"]
+[04:26:20.619] DEBUG: Session data saved to slot 2!
+[04:26:20.620] LOG: Wave Seed: ``NlI?v`>Z_>n?g>jn^Vqmo 6
+[04:26:21.066] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:26:21.066] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:26:21.066] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:26:21.067] LOG: %cStart Phase PostSummonPhase color:green;
+[04:26:21.067] LOG: Ran PSP for: Lillipup
+[04:26:21.067] LOG: %cStart Phase PostSummonPhase color:green;
+[04:26:21.067] LOG: %cStart Phase PostSummonPhase color:green;
+[04:26:21.067] LOG: %cStart Phase TurnInitPhase color:green;
+[04:26:21.068] LOG: %cStart Phase CommandPhase color:green;
+[04:26:23.095] WARN: cry/70015 not found
+[04:26:28.843] LOG: Move: GLITZY_GLOW Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Partner Espeon
+[04:26:28.845] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:26:28.848] LOG: Battle Seed: RBFzLMNANaEM3KLU
+[04:26:28.849] LOG: Move Pool: ["Tackle","Howl","Growl","Roar"]
+[04:26:28.849] LOG: Move Scores: [12,2,2,-20]
+[04:26:28.849] LOG: Sorted Move Pool: ["Tackle","Howl","Growl","Roar"]
+[04:26:28.849] LOG: Chosen Move: Tackle
+[04:26:28.849] LOG: %cStart Phase TurnStartPhase color:green;
+[04:26:28.850] LOG: %cStart Phase MovePhase color:green;
+[04:26:28.850] LOG: %cUser: Partner Espeon
+Move: GLITZY_GLOW
+Use Mode: NORMAL color:orchid
+[04:26:28.851] LOG: %cStart Phase MessagePhase color:green;
+[04:26:28.988] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:26:30.265] LOG: crit stage: +0
+[04:26:30.267] LOG: Move: Glitzy Glow | Base damage: 21.2 | Power: 80 | Source attack: 25 | Target defense: 10
+[04:26:30.268] LOG: Move: Glitzy Glow | Attack damage: 27
+[04:26:30.269] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:26:30.299] LOG: %cStart Phase FaintPhase color:green;
+[04:26:30.890] LOG: %cStart Phase MessagePhase color:green;
+[04:26:31.077] LOG: %cStart Phase VictoryPhase color:green;
+[04:26:31.078] LOG: %cStart Phase ExpPhase color:green;
+[04:26:31.265] LOG: %cStart Phase MoveEndPhase color:green;
+[04:26:31.265] LOG: %cStart Phase MovePhase color:green;
+[04:26:31.265] LOG: %cStart Phase MoveEndPhase color:green;
+[04:26:31.265] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:26:31.265] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:26:31.265] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:26:31.265] LOG: %cStart Phase BerryPhase color:green;
+[04:26:31.265] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:26:31.265] LOG: %cStart Phase TurnEndPhase color:green;
+[04:26:31.268] LOG: %cStart Phase BattleEndPhase color:green;
+[04:26:31.268] LOG: Battle Score: 29 (1 Turns x1)
+[04:26:31.268] LOG: Total Score: 133
+[04:26:31.275] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:26:31.275] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:26:31.314] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:26:31.314] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:26:31.356] LOG: %cStart Phase MessagePhase color:green;
+[04:26:31.452] LOG: %cStart Phase EggLapsePhase color:green;
+[04:26:31.452] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:26:31.452] LOG: Wave Seed: ``NlI?v`>Z_>n?g>jn^Vqmo 6
+[04:26:31.456] LOG: 7 4 [2,3,4,5]
+[04:26:31.456] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[04:26:31.456] LOG: 24 9 [2,3,4,5,6,7,8,9,10,27,30]
+[04:26:31.456] LOG: {"id":"ER_ROOM_SERVICE","localeKey":"","iconImage":"er_room_service","soundName":"se/restore","tier":1} 
+[04:26:31.456] LOG: 16 9 [2,3,4,5,6,7,8,9,10,27,30]
+[04:26:31.456] LOG: {"id":"ER_UPGRADED_MAP","localeKey":"","iconImage":"map","iconTint":16765514,"soundName":"se/restore","tier":1} 
+[04:26:31.456] LOG: 0 0 [2,3,4,5,6,7,8,9,10,27,30]
+[04:26:31.456] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[04:26:31.456] LOG: 12 9 [2,3,4,5,6,7,8,9,10,27,30]
+[04:26:31.456] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[04:26:46.746] LOG: %cStart Phase NewBattlePhase color:green;
+[04:26:46.746] LOG: Wave Seed: aaOmJ@wa?[`?o@h?ko_Wrnp 7
+[04:26:46.747] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:26:46.749] LOG: Starting species pool tier: UNCOMMON
+[04:26:46.756] LOG: Pokemon: Wild Venonat | Species ID: 48 | Level: 6 | Nature: Quiet (+SpAtk/-Spd)
+[04:26:46.756] LOG: Stats (IVs): HP: 24 (23), Atk: 11 (0), Def: 11 (6), Spatk: 15 (29), Spdef: 12 (15), Spd: 10 (16)
+[04:26:46.756] LOG: Ability: Toxic Debris | Passive Ability: Compound Eyes 
+[04:26:46.756] LOG: Moveset: ["Signal Beam","Confusion","Poison Powder","Tackle"]
+[04:26:48.006] DEBUG: Session data saved to slot 2!
+[04:26:48.006] LOG: Wave Seed: aaOmJ@wa?[`?o@h?ko_Wrnp 7
+[04:26:48.440] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:26:48.440] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:26:48.440] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:26:48.440] LOG: %cStart Phase PostSummonPhase color:green;
+[04:26:48.441] LOG: Ran PSP for: Venonat
+[04:26:48.441] LOG: %cStart Phase PostSummonPhase color:green;
+[04:26:48.441] LOG: %cStart Phase PostSummonPhase color:green;
+[04:26:48.441] LOG: %cStart Phase TurnInitPhase color:green;
+[04:26:48.441] LOG: %cStart Phase CommandPhase color:green;
+[04:26:54.735] LOG: Move: GROWL Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Partner Espeon
+[04:26:54.737] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:26:54.741] LOG: Applied X Defense 
+[04:26:54.742] LOG: Battle Seed: rjZVf5JAeUWzhXrk
+[04:26:54.745] LOG: Move Pool: ["Signal Beam","Confusion","Poison Powder","Tackle"]
+[04:26:54.745] LOG: Move Scores: [12.75,38,10,8]
+[04:26:54.745] LOG: Sorted Move Pool: ["Confusion","Signal Beam","Poison Powder","Tackle"]
+[04:26:54.745] LOG: Chosen Move: Confusion
+[04:26:54.745] LOG: %cStart Phase TurnStartPhase color:green;
+[04:26:54.746] LOG: %cStart Phase MovePhase color:green;
+[04:26:54.746] LOG: %cUser: Partner Espeon
+Move: GROWL
+Use Mode: NORMAL color:orchid
+[04:26:54.753] LOG: %cStart Phase MessagePhase color:green;
+[04:26:54.985] LOG: %cStart Phase ErOmniformTransformWaitPhase color:green;
+[04:26:55.134] LOG: %cStart Phase MessagePhase color:green;
+[04:26:55.247] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:26:55.264] WARN: cry/133 not found
+[04:26:55.498] LOG: crit stage: +0
+[04:26:55.499] LOG: Move: Growl | Base damage: 9.68 | Power: 60 | Source attack: 16 | Target defense: 12
+[04:26:55.500] LOG: Move: Growl | Attack damage: 14
+[04:26:55.501] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:26:55.532] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:26:55.716] LOG: %cStart Phase MessagePhase color:green;
+[04:26:55.963] LOG: %cStart Phase MoveEndPhase color:green;
+[04:26:55.963] LOG: %cStart Phase MovePhase color:green;
+[04:26:55.963] LOG: %cUser: Venonat
+Move: CONFUSION
+Use Mode: NORMAL color:orchid
+[04:26:55.967] LOG: %cStart Phase MessagePhase color:green;
+[04:26:56.096] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:26:56.732] LOG: crit stage: +0
+[04:26:56.733] LOG: Move: Confusion | Base damage: 4.444444444444445 | Power: 50 | Source attack: 15 | Target defense: 27
+[04:26:56.734] LOG: Move: Confusion | Attack damage: 1
+[04:26:56.736] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:26:56.765] LOG: %cStart Phase CommonAnimPhase color:green;
+[04:26:57.114] LOG: %cStart Phase MessagePhase color:green;
+[04:26:57.346] LOG: %cStart Phase MoveEndPhase color:green;
+[04:26:57.347] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:26:57.347] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:26:57.347] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:26:57.347] LOG: %cStart Phase BerryPhase color:green;
+[04:26:57.348] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:26:57.348] LOG: %cStart Phase TurnEndPhase color:green;
+[04:26:57.351] LOG: %cStart Phase TurnInitPhase color:green;
+[04:26:57.351] LOG: %cStart Phase CommandPhase color:green;
+[04:26:58.527] LOG: Move: GLITZY_GLOW Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Eevee
+[04:26:58.530] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:26:58.534] LOG: Applied X Defense 
+[04:26:58.535] LOG: Battle Seed: rjZVf5JAeUWzhXrk
+[04:26:58.539] LOG: Move Pool: ["Signal Beam","Confusion","Poison Powder","Tackle"]
+[04:26:58.539] LOG: Move Scores: [27,15,10,8]
+[04:26:58.539] LOG: Sorted Move Pool: ["Signal Beam","Confusion","Poison Powder","Tackle"]
+[04:26:58.539] LOG: Chosen Move: Signal Beam
+[04:26:58.539] LOG: %cStart Phase TurnStartPhase color:green;
+[04:26:58.540] LOG: %cStart Phase MovePhase color:green;
+[04:26:58.540] LOG: %cUser: Eevee
+Move: GLITZY_GLOW
+Use Mode: NORMAL color:orchid
+[04:26:58.545] LOG: %cStart Phase MessagePhase color:green;
+[04:26:58.740] LOG: %cStart Phase CommonAnimPhase color:green;
+[04:26:59.072] LOG: %cStart Phase MessagePhase color:green;
+[04:26:59.338] LOG: %cStart Phase ErOmniformTransformWaitPhase color:green;
+[04:26:59.340] LOG: %cStart Phase MessagePhase color:green;
+[04:26:59.471] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:00.757] LOG: crit stage: +0
+[04:27:00.759] LOG: Move: Glitzy Glow | Base damage: 18 | Power: 80 | Source attack: 25 | Target defense: 12
+[04:27:00.759] LOG: Move: Glitzy Glow | Attack damage: 11
+[04:27:00.761] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:27:00.790] LOG: %cStart Phase MessagePhase color:green;
+[04:27:01.022] LOG: %cStart Phase FaintPhase color:green;
+[04:27:02.323] LOG: %cStart Phase MessagePhase color:green;
+[04:27:02.528] LOG: %cStart Phase VictoryPhase color:green;
+[04:27:02.528] LOG: %cStart Phase ExpPhase color:green;
+[04:27:02.790] LOG: %cStart Phase LevelUpPhase color:green;
+[04:27:02.792] LOG: %cStart Phase MoveEndPhase color:green;
+[04:27:02.792] LOG: %cStart Phase MovePhase color:green;
+[04:27:02.792] LOG: %cStart Phase MoveEndPhase color:green;
+[04:27:02.792] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:27:02.792] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:27:02.792] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:27:02.792] LOG: %cStart Phase BerryPhase color:green;
+[04:27:02.792] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:27:02.792] LOG: %cStart Phase TurnEndPhase color:green;
+[04:27:02.793] LOG: %cStart Phase MessagePhase color:green;
+[04:27:03.038] LOG: %cStart Phase BattleEndPhase color:green;
+[04:27:03.039] LOG: Battle Score: 32 (2 Turns x0.84)
+[04:27:03.039] LOG: Total Score: 165
+[04:27:03.050] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:27:03.050] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:27:03.074] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:27:03.074] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:27:03.122] LOG: %cStart Phase MessagePhase color:green;
+[04:27:03.412] LOG: %cStart Phase EggLapsePhase color:green;
+[04:27:03.412] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:27:03.412] LOG: Wave Seed: aaOmJ@wa?[`?o@h?ko_Wrnp 7
+[04:27:03.416] LOG: 7 4 [2,3,4,5]
+[04:27:03.416] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[04:27:03.416] LOG: 0 0 [2,3,4,5]
+[04:27:03.416] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:27:03.416] LOG: 16 9 [2,3,4,5,6,7,8,9,10,27,30]
+[04:27:03.416] LOG: {"id":"ER_UPGRADED_MAP","localeKey":"","iconImage":"map","iconTint":16765514,"soundName":"se/restore","tier":1} 
+[04:27:03.416] LOG: 21 9 [2,3,4,5,6,7,8,9,10,27,30]
+[04:27:03.416] LOG: {"id":"ER_EJECT_PACK","localeKey":"","iconImage":"er_eject_pack","soundName":"se/restore","tier":1} 
+[04:27:03.417] LOG: 11 9 [2,3,4,5,6,7,8,9,10,27,30]
+[04:27:03.417] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[04:27:03.417] LOG: 12 9 [2,3,4,5,6,7,8,9,10,27,30]
+[04:27:03.417] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[04:27:07.867] WARN: cry/70015 not found
+[04:27:14.175] LOG: %cStart Phase NewBattlePhase color:green;
+[04:27:14.175] LOG: Wave Seed: bbPnKAxb@\a@pAi@lp`Xsoq 8
+[04:27:14.176] LOG: %cStart Phase ReturnPhase color:green;
+[04:27:14.282] LOG: %cStart Phase ShowTrainerPhase color:green;
+[04:27:14.397] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:27:14.410] LOG: Pokemon: Foe Bulbasaur | Species ID: 1 | Level: 7 | Nature: Naive (+Spd/-SpDef)
+[04:27:14.411] LOG: Stats (IVs): HP: 25 (0), Atk: 11 (2), Def: 12 (8), Spatk: 14 (1), Spdef: 14 (20), Spd: 13 (27)
+[04:27:14.411] LOG: Ability: Chloroplast | Passive Ability: Overgrow 
+[04:27:14.411] LOG: Moveset: ["Bullet Seed","Grassy Terrain","Sleep Powder","Growl"]
+[04:27:14.417] LOG: Pokemon: Foe Fletchling | Species ID: 661 | Level: 6 | Nature: Brave (+Atk/-Spd)
+[04:27:14.417] LOG: Stats (IVs): HP: 21 (20), Atk: 14 (3), Def: 11 (23), Spatk: 10 (29), Spdef: 9 (17), Spd: 12 (16)
+[04:27:14.417] LOG: Ability: Big Pecks | Passive Ability: Flock 
+[04:27:14.417] LOG: Moveset: ["Air Cutter","Flail","Growl","Peck"]
+[04:27:17.015] LOG: Generated AI funcs
+[04:27:17.084] DEBUG: Session data saved to slot 2!
+[04:27:17.084] LOG: Wave Seed: bbPnKAxb@\a@pAi@lp`Xsoq 8
+[04:27:17.298] LOG: Rival Ivy
+[04:27:17.298] LOG: Dialogue dialogue:rivalFemale.encounter.1 skipped
+[04:27:17.347] LOG: Rival Ivy
+[04:27:17.614] LOG: %cStart Phase SummonPhase color:green;
+[04:27:17.614] LOG: Ivy
+[04:27:17.780] WARN: cry/1 not found
+[04:27:17.888] LOG: %cStart Phase SummonPhase color:green;
+[04:27:18.071] WARN: cry/133 not found
+[04:27:18.180] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:27:18.181] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:27:18.181] LOG: Applied X Speed 
+[04:27:18.181] LOG: %cStart Phase PostSummonPhase color:green;
+[04:27:18.181] LOG: Ran PSP for: Eevee
+[04:27:18.182] LOG: Applied X Speed 
+[04:27:18.182] LOG: %cStart Phase PostSummonPhase color:green;
+[04:27:18.182] LOG: Applied X Speed 
+[04:27:18.182] LOG: %cStart Phase PostSummonPhase color:green;
+[04:27:18.183] LOG: %cStart Phase PostSummonPhase color:green;
+[04:27:18.183] LOG: Ran PSP for: Bulbasaur
+[04:27:18.183] LOG: %cStart Phase PostSummonPhase color:green;
+[04:27:18.183] LOG: %cStart Phase PostSummonPhase color:green;
+[04:27:18.183] LOG: %cStart Phase TurnInitPhase color:green;
+[04:27:18.183] LOG: %cStart Phase CommandPhase color:green;
+[04:27:19.835] LOG: Move: NO_RETREAT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Eevee
+[04:27:19.838] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:27:19.839] LOG: Applied X Speed 
+[04:27:19.840] LOG: Applied X Speed 
+[04:27:19.841] LOG: Applied X Defense 
+[04:27:19.843] LOG: Battle Seed: RZXBOW8zDZbGgfxO
+[04:27:19.845] LOG: Move Pool: ["Bullet Seed","Grassy Terrain","Sleep Powder","Growl"]
+[04:27:19.845] LOG: Move Scores: [30,6,10,2]
+[04:27:19.845] LOG: Sorted Move Pool: ["Bullet Seed","Sleep Powder","Grassy Terrain","Growl"]
+[04:27:19.845] LOG: Chosen Move: Sleep Powder
+[04:27:19.845] LOG: %cStart Phase TurnStartPhase color:green;
+[04:27:19.845] LOG: Applied X Speed 
+[04:27:19.846] LOG: Applied X Speed 
+[04:27:19.846] LOG: Applied X Speed 
+[04:27:19.847] LOG: %cStart Phase MovePhase color:green;
+[04:27:19.847] LOG: %cUser: Eevee
+Move: NO_RETREAT
+Use Mode: NORMAL color:orchid
+[04:27:19.847] LOG: Applied X Speed 
+[04:27:19.848] LOG: Applied X Speed 
+[04:27:19.848] LOG: %cStart Phase MessagePhase color:green;
+[04:27:19.908] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:20.097] WARN: cry/133 not found
+[04:27:20.298] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:27:20.299] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:27:20.483] LOG: %cStart Phase MessagePhase color:green;
+[04:27:20.697] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:27:20.882] LOG: %cStart Phase MessagePhase color:green;
+[04:27:21.097] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:27:21.282] LOG: %cStart Phase MessagePhase color:green;
+[04:27:21.497] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:27:21.683] LOG: %cStart Phase MessagePhase color:green;
+[04:27:21.897] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:27:22.082] LOG: %cStart Phase MessagePhase color:green;
+[04:27:22.313] LOG: %cStart Phase MessagePhase color:green;
+[04:27:22.563] LOG: %cStart Phase MoveEndPhase color:green;
+[04:27:22.564] LOG: %cStart Phase MovePhase color:green;
+[04:27:22.564] LOG: %cUser: Bulbasaur
+Move: SLEEP_POWDER
+Use Mode: NORMAL color:orchid
+[04:27:22.564] LOG: Applied X Speed 
+[04:27:22.567] LOG: Applied X Speed 
+[04:27:22.568] LOG: %cStart Phase MessagePhase color:green;
+[04:27:22.713] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:22.715] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:27:22.881] LOG: %cStart Phase MessagePhase color:green;
+[04:27:23.113] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:27:23.149] LOG: %cStart Phase MoveEndPhase color:green;
+[04:27:23.149] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:27:23.149] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:27:23.149] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:27:23.149] LOG: %cStart Phase BerryPhase color:green;
+[04:27:23.150] LOG: Applied X Speed 
+[04:27:23.150] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:27:23.151] LOG: Applied X Speed 
+[04:27:23.151] LOG: %cStart Phase TurnEndPhase color:green;
+[04:27:23.151] LOG: Applied X Speed 
+[04:27:23.152] LOG: %cStart Phase TurnInitPhase color:green;
+[04:27:23.152] LOG: %cStart Phase CommandPhase color:green;
+[04:27:31.540] LOG: Move: BADDY_BAD Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Eevee
+[04:27:31.542] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:27:31.543] LOG: Applied X Speed 
+[04:27:31.544] LOG: Applied X Speed 
+[04:27:31.546] LOG: Applied X Defense 
+[04:27:31.548] LOG: Battle Seed: RZXBOW8zDZbGgfxO
+[04:27:31.550] LOG: Move Pool: ["Bullet Seed","Grassy Terrain","Sleep Powder","Growl"]
+[04:27:31.550] LOG: Move Scores: [30,6,10,2]
+[04:27:31.550] LOG: Sorted Move Pool: ["Bullet Seed","Sleep Powder","Grassy Terrain","Growl"]
+[04:27:31.550] LOG: Chosen Move: Bullet Seed
+[04:27:31.550] LOG: %cStart Phase TurnStartPhase color:green;
+[04:27:31.551] LOG: Applied X Speed 
+[04:27:31.551] LOG: Applied X Speed 
+[04:27:31.552] LOG: Applied X Speed 
+[04:27:31.552] LOG: %cStart Phase MovePhase color:green;
+[04:27:31.552] LOG: %cUser: Eevee
+Move: BADDY_BAD
+Use Mode: NORMAL color:orchid
+[04:27:31.552] LOG: Applied X Speed 
+[04:27:31.556] LOG: Applied X Speed 
+[04:27:31.556] LOG: Applied X Speed 
+[04:27:31.556] LOG: %cStart Phase MessagePhase color:green;
+[04:27:31.801] LOG: %cStart Phase ErOmniformTransformWaitPhase color:green;
+[04:27:31.952] LOG: %cStart Phase MessagePhase color:green;
+[04:27:32.096] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:32.982] LOG: crit stage: +0
+[04:27:32.983] LOG: Move: Baddy Bad | Base damage: 18 | Power: 80 | Source attack: 25 | Target defense: 13
+[04:27:32.984] LOG: Move: Baddy Bad | Attack damage: 25
+[04:27:32.987] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:27:33.015] LOG: %cStart Phase MessagePhase color:green;
+[04:27:33.313] LOG: %cStart Phase FaintPhase color:green;
+[04:27:33.315] WARN: cry/1 not found
+[04:27:33.381] LOG: %cStart Phase MessagePhase color:green;
+[04:27:33.863] LOG: %cStart Phase VictoryPhase color:green;
+[04:27:33.863] LOG: %cStart Phase ExpPhase color:green;
+[04:27:34.223] LOG: %cStart Phase MoveEndPhase color:green;
+[04:27:34.223] LOG: %cStart Phase MovePhase color:green;
+[04:27:34.224] LOG: %cStart Phase MoveEndPhase color:green;
+[04:27:34.224] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:27:34.224] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:27:34.224] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:27:34.224] LOG: %cStart Phase BerryPhase color:green;
+[04:27:34.224] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:27:34.224] LOG: %cStart Phase TurnEndPhase color:green;
+[04:27:34.226] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:27:34.407] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:27:34.636] LOG: %cStart Phase MessagePhase color:green;
+[04:27:34.930] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:27:34.965] LOG: %cStart Phase SwitchSummonPhase color:green;
+[04:27:34.965] LOG: Applied X Speed 
+[04:27:35.197] LOG: Ivy
+[04:27:35.414] LOG: Applied X Speed 
+[04:27:35.414] LOG: %cStart Phase PostSummonPhase color:green;
+[04:27:35.414] LOG: Ran PSP for: Fletchling
+[04:27:35.415] LOG: %cStart Phase PostSummonPhase color:green;
+[04:27:35.415] LOG: %cStart Phase PostSummonPhase color:green;
+[04:27:35.415] LOG: %cStart Phase TurnInitPhase color:green;
+[04:27:35.415] LOG: %cStart Phase CommandPhase color:green;
+[04:27:39.443] LOG: Move: PLAY_NICE Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Partner Umbreon
+[04:27:39.445] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:27:39.447] LOG: Applied X Defense 
+[04:27:39.449] LOG: Applied X Defense 
+[04:27:39.452] LOG: Applied X Defense 
+[04:27:39.452] LOG: Battle Seed: RZXBOW8zDZbGgfxO
+[04:27:39.455] LOG: Move Pool: ["Air Cutter","Flail","Growl","Peck"]
+[04:27:39.455] LOG: Move Scores: [27,6,2,30]
+[04:27:39.455] LOG: Sorted Move Pool: ["Peck","Air Cutter","Flail","Growl"]
+[04:27:39.455] LOG: Chosen Move: Peck
+[04:27:39.455] LOG: %cStart Phase TurnStartPhase color:green;
+[04:27:39.456] LOG: Applied X Speed 
+[04:27:39.456] LOG: Applied X Speed 
+[04:27:39.456] LOG: Applied X Speed 
+[04:27:39.457] LOG: %cStart Phase MovePhase color:green;
+[04:27:39.457] LOG: %cUser: Partner Umbreon
+Move: PLAY_NICE
+Use Mode: NORMAL color:orchid
+[04:27:39.457] LOG: Applied X Speed 
+[04:27:39.463] LOG: Applied X Speed 
+[04:27:39.463] LOG: %cStart Phase MessagePhase color:green;
+[04:27:39.693] LOG: %cStart Phase ErOmniformTransformWaitPhase color:green;
+[04:27:39.843] LOG: %cStart Phase MessagePhase color:green;
+[04:27:39.955] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:40.389] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:27:40.574] LOG: %cStart Phase MessagePhase color:green;
+[04:27:40.822] LOG: %cStart Phase MoveEndPhase color:green;
+[04:27:40.822] LOG: %cStart Phase MovePhase color:green;
+[04:27:40.822] LOG: %cUser: Fletchling
+Move: PECK
+Use Mode: NORMAL color:orchid
+[04:27:40.822] LOG: Applied X Speed 
+[04:27:40.825] LOG: Applied X Speed 
+[04:27:40.826] LOG: %cStart Phase MessagePhase color:green;
+[04:27:40.955] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:41.155] LOG: crit stage: +0
+[04:27:41.157] LOG: Applied X Defense 
+[04:27:41.157] LOG: Move: Peck | Base damage: 3.016888888888889 | Power: 39 | Source attack: 8 | Target defense: 27
+[04:27:41.158] LOG: Move: Peck | Attack damage: 1
+[04:27:41.158] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:27:41.190] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:41.405] LOG: crit stage: +0
+[04:27:41.407] LOG: Applied X Defense 
+[04:27:41.407] LOG: Move: Peck | Base damage: 3.016888888888889 | Power: 39 | Source attack: 8 | Target defense: 27
+[04:27:41.408] LOG: Move: Peck | Attack damage: 1
+[04:27:41.408] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:27:41.440] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:41.656] LOG: crit stage: +0
+[04:27:41.657] LOG: Applied X Defense 
+[04:27:41.657] LOG: Move: Peck | Base damage: 3.016888888888889 | Power: 39 | Source attack: 8 | Target defense: 27
+[04:27:41.658] LOG: Move: Peck | Attack damage: 1
+[04:27:41.658] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:27:41.690] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:41.906] LOG: crit stage: +0
+[04:27:41.907] LOG: Applied X Defense 
+[04:27:41.907] LOG: Move: Peck | Base damage: 3.016888888888889 | Power: 39 | Source attack: 8 | Target defense: 27
+[04:27:41.908] LOG: Move: Peck | Attack damage: 1
+[04:27:41.909] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:27:41.940] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:42.156] LOG: crit stage: +0
+[04:27:42.157] LOG: Applied X Defense 
+[04:27:42.157] LOG: Move: Peck | Base damage: 3.016888888888889 | Power: 39 | Source attack: 8 | Target defense: 27
+[04:27:42.158] LOG: Move: Peck | Attack damage: 1
+[04:27:42.159] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:27:42.190] LOG: %cStart Phase MessagePhase color:green;
+[04:27:42.388] LOG: %cStart Phase MoveEndPhase color:green;
+[04:27:42.389] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:27:42.389] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:27:42.389] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:27:42.389] LOG: %cStart Phase BerryPhase color:green;
+[04:27:42.389] LOG: Applied X Speed 
+[04:27:42.390] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:27:42.390] LOG: Applied X Speed 
+[04:27:42.390] LOG: %cStart Phase TurnEndPhase color:green;
+[04:27:42.393] LOG: Applied X Speed 
+[04:27:42.393] LOG: %cStart Phase TurnInitPhase color:green;
+[04:27:42.393] LOG: %cStart Phase CommandPhase color:green;
+[04:27:46.986] LOG: Move: NO_RETREAT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Eevee
+[04:27:46.989] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:27:46.991] LOG: Applied X Defense 
+[04:27:46.992] LOG: Applied X Defense 
+[04:27:46.994] LOG: Applied X Defense 
+[04:27:46.994] LOG: Battle Seed: RZXBOW8zDZbGgfxO
+[04:27:46.997] LOG: Move Pool: ["Air Cutter","Flail","Growl","Peck"]
+[04:27:46.997] LOG: Move Scores: [27,6,2,30]
+[04:27:46.997] LOG: Sorted Move Pool: ["Peck","Air Cutter","Flail","Growl"]
+[04:27:46.997] LOG: Chosen Move: Peck
+[04:27:46.997] LOG: %cStart Phase TurnStartPhase color:green;
+[04:27:46.997] LOG: Applied X Speed 
+[04:27:46.997] LOG: Applied X Speed 
+[04:27:46.998] LOG: Applied X Speed 
+[04:27:46.998] LOG: %cStart Phase MovePhase color:green;
+[04:27:46.998] LOG: %cUser: Eevee
+Move: NO_RETREAT
+Use Mode: NORMAL color:orchid
+[04:27:46.998] LOG: Applied X Speed 
+[04:27:46.999] LOG: %cStart Phase MessagePhase color:green;
+[04:27:47.096] LOG: %cStart Phase MessagePhase color:green;
+[04:27:47.313] LOG: %cStart Phase MoveEndPhase color:green;
+[04:27:47.314] LOG: %cStart Phase MovePhase color:green;
+[04:27:47.314] LOG: %cUser: Fletchling
+Move: PECK
+Use Mode: NORMAL color:orchid
+[04:27:47.315] LOG: Applied X Speed 
+[04:27:47.317] LOG: Applied X Speed 
+[04:27:47.317] LOG: %cStart Phase MessagePhase color:green;
+[04:27:47.430] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:47.631] LOG: crit stage: +0
+[04:27:47.632] LOG: Applied X Defense 
+[04:27:47.632] LOG: Move: Peck | Base damage: 3.016888888888889 | Power: 39 | Source attack: 8 | Target defense: 27
+[04:27:47.633] LOG: Move: Peck | Attack damage: 1
+[04:27:47.634] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:27:47.665] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:47.880] LOG: crit stage: +0
+[04:27:47.882] LOG: Applied X Defense 
+[04:27:47.882] LOG: Move: Peck | Base damage: 3.016888888888889 | Power: 39 | Source attack: 8 | Target defense: 27
+[04:27:47.882] LOG: Move: Peck | Attack damage: 1
+[04:27:47.883] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:27:47.915] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:27:48.130] LOG: crit stage: +0
+[04:27:48.132] LOG: Applied X Defense 
+[04:27:48.132] LOG: Move: Peck | Base damage: 3.016888888888889 | Power: 39 | Source attack: 8 | Target defense: 27
+[04:27:48.133] LOG: Move: Peck | Attack damage: 1
+[04:27:48.133] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:27:48.165] LOG: %cStart Phase MessagePhase color:green;
+[04:27:48.380] LOG: %cStart Phase MoveEndPhase color:green;
+[04:27:48.380] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:27:48.380] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:27:48.380] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:27:48.380] LOG: %cStart Phase BerryPhase color:green;
+[04:27:48.381] LOG: Applied X Speed 
+[04:27:48.381] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:27:48.382] LOG: Applied X Speed 
+[04:27:48.382] LOG: %cStart Phase TurnEndPhase color:green;
+[04:27:48.384] LOG: Applied X Speed 
+[04:27:48.384] LOG: %cStart Phase TurnInitPhase color:green;
+[04:27:48.384] LOG: %cStart Phase CommandPhase color:green;
+[04:30:22.895] LOG: Move: GLITZY_GLOW Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Eevee
+[04:30:22.898] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:30:22.900] LOG: Applied X Defense 
+[04:30:22.903] LOG: Applied X Defense 
+[04:30:22.905] LOG: Applied X Defense 
+[04:30:22.906] LOG: Battle Seed: RZXBOW8zDZbGgfxO
+[04:30:22.910] LOG: Move Pool: ["Air Cutter","Flail","Growl","Peck"]
+[04:30:22.910] LOG: Move Scores: [27,6,2,30]
+[04:30:22.910] LOG: Sorted Move Pool: ["Peck","Air Cutter","Flail","Growl"]
+[04:30:22.910] LOG: Chosen Move: Air Cutter
+[04:30:22.910] LOG: %cStart Phase TurnStartPhase color:green;
+[04:30:22.910] LOG: Applied X Speed 
+[04:30:22.910] LOG: Applied X Speed 
+[04:30:22.911] LOG: Applied X Speed 
+[04:30:22.911] LOG: %cStart Phase MovePhase color:green;
+[04:30:22.911] LOG: %cUser: Eevee
+Move: GLITZY_GLOW
+Use Mode: NORMAL color:orchid
+[04:30:22.911] LOG: Applied X Speed 
+[04:30:22.919] LOG: Applied X Speed 
+[04:30:22.919] LOG: %cStart Phase MessagePhase color:green;
+[04:30:23.140] LOG: %cStart Phase ErOmniformTransformWaitPhase color:green;
+[04:30:23.308] LOG: %cStart Phase MessagePhase color:green;
+[04:30:23.438] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:30:24.648] LOG: crit stage: +0
+[04:30:24.649] LOG: Move: Glitzy Glow | Base damage: 36.944 | Power: 80 | Source attack: 42 | Target defense: 10
+[04:30:24.650] LOG: Move: Glitzy Glow | Attack damage: 50
+[04:30:24.683] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:30:24.698] LOG: %cStart Phase MessagePhase color:green;
+[04:30:24.971] LOG: %cStart Phase FaintPhase color:green;
+[04:30:25.839] LOG: %cStart Phase MessagePhase color:green;
+[04:30:26.051] LOG: %cStart Phase VictoryPhase color:green;
+[04:30:26.053] LOG: %cStart Phase ExpPhase color:green;
+[04:30:26.322] LOG: %cStart Phase LevelUpPhase color:green;
+[04:30:26.323] LOG: %cStart Phase MoveEndPhase color:green;
+[04:30:26.323] LOG: %cStart Phase MovePhase color:green;
+[04:30:26.323] LOG: %cStart Phase MoveEndPhase color:green;
+[04:30:26.323] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:30:26.323] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:30:26.323] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:30:26.323] LOG: %cStart Phase BerryPhase color:green;
+[04:30:26.323] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:30:26.323] LOG: %cStart Phase TurnEndPhase color:green;
+[04:30:26.325] LOG: %cStart Phase BattleEndPhase color:green;
+[04:30:26.325] LOG: Battle Score: 46 (5 Turns x0.59)
+[04:30:26.325] LOG: Total Score: 211
+[04:30:26.340] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:30:26.341] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:30:26.372] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:30:26.372] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:30:26.413] LOG: %cStart Phase MessagePhase color:green;
+[04:30:26.676] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[04:30:26.678] LOG: Rival Ivy
+[04:30:26.678] LOG: Rival Ivy
+[04:30:27.069] LOG: Dialogue dialogue:rivalFemale.victory.1 skipped
+[04:30:27.070] LOG: %cStart Phase MoneyRewardPhase color:green;
+[04:30:27.285] LOG: %cStart Phase ModifierRewardPhase color:green;
+[04:30:27.500] LOG: %cStart Phase ModifierRewardPhase color:green;
+[04:30:27.710] LOG: %cStart Phase EggLapsePhase color:green;
+[04:30:27.710] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:30:27.710] LOG: Wave Seed: bbPnKAxb@\a@pAi@lp`Xsoq 8
+[04:30:27.713] LOG: 8 4 [2,3,4,5]
+[04:30:27.714] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} 
+[04:30:27.714] LOG: 0 0 [2,3,4,5]
+[04:30:27.714] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:30:27.714] LOG: 50 6 [10,11,12,13,14,23]
+[04:30:27.714] LOG: {"id":"ER_SMOKE_BALL","localeKey":"","iconImage":"er_smoke_ball","soundName":"se/restore","tier":2} 
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"ZZHfCy9pZ8TY8h9a8dhXPkgi","gameModeId":4,"difficulty":"youngster","challenges":[],"roster":[{"id":1198808088,"player":true,"species":133,"formIndex":1,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":23,"stats":[33,19,16,31,24,30],"ivs":[31,31,31,31,29,30],"nature":11,"moveset":[{"moveId":45,"ppUsed":0,"ppUp":0},{"moveId":736,"ppUsed":0,"ppUp":0},{"moveId":748,"ppUsed":0,"ppUp":0},{"moveId":737,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":133,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[0,16,13],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,1,1,1,1,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":45,"targets":[2],"result":1,"useMode":1},{"move":737,"targets":[2],"result":1,"useMode":1},{"move":589,"targets":[2],"result":1,"useMode":1},{"move":748,"targets":[0],"result":1,"useMode":1},{"move":736,"targets":[2],"result":1,"useMode":1},{"move":736,"targets":[3],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3713329779,"player":true,"species":967,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":128,"levelExp":0,"gender":0,"hp":23,"stats":[23,16,11,15,13,20],"ivs":[31,31,31,31,31,31],"nature":11,"moveset":[{"moveId":5013,"ppUsed":0,"ppUp":0},{"moveId":424,"ppUsed":0,"ppUp":0},{"moveId":21,"ppUsed":0,"ppUp":0},{"moveId":422,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":967,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[15],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":5013,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1834308319,"player":true,"species":985,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":-1,"hp":28,"stats":[28,13,16,11,18,19],"ivs":[30,31,31,31,31,31],"nature":13,"moveset":[{"moveId":584,"ppUsed":0,"ppUp":0},{"moveId":706,"ppUsed":0,"ppUp":0},{"moveId":736,"ppUsed":0,"ppUp":0},{"moveId":871,"ppUsed":0,"ppUp":0}],"status":null,"friendship":0,"metLevel":5,"metBiome":-1,"metSpecies":985,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":17,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[301,5504,86],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2342746286,"player":true,"species":412,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":22,"stats":[22,8,12,14,12,10],"ivs":[30,31,31,30,31,31],"nature":15,"moveset":[{"moveId":564,"ppUsed":0,"ppUp":0},{"moveId":552,"ppUsed":0,"ppUp":0},{"moveId":455,"ppUsed":0,"ppUp":0},{"moveId":456,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":412,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2323077326,"player":true,"species":190,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":116,"levelExp":0,"gender":0,"hp":22,"stats":[22,13,12,9,12,17],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":350,"ppUsed":0,"ppUp":0},{"moveId":480,"ppUsed":0,"ppUp":0},{"moveId":860,"ppUsed":0,"ppUp":0},{"moveId":252,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":190,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":858069942,"player":true,"species":415,"formIndex":0,"abilityIndex":1,"passive":true,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":128,"levelExp":0,"gender":0,"hp":20,"stats":[20,14,10,10,10,14],"ivs":[31,31,31,30,31,30],"nature":3,"moveset":[{"moveId":588,"ppUsed":0,"ppUp":0},{"moveId":860,"ppUsed":0,"ppUp":0},{"moveId":147,"ppUsed":0,"ppUp":0},{"moveId":731,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":415,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":1,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"interaction","seq":0,"kind":"reward","choice":0},{"type":"command","wave":2,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"interaction","seq":1,"kind":"reward","choice":1},{"type":"command","wave":3,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":3,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":0}},{"type":"command","wave":3,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":2,"kind":"reroll","choice":-2},{"type":"interaction","seq":3,"kind":"reward","choice":2},{"type":"command","wave":4,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":4,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":4,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"interaction","seq":4,"kind":"reward","choice":1},{"type":"command","wave":5,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":0}},{"type":"command","wave":5,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":5,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":5,"kind":"reroll","choice":-2},{"type":"interaction","seq":6,"kind":"reward","choice":0},{"type":"command","wave":6,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":7,"kind":"reward","choice":0},{"type":"command","wave":7,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"command","wave":7,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":8,"kind":"reward","choice":0},{"type":"command","wave":8,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":0}},{"type":"command","wave":8,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"command","wave":8,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":8,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":0}},{"type":"command","wave":8,"turn":5,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}}],"endState":{"waveIndex":8,"money":1740,"party":[{"species":70015,"level":9,"hp":25,"maxHp":33},{"species":985,"level":5,"hp":28,"maxHp":28},{"species":967,"level":5,"hp":23,"maxHp":23},{"species":412,"level":5,"hp":22,"maxHp":22},{"species":190,"level":5,"hp":22,"maxHp":22},{"species":415,"level":5,"hp":20,"maxHp":20}]},"checkpoint":{"wave":1,"seed":"ZZHfCy9pZ8TY8h9a8dhXPkgi","party":[{"id":1198808088,"player":true,"species":133,"formIndex":1,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":23,"stats":[33,19,16,31,24,30],"ivs":[31,31,31,31,29,30],"nature":11,"moveset":[{"moveId":45,"ppUsed":0,"ppUp":0},{"moveId":736,"ppUsed":0,"ppUp":0},{"moveId":748,"ppUsed":0,"ppUp":0},{"moveId":737,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":133,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[0,16,13],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,1,1,1,1,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":45,"targets":[2],"result":1,"useMode":1},{"move":737,"targets":[2],"result":1,"useMode":1},{"move":589,"targets":[2],"result":1,"useMode":1},{"move":748,"targets":[0],"result":1,"useMode":1},{"move":736,"targets":[2],"result":1,"useMode":1},{"move":736,"targets":[3],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3713329779,"player":true,"species":967,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":128,"levelExp":0,"gender":0,"hp":23,"stats":[23,16,11,15,13,20],"ivs":[31,31,31,31,31,31],"nature":11,"moveset":[{"moveId":5013,"ppUsed":0,"ppUp":0},{"moveId":424,"ppUsed":0,"ppUp":0},{"moveId":21,"ppUsed":0,"ppUp":0},{"moveId":422,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":967,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[15],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":5013,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1834308319,"player":true,"species":985,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":-1,"hp":28,"stats":[28,13,16,11,18,19],"ivs":[30,31,31,31,31,31],"nature":13,"moveset":[{"moveId":584,"ppUsed":0,"ppUp":0},{"moveId":706,"ppUsed":0,"ppUp":0},{"moveId":736,"ppUsed":0,"ppUp":0},{"moveId":871,"ppUsed":0,"ppUp":0}],"status":null,"friendship":0,"metLevel":5,"metBiome":-1,"metSpecies":985,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":17,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[301,5504,86],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2342746286,"player":true,"species":412,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":22,"stats":[22,8,12,14,12,10],"ivs":[30,31,31,30,31,31],"nature":15,"moveset":[{"moveId":564,"ppUsed":0,"ppUp":0},{"moveId":552,"ppUsed":0,"ppUp":0},{"moveId":455,"ppUsed":0,"ppUp":0},{"moveId":456,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":412,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2323077326,"player":true,"species":190,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":116,"levelExp":0,"gender":0,"hp":22,"stats":[22,13,12,9,12,17],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":350,"ppUsed":0,"ppUp":0},{"moveId":480,"ppUsed":0,"ppUp":0},{"moveId":860,"ppUsed":0,"ppUp":0},{"moveId":252,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":190,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":858069942,"player":true,"species":415,"formIndex":0,"abilityIndex":1,"passive":true,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":128,"levelExp":0,"gender":0,"hp":20,"stats":[20,14,10,10,10,14],"ivs":[31,31,31,30,31,30],"nature":3,"moveset":[{"moveId":588,"ppUsed":0,"ppUp":0},{"moveId":860,"ppUsed":0,"ppUp":0},{"moveId":147,"ppUsed":0,"ppUp":0},{"moveId":731,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":415,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"}],"money":1000,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":0}}}
