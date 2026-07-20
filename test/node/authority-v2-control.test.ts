@@ -114,17 +114,37 @@ describe("ordered-wait local presentation lease", () => {
     phaseName: "NextEncounterPhase",
     messageHandlerActionable: true,
   };
+  const exactSameAddressLevelUp = {
+    sessionEpoch: 1,
+    wave: 3,
+    turn: 7,
+    phaseName: "LevelUpPhase",
+    messageHandlerActionable: true,
+  };
 
-  it("admits only the explicit N+1/t1 NextEncounter action prompt", () => {
+  it("admits only the explicit terminal-result LevelUp and N+1/t1 NextEncounter action prompts", () => {
     expect(successorWaitAllowsLocalPresentationInput(successorWait(), exactNextEncounter)).toBe(true);
+    expect(successorWaitAllowsLocalPresentationInput(successorWait(), exactSameAddressLevelUp)).toBe(true);
     expect(
       successorWaitAllowsLocalPresentationInput(successorWait({ allowNextWaveStart: false }), exactNextEncounter),
+    ).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(successorWait({ allowNextWaveStart: false }), exactSameAddressLevelUp),
     ).toBe(false);
     expect(successorWaitAllowsLocalPresentationInput(successorWait(), { ...exactNextEncounter, sessionEpoch: 2 })).toBe(
       false,
     );
     expect(successorWaitAllowsLocalPresentationInput(successorWait(), { ...exactNextEncounter, wave: 3 })).toBe(false);
     expect(successorWaitAllowsLocalPresentationInput(successorWait(), { ...exactNextEncounter, turn: 2 })).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(successorWait(), {
+        ...exactSameAddressLevelUp,
+        phaseName: "MessagePhase",
+      }),
+    ).toBe(false);
+    expect(successorWaitAllowsLocalPresentationInput(successorWait(), { ...exactSameAddressLevelUp, turn: 8 })).toBe(
+      false,
+    );
     expect(
       successorWaitAllowsLocalPresentationInput(successorWait(), {
         ...exactNextEncounter,

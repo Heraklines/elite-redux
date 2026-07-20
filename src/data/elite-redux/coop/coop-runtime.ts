@@ -2972,12 +2972,18 @@ export function wireCoopStallWatchdog(
           `tick=${coopSessionGeneration()}g turn=${point.turn || "-"} wave=${point.wave || "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} assertions=${getCoopChecksumAssertionCount()} wait=${localMs}ms machineWaits=${coopMachineWaitLabels().join(",") || "-"} peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} lastRx=${formatLastRx(transport)} transport=${transport.state} ${formatCoopDurabilityHealth(runtime, transport)}`,
         );
       }
-      // #806 faint-replacement suppression: a live human choosing (or the host awaiting) a faint
-      // replacement legitimately parks BOTH engines in network waits. Do NOT keepalive-report that as a
-      // stall and do NOT deadlock-recover during it - the reward shop gets this exemption for free (its
-      // owner is in UI); the faint window needs it explicit because both sides ARE in network waits. The
-      // faint-switch wait's own timeout still fires, so a genuinely-dead partner is never masked.
-      if (isCoopFaintSwitchWindowOpen()) {
+      // #806 faint-replacement suppression: a live human choosing (or the other replica awaiting) a faint
+      // replacement legitimately parks BOTH engines in network/machine waits. Do NOT keepalive-report that
+      // as a stall and do NOT deadlock-recover during it - the replacement's own 60s scheduler lease still
+      // bounds a genuinely-dead owner.
+      //
+      // Under the complete Authority V2 cutover there need not be a legacy relay faint-window pin at all:
+      // the non-owner installs the exact REPLACEMENT control as an ordered wait while the owner acts through
+      // the public PARTY handler. Consulting only `isCoopFaintSwitchWindowOpen()` made that healthy V2 wait
+      // look asymmetric after 20s and launched recovery in the middle of a real human pick. The globally
+      // installed V2 control is the stronger proof and must grant the same deliberation lease on both seats.
+      const activeV2Control = runtime.v2ControlLedger?.activeControl;
+      if (isCoopFaintSwitchWindowOpen() || activeV2Control?.kind === "REPLACEMENT") {
         return;
       }
       if (localMs >= COOP_STALL_REPORT_MS) {

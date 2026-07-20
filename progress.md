@@ -219,3 +219,27 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   to synthesize another boot edge. The helper now preserves the existing production phase for the ordinary
   phase-queue driver to start exactly once; arbitrary gameplay queues still fail closed.
 - Local verification remains static-only under `AGENTS.md`; exact-SHA remote S4 qualification is required.
+
+2026-07-20 — Public-browser wave-start and human-control lease closure
+
+- Exact all-V2 browser campaign `29761110643` separated three production mechanisms from one noisy journey
+  assertion. Mystery correctly captured `ME_PRESENT` at wave N+1/turn 0, but the reward terminal's explicit
+  next-wave wait admitted only turn 1 and rejected the complete immutable interaction before its adapter ran.
+  A wait that explicitly grants both the wave crossing and `INTERACTION_COMMIT` now admits only that pre-turn
+  interaction; command, replacement, wave, and terminal material remain turn-1-only.
+- Surface and dirty profiles installed an exact V2 `REPLACEMENT` control on both seats, then the real owner
+  spent 43 seconds in the public PARTY picker. The legacy-only stall exemption could not see that control and
+  launched asymmetric recovery at 20 seconds, fencing the valid replacement result and ending the session.
+  The stall watchdog now recognizes the runtime ledger's installed REPLACEMENT as the authoritative human
+  deliberation lease; the replacement scheduler's own 60-second lease remains the liveness bound.
+- Depth exposed a distinct Authority V2 cycle after taking Rare Candy: the immutable reward result applied,
+  but its same-address `LevelUpPhase` action-only presentation was frozen by the ordered successor wait while
+  the guest advanced to wave 2. The explicit terminal-result crossing permission now grants only the
+  same-address actionable LevelUp message and the N+1/t1 actionable NextEncounter intro. It grants no choice
+  surface or arbitrary MessagePhase.
+- Public journey `29760764684` did mechanically apply/ack reward terminal revision 6, install its ordered
+  successor, and reach wave-2 command. Its assertion still searched for the removed legacy log word
+  `JOURNAL`; the production V2 path emits `materialize retained`. The harness, unit fixture, and static
+  boundary contract now require the current semantic proof.
+- Local validation remains static-only per `AGENTS.md`; no co-op Vitest or browser game was run locally.
+  Exact-SHA remote contracts, full gate, and focused public browser profiles remain required.

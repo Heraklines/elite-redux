@@ -309,10 +309,11 @@ export type CoopNextControl =
       /**
        * No mechanically authoritative choice UI is authorized by this entry. The replica is parked at this
        * exact source address until the immediately-following ordered entry has one of the stated kinds.
-       * `allowNextWaveStart` may grant the exact N+1/t1 NextEncounter MESSAGE presentation its local
-       * action-only lease; that prompt cannot choose or mutate authoritative material and is required to
-       * reach the next ordered command/interaction boundary. This remains an explicit sequencing contract,
-       * never a nullable/locally-derived tail or a lease for a choice surface.
+       * `allowNextWaveStart` may grant the exact same-address LevelUp MESSAGE produced by an already-applied
+       * terminal result and the N+1/t1 NextEncounter MESSAGE their local action-only leases. Those prompts
+       * cannot choose or mutate authoritative material and are required to reach the next ordered
+       * command/interaction boundary. This remains an explicit sequencing contract, never a
+       * nullable/locally-derived tail or a lease for a choice surface.
        */
       readonly kind: "AWAIT_SUCCESSOR";
       readonly afterOperationId: string;

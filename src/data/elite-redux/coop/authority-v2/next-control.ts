@@ -166,7 +166,15 @@ export function successorWaitAllows(
     wait.allowedKinds.length === turnBoundaryKinds.length
     && turnBoundaryKinds.every(kind => wait.allowedKinds.includes(kind));
   if (address.wave === wait.wave + 1) {
-    return wait.allowNextWaveStart && address.turn === 1;
+    // Battle-open control and settled wave/terminal material are authored at turn 1. A mystery encounter
+    // is the one mechanical surface that legitimately opens before that battle turn exists: its complete
+    // ME_PRESENT interaction image is captured at wave N+1 / turn 0. The predecessor must still explicitly
+    // grant both the wave crossing and INTERACTION_COMMIT, so this does not admit an arbitrary pre-turn
+    // command, replacement, wave, or terminal entry.
+    const preTurnMystery =
+      address.turn === 0
+      && interactionOperationKindOfEntry({ kind: nextKind, material: { payload: nextMaterial } }) === "ME_PRESENT";
+    return wait.allowNextWaveStart && (address.turn === 1 || preTurnMystery);
   }
   if (address.wave !== wait.wave) {
     return false;
@@ -190,26 +198,25 @@ export interface CoopV2LocalPresentationInputProof {
 }
 
 /**
- * Whether an ordered wait explicitly grants the non-mechanical next-wave narration its local input lease.
+ * Whether an ordered wait explicitly grants a non-mechanical action-only presentation its local input lease.
  *
- * A reward/market terminal can only be followed by CONTROL_COMMIT after NextEncounterPhase has shown and
- * dismissed its action-only intro prompt. Freezing that prompt creates a cycle: the prompt waits for V2
- * control while V2 control waits for the prompt to reach CommandPhase. The existing `allowNextWaveStart`
- * bit is the authority's explicit permission for this exact N+1/t1 bridge. No same-wave prompt, arbitrary
- * MESSAGE phase, choice handler, or wait without that permission is admitted.
+ * A terminal reward may first show the same-address LevelUpPhase produced by its already-committed Rare
+ * Candy result, then show the N+1/t1 NextEncounterPhase intro before CONTROL_COMMIT can exist. Freezing
+ * either action-only message creates a cycle: the presentation waits for V2 control while V2 control waits
+ * for the presentation to reach the next ordered boundary. `allowNextWaveStart` is the authority's explicit
+ * permission to leave the terminal interaction and grants only those two exact bridges. No arbitrary
+ * same-wave message, choice handler, or wait without that permission is admitted.
  */
 export function successorWaitAllowsLocalPresentationInput(
   wait: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>,
   proof: CoopV2LocalPresentationInputProof,
 ): boolean {
-  return (
-    wait.allowNextWaveStart
-    && proof.sessionEpoch === wait.epoch
-    && proof.wave === wait.wave + 1
-    && proof.turn === 1
-    && proof.phaseName === "NextEncounterPhase"
-    && proof.messageHandlerActionable
-  );
+  if (!wait.allowNextWaveStart || proof.sessionEpoch !== wait.epoch || !proof.messageHandlerActionable) {
+    return false;
+  }
+  const sameAddressLevelUp = proof.wave === wait.wave && proof.turn === wait.turn && proof.phaseName === "LevelUpPhase";
+  const nextWaveIntro = proof.wave === wait.wave + 1 && proof.turn === 1 && proof.phaseName === "NextEncounterPhase";
+  return sameAddressLevelUp || nextWaveIntro;
 }
 
 interface MechanicalAddress {

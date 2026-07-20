@@ -15,6 +15,7 @@
 //     never a machine wait, so localMs stays quiet and nothing escalates
 // =============================================================================
 
+import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import type { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { getCoopCausalTrace, resetCoopCausalTrace } from "#data/elite-redux/coop/coop-causal-trace";
 import {
@@ -53,7 +54,7 @@ const idleStream = { oldestNetworkWaitMs: () => -1 } as unknown as CoopBattleStr
  * There is no bound supervisor, so `failCoopRuntimeSharedSession` takes the bounded legacy teardown:
  * it sets the runtime's shared-terminal state to frozen (the observable we assert on) without a scene.
  */
-function makeStubRuntime(): CoopRuntime {
+function makeStubRuntime(activeControl: CoopNextControl | null = null): CoopRuntime {
   return {
     controller: {
       versionMismatch: false,
@@ -65,6 +66,7 @@ function makeStubRuntime(): CoopRuntime {
     membership: { terminate: () => {} },
     battleSync: { freezeForTerminal: () => {} },
     interactionRelay: { cancelWaiters: () => {} },
+    v2ControlLedger: { activeControl },
   } as unknown as CoopRuntime;
 }
 
@@ -125,6 +127,31 @@ describe("#P33 asymmetric stall watchdog -> bounded recovery -> shared terminal"
     expect(isCoopSharedTerminalFrozen(runtime), "faint window exempts the watchdog").toBe(false);
     endHold();
     endCoopFaintSwitchWindow();
+  });
+
+  it("an installed V2 replacement control suppresses escalation without a legacy faint-window pin", async () => {
+    const runtime = makeStubRuntime({
+      kind: "REPLACEMENT",
+      operationId: "RC/e1/w2/t1/o2/f0/s0",
+      ownerSeatId: 0,
+      epoch: 1,
+      wave: 2,
+      turn: 1,
+      occurrence: 2,
+      fieldIndex: 0,
+    });
+    wireHost(runtime);
+    const endHold = beginCoopMachineWait("authority-v2-successor:w2:t1:r25");
+
+    // The real public-browser failure waited 43 seconds for the owner to finish the PARTY picker. Cross the
+    // 20-second asymmetric-stall threshold while remaining inside the replacement scheduler's 60-second
+    // owner lease: the exact V2 control is human deliberation, not an asymmetric deadlock.
+    await vi.advanceTimersByTimeAsync(45_000);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(getCoopCausalTrace().some(e => e.domain === "recovery")).toBe(false);
+    expect(isCoopSharedTerminalFrozen(runtime), "V2 replacement deliberation remains playable").toBe(false);
+    endHold();
   });
 
   it("a human-input wait is never a machine wait, so a shop browse never escalates", async () => {

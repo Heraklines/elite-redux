@@ -954,7 +954,7 @@ test("reward terminal proof binds host retention to guest application and materi
   });
   guestEvidence.push({
     kind: "console",
-    text: `[coop:reward] reward op WATCHER materialize JOURNAL choice=-1 terminal=true id=${operationId}`,
+    text: `[coop:reward] reward op WATCHER materialize retained choice=-1 terminal=true id=${operationId}`,
   });
   const host = { label: "host", evidence: hostEvidence };
   const guest = { label: "guest", evidence: guestEvidence };

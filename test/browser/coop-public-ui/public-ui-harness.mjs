@@ -2414,7 +2414,7 @@ export class DuoPublicUiRig {
         },
       ),
       this.guest.evidence.waitFor(
-        new RegExp(`reward op WATCHER materialize JOURNAL choice=-1 terminal=true id=${escapedOperationId}`, "u"),
+        new RegExp(`reward op WATCHER materialize retained choice=-1 terminal=true id=${escapedOperationId}`, "u"),
         {
           from: cursors[this.guest.label],
           timeoutMs: this.config.timeoutMs,

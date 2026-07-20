@@ -891,6 +891,85 @@ describe("authority-v2 log", () => {
     ).toThrow(/not authorized by predecessor control/);
   });
 
+  it("admits only an explicitly authorized next-wave pre-turn interaction at turn 0", () => {
+    const nextWaveMysteryPresentation = {
+      ...entryInput("wave-2-mystery-present", { kind: "INTERACTION_COMMIT" }),
+      material: {
+        digest: "wave-2-mystery-present",
+        payload: {
+          envelope: {
+            sessionEpoch: 1,
+            wave: 2,
+            turn: 0,
+            pendingOperation: { kind: "ME_PRESENT" },
+          },
+        },
+      },
+    };
+
+    const closed = makeLog(scheduler, []);
+    closed.commit(
+      entryInput("reward-result-closed-to-mystery", {
+        nextControl: successorWait("reward-result-closed-to-mystery", [
+          "INTERACTION_COMMIT",
+          "CONTROL_COMMIT",
+          "WAVE_ADVANCE",
+          "TERMINAL_COMMIT",
+        ]),
+      }),
+    );
+    expect(() => closed.commit(nextWaveMysteryPresentation)).toThrow(/not authorized by predecessor control/);
+
+    const open = makeLog(scheduler, []);
+    open.commit(
+      entryInput("reward-result-open-to-mystery", {
+        nextControl: successorWait(
+          "reward-result-open-to-mystery",
+          ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+          true,
+        ),
+      }),
+    );
+    expect(open.commit(nextWaveMysteryPresentation).revision).toBe(2);
+
+    const wrongPreTurnInteraction = makeLog(scheduler, []);
+    wrongPreTurnInteraction.commit(
+      entryInput("reward-result-before-invalid-reward", {
+        nextControl: successorWait("reward-result-before-invalid-reward", ["INTERACTION_COMMIT"], true),
+      }),
+    );
+    expect(() =>
+      wrongPreTurnInteraction.commit({
+        ...nextWaveMysteryPresentation,
+        operationId: "wave-2-reward-turn-0",
+        material: {
+          digest: "wave-2-reward-turn-0",
+          payload: {
+            envelope: {
+              sessionEpoch: 1,
+              wave: 2,
+              turn: 0,
+              pendingOperation: { kind: "REWARD_PRESENT" },
+            },
+          },
+        },
+      }),
+    ).toThrow(/not authorized by predecessor control/);
+
+    const commandAtTurnZero = makeLog(scheduler, []);
+    commandAtTurnZero.commit(
+      entryInput("reward-result-before-invalid-command", {
+        nextControl: successorWait("reward-result-before-invalid-command", ["CONTROL_COMMIT"], true),
+      }),
+    );
+    expect(() =>
+      commandAtTurnZero.commit({
+        ...entryInput("wave-2-command-turn-0", { kind: "CONTROL_COMMIT" }),
+        material: { digest: "wave-2-command-turn-0", payload: { wave: 2, turn: 0 } },
+      }),
+    ).toThrow(/not authorized by predecessor control/);
+  });
+
   it("admits only the bounded settlement-turn advance from an exact turn-boundary wait", () => {
     const turnBoundaryKinds = [
       "CONTROL_COMMIT",

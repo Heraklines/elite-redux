@@ -252,7 +252,7 @@ if (
 if (
   !harness?.includes("reward authoritative RESULT retained")
   || !harness.includes("shop authoritative RESULT applied-before-render")
-  || !harness.includes("reward op WATCHER materialize JOURNAL")
+  || !harness.includes("reward op WATCHER materialize retained")
 ) {
   failures.push("public-ui-harness.mjs: reward leave must prove exact retained terminal application before wave 2");
 }
