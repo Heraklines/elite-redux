@@ -2416,9 +2416,32 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         }
         break;
       }
-      // A representative soak must exercise CommandPhase -> rendezvous wiring itself. Materialize and
-      // start the guest's real owned CommandPhase first; it announces its own arrival and legitimately
-      // parks until the host phase below arrives. Never pre-seed this boundary through reannounce().
+      // Both production browsers start their first queued CommandPhase independently. The authority's
+      // host-owned phase must therefore start before the replica can pass its read-only field-0 phase:
+      // that exact start commits CONTROL_COMMIT, which is the sole ordered permission for the guest to
+      // reach its field-1 public command. Waiting to start the host until after field 1 is visible creates
+      // a one-process-only cycle (guest waits for control -> harness waits for guest -> host never starts).
+      // Start the real authority phase now; it can legitimately park on the reciprocal rendezvous until
+      // the guest-owned phase below starts. Never manufacture either side through reannounce().
+      let hostCommand: { readonly phaseName: string; start(): void } | null = null;
+      if (!restartAlreadyOpenHost) {
+        hostCommand = await withClient(rig.hostCtx, async () => {
+          const current = rig.hostScene.phaseManager.getCurrentPhase();
+          if (
+            current?.phaseName !== "CommandPhase"
+            || rig.hostScene.currentBattle.waveIndex !== wave
+            || rig.hostScene.currentBattle.turn !== turn
+          ) {
+            throw new Error(
+              `host command boundary is not current: ${current?.phaseName ?? "none"} `
+                + `${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}`,
+            );
+          }
+          current.start();
+          await drainLoopback();
+          return current;
+        });
+      }
       let guestCommand: { readonly phaseName: string; start(): void } | null = null;
       if (!finalBossStageOne) {
         guestCommand = await withClient(rig.guestCtx, () =>
@@ -2444,9 +2467,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           await drainLoopback();
         });
       }
-      // With a biome commit this resumes only after the renderer consumed its exact receipt. Without one it
-      // starts the CommandPhase that toFirst deliberately left untouched, publishing the host's reciprocal
-      // arrival in both cases.
+      // With a biome commit this resumes only after the renderer consumed its exact receipt. The ordinary
+      // authority phase was already started above so it could publish CONTROL_COMMIT; pumping the guest's
+      // real arrival now opens its public handler without re-entering that phase.
       await withClient(rig.hostCtx, async () => {
         if (restartAlreadyOpenHost) {
           const current = rig.hostScene.phaseManager.getCurrentPhase();
@@ -2466,15 +2489,30 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           await drainLoopback();
           return;
         }
-        // The guest's real CommandPhase above has already sent its reciprocal arrival. With full
-        // destination-context scheduling that frame is intentionally parked in the HOST inbox until
-        // this exact scope is installed. Pump it before phaseInterceptor.to(): CommandPhase itself
-        // awaits that arrival, so pumping only after `to()` returns creates a harness-only circular
-        // wait (guest arrival queued -> host phase awaits -> caller cannot reach the later pump).
+        if (hostCommand == null) {
+          throw new Error(`host command ${wave}:${turn} was not started`);
+        }
+        // The guest's real CommandPhase above sent the reciprocal arrival. With destination-context
+        // scheduling it is intentionally parked in this HOST inbox until this exact scope is installed.
         await drainLoopback();
-        await game.phaseInterceptor.to("CommandPhase");
       });
       await pumpDuoDestinations(rig, 2);
+      if (!restartAlreadyOpenHost && hostCommand != null) {
+        const hostCommandSurface = await waitForPublicModeOrPhaseExit(
+          rig.hostCtx,
+          hostCommand,
+          UiMode.COMMAND,
+          `host command ${wave}:${turn}`,
+        );
+        const hostHasCommandable = withClientSync(rig.hostCtx, () =>
+          rig.hostScene
+            .getPlayerParty()
+            .some(mon => mon.coopOwner === "host" && !mon.isFainted() && mon.isAllowedInBattle()),
+        );
+        if (hostHasCommandable && hostCommandSurface !== "opened") {
+          fail("no-park", wave, `host command ${wave}:${turn} left without a public COMMAND handler`);
+        }
+      }
       // Classic wave 200 stage one is intentionally one player versus one boss. The renderer has no
       // owned field slot or public CommandPhase until the boss's phase-two transition calls setDouble(true).
       // Starting its CoopReplayTurnPhase here, before the authority submits slot 0, blocks waiting for a
