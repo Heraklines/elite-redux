@@ -5099,6 +5099,17 @@ function buildCoopV2LiveSeams(
           if (!markCoopV2ControlMaterialApplied(runtime, entry) || entry.nextControl.kind !== "COMMAND_FRONTIER") {
             return false;
           }
+          // A CONTROL_COMMIT is the ordered wake for a preceding TURN_COMMIT whose successor was
+          // AWAIT_SUCCESSOR. Replacement and wave entries already dissolve that parked finalizer after
+          // installing their carrier; command-open must do the same after its complete state image is
+          // materialized. Otherwise the real TurnInit -> CommandPhase chain can never be created, while the
+          // control projector correctly waits forever for proof from that nonexistent CommandPhase.
+          //
+          // Ending the finalizer here does not reintroduce queue-order authority: this exact authenticated
+          // CONTROL_COMMIT, after materialApplied, is the sole event that permits the ordinary structural
+          // chain to advance. The resulting CommandPhase must still cross its address-exact V2 boundary and
+          // publish the real controlInstalled proof before the entry can retire.
+          releaseCoopV2ParkedTurnBoundary(runtime, entry);
           releaseCoopV2DeferredCommandStarts(runtime, entry.nextControl);
           return true;
         }
