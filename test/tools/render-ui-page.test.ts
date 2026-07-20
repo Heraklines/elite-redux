@@ -1210,6 +1210,12 @@ const RECIPES: Record<string, Recipe> = {
     prepare: () => [buildTournamentBracketDemoConfig({ size: 16, advancedRounds: 2, card: "playable" })],
     diffTolerance: 0,
   },
+  // Bracket tree (4-field, the Sample Cup shape): semifinals + final, fresh bracket.
+  "tournament-bracket-4": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" })],
+    diffTolerance: 0,
+  },
   // Bracket with BYES (5-field padded to 8): top seeds auto-advance, "(bye)" slots shown.
   "tournament-bracket-byes": {
     mode: UiMode.TOURNAMENT_BRACKET,
