@@ -13,6 +13,7 @@ import {
   createBattlePromptAdvancer,
   driveBattleFallback,
   findRegisteredSurface,
+  hasPassiveBattleProgressSurface,
   resolveSurfaceOwner,
   waitForOutcomeBounded,
 } from "./campaign.mjs";
@@ -722,6 +723,39 @@ test("an explicitly frozen battle prompt never spends public input", async () =>
   });
   assert.equal(await advance(), false);
   assert.equal(authority.presses.length, 0);
+});
+
+test("a non-actionable NextEncounter tween is known passive progress, but an armed prompt is not", () => {
+  const authority = fakeClient("authority", ["Start Phase NextEncounterPhase"]);
+  const renderer = fakeClient("renderer");
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "battle:message",
+      operationClass: "battle-progress",
+      phase: "NextEncounterPhase",
+      ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: true },
+    },
+  });
+
+  assert.equal(hasPassiveBattleProgressSurface([authority, renderer], { authority: 0, renderer: 0 }), true);
+
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "battle:message",
+      operationClass: "battle-progress",
+      phase: "NextEncounterPhase",
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: true },
+    },
+  });
+  assert.equal(
+    hasPassiveBattleProgressSurface([authority, renderer], { authority: 0, renderer: 0 }),
+    false,
+    "an armed-but-frozen prompt is a real product failure, not passive animation",
+  );
 });
 
 // Track R cycle 4 - the wave-3-turn-2 LevelUpPhase co-op deadlock (campaign run 29644735938,

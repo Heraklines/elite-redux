@@ -22,7 +22,8 @@ import { globalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import {
   type CoopCommandOpenMaterialV2,
-  decodeCommandOpenEntry,
+  type CoopInteractionOpenMaterialV2,
+  decodeControlOpenEntry,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import {
   decodeReplacementCommitMaterial,
@@ -4055,6 +4056,14 @@ export interface CoopRuntime {
       resume: () => void;
     }
   >;
+  /** Input phases parked before opening their handler until their exact ordered V2 control applies. */
+  readonly v2DeferredInteractionStarts: Map<
+    string,
+    {
+      readonly phaseToken: object;
+      resume: () => void;
+    }
+  >;
   /**
    * Exact V2 REPLACEMENT frontiers installed by the ordered replica projector. This is a protocol
    * acceptance frontier, not a claim that a local picker exists: replacement choices are resolved before
@@ -4877,6 +4886,13 @@ function markCoopV2ControlMaterialApplied(runtime: CoopRuntime, entry: CoopAutho
   if (!runtime.v2ControlLedger.markMaterialApplied(entry)) {
     return false;
   }
+  if (entry.nextControl.kind === "REPLACEMENT") {
+    // A replica can render a faint event before the authority reaches its settled TURN_COMMIT. Its
+    // early picker deliberately retires without opening input and waits here. Reconstruct that exact
+    // generation only after the immutable turn material is installed, then let ordinary projection
+    // demand the real PARTY handler before signing controlInstalled.
+    releaseCoopV2DeferredInteractionStarts(runtime, entry.nextControl);
+  }
   if (
     runtime.v2RecoveryWaitSuccessorOperationId === entry.operationId
     && entry.nextControl.kind !== "AWAIT_SUCCESSOR"
@@ -5275,7 +5291,7 @@ function buildCoopV2LiveSeams(
           return outcome === "deferred" ? "deferred" : false;
         }
         if (entry.kind === "CONTROL_COMMIT") {
-          const material = decodeCommandOpenEntry(entry);
+          const material = decodeControlOpenEntry(entry);
           if (material == null || !runtime.v2ControlLedger.registerEntry(entry)) {
             return false;
           }
@@ -5289,8 +5305,18 @@ function buildCoopV2LiveSeams(
           if (!stateApplied) {
             return false;
           }
+          if (!markCoopV2ControlMaterialApplied(runtime, entry)) {
+            return false;
+          }
+          if (material.kind === "interaction-open") {
+            if (entry.nextControl.kind !== "SHARED_INTERACTION") {
+              return false;
+            }
+            releaseCoopV2DeferredInteractionStarts(runtime, entry.nextControl);
+            return true;
+          }
           ensureCoopV2CommandPresentation(runtime);
-          if (!markCoopV2ControlMaterialApplied(runtime, entry) || entry.nextControl.kind !== "COMMAND_FRONTIER") {
+          if (entry.nextControl.kind !== "COMMAND_FRONTIER") {
             return false;
           }
           // A CONTROL_COMMIT is the ordered wake for a preceding TURN_COMMIT whose successor was
@@ -5493,6 +5519,12 @@ function materializeCoopV2RecoveryProjection(
         installCoopV2BiomeProjection(operationId: string, sourceWave: number): boolean;
       };
       return phase.installCoopV2BiomeProjection(plan.operationId, plan.sourceWave) ? phase : null;
+    }
+    case "crossroads": {
+      const phase = phaseManager.create("ErCrossroadsPhase", plan.sourceWave) as Phase & {
+        installCoopV2CrossroadsProjection(operationId: string, sourceWave: number): boolean;
+      };
+      return phase.installCoopV2CrossroadsProjection(plan.operationId, plan.sourceWave) ? phase : null;
     }
     case "catch-full":
       return ownerIsLocal
@@ -5747,6 +5779,8 @@ function buildCoopV2LiveRecoverySeams(
       // replaceWithCoopRecoveryPhase destroyed every phase/handler generation. No command or interaction
       // side token from that old tree may satisfy the reconstructed frontier.
       runtime.v2InstalledCommandTargets.clear();
+      runtime.v2DeferredCommandStarts.clear();
+      runtime.v2DeferredInteractionStarts.clear();
       runtime.v2InstalledInteractionTargets.clear();
       runtime.v2RecoveryPreparedControlId = null;
       const finalEntry = bundle.requiredTail.at(-1) ?? null;
@@ -6106,6 +6140,168 @@ export function commitCoopV2ReplacementAuthority(
 }
 
 export type CoopV2CommandBoundaryVerdict = "ready" | "deferred" | "failed";
+export type CoopV2InteractionBoundaryVerdict = "ready" | "deferred" | "failed";
+
+/**
+ * Gate an early replica faint picker behind the settled TURN_COMMIT that owns its exact replacement
+ * address. Live-event replay may discover the faint before that commit arrives; it must not expose an
+ * unlogged choice or keep the replay tree ahead of CoopFinalizeTurnPhase. The caller retires that early
+ * phase when this returns `deferred`; `resume` reconstructs the same addressed picker after material apply.
+ */
+export function enterCoopV2ReplacementControlBoundary(input: {
+  readonly operationId: string;
+  readonly ownerSeatId: number;
+  readonly wave: number;
+  readonly turn: number;
+  readonly occurrence: number;
+  readonly fieldIndex: number;
+  readonly phaseToken: object;
+  readonly resume: () => void;
+}): CoopV2InteractionBoundaryVerdict {
+  const runtime = active;
+  if (runtime == null || !coopV2ReplacementCutovers.has(runtime)) {
+    return "ready";
+  }
+  const control: Extract<CoopNextControl, { kind: "REPLACEMENT" }> = {
+    kind: "REPLACEMENT",
+    operationId: input.operationId,
+    ownerSeatId: input.ownerSeatId,
+    epoch: runtime.controller.sessionEpoch,
+    wave: input.wave,
+    turn: input.turn,
+    occurrence: input.occurrence,
+    fieldIndex: input.fieldIndex,
+  };
+  const check = validateNextControl(control);
+  if (!check.ok) {
+    coopWarn("v2-control", `replacement refused malformed control: ${check.reason}`);
+    return "failed";
+  }
+  if (runtime.controller.localSeatId !== input.ownerSeatId) {
+    return "ready";
+  }
+  const current = runtime.v2ControlLedger.latestControl;
+  if (current != null && controlsEqual(current, control) && runtime.v2ControlLedger.isMaterialApplied(current)) {
+    return "ready";
+  }
+  if (runtime.controller.authorityRole === "authority" || current?.kind === "TERMINAL") {
+    return "failed";
+  }
+  const controlId = controlIdOf(control);
+  const existing = runtime.v2DeferredInteractionStarts.get(controlId);
+  if (existing != null && existing.phaseToken !== input.phaseToken) {
+    return "failed";
+  }
+  runtime.v2DeferredInteractionStarts.set(controlId, {
+    phaseToken: input.phaseToken,
+    resume: input.resume,
+  });
+  coopLog("v2-control", `retired early replacement picker until ordered control ${controlId}`);
+  return "deferred";
+}
+
+/**
+ * Park a deterministic Crossroads phase before it exposes input until the one global log explicitly opens
+ * its exact result address. The authority authors a complete state + recovery capsule CONTROL_COMMIT; a
+ * replica waits for that entry and resumes this same phase generation only after its material applies.
+ */
+export function enterCoopV2CrossroadsControlBoundary(input: {
+  readonly operationId: string;
+  readonly ownerSeatId: number;
+  readonly sourceWave: number;
+  readonly phaseToken: object;
+  readonly resume: () => void;
+}): CoopV2InteractionBoundaryVerdict {
+  const runtime = active;
+  const battle = globalScene.currentBattle;
+  if (
+    runtime == null
+    || battle == null
+    || !coopV2ControlCutovers.has(runtime)
+    || !coopV2InteractionCutovers.has(runtime)
+  ) {
+    return "ready";
+  }
+  if (
+    input.operationId.length === 0
+    || !Number.isSafeInteger(input.ownerSeatId)
+    || input.ownerSeatId < 0
+    || !Number.isSafeInteger(input.sourceWave)
+    || input.sourceWave <= 0
+    || battle.waveIndex !== input.sourceWave
+  ) {
+    return "failed";
+  }
+  const state = captureCoopAuthoritativeBattleState(battle.turn);
+  if (state == null || state.wave !== input.sourceWave || state.turn !== battle.turn) {
+    return "failed";
+  }
+  const control: Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }> = {
+    kind: "SHARED_INTERACTION",
+    surfaceClass: "op:biome",
+    operationId: input.operationId,
+    ownerSeatId: input.ownerSeatId,
+    epoch: runtime.controller.sessionEpoch,
+    wave: state.wave,
+    turn: state.turn,
+    operationKind: "CROSSROADS_PICK",
+    successor: {
+      operationKinds: ["CROSSROADS_PICK"],
+      operationIds: [input.operationId],
+    },
+  };
+  const controlCheck = validateNextControl(control);
+  if (!controlCheck.ok) {
+    coopWarn("v2-control", `Crossroads refused malformed control: ${controlCheck.reason}`);
+    return "failed";
+  }
+  const current = runtime.v2ControlLedger.latestControl;
+  if (current != null && controlsEqual(current, control) && runtime.v2ControlLedger.isMaterialApplied(current)) {
+    return "ready";
+  }
+  if (runtime.controller.authorityRole === "authority") {
+    const cutover = coopV2ControlCutovers.get(runtime);
+    const frontier = cutover?.authorityFrontier()?.nextControl ?? null;
+    if (frontier != null && controlsEqual(frontier, control)) {
+      return "ready";
+    }
+    if (cutover == null || frontier?.kind !== "AWAIT_SUCCESSOR" || !frontier.allowedKinds.includes("CONTROL_COMMIT")) {
+      coopWarn(
+        "v2-control",
+        `Crossroads predecessor is ${frontier?.kind ?? "none"}, expected CONTROL_COMMIT-authorizing wait`,
+      );
+      return "failed";
+    }
+    const material: CoopInteractionOpenMaterialV2 = {
+      kind: "interaction-open",
+      wave: state.wave,
+      turn: state.turn,
+      authoritativeState: state,
+      control,
+      projection: {
+        kind: "crossroads",
+        sourceWave: input.sourceWave,
+      },
+    };
+    const operationId = `V2/CONTROL/INTERACTION/${input.operationId}`;
+    return cutover.commitHostInteractionOpen({ operationId, material }) == null ? "failed" : "ready";
+  }
+
+  if (current?.kind === "TERMINAL") {
+    return "failed";
+  }
+  const controlId = controlIdOf(control);
+  const existing = runtime.v2DeferredInteractionStarts.get(controlId);
+  if (existing != null && existing.phaseToken !== input.phaseToken) {
+    return "failed";
+  }
+  runtime.v2DeferredInteractionStarts.set(controlId, {
+    phaseToken: input.phaseToken,
+    resume: input.resume,
+  });
+  coopLog("v2-control", `parked Crossroads until ordered interaction-open ${controlId}`);
+  return "deferred";
+}
 
 function commandStartKey(wave: number, turn: number, fieldIndex: number, pokemonId: number): string {
   return `${wave}:${turn}:${fieldIndex}:${pokemonId}`;
@@ -6282,8 +6478,28 @@ function releaseCoopV2DeferredCommandStarts(
   }
 }
 
+/** Release only the exact phase generation addressed by an applied shared-interaction control-open. */
+function releaseCoopV2DeferredInteractionStarts(
+  runtime: CoopRuntime,
+  control: Extract<CoopNextControl, { kind: "SHARED_INTERACTION" | "REPLACEMENT" }>,
+): void {
+  const controlId = controlIdOf(control);
+  const pending = runtime.v2DeferredInteractionStarts.get(controlId);
+  if (pending == null) {
+    return;
+  }
+  runtime.v2DeferredInteractionStarts.delete(controlId);
+  try {
+    pending.resume();
+  } catch (error) {
+    coopWarn("v2-control", `deferred shared-interaction resume threw control=${controlId}`, error);
+  }
+}
+
 /** Dispose + drop the shadow harness for a runtime (teardown). Idempotent. */
 function disposeCoopV2Shadow(runtime: CoopRuntime): void {
+  runtime.v2DeferredCommandStarts.clear();
+  runtime.v2DeferredInteractionStarts.clear();
   const controlCutover = coopV2ControlCutovers.get(runtime);
   if (controlCutover != null) {
     controlCutover.dispose();
@@ -8435,12 +8651,24 @@ function commitCoopV2SettledWaveAdvance(
   }
   const operationId = `V2/WAVE/e${runtime.controller.sessionEpoch}/w${transition.wave}/tick${state.tick}`;
   let destination: CoopWaveAdvanceDestination;
-  if (
+  if (destinationSurface === "CROSSROADS_PICK") {
+    // Crossroads has no preceding serialized PRESENT result. Its real option handler is opened by a
+    // complete CONTROL_COMMIT capsule at the phase chokepoint.
+    destination = {
+      kind: "AWAIT_SUCCESSOR",
+      afterOperationId: operationId,
+      epoch: runtime.controller.sessionEpoch,
+      wave: transition.wave,
+      turn: state.turn,
+      allowedKinds: ["CONTROL_COMMIT"],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+  } else if (
     destinationSurface === "REWARD_PRESENT"
     || destinationSurface === "SHOP_PRESENT"
     || destinationSurface === "MYSTERY_PRESENT"
     || destinationSurface === "BIOME_PICK"
-    || destinationSurface === "CROSSROADS_PICK"
     || destinationSurface === "BARGAIN"
   ) {
     destination = {
@@ -9488,6 +9716,8 @@ export function assembleCoopRuntime(
     if (authorityV2Epoch != null && authorityV2Epoch !== epoch) {
       disposeCoopV2Shadow(runtime);
       runtime.v2InstalledCommandTargets.clear();
+      runtime.v2DeferredCommandStarts.clear();
+      runtime.v2DeferredInteractionStarts.clear();
       runtime.v2InstalledInteractionTargets.clear();
       runtime.v2InteractionStateApplied.clear();
       runtime.v2SettledInteractionOperations.clear();
@@ -9769,6 +9999,7 @@ export function assembleCoopRuntime(
     waveOperationBinding,
     v2InstalledCommandTargets: new Set<string>(),
     v2DeferredCommandStarts: new Map(),
+    v2DeferredInteractionStarts: new Map(),
     v2InstalledInteractionTargets: new Set<string>(),
     v2InteractionStateApplied: new Set<string>(),
     v2SettledInteractionOperations: new Set<string>(),

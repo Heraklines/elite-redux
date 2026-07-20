@@ -6,15 +6,21 @@
 
 import {
   buildCommandOpenEntry,
+  buildInteractionOpenEntry,
   type CoopCommandOpenMaterialV2,
+  type CoopInteractionOpenMaterialV2,
   commandOpenMaterialDigest,
   decodeCommandOpenEntry,
+  decodeInteractionOpenEntry,
+  interactionOpenMaterialDigest,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
+import { isValidAuthorityEntry } from "#data/elite-redux/coop/authority-v2/authority-entry";
 import type {
   CoopAuthorityEntry,
   CoopFrameContextV2,
   CoopNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import { controlAllowsSuccessorEntry } from "#data/elite-redux/coop/authority-v2/next-control";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";
 
@@ -72,6 +78,38 @@ function material(overrides: Partial<CoopCommandOpenMaterialV2> = {}): CoopComma
     wave: 4,
     turn: 1,
     authoritativeState: state(),
+    ...overrides,
+  };
+}
+
+function crossroadsControl(
+  overrides: Partial<Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }>> = {},
+): Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }> {
+  return {
+    kind: "SHARED_INTERACTION",
+    surfaceClass: "op:biome",
+    operationId: "3:1:CROSSROADS_PICK:9600007",
+    ownerSeatId: 1,
+    epoch: 3,
+    wave: 4,
+    turn: 1,
+    operationKind: "CROSSROADS_PICK",
+    successor: {
+      operationKinds: ["CROSSROADS_PICK"],
+      operationIds: ["3:1:CROSSROADS_PICK:9600007"],
+    },
+    ...overrides,
+  };
+}
+
+function interactionMaterial(overrides: Partial<CoopInteractionOpenMaterialV2> = {}): CoopInteractionOpenMaterialV2 {
+  return {
+    kind: "interaction-open",
+    wave: 4,
+    turn: 1,
+    authoritativeState: state(),
+    control: crossroadsControl(),
+    projection: { kind: "crossroads", sourceWave: 4 },
     ...overrides,
   };
 }
@@ -156,5 +194,61 @@ describe("authority-v2 explicit command-open boundary", () => {
       },
     };
     expect(decodeCommandOpenEntry(tampered)).toBeNull();
+  });
+
+  it("opens one exact recoverable Crossroads control from complete immutable state", () => {
+    const open = interactionMaterial();
+    const built = buildInteractionOpenEntry({
+      context,
+      operationId: "V2/CONTROL/INTERACTION/3:1:CROSSROADS_PICK:9600007",
+      material: open,
+    });
+    const committed = { ...built, revision: 6 } satisfies CoopAuthorityEntry;
+
+    expect(built.kind).toBe("CONTROL_COMMIT");
+    expect(built.material.digest).toBe(interactionOpenMaterialDigest(open));
+    expect(built.nextControl).toEqual(crossroadsControl());
+    expect(isValidAuthorityEntry(committed)).toBe(true);
+    expect(
+      controlAllowsSuccessorEntry(
+        {
+          kind: "AWAIT_SUCCESSOR",
+          afterOperationId: "reward-terminal",
+          epoch: context.sessionEpoch,
+          wave: open.wave,
+          turn: open.turn,
+          allowedKinds: ["CONTROL_COMMIT"],
+          allowNextWaveStart: false,
+          expectedOperationId: null,
+        },
+        "reward-terminal",
+        committed,
+      ),
+    ).toBe(true);
+    expect(decodeInteractionOpenEntry(committed)).toEqual(open);
+  });
+
+  it("rejects a Crossroads control whose recovery capsule or exact result address drifts", () => {
+    expect(() =>
+      buildInteractionOpenEntry({
+        context,
+        operationId: "wrong-source-wave",
+        material: interactionMaterial({ projection: { kind: "crossroads", sourceWave: 3 } }),
+      }),
+    ).toThrow(/complete state and recoverable projection/u);
+    expect(() =>
+      buildInteractionOpenEntry({
+        context,
+        operationId: "wrong-result-address",
+        material: interactionMaterial({
+          control: crossroadsControl({
+            successor: {
+              operationKinds: ["CROSSROADS_PICK"],
+              operationIds: ["3:1:CROSSROADS_PICK:other"],
+            },
+          }),
+        }),
+      }),
+    ).toThrow(/complete state and recoverable projection/u);
   });
 });

@@ -57,22 +57,29 @@ import {
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { awaitCoopChoiceWithOrphanBackstop } from "#data/elite-redux/coop/coop-interaction-relay";
-import type { CoopCrossroadsPickPayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import { type CoopCrossroadsPickPayload, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   advanceCoopInteractionForContinuation,
   coopSessionGeneration,
+  enterCoopV2CrossroadsControlBoundary,
   failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
+  notifyCoopV2InteractionSurfaceReady,
   notifyCoopWaveContinuationSurfaceReady,
   runWhenCoopRuntimeActive,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_CROSSROADS_CHOICE_KINDS, COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_CROSSROADS_CHOICE_KINDS,
+  COOP_CROSSROADS_SEQ_BASE,
+  COOP_MAX_REACHABLE_COUNTER,
+} from "#data/elite-redux/coop/coop-seq-registry";
+import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { erHasNotoriety } from "#data/elite-redux/er-biome-notoriety";
 import { erMarkBiomeStay, setErLeaveBiomeNow } from "#data/elite-redux/er-biome-structure";
@@ -172,6 +179,7 @@ export class ErCrossroadsPhase extends Phase {
   /** True while a guest-owned choice is parked on the host-committed envelope. */
   private coopCommitPending = false;
   private coopOwnerPromptState: "idle" | "opening" | "open" = "idle";
+  private coopV2OpenBoundaryState: "idle" | "parked" | "released" = "idle";
 
   /** Co-op (#848): interaction counter pinned at open (-1 = solo / not pinned). */
   private coopStartCounter = -1;
@@ -179,6 +187,33 @@ export class ErCrossroadsPhase extends Phase {
   private coopCommitRecoveryToken = 0;
   /** The local terminal mutation is applied once even if publishing its immutable result must retry. */
   private coopAppliedTerminal: { readonly pinned: number; readonly moveOn: boolean } | null = null;
+
+  /**
+   * Install the exact generation carried by an Authority V2 recovery entry.
+   *
+   * Recovery must not recompute the interaction counter from ambient legacy state. The operation address
+   * already contains the immutable pinned counter and owner, so validate and retain both before start().
+   */
+  public installCoopV2CrossroadsProjection(operationId: string, sourceWave: number): boolean {
+    const parsed = parseCoopOperationId(operationId);
+    const pinned = parsed == null ? -1 : parsed.pinnedSeq - COOP_CROSSROADS_SEQ_BASE;
+    if (
+      parsed == null
+      || parsed.kind !== "CROSSROADS_PICK"
+      || !Number.isSafeInteger(pinned)
+      || pinned < 0
+      || pinned > COOP_MAX_REACHABLE_COUNTER
+      || parsed.owner !== coopInteractionOwnerSeat(pinned)
+      || sourceWave !== this.coopSourceWave
+      || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
+      || (this.coopStartCounter >= 0 && this.coopStartCounter !== pinned)
+    ) {
+      return false;
+    }
+    this.coopV2ControlOperationId = operationId;
+    this.coopStartCounter = pinned;
+    return true;
+  }
 
   private requireCoopBiomeOperationBinding(): CoopBiomeOperationBinding {
     this.coopBiomeOperationBinding ??= captureCoopBiomeOperationBinding();
@@ -288,29 +323,68 @@ export class ErCrossroadsPhase extends Phase {
     // fallback ONE-SIDED -> one client leaves + changes biome while the other stays -> biome divergence.
     // The barrier makes the pin below read in LOCKSTEP; timeout retransmits and never authorizes a one-sided
     // pin. Skipped in the hotseat spoof path (no real peer to rendezvous with).
-    if (!spoofed && !(await this.coopAwaitBoundaryBarrier())) {
+    const recoveredExactControl = this.coopV2ControlOperationId != null;
+    if (!spoofed && !recoveredExactControl && !(await this.coopAwaitBoundaryBarrier())) {
       return;
     }
     if (this.coopStartCounter < 0) {
       this.coopStartCounter = controller.interactionCounter();
     }
     const pinned = this.coopStartCounter;
-    this.coopV2ControlOperationId = coopBiomeOperationId(
+    const derivedControlOperationId = coopBiomeOperationId(
       "CROSSROADS_PICK",
       COOP_CROSSROADS_SEQ_BASE + pinned,
       pinned,
       this.requireCoopBiomeOperationBinding(),
     );
+    if (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== derivedControlOperationId) {
+      failCoopSharedSession(`Crossroads ${pinned} recovery address did not match the active Authority V2 epoch`);
+      return;
+    }
+    const controlOperationId = this.coopV2ControlOperationId ?? derivedControlOperationId;
+    this.coopV2ControlOperationId = controlOperationId;
     const owns = spoofed || controller.isLocalOwnerAtCounter(pinned);
     coopLog(
       "reward",
       `crossroads owner/watcher decision: pinnedStart=${pinned} role=${controller.role} spoof=${spoofed} -> ${owns ? "OWNER" : "WATCHER"} (#848)`,
     );
-    if (owns) {
-      this.coopOwnerFlow(pinned);
-    } else {
-      await this.coopWatchFlow(pinned);
+    if (this.coopV2OpenBoundaryState !== "idle") {
+      return;
     }
+    const generation = coopSessionGeneration();
+    const wave = this.requireCoopSourceWave();
+    const openExactSurface = (): void => {
+      if (this.coopV2OpenBoundaryState === "released" || !this.boundaryStillLive(generation, wave)) {
+        return;
+      }
+      this.coopV2OpenBoundaryState = "released";
+      if (owns) {
+        this.coopOwnerFlow(pinned);
+      } else {
+        this.coopWatchFlow(pinned).catch(error => {
+          coopWarn("reward", `Crossroads watcher ${pinned} rejected after its V2 control opened`, error);
+          if (this.boundaryStillLive(generation, wave)) {
+            failCoopSharedSession(`Crossroads watcher ${pinned} failed after its Authority V2 control opened`);
+          }
+        });
+      }
+    };
+    const controlBoundary = enterCoopV2CrossroadsControlBoundary({
+      operationId: controlOperationId,
+      ownerSeatId: coopInteractionOwnerSeat(pinned),
+      sourceWave: wave,
+      phaseToken: this,
+      resume: openExactSurface,
+    });
+    if (controlBoundary === "failed") {
+      failCoopSharedSession(`Crossroads ${pinned} could not obtain its Authority V2 input control`);
+      return;
+    }
+    if (controlBoundary === "deferred") {
+      this.coopV2OpenBoundaryState = "parked";
+      return;
+    }
+    openExactSurface();
   }
 
   /**
@@ -418,6 +492,7 @@ export class ErCrossroadsPhase extends Phase {
         this.clearCrossroadsCommitRecovery();
         this.coopOwnerPromptState = "open";
         getCoopUiMirror()?.beginSession("owner", UiMode.OPTION_SELECT, mirrorSeq);
+        notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
         // Crossroads can be the first actionable surface after the every-ten-wave market. Publishing from
         // the real, active picker keeps the retained WAVE_ADVANCE journal closed until a player can act;
         // merely queuing this phase is deliberately insufficient.
@@ -544,6 +619,7 @@ export class ErCrossroadsPhase extends Phase {
       }
       this.clearCrossroadsCommitRecovery();
       getCoopUiMirror()?.beginSession("watcher", UiMode.OPTION_SELECT, mirrorSeq);
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
       // The watcher is a real public continuation too. Only the authoritative guest runtime can consume
       // this notification, so owner parity cannot leave the retained wave waiting on the wrong renderer.
       this.notifyCoopContinuationSurfaceReady();

@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { CoopCommandOpenMaterialV2 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
+import type {
+  CoopCommandOpenMaterialV2,
+  CoopInteractionOpenMaterialV2,
+} from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import type { CoopAuthorityEntry, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import type { CoopAuthorityV2Shadow, CoopV2AuthorityFrontier } from "#data/elite-redux/coop/authority-v2/shadow";
 
@@ -30,6 +33,16 @@ export class CoopV2ControlCutover {
       return null;
     }
     return this.harness.tapCommandOpen(input);
+  }
+
+  commitHostInteractionOpen(input: {
+    readonly operationId: string;
+    readonly material: CoopInteractionOpenMaterialV2;
+  }): CoopAuthorityEntry | null {
+    if (this.disposed) {
+      return null;
+    }
+    return this.harness.tapInteractionOpen(input);
   }
 
   dispose(): void {

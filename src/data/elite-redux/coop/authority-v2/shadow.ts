@@ -44,7 +44,9 @@
 import type { BattleScene } from "#app/battle-scene";
 import {
   buildCommandOpenEntry,
+  buildInteractionOpenEntry,
   type CoopCommandOpenMaterialV2,
+  type CoopInteractionOpenMaterialV2,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import {
   buildReplacementCommitEntry,
@@ -731,6 +733,32 @@ export class CoopAuthorityV2Shadow {
         }),
       );
       this.logParity("CONTROL_COMMIT", entry.revision, true, "materialDigest");
+      return entry;
+    });
+  }
+
+  /**
+   * Commit a real shared-input boundary after its predecessor entered an ordered wait. The immutable
+   * material includes both the complete state and the closed recovery projection; no local queue decides
+   * which interaction opens.
+   */
+  tapInteractionOpen(input: {
+    readonly operationId: string;
+    readonly material: CoopInteractionOpenMaterialV2;
+    readonly subsumes?: readonly number[];
+  }): CoopAuthorityEntry | null {
+    this.lastObservedWave = input.material.wave;
+    this.lastObservedTurn = input.material.turn;
+    return this.runTap("CONTROL_COMMIT", () => {
+      const entry = this.commit(
+        buildInteractionOpenEntry({
+          context: this.frameContext,
+          operationId: input.operationId,
+          material: input.material,
+          ...(input.subsumes == null ? {} : { subsumes: input.subsumes }),
+        }),
+      );
+      this.logParity("CONTROL_COMMIT", entry.revision, true, "materialDigest", "surface=interaction-open");
       return entry;
     });
   }

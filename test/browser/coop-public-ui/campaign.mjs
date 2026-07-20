@@ -2301,6 +2301,35 @@ function phaseProgressSignature(clients) {
   return clients.map(client => client.evidence.findLast(START_PHASE)?.index ?? -1).join(",");
 }
 
+/**
+ * Whether a browser is currently publishing a known passive battle-progress surface.
+ *
+ * A low-FPS two-browser runner can remain in NextEncounterPhase's tween (or another battle narration
+ * phase) longer than the short unknown-UI budget. `awaitingActionInput !== true` proves there is no key
+ * a human could press yet; keep waiting under the immutable outer deadline. Once a prompt arms, this
+ * exemption disappears: the ordinary prompt driver must press it, and an authority-frozen prompt still
+ * fails loudly instead of being mislabeled as passive.
+ */
+export function hasPassiveBattleProgressSurface(clients, cursors) {
+  return clients.some(client => {
+    const cursor = cursors[client.label] ?? 0;
+    const event = client.evidence.findLastSemanticSurface(cursor);
+    const observation = event?.observation;
+    if (
+      observation == null
+      || observation.operationClass !== "battle-progress"
+      || !BATTLE_PROMPT_PHASES.has(observation.surfaceId)
+      || observation.ready?.handlerActive !== true
+      || observation.ready?.awaitingActionInput === true
+    ) {
+      return false;
+    }
+    const phaseEvent = client.evidence.findLast(START_PHASE, cursor);
+    const phaseName = phaseEvent == null ? null : START_PHASE.exec(phaseEvent.text ?? "")?.[1];
+    return phaseName == null || (event.index >= phaseEvent.index && observation.phase === phaseName);
+  });
+}
+
 function currentPairedBattleKind(rig, wave) {
   const observations = Object.values(rig.clients).map(client => {
     const event = client.evidence.findLastSurface("command");
@@ -2447,6 +2476,13 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
     const registeredSurface = findRegisteredSurface(rig, dispatch, surfaceCursors, handledIndex);
     if (registeredSurface != null) {
       lastRegisteredSurface = registeredSurface.name;
+      stallSince = 0;
+      await delay(150);
+      continue;
+    }
+
+    if (hasPassiveBattleProgressSurface(clients, commandCursors)) {
+      lastRegisteredSurface = "passive-battle-progress";
       stallSince = 0;
       await delay(150);
       continue;

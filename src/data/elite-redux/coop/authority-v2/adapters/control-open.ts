@@ -20,7 +20,7 @@ import type {
   CoopFrameContextV2,
   CoopNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
-import { validateNextControl } from "#data/elite-redux/coop/authority-v2/next-control";
+import { controlsEqual, validateNextControl } from "#data/elite-redux/coop/authority-v2/next-control";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 
 export interface CoopCommandOpenMaterialV2 {
@@ -31,11 +31,46 @@ export interface CoopCommandOpenMaterialV2 {
   readonly authoritativeState: CoopAuthoritativeBattleStateV1;
 }
 
+/**
+ * Complete projection capsule for the deterministic every-five-wave Crossroads picker.
+ *
+ * Crossroads has no separate `*_PRESENT` result: its Stay/Leave options are static, but opening the
+ * actionable handler is still a mechanical control boundary. Keeping the exact result operation and
+ * constructor source wave in this CONTROL_COMMIT lets ordinary delivery and recovery install the same
+ * generation without deriving it from a local phase queue.
+ */
+export interface CoopCrossroadsControlProjectionV2 {
+  readonly kind: "crossroads";
+  readonly sourceWave: number;
+}
+
+/** A real shared-interaction chokepoint authored after the preceding result entered an ordered wait. */
+export interface CoopInteractionOpenMaterialV2 {
+  readonly kind: "interaction-open";
+  readonly wave: number;
+  readonly turn: number;
+  /** Complete state at the exact pre-input boundary. */
+  readonly authoritativeState: CoopAuthoritativeBattleStateV1;
+  /** The exact executable control this material opens; included in the digest, not merely beside it. */
+  readonly control: Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }>;
+  /** Closed phase-construction material used by recovery. */
+  readonly projection: CoopCrossroadsControlProjectionV2;
+}
+
+export type CoopControlOpenMaterialV2 = CoopCommandOpenMaterialV2 | CoopInteractionOpenMaterialV2;
+
 export interface BuildCommandOpenEntryInput {
   readonly context: CoopFrameContextV2;
   readonly operationId: string;
   readonly material: CoopCommandOpenMaterialV2;
   readonly command: Extract<CoopNextControl, { kind: "COMMAND_FRONTIER" }>;
+  readonly subsumes?: readonly number[];
+}
+
+export interface BuildInteractionOpenEntryInput {
+  readonly context: CoopFrameContextV2;
+  readonly operationId: string;
+  readonly material: CoopInteractionOpenMaterialV2;
   readonly subsumes?: readonly number[];
 }
 
@@ -89,8 +124,40 @@ export function isCompleteCommandOpenMaterial(value: unknown): value is CoopComm
   );
 }
 
+/** Validate the complete, recoverable Crossroads control-open image. */
+export function isCompleteInteractionOpenMaterial(value: unknown): value is CoopInteractionOpenMaterialV2 {
+  if (!isPlainObject(value) || !isPlainObject(value.control) || !isPlainObject(value.projection)) {
+    return false;
+  }
+  const control = value.control as unknown as Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }>;
+  return (
+    value.kind === "interaction-open"
+    && isPositiveSafeInt(value.wave)
+    && isPositiveSafeInt(value.turn)
+    && isCompleteCommandOpenState(value.authoritativeState, value.wave, value.turn)
+    && control.kind === "SHARED_INTERACTION"
+    && control.surfaceClass === "op:biome"
+    && control.operationKind === "CROSSROADS_PICK"
+    && isPositiveSafeInt(control.epoch)
+    && control.wave === value.wave
+    && control.turn === value.turn
+    && validateNextControl(control).ok
+    && control.successor.operationKinds.length === 1
+    && control.successor.operationKinds[0] === "CROSSROADS_PICK"
+    && control.successor.operationIds?.length === 1
+    && control.successor.operationIds[0] === control.operationId
+    && value.projection.kind === "crossroads"
+    && isPositiveSafeInt(value.projection.sourceWave)
+    && value.projection.sourceWave === value.wave
+  );
+}
+
 export function commandOpenMaterialDigest(material: CoopCommandOpenMaterialV2): string {
   return `command-open:${fnv1a32(canonicalJson(material))}`;
+}
+
+export function interactionOpenMaterialDigest(material: CoopInteractionOpenMaterialV2): string {
+  return `interaction-open:${fnv1a32(canonicalJson(material))}`;
 }
 
 export function buildCommandOpenEntry(input: BuildCommandOpenEntryInput): Omit<CoopAuthorityEntry, "revision"> {
@@ -140,6 +207,50 @@ export function decodeCommandOpenEntry(entry: CoopAuthorityEntry): CoopCommandOp
     return null;
   }
   return material;
+}
+
+/** Build the ordered control boundary for one deterministic shared-input phase. */
+export function buildInteractionOpenEntry(input: BuildInteractionOpenEntryInput): Omit<CoopAuthorityEntry, "revision"> {
+  if (typeof input.operationId !== "string" || input.operationId.length === 0) {
+    throw new Error("interaction CONTROL_COMMIT operationId must be a non-empty string");
+  }
+  if (!isCompleteInteractionOpenMaterial(input.material)) {
+    throw new Error("interaction CONTROL_COMMIT requires a complete state and recoverable projection");
+  }
+  if (input.material.control.epoch !== input.context.sessionEpoch) {
+    throw new Error("interaction CONTROL_COMMIT control does not match its authenticated epoch");
+  }
+  return {
+    context: input.context,
+    operationId: input.operationId,
+    kind: "CONTROL_COMMIT",
+    material: {
+      digest: interactionOpenMaterialDigest(input.material),
+      payload: structuredClone(input.material),
+    },
+    nextControl: structuredClone(input.material.control),
+    subsumes: normalizeSubsumes(input.subsumes),
+  };
+}
+
+export function decodeInteractionOpenEntry(entry: CoopAuthorityEntry): CoopInteractionOpenMaterialV2 | null {
+  if (entry.kind !== "CONTROL_COMMIT" || !isCompleteInteractionOpenMaterial(entry.material.payload)) {
+    return null;
+  }
+  const material = entry.material.payload;
+  if (
+    interactionOpenMaterialDigest(material) !== entry.material.digest
+    || entry.context.sessionEpoch !== material.control.epoch
+    || !controlsEqual(material.control, entry.nextControl)
+  ) {
+    return null;
+  }
+  return material;
+}
+
+/** Decode either closed CONTROL_COMMIT material kind without guessing from its successor. */
+export function decodeControlOpenEntry(entry: CoopAuthorityEntry): CoopControlOpenMaterialV2 | null {
+  return decodeCommandOpenEntry(entry) ?? decodeInteractionOpenEntry(entry);
 }
 
 function normalizeSubsumes(values: readonly number[] | undefined): readonly number[] {

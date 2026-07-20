@@ -14,6 +14,7 @@
 // from its ambient queue, local RNG, or a stale handler.
 // =============================================================================
 
+import { decodeInteractionOpenEntry } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import type { CoopAuthorityEntry } from "#data/elite-redux/coop/authority-v2/contract";
 import { decodeCoopV2InteractionEnvelope } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import {
@@ -52,6 +53,11 @@ export type CoopV2InteractionProjectionPlan =
     }
   | {
       readonly kind: "biome";
+      readonly operationId: string;
+      readonly sourceWave: number;
+    }
+  | {
+      readonly kind: "crossroads";
       readonly operationId: string;
       readonly sourceWave: number;
     }
@@ -138,9 +144,22 @@ function rewardProjectionFromOperation(
 export function projectionPlanOfCoopV2InteractionEntry(
   entry: CoopAuthorityEntry,
 ): CoopV2InteractionProjectionPlan | null {
-  const material = decodeCoopV2InteractionEnvelope(entry);
   const control = entry.nextControl;
-  if (material == null || control.kind !== "SHARED_INTERACTION") {
+  if (control.kind !== "SHARED_INTERACTION") {
+    return null;
+  }
+  const controlOpen = decodeInteractionOpenEntry(entry);
+  if (controlOpen != null) {
+    return controlOpen.projection.kind === "crossroads"
+      ? {
+          kind: "crossroads",
+          operationId: control.operationId,
+          sourceWave: controlOpen.projection.sourceWave,
+        }
+      : null;
+  }
+  const material = decodeCoopV2InteractionEnvelope(entry);
+  if (material == null) {
     return null;
   }
   const operation = material.envelope.pendingOperation;

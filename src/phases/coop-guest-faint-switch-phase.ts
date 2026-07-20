@@ -25,6 +25,7 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   coopSessionGeneration,
+  enterCoopV2ReplacementControlBoundary,
   failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
@@ -68,7 +69,6 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     if (this.opened) {
       return;
     }
-    this.opened = true;
     const controller = getCoopController();
     const relay = getCoopInteractionRelay();
     if (controller == null || relay == null) {
@@ -105,7 +105,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       failCoopSharedSession("The replacement picker lost its active runtime.");
       return;
     }
-    this.coopV2ControlOperationId = replacementOperationId(
+    const controlOperationId = replacementOperationId(
       {
         epoch: controller.sessionEpoch,
         wave: sourceWave,
@@ -115,6 +115,36 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       },
       controller.localSeatId,
     );
+    this.coopV2ControlOperationId = controlOperationId;
+    const controlBoundary = enterCoopV2ReplacementControlBoundary({
+      operationId: controlOperationId,
+      ownerSeatId: controller.localSeatId,
+      wave: sourceWave,
+      turn: sourceTurn,
+      occurrence,
+      fieldIndex: this.fieldIndex,
+      phaseToken: this,
+      resume: () => {
+        runWhenCoopRuntimeActive(runtime, () => {
+          if (coopSessionGeneration() !== sourceGeneration || getCoopRuntime() !== runtime) {
+            return;
+          }
+          scene.phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", this.fieldIndex, sourceAddress);
+        });
+      },
+    });
+    if (controlBoundary === "failed") {
+      failCoopSharedSession("The replacement picker could not obtain its exact Authority V2 control.");
+      return;
+    }
+    if (controlBoundary === "deferred") {
+      // Do not hold the replay tree in front of CoopFinalizeTurnPhase: that phase is what applies the
+      // settled TURN_COMMIT whose successor releases the reconstruction callback above.
+      this.opened = true;
+      scene.phaseManager.shiftPhase();
+      return;
+    }
+    this.opened = true;
     const boundaryStillLive = (): boolean =>
       coopSessionGeneration() === sourceGeneration
       && getCoopRuntime() === runtime
