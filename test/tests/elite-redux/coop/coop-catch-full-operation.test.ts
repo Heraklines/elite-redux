@@ -7,15 +7,22 @@ import {
   armCoopCatchFullIntentResend,
   captureCoopCatchFullOperationBinding,
   commitCoopCatchFullAuthorityDecision,
+  coopCatchFullDecisionOperationId,
   resetCoopCatchFullOperationFlag,
   resetCoopCatchFullRetryMs,
   sendCoopCatchFullPrompt,
+  sendCoopCatchFullPromptWithOperationId,
   setCoopCatchFullOperationEnabled,
   setCoopCatchFullRetryMs,
 } from "#data/elite-redux/coop/coop-catch-full-operation";
 import { COOP_CATCH_FULL_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopOperationJournalApplied } from "#data/elite-redux/coop/coop-operation-journal";
-import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  assembleCoopRuntime,
+  clearCoopRuntime,
+  setCoopRuntime,
+  settleCoopV2InteractionOperation,
+} from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { afterEach, describe, expect, it } from "vitest";
@@ -124,6 +131,17 @@ describe("co-op wild catch-full operation migration", () => {
     const hostBinding = captureCoopCatchFullOperationBinding();
     setCoopRuntime(guestRuntime);
     const guestBinding = captureCoopCatchFullOperationBinding();
+    setCoopRuntime(hostRuntime);
+    const promptOperationId = sendCoopCatchFullPromptWithOperationId(
+      hostRuntime.interactionRelay,
+      "Venusaur",
+      3,
+      { localRole: "host", wave: 7, turn: 4 },
+      hostBinding,
+    );
+    expect(promptOperationId).not.toBeNull();
+    const decisionOperationId = coopCatchFullDecisionOperationId(promptOperationId!);
+    expect(decisionOperationId).not.toBeNull();
     let delivered = 0;
     const offCount = pair.host.onMessage(msg => {
       if (msg.t === "interactionChoice" && msg.kind === "catchFull") {
@@ -149,6 +167,7 @@ describe("co-op wild catch-full operation migration", () => {
 
     expect(pair.faultsInjected(), "the first owner decision was actually dropped").toBe(1);
     expect(await awaited).toMatchObject({ choice: 4, kind: "catchFull" });
+    expect(settleCoopV2InteractionOperation(decisionOperationId!, guestRuntime)).toBe(true);
     setCoopRuntime(hostRuntime);
     commitCoopCatchFullAuthorityDecision(
       {
@@ -157,11 +176,14 @@ describe("co-op wild catch-full operation migration", () => {
         localRole: "host",
         wave: 7,
         turn: 4,
+        operationId: decisionOperationId!,
       },
       hostBinding,
     );
     await new Promise(resolve => setTimeout(resolve, 30));
-    const traced = getCoopOperationJournalApplied().find(envelope => envelope.pendingOperation?.kind === "CATCH_FULL");
+    const traced = getCoopOperationJournalApplied()
+      .filter(envelope => envelope.pendingOperation?.kind === "CATCH_FULL")
+      .at(-1);
     expect(traced?.pendingOperation?.payload, "the host-resolved owner decision is trace-replayable").toEqual({
       type: "decision",
       speciesId: 3,
@@ -182,21 +204,23 @@ describe("co-op wild catch-full operation migration", () => {
     setCoopRuntime(hostRuntime);
     const hostBinding = captureCoopCatchFullOperationBinding();
     const awaited = hostRuntime.interactionRelay.awaitInteractionChoice(COOP_CATCH_FULL_SEQ, 100, ["catchFull"]);
-    expect(
-      sendCoopCatchFullPrompt(
-        hostRuntime.interactionRelay,
-        "Venusaur",
-        3,
-        { localRole: "host", wave: 7, turn: 5 },
-        hostBinding,
-      ),
-    ).toBe(true);
+    const promptOperationId = sendCoopCatchFullPromptWithOperationId(
+      hostRuntime.interactionRelay,
+      "Venusaur",
+      3,
+      { localRole: "host", wave: 7, turn: 5 },
+      hostBinding,
+    );
+    expect(promptOperationId).not.toBeNull();
+    const decisionOperationId = coopCatchFullDecisionOperationId(promptOperationId!);
+    expect(decisionOperationId).not.toBeNull();
 
     // Model the promise tail after a two-engine context swap: the guest remains the ambient process runtime
     // when its proposal resolves the host's await. The explicit binding must still use the host clock/journal.
     setCoopRuntime(guestRuntime);
     guestRuntime.interactionRelay.sendInteractionChoice(COOP_CATCH_FULL_SEQ, "catchFull", 4);
     expect(await awaited).toMatchObject({ choice: 4, kind: "catchFull" });
+    expect(settleCoopV2InteractionOperation(decisionOperationId!, guestRuntime)).toBe(true);
     expect(
       commitCoopCatchFullAuthorityDecision(
         {
@@ -205,6 +229,7 @@ describe("co-op wild catch-full operation migration", () => {
           localRole: "host",
           wave: 7,
           turn: 5,
+          operationId: decisionOperationId!,
         },
         hostBinding,
       ),
@@ -231,6 +256,17 @@ describe("co-op wild catch-full operation migration", () => {
     const hostBinding = captureCoopCatchFullOperationBinding();
     setCoopRuntime(guestRuntime);
     const guestBinding = captureCoopCatchFullOperationBinding();
+    setCoopRuntime(hostRuntime);
+    const promptOperationId = sendCoopCatchFullPromptWithOperationId(
+      hostRuntime.interactionRelay,
+      "Venusaur",
+      3,
+      { localRole: "host", wave: 7, turn: 6 },
+      hostBinding,
+    );
+    expect(promptOperationId).not.toBeNull();
+    const decisionOperationId = coopCatchFullDecisionOperationId(promptOperationId!);
+    expect(decisionOperationId).not.toBeNull();
     let delivered = 0;
     const offCount = pair.host.onMessage(msg => {
       if (msg.t === "interactionChoice" && msg.kind === "catchFull") {
@@ -252,6 +288,7 @@ describe("co-op wild catch-full operation migration", () => {
       },
       guestBinding,
     );
+    expect(settleCoopV2InteractionOperation(decisionOperationId!, guestRuntime)).toBe(true);
     expect(
       commitCoopCatchFullAuthorityDecision(
         {
@@ -260,6 +297,7 @@ describe("co-op wild catch-full operation migration", () => {
           localRole: "host",
           wave: 7,
           turn: 6,
+          operationId: decisionOperationId!,
         },
         hostBinding,
       ),

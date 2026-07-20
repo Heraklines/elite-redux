@@ -30,6 +30,7 @@ import {
   resetCoopAbilityOutcomeRetryMs,
   setCoopAbilityOperationEnabled,
   setCoopAbilityOutcomeRetryMs,
+  settleCoopAbilityOperation,
 } from "#data/elite-redux/coop/coop-ability-operation";
 import {
   COOP_ABILITY_KIND,
@@ -43,7 +44,12 @@ import {
   COOP_INTERACTION_REROLL,
   CoopInteractionRelay,
 } from "#data/elite-redux/coop/coop-interaction-relay";
-import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  assembleCoopRuntime,
+  clearCoopRuntime,
+  setCoopRuntime,
+  settleCoopV2InteractionOperation,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
@@ -354,17 +360,23 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
       );
       const action = await awaited;
       expect(action?.data).toEqual(data);
-      expect(
-        adoptAbilityWatcherOutcome(
-          {
-            pinned: SHOP_SEQ,
-            data: action?.data ?? null,
-            localRole: "guest",
-            wave: 1,
-          },
-          guestBinding,
-        ),
-      ).toMatchObject({ accepted: true, projectionApplied: false });
+      const adoption = adoptAbilityWatcherOutcome(
+        {
+          pinned: SHOP_SEQ,
+          data: action?.data ?? null,
+          localRole: "guest",
+          wave: 1,
+        },
+        guestBinding,
+      );
+      expect(adoption).toMatchObject({ accepted: true, projectionApplied: false });
+      if (!adoption.accepted) {
+        throw new Error("the exact watcher result was not adopted");
+      }
+      // Model the production phase edge: consuming the carrier is not material completion. The picker
+      // first ends its exact operation, then the runtime retries the deferred retained result.
+      expect(settleCoopAbilityOperation(adoption.operationId, guestBinding)).toBe(true);
+      expect(settleCoopV2InteractionOperation(adoption.operationId, guestRuntime)).toBe(true);
       expect(
         adoptAbilityWatcherOutcome(
           {

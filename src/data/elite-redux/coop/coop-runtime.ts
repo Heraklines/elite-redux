@@ -4083,15 +4083,24 @@ export interface CoopRuntime {
 let active: CoopRuntime | null = null;
 
 /**
- * Production phase terminal proof for an Authority V2 interaction result. FIFO injection, a raw proposal,
+ * Production phase terminal proof for an authoritative interaction result. FIFO injection, a raw proposal,
  * and a queued phase may never call this; only the exact operation consumer calls it after ending/shifting
- * its local phase.
+ * its local phase. The proof belongs to the runtime even before V2 negotiation: legacy journal fallback
+ * uses the same live materializers and must be able to finish their deferred entry without inventing a
+ * weaker completion rule. Only V2 retry/projection below remains cutover-gated.
  */
 export function settleCoopV2InteractionOperation(operationId: string, runtime: CoopRuntime | null = active): boolean {
-  if (runtime == null || operationId.length === 0 || !coopV2InteractionCutovers.has(runtime)) {
+  if (runtime == null || operationId.length === 0) {
     return false;
   }
   runtime.v2SettledInteractionOperations.add(operationId);
+  if (!coopV2InteractionCutovers.has(runtime)) {
+    // A mixed-capability peer pair stays on the legacy retained journal. Its live sink deliberately
+    // deferred until this exact phase terminal; retry now so the decision cancels owner resends and
+    // advances the dense legacy cursor without waiting for a transport backoff.
+    runtime.durability?.retryDeferred("op:global");
+    return true;
+  }
   // Pace the retained replica entry immediately from the real engine completion edge. Authority
   // redelivery remains the durability owner; this only avoids making correctness/liveness wait for its
   // next 250ms backoff when the phase terminal appeared one microtask after material injection.

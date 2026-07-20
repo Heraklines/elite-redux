@@ -21,6 +21,7 @@ import {
   armCoopRevivalIntentResend,
   captureCoopRevivalOperationBinding,
   commitRevivalAuthorityDecision,
+  coopRevivalOperationId,
   resetCoopRevivalOperationFlag,
   resetCoopRevivalOperationState,
   resetCoopRevivalRetryMs,
@@ -28,7 +29,12 @@ import {
   setCoopRevivalOperationEnabled,
   setCoopRevivalRetryMs,
 } from "#data/elite-redux/coop/coop-revival-operation";
-import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  assembleCoopRuntime,
+  clearCoopRuntime,
+  setCoopRuntime,
+  settleCoopV2InteractionOperation,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -185,6 +191,14 @@ describe("co-op Revival Blessing operation migration", () => {
     expect(pair.faultsInjected(), "the first owner decision was actually dropped").toBe(1);
     const choice = await awaited;
     expect(choice).toMatchObject({ choice: 3, data, kind: "revival" });
+    const decisionOperationId = coopRevivalOperationId(
+      { type: "decision", fieldIndex: COOP_GUEST_FIELD_INDEX, partySlot: 3, speciesId: 9 },
+      4,
+      2,
+      "guest",
+      guestBinding,
+    );
+    expect(settleCoopV2InteractionOperation(decisionOperationId, guestRuntime)).toBe(true);
     setCoopRuntime(hostRuntime);
     expect(
       commitRevivalAuthorityDecision(

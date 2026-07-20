@@ -25,7 +25,7 @@ import {
   setCoopRewardAuthorityStateHooksForTest,
   setCoopRewardOperationEnabled,
 } from "#data/elite-redux/coop/coop-reward-operation";
-import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
+import type { CoopAuthoritativeBattleStateV1, CoopRewardSurfaceIdentity } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { type CoopFaultProfile, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -69,13 +69,14 @@ function latestAppliedOperationAddress(): { epoch: number; wave: number; turn: n
   return { epoch: envelope.sessionEpoch, wave: envelope.wave, turn: envelope.turn };
 }
 
-function rewardContinuation(pinned: number, reroll = 0) {
+function rewardContinuation(pinned: number, reroll = 0, rewardSurface?: CoopRewardSurfaceIdentity) {
   return {
     continuation: {
       surface: "reward" as const,
       pinned,
       reroll,
       options: [{ id: "TEST_REWARD", tier: 0, upgradeCount: 0, cost: 0 }],
+      ...(rewardSurface == null ? {} : { rewardSurface }),
     },
   };
 }
@@ -540,6 +541,9 @@ describe("P33 retained reward/shop authoritative results", () => {
       slot: COOP_INTERACTION_LEAVE,
       data: undefined,
       terminal: true,
+      result: {
+        remainingStock: [],
+      },
     });
     expect((envelope.pendingOperation?.payload as CoopRewardActionPayload).terminal).toBe(true);
     hostManager.dispose();
@@ -594,7 +598,7 @@ describe("P33 retained reward/shop authoritative results", () => {
         preparedA.operationId,
         state(61, 700, "runtime-a"),
         bindingA,
-        rewardContinuation(0),
+        rewardContinuation(0, 0, params.rewardSurface),
       ),
     ).toEqual({
       operationId: preparedA.operationId,
@@ -605,7 +609,7 @@ describe("P33 retained reward/shop authoritative results", () => {
         preparedB.operationId,
         state(62, 600, "runtime-b"),
         bindingB,
-        rewardContinuation(0),
+        rewardContinuation(0, 0, params.rewardSurface),
       ),
     ).toEqual({
       operationId: preparedB.operationId,

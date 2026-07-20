@@ -3,13 +3,22 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_STORMGLASS_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
 import { getCoopOperationJournalApplied } from "#data/elite-redux/coop/coop-operation-journal";
 import {
+  assembleCoopRuntime,
+  clearCoopRuntime,
+  setCoopRuntime,
+  settleCoopV2InteractionOperation,
+} from "#data/elite-redux/coop/coop-runtime";
+import { COOP_STORMGLASS_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  captureCoopStormglassOperationBinding,
   commitCoopStormglassDecision,
+  coopStormglassDecisionOperationId,
+  coopStormglassPresentationOperationId,
   resetCoopStormglassOperationFlag,
   setCoopStormglassOperationEnabled,
+  settleCoopStormglassOperation,
 } from "#data/elite-redux/coop/coop-stormglass-operation";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { WeatherType } from "#enums/weather-type";
@@ -47,13 +56,27 @@ describe("co-op Stormglass operation migration", () => {
     const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
     const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
     setCoopRuntime(hostRuntime);
+    const hostBinding = captureCoopStormglassOperationBinding();
+    setCoopRuntime(guestRuntime);
+    const guestBinding = captureCoopStormglassOperationBinding();
+    const decisionOperationId = coopStormglassDecisionOperationId(coopStormglassPresentationOperationId(hostBinding));
+    expect(decisionOperationId).not.toBeNull();
+    expect(settleCoopStormglassOperation(decisionOperationId!, guestBinding)).toBe(true);
+    expect(settleCoopV2InteractionOperation(decisionOperationId!, guestRuntime)).toBe(true);
+    setCoopRuntime(hostRuntime);
     const awaited = guestRuntime.interactionRelay.awaitInteractionChoice(COOP_STORMGLASS_SEQ, 100, ["stormglass"]);
 
-    commitCoopStormglassDecision(hostRuntime.interactionRelay, 2, WeatherType.SANDSTORM, {
-      localRole: "host",
-      wave: 8,
-      turn: 0,
-    });
+    commitCoopStormglassDecision(
+      hostRuntime.interactionRelay,
+      2,
+      WeatherType.SANDSTORM,
+      {
+        localRole: "host",
+        wave: 8,
+        turn: 0,
+      },
+      hostBinding,
+    );
 
     expect(pair.faultsInjected(), "the raw stormglass choice was actually dropped").toBe(1);
     expect(await awaited).toMatchObject({ choice: 2, kind: "stormglass" });
