@@ -471,6 +471,24 @@ test("Crossroads result envelopes retain the exact V2 control turn instead of a 
     /create\("ErCrossroadsPhase", plan\.sourceWave, control\.turn\)[\s\S]*installCoopV2CrossroadsProjection\(plan\.operationId, plan\.sourceWave, control\.turn\)/u,
     "ordinary and recovery projection pass the authority-stated turn into Crossroads",
   );
+
+  const ownerReadyStart = crossroadsPhase.indexOf("private publishCoopOwnerSurfaceWhenActionable(");
+  const ownerReadyEnd = crossroadsPhase.indexOf("\n  /**", ownerReadyStart + 1);
+  assert.notEqual(ownerReadyStart, -1, "Crossroads exposes a bounded owner actionability proof");
+  assert.ok(ownerReadyEnd > ownerReadyStart, "Crossroads owner actionability proof has a bounded source block");
+  const ownerReady = crossroadsPhase.slice(ownerReadyStart, ownerReadyEnd);
+  const actionableCheck = ownerReady.indexOf("handler.isCoopV2InputActionable?.() === true");
+  const controlProof = ownerReady.indexOf("notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime)");
+  assert.ok(actionableCheck >= 0, "Crossroads checks the exact option handler's input-delay state");
+  assert.ok(
+    controlProof > actionableCheck,
+    "Crossroads cannot publish controlInstalled before the handler is actionable",
+  );
+  assert.match(
+    ownerReady,
+    /runWhenCoopRuntimeActive\(this\.coopOwningRuntime, publish\)/u,
+    "delayed Crossroads readiness re-enters the phase's own browser runtime",
+  );
 });
 
 test("the learn-move soak proves the real guest UI-to-relay terminal before rebuilding combat", () => {

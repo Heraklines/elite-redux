@@ -4260,6 +4260,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           wave,
           `learn-move presentation never installed its exact replay phase (current=${guestLearnPhase?.phaseName ?? "none"})`,
         );
+        return;
       }
       await withClient(rig.guestCtx, async () => {
         guestLearnPhase.start();

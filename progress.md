@@ -545,3 +545,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   can create. The driver now first proves the exact retained phase, starts that
   one phase to model the production dispatcher, then proves and drives the real
   handler and still requires the full authority terminal.
+
+2026-07-20 - Actionability-before-result closure
+
+- Requalification at `892021b33` proved the retained settlement coordinate:
+  the guest now constructed Crossroads at the authority's exact wave 5/turn 2
+  address. It also exposed the next independent race. Revision 26's
+  `CONTROL_COMMIT` applied its material while the real option handler was still
+  inside its 500 ms input delay. The guest emitted the Leave result as revision
+  27 before revision 26 reached `controlInstalled`; the replica correctly held
+  27 as a gap and remained on `ErCrossroadsPhase`.
+- Crossroads no longer publishes readiness merely because OPTION_SELECT is
+  visible. The owner phase re-enters its own runtime and polls the exact active
+  handler's `isCoopV2InputActionable()` proof. Only then does it publish
+  `controlInstalled` and the wave-continuation receipt. A source contract pins
+  the required ordering so no future delayed menu can regress to
+  visibility-as-authority.
+- The same gate caught a nullable learn-move harness reference statically. The
+  failed exact-phase proof now exits before dereference. Scoped Biome is clean
+  apart from repository-baseline warnings, the Authority source contracts are
+  18/18, and runtime qualification remains remote-only.

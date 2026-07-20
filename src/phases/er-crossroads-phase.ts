@@ -501,12 +501,51 @@ export class ErCrossroadsPhase extends Phase {
         this.clearCrossroadsCommitRecovery();
         this.coopOwnerPromptState = "open";
         getCoopUiMirror()?.beginSession("owner", UiMode.OPTION_SELECT, mirrorSeq);
-        notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
-        // Crossroads can be the first actionable surface after the every-ten-wave market. Publishing from
-        // the real, active picker keeps the retained WAVE_ADVANCE journal closed until a player can act;
-        // merely queuing this phase is deliberately insufficient.
-        this.notifyCoopContinuationSurfaceReady();
+        this.publishCoopOwnerSurfaceWhenActionable(generation, wave);
       });
+  }
+
+  /**
+   * The option handler deliberately blocks input for 500 ms after it becomes visible. Visibility is not a
+   * V2 control proof: publishing during that delay can let a result entry race ahead of the still-uninstalled
+   * CONTROL_COMMIT. Retry from this phase's own runtime until the exact handler can consume human input.
+   */
+  private publishCoopOwnerSurfaceWhenActionable(generation: number, wave: number): void {
+    const publish = (): void => {
+      if (!this.boundaryStillLive(generation, wave)) {
+        return;
+      }
+      const handler = globalScene.ui.getHandler() as
+        | {
+            active?: boolean;
+            isCoopV2InputActionable?: () => boolean;
+          }
+        | undefined;
+      const actionable =
+        globalScene.ui.getMode() === UiMode.OPTION_SELECT
+        && handler?.active === true
+        && handler.isCoopV2InputActionable?.() === true;
+      if (!actionable) {
+        setTimeout(() => {
+          if (this.coopOwningRuntime == null) {
+            publish();
+          } else {
+            runWhenCoopRuntimeActive(this.coopOwningRuntime, publish);
+          }
+        }, 10);
+        return;
+      }
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+      // Crossroads can be the first actionable surface after the every-ten-wave market. Publishing from
+      // the real, active picker keeps the retained WAVE_ADVANCE journal closed until a player can act;
+      // merely queuing this phase is deliberately insufficient.
+      this.notifyCoopContinuationSurfaceReady();
+    };
+    if (this.coopOwningRuntime == null) {
+      publish();
+    } else {
+      runWhenCoopRuntimeActive(this.coopOwningRuntime, publish);
+    }
   }
 
   /** Publish only after the phase's own runtime and scene are installed together. */
