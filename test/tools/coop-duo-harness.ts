@@ -1806,6 +1806,18 @@ export function markRealGuestCommandBoundary(scene: BattleScene, wave: number, t
 export function materializeMirroredGuestInputTurn(scene: BattleScene): void {
   const current = scene.phaseManager.getCurrentPhase();
   const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+  const proven = realGuestCommandBoundaries.get(scene);
+  if (
+    current?.phaseName === "CommandPhase"
+    && proven?.wave === scene.currentBattle?.waveIndex
+    && proven.turn === scene.currentBattle?.turn
+  ) {
+    // buildDuo already crossed the omitted TurnInit boundary and recorded this exact real CommandPhase.
+    // Older callers still invoke this helper once after buildDuo; treating that proven boundary as a
+    // successful no-op prevents them from deleting/recreating a live V2 control surface. An unproved,
+    // wrong-address, or non-command phase remains loud below.
+    return;
+  }
   const untouchedBoot =
     current != null
     && DIRECT_GUEST_BOOT_PHASES.has(current.phaseName)

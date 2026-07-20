@@ -33,6 +33,9 @@ import { isValidNextControl as isCanonicalNextControl } from "#data/elite-redux/
 /** Max length of a wire operationId - bounds the identity so a malformed frame cannot balloon memory. */
 export const COOP_OPERATION_ID_MAX_LENGTH = 256;
 
+/** Defensive recursion bound for one mechanical wire image. */
+const COOP_WIRE_JSON_MAX_DEPTH = 128;
+
 /** Matches any ASCII control character (C0 range + DEL) - forbidden in a wire-safe identity token. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control chars is the explicit intent.
 const CONTROL_CHAR = /[\u0000-\u001f\u007f]/;
@@ -64,6 +67,84 @@ export function isValidRevision(revision: unknown): revision is number {
 export function hasValidDigest(entry: { readonly material?: { readonly digest?: unknown } }): boolean {
   const digest = entry.material?.digest;
   return typeof digest === "string" && digest.length > 0 && digest.length <= COOP_OPERATION_ID_MAX_LENGTH;
+}
+
+/**
+ * Whether a value survives the protocol's JSON carrier byte-for-byte as the same data model.
+ *
+ * `structuredClone` is deliberately NOT the definition of a wire value: it preserves `undefined`, sparse
+ * array holes, non-finite numbers, Maps, Dates, and other shapes which JSON/WebRTC either drops, rewrites,
+ * or rejects. Authority digests and application must describe the exact image the peer receives, so every
+ * mechanical entry is rejected before it consumes a revision unless the complete entry is JSON-stable.
+ */
+export function isWireStableJsonValue(value: unknown): boolean {
+  return isWireStableJsonValueAt(value, new Set<object>(), 0);
+}
+
+function isWireStableJsonValueAt(value: unknown, ancestors: Set<object>, depth: number): boolean {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    return true;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+  if (typeof value !== "object" || depth > COOP_WIRE_JSON_MAX_DEPTH) {
+    return false;
+  }
+  if (ancestors.has(value)) {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
+    return false;
+  }
+
+  ancestors.add(value);
+  try {
+    return Array.isArray(value)
+      ? isWireStableJsonArray(value, ancestors, depth + 1)
+      : isWireStableJsonRecord(value, ancestors, depth + 1);
+  } finally {
+    ancestors.delete(value);
+  }
+}
+
+function isWireStableJsonArray(value: unknown[], ancestors: Set<object>, depth: number): boolean {
+  const keys = Reflect.ownKeys(value);
+  if (keys.length !== value.length + 1 || !keys.includes("length") || Object.keys(value).length !== value.length) {
+    return false;
+  }
+  for (let index = 0; index < value.length; index++) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (
+      descriptor == null
+      || !descriptor.enumerable
+      || !("value" in descriptor)
+      || !isWireStableJsonValueAt(descriptor.value, ancestors, depth)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isWireStableJsonRecord(value: object, ancestors: Set<object>, depth: number): boolean {
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== "string") {
+      return false;
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (
+      descriptor == null
+      || !descriptor.enumerable
+      || !("value" in descriptor)
+      || !isWireStableJsonValueAt(descriptor.value, ancestors, depth)
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 const AUTHORITY_ENTRY_KINDS: ReadonlySet<string> = new Set([
@@ -115,11 +196,12 @@ export function isValidFrameContext(context: unknown): context is CoopFrameConte
 /**
  * Whether a value is a structurally valid CoopAuthorityEntry (a committed one - `revision` present). Used
  * to reject a malformed inbound frame at the replica boundary BEFORE it can perturb ordering state. Checks
- * identity (operationId + revision), the digest, the kind, the frame context, and the successor control -
- * NOT the opaque payload (the log never inspects it).
+ * identity (operationId + revision), the digest, the kind, the frame context, the successor control, and
+ * JSON-wire stability of the complete entry. The payload remains mechanically opaque, but it may not carry
+ * a shape whose JSON representation differs from the value used to derive its digest.
  */
 export function isValidAuthorityEntry(entry: unknown): entry is CoopAuthorityEntry {
-  if (entry == null || typeof entry !== "object") {
+  if (entry == null || typeof entry !== "object" || !isWireStableJsonValue(entry)) {
     return false;
   }
   const candidate = entry as Partial<CoopAuthorityEntry>;

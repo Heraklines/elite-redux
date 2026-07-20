@@ -282,6 +282,49 @@ describe("authority-v2 log", () => {
     expect(scheduler.liveCount()).toBe(0);
   });
 
+  it("rejects every non-JSON-stable mechanical image before consuming a revision", () => {
+    const authority = makeLog(scheduler, sent);
+    const invalidPayloads: unknown[] = [
+      { droppedByJson: undefined },
+      { rewrittenByJson: Number.NaN },
+      { rewrittenByJson: Number.POSITIVE_INFINITY },
+      Object.assign(["dense"], { droppedByJson: true }),
+      new Array(1),
+      new Map([["not", "json"]]),
+      {
+        get invokedOnlyBySerialization() {
+          return "unstable";
+        },
+      },
+    ];
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    invalidPayloads.push(cyclic);
+
+    for (const [index, payload] of invalidPayloads.entries()) {
+      expect(
+        () =>
+          authority.commit({
+            ...entryInput(`wire-invalid-${index}`),
+            material: { digest: `wire-invalid-${index}`, payload },
+          }),
+        `payload ${index} must fail before reservation`,
+      ).toThrow("malformed mechanical entry");
+      expect(authority.diagnostics().headRevision).toBe(0);
+      expect(authority.retained()).toHaveLength(0);
+      expect(delivered(sent)).toHaveLength(0);
+    }
+
+    const replica = makeReplicaLog(scheduler, sent);
+    expect(
+      replica.admit({
+        ...fullEntry(1, "wire-invalid-inbound"),
+        material: { digest: "wire-invalid-inbound", payload: { droppedByJson: undefined } },
+      }),
+    ).toEqual({ kind: "rejected", reason: "malformed-entry" });
+    expect(replica.diagnostics().receivedThrough).toBe(0);
+  });
+
   it("immediately republishes only N+1 when predecessor quorum unblocks an ordered gap", () => {
     const log = makeLog(scheduler, sent);
     const first = log.commit(
