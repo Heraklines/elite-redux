@@ -34,7 +34,11 @@ class MockR2Bucket {
     },
   ) {
     const uploadId = `upload-${this.sessions.size + 1}`;
-    this.sessions.set(uploadId, { key, options, parts: new Map() });
+    this.sessions.set(uploadId, {
+      key,
+      ...(options ? { options } : {}),
+      parts: new Map<number, Uint8Array>(),
+    });
     return this.multipart(key, uploadId);
   }
 
@@ -48,7 +52,12 @@ class MockR2Bucket {
       return null;
     }
     return {
-      body: new Blob([object.bytes]).stream(),
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(object.bytes);
+          controller.close();
+        },
+      }),
       size: object.bytes.byteLength,
       httpEtag: '"mock-etag"',
       httpMetadata: object.httpMetadata,
@@ -100,11 +109,14 @@ class MockR2Bucket {
           bytes.set(value, offset);
           offset += value.byteLength;
         }
-        this.objects.set(key, {
-          bytes,
-          httpMetadata: session.options?.httpMetadata,
-          customMetadata: session.options?.customMetadata,
-        });
+        const stored: StoredObject = { bytes };
+        if (session.options?.httpMetadata) {
+          stored.httpMetadata = session.options.httpMetadata;
+        }
+        if (session.options?.customMetadata) {
+          stored.customMetadata = session.options.customMetadata;
+        }
+        this.objects.set(key, stored);
         this.sessions.delete(uploadId);
       },
       abort: async () => {

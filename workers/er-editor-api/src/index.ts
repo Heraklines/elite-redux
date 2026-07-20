@@ -1039,12 +1039,15 @@ async function readRepoJson(
     if (meta.content) {
       try {
         const parsed = JSON.parse(fromBase64(meta.content)) as unknown;
-        return { sha: meta.sha, existing: isPlainObject(parsed) ? parsed : {} };
+        return {
+          ...(meta.sha ? { sha: meta.sha } : {}),
+          existing: isPlainObject(parsed) ? parsed : {},
+        };
       } catch {
         return { error: `current ${label} file is not valid JSON` };
       }
     }
-    return { sha: meta.sha, existing: {} };
+    return { ...(meta.sha ? { sha: meta.sha } : {}), existing: {} };
   }
   if (getRes.status === 404) {
     return { existing: {} };
@@ -2186,10 +2189,20 @@ export default {
       } catch {
         return json({ ok: false, error: "invalid JSON body" }, 400, env);
       }
-      return handleSave(
-        { password: body.password, file: "egg-moves", delta: body.eggMoves, author: body.author, deploy: body.deploy },
-        env,
-      );
+      const saveBody: SaveBody = { file: "egg-moves" };
+      if (body.password !== undefined) {
+        saveBody.password = body.password;
+      }
+      if (body.eggMoves !== undefined) {
+        saveBody.delta = body.eggMoves;
+      }
+      if (body.author !== undefined) {
+        saveBody.author = body.author;
+      }
+      if (body.deploy !== undefined) {
+        saveBody.deploy = body.deploy;
+      }
+      return handleSave(saveBody, env);
     }
 
     return json({ ok: false, error: "not found" }, 404, env);

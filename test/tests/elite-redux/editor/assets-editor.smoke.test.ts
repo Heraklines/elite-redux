@@ -89,7 +89,7 @@ describe("ER Editor Assets direct media upload", () => {
     const requests: { url: string; init?: RequestInit }[] = [];
     const fetchMock = vi.fn(async (urlValue: string | URL | Request, init?: RequestInit) => {
       const url = String(urlValue);
-      requests.push({ url, init });
+      requests.push({ url, ...(init ? { init } : {}) });
       if (url.endsWith("/media-upload/start")) {
         return Response.json(
           { ok: true, id: "11111111-1111-4111-8111-111111111111", uploadId: "up-1", partSize },
