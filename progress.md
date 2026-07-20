@@ -158,3 +158,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local verification remains static-only under `AGENTS.md`: scoped Biome has no errors (baseline warnings/info
   only), and the full TypeScript rerun remains at 213 unrelated diagnostics with zero in touched paths.
   The complete batch still requires exact-SHA remote contracts/gate and public two-browser campaign proof.
+
+2026-07-20 — Authority V2 Showdown command-coordinate closure
+
+- Exact gate `29756285702` at `125f6edb2` made the directly mirrored Showdown guest open its real initial
+  `CommandPhase`. That exposed a production deadlock rather than a synthetic replay fault: the guest's
+  reflected local player field is `f0`, while the authenticated mechanical frontier remains host-canonical
+  (`f2` for the same guest-owned Pokémon). Whole-frontier equality therefore parked the real phase after
+  material apply and left revision 1 at `controlDeferred`.
+- Replica command admission now maps a real Showdown phase back to its exact host-canonical
+  `{ownerSeatId, fieldIndex, pokemonId}` target. It accepts only an authenticated, material-applied frontier
+  at the same epoch/wave/turn containing that target. Deferred starts retain the canonical target and epoch,
+  so the inverse race—phase first, entry second—releases the same phase generation without coordinate drift.
+- A node-pure failure-first contract pins guest-local `f0` -> canonical enemy `f2`; the existing S4/S5
+  two-engine journeys remain the end-to-end proof. Local scoped Biome has no errors (repository-baseline
+  warnings/info only), `git diff --check` is clean, and full TypeScript has zero touched-path diagnostics.
+  No local co-op Vitest or browser process was run. Exact-SHA remote contract/Showdown qualification remains
+  required before merging the checkpoint.

@@ -259,6 +259,25 @@ describe("resolveCoopV2ShowdownCommandProof", () => {
     });
   });
 
+  it("lets a real guest-local player command prove its exact host-canonical frontier target", () => {
+    const guestLocalProof = resolveCoopV2ShowdownCommandProof({
+      fieldIndex: 0,
+      pokemonId: 42,
+      enemyOffset: 2,
+      hostSeatId: 7,
+      guestSeatId: 9,
+      localRole: "guest",
+      localSide: "player",
+    });
+    const authoritativeFrontier = [
+      { ownerSeatId: 7, pokemonId: 11, fieldIndex: 0 },
+      { ownerSeatId: 9, pokemonId: 42, fieldIndex: 2 },
+    ];
+
+    expect(guestLocalProof).not.toEqual({ ownerSeatId: 9, pokemonId: 42, fieldIndex: 0 });
+    expect(authoritativeFrontier).toContainEqual(guestLocalProof);
+  });
+
   it("rejects malformed coordinates and ambiguous seat bindings", () => {
     expect(
       resolveCoopV2ShowdownCommandProof({

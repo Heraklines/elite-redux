@@ -46,6 +46,7 @@ import {
 import type {
   CoopAuthoritativeMaterial,
   CoopAuthorityEntry,
+  CoopCommandControlTarget,
   CoopControlInstallResult,
   CoopNextControl,
   CoopRuntimeContext,
@@ -4049,10 +4050,16 @@ export interface CoopRuntime {
   readonly v2DeferredCommandStarts: Map<
     string,
     {
+      readonly epoch: number;
       readonly wave: number;
       readonly turn: number;
       readonly fieldIndex: number;
       readonly pokemonId: number;
+      /**
+       * Host-canonical target for a locally reflected Showdown CommandPhase. Classic co-op leaves this
+       * absent because both clients share the canonical player-field orientation.
+       */
+      readonly authorityTarget?: CoopCommandControlTarget;
       resume: () => void;
     }
   >;
@@ -6384,6 +6391,81 @@ export function establishCoopV2CommandControlFrontier(): CoopV2CommandBoundaryVe
   return cutover.commitHostCommandOpen({ operationId, material, command }) == null ? "failed" : "ready";
 }
 
+interface CoopV2ReplicaCommandClaim {
+  readonly authorityTarget: CoopCommandControlTarget | null;
+  readonly addressedByCurrent: boolean;
+}
+
+function resolveShowdownReplicaCommandClaim(
+  runtime: CoopRuntime,
+  current: ProjectableControl | null,
+  wave: number,
+  turn: number,
+  fieldIndex: number,
+  pokemonId: number,
+  enemyOffset: number,
+): CoopV2ReplicaCommandClaim | null {
+  const seats = resolveShowdownSeatAuthority(runtime);
+  if (seats == null) {
+    return null;
+  }
+  const authorityTarget = resolveCoopV2ShowdownCommandProof({
+    localRole: runtime.controller.role,
+    localSide: "player",
+    fieldIndex,
+    pokemonId,
+    enemyOffset,
+    ...seats,
+  });
+  if (authorityTarget == null) {
+    return null;
+  }
+  // A Showdown guest owns a reflected local player field. The immutable entry remains in host-canonical
+  // coordinates, so comparing the guest's locally recaptured aggregate frontier against it deadlocks:
+  // local f0 is canonical f<enemyOffset>. Authenticate the complete entry in the replica/log, then let
+  // this real phase prove only the exact canonical target to which it maps. This is the same seat-scoped
+  // partition rule used by the projector and scales to more than two participants.
+  const addressedByCurrent =
+    current?.kind === "COMMAND_FRONTIER"
+    && current.epoch === runtime.controller.sessionEpoch
+    && current.wave === wave
+    && current.turn === turn
+    && current.commands.some(
+      command =>
+        command.ownerSeatId === authorityTarget.ownerSeatId
+        && command.fieldIndex === authorityTarget.fieldIndex
+        && command.pokemonId === authorityTarget.pokemonId,
+    );
+  return { authorityTarget, addressedByCurrent };
+}
+
+function resolveClassicReplicaCommandClaim(
+  runtime: CoopRuntime,
+  current: ProjectableControl | null,
+  state: NonNullable<ReturnType<typeof captureCoopAuthoritativeBattleState>>,
+): CoopV2ReplicaCommandClaim | null {
+  const frontier = resolveCoopV2CommandFrontier(state);
+  if (frontier.commands.length === 0 || frontier.unresolved.length > 0) {
+    coopWarn(
+      "v2-control",
+      `command-open refused incomplete frontier wave=${state.wave} turn=${state.turn} `
+        + `commands=${frontier.commands.length} unresolved=${frontier.unresolved.length}`,
+    );
+    return null;
+  }
+  const command: Extract<CoopNextControl, { kind: "COMMAND_FRONTIER" }> = {
+    kind: "COMMAND_FRONTIER",
+    epoch: runtime.controller.sessionEpoch,
+    wave: state.wave,
+    turn: state.turn,
+    commands: frontier.commands,
+  };
+  return {
+    authorityTarget: null,
+    addressedByCurrent: current != null && controlsEqual(current, command),
+  };
+}
+
 /**
  * Gate a real CommandPhase behind the one ordered control graph.
  *
@@ -6409,22 +6491,6 @@ export function enterCoopV2CommandControlBoundary(
   if (state == null || state.wave !== battle.waveIndex || state.turn !== battle.turn) {
     return "failed";
   }
-  const frontier = resolveCoopV2CommandFrontier(state);
-  if (frontier.commands.length === 0 || frontier.unresolved.length > 0) {
-    coopWarn(
-      "v2-control",
-      `command-open refused incomplete frontier wave=${state.wave} turn=${state.turn} `
-        + `commands=${frontier.commands.length} unresolved=${frontier.unresolved.length}`,
-    );
-    return "failed";
-  }
-  const command: Extract<CoopNextControl, { kind: "COMMAND_FRONTIER" }> = {
-    kind: "COMMAND_FRONTIER",
-    epoch: runtime.controller.sessionEpoch,
-    wave: state.wave,
-    turn: state.turn,
-    commands: frontier.commands,
-  };
   const cutover = coopV2ControlCutovers.get(runtime);
   if (cutover == null) {
     return "ready";
@@ -6435,7 +6501,21 @@ export function enterCoopV2CommandControlBoundary(
   }
 
   const current = runtime.v2ControlLedger.latestControl;
-  if (current != null && controlsEqual(current, command) && runtime.v2ControlLedger.isMaterialApplied(current)) {
+  const claim = runtime.controller.isVersusSession()
+    ? resolveShowdownReplicaCommandClaim(
+        runtime,
+        current,
+        state.wave,
+        state.turn,
+        fieldIndex,
+        pokemonId,
+        battle.arrangement.enemyOffset,
+      )
+    : resolveClassicReplicaCommandClaim(runtime, current, state);
+  if (claim == null) {
+    return "failed";
+  }
+  if (claim.addressedByCurrent && current != null && runtime.v2ControlLedger.isMaterialApplied(current)) {
     return "ready";
   }
   if (current?.kind === "TERMINAL") {
@@ -6443,10 +6523,12 @@ export function enterCoopV2CommandControlBoundary(
   }
   const key = commandStartKey(state.wave, state.turn, fieldIndex, pokemonId);
   runtime.v2DeferredCommandStarts.set(key, {
+    epoch: runtime.controller.sessionEpoch,
     wave: state.wave,
     turn: state.turn,
     fieldIndex,
     pokemonId,
+    ...(claim.authorityTarget == null ? {} : { authorityTarget: claim.authorityTarget }),
     resume,
   });
   coopLog("v2-control", `parked local CommandPhase until ordered command-open ${key}`);
@@ -6459,10 +6541,13 @@ function releaseCoopV2DeferredCommandStarts(
   control: Extract<CoopNextControl, { kind: "COMMAND_FRONTIER" }>,
 ): void {
   for (const [key, pending] of [...runtime.v2DeferredCommandStarts]) {
+    const expected = pending.authorityTarget;
     const addressed = control.commands.some(
       command =>
-        command.fieldIndex === pending.fieldIndex
-        && command.pokemonId === pending.pokemonId
+        command.fieldIndex === (expected?.fieldIndex ?? pending.fieldIndex)
+        && command.pokemonId === (expected?.pokemonId ?? pending.pokemonId)
+        && (expected == null || command.ownerSeatId === expected.ownerSeatId)
+        && control.epoch === pending.epoch
         && control.wave === pending.wave
         && control.turn === pending.turn,
     );
@@ -6913,8 +6998,8 @@ export function isShowdownGuestFlip(): boolean {
  * controls the guest/enemy side. Authenticated bindings must contain exactly one peer; only the unbound
  * two-seat compatibility path may use the historic 0/1 fallback.
  */
-function resolveShowdownSeatAuthority(): CoopShowdownSeatAuthority | null {
-  const controller = active?.controller;
+function resolveShowdownSeatAuthority(runtime: CoopRuntime | null = active): CoopShowdownSeatAuthority | null {
+  const controller = runtime?.controller;
   if (controller == null || !controller.isVersusSession()) {
     return null;
   }
