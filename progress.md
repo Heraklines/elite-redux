@@ -259,3 +259,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A static architecture contract prevents the phase dependency from returning and requires the immutable
   ordinary projection edge. Local validation remains static-only; the exact-SHA mystery browser campaign is
   the required production-fidelity regression proof.
+
+2026-07-20 — Authority V2 immediate-replacement finalizer release
+
+- Exact-SHA depth evidence from public campaign `29765183668` showed a second production cycle at wave 3:
+  the guest's live faint presentation correctly retired its speculative replacement picker, the settled
+  `TURN_COMMIT` revision 12 applied and reconstructed the exact picker, but that wake was queued behind the
+  still-current `CoopFinalizeTurnPhase`. The finalizer then parked waiting for the picker it itself blocked;
+  the authority timed out the unseen human surface and the replica eventually terminalized.
+- The finalizer now accepts one address-exact installed-control edge. The same TURN revision can arm only its
+  own immutable `REPLACEMENT`; a later edge must be exactly revision N+1 and permitted by the TURN's explicit
+  `AWAIT_SUCCESSOR`. If the wake arrives during receipt completion it is retained until the park decision;
+  if it arrives after parking it releases immediately. The picker wake is always queued before that release,
+  while a non-owner remains parked until the authoritative `REPLACEMENT_COMMIT` carrier exists.
+- The same race-safe latch now covers a deferred shared-interaction `CONTROL_COMMIT`, closing the equivalent
+  fast-buffered ordering hole. A static contract pins reconstruction-before-release and both early/late race
+  orders. Scoped Biome and 9/9 architecture contracts are clean; full TypeScript reports no touched-path
+  diagnostics. Exact-SHA remote depth/surface/dirty campaigns remain the production-fidelity proof.

@@ -4527,19 +4527,21 @@ function releaseCoopV2ParkedTurnBoundary(runtime: CoopRuntime, entry: CoopAuthor
   }
   const phase = globalScene.phaseManager?.getCurrentPhase() as
     | {
-        releaseForCoopV2Successor?: (successor: {
+        releaseForCoopV2Control?: (successor: {
           sessionEpoch: number;
           revision: number;
-          kind: string;
+          kind: CoopAuthorityEntry["kind"];
+          operationId: string;
           nextControl: CoopNextControl;
         }) => boolean;
       }
     | undefined;
   return (
-    phase?.releaseForCoopV2Successor?.({
+    phase?.releaseForCoopV2Control?.({
       sessionEpoch: entry.context.sessionEpoch,
       revision: entry.revision,
       kind: entry.kind,
+      operationId: entry.operationId,
       nextControl: entry.nextControl,
     }) === true
   );
@@ -4910,12 +4912,16 @@ function markCoopV2ControlMaterialApplied(runtime: CoopRuntime, entry: CoopAutho
   if (!runtime.v2ControlLedger.markMaterialApplied(entry)) {
     return false;
   }
-  if (entry.nextControl.kind === "REPLACEMENT") {
+  if (entry.nextControl.kind === "REPLACEMENT" && releaseCoopV2DeferredInteractionStarts(runtime, entry.nextControl)) {
     // A replica can render a faint event before the authority reaches its settled TURN_COMMIT. Its
     // early picker deliberately retires without opening input and waits here. Reconstruct that exact
     // generation only after the immutable turn material is installed, then let ordinary projection
     // demand the real PARTY handler before signing controlInstalled.
-    releaseCoopV2DeferredInteractionStarts(runtime, entry.nextControl);
+    // The reconstructed picker is now immediately behind CoopFinalizeTurnPhase. Arm the exact
+    // same-entry successor before that finalizer decides whether to park; if it already parked, this
+    // releases it synchronously. Non-owners have no local picker and remain parked until the later
+    // REPLACEMENT_COMMIT installs its authoritative checkpoint carrier.
+    releaseCoopV2ParkedTurnBoundary(runtime, entry);
   }
   if (
     runtime.v2RecoveryWaitSuccessorOperationId === entry.operationId
@@ -5349,7 +5355,12 @@ function buildCoopV2LiveSeams(
             if (entry.nextControl.kind !== "SHARED_INTERACTION") {
               return false;
             }
-            releaseCoopV2DeferredInteractionStarts(runtime, entry.nextControl);
+            // The exact phase wake must be queued before a preceding AWAIT_SUCCESSOR turn is released.
+            // A fast buffered entry may arm that release before the finalizer reaches its park decision;
+            // CoopFinalizeTurnPhase retains the authenticated edge until then.
+            if (releaseCoopV2DeferredInteractionStarts(runtime, entry.nextControl)) {
+              releaseCoopV2ParkedTurnBoundary(runtime, entry);
+            }
             return true;
           }
           ensureCoopV2CommandPresentation(runtime);
@@ -6665,17 +6676,19 @@ function releaseCoopV2DeferredCommandStarts(
 function releaseCoopV2DeferredInteractionStarts(
   runtime: CoopRuntime,
   control: Extract<CoopNextControl, { kind: "SHARED_INTERACTION" | "REPLACEMENT" }>,
-): void {
+): boolean {
   const controlId = controlIdOf(control);
   const pending = runtime.v2DeferredInteractionStarts.get(controlId);
   if (pending == null) {
-    return;
+    return false;
   }
   runtime.v2DeferredInteractionStarts.delete(controlId);
   try {
     pending.resume();
+    return true;
   } catch (error) {
     coopWarn("v2-control", `deferred shared-interaction resume threw control=${controlId}`, error);
+    return false;
   }
 }
 

@@ -32,8 +32,9 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { Phase } from "#app/phase";
 import { CommonBattleAnim, MoveAnim } from "#data/battle-anims";
-import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
+import type { CoopAuthorityEntryKind, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2WaveCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-wave";
+import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
@@ -930,6 +931,18 @@ export class CoopFinalizeTurnPhase extends Phase {
   private ended = false;
   /** A V2 TURN with no stated immediate control remains current until the next ordered entry installs a wake. */
   private awaitingAuthoritySuccessor = false;
+  /**
+   * The successor wake can be installed synchronously while this phase is still completing its own
+   * presentation receipt. Retain that exact authenticated edge until finishTurn reaches the park decision;
+   * otherwise a fast replica loses the release merely because the log retry beat the finalizer by one stack.
+   */
+  private authoritySuccessorReady: {
+    sessionEpoch: number;
+    revision: number;
+    kind: CoopAuthorityEntryKind;
+    operationId: string;
+    nextControl: CoopNextControl;
+  } | null = null;
   private authoritySuccessorMachineWaitEnd: (() => void) | null = null;
   private supersedingCheckpoint: CoopCheckpointEnvelope | null | undefined;
   private turnCommitSupersededBy: CoopCheckpointEnvelope | undefined;
@@ -1061,6 +1074,7 @@ export class CoopFinalizeTurnPhase extends Phase {
   public override end(): void {
     this.ended = true;
     this.awaitingAuthoritySuccessor = false;
+    this.authoritySuccessorReady = null;
     this.authoritySuccessorMachineWaitEnd?.();
     this.authoritySuccessorMachineWaitEnd = null;
     this.clearTurnCommitRetry();
@@ -1072,26 +1086,65 @@ export class CoopFinalizeTurnPhase extends Phase {
   }
 
   /**
-   * Release a null-successor TURN only after its next ordered Authority V2 entry has installed the engine
-   * wake/carrier that will run next. Ending sooner lets an empty Phaser queue manufacture a phantom
-   * TurnInit/CommandPhase for the old wave; ending later leaves the installed successor stuck behind this
-   * finalizer. The global revision and authenticated epoch are the causal fence.
+   * Arm or release this TURN only after its immutable successor has installed the engine wake/carrier that
+   * will run next. A same-revision REPLACEMENT is the immediate control stated by this TURN_COMMIT; a later
+   * revision is legal only when this TURN stated AWAIT_SUCCESSOR. The wake can arrive before finishTurn
+   * decides to park, so the exact edge is latched and consumed at that decision rather than being lost.
    */
-  public releaseForCoopV2Successor(successor: {
+  public releaseForCoopV2Control(successor: {
     sessionEpoch: number;
     revision: number;
-    kind: string;
+    kind: CoopAuthorityEntryKind;
+    operationId: string;
     nextControl: CoopNextControl;
   }): boolean {
+    if (this.ended || successor.sessionEpoch !== this.epoch || this.authorityRevision == null) {
+      return false;
+    }
+    const statedControl = this.authorityNextControl;
+    const sameEntryReplacement =
+      successor.revision === this.authorityRevision
+      && successor.kind === "TURN_COMMIT"
+      && statedControl?.kind === "REPLACEMENT"
+      && successor.operationId === `TURN/e${this.epoch}/w${this.wave}/t${this.turn}`
+      && controlIdOf(successor.nextControl) === controlIdOf(statedControl);
+    const orderedSuccessor =
+      successor.revision === this.authorityRevision + 1
+      && statedControl?.kind === "AWAIT_SUCCESSOR"
+      && statedControl.afterOperationId === `TURN/e${this.epoch}/w${this.wave}/t${this.turn}`
+      && statedControl.allowedKinds.includes(successor.kind)
+      && (statedControl.expectedOperationId == null || statedControl.expectedOperationId === successor.operationId);
+    if (!sameEntryReplacement && !orderedSuccessor) {
+      return false;
+    }
+    const prior = this.authoritySuccessorReady;
     if (
-      !this.awaitingAuthoritySuccessor
-      || this.ended
-      || successor.sessionEpoch !== this.epoch
-      || this.authorityRevision == null
-      || successor.revision <= this.authorityRevision
+      prior != null
+      && (prior.revision !== successor.revision
+        || prior.operationId !== successor.operationId
+        || controlIdOf(prior.nextControl) !== controlIdOf(successor.nextControl))
     ) {
       return false;
     }
+    this.authoritySuccessorReady ??= successor;
+    if (!this.awaitingAuthoritySuccessor) {
+      coopLog(
+        "v2-turn",
+        `guest armed turn=${this.turn} authorityRev=${this.authorityRevision} `
+          + `for ${successor.kind} rev=${successor.revision} before park`,
+      );
+      return true;
+    }
+    return this.completeCoopV2ControlRelease(successor);
+  }
+
+  private completeCoopV2ControlRelease(successor: {
+    sessionEpoch: number;
+    revision: number;
+    kind: CoopAuthorityEntryKind;
+    operationId: string;
+    nextControl: CoopNextControl;
+  }): boolean {
     if (successor.nextControl.kind === "COMMAND_FRONTIER") {
       if (
         successor.nextControl.epoch !== this.epoch
@@ -1793,6 +1846,10 @@ export class CoopFinalizeTurnPhase extends Phase {
         // TurnInit -> Command for the old wave, which can permanently block a slightly-later wave/replacement
         // wake behind human input.
         this.awaitingAuthoritySuccessor = true;
+        if (this.authoritySuccessorReady != null) {
+          this.completeCoopV2ControlRelease(this.authoritySuccessorReady);
+          return;
+        }
         this.authoritySuccessorMachineWaitEnd ??= beginCoopMachineWait(
           `authority-v2-successor:w${wave}:t${this.turn}:r${this.revision ?? "?"}`,
         );

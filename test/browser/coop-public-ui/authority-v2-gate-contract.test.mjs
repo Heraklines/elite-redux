@@ -219,3 +219,40 @@ test("ME_PRESENT DATA cannot wait on the successor phase that V2 projection must
     "the authenticated successor replaces a stuck local predecessor",
   );
 });
+
+test("a committed replacement wake cannot be stranded behind its own turn finalizer", () => {
+  const markStart = coopRuntime.indexOf("function markCoopV2ControlMaterialApplied(");
+  const markEnd = coopRuntime.indexOf("\n}\n", markStart) + 2;
+  assert.notEqual(markStart, -1, "runtime exposes the materialApplied successor edge");
+  assert.ok(markEnd > markStart, "materialApplied successor edge has a bounded source block");
+  const mark = coopRuntime.slice(markStart, markEnd);
+  const reconstructsPicker = mark.indexOf("releaseCoopV2DeferredInteractionStarts");
+  const releasesFinalizer = mark.indexOf("releaseCoopV2ParkedTurnBoundary");
+  assert.ok(reconstructsPicker >= 0, "the exact deferred replacement picker is reconstructed");
+  assert.ok(
+    releasesFinalizer > reconstructsPicker,
+    "the parked turn is released only after its exact replacement wake is queued",
+  );
+
+  const releaseStart = replayPhases.indexOf("public releaseForCoopV2Control(");
+  const releaseEnd = replayPhases.indexOf("\n  private completeCoopV2ControlRelease(", releaseStart);
+  assert.notEqual(releaseStart, -1, "the real finalizer exposes one authenticated release edge");
+  assert.ok(releaseEnd > releaseStart, "the finalizer release edge has a bounded source block");
+  const release = replayPhases.slice(releaseStart, releaseEnd);
+  assert.match(release, /successor\.revision === this\.authorityRevision/u);
+  assert.match(release, /statedControl\?\.kind === "REPLACEMENT"/u);
+  assert.match(release, /controlIdOf\(successor\.nextControl\) === controlIdOf\(statedControl\)/u);
+  assert.match(release, /this\.authoritySuccessorReady \?\?= successor/u);
+
+  const parkStart = replayPhases.indexOf("} else if (v2NoImmediateCommand) {");
+  const parkEnd = replayPhases.indexOf("\n      } else {", parkStart);
+  assert.notEqual(parkStart, -1, "the finalizer has an explicit non-command park");
+  assert.ok(parkEnd > parkStart, "the non-command park has a bounded source block");
+  const park = replayPhases.slice(parkStart, parkEnd);
+  const marksParked = park.indexOf("this.awaitingAuthoritySuccessor = true");
+  const consumesEarlyWake = park.indexOf("this.authoritySuccessorReady != null");
+  assert.ok(
+    marksParked >= 0 && consumesEarlyWake > marksParked,
+    "a wake installed during receipt completion is consumed at the exact park decision",
+  );
+});
