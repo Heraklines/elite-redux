@@ -501,6 +501,9 @@ test("the learn-move soak proves the real guest UI-to-relay terminal before rebu
   assert.ok(end > start, "the learn-move wave has a bounded source block");
   const learnMove = soakDriver.slice(start, end);
   const schedulesDestinations = learnMove.indexOf("setDestinationContextDelivery?.(destinationScheduled)");
+  const createsHostPhase = learnMove.indexOf('phaseManager.create("LearnMoveBatchPhase"');
+  const installsHostPhase = learnMove.indexOf("phaseManager.overridePhase(hostLearnPhase)");
+  const startsHostPhase = learnMove.indexOf("hostLearnPhase.start()");
   const provesPhase = learnMove.indexOf('guestLearnPhase?.phaseName !== "CoopReplayLearnMoveBatchPhase"');
   const startsProvenPhase = learnMove.indexOf("guestLearnPhase.start()");
   const provesMode = learnMove.indexOf(
@@ -510,6 +513,10 @@ test("the learn-move soak proves the real guest UI-to-relay terminal before rebu
   const secondInput = learnMove.indexOf('"learn-move overwrite slot zero"');
   const provesTerminal = learnMove.indexOf("isCoopLearnMoveForwardInFlightEmpty()");
   assert.ok(schedulesDestinations >= 0, "transport callbacks are pinned to their destination browser");
+  assert.ok(
+    createsHostPhase >= 0 && installsHostPhase > createsHostPhase && startsHostPhase > installsHostPhase,
+    "the host control proof belongs to the exact current LearnMoveBatchPhase, never a detached UI producer",
+  );
   assert.ok(
     provesPhase > schedulesDestinations && startsProvenPhase > provesPhase && provesMode > startsProvenPhase,
     "the interceptor starts only the exact queue-owned replay phase before proving its public handler",
@@ -576,5 +583,22 @@ test("a chained biome picker preserves its exact interaction coordinate through 
       .length,
     2,
     "both the owner and watcher map paths publish through the same exact proof",
+  );
+});
+
+test("overlapping duo scopes cannot overwrite a newer browser-local biome permit snapshot", () => {
+  assert.match(
+    duoHarness,
+    /outgoing\.biomeStateSaveGeneration = \(outgoing\.biomeStateSaveGeneration \?\? 0\) \+ 1;[\s\S]*outgoing\.biomeState = snapshotBiomeModuleState\(\)/u,
+    "cross-client preemption claims and persists the newest World Map snapshot",
+  );
+  assert.equal(
+    [
+      ...duoHarness.matchAll(
+        /ctx\.biomeState !== undefined && ctx\.biomeStateSaveGeneration === biomeStateSaveGeneration/gu,
+      ),
+    ].length,
+    2,
+    "both synchronous and asynchronous client windows fence stale biome-state save-back",
   );
 });

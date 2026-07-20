@@ -582,3 +582,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   that order and requires both map paths to use it. Static validation is 18/18
   Authority contracts, scoped Biome has baseline diagnostics only, and the
   runtime fix awaits exact-SHA GitHub-hosted qualification.
+- Exact-SHA requalification then proved that complete sequence through
+  Crossroads revision 27 and World Map result revision 28. The ensuing guest
+  `SwitchBiomePhase` nevertheless lost its already-applied one-shot permit.
+  This was the two-engine fixture's async context isolation: Mystery pins had a
+  monotonic save-owner token, while browser-local biome state did not, so an
+  older overlapping scope could overwrite a newer permit snapshot. Biome state
+  now uses the same save-generation fence in synchronous and asynchronous
+  client windows.
+- C2 independently exposed another fixture-only authority violation. The
+  learn-move leg started a detached host `LearnMoveBatchPhase` while
+  `CommandPhase` remained current, making its visible watcher handler
+  ineligible to own the authority-local control lease. The soak now installs
+  that exact host phase via `overridePhase` before starting it, matching the
+  production queue identity. Static Authority contracts are 19/19; both fixes
+  await the next remote C1/C2 qualification.

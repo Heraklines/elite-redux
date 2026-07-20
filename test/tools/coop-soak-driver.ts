@@ -4234,7 +4234,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     rig.pair.setDestinationContextDelivery?.(destinationScheduled);
     try {
       await withClient(rig.hostCtx, async () => {
-        rig.hostScene.phaseManager.create("LearnMoveBatchPhase", LEARN_SLOT, [LEARN_NEW_MOVE]).start();
+        const hostLearnPhase = rig.hostScene.phaseManager.create("LearnMoveBatchPhase", LEARN_SLOT, [LEARN_NEW_MOVE]);
+        if (!rig.hostScene.phaseManager.overridePhase(hostLearnPhase)) {
+          fail("no-park", wave, "learn-move host phase could not become the exact current phase");
+          return;
+        }
+        // PhaseInterceptor disables automatic startCurrentPhase in engine tests. Production runs this same
+        // phase as the queue-owned current phase; start only after overridePhase has established that identity
+        // so the host's watcher handler can prove the authority-local V2 control lease.
+        hostLearnPhase.start();
         await drainLoopback();
         await new Promise<void>(resolve => setTimeout(resolve, 10));
       });

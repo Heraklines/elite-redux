@@ -314,6 +314,11 @@ export interface ClientCtx {
    */
   biomeState?: CoopBiomeModuleSnapshot;
   /**
+   * Monotonic save ownership for the World-Map substrate. Async client windows can finish out of entry
+   * order; an older window must never overwrite a newer scope's one-shot committed transition permit.
+   */
+  biomeStateSaveGeneration?: number;
+  /**
    * The 3 mystery-encounter pins for THIS client (save/restore around the swap; idle off-ME).
    * Optional: ctxs that never reach an ME (the wave/shop spike tests) omit it and the swap treats
    * them as idle; an ME-driving ctx carries the live pins so the host's and guest's never bleed.
@@ -565,6 +570,7 @@ function persistPreemptedClientState(outgoing: ClientCtx): void {
     outgoing.moduleLets = snapshotModuleLets();
   }
   if (outgoing.biomeState !== undefined) {
+    outgoing.biomeStateSaveGeneration = (outgoing.biomeStateSaveGeneration ?? 0) + 1;
     outgoing.biomeState = snapshotBiomeModuleState();
   }
   // Claim the ME-pin save like persistInstalledClientMePins: this snapshot is definitionally newer
@@ -601,6 +607,8 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   }
   const mePinsSaveGeneration = (ctx.mePinsSaveGeneration ?? 0) + 1;
   ctx.mePinsSaveGeneration = mePinsSaveGeneration;
+  const biomeStateSaveGeneration = (ctx.biomeStateSaveGeneration ?? 0) + 1;
+  ctx.biomeStateSaveGeneration = biomeStateSaveGeneration;
   const prev = captureLiveCtx();
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
@@ -636,7 +644,7 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     if (coopHarnessModuleLetIsolation) {
       ctx.moduleLets = snapshotModuleLets();
     }
-    if (ctx.biomeState !== undefined) {
+    if (ctx.biomeState !== undefined && ctx.biomeStateSaveGeneration === biomeStateSaveGeneration) {
       ctx.biomeState = snapshotBiomeModuleState();
     }
     // Symmetric with withClient: a sync window (incl. a pinned timer callback) that legitimately
@@ -673,6 +681,8 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   // this browser; a later scope (or an explicit persistInstalledClientMePins) invalidates this claim.
   const mePinsSaveGeneration = (ctx.mePinsSaveGeneration ?? 0) + 1;
   ctx.mePinsSaveGeneration = mePinsSaveGeneration;
+  const biomeStateSaveGeneration = (ctx.biomeStateSaveGeneration ?? 0) + 1;
+  ctx.biomeStateSaveGeneration = biomeStateSaveGeneration;
   const prev = captureLiveCtx();
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
@@ -714,7 +724,7 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     if (coopHarnessModuleLetIsolation) {
       ctx.moduleLets = snapshotModuleLets();
     }
-    if (ctx.biomeState !== undefined) {
+    if (ctx.biomeState !== undefined && ctx.biomeStateSaveGeneration === biomeStateSaveGeneration) {
       ctx.biomeState = snapshotBiomeModuleState();
     }
     if (ctx.mePinsSaveGeneration === mePinsSaveGeneration) {
