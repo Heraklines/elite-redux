@@ -391,6 +391,7 @@ function isValidBiomeCommitAddress(
   envelope: CoopAuthoritativeEnvelopeV1,
   binding?: CoopBiomeOperationBinding | null,
 ): boolean {
+  const authoritativeState = envelope.authoritativeState;
   return (
     envelope.version === 1
     && envelope.logicalPhase === "BIOME_SELECT"
@@ -400,8 +401,13 @@ function isValidBiomeCommitAddress(
     && envelope.wave >= 0
     && Number.isSafeInteger(envelope.turn)
     && envelope.turn >= 0
+    && authoritativeState != null
+    && typeof authoritativeState === "object"
+    && authoritativeState.version === 1
+    && authoritativeState.wave === envelope.wave
+    && authoritativeState.turn === envelope.turn
     && (!v2InteractionActive(binding)
-      || isCompleteCoopOperationAuthorityState(envelope.authoritativeState, envelope.wave, envelope.turn))
+      || isCompleteCoopOperationAuthorityState(authoritativeState, envelope.wave, envelope.turn))
   );
 }
 
