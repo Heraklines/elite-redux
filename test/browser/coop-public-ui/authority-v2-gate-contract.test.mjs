@@ -24,6 +24,7 @@ const replayPhases = readFileSync(new URL("src/phases/coop-replay-phases.ts", ro
 const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts", root), "utf8");
 const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
 const soakDriver = readFileSync(new URL("test/tools/coop-soak-driver.ts", root), "utf8");
+const hostFaintSoak = readFileSync(new URL("test/tests/elite-redux/coop/coop-soak-host-faint.test.ts", root), "utf8");
 const switchPhase = readFileSync(new URL("src/phases/switch-phase.ts", root), "utf8");
 const titlePhase = readFileSync(new URL("src/phases/title-phase.ts", root), "utf8");
 const shadow = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/shadow.ts", root), "utf8");
@@ -486,6 +487,14 @@ test("the learn-move soak proves the real guest UI-to-relay terminal before rebu
   assert.ok(
     provesTerminal > secondInput,
     "the driver waits for the UI-to-relay-to-authority terminal instead of trusting shared fixture objects",
+  );
+});
+
+test("the host-faint soak observes the actionable successor without consuming it", () => {
+  assert.match(
+    hostFaintSoak,
+    /phaseInterceptor\.to\("CommandPhase", false\)/u,
+    "the focused replacement proof stops at CommandPhase instead of running past the boundary under test",
   );
 });
 

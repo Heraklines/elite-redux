@@ -154,11 +154,14 @@ describe.skipIf(!RUN)("co-op SOAK host-owned faint: the driver drives the host's
       if (hostOwnedFaintPending(rig)) {
         registerHostFaintAutoPick(game, rig);
       }
-      await game.phaseInterceptor.to("CommandPhase");
+      // This assertion is about reaching the next actionable boundary. Starting that CommandPhase lets
+      // the one-sided focused fixture consume/park it and eventually fall through to its inert Title
+      // tail, converting successful replacement progression into a false red.
+      await game.phaseInterceptor.to("CommandPhase", false);
     });
     await drainLoopback();
     const guestBoundary = await withClient(rig.guestCtx, () => rig.guestRuntime.rendezvous.awaitPartner(commandPoint));
-    expect(guestBoundary.timedOut, "post-replacement command boundary was reciprocal").toBe(false);
+    expect(guestBoundary.timedOut, "the explicitly driven command boundary was reciprocal").toBe(false);
 
     expect(
       rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,

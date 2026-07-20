@@ -520,3 +520,10 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   now accepts either the finalizer or its ordered actionable Command successor
   during that pump, while the following assertions still require the exact
   converged field, party, phase, and single replacement carrier.
+- C5's host-owned-faint trace likewise showed the complete production path:
+  PARTY opened, the legal host bench was summoned, `REPLACEMENT_COMMIT` was
+  emitted, and the next `CommandPhase` started. The test called
+  `phaseInterceptor.to("CommandPhase")` with its default `runTarget=true`, so
+  the one-sided fixture consumed the very boundary it meant to assert and later
+  compared the inert `TitlePhase` tail to Command. It now stops before running
+  that successor; a source contract prevents this false-red pattern returning.

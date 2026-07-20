@@ -42,6 +42,7 @@
     "test/node/authority-v2-log.test.ts",
     "test/node/authority-v2-replacement.test.ts",
     "test/tests/elite-redux/coop/coop-p33-client.test.ts",
+    "test/tests/elite-redux/coop/coop-soak-host-faint.test.ts",
     "test/tests/elite-redux/coop/coop-stall-asymmetric-watchdog.test.ts",
     "test/tests/elite-redux/showdown/showdown-versus-faint.test.ts",
     "test/tools/coop-duo-harness.ts",
