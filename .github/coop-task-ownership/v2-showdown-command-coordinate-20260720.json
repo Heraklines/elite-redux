@@ -1,0 +1,13 @@
+{
+  "taskId": "v2-showdown-command-coordinate-20260720",
+  "version": 1,
+  "branch": "ci/coop/v2-showdown-command-coordinate-20260720",
+  "trainRef": "coop/integration-20260718",
+  "baseSha": "125f6edb2f8dcf8ab352cddab59112c3c9617228",
+  "allowedFiles": [
+    ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
+    "progress.md",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "test/node/authority-v2-command-frontier.test.ts"
+  ]
+}
