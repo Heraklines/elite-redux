@@ -61,8 +61,6 @@ describe("co-op Stormglass operation migration", () => {
     const guestBinding = captureCoopStormglassOperationBinding();
     const decisionOperationId = coopStormglassDecisionOperationId(coopStormglassPresentationOperationId(hostBinding));
     expect(decisionOperationId).not.toBeNull();
-    expect(settleCoopStormglassOperation(decisionOperationId!, guestBinding)).toBe(true);
-    expect(settleCoopV2InteractionOperation(decisionOperationId!, guestRuntime)).toBe(true);
     setCoopRuntime(hostRuntime);
     const awaited = guestRuntime.interactionRelay.awaitInteractionChoice(COOP_STORMGLASS_SEQ, 100, ["stormglass"]);
 
@@ -80,6 +78,10 @@ describe("co-op Stormglass operation migration", () => {
 
     expect(pair.faultsInjected(), "the raw stormglass choice was actually dropped").toBe(1);
     expect(await awaited).toMatchObject({ choice: 2, kind: "stormglass" });
+    // The retained result wakes the real picker first. Only its exact terminal makes the deferred
+    // operation ACKable; this mirrors ErStormglassPickerPhase rather than pre-settling a still-live wait.
+    expect(settleCoopStormglassOperation(decisionOperationId!, guestBinding)).toBe(true);
+    expect(settleCoopV2InteractionOperation(decisionOperationId!, guestRuntime)).toBe(true);
     expect(
       getCoopOperationJournalApplied().find(envelope => envelope.pendingOperation?.kind === "STORMGLASS")
         ?.pendingOperation?.payload,

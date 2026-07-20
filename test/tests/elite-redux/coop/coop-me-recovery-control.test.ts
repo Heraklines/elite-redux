@@ -355,10 +355,21 @@ describe("CoopReplayMePhase fail-closed terminal recovery", () => {
         dex: "dex",
         authoritativeState: {
           version: 1,
+          tick: 1,
           wave: 27,
           turn: 0,
           playerParty: [],
           enemyParty: [],
+          field: [],
+          weather: 0,
+          weatherTurnsLeft: 0,
+          terrain: 0,
+          terrainTurnsLeft: 0,
+          arenaTags: [],
+          money: 0,
+          pokeballCounts: [],
+          playerModifiers: [],
+          enemyModifiers: [],
         },
       } as unknown as Extract<CoopInteractionOutcome, { k: "meResync" }>;
       const phaseSeam = phase as unknown as {

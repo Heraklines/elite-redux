@@ -28,15 +28,18 @@ import { coopHostPrepareWildCatchFullDecision } from "#data/elite-redux/coop/coo
 import {
   captureCoopCatchFullOperationBinding,
   commitCoopCatchFullAuthorityDecision,
+  coopCatchFullDecisionOperationId,
   resetCoopCatchFullRetryMs,
   setCoopCatchFullRetryMs,
 } from "#data/elite-redux/coop/coop-catch-full-operation";
 import { COOP_CATCH_FULL_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   assembleCoopRuntime,
   clearCoopRuntime,
   getCoopInteractionRelay,
   setCoopRuntime,
+  settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -138,13 +141,19 @@ describe("co-op wild-catch FULL-party keep/release owner-pick relay (#856)", () 
       getPlayerParty: () => new Array(6).fill({}),
     } as unknown as BattleScene);
 
-    const hostAwait = coopHostPrepareWildCatchFullDecision("Rattata", 19);
+    let promptOperationId: string | null = null;
+    const hostAwait = coopHostPrepareWildCatchFullDecision("Rattata", 19, operationId => {
+      promptOperationId = operationId;
+    });
     // Resolve the real helper's await after the harness has installed the peer. The decision commit must use
     // the host binding captured before the await, never this ambient guest selector.
     setCoopRuntime(guestRuntime);
     guestRuntime.interactionRelay.sendInteractionChoice(COOP_CATCH_FULL_SEQ, "catchFull", 2);
     const prepared = await hostAwait;
     expect(prepared?.slot).toBe(2);
+    const decisionOperationId = promptOperationId == null ? null : coopCatchFullDecisionOperationId(promptOperationId);
+    expect(decisionOperationId).not.toBeNull();
+    expect(settleCoopV2InteractionOperation(decisionOperationId!, guestRuntime)).toBe(true);
     expect(prepared?.commitAfterApply()).toBe(true);
     await flush();
 
@@ -246,7 +255,10 @@ describe("co-op wild-catch FULL-party keep/release owner-pick relay (#856)", () 
 
     // start() captures the guest binding before either UI callback. Resume both callbacks after swapping the
     // process-global runtime to the host, exactly the adversarial shared-process schedule that used to bleed.
-    new CoopGuestCatchFullPhase("Rattata", 19).start();
+    const promptOperationId = makeCoopOperationId(1, 1, 1, "CATCH_FULL");
+    const decisionOperationId = coopCatchFullDecisionOperationId(promptOperationId);
+    expect(decisionOperationId).not.toBeNull();
+    new CoopGuestCatchFullPhase("Rattata", 19, promptOperationId).start();
     setCoopRuntime(hostRuntime);
     expect(textCallback).not.toBeNull();
     textCallback!();
@@ -260,6 +272,7 @@ describe("co-op wild-catch FULL-party keep/release owner-pick relay (#856)", () 
           localRole: "host",
           wave: 1,
           turn: 0,
+          operationId: decisionOperationId!,
         },
         hostBinding,
       ),

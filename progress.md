@@ -68,3 +68,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Exact child gate `29736100049` proves the bounded settlement successor works: wave 1 now reaches and applies WAVE_ADVANCE revision 3, opens the real reward phase, and commits REWARD_PRESENT revision 4. The next live fault is an authority-local reservation refusal when the first REWARD result tries to consume that presentation.
 - Root cause: REWARD_PRESENT/SHOP_PRESENT is synchronously retained before its caller can assign the returned operation ID to the concrete phase, while the real owner UI opens only after an async rendezvous. The initial authority projector correctly defers, but the reward and market public-ready callbacks notified only the wave transaction and never retried the global interaction ledger. In progress: have both reward and market readiness edges publish the same address-exact V2 interaction proof used by ordinary delivery and recovery, after the actual MODIFIER_SELECT/BIOME_SHOP or watcher MESSAGE handler is active.
 - 2026-07-20 interaction-terminal compatibility closure: the exact phase-terminal ledger is now runtime-owned in both negotiated V2 and legacy-journal fallback. Mixed-capability sessions immediately retry only their deferred `op:global` result after the real phase terminal; V2 retry/projection remains cutover-gated. This closes the fallback Stormglass/Revival/Catch-Full failure introduced when strict materializers began requiring terminal proof, without treating raw carriers or queued UI as completion. Lane-A fixtures now model the same terminal edge, and reward fixtures include the complete market terminal result and ordered Mystery reward-surface identity. Local scoped Biome and `git diff --check` are green; TypeScript remains at 213 unrelated diagnostics with zero in touched paths. No local co-op Vitest or browser execution was used.
+2026-07-20 — Authority V2 exact-terminal gate follow-up
+
+- Triaged exact-SHA full gate `29737684710` at `bd891e77f`: Lane A fell from 11 failures to 4 (1157/1161 green).
+- Closed a real two-runtime ownership seam in the Stormglass result materializer: operation-specific terminal
+  proof is now read from the receiving runtime binding, never the ambient process-global runtime.
+- Updated the remaining failure-first fixtures to exercise the real ordered lifecycle: complete Mystery
+  terminal state, catch-full prompt/decision addresses, and Stormglass result delivery before phase terminal.
+- Scoped Biome is clean apart from the known runtime baseline, `git diff --check` is clean, and TypeScript
+  remains at 213 unrelated diagnostics with zero in touched paths. No local co-op Vitest/browser execution;
+  remote gate requalification remains required by `AGENTS.md`.

@@ -7792,7 +7792,12 @@ function materializeCoopStormglassFromOp(runtime: CoopRuntime, envelope: CoopAut
   if (operation?.kind !== "STORMGLASS" || payload == null) {
     return false;
   }
-  if (isCoopStormglassOperationSettled(operation.id)) {
+  if (
+    isCoopStormglassOperationSettled(operation.id, {
+      opState: runtime.opState,
+      durability: runtime.durability ?? null,
+    })
+  ) {
     return true;
   }
   runtime.interactionRelay.materializeCommittedInteractionChoice(
