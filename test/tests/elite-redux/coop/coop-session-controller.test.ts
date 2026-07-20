@@ -72,16 +72,16 @@ describe("co-op session controller (#633, P1)", () => {
     });
 
     it("rejects an older peer without authenticated V2 quiz presentation carriers", async () => {
-      // er-coop-42: a 41 peer drops a host-owned quiz answer after suppressing the raw legacy authority
-      // stream, so pairing must fail closed instead of hanging one browser inside ErQuizPhase.
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-42");
+      // er-coop-43: a 42 peer cannot reconstruct the complete immutable interaction projection,
+      // so pairing must fail closed instead of accepting a mixed recovery graph.
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-43");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",
         version: COOP_PROTOCOL_VERSION,
       });
       controller.connect();
-      guest.send({ t: "hello", version: "er-coop-41", username: "Cached", role: "guest", epoch: 0 });
+      guest.send({ t: "hello", version: "er-coop-42", username: "Cached", role: "guest", epoch: 0 });
       await flush();
 
       expect(controller.versionMismatch).toBe(true);

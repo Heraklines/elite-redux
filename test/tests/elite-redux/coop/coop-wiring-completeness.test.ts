@@ -404,9 +404,11 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       'failCoopSharedSession("A shared reward surface opened without its authoritative runtime."',
     );
 
-    const biomeStart = biome.indexOf("private setNextBiomeAndEnd(nextBiome: BiomeId): boolean");
+    const biomeStart = biome.indexOf("private setNextBiomeAndEnd(");
     const biomeEnd = biome.indexOf("private async finishGuestOwnedBiomeAfterCommit", biomeStart);
     const biomeBoundary = biome.slice(biomeStart, biomeEnd);
+    expect(biomeStart, "the World Map terminal funnel exists").toBeGreaterThanOrEqual(0);
+    expect(biomeEnd, "the World Map terminal funnel has a bounded source section").toBeGreaterThan(biomeStart);
     expect(biomeBoundary, "only actual solo play may use the direct World Map path").toContain(
       "if (!globalScene.gameMode.isCoop)",
     );
