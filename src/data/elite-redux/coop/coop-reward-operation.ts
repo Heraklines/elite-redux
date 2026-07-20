@@ -562,6 +562,26 @@ function relayedLabel(surface: CoopShopSurface, action: CoopRewardRelayAction): 
 }
 
 /**
+ * Whether one reward/market action closes its current ordered interaction.
+ *
+ * A free reward pick is terminal even though its numeric choice is an ordinary option index. Treating only
+ * the LEAVE sentinel as terminal made its V2 successor wait forbid the next wave, so the following real
+ * CONTROL_COMMIT was rejected after an otherwise-successful reward. Paid shop/check/transfer/lock actions
+ * and rerolls keep the current reward surface open; an explicit leave closes either surface.
+ */
+export function isCoopRewardActionTerminal(
+  surface: CoopShopSurface,
+  label: string | undefined,
+  choice: number,
+  data?: number[] | undefined,
+): boolean {
+  return (
+    choice === COOP_INTERACTION_LEAVE
+    || (surface === "reward" && relayedLabel(surface, { label, choice, data }) === "reward")
+  );
+}
+
+/**
  * The owner-parity validator (§1.3): the intent's owner seat MUST be the seat the interaction counter
  * assigns for this pinned slot. The typed successor of `isLocalOwnerAtCounter` - the host refuses an intent
  * from the wrong seat instead of trusting the sender.

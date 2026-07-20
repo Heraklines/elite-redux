@@ -18,6 +18,7 @@ import {
   commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
   coopRewardMirrorSeq,
+  isCoopRewardActionTerminal,
   isCoopRewardRetainedResultMode,
   isValidCoopRewardSurfaceIdentity,
 } from "#data/elite-redux/coop/coop-reward-operation";
@@ -1570,7 +1571,7 @@ export class SelectModifierPhase extends BattlePhase {
         label,
         choice,
         data: wire,
-        terminal: choice === COOP_INTERACTION_LEAVE,
+        terminal: isCoopRewardActionTerminal("reward", label, choice, wire),
         localRole: controller.role,
         wave: this.coopRewardWave(),
         turn: this.coopRewardTurn(),
@@ -1844,7 +1845,7 @@ export class SelectModifierPhase extends BattlePhase {
             failCoopSharedSession(`Reward result ${operationId} was not recovered`);
             return;
           }
-          const terminal = action.choice === COOP_INTERACTION_LEAVE;
+          const terminal = isCoopRewardActionTerminal("reward", action.kind, action.choice, action.data);
           const decision = adoptRewardWatcherChoice(
             {
               surface: "reward",
@@ -2372,7 +2373,7 @@ export class SelectModifierPhase extends BattlePhase {
             operationId: action.operationId,
             rewardSurface: action.rewardSurface,
           },
-          terminal: action.choice === COOP_INTERACTION_LEAVE,
+          terminal: isCoopRewardActionTerminal("reward", action.kind, action.choice, action.data),
           localRole: controller.role,
           wave: this.coopRewardWave(),
           turn: this.coopRewardTurn(),

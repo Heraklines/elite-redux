@@ -20,6 +20,7 @@ import {
   captureCoopRewardResultState,
   commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
+  isCoopRewardActionTerminal,
   releaseCoopRewardResultState,
   resetCoopRewardOperationState,
   setCoopRewardAuthorityStateHooksForTest,
@@ -142,6 +143,16 @@ describe("P33 retained reward/shop authoritative results", () => {
     resetCoopRewardOperationState();
     // Citizenship: clear the installed op-state so the next (--no-isolate) file starts with none installed.
     setActiveCoopRuntimeOpState(null);
+  });
+
+  it("classifies a picked free reward as terminal without closing continuing shop actions", () => {
+    expect(isCoopRewardActionTerminal("reward", "reward", 2, [0])).toBe(true);
+    expect(isCoopRewardActionTerminal("reward", undefined, 2, [0])).toBe(true);
+    expect(isCoopRewardActionTerminal("reward", "skip", COOP_INTERACTION_LEAVE)).toBe(true);
+    expect(isCoopRewardActionTerminal("reward", "reroll", COOP_INTERACTION_REROLL)).toBe(false);
+    expect(isCoopRewardActionTerminal("reward", "shop", 0, [1])).toBe(false);
+    expect(isCoopRewardActionTerminal("market", "biomeShop", 0)).toBe(false);
+    expect(isCoopRewardActionTerminal("market", "biomeShop", COOP_INTERACTION_LEAVE)).toBe(true);
   });
 
   it("host-owned buy/skip/reroll results carry non-empty post-action state and open projection only after apply", async () => {
