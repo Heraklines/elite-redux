@@ -2527,5 +2527,108 @@
     ],
     "trainerClass": "ALLISTER",
     "weight": 100
+  },
+  "TRAINER_70016": {
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70016,
+    "maxWave": 150,
+    "minWave": 70,
+    "name": "Suggest a name 001",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "VOLT_SWITCH",
+          "AIR_SLASH",
+          "RAIN_DANCE",
+          "ENDURE"
+        ],
+        "species": 941
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BATON_PASS",
+          "ROOST",
+          "SUBSTITUTE",
+          "FLY"
+        ],
+        "species": 85
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "BATON"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "DRILL_RUN",
+          "ACROBATICS",
+          "AQUA_BASH",
+          "FLIP_TURN"
+        ],
+        "species": 10026
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SOAK",
+          "BRINE",
+          "DARK_PULSE",
+          "WHIRLPOOL"
+        ],
+        "sanityOff": true,
+        "species": 10044
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "BATON"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "U_TURN",
+          "FLASH_FREEZE",
+          "HYPER_DRILL",
+          "JUMP_KICK"
+        ],
+        "species": 899
+      }
+    ],
+    "trainerClass": "VETERAN",
+    "weight": 100
   }
 }
