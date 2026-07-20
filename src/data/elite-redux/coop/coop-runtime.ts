@@ -4931,6 +4931,14 @@ function markCoopV2ControlMaterialApplied(runtime: CoopRuntime, entry: CoopAutho
     runtime.v2ProjectedReplacementControlId = controlIdOf(entry.nextControl);
     releaseCoopV2ParkedTurnBoundary(runtime, entry);
   }
+  if (entry.kind !== "CONTROL_COMMIT" && entry.nextControl.kind === "COMMAND_FRONTIER") {
+    // A replacement/wave/turn result can itself state the next command frontier. The real CommandPhase may
+    // reach its admission gate while that result is still material-deferred (notably while a replacement
+    // checkpoint is being applied). Once this exact ledger entry becomes materially complete, wake only
+    // phases addressed by its immutable frontier. Waiting for another CONTROL_COMMIT is impossible because
+    // this entry already owns command control; that missing wake was the post-replacement Showdown softlock.
+    releaseCoopV2DeferredCommandStarts(runtime, entry.nextControl);
+  }
   if (
     runtime.v2RecoveryWaitSuccessorOperationId === entry.operationId
     && entry.nextControl.kind !== "AWAIT_SUCCESSOR"
@@ -5218,6 +5226,24 @@ function buildCoopV2LiveSeams(
             turn: globalScene.currentBattle?.turn ?? 0,
           },
         );
+        return;
+      }
+      if (projected.kind !== "installed" && projected.kind !== "already-installed") {
+        return;
+      }
+      if (entry.nextControl.kind === "COMMAND_FRONTIER") {
+        // An authority-side CommandPhase can have reached its V2 gate while a same-address interaction
+        // still owned control. The later ordered command-open is the only event allowed to wake it.
+        releaseCoopV2DeferredCommandStarts(runtime, entry.nextControl);
+      } else if (
+        entry.nextControl.kind === "AWAIT_SUCCESSOR"
+        && entry.nextControl.allowedKinds.includes("CONTROL_COMMIT")
+      ) {
+        // A settled interaction decision installs AWAIT_SUCCESSOR before the authority is allowed to mint
+        // the next command frontier. Retry one real parked CommandPhase under its captured runtime. Its
+        // nested CONTROL_COMMIT releases any remaining same-address fields after the immutable aggregate
+        // frontier has been accepted by the log.
+        resumeOneCoopV2DeferredAuthorityCommandStart(runtime, entry.nextControl);
       }
     },
     admitEntry: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean => {
@@ -6384,6 +6410,7 @@ export function enterCoopV2CrossroadsControlBoundary(input: {
   readonly operationId: string;
   readonly ownerSeatId: number;
   readonly sourceWave: number;
+  readonly sourceTurn: number;
   readonly phaseToken: object;
   readonly resume: () => void;
 }): CoopV2InteractionBoundaryVerdict {
@@ -6403,12 +6430,19 @@ export function enterCoopV2CrossroadsControlBoundary(input: {
     || input.ownerSeatId < 0
     || !Number.isSafeInteger(input.sourceWave)
     || input.sourceWave <= 0
+    || !Number.isSafeInteger(input.sourceTurn)
+    || input.sourceTurn < 0
     || battle.waveIndex !== input.sourceWave
   ) {
     return "failed";
   }
-  const state = captureCoopAuthoritativeBattleState(battle.turn);
-  if (state == null || state.wave !== input.sourceWave || state.turn !== battle.turn) {
+  // Crossroads is enqueued during turn settlement and may start only after the engine increments its
+  // ambient battle turn. Its constructor-captured source coordinate is the durable phase address used by
+  // the eventual result envelope; opening control from the later ambient turn creates an impossible
+  // SHARED_INTERACTION(w/t+1) -> INTERACTION_COMMIT(w/t) edge. Capture the complete live state at the
+  // phase address so open, result, recovery, and replay all share one coordinate.
+  const state = captureCoopAuthoritativeBattleState(input.sourceTurn);
+  if (state == null || state.wave !== input.sourceWave || state.turn !== input.sourceTurn) {
     return "failed";
   }
   const control: Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }> = {
@@ -6665,6 +6699,28 @@ export function enterCoopV2CommandControlBoundary(
   }
 
   if (runtime.controller.authorityRole === "authority") {
+    const authorityControl = cutover.authorityFrontier()?.nextControl ?? null;
+    if (
+      authorityControl?.kind === "SHARED_INTERACTION"
+      && authorityControl.epoch === runtime.controller.sessionEpoch
+      && authorityControl.wave === state.wave
+      && authorityControl.turn === state.turn
+    ) {
+      const key = commandStartKey(state.wave, state.turn, fieldIndex, pokemonId);
+      runtime.v2DeferredCommandStarts.set(key, {
+        epoch: runtime.controller.sessionEpoch,
+        wave: state.wave,
+        turn: state.turn,
+        fieldIndex,
+        pokemonId,
+        resume,
+      });
+      coopLog(
+        "v2-control",
+        `parked authority CommandPhase behind ordered shared interaction ${authorityControl.operationId} key=${key}`,
+      );
+      return "deferred";
+    }
     return establishCoopV2CommandControlFrontier();
   }
 
@@ -6733,6 +6789,31 @@ function releaseCoopV2DeferredCommandStarts(
       coopWarn("v2-control", `deferred CommandPhase resume threw key=${key}`, error);
     }
   }
+}
+
+/** Resume one real authority CommandPhase only after its same-address ordered successor wait is installed. */
+function resumeOneCoopV2DeferredAuthorityCommandStart(
+  runtime: CoopRuntime,
+  wait: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>,
+): void {
+  if (runtime.controller.authorityRole !== "authority" || wait.epoch !== runtime.controller.sessionEpoch) {
+    return;
+  }
+  const candidate = [...runtime.v2DeferredCommandStarts].find(
+    ([, pending]) => pending.epoch === wait.epoch && pending.wave === wait.wave && pending.turn === wait.turn,
+  );
+  if (candidate == null) {
+    return;
+  }
+  const [key, pending] = candidate;
+  runtime.v2DeferredCommandStarts.delete(key);
+  runWhenCoopRuntimeActive(runtime, () => {
+    try {
+      pending.resume();
+    } catch (error) {
+      coopWarn("v2-control", `authority deferred CommandPhase resume threw key=${key}`, error);
+    }
+  });
 }
 
 /** Release only the exact phase generation addressed by an applied shared-interaction control-open. */

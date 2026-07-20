@@ -2304,22 +2304,29 @@ export class DuoPublicUiRig {
    * automatically, both players independently lock the Friendly wager, and the ordinary battle opens.
    */
   async startShowdownBattle() {
-    // Wager can open on one browser while completePairingBinding is still proving the reciprocal browser's
-    // stable seat. Capture before that concurrent transition: a static wager surface is emitted once, so a
-    // cursor taken afterward can wait forever despite the player visibly sitting on the correct screen.
-    const battleCursors = Object.fromEntries(
-      Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
-    );
+    // Wager can open before pair() finishes its screenshots/fingerprint proof, not merely while
+    // completePairingBinding is running. Reuse the cursors captured before the first lobby request: a
+    // static wager surface is emitted once, so any cursor sampled after pair() returns can wait forever
+    // despite the player visibly sitting on the correct screen.
+    const wagerCursors = this.pairRoleCursors;
+    if (!wagerCursors) {
+      throw new Error("startShowdownBattle called before pair()");
+    }
     await this.completePairingBinding();
     await Promise.all(
       Object.values(this.clients).map(client =>
         waitForSemanticSurface(client, "wager", {
-          fromCursor: battleCursors[client.label],
+          fromCursor: wagerCursors[client.label],
           timeoutMs: this.config.timeoutMs,
         }),
       ),
     );
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("showdown-wager-open")));
+    // Battle evidence starts immediately before the two real wager submissions. This excludes setup/title
+    // surfaces without risking the one-shot wager race above.
+    const battleCursors = Object.fromEntries(
+      Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
+    );
     await Promise.all(
       Object.values(this.clients).map(client =>
         selectOptionById(client, {
@@ -2327,7 +2334,7 @@ export class DuoPublicUiRig {
           targetId: "showdown-wager:friendly",
           navKeys: ["ArrowUp", "ArrowDown"],
           timeoutMs: this.config.timeoutMs,
-          fromCursor: battleCursors[client.label],
+          fromCursor: wagerCursors[client.label],
         }),
       ),
     );

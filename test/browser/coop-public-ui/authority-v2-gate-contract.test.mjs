@@ -303,6 +303,19 @@ test("a committed replacement wake cannot be stranded behind its own turn finali
   );
 });
 
+test("a materially complete non-control entry wakes the exact command frontier it already owns", () => {
+  const markStart = coopRuntime.indexOf("function markCoopV2ControlMaterialApplied(");
+  const markEnd = coopRuntime.indexOf("\n}\n", markStart) + 2;
+  assert.notEqual(markStart, -1, "runtime exposes the shared material-terminal seam");
+  assert.ok(markEnd > markStart, "material-terminal seam has a bounded source block");
+  const mark = coopRuntime.slice(markStart, markEnd);
+  assert.match(
+    mark,
+    /entry\.kind !== "CONTROL_COMMIT" && entry\.nextControl\.kind === "COMMAND_FRONTIER"[\s\S]*releaseCoopV2DeferredCommandStarts\(runtime, entry\.nextControl\)/u,
+    "replacement/turn/wave entries release a CommandPhase parked while their own material was applying",
+  );
+});
+
 test("ordinary replacement projection has an immutable fallback when cosmetic faint replay is absent", () => {
   const prepareStart = coopRuntime.indexOf("function prepareCoopV2OrdinaryReplacementControlSurface(");
   const prepareEnd = coopRuntime.indexOf("\n/**\n * Install an ordinary replica's exact V2 successor", prepareStart);
@@ -388,6 +401,16 @@ test("TURN_RESOLVE prompts form a closed command-to-turn Authority V2 path", () 
     turnResolveCases,
     /\["TURN_COMMIT", "INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"\]/u,
   );
+  assert.match(
+    coopRuntime,
+    /authorityControl\?\.kind === "SHARED_INTERACTION"[\s\S]*v2DeferredCommandStarts\.set\(key,[\s\S]*return "deferred"/u,
+    "a transient authority CommandPhase parks instead of aborting while the exact mid-turn interaction owns control",
+  );
+  assert.match(
+    coopRuntime,
+    /entry\.nextControl\.kind === "AWAIT_SUCCESSOR"[\s\S]*allowedKinds\.includes\("CONTROL_COMMIT"\)[\s\S]*resumeOneCoopV2DeferredAuthorityCommandStart/u,
+    "the installed interaction successor wait retries the parked authority CommandPhase",
+  );
 });
 
 test("Crossroads result envelopes retain the exact V2 control turn instead of a legacy turn-zero sentinel", () => {
@@ -407,6 +430,18 @@ test("Crossroads result envelopes retain the exact V2 control turn instead of a 
   assert.doesNotMatch(ownerCommit, /turn: 0/u);
   assert.match(watcherApply, /turn: this\.coopSourceTurn/u);
   assert.doesNotMatch(watcherApply, /turn: 0/u);
+  assert.match(
+    crossroadsPhase,
+    /enterCoopV2CrossroadsControlBoundary\(\{[\s\S]*sourceWave: wave,[\s\S]*sourceTurn: this\.coopSourceTurn/u,
+    "the control-open receives the same constructor-captured coordinate as the result",
+  );
+  const crossroadsBoundaryStart = coopRuntime.indexOf("export function enterCoopV2CrossroadsControlBoundary(");
+  const crossroadsBoundaryEnd = coopRuntime.indexOf("\nfunction commandStartKey(", crossroadsBoundaryStart);
+  assert.notEqual(crossroadsBoundaryStart, -1, "runtime exposes the Crossroads control boundary");
+  assert.ok(crossroadsBoundaryEnd > crossroadsBoundaryStart, "Crossroads control boundary has a bounded source block");
+  const crossroadsBoundary = coopRuntime.slice(crossroadsBoundaryStart, crossroadsBoundaryEnd);
+  assert.match(crossroadsBoundary, /captureCoopAuthoritativeBattleState\(input\.sourceTurn\)/u);
+  assert.doesNotMatch(crossroadsBoundary, /captureCoopAuthoritativeBattleState\(battle\.turn\)/u);
 
   assert.match(
     coopRuntime,

@@ -438,3 +438,48 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   harness was still verifying its peer's seat. The wager cursor is now captured
   before that concurrent binding transition, so the one-shot public surface
   cannot fall just behind the observer window.
+
+2026-07-20 - Installed mid-turn command successor and phase-addressed Crossroads open
+
+- Exact-SHA C2 learn-move evidence at `68ec6ea2e` proved the prompt/result edge
+  itself now commits, then exposed the next closed-graph gap: the authority's
+  locally queued same-turn `CommandPhase` reached its admission boundary while
+  the exact `SHARED_INTERACTION` still owned control. Treating that ordinary
+  engine scheduling race as invalid authority aborted the session.
+- A same-address authority `CommandPhase` now parks behind that executable
+  interaction. Only the committed decision's installed
+  `AWAIT_SUCCESSOR(CONTROL_COMMIT)` retries one real phase; that phase authors
+  the aggregate immutable command frontier, whose commit releases the remaining
+  addressed starts. A `TURN_RESOLVE` wait is distinguished by its explicit
+  `TURN_COMMIT` permission and alone admits same-turn `command-open`; ordinary
+  interaction waits still require the next turn.
+- Exact-SHA C5 traces corrected the remaining Crossroads diagnosis. The live
+  phase had captured wave 5/turn 1, but it did not start until the ambient battle
+  advanced to turn 2. Its `CONTROL_COMMIT` therefore opened
+  `SHARED_INTERACTION(w5/t2)`, while the correctly phase-bound result used
+  `INTERACTION_COMMIT(w5/t1)`. The log rejected that impossible predecessor
+  edge by design.
+- `enterCoopV2CrossroadsControlBoundary` now requires the immutable phase
+  `sourceTurn`, captures its complete state at that coordinate, and uses the
+  same address for control, result, ordinary projection, and recovery. The
+  architecture contract now checks both sides of the edge rather than checking
+  only the result path.
+- Local validation remained static-only per `AGENTS.md`: the Authority V2
+  architecture contract is 15/15, `git diff --check` is clean, scoped Biome has
+  no new errors (repository-baseline diagnostics only), and full TypeScript
+  remains at 584 baseline output lines with zero touched-path diagnostics.
+  Runtime co-op behavior remains GitHub-hosted qualification only.
+- The completed Showdown browser artifact independently showed both real wager
+  surfaces were healthy, but each was emitted before `pair()` finished its
+  fingerprint/checkpoint work. The prior observer fix sampled at
+  `startShowdownBattle`, which was still too late. Wager observation now reuses
+  the pre-lobby-request cursor, while command evidence takes a fresh cursor
+  immediately before the two real wager submissions.
+- S4 then exposed a real post-replacement wake omission without a safety abort.
+  Revision 3 already stated the complete turn-2 `COMMAND_FRONTIER`; the guest's
+  real `CommandPhase` correctly parked while revision 3's checkpoint material
+  was still applying. Material completion marked the control ready but only
+  `CONTROL_COMMIT` paths released deferred command starts, so the phase waited
+  for a second command-open entry that could never legally exist. Every
+  non-control entry that itself states `COMMAND_FRONTIER` now releases only its
+  exact addressed starts at the shared material-terminal seam.

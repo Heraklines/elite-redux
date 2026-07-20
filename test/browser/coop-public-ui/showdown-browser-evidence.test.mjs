@@ -91,10 +91,14 @@ test("two public clients must prove one positive gameplay epoch before locking t
     harness.indexOf("\n  /**\n   * Drive one reciprocal", harness.indexOf("async startShowdownBattle()")),
   );
   assert.ok(
-    start.indexOf("const battleCursors") < start.indexOf("completePairingBinding()"),
-    "the observer cursor precedes the concurrent binding-to-wager transition",
+    start.indexOf("const wagerCursors = this.pairRoleCursors") < start.indexOf("completePairingBinding()"),
+    "wager observation reuses the pre-request cursor and therefore precedes pair() itself",
   );
   assert.ok(start.indexOf("completePairingBinding()") < start.indexOf('waitForSemanticSurface(client, "wager"'));
+  assert.ok(
+    start.indexOf('waitForSemanticSurface(client, "wager"') < start.indexOf("const battleCursors"),
+    "battle evidence receives a fresh cursor only after the one-shot wager was observed",
+  );
   assert.match(start, /targetId: "showdown-wager:friendly"/u);
   assert.match(start, /assertSharedCommandFrontier\(battleCursors, "showdown-wave-1-command"/u);
 });

@@ -111,13 +111,16 @@ function frameContext(overrides: Partial<CoopFrameContextV2> = {}): CoopFrameCon
   };
 }
 
-function commandControl(): CoopNextControl {
+function commandControl(
+  overrides: Partial<Extract<CoopNextControl, { kind: "COMMAND_FRONTIER" }>> = {},
+): Extract<CoopNextControl, { kind: "COMMAND_FRONTIER" }> {
   return {
     kind: "COMMAND_FRONTIER",
     epoch: 1,
     wave: 1,
     turn: 1,
     commands: [{ ownerSeatId: 0, pokemonId: 42, fieldIndex: 0 }],
+    ...overrides,
   };
 }
 
@@ -909,6 +912,66 @@ describe("authority-v2 log", () => {
     );
     expect(decision.revision).toBe(3);
     expect(log.commit(entryInput("settled-turn-after-learn")).revision).toBe(4);
+  });
+
+  it("lets a settled TURN_RESOLVE decision reopen command control at the same turn only", () => {
+    const commandOpen = (turn: number) => ({
+      ...entryInput(`command-open-turn-${turn}`, {
+        kind: "CONTROL_COMMIT" as const,
+        nextControl: commandControl({ turn }),
+      }),
+      material: {
+        digest: `command-open-turn-${turn}`,
+        payload: {
+          kind: "command-open",
+          wave: 1,
+          turn,
+        },
+      },
+    });
+    const decisionWait = (operationId: string) => ({
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: operationId,
+      epoch: 1,
+      wave: 1,
+      turn: 1,
+      allowedKinds: ["TURN_COMMIT", "INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"] as const,
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    });
+
+    const sameTurn = makeLog(scheduler, []);
+    sameTurn.commit(
+      entryInput("learn-decision-same-turn", {
+        kind: "INTERACTION_COMMIT",
+        nextControl: decisionWait("learn-decision-same-turn"),
+      }),
+    );
+    expect(sameTurn.commit(commandOpen(1)).revision).toBe(2);
+
+    const wrongTurn = makeLog(scheduler, []);
+    wrongTurn.commit(
+      entryInput("learn-decision-wrong-turn", {
+        kind: "INTERACTION_COMMIT",
+        nextControl: decisionWait("learn-decision-wrong-turn"),
+      }),
+    );
+    expect(() => wrongTurn.commit(commandOpen(2))).toThrow(/not authorized by predecessor control/u);
+
+    const ordinaryInteraction = makeLog(scheduler, []);
+    ordinaryInteraction.commit(
+      entryInput("ordinary-interaction", {
+        kind: "INTERACTION_COMMIT",
+        nextControl: successorWait("ordinary-interaction", [
+          "INTERACTION_COMMIT",
+          "CONTROL_COMMIT",
+          "WAVE_ADVANCE",
+          "TERMINAL_COMMIT",
+        ]),
+      }),
+    );
+    expect(() => ordinaryInteraction.commit(commandOpen(1))).toThrow(/not authorized by predecessor control/u);
+    expect(ordinaryInteraction.commit(commandOpen(2)).revision).toBe(2);
   });
 
   it("does not let arbitrary interaction material interrupt command control", () => {

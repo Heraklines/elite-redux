@@ -381,6 +381,7 @@ export class ErCrossroadsPhase extends Phase {
       operationId: controlOperationId,
       ownerSeatId: coopInteractionOwnerSeat(pinned),
       sourceWave: wave,
+      sourceTurn: this.coopSourceTurn,
       phaseToken: this,
       resume: openExactSurface,
     });

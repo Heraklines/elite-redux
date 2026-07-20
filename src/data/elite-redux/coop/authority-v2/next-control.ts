@@ -180,7 +180,12 @@ export function successorWaitAllows(
     return false;
   }
   if (nextKind === "CONTROL_COMMIT" && !controlOnly) {
-    return broadWaitAllowsControlCommitTurn(nextMaterial, address.turn, wait.turn);
+    return broadWaitAllowsControlCommitTurn(
+      nextMaterial,
+      address.turn,
+      wait.turn,
+      wait.allowedKinds.includes("TURN_COMMIT"),
+    );
   }
   if (turnBoundaryWait && (nextKind === "WAVE_ADVANCE" || nextKind === "TERMINAL_COMMIT")) {
     return address.turn === wait.turn || address.turn === wait.turn + 1;
@@ -225,23 +230,32 @@ interface MechanicalAddress {
   readonly turn: number;
 }
 
-function broadWaitAllowsControlCommitTurn(nextMaterial: unknown, nextTurn: number, waitTurn: number): boolean {
+function broadWaitAllowsControlCommitTurn(
+  nextMaterial: unknown,
+  nextTurn: number,
+  waitTurn: number,
+  allowSameTurnCommand: boolean,
+): boolean {
   const controlMaterial = objectRecord(nextMaterial);
   // CONTROL_COMMIT closes two different authority boundaries:
   //
-  // - command-open is authored after settlement advances into the next turn;
+  // - ordinary command-open is authored after settlement advances into the next turn;
+  // - a TURN_RESOLVE prompt decision can return to the still-open command turn;
   // - interaction-open authorizes a real picker (currently Crossroads) at the
   //   same settlement address as the interaction result that led to it.
   //
-  // Treating both as command-open rejected a legitimate reward -> Crossroads
-  // successor even though the reward's wait explicitly allowed CONTROL_COMMIT.
+  // TURN_RESOLVE decisions are the only broad waits that also authorize TURN_COMMIT. That closed
+  // distinction grants their command-open the same-turn edge without allowing an ordinary reward/shop
+  // terminal to reopen its completed command turn. Treating interaction-open as command-open likewise
+  // rejected a legitimate reward -> Crossroads successor even though the reward's wait explicitly
+  // allowed CONTROL_COMMIT.
   // Unknown material remains fail-closed here; the adapter performs the full
   // digest/schema validation if admission succeeds.
   const expectedTurn =
     controlMaterial?.kind === "interaction-open"
       ? waitTurn
       : controlMaterial?.kind === "command-open"
-        ? waitTurn + 1
+        ? waitTurn + (allowSameTurnCommand ? 0 : 1)
         : null;
   return expectedTurn != null && nextTurn === expectedTurn;
 }
