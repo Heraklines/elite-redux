@@ -502,10 +502,24 @@ describe("authenticated P33 browser client", () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    let hostGameplayBindingSettled = false;
+    let guestGameplayBindingSettled = false;
+    const hostGameplayBinding = host.awaitGameplayBinding(2_000).then(ready => {
+      hostGameplayBindingSettled = true;
+      return ready;
+    });
+    const guestGameplayBinding = guest.awaitGameplayBinding(2_000).then(ready => {
+      guestGameplayBindingSettled = true;
+      return ready;
+    });
+
     const provisionalEpoch = host.sessionEpoch;
     expect(provisionalEpoch).toBeGreaterThan(0);
     expect(guest.sessionEpoch, "the replica has no boundary epoch before a launch decision").toBe(0);
     expect(guest.authenticatedBinding).toBeNull();
+    await Promise.resolve();
+    expect(hostGameplayBindingSettled, "an authority epoch without a seat-map ACK cannot open gameplay").toBe(false);
+    expect(guestGameplayBindingSettled, "an epoch-0 replica cannot open gameplay").toBe(false);
 
     const commitment = {
       version: 1 as const,
@@ -540,6 +554,10 @@ describe("authenticated P33 browser client", () => {
     expect(guest.authenticatedBinding?.sessionEpoch).toBe(host.sessionEpoch);
     expect(hostBindingReady, "the authority receives a post-capability binding lifecycle edge").toHaveBeenCalled();
     expect(guestBindingReady, "the replica receives a post-capability binding lifecycle edge").toHaveBeenCalled();
+    await expect(hostGameplayBinding).resolves.toBe(true);
+    await expect(guestGameplayBinding).resolves.toBe(true);
+    expect(host.p33FrameContext()?.sessionEpoch).toBe(host.sessionEpoch);
+    expect(guest.p33FrameContext()?.sessionEpoch).toBe(host.sessionEpoch);
 
     host.dispose();
     guest.dispose();

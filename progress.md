@@ -284,3 +284,36 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   finalizer is current, it reconstructs `CoopGuestFaintSwitchPhase` solely from the retained V2 control and
   only then releases the predecessor. The real PARTY handler remains the only `controlInstalled` proof.
   Recovery and hard-epoch reset clear the construction guard. The architecture contract is now 10/10.
+
+2026-07-20 - Showdown fresh-session binding admission
+
+- The paired staging captures at `2026-07-20T17-03-19-161Z` and
+  `2026-07-20T17-03-35-539Z` on build `7fc28604c` isolated the reported wave-1
+  safety abort. Team and wager rendezvous completed, but the authority entered
+  the battle at epoch `1827396545435366` / run
+  `df99272d-907c-424a-810c-a7dd52616476` while the replica remained at epoch
+  `0` with no run. The replica consequently rejected every battle event as
+  cross-addressed and every turn resolution as unawaited. This was a real
+  production admission defect, not a renderer or language mismatch.
+- Showdown remains ephemeral and performs no save discovery, loading, or
+  persistence. It now crosses the same atomic fresh-run boundary as ordinary
+  co-op: functional compatibility, the authority's durable
+  `resumeStartNew` epoch/run commitment, and an acknowledged P33 seat-map
+  binding. Both seats fail closed if that exact gameplay address cannot be
+  proved before team selection.
+- `CoopSessionController.awaitGameplayBinding` is the bounded shared proof. A
+  P33 session opens only from complete exact binding axes after the peer ACK;
+  legacy opens only with a positive epoch and valid run identity. Disconnect,
+  disposal, P33 rejection, protocol violation, and timeout close the barrier.
+- The P33 behavior regression proves neither the authority's provisional epoch
+  nor the replica's epoch-zero state can open gameplay, then proves both peers
+  expose the same committed frame epoch after binding. The architecture
+  contract prevents the Showdown title path from bypassing compatibility,
+  fresh identity commitment, or binding proof while also preventing save
+  discovery from leaking into the ephemeral mode.
+- Local verification remained static-only per `AGENTS.md`: architecture
+  contracts are 11/11, scoped Biome made only formatting changes and reports
+  repository-baseline warnings, `git diff --check` is clean, and full
+  TypeScript reports 589 baseline lines with zero diagnostics in touched
+  paths. The P33 behavior test and Showdown end-to-end journey require
+  exact-SHA GitHub-hosted qualification.

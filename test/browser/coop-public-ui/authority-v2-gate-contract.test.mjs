@@ -13,11 +13,13 @@ const campaignWorkflow = readFileSync(new URL(".github/workflows/coop-public-ui-
 const journeyWorkflow = readFileSync(new URL(".github/workflows/coop-public-ui-journey.yml", root), "utf8");
 const stagingWorkflow = readFileSync(new URL(".github/workflows/deploy-staging.yml", root), "utf8");
 const coopRuntime = readFileSync(new URL("src/data/elite-redux/coop/coop-runtime.ts", root), "utf8");
+const sessionController = readFileSync(new URL("src/data/elite-redux/coop/coop-session-controller.ts", root), "utf8");
 const duoHarness = readFileSync(new URL("test/tools/coop-duo-harness.ts", root), "utf8");
 const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
 const replayPhases = readFileSync(new URL("src/phases/coop-replay-phases.ts", root), "utf8");
+const titlePhase = readFileSync(new URL("src/phases/title-phase.ts", root), "utf8");
 const shadow = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/shadow.ts", root), "utf8");
 const waveAdapter = readFileSync(
   new URL("src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts", root),
@@ -75,6 +77,32 @@ test("public-browser campaign and staging bundle qualify the same V2 cutover", (
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_WAVE=on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_INTERACTION=on"/u);
   assert.match(stagingWorkflow, /echo "VITE_COOP_AUTHORITY_V2_RECOVERY=on"/u);
+});
+
+test("Showdown cannot skip the shared epoch/run/binding boundary when it skips save discovery", () => {
+  const branchStart = titlePhase.indexOf('if (sessionKind === "versus") {');
+  const branchEnd = titlePhase.indexOf("\n        void controller", branchStart + 1);
+  assert.notEqual(branchStart, -1, "title phase owns an explicit versus launch path");
+  assert.ok(branchEnd > branchStart, "the versus branch ends before ordinary co-op save discovery");
+  const versus = titlePhase.slice(branchStart, branchEnd);
+  const checksCompatibility = versus.indexOf(".awaitPartnerCompatibility()");
+  const commitsFreshIdentity = versus.indexOf(".sendResumeStartNew()");
+  const waitsForBinding = versus.indexOf("controller.awaitGameplayBinding()");
+  const entersRun = versus.indexOf("startNewRun()");
+  assert.ok(checksCompatibility >= 0, "versus proves the opponent build before launch");
+  assert.ok(commitsFreshIdentity > checksCompatibility, "the authority commits one shared fresh run/epoch");
+  assert.ok(waitsForBinding > checksCompatibility, "both seats wait for the exact gameplay binding");
+  assert.ok(entersRun > waitsForBinding, "battle entry is reachable only after binding proof");
+  assert.doesNotMatch(versus, /getCoopResumeLobbySnapshot|findCoopResumeCandidate|loadSaveSlot/u);
+
+  const waitStart = sessionController.indexOf("awaitGameplayBinding(");
+  const waitEnd = sessionController.indexOf("\n  /** Tear down:", waitStart);
+  assert.notEqual(waitStart, -1, "the controller exposes a bounded gameplay-binding barrier");
+  assert.ok(waitEnd > waitStart, "the gameplay-binding barrier has a bounded source block");
+  const wait = sessionController.slice(waitStart, waitEnd);
+  assert.match(wait, /this\.exactP33BindingAxes\(\)/u);
+  assert.match(wait, /this\.sessionEpochValue > 0 && isCoopRunId\(this\.runIdValue\)/u);
+  assert.match(wait, /this\.p33BindingRejected \|\| this\.authenticatedProtocolViolation/u);
 });
 
 test("wave/terminal cutover carries full settled state and retires every legacy wave authority", () => {

@@ -1062,14 +1062,97 @@ export class TitlePhase extends Phase {
           setModeAndEnd(launchMode);
         };
 
-        // Showdown 1v1 (B7 item 5): a versus match is EPHEMERAL - it never saves, never resumes,
-        // and never picks a save slot. The co-op RESUME / NEW-GAME barrier below (readCoopResumeMarker,
-        // the guest resume-decision wait, loadSaveSlot) is a co-op-only feature; running it for versus
-        // surfaced an unselectable "wait for the partner to resume or start a new game?" prompt that
-        // HARD SOFT-LOCKED both clients post-pairing. Skip the entire barrier for versus on BOTH roles
-        // and go straight into the versus teambuild (the negotiate step is the real sync point).
+        // Showdown is ephemeral: it never discovers, loads, or writes a co-op save. It nevertheless MUST
+        // cross the same atomic fresh-session identity boundary as a new co-op run. Skipping the whole
+        // boundary left the host on its positive epoch while the authenticated replica remained at epoch
+        // zero; team/wager rendezvous still passed, but every battleEvent/turnResolution was then correctly
+        // rejected as cross-addressed. Keep save discovery skipped while requiring compatibility,
+        // resumeStartNew's exact epoch/run transaction, and the acknowledged P33 seat-map binding.
         if (sessionKind === "versus") {
-          startNewRun();
+          void controller
+            .awaitPartnerCompatibility()
+            .then(identity => {
+              if (!isCurrentSession()) {
+                return;
+              }
+              if (identity == null || identity.partnerName == null) {
+                stage.setSeat(1, { name: null, detail: "Reconnect needed", dot: "red" });
+                stage.setStatus("Could not verify a compatible opponent build. Reconnect and try again.");
+                terminalFailure(
+                  "Could not verify your Showdown opponent's build. Both players should refresh, reconnect, and try again.",
+                );
+                return;
+              }
+              const partner = identity.partnerName;
+              stage.setSeat(1, { name: partner, detail: "Authenticating match...", dot: "amber" });
+              stage.setStatus(`Connected! Securing the match with ${partner}...`);
+              const enterBoundShowdown = async (): Promise<void> => {
+                const bound = await controller.awaitGameplayBinding();
+                if (!isCurrentSession()) {
+                  return;
+                }
+                if (!bound) {
+                  terminalFailure("The Showdown match identity could not be authenticated. Reconnect and try again.");
+                  return;
+                }
+                stage.setSeat(1, { name: partner, detail: "Match secured", dot: "green" });
+                startNewRun();
+              };
+
+              if (identity.localRole === "guest") {
+                globalScene.ui.setMode(UiMode.MESSAGE);
+                globalScene.ui.resetModeChain();
+                globalScene.ui.showText(`Connected! Waiting for ${partner} to secure the match...`, null);
+                let released = false;
+                const waitTimer = setTimeout(() => {
+                  if (!released && isCurrentSession()) {
+                    released = true;
+                    terminalFailure(
+                      "Your opponent did not finish securing the Showdown match. Reconnect and try again.",
+                    );
+                  }
+                }, COOP_RESUME_GUEST_WAIT_MS);
+                controller.armResumeStartNewHandler(() => {
+                  if (released || !isCurrentSession()) {
+                    return;
+                  }
+                  released = true;
+                  clearTimeout(waitTimer);
+                  void enterBoundShowdown();
+                });
+                return;
+              }
+
+              globalScene.ui.setMode(UiMode.MESSAGE);
+              globalScene.ui.resetModeChain();
+              globalScene.ui.showText(`Connected! Securing the match with ${partner}...`, null);
+              void controller
+                .sendResumeStartNew()
+                .then(acknowledged => {
+                  if (!isCurrentSession()) {
+                    return;
+                  }
+                  if (!acknowledged) {
+                    terminalFailure("The Showdown match could not be committed. Reconnect and try again.");
+                    return;
+                  }
+                  void enterBoundShowdown();
+                })
+                .catch(error => {
+                  if (!isCurrentSession()) {
+                    return;
+                  }
+                  console.error("[showdown] fresh match identity failed", error);
+                  terminalFailure("The Showdown match could not be committed. Reconnect and try again.");
+                });
+            })
+            .catch(error => {
+              if (!isCurrentSession()) {
+                return;
+              }
+              console.error("[showdown] compatibility barrier failed", error);
+              terminalFailure("The Showdown match could not be authenticated. Reconnect and try again.");
+            });
           return;
         }
 

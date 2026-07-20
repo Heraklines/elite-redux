@@ -2127,6 +2127,66 @@ export class CoopSessionController {
     });
   }
 
+  /**
+   * Wait until the atomic fresh/resume decision has installed the exact gameplay identity that may
+   * address mechanical traffic. P33 is not ready merely because its account hello and capabilities
+   * matched: the authority must mint a run/epoch/seat-map binding and both authenticated seats must ACK
+   * that same immutable binding. Legacy sessions have no authenticated seat-map transaction, but still
+   * require the shared positive epoch + run identity established by the same launch decision.
+   *
+   * Showdown used to skip this boundary along with save discovery. Its authority entered the battle at
+   * the host epoch while the replica remained at epoch 0, so the replica correctly rejected every live
+   * battle event as cross-addressed. Callers must fail closed when this returns false.
+   */
+  awaitGameplayBinding(timeoutMs = 15_000): Promise<boolean> {
+    const evaluate = (): { settled: boolean; ready: boolean } => {
+      if (this.disposed || this.transportState === "disconnected" || this.transportState === "closed") {
+        return { settled: true, ready: false };
+      }
+      if (this.p33Context != null) {
+        if (this.p33BindingRejected || this.authenticatedProtocolViolation) {
+          return { settled: true, ready: false };
+        }
+        return this.exactP33BindingAxes() == null ? { settled: false, ready: false } : { settled: true, ready: true };
+      }
+      const ready = this.sessionEpochValue > 0 && isCoopRunId(this.runIdValue);
+      return ready ? { settled: true, ready: true } : { settled: false, ready: false };
+    };
+
+    const current = evaluate();
+    if (current.settled) {
+      return Promise.resolve(current.ready);
+    }
+    return new Promise(resolve => {
+      let settled = false;
+      let offChange = (): void => {};
+      const off = (): void => {
+        offChange();
+        this.compatibilityLifecycleHandlers.delete(check);
+      };
+      const finish = (ready: boolean): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        off();
+        resolve(ready);
+      };
+      const check = (): void => {
+        const result = evaluate();
+        if (result.settled) {
+          finish(result.ready);
+        }
+      };
+      const timer = setTimeout(() => finish(false), Math.max(0, timeoutMs));
+      offChange = this.onChange(check);
+      this.compatibilityLifecycleHandlers.add(check);
+      // Close the subscribe-after-check race for both binding construction and its final ACK.
+      check();
+    });
+  }
+
   /** Tear down: stop listening to the transport (does not close the transport). */
   dispose(): void {
     if (this.disposed) {
