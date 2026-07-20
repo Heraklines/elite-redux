@@ -47,8 +47,10 @@ import { buildTeamMenuPresetViews, runShowdownPresetBuild } from "#data/elite-re
 import {
   getTournamentBracket,
   listTournaments,
+  pingTournamentPresence,
   registerForTournament,
 } from "#data/elite-redux/showdown/tournament-client";
+import { buildOwnGhostIconSummary } from "#data/elite-redux/showdown/tournament-ghost-icon";
 import { setTournamentMatchContext } from "#data/elite-redux/showdown/tournament-match-context";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
@@ -604,6 +606,12 @@ export class TitlePhase extends Phase {
         now: Date.now(),
         onPlayMatch: (matchId: string, opponent: string) => enterMatch(t.id, matchId, opponent),
         onBack: () => void showList(),
+        // P1.5 live board: poll the worker for the advancing bracket + ping presence while open.
+        onPoll: async () => {
+          const fresh = await getTournamentBracket(t.id);
+          return fresh.ok ? fresh.data.tournament : null;
+        },
+        onPing: () => void pingTournamentPresence(t.id),
       });
     };
 
@@ -613,7 +621,9 @@ export class TitlePhase extends Phase {
         notice("You need a saved team preset to register. Build one in the Showdown menu.", () => void showList());
         return;
       }
-      void registerForTournament(id, presets[0].name).then(res => {
+      // P1.5: carry the player's ghost-trainer appearance summary so the board can draw their
+      // slot icon + name + title. Registering may AUTO-CLOSE the tournament at cap (server-side).
+      void registerForTournament(id, presets[0].name, buildOwnGhostIconSummary()).then(res => {
         if (res.ok) {
           void showList();
         } else {

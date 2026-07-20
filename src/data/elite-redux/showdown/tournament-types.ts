@@ -39,11 +39,104 @@ export interface BracketView {
   rounds: BracketMatchView[][];
 }
 
+/**
+ * The entrant's ghost-trainer APPEARANCE SUMMARY (P1.5 board) — mirror of the worker's
+ * GhostIconSummary. Presentation-only: sprite key + authored name + title, drawn as each
+ * slot's icon + the opponent card. Untrusted (peer-authored) — re-sanitized on receipt via
+ * {@linkcode sanitizeGhostIconSummary} (the ghost-profile rule).
+ */
+export interface GhostIconSummary {
+  /** Trainer atlas key (TrainerConfig.getSpriteKey), e.g. "veteran" / "ace_trainer_f". */
+  spriteKey?: string;
+  /** Authored display name (falls back to the username when absent). */
+  name?: string;
+  /** Authored title prefix. */
+  title?: string;
+}
+
 /** One entrant summary in a tournament view. */
 export interface EntrantView {
   participant: TournamentParticipant;
   name: string;
   seed: number | null;
+  /** P1.5: ghost-trainer appearance summary (null for old registrations -> fallback icon). */
+  ghost?: GhostIconSummary | null;
+  /** P1.5: epoch ms of this entrant's last presence ping (null = never seen). */
+  lastSeen?: number | null;
+}
+
+/** Field caps (mirror er-ghost-profile GHOST_NAME_MAX / GHOST_TITLE_MAX). */
+const GHOST_ICON_NAME_MAX = 24;
+const GHOST_ICON_TITLE_MAX = 32;
+const GHOST_ICON_KEY_MAX = 40;
+
+/**
+ * Re-sanitize an untrusted ghost-icon summary on RECEIPT (the ghost-profile rule): the sprite
+ * KEY is clamped to a strict `[a-z0-9_]` trainer-atlas token (no arbitrary path), name/title
+ * are control-stripped + length-clamped. Returns null when nothing meaningful survives.
+ */
+export function sanitizeGhostIconSummary(raw: unknown): GhostIconSummary | null {
+  if (typeof raw !== "object" || raw === null) {
+    return null;
+  }
+  const r = raw as Record<string, unknown>;
+  const out: GhostIconSummary = {};
+  if (typeof r.spriteKey === "string") {
+    const key = r.spriteKey
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, "")
+      .slice(0, GHOST_ICON_KEY_MAX);
+    if (key.length > 0) {
+      out.spriteKey = key;
+    }
+  }
+  const clamp = (v: unknown, max: number): string | undefined => {
+    if (typeof v !== "string") {
+      return;
+    }
+    const cleaned = [...v]
+      .filter(ch => ch.charCodeAt(0) >= 0x20 && ch.charCodeAt(0) !== 0x7f)
+      .join("")
+      .trim();
+    return cleaned.length === 0 ? undefined : cleaned.slice(0, max);
+  };
+  const name = clamp(r.name, GHOST_ICON_NAME_MAX);
+  if (name) {
+    out.name = name;
+  }
+  const title = clamp(r.title, GHOST_ICON_TITLE_MAX);
+  if (title) {
+    out.title = title;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/** Presence freshness window: an entrant pinged within this is considered "present" (A: FIGHT). */
+export const PRESENCE_FRESH_MS = 90_000;
+
+/** True if the entrant's last ping is fresh enough to count as present in the lobby now. */
+export function isPresent(lastSeen: number | null | undefined, now: number): boolean {
+  return typeof lastSeen === "number" && now - lastSeen <= PRESENCE_FRESH_MS;
+}
+
+/** Format a last-seen timestamp as a short "just now" / "Xm ago" / "Xh ago" / "Xd ago" string. */
+export function formatLastSeen(lastSeen: number | null | undefined, now: number): string {
+  if (typeof lastSeen !== "number") {
+    return "not seen yet";
+  }
+  const ms = Math.max(0, now - lastSeen);
+  if (ms < 60_000) {
+    return "just now";
+  }
+  const mins = Math.floor(ms / 60_000);
+  if (mins < 60) {
+    return `${mins}m ago`;
+  }
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 /** The full tournament view (list is the same minus `bracket`). */

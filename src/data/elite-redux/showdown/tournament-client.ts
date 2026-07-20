@@ -13,7 +13,7 @@
 // =============================================================================
 
 import { SESSION_ID_COOKIE_NAME } from "#app/constants";
-import type { TournamentView } from "#data/elite-redux/showdown/tournament-types";
+import type { GhostIconSummary, TournamentView } from "#data/elite-redux/showdown/tournament-types";
 import { getCookie } from "#utils/cookies";
 
 export type ClientResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -60,14 +60,31 @@ export function getTournamentBracket(id: string): Promise<ClientResult<{ tournam
   return request("GET", `/tournament/bracket?id=${encodeURIComponent(id)}`);
 }
 
-/** Register for a tournament with a saved team preset (a preset name is REQUIRED). */
-export function registerForTournament(id: string, presetName: string): Promise<ClientResult<unknown>> {
-  return request("POST", "/tournament/register", { id, presetName });
+/**
+ * Register for a tournament with a saved team preset (a preset name is REQUIRED). The optional
+ * ghost-icon summary (sprite key / name / title) is carried into the entrants table so the board
+ * can draw the entrant's ghost-trainer identity (P1.5). The worker sanitizes it on receipt.
+ */
+export function registerForTournament(
+  id: string,
+  presetName: string,
+  ghost?: GhostIconSummary,
+): Promise<ClientResult<{ autoClosed?: boolean }>> {
+  return request("POST", "/tournament/register", { id, presetName, ...(ghost ? { ghost } : {}) });
 }
 
 /** Withdraw from a tournament (before registration closes). */
 export function withdrawFromTournament(id: string): Promise<ClientResult<unknown>> {
   return request("POST", "/tournament/withdraw", { id });
+}
+
+/**
+ * Presence ping (P1.5): stamp the caller's last-seen on this tournament while they sit on the
+ * board / in the tournament lobby, so an opponent's board shows "A: FIGHT" vs "last seen <ago>".
+ * Best-effort and display-only (the P2 activity-win logic is out of scope).
+ */
+export function pingTournamentPresence(id: string): Promise<ClientResult<unknown>> {
+  return request("POST", "/tournament/ping", { id });
 }
 
 /**
