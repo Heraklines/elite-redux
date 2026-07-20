@@ -2773,6 +2773,32 @@
             "weight": 1
           }
         ]
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "GANLON_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "CALCIUM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "RLA",
+          "RLNA",
+          "RLA",
+          "RLNA"
+        ],
+        "slotChance": 55,
+        "species": 135
       }
     ],
     "trainerClass": "MUSICIAN",
