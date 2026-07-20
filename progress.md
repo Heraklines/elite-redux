@@ -317,3 +317,31 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   TypeScript reports 589 baseline lines with zero diagnostics in touched
   paths. The P33 behavior test and Showdown end-to-end journey require
   exact-SHA GitHub-hosted qualification.
+
+2026-07-20 - Showdown two-real-browser admission regression
+
+- The existing exact-SHA public-browser matrix never selected Showdown, so it
+  could not observe the tester's host-positive/guest-zero epoch split even
+  though its ordinary co-op journeys were green. The mode also lacked stable
+  title/team/wager option identities, leaving any attempted driver dependent
+  on translated labels or blind cursor counts.
+- A dedicated `showdown-battle` journey now registers two fresh EN/DE accounts
+  and drives only the public title menu, legal preset selection, confirmation,
+  lobby request/accept, Friendly wager, and battle keys. Its one-mon
+  Bulbasaur/Tackle preset is available only when both the sealed build identity
+  and per-page URL fixture agree; it is never persisted or auto-selected.
+- Before either browser may lock the wager, the harness now requires both
+  authenticated bindings to carry the same positive gameplay epoch and records
+  the exact role/seat/revision/generation evidence. It then proves the shared
+  wave-1 command frontier, executes one reciprocal turn, and requires the next
+  exact command frontier plus retained V2 continuation retirement.
+- Showdown team and wager handlers now expose read-only stable semantic option
+  IDs. Wager ownership is correctly modeled as reciprocal local input rather
+  than the alternating shared-interaction owner used by shops and Mystery
+  encounters. Workflow path filters include the full Showdown stack so future
+  changes cannot bypass this journey.
+- Local validation remained static-only per `AGENTS.md`: 21/21 architecture,
+  workflow, and Showdown source contracts pass; the public-driver boundary is
+  green; scoped Biome has no errors; full TypeScript reports 222 repository
+  baseline diagnostics and zero in the touched TypeScript paths. The exact-SHA
+  two-browser journey and complete sharded co-op gate remain remote-only.

@@ -1,6 +1,6 @@
 import { pokerogueApi } from "#api/api";
 import { loggedInUser } from "#app/account";
-import { getDevMenuItems } from "#app/dev-tools/registry";
+import { getCoopBrowserShowdownFixturePreset, getDevMenuItems } from "#app/dev-tools/registry";
 import { GameMode, getGameMode } from "#app/game-mode";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
@@ -223,6 +223,7 @@ export class TitlePhase extends Phase {
             // carrying the chosen preset, so both clients arrive pre-built and pairing leads
             // near-immediately to the wager (no 10-minute in-lobby pick wait).
             options.push({
+              semanticId: "showdown",
               label: GameMode.getModeName(GameModes.SHOWDOWN),
               handler: () => {
                 this.openShowdownTeamMenu(setModeAndEnd);
@@ -498,9 +499,22 @@ export class TitlePhase extends Phase {
    */
   private openShowdownTeamMenu(setModeAndEnd: (gameMode: GameModes) => void): void {
     const { gameData } = globalScene;
+    const browserFixturePreset = getCoopBrowserShowdownFixturePreset();
     const showMenu = (): void => {
+      const fixtureViews =
+        browserFixturePreset == null
+          ? null
+          : [
+              {
+                name: browserFixturePreset.name,
+                mons: browserFixturePreset.mons,
+                invalidReason:
+                  validateShowdownTeam(browserFixturePreset.mons, buildUnlockSnapshot(gameData), isMegaStage)[0]
+                    ?.message ?? null,
+              },
+            ];
       const config: ShowdownTeamMenuConfig = {
-        presets: buildTeamMenuPresetViews(gameData),
+        presets: fixtureViews ?? buildTeamMenuPresetViews(gameData),
         onExit: () => {
           void globalScene.ui.revertModes().then(() => {
             globalScene.phaseManager.toTitleScreen();
@@ -519,7 +533,7 @@ export class TitlePhase extends Phase {
         // IMPORT save: persist the imported team as a new account-save preset (the handler appends its view).
         onImportSave: (name, mons) => gameData.saveShowdownTeamPreset(name, mons),
         onEnterLobby: idx => {
-          const preset = gameData.listShowdownTeamPresets()[idx];
+          const preset = browserFixturePreset ?? gameData.listShowdownTeamPresets()[idx];
           if (preset == null) {
             showMenu();
             return;

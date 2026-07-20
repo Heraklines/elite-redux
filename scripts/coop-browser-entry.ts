@@ -452,8 +452,12 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       return { surfaceId: "bargain", operationClass: "encounter", ownerModel: "interaction" };
     case "ER_SHINY_LAB":
       return { surfaceId: "shiny-lab", operationClass: "cosmetic", ownerModel: "local" };
+    case "SHOWDOWN_TEAM_MENU":
+      return { surfaceId: "showdown-team-menu", operationClass: "setup", ownerModel: "local" };
     case "SHOWDOWN_WAGER":
-      return { surfaceId: "wager", operationClass: "encounter", ownerModel: "interaction" };
+      // Both players choose and lock their own stake. This is reciprocal local input, not the
+      // alternating shared-interaction owner model used by shops and Mystery encounters.
+      return { surfaceId: "wager", operationClass: "setup", ownerModel: "local" };
     case "LEARN_MOVE_BATCH":
       return { surfaceId: "learn-move-batch", operationClass: "learn-move", ownerModel: "interaction" };
     case "SAVE_SLOT":
@@ -682,6 +686,54 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       selectedOptionId,
       optionIds: null,
       optionCount: null,
+    };
+  }
+  if (uiMode === "SHOWDOWN_TEAM_MENU") {
+    const showdownHandler = handler as unknown as {
+      config?: { presets?: unknown[] } | null;
+      teamCursor?: number;
+    };
+    const presetCount = Array.isArray(showdownHandler.config?.presets) ? showdownHandler.config.presets.length : 0;
+    const optionIds = [
+      ...Array.from({ length: presetCount }, (_value, index) => `showdown-preset:${index}`),
+      "showdown-action:create",
+    ];
+    const teamCursor = Number.isSafeInteger(showdownHandler.teamCursor) ? (showdownHandler.teamCursor as number) : null;
+    return {
+      selectedOptionId: teamCursor == null ? null : (optionIds[teamCursor] ?? `cursor:${teamCursor}`),
+      optionIds,
+      optionCount: optionIds.length,
+    };
+  }
+  if (uiMode === "SHOWDOWN_WAGER") {
+    const showdownHandler = handler as unknown as {
+      choices?: Array<{
+        offer?: {
+          speciesId?: unknown;
+          variant?: unknown;
+          cost?: unknown;
+        } | null;
+      }>;
+      cursor?: number;
+    };
+    const optionIds = Array.isArray(showdownHandler.choices)
+      ? showdownHandler.choices.map((choice, index) => {
+          const offer = choice?.offer;
+          if (offer == null) {
+            return "showdown-wager:friendly";
+          }
+          return Number.isSafeInteger(offer.speciesId)
+            ? `showdown-wager:stake:${offer.speciesId}:${Number.isSafeInteger(offer.variant) ? offer.variant : 0}:${
+                Number.isSafeInteger(offer.cost) ? offer.cost : 0
+              }`
+            : `showdown-wager:stake:${index}`;
+        })
+      : null;
+    const wagerCursor = Number.isSafeInteger(showdownHandler.cursor) ? (showdownHandler.cursor as number) : null;
+    return {
+      selectedOptionId: wagerCursor == null ? null : (optionIds?.[wagerCursor] ?? `cursor:${wagerCursor}`),
+      optionIds,
+      optionCount: optionIds?.length ?? null,
     };
   }
   if (uiMode === "TARGET_SELECT") {

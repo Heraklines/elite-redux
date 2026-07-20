@@ -944,6 +944,8 @@ export class PublicUiClient {
       );
     } else if (this.config.journey === "game-over") {
       entryUrl.searchParams.set("coopfixture", "game-over");
+    } else if (this.config.journey === "showdown-battle") {
+      entryUrl.searchParams.set("coopfixture", "showdown-battle");
     }
     this.evidence.record("navigate", { url: entryUrl.origin });
     await this.page.goto(entryUrl, { waitUntil: "domcontentloaded", timeout: this.config.bootTimeoutMs });
@@ -1419,6 +1421,61 @@ export class PublicUiClient {
     await this.checkpoint("lobby-announced");
   }
 
+  async enterShowdownLobby() {
+    await this.evidence.waitFor(TITLE_PHASE, {
+      from: this.pageCursor,
+      timeoutMs: this.config.timeoutMs,
+      description: "TitlePhase before opening Showdown",
+    });
+    await selectOptionById(this, {
+      surfaceId: "title-menu",
+      targetId: "new-game",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      timeoutMs: this.config.timeoutMs,
+      fromCursor: this.pageCursor,
+    });
+    const modeCursor = this.evidence.cursor();
+    await selectOptionById(this, {
+      surfaceId: "option-select:TitlePhase",
+      targetId: "showdown",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      timeoutMs: this.config.timeoutMs,
+      fromCursor: modeCursor,
+    });
+    const teamCursor = this.evidence.cursor();
+    await waitForSemanticSurface(this, "showdown-team-menu", {
+      fromCursor: teamCursor,
+      timeoutMs: this.config.timeoutMs,
+    });
+    await selectOptionById(this, {
+      surfaceId: "showdown-team-menu",
+      targetId: "showdown-preset:0",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      timeoutMs: this.config.timeoutMs,
+      fromCursor: teamCursor,
+    });
+    const confirmationCursor = this.evidence.cursor();
+    await waitForSemanticSurface(this, "confirm:TitlePhase", {
+      fromCursor: confirmationCursor,
+      timeoutMs: this.config.timeoutMs,
+    });
+    this.lobbySurfaceCursor = this.evidence.cursor();
+    const announceCursor = this.evidence.cursor();
+    await selectOptionById(this, {
+      surfaceId: "confirm:TitlePhase",
+      targetId: "yes",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      timeoutMs: this.config.timeoutMs,
+      fromCursor: confirmationCursor,
+    });
+    await this.evidence.waitFor(/start announce name=/u, {
+      from: announceCursor,
+      timeoutMs: this.config.timeoutMs,
+      description: "public Showdown lobby announce",
+    });
+    await this.checkpoint("showdown-lobby-announced");
+  }
+
   async waitForLobbyPlayer(username, timeoutMs = this.config.timeoutMs) {
     return this.evidence.waitForCondition(
       sink => {
@@ -1646,6 +1703,7 @@ export class DuoPublicUiRig {
     this.lastSharedSurfaceAddress = new Map();
     this.activeBattleWave = null;
     this.pairRoleCursors = null;
+    this.showdownCommandCursors = null;
   }
 
   async waitForAllLocalCommandsDrivingBattlePrompts(from, purpose) {
@@ -1982,10 +2040,14 @@ export class DuoPublicUiRig {
     await this.startChromeTrace();
   }
 
-  async pair(requesterSeat) {
+  async pair(requesterSeat, { sessionKind = "coop" } = {}) {
     const requester = this.client(requesterSeat);
     const acceptor = Object.values(this.clients).find(client => client !== requester);
-    await Promise.all(Object.values(this.clients).map(client => client.enterCoopLobby()));
+    await Promise.all(
+      Object.values(this.clients).map(client =>
+        sessionKind === "versus" ? client.enterShowdownLobby() : client.enterCoopLobby(),
+      ),
+    );
     const roleCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
@@ -2175,6 +2237,13 @@ export class DuoPublicUiRig {
       throw new Error("completePairingBinding called before pair()");
     }
     await Promise.all(Object.values(this.clients).map(client => client.waitForPublicRole(roleCursors[client.label])));
+    const bindings = Object.values(this.clients).map(client => ({
+      client,
+      event: client.evidence.findBinding(roleCursors[client.label]),
+    }));
+    if (bindings.some(binding => binding.event == null)) {
+      throw new Error("Stable-seat binding disappeared before exact address verification");
+    }
     const roles = Object.values(this.clients)
       .map(client => client.publicRole)
       .sort();
@@ -2186,7 +2255,82 @@ export class DuoPublicUiRig {
         `Stable-seat binding invalid after launch decision: roles=${JSON.stringify(roles)} seats=${JSON.stringify(seats)}`,
       );
     }
+    const epochs = bindings.map(binding => binding.event.observation.epoch);
+    if (epochs.some(epoch => !Number.isSafeInteger(epoch) || epoch <= 0) || new Set(epochs).size !== 1) {
+      throw new Error(`Stable-seat bindings disagree on gameplay epoch: ${JSON.stringify(epochs)}`);
+    }
+    for (const binding of bindings) {
+      binding.client.evidence.record("paired-binding-address-proof", {
+        epoch: binding.event.observation.epoch,
+        role: binding.event.observation.role,
+        seat: binding.event.observation.seat,
+        membershipRevision: binding.event.observation.membershipRevision,
+        connectionGeneration: binding.event.observation.connectionGeneration,
+        peerEpoch: bindings.find(candidate => candidate !== binding)?.event.observation.epoch ?? null,
+        sourceEventIndex: binding.event.index,
+      });
+    }
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("paired-and-verifying-save")));
+  }
+
+  /**
+   * Cross the real Showdown pre-battle pipeline after public lobby pairing. Unlike ordinary co-op,
+   * Showdown has no save prompt or host launch button: the title flow commits a fresh shared identity
+   * automatically, both players independently lock the Friendly wager, and the ordinary battle opens.
+   */
+  async startShowdownBattle() {
+    await this.completePairingBinding();
+    const battleCursors = Object.fromEntries(
+      Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
+    );
+    await Promise.all(
+      Object.values(this.clients).map(client =>
+        waitForSemanticSurface(client, "wager", {
+          fromCursor: battleCursors[client.label],
+          timeoutMs: this.config.timeoutMs,
+        }),
+      ),
+    );
+    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("showdown-wager-open")));
+    await Promise.all(
+      Object.values(this.clients).map(client =>
+        selectOptionById(client, {
+          surfaceId: "wager",
+          targetId: "showdown-wager:friendly",
+          navKeys: ["ArrowUp", "ArrowDown"],
+          timeoutMs: this.config.timeoutMs,
+          fromCursor: battleCursors[client.label],
+        }),
+      ),
+    );
+    await this.waitForAllLocalCommandsDrivingBattlePrompts(battleCursors, "showdown-wave-1-intro");
+    const boundary = await this.assertSharedCommandFrontier(battleCursors, "showdown-wave-1-command", {
+      expectedWave: 1,
+    });
+    this.activeBattleWave = boundary.wave;
+    this.showdownCommandCursors = battleCursors;
+    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("showdown-wave-1-command")));
+  }
+
+  /** Drive one reciprocal real-player turn and prove both browsers install the next exact frontier. */
+  async driveShowdownTurn() {
+    if (this.showdownCommandCursors == null) {
+      throw new Error("driveShowdownTurn requires startShowdownBattle()");
+    }
+    const { outcomeCursors, expectedCommandAddress } = await this.driveSequentialCommandRound(
+      this.showdownCommandCursors,
+      this.config.keys.battle,
+      "showdown-turn-1",
+    );
+    const outcome = await this.waitForPostTurnOutcome(outcomeCursors, { expectedCommandAddress });
+    if (outcome.kind !== "command") {
+      throw new Error(`Showdown turn 1 reached ${outcome.kind} instead of the next synchronized command frontier`);
+    }
+    await this.assertSharedCommandFrontier(outcomeCursors, "showdown-turn-1-next-command", {
+      expectedWave: 1,
+    });
+    await this.assertRetainedContinuation(outcomeCursors, "showdown-turn-1-next-command");
+    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("showdown-turn-1-synchronized")));
   }
 
   async assertSharedSurface(surface, cursors, proofName, { allowAddressRepeat = false, expectedWave = null } = {}) {

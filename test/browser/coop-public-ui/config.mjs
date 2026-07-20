@@ -77,6 +77,7 @@ const allowedJourneys = new Set([
   "faint-replacement",
   "commander-skip",
   "game-over",
+  "showdown-battle",
   "resume-scan-isolation",
   "save-mutations",
 ]);

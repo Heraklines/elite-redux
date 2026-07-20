@@ -1,0 +1,108 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import test from "node:test";
+
+const root = resolve(import.meta.dirname, "../../..");
+const read = path => readFile(resolve(root, path), "utf8");
+
+const [workflow, config, journeys, harness, observer, registry, title] = await Promise.all([
+  read(".github/workflows/coop-public-ui-journey.yml"),
+  read("test/browser/coop-public-ui/config.mjs"),
+  read("test/browser/coop-public-ui/journeys.mjs"),
+  read("test/browser/coop-public-ui/public-ui-harness.mjs"),
+  read("scripts/coop-browser-entry.ts"),
+  read("src/dev-tools/registry.ts"),
+  read("src/phases/title-phase.ts"),
+]);
+
+test("the exact-SHA workflow exposes and seals a dedicated Showdown battle journey", () => {
+  assert.match(workflow, /options:[\s\S]*- showdown-battle/u);
+  assert.match(workflow, /VITE_COOP_BROWSER_FIXTURE:.*inputs\.journey == 'showdown-battle'.*'showdown-battle'.*'off'/u);
+  assert.match(workflow, /Verify exact two-browser Showdown admission and turn contracts/u);
+  assert.match(workflow, /- "src\/data\/elite-redux\/showdown\/\*\*"/u);
+  assert.match(workflow, /- "src\/phases\/title-phase\.ts"/u);
+  assert.match(workflow, /- "src\/ui\/handlers\/showdown-\*\.ts"/u);
+  assert.match(workflow, /src\/phases\/title-phase\|src\/system\/game-data/u);
+  assert.match(workflow, /src\/phases\/title-phase\.ts \\/u);
+  assert.match(config, /"showdown-battle"/u);
+  assert.match(journeys, /"showdown-battle": showdownBattle/u);
+  assert.match(
+    journeys,
+    /showdownBattle\(rig\)[\s\S]*pair\(rig\.config\.requesterSeat, \{ sessionKind: "versus" \}\)[\s\S]*startShowdownBattle\(\)[\s\S]*driveShowdownTurn\(\)/u,
+  );
+});
+
+test("the preset fixture requires both immutable build identity and exact page URL", () => {
+  assert.match(
+    registry,
+    /isCoopBrowserShowdownFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "showdown-battle"/u,
+  );
+  assert.match(
+    registry,
+    /getCoopBrowserShowdownFixturePreset\(\)[\s\S]*!isCoopBrowserShowdownFixtureBuild\(\)[\s\S]*get\("coopfixture"\) !== "showdown-battle"/u,
+  );
+  assert.match(
+    registry,
+    /speciesId: SpeciesId\.BULBASAUR[\s\S]*level: 100[\s\S]*moveset: \[MoveId\.TACKLE\][\s\S]*item: SHOWDOWN_ITEM_POOL\[0\]/u,
+  );
+  assert.match(title, /getCoopBrowserShowdownFixturePreset\(\)/u);
+  assert.match(
+    title,
+    /presets: fixtureViews \?\? buildTeamMenuPresetViews\(gameData\)[\s\S]*browserFixturePreset \?\? gameData\.listShowdownTeamPresets\(\)\[idx\]/u,
+  );
+});
+
+test("Showdown setup exposes locale-independent semantic options with reciprocal local wager ownership", () => {
+  assert.match(title, /semanticId: "showdown"[\s\S]*GameModes\.SHOWDOWN/u);
+  assert.match(observer, /case "SHOWDOWN_TEAM_MENU":[\s\S]*surfaceId: "showdown-team-menu"[\s\S]*ownerModel: "local"/u);
+  assert.match(observer, /case "SHOWDOWN_WAGER":[\s\S]*surfaceId: "wager"[\s\S]*ownerModel: "local"/u);
+  assert.match(observer, /showdown-preset:\$\{index\}/u);
+  assert.match(observer, /showdown-wager:friendly/u);
+});
+
+test("two public clients must prove one positive gameplay epoch before locking the wager", () => {
+  const enter = harness.slice(
+    harness.indexOf("async enterShowdownLobby()"),
+    harness.indexOf("\n  async waitForLobbyPlayer(", harness.indexOf("async enterShowdownLobby()")),
+  );
+  assert.match(enter, /targetId: "new-game"/u);
+  assert.match(enter, /targetId: "showdown"/u);
+  assert.match(enter, /targetId: "showdown-preset:0"/u);
+  assert.match(enter, /targetId: "yes"/u);
+  assert.match(enter, /waitFor\(\/start announce name=\/u/u);
+
+  const binding = harness.slice(
+    harness.indexOf("async completePairingBinding()"),
+    harness.indexOf("\n  async assertSharedSurface(", harness.indexOf("async completePairingBinding()")),
+  );
+  assert.match(binding, /epochs\.some\(epoch => !Number\.isSafeInteger\(epoch\) \|\| epoch <= 0\)/u);
+  assert.match(binding, /new Set\(epochs\)\.size !== 1/u);
+  assert.match(binding, /paired-binding-address-proof/u);
+
+  const start = harness.slice(
+    harness.indexOf("async startShowdownBattle()"),
+    harness.indexOf("\n  /**\n   * Drive one reciprocal", harness.indexOf("async startShowdownBattle()")),
+  );
+  assert.ok(start.indexOf("completePairingBinding()") < start.indexOf('waitForSemanticSurface(client, "wager"'));
+  assert.match(start, /targetId: "showdown-wager:friendly"/u);
+  assert.match(start, /assertSharedCommandFrontier\(battleCursors, "showdown-wave-1-command"/u);
+});
+
+test("the journey executes a reciprocal turn and requires the next retained frontier", () => {
+  const turn = harness.slice(
+    harness.indexOf("async driveShowdownTurn()"),
+    harness.indexOf("\n  async assertSharedSurface(", harness.indexOf("async driveShowdownTurn()")),
+  );
+  assert.match(turn, /driveSequentialCommandRound\(/u);
+  assert.match(turn, /waitForPostTurnOutcome\(/u);
+  assert.match(turn, /outcome\.kind !== "command"/u);
+  assert.match(turn, /assertSharedCommandFrontier\(outcomeCursors, "showdown-turn-1-next-command"/u);
+  assert.match(turn, /assertRetainedContinuation\(outcomeCursors, "showdown-turn-1-next-command"/u);
+  assert.match(turn, /showdown-turn-1-synchronized/u);
+});

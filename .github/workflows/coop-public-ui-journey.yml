@@ -11,8 +11,12 @@ on:
       - "src/data/elite-redux/coop/authority-v2/**"
       - "src/data/elite-redux/coop/coop-runtime.ts"
       - "src/data/elite-redux/coop/coop-webrtc-transport.ts"
+      - "src/data/elite-redux/showdown/**"
       - "src/dev-tools/registry.ts"
       - "src/phases/coop-replay-turn-phase.ts"
+      - "src/phases/select-starter-phase.ts"
+      - "src/phases/title-phase.ts"
+      - "src/ui/handlers/showdown-*.ts"
       - "src/ui/handlers/starter-select-ui-handler.ts"
       - "test/browser/coop-public-ui/**"
       - "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts"
@@ -34,6 +38,7 @@ on:
           - faint-replacement
           - commander-skip
           - game-over
+          - showdown-battle
           - resume-scan-isolation
           - save-mutations
           - market-wide-lens
@@ -143,7 +148,7 @@ jobs:
           status=$?
           set -e
           diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
-          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-webrtc-transport|src/dev-tools/registry|src/phases/coop-replay-turn-phase|src/system/game-data|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-webrtc-transport|src/dev-tools/registry|src/phases/coop-replay-turn-phase|src/phases/title-phase|src/system/game-data|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
           if [ -n "$owned" ]; then
             printf '%s\n' "$owned"
             exit 1
@@ -164,6 +169,7 @@ jobs:
             src/data/elite-redux/coop/coop-webrtc-transport.ts \
             src/dev-tools/registry.ts \
             src/phases/coop-replay-turn-phase.ts \
+            src/phases/title-phase.ts \
             src/ui/handlers/save-slot-select-ui-handler.ts \
             src/ui/handlers/starter-select-ui-handler.ts \
             test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
@@ -190,6 +196,7 @@ jobs:
             test/browser/coop-public-ui/run.mjs \
             test/browser/coop-public-ui/save-mutation-evidence.test.mjs \
             test/browser/coop-public-ui/semantic-surface-evidence.test.mjs \
+            test/browser/coop-public-ui/showdown-browser-evidence.test.mjs \
             test/browser/coop-public-ui/terminal-watchdog.mjs \
             test/browser/coop-public-ui/vite.config.mjs \
             test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts \
@@ -245,6 +252,9 @@ jobs:
       - name: Verify public journey uses the release Authority V2 cutover
         run: node --test test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs
 
+      - name: Verify exact two-browser Showdown admission and turn contracts
+        run: node --test test/browser/coop-public-ui/showdown-browser-evidence.test.mjs
+
       - name: Build normal application with CI-only read-only observer
         env:
           COOP_BROWSER_OUT_DIR: dist-coop-public-ui
@@ -252,7 +262,7 @@ jobs:
           VITE_BYPASS_TUTORIAL: 0
           VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || 'off' }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_COOP_AUTHORITY_V2_TURN: "on"
           VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"

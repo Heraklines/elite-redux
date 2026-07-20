@@ -23,6 +23,10 @@
 // =============================================================================
 
 import Overrides from "#app/overrides";
+import { speciesStarterCosts } from "#balance/starters";
+import { SHOWDOWN_ITEM_POOL } from "#data/elite-redux/showdown/showdown-item-pool";
+import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
+import { makeShowdownTeamPreset, type ShowdownTeamPreset } from "#data/elite-redux/showdown/showdown-team-preset";
 import type { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { Nature } from "#enums/nature";
@@ -106,6 +110,45 @@ export function isCoopBrowserFaintFixtureBuild(): boolean {
 export function isCoopBrowserGameOverFixtureBuild(): boolean {
   const env = import.meta.env as unknown as Record<string, unknown> | undefined;
   return env?.VITE_COOP_BROWSER_FIXTURE === "game-over";
+}
+
+/** Whether this exact bundle was built for the public two-browser Showdown battle journey. */
+export function isCoopBrowserShowdownFixtureBuild(): boolean {
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  return env?.VITE_COOP_BROWSER_FIXTURE === "showdown-battle";
+}
+
+/**
+ * Supply one ordinary legal preset to the dedicated Showdown public-browser bundle.
+ *
+ * This fixture is inert unless both the immutable build identity and the exact page URL agree.
+ * It does not persist or auto-select anything: each browser still opens the normal team menu,
+ * confirms the visible preset, pairs, chooses its wager, and commands the battle through public
+ * keyboard input. An omitted nature deliberately avoids depending on account-specific nature
+ * unlocks while the fresh-account default Bulbasaur/ability and Tackle remain production-legal.
+ */
+export function getCoopBrowserShowdownFixturePreset(): ShowdownTeamPreset | null {
+  if (!isCoopBrowserShowdownFixtureBuild() || typeof location === "undefined") {
+    return null;
+  }
+  if (new URLSearchParams(location.search).get("coopfixture") !== "showdown-battle") {
+    return null;
+  }
+  const mon: ShowdownMonManifest = {
+    speciesId: SpeciesId.BULBASAUR,
+    formIndex: 0,
+    level: 100,
+    shiny: false,
+    variant: 0,
+    abilityIndex: 0,
+    ivs: new Array(6).fill(15),
+    moveset: [MoveId.TACKLE],
+    item: SHOWDOWN_ITEM_POOL[0],
+    rootSpeciesId: SpeciesId.BULBASAUR,
+    erBlackShiny: false,
+    baseCost: speciesStarterCosts[SpeciesId.BULBASAUR],
+  };
+  return makeShowdownTeamPreset("Browser Showdown", [mon]);
 }
 
 /**

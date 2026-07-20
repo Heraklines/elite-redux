@@ -84,7 +84,7 @@ test("journey starter fixtures require both the exact build and exact per-page U
 
   assert.match(
     jobBlock(workflow, "browser-build"),
-    /VITE_COOP_BROWSER_FIXTURE:.*commander-skip.*faint-replacement.*game-over.*off/u,
+    /VITE_COOP_BROWSER_FIXTURE:.*commander-skip.*faint-replacement.*game-over.*showdown-battle.*off/u,
     "the sealed bundle receives one exact fixture identity and defaults closed",
   );
   assert.match(
@@ -93,6 +93,10 @@ test("journey starter fixtures require both the exact build and exact per-page U
   );
   assert.match(registry, /isCoopBrowserFaintFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "faint-replacement"/u);
   assert.match(registry, /isCoopBrowserGameOverFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "game-over"/u);
+  assert.match(
+    registry,
+    /isCoopBrowserShowdownFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "showdown-battle"/u,
+  );
   assert.match(
     registry,
     /getCoopBrowserCommanderFixtureStarters\(\)[\s\S]*!isCoopBrowserCommanderFixtureBuild\(\)[\s\S]*get\("coopfixture"\)[\s\S]*"commander"[\s\S]*"dondozo"/u,

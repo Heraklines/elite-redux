@@ -291,6 +291,13 @@ async function gameOver(rig) {
   await rig.driveWaveToGameOver();
 }
 
+async function showdownBattle(rig) {
+  await rig.loginBoth();
+  await rig.pair(rig.config.requesterSeat, { sessionKind: "versus" });
+  await rig.startShowdownBattle();
+  await rig.driveShowdownTurn();
+}
+
 async function saveMutations(rig) {
   await rig.loginBoth();
   await rig.pair(rig.config.requesterSeat);
@@ -499,6 +506,7 @@ const journeys = {
   "faint-replacement": faintReplacement,
   "commander-skip": commanderSkip,
   "game-over": gameOver,
+  "showdown-battle": showdownBattle,
   "resume-scan-isolation": resumeScanIsolation,
   "save-mutations": saveMutations,
 };
