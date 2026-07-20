@@ -468,6 +468,11 @@ export async function handleTournamentRoute(
     return json({ error: "unauthorized" }, 401, cors);
   }
 
+  // Ensure the schema (incl. the additive P1.5 ghost_json / last_seen columns) exists
+  // BEFORE any handler reads it — every route, GET included, since handleBracket/handleResult
+  // SELECT the new columns and the LIVE table was created before they existed. Idempotent.
+  await ensureTournamentTables(env);
+
   // GET routes
   if (request.method === "GET") {
     if (url.pathname === "/tournament/list") {
@@ -490,7 +495,6 @@ export async function handleTournamentRoute(
     return json({ error: "invalid json" }, 400, cors);
   }
 
-  await ensureTournamentTables(env);
   switch (url.pathname) {
     case "/tournament/create":
       return handleCreate(body, caller, env, cors);
