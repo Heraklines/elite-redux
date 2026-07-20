@@ -161,6 +161,7 @@ import {
   captureCoopMeOutcome,
   consumeCoopMeOutcomeRollbackFatal,
   coopAppliedStateTick,
+  drainCoopApplyFailures,
   reapplyAcceptedCoopAuthoritativeBattleState,
   resetCoopStateTicks,
 } from "#data/elite-redux/coop/coop-battle-engine";
@@ -5203,6 +5204,14 @@ function buildCoopV2LiveSeams(
             ? reapplyAcceptedCoopAuthoritativeBattleState(material.envelope.authoritativeState, true)
             : applyCoopAuthoritativeBattleState(material.envelope.authoritativeState, true);
           if (!stateApplied) {
+            const failures = drainCoopApplyFailures();
+            coopWarn(
+              "v2-interaction",
+              `DATA state apply rejected rev=${entry.revision} class=${material.surfaceClass} op=${entry.operationId} `
+                + `incomingTick=${material.envelope.authoritativeState.tick} acceptedTick=${coopAppliedStateTick()} `
+                + `phase=${globalScene.phaseManager?.getCurrentPhase()?.constructor?.name ?? "none"} `
+                + `failures=${JSON.stringify(failures)}`,
+            );
             return false;
           }
           runtime.v2InteractionStateApplied.add(entry.operationId);

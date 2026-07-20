@@ -123,3 +123,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The older exact-SHA two-browser campaign `29740497493` remains in flight and is intentionally preserved:
   its real browser boot does not share the in-process fixture defect and therefore remains useful independent
   production evidence. Next: push the child checkpoint, rerun the complete gate, and triage only survivors.
+
+2026-07-20 — Authority V2 wave-1 reward-result diagnosis
+
+- The Mystery profile from real-browser campaign `29740497493` proved the initial command fix is unrelated to
+  its live wave-1 failure. The guest successfully applied and proved `REWARD_PRESENT` at state tick 16, opened
+  the exact read-only reward watcher, then rejected the owner's terminal Leave `INTERACTION_COMMIT` at tick 17
+  before the reward adapter ran. Its mechanical browser digest had not changed.
+- The central V2 interaction transaction now drains and logs the existing structured state-apply accumulator
+  with incoming/accepted ticks and the live phase when such a material rejection occurs. This preserves the
+  fail-closed behavior while turning the next smallest remote reproduction into causal evidence instead of
+  another opaque `materialRejected` digest.
+- Local verification is static-only per `AGENTS.md`; the diagnostic checkpoint requires a remote real-browser
+  Mystery rerun. No staging or production deployment is authorized.
