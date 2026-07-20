@@ -108,11 +108,13 @@ import {
   assembleCoopRuntime,
   type CoopRuntime,
   clearCoopRuntime,
+  establishCoopV2CommandControlFrontier,
   getCoopInteractionRelay,
   getCoopMeBattleInteractionCounter,
   getCoopRuntime,
   installCoopRuntimeGhostHooks,
   installCoopRuntimeLiveEmitter,
+  recordCoopV2CommandControlStarted,
   setCoopMeBattleInteractionCounter,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -1564,6 +1566,48 @@ export async function drainLoopback(): Promise<void> {
   }
 }
 
+/**
+ * Bridge the one lifecycle edge that the legacy two-engine fixture cannot reproduce directly.
+ *
+ * Production pairs both browsers before BattleScene creates the first CommandPhase. `buildDuo`, however,
+ * receives a GameManager that has already driven the host to an open solo CommandPhase, then assembles the
+ * co-op runtimes around that live scene. Without this bridge Authority V2 first observes field 1 after
+ * field 0 already accepted input, so the exact field-0 proof is permanently unavailable and the log
+ * correctly refuses the first TURN_COMMIT.
+ *
+ * This does not manufacture a queued phase or infer a control from UI mode. It accepts only the real,
+ * currently-running CommandPhase whose registered handler is active, establishes the immutable frontier,
+ * and records that exact phase's actor through the same production proof function CommandPhase.start uses.
+ * Any other pre-pair state remains loud instead of being papered over.
+ */
+function adoptAlreadyOpenHostCommandBoundary(scene: BattleScene): boolean {
+  const phase = scene.phaseManager.getCurrentPhase() as
+    | (Phase & { readonly phaseName: "CommandPhase"; getFieldIndex(): number })
+    | null;
+  if (phase?.phaseName !== "CommandPhase") {
+    return false;
+  }
+  const handler = scene.ui.getHandler() as { active?: boolean } | null;
+  const mode = scene.ui.getMode();
+  if (handler?.active !== true || (mode !== UiMode.COMMAND && mode !== UiMode.FIGHT)) {
+    throw new Error(
+      "cannot adopt pre-pair CommandPhase without an active public handler: "
+        + `ui=${UiMode[mode] ?? mode} handlerActive=${String(handler?.active)}`,
+    );
+  }
+  const fieldIndex = phase.getFieldIndex();
+  const pokemon = scene.getPlayerField()[fieldIndex];
+  if (pokemon == null) {
+    throw new Error(`cannot adopt pre-pair CommandPhase for missing field ${fieldIndex}`);
+  }
+  const frontier = establishCoopV2CommandControlFrontier();
+  if (frontier !== "ready") {
+    throw new Error(`cannot establish pre-pair Authority V2 command frontier: ${frontier}`);
+  }
+  recordCoopV2CommandControlStarted(fieldIndex, pokemon.id, "player");
+  return true;
+}
+
 const DIRECT_GUEST_BOOT_PHASES = new Set(["LoginPhase", "SelectGenderPhase", "TitlePhase"]);
 
 /**
@@ -2305,6 +2349,14 @@ export async function buildDuo(
   await drainLoopback();
 
   const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair: runtimePair };
+  // `buildDuo` is handed an already-open solo host input phase, while production negotiates before battle
+  // construction. Adopt only that exact live phase, then deliver its CONTROL_COMMIT under each destination
+  // context before any test is allowed to select a move.
+  const adoptedPrePairCommand = await withClient(hostCtx, () => adoptAlreadyOpenHostCommandBoundary(hostScene));
+  if (adoptedPrePairCommand) {
+    await withClient(guestCtx, () => drainLoopback());
+    await withClient(hostCtx, () => drainLoopback());
+  }
   installDuoCtxOwnershipPins(rig, hostGame);
   liveDuoRigs.add(rig);
   return rig;

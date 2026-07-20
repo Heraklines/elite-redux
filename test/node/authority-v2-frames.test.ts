@@ -169,7 +169,21 @@ describe("authority-v2 frame codec (round-trip)", () => {
       { kind: "TERMINAL", terminalId: "the-end" },
     ];
     for (const nextControl of controls) {
-      const frame = { v: 2, t: "authorityEntry", ctx: CTX, body: { ...ENTRY_BODY, nextControl } };
+      const frame = {
+        v: 2,
+        t: "authorityEntry",
+        ctx: CTX,
+        body: {
+          ...ENTRY_BODY,
+          // TERMINAL is the closed successor of TERMINAL_COMMIT only; using the generic TURN fixture
+          // would correctly exercise the entry/control compatibility rejection instead of this shape test.
+          kind:
+            nextControl != null && (nextControl as { kind?: unknown }).kind === "TERMINAL"
+              ? ("TERMINAL_COMMIT" as const)
+              : ENTRY_BODY.kind,
+          nextControl,
+        },
+      };
       expect(validateInboundFrame(frame).kind).toBe("valid");
     }
   });
