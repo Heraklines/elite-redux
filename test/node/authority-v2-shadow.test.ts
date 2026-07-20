@@ -32,6 +32,7 @@ import {
   decodeRewardInteractionMaterial,
 } from "#data/elite-redux/coop/authority-v2/adapters/interactions-reward";
 import { computeTurnCommitDigest } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
+import type { CoopAuthorityEntry } from "#data/elite-redux/coop/authority-v2/contract";
 import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
@@ -197,7 +198,7 @@ function routeCoopV2InboundFrameInto(harness: CoopAuthorityV2Shadow, wire: strin
 // --- fixtures ---------------------------------------------------------------
 
 function turnTap(operationId = "TURN/w5/t1", legacyDigest = "legacy-turn") {
-  const capture = { turnResolution: { events: [1, 2, 3] }, checkpoint: { hp: 100 } };
+  const capture = { wave: 5, turn: 1, turnResolution: { events: [1, 2, 3] }, checkpoint: { hp: 100 } };
   return {
     operationId,
     capture,
@@ -403,14 +404,14 @@ describe("authority-v2 shadow harness", () => {
     expect(host.parityMatches).toBe(0);
 
     // The v2 digest the adapter WOULD compute -> match=true.
-    const capture = { turnResolution: { events: [9] }, checkpoint: { hp: 1 } };
+    const capture = { wave: 5, turn: 2, turnResolution: { events: [9] }, checkpoint: { hp: 1 } };
     const matchingDigest = computeTurnCommitDigest(capture);
     duo.host.tapTurnCommit({
       operationId: "TURN/match",
       capture,
       nextCommandFrontier: {
         epoch: SESSION.epoch,
-        wave: 6,
+        wave: 5,
         resolvedTurn: 2,
         commands: [{ ownerSeatId: 0, pokemonId: 7, fieldIndex: 0 }],
       },
@@ -988,40 +989,64 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
   // ------------------------------------------------------------------------
 
   it("routes each relay interaction kind to its MATCHING adapter builder (fault-free)", () => {
-    const duo = buildDuo(new FakeClock());
-    const host = duo.host;
-    const tap = (kind: string, choice: number, data?: number[]) =>
-      host.tapInteractionChoice({ seq: 1, kind, choice, ownerSeatId: 0, wave: 5, ...(data == null ? {} : { data }) });
+    const check = (
+      kind: string,
+      choice: number,
+      data: number[] | undefined,
+      inspect: (entry: CoopAuthorityEntry) => void,
+    ): void => {
+      const duo = buildDuo(new FakeClock());
+      const entry = duo.host.tapInteractionChoice({
+        seq: 1,
+        kind,
+        choice,
+        ownerSeatId: 0,
+        wave: 5,
+        ...(data == null ? {} : { data }),
+      });
+      expect(entry, `${kind} produced one independently valid shadow entry`).not.toBeNull();
+      if (entry != null) {
+        inspect(entry);
+      }
+      expect(duo.host.diagnostics().faults).toBe(0);
+      duo.dispose();
+    };
 
     // interactions-reward: BIOME pick + crossroads.
-    const biomePick = tap("biomePick", 0, [3]);
-    expect(decodeBiomeInteractionMaterial(biomePick!)?.selection.kind).toBe("biome-pick");
-    const crossroads = tap("crossroads", 1);
-    expect(decodeBiomeInteractionMaterial(crossroads!)?.selection.kind).toBe("crossroads-pick");
+    check("biomePick", 0, [3], entry =>
+      expect(decodeBiomeInteractionMaterial(entry)?.selection.kind).toBe("biome-pick"),
+    );
+    check("crossroads", 1, undefined, entry =>
+      expect(decodeBiomeInteractionMaterial(entry)?.selection.kind).toBe("crossroads-pick"),
+    );
 
     // interactions-reward: MARKET (the biome shop).
-    const market = tap("biomeShop", 0, [1, 200]);
-    expect(decodeMarketInteractionMaterial(market!)?.kind).toBe("market");
+    check("biomeShop", 0, [1, 200], entry => expect(decodeMarketInteractionMaterial(entry)?.kind).toBe("market"));
 
     // interactions-learn: ability / colosseum / stormglass / learn-move.
-    expect(learnDecodeInteractionMaterial(tap("abilityPicker", -3, [1, 2, 3])!)?.surface).toBe("ability-pick");
-    expect(learnDecodeInteractionMaterial(tap("coloPick", 0, [4])!)?.surface).toBe("colosseum/decision");
-    expect(learnDecodeInteractionMaterial(tap("stormglass", 2)!)?.surface).toBe("stormglass");
-    expect(learnDecodeInteractionMaterial(tap("learnMove", 1)!)?.surface).toBe("learn-move/decision");
+    check("abilityPicker", -3, [1, 2, 3], entry =>
+      expect(learnDecodeInteractionMaterial(entry)?.surface).toBe("ability-pick"),
+    );
+    check("coloPick", 0, [4], entry =>
+      expect(learnDecodeInteractionMaterial(entry)?.surface).toBe("colosseum/decision"),
+    );
+    check("stormglass", 2, undefined, entry =>
+      expect(learnDecodeInteractionMaterial(entry)?.surface).toBe("stormglass"),
+    );
+    check("learnMove", 1, undefined, entry =>
+      expect(learnDecodeInteractionMaterial(entry)?.surface).toBe("learn-move/decision"),
+    );
 
     // interactions-mystery: ME option-pick, ME terminal (a LEAVE sentinel), catch-full.
-    expect(mysteryDecodeInteractionMaterial(tap("me", 0, [0])!)?.kind).toBe("me-option-pick");
-    expect(mysteryDecodeInteractionMaterial(tap("meBtn", -1)!)?.kind).toBe("me-terminal");
-    expect(mysteryDecodeInteractionMaterial(tap("catchFull", 2)!)?.kind).toBe("catch-full");
+    check("me", 0, [0], entry => expect(mysteryDecodeInteractionMaterial(entry)?.kind).toBe("me-option-pick"));
+    check("meBtn", -1, undefined, entry => expect(mysteryDecodeInteractionMaterial(entry)?.kind).toBe("me-terminal"));
+    check("catchFull", 2, undefined, entry => expect(mysteryDecodeInteractionMaterial(entry)?.kind).toBe("catch-full"));
 
     // an UNKNOWN kind keeps the generic reward path with the kind recorded in the parity line.
-    const unknown = tap("quizAns", 0);
-    expect(decodeRewardInteractionMaterial(unknown!)?.kind).toBe("reward");
-    expect(parityLine("INTERACTION_COMMIT")).toContain("surface=reward/generic(quizAns)");
-
-    // Every routed pick committed WITHOUT a single shadow fault.
-    expect(host.diagnostics().faults).toBe(0);
-    duo.dispose();
+    check("quizAns", 0, undefined, entry => {
+      expect(decodeRewardInteractionMaterial(entry)?.kind).toBe("reward");
+      expect(parityLine("INTERACTION_COMMIT")).toContain("surface=reward/generic(quizAns)");
+    });
   });
 
   it("records the routed surface + relay kind in the interaction parity line (judgeable routing)", () => {

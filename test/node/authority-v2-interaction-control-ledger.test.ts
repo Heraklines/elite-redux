@@ -32,7 +32,17 @@ function interactionEntry(revision: number, operationId: string, nextControl: Co
     revision,
     operationId,
     kind: "INTERACTION_COMMIT",
-    material: { digest: `digest-${operationId}`, payload: null },
+    material: {
+      digest: `digest-${operationId}`,
+      payload: {
+        envelope: {
+          sessionEpoch: CONTEXT.sessionEpoch,
+          wave: 5,
+          turn: 1,
+          pendingOperation: { kind: "REWARD" },
+        },
+      },
+    },
     nextControl,
     subsumes: [],
   };
@@ -49,8 +59,8 @@ function shared(
     kind: "SHARED_INTERACTION",
     operationId,
     ownerSeatId: 1,
-    epoch: 1,
-    wave: 1,
+    epoch: CONTEXT.sessionEpoch,
+    wave: 5,
     turn: 1,
     surfaceClass: "op:reward",
     operationKind: "REWARD",
@@ -67,7 +77,14 @@ function interactionResultEntry(
     ...interactionEntry(revision, operationId, TERMINAL_CONTROL),
     material: {
       digest: `digest-${operationId}`,
-      payload: { envelope: { pendingOperation: { kind: operationKind } } },
+      payload: {
+        envelope: {
+          sessionEpoch: CONTEXT.sessionEpoch,
+          wave: 5,
+          turn: 1,
+          pendingOperation: { kind: operationKind },
+        },
+      },
     },
   };
 }
@@ -180,12 +197,14 @@ describe("Authority V2 interaction control ledger", () => {
       ledger.admitSuccessor({
         ...interactionEntry(2, "wrong", TERMINAL_CONTROL),
         kind: "TURN_COMMIT",
+        material: { digest: "digest-wrong", payload: { epoch: 3, wave: 5, turn: 1 } },
       }),
     ).toBe(false);
     expect(
       ledger.admitSuccessor({
         ...interactionEntry(2, "wave", TERMINAL_CONTROL),
         kind: "WAVE_ADVANCE",
+        material: { digest: "digest-wave", payload: { wave: 5, turn: 1 } },
       }),
     ).toBe(true);
     expect(ledger.latestControl).toBeNull();
@@ -205,12 +224,20 @@ describe("Authority V2 interaction control ledger", () => {
       ledger.admitSuccessor({
         ...interactionEntry(2, "RC/e3/w5/t1/o0/f1/s1", TERMINAL_CONTROL),
         kind: "REPLACEMENT_COMMIT",
+        material: {
+          digest: "digest-wrong-replacement",
+          payload: { sourceAddress: { epoch: 3, wave: 5, turn: 1 } },
+        },
       }),
     ).toBe(false);
     expect(
       ledger.admitSuccessor({
         ...interactionEntry(2, "RC/e3/w5/t1/o0/f0/s1", TERMINAL_CONTROL),
         kind: "REPLACEMENT_COMMIT",
+        material: {
+          digest: "digest-replacement",
+          payload: { sourceAddress: { epoch: 3, wave: 5, turn: 1 } },
+        },
       }),
     ).toBe(true);
   });

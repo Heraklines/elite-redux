@@ -191,7 +191,10 @@ function replacementEntryInput(
     context: frameContext(),
     operationId: `repl-w${wave}`,
     kind: "REPLACEMENT_COMMIT",
-    material: { digest: `repl-w${wave}`, payload: { wave } },
+    material: {
+      digest: `repl-w${wave}`,
+      payload: { sourceAddress: { epoch: 1, wave, turn: 1 } },
+    },
     nextControl,
     subsumes: [],
   };
@@ -475,12 +478,11 @@ describe("WAVE_ADVANCE supersession at the log", () => {
     sent = [];
   });
 
-  it("retires same-wave turn/replacement entries and keeps a different-wave one", () => {
+  it("retires the ordered same-wave turn/replacement chain", () => {
     const log = makeLog(scheduler, sent);
     const turnW3T1 = log.commit(turnAwaitEntryInput(3, 1, ["REPLACEMENT_COMMIT"])); // rev 1
-    const replW3 = log.commit(replacementEntryInput(3, ["TURN_COMMIT"])); // rev 2
-    const turnW4 = log.commit(turnAwaitEntryInput(4, 1, ["WAVE_ADVANCE"])); // rev 3 (different wave)
-    expect(log.retained().map(e => e.revision)).toEqual([1, 2, 3]);
+    const replW3 = log.commit(replacementEntryInput(3, ["WAVE_ADVANCE"])); // rev 2
+    expect(log.retained().map(e => e.revision)).toEqual([1, 2]);
 
     // Build the advance's subsumes from the live retained frontier.
     const subsumes = waveBoundarySubsumes(log.retained(), 3);
@@ -490,12 +492,12 @@ describe("WAVE_ADVANCE supersession at the log", () => {
       buildWaveAdvanceEntry({
         context: frameContext(),
         operationId: "wave-adv-w3",
-        transition: WIN_TRANSITION,
+        transition: { ...WIN_TRANSITION, turn: 1 },
         destination: reward() as never,
         subsumes,
       }),
     );
-    expect(advance.revision).toBe(4);
+    expect(advance.revision).toBe(3);
 
     // Admitting the advance retires the two same-wave entries (supersession by log order).
     log.acceptReceipt(receipt(advance, "admitted"));
@@ -504,12 +506,10 @@ describe("WAVE_ADVANCE supersession at the log", () => {
         .retained()
         .map(e => e.revision)
         .sort((a, b) => a - b),
-    ).toEqual([3, 4]);
+    ).toEqual([3]);
     // Their leases (and timers) are cancelled.
     expect(scheduler.ownerCount(`authority-v2:session-A:seat0:deliver:${turnW3T1.revision}`)).toBe(0);
     expect(scheduler.ownerCount(`authority-v2:session-A:seat0:deliver:${replW3.revision}`)).toBe(0);
-    // The different-wave turn is untouched, still delivering.
-    expect(scheduler.ownerCount(`authority-v2:session-A:seat0:deliver:${turnW4.revision}`)).toBe(1);
   });
 });
 

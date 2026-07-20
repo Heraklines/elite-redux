@@ -229,6 +229,9 @@ describe("Authority V2 interaction cutover", () => {
       surfaceClass: "op:biome",
       operationId: makeCoopOperationId(1, 1, COOP_BIOME_PICK_SEQ_BASE + pinned, "BIOME_PICK"),
       ownerSeatId: 1,
+      epoch: 1,
+      wave: 1,
+      turn: 1,
       operationKind: "BIOME_PICK",
       successor: {
         operationKinds: ["BIOME_PICK"],
