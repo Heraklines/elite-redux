@@ -1554,10 +1554,48 @@ export class SelectModifierPhase extends BattlePhase {
       choice === COOP_INTERACTION_LEAVE
       && controller.role === "host"
       && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
-      && !isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)
     ) {
       if (prepared == null) {
         failCoopSharedSession("Host reward terminal could not retain its authoritative intent");
+        return true;
+      }
+      const v2 = isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability);
+      if (v2) {
+        // Authority V2 suppresses the raw relay below, so this retained result is the ONLY terminal carrier.
+        // Close the owner's public input surface before publishing the exact operation-consumer proof. The
+        // phase itself remains parked until the peer materially applies this result;
+        // coopFinishTerminalAfterMaterialApplied owns end().
+        const runtime = getCoopRuntime();
+        if (runtime == null) {
+          failCoopSharedSession(`Reward terminal ${prepared.operationId} has no Authority V2 runtime`);
+          return true;
+        }
+        const generation = coopSessionGeneration();
+        globalScene.ui
+          .setMode(UiMode.MESSAGE)
+          .then(() => {
+            if (coopSessionGeneration() !== generation) {
+              return;
+            }
+            runWhenCoopRuntimeActive(runtime, () => {
+              this.coopProveV2RewardOperationComplete(prepared.operationId);
+              if (!this.coopCommitPendingAuthorityResult(prepared.operationId)) {
+                return;
+              }
+              coopLog(
+                "reward",
+                `OWNER retained terminal before continuation seq=${this.coopInteractionStart} id=${prepared.operationId}`,
+              );
+              recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
+              this.coopAwaitTerminalMaterialApplied(prepared.operationId);
+            });
+          })
+          .catch(error => {
+            coopWarn("reward", "V2 owner terminal could not close its public input surface", error);
+            if (coopSessionGeneration() === generation) {
+              failCoopSharedSession(`Reward terminal ${prepared.operationId} could not close its public input surface`);
+            }
+          });
         return true;
       }
       if (!this.coopCommitPendingAuthorityResult(prepared.operationId)) {
