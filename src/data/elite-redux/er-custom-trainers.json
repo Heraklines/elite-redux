@@ -2626,6 +2626,31 @@
           "JUMP_KICK"
         ],
         "species": 899
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "MYSTIC_WATER"
+          },
+          {
+            "count": 1,
+            "item": "ER_ICE_GEM"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "AURORA_BEAM",
+          "SUPERSONIC",
+          "BRINE",
+          "TAILWIND"
+        ],
+        "species": 279
       }
     ],
     "trainerClass": "VETERAN",
