@@ -92,3 +92,41 @@ Decisions locked with the maintainer; do not relitigate.
   granting via settlement pipeline + champion screen.
 - P3: polish (notifications, spectate/replays from telemetry, community
   creation, Swiss format).
+
+## P1.5 — the PLAYER-JOURNEY simulation (maintainer-validated 2026-07-20; BINDING for the board build)
+
+The Sample Cup (4 players) as experienced by one player:
+1. LIST: "Sample Cup - 2/4 registered - REGISTER". Registering ticks the live
+   counter; the entry shows "waiting for entrants (3/4)".
+2. AUTO-CLOSE AT CAP: the moment the last slot fills, the worker closes
+   registration and generates the seeded bracket automatically - no organizer
+   step. Every client's list entry flips to IN PROGRESS -> view board.
+3. THE BOARD (the showpiece): PWT backdrop + music. Bracket tree with real
+   CONNECTING LINES (semis -> final -> champion slot). Each slot: the player's
+   GHOST-TRAINER ICON (their ghost customization identity) + name + seed chip.
+   YOUR next fight is gold-highlighted with a VS marker. Opponent card below:
+   ghost-trainer portrait + their custom TITLE + deadline countdown + "A: FIGHT"
+   when they are present in the tournament lobby, else "last seen <ago>".
+4. FIGHT: A -> tournament lobby (pairs ONLY the bracket opponent) -> team
+   preview (no ante) -> battle (ghost presentation incl. intro/win/lose lines
+   as in any showdown match) -> result auto-reports.
+5. RESOLUTION VISUALS: winner's icon advances along the line into the next
+   round's slot; loser's slot DIMS with an X ("eliminated"). An eliminated
+   player keeps full view of the board as the cup resolves (spectator state).
+6. CHAMPION: final resolves -> the board renders the champion state - the
+   winner's trainer art center-stage over the bracket, "CHAMPION - <name>".
+
+Interactions: d-pad browses matches (each shows its pairing card), A on YOUR
+match = enter the tournament lobby, B = back to list. The board polls the
+worker and refreshes live.
+
+Implementation notes:
+- Auto-close: in the worker register route - when the successful insert fills
+  maxEntrants, run the same close/generate path as the admin route.
+- Ghost icons: registration carries the entrant's ghost-trainer appearance
+  summary (sprite key/name/title) into the entrants table (additive columns or
+  a json column); the board renders from it. Sanitize on receipt (the ghost
+  profile rule).
+- All new edges follow the hardened flow rules; every board state gets a
+  render golden (fresh 4-bracket, mid-round with an advance, eliminated view,
+  champion), including the connecting lines and icon slots.
