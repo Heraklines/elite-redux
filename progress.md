@@ -416,3 +416,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   final result alone states the real command or terminal successor. Node and
   source contracts pin both invariants. Remote S4 and browser qualification are
   required; no co-op engine test was run locally.
+- The same async proof defect existed on the authority owner's vanilla
+  `SwitchPhase`. Its V2 notification is now also chained to the real PARTY
+  `setMode` completion, with a fail-closed rejection path. This covers the
+  host-owned-faint C5 timeout as well as guest-owned replacement projection.
+- Closed the missing mid-turn interaction edge exposed by C2. An exact
+  registered `TURN_RESOLVE` prompt (learn move/batch, revival, or catch-full)
+  may now consume same-address command control, while decisions, wrong phases,
+  wrong kinds, and mismatched operation ids remain fail-closed. Their committed
+  decisions explicitly authorize the same-address `TURN_COMMIT`, so the
+  authoritative turn can finish without falling back to local phase order.
+- Reclassified the two remaining S4 reds at `47b825cfd` from their retained
+  traces: neither contains the tester-facing safety abort. The one-process
+  fixture was synthesizing input before pumping the peer-owned V2 successor,
+  and later tried to drive an already-actionable CommandPhase toward an older
+  finalizer. The Showdown test now pumps both destination contexts before input
+  and treats an already-installed exact CommandPhase as success.
+- The exact-SHA Showdown browser run at `47b825cfd` also proved a harness cursor
+  race, not a product failure: both screenshots visibly showed Friendly wager
+  and the trace emitted `surfaceId=wager`, but one browser emitted it while the
+  harness was still verifying its peer's seat. The wager cursor is now captured
+  before that concurrent binding transition, so the one-shot public surface
+  cannot fall just behind the observer window.

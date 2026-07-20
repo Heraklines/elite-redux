@@ -74,6 +74,7 @@ import {
   installDuoLogCapture,
   materializeGuestInputAfterReplacement,
   presentedFieldMon,
+  pumpDuoDestinations,
   type ShowdownDuoRig,
   settleDuoPromise,
   withClient,
@@ -436,7 +437,10 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       // intercepted test manager deliberately does not; run the real start chokepoint so Authority V2
       // observes the installed guest-owned command control before the public UI accepts a choice.
       cur.start();
-      await drainLoopback();
+      // A real browser always yields between opening a surface and the next keyboard event. Pump both
+      // independent destination contexts here so the retained replacement successor and its command proof
+      // complete before this one-process fixture synthesizes that next event.
+      await pumpDuoDestinations(rig, 3);
       const own = getShowdownOwnManifest();
       const opp = getShowdownOpponentManifest();
       if (own == null || opp == null) {
@@ -896,15 +900,20 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       ).toBe(GUEST_BENCH_1);
       // The IDLE-fallback guest reaches the replacement checkpoint via the out-of-band CHECKPOINT route
       // (coop-replay-turn-phase.ts pump: materialApplied -> presentationReady -> continuationReady). That
-      // handshake needs BOTH engines pumped, so first prove the checkpoint has advanced the guest to its
-      // real CoopFinalizeTurnPhase. Only then recreate the abbreviated headless NewBattle/TurnInit input
-      // tail; doing that while the replay is still parked would discard the checkpoint at the wrong address.
+      // handshake needs BOTH engines pumped. Cross its real CoopFinalizeTurnPhase when still pending; if V2
+      // already projected the exact CommandPhase, preserve it. Only then recreate the abbreviated headless
+      // NewBattle/TurnInit input tail; doing that while replay is parked discards the checkpoint at the wrong address.
       await withClient(rig.guestCtx, async () => {
-        await driveClientPhaseQueueTo(rig.guestScene, "Showdown replacement CoopFinalizeTurnPhase", {
-          matches: phase => phase.phaseName === "CoopFinalizeTurnPhase",
-          perPhaseTimeoutMs: 5_000,
-          pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
-        });
+        // Authority V2 can finish the retained replacement round trip while this fixture is pumping the
+        // peer, in which case the exact post-replacement CommandPhase is already current. Do not drive that
+        // actionable phase as though it were an inert pre-finalizer tail.
+        if (rig.guestScene.phaseManager.getCurrentPhase()?.phaseName !== "CommandPhase") {
+          await driveClientPhaseQueueTo(rig.guestScene, "Showdown replacement CoopFinalizeTurnPhase", {
+            matches: phase => phase.phaseName === "CoopFinalizeTurnPhase",
+            perPhaseTimeoutMs: 5_000,
+            pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+          });
+        }
         await materializeGuestInputAfterReplacement(rig.guestScene);
         await driveClientPhaseQueueTo(rig.guestScene, "Showdown replacement CommandPhase", {
           matches: phase => phase.phaseName === "CommandPhase",

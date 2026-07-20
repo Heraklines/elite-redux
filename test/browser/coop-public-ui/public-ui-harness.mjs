@@ -2304,10 +2304,13 @@ export class DuoPublicUiRig {
    * automatically, both players independently lock the Friendly wager, and the ordinary battle opens.
    */
   async startShowdownBattle() {
-    await this.completePairingBinding();
+    // Wager can open on one browser while completePairingBinding is still proving the reciprocal browser's
+    // stable seat. Capture before that concurrent transition: a static wager surface is emitted once, so a
+    // cursor taken afterward can wait forever despite the player visibly sitting on the correct screen.
     const battleCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
+    await this.completePairingBinding();
     await Promise.all(
       Object.values(this.clients).map(client =>
         waitForSemanticSurface(client, "wager", {

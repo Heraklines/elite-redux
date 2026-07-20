@@ -429,6 +429,23 @@ describe("Authority V2 interaction cutover", () => {
     expect(terminalMarket).toMatchObject({ kind: "AWAIT_SUCCESSOR", allowNextWaveStart: true });
   });
 
+  it.each([
+    ["REVIVAL", { type: "decision", fieldIndex: 0, partySlot: 1, speciesId: 25 }, "op:revival"],
+    ["CATCH_FULL", { type: "decision", partySlot: 1 }, "op:catchFull"],
+    ["LEARN_MOVE", { type: "decision", partySlot: 0, moveId: 33, forgetSlot: 0, maxMoveCount: 4 }, "op:learnMove"],
+    ["LEARN_MOVE_BATCH", { type: "decision", partySlot: 0, assignments: [[33, 0]], fallback: false }, "op:learnMove"],
+  ] as const)("lets a settled TURN_RESOLVE %s decision return to the exact turn log", (kind, payload, surfaceClass) => {
+    const successor = successorOfCoopV2InteractionEnvelope(surfaceClass, envelope(kind, payload, "TURN_RESOLVE"));
+    expect(successor).toMatchObject({
+      kind: "AWAIT_SUCCESSOR",
+      epoch: 1,
+      wave: 1,
+      turn: 1,
+      allowNextWaveStart: false,
+    });
+    expect(successor?.kind === "AWAIT_SUCCESSOR" && successor.allowedKinds).toContain("TURN_COMMIT");
+  });
+
   it("freezes terminal reward material to its exact JSON wire image before digesting it", () => {
     const built = buildCoopV2InteractionEnvelopeEntry({
       context: FRAME,

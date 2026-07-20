@@ -90,6 +90,10 @@ test("two public clients must prove one positive gameplay epoch before locking t
     harness.indexOf("async startShowdownBattle()"),
     harness.indexOf("\n  /**\n   * Drive one reciprocal", harness.indexOf("async startShowdownBattle()")),
   );
+  assert.ok(
+    start.indexOf("const battleCursors") < start.indexOf("completePairingBinding()"),
+    "the observer cursor precedes the concurrent binding-to-wager transition",
+  );
   assert.ok(start.indexOf("completePairingBinding()") < start.indexOf('waitForSemanticSurface(client, "wager"'));
   assert.match(start, /targetId: "showdown-wager:friendly"/u);
   assert.match(start, /assertSharedCommandFrontier\(battleCursors, "showdown-wave-1-command"/u);

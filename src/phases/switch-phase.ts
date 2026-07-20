@@ -466,7 +466,7 @@ export class SwitchPhase extends BattlePhase {
           && scene.phaseManager.getCurrentPhase() === this
           && scene.currentBattle.waveIndex === ownerBoundary.wave
           && (scene.currentBattle.turn ?? 0) === ownerBoundary.turn);
-      scene.ui.setMode(
+      const openedParty = scene.ui.setMode(
         UiMode.PARTY,
         this.isModal ? PartyUiMode.FAINT_SWITCH : PartyUiMode.POST_BATTLE_SWITCH,
         fieldIndex,
@@ -547,11 +547,23 @@ export class SwitchPhase extends BattlePhase {
         PartyUiHandler.FilterNonFainted,
       );
       if (authoritative && this.coopV2ControlOperationId != null) {
-        queueMicrotask(() => {
-          if (ownerRuntime != null) {
-            runWhenCoopRuntimeActive(ownerRuntime, () => notifyCoopV2InteractionSurfaceReady(ownerRuntime));
-          }
-        });
+        // Phaser's setMode transition is asynchronous. A queued microtask can run while MESSAGE/the prior
+        // handler is still current, permanently leaving the ordered replacement control uninstalled even
+        // though the owner later sees and uses PARTY. Bind the proof to the real setMode completion.
+        Promise.resolve(openedParty).then(
+          () => {
+            if (ownerRuntime != null) {
+              runWhenCoopRuntimeActive(ownerRuntime, () => notifyCoopV2InteractionSurfaceReady(ownerRuntime));
+            }
+          },
+          () => {
+            if (ownerRuntime != null) {
+              runWhenCoopRuntimeActive(ownerRuntime, () =>
+                failCoopSharedSession("The owner replacement picker failed to open its public PARTY surface."),
+              );
+            }
+          },
+        );
       }
       return;
     }

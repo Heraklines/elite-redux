@@ -791,7 +791,7 @@ export function successorOfCoopV2InteractionEnvelope(
     }
     case "REVIVAL": {
       if (payload?.type !== "prompt") {
-        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
+        return wait(["TURN_COMMIT", "INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
       }
       const resultOperationIds = operationIdsAfterPrompt(operation.id, "REVIVAL", [1, 2, 3, 4, 5, 6]);
       return resultOperationIds == null
@@ -800,7 +800,7 @@ export function successorOfCoopV2InteractionEnvelope(
     }
     case "CATCH_FULL": {
       if (payload?.type !== "prompt") {
-        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
+        return wait(["TURN_COMMIT", "INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
       }
       const resultOperationIds = operationIdsAfterPrompt(operation.id, "CATCH_FULL", [1]);
       return resultOperationIds == null
@@ -810,7 +810,7 @@ export function successorOfCoopV2InteractionEnvelope(
     case "LEARN_MOVE":
     case "LEARN_MOVE_BATCH": {
       if (payload?.type !== "prompt") {
-        return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
+        return wait(["TURN_COMMIT", "INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], false);
       }
       const resultOperationIds = operationIdsAfterPrompt(operation.id, operation.kind, [1]);
       return resultOperationIds == null

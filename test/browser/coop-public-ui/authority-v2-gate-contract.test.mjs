@@ -22,6 +22,7 @@ const guestFaintSwitchPhase = readFileSync(new URL("src/phases/coop-guest-faint-
 const replayPhases = readFileSync(new URL("src/phases/coop-replay-phases.ts", root), "utf8");
 const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts", root), "utf8");
 const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
+const switchPhase = readFileSync(new URL("src/phases/switch-phase.ts", root), "utf8");
 const titlePhase = readFileSync(new URL("src/phases/title-phase.ts", root), "utf8");
 const shadow = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/shadow.ts", root), "utf8");
 const waveAdapter = readFileSync(
@@ -32,6 +33,11 @@ const replacementAdapter = readFileSync(
   new URL("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts", root),
   "utf8",
 );
+const interactionCutover = readFileSync(
+  new URL("src/data/elite-redux/coop/authority-v2/cutover-interaction.ts", root),
+  "utf8",
+);
+const nextControl = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/next-control.ts", root), "utf8");
 
 function jobBlock(workflow, job) {
   const lines = workflow.split(/\r?\n/gu);
@@ -335,6 +341,14 @@ test("replacement controls are proven by the real async PARTY surface and batche
     awaitParty > openParty && notifyReady > awaitParty,
     "control readiness is published only after PARTY's asynchronous public handler opens",
   );
+  const ownerOpenParty = switchPhase.indexOf("const openedParty = scene.ui.setMode(");
+  const ownerAwaitParty = switchPhase.indexOf("Promise.resolve(openedParty).then(", ownerOpenParty);
+  const ownerNotifyReady = switchPhase.indexOf("notifyCoopV2InteractionSurfaceReady(ownerRuntime)", ownerAwaitParty);
+  assert.notEqual(ownerOpenParty, -1, "the authority owner replacement retains the real setMode completion");
+  assert.ok(
+    ownerAwaitParty > ownerOpenParty && ownerNotifyReady > ownerAwaitParty,
+    "the authority owner also proves control only after PARTY is public",
+  );
 
   const successorStart = replacementAdapter.indexOf('case "next-replacement":');
   const successorEnd = replacementAdapter.indexOf('\n    case "terminal":', successorStart);
@@ -348,6 +362,31 @@ test("replacement controls are proven by the real async PARTY surface and batche
     successor,
     /kind: "REPLACEMENT"/u,
     "an already-resolved double-KO batch may not demand a second executable picker",
+  );
+});
+
+test("TURN_RESOLVE prompts form a closed command-to-turn Authority V2 path", () => {
+  assert.match(nextControl, /const TURN_RESOLVE_PROMPT_SURFACES = \{/u);
+  for (const [kind, surface] of [
+    ["CATCH_FULL", "op:catchFull"],
+    ["LEARN_MOVE", "op:learnMove"],
+    ["LEARN_MOVE_BATCH", "op:learnMove"],
+    ["REVIVAL", "op:revival"],
+  ]) {
+    assert.match(nextControl, new RegExp(`${kind}: "${surface}"`, "u"));
+  }
+  assert.match(nextControl, /envelope\?\.logicalPhase === "TURN_RESOLVE"/u);
+  assert.match(nextControl, /operation\?\.id === next\.operationId/u);
+  assert.match(nextControl, /operation\.status === "applied"/u);
+  assert.match(nextControl, /payload\?\.type === "prompt"/u);
+
+  const turnResolveCases = interactionCutover.slice(
+    interactionCutover.indexOf('case "REVIVAL":'),
+    interactionCutover.indexOf('case "ME_PRESENT":'),
+  );
+  assert.match(
+    turnResolveCases,
+    /\["TURN_COMMIT", "INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"\]/u,
   );
 });
 

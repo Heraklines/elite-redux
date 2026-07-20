@@ -831,6 +831,135 @@ describe("authority-v2 log", () => {
     expect(successor.revision).toBe(2);
   });
 
+  it("closes the command -> TURN_RESOLVE prompt -> decision -> turn authority graph", () => {
+    const promptOperationId = "turn-resolve-learn-prompt";
+    const decisionOperationId = "turn-resolve-learn-decision";
+    const interactionEntry = (
+      operationId: string,
+      payload: Readonly<Record<string, unknown>>,
+      nextControl: CoopNextControl,
+    ) => ({
+      ...entryInput(operationId, { kind: "INTERACTION_COMMIT", nextControl }),
+      material: {
+        digest: `digest-${operationId}`,
+        payload: {
+          kind: "OPERATION_ENVELOPE_V1",
+          surfaceClass: "op:learnMove",
+          envelope: {
+            sessionEpoch: 1,
+            wave: 1,
+            turn: 1,
+            logicalPhase: "TURN_RESOLVE",
+            pendingOperation: {
+              id: operationId,
+              kind: "LEARN_MOVE_BATCH",
+              owner: 1,
+              status: "applied",
+              payload,
+            },
+          },
+        },
+      },
+    });
+
+    const log = makeLog(scheduler, sent);
+    log.commit(
+      entryInput("command-open-before-learn", {
+        kind: "CONTROL_COMMIT",
+        nextControl: commandControl(),
+      }),
+    );
+    const prompt = log.commit(
+      interactionEntry(
+        promptOperationId,
+        { type: "prompt" },
+        {
+          kind: "SHARED_INTERACTION",
+          surfaceClass: "op:learnMove",
+          operationId: promptOperationId,
+          ownerSeatId: 1,
+          epoch: 1,
+          wave: 1,
+          turn: 1,
+          operationKind: "LEARN_MOVE_BATCH",
+          successor: {
+            operationKinds: ["LEARN_MOVE_BATCH"],
+            operationIds: [decisionOperationId],
+          },
+        },
+      ),
+    );
+    expect(prompt.revision).toBe(2);
+
+    const decision = log.commit(
+      interactionEntry(
+        decisionOperationId,
+        { type: "decision" },
+        {
+          kind: "AWAIT_SUCCESSOR",
+          afterOperationId: decisionOperationId,
+          epoch: 1,
+          wave: 1,
+          turn: 1,
+          allowedKinds: ["TURN_COMMIT", "INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+          allowNextWaveStart: false,
+          expectedOperationId: null,
+        },
+      ),
+    );
+    expect(decision.revision).toBe(3);
+    expect(log.commit(entryInput("settled-turn-after-learn")).revision).toBe(4);
+  });
+
+  it("does not let arbitrary interaction material interrupt command control", () => {
+    const interactionAfterCommand = (
+      operationId: string,
+      logicalPhase: string,
+      operationKind: string,
+      payloadType: string,
+      envelopeOperationId = operationId,
+    ) => ({
+      ...entryInput(operationId, { kind: "INTERACTION_COMMIT" }),
+      material: {
+        digest: `digest-${operationId}`,
+        payload: {
+          kind: "OPERATION_ENVELOPE_V1",
+          surfaceClass: "op:learnMove",
+          envelope: {
+            sessionEpoch: 1,
+            wave: 1,
+            turn: 1,
+            logicalPhase,
+            pendingOperation: {
+              id: envelopeOperationId,
+              kind: operationKind,
+              owner: 1,
+              status: "applied",
+              payload: { type: payloadType },
+            },
+          },
+        },
+      },
+    });
+    const rejected = [
+      interactionAfterCommand("decision", "TURN_RESOLVE", "LEARN_MOVE", "decision"),
+      interactionAfterCommand("normal-interaction", "INTERACTION", "LEARN_MOVE", "prompt"),
+      interactionAfterCommand("reward-prompt", "TURN_RESOLVE", "REWARD", "prompt"),
+      interactionAfterCommand("id-mismatch", "TURN_RESOLVE", "REVIVAL", "prompt", "different-id"),
+    ];
+
+    for (const entry of rejected) {
+      const log = makeLog(scheduler, []);
+      log.commit(
+        entryInput(`command-before-${entry.operationId}`, {
+          kind: "CONTROL_COMMIT",
+          nextControl: commandControl(),
+        }),
+      );
+      expect(() => log.commit(entry)).toThrow(/not authorized by predecessor control/);
+    }
+  });
+
   it("rejects a right-kind successor carrying the wrong live wave/turn coordinate", () => {
     const log = makeLog(scheduler, sent);
     log.commit(

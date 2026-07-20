@@ -341,6 +341,48 @@ export function interactionOperationKindOfEntry(entry: {
     : null;
 }
 
+const TURN_RESOLVE_PROMPT_SURFACES = {
+  CATCH_FULL: "op:catchFull",
+  LEARN_MOVE: "op:learnMove",
+  LEARN_MOVE_BATCH: "op:learnMove",
+  REVIVAL: "op:revival",
+} as const;
+
+/**
+ * A command frontier normally closes on TURN_COMMIT, but four closed interaction surfaces can be
+ * discovered while that same turn is settling. Their immutable prompt must enter the mechanical log
+ * before the player can answer it; requiring TURN_COMMIT first creates an impossible cycle.
+ *
+ * This is deliberately stricter than "any interaction at the same coordinate": only a registered
+ * TURN_RESOLVE prompt whose envelope id is the Authority V2 entry id may interrupt command control.
+ * Decisions, presentation interactions, and unknown future kinds remain rejected until their predecessor
+ * explicitly states them.
+ */
+function isExactTurnResolvePromptEntry(next: {
+  readonly kind: AuthorityEntryKind;
+  readonly operationId: string;
+  readonly material: { readonly payload: unknown };
+}): boolean {
+  if (next.kind !== "INTERACTION_COMMIT") {
+    return false;
+  }
+  const wrapper = objectRecord(next.material.payload);
+  const envelope = objectRecord(wrapper?.envelope);
+  const operation = objectRecord(envelope?.pendingOperation);
+  const payload = objectRecord(operation?.payload);
+  const operationKind = operation?.kind;
+  return (
+    wrapper?.kind === "OPERATION_ENVELOPE_V1"
+    && envelope?.logicalPhase === "TURN_RESOLVE"
+    && operation?.id === next.operationId
+    && typeof operationKind === "string"
+    && operationKind in TURN_RESOLVE_PROMPT_SURFACES
+    && wrapper.surfaceClass === TURN_RESOLVE_PROMPT_SURFACES[operationKind as keyof typeof TURN_RESOLVE_PROMPT_SURFACES]
+    && operation.status === "applied"
+    && payload?.type === "prompt"
+  );
+}
+
 /**
  * One total predecessor-control -> immediate-entry admission rule, shared by the authority log and the
  * replica control ledger. No executable control can be silently skipped by an unrelated later entry.
@@ -368,7 +410,7 @@ export function controlAllowsSuccessorEntry(
     case "COMMAND_FRONTIER": {
       const address = mechanicalAddressOf(next.kind, next.context.sessionEpoch, next.material.payload);
       return (
-        next.kind === "TURN_COMMIT"
+        (next.kind === "TURN_COMMIT" || isExactTurnResolvePromptEntry(next))
         && address?.epoch === control.epoch
         && address.wave === control.wave
         && address.turn === control.turn
