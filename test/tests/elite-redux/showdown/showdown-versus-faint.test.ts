@@ -191,27 +191,42 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
   }
 
   /**
+   * Select a replacement through the same PARTY handler inputs used by a browser. The first ACTION
+   * opens the selected mon's option menu; the second chooses its first legal FAINT_SWITCH action
+   * (SEND_OUT). Keeping this in the public handler path is load-bearing: directly invoking the
+   * callback bypasses Authority V2's actionable-handler proof and can only produce a false gate red.
+   */
+  function chooseReplacementThroughPartyUi(scene: BattleScene, partySlot: number, label: string): void {
+    expect(scene.ui.getMode(), `${label}: the real PARTY handler is active`).toBe(UiMode.PARTY);
+    for (let cursor = 0; cursor < partySlot; cursor++) {
+      expect(scene.ui.processInput(Button.DOWN), `${label}: moved the public PARTY cursor to slot ${cursor + 1}`).toBe(
+        true,
+      );
+    }
+    expect(scene.ui.processInput(Button.ACTION), `${label}: opened the public replacement option menu`).toBe(true);
+    expect(scene.ui.processInput(Button.ACTION), `${label}: selected SEND_OUT through the public option menu`).toBe(
+      true,
+    );
+  }
+
+  /**
    * Drive the guest's replay for `turn`, then advance the real V2 reconstruction when the live-event picker
    * arrived before its ordered TURN_COMMIT. The first object must retire unopened; material application
-   * enqueues a fresh address-exact {@linkcode CoopGuestFaintSwitchPhase}, which is the ONE `UiMode.PARTY`
-   * surface intercepted here to pick {@linkcode GUEST_PICK_SLOT}. The relay send + seq keying stay fully real.
+   * enqueues a fresh address-exact {@linkcode CoopGuestFaintSwitchPhase}, whose real `UiMode.PARTY` handler
+   * is driven here with public directional/action inputs to pick {@linkcode GUEST_PICK_SLOT}. The handler,
+   * callback, relay send, and seq keying all stay fully real.
    * Returns whether the authorized picker actually OPENED (the gate fired - the crisp red-proof anchor:
    * with the co-op ownership gate un-branched the picker never opens on the versus guest).
    */
   async function driveGuestReplayPickingBench(rig: ShowdownDuoRig, turn: number): Promise<boolean> {
     let pickerOpened = false;
     await withClient(rig.guestCtx, async () => {
-      const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+      const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => Promise<void> };
       const realSetMode = ui.setMode.bind(ui);
-      ui.setMode = (...args: unknown[]): unknown => {
+      ui.setMode = (...args: unknown[]): Promise<void> => {
         if (args[0] === UiMode.PARTY) {
           pickerOpened = true;
           ui.setMode = realSetMode; // one-shot
-          (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
-          return;
-        }
-        if (args[0] === UiMode.MESSAGE) {
-          return; // the picker's close transition - a no-op headlessly
         }
         return realSetMode(...args);
       };
@@ -230,6 +245,14 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
           authorizedPicker.start();
           await drainLoopback();
         }
+        if (pickerOpened) {
+          await vi.waitUntil(() => rig.guestScene.ui.getMode() === UiMode.PARTY, {
+            timeout: 5_000,
+            interval: 10,
+          });
+          chooseReplacementThroughPartyUi(rig.guestScene, GUEST_PICK_SLOT, "guest replacement");
+          await drainLoopback();
+        }
       } finally {
         ui.setMode = realSetMode;
       }
@@ -237,19 +260,31 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
     return pickerOpened;
   }
 
-  /** Register a one-shot driver for the HOST's OWN vanilla faint picker (its own team's replacement). */
-  function driveHostOwnFaintPicker(rig: ShowdownDuoRig): void {
-    const ui = rig.hostScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+  /** Observe and drive the HOST's OWN vanilla faint picker through its real public PARTY handler. */
+  function driveHostOwnFaintPicker(rig: ShowdownDuoRig): { choose: () => Promise<void>; restore: () => void } {
+    let pickerOpened = false;
+    const ui = rig.hostScene.ui as unknown as { setMode: (...args: unknown[]) => Promise<void> };
     const realSetMode = ui.setMode.bind(ui);
-    ui.setMode = (...args: unknown[]): unknown => {
+    const restore = (): void => {
+      ui.setMode = realSetMode;
+    };
+    ui.setMode = (...args: unknown[]): Promise<void> => {
       if (args[0] === UiMode.PARTY) {
-        // Invoke the real SwitchPhase callback synchronously in the host's active client window. The old
-        // process-global prompt timer could fire after globalScene moved to the guest and orphan the close.
-        ui.setMode = realSetMode;
-        (args[3] as (slotIndex: number, option: number) => void)(1, 0);
-        return;
+        pickerOpened = true;
+        restore(); // one-shot; the real transition below remains authoritative
       }
       return realSetMode(...args);
+    };
+    return {
+      choose: async () => {
+        await vi.waitUntil(() => pickerOpened && rig.hostScene.ui.getMode() === UiMode.PARTY, {
+          timeout: 5_000,
+          interval: 10,
+        });
+        chooseReplacementThroughPartyUi(rig.hostScene, 1, "host replacement");
+        await drainLoopback();
+      },
+      restore,
     };
   }
 
@@ -494,12 +529,16 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
 
     // HOST crosses: BOTH replacement flows run in the SAME crossing - the host's OWN vanilla picker (driven
     // here) AND the ShowdownEnemyFaintSwitchPhase awaiting the guest's buffered pick. Neither deadlocks.
-    driveHostOwnFaintPicker(rig);
+    const hostPicker = driveHostOwnFaintPicker(rig);
     let hostAdvance: Promise<void> | undefined;
-    await withClient(rig.hostCtx, async () => {
-      hostAdvance = game.phaseInterceptor.to("CommandPhase");
-      await drainLoopback();
-    });
+    try {
+      await withClient(rig.hostCtx, async () => {
+        hostAdvance = game.phaseInterceptor.to("CommandPhase");
+        await hostPicker.choose();
+      });
+    } finally {
+      hostPicker.restore();
+    }
     expect(hostAdvance, "the host double-faint crossing was started").toBeDefined();
     await settleDuoPromise(rig, hostAdvance!, "Showdown double-faint host crossing");
     expect(
@@ -696,22 +735,21 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
           ui.setModeBoundedWhen = realSetModeBoundedWhen;
         };
         ui.setMode = (...args: unknown[]): unknown => {
+          const transition = realSetMode(...args);
           if (args[0] === UiMode.PARTY) {
             pickerOpens++;
-            return;
           }
           if (args[0] === UiMode.MESSAGE && pickerOpens > 0) {
             pickerCloses++;
-            return;
           }
-          return realSetMode(...args);
+          return transition;
         };
         ui.setModeBoundedWhen = async (...args): Promise<"completed" | "forced" | "superseded"> => {
+          const result = await realSetModeBoundedWhen(...args);
           if (args[0] === UiMode.MESSAGE && pickerOpens > 0) {
             pickerCloses++;
-            return "completed";
           }
-          return realSetModeBoundedWhen(...args);
+          return result;
         };
         const replay = rig.guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
         // Match the live delayed-presentation race: the faint address remains turn N even if ambient
@@ -736,7 +774,12 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
           picker.start();
           await drainLoopback();
         }
+        await vi.waitUntil(() => pickerOpens === 1 && rig.guestScene.ui.getMode() === UiMode.PARTY, {
+          timeout: 5_000,
+          interval: 10,
+        });
         expect(pickerOpens, "the real Showdown replacement picker opened exactly once").toBe(1);
+        expect(rig.guestScene.ui.getMode(), "the idle replacement is a real active PARTY surface").toBe(UiMode.PARTY);
         expect(rig.guestScene.phaseManager.getCurrentPhase()).toBe(picker);
       });
 
