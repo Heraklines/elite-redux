@@ -430,7 +430,18 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     const duo = buildDeferredDuo(clock, guestLive);
 
     // Revision 1 is admitted but its real turn material cannot settle while the faint picker is open.
-    duo.host.tapTurnCommit(turnTap("TURN/blocked-by-picker"));
+    const blockedTurn = turnTap("TURN/blocked-by-picker");
+    duo.host.tapTurnCommit({
+      ...blockedTurn,
+      capture: {
+        ...blockedTurn.capture,
+        epoch: SESSION.epoch,
+        wave: 5,
+        turn: 1,
+        revision: 1,
+      },
+      nextCommandFrontier: null,
+    });
     await flushLoopback();
     duo.flush("guest");
     expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 0 });

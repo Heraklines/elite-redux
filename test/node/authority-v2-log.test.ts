@@ -334,13 +334,15 @@ describe("authority-v2 log", () => {
     });
     const committed = log.commit(entryInput("op-quorum"));
 
-    expect(
-      log.acceptReceipt(
-        receipt(committed, "materialApplied", {
-          context: { ...committed.context, senderSeatId: 1, connectionGeneration: 4 },
-        }),
-      ),
-    ).toBe(false);
+    for (const stage of ["admitted", "materialApplied", "controlInstalled"] as const) {
+      expect(
+        log.acceptReceipt(
+          receipt(committed, stage, {
+            context: { ...committed.context, senderSeatId: 1, connectionGeneration: 4 },
+          }),
+        ),
+      ).toBe(false);
+    }
     expect(log.retained()).toHaveLength(1);
 
     // Right seat, stale generation: cannot satisfy the frozen quorum.
@@ -355,7 +357,21 @@ describe("authority-v2 log", () => {
 
     expect(
       log.acceptReceipt(
+        receipt(committed, "admitted", {
+          context: { ...committed.context, senderSeatId: 2, connectionGeneration: 9 },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      log.acceptReceipt(
         receipt(committed, "materialApplied", {
+          context: { ...committed.context, senderSeatId: 2, connectionGeneration: 9 },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      log.acceptReceipt(
+        receipt(committed, "controlInstalled", {
           context: { ...committed.context, senderSeatId: 2, connectionGeneration: 9 },
         }),
       ),
@@ -585,8 +601,9 @@ describe("authority-v2 log", () => {
     expect(sent.filter(wire => wire.kind === "requestTail")).toHaveLength(1);
     expect(log.recordReplicaStage(first, "materialApplied")).toBe(true);
 
-    // Revision 1 had no nextControl, so materialApplied completes its mechanical frontier. A new, genuinely
-    // different gap can now request from revision 2 once; repeats coalesce again.
+    // A committed entry always has an explicit successor, so its frontier completes only after the exact
+    // control-install proof. A new, genuinely different gap can then request from revision 2 once.
+    expect(log.recordReplicaStage(first, "controlInstalled")).toBe(true);
     expect(log.admit(fullEntry(3, "op-3"))).toEqual({ kind: "gap", missingFrom: 2 });
     expect(log.admit(fullEntry(4, "op-4"))).toEqual({ kind: "gap", missingFrom: 2 });
     expect(
@@ -660,12 +677,15 @@ describe("authority-v2 log", () => {
     expect(withControl.acceptReceipt(receipt(a, "controlInstalled"))).toBe(true);
     expect(withControl.retained()).toHaveLength(0);
 
-    // Entry WITHOUT a nextControl: materialApplied alone retires it.
-    const noControl = makeLog(scheduler, []);
-    const b = noControl.commit(entryInput("op-2"));
-    noControl.acceptReceipt(receipt(b, "admitted"));
-    expect(noControl.acceptReceipt(receipt(b, "materialApplied"))).toBe(true);
-    expect(noControl.retained()).toHaveLength(0);
+    // An explicit ordered wait is also a real installed control, but presentation proof is still irrelevant.
+    const withOrderedWait = makeLog(scheduler, []);
+    const b = withOrderedWait.commit(
+      entryInput("op-2", { nextControl: successorWait("op-2", ["INTERACTION_COMMIT"]) }),
+    );
+    withOrderedWait.acceptReceipt(receipt(b, "admitted"));
+    expect(withOrderedWait.acceptReceipt(receipt(b, "materialApplied"))).toBe(false);
+    expect(withOrderedWait.acceptReceipt(receipt(b, "controlInstalled"))).toBe(true);
+    expect(withOrderedWait.retained()).toHaveLength(0);
   });
 
   it("builds a contiguous recovery slice and retains the last stated control after retirement", () => {
@@ -686,7 +706,10 @@ describe("authority-v2 log", () => {
       requiredTail: [second],
     });
 
-    expect(log.acceptReceipt(receipt(first, "materialApplied"))).toBe(true);
+    expect(log.acceptReceipt(receipt(first, "admitted"))).toBe(false);
+    expect(log.acceptReceipt(receipt(first, "materialApplied"))).toBe(false);
+    expect(log.acceptReceipt(receipt(first, "controlInstalled"))).toBe(true);
+    expect(log.acceptReceipt(receipt(second, "admitted"))).toBe(false);
     expect(log.acceptReceipt(receipt(second, "materialApplied"))).toBe(false);
     expect(log.acceptReceipt(receipt(second, "controlInstalled"))).toBe(true);
     expect(log.retained()).toHaveLength(0);
@@ -748,7 +771,9 @@ describe("authority-v2 log", () => {
     const log = makeLog(scheduler, sent);
     const first = log.commit(entryInput("op-recovery-hole-1"));
     log.commit(entryInput("op-recovery-hole-2"));
-    expect(log.acceptReceipt(receipt(first, "materialApplied"))).toBe(true);
+    expect(log.acceptReceipt(receipt(first, "admitted"))).toBe(false);
+    expect(log.acceptReceipt(receipt(first, "materialApplied"))).toBe(false);
+    expect(log.acceptReceipt(receipt(first, "controlInstalled"))).toBe(true);
 
     // A real replica that still reported frontier 0 could not have retired revision 1. Refuse the
     // contradictory request rather than returning revision 2 as if it were a complete tail.
@@ -791,7 +816,9 @@ describe("authority-v2 log", () => {
 
     // Once exact proof retires the oldest truth, the next real commit receives revision 3. The refused
     // attempt never existed and therefore cannot create a gap at the replica.
-    expect(log.acceptReceipt(receipt(first, "materialApplied"))).toBe(true);
+    expect(log.acceptReceipt(receipt(first, "admitted"))).toBe(false);
+    expect(log.acceptReceipt(receipt(first, "materialApplied"))).toBe(false);
+    expect(log.acceptReceipt(receipt(first, "controlInstalled"))).toBe(true);
     const third = log.commit(entryInput("op-3"));
     expect(third.revision).toBe(3);
     expect(log.retained().map(entry => entry.revision)).toEqual([second.revision, third.revision]);

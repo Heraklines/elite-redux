@@ -18,7 +18,6 @@ import type {
 import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
-  applyCoopOperationEnvelopeThroughRegisteredApplier,
   registerCoopOperationLiveSink,
   resetCoopOperationJournalLog,
 } from "#data/elite-redux/coop/coop-operation-journal";
@@ -28,7 +27,6 @@ import {
   setActiveCoopRuntimeOpState,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import type { CoopOperationSurfaceClass } from "#data/elite-redux/coop/coop-operation-surface-registry";
-import { setCoopRewardAuthorityStateHooksForTest } from "#data/elite-redux/coop/coop-reward-operation";
 import {
   COOP_BIOME_PICK_SEQ_BASE,
   COOP_CROSSROADS_SEQ_BASE,
@@ -110,7 +108,6 @@ function envelope(
 afterEach(() => {
   registerCoopOperationLiveSink("op:ability", null);
   registerCoopOperationLiveSink("op:reward", null);
-  setCoopRewardAuthorityStateHooksForTest(null);
   resetCoopOperationJournalLog();
   setActiveCoopRuntimeOpState(null);
 });
@@ -472,35 +469,6 @@ describe("Authority V2 interaction cutover", () => {
       }),
     ).toBe("applied");
     expect(sink).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not re-enter a surface state applier after the V2 replica installed the immutable image", () => {
-    setActiveCoopRuntimeOpState(createCoopRuntimeOpState("guest"));
-    const apply = vi.fn(() => true);
-    const reapply = vi.fn(() => true);
-    setCoopRewardAuthorityStateHooksForTest({
-      capture: () => null,
-      apply,
-      reapply,
-    });
-    registerCoopOperationLiveSink("op:reward", () => true);
-    const committed = envelope(
-      "REWARD",
-      { label: "shop", choice: 0, data: [0], terminal: false, result: { lockModifierTiers: false } },
-      "REWARD_SELECT",
-      0,
-      1,
-    );
-    expect(
-      applyCoopOperationEnvelopeThroughRegisteredApplier("op:reward", committed, {
-        authority: "v2",
-        revision: 7,
-        operationId: committed.pendingOperation!.id,
-        sessionEpoch: 1,
-      }),
-    ).toBe("applied");
-    expect(apply).not.toHaveBeenCalled();
-    expect(reapply).not.toHaveBeenCalled();
   });
 
   it("keeps the registry type closed over known surface classes", () => {

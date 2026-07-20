@@ -253,7 +253,17 @@ export function buildTurnCommitEntry(input: BuildTurnCommitInput): BuildTurnComm
           epoch: input.context.sessionEpoch,
           wave: sourceWave as number,
           turn: sourceTurn as number,
-          allowedKinds: ["REPLACEMENT_COMMIT", "INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
+          // The absence of an immediate command frontier means the turn capture occurred before the engine
+          // could know which boundary comes next. A normal surviving battle opens the next turn through an
+          // explicit CONTROL_COMMIT; faint, interaction, wave, and terminal successors remain legal too.
+          // Omitting CONTROL_COMMIT made turn N's closed wait reject turn N+1's command-open by design.
+          allowedKinds: [
+            "CONTROL_COMMIT",
+            "REPLACEMENT_COMMIT",
+            "INTERACTION_COMMIT",
+            "WAVE_ADVANCE",
+            "TERMINAL_COMMIT",
+          ],
           expectedOperationId: null,
         }
       : {

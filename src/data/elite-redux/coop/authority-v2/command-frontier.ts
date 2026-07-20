@@ -86,6 +86,14 @@ export function resolveCoopV2CommandFrontier(state: CoopAuthoritativeBattleState
   const seats = [...state.field].filter(isHumanSeat).sort((left, right) => left.bi - right.bi);
 
   for (const seat of seats) {
+    // The authoritative field image deliberately retains hidden/pre-intro/just-vacated slot occupants so
+    // state reconciliation can remove or reveal them correctly. A command frontier is narrower: only a
+    // Pokemon that is actually presented at this post-effects boundary can own a real CommandPhase proof.
+    // Including a healthy but non-presented slot manufactured an impossible actor and left the authority's
+    // successor reservation permanently uninstalled.
+    if (!seat.presented) {
+      continue;
+    }
     if ((seatHp(state, seat) ?? 1) <= 0) {
       continue;
     }

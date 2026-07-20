@@ -425,10 +425,10 @@ describe("authority-v2 shadow harness", () => {
 
   it("exercises every tap kind (turn / replacement / wave / terminal / interaction)", () => {
     const clock = new FakeClock();
-    const duo = buildDuo(clock);
+    const duos = Array.from({ length: 5 }, () => buildDuo(clock));
 
-    duo.host.tapTurnCommit(turnTap("TAP/turn"));
-    duo.host.tapReplacementCommit({
+    duos[0].host.tapTurnCommit(turnTap("TAP/turn"));
+    duos[1].host.tapReplacementCommit({
       proposal: {
         sourceAddress: { epoch: SESSION.epoch, wave: 5, turn: 1, occurrence: 0, fieldIndex: 0 },
         ownerSeatId: 0,
@@ -438,7 +438,7 @@ describe("authority-v2 shadow harness", () => {
       successor: { kind: "terminal" },
       legacyDigest: "legacy-replace",
     });
-    duo.host.tapWaveAdvance({
+    duos[2].host.tapWaveAdvance({
       operationId: "TAP/wave",
       transition: {
         kind: "wave-advance",
@@ -454,31 +454,32 @@ describe("authority-v2 shadow harness", () => {
       destination: { kind: "REWARD", operationId: "TAP/wave/reward", ownerSeatId: 0 },
       legacyDigest: "legacy-wave",
     });
-    duo.host.tapTerminal({
+    duos[3].host.tapTerminal({
       operationId: "TAP/terminal",
       terminal: { kind: "terminal", terminalId: "term-1", reason: "game-over", wave: 6, turn: 1 },
       legacyDigest: "legacy-terminal",
     });
     const rewardEntry = buildRewardInteractionEntry({
-      context: duo.host.authenticatedFrameContext,
+      context: duos[4].host.authenticatedFrameContext,
       address: { epoch: SESSION.epoch, wave: 6, ownerSeatId: 0, actionOrdinal: 0 },
       material: { kind: "reward", wave: 6, ownerSeatId: 0, choice: { kind: "leave" }, terminal: true },
       successor: { kind: "REWARD", operationId: "TAP/reward/successor", ownerSeatId: 0 },
     });
-    duo.host.tapInteraction({ entry: rewardEntry, legacyDigest: "legacy-interaction" });
+    duos[4].host.tapInteraction({ entry: rewardEntry, legacyDigest: "legacy-interaction" });
 
-    const host = duo.host.diagnostics();
-    const guest = duo.guest.diagnostics();
-    expect(host.committed).toBe(5);
-    expect(host.parityChecks).toBe(5);
-    expect(guest.admitted).toBe(5);
-    expect(guest.applied).toBe(5);
+    const hosts = duos.map(duo => duo.host.diagnostics());
+    const guests = duos.map(duo => duo.guest.diagnostics());
+    expect(hosts.reduce((sum, host) => sum + host.committed, 0)).toBe(5);
+    expect(hosts.reduce((sum, host) => sum + host.parityChecks, 0)).toBe(5);
+    expect(guests.reduce((sum, guest) => sum + guest.admitted, 0)).toBe(5);
+    expect(guests.reduce((sum, guest) => sum + guest.applied, 0)).toBe(5);
     // Everything retired end-to-end; zero leaked timers on both sides.
-    expect(host.retained).toBe(0);
-    expect(host.pendingTimers).toBe(0);
-    expect(guest.pendingTimers).toBe(0);
+    expect(hosts.every(host => host.retained === 0 && host.pendingTimers === 0)).toBe(true);
+    expect(guests.every(guest => guest.pendingTimers === 0)).toBe(true);
 
-    duo.dispose();
+    for (const duo of duos) {
+      duo.dispose();
+    }
   });
 
   it("isolates a shadow fault: a malformed tap logs a FAULT, never throws, and the harness keeps working", () => {
@@ -600,19 +601,25 @@ describe("authority-v2 shadow transport routing seam", () => {
 
   it("the thin cycle-free tap free functions route to the active harness (emit-seam entry points)", () => {
     const clock = new FakeClock();
-    const host = new CoopAuthorityV2Shadow({
-      identity: identity(0),
-      scene: STUB_SCENE,
-      transport: STUB_TRANSPORT,
-      send: () => {},
-      scheduler: createCoopScheduler(clock),
-    });
+    const hosts = Array.from(
+      { length: 3 },
+      () =>
+        new CoopAuthorityV2Shadow({
+          identity: identity(0),
+          scene: STUB_SCENE,
+          transport: STUB_TRANSPORT,
+          send: () => {},
+          scheduler: createCoopScheduler(clock),
+        }),
+    );
     // No active harness -> the thin taps are pure no-ops (never throw).
     expect(() => tapCoopV2ShadowTurnCommit(turnTap("THIN/no-active"))).not.toThrow();
-    expect(host.diagnostics().committed).toBe(0);
+    expect(hosts.every(host => host.diagnostics().committed === 0)).toBe(true);
 
-    setActiveCoopV2Shadow(host);
+    setActiveCoopV2Shadow(hosts[0]);
     tapCoopV2ShadowTurnCommit(turnTap("THIN/turn"));
+    clearActiveCoopV2Shadow(hosts[0]);
+    setActiveCoopV2Shadow(hosts[1]);
     tapCoopV2ShadowReplacementCommit({
       proposal: {
         sourceAddress: { epoch: SESSION.epoch, wave: 5, turn: 1, occurrence: 0, fieldIndex: 1 },
@@ -623,19 +630,23 @@ describe("authority-v2 shadow transport routing seam", () => {
       successor: { kind: "terminal" },
       legacyDigest: "legacy",
     });
+    clearActiveCoopV2Shadow(hosts[1]);
+    setActiveCoopV2Shadow(hosts[2]);
     tapCoopV2ShadowInteraction({
       entry: buildRewardInteractionEntry({
-        context: host.authenticatedFrameContext,
+        context: hosts[2].authenticatedFrameContext,
         address: { epoch: SESSION.epoch, wave: 5, ownerSeatId: 0, actionOrdinal: 1 },
         material: { kind: "reward", wave: 5, ownerSeatId: 0, choice: { kind: "skip" }, terminal: true },
         successor: { kind: "REWARD", operationId: "THIN/reward/successor", ownerSeatId: 0 },
       }),
       legacyDigest: "legacy",
     });
-    expect(host.diagnostics().committed).toBe(3);
+    expect(hosts.every(host => host.diagnostics().committed === 1)).toBe(true);
 
-    clearActiveCoopV2Shadow(host);
-    host.dispose();
+    clearActiveCoopV2Shadow(hosts[2]);
+    for (const host of hosts) {
+      host.dispose();
+    }
   });
 
   it("routes v2 frames PER TRANSPORT INSTANCE via onV2Frame - two harnesses in one process (duo)", async () => {
@@ -864,17 +875,18 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
   });
 
   it("REPLACEMENT parity match=true/false by fingerprinting the legacy image through the faint adapter", () => {
-    const duo = buildDuo(new FakeClock());
+    const matchingDuo = buildDuo(new FakeClock());
     // Identical legacy image -> match=true.
-    duo.host.tapReplacementCommit({
+    matchingDuo.host.tapReplacementCommit({
       proposal: replacementProposal(25),
       resolution: "owner-pick",
       successor: { kind: "terminal" },
       legacyDigest: "op-id",
       legacyImage: { proposal: replacementProposal(25), resolution: "owner-pick" },
     });
+    const divergentDuo = buildDuo(new FakeClock());
     // A legacy image resolving a DIFFERENT species -> the resolved states differ -> match=false.
-    duo.host.tapReplacementCommit({
+    divergentDuo.host.tapReplacementCommit({
       proposal: replacementProposal(25),
       resolution: "owner-pick",
       successor: { kind: "terminal" },
@@ -882,59 +894,64 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
       legacyDigest: "op-id",
       legacyImage: { proposal: replacementProposal(999), resolution: "owner-pick" },
     });
-    const diag = duo.host.diagnostics();
-    expect(diag.parityChecks).toBe(2);
-    expect(diag.parityMatches).toBe(1);
-    expect(diag.faults).toBe(0);
+    const diagnostics = [matchingDuo.host.diagnostics(), divergentDuo.host.diagnostics()];
+    expect(diagnostics.reduce((sum, diag) => sum + diag.parityChecks, 0)).toBe(2);
+    expect(diagnostics.reduce((sum, diag) => sum + diag.parityMatches, 0)).toBe(1);
+    expect(diagnostics.every(diag => diag.faults === 0)).toBe(true);
     expect(parityLine("REPLACEMENT_COMMIT")).toContain("match=false");
     expect(parityLine("REPLACEMENT_COMMIT")).toContain("field=digest");
-    duo.dispose();
+    matchingDuo.dispose();
+    divergentDuo.dispose();
   });
 
   it("WAVE parity match=true/false by fingerprinting the legacy transition image", () => {
-    const duo = buildDuo(new FakeClock());
     const destination = { kind: "REWARD", operationId: "W/reward", ownerSeatId: 0 } as const;
-    duo.host.tapWaveAdvance({
+    const matchingDuo = buildDuo(new FakeClock());
+    matchingDuo.host.tapWaveAdvance({
       operationId: "WAVE/true",
       transition: waveTransition(6),
       destination,
       legacyDigest: "legacy-wave-token",
       legacyImage: waveTransition(6),
     });
-    duo.host.tapWaveAdvance({
+    const divergentDuo = buildDuo(new FakeClock());
+    divergentDuo.host.tapWaveAdvance({
       operationId: "WAVE/false",
       transition: waveTransition(6),
       destination,
       legacyDigest: "legacy-wave-token",
       legacyImage: waveTransition(7), // a divergent nextWave -> states differ
     });
-    const diag = duo.host.diagnostics();
-    expect(diag.parityMatches).toBe(1);
-    expect(diag.faults).toBe(0);
+    const diagnostics = [matchingDuo.host.diagnostics(), divergentDuo.host.diagnostics()];
+    expect(diagnostics.reduce((sum, diag) => sum + diag.parityMatches, 0)).toBe(1);
+    expect(diagnostics.every(diag => diag.faults === 0)).toBe(true);
     expect(parityLine("WAVE_ADVANCE")).toContain("match=false");
     expect(parityLine("WAVE_ADVANCE")).toContain("field=materialDigest");
-    duo.dispose();
+    matchingDuo.dispose();
+    divergentDuo.dispose();
   });
 
   it("TERMINAL parity match=true/false by fingerprinting the legacy terminal image", () => {
-    const duo = buildDuo(new FakeClock());
-    duo.host.tapTerminal({
+    const matchingDuo = buildDuo(new FakeClock());
+    matchingDuo.host.tapTerminal({
       operationId: "TERM/true",
       terminal: terminalMaterial("game-over"),
       legacyDigest: "legacy-term-token",
       legacyImage: terminalMaterial("game-over"),
     });
-    duo.host.tapTerminal({
+    const divergentDuo = buildDuo(new FakeClock());
+    divergentDuo.host.tapTerminal({
       operationId: "TERM/false",
       terminal: terminalMaterial("game-over"),
       legacyDigest: "legacy-term-token",
       legacyImage: terminalMaterial("final-flee"), // a divergent reason -> states differ
     });
-    const diag = duo.host.diagnostics();
-    expect(diag.parityMatches).toBe(1);
-    expect(diag.faults).toBe(0);
+    const diagnostics = [matchingDuo.host.diagnostics(), divergentDuo.host.diagnostics()];
+    expect(diagnostics.reduce((sum, diag) => sum + diag.parityMatches, 0)).toBe(1);
+    expect(diagnostics.every(diag => diag.faults === 0)).toBe(true);
     expect(parityLine("TERMINAL_COMMIT")).toContain("match=false");
-    duo.dispose();
+    matchingDuo.dispose();
+    divergentDuo.dispose();
   });
 
   it("INTERACTION (pre-built) parity match=true/false by fingerprinting the legacy interaction image", () => {
@@ -1045,6 +1062,33 @@ describe("authority-v2 shadow PARITY FIDELITY", () => {
       }),
     ).toBeNull();
     expect(harness.diagnostics()).toMatchObject({ committed: 0, retained: 0, parityChecks: 0 });
+    harness.dispose();
+  });
+
+  it("keeps mechanically unowned kinds in shadow without refusing an authority-local reservation", () => {
+    const clock = new FakeClock();
+    const liveReplica: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "INTERACTION_COMMIT",
+      ownsControl: control => control.kind === "SHARED_INTERACTION",
+      prepareAuthorityEntry: () => null,
+      authorityEntryCommitted: () => {
+        throw new Error("an unowned entry must not enter the live authority projector");
+      },
+      admitEntry: () => true,
+      applyMaterial: () => null,
+      projectControl: () => null,
+    };
+    const harness = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: () => {},
+      scheduler: createCoopScheduler(clock),
+      liveReplica,
+    });
+
+    expect(harness.tapTurnCommit(turnTap("TURN/unowned-live-kind"))?.kind).toBe("TURN_COMMIT");
+    expect(harness.diagnostics()).toMatchObject({ committed: 1, retained: 1, faults: 0 });
     harness.dispose();
   });
 });

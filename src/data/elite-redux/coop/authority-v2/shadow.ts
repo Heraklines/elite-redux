@@ -1426,13 +1426,19 @@ export class CoopAuthorityV2Shadow {
         ? undefined
         : candidate => {
             if (!this.liveReplica?.ownsEntry(candidate)) {
-              return null;
+              // A partially negotiated cutover still runs the remaining kinds through the pure shadow
+              // pipeline. Supplying a prepare callback makes AuthorityLog require a rollback closure, so
+              // an unowned entry must explicitly reserve "nothing" instead of returning null (which means
+              // an owned authority-local reservation was refused). No live ledger is touched here.
+              return () => {};
             }
             return this.liveReplica.prepareAuthorityEntry?.(this.runtimeContext, candidate) ?? null;
           },
     );
     this.committed += 1;
-    this.liveReplica?.authorityEntryCommitted?.(this.runtimeContext, committed);
+    if (this.liveReplica?.ownsEntry(committed) === true) {
+      this.liveReplica.authorityEntryCommitted?.(this.runtimeContext, committed);
+    }
     return committed;
   }
 

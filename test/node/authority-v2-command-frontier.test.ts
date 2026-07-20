@@ -131,6 +131,25 @@ describe("resolveCoopV2CommandFrontier", () => {
     expect(result.commands).toEqual([{ ownerSeatId: 3, pokemonId: 22, fieldIndex: 0 }]);
   });
 
+  it("excludes a healthy logical slot occupant that has no real presented CommandPhase", () => {
+    const result = resolveCoopV2CommandFrontier(
+      state(
+        [
+          fieldSeat("player", 0, 10, { ownerSeatId: 2, presented: false }),
+          fieldSeat("player", 1, 11, { ownerSeatId: 5 }),
+        ],
+        [
+          { id: 10, hp: 30 },
+          { id: 11, hp: 20 },
+        ],
+        [],
+      ),
+    );
+
+    expect(result.unresolved).toEqual([]);
+    expect(result.commands).toEqual([{ ownerSeatId: 5, pokemonId: 11, fieldIndex: 1 }]);
+  });
+
   it("keeps the persisted host/guest role fallback but rejects invalid addresses", () => {
     const result = resolveCoopV2CommandFrontier(
       state(

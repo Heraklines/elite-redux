@@ -137,9 +137,8 @@ describe("authority-v2 frame codec (round-trip)", () => {
     });
   }
 
-  it("validates every next-control kind (incl. null)", () => {
+  it("validates every committed next-control kind", () => {
     const controls: unknown[] = [
-      null,
       {
         kind: "COMMAND_FRONTIER",
         epoch: 3,
@@ -407,5 +406,10 @@ describe("authority-v2 frame context - bindFrameContext", () => {
         expect(error.issues).toEqual(expect.arrayContaining(["seatMapId", "connectionGeneration"]));
       }
     }
+  });
+
+  it("rejects a committed entry without an explicit successor", () => {
+    const frame = { v: 2, t: "authorityEntry", ctx: CTX, body: { ...ENTRY_BODY, nextControl: null } };
+    expect(validateInboundFrame(frame).kind).toBe("protocol-violation");
   });
 });

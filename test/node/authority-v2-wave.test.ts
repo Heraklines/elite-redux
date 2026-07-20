@@ -152,15 +152,39 @@ function turnEntryInput(wave: number, turn: number): Omit<CoopAuthorityEntry, "r
   };
 }
 
+/** A TURN_COMMIT that explicitly yields to one of the named non-command entry kinds. */
+function turnAwaitEntryInput(
+  wave: number,
+  turn: number,
+  allowedKinds: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>["allowedKinds"],
+): Omit<CoopAuthorityEntry, "revision"> {
+  const entry = turnEntryInput(wave, turn);
+  return {
+    ...entry,
+    nextControl: {
+      kind: "AWAIT_SUCCESSOR",
+      afterOperationId: entry.operationId,
+      epoch: 1,
+      wave,
+      turn,
+      allowedKinds,
+      expectedOperationId: null,
+    },
+  };
+}
+
 /** A REPLACEMENT_COMMIT input whose stated control is an ordered same-wave replacement wait. */
-function replacementEntryInput(wave: number): Omit<CoopAuthorityEntry, "revision"> {
+function replacementEntryInput(
+  wave: number,
+  allowedKinds: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>["allowedKinds"] = ["REPLACEMENT_COMMIT"],
+): Omit<CoopAuthorityEntry, "revision"> {
   const nextControl: CoopNextControl = {
     kind: "AWAIT_SUCCESSOR",
     afterOperationId: `repl-w${wave}`,
     epoch: 1,
     wave,
     turn: 1,
-    allowedKinds: ["REPLACEMENT_COMMIT"],
+    allowedKinds,
     expectedOperationId: null,
   };
   return {
@@ -453,9 +477,9 @@ describe("WAVE_ADVANCE supersession at the log", () => {
 
   it("retires same-wave turn/replacement entries and keeps a different-wave one", () => {
     const log = makeLog(scheduler, sent);
-    const turnW3T1 = log.commit(turnEntryInput(3, 1)); // rev 1
-    const replW3 = log.commit(replacementEntryInput(3)); // rev 2
-    const turnW4 = log.commit(turnEntryInput(4, 1)); // rev 3 (different wave)
+    const turnW3T1 = log.commit(turnAwaitEntryInput(3, 1, ["REPLACEMENT_COMMIT"])); // rev 1
+    const replW3 = log.commit(replacementEntryInput(3, ["TURN_COMMIT"])); // rev 2
+    const turnW4 = log.commit(turnAwaitEntryInput(4, 1, ["WAVE_ADVANCE"])); // rev 3 (different wave)
     expect(log.retained().map(e => e.revision)).toEqual([1, 2, 3]);
 
     // Build the advance's subsumes from the live retained frontier.
@@ -506,7 +530,7 @@ describe("TERMINAL_COMMIT supersedes an unretired turn wait", () => {
     const log = makeLog(scheduler, sent);
     // A stale turn wait: committed, retained, its redelivery timer armed, and it will NEVER
     // reach controlInstalled (the host resolves the run instead of the turn).
-    const staleTurn = log.commit(turnEntryInput(3, 2)); // rev 1
+    const staleTurn = log.commit(turnAwaitEntryInput(3, 2, ["TERMINAL_COMMIT"])); // rev 1
     expect(log.retained().map(e => e.revision)).toEqual([1]);
     expect(scheduler.ownerCount(`authority-v2:session-A:seat0:deliver:${staleTurn.revision}`)).toBe(1);
 
@@ -543,7 +567,7 @@ describe("TERMINAL_COMMIT supersedes an unretired turn wait", () => {
 
   it("zero-leak teardown: dispose leaves no timers or leases", () => {
     const log = makeLog(scheduler, sent);
-    log.commit(turnEntryInput(3, 2));
+    log.commit(turnAwaitEntryInput(3, 2, ["TERMINAL_COMMIT"]));
     log.commit(
       buildTerminalCommitEntry({
         context: frameContext(),

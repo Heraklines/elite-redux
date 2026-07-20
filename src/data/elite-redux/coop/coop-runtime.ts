@@ -5608,9 +5608,87 @@ function commandStartKey(wave: number, turn: number, fieldIndex: number, pokemon
 }
 
 /**
+ * Establish the ordered command frontier at the first real CommandPhase that survives every pre-command
+ * engine effect (entry abilities, ambushes, forced replacement, and generated skips).
+ *
+ * Keeping creation before this phase accepts input is essential: if CONTROL_COMMIT were first authored by
+ * actor 2's CommandPhase after actor 1 already
+ * accepted input, the immutable frontier would require a proof from a phase generation that no longer
+ * exists. The authority would then retain an un-installable control forever and correctly refuse every
+ * later mechanical entry.
+ *
+ * Replacement/turn/wave entries may already state this exact frontier; in that case no new revision is
+ * minted. Replicas do not author controls and wait for ordered delivery at their CommandPhase gate.
+ */
+export function establishCoopV2CommandControlFrontier(): CoopV2CommandBoundaryVerdict {
+  const runtime = active;
+  const battle = globalScene.currentBattle;
+  if (runtime == null || battle == null || !coopV2ControlCutovers.has(runtime)) {
+    return "ready";
+  }
+  if (runtime.controller.authorityRole !== "authority") {
+    return "ready";
+  }
+  const state = captureCoopAuthoritativeBattleState(battle.turn);
+  if (state == null || state.wave !== battle.waveIndex || state.turn !== battle.turn) {
+    return "failed";
+  }
+  const frontier = resolveCoopV2CommandFrontier(state);
+  if (frontier.commands.length === 0 || frontier.unresolved.length > 0) {
+    const unresolved = frontier.unresolved
+      .map(issue => `${issue.seat.side}:bi${issue.seat.bi}:pokemon${issue.seat.pokemonId}:${issue.reason}`)
+      .join(",");
+    coopWarn(
+      "v2-control",
+      `command-open refused incomplete frontier wave=${state.wave} turn=${state.turn} `
+        + `commands=${frontier.commands.length} unresolved=[${unresolved}]`,
+    );
+    return "failed";
+  }
+  const command: Extract<CoopNextControl, { kind: "COMMAND_FRONTIER" }> = {
+    kind: "COMMAND_FRONTIER",
+    epoch: runtime.controller.sessionEpoch,
+    wave: state.wave,
+    turn: state.turn,
+    commands: frontier.commands,
+  };
+  const cutover = coopV2ControlCutovers.get(runtime);
+  if (cutover == null) {
+    return "ready";
+  }
+  const current = cutover.authorityFrontier()?.nextControl ?? null;
+  if (current != null && controlsEqual(current, command)) {
+    return "ready";
+  }
+  if (current != null && current.kind !== "AWAIT_SUCCESSOR") {
+    coopWarn(
+      "v2-control",
+      `command-open predecessor is ${current.kind}, expected AWAIT_SUCCESSOR at wave=${state.wave} turn=${state.turn}`,
+    );
+    return "failed";
+  }
+  if (current?.kind === "AWAIT_SUCCESSOR" && !current.allowedKinds.includes("CONTROL_COMMIT")) {
+    coopWarn(
+      "v2-control",
+      `command-open predecessor does not authorize CONTROL_COMMIT after ${current.afterOperationId}`,
+    );
+    return "failed";
+  }
+  const material: CoopCommandOpenMaterialV2 = {
+    kind: "command-open",
+    wave: state.wave,
+    turn: state.turn,
+    authoritativeState: state,
+  };
+  const operationId = `V2/CONTROL/COMMAND/e${runtime.controller.sessionEpoch}/w${state.wave}/t${state.turn}/tick${state.tick}`;
+  return cutover.commitHostCommandOpen({ operationId, material, command }) == null ? "failed" : "ready";
+}
+
+/**
  * Gate a real CommandPhase behind the one ordered control graph.
  *
- * The authority commits CONTROL_COMMIT from this post-entry-effects chokepoint.
+ * The authority commits CONTROL_COMMIT before this real phase can accept input, then records proof only
+ * after the CommandPhase reaches its public-input chokepoint.
  * A replica that reaches its locally queued CommandPhase first parks it until
  * that exact entry's material is applied; it never opens input from queue order.
  */
@@ -5653,32 +5731,7 @@ export function enterCoopV2CommandControlBoundary(
   }
 
   if (runtime.controller.authorityRole === "authority") {
-    const current = cutover.authorityFrontier()?.nextControl ?? null;
-    if (current != null && controlsEqual(current, command)) {
-      return "ready";
-    }
-    if (current != null && current.kind !== "AWAIT_SUCCESSOR") {
-      coopWarn(
-        "v2-control",
-        `command-open predecessor is ${current.kind}, expected AWAIT_SUCCESSOR at wave=${state.wave} turn=${state.turn}`,
-      );
-      return "failed";
-    }
-    if (current?.kind === "AWAIT_SUCCESSOR" && !current.allowedKinds.includes("CONTROL_COMMIT")) {
-      coopWarn(
-        "v2-control",
-        `command-open predecessor does not authorize CONTROL_COMMIT after ${current.afterOperationId}`,
-      );
-      return "failed";
-    }
-    const material: CoopCommandOpenMaterialV2 = {
-      kind: "command-open",
-      wave: state.wave,
-      turn: state.turn,
-      authoritativeState: state,
-    };
-    const operationId = `V2/CONTROL/COMMAND/e${runtime.controller.sessionEpoch}/w${state.wave}/t${state.turn}/tick${state.tick}`;
-    return cutover.commitHostCommandOpen({ operationId, material, command }) == null ? "failed" : "ready";
+    return establishCoopV2CommandControlFrontier();
   }
 
   const current = runtime.v2ControlLedger.latestControl;
