@@ -8,6 +8,7 @@ on:
       - ".github/workflows/coop-public-ui-journey.yml"
       - "scripts/coop-browser-entry.ts"
       - "scripts/prepare-coop-browser-artifact.mjs"
+      - "src/data/elite-redux/coop/authority-v2/**"
       - "src/data/elite-redux/coop/coop-runtime.ts"
       - "src/data/elite-redux/coop/coop-webrtc-transport.ts"
       - "src/dev-tools/registry.ts"
@@ -241,6 +242,9 @@ jobs:
       - name: Verify exact save mutation browser evidence contracts
         run: node --test test/browser/coop-public-ui/save-mutation-evidence.test.mjs
 
+      - name: Verify public journey uses the release Authority V2 cutover
+        run: node --test test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs
+
       - name: Build normal application with CI-only read-only observer
         env:
           COOP_BROWSER_OUT_DIR: dist-coop-public-ui
@@ -250,6 +254,11 @@ jobs:
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
+          VITE_COOP_AUTHORITY_V2_TURN: "on"
+          VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          VITE_COOP_AUTHORITY_V2_WAVE: "on"
+          VITE_COOP_AUTHORITY_V2_INTERACTION: "on"
+          VITE_COOP_AUTHORITY_V2_RECOVERY: "on"
           VITE_SERVER_URL: ${{ env.COOP_UI_API_ORIGIN }}
         run: pnpm exec vite build --mode beta --config test/browser/coop-public-ui/vite.config.mjs
 

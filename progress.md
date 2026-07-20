@@ -192,3 +192,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `CoopFinalizeTurnPhase` and `CommandPhase` application remain available for the post-turn release path.
   Scoped Biome and remote exact-SHA qualification are required; no local co-op Vitest or browser process is
   permitted by `AGENTS.md`.
+
+2026-07-20 â€” Public two-browser Authority V2 qualification wiring
+
+- Exact-SHA public journey `29758213547` negotiated only `authority.v2shadow`; its browser build omitted every
+  `VITE_COOP_AUTHORITY_V2_*` cutover flag even though the sharded gate, campaign workflow, staging workflow,
+  and `AGENTS.md` require the complete release architecture. The journey consequently exercised legacy
+  progression plus shadow telemetry and could not qualify V2 regardless of its gameplay verdict.
+- The public journey bundle now enables turn, replacement, wave, interaction, and recovery V2 together,
+  changes anywhere below `src/data/elite-redux/coop/authority-v2/**` trigger that workflow, and the workflow
+  runs the architecture contract before building.
+- The architecture contract now inspects the public-journey workflow in addition to gate, campaign, and
+  staging. A future flag omission therefore fails before Chrome starts instead of producing a misleading
+  multi-minute legacy campaign.
