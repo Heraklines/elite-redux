@@ -2994,8 +2994,8 @@
     "endless": false,
     "id": 70019,
     "introDialogue": "I'll show you the efforts of our bonds and hard work",
-    "maxWave": 130,
-    "minWave": 45,
+    "maxWave": 180,
+    "minWave": 60,
     "name": "Salt",
     "team": [
       {
