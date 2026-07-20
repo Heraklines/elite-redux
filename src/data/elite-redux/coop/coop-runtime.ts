@@ -33,6 +33,7 @@ import {
   type CoopTerminalMaterialV2,
   type CoopWaveAdvanceDestination,
   type CoopWaveTransitionMaterialV2,
+  classifyWaveSettlementCursor,
   digestOfMaterial,
   isValidTerminalMaterial,
   isValidWaveTransitionMaterial,
@@ -4583,9 +4584,60 @@ function applyCoopV2WaveDataAtBoundary(runtime: CoopRuntime, transaction: CoopV2
   if (!applied) {
     return false;
   }
+  if (!adoptCoopV2SettledWaveTurnCursor(transaction)) {
+    return false;
+  }
   transaction.dataApplied = true;
   coopLog("v2-wave", `DATA applied rev=${transaction.entryRevision} wave=${sourceWave} tick=${immutableState.tick}`);
   return releaseCoopSettledWaveBoundary(sourceWave);
+}
+
+/**
+ * Adopt the ordered settlement cursor carried by WAVE_ADVANCE.
+ *
+ * The generic immutable state applier must remain counter-neutral: TURN_COMMIT, recovery, and interaction
+ * snapshots cannot move control merely because their payload mentions a turn. This wave entry is different:
+ * after its complete material image applies, the globally ordered log explicitly authorizes the source
+ * battle's TurnEnd cursor. Reproduce only Battle.incrementTurn's structural reset (commands/seed), never
+ * guest-local TurnEnd effects, and reject any jump larger than the one authenticated boundary.
+ */
+function adoptCoopV2SettledWaveTurnCursor(transaction: CoopV2WaveLiveTransaction): boolean {
+  const battle = globalScene.currentBattle;
+  if (battle == null) {
+    return false;
+  }
+  const settledTurn = transaction.authoritativeState.turn;
+  const action = classifyWaveSettlementCursor(
+    transaction.transition.wave,
+    settledTurn,
+    transaction.transition.nextWave,
+    battle.waveIndex,
+    battle.turn,
+  );
+  switch (action) {
+    case "already-settled":
+    case "next-wave-ready":
+      return true;
+    case "advance-one": {
+      const priorTurn = battle.turn;
+      battle.incrementTurn();
+      globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
+      const adopted = battle.turn === settledTurn;
+      coopLog(
+        "v2-wave",
+        `settlement cursor ${transaction.transition.wave}:${priorTurn}->${battle.waveIndex}:${battle.turn} `
+          + `target=${transaction.transition.wave}:${settledTurn} adopted=${Number(adopted)}`,
+      );
+      return adopted;
+    }
+    case "invalid":
+      coopWarn(
+        "v2-wave",
+        `settlement cursor refused source=${transaction.transition.wave}:${settledTurn} `
+          + `nextWave=${transaction.transition.nextWave} live=${battle.waveIndex}:${battle.turn}`,
+      );
+      return false;
+  }
 }
 
 function applyCoopV2WaveEntry(runtime: CoopRuntime, entry: CoopAuthorityEntry): ApplyMaterialResult {
@@ -4835,7 +4887,7 @@ function observeCoopV2InteractionSurface(
     const handler = globalScene.ui?.getHandler() as
       | {
           active?: boolean;
-          isAwaitingPromptAction?: () => boolean;
+          isCoopV2InputActionable?: () => boolean;
         }
       | undefined;
     if (phase == null || handler == null || typeof phase !== "object" || typeof handler !== "object") {
@@ -4843,7 +4895,7 @@ function observeCoopV2InteractionSurface(
     }
     const handlerActive = handler.active === true;
     const actionable =
-      handlerActive && (typeof handler.isAwaitingPromptAction !== "function" || handler.isAwaitingPromptAction());
+      handlerActive && typeof handler.isCoopV2InputActionable === "function" && handler.isCoopV2InputActionable();
     const explicitProofName =
       typeof (phase as { coopV2ProofPhaseName?: unknown }).coopV2ProofPhaseName === "string"
         ? (phase as unknown as { coopV2ProofPhaseName: string }).coopV2ProofPhaseName

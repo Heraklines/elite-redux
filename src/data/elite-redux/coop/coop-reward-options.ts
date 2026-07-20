@@ -22,7 +22,7 @@
 import { modifierTypes } from "#data/data-lists";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopSerializedRewardOption } from "#data/elite-redux/coop/coop-transport";
-import type { ModifierTier } from "#enums/modifier-tier";
+import { ModifierTier } from "#enums/modifier-tier";
 import type { Pokemon } from "#field/pokemon";
 import type { ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import { ModifierTypeGenerator, ModifierTypeOption as ModifierTypeOptionCtor } from "#modifiers/modifier-type";
@@ -38,9 +38,15 @@ export function serializeRewardOptions(options: ModifierTypeOption[]): CoopSeria
   const out = options.map(opt => {
     const type = opt.type;
     const pregenArgs = readPregenArgs(type);
+    // Guaranteed/custom rewards can bypass the random-pool path that normally stamps `type.tier` (Lure in
+    // the deterministic multiwave gate is one real example). Tier belongs to the immutable presentation
+    // contract, so infer it from the registry or use the UI's canonical COMMON fallback—never put
+    // `undefined` on the wire. Stamp the normalized tier back so owner rendering and reconstruction agree.
+    const tier = type.getOrInferTier() ?? ModifierTier.COMMON;
+    type.setTier(tier);
     return {
       id: type.id,
-      tier: type.tier,
+      tier,
       upgradeCount: opt.upgradeCount,
       cost: opt.cost,
       ...(pregenArgs === undefined ? {} : { pregenArgs }),

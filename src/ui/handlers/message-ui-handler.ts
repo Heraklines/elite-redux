@@ -281,6 +281,15 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
   }
 
   /**
+   * A pure message surface is actionable only after its exact prompt continuation is armed.
+   * Menu subclasses such as PartyUiHandler override this because their ordinary cursor input
+   * remains actionable while no message prompt is active.
+   */
+  override isCoopV2InputActionable(): boolean {
+    return this.active && this.isAwaitingPromptAction();
+  }
+
+  /**
    * Monotonic identity for human-action prompts published by this handler. A single battle phase can
    * show more than one prompt, so phase object identity alone cannot safely deduplicate browser or
    * co-op input drivers.

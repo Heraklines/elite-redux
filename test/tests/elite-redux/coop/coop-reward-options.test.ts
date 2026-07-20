@@ -14,10 +14,15 @@
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
-import { SpeciesId } from "#enums/species-id";
-import { GameManager } from "#test/framework/game-manager";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
-import { getPlayerModifierTypeOptions, regenerateModifierPoolThresholds } from "#modifiers/modifier-type";
+import { ModifierTier } from "#enums/modifier-tier";
+import { SpeciesId } from "#enums/species-id";
+import {
+  getPlayerModifierTypeOptions,
+  ModifierTypeOption,
+  regenerateModifierPoolThresholds,
+} from "#modifiers/modifier-type";
+import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -38,6 +43,19 @@ describe("co-op reward-option host-streaming (#633 Fix #2) - registry round-trip
   it("reconstruct returns null for an unknown id (watcher then keeps its own roll, never crashes)", () => {
     const bad = [{ id: "__NOT_A_REAL_MODIFIER__", tier: 0, upgradeCount: 0, cost: 0 }];
     expect(reconstructRewardOptions(bad, [])).toBeNull();
+  });
+
+  it("normalizes a guaranteed/custom reward whose random-pool path never stamped a tier", () => {
+    const forcedLure = modifierTypes.LURE();
+    forcedLure.id = "LURE";
+    forcedLure.tier = undefined as unknown as ModifierTier;
+
+    const serialized = serializeRewardOptions([new ModifierTypeOption(forcedLure, 0, 0)]);
+
+    expect(serialized).toHaveLength(1);
+    expect(serialized[0].tier).toBe(ModifierTier.COMMON);
+    expect(Number.isFinite(serialized[0].tier)).toBe(true);
+    expect(forcedLure.tier).toBe(serialized[0].tier);
   });
 });
 

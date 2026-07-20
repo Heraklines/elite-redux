@@ -1118,8 +1118,9 @@ export class CoopFinalizeTurnPhase extends Phase {
    * Adopt the one legal numeric successor of this settled turn without executing local turn-end mechanics.
    *
    * Both the ordinary immediate-command path and a later ordered successor use this same live-cursor proof.
-   * Applying a V2 state image does not mutate `currentBattle.turn`, so envelope metadata is never accepted as
-   * evidence that the renderer crossed the boundary.
+   * Applying a generic V2 state image does not mutate `currentBattle.turn`, so envelope metadata is never
+   * accepted as evidence that the renderer crossed this TURN boundary. WAVE_ADVANCE owns its separate,
+   * strictly-bounded settlement-cursor adoption after the complete wave material applies.
    */
   private advanceRenderedTurnBoundary(): void {
     const settledTurn = this.turn;

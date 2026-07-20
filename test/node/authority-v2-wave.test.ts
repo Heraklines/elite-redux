@@ -31,6 +31,7 @@ import {
   type CoopWaveTerminalSink,
   type CoopWaveTransitionMaterialV2,
   checkWaveTerminalParity,
+  classifyWaveSettlementCursor,
   createWaveTerminalApplier,
   digestOfMaterial,
   entryControlWave,
@@ -311,6 +312,19 @@ describe("buildWaveAdvanceEntry - destination coverage", () => {
         destination: { kind: "TERMINAL", terminalId: "x" } as never,
       }),
     ).toThrow(CoopWaveTerminalBuildError);
+  });
+});
+
+describe("WAVE_ADVANCE settlement cursor ownership", () => {
+  it("permits only the exact settled boundary or an already-created stated next wave", () => {
+    expect(classifyWaveSettlementCursor(3, 2, 4, 3, 1)).toBe("advance-one");
+    expect(classifyWaveSettlementCursor(3, 2, 4, 3, 2)).toBe("already-settled");
+    expect(classifyWaveSettlementCursor(3, 2, 4, 4, 1)).toBe("next-wave-ready");
+
+    expect(classifyWaveSettlementCursor(3, 3, 4, 3, 1)).toBe("invalid");
+    expect(classifyWaveSettlementCursor(3, 2, 4, 3, 3)).toBe("invalid");
+    expect(classifyWaveSettlementCursor(3, 2, 4, 4, 2)).toBe("invalid");
+    expect(classifyWaveSettlementCursor(3, 2, 4, 5, 1)).toBe("invalid");
   });
 });
 

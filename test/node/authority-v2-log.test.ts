@@ -277,6 +277,26 @@ describe("authority-v2 log", () => {
     expect(scheduler.liveCount()).toBe(0);
   });
 
+  it("immediately republishes only N+1 when predecessor quorum unblocks an ordered gap", () => {
+    const log = makeLog(scheduler, sent);
+    const first = log.commit(
+      entryInput("op-1", {
+        nextControl: successorWait("op-1", ["INTERACTION_COMMIT"]),
+      }),
+    );
+    const second = log.commit(entryInput("op-2", { kind: "INTERACTION_COMMIT" }));
+    expect(delivered(sent).map(entry => entry.revision)).toEqual([1, 2]);
+
+    sent.length = 0;
+    expect(log.acceptReceipt(receipt(first, "admitted"))).toBe(false);
+    expect(log.acceptReceipt(receipt(first, "materialApplied"))).toBe(false);
+    expect(log.acceptReceipt(receipt(first, "controlInstalled"))).toBe(true);
+
+    expect(delivered(sent).map(entry => entry.revision)).toEqual([second.revision]);
+    expect(log.retained().map(entry => entry.revision)).toEqual([second.revision]);
+    expect(scheduler.ownerCount(`authority-v2:session-A:seat0:deliver:${second.revision}`)).toBe(1);
+  });
+
   it("rejects self-signed and address-mismatched control receipts", () => {
     const log = makeLog(scheduler, sent);
     const committed = log.commit(entryInput("op-auth", { nextControl: commandControl() }));

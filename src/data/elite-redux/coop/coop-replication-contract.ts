@@ -97,7 +97,8 @@ export const COOP_AUTHORITATIVE_WIRE_FIELDS: readonly CoopWireFieldDescriptor[] 
   {
     name: "turn",
     applied: false,
-    applyExcluded: "diagnostic/log only; the guest tracks its own currentBattle.turn",
+    applyExcluded:
+      "generic DATA apply is counter-neutral; the ordered V2 turn/wave projector advances currentBattle.turn at its typed boundary",
     hash: { kind: "excluded", reason: "per-client turn counter; the checksum excludes all counters" },
   },
   {

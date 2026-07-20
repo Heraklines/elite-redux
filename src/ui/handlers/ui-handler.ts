@@ -27,6 +27,16 @@ export abstract class UiHandler {
 
   abstract processInput(button: Button): boolean;
 
+  /**
+   * Whether this exact active handler generation can consume ordinary human input now.
+   *
+   * Authority V2 uses this as a mechanical control proof. Handlers with animation,
+   * prompt, or debounce gates must override it; merely being visible is not enough.
+   */
+  isCoopV2InputActionable(): boolean {
+    return this.active;
+  }
+
   getUi() {
     return globalScene.ui;
   }

@@ -341,6 +341,10 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
     return this.blockInput;
   }
 
+  override isCoopV2InputActionable(): boolean {
+    return this.active && !this.blockInput;
+  }
+
   /** Distinguishes repeated option/confirmation surfaces within one long-lived game phase. */
   getSurfaceGeneration(): number {
     return this.surfaceGeneration;

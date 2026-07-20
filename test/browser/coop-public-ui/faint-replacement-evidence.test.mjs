@@ -22,6 +22,11 @@ test("faint replacement waits for the owned actionable party surface before pres
     readFile(new URL("../../../src/phases/coop-replay-turn-phase.ts", import.meta.url), "utf8"),
   ]);
   const hostSwitch = await readFile(new URL("../../../src/phases/switch-phase.ts", import.meta.url), "utf8");
+  const [runtime, partyHandler, messageHandler] = await Promise.all([
+    readFile(new URL("../../../src/data/elite-redux/coop/coop-runtime.ts", import.meta.url), "utf8"),
+    readFile(new URL("../../../src/ui/handlers/party-ui-handler.ts", import.meta.url), "utf8"),
+    readFile(new URL("../../../src/ui/handlers/message-ui-handler.ts", import.meta.url), "utf8"),
+  ]);
 
   assert.match(browserEntry, /phase === "SwitchPhase" \|\| phase === "CoopGuestFaintSwitchPhase"/u);
   assert.match(browserEntry, /surfaceId: "party:replacement"/u);
@@ -44,6 +49,20 @@ test("faint replacement waits for the owned actionable party surface before pres
   assert.match(hostSwitch, /const operationSourceAddress = this\.faintSourceAddress \?\? \{[\s\S]*wave:[\s\S]*turn:/u);
   assert.match(hostSwitch, /const sourceAddress = operationSourceAddress/u);
   assert.match(hostSwitch, /waitForOperationMaterialApplied\(operationId\)[\s\S]*releaseAfterPeerMaterial\(\)/u);
+  // Run 29737686349 mystery lane: PartyUiHandler inherits MessageUiHandler for incidental text, so the
+  // generic inherited isAwaitingPromptAction() returned false on a normal live cursor and V2 froze every
+  // replacement key forever. The ledger must consume an explicit handler actionability contract, with
+  // Party overriding message-prompt semantics for its ordinary unblocked cursor.
+  assert.match(runtime, /handler\.isCoopV2InputActionable\(\)/u);
+  assert.doesNotMatch(runtime, /handler\.isAwaitingPromptAction\(\)/u);
+  assert.match(
+    partyHandler,
+    /override isCoopV2InputActionable\(\): boolean \{[\s\S]*?!this\.pendingPrompt[\s\S]*?!this\.blockInput/u,
+  );
+  assert.match(
+    messageHandler,
+    /override isCoopV2InputActionable\(\): boolean \{[\s\S]*?this\.isAwaitingPromptAction\(\)/u,
+  );
   assert.match(
     harness,
     /createBattlePromptAdvancer\([\s\S]*?"faint-replacement-picker"[\s\S]*?findOwnedReadyReplacement\(owner,[\s\S]*?targetId: "party-option:send-out"/u,

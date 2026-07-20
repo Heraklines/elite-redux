@@ -343,6 +343,10 @@ export class MysteryEncounterUiHandler extends UiHandler {
     }
   }
 
+  override isCoopV2InputActionable(): boolean {
+    return this.active && !this.blockInput;
+  }
+
   override getCursor(): number {
     return this.cursor ? this.cursor : 0;
   }

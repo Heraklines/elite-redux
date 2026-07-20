@@ -1671,7 +1671,7 @@ export async function driveClientPhaseQueueTo(
   const matches = options.matches ?? (phase => phase.phaseName === target);
   const maxPhases = options.maxPhases ?? 128;
   const perPhaseTimeoutMs = options.perPhaseTimeoutMs ?? 10_000;
-  const peerCtx = replayPeerContextByGuestScene.get(scene);
+  const peerCtx = peerContextByScene.get(scene);
   const pumpPeer = options.pumpPeer ?? (peerCtx == null ? undefined : () => withClient(peerCtx, () => drainLoopback()));
 
   for (let step = 0; step < maxPhases; step++) {
@@ -2193,7 +2193,7 @@ const retainedWaveBoundaryByGuestScene = new WeakMap<object, RetainedWaveBoundar
  * receives and answers that request concurrently. The one-process harness must
  * explicitly schedule that peer inbox before it can expect the guest's resend.
  */
-const replayPeerContextByGuestScene = new WeakMap<object, ClientCtx>();
+const peerContextByScene = new WeakMap<object, ClientCtx>();
 
 function registerRetainedWaveBoundaryBridge(
   hostGame: GameManager,
@@ -2323,7 +2323,8 @@ export async function buildDuo(
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: () => runtimePair.flush("guest"),
   };
-  replayPeerContextByGuestScene.set(guestScene, hostCtx);
+  peerContextByScene.set(hostScene, guestCtx);
+  peerContextByScene.set(guestScene, hostCtx);
   await withClient(guestCtx, () => {
     toCoopGameMode(guestScene);
     mirrorHostBattleToGuest(hostScene, guestScene);
@@ -2566,7 +2567,7 @@ export async function driveGuestReplayTurn(
     replay.start();
   }
   await drainLoopback();
-  const peerCtx = replayPeerContextByGuestScene.get(guestScene as object);
+  const peerCtx = peerContextByScene.get(guestScene as object);
   // Stall detection by phase IDENTITY (#827): the #782 instant-streaming continuation re-enters as a NEW
   // CoopReplayTurnPhase object each increment, so a real advance resets the counter; only the SAME object
   // stuck is a genuine hang. Equivalent to the old name-based check for the non-continuation callers (their
@@ -3104,11 +3105,15 @@ const REWARD_WATCH_MAX_IDLE = 32;
  */
 export async function awaitRewardShopPhaseExit(phase: ShopPhaseSeam): Promise<void> {
   const phaseManager = globalScene.phaseManager;
+  const peerCtx = peerContextByScene.get(globalScene);
   if (phaseManager.getCurrentPhase() !== (phase as unknown as Phase)) {
     return;
   }
   for (let attempt = 0; attempt < 320; attempt++) {
     await drainLoopback();
+    if (peerCtx != null) {
+      await withClient(peerCtx, () => drainLoopback());
+    }
     if (phaseManager.getCurrentPhase() !== (phase as unknown as Phase)) {
       return;
     }
@@ -3126,6 +3131,7 @@ export async function driveGuestRewardWatch(
   opts: { alreadyStarted?: boolean } = {},
 ): Promise<void> {
   const phaseManager = globalScene.phaseManager;
+  const peerCtx = peerContextByScene.get(globalScene);
   // Production queues one concrete SelectModifierPhase and Phase.end() must actually release it before
   // the next surface is ready. A counter advance is only the mechanical terminal: the UI transition that
   // calls super.end() can still be pending. Returning at the counter used to let the shared-process soak
@@ -3170,6 +3176,13 @@ export async function driveGuestRewardWatch(
   let mechanicalTerminalReached = false;
   for (let i = 0; i < REWARD_WATCH_MAX_IDLE; i++) {
     await drainLoopback();
+    if (peerCtx != null) {
+      // Real browsers process both inboxes concurrently. A sequential shared-process watcher must likewise
+      // let the authority consume the predecessor's controlInstalled receipt, which can immediately
+      // re-publish the now-unblocked reward result. Pumping only this client manufactured a sub-250ms gap
+      // hang that production's independent event loops do not have.
+      await withClient(peerCtx, () => drainLoopback());
+    }
     // Completed when EITHER the watcher left (coopWatcher cleared - e.g. a no-relay short-circuit) OR the
     // interaction counter advanced past the pinned one (the owner's terminal was mirrored + applied).
     if (!(guestPhase as unknown as { coopWatcher: boolean }).coopWatcher || advancedPastPinned() || terminalApplied) {
@@ -3519,7 +3532,8 @@ export async function buildDuoForMe(
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: () => runtimePair.flush("guest"),
   };
-  replayPeerContextByGuestScene.set(guestScene, hostCtx);
+  peerContextByScene.set(hostScene, guestCtx);
+  peerContextByScene.set(guestScene, hostCtx);
   await withClient(guestCtx, () => {
     toCoopGameMode(guestScene);
     mirrorHostMeToGuest(hostScene, guestScene);
@@ -4526,7 +4540,8 @@ export async function buildShowdownDuo(
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: pumpInboundFor("guest"),
   };
-  replayPeerContextByGuestScene.set(guestScene, hostCtx);
+  peerContextByScene.set(hostScene, guestCtx);
+  peerContextByScene.set(guestScene, hostCtx);
   await withClient(guestCtx, () => {
     toShowdownGameMode(guestScene);
     // The mirror reconstructs the guest's world in its LOCAL (flipped) orientation (Task F1): its OWN

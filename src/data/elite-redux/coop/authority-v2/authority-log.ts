@@ -674,9 +674,17 @@ export class AuthorityLog implements CoopAuthorityLog {
     // Retirement rule: admitted + materialApplied + controlInstalled. AWAIT_SUCCESSOR is a real, addressed
     // ordering control whose ledger proof is required just like an executable UI successor.
     if (allPeersReached(lease, required)) {
+      const retired = this.retire(receipt.revision);
+      if (retired) {
+        // A later retained entry may already have reached the replica while this predecessor's control was
+        // still being installed and therefore been rejected as a gap. Quorum retirement proves every peer
+        // can now accept exactly N+1. Re-publish only that immediate successor now instead of waiting for
+        // the generic backoff (or blasting the whole tail and manufacturing fresh gaps).
+        this.redeliverImmediateSuccessor(receipt.revision);
+      }
       return {
         kind: "advanced",
-        retired: this.retire(receipt.revision),
+        retired,
         waitingForSeatIds: [],
       };
     }
@@ -1013,6 +1021,15 @@ export class AuthorityLog implements CoopAuthorityLog {
     this.stopLease(lease);
     this.retainedWindow.delete(revision);
     return true;
+  }
+
+  /** Re-publish only the newly-unblocked contiguous successor; its existing lease/timer remains unchanged. */
+  private redeliverImmediateSuccessor(retiredRevision: number): void {
+    const successor = this.retainedWindow.get(retiredRevision + 1);
+    if (this.disposed || successor == null || successor.stopped) {
+      return;
+    }
+    this.sendGuarded({ kind: "deliver", entry: successor.entry });
   }
 
   /** Exact identity check for the one unfinished replica entry; a conflicting same-revision frame is hostile. */

@@ -78,3 +78,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Scoped Biome is clean apart from the known runtime baseline, `git diff --check` is clean, and TypeScript
   remains at 213 unrelated diagnostics with zero in touched paths. No local co-op Vitest/browser execution;
   remote gate requalification remains required by `AGENTS.md`.
+
+2026-07-20 — Authority V2 campaign frontier closure
+
+- Exact two-browser campaign `29737686349` showed one common mechanical divergence in surface, depth, and
+  dirty: all digest components matched except the renderer remained one turn behind at the reward boundary.
+  Generic state application intentionally excludes the control cursor, but a winning TURN has WAVE_ADVANCE
+  rather than a command successor, so nothing adopted the authenticated TurnEnd cursor. WAVE_ADVANCE now
+  permits only an already-settled cursor, the exact one-turn settlement, or the stated next wave at turn 1;
+  every larger/wrong-wave move fails closed.
+- The same campaign's mystery lane exposed a live host-owned replacement picker whose keys were permanently
+  frozen. PartyUiHandler inherits MessageUiHandler for incidental text, and the V2 projector mistakenly used
+  inherited message-prompt readiness as the contract for an ordinary party cursor. UI handlers now publish
+  an explicit V2 actionability method: message prompts require an armed continuation, party/options/Mystery
+  surfaces include their real prompt/debounce gates, and the projector consumes only that explicit proof.
+- Gate `29738401566` also exposed forced/custom reward options with an unstamped tier and ordered N/N+1
+  delivery gaps. Reward serialization now infers/stamps a finite canonical tier, and predecessor quorum
+  immediately republishes only the retained N+1 entry. The shared-process duo harness pumps both real client
+  inboxes during reward waits instead of manufacturing a sub-retry-window hang.
+- Local static-only verification per `AGENTS.md`: scoped Biome clean on all 16 touched files,
+  `git diff --check` clean, and TypeScript remains at 213 unrelated diagnostics with zero in touched paths.
+  No local co-op Vitest or browser process was run. Remote exact-SHA contracts, full gate, and four-profile
+  two-browser campaign remain required before any staging decision.

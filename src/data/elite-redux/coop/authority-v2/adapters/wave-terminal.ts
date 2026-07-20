@@ -118,6 +118,47 @@ export interface CoopWaveTransitionMaterialV2 {
   readonly authorityCarrier?: CoopWaveTerminalAuthorityCarrierV2;
 }
 
+/**
+ * The only legal renderer-cursor action when an authenticated WAVE_ADVANCE installs its settled image.
+ *
+ * Generic authoritative-state application deliberately does not rewrite `currentBattle.turn`: a turn image
+ * describes material at a boundary, not permission to move the live control cursor. WAVE_ADVANCE is the
+ * ordered permission. It may prove that the source battle is already settled, advance it by exactly one
+ * turn (the ordinary TurnEnd settlement), or observe that the engine has already constructed the stated
+ * next wave at turn 1. Every other coordinate is a protocol/runtime mismatch and must fail closed.
+ */
+export type CoopWaveSettlementCursorAction = "already-settled" | "advance-one" | "next-wave-ready" | "invalid";
+
+export function classifyWaveSettlementCursor(
+  sourceWave: number,
+  settledTurn: number,
+  nextWave: number,
+  currentWave: number,
+  currentTurn: number,
+): CoopWaveSettlementCursorAction {
+  if (
+    !Number.isSafeInteger(sourceWave)
+    || sourceWave <= 0
+    || !Number.isSafeInteger(settledTurn)
+    || settledTurn <= 0
+    || !Number.isSafeInteger(nextWave)
+    || nextWave <= 0
+    || !Number.isSafeInteger(currentWave)
+    || currentWave <= 0
+    || !Number.isSafeInteger(currentTurn)
+    || currentTurn <= 0
+  ) {
+    return "invalid";
+  }
+  if (currentWave === sourceWave) {
+    if (currentTurn === settledTurn) {
+      return "already-settled";
+    }
+    return currentTurn + 1 === settledTurn ? "advance-one" : "invalid";
+  }
+  return nextWave !== sourceWave && currentWave === nextWave && currentTurn === 1 ? "next-wave-ready" : "invalid";
+}
+
 /** Why a TERMINAL_COMMIT sealed the session. Every one is a canonical successor of the final live events. */
 export type CoopTerminalReasonV2 = "game-over" | "final-flee" | "final-boss-credits" | "shared-fault";
 

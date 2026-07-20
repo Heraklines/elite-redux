@@ -1262,6 +1262,21 @@ export class PartyUiHandler extends MessageUiHandler {
     return false;
   }
 
+  /**
+   * PartyUiHandler inherits MessageUiHandler only so it can host incidental text. Its normal party
+   * cursor is actionable when there is no pending text/debounce gate, even though it is not waiting
+   * for a MessageUiHandler prompt. Treating inherited prompt readiness as the party-menu contract
+   * permanently froze Authority V2 faint replacement pickers.
+   */
+  override isCoopV2InputActionable(): boolean {
+    return (
+      this.active
+      && !this.pendingPrompt
+      && !this.blockInput
+      && (!this.awaitingActionInput || this.onActionInput != null)
+    );
+  }
+
   private allowCancel(): boolean {
     return !(this.partyUiMode === PartyUiMode.FAINT_SWITCH || this.partyUiMode === PartyUiMode.REVIVAL_BLESSING);
   }
