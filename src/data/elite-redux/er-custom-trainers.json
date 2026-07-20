@@ -2984,7 +2984,7 @@
     "battleBgm": "battle_trainer_afd",
     "battleType": "single",
     "challenge": "none",
-    "defeatDialogue": "I see you also know about bonds and hard work",
+    "defeatDialogue": "oofI see you also know about bonds and hard work",
     "difficulties": [
       "youngster",
       "ace",
@@ -3455,7 +3455,7 @@
     ],
     "trainerClass": "BREEDER",
     "trainerEffect": "holyrays",
-    "victoryDialogue": "oof",
+    "victoryDialogue": "I see you also know about bonds and hard work",
     "weight": 40
   },
   "TRAINER_70020": {
@@ -3686,6 +3686,312 @@
       }
     ],
     "trainerClass": "ACE_TRAINER",
+    "weight": 100
+  },
+  "TRAINER_70021": {
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "Back to training.",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70021,
+    "introDialogue": "We trained in the Way of the Psychic Fist.",
+    "maxWave": 180,
+    "minWave": 100,
+    "name": "Suggest a name 005",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BRICK_BREAK",
+          "DYNAMIC_PUNCH",
+          "PROTECT",
+          "U_TURN"
+        ],
+        "species": 10815
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 2,
+            "fusion": {
+              "abilitySlot": 1,
+              "formIndex": 0,
+              "species": 286
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "ER_OMNI_GEM"
+              },
+              {
+                "count": 1,
+                "item": "CARBOS"
+              },
+              {
+                "count": 2,
+                "item": "SCOPE_LENS"
+              },
+              {
+                "count": 2,
+                "item": "WIDE_LENS"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "BULLET_SEED",
+              "ARM_THRUST",
+              "STUN_SPORE",
+              "TOXIC_SPIKES"
+            ],
+            "species": 286,
+            "weight": 5
+          },
+          {
+            "abilitySlot": 2,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "ER_OMNI_GEM"
+              },
+              {
+                "count": 1,
+                "item": "CARBOS"
+              },
+              {
+                "count": 2,
+                "item": "SCOPE_LENS"
+              },
+              {
+                "count": 2,
+                "item": "WIDE_LENS"
+              },
+              {
+                "count": 1,
+                "item": "REVIVER_SEED"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "BULLET_SEED",
+              "ARM_THRUST",
+              "COMET_PUNCH",
+              "PROTECT"
+            ],
+            "species": 10502,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "APICOT_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ENIGMA_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "STARF_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LEPPA_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "ENDURE",
+          "REVERSAL",
+          "BERRY_SMASH",
+          "PROTECT"
+        ],
+        "species": 766
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "heldItems": [
+              {
+                "count": 2,
+                "item": "IRON"
+              },
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              },
+              {
+                "count": 2,
+                "item": "CALCIUM"
+              },
+              {
+                "count": 1,
+                "item": "ZINC"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "RLA",
+              "RLA",
+              "RLA",
+              "AQUA_RING"
+            ],
+            "species": 834,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 2,
+            "heldItems": [
+              {
+                "count": 2,
+                "item": "IRON"
+              },
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              },
+              {
+                "count": 2,
+                "item": "CALCIUM"
+              },
+              {
+                "count": 1,
+                "item": "ZINC"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "RLA",
+              "RLA",
+              "RLA",
+              "AQUA_RING"
+            ],
+            "species": 10575,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "MULTI_LENS"
+              },
+              {
+                "count": 1,
+                "item": "SHELL_BELL"
+              },
+              {
+                "count": 1,
+                "item": "BLACK_BELT"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "CHLOROBLAST",
+              "TRIPLE_AXEL",
+              "SUCKER_PUNCH",
+              "GRASSY_TERRAIN"
+            ],
+            "species": 908,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "MULTI_LENS"
+              },
+              {
+                "count": 1,
+                "item": "SHELL_BELL"
+              },
+              {
+                "count": 1,
+                "item": "BLACK_BELT"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "CHLOROBLAST",
+              "TRIPLE_AXEL",
+              "SUCKER_PUNCH",
+              "GRASSY_TERRAIN"
+            ],
+            "species": 10596,
+            "weight": 3
+          }
+        ]
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          },
+          {
+            "count": 2,
+            "item": "IRON"
+          },
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "ER_ELECTRIC_GEM"
+          },
+          {
+            "count": 1,
+            "item": "ER_DARK_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "WHIRLWIND",
+          "KNOCK_OFF",
+          "CROSS_CHOP",
+          "PLASMA_FISTS"
+        ],
+        "species": 992
+      }
+    ],
+    "trainerClass": "BLACK_BELT",
+    "victoryDialogue": "Back to training.",
     "weight": 100
   }
 }
