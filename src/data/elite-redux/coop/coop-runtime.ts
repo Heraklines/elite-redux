@@ -4097,6 +4097,11 @@ export interface CoopRuntime {
   /** Exact control whose new engine generation was queued under the current correlated recovery fence. */
   v2RecoveryPreparedControlId: string | null;
   /**
+   * Exact ordinary replacement generation queued from the immutable control. This is a duplicate-construction
+   * guard only; the real PARTY handler must still publish address-exact controlInstalled proof.
+   */
+  v2ProjectedReplacementControlId: string | null;
+  /**
    * Exact ordinary (non-recovery) shared-interaction generation installed directly from immutable V2
    * material. This closes the gap where a replica's obsolete predecessor phase never locally reaches the
    * successor the authority already committed (for example NextEncounterPhase waiting forever before an
@@ -4864,6 +4869,8 @@ function projectCoopV2InteractionControl(
       };
     }
     prepareCoopV2OrdinaryInteractionControlSurface(runtime, control, plan);
+  } else if (runtime.controller.localSeatId === control.ownerSeatId) {
+    prepareCoopV2OrdinaryReplacementControlSurface(runtime, control);
   }
 
   const contract = coopV2InteractionProofContract(control);
@@ -4921,6 +4928,7 @@ function markCoopV2ControlMaterialApplied(runtime: CoopRuntime, entry: CoopAutho
     // same-entry successor before that finalizer decides whether to park; if it already parked, this
     // releases it synchronously. Non-owners have no local picker and remain parked until the later
     // REPLACEMENT_COMMIT installs its authoritative checkpoint carrier.
+    runtime.v2ProjectedReplacementControlId = controlIdOf(entry.nextControl);
     releaseCoopV2ParkedTurnBoundary(runtime, entry);
   }
   if (
@@ -5696,6 +5704,60 @@ function materializeCoopV2InteractionProjection(
 }
 
 /**
+ * Queue an ordinary owner replacement directly from its immutable V2 address when no cosmetic faint replay
+ * produced the same wake. The current finalizer remains the causal fence until this exact phase is behind it;
+ * PARTY handler readiness, not queue insertion, still owns controlInstalled.
+ */
+function prepareCoopV2OrdinaryReplacementControlSurface(
+  runtime: CoopRuntime,
+  control: Extract<ProjectableControl, { kind: "REPLACEMENT" }>,
+): boolean {
+  if (runtime.controller.authorityRole !== "replica" || runtime.controller.localSeatId !== control.ownerSeatId) {
+    return false;
+  }
+  const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
+  if (sourceEntry == null || !controlsEqual(sourceEntry.nextControl, control)) {
+    return false;
+  }
+  const controlId = controlIdOf(control);
+  if (runtime.v2ProjectedReplacementControlId === controlId || runtime.v2RecoveryPreparedControlId === controlId) {
+    // A wake installed during receipt completion may have beaten finishTurn's park decision. Re-present
+    // the same authenticated edge idempotently so either race order releases the exact finalizer.
+    releaseCoopV2ParkedTurnBoundary(runtime, sourceEntry);
+    return true;
+  }
+  const receiverScene = runtimeSceneBindings.get(runtime);
+  if (receiverScene != null && receiverScene !== globalScene) {
+    return false;
+  }
+  const phaseManager = globalScene.phaseManager;
+  const current = phaseManager?.getCurrentPhase();
+  if (current == null) {
+    return false;
+  }
+  const currentOperationId =
+    typeof (current as { coopV2ControlOperationId?: unknown }).coopV2ControlOperationId === "string"
+      ? (current as unknown as { coopV2ControlOperationId: string }).coopV2ControlOperationId
+      : null;
+  if (current.is("CoopGuestFaintSwitchPhase") && currentOperationId === control.operationId) {
+    runtime.v2ProjectedReplacementControlId = controlId;
+    return true;
+  }
+  if (!current.is("CoopFinalizeTurnPhase")) {
+    return false;
+  }
+  phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", control.fieldIndex, {
+    wave: control.wave,
+    turn: control.turn,
+    occurrence: control.occurrence,
+  });
+  runtime.v2ProjectedReplacementControlId = controlId;
+  releaseCoopV2ParkedTurnBoundary(runtime, sourceEntry);
+  coopLog("v2-control", `projected exact replacement generation for ${controlId} from immutable control`);
+  return true;
+}
+
+/**
  * Install an ordinary replica's exact V2 successor when the obsolete local phase tree cannot reach it.
  *
  * Most interaction phases still arrive naturally at their committed successor and are proven in place. A
@@ -5894,6 +5956,7 @@ function buildCoopV2LiveRecoverySeams(
       runtime.v2DeferredInteractionStarts.clear();
       runtime.v2InstalledInteractionTargets.clear();
       runtime.v2RecoveryPreparedControlId = null;
+      runtime.v2ProjectedReplacementControlId = null;
       runtime.v2ProjectedInteractionControlId = null;
       const finalEntry = bundle.requiredTail.at(-1) ?? null;
       const adopted =
@@ -9917,6 +9980,7 @@ export function assembleCoopRuntime(
       runtime.v2SettledInteractionOperations.clear();
       runtime.v2ControlLedger.clear();
       runtime.v2RecoveryWaitSuccessorOperationId = null;
+      runtime.v2ProjectedReplacementControlId = null;
       runtime.v2ProjectedInteractionControlId = null;
       runtime.v2WaveTransactions.clear();
       coopLog("v2-recovery", `hard epoch boundary ${authorityV2Epoch}->${epoch}; retired prior authoritative log`);
@@ -10201,6 +10265,7 @@ export function assembleCoopRuntime(
     v2ControlLedger: new CoopV2ControlLedger(),
     v2RecoveryWaitSuccessorOperationId: null,
     v2RecoveryPreparedControlId: null,
+    v2ProjectedReplacementControlId: null,
     v2ProjectedInteractionControlId: null,
     v2WaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
     v2CompletedWaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),

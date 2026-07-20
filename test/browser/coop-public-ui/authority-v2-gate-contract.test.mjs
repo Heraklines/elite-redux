@@ -256,3 +256,32 @@ test("a committed replacement wake cannot be stranded behind its own turn finali
     "a wake installed during receipt completion is consumed at the exact park decision",
   );
 });
+
+test("ordinary replacement projection has an immutable fallback when cosmetic faint replay is absent", () => {
+  const prepareStart = coopRuntime.indexOf("function prepareCoopV2OrdinaryReplacementControlSurface(");
+  const prepareEnd = coopRuntime.indexOf("\n/**\n * Install an ordinary replica's exact V2 successor", prepareStart);
+  assert.notEqual(prepareStart, -1, "runtime exposes the ordinary replacement projector");
+  assert.ok(prepareEnd > prepareStart, "ordinary replacement projector has a bounded source block");
+  const prepare = coopRuntime.slice(prepareStart, prepareEnd);
+  const readsImmutableEntry = prepare.indexOf("v2ControlLedger.sourceEntryOf(control)");
+  const checksExactControl = prepare.indexOf("controlsEqual(sourceEntry.nextControl, control)");
+  const queuesExactPicker = prepare.indexOf('unshiftNew("CoopGuestFaintSwitchPhase"');
+  const releasesFinalizer = prepare.lastIndexOf("releaseCoopV2ParkedTurnBoundary(runtime, sourceEntry)");
+  assert.ok(readsImmutableEntry >= 0, "projection starts from the retained mechanical entry");
+  assert.ok(checksExactControl > readsImmutableEntry, "the retained entry must state the identical control");
+  assert.ok(
+    queuesExactPicker > checksExactControl,
+    "the exact picker is reconstructed without a faint-event side token",
+  );
+  assert.ok(
+    releasesFinalizer > queuesExactPicker,
+    "the predecessor finalizer cannot yield until the immutable picker wake exists",
+  );
+
+  const projectStart = coopRuntime.indexOf("function projectCoopV2InteractionControl(");
+  const projectEnd = coopRuntime.indexOf("\n/**\n * Mark the exact globally-registered successor", projectStart);
+  assert.notEqual(projectStart, -1, "runtime exposes the ordinary interaction projector");
+  assert.ok(projectEnd > projectStart, "ordinary interaction projector has a bounded source block");
+  const project = coopRuntime.slice(projectStart, projectEnd);
+  assert.match(project, /prepareCoopV2OrdinaryReplacementControlSurface\(runtime, control\)/u);
+});

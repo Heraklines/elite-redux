@@ -276,3 +276,11 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   fast-buffered ordering hole. A static contract pins reconstruction-before-release and both early/late race
   orders. Scoped Biome and 9/9 architecture contracts are clean; full TypeScript reports no touched-path
   diagnostics. Exact-SHA remote depth/surface/dirty campaigns remain the production-fidelity proof.
+- Compact evidence from both the `cbeef84c7` depth and Mystery lanes independently reproduced this same
+  wave-1 edge: the immutable turn reached `2/2/1`, the cosmetic picker had retired, the finalizer parked, and
+  the exact replacement surface never became public. The resulting recovery terminal was secondary.
+- Ordinary replacement projection no longer requires that cosmetic faint replay side token at all. If the
+  real replay already staged the exact wake, the projector adopts it; otherwise, while the authenticated
+  finalizer is current, it reconstructs `CoopGuestFaintSwitchPhase` solely from the retained V2 control and
+  only then releases the predecessor. The real PARTY handler remains the only `controlInstalled` proof.
+  Recovery and hard-epoch reset clear the construction guard. The architecture contract is now 10/10.
