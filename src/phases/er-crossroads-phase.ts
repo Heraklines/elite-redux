@@ -162,14 +162,17 @@ export class ErCrossroadsPhase extends Phase {
   /** Exact operation runtime retained across UI/network callbacks. */
   private coopBiomeOperationBinding: CoopBiomeOperationBinding | null = null;
 
-  constructor(sourceWave: number | null = null) {
+  constructor(sourceWave: number | null = null, sourceTurn: number | null = null) {
     super();
     if (sourceWave != null && (!Number.isSafeInteger(sourceWave) || sourceWave < 0)) {
       throw new Error(`[coop-op] Crossroads received invalid source wave ${sourceWave}`);
     }
+    if (sourceTurn != null && (!Number.isSafeInteger(sourceTurn) || sourceTurn < 0)) {
+      throw new Error(`[coop-op] Crossroads received invalid source turn ${sourceTurn}`);
+    }
     const ambientWave = globalScene.currentBattle?.waveIndex ?? -1;
     this.coopSourceWave = sourceWave ?? ambientWave;
-    this.coopSourceTurn = globalScene.currentBattle?.turn ?? 0;
+    this.coopSourceTurn = sourceTurn ?? globalScene.currentBattle?.turn ?? 0;
     this.coopSourceBiomeId = globalScene.arena.biomeId;
   }
 
@@ -194,7 +197,11 @@ export class ErCrossroadsPhase extends Phase {
    * Recovery must not recompute the interaction counter from ambient legacy state. The operation address
    * already contains the immutable pinned counter and owner, so validate and retain both before start().
    */
-  public installCoopV2CrossroadsProjection(operationId: string, sourceWave: number): boolean {
+  public installCoopV2CrossroadsProjection(
+    operationId: string,
+    sourceWave: number,
+    sourceTurn: number = this.coopSourceTurn,
+  ): boolean {
     const parsed = parseCoopOperationId(operationId);
     const pinned = parsed == null ? -1 : parsed.pinnedSeq - COOP_CROSSROADS_SEQ_BASE;
     if (
@@ -205,6 +212,7 @@ export class ErCrossroadsPhase extends Phase {
       || pinned > COOP_MAX_REACHABLE_COUNTER
       || parsed.owner !== coopInteractionOwnerSeat(pinned)
       || sourceWave !== this.coopSourceWave
+      || sourceTurn !== this.coopSourceTurn
       || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
       || (this.coopStartCounter >= 0 && this.coopStartCounter !== pinned)
     ) {
@@ -537,7 +545,7 @@ export class ErCrossroadsPhase extends Phase {
         payload: { optionIndex: choice },
         localRole: role,
         wave: this.requireCoopSourceWave(),
-        turn: 0,
+        turn: this.coopSourceTurn,
         boundarySourceBiomeId: this.coopSourceBiomeId,
         boundaryNextWave: this.requireCoopSourceWave() + 1,
         allowedRoutes: [],
@@ -706,7 +714,7 @@ export class ErCrossroadsPhase extends Phase {
         res,
         localRole: role,
         wave: this.requireCoopSourceWave(),
-        turn: 0,
+        turn: this.coopSourceTurn,
         sourceBiomeId: this.coopSourceBiomeId,
         nextWave: this.requireCoopSourceWave() + 1,
         allowedRoutes: [],

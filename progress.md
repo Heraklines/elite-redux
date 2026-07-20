@@ -370,3 +370,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   11/11 Authority V2 contracts, 5/5 Showdown evidence contracts, a green public
   browser boundary, clean scoped Biome, and zero TypeScript diagnostics in the
   touched co-op paths. Remote exact-SHA requalification remains required.
+
+2026-07-20 - Exact Crossroads and chained-map Authority V2 coordinates
+
+- Full-gate C1/P1 evidence showed `CONTROL_COMMIT` revision 26 correctly open a
+  Crossroads control at wave 5, turn 2. Both the host-owned and guest-owned
+  result paths nevertheless built their operation envelopes with the old
+  between-wave `turn: 0` sentinel. The mechanical log correctly rejected the
+  otherwise valid `INTERACTION_COMMIT` as a wrong-coordinate successor, then
+  legacy receipt retries exhausted and terminalized the session.
+- Crossroads now carries its immutable construction turn through owner intent,
+  authority watcher adoption, ordinary projection, and recovery projection.
+  The V2 projector passes the authority-stated turn explicitly instead of
+  relying on whichever `currentBattle` happens to be ambient.
+- The same audit found the immediately chained World Map picker would otherwise
+  repeat the defect on Crossroads Leave. `SelectBiomePhase` now captures or
+  receives the exact source turn and uses it for owner, watcher, and
+  deterministic biome results. Its V2 projector supplies and revalidates the
+  stated turn.
+- A node-pure log regression proves executable shared interaction results are
+  admitted only for the exact operation ID and wave/turn, and source contracts
+  prevent either live phase from restoring the turn-zero sentinel. Local
+  static architecture coverage is 13/13; remote node and real-engine shards
+  remain the behavioral qualification.

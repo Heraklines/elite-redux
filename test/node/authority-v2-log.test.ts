@@ -854,6 +854,77 @@ describe("authority-v2 log", () => {
     expect(() => log.commit(wrongCoordinate)).toThrow(/not authorized by predecessor control/);
   });
 
+  it("admits an executable shared interaction result only at its exact operation and coordinate", () => {
+    const operationId = "1:1:CROSSROADS_PICK:9600005";
+    const control: Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }> = {
+      kind: "SHARED_INTERACTION",
+      surfaceClass: "op:biome",
+      operationId,
+      ownerSeatId: 1,
+      epoch: 1,
+      wave: 5,
+      turn: 2,
+      operationKind: "CROSSROADS_PICK",
+      successor: {
+        operationKinds: ["CROSSROADS_PICK"],
+        operationIds: [operationId],
+      },
+    };
+    const open = {
+      ...entryInput(`V2/CONTROL/INTERACTION/${operationId}`, {
+        kind: "CONTROL_COMMIT",
+        nextControl: control,
+      }),
+      material: {
+        digest: "crossroads-open",
+        payload: { wave: 5, turn: 2 },
+      },
+    };
+    const result = (resultOperationId: string, turn: number) => ({
+      ...entryInput(resultOperationId, {
+        kind: "INTERACTION_COMMIT",
+        nextControl: {
+          kind: "AWAIT_SUCCESSOR" as const,
+          afterOperationId: resultOperationId,
+          epoch: 1,
+          wave: 5,
+          turn: 2,
+          allowedKinds: ["CONTROL_COMMIT" as const],
+          allowNextWaveStart: true,
+          expectedOperationId: null,
+        },
+      }),
+      material: {
+        digest: `crossroads-result-${resultOperationId}-${turn}`,
+        payload: {
+          envelope: {
+            sessionEpoch: 1,
+            wave: 5,
+            turn,
+            pendingOperation: {
+              id: resultOperationId,
+              kind: "CROSSROADS_PICK",
+            },
+          },
+        },
+      },
+    });
+
+    const exact = makeLog(scheduler, sent);
+    expect(exact.commit(open).revision).toBe(1);
+    expect(exact.commit(result(operationId, 2)).revision).toBe(2);
+
+    const wrongTurn = makeLog(scheduler, []);
+    wrongTurn.commit(open);
+    expect(() => wrongTurn.commit(result(operationId, 0))).toThrow(/not authorized by predecessor control/);
+
+    const wrongOperation = makeLog(scheduler, []);
+    wrongOperation.commit(open);
+    expect(() => wrongOperation.commit(result(`${operationId}:stale`, 2))).toThrow(
+      /not authorized by predecessor control/,
+    );
+  });
+
   it("admits exactly wave N+1 turn 1 only when the predecessor explicitly authorizes that crossing", () => {
     const nextWaveCommand = {
       ...entryInput("wave-2-command", { kind: "CONTROL_COMMIT" }),

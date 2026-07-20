@@ -19,6 +19,8 @@ const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8")
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
 const replayPhases = readFileSync(new URL("src/phases/coop-replay-phases.ts", root), "utf8");
+const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts", root), "utf8");
+const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
 const titlePhase = readFileSync(new URL("src/phases/title-phase.ts", root), "utf8");
 const shadow = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/shadow.ts", root), "utf8");
 const waveAdapter = readFileSync(
@@ -317,4 +319,53 @@ test("ordinary replacement projection has an immutable fallback when cosmetic fa
   assert.ok(projectEnd > projectStart, "ordinary interaction projector has a bounded source block");
   const project = coopRuntime.slice(projectStart, projectEnd);
   assert.match(project, /prepareCoopV2OrdinaryReplacementControlSurface\(runtime, control\)/u);
+});
+
+test("Crossroads result envelopes retain the exact V2 control turn instead of a legacy turn-zero sentinel", () => {
+  const ownerStart = crossroadsPhase.indexOf("private coopOwnerCommit(");
+  const ownerEnd = crossroadsPhase.indexOf("\n  /**", ownerStart);
+  assert.notEqual(ownerStart, -1, "Crossroads exposes the owner result seam");
+  assert.ok(ownerEnd > ownerStart, "Crossroads owner result seam has a bounded source block");
+  const ownerCommit = crossroadsPhase.slice(ownerStart, ownerEnd);
+
+  const watcherStart = crossroadsPhase.indexOf("private applyCrossroadsWatcherDecision(");
+  const watcherEnd = crossroadsPhase.indexOf("\n  private ", watcherStart + 1);
+  assert.notEqual(watcherStart, -1, "Crossroads exposes the watcher result seam");
+  assert.ok(watcherEnd > watcherStart, "Crossroads watcher result seam has a bounded source block");
+  const watcherApply = crossroadsPhase.slice(watcherStart, watcherEnd);
+
+  assert.match(ownerCommit, /turn: this\.coopSourceTurn/u);
+  assert.doesNotMatch(ownerCommit, /turn: 0/u);
+  assert.match(watcherApply, /turn: this\.coopSourceTurn/u);
+  assert.doesNotMatch(watcherApply, /turn: 0/u);
+
+  assert.match(
+    coopRuntime,
+    /create\("ErCrossroadsPhase", plan\.sourceWave, control\.turn\)[\s\S]*installCoopV2CrossroadsProjection\(plan\.operationId, plan\.sourceWave, control\.turn\)/u,
+    "ordinary and recovery projection pass the authority-stated turn into Crossroads",
+  );
+});
+
+test("a chained biome picker preserves its exact interaction coordinate through owner, watcher, and recovery", () => {
+  const watcherStart = selectBiomePhase.indexOf("private async applyBiomeWatcherDecision(");
+  const watcherEnd = selectBiomePhase.indexOf("\n  private ", watcherStart + 1);
+  assert.notEqual(watcherStart, -1, "SelectBiome exposes the watcher result seam");
+  assert.ok(watcherEnd > watcherStart, "SelectBiome watcher result seam has a bounded source block");
+  const watcherApply = selectBiomePhase.slice(watcherStart, watcherEnd);
+
+  const ownerStart = selectBiomePhase.indexOf("private coopRelayOwnerBiome(");
+  const ownerEnd = selectBiomePhase.length;
+  assert.notEqual(ownerStart, -1, "SelectBiome exposes the owner result seam");
+  assert.ok(ownerEnd > ownerStart, "SelectBiome owner result seam has a bounded source block");
+  const ownerCommit = selectBiomePhase.slice(ownerStart, ownerEnd);
+
+  assert.match(watcherApply, /turn: this\.coopSourceTurn/u);
+  assert.doesNotMatch(watcherApply, /turn: 0/u);
+  assert.match(ownerCommit, /turn: this\.coopSourceTurn/u);
+  assert.doesNotMatch(ownerCommit, /turn: 0/u);
+  assert.match(
+    coopRuntime,
+    /create\("SelectBiomePhase", plan\.sourceWave, control\.turn\)[\s\S]*installCoopV2BiomeProjection\(plan\.operationId, plan\.sourceWave, control\.turn\)/u,
+    "ordinary and recovery projection pass the authority-stated turn into the chained biome picker",
+  );
 });

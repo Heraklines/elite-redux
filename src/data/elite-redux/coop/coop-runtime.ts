@@ -5571,16 +5571,16 @@ function materializeCoopV2InteractionProjection(
       return phase.installCoopV2BargainPresentation(plan.operationId, plan.pinned) ? phase : null;
     }
     case "biome": {
-      const phase = phaseManager.create("SelectBiomePhase", plan.sourceWave) as Phase & {
-        installCoopV2BiomeProjection(operationId: string, sourceWave: number): boolean;
+      const phase = phaseManager.create("SelectBiomePhase", plan.sourceWave, control.turn) as Phase & {
+        installCoopV2BiomeProjection(operationId: string, sourceWave: number, sourceTurn: number): boolean;
       };
-      return phase.installCoopV2BiomeProjection(plan.operationId, plan.sourceWave) ? phase : null;
+      return phase.installCoopV2BiomeProjection(plan.operationId, plan.sourceWave, control.turn) ? phase : null;
     }
     case "crossroads": {
-      const phase = phaseManager.create("ErCrossroadsPhase", plan.sourceWave) as Phase & {
-        installCoopV2CrossroadsProjection(operationId: string, sourceWave: number): boolean;
+      const phase = phaseManager.create("ErCrossroadsPhase", plan.sourceWave, control.turn) as Phase & {
+        installCoopV2CrossroadsProjection(operationId: string, sourceWave: number, sourceTurn: number): boolean;
       };
-      return phase.installCoopV2CrossroadsProjection(plan.operationId, plan.sourceWave) ? phase : null;
+      return phase.installCoopV2CrossroadsProjection(plan.operationId, plan.sourceWave, control.turn) ? phase : null;
     }
     case "catch-full":
       return ownerIsLocal

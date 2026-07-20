@@ -16,6 +16,8 @@
     "src/data/elite-redux/coop/coop-session-controller.ts",
     "src/dev-tools/registry.ts",
     "src/phases/coop-replay-phases.ts",
+    "src/phases/er-crossroads-phase.ts",
+    "src/phases/select-biome-phase.ts",
     "src/phases/title-phase.ts",
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
     "test/browser/coop-public-ui/blocked-instrumentation.md",

@@ -135,6 +135,8 @@ export class SelectBiomePhase extends BattlePhase {
    * from re-addressing the map through a speculative next Battle.
    */
   private readonly coopConstructionWave: number;
+  /** Immutable settlement turn that authored this map control; V2 projection supplies it explicitly. */
+  private readonly coopSourceTurn: number;
 
   /**
    * Co-op (#848): the interaction counter to advance ONCE at the terminal, or -1 when this
@@ -177,19 +179,28 @@ export class SelectBiomePhase extends BattlePhase {
   /** Exact runtime retained across UI/network callbacks in the two-engine topology. */
   private readonly coopOwningRuntime = getCoopRuntime();
 
-  constructor(coopSourceWave: number | null = null) {
+  constructor(coopSourceWave: number | null = null, coopSourceTurn: number | null = null) {
     super();
+    if (coopSourceTurn != null && (!Number.isSafeInteger(coopSourceTurn) || coopSourceTurn < 0)) {
+      throw new Error(`[coop-op] SelectBiomePhase received invalid source turn ${coopSourceTurn}`);
+    }
     this.coopSourceWave = coopSourceWave;
     this.coopConstructionWave = coopSourceWave ?? globalScene.currentBattle?.waveIndex ?? -1;
+    this.coopSourceTurn = coopSourceTurn ?? globalScene.currentBattle?.turn ?? 0;
   }
 
   /** Bind the exact chained-map successor before recovery releases this phase. */
-  public installCoopV2BiomeProjection(operationId: string, sourceWave: number): boolean {
+  public installCoopV2BiomeProjection(
+    operationId: string,
+    sourceWave: number,
+    sourceTurn: number = this.coopSourceTurn,
+  ): boolean {
     if (
       operationId.length === 0
       || !Number.isSafeInteger(sourceWave)
       || sourceWave < 0
       || (this.coopSourceWave != null && this.coopSourceWave !== sourceWave)
+      || sourceTurn !== this.coopSourceTurn
       || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
     ) {
       return false;
@@ -845,7 +856,7 @@ export class SelectBiomePhase extends BattlePhase {
         res: committedRes,
         localRole: role,
         wave: boundaryWave,
-        turn: 0,
+        turn: this.coopSourceTurn,
         sourceBiomeId: globalScene.arena.biomeId,
         nextWave: boundaryWave + 1,
         allowedRoutes: revealed.map(node => node.biome),
@@ -1019,7 +1030,7 @@ export class SelectBiomePhase extends BattlePhase {
           sourceWave,
           sourceBiomeId: globalScene.arena.biomeId,
           destinationBiomeId: nextBiome,
-          turn: 0,
+          turn: this.coopSourceTurn,
           localRole: role,
         },
         this.requireCoopBiomeOperationBinding(),
@@ -1585,7 +1596,7 @@ export class SelectBiomePhase extends BattlePhase {
         },
         localRole: role,
         wave: sourceWave,
-        turn: 0,
+        turn: this.coopSourceTurn,
         boundarySourceBiomeId: globalScene.arena.biomeId,
         boundaryNextWave: sourceWave + 1,
         allowedRoutes: this.coopRevealed?.map(node => node.biome) ?? [],
