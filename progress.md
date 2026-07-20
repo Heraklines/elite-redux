@@ -513,3 +513,10 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   and full TypeScript remains at 584 baseline lines with zero touched-path
   diagnostics. Exact-SHA GitHub-hosted Showdown and sharded-gate runs are the
   required behavioral proof.
+- The same SHA's S4 artifact was 85/86 green. Its only red had already reached
+  a real post-replacement `CommandPhase` with `UiMode.COMMAND`; the test started
+  searching for the older finalizer just before the peer pump installed that
+  successor and then classified the healthy supersession as a hang. The oracle
+  now accepts either the finalizer or its ordered actionable Command successor
+  during that pump, while the following assertions still require the exact
+  converged field, party, phase, and single replacement carrier.

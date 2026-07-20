@@ -905,11 +905,12 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       // NewBattle/TurnInit input tail; doing that while replay is parked discards the checkpoint at the wrong address.
       await withClient(rig.guestCtx, async () => {
         // Authority V2 can finish the retained replacement round trip while this fixture is pumping the
-        // peer, in which case the exact post-replacement CommandPhase is already current. Do not drive that
-        // actionable phase as though it were an inert pre-finalizer tail.
+        // peer, in which case the exact post-replacement CommandPhase is already current or can supersede
+        // the finalizer while driveClientPhaseQueueTo is pumping. Accept either ordered boundary: treating
+        // a newly-actionable CommandPhase as a hang is a stale test oracle, not a production failure.
         if (rig.guestScene.phaseManager.getCurrentPhase()?.phaseName !== "CommandPhase") {
           await driveClientPhaseQueueTo(rig.guestScene, "Showdown replacement CoopFinalizeTurnPhase", {
-            matches: phase => phase.phaseName === "CoopFinalizeTurnPhase",
+            matches: phase => phase.phaseName === "CoopFinalizeTurnPhase" || phase.phaseName === "CommandPhase",
             perPhaseTimeoutMs: 5_000,
             pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
           });
