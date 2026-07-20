@@ -59,6 +59,22 @@ export interface CoopInteractionOpenMaterialV2 {
 
 export type CoopControlOpenMaterialV2 = CoopCommandOpenMaterialV2 | CoopInteractionOpenMaterialV2;
 
+/**
+ * Presentation phases whose completion callback is itself the structural path to CommandPhase.
+ *
+ * A faster authority can publish command-open while a slower replica is still sliding the next encounter
+ * onto the field. Applying the command image at that instant runs the absolute field projector, which
+ * deliberately kills battler tweens; Phaser then also drops the encounter tween's completion callback and
+ * the replica can never create the real CommandPhase needed to prove the control. Keep the DATA entry
+ * retained until that local presentation reaches its own command boundary. This is ordering, not a timeout
+ * or local successor guess: the same immutable entry is retried there.
+ */
+const COMMAND_OPEN_PRESENTATION_BARRIERS = new Set(["EncounterPhase", "NewBiomeEncounterPhase", "NextEncounterPhase"]);
+
+export function commandOpenMaterialMustWaitForPresentation(phaseName: string | null | undefined): boolean {
+  return phaseName != null && COMMAND_OPEN_PRESENTATION_BARRIERS.has(phaseName);
+}
+
 export interface BuildCommandOpenEntryInput {
   readonly context: CoopFrameContextV2;
   readonly operationId: string;

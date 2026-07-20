@@ -175,3 +175,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   warnings/info only), `git diff --check` is clean, and full TypeScript has zero touched-path diagnostics.
   No local co-op Vitest or browser process was run. Exact-SHA remote contract/Showdown qualification remains
   required before merging the checkpoint.
+
+2026-07-20 â€” Authority V2 encounter-to-command presentation ordering
+
+- Exact-SHA two-browser campaign `29753502613` exposed a production speed race after the wave-1 reward:
+  the guest adopted wave 2 and started `NextEncounterPhase`, while the faster authority reached command
+  control and delivered revision 6. Applying that command image invoked the absolute field projector during
+  the guest's two-second encounter slide. The projector correctly killed battler tweens, but Phaser thereby
+  discarded the slide's progression-owning completion callback; no local `CommandPhase` could ever be
+  created, so the retained entry stayed at `6/6/5` awaiting its real proof.
+- A command-open entry now remains admitted but material-deferred while `EncounterPhase`,
+  `NewBiomeEncounterPhase`, or `NextEncounterPhase` owns the structural route to command control. When the
+  real local `CommandPhase` starts, its address-exact boundary schedules an immediate coalesced retry of that
+  same immutable entry; no timeout, transport resend, or locally guessed successor participates.
+- A node-pure policy contract covers all three progression-owning encounter phases and proves ordinary
+  `CoopFinalizeTurnPhase` and `CommandPhase` application remain available for the post-turn release path.
+  Scoped Biome and remote exact-SHA qualification are required; no local co-op Vitest or browser process is
+  permitted by `AGENTS.md`.

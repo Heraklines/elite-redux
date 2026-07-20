@@ -7,7 +7,9 @@
   "allowedFiles": [
     ".github/coop-task-ownership/v2-showdown-command-coordinate-20260720.json",
     "progress.md",
+    "src/data/elite-redux/coop/authority-v2/adapters/control-open.ts",
     "src/data/elite-redux/coop/coop-runtime.ts",
-    "test/node/authority-v2-command-frontier.test.ts"
+    "test/node/authority-v2-command-frontier.test.ts",
+    "test/node/authority-v2-control-open.test.ts"
   ]
 }

@@ -23,6 +23,7 @@ import type { Phase } from "#app/phase";
 import {
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
+  commandOpenMaterialMustWaitForPresentation,
   decodeControlOpenEntry,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import {
@@ -5306,6 +5307,19 @@ function buildCoopV2LiveSeams(
           if (receiverScene != null && receiverScene !== globalScene) {
             return "deferred";
           }
+          if (
+            material.kind === "command-open"
+            && commandOpenMaterialMustWaitForPresentation(globalScene.phaseManager?.getCurrentPhase()?.phaseName)
+          ) {
+            // Do not let the absolute command-state projector kill an encounter tween whose onComplete
+            // callback is the only structural route to the real CommandPhase. The immutable entry stays
+            // admitted and is retried from that CommandPhase's boundary below.
+            coopLog(
+              "v2-control",
+              `deferred command-open rev=${entry.revision} until encounter presentation reaches CommandPhase`,
+            );
+            return "deferred";
+          }
           const stateApplied =
             applyCoopAuthoritativeBattleState(material.authoritativeState, true)
             || reapplyAcceptedCoopAuthoritativeBattleState(material.authoritativeState, true);
@@ -6532,6 +6546,10 @@ export function enterCoopV2CommandControlBoundary(
     resume,
   });
   coopLog("v2-control", `parked local CommandPhase until ordered command-open ${key}`);
+  // The immutable entry can already be admitted but material-deferred because this replica was still in
+  // EncounterPhase when it arrived. Retry from the real command boundary immediately; waiting for a
+  // transport resend would make local CPU speed part of correctness and needlessly add several seconds.
+  scheduleCoopV2CommandProofRetry(runtime);
   return "deferred";
 }
 

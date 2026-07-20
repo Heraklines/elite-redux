@@ -10,6 +10,7 @@ import {
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
   commandOpenMaterialDigest,
+  commandOpenMaterialMustWaitForPresentation,
   decodeCommandOpenEntry,
   decodeInteractionOpenEntry,
   interactionOpenMaterialDigest,
@@ -115,6 +116,15 @@ function interactionMaterial(overrides: Partial<CoopInteractionOpenMaterialV2> =
 }
 
 describe("authority-v2 explicit command-open boundary", () => {
+  it("retains command material while an encounter presentation owns the route to CommandPhase", () => {
+    expect(commandOpenMaterialMustWaitForPresentation("EncounterPhase")).toBe(true);
+    expect(commandOpenMaterialMustWaitForPresentation("NewBiomeEncounterPhase")).toBe(true);
+    expect(commandOpenMaterialMustWaitForPresentation("NextEncounterPhase")).toBe(true);
+    expect(commandOpenMaterialMustWaitForPresentation("CoopFinalizeTurnPhase")).toBe(false);
+    expect(commandOpenMaterialMustWaitForPresentation("CommandPhase")).toBe(false);
+    expect(commandOpenMaterialMustWaitForPresentation(null)).toBe(false);
+  });
+
   it("carries and fingerprints the complete post-entry-effects state", () => {
     const built = buildCommandOpenEntry({
       context,
