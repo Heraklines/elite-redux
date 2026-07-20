@@ -12,6 +12,7 @@
     "src/data/elite-redux/coop/authority-v2/contract.ts",
     "src/data/elite-redux/coop/authority-v2/next-control.ts",
     "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/phases/coop-replay-phases.ts",
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
     "test/browser/coop-public-ui/check-public-boundary.mjs",
     "test/browser/coop-public-ui/public-ui-harness.mjs",
