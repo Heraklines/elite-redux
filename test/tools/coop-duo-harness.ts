@@ -4617,12 +4617,44 @@ export async function buildShowdownDuo(
   guestRuntime.controller.connect();
   await drainLoopback();
 
-  // Production installs both versus runtimes before CommandPhase accepts input. Showdown fixtures
+  // Production installs both versus runtimes before either CommandPhase accepts input. Showdown fixtures
   // deliberately stop at the pre-command boundary so the orphan-runtime guard remains meaningful;
   // open the host command surface only after the authoritative pair has connected.
   await withClient(hostCtx, () => hostGame.phaseInterceptor.to("CommandPhase"));
 
   const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
+  // The direct mirror omitted the guest browser's real Encounter -> TurnInit path. Materialize only that
+  // missing edge and start the actual local-player CommandPhase. Besides opening the public input surface,
+  // this supplies the guest seat's address-exact Authority V2 control proof. The old rig answered the
+  // guest's command exclusively through ShowdownCommandRelay while its scene remained on Login/Title;
+  // TURN_COMMIT then correctly stayed behind the unproved CONTROL_COMMIT forever, manufacturing a replay
+  // hang that no real paired browser should be able to bypass. Real-launch tests subsequently replace this
+  // mirrored state and phase queue with the serialized launch snapshot, exactly like a fresh browser boot.
+  await withClient(guestCtx, async () => {
+    await drainLoopback();
+    materializeMirroredGuestInputTurn(guestScene);
+    const guestOwnCommand = await driveClientPhaseQueueTo(guestScene, "initial Showdown guest CommandPhase", {
+      matches: phase =>
+        phase.phaseName === "CommandPhase"
+        && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === COOP_HOST_FIELD_INDEX,
+    });
+    guestOwnCommand.start();
+    await drainLoopback();
+    if (guestScene.phaseManager.getCurrentPhase() !== guestOwnCommand || guestScene.ui.getMode() !== UiMode.COMMAND) {
+      throw new Error(
+        "initial Showdown guest command control was not publicly actionable "
+          + `(phase=${guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}, `
+          + `ui=${UiMode[guestScene.ui.getMode()] ?? guestScene.ui.getMode()})`,
+      );
+    }
+    markRealGuestCommandBoundary(guestScene, guestScene.currentBattle.waveIndex, guestScene.currentBattle.turn);
+  });
+  // Deliver the controlInstalled receipt and its acknowledgement under each destination's complete context.
+  // Two rounds close both directions without allowing the shared-process fixture to borrow the other scene.
+  for (let round = 0; round < 2; round++) {
+    await withClient(hostCtx, () => drainLoopback());
+    await withClient(guestCtx, () => drainLoopback());
+  }
   // Showdown rigs own the same two independently assembled runtimes as ordinary co-op rigs. Register
   // them with the shared afterEach teardown too: clearing only the ambient (usually guest) runtime leaves
   // the host battle stream's retained replacement timer alive, so a prior test can retransmit an old-epoch
