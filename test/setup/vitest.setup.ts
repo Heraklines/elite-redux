@@ -1,6 +1,6 @@
 import "vitest-canvas-mock";
 import "#app/i18n"; // tests don't go through `main.ts`, requiring this to be imported here as well
-
+import { clearNegotiatedCoopCapabilities } from "#data/elite-redux/coop/coop-capabilities";
 import { PromptHandler } from "#test/helpers/prompt-handler";
 import { MockConsole } from "#test/mocks/mock-console/mock-console";
 import { logTestEnd, logTestStart } from "#test/setup/test-end-log";
@@ -128,6 +128,11 @@ afterEach(context => {
   logTestEnd(context.task);
   clearInterval(PromptHandler.runInterval);
   PromptHandler.runInterval = undefined;
+  // The co-op gate deliberately packs many files into one --no-isolate worker. Negotiated capabilities
+  // are session-global production state, so allowing one test's frozen intersection to reach the next file
+  // silently changes which authority implementation that unrelated test exercises. A real re-pair clears
+  // this state; every independent test gets the same boundary here.
+  clearNegotiatedCoopCapabilities();
 });
 
 //#endregion Hooks
