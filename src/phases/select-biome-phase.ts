@@ -39,8 +39,10 @@ import {
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
+  notifyCoopV2InteractionSurfaceReady,
   notifyCoopWaveContinuationSurfaceReady,
   resolveCoopRetainedWaveContinuationIdentity,
+  runWhenCoopRuntimeActive,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_PICK_CHOICE_KINDS, COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
@@ -623,7 +625,7 @@ export class SelectBiomePhase extends BattlePhase {
         // A retained biome boundary is continuation-safe only once this exact phase owns a live, actionable
         // ER_MAP handler. Phase construction and the completed rendezvous are not public surfaces. The runtime
         // revalidates phase, mode, handler activity and source wave before releasing retained authority.
-        notifyCoopWaveContinuationSurfaceReady(wave);
+        this.publishCoopBiomeSurfaceWhenActionable(generation, wave);
       });
   }
 
@@ -672,7 +674,7 @@ export class SelectBiomePhase extends BattlePhase {
       // The watcher exposes the same real map handler, but its onSelect is deliberately inert and authority
       // remains the awaited owner relay below. Publishing here proves the renderer has an executable public
       // continuation without granting it any mechanical decision authority.
-      notifyCoopWaveContinuationSurfaceReady(boundaryWave);
+      this.publishCoopBiomeSurfaceWhenActionable(generation, boundaryWave);
     } catch {
       coopWarn("reward", "biome pick WATCHER map failed to open (still awaiting relay) (#848)");
     }
@@ -945,6 +947,46 @@ export class SelectBiomePhase extends BattlePhase {
     );
     if (committed && applied) {
       releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
+    }
+  }
+
+  /**
+   * Prove both retained authorities from the exact live World Map handler. A chained Crossroads result names
+   * BIOME_PICK as its V2 successor, so publishing only the older wave-continuation lease leaves that result
+   * retained and makes the following biome result an illegal concurrent reservation.
+   */
+  private publishCoopBiomeSurfaceWhenActionable(generation: number, wave: number): void {
+    const publish = (): void => {
+      if (!this.boundaryStillLive(generation, wave)) {
+        return;
+      }
+      const handler = globalScene.ui.getHandler() as
+        | {
+            active?: boolean;
+            isCoopV2InputActionable?: () => boolean;
+          }
+        | undefined;
+      const actionable =
+        globalScene.ui.getMode() === UiMode.ER_MAP
+        && handler?.active === true
+        && handler.isCoopV2InputActionable?.() === true;
+      if (!actionable) {
+        setTimeout(() => {
+          if (this.coopOwningRuntime == null) {
+            publish();
+          } else {
+            runWhenCoopRuntimeActive(this.coopOwningRuntime, publish);
+          }
+        }, 10);
+        return;
+      }
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+      notifyCoopWaveContinuationSurfaceReady(wave);
+    };
+    if (this.coopOwningRuntime == null) {
+      publish();
+    } else {
+      runWhenCoopRuntimeActive(this.coopOwningRuntime, publish);
     }
   }
 

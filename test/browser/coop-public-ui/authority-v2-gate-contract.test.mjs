@@ -554,4 +554,27 @@ test("a chained biome picker preserves its exact interaction coordinate through 
     /create\("SelectBiomePhase", plan\.sourceWave, control\.turn\)[\s\S]*installCoopV2BiomeProjection\(plan\.operationId, plan\.sourceWave, control\.turn\)/u,
     "ordinary and recovery projection pass the authority-stated turn into the chained biome picker",
   );
+  const readyStart = selectBiomePhase.indexOf("private publishCoopBiomeSurfaceWhenActionable(");
+  const readyEnd = selectBiomePhase.indexOf("\n  private ", readyStart + 1);
+  assert.notEqual(readyStart, -1, "SelectBiome exposes one bounded public-control proof");
+  assert.ok(readyEnd > readyStart, "SelectBiome public-control proof has a bounded source block");
+  const ready = selectBiomePhase.slice(readyStart, readyEnd);
+  const actionableCheck = ready.indexOf("handler.isCoopV2InputActionable?.() === true");
+  const interactionProof = ready.indexOf("notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime)");
+  const continuationProof = ready.indexOf("notifyCoopWaveContinuationSurfaceReady(wave)");
+  assert.ok(actionableCheck >= 0, "SelectBiome checks the exact World Map handler");
+  assert.ok(
+    interactionProof > actionableCheck,
+    "SelectBiome cannot retire the chained V2 interaction before the World Map is actionable",
+  );
+  assert.ok(
+    continuationProof > interactionProof,
+    "the same actionable World Map proves V2 interaction control before the retained wave continuation",
+  );
+  assert.equal(
+    [...selectBiomePhase.matchAll(/this\.publishCoopBiomeSurfaceWhenActionable\(generation, (?:wave|boundaryWave)\)/gu)]
+      .length,
+    2,
+    "both the owner and watcher map paths publish through the same exact proof",
+  );
 });

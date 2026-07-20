@@ -565,3 +565,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   failed exact-phase proof now exits before dereference. Scoped Biome is clean
   apart from repository-baseline warnings, the Authority source contracts are
   18/18, and runtime qualification remains remote-only.
+
+2026-07-20 - Chained World Map control-proof closure
+
+- Exact-tip C1 proved the Crossroads actionability fix itself: revision 26 did
+  not retire until the delayed OPTION_SELECT handler became actionable, and
+  the guest's Leave result then applied in order as revision 27. That result's
+  typed successor was the chained `BIOME_PICK`; both real World Map handlers
+  opened, but `SelectBiomePhase` published only the older retained-wave lease.
+  The V2 replica therefore correctly retained revision 27 at
+  `materialApplied`, and the host rejected the attempted map result as a
+  concurrent authority-local successor reservation.
+- The owner and watcher map paths now share one runtime-bound proof that checks
+  the exact live ER_MAP handler, retires the V2 `BIOME_PICK` control first, and
+  only then releases the retained wave continuation. The source contract pins
+  that order and requires both map paths to use it. Static validation is 18/18
+  Authority contracts, scoped Biome has baseline diagnostics only, and the
+  runtime fix awaits exact-SHA GitHub-hosted qualification.
