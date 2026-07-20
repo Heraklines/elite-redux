@@ -661,6 +661,7 @@ export function createBattlePromptAdvancer(
           && Number.isSafeInteger(observation.phaseInstance)
           && observation.ready?.handlerActive === true
           && observation.ready?.awaitingActionInput === true
+          && observation.ready?.inputBlocked !== true
           && !consumedInstances.has(instanceKey)
         );
       });
@@ -1237,6 +1238,26 @@ function semanticEventsShareAppearance(events) {
 }
 
 /**
+ * Whether a legacy phase/owner marker still belongs to the client's current phase.
+ *
+ * Phase start lines are intentionally retained for the entire campaign. They may prove
+ * that a registered UI is still being constructed only until a later phase starts. Once
+ * that happens, treating the old marker as a pending surface turns legitimate no-op
+ * phases (for example EggLapsePhase with no egg to hatch) into deadline-long false reds.
+ */
+function legacySurfacePhaseIsCurrent(client, driver, cursor) {
+  if (!(driver.phase instanceof RegExp)) {
+    return true;
+  }
+  const surfacePhase = client.evidence.findLast(driver.phase, cursor);
+  if (surfacePhase == null) {
+    return false;
+  }
+  const currentPhase = client.evidence.findLast(START_PHASE, cursor);
+  return currentPhase == null || surfacePhase.index >= currentPhase.index;
+}
+
+/**
  * Return the first registered between-wave surface observed since this wave began.
  *
  * A phase/owner marker can precede the handler's actionable semantic projection by much
@@ -1268,6 +1289,9 @@ export function findRegisteredSurface(rig, dispatch, cursors, handledIndex = new
         return false;
       }
       return Object.values(rig.clients).some(client => {
+        if (!legacySurfacePhaseIsCurrent(client, driver, cursors[client.label] ?? 0)) {
+          return false;
+        }
         const event = client.evidence.find(driver.present, cursors[client.label] ?? 0);
         return event != null && event.index > (handledIndex.get(`${driver.name}:${client.label}`) ?? -1);
       });

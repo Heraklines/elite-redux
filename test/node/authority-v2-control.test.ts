@@ -34,6 +34,7 @@ import {
   controlsEqual,
   isValidNextControl,
   sameControlAddress,
+  successorWaitAllowsLocalPresentationInput,
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
 import { applyEntry, expectedControlId, type ReplicaReceiptSink } from "#data/elite-redux/coop/authority-v2/replica";
@@ -90,6 +91,54 @@ const reward = (over: Partial<Extract<Projectable, { kind: "REWARD" }>> = {}): P
 });
 
 const terminal = (terminalId = "term-1"): Projectable => ({ kind: "TERMINAL", terminalId });
+
+const successorWait = (
+  over: Partial<Extract<Projectable, { kind: "AWAIT_SUCCESSOR" }>> = {},
+): Extract<Projectable, { kind: "AWAIT_SUCCESSOR" }> => ({
+  kind: "AWAIT_SUCCESSOR",
+  afterOperationId: "reward-terminal",
+  epoch: 1,
+  wave: 3,
+  turn: 7,
+  allowedKinds: ["CONTROL_COMMIT", "INTERACTION_COMMIT"],
+  allowNextWaveStart: true,
+  expectedOperationId: null,
+  ...over,
+});
+
+describe("ordered-wait local presentation lease", () => {
+  const exactNextEncounter = {
+    sessionEpoch: 1,
+    wave: 4,
+    turn: 1,
+    phaseName: "NextEncounterPhase",
+    messageHandlerActionable: true,
+  };
+
+  it("admits only the explicit N+1/t1 NextEncounter action prompt", () => {
+    expect(successorWaitAllowsLocalPresentationInput(successorWait(), exactNextEncounter)).toBe(true);
+    expect(
+      successorWaitAllowsLocalPresentationInput(successorWait({ allowNextWaveStart: false }), exactNextEncounter),
+    ).toBe(false);
+    expect(successorWaitAllowsLocalPresentationInput(successorWait(), { ...exactNextEncounter, sessionEpoch: 2 })).toBe(
+      false,
+    );
+    expect(successorWaitAllowsLocalPresentationInput(successorWait(), { ...exactNextEncounter, wave: 3 })).toBe(false);
+    expect(successorWaitAllowsLocalPresentationInput(successorWait(), { ...exactNextEncounter, turn: 2 })).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(successorWait(), {
+        ...exactNextEncounter,
+        phaseName: "MysteryEncounterPhase",
+      }),
+    ).toBe(false);
+    expect(
+      successorWaitAllowsLocalPresentationInput(successorWait(), {
+        ...exactNextEncounter,
+        messageHandlerActionable: false,
+      }),
+    ).toBe(false);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // controlId

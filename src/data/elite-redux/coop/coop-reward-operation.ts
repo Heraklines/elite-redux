@@ -919,11 +919,17 @@ export function commitRewardAuthoritativeResult(
   if (
     !samePayload(res.kind === "reack" ? res.op.payload : res.envelope.pendingOperation?.payload, resultIntent.payload)
   ) {
+    coopWarn("reward", `authoritative reward result changed across commit id=${operationId}`);
     return null;
   }
   s.committedResultEnvelopes.set(operationId, res.envelope);
   retainLatestRewardResultState(s, prepared, resultState);
   if (!retainEnvelope(res.envelope, binding)) {
+    coopWarn(
+      "reward",
+      `authoritative reward result could not enter the negotiated authority log id=${operationId} `
+        + `legacyRevision=${res.envelope.revision}`,
+    );
     return null;
   }
   advancePreparedWatcher(prepared);

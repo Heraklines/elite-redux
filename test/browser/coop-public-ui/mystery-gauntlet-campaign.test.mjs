@@ -581,6 +581,11 @@ test("the high-frequency semantic observer caches only its expensive digest on a
   assert.match(observer, /function semanticMechanicalDigest\(key: string\)/u);
   assert.match(
     observer,
+    /Math\.ceil\(sorted\.length \* 0\.95\) - 1/u,
+    "the 20-sample p95 must select nearest-rank index 18 rather than treating the lone maximum as p95",
+  );
+  assert.match(
+    observer,
     /key === semanticDigestCacheKey && now - semanticDigestCacheAt < 1_000[\s\S]*return semanticDigestCache/u,
   );
   assert.match(

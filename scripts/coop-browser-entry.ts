@@ -93,7 +93,11 @@ function recordDigestDuration(durationMs: number): void {
     return;
   }
   const sorted = [...digestDurationsMs].sort((a, b) => a - b);
-  const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+  // Nearest-rank p95 is ceil(0.95 * N), converted to a zero-based index. Using
+  // floor(0.95 * N) made N=20 select index 19 (the maximum/p100), so one ordinary
+  // runner scheduling outlier falsely failed the campaign as an observer regression.
+  const p95Index = Math.max(0, Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1));
+  const p95 = sorted[p95Index];
   if (p95 > DIGEST_BUDGET_MS) {
     digestBudgetReported = true;
     console.error(

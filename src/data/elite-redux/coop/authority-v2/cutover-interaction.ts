@@ -132,6 +132,12 @@ function rewardPayload(value: unknown): boolean {
     isPlainObject(value)
     && value.terminal === false
     && (value.label === "shop" || value.label === "check" || value.label === "transfer" || value.label === "lock");
+  const terminalMatchesAction =
+    isPlainObject(value)
+    && (value.terminal === true
+      ? (value.label === "skip" && value.choice === -1)
+        || (value.label === "reward" && integer(value.choice) && value.choice >= 0)
+      : value.label !== "skip" && value.label !== "reward");
   return (
     isPlainObject(value)
     && (value.label === "reward"
@@ -144,7 +150,7 @@ function rewardPayload(value: unknown): boolean {
     && integer(value.choice)
     && (value.data === undefined || integerArray(value.data))
     && typeof value.terminal === "boolean"
-    && (!value.terminal || (value.label === "skip" && value.choice === -1))
+    && terminalMatchesAction
     && isPlainObject(value.result)
     && typeof value.result.lockModifierTiers === "boolean"
     && (!continuing || rewardPresentationPayload(value.result.continuation, "reward"))

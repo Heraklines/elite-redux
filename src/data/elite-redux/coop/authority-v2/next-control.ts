@@ -180,6 +180,38 @@ export function successorWaitAllows(
   return address.turn === wait.turn;
 }
 
+export interface CoopV2LocalPresentationInputProof {
+  readonly sessionEpoch: number;
+  readonly wave: number;
+  readonly turn: number;
+  readonly phaseName: string;
+  /** True only for the active MESSAGE handler with an armed ACTION/CANCEL continuation. */
+  readonly messageHandlerActionable: boolean;
+}
+
+/**
+ * Whether an ordered wait explicitly grants the non-mechanical next-wave narration its local input lease.
+ *
+ * A reward/market terminal can only be followed by CONTROL_COMMIT after NextEncounterPhase has shown and
+ * dismissed its action-only intro prompt. Freezing that prompt creates a cycle: the prompt waits for V2
+ * control while V2 control waits for the prompt to reach CommandPhase. The existing `allowNextWaveStart`
+ * bit is the authority's explicit permission for this exact N+1/t1 bridge. No same-wave prompt, arbitrary
+ * MESSAGE phase, choice handler, or wait without that permission is admitted.
+ */
+export function successorWaitAllowsLocalPresentationInput(
+  wait: Extract<ProjectableControl, { kind: "AWAIT_SUCCESSOR" }>,
+  proof: CoopV2LocalPresentationInputProof,
+): boolean {
+  return (
+    wait.allowNextWaveStart
+    && proof.sessionEpoch === wait.epoch
+    && proof.wave === wait.wave + 1
+    && proof.turn === 1
+    && proof.phaseName === "NextEncounterPhase"
+    && proof.messageHandlerActionable
+  );
+}
+
 interface MechanicalAddress {
   readonly epoch: number;
   readonly wave: number;

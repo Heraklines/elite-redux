@@ -28,6 +28,13 @@ class FakeEvidence {
     return this.events.slice(from).find(event => pattern.test(event.text ?? ""));
   }
 
+  findLast(pattern, from = 0) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(event => pattern.test(event.text ?? ""));
+  }
+
   findLastSemanticSurface(from = 0, surfaceId = null) {
     return this.events
       .slice(from)
@@ -515,6 +522,33 @@ test("a registered reward waiting for handler readiness is not classified as an 
   );
 });
 
+test("a legacy phase marker stops registering a semantic surface after a later phase supersedes it", () => {
+  const authority = fakeClient("authority", [
+    "Start Phase EggLapsePhase",
+    "Start Phase SelectModifierPhase",
+    "Start Phase NextEncounterPhase",
+  ]);
+  const renderer = fakeClient("renderer", [
+    "Start Phase EggLapsePhase",
+    "Start Phase SelectModifierPhase",
+    "Start Phase CommandPhase",
+  ]);
+  const rig = { host: authority, clients: { authority, renderer } };
+  const driver = {
+    name: "egg",
+    phase: /Start Phase EggLapsePhase/u,
+    present: /Start Phase EggLapsePhase/u,
+    v2SurfaceId: "egg:lapse",
+    owner: { role: "host" },
+  };
+
+  assert.equal(
+    findRegisteredSurface(rig, [driver], { authority: 0, renderer: 0 }),
+    null,
+    "a no-op egg phase must not mask the real later frontier for the rest of the deadline",
+  );
+});
+
 test("registered surfaces deduplicate re-emissions by semantic identity, not evidence index", () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
@@ -656,6 +690,38 @@ test("battle prompt consumption survives helper recreation and stale ready surfa
   authority.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 33);
   assert.equal(await afterSupersession(), true, "a later visibly-current prompt generation remains drivable");
   assert.equal(authority.presses.length, 2);
+});
+
+test("an explicitly frozen battle prompt never spends public input", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const from = { authority: 0, renderer: 0 };
+  const stats = { battleMessagePrompts: 0, postBattleExpPrompts: 0 };
+  authority.evidence.pushCommandSurface();
+  renderer.evidence.pushCommandSurface();
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "battle:message",
+      coop: true,
+      phase: "NextEncounterPhase",
+      phaseInstance: 41,
+      uiMode: "MESSAGE",
+      ownerModel: "local",
+      localSeat: 0,
+      seatsWithInput: [0],
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: true },
+      address: { epoch: 7, wave: 2, turn: 1 },
+    },
+  });
+
+  const advance = createBattlePromptAdvancer(rig, from, stats, "next-wave-intro", {
+    requireSharedCommandAddress: false,
+  });
+  assert.equal(await advance(), false);
+  assert.equal(authority.presses.length, 0);
 });
 
 // Track R cycle 4 - the wave-3-turn-2 LevelUpPhase co-op deadlock (campaign run 29644735938,

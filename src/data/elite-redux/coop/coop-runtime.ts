@@ -96,6 +96,7 @@ import {
   controlIdOf,
   controlsEqual,
   type ProjectableControl,
+  successorWaitAllowsLocalPresentationInput,
   validateNextControl,
 } from "#data/elite-redux/coop/authority-v2/next-control";
 import type {
@@ -4970,6 +4971,38 @@ export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null 
     return false;
   }
   projectCoopV2InteractionControl(runtime, pending);
+  if (pending.kind === "AWAIT_SUCCESSOR") {
+    const activeControl = ledger.activeControl;
+    const battle = globalScene.currentBattle;
+    const phase = globalScene.phaseManager?.getCurrentPhase();
+    const handler = globalScene.ui?.getHandler() as
+      | {
+          active?: boolean;
+          isCoopV2InputActionable?: () => boolean;
+        }
+      | undefined;
+    const messageHandlerActionable =
+      globalScene.ui?.getMode() === UiMode.MESSAGE
+      && handler?.active === true
+      && typeof handler.isCoopV2InputActionable === "function"
+      && handler.isCoopV2InputActionable();
+    if (
+      activeControl?.kind === "AWAIT_SUCCESSOR"
+      && controlsEqual(activeControl, pending)
+      && ledger.isMaterialApplied(pending)
+      && battle != null
+      && phase != null
+      && successorWaitAllowsLocalPresentationInput(pending, {
+        sessionEpoch: runtime.controller.sessionEpoch,
+        wave: battle.waveIndex,
+        turn: battle.turn,
+        phaseName: phase.phaseName,
+        messageHandlerActionable,
+      })
+    ) {
+      return false;
+    }
+  }
   const contract = pending.kind === "AWAIT_SUCCESSOR" ? null : coopV2InteractionProofContract(pending);
   return !ledger.allowsHumanInput(runtime.controller.localSeatId, observeCoopV2InteractionSurface(contract));
 }

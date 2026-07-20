@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { CoopFrameContextV2 } from "#data/elite-redux/coop/authority-v2/contract";
+import type { CoopAuthorityEntry, CoopFrameContextV2 } from "#data/elite-redux/coop/authority-v2/contract";
 import {
   buildCoopV2InteractionEnvelopeEntry,
   decodeCoopV2InteractionEnvelope,
@@ -121,16 +121,8 @@ describe("Authority V2 interaction cutover", () => {
         label: "reward",
         choice: 0,
         data: undefined,
-        terminal: false,
-        result: {
-          lockModifierTiers: false,
-          continuation: {
-            surface: "reward",
-            pinned: 0,
-            reroll: 0,
-            options: [{ id: "A", tier: 0, upgradeCount: 0, cost: 0 }],
-          },
-        },
+        terminal: true,
+        result: { lockModifierTiers: false },
       },
       "REWARD_SELECT",
       "op:reward",
@@ -227,6 +219,49 @@ describe("Authority V2 interaction cutover", () => {
     });
     expect(built?.nextControl).toEqual(successor);
     expect(built?.nextControl).not.toBeNull();
+  });
+
+  it("admits a taken free reward as a terminal result through its exact JSON wire image", () => {
+    const value = envelope(
+      "REWARD",
+      {
+        label: "reward",
+        choice: 1,
+        data: [0],
+        terminal: true,
+        result: { lockModifierTiers: true },
+      },
+      "REWARD_SELECT",
+      0,
+      200_000,
+    );
+    const built = buildCoopV2InteractionEnvelopeEntry({
+      context: FRAME,
+      surfaceClass: "op:reward",
+      envelope: value,
+    });
+    expect(built?.nextControl).toMatchObject({
+      kind: "AWAIT_SUCCESSOR",
+      allowNextWaveStart: true,
+    });
+    if (built == null) {
+      throw new Error("terminal reward did not build an Authority V2 entry");
+    }
+    const wireEntry = JSON.parse(JSON.stringify({ ...built, revision: 7 })) as CoopAuthorityEntry;
+    expect(decodeCoopV2InteractionEnvelope(wireEntry)).not.toBeNull();
+  });
+
+  it("rejects reward terminal flags that disagree with the concrete action", () => {
+    const build = (payload: unknown) =>
+      buildCoopV2InteractionEnvelopeEntry({
+        context: FRAME,
+        surfaceClass: "op:reward",
+        envelope: envelope("REWARD", payload, "REWARD_SELECT"),
+      });
+
+    expect(build({ label: "reward", choice: 0, terminal: false, result: { lockModifierTiers: false } })).toBeNull();
+    expect(build({ label: "skip", choice: -1, terminal: false, result: { lockModifierTiers: false } })).toBeNull();
+    expect(build({ label: "reroll", choice: -2, terminal: true, result: { lockModifierTiers: false } })).toBeNull();
   });
 
   it("separates the host-authored Mystery presentation from its pinned human-input owner", () => {
