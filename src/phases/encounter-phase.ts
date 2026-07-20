@@ -70,6 +70,7 @@ import { BiomeId } from "#enums/biome-id";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import type { Nature } from "#enums/nature";
 import { PlayerGender } from "#enums/player-gender";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerSlot } from "#enums/trainer-slot";
@@ -225,6 +226,10 @@ function buildDevEnemy(spec: DevEnemyMonSpec, fallbackLevel: number, trainerBatt
   }
   if (spec.abilitySlot !== undefined) {
     enemy.abilityIndex = Math.max(0, Math.min(2, spec.abilitySlot));
+  }
+  if (spec.nature !== undefined) {
+    enemy.nature = spec.nature as Nature;
+    enemy.calculateStats();
   }
   if (spec.shiny) {
     enemy.shiny = true;

@@ -121,6 +121,27 @@ export class FieldHelper extends GameManagerHelper {
   }
 
   /**
+   * Forcibly replace one ER passive slot while preserving the other innate sources.
+   * @param pokemon - The Pokemon whose passive slot will be changed
+   * @param slot - The zero-based ER passive slot to replace
+   * @param ability - The {@linkcode AbilityId} to set, either as a static value or a function returning one
+   * @returns The newly created {@linkcode MockInstance} object.
+   */
+  public mockPassiveAbilitySlot(
+    pokemon: Pokemon,
+    slot: 0 | 1 | 2,
+    ability: AbilityId | ((p: Pokemon) => AbilityId),
+  ): MockInstance<Pokemon["getPassiveAbilities"]> {
+    const getPassiveAbilities = pokemon.getPassiveAbilities.bind(pokemon);
+    return vi.spyOn(pokemon, "getPassiveAbilities").mockImplementation(() => {
+      const passives = [...getPassiveAbilities()];
+      const abilityId = typeof ability === "function" ? ability(pokemon) : ability;
+      passives[slot] = allAbilities[abilityId];
+      return passives;
+    });
+  }
+
+  /**
    * Force a given Pokemon to Terastallize to the given type.
    *
    * @param pokemon - The pokemon to Terastallize

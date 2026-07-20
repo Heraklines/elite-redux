@@ -19,6 +19,7 @@
 import { PostTurnAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { applyAbilityDrainRecovery } from "#data/elite-redux/archetypes/lifesteal";
 import { HitResult } from "#enums/hit-result";
 import { WeatherType } from "#enums/weather-type";
 import type { AbAttrBaseParams } from "#types/ability-types";
@@ -30,16 +31,20 @@ export interface PostTurnDrainOptions {
   readonly fraction: number;
   /** If set, only drains while one of these weathers is active. */
   readonly weather?: readonly WeatherType[];
+  /** When true, only opponents currently carrying a trapping/binding tag are drained. */
+  readonly onlyIfTrapped?: boolean;
 }
 
 export class PostTurnDrainAbAttr extends PostTurnAbAttr {
   private readonly fraction: number;
   private readonly weather: readonly WeatherType[] | null;
+  private readonly onlyIfTrapped: boolean;
 
   constructor(options: PostTurnDrainOptions) {
     super();
     this.fraction = options.fraction;
     this.weather = options.weather ?? null;
+    this.onlyIfTrapped = options.onlyIfTrapped ?? false;
   }
 
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
@@ -49,35 +54,30 @@ export class PostTurnDrainAbAttr extends PostTurnAbAttr {
         return false;
       }
     }
-    return pokemon.getOpponents().some(o => o && !o.isFainted() && o.hp > 0);
+    return pokemon.getOpponents().some(o => o && !o.isFainted() && o.hp > 0 && (!this.onlyIfTrapped || o.isTrapped()));
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
     }
-    let drained = 0;
     // Triple: a placement-dependent foe effect only reaches ADJACENT foes (binary: all foes).
     for (const opp of pokemon.getAdjacentOpponents()) {
-      if (!opp || opp.isFainted() || opp.hp <= 0) {
+      if (!opp || opp.isFainted() || opp.hp <= 0 || (this.onlyIfTrapped && !opp.isTrapped())) {
         continue;
       }
       const dmg = toDmgValue(opp.getMaxHp() * this.fraction);
       const before = opp.hp;
       opp.damageAndUpdate(dmg, { result: HitResult.INDIRECT });
-      drained += before - opp.hp;
-    }
-    if (drained > 0 && !pokemon.isFullHp()) {
-      globalScene.phaseManager.unshiftNew(
-        "PokemonHealPhase",
-        pokemon.getBattlerIndex(),
-        drained,
-        i18next.t("abilityTriggers:postTurnHeal", {
-          pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
-          abilityName: pokemon.getAbility()?.name ?? "",
-        }),
-        true,
-      );
+      const amount = before - opp.hp;
+      if (amount <= 0) {
+        continue;
+      }
+      const message = i18next.t("abilityTriggers:postTurnHeal", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+        abilityName: pokemon.getAbility()?.name ?? "",
+      });
+      applyAbilityDrainRecovery(pokemon, opp, amount, message);
     }
   }
 }

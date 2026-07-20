@@ -17,6 +17,7 @@
 // =============================================================================
 
 import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
+import type { MoveFlags } from "#enums/move-flags";
 import { MoveResult } from "#enums/move-result";
 
 export interface RepeatMovePowerBoostOptions {
@@ -24,16 +25,24 @@ export interface RepeatMovePowerBoostOptions {
   readonly bonus: number;
   /** Cap on total boost. */
   readonly cap?: number;
+  /** Optional move flag required for the repeat boost. */
+  readonly flag?: MoveFlags;
 }
 
 export class RepeatMovePowerBoostAbAttr extends MovePowerBoostAbAttr {
   private readonly bonus: number;
   private readonly cap: number;
+  private readonly flag: MoveFlags | undefined;
 
   constructor(options: RepeatMovePowerBoostOptions) {
-    super(() => true, 1);
+    super((_pokemon, _target, move) => options.flag === undefined || move.hasFlag(options.flag), 1);
     this.bonus = options.bonus;
     this.cap = options.cap ?? Number.POSITIVE_INFINITY;
+    this.flag = options.flag;
+  }
+
+  public getFlag(): MoveFlags | undefined {
+    return this.flag;
   }
 
   override apply(params: Parameters<MovePowerBoostAbAttr["apply"]>[0]): void {

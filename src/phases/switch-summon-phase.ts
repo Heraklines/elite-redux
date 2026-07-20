@@ -4,12 +4,15 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { SubstituteTag } from "#data/battler-tags";
 import { allMoves } from "#data/data-lists";
 import { markChivalryRedirect, pokemonCarriesChivalry } from "#data/elite-redux/abilities/chivalry";
+import { getSaltCircleEscapeSource } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import { erRecordAchievementSwitchIn } from "#data/elite-redux/er-achievement-tracker";
 import { type ErBondedCharmSnapshot, erBondedCharmApply, erBondedCharmSnapshot } from "#data/elite-redux/er-relics";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballTintColor } from "#data/pokeball";
 import { ArenaTagSide } from "#enums/arena-tag-side";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { Command } from "#enums/command";
+import { MoveId } from "#enums/move-id";
 import { SwitchType } from "#enums/switch-type";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { Pokemon } from "#field/pokemon";
@@ -166,6 +169,8 @@ export class SwitchSummonPhase extends SummonPhase {
       && globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON
         ? erBondedCharmSnapshot(this.lastPokemon)
         : [];
+    const saltCircleSource =
+      this.switchType === SwitchType.INITIAL_SWITCH ? undefined : getSaltCircleEscapeSource(this.lastPokemon);
 
     // ER Chivalry (5909): a VOLUNTARY switch-out (menu "Switch" command) of a
     // Chivalry holder marks the incoming mon to redirect 25% of its direct
@@ -257,6 +262,9 @@ export class SwitchSummonPhase extends SummonPhase {
         }
       } else {
         switchedInPokemon.fieldSetup(true);
+      }
+      if (saltCircleSource !== undefined) {
+        switchedInPokemon.addTag(BattlerTagType.SALT_CURED, 1, MoveId.SALT_CURE, saltCircleSource.id);
       }
       // ER relic (#439): Bonded Charm - apply the snapshot captured above, before
       // the outgoing mon's leaveField() zeroed its stages. Runs AFTER

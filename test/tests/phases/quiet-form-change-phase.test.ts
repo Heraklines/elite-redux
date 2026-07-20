@@ -33,11 +33,10 @@ describe("Phases - Quiet Form Change Phase", () => {
     const morpeko = game.field.getPlayerPokemon();
     expect(morpeko.getFormKey()).toBe("full-belly");
 
-    // give each form a different passive, both of which activate on switch-in
-    game.field.mockAbility(
-      morpeko,
-      p => (p.getFormKey() === "hangry" ? AbilityId.INTIMIDATE : AbilityId.INTREPID_SWORD),
-      true,
+    // Give each form a different secondary innate while preserving Hunger Switch
+    // in slot 0 so the form-change driver remains active.
+    game.field.mockPassiveAbilitySlot(morpeko, 1, p =>
+      p.getFormKey() === "hangry" ? AbilityId.INTIMIDATE : AbilityId.INTREPID_SWORD,
     );
 
     game.move.use(MoveId.SPLASH);
@@ -45,7 +44,7 @@ describe("Phases - Quiet Form Change Phase", () => {
 
     expect(game.phaseInterceptor.log).toContain("QuietFormChangePhase");
     expect(morpeko.getFormKey()).toBe("hangry");
-    expect(morpeko.getPassiveAbility().id).toBe(AbilityId.INTIMIDATE);
+    expect(morpeko.getPassiveAbilities()[1]?.id).toBe(AbilityId.INTIMIDATE);
     expect(morpeko).toHaveAbilityApplied(AbilityId.INTIMIDATE);
     expect(morpeko).not.toHaveAbilityApplied(AbilityId.INTREPID_SWORD);
     morpeko.waveData.abilitiesApplied.clear();
@@ -56,7 +55,7 @@ describe("Phases - Quiet Form Change Phase", () => {
 
     expect(game.phaseInterceptor.log).toContain("QuietFormChangePhase");
     expect(morpeko.getFormKey()).toBe("full-belly");
-    expect(morpeko.getPassiveAbility().id).toBe(AbilityId.INTREPID_SWORD);
+    expect(morpeko.getPassiveAbilities()[1]?.id).toBe(AbilityId.INTREPID_SWORD);
     expect(morpeko).toHaveAbilityApplied(AbilityId.INTREPID_SWORD);
     expect(morpeko).not.toHaveAbilityApplied(AbilityId.INTIMIDATE);
   });
@@ -67,21 +66,18 @@ describe("Phases - Quiet Form Change Phase", () => {
     const castform = game.scene.getPlayerParty()[1];
     expect(castform.getFormKey()).toBe("");
 
-    // Create a loop of back and forth sun/rain
-    game.field.mockAbility(
-      castform,
-      p => {
-        switch (p.getFormKey()) {
-          case "sunny":
-            return AbilityId.DRIZZLE;
-          case "rainy":
-            return AbilityId.DROUGHT;
-          default:
-            return AbilityId.DRIZZLE;
-        }
-      },
-      true,
-    );
+    // Create a loop of back and forth sun/rain in slot 1 while preserving
+    // Forecast in slot 0 so weather still drives Castform's form changes.
+    game.field.mockPassiveAbilitySlot(castform, 1, p => {
+      switch (p.getFormKey()) {
+        case "sunny":
+          return AbilityId.DRIZZLE;
+        case "rainy":
+          return AbilityId.DROUGHT;
+        default:
+          return AbilityId.DRIZZLE;
+      }
+    });
 
     game.doSwitchPokemon(1);
     await game.toEndOfTurn();

@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { getExperienceGainMultiplier } from "#data/elite-redux/archetypes/ability-meta-consumers";
 import { ExpGainsSpeed } from "#enums/exp-gains-speed";
 import { ExpNotification } from "#enums/exp-notification";
 import { ExpBoosterModifier } from "#modifiers/modifier";
@@ -7,7 +8,7 @@ import { NumberHolder } from "#utils/common";
 
 export class ShowPartyExpBarPhase extends PlayerPartyMemberPokemonPhase {
   public readonly phaseName = "ShowPartyExpBarPhase";
-  private expValue: number;
+  private readonly expValue: number;
 
   constructor(partyMemberIndex: number, expValue: number) {
     super(partyMemberIndex);
@@ -21,6 +22,7 @@ export class ShowPartyExpBarPhase extends PlayerPartyMemberPokemonPhase {
     const pokemon = this.getPokemon();
     const exp = new NumberHolder(this.expValue);
     globalScene.applyModifiers(ExpBoosterModifier, true, exp);
+    exp.value *= getExperienceGainMultiplier(pokemon);
     exp.value = Math.floor(exp.value);
 
     const lastLevel = pokemon.level;

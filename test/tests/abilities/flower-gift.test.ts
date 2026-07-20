@@ -105,7 +105,7 @@ describe("Abilities - Flower Gift", () => {
       .startingLevel(100);
   });
 
-  it("increases the ATK and SPDEF stat stages of the Pokémon with this Ability and its allies by 1.5× during Harsh Sunlight", async () => {
+  it("increases each recipient's higher offense and defense by 1.5x during Harsh Sunlight", async () => {
     game.override.battleStyle("double");
     await game.classicMode.startBattle(SpeciesId.CHERRIM, SpeciesId.MAGIKARP);
 
@@ -114,7 +114,7 @@ describe("Abilities - Flower Gift", () => {
     const cherrimSpDefStat = cherrim.getEffectiveStat(Stat.SPDEF);
 
     const magikarpAtkStat = magikarp.getEffectiveStat(Stat.ATK);
-    const magikarpSpDefStat = magikarp.getEffectiveStat(Stat.SPDEF);
+    const magikarpDefStat = magikarp.getEffectiveStat(Stat.DEF);
 
     game.move.select(MoveId.SUNNY_DAY, 0);
     game.move.select(MoveId.SPLASH, 1);
@@ -126,7 +126,7 @@ describe("Abilities - Flower Gift", () => {
     expect(cherrim.getEffectiveStat(Stat.ATK)).toBe(Math.floor(cherrimAtkStat * 1.5));
     expect(cherrim.getEffectiveStat(Stat.SPDEF)).toBe(Math.floor(cherrimSpDefStat * 1.5));
     expect(magikarp.getEffectiveStat(Stat.ATK)).toBe(Math.floor(magikarpAtkStat * 1.5));
-    expect(magikarp.getEffectiveStat(Stat.SPDEF)).toBe(Math.floor(magikarpSpDefStat * 1.5));
+    expect(magikarp.getEffectiveStat(Stat.DEF)).toBe(Math.floor(magikarpDefStat * 1.5));
   });
 
   it("should not increase the damage of an ally using an ability ignoring move", async () => {

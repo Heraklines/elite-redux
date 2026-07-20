@@ -24,12 +24,13 @@
 
 import { PostAttackAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { canTriggerFollowUpMove } from "#data/elite-redux/ability-upgrades/attrs/follow-up-guard";
 import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { MoveCategory } from "#enums/move-category";
 import type { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
-import { isVirtual, MoveUseMode } from "#enums/move-use-mode";
+import { MoveUseMode } from "#enums/move-use-mode";
 import type { PokemonType } from "#enums/pokemon-type";
 import { getMoveTargets } from "#moves/move-utils";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
@@ -61,6 +62,12 @@ export interface PostAttackScriptedMoveOptions {
    * Eruption follow-up that scales with the user's HP".
    */
   readonly hpScaledBasePower?: number;
+  /** Optional exact allowlist for moves that may trigger the follow-up. */
+  readonly triggerMoveIds?: readonly MoveId[];
+  /** Require the target to have lost at least one stat stage this turn. */
+  readonly targetStatsDecreased?: boolean;
+  /** Permit one specific virtual move to trigger this follow-up. */
+  readonly allowVirtualTriggerMoveId?: MoveId;
 }
 
 export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
@@ -108,17 +115,19 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
     // PostAttack hooks run (move-effect-phase.ts), so getLastXMoves(1)[0] is the
     // move that is currently resolving — including for the non-first hits of a
     // multi-hit move (which reuse the entry pushed on the first hit).
-    const lastUseMode = pokemon.getLastXMoves(1)[0]?.useMode;
-    if (lastUseMode !== undefined && isVirtual(lastUseMode)) {
-      return false;
-    }
     // Multi-hit guard: the PostAttack hook fires once per HIT, so a multi-hit
     // trigger move (e.g. a 2-5 strike Water move for High Tide) would enqueue the
     // scripted follow-up on every strike — the reported runaway "fires ~50x"
     // stack. Fire only on the final hit (hitsLeft === 1) so the follow-up
     // triggers once per move use, mirroring the once-per-multihit `hitsLeft > 1`
     // guard used across ab-attrs.
-    if (pokemon.turnData.hitsLeft > 1) {
+    if (!canTriggerFollowUpMove(pokemon) && move.id !== this.opts.allowVirtualTriggerMoveId) {
+      return false;
+    }
+    if (this.opts.triggerMoveIds !== undefined && !this.opts.triggerMoveIds.includes(move.id)) {
+      return false;
+    }
+    if (this.opts.targetStatsDecreased && !opponent.turnData.statStagesDecreased) {
       return false;
     }
     if (this.opts.categoryFilter !== undefined && move.category !== this.opts.categoryFilter) {

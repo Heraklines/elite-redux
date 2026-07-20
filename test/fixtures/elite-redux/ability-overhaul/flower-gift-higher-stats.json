@@ -1,0 +1,35 @@
+{
+  "v": 1,
+  "name": "Flower Gift boosts the holder's higher offense in sun",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "weather": "SUNNY",
+    "difficulty": "ace",
+    "seed": "flower-gift-higher-stats"
+  },
+  "party": [
+    {
+      "species": "ALAKAZAM",
+      "ability": "FLOWER_GIFT",
+      "moves": ["SPLASH"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["SPLASH"]
+      }
+    ]
+  },
+  "script": [{ "move": "SPLASH", "enemyMove": "SPLASH" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "weather": "SUNNY",
+    "playerEffectiveStat": { "stat": "SPATK", "value": 459 }
+  }
+}

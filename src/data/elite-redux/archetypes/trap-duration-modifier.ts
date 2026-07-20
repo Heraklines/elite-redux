@@ -44,6 +44,8 @@ export interface TrapDurationModifierOptions {
   readonly turns: number;
   /** Override per-turn damage fraction (e.g. 1/6 = 0.1666). */
   readonly damageFraction: number;
+  /** Optional subset of trapping moves affected. Defaults to every trapping move. */
+  readonly moveIds?: readonly MoveId[];
 }
 
 export class TrapDurationModifierAbAttr extends PostAttackAbAttr {
@@ -56,7 +58,7 @@ export class TrapDurationModifierAbAttr extends PostAttackAbAttr {
     if (!opponent || opponent.isFainted()) {
       return false;
     }
-    return TRAPPING_MOVES.has(move.id);
+    return TRAPPING_MOVES.has(move.id) && (this.opts.moveIds === undefined || this.opts.moveIds.includes(move.id));
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {

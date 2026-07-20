@@ -55,6 +55,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { CommonBattleAnim, MoveChargeAnim } from "#data/battle-anims";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { healEntranceFromConfusion } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { hasOtherErMajorStatus } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
@@ -1091,7 +1092,8 @@ export class ConfusedTag extends SerializableBattlerTag {
       }
       // Intentionally don't increment rage fist's hitCount
       phaseManager.queueMessage(i18next.t("battlerTags:confusedLapseHurtItself"));
-      pokemon.damageAndUpdate(damage, { result: HitResult.CONFUSION });
+      const confusionDamage = pokemon.damageAndUpdate(damage, { result: HitResult.CONFUSION });
+      healEntranceFromConfusion(pokemon, confusionDamage);
       const currentPhase = phaseManager.getCurrentPhase();
       if (currentPhase.is("MovePhase") && currentPhase.pokemon === pokemon) {
         currentPhase.cancel();

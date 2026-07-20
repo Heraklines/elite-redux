@@ -65,7 +65,10 @@ import {
   ER_PARTNER_UMBREON_ABILITY_ID,
   ER_PARTNER_VAPOREON_ABILITY_ID,
 } from "#data/elite-redux/abilities/composite-newcomers";
-import { registerOmniformMapping } from "#data/elite-redux/abilities/omniform-registry";
+import {
+  registerOmniformMapping,
+  registerOmniformUnlockOwner,
+} from "#data/elite-redux/abilities/omniform-registry";
 import { registerErEditorMon } from "#data/elite-redux/init-elite-redux-custom-species";
 import { EggTier } from "#enums/egg-type";
 import { MoveId } from "#enums/move-id";
@@ -534,6 +537,27 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
     for (const target of ER_PARTNER_FAMILY) {
       registerOmniformMapping(holder.partnerId as SpeciesId, 0, target.mapType, target.partnerId as SpeciesId, 0);
       result.omniformMappings++;
+    }
+  }
+
+  // Partner Eevee is the permanent candy-unlock owner for the whole Omniform
+  // family. The transient pre-transform snapshot covers ordinary mid-battle
+  // adaptation; this registry also covers partner Eeveelutions loaded or spawned
+  // directly, which otherwise consult their transform-only species' empty data.
+  if (partnerFormIndex >= 0) {
+    registerOmniformUnlockOwner(
+      PARTNER_HEAD_SPECIES,
+      partnerFormIndex,
+      PARTNER_HEAD_SPECIES,
+      partnerFormIndex,
+    );
+    for (const member of ER_PARTNER_FAMILY) {
+      registerOmniformUnlockOwner(
+        member.partnerId as SpeciesId,
+        0,
+        PARTNER_HEAD_SPECIES,
+        partnerFormIndex,
+      );
     }
   }
 

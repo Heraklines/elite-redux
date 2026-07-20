@@ -45,6 +45,10 @@ import {
 } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
+import {
+  AllyHigherStatMultiplierAbAttr,
+  HigherStatMultiplierAbAttr,
+} from "#data/elite-redux/ability-upgrades/attrs/index";
 import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
 import { PostFaintDetonateAbAttr } from "#data/elite-redux/archetypes/post-faint-detonate";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
@@ -529,10 +533,8 @@ describe("ER vanilla ability rebalance — R2 FLOWER_GIFT ATK->SPATK", () => {
   it("FLOWER_GIFT — StatMultiplier and AllyStatMultiplier no longer target ATK", () => {
     const ab = getAbility(AbilityId.FLOWER_GIFT);
     // Vanilla had ATK + SPDEF for self+ally; ER swaps ATK→SPATK.
-    const atkBoost = ab.attrs.find(a => a instanceof StatMultiplierAbAttr && a.stat === Stat.ATK);
-    expect(atkBoost).toBeUndefined();
-    const spAtkBoost = ab.attrs.find(a => a instanceof StatMultiplierAbAttr && a.stat === Stat.SPATK);
-    expect(spAtkBoost).toBeDefined();
+    expect(ab.attrs.filter(a => a instanceof HigherStatMultiplierAbAttr)).toHaveLength(2);
+    expect(ab.attrs.filter(a => a instanceof AllyHigherStatMultiplierAbAttr)).toHaveLength(2);
   });
 });
 

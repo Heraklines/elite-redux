@@ -1,0 +1,39 @@
+{
+  "v": 1,
+  "name": "Poseidon's Dominion drains trapped foes",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "poseidon-trapped-drain"
+  },
+  "party": [
+    {
+      "species": "KYOGRE",
+      "ability": 5485,
+      "moves": ["SPLASH", "PROTECT"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["SPLASH"]
+      }
+    ]
+  },
+  "start": {
+    "playerHpPct": 40
+  },
+  "script": [{ "move": "SPLASH", "enemyMove": "SPLASH" }, { "move": "PROTECT", "enemyMove": "SPLASH" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Poseidon's Dominion",
+    "playerHp": { "min": 160 },
+    "enemyDamaged": true,
+    "enemyTags": ["WHIRLPOOL"]
+  }
+}

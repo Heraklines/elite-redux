@@ -5,6 +5,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
+import { isReleasedCommander } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import {
   applyCoopAuthoritativeBattleState,
   reapplyAcceptedCoopAuthoritativeBattleState,
@@ -194,6 +195,7 @@ export class CommandPhase extends FieldPhase {
     const pokemon = this.getPokemon();
     if (
       (globalScene.currentBattle?.getBattlerCount() ?? 0) > 1
+      && !isReleasedCommander(pokemon)
       && pokemon.getAllies().some(ally => ally.getTag(BattlerTagType.COMMANDED)?.sourceId === pokemon.id)
     ) {
       globalScene.currentBattle.turnCommands[this.fieldIndex] = {

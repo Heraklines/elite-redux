@@ -16,7 +16,7 @@
 //   - 354 Weather Control — "Negates all weather based moves from enemies."
 // =============================================================================
 
-import { PreDefendAbAttr, type TypeMultiplierAbAttrParams } from "#abilities/ab-attrs";
+import { MoveImmunityAbAttr } from "#abilities/ab-attrs";
 import { MoveId } from "#enums/move-id";
 
 // The dex enumerates the OFFENSIVE weather-based moves Weather Control negates
@@ -43,21 +43,8 @@ const WEATHER_BASED_MOVES = new Set<MoveId>([
   MoveId.GRASS_PLEDGE,
 ]);
 
-export class WeatherBasedMoveBlockAbAttr extends PreDefendAbAttr {
+export class WeatherBasedMoveBlockAbAttr extends MoveImmunityAbAttr {
   constructor() {
-    super(true);
-  }
-
-  override canApply(params: TypeMultiplierAbAttrParams): boolean {
-    const { move, opponent, pokemon } = params;
-    if (opponent === pokemon) {
-      return false;
-    }
-    return WEATHER_BASED_MOVES.has(move.id);
-  }
-
-  override apply(params: TypeMultiplierAbAttrParams): void {
-    params.typeMultiplier.value = 0;
-    params.cancelled.value = true;
+    super((pokemon, opponent, move) => pokemon !== opponent && WEATHER_BASED_MOVES.has(move.id));
   }
 }

@@ -102,6 +102,8 @@ export interface DamageReductionOptions {
    * `{ kind: "all" }` explicitly to be unambiguous at the data layer.
    */
   readonly filter: DamageReductionFilter;
+  /** Whether this reduction also applies to direct fixed-damage moves. */
+  readonly affectsFixedDamage?: boolean;
 }
 
 /**
@@ -152,6 +154,7 @@ export class DamageReductionAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
         DamageReductionAbAttr.matchesFilter(filter, target, attacker, move),
       multiplier,
       false,
+      opts.affectsFixedDamage,
     );
     this.reductionAmount = opts.reduction;
     this.filterSpec = filter;

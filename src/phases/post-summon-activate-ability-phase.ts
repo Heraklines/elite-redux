@@ -1,4 +1,4 @@
-import { applyAbAttrs, applyPostSummonPassiveAbAttrs } from "#abilities/apply-ab-attrs";
+import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import type { BattlerIndex } from "#enums/battler-index";
 import { PostSummonPhase } from "#phases/post-summon-phase";
@@ -8,12 +8,12 @@ import { PostSummonPhase } from "#phases/post-summon-phase";
  */
 export class PostSummonActivateAbilityPhase extends PostSummonPhase {
   private readonly priority: number;
-  private readonly passive: boolean;
+  private readonly passiveSlot: number | undefined;
 
-  constructor(battlerIndex: BattlerIndex, priority: number, passive: boolean) {
+  constructor(battlerIndex: BattlerIndex, priority: number, passiveSlot?: number) {
     super(battlerIndex);
     this.priority = priority;
-    this.passive = passive;
+    this.passiveSlot = passiveSlot;
   }
 
   start() {
@@ -30,15 +30,12 @@ export class PostSummonActivateAbilityPhase extends PostSummonPhase {
       this.end();
       return;
     }
-    if (this.passive) {
-      // ER 3-innate model: apply EVERY non-empty passive slot, not just slot 0.
-      // `applyAbAttrs(..., { passive: true })` with no slot defaults to slot 0,
-      // which left innate slots 1/2 (e.g. Grimmsnarl's Intimidate/Scare) dead on
-      // switch-in. This mirrors the form-change path's all-slots iteration.
-      applyPostSummonPassiveAbAttrs(this.getPokemon());
-    } else {
-      applyAbAttrs("PostSummonAbAttr", { pokemon: this.getPokemon(), passive: false });
-    }
+    const passive = this.passiveSlot !== undefined;
+    applyAbAttrs("PostSummonAbAttr", {
+      pokemon: this.getPokemon(),
+      passive,
+      passiveSlot: this.passiveSlot,
+    });
 
     this.end();
   }

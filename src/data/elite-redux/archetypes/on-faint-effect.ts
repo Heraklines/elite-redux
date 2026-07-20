@@ -165,6 +165,8 @@ export interface OnFaintEffectAttackerStatChange {
    * `stages` value; an empty list is rejected at construction time.
    */
   readonly stats: ReadonlyArray<{ readonly stat: BattleStat; readonly stages: number }>;
+  /** Optional additional stat changes applied to every living ally of the attacker. */
+  readonly allyStats?: ReadonlyArray<{ readonly stat: BattleStat; readonly stages: number }>;
 }
 
 /**
@@ -472,6 +474,17 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
         [change.stat],
         change.stages,
       );
+    }
+    for (const ally of attacker.getAllies().filter(pokemon => !pokemon.isFainted())) {
+      for (const change of effect.allyStats ?? []) {
+        globalScene.phaseManager.unshiftNew(
+          "StatStageChangePhase",
+          ally.getBattlerIndex(),
+          false,
+          [change.stat],
+          change.stages,
+        );
+      }
     }
   }
 

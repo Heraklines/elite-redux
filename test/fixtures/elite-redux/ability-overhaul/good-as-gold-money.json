@@ -1,0 +1,28 @@
+{
+  "v": 1,
+  "name": "Good as Gold grants 1.2x battle money",
+  "run": {
+    "wave": 1,
+    "level": 100,
+    "money": 1000,
+    "difficulty": "ace",
+    "seed": "good-as-gold-money",
+    "waves": 2
+  },
+  "party": [
+    {
+      "species": "MEWTWO",
+      "ability": "GOOD_AS_GOLD",
+      "moves": ["PSYCHIC", "AURA_SPHERE", "ICE_BEAM", "RECOVER"]
+    }
+  ],
+  "enemy": {
+    "kind": "trainer",
+    "trainerType": "YOUNGSTER"
+  },
+  "script": [{ "move": "PSYCHIC" }, { "move": "PSYCHIC" }, { "move": "PSYCHIC" }, { "move": "PSYCHIC" }],
+  "expect": {
+    "outcome": "max-waves",
+    "money": 1108
+  }
+}

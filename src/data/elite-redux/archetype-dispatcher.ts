@@ -116,7 +116,6 @@ import {
   PostSummonRemoveArenaTagAbAttr,
   PostSummonStatStageChangeAbAttr,
   PostTurnRandomBerryEffectAbAttr,
-  PostTurnResetStatusAbAttr,
   PreHitResistTypeChangeAbAttr,
   PreserveBaseStatAbilitiesAbAttr,
   PreventItemUseAbAttr,
@@ -149,6 +148,8 @@ import { SetArenaTagOnHitAbAttr, SetTerrainOnHitAbAttr } from "#data/elite-redux
 import { StatBoostOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-boost-on-flag-attack";
 import { StatChangeOnCategoryAttackAbAttr } from "#data/elite-redux/abilities/stat-change-on-category-attack";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
+import { HolderAndAlliesRecoveryAbAttr } from "#data/elite-redux/ability-upgrades/attrs/party-recovery";
+import { onSuccessfulStatDrop } from "#data/elite-redux/ability-upgrades/attrs/stat-control";
 import { AbsorbantAbAttr } from "#data/elite-redux/archetypes/absorbant";
 import { AddTypeToAttackerOnContactAbAttr } from "#data/elite-redux/archetypes/add-type-to-attacker-on-contact";
 import { AllyAttackPowerBoostAbAttr } from "#data/elite-redux/archetypes/ally-attack-power-boost";
@@ -351,7 +352,6 @@ import { WeatherStatMultiplierAbAttr } from "#data/elite-redux/archetypes/weathe
 import {
   WeatherDamageReductionAbAttr,
   WeatherTypeBoostAbAttr,
-  WeatherTypeDebuffCancelAbAttr,
 } from "#data/elite-redux/archetypes/weather-terrain-interaction";
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
 import { ER_ABILITY_ARCHETYPES, type ErArchetypeKind } from "#data/elite-redux/er-ability-archetypes";
@@ -2200,15 +2200,6 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
   if (erAbilityId === 806) {
     out.push(new OnOpponentSwitchOutAbAttr({ moveId: MoveId.PURSUIT, power: 20 }));
   }
-  // Caretaker 783 (Healer + Friend Guard) — the Healer part cures only the ALLY
-  // (30%/turn). The description is "30% chance to cure status for BOTH the user
-  // and their ally ... 2 separate checks for each Pokemon" — so append an
-  // independent 30% SELF-cure (allyTarget=false) alongside the inherited ally one.
-  if (erAbilityId === 783) {
-    const selfCure = new PostTurnResetStatusAbAttr(false);
-    selfCure.addCondition(holder => holder.randBattleSeedInt(10) < 3);
-    out.push(selfCure);
-  }
   // Unown Power 776 (Mystic Power) — Mystic Power grants STAB to all moves, but
   // the "Hidden/Secret Power is always super effective (×2)" clause was dropped.
   // Model the always-SE as a flat ×2 power boost on those two moves (same
@@ -2375,7 +2366,7 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
  * Cluster table (round 3):
  *   - 333 Sweet Dreams → {@linkcode PassiveRecoveryAbAttr} (status: SLEEP, 1/8).
  *   - 447 Furnace → {@linkcode StatTriggerOnHitAbAttr} (filter: ROCK, +2 SPD).
- *   - 591 Celestial Blessing → {@linkcode PassiveRecoveryAbAttr} (terrain: MISTY, 1/12).
+ *   - 591 Celestial Blessing → {@linkcode PassiveRecoveryAbAttr} (terrain: MISTY, 1/8).
  *   - 643 Denting Blows → {@linkcode StatDebuffOnFlagAttackAbAttr} HAMMER_BASED -1 DEF.
  *   - 653 Rest in Peace → {@linkcode PassiveRecoveryAbAttr} (weather: FOG, 1/8).
  *   - 787 Cryo Architect → {@linkcode StatTriggerOnHitAbAttr} (filter: WATER+ICE, +1 ATK/DEF).
@@ -2504,6 +2495,16 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
   }
 
   switch (erAbilityId) {
+    case 875:
+      // Energy Tap: normally drains 1/8 of damage, upgraded to 1/4 against
+      // Electric- or Fire-type targets.
+      return ok([
+        new LifestealOnHitAbAttr({
+          healFraction: 0.125,
+          boostedTargetTypes: [PokemonType.ELECTRIC, PokemonType.FIRE],
+          boostedHealFraction: 0.25,
+        }),
+      ]);
     case 266:
     case 267: {
       // As One (Calyrex Ice Rider 266 / Shadow Rider 267) — "Prevents all
@@ -2660,6 +2661,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
             excludeAttackerTypes: [PokemonType.GHOST],
           },
         }),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 10,
+          tags: [BattlerTagType.CURSED],
+          contactRequired: false,
+        }),
       ]);
     case 565:
       // Vengeful Spirit — "Curses the attacker when KO'd by a direct hit (25%
@@ -2773,18 +2779,18 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Spiteful — Reduces attacker's PP by 4 on contact. The 4-PP reduction
       // matches vanilla Spite (the move) so the proc has a symmetric mental
       // model with the move-effect cousin.
-      return ok([new PpReductionOnContactAbAttr({ reduction: 4, contactRequired: true })]);
+      return ok([new PpReductionOnContactAbAttr({ reduction: 4, contactRequired: true, refundHolder: true })]);
     case 574:
       // Sharp Edges — 1/6 HP damage when touched. Vanilla Rough Skin uses 1/8
       // ratio; we use 1/6 per ER description. Pokerogue's class takes the
       // *divisor* (so 6 → 1/6, 8 → 1/8).
       return ok([new PostDefendContactDamageAbAttr(6)]);
     case 591:
-      // Celestial Blessing — heals 1/12 max HP each turn while Misty Terrain
+      // Celestial Blessing - heals 1/8 max HP each turn while Misty Terrain
       // is active.
       return ok([
         new PassiveRecoveryAbAttr({
-          healFraction: 1 / 12,
+          healFraction: 1 / 8,
           condition: { kind: "terrain", terrains: [TerrainType.MISTY] },
         }),
       ]);
@@ -2830,7 +2836,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Funeral Pyre — non-Ghost-AND-non-Dark take 1/4 dmg every turn.
       return ok([
         new PostTurnHurtNonTypedAbAttr({
-          safeTypes: [PokemonType.GHOST, PokemonType.DARK],
+          safeTypes: [PokemonType.GHOST, PokemonType.DARK, PokemonType.FIRE],
           damageFraction: 1 / 4,
         }),
       ]);
@@ -3017,6 +3023,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
             stats: [
               { stat: Stat.ATK, stages: -2 },
               { stat: Stat.SPATK, stages: -2 },
+            ],
+            allyStats: [
+              { stat: Stat.ATK, stages: -1 },
+              { stat: Stat.SPATK, stages: -1 },
             ],
           },
         }),
@@ -3717,10 +3727,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 485:
-      // Soothing Aroma — "Cures party status on entry."
-      // Pokerogue's heal-bell uses HealStatusEffectAttr — wire as a scripted
-      // Heal Bell call from PostSummon.
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.HEAL_BELL, targetsSelf: true })]);
+      // Soothing Aroma - cures party status on entry, then heals the holder and
+      // adjacent allies by 1/16 of their maximum HP each turn.
+      return ok([
+        new PostSummonScriptedMoveAbAttr({ moveId: MoveId.HEAL_BELL, targetsSelf: true }),
+        new HolderAndAlliesRecoveryAbAttr(1 / 16),
+      ]);
     case 603:
       // Flourish — "Boosts Grass moves by 50% in grassy terrain."
       // No direct primitive — wire via MovePowerBoostAbAttr with a closure that
@@ -4244,11 +4256,35 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Scare — "Lowers foes' Sp. Atk by one stage on entry."
       // Same shape as Intimidate but targeting SPATK. Uses the vanilla
       // intimidate primitive (selfTarget=false, intimidate=true).
-      return ok([new PostSummonStatStageChangeAbAttr([Stat.SPATK], -1, false, true)]);
+      return ok([
+        new PostSummonStatStageChangeAbAttr(
+          [Stat.SPATK],
+          -1,
+          false,
+          true,
+          onSuccessfulStatDrop(target => {
+            if (target.randBattleSeedInt(100) < 10) {
+              target.addTag(BattlerTagType.ER_FEAR, 2);
+            }
+          }),
+        ),
+      ]);
     case 632:
       // Terrify — "Lowers foes' Sp. Atk by two stages on entry."
       // Same shape as Scare but -2 stages.
-      return ok([new PostSummonStatStageChangeAbAttr([Stat.SPATK], -2, false, true)]);
+      return ok([
+        new PostSummonStatStageChangeAbAttr(
+          [Stat.SPATK],
+          -2,
+          false,
+          true,
+          onSuccessfulStatDrop(target => {
+            if (target.randBattleSeedInt(100) < 10) {
+              target.addTag(BattlerTagType.ER_FEAR, 2);
+            }
+          }),
+        ),
+      ]);
     case 283:
       // Christmas Spirit — "Takes 50% less damage in hail AND is immune to hail
       // chip damage." The move-damage reduction PLUS the hail/snow chip immunity.
@@ -5173,40 +5209,18 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // main-switch entry is dead; kept as a marker.
       return SKIP_BESPOKE;
     case 589:
-      // Catastrophe — FULL: "In Sun, Water moves gain the damage boost they
-      // receive from rain. In Rain, Fire moves gain the damage boost they
-      // receive from sun." "Gain the damage boost" means the move behaves as if
-      // it were in its FAVORABLE weather — i.e. net ×1.5, NOT a flat stat mult.
-      //
-      // Two halves per weather→type pairing (mirrors Hydro Steam):
-      //   1. WeatherTypeBoostAbAttr   — applies the ×1.5 move-power boost.
-      //   2. WeatherTypeDebuffCancelAbAttr — cancels the ADVERSE arena weather
-      //      type multiplier (rain ×0.5 on Fire / sun ×0.5 on Water). Without
-      //      this, the ×1.5 power is swallowed by the ×0.5 weather penalty and
-      //      nets only ×0.75 — the bug where a Fire move in rain barely scratched.
-      // Both primitives honor weather suppression (Cloud Nine / Air Lock).
+      // Catastrophe — maintainer override: Hail/Snow boosts Rock moves and
+      // Sandstorm boosts Ice moves. Both use the standard 1.5x weather boost.
       return ok([
-        // Water move while the sun is up → the rain boost (×1.5) + cancel sun's
-        // ×0.5 Water penalty.
         new WeatherTypeBoostAbAttr({
-          weathers: [WeatherType.SUNNY, WeatherType.HARSH_SUN],
-          type: PokemonType.WATER,
+          weathers: [WeatherType.HAIL, WeatherType.SNOW],
+          type: PokemonType.ROCK,
           multiplier: 1.5,
         }),
-        new WeatherTypeDebuffCancelAbAttr({
-          weathers: [WeatherType.SUNNY, WeatherType.HARSH_SUN],
-          type: PokemonType.WATER,
-        }),
-        // Fire move while it rains → the sun boost (×1.5) + cancel rain's ×0.5
-        // Fire penalty.
         new WeatherTypeBoostAbAttr({
-          weathers: [WeatherType.RAIN, WeatherType.HEAVY_RAIN],
-          type: PokemonType.FIRE,
+          weathers: [WeatherType.SANDSTORM],
+          type: PokemonType.ICE,
           multiplier: 1.5,
-        }),
-        new WeatherTypeDebuffCancelAbAttr({
-          weathers: [WeatherType.RAIN, WeatherType.HEAVY_RAIN],
-          type: PokemonType.FIRE,
         }),
       ]);
     case 406:
@@ -5886,8 +5900,8 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 16 — more compositions in the flag-boost / chance-status / proc clusters.
     // -------------------------------------------------------------------------
     case 687:
-      // Vitality Strike — "Heals for 10% of the damage dealt by punching moves."
-      return ok([new LifestealOnHitAbAttr({ healFraction: 0.1, filter: { flag: MoveFlags.PUNCHING_MOVE } })]);
+      // Vitality Strike keeps its punching lifesteal, upgraded to 1/4.
+      return ok([new LifestealOnHitAbAttr({ healFraction: 0.25, filter: { flag: MoveFlags.PUNCHING_MOVE } })]);
     case 691:
       // Assassin's Tools — "Contact moves have a 30% chance to PSN, PRLZ, or BLD."
       // ChanceStatusOnHit supports multi-status uniform pick. ER_BLEED is a
@@ -5956,6 +5970,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new FlagDamageBoostAbAttr({ flag: MoveFlags.HORN_BASED, multiplier: 1.3 }),
         new AttackStatSubstituteAbAttr({ physicalStat: Stat.SPATK, flag: MoveFlags.HORN_BASED }),
+        new LifestealOnHitAbAttr({ healFraction: 0.125, filter: { flag: MoveFlags.HORN_BASED } }),
       ]);
     case 756: {
       // Twinkle Toes — "Kicking moves +30%. Normal-type moves become Fairy-type
@@ -6104,6 +6119,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           moveId: MoveId.ICICLE_SPEAR,
           power: 13,
           filter: { contactRequired: true },
+        }),
+        new ChanceStatusOnAttackAbAttr({
+          chance: 10,
+          effects: [StatusEffect.TOXIC],
+          contactRequired: false,
         }),
       ]);
     case 998:
@@ -7260,6 +7280,12 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // both, and understated the 30% intent).
       return ok([
         new ChanceStatusOnHitAbAttr({
+          chance: 30,
+          contactRequired: true,
+          effects: [StatusEffect.BURN],
+          tags: [BattlerTagType.ER_FROSTBITE],
+        }),
+        new ChanceStatusOnAttackAbAttr({
           chance: 30,
           contactRequired: true,
           effects: [StatusEffect.BURN],

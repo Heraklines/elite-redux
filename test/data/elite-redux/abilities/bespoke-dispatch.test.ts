@@ -593,19 +593,19 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.attrs.some(a => a.constructor.name === "EntryEffectAbAttr")).toBe(true);
   });
 
-  it("er id 589 (Catastrophe) wires two type×weather boosts AND two weather-debuff cancels, no flat WeatherStatMultiplier", () => {
+  it("er id 589 (Catastrophe) boosts Rock in snow/hail and Ice in sand", () => {
     const res = dispatchArchetype("bespoke", null, 589);
     expect(res.skipReason).toBeNull();
-    // Each weather→type pairing (Water-in-sun, Fire-in-rain) gets a ×1.5 power
-    // boost PLUS a debuff-cancel so the adverse weather ×0.5 doesn't swallow it.
     const boosts = res.attrs.filter((a): a is WeatherTypeBoostAbAttr => a instanceof WeatherTypeBoostAbAttr);
     expect(boosts).toHaveLength(2);
-    const cancels = res.attrs.filter(
-      (a): a is WeatherTypeDebuffCancelAbAttr => a instanceof WeatherTypeDebuffCancelAbAttr,
-    );
-    expect(cancels).toHaveLength(2);
     expect(boosts.every(b => b.getMultiplier() === 1.5)).toBe(true);
-    // The prior flat-stat approximation must remain absent.
+    expect(boosts.map(b => [b.getBoostType(), [...b.getWeathers()]])).toEqual(
+      expect.arrayContaining([
+        [PokemonType.ROCK, [WeatherType.HAIL, WeatherType.SNOW]],
+        [PokemonType.ICE, [WeatherType.SANDSTORM]],
+      ]),
+    );
+    expect(res.attrs.some(a => a instanceof WeatherTypeDebuffCancelAbAttr)).toBe(false);
     expect(res.attrs.some(a => a.constructor.name === "WeatherStatMultiplierAbAttr")).toBe(false);
   });
 
@@ -789,11 +789,11 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getFilter()).toEqual({ types: [PokemonType.ROCK] });
   });
 
-  it("er id 591 (Celestial Blessing) wires PassiveRecovery (terrain: MISTY, 1/12)", () => {
+  it("er id 591 (Celestial Blessing) wires PassiveRecovery (terrain: MISTY, 1/8)", () => {
     const res = dispatchArchetype("bespoke", null, 591);
     expect(res.skipReason).toBeNull();
     const attr = res.attrs[0] as PassiveRecoveryAbAttr;
-    expect(attr.getHealFraction()).toBeCloseTo(1 / 12);
+    expect(attr.getHealFraction()).toBeCloseTo(1 / 8);
     expect(attr.getRecoveryCondition()).toEqual({ kind: "terrain", terrains: [TerrainType.MISTY] });
   });
 

@@ -1,0 +1,34 @@
+{
+  "v": 1,
+  "name": "Imposter boosts copied attacks while transformed",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "imposter-copied-attacks"
+  },
+  "party": [
+    {
+      "species": "DITTO",
+      "ability": "IMPOSTER",
+      "moves": ["TRANSFORM"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["TACKLE"]
+      }
+    ]
+  },
+  "script": [{ "move": "TACKLE", "enemyMove": "TACKLE" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerTransformed": true,
+    "enemyHp": 309
+  }
+}

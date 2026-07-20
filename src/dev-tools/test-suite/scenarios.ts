@@ -32,6 +32,7 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
+import { suppressAbilityIdForTurns } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { coopOwnedCount } from "#data/elite-redux/coop/coop-session";
 import { erRunUnlockAbilitySlot, erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
@@ -47,6 +48,7 @@ import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-red
 import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
+import { ER_PARTNER_VAPOREON_SPECIES_ID } from "#data/elite-redux/er-newcomer-species";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import {
   type ErDifficulty,
@@ -828,9 +830,679 @@ const BG_BIOME_SCENARIOS: DevScenario[] = [
   bgBiomeScenario("Island", BiomeId.ISLAND, "sunny sandy shore and sea."),
 ];
 
+interface EasyAbilityAdditionScenarioConfig {
+  label: string;
+  description: string;
+  ability?: AbilityId;
+  party: () => Starter[];
+  overrides?: Partial<MutableOverrides>;
+  onPartyReady?: () => void;
+  onBattleStart?: () => void;
+}
+
+function easyAbilityAdditionScenario(config: EasyAbilityAdditionScenarioConfig): DevScenario {
+  const scenario: DevScenario = {
+    label: config.label,
+    description: config.description,
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ...(config.ability == null ? {} : { ABILITY_OVERRIDE: config.ability }),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ...config.overrides,
+      });
+      return config.party();
+    },
+  };
+  if (config.onPartyReady) {
+    scenario.onPartyReady = config.onPartyReady;
+  }
+  if (config.onBattleStart) {
+    scenario.onBattleStart = config.onBattleStart;
+  }
+  return scenario;
+}
+
+function woundPlayerParty(fraction: number): void {
+  for (const pokemon of globalScene.getPlayerParty()) {
+    pokemon.hp = Math.max(1, Math.floor(pokemon.getMaxHp() * fraction));
+  }
+}
+
+function woundPlayerField(fraction: number): void {
+  for (const pokemon of globalScene.getPlayerField()) {
+    pokemon.hp = Math.max(1, Math.floor(pokemon.getMaxHp() * fraction));
+    pokemon.updateInfo();
+  }
+}
+
+const EASY_ABILITY_ADDITION_SCENARIOS: DevScenario[] = [
+  easyAbilityAdditionScenario({
+    label: "Ability+: Healer always cures both",
+    description:
+      "Healer now checks the holder and its ally at 100% each turn.\n"
+      + "DO: start burned in this double battle and let the poisoned ally stay in. Use Protect and Splash.\n"
+      + "EXPECT: both active Pokemon have their status removed at the end of the turn.",
+    ability: AbilityId.HEALER,
+    overrides: {
+      BATTLE_STYLE_OVERRIDE: "double",
+      STATUS_OVERRIDE: StatusEffect.BURN,
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+    },
+    party: () => [
+      makeStarter(SpeciesId.CHANSEY, {
+        moveset: [MoveId.PROTECT, MoveId.HEAL_PULSE, MoveId.LIGHT_SCREEN, MoveId.SOFT_BOILED],
+      }),
+      makeStarter(SpeciesId.AUDINO, {
+        abilityIndex: 0,
+        moveset: [MoveId.SPLASH, MoveId.HELPING_HAND, MoveId.DAZZLING_GLEAM, MoveId.WISH],
+      }),
+    ],
+    onBattleStart: () => {
+      const ally = globalScene.getPlayerField()[1];
+      if (ally) {
+        ally.summonData.ability = AbilityId.BALL_FETCH;
+        ally.trySetStatus(StatusEffect.POISON);
+      }
+    },
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Klutz also blocks berries",
+    description:
+      "Klutz keeps its current implementation state and now also applies Unnerve.\n"
+      + "DO: use Super Fang on the Sitrus Berry holder.\n"
+      + "EXPECT: the foe drops below half HP but cannot consume its berry while Klutz is active.",
+    ability: AbilityId.KLUTZ,
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+      ENEMY_HELD_ITEMS_OVERRIDE: [{ name: "BERRY", type: BerryType.SITRUS }],
+    },
+    party: () => [
+      makeStarter(SpeciesId.CROBAT, {
+        moveset: [MoveId.SUPER_FANG, MoveId.PROTECT, MoveId.ROOST, MoveId.CROSS_POISON],
+      }),
+    ],
+  }),
+  ...([AbilityId.SWEET_VEIL, AbilityId.PASTEL_VEIL] as const).map((ability, index) =>
+    easyAbilityAdditionScenario({
+      label: `Ability+: ${index === 0 ? "Sweet" : "Pastel"} Veil party heal`,
+      description:
+        `${index === 0 ? "Sweet Veil" : "Pastel Veil"} now heals every living party member by 10% on the holder's first entry.\n`
+        + "DO: switch from Snorlax to Alcremie after the battle starts with the party staged at half HP.\n"
+        + "EXPECT: Alcremie's first entry heals every living party member by 10%; fainted members are not revived.",
+      ability,
+      party: () => [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT, MoveId.CRUNCH],
+        }),
+        makeStarter(SpeciesId.ALCREMIE, {
+          moveset: [MoveId.DAZZLING_GLEAM, MoveId.RECOVER, MoveId.PROTECT, MoveId.HELPING_HAND],
+        }),
+      ],
+      onBattleStart: () => woundPlayerParty(0.5),
+    }),
+  ),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Steadfast gains Limber",
+    description:
+      "Steadfast keeps its flinch Speed boost and gains the complete ER Limber package.\n"
+      + "DO: let the foe use Thunder Wave, then use Close Combat and Double-Edge on later turns.\n"
+      + "EXPECT: paralysis is blocked, Close Combat's self-stat drops are blocked, and Double-Edge recoil is halved.",
+    ability: AbilityId.STEADFAST,
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.PIKACHU,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.THUNDER_WAVE],
+    },
+    party: () => [
+      makeStarter(SpeciesId.LUCARIO, {
+        moveset: [MoveId.DOUBLE_EDGE, MoveId.CLOSE_COMBAT, MoveId.PROTECT, MoveId.EXTREME_SPEED],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Heavy Metal overlap check",
+    description:
+      "Heavy Metal doubles weight and halves Ghost, Dark, or sound damage once per hit.\n"
+      + "DO: let the foe use Snarl, then compare Hyper Voice, Dark Pulse, and Shadow Ball.\n"
+      + "EXPECT: Snarl is halved once, not quartered, and each single-category attack is also halved.",
+    ability: AbilityId.HEAVY_METAL,
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.HOUNDOOM,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.SNARL, MoveId.HYPER_VOICE, MoveId.DARK_PULSE, MoveId.SHADOW_BALL],
+    },
+    party: () => [
+      makeStarter(SpeciesId.AGGRON, {
+        moveset: [MoveId.PROTECT, MoveId.HEAVY_SLAM, MoveId.REST, MoveId.IRON_DEFENSE],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Perish Body adds Aftermath",
+    description:
+      "Perish Body keeps its perish-count effect and now also carries ER Aftermath.\n"
+      + "DO: let the foe KO the low-HP lead with the non-contact move Shadow Ball.\n"
+      + "EXPECT: the attacker is hit by the 100 BP Aftermath detonation and flinches before the bench enters.",
+    ability: AbilityId.PERISH_BODY,
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.ALAKAZAM,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.SHADOW_BALL],
+    },
+    party: () => [
+      makeStarter(SpeciesId.CURSOLA, {
+        moveset: [MoveId.PROTECT, MoveId.SHADOW_BALL, MoveId.STRENGTH_SAP, MoveId.WILL_O_WISP],
+      }),
+      makeStarter(SpeciesId.BLISSEY, {
+        moveset: [MoveId.SEISMIC_TOSS, MoveId.SOFT_BOILED, MoveId.PROTECT, MoveId.THUNDER_WAVE],
+      }),
+    ],
+    onBattleStart: () => woundPlayerField(0.01),
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Dazzling accuracy x1.2",
+    description:
+      "Dazzling keeps its priority immunity and now multiplies accuracy by 1.2.\n"
+      + "DO: use Fire Blast several times while the foe uses Quick Attack.\n"
+      + "EXPECT: Fire Blast is effectively perfect accuracy and Quick Attack is still blocked.",
+    ability: AbilityId.DAZZLING,
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.PIKACHU,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.QUICK_ATTACK],
+    },
+    party: () => [
+      makeStarter(SpeciesId.BRUXISH, {
+        moveset: [MoveId.FIRE_BLAST, MoveId.PSYCHIC_FANGS, MoveId.AQUA_JET, MoveId.PROTECT],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Gulp Missile takes 20% less",
+    description:
+      "Gulp Missile keeps its form and counter behavior and now reduces all direct incoming damage by 20%.\n"
+      + "DO: let the foe use Body Slam while you Protect on alternating turns.\n"
+      + "EXPECT: unprotected hits deal 20% less than the same matchup without the ability.",
+    ability: AbilityId.GULP_MISSILE,
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.BODY_SLAM],
+    },
+    party: () => [
+      makeStarter(SpeciesId.CRAMORANT, {
+        moveset: [MoveId.SURF, MoveId.PROTECT, MoveId.ROOST, MoveId.AIR_SLASH],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Delta Stream adds Air Blower",
+    description:
+      "Delta Stream keeps Strong Winds and now also starts a 3-turn Tailwind.\n"
+      + "DO: inspect the field immediately after Rayquaza enters.\n"
+      + "EXPECT: Strong Winds and the player's 3-turn Tailwind are both active.",
+    ability: AbilityId.DELTA_STREAM,
+    party: () => [
+      makeStarter(SpeciesId.RAYQUAZA, {
+        moveset: [MoveId.DRAGON_ASCENT, MoveId.EXTREME_SPEED, MoveId.PROTECT, MoveId.ROOST],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability replacement: Screen Cleaner is opponent-only",
+    description:
+      "Screen Cleaner now removes Reflect, Light Screen, Aurora Veil, and Smokescreen only from the opposing side.\n"
+      + "DO: use Light Screen while the foe uses Reflect, then switch to Mr. Rime.\n"
+      + "EXPECT: the foe's Reflect is removed when Mr. Rime enters, while your Light Screen remains.",
+    ability: AbilityId.SCREEN_CLEANER,
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.MR_RIME,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.REFLECT],
+    },
+    party: () => [
+      makeStarter(SpeciesId.MR_RIME, {
+        moveset: [MoveId.LIGHT_SCREEN, MoveId.PROTECT, MoveId.PSYCHIC, MoveId.ICE_BEAM],
+      }),
+      makeStarter(SpeciesId.MR_RIME, {
+        moveset: [MoveId.SPLASH, MoveId.PROTECT, MoveId.PSYCHIC, MoveId.ICE_BEAM],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability replacement: Quick Draw mirror damage",
+    description:
+      "Quick Draw keeps its 30% move-order proc. When it procs, the move deals double damage to another active Quick Draw user.\n"
+      + "DO: trade Tackle repeatedly with the opposing Quick Draw holder.\n"
+      + "EXPECT: only attacks announced by Quick Draw receive the mirror-match double damage.",
+    ability: AbilityId.QUICK_DRAW,
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+      ENEMY_ABILITY_OVERRIDE: AbilityId.QUICK_DRAW,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+    },
+    party: () => [
+      makeStarter(SpeciesId.MAGIKARP, {
+        moveset: [MoveId.TACKLE, MoveId.SPLASH, MoveId.PROTECT, MoveId.FLAIL],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability replacement: Unburden speed protection",
+    description:
+      "Unburden is now an always-active 1.2x Speed boost and no longer depends on losing an item.\n"
+      + "DO: let the foe use Scary Face and Thunder Wave, then use a self-dropping move.\n"
+      + "EXPECT: paralysis may be applied, but Speed remains at 1.2x and its Speed stage never drops.",
+    ability: AbilityId.UNBURDEN,
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.PIKACHU,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.SCARY_FACE, MoveId.THUNDER_WAVE],
+    },
+    party: () => [
+      makeStarter(SpeciesId.TREECKO, {
+        moveset: [MoveId.SPLASH, MoveId.PROTECT, MoveId.QUICK_ATTACK, MoveId.LEAF_BLADE],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Liquid Ooze reverses ability drains",
+    description:
+      "Liquid Ooze now reverses ability-driven recovery such as Energy Tap and Predator into indirect damage.\n"
+      + "DO: use Night Shade against the Liquid Ooze target.\n"
+      + "EXPECT: Energy Tap damages its own holder instead of healing it. Shell Bell recovery remains unaffected.",
+    ability: erAbility(ErAbilityId.ENERGY_TAP),
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+      ENEMY_ABILITY_OVERRIDE: AbilityId.LIQUID_OOZE,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.GROWL],
+    },
+    party: () => [
+      makeStarter(SpeciesId.FEEBAS, {
+        moveset: [MoveId.NIGHT_SHADE, MoveId.PROTECT, MoveId.GROWL, MoveId.SPLASH],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability replacement: Snow Cloak veil",
+    description:
+      "Snow Cloak now creates and maintains Aurora Veil during hail or snow.\n"
+      + "DO: inspect the field, then switch the holder or end the weather.\n"
+      + "EXPECT: Aurora Veil is active without a turn limit and disappears immediately with either condition.",
+    ability: AbilityId.SNOW_CLOAK,
+    overrides: {
+      WEATHER_OVERRIDE: WeatherType.HAIL,
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.GROWL],
+    },
+    party: () => [
+      makeStarter(SpeciesId.GLACEON, {
+        moveset: [MoveId.PROTECT, MoveId.ICE_BEAM, MoveId.GROWL, MoveId.SPLASH],
+      }),
+      makeStarter(SpeciesId.SNORLAX, {
+        moveset: [MoveId.PROTECT, MoveId.BODY_SLAM, MoveId.GROWL, MoveId.SPLASH],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Mummy disables first innate",
+    description:
+      "Mummy, Lingering Aroma, and Wandering Spirit keep their original contact effect and also disable the attacker's first innate until switch.\n"
+      + "DO: hit the Mummy holder with Bite, then switch out and return.\n"
+      + "EXPECT: the active Ability becomes Mummy, innate slot one is disabled for that summon, and returns after switching.",
+    ability: AbilityId.BALL_FETCH,
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.YAMASK,
+      ENEMY_ABILITY_OVERRIDE: AbilityId.MUMMY,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.GROWL],
+    },
+    party: () => [
+      makeStarter(SpeciesId.SNORLAX, {
+        moveset: [MoveId.BITE, MoveId.PROTECT, MoveId.GROWL, MoveId.SPLASH],
+      }),
+      makeStarter(SpeciesId.BLISSEY, {
+        moveset: [MoveId.PROTECT, MoveId.GROWL, MoveId.SPLASH, MoveId.HEAL_PULSE],
+      }),
+    ],
+    onPartyReady: () => {
+      const lead = globalScene.getPlayerParty()[0];
+      if (lead) {
+        lead.customPokemonData.passive = AbilityId.RUN_AWAY;
+      }
+    },
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Parroting blocks sound",
+    description:
+      "Parroting still copies sound moves used by other battlers and now also grants sound immunity.\n"
+      + "DO: let the foe use Hyper Voice. Then use a harmless move and watch the copied sound response.\n"
+      + "EXPECT: Hyper Voice deals no damage, while Parroting's existing copy behavior remains active.",
+    ability: erAbility(ErAbilityId.PARROTING),
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.EXPLOUD,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.HYPER_VOICE],
+    },
+    party: () => [
+      makeStarter(SpeciesId.CHATOT, {
+        moveset: [MoveId.PROTECT, MoveId.CHATTER, MoveId.ROOST, MoveId.SING],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Antarctic Bird boosts Water",
+    description:
+      "Antarctic Bird keeps its Ice and Flying boosts and now boosts Water moves by 30% too.\n"
+      + "DO: use Surf, Ice Beam, and Air Slash on the same tanky foe.\n"
+      + "EXPECT: Surf receives the same 1.3x ability boost as the existing Ice and Flying attacks.",
+    ability: erAbility(ErAbilityId.ANTARCTIC_BIRD),
+    party: () => [
+      makeStarter(SpeciesId.ARTICUNO, {
+        moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.AIR_SLASH, MoveId.ROOST],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Moon Spirit halves Water",
+    description:
+      "Moon Spirit keeps its Fairy and Dark STAB and enhanced Moonlight, and now halves Water damage.\n"
+      + "DO: let the foe repeatedly use Surf.\n"
+      + "EXPECT: each Water hit deals half normal damage.",
+    ability: erAbility(ErAbilityId.MOON_SPIRIT),
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.BLASTOISE,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.SURF],
+    },
+    party: () => [
+      makeStarter(SpeciesId.UMBREON, {
+        moveset: [MoveId.MOONLIGHT, MoveId.DARK_PULSE, MoveId.MOONBLAST, MoveId.PROTECT],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Soothing Aroma heals allies",
+    description:
+      "Soothing Aroma keeps Heal Bell on entry and now restores 1/16 max HP to the holder and adjacent allies each turn.\n"
+      + "DO: use Protect and Helping Hand for one turn with both allies staged at half HP.\n"
+      + "EXPECT: both active Pokemon recover 1/16 max HP at turn end.",
+    ability: erAbility(ErAbilityId.SOOTHING_AROMA),
+    overrides: {
+      BATTLE_STYLE_OVERRIDE: "double",
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.PROTECT],
+    },
+    party: () => [
+      makeStarter(SpeciesId.SKIPLOOM, {
+        moveset: [MoveId.PROTECT, MoveId.GIGA_DRAIN, MoveId.SYNTHESIS, MoveId.HELPING_HAND],
+      }),
+      makeStarter(SpeciesId.BLISSEY, {
+        moveset: [MoveId.HELPING_HAND, MoveId.PROTECT, MoveId.SEISMIC_TOSS, MoveId.SOFT_BOILED],
+      }),
+    ],
+    onBattleStart: () => {
+      const ally = globalScene.getPlayerField()[1];
+      if (ally) {
+        ally.summonData.ability = AbilityId.BALL_FETCH;
+      }
+      woundPlayerField(0.5);
+    },
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Butter Up inherits recovery",
+    description:
+      "Butter Up combines Hospitality with the upgraded Soothing Aroma package.\n"
+      + "DO: use Protect with both allies staged at half HP.\n"
+      + "EXPECT: the holder and adjacent ally each recover 1/16 max HP at turn end.",
+    ability: erAbility(ErAbilityId.BUTTER_UP),
+    overrides: {
+      BATTLE_STYLE_OVERRIDE: "double",
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.PROTECT],
+    },
+    party: () => [
+      makeStarter(SpeciesId.SKIPLOOM, {
+        moveset: [MoveId.PROTECT, MoveId.GIGA_DRAIN, MoveId.SYNTHESIS, MoveId.HELPING_HAND],
+      }),
+      makeStarter(SpeciesId.BLISSEY, {
+        moveset: [MoveId.HELPING_HAND, MoveId.PROTECT, MoveId.SEISMIC_TOSS, MoveId.SOFT_BOILED],
+      }),
+    ],
+    onBattleStart: () => {
+      const ally = globalScene.getPlayerField()[1];
+      if (ally) {
+        ally.summonData.ability = AbilityId.BALL_FETCH;
+      }
+      woundPlayerField(0.5);
+    },
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Neutralizing Fog controls weather moves",
+    description:
+      "Neutralizing Fog keeps Defog on entry and now also blocks enemy weather-based moves.\n"
+      + "DO: let the foe use Thunder and Weather Ball.\n"
+      + "EXPECT: both attacks are negated while the entry Defog still resolves.",
+    ability: erAbility(ErAbilityId.NEUTRALIZING_FOG),
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.ZAPDOS,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.THUNDER, MoveId.WEATHER_BALL],
+    },
+    party: () => [
+      makeStarter(SpeciesId.CORVIKNIGHT, {
+        moveset: [MoveId.PROTECT, MoveId.ROOST, MoveId.BODY_PRESS, MoveId.IRON_DEFENSE],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Color Spectrum adds Mystic Power",
+    description:
+      "Color Spectrum keeps its STAB boost and random pure-type rotation and now also makes every move receive STAB.\n"
+      + "DO: use Surf, Thunderbolt, Ice Beam, and Psychic across turns.\n"
+      + "EXPECT: every move receives STAB regardless of the holder's current random type.",
+    ability: erAbility(ErAbilityId.COLOR_SPECTRUM),
+    party: () => [
+      makeStarter(SpeciesId.KECLEON, {
+        moveset: [MoveId.SURF, MoveId.THUNDERBOLT, MoveId.ICE_BEAM, MoveId.PSYCHIC],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Higher Rank priority x1.3",
+    description:
+      "Higher Rank's existing priority-move boost is raised from 1.2x to 1.3x.\n"
+      + "DO: use Quick Attack on the tanky foe and compare it with a normal Tackle.\n"
+      + "EXPECT: the priority move receives the new 30% boost.",
+    ability: erAbility(ErAbilityId.HIGHER_RANK),
+    party: () => [
+      makeStarter(SpeciesId.PERSIAN, {
+        moveset: [MoveId.QUICK_ATTACK, MoveId.TACKLE, MoveId.PROTECT, MoveId.SCREECH],
+      }),
+    ],
+  }),
+  ...(
+    [
+      {
+        name: "Flourish",
+        ability: ErAbilityId.FLOURISH,
+        terrain: TerrainType.GRASSY,
+        attack: MoveId.ENERGY_BALL,
+      },
+      {
+        name: "Celestial Blessing",
+        ability: ErAbilityId.CELESTIAL_BLESSING,
+        terrain: TerrainType.MISTY,
+        attack: MoveId.MOONBLAST,
+      },
+      {
+        name: "Eternal Blessing",
+        ability: ErAbilityId.ETERNAL_BLESSING,
+        terrain: TerrainType.MISTY,
+        attack: MoveId.MOONBLAST,
+      },
+    ] as const
+  ).map(config =>
+    easyAbilityAdditionScenario({
+      label: `Ability+: ${config.name} heals 1/8`,
+      description:
+        `${config.name} now restores 1/8 max HP each turn in its matching terrain.\n`
+        + "DO: start at half HP, keep the matching terrain active, and use Protect.\n"
+        + "EXPECT: the ability contributes 1/8 max HP recovery at turn end while its existing effects remain.",
+      ability: erAbility(config.ability),
+      overrides: { STARTING_TERRAIN_OVERRIDE: config.terrain },
+      party: () => [
+        makeStarter(SpeciesId.MEGANIUM, {
+          moveset: [MoveId.PROTECT, config.attack, MoveId.RECOVER, MoveId.REFLECT],
+        }),
+      ],
+      onBattleStart: () => woundPlayerField(0.5),
+    }),
+  ),
+  ...(
+    [
+      { name: "Readied Action", ability: ErAbilityId.READIED_ACTION },
+      { name: "Demolitionist", ability: ErAbilityId.DEMOLITIONIST },
+    ] as const
+  ).map(config =>
+    easyAbilityAdditionScenario({
+      label: `Ability+: ${config.name} doubles direct damage`,
+      description:
+        `${config.name} doubles direct move damage on the holder's first turn instead of multiplying Attack.\n`
+        + "DO: use Sonic Boom on turn 1, then repeat it on turn 2. Psychic can be compared the same way.\n"
+        + "EXPECT: Sonic Boom deals 40 damage on turn 1 and 20 on turn 2, with no visible Attack-stat change.",
+      ability: erAbility(config.ability),
+      party: () => [
+        makeStarter(SpeciesId.ALAKAZAM, {
+          moveset: [MoveId.SONIC_BOOM, MoveId.PSYCHIC, MoveId.PROTECT, MoveId.RECOVER],
+        }),
+      ],
+    }),
+  ),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Powder Burst blocks powder",
+    description:
+      "Powder Burst keeps casting Powder on entry and now also grants powder-move immunity.\n"
+      + "DO: let the foe use Spore and Sleep Powder.\n"
+      + "EXPECT: both powder moves fail and the holder never falls asleep.",
+    ability: erAbility(ErAbilityId.POWDER_BURST),
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.BRELOOM,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.SPORE, MoveId.SLEEP_POWDER],
+    },
+    party: () => [
+      makeStarter(SpeciesId.SNORLAX, {
+        moveset: [MoveId.PROTECT, MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Superheavy full refresh package",
+    description:
+      "Superheavy keeps Steadfast and forced-switch immunity and rebuilds with the complete Heavy Metal package.\n"
+      + "DO: let the foe use Snarl, Sonic Boom, Shadow Ball, and Roar.\n"
+      + "EXPECT: Snarl is halved once, Sonic Boom deals 10, Ghost damage is halved, and forced switching is blocked.",
+    ability: erAbility(ErAbilityId.SUPERHEAVY),
+    overrides: {
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.EXPLOUD,
+      ENEMY_MOVESET_OVERRIDE: [MoveId.SNARL, MoveId.SONIC_BOOM, MoveId.SHADOW_BALL, MoveId.ROAR],
+    },
+    party: () => [
+      makeStarter(SpeciesId.SNORLAX, {
+        moveset: [MoveId.PROTECT, MoveId.HEAVY_SLAM, MoveId.REST, MoveId.BODY_SLAM],
+      }),
+    ],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Toxic Spill field Poison weakness",
+    description:
+      "Toxic Spill makes every Pokemon currently on the field weak to Poison on entry.\n"
+      + "DO: use Sludge Bomb on the Normal-type foe.\n"
+      + "EXPECT: the hit is super effective; natural Poison immunities remain immune.",
+    ability: erAbility(ErAbilityId.TOXIC_SPILL),
+    overrides: { ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX },
+    party: () => [makeStarter(SpeciesId.MUK, { moveset: [MoveId.SLUDGE_BOMB, MoveId.PROTECT] })],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Telekinetic one-turn Struggle",
+    description:
+      "Telekinetic forces eligible opponents to use Struggle for exactly one turn on entry.\n"
+      + "DO: use Growl twice while the foe has only Splash.\n"
+      + "EXPECT: the foe Struggles on turn 1 and uses Splash normally on turn 2.",
+    ability: erAbility(ErAbilityId.TELEKINETIC),
+    overrides: { ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX, ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH] },
+    party: () => [makeStarter(SpeciesId.BLISSEY, { moveset: [MoveId.GROWL, MoveId.SOFT_BOILED] })],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Monkey Business adds Covet",
+    description:
+      "Monkey Business follows its automatic Tickle stat reductions with one 20 BP Covet.\n"
+      + "DO: enter battle, then use an ordinary attack.\n"
+      + "EXPECT: Tickle is followed by Covet on entry; the ordinary attack does not trigger another Covet.",
+    ability: erAbility(ErAbilityId.MONKEY_BUSINESS),
+    overrides: { ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX },
+    party: () => [makeStarter(SpeciesId.AMBIPOM, { moveset: [MoveId.SPLASH, MoveId.PROTECT] })],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Entrance receives confusion damage",
+    description:
+      "Entrance heals the holder by the actual HP an opposing confused Pokemon loses to itself.\n"
+      + "DO: use Confuse Ray, then wait for the foe to hurt itself.\n"
+      + "EXPECT: Entrance announces the transfer and heals by the exact self-damage dealt.",
+    ability: erAbility(ErAbilityId.ENTRANCE),
+    overrides: { ENEMY_SPECIES_OVERRIDE: SpeciesId.RATTATA, ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE] },
+    party: () => [makeStarter(SpeciesId.ALAKAZAM, { moveset: [MoveId.CONFUSE_RAY, MoveId.RECOVER] })],
+    onBattleStart: () => woundPlayerField(0.4),
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Poseidon drains trapped foes",
+    description:
+      "Poseidon's Dominion keeps its entry Whirlpool and drains 1/6 max HP from trapped foes each turn.\n"
+      + "DO: enter at reduced HP and use Protect.\n"
+      + "EXPECT: the Whirlpool-trapped foe loses 1/6 max HP and the holder recovers the same amount.",
+    ability: erAbility(ErAbilityId.POSEIDON_S_DOMINION),
+    overrides: { ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX },
+    party: () => [makeStarter(SpeciesId.KYOGRE, { moveset: [MoveId.PROTECT, MoveId.SPLASH] })],
+    onBattleStart: () => woundPlayerField(0.4),
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Brain Mass Drain Brain counter",
+    description:
+      "Brain Mass keeps its full-HP damage reduction and has a 50% chance to counter hits with Drain Brain.\n"
+      + "DO: let the foe attack repeatedly while below full HP.\n"
+      + "EXPECT: a successful proc launches one Drain Brain and returns only half its normal healing.",
+    ability: erAbility(ErAbilityId.BRAIN_MASS),
+    overrides: { ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX, ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE] },
+    party: () => [makeStarter(SpeciesId.ALAKAZAM, { moveset: [MoveId.SPLASH, MoveId.RECOVER] })],
+    onBattleStart: () => woundPlayerField(0.4),
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Mimicry optimizes Terrain Pulse",
+    description:
+      "Mimicry picks Terrain Pulse's most effective legal terrain type for its target and grants matching STAB.\n"
+      + "DO: use Terrain Pulse against Gyarados on Psychic Terrain.\n"
+      + "EXPECT: it selects Electric typing and lands as a super-effective attack.",
+    ability: AbilityId.MIMICRY,
+    overrides: {
+      STARTING_TERRAIN_OVERRIDE: TerrainType.PSYCHIC,
+      ENEMY_SPECIES_OVERRIDE: SpeciesId.GYARADOS,
+    },
+    party: () => [makeStarter(SpeciesId.MEW, { moveset: [MoveId.TERRAIN_PULSE, MoveId.PROTECT] })],
+  }),
+  easyAbilityAdditionScenario({
+    label: "Ability+: Blistering Sun linked field",
+    description:
+      "Blistering Sun starts Desolate Land's harsh sunlight and the holder's Tailwind together.\n"
+      + "DO: inspect the field on entry and switch the holder out.\n"
+      + "EXPECT: harsh sun and Tailwind remain linked to the holder and both end when it leaves.",
+    ability: erAbility(ErAbilityId.BLISTERING_SUN),
+    party: () => [
+      makeStarter(SpeciesId.CHARIZARD, { moveset: [MoveId.PROTECT, MoveId.SPLASH] }),
+      makeStarter(SpeciesId.BLISSEY, { moveset: [MoveId.PROTECT, MoveId.SOFT_BOILED] }),
+    ],
+  }),
+];
+
 export const DEV_SCENARIOS: DevScenario[] = [
   ...BG_CHECK_SCENARIOS,
   ...BG_BIOME_SCENARIOS,
+  ...EASY_ABILITY_ADDITION_SCENARIOS,
   // ===========================================================================
   // Ability - Discipline lets you switch out WHILE rampaging (Outrage/Thrash)
   // ===========================================================================
@@ -940,6 +1612,41 @@ export const DEV_SCENARIOS: DevScenario[] = [
           moveset: [MoveId.WATER_GUN, MoveId.EMBER, MoveId.SWORDS_DANCE, MoveId.TACKLE],
         }),
       ];
+    },
+  },
+  {
+    label: "Partner: Eeveelution innate unlocks",
+    description:
+      "Partner Eevee's three candy-unlock bits belong to the WHOLE Omniform family, even\n"
+      + "when a partner Eeveelution is loaded directly instead of transforming first.\n"
+      + "This scenario starts as Partner Vaporeon and unlocks Partner Eevee innate slots\n"
+      + "1 and 3 only.\n"
+      + "DO: open Info -> Abilities (R, then Abilities) or the Summary ability panel.\n"
+      + "EXPECT: innate rows 1 and 3 are live; row 2 says 'Innate (Locked)'. The panel\n"
+      + "must use Partner Eevee's unlocks rather than Partner Vaporeon's transform-only\n"
+      + "starter data. Before the fix all three rows appeared locked when loaded directly.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(ER_PARTNER_VAPOREON_SPECIES_ID as SpeciesId, {
+          moveset: [MoveId.WATER_GUN, MoveId.ICE_BEAM, MoveId.SHADOW_BALL, MoveId.TACKLE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const eeveeData = globalScene.gameData.starterData[SpeciesId.EEVEE];
+      if (eeveeData) {
+        eeveeData.passiveAttr = unlockSlot(unlockSlot(0, 0), 2);
+      }
+      globalScene.getPlayerPokemon()?.updateInfo();
     },
   },
   // ===========================================================================
@@ -18680,6 +19387,422 @@ export const DEV_SCENARIOS: DevScenario[] = [
           moveset: [MoveId.TACKLE, MoveId.VINE_WHIP, MoveId.GROWL, MoveId.GROWTH],
         }),
       ];
+    },
+  },
+  // ===========================================================================
+  // Ability overhaul - deferred meta consumers
+  // ===========================================================================
+  {
+    label: "(note) Anticipation reveals one extra World Map route",
+    description:
+      "ABILITY META check - Anticipation now reveals one additional destination whenever the next\n"
+      + "World Map graph is generated. DO: win the opening wave, leave the reward and biome shop,\n"
+      + "then choose Leave at the crossroads and inspect the World Map. EXPECT: Anticipation reveals\n"
+      + "exactly one more rolled route than the same run would reveal without it. Locked, suppressed,\n"
+      + "or duplicate copies of the same ability must not add routes.\n"
+      + "Wandering Spirit uses the same +1 reveal consumer. Focused regression: \n"
+      + "test/tests/elite-redux/er-ability-meta-consumers.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 10,
+        STARTING_LEVEL_OVERRIDE: 50,
+        ABILITY_OVERRIDE: AbilityId.ANTICIPATION,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Super Luck grants 1.2x experience",
+    description:
+      "ABILITY META check - Super Luck adds a 1.2x multiplier to experience gained by its holder.\n"
+      + "DO: defeat the Magikarp and read both the active and bench experience gains. EXPECT: each\n"
+      + "eligible holder receives 20% more experience than the same battle without Super Luck. A\n"
+      + "suppressed or fainted holder\n"
+      + "gets the normal amount, and an active plus innate duplicate applies only once. ER Lucky Wings\n"
+      + "uses the same 1.2x experience consumer. Focused and headless coverage lives with the ability\n"
+      + "overhaul meta tests.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 20,
+        ABILITY_OVERRIDE: AbilityId.SUPER_LUCK,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 20,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.THUNDER_WAVE],
+        }),
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Good as Gold grants 1.2x battle money",
+    description:
+      "ABILITY META check - an eligible Good as Gold holder on the player field multiplies the\n"
+      + "battle-end money reward by 1.2. DO: note the starting money, defeat the trainer, and read\n"
+      + "the money-won line. EXPECT: the payout is 20% higher than the normal wave payout. A\n"
+      + "suppressed or fainted holder gives no bonus, and an active plus innate duplicate applies\n"
+      + "only once. Focused and headless coverage lives with the ability-overhaul meta tests.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 20,
+        BATTLE_TYPE_OVERRIDE: BattleType.TRAINER,
+        ABILITY_OVERRIDE: AbilityId.GOOD_AS_GOLD,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ball Fetch returns used Poke and Great Balls after battle",
+    description:
+      "BALL FETCH replacement check - used Poke Balls and Great Balls are returned after the battle,\n"
+      + "not immediately at turn end. DO: throw a Poke Ball at the Magikarp and finish the capture.\n"
+      + "EXPECT: the ball count drops when thrown, then returns to its starting count after the battle.\n"
+      + "Ultra, Rogue, and Master Balls are never restored. Multiple eligible or duplicate Ball Fetch\n"
+      + "sources cannot return the same physical ball twice. Focused and headless coverage lives with\n"
+      + "the ability-overhaul meta tests.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 20,
+        ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Stench protects Toxic Terrain",
+    description:
+      "ER STENCH protection check - this scenario starts with Stench suppressed for exactly one turn.\n"
+      + "DO: use Toxic Terrain on turn 1, then use Minimize while the foe repeatedly uses terrain moves.\n"
+      + "EXPECT: Toxic Terrain counts down once at the end of turn 1 while Stench is still suppressed.\n"
+      + "Stench then reactivates, freezes the remaining duration, and blocks terrain moves from replacing\n"
+      + "or clearing Toxic Terrain. Focused and headless coverage pins both behaviors.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.STENCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MUK,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [
+          MoveId.GRASSY_TERRAIN,
+          MoveId.MISTY_TERRAIN,
+          MoveId.ELECTRIC_TERRAIN,
+          MoveId.PSYCHIC_TERRAIN,
+        ],
+      });
+      return [
+        makeStarter(SpeciesId.MUK, {
+          moveset: [erMove(ErMoveId.TOXIC_TERRAIN), MoveId.MINIMIZE, MoveId.POISON_JAB, MoveId.KNOCK_OFF],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const pokemon = globalScene.getPlayerField()[0];
+      if (pokemon) {
+        suppressAbilityIdForTurns(pokemon, AbilityId.STENCH, 1, AbilityId.BALL_FETCH);
+      }
+    },
+  },
+  {
+    label: "Grappler binds with every damaging move",
+    description:
+      "GRAPPLER replacement check - every damaging move binds for exactly four turns and the bind\n"
+      + "deals 1/4 max HP per lapse. DO: use Tackle. EXPECT: the target gains Bind even though Tackle\n"
+      + "is not naturally a trapping move, and loses one quarter of its maximum HP to the first lapse.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(523),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 1,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "Frost Dragon follows Ice with Breaking Swipe",
+    description:
+      "FROST DRAGON replacement check - using an Ice move triggers one 40 BP Breaking Swipe.\n"
+      + "DO: use Ice Beam. EXPECT: Breaking Swipe follows immediately and lowers the target's Attack\n"
+      + "by one stage. Dragon moves alone must not trigger the follow-up.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(1009),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.GLACEON, { moveset: [MoveId.ICE_BEAM, MoveId.DRAGON_PULSE] })];
+    },
+  },
+  {
+    label: "Tummyache suppresses its direct attacker",
+    description:
+      "TUMMYACHE addition check - a direct-damage faint applies Gastro Acid to the attacker.\n"
+      + "DO: let the enemy knock out the holder. EXPECT: the attacker survives with its ability\n"
+      + "suppressed. Indirect damage and self-inflicted fainting must not trigger the retaliation.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 20,
+        ABILITY_OVERRIDE: erAbility(954),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.GIGA_IMPACT],
+      });
+      return [makeStarter(SpeciesId.MAGIKARP, { moveset: [MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "Rain Dish absorbs Water into higher Defense",
+    description:
+      "RAIN DISH addition check - Water attacks deal no damage and raise the holder's higher\n"
+      + "defensive stat by one stage. DO: let the foe use Water Gun. EXPECT: Blastoise remains\n"
+      + "at full HP and its naturally higher Special Defense rises by one stage.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.RAIN_DISH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SQUIRTLE,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.WATER_GUN],
+      });
+      return [makeStarter(SpeciesId.BLASTOISE, { moveset: [MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "Defeatist ten-percent comeback",
+    description:
+      "DEFEATIST addition check - crossing from above 10% HP to 10% or below from direct\n"
+      + "damage raises Attack, Sp. Atk, and Speed by two stages once per battle while the\n"
+      + "existing low-HP reductions remain. DO: use Swords Dance and take Tackle. EXPECT: all\n"
+      + "three offensive comeback stages rise by two without the holder fainting.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.DEFEATIST,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.RATTATA,
+        ENEMY_LEVEL_OVERRIDE: 35,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SWORDS_DANCE] })];
+    },
+  },
+  {
+    label: "Ball Fetch intercepts and returns ball moves",
+    description:
+      "BALL FETCH replacement check - ball/bomb and throwing moves are blocked, then used once\n"
+      + "against their original user. DO: let Rattata use Aura Sphere. EXPECT: Blastoise takes no\n"
+      + "damage and immediately returns Aura Sphere into Rattata.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.RATTATA,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.RUN_AWAY,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.AURA_SPHERE],
+      });
+      return [makeStarter(SpeciesId.BLASTOISE, { moveset: [MoveId.SWORDS_DANCE] })];
+    },
+  },
+  {
+    label: "Intimidate fears after a successful drop",
+    description:
+      "INTIMIDATE rider check. EXPECT: the adjacent foe loses one Attack stage and, on the\n"
+      + "successful drop's 10% proc, gains Fear. A blocked or capped drop must never roll Fear.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.INTIMIDATE,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.RATTATA,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.BLASTOISE, { moveset: [MoveId.MAGIC_ROOM] })];
+    },
+  },
+  {
+    label: "Berserk raises higher offense on Enrage",
+    description:
+      "BERSERK transition check. DO: let Rattata use Swagger. EXPECT: Swagger adds Enrage and\n"
+      + "Berserk immediately raises Alakazam's naturally higher Sp. Atk by one stage.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.BERSERK,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.RATTATA,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SWAGGER],
+      });
+      return [makeStarter(SpeciesId.ALAKAZAM, { moveset: [MoveId.CALM_MIND] })];
+    },
+  },
+  {
+    label: "Hyper Aggressive gains second strike only while enraged",
+    description:
+      "HYPER AGGRESSIVE replacement check. DO: use Tail Whip while Snorlax uses Swagger, then\n"
+      + "use Tackle. EXPECT: Tail Whip remains single-use; after Enrage, Tackle hits twice and\n"
+      + "only the added strike is reduced to 25% power.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.HYPER_AGGRESSIVE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SWAGGER, MoveId.SWORDS_DANCE],
+      });
+      return [makeStarter(SpeciesId.BLASTOISE, { moveset: [MoveId.TAIL_WHIP, MoveId.TACKLE] })];
+    },
+  },
+  {
+    label: "Flower Gift boosts each Pokemon's higher stats",
+    description:
+      "FLOWER GIFT upgrade check. Alakazam's naturally higher offense is Sp. Atk and its higher\n"
+      + "defense is Sp. Def. EXPECT: while sun is active, both are multiplied by 1.5; its lower\n"
+      + "Attack and Defense are unchanged. In doubles, each ally uses its own natural stat pair.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        WEATHER_OVERRIDE: WeatherType.SUNNY,
+        ABILITY_OVERRIDE: AbilityId.FLOWER_GIFT,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.ALAKAZAM, { moveset: [MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "Imposter boosts copied attacks while transformed",
+    description:
+      "IMPOSTER upgrade check. Ditto transforms into Snorlax on entry. DO: use the copied Tackle.\n"
+      + "EXPECT: Ditto remains transformed and its copied Tackle deals 1.3x normal damage. The\n"
+      + "bonus disappears whenever it is not transformed.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.IMPOSTER,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [makeStarter(SpeciesId.DITTO, { moveset: [MoveId.TRANSFORM] })];
+    },
+  },
+  {
+    label: "Forewarn's two-turn protection is once per battle",
+    description:
+      "FOREWARN upgrade check. Let Umbreon hit Alakazam with Astonish, switch to Snorlax,\n"
+      + "then switch Alakazam back in and wait one turn. EXPECT: the first hit is forced to not\n"
+      + "very effective, but the next hit after re-entry is super effective because the window cannot re-arm.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.FOREWARN,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.UMBREON,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.RUN_AWAY,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.ASTONISH],
+      });
+      return [
+        makeStarter(SpeciesId.ALAKAZAM, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "Catastrophe boosts Rock moves in hail",
+    description:
+      "CATASTROPHE maintainer override. In Hail or Snow, Rock moves deal 1.5x damage; in\n"
+      + "Sandstorm, Ice moves deal 1.5x damage. EXPECT: Rock Slide receives the Hail boost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 146,
+        STARTING_LEVEL_OVERRIDE: 100,
+        WEATHER_OVERRIDE: WeatherType.HAIL,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.CATASTROPHE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.RUN_AWAY,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.ROCK_SLIDE] })];
     },
   },
   // ===========================================================================

@@ -1,0 +1,44 @@
+{
+  "v": 1,
+  "name": "Quick Draw mirror-match bonus",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "quick-draw-mirror"
+  },
+  "party": [
+    {
+      "species": "MAGIKARP",
+      "ability": "QUICK_DRAW",
+      "moves": ["TACKLE", "SPLASH", "PROTECT", "FLAIL"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "MAGIKARP",
+        "level": 100,
+        "ability": "QUICK_DRAW",
+        "moves": ["TACKLE"]
+      }
+    ]
+  },
+  "script": [
+    { "move": "TACKLE", "enemyMove": "TACKLE" },
+    { "move": "TACKLE", "enemyMove": "TACKLE" },
+    { "move": "TACKLE", "enemyMove": "TACKLE" },
+    { "move": "TACKLE", "enemyMove": "TACKLE" },
+    { "move": "TACKLE", "enemyMove": "TACKLE" },
+    { "move": "TACKLE", "enemyMove": "TACKLE" },
+    { "move": "TACKLE", "enemyMove": "TACKLE" },
+    { "move": "TACKLE", "enemyMove": "TACKLE" }
+  ],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Quick Draw",
+    "enemyAbility": "Quick Draw",
+    "logIncludes": ["Quick Draw"]
+  }
+}

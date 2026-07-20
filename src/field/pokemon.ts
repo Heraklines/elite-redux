@@ -2,6 +2,7 @@ import type { PreAttackModifyDamageAbAttrParams } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import {
   applyAbAttrs,
+  applyFilteredAbAttrs,
   applyOnGainAbAttrs,
   applyOnLoseAbAttrs,
   getEnemyPassiveSlotLimit,
@@ -68,10 +69,22 @@ import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { erLibraryCastIsSpecial, erLibraryDamageMultiplier } from "#data/elite-redux/abilities/library";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
 import { erOmniformRevertOnLeaveField } from "#data/elite-redux/abilities/omniform";
-import { erOmniformOriginalSpecies } from "#data/elite-redux/abilities/omniform-registry";
+import {
+  erOmniformOriginalIdentity,
+  resolveOmniformUnlockOwnerIdentity,
+} from "#data/elite-redux/abilities/omniform-registry";
 import { erShatteredPsycheOnLeaveField } from "#data/elite-redux/abilities/shattered-psyche";
 import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
 import { getGraftedTypes } from "#data/elite-redux/abilities/type-graft";
+import {
+  isAbilityIdSuppressed,
+  isInnateSlotSuppressed,
+} from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
+import {
+  getRequestedFieldDamageMultiplier,
+  isSuppressedByRequestedFieldAbility,
+  resolveRequestedMoveType,
+} from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
@@ -308,6 +321,12 @@ import i18next from "i18next";
 import Phaser from "phaser";
 import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
 import type { NonEmptyTuple } from "type-fest";
+
+export interface PokemonAbilitySource {
+  readonly ability: Ability;
+  readonly passive: boolean;
+  readonly passiveSlot?: number;
+}
 
 export abstract class Pokemon extends Phaser.GameObjects.Container {
   /**
@@ -2010,6 +2029,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (ally != null) {
       applyAbAttrs("AllyStatMultiplierAbAttr", {
         pokemon: ally,
+        target: this,
         stat,
         statVal,
         simulated,
@@ -2026,11 +2046,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       PersistentFieldAuraAbAttr.applyAuras(this, stat, statVal);
     }
 
-    let ret =
-      statVal.value
-      * (wonderRoomSwapped
-        ? 1 // ER Wonder Room: swapped ATK/SpAtk ignore stat stages ("buffs")
-        : this.getStatStageMultiplier(stat, opponent, move, ignoreOppAbility, isCritical, simulated, ignoreHeldItems));
+    const unburdenSpeedProtected = stat === Stat.SPD && !ignoreAbility && this.hasAbility(AbilityId.UNBURDEN);
+    const stageMultiplier = wonderRoomSwapped
+      ? 1 // ER Wonder Room: swapped ATK/SpAtk ignore stat stages ("buffs")
+      : this.getStatStageMultiplier(stat, opponent, move, ignoreOppAbility, isCritical, simulated, ignoreHeldItems);
+    let ret = statVal.value * (unburdenSpeedProtected ? Math.max(stageMultiplier, 1) : stageMultiplier);
 
     switch (stat) {
       case Stat.ATK:
@@ -2074,22 +2094,20 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         if (globalScene.arena.getTagOnSide(ArenaTagType.TAILWIND, side)) {
           ret *= 2;
         }
-        if (globalScene.arena.getTagOnSide(ArenaTagType.GRASS_WATER_PLEDGE, side)) {
+        if (!unburdenSpeedProtected && globalScene.arena.getTagOnSide(ArenaTagType.GRASS_WATER_PLEDGE, side)) {
           ret >>= 2;
         }
 
-        if (this.getTag(BattlerTagType.SLOW_START)) {
+        if (!unburdenSpeedProtected && this.getTag(BattlerTagType.SLOW_START)) {
           ret >>= 1;
         }
-        if (this.status && this.status.effect === StatusEffect.PARALYSIS) {
+        if (!unburdenSpeedProtected && this.status && this.status.effect === StatusEffect.PARALYSIS) {
           ret >>= 1;
-        }
-        if (this.getTag(BattlerTagType.UNBURDEN) && this.hasAbility(AbilityId.UNBURDEN)) {
-          ret *= 2;
         }
         // ER tactical items: Iron Ball halves Speed, Float Stone raises it 10%.
         if (!ignoreHeldItems) {
-          ret *= erTacticalSpeedMultiplier(this);
+          const tacticalMultiplier = erTacticalSpeedMultiplier(this);
+          ret *= unburdenSpeedProtected ? Math.max(tacticalMultiplier, 1) : tacticalMultiplier;
         }
         break;
       }
@@ -2819,6 +2837,69 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     return slots;
   }
 
+  private collectAbilitySources(
+    ignoreOverride: boolean,
+    activeOnly: boolean,
+    ignoreFaint = false,
+  ): readonly PokemonAbilitySource[] {
+    const sources: PokemonAbilitySource[] = [];
+    const seenIds = new Set<AbilityId>();
+    const active = this.getAbility(ignoreOverride);
+    if (!activeOnly || this.canApplyAbility(false, 0, ignoreFaint)) {
+      seenIds.add(active.id);
+      sources.push({ ability: active, passive: false });
+    }
+
+    const passiveAbilities = this.getPassiveAbilities();
+    const enemySlotLimit = getEnemyPassiveSlotLimit(this);
+    for (let slot = 0; slot < passiveAbilities.length; slot++) {
+      const ability = passiveAbilities[slot];
+      if (!ability) {
+        continue;
+      }
+      const isGiftSlot = slot >= 3;
+      const isFormChangeDriver = this.abilityDrivesFormChange(ability);
+      if (!isGiftSlot && slot >= enemySlotLimit && !isFormChangeDriver) {
+        continue;
+      }
+      if (activeOnly && !this.canApplyAbility(true, slot, ignoreFaint)) {
+        continue;
+      }
+      if (seenIds.has(ability.id)) {
+        continue;
+      }
+      seenIds.add(ability.id);
+      sources.push({ ability, passive: true, passiveSlot: slot });
+    }
+
+    return sources;
+  }
+
+  /**
+   * Enumerate each distinct active/innate ability source in canonical order.
+   * This applies structural source gates (enemy slot limits and duplicate ids),
+   * but deliberately retains locked or temporarily suppressed player innates.
+   */
+  public getAbilitySources(ignoreOverride = false): readonly PokemonAbilitySource[] {
+    return this.collectAbilitySources(ignoreOverride, false);
+  }
+
+  /**
+   * Enumerate currently eligible sources, deduplicating only after suppression
+   * and unlock gates so a disabled earlier slot cannot mask a later duplicate.
+   */
+  public getActiveAbilitySources(ignoreOverride = false): readonly PokemonAbilitySource[] {
+    return this.collectAbilitySources(ignoreOverride, true);
+  }
+
+  /**
+   * Enumerate sources that pass every normal eligibility gate except the holder's
+   * faint state. Intended only for explicitly post-battle abilities such as Ball Fetch.
+   */
+  public getPostBattleAbilitySources(ignoreOverride = false): readonly PokemonAbilitySource[] {
+    return this.collectAbilitySources(ignoreOverride, true, true);
+  }
+
   /**
    * The selectable ability "slots" for this Pokémon, used by the ER Ability
    * Randomizer: slot 0 is the active ability, slots 1-3 are the ER innate
@@ -2916,38 +2997,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns An array of all the ability attributes on this ability.
    */
   public getAbilityAttrs<T extends AbAttrString>(attrType: T, canApply = true, ignoreOverride = false): AbAttrMap[T][] {
-    const abilityAttrs: AbAttrMap[T][] = [];
-
-    // ER 3-passive model: gather attrs from the active ability AND all eligible
-    // innate (passive) slots, not just slot 0. Mirrors applyAbAttrsInternal's
-    // gating (enemy level slot-limit + per-slot canApplyAbility + id dedup) so
-    // query methods agree with what applyAbAttrs actually fires. Previously this
-    // only consulted getPassiveAbility() (slot 0), making innates in slots 1-2
-    // invisible (e.g. innate Rock Head failing to block recoil).
-    const active = this.getAbility(ignoreOverride);
-    const seen = new Set<number>([active.id]);
-    if (!canApply || this.canApplyAbility()) {
-      abilityAttrs.push(...active.getAttrs(attrType));
-    }
-
-    const passives = this.getPassiveAbilities();
-    const slotLimit = getEnemyPassiveSlotLimit(this);
-    for (let slot = 0; slot < passives.length; slot++) {
-      // ER Black Shinies (#349): GIFT slots (>= 3) ignore the enemy level limit.
-      if (slot < 3 && slot >= slotLimit) {
-        continue;
-      }
-      const pa = passives[slot];
-      if (!pa || seen.has(pa.id)) {
-        continue;
-      }
-      if (!canApply || this.canApplyAbility(true, slot)) {
-        abilityAttrs.push(...pa.getAttrs(attrType));
-        seen.add(pa.id);
-      }
-    }
-
-    return abilityAttrs;
+    const sources = canApply ? this.getActiveAbilitySources(ignoreOverride) : this.getAbilitySources(ignoreOverride);
+    return sources.flatMap(source => source.ability.getAttrs(attrType));
   }
 
   /**
@@ -2963,29 +3014,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * Dragon moves hit Fairies. All such sites must route through this.
    */
   public getAllActiveAbilityAttrs(): readonly AbAttrMap[AbAttrString][] {
-    const out: AbAttrMap[AbAttrString][] = [];
-    const active = this.getAbility();
-    const seen = new Set<number>([active.id]);
-    if (this.canApplyAbility()) {
-      out.push(...active.attrs);
-    }
-    const passives = this.getPassiveAbilities();
-    const slotLimit = getEnemyPassiveSlotLimit(this);
-    for (let slot = 0; slot < passives.length; slot++) {
-      // ER Black Shinies (#349): GIFT slots (>= 3) ignore the enemy level limit.
-      if (slot < 3 && slot >= slotLimit) {
-        continue;
-      }
-      const pa = passives[slot];
-      if (!pa || seen.has(pa.id)) {
-        continue;
-      }
-      if (this.canApplyAbility(true, slot)) {
-        out.push(...pa.attrs);
-        seen.add(pa.id);
-      }
-    }
-    return out;
+    return this.getActiveAbilitySources().flatMap(source => source.ability.attrs);
   }
 
   /**
@@ -3219,21 +3248,29 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (globalScene.gameMode.isCoop && this.customPokemonData?.coopPassiveAttr != null) {
       return this.customPokemonData.coopPassiveAttr[slot] ?? 0;
     }
-    // ER Omniform (5929): a mid-battle-transformed holder (Partner Eevee -> a partner
-    // eeveelution, id 70012+) reads its innate candy-unlock from the PRE-TRANSFORM
-    // SOURCE species, not the transform TARGET. The target species is never candy-
-    // bought, so reading its `passiveAttr` (0) would silently LOCK every innate the
-    // player unlocked on Partner Eevee. Consulting the source snapshot carries that
-    // unlocked-innate set to every form it adapts into (maintainer directive) and,
-    // once the holder reverts on `leaveField`, this returns `undefined` so the gate
-    // falls back to the reverted base species unchanged.
-    const selfSpecies = erOmniformOriginalSpecies(this) ?? this.species;
-    const owner =
-      this.isFusion() && this.fusionSpecies && (slot === 0 || slot === 2) ? this.fusionSpecies : selfSpecies;
+    // ER Omniform (5929): every family member reads candy unlocks from its
+    // registered family HEAD. The transient original snapshot handles a holder
+    // that just transformed; the permanent owner registry additionally handles a
+    // partner Eeveelution loaded or instantiated directly (no snapshot exists).
+    // Fusion slot ownership remains unchanged: slots 0/2 belong to the fusion
+    // species, slot 1 to the base species, and either owner may itself belong to an
+    // Omniform family.
+    const originalIdentity = erOmniformOriginalIdentity(this);
+    const selfIdentity = originalIdentity ?? {
+      speciesId: this.species.speciesId,
+      formIndex: this.formIndex,
+    };
+    const slotOwnerIdentity =
+      this.isFusion() && this.fusionSpecies && (slot === 0 || slot === 2)
+        ? { speciesId: this.fusionSpecies.speciesId, formIndex: this.fusionFormIndex }
+        : selfIdentity;
+    const unlockOwnerIdentity =
+      resolveOmniformUnlockOwnerIdentity(slotOwnerIdentity.speciesId, slotOwnerIdentity.formIndex) ?? slotOwnerIdentity;
+    const owner = getPokemonSpecies(unlockOwnerIdentity.speciesId);
     return globalScene.gameData.starterData[owner.getRootSpeciesId()]?.passiveAttr ?? 0;
   }
 
-  public canApplyAbility(passive = false, passiveSlot = 0): boolean {
+  public canApplyAbility(passive = false, passiveSlot = 0, ignoreFaint = false): boolean {
     // ER 3-passive: resolve the candidate ability first (before the unlock gates
     // below) so we can special-case form-change-driving innates. We avoid falling
     // back to `this.getAbility()` for an empty passive slot because that would
@@ -3303,6 +3340,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (globalScene.movesetGenInProgress) {
       return true;
     }
+    if (passive && passiveSlot < 3 && isInnateSlotSuppressed(this, passiveSlot as 0 | 1 | 2)) {
+      return false;
+    }
+    if (isAbilityIdSuppressed(this, ability.id)) {
+      return false;
+    }
+    if (isSuppressedByRequestedFieldAbility(this, ability.id)) {
+      return false;
+    }
     if (this.isTransformed() && ability.hasAttr("NoTransformAbilityAbAttr")) {
       return false;
     }
@@ -3350,7 +3396,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     ) {
       return false;
     }
-    return (this.hp > 0 || ability.bypassFaint) && !ability.conditions.find(condition => !condition(this));
+    return (
+      (ignoreFaint || this.hp > 0 || ability.bypassFaint) && !ability.conditions.find(condition => !condition(this))
+    );
   }
 
   /**
@@ -3362,37 +3410,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns Whether this {@linkcode Pokemon} has the given ability
    */
   public hasAbility(ability: AbilityId, canApply = true, ignoreOverride = false): boolean {
-    if (this.getAbility(ignoreOverride).id === ability && (!canApply || this.canApplyAbility())) {
-      return true;
-    }
-    // ER 3-passive model: check every eligible innate slot, not just slot 0.
-    // Short-circuit on "no usable passive" EXCEPT when the queried ability is a
-    // form-change driver (Forecast/Hunger Switch/Flower Gift relocated into an
-    // innate slot) — those are never candy-gated, so we must still scan the slots
-    // to find them (covers both the "changes form" canApply path and the "revert
-    // to normal" canApply=false path, e.g. Air Lock / switch-out).
-    if (!this.hasPassive() && !this.abilityDrivesFormChange(allAbilities[ability])) {
-      return false;
-    }
-    const passives = this.getPassiveAbilities();
-    const slotLimit = getEnemyPassiveSlotLimit(this);
-    for (let slot = 0; slot < passives.length; slot++) {
-      const pa = passives[slot];
-      // Form-change drivers are species identity, never gated by the enemy slot
-      // limit or candy unlock — match them regardless of slot position (#480:
-      // Stance Change sits in innate slot 2, past a low-level enemy's slot limit).
-      if (pa?.id === ability && this.abilityDrivesFormChange(pa) && (!canApply || this.canApplyAbility(true, slot))) {
-        return true;
-      }
-      // ER Black Shinies (#349): GIFT slots (>= 3) ignore the enemy slot limit.
-      if (slot < 3 && slot >= slotLimit) {
-        continue;
-      }
-      if (pa?.id === ability && (!canApply || this.canApplyAbility(true, slot))) {
-        return true;
-      }
-    }
-    return false;
+    const sources = canApply ? this.getActiveAbilitySources(ignoreOverride) : this.getAbilitySources(ignoreOverride);
+    return sources.some(source => source.ability.id === ability);
   }
 
   /**
@@ -3451,40 +3470,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns Whether this Pokemon has an ability with the given {@linkcode AbAttr}.
    */
   public hasAbilityWithAttr(attrType: AbAttrString, canApply = true, ignoreOverride = false): boolean {
-    if ((!canApply || this.canApplyAbility()) && this.getAbility(ignoreOverride).hasAttr(attrType)) {
-      return true;
-    }
-    // ER 3-passive model: check every eligible innate slot, not just slot 0.
-    // Short-circuit on "no usable passive" EXCEPT when the queried attribute is a
-    // form-change driver — those innates are never candy-gated (see `hasAbility`).
-    if (!this.hasPassive() && !(Pokemon.FORM_CHANGE_DRIVER_ATTRS as readonly AbAttrString[]).includes(attrType)) {
-      return false;
-    }
-    const passives = this.getPassiveAbilities();
-    const slotLimit = getEnemyPassiveSlotLimit(this);
-    for (let slot = 0; slot < passives.length; slot++) {
-      // ER Black Shinies (#349): GIFT slots (>= 3) ignore the enemy slot limit.
-      if (slot < 3 && slot >= slotLimit) {
-        continue;
-      }
-      const pa = passives[slot];
-      if (pa?.hasAttr(attrType) && (!canApply || this.canApplyAbility(true, slot))) {
-        return true;
-      }
-    }
-    return false;
+    const sources = canApply ? this.getActiveAbilitySources(ignoreOverride) : this.getAbilitySources(ignoreOverride);
+    return sources.some(source => source.ability.hasAttr(attrType));
   }
 
-  /**
-   * Return the ability priorities of the pokemon's ability and, if enabled, its passive ability
-   * @returns A tuple containing the ability priorities of the pokemon
-   */
-  public getAbilityPriorities(): [activePriority: number] | [activePriority: number, passivePriority: number] {
-    const abilityPriority = this.getAbility().postSummonPriority;
-    if (this.hasPassive()) {
-      return [abilityPriority, this.getPassiveAbility().postSummonPriority];
-    }
-    return [abilityPriority];
+  /** Return post-summon priorities for every currently active ability source. */
+  public getAbilityPriorities(): number[] {
+    return this.getActiveAbilitySources().map(source => source.ability.postSummonPriority);
   }
 
   /**
@@ -3570,6 +3562,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return true;
     }
 
+    const side = this.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
+    if (globalScene.arena.getTagOnSide(ArenaTagType.FIRE_GRASS_PLEDGE, side)) {
+      return true;
+    }
+
     if (this.isOfType(PokemonType.GHOST)) {
       return false;
     }
@@ -3598,7 +3595,6 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
 
-    const side = this.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
     return (
       trapped.value
       || !!this.getTag(TrappedTag) // ER FEAR traps the bearer (ROM). Ghost's early-return above still lets // Ghosts switch out, matching vanilla trap rules.
@@ -3687,7 +3683,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (move.hasAttr("TypelessAttr")) {
       return 1;
     }
-    const moveType = source.getMoveType(move);
+    const moveType = resolveRequestedMoveType(source, this, move, source.getMoveType(move));
 
     const typeMultiplier = new NumberHolder(
       move.category !== MoveCategory.STATUS || move.hasAttr("RespectAttackTypeImmunityAttr")
@@ -3774,6 +3770,23 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           if (typeMultiplier.value === 0) {
             break;
           }
+        }
+      }
+
+      // ER Ball Fetch: flag-based interception is a data-driven immunity that
+      // cannot be represented by the fixed-type TypeImmunity base alone.
+      // Consume its marker here on the same effectiveness surface as all other
+      // move immunities so the incoming hit is cancelled before damage.
+      if (!cancelledHolder.value) {
+        const blockedByFlag = this.getAllActiveAbilityAttrs().some(attr => {
+          if (attr?.constructor?.name !== "MoveFlagImmunityAbAttr") {
+            return false;
+          }
+          return (attr as unknown as { blocks: (candidate: Move) => boolean }).blocks(move);
+        });
+        if (blockedByFlag) {
+          typeMultiplier.value = 0;
+          cancelledHolder.value = true;
         }
       }
     }
@@ -3950,6 +3963,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // weaknesses (already pure Ice via the type override) still apply.
     if (multi.value < 1 && this.getTag(BattlerTagType.ER_ICE_STATUE) != null) {
       multi.value = 1;
+    }
+    // Toxic Spill snapshots every battler present on entry. Existing
+    // immunities stay immune; every other Poison matchup becomes weak.
+    if (moveType === PokemonType.POISON && this.tempSummonData.erPoisonWeakness && multi.value > 0) {
+      multi.value = Math.max(2, multi.value);
     }
     // ER Dojo (#439 §3): martial mastery - moves of the biome's `unresistedType`
     // (Fighting) are NEVER resisted here. Any sub-neutral matchup (resistances AND
@@ -4996,6 +5014,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         this.hasAbilityWithAttr("MoveAbilityBypassAbAttr") || sourceMove.hasFlag(MoveFlags.IGNORE_ABILITIES);
       applyAbAttrs("AllyStatMultiplierAbAttr", {
         pokemon: ally,
+        target,
         stat: Stat.ACC,
         statVal: accuracyMultiplier,
         ignoreAbility: ignore,
@@ -5004,6 +5023,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
       applyAbAttrs("AllyStatMultiplierAbAttr", {
         pokemon: ally,
+        target,
         stat: Stat.EVA,
         statVal: evasionMultiplier,
         ignoreAbility: ignore,
@@ -5209,7 +5229,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     const sourceTypes = source.getTypes(false, false);
     const sourceTeraType = source.getTeraType();
-    const moveType = source.getMoveType(move);
+    const moveType = resolveRequestedMoveType(source, this, move, source.getMoveType(move));
     const matchesSourceType = sourceTypes.includes(source.getMoveType(move));
 
     const stabMultiplier = new NumberHolder(1);
@@ -5382,6 +5402,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const fixedDamage = new NumberHolder(0);
     applyMoveAttrs("FixedDamageAttr", source, this, move, fixedDamage);
     if (fixedDamage.value) {
+      applyFilteredAbAttrs(
+        "MovePowerBoostAbAttr",
+        {
+          pokemon: source,
+          opponent: this,
+          move,
+          power: fixedDamage,
+        },
+        attr => attr.appliesToFixedDamage(),
+      );
+
       const multiLensMultiplier = new NumberHolder(1);
       globalScene.applyModifiers(
         PokemonMultiHitModifier,
@@ -5392,6 +5423,20 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         multiLensMultiplier,
       );
       fixedDamage.value = toDmgValue(fixedDamage.value * multiLensMultiplier.value);
+
+      if (!ignoreAbility) {
+        applyFilteredAbAttrs(
+          "ReceivedMoveDamageMultiplierAbAttr",
+          {
+            pokemon: this,
+            opponent: source,
+            move,
+            simulated,
+            damage: fixedDamage,
+          },
+          attr => attr.appliesToFixedDamage(),
+        );
+      }
 
       return {
         cancelled: false,
@@ -5642,6 +5687,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * erRelicDefenderMultiplier
         * erLibraryMultiplier,
     );
+    damage.value = toDmgValue(damage.value * getRequestedFieldDamageMultiplier(source, this, move));
 
     // ER Overrule 815: on a CRITICAL hit, the holder's attacks deal double damage
     // if they are resisted (negating the not-very-effective penalty). No-op for
@@ -6211,6 +6257,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (newTag.canAdd(this)) {
       this.summonData.tags.push(newTag);
       newTag.onAdd(this);
+      if (
+        (tagType === BattlerTagType.CONFUSED || tagType === BattlerTagType.ER_ENRAGE)
+        && this.hasAbility(AbilityId.BERSERK)
+      ) {
+        const stat = this.getStat(Stat.SPATK, false) > this.getStat(Stat.ATK, false) ? Stat.SPATK : Stat.ATK;
+        globalScene.phaseManager.unshiftNew("StatStageChangePhase", this.getBattlerIndex(), true, [stat], 1);
+      }
       return true;
     }
 

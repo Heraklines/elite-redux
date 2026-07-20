@@ -42,6 +42,13 @@ function identityKey(speciesId: number, formIndex: number): string {
 const OMNIFORM_REGISTRY = new Map<string, Map<PokemonType, OmniformTarget>>();
 
 /**
+ * Permanent candy-unlock owner for each Omniform family identity. Unlike the
+ * per-battle original snapshot below, this also covers a family member loaded
+ * or instantiated directly (for example a saved Partner Eeveelution).
+ */
+const OMNIFORM_UNLOCK_OWNERS = new Map<string, OmniformTarget>();
+
+/**
  * Register a mapping: a holder in form `(fromSpeciesId, fromFormIndex)` using a
  * move of type `moveType` transforms into `(toSpeciesId, toFormIndex)`.
  */
@@ -61,9 +68,31 @@ export function registerOmniformMapping(
   byType.set(moveType, { speciesId: toSpeciesId, formIndex: toFormIndex });
 }
 
-/** Remove every registered mapping (test isolation). */
+/**
+ * Register the stable candy-unlock owner for an Omniform family member.
+ * Multiple members may point to the same owner identity.
+ */
+export function registerOmniformUnlockOwner(
+  memberSpeciesId: SpeciesId,
+  memberFormIndex: number,
+  ownerSpeciesId: SpeciesId,
+  ownerFormIndex: number,
+): void {
+  OMNIFORM_UNLOCK_OWNERS.set(identityKey(memberSpeciesId, memberFormIndex), {
+    speciesId: ownerSpeciesId,
+    formIndex: ownerFormIndex,
+  });
+}
+
+/** The stable candy-unlock owner for an Omniform identity, when registered. */
+export function resolveOmniformUnlockOwnerIdentity(speciesId: number, formIndex: number): OmniformTarget | undefined {
+  return OMNIFORM_UNLOCK_OWNERS.get(identityKey(speciesId, formIndex));
+}
+
+/** Remove every registered mapping and unlock owner (test isolation). */
 export function clearOmniformRegistry(): void {
   OMNIFORM_REGISTRY.clear();
+  OMNIFORM_UNLOCK_OWNERS.clear();
 }
 
 /** The mapped target for `pokemon`'s CURRENT form and `moveType`, or `undefined`. */

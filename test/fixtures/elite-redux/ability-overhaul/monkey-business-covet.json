@@ -1,0 +1,36 @@
+{
+  "v": 1,
+  "name": "Monkey Business follows its Tickle with 20 BP Covet",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "monkey-business-covet"
+  },
+  "party": [
+    {
+      "species": "AMBIPOM",
+      "ability": 5192,
+      "moves": ["SPLASH"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "RUN_AWAY",
+        "moves": ["SPLASH"]
+      }
+    ]
+  },
+  "script": [{ "move": "SPLASH", "enemyMove": "SPLASH" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Monkey Business",
+    "enemyDamaged": true,
+    "enemyStage": { "stat": "ATK", "value": -1 },
+    "logIncludes": ["Covet"]
+  }
+}

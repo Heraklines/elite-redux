@@ -1,4 +1,5 @@
 import { AbilityId } from "#enums/ability-id";
+import { ErAbilityId } from "#enums/er-ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
@@ -20,13 +21,15 @@ describe("Ability - Liquid Ooze", () => {
     game.override
       .ability(AbilityId.BALL_FETCH)
       .battleStyle("single")
+      .startingLevel(100)
       .enemyLevel(20)
       .enemySpecies(SpeciesId.MAGIKARP)
       .enemyAbility(AbilityId.LIQUID_OOZE)
-      .enemyMoveset(MoveId.SPLASH);
+      .enemyMoveset(MoveId.GROWL);
   });
 
   it("should reverse the effect of HP-draining moves", async () => {
+    game.override.startingLevel(20).enemyLevel(100).enemySpecies(SpeciesId.SNORLAX);
     await game.classicMode.startBattle(SpeciesId.FEEBAS);
 
     game.move.use(MoveId.GIGA_DRAIN);
@@ -58,6 +61,37 @@ describe("Ability - Liquid Ooze", () => {
     await game.toEndOfTurn();
 
     expect(game.field.getPlayerPokemon()).toHaveFullHp();
+  });
+
+  it("reverses Energy Tap's ability-driven recovery", async () => {
+    game.override.ability(ErAbilityId.ENERGY_TAP as unknown as AbilityId).startingLevel(100);
+    await game.classicMode.startBattle(SpeciesId.FEEBAS);
+
+    const player = game.field.getPlayerPokemon();
+    game.move.use(MoveId.NIGHT_SHADE);
+    await game.toEndOfTurn();
+
+    expect(player.hp).toBeLessThan(player.getMaxHp());
+  });
+
+  it("reverses Predator's on-KO recovery", async () => {
+    game.override
+      .ability(ErAbilityId.PREDATOR as unknown as AbilityId)
+      .startingLevel(100)
+      .enemyLevel(1);
+    await game.classicMode.startBattle(SpeciesId.FEEBAS);
+
+    const player = game.field.getPlayerPokemon();
+    const enemy = game.field.getEnemyPokemon();
+    player.hp = Math.floor(player.getMaxHp() / 2);
+    enemy.hp = 1;
+    const before = player.hp;
+
+    game.move.use(MoveId.TACKLE);
+    await game.toEndOfTurn();
+
+    expect(enemy).toHaveFainted();
+    expect(player.hp).toBeLessThan(before);
   });
 
   // TODO: Write test

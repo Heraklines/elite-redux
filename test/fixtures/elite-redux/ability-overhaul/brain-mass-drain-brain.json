@@ -1,0 +1,39 @@
+{
+  "v": 1,
+  "name": "Brain Mass counters with half-heal Drain Brain",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "brain-mass-drain-brain",
+    "battleRng": "min"
+  },
+  "party": [
+    {
+      "species": "ALAKAZAM",
+      "ability": 5656,
+      "moves": ["SPLASH"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "RUN_AWAY",
+        "moves": ["TACKLE"]
+      }
+    ]
+  },
+  "start": {
+    "playerHpPct": 40
+  },
+  "script": [{ "move": "SPLASH", "enemyMove": "TACKLE" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Brain Mass",
+    "enemyStage": { "stat": "SPATK", "value": -1 },
+    "logIncludes": ["Drain Brain"]
+  }
+}

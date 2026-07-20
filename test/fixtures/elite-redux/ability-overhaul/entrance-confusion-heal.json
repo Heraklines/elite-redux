@@ -1,0 +1,39 @@
+{
+  "v": 1,
+  "name": "Entrance transfers confusion self-damage",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "entrance-confusion-heal",
+    "battleRng": "min"
+  },
+  "party": [
+    {
+      "species": "BLISSEY",
+      "ability": 5315,
+      "moves": ["CONFUSE_RAY"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "RATTATA",
+        "level": 100,
+        "ability": "RUN_AWAY",
+        "moves": ["TACKLE"]
+      }
+    ]
+  },
+  "start": {
+    "playerHpPct": 40
+  },
+  "script": [{ "move": "CONFUSE_RAY", "enemyMove": "TACKLE" }, { "move": "CONFUSE_RAY", "enemyMove": "TACKLE" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Entrance",
+    "playerHp": { "min": 186 },
+    "logIncludes": ["absorbed the confusion damage"]
+  }
+}

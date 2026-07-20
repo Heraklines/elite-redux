@@ -33,17 +33,21 @@ const FORBIDDEN_TAGS = [
 export interface CopyMoveByFilterOptions {
   /** Copy moves carrying this flag (e.g. SOUND_BASED). */
   readonly flag?: MoveFlags;
+  /** Copy moves carrying any one of these flags. */
+  readonly anyFlags?: readonly MoveFlags[];
   /** Copy moves whose id is in this list. */
   readonly moveIds?: readonly MoveId[];
 }
 
 export class CopyMoveByFilterAbAttr extends PostDancingMoveAbAttr {
-  private readonly flag?: MoveFlags;
-  private readonly moveIds?: readonly MoveId[];
+  private readonly flag: MoveFlags | undefined;
+  private readonly anyFlags: readonly MoveFlags[] | undefined;
+  private readonly moveIds: readonly MoveId[] | undefined;
 
   constructor(options: CopyMoveByFilterOptions) {
     super();
     this.flag = options.flag;
+    this.anyFlags = options.anyFlags;
     this.moveIds = options.moveIds;
   }
 
@@ -57,6 +61,9 @@ export class CopyMoveByFilterAbAttr extends PostDancingMoveAbAttr {
     }
     const m = move.getMove();
     if (this.flag !== undefined && !m.hasFlag(this.flag)) {
+      return false;
+    }
+    if (this.anyFlags !== undefined && !this.anyFlags.some(flag => m.hasFlag(flag))) {
       return false;
     }
     if (this.moveIds !== undefined && !this.moveIds.includes(m.id)) {

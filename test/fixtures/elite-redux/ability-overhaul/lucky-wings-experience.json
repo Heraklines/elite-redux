@@ -1,0 +1,32 @@
+{
+  "v": 1,
+  "name": "Lucky Wings grants 1.2x experience",
+  "run": {
+    "wave": 1,
+    "level": 50,
+    "difficulty": "ace",
+    "seed": "lucky-wings-exp"
+  },
+  "party": [
+    {
+      "species": "MEWTWO",
+      "ability": 5551,
+      "moves": ["PSYCHIC", "AURA_SPHERE", "ICE_BEAM", "RECOVER"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "MAGIKARP",
+        "level": 5,
+        "moves": ["SPLASH", "TACKLE", "FLAIL", "BOUNCE"]
+      }
+    ]
+  },
+  "script": [{ "move": "PSYCHIC", "enemyMove": "SPLASH" }],
+  "expect": {
+    "outcome": "victory",
+    "partyProgress": [{ "slot": 0, "exp": 135156 }]
+  }
+}

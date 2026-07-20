@@ -96,12 +96,16 @@ export class Battle {
   public battleSeed: string = randomString(16, true);
   private battleSeedState: string | null = null;
   public moneyScattered = 0;
+  /** Good as Gold multiplier captured from the active field at this battle's terminal boundary. */
+  public erBattleEndMoneyMultiplier = 1;
+  public erBattleEndMoneyMultiplierCaptured = false;
   // TODO: These trackers are only used for Sticky Web + Mirror Armor edge cases
   // and are abhorrently janky.
   /** Primarily for double battles, keeps track of last enemy and player pokemon that triggered its ability or used a move */
   public lastEnemyInvolved: number;
   public lastPlayerInvolved: number;
   public lastUsedPokeball: PokeballType | null = null;
+  private readonly usedPokeballCounts: Partial<Record<PokeballType, number>> = {};
   /**
    * Saves the number of times a Pokemon on the enemy's side has fainted during this battle.
    * This is saved here since we encounter a new enemy every wave.
@@ -284,6 +288,16 @@ export class Battle {
     this.battleSeedState = null;
   }
 
+  public recordUsedPokeball(pokeballType: PokeballType): void {
+    this.usedPokeballCounts[pokeballType] = (this.usedPokeballCounts[pokeballType] ?? 0) + 1;
+  }
+
+  public consumeUsedPokeballs(pokeballType: PokeballType): number {
+    const count = this.usedPokeballCounts[pokeballType] ?? 0;
+    delete this.usedPokeballCounts[pokeballType];
+    return count;
+  }
+
   addParticipant(playerPokemon: PlayerPokemon): void {
     this.playerParticipantIds.add(playerPokemon.id);
   }
@@ -316,6 +330,8 @@ export class Battle {
       moneyAmount.value *= 2;
     }
 
+    const battleEndMultiplier = this.erBattleEndMoneyMultiplierCaptured ? this.erBattleEndMoneyMultiplier : 1;
+    moneyAmount.value = Math.floor(moneyAmount.value * battleEndMultiplier);
     globalScene.addMoney(moneyAmount.value);
 
     const userLocale = navigator.language || "en-US";

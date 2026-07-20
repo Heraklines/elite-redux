@@ -1,0 +1,34 @@
+{
+  "v": 1,
+  "name": "Rain Dish absorbs Water into higher Defense",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "rain-dish-water-defense"
+  },
+  "party": [
+    {
+      "species": "BLASTOISE",
+      "ability": "RAIN_DISH",
+      "moves": ["SPLASH"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SQUIRTLE",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["WATER_GUN"]
+      }
+    ]
+  },
+  "script": [{ "move": "SPLASH", "enemyMove": "WATER_GUN" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerDamaged": false,
+    "playerStage": { "stat": "SPDEF", "value": 1 }
+  }
+}

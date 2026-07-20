@@ -457,6 +457,8 @@ export interface ChanceBattlerTagOnHitOptions {
    * 100% rider tied to the status move Hypnosis itself. OnAttack variant only.
    */
   readonly moveIds?: readonly MoveId[];
+  /** Optional per-interaction chance override for offensive tag procs. */
+  readonly chanceResolver?: (holder: Pokemon, target: Pokemon, move: Move) => number;
 }
 
 /**
@@ -786,6 +788,7 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
   private readonly critRequired: boolean;
   private readonly firstTurnChance: number | undefined;
   private readonly moveIds: readonly MoveId[] | undefined;
+  private readonly chanceResolver: ((holder: Pokemon, target: Pokemon, move: Move) => number) | undefined;
 
   constructor(opts: ChanceBattlerTagOnHitOptions) {
     if (!(opts.chance >= 0 && opts.chance <= 100)) {
@@ -809,6 +812,7 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     this.critRequired = opts.critRequired ?? false;
     this.firstTurnChance = opts.firstTurnChance;
     this.moveIds = opts.moveIds;
+    this.chanceResolver = opts.chanceResolver;
     this.contactExcluded = opts.contactExcluded ?? false;
     // A target-state gate (targetHasTag), crit gate, or move-id gate replaces
     // contact as the trigger when set.
@@ -889,9 +893,10 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     return !this.critRequired || !!target.turnData?.attacksReceived?.[0]?.critical;
   }
 
-  private passesChance(pokemon: Pokemon): boolean {
-    const chance =
-      this.firstTurnChance !== undefined && pokemon.tempSummonData?.waveTurnCount === 1
+  private passesChance(pokemon: Pokemon, target: Pokemon, move: Move): boolean {
+    const chance = this.chanceResolver
+      ? this.chanceResolver(pokemon, target, move)
+      : this.firstTurnChance !== undefined && pokemon.tempSummonData?.waveTurnCount === 1
         ? this.firstTurnChance
         : this.chance;
     return chance === 100 || pokemon.randBattleSeedInt(100) < chance;
@@ -911,7 +916,7 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     if (!this.matchesTarget(target)) {
       return false;
     }
-    if (!this.passesChance(pokemon)) {
+    if (!this.passesChance(pokemon, target, move)) {
       return false;
     }
     const tag = this.pickTag(pokemon);
