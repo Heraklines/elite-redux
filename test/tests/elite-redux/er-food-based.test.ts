@@ -8,11 +8,13 @@ import { MovePowerBoostAbAttr, ReceivedMoveDamageMultiplierAbAttr } from "#abili
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { allAbilities, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
+import { ER_GLYCOLYSIS_ABILITY_ID, MANUAL_COMPOSITE_PARTS } from "#data/elite-redux/abilities/composite-newcomers";
 import {
   ER_SUGAR_RUSH_ABILITY_ID,
   ER_UPCYCLE_ABILITY_ID,
   isErFoodPokemon,
 } from "#data/elite-redux/abilities/food-based";
+import { AbilityId } from "#enums/ability-id";
 import { EggTier } from "#enums/egg-type";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
@@ -62,6 +64,23 @@ describe.skipIf(!RUN)("ER Food tag and Fidough abilities", () => {
     const powerAttrs = sugarRush.attrs.filter(attr => attr instanceof MovePowerBoostAbAttr);
     expect(powerAttrs.map(attr => attr.getPowerMultiplier())).toEqual([1.5, 2]);
     expect(sugarRush.attrs.filter(attr => attr instanceof ReceivedMoveDamageMultiplierAbAttr)).toHaveLength(1);
+  });
+
+  it("gives Mega Fidough Glycolysis with Harvest and Well-Baked Body", () => {
+    const megaFidough = getPokemonSpecies(SpeciesId.FIDOUGH).forms.find(form => form.formKey === "mega");
+    const glycolysis = allAbilities[ER_GLYCOLYSIS_ABILITY_ID];
+    const expectedAttrTypes = [
+      ...allAbilities[AbilityId.HARVEST].attrs,
+      ...allAbilities[AbilityId.WELL_BAKED_BODY].attrs,
+    ].map(attr => attr.constructor.name);
+
+    expect(megaFidough?.getPassiveAbilities()[0]).toBe(ER_GLYCOLYSIS_ABILITY_ID);
+    expect(glycolysis.name).toBe("Glycolysis");
+    expect(MANUAL_COMPOSITE_PARTS[ER_GLYCOLYSIS_ABILITY_ID].constituents).toEqual([
+      AbilityId.HARVEST,
+      AbilityId.WELL_BAKED_BODY,
+    ]);
+    expect(glycolysis.attrs.map(attr => attr.constructor.name)).toEqual(expectedAttrTypes);
   });
 
   it("hatches Partner Fidough and keeps the approved Alpha forms in Legendary eggs", () => {

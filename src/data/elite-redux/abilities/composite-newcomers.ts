@@ -82,6 +82,8 @@ export const ER_PARTNER_UMBREON_ABILITY_ID = 5951;
 export const ER_PARTNER_LEAFEON_ABILITY_ID = 5952;
 export const ER_PARTNER_GLACEON_ABILITY_ID = 5953;
 export const ER_PARTNER_SYLVEON_ABILITY_ID = 5954;
+// 5955-5969 are allocated by type-nativization and other newcomer abilities.
+export const ER_GLYCOLYSIS_ABILITY_ID = 5970;
 
 /**
  * A single manual-composite definition: the display name, the verbatim short
@@ -146,6 +148,12 @@ const MOUNTAINEER = 5052; // ER custom (immune to Rock moves + Stealth Rock)
  * (attrs) and `getErCompositeDetailedDescription` (constituent detail text).
  */
 export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>> = {
+  [ER_GLYCOLYSIS_ABILITY_ID]: {
+    id: ER_GLYCOLYSIS_ABILITY_ID,
+    name: "Glycolysis",
+    description: "Harvest + Well-Baked Body.",
+    constituents: [AbilityId.HARVEST, AbilityId.WELL_BAKED_BODY],
+  },
   [ER_FIRST_SERPENT_ABILITY_ID]: {
     id: ER_FIRST_SERPENT_ABILITY_ID,
     name: "First Serpent",
