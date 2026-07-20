@@ -786,6 +786,60 @@ describe("authority-v2 log", () => {
     expect(() => log.commit(wrongCoordinate)).toThrow(/not authorized by predecessor control/);
   });
 
+  it("admits only the bounded settlement-turn advance from an exact turn-boundary wait", () => {
+    const turnBoundaryKinds = [
+      "CONTROL_COMMIT",
+      "REPLACEMENT_COMMIT",
+      "INTERACTION_COMMIT",
+      "WAVE_ADVANCE",
+      "TERMINAL_COMMIT",
+    ] as const;
+    const settlementEntry = (operationId: string, kind: "WAVE_ADVANCE" | "TERMINAL_COMMIT", turn: number) => ({
+      ...entryInput(operationId, {
+        kind,
+        nextControl:
+          kind === "TERMINAL_COMMIT"
+            ? { kind: "TERMINAL" as const, terminalId: operationId }
+            : successorWait(operationId, ["CONTROL_COMMIT"]),
+      }),
+      material: {
+        digest: `digest-${operationId}`,
+        payload: { wave: 1, turn },
+      },
+    });
+
+    for (const kind of ["WAVE_ADVANCE", "TERMINAL_COMMIT"] as const) {
+      const log = makeLog(scheduler, []);
+      log.commit(
+        entryInput(`turn-before-${kind}`, {
+          nextControl: successorWait(`turn-before-${kind}`, turnBoundaryKinds),
+        }),
+      );
+      expect(log.commit(settlementEntry(`settled-${kind}`, kind, 2)).revision).toBe(2);
+    }
+
+    const driftLog = makeLog(scheduler, []);
+    driftLog.commit(
+      entryInput("turn-before-drift", {
+        nextControl: successorWait("turn-before-drift", turnBoundaryKinds),
+      }),
+    );
+    expect(() => driftLog.commit(settlementEntry("settled-too-late", "WAVE_ADVANCE", 3))).toThrow(
+      /not authorized by predecessor control/,
+    );
+
+    const narrowLog = makeLog(scheduler, []);
+    narrowLog.commit(
+      entryInput("interaction-before-wave", {
+        nextControl: successorWait("interaction-before-wave", ["WAVE_ADVANCE"]),
+      }),
+    );
+    expect(() => narrowLog.commit(settlementEntry("narrow-next-turn", "WAVE_ADVANCE", 2))).toThrow(
+      /not authorized by predecessor control/,
+    );
+    expect(narrowLog.commit(settlementEntry("narrow-same-turn", "WAVE_ADVANCE", 1)).revision).toBe(2);
+  });
+
   it("keeps a replica successor wait until an exact allowed next revision is admitted", () => {
     const log = makeReplicaLog(scheduler, sent);
     const predecessor = fullEntry(1, "op-wait", {

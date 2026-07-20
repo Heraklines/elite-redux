@@ -147,12 +147,33 @@ export function successorWaitAllows(
   if (address.epoch !== wait.epoch) {
     return false;
   }
-  // A turn result parks at turn N before the real post-effects CommandPhase can author CONTROL_COMMIT
-  // for turn N+1. A wave boundary states its already-advanced command coordinate and permits only that
-  // CONTROL_COMMIT, so it remains exact. Every other immediate successor is at the wait's exact address.
+  // A turn result parks at turn N before the engine finishes its post-effects settlement. A surviving
+  // battle authors CONTROL_COMMIT for turn N+1. Victory/GameOver can likewise capture its complete
+  // immutable WAVE_ADVANCE/TERMINAL_COMMIT state after the engine has advanced that settlement turn.
+  //
+  // Only the exact broad wait emitted by the TURN_COMMIT adapter receives this bounded N-or-N+1 rule.
+  // Interaction/replacement waits stay exact, and arbitrary N+2 drift remains fail-closed.
   const controlOnly = wait.allowedKinds.length === 1 && wait.allowedKinds[0] === "CONTROL_COMMIT";
-  const expectedTurn = nextKind === "CONTROL_COMMIT" && !controlOnly ? wait.turn + 1 : wait.turn;
-  return address.wave === wait.wave && address.turn === expectedTurn;
+  const turnBoundaryKinds: readonly AuthorityEntryKind[] = [
+    "CONTROL_COMMIT",
+    "REPLACEMENT_COMMIT",
+    "INTERACTION_COMMIT",
+    "WAVE_ADVANCE",
+    "TERMINAL_COMMIT",
+  ];
+  const turnBoundaryWait =
+    wait.allowedKinds.length === turnBoundaryKinds.length
+    && turnBoundaryKinds.every(kind => wait.allowedKinds.includes(kind));
+  if (address.wave !== wait.wave) {
+    return false;
+  }
+  if (nextKind === "CONTROL_COMMIT" && !controlOnly) {
+    return address.turn === wait.turn + 1;
+  }
+  if (turnBoundaryWait && (nextKind === "WAVE_ADVANCE" || nextKind === "TERMINAL_COMMIT")) {
+    return address.turn === wait.turn || address.turn === wait.turn + 1;
+  }
+  return address.turn === wait.turn;
 }
 
 interface MechanicalAddress {
