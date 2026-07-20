@@ -183,6 +183,22 @@ export class SelectBiomePhase extends BattlePhase {
     this.coopConstructionWave = coopSourceWave ?? globalScene.currentBattle?.waveIndex ?? -1;
   }
 
+  /** Bind the exact chained-map successor before recovery releases this phase. */
+  public installCoopV2BiomeProjection(operationId: string, sourceWave: number): boolean {
+    if (
+      operationId.length === 0
+      || !Number.isSafeInteger(sourceWave)
+      || sourceWave < 0
+      || (this.coopSourceWave != null && this.coopSourceWave !== sourceWave)
+      || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
+    ) {
+      return false;
+    }
+    this.coopSourceWave = sourceWave;
+    this.coopV2ControlOperationId = operationId;
+    return true;
+  }
+
   /** Capture one durable address before any UI/network await can observe a newer ambient battle. */
   private requireCoopSourceWave(): number {
     if (this.coopSourceWave != null) {

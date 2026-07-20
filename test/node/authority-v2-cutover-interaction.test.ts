@@ -116,7 +116,21 @@ describe("Authority V2 interaction cutover", () => {
   it.each([
     [
       "REWARD",
-      { label: "reward", choice: 0, data: undefined, terminal: false, result: { lockModifierTiers: false } },
+      {
+        label: "reward",
+        choice: 0,
+        data: undefined,
+        terminal: false,
+        result: {
+          lockModifierTiers: false,
+          continuation: {
+            surface: "reward",
+            pinned: 0,
+            reroll: 0,
+            options: [{ id: "A", tier: 0, upgradeCount: 0, cost: 0 }],
+          },
+        },
+      },
       "REWARD_SELECT",
       "op:reward",
       "AWAIT_SUCCESSOR",
@@ -130,7 +144,25 @@ describe("Authority V2 interaction cutover", () => {
     ],
     [
       "SHOP_BUY",
-      { slot: 0, data: undefined, terminal: false, result: { remainingStock: [1, 0] } },
+      {
+        slot: 0,
+        data: undefined,
+        terminal: false,
+        result: {
+          remainingStock: [1, 0],
+          continuation: {
+            surface: "market",
+            pinned: 0,
+            reroll: 0,
+            options: [
+              { id: "A", tier: 0, upgradeCount: 0, cost: 1 },
+              { id: "B", tier: 0, upgradeCount: 0, cost: 1 },
+            ],
+            marketKind: "biome",
+            remainingStock: [1, 0],
+          },
+        },
+      },
       "SHOP",
       "op:reward",
       "SHARED_INTERACTION",

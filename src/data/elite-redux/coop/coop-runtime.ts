@@ -86,6 +86,10 @@ import {
   setActiveCoopV2WaveCutover,
 } from "#data/elite-redux/coop/authority-v2/cutover-wave";
 import {
+  type CoopV2InteractionProjectionPlan,
+  projectionPlanOfCoopV2InteractionEntry,
+} from "#data/elite-redux/coop/authority-v2/interaction-projection";
+import {
   commandControlTargetId,
   commandTargetsOwnedBySeat,
   controlIdOf,
@@ -4731,15 +4735,18 @@ function projectCoopV2InteractionControl(
     }
     return result;
   }
+  if (control.kind === "SHARED_INTERACTION") {
+    const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
+    if (sourceEntry == null || projectionPlanOfCoopV2InteractionEntry(sourceEntry) == null) {
+      return {
+        kind: "rejected",
+        reason: `shared interaction ${controlId} has no complete immutable projection capsule`,
+      };
+    }
+  }
 
-  const contract =
-    control.kind === "REPLACEMENT"
-      ? {
-          phaseNames: ["SwitchPhase", "CoopGuestFaintSwitchPhase", "ShowdownEnemyFaintSwitchPhase"] as const,
-          uiModes: [UiMode.PARTY] as const,
-        }
-      : coopV2InteractionUiProofContract(control.surfaceClass, control.operationKind);
-  const observation = observeCoopV2InteractionSurface();
+  const contract = coopV2InteractionProofContract(control);
+  const observation = observeCoopV2InteractionSurface(contract);
   const messageShopWatcherReady =
     control.kind === "REPLACEMENT"
     || observation?.uiMode !== UiMode.MESSAGE
@@ -4795,7 +4802,25 @@ function markCoopV2ControlMaterialApplied(runtime: CoopRuntime, entry: CoopAutho
 }
 
 /** Capture the exact current phase/handler generation; a keepalive or queued phase is never actionable proof. */
-function observeCoopV2InteractionSurface(): CoopV2InteractionSurfaceObservation | null {
+interface CoopV2InteractionProofContract {
+  readonly phaseNames: readonly string[];
+  readonly uiModes: readonly number[];
+}
+
+function coopV2InteractionProofContract(
+  control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" | "REPLACEMENT" }>,
+): CoopV2InteractionProofContract | null {
+  return control.kind === "REPLACEMENT"
+    ? {
+        phaseNames: ["SwitchPhase", "CoopGuestFaintSwitchPhase", "ShowdownEnemyFaintSwitchPhase"],
+        uiModes: [UiMode.PARTY],
+      }
+    : coopV2InteractionUiProofContract(control.surfaceClass, control.operationKind);
+}
+
+function observeCoopV2InteractionSurface(
+  contract: CoopV2InteractionProofContract | null = null,
+): CoopV2InteractionSurfaceObservation | null {
   try {
     const phase = globalScene.phaseManager?.getCurrentPhase();
     const handler = globalScene.ui?.getHandler() as
@@ -4810,12 +4835,26 @@ function observeCoopV2InteractionSurface(): CoopV2InteractionSurfaceObservation 
     const handlerActive = handler.active === true;
     const actionable =
       handlerActive && (typeof handler.isAwaitingPromptAction !== "function" || handler.isAwaitingPromptAction());
+    const explicitProofName =
+      typeof (phase as { coopV2ProofPhaseName?: unknown }).coopV2ProofPhaseName === "string"
+        ? (phase as unknown as { coopV2ProofPhaseName: string }).coopV2ProofPhaseName
+        : null;
+    const concretePhaseName =
+      contract?.phaseNames.find(
+        phaseName =>
+          phase.phaseName === phaseName
+          || explicitProofName === phaseName
+          || (typeof (phase as { is?: unknown }).is === "function"
+            && (phase as unknown as { is: (candidate: string) => boolean }).is(phaseName)),
+      ) ?? phase.phaseName;
     return {
       operationId:
         typeof (phase as { coopV2ControlOperationId?: unknown }).coopV2ControlOperationId === "string"
           ? (phase as unknown as { coopV2ControlOperationId: string }).coopV2ControlOperationId
           : null,
-      phaseName: phase.phaseName,
+      // Markets deliberately inherit phaseName="SelectModifierPhase" for legacy mechanics. Their explicit
+      // V2 identity binds the concrete registered subclass without changing that load-bearing legacy name.
+      phaseName: concretePhaseName,
       uiMode: globalScene.ui.getMode(),
       phaseToken: phase,
       handlerToken: handler,
@@ -4846,7 +4885,8 @@ export function isCoopV2InteractionHumanInputFrozen(runtime: CoopRuntime | null 
     return false;
   }
   projectCoopV2InteractionControl(runtime, pending);
-  return !ledger.allowsHumanInput(runtime.controller.localSeatId, observeCoopV2InteractionSurface());
+  const contract = pending.kind === "AWAIT_SUCCESSOR" ? null : coopV2InteractionProofContract(pending);
+  return !ledger.allowsHumanInput(runtime.controller.localSeatId, observeCoopV2InteractionSurface(contract));
 }
 
 /** Retry the exact retained interaction claim after a real phase reports that its public handler is active. */
@@ -5286,15 +5326,176 @@ function buildCoopV2LiveSeams(
   return seams;
 }
 
+function materializeCoopV2RecoveryProjection(
+  runtime: CoopRuntime,
+  control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>,
+  plan: CoopV2InteractionProjectionPlan,
+): Phase | null {
+  const phaseManager = globalScene.phaseManager;
+  const ownerIsLocal = control.ownerSeatId === runtime.controller.localSeatId;
+  switch (plan.kind) {
+    case "ability": {
+      const phase = phaseManager.create(
+        plan.phaseName,
+        plan.presentation.partyIndex,
+        plan.presentation.pinned,
+        !ownerIsLocal,
+      ) as Phase & {
+        installCoopV2AbilityPresentation(operationId: string, presentation: CoopAbilityPresentationPayload): boolean;
+      };
+      return phase.installCoopV2AbilityPresentation(plan.operationId, plan.presentation) ? phase : null;
+    }
+    case "bargain": {
+      const indices = plan.sins.map(sin => BARGAIN_SIN_ORDER.indexOf(sin as (typeof BARGAIN_SIN_ORDER)[number]));
+      if (indices.some(index => index < 0)) {
+        return null;
+      }
+      runtime.interactionRelay.materializeCommittedInteractionChoice(
+        COOP_BARGAIN_SEQ_BASE + plan.pinned,
+        COOP_BARGAIN_PRESENT_KIND,
+        0,
+        indices,
+        plan.operationId,
+      );
+      const phase = phaseManager.create("TheBargainPhase") as Phase & {
+        installCoopV2BargainPresentation(operationId: string, pinned: number): boolean;
+      };
+      return phase.installCoopV2BargainPresentation(plan.operationId, plan.pinned) ? phase : null;
+    }
+    case "biome": {
+      const phase = phaseManager.create("SelectBiomePhase", plan.sourceWave) as Phase & {
+        installCoopV2BiomeProjection(operationId: string, sourceWave: number): boolean;
+      };
+      return phase.installCoopV2BiomeProjection(plan.operationId, plan.sourceWave) ? phase : null;
+    }
+    case "catch-full":
+      return ownerIsLocal
+        ? phaseManager.create("CoopGuestCatchFullPhase", plan.pokemonName, plan.speciesId, plan.operationId)
+        : null;
+    case "colosseum":
+      return phaseManager.create(
+        "CoopGuestColosseumChoicePhase",
+        plan.labels,
+        plan.round,
+        ownerIsLocal,
+        plan.operationId,
+        () => undefined,
+      );
+    case "learn-move":
+      return phaseManager.create(
+        "CoopReplayLearnMovePhase",
+        plan.partySlot,
+        plan.moveId,
+        plan.maxMoveCount,
+        plan.operationId,
+        ownerIsLocal,
+      );
+    case "learn-move-batch":
+      return phaseManager.create(
+        "CoopReplayLearnMoveBatchPhase",
+        plan.partySlot,
+        [...plan.learnableIds],
+        plan.ownerIsGuest,
+        plan.operationId,
+      );
+    case "mystery": {
+      if (coopMeInteractionStartValue() !== plan.pinned) {
+        return null;
+      }
+      setCoopMeActivePresentation(plan.presentation);
+      runtime.interactionRelay.materializeCommittedInteractionOutcome(
+        COOP_ME_PUMP_SEQ_BASE + plan.pinned,
+        plan.presentation,
+        plan.operationId,
+      );
+      const phase = phaseManager.create("CoopReplayMePhase", plan.pinned, undefined, plan.operationId) as Phase & {
+        installCoopV2MePresentation(
+          operationId: string,
+          interactionCounter: number,
+          presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }>,
+        ): boolean;
+      };
+      return phase.installCoopV2MePresentation(plan.operationId, plan.pinned, plan.presentation) ? phase : null;
+    }
+    case "revival":
+      return phaseManager.create("CoopGuestRevivalPhase", plan.fieldIndex, plan.operationId, ownerIsLocal);
+    case "reward": {
+      runtime.interactionRelay.materializeCommittedRewardOptions(
+        plan.projection.pinned,
+        plan.projection.reroll,
+        structuredClone(plan.projection.options) as CoopSerializedRewardOption[],
+        plan.projection.rewardSurface,
+        plan.operationId,
+      );
+      const phase = phaseManager.create(
+        "SelectModifierPhase",
+        plan.projection.reroll,
+        undefined,
+        undefined,
+        false,
+        {
+          kind: "inherited",
+          address: { wave: control.wave, turn: control.turn },
+        },
+        plan.projection.rewardSurface,
+      ) as Phase & {
+        installCoopV2RewardProjection(
+          operationId: string,
+          projection: Extract<CoopRewardPresentationPayload, { readonly surface: "reward" }>,
+        ): boolean;
+      };
+      return phase.installCoopV2RewardProjection(plan.operationId, plan.projection) ? phase : null;
+    }
+    case "market": {
+      runtime.interactionRelay.materializeCommittedRewardOptions(
+        plan.projection.pinned,
+        plan.projection.reroll,
+        structuredClone(plan.projection.options) as CoopSerializedRewardOption[],
+        plan.projection.rewardSurface,
+        plan.operationId,
+        {
+          marketKind: plan.projection.marketKind,
+          remainingStock: [...plan.projection.remainingStock],
+        },
+      );
+      const phaseName =
+        plan.projection.marketKind === "biome"
+          ? "BiomeShopPhase"
+          : plan.projection.marketKind === "exotic"
+            ? "ExoticShopPhase"
+            : plan.projection.marketKind === "black-market"
+              ? "BlackMarketShopPhase"
+              : "ImportBazaarShopPhase";
+      const phase = phaseManager.create(phaseName, 0, undefined, undefined, false, {
+        kind: "inherited",
+        address: { wave: control.wave, turn: control.turn },
+      }) as Phase & {
+        installCoopV2MarketProjection(
+          operationId: string,
+          projection: Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>,
+        ): boolean;
+      };
+      return phase.installCoopV2MarketProjection(plan.operationId, plan.projection) ? phase : null;
+    }
+    case "stormglass": {
+      const phase = phaseManager.create("ErStormglassPickerPhase") as Phase & {
+        installCoopV2StormglassPresentation(
+          operationId: string,
+          presentation: CoopStormglassPresentationPayload,
+        ): boolean;
+      };
+      return phase.installCoopV2StormglassPresentation(plan.operationId, plan.presentation) ? phase : null;
+    }
+  }
+}
+
 /**
  * Construct the exact engine generation recovery will subsequently prove.
  *
- * Ordinary projection is observation-only: it must never invent a UI from ambient state. Recovery is the
- * one exception because it deliberately destroyed the obsolete phase tree under a held fence. Command
- * frontiers are fully reconstructible from their immutable actor addresses plus the recovered snapshot, so
- * queue those exact CommandPhases before opening the one-shift projection window. Replacement controls are
- * likewise complete in their own address, so an owning replica can reconstruct the exact guest picker.
- * Shared interactions remain owned by their immutable frontier entry material and ordinary exact observer.
+ * Recovery deliberately destroyed the obsolete phase tree under a held fence. Every executable shared
+ * interaction is therefore reconstructed only from the retained immutable frontier entry through the same
+ * closed projection-plan decoder ordinary control validation uses; no local RNG, queue inference, or stale
+ * handler is permitted to choose the screen.
  */
 function prepareCoopV2RecoveryControlSurface(runtime: CoopRuntime, control: NonNullable<CoopNextControl>): boolean {
   const controlId = controlIdOf(control as ProjectableControl);
@@ -5322,6 +5523,21 @@ function prepareCoopV2RecoveryControlSurface(runtime: CoopRuntime, control: NonN
     });
     runtime.v2RecoveryPreparedControlId = controlId;
     coopLog("v2-recovery", `queued exact replacement picker for ${controlId}`);
+    return true;
+  }
+  if (control.kind === "SHARED_INTERACTION") {
+    const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
+    const plan = sourceEntry == null ? null : projectionPlanOfCoopV2InteractionEntry(sourceEntry);
+    if (plan == null) {
+      return false;
+    }
+    const phase = materializeCoopV2RecoveryProjection(runtime, control, plan);
+    if (phase == null) {
+      return false;
+    }
+    globalScene.phaseManager.pushPhase(phase);
+    runtime.v2RecoveryPreparedControlId = controlId;
+    coopLog("v2-recovery", `queued exact ${plan.kind} generation for ${controlId}`);
     return true;
   }
   if (control.kind !== "COMMAND_FRONTIER") {
@@ -5412,13 +5628,7 @@ function buildCoopV2LiveRecoverySeams(
         finalEntry == null
           ? bundle.frontier === 0
             ? bundle.nextControl == null && runtime.v2ControlLedger.adoptRecoveryFrontier(null)
-            : bundle.nextControl != null
-              && bundle.frontierOperationId != null
-              && runtime.v2ControlLedger.adoptRecoveryControl(
-                bundle.frontier,
-                bundle.frontierOperationId,
-                bundle.nextControl,
-              )
+            : false
           : finalEntry.revision === bundle.frontier
             && finalEntry.operationId === bundle.frontierOperationId
             && controlsEqual(finalEntry.nextControl, bundle.nextControl)
@@ -7152,6 +7362,10 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
           || (option.pregenArgs !== undefined
             && (!Array.isArray(option.pregenArgs) || !option.pregenArgs.every(Number.isFinite))),
       )
+      || (payload.surface === "market"
+        && (!Array.isArray(payload.remainingStock)
+          || payload.remainingStock.length !== payload.options.length
+          || payload.remainingStock.some(stock => !Number.isSafeInteger(stock) || stock < 0)))
       || (payload.rewardSurface !== undefined && !isValidCoopRewardSurfaceIdentity(payload.rewardSurface))
     ) {
       return false;
@@ -7162,6 +7376,12 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
       structuredClone(payload.options) as CoopSerializedRewardOption[],
       payload.rewardSurface,
       op.id,
+      payload.surface === "market"
+        ? {
+            marketKind: payload.marketKind,
+            remainingStock: [...payload.remainingStock],
+          }
+        : undefined,
     );
     return true;
   }
@@ -7174,6 +7394,10 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
       || typeof payload.choice !== "number"
       || typeof payload.terminal !== "boolean"
       || typeof payload.result?.lockModifierTiers !== "boolean"
+      || (payload.terminal === false
+        && (payload.result.continuation?.surface !== "reward"
+          || payload.result.continuation.pinned !== pinned
+          || !Array.isArray(payload.result.continuation.options)))
       || (payload.rewardSurface !== undefined && !isValidCoopRewardSurfaceIdentity(payload.rewardSurface))
       || Math.floor(ordinal / COOP_REWARD_SURFACE_ACTION_STRIDE) !== expectedSurfaceBand
       || (payload.data !== undefined && (!Array.isArray(payload.data) || !payload.data.every(Number.isFinite)))
@@ -7188,6 +7412,16 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
       op.id,
       payload.rewardSurface,
     );
+    const continuation = payload.result.continuation;
+    if (continuation != null) {
+      runtime.interactionRelay.materializeCommittedRewardOptions(
+        continuation.pinned,
+        continuation.reroll,
+        structuredClone(continuation.options) as CoopSerializedRewardOption[],
+        continuation.rewardSurface,
+        op.id,
+      );
+    }
     armCoopRewardJournalMaterialization(op.id, pinned);
     return true;
   }
@@ -7198,6 +7432,12 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
       || typeof payload.terminal !== "boolean"
       || !Array.isArray(payload.result?.remainingStock)
       || payload.result.remainingStock.some(stock => !Number.isSafeInteger(stock) || stock < 0)
+      || (payload.terminal === false
+        && (payload.result.continuation?.surface !== "market"
+          || payload.result.continuation.pinned !== pinned
+          || payload.result.continuation.remainingStock.length !== payload.result.continuation.options.length
+          || JSON.stringify(payload.result.continuation.remainingStock)
+            !== JSON.stringify(payload.result.remainingStock)))
       || (payload.data !== undefined && (!Array.isArray(payload.data) || !payload.data.every(Number.isFinite)))
     ) {
       return false;
@@ -7211,6 +7451,20 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
       undefined,
       [...payload.result.remainingStock],
     );
+    const continuation = payload.result.continuation;
+    if (continuation != null) {
+      runtime.interactionRelay.materializeCommittedRewardOptions(
+        continuation.pinned,
+        continuation.reroll,
+        structuredClone(continuation.options) as CoopSerializedRewardOption[],
+        continuation.rewardSurface,
+        op.id,
+        {
+          marketKind: continuation.marketKind,
+          remainingStock: [...continuation.remainingStock],
+        },
+      );
+    }
     armCoopRewardJournalMaterialization(op.id, pinned);
     return true;
   }
@@ -7710,6 +7964,24 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
       return false;
     }
     setCoopMeActivePresentation(payload.presentation);
+    const current = globalScene.phaseManager?.getCurrentPhase() as
+      | {
+          is?: (phaseName: string) => boolean;
+          installCoopV2MePresentation?: (
+            operationId: string,
+            interactionCounter: number,
+            presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }>,
+          ) => boolean;
+        }
+      | undefined;
+    if (
+      current?.is?.("CoopReplayMePhase") !== true
+      || current.installCoopV2MePresentation?.(op.id, pinned, payload.presentation) !== true
+    ) {
+      // Do not sign DATA for a presentation whose exact queue-owned phase generation is not bindable yet.
+      // The retained entry will retry once MysteryEncounterPhase has diverted into CoopReplayMePhase.
+      return false;
+    }
     const retained = captureCoopActiveMysteryControl();
     if (
       retained?.interactionCounter !== pinned
@@ -9239,7 +9511,7 @@ export function assembleCoopRuntime(
         seq,
       });
     },
-    publishRewardOptions: (seq, reroll, options, rewardSurface) => {
+    publishRewardOptions: (seq, reroll, options, rewardSurface, projection) => {
       if (runtime == null || controller.authorityRole !== "authority") {
         return null;
       }
@@ -9255,6 +9527,12 @@ export function assembleCoopRuntime(
             pinned: seq,
             reroll,
             options,
+            ...(projection == null
+              ? {}
+              : {
+                  marketKind: projection.marketKind,
+                  remainingStock: projection.remainingStock,
+                }),
             ...(rewardSurface == null ? {} : { rewardSurface }),
             localRole: "host",
             wave,

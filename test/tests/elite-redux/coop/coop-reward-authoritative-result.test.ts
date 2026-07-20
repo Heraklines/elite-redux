@@ -65,6 +65,36 @@ function latestAppliedOperationAddress(): { epoch: number; wave: number; turn: n
   return { epoch: envelope.sessionEpoch, wave: envelope.wave, turn: envelope.turn };
 }
 
+function rewardContinuation(pinned: number, reroll = 0) {
+  return {
+    continuation: {
+      surface: "reward" as const,
+      pinned,
+      reroll,
+      options: [{ id: "TEST_REWARD", tier: 0, upgradeCount: 0, cost: 0 }],
+    },
+  };
+}
+
+function marketContinuation(pinned: number, remainingStock: readonly number[]) {
+  return {
+    remainingStock,
+    continuation: {
+      surface: "market" as const,
+      pinned,
+      reroll: 777,
+      options: remainingStock.map((_, index) => ({
+        id: `TEST_MARKET_${index}`,
+        tier: 0,
+        upgradeCount: 0,
+        cost: 1,
+      })),
+      marketKind: "biome" as const,
+      remainingStock,
+    },
+  };
+}
+
 describe("P33 retained reward/shop authoritative results", () => {
   let appliedStates: CoopAuthoritativeBattleStateV1[];
   let applyCalls: number;
@@ -154,7 +184,14 @@ describe("P33 retained reward/shop authoritative results", () => {
         turn: 3,
       });
       expect(prepared?.revision, "stage one retains intent but publishes no pre-action result").toBe(0);
-      expect(commitRewardAuthoritativeResult(prepared!.operationId, action.result)).toMatchObject({
+      expect(
+        commitRewardAuthoritativeResult(
+          prepared!.operationId,
+          action.result,
+          undefined,
+          action.terminal ? undefined : rewardContinuation(2, action.label === "reroll" ? 1 : 0),
+        ),
+      ).toMatchObject({
         operationId: prepared!.operationId,
       });
       await flushWire();
@@ -312,7 +349,14 @@ describe("P33 retained reward/shop authoritative results", () => {
     expect(duplicateBeforeResult).toEqual({ adopt: false, reason: "host-intent-in-flight-or-complete" });
 
     hostExecutions++;
-    expect(commitRewardAuthoritativeResult(first.operationId!, state(21, 700, "guest-buy"))).not.toBeNull();
+    expect(
+      commitRewardAuthoritativeResult(
+        first.operationId!,
+        state(21, 700, "guest-buy"),
+        undefined,
+        marketContinuation(1, [2]),
+      ),
+    ).not.toBeNull();
     await flushWire();
     expect(hostExecutions).toBe(1);
     expect(guestExecutions, "guest applies state/result but never runs the buy implementation").toBe(0);
@@ -350,7 +394,9 @@ describe("P33 retained reward/shop authoritative results", () => {
       turn: 3,
     })!;
     const complete = state(31, 1_100, "retained-reward");
-    expect(commitRewardAuthoritativeResult(prepared.operationId, complete)).not.toBeNull();
+    expect(
+      commitRewardAuthoritativeResult(prepared.operationId, complete, undefined, rewardContinuation(4)),
+    ).not.toBeNull();
     await flushWire();
     expect(pair.faultsInjected(), "the first complete result was actually dropped").toBe(1);
     expect(applyCalls).toBe(0);
@@ -417,7 +463,12 @@ describe("P33 retained reward/shop authoritative results", () => {
         turn: 3,
       })!;
       expect(
-        commitRewardAuthoritativeResult(prepared.operationId, state(51 + index, 800 - index, `r${index}`)),
+        commitRewardAuthoritativeResult(
+          prepared.operationId,
+          state(51 + index, 800 - index, `r${index}`),
+          undefined,
+          rewardContinuation(2),
+        ),
       ).not.toBeNull();
     };
 
@@ -471,10 +522,14 @@ describe("P33 retained reward/shop authoritative results", () => {
       turn: 3,
     })!;
     const empty = { ...state(41, 500, "empty"), playerParty: [] };
-    expect(commitRewardAuthoritativeResult(prepared.operationId, empty)).toBeNull();
+    expect(commitRewardAuthoritativeResult(prepared.operationId, empty, undefined, { remainingStock: [] })).toBeNull();
     expect(hostManager.unackedCount()).toBe(0);
 
-    expect(commitRewardAuthoritativeResult(prepared.operationId, state(42, 500, "terminal"))).not.toBeNull();
+    expect(
+      commitRewardAuthoritativeResult(prepared.operationId, state(42, 500, "terminal"), undefined, {
+        remainingStock: [],
+      }),
+    ).not.toBeNull();
     await flushWire();
     const envelope = getCoopOperationJournalApplied().at(-1)!;
     expect(envelope.pendingOperation?.payload as CoopShopBuyPayload).toEqual({
@@ -530,11 +585,25 @@ describe("P33 retained reward/shop authoritative results", () => {
     };
     const preparedA = commitRewardOwnerIntent(params, bindingA)!;
     const preparedB = commitRewardOwnerIntent(params, bindingB)!;
-    expect(commitRewardAuthoritativeResult(preparedA.operationId, state(61, 700, "runtime-a"), bindingA)).toEqual({
+    expect(
+      commitRewardAuthoritativeResult(
+        preparedA.operationId,
+        state(61, 700, "runtime-a"),
+        bindingA,
+        rewardContinuation(0),
+      ),
+    ).toEqual({
       operationId: preparedA.operationId,
       revision: 1,
     });
-    expect(commitRewardAuthoritativeResult(preparedB.operationId, state(62, 600, "runtime-b"), bindingB)).toEqual({
+    expect(
+      commitRewardAuthoritativeResult(
+        preparedB.operationId,
+        state(62, 600, "runtime-b"),
+        bindingB,
+        rewardContinuation(0),
+      ),
+    ).toEqual({
       operationId: preparedB.operationId,
       revision: 1,
     });

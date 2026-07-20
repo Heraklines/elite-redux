@@ -21,6 +21,10 @@ import { ModifierTier } from "#enums/modifier-tier";
 import { BiomeShopPhase } from "#phases/biome-shop-phase";
 
 export class BlackMarketShopPhase extends BiomeShopPhase {
+  protected override coopMarketProjectionKind(): "black-market" {
+    return "black-market";
+  }
+
   protected override erIsBlackMarket(): boolean {
     return true;
   }

@@ -34,6 +34,7 @@ import {
   COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
   COOP_ME_REWARD_SURFACE_LIMIT,
   type CoopAuthoritativeEnvelopeV1,
+  type CoopMarketProjectionKind,
   type CoopOperationKind,
   type CoopPendingOperation,
   type CoopRewardActionPayload,
@@ -712,6 +713,11 @@ export interface CoopRewardOwnerCommitResult {
 /** Phase-local mechanical state not represented by the shared battle snapshot. */
 export interface CoopRewardSurfaceResultState {
   readonly remainingStock?: readonly number[];
+  /**
+   * Exact phase-local surface that remains executable after this result. Required for non-terminal
+   * retained actions and deliberately absent for terminal results.
+   */
+  readonly continuation?: CoopRewardPresentationPayload;
 }
 
 /**
@@ -865,13 +871,15 @@ export function commitRewardAuthoritativeResult(
   }
   const resultPayload =
     prepared.surface === "reward"
-      ? ({
-          ...(prepared.intent.payload as CoopRewardActionPayload),
-          result: { lockModifierTiers: resultState.lockModifierTiers },
-        } satisfies CoopRewardActionPayload)
-      : buildCompleteMarketResultPayload(prepared.intent.payload, surfaceResult);
+      ? buildCompleteRewardResultPayload(
+          prepared.intent.payload,
+          resultState.lockModifierTiers,
+          prepared,
+          surfaceResult,
+        )
+      : buildCompleteMarketResultPayload(prepared.intent.payload, prepared, surfaceResult);
   if (resultPayload == null) {
-    coopWarn("reward", `authoritative market result refused incomplete surface state id=${operationId}`);
+    coopWarn("reward", `authoritative reward result refused incomplete continuation state id=${operationId}`);
     return null;
   }
   const resultIntent: CoopPendingOperation = {
@@ -905,17 +913,100 @@ export function commitRewardAuthoritativeResult(
   return { operationId, revision: res.envelope.revision };
 }
 
+function completeRewardContinuation(
+  continuation: CoopRewardPresentationPayload | undefined,
+  prepared: PreparedRewardIntent,
+  surface: CoopShopSurface,
+): CoopRewardPresentationPayload | null {
+  if (
+    continuation == null
+    || continuation.surface !== surface
+    || continuation.pinned !== prepared.pinned
+    || continuation.rewardSurface?.surfaceId !== prepared.rewardSurface?.surfaceId
+    || continuation.rewardSurface?.ordinal !== prepared.rewardSurface?.ordinal
+    || !Number.isSafeInteger(continuation.reroll)
+    || continuation.reroll < 0
+    || !Array.isArray(continuation.options)
+    || continuation.options.some(
+      option =>
+        typeof option?.id !== "string"
+        || option.id.length === 0
+        || !Number.isFinite(option.tier)
+        || !Number.isFinite(option.upgradeCount)
+        || !Number.isFinite(option.cost)
+        || (option.pregenArgs !== undefined
+          && (!Array.isArray(option.pregenArgs) || !option.pregenArgs.every(Number.isFinite))),
+    )
+  ) {
+    return null;
+  }
+  if (
+    continuation.surface === "market"
+    && (!Array.isArray(continuation.remainingStock)
+      || continuation.remainingStock.length !== continuation.options.length
+      || continuation.remainingStock.some(stock => !Number.isSafeInteger(stock) || stock < 0))
+  ) {
+    return null;
+  }
+  return structuredClone(continuation);
+}
+
+function buildCompleteRewardResultPayload(
+  payload: unknown,
+  lockModifierTiers: boolean,
+  prepared: PreparedRewardIntent,
+  surfaceResult: CoopRewardSurfaceResultState | undefined,
+): CoopRewardActionPayload | null {
+  const action = payload as CoopRewardActionPayload;
+  const continuation = action.terminal
+    ? undefined
+    : completeRewardContinuation(surfaceResult?.continuation, prepared, "reward");
+  if (!action.terminal && continuation == null) {
+    return null;
+  }
+  return {
+    ...action,
+    result: {
+      lockModifierTiers,
+      ...(continuation == null
+        ? {}
+        : {
+            continuation: continuation as Extract<CoopRewardPresentationPayload, { readonly surface: "reward" }>,
+          }),
+    },
+  };
+}
+
 function buildCompleteMarketResultPayload(
   payload: unknown,
+  prepared: PreparedRewardIntent,
   surfaceResult: CoopRewardSurfaceResultState | undefined,
 ): CoopShopBuyPayload | null {
+  const action = payload as CoopShopBuyPayload;
   const remainingStock = surfaceResult?.remainingStock;
   if (!Array.isArray(remainingStock) || remainingStock.some(stock => !Number.isSafeInteger(stock) || stock < 0)) {
     return null;
   }
+  const continuation = action.terminal
+    ? undefined
+    : completeRewardContinuation(surfaceResult?.continuation, prepared, "market");
+  if (
+    (!action.terminal && continuation == null)
+    || (continuation?.surface === "market"
+      && JSON.stringify(continuation.remainingStock) !== JSON.stringify(remainingStock))
+  ) {
+    return null;
+  }
   return {
-    ...(payload as CoopShopBuyPayload),
-    result: { remainingStock: [...remainingStock] },
+    ...action,
+    result: {
+      remainingStock: [...remainingStock],
+      ...(continuation == null
+        ? {}
+        : {
+            continuation: continuation as Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>,
+          }),
+    },
   };
 }
 
@@ -930,6 +1021,8 @@ export function commitCoopRewardOptionsPresentation(
     readonly pinned: number;
     readonly reroll: number;
     readonly options: readonly CoopSerializedRewardOption[];
+    readonly marketKind?: CoopMarketProjectionKind;
+    readonly remainingStock?: readonly number[];
     readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
     readonly localRole: CoopRole;
     readonly wave: number;
@@ -956,6 +1049,11 @@ export function commitCoopRewardOptionsPresentation(
         || (option.pregenArgs !== undefined
           && (!Array.isArray(option.pregenArgs) || !option.pregenArgs.every(Number.isFinite))),
     )
+    || (params.surface === "market"
+      && (params.marketKind == null
+        || !Array.isArray(params.remainingStock)
+        || params.remainingStock.length !== params.options.length
+        || params.remainingStock.some(stock => !Number.isSafeInteger(stock) || stock < 0)))
     || (params.rewardSurface !== undefined && !isValidCoopRewardSurfaceIdentity(params.rewardSurface))
   ) {
     return null;
@@ -971,13 +1069,24 @@ export function commitCoopRewardOptionsPresentation(
     // These are deliberately separate identities (and may differ for guest-owned Mystery rewards).
     const inputOwnerSeat = coopInteractionOwnerSeat(params.pinned);
     const operationId = makeCoopOperationId(s.epoch, inputOwnerSeat, actionSlot, presentationKind);
-    const payload: CoopRewardPresentationPayload = {
-      surface: params.surface,
-      pinned: params.pinned,
-      reroll: params.reroll,
-      options: structuredClone(params.options),
-      ...(params.rewardSurface == null ? {} : { rewardSurface: params.rewardSurface }),
-    };
+    const payload: CoopRewardPresentationPayload =
+      params.surface === "reward"
+        ? {
+            surface: "reward",
+            pinned: params.pinned,
+            reroll: params.reroll,
+            options: structuredClone(params.options),
+            ...(params.rewardSurface == null ? {} : { rewardSurface: params.rewardSurface }),
+          }
+        : {
+            surface: "market",
+            pinned: params.pinned,
+            reroll: params.reroll,
+            options: structuredClone(params.options),
+            marketKind: params.marketKind!,
+            remainingStock: [...params.remainingStock!],
+            ...(params.rewardSurface == null ? {} : { rewardSurface: params.rewardSurface }),
+          };
     const retained = s.committedResultEnvelopes.get(operationId);
     if (retained != null) {
       if (samePayload(retained.pendingOperation?.payload, payload) && retainEnvelope(retained, binding)) {

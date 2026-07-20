@@ -874,6 +874,7 @@ describe.skipIf(!RUN)(
       let guestQuizShop: ShopPhaseSeam | undefined;
       let guestQuizPhase: ErQuizPhaseSeam | undefined;
       let guestQuizStartObserved = false;
+      let hostQuizControlOperationId: string | null = null;
 
       // A mirror-quiz handoff must be INTERLEAVED (the IT #2 split), NOT driven host-fully-first. On the
       // quiz's `mePresent subPrompt {kind:"quiz"}`, the guest's CoopReplayMePhase.start races the 8M outcome
@@ -916,7 +917,14 @@ describe.skipIf(!RUN)(
 
         // This prompt observes the first player-visible quiz surface without choosing. The phase interceptor
         // keeps running toward the shop while the host is naturally parked for human input.
-        game.onNextPrompt("ErQuizPhase", UiMode.ER_QUIZ, signalHostQuizOpen);
+        game.onNextPrompt("ErQuizPhase", UiMode.ER_QUIZ, () => {
+          hostQuizControlOperationId = (
+            game.scene.phaseManager.getCurrentPhase() as unknown as {
+              coopV2ControlOperationId: string | null;
+            }
+          ).coopV2ControlOperationId;
+          signalHostQuizOpen();
+        });
         await game.phaseInterceptor.to("SelectModifierPhase", false);
         return hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       });
@@ -951,6 +959,10 @@ describe.skipIf(!RUN)(
           throw new Error("concurrent guest quiz replay created no production ErQuizPhase");
         }
         guestQuizQuestions = guestQuizPhase.questions.length;
+        expect(
+          guestQuizPhase.coopV2ControlOperationId,
+          "watcher mirror quiz inherited the exact host ME_PRESENT control address",
+        ).toBe(hostQuizControlOperationId);
       });
 
       // ===== STEP A3 (host): now answer every real owner question. The outer host scheduler remained parked
@@ -1040,6 +1052,10 @@ describe.skipIf(!RUN)(
         quizSessionSends.length,
         "host retained the quiz SESSION as an ME_PRESENT subPrompt { kind:'quiz' } (#818)",
       ).toBe(1);
+      expect(
+        hostQuizControlOperationId,
+        "the owner-side ErQuizPhase was bound to an exact ME_PRESENT control address before input",
+      ).toMatch(/:ME_PRESENT$/);
       const streamedSession = quizSessionSends[0];
       expect(
         streamedSession.subPrompt?.kind === "quiz" ? streamedSession.subPrompt.questions.length : -1,

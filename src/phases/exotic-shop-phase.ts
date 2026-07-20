@@ -21,6 +21,10 @@ import { ModifierTier } from "#enums/modifier-tier";
 import { BiomeShopPhase } from "#phases/biome-shop-phase";
 
 export class ExoticShopPhase extends BiomeShopPhase {
+  protected override coopMarketProjectionKind(): "exotic" {
+    return "exotic";
+  }
+
   protected override buildStock(): void {
     this.shopOptions = buildExoticShopStock();
     // Premium goods stock few copies each (rarer tier = scarcer).

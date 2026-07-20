@@ -3979,6 +3979,8 @@ export function relayGuestMeShopLeaveSync(guestShop: ShopPhaseSeam): void {
 /** #818 seam: the ErQuizPhase private tally fields the harness inspects (mirrors ShopPhaseSeam's shape). */
 export interface ErQuizPhaseSeam {
   phaseName: string;
+  /** Exact ME_PRESENT operation that authorized this public quiz generation. */
+  coopV2ControlOperationId: string | null;
   /** The host-streamed questions the mirror renders (structurally ErQuizQuestion[]). */
   questions: unknown[];
   /** Current question index (0-based). */

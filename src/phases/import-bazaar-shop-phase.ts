@@ -21,6 +21,10 @@ import { ModifierTier } from "#enums/modifier-tier";
 import { BiomeShopPhase } from "#phases/biome-shop-phase";
 
 export class ImportBazaarShopPhase extends BiomeShopPhase {
+  protected override coopMarketProjectionKind(): "import-bazaar" {
+    return "import-bazaar";
+  }
+
   protected override buildStock(): void {
     this.shopOptions = buildImportShopStock();
     // Bazaar goods are plentiful: stock per-tier counts like the biome shop.

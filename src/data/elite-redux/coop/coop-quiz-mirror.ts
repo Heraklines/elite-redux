@@ -222,10 +222,10 @@ export function coopQuizAwaitRemoteAnswer(index: number): Promise<number> | null
  * EXACT sender the party / secondary sub-prompts use: a `mePresent` interactionOutcome on the ME pump
  * seq, carrying the session as a {kind:"quiz"} subPrompt.
  */
-export function coopQuizHostStreamSession(questions: readonly unknown[], stopOnWrong: boolean): void {
+export function coopQuizHostStreamSession(questions: readonly unknown[], stopOnWrong: boolean): string | null {
   const controller = getCoopController();
   if (controller?.role !== "host" || coopQuizSide() === null) {
-    return;
+    return null;
   }
   const seq = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
   // The caller (ErQuizPhase) passes ErQuizQuestion[], which is structurally a CoopQuizWireQuestion[]
@@ -253,7 +253,7 @@ export function coopQuizHostStreamSession(questions: readonly unknown[], stopOnW
   });
   if (operationId == null && isCoopMeOperationEnabled()) {
     failCoopSharedSession("Quiz presentation could not enter authoritative control");
-    return;
+    return null;
   }
   // The committed envelope is the presentation carrier while durability is active. Legacy raw delivery
   // remains only for a negotiated fallback or a non-journal operation session, and always follows commit.
@@ -262,4 +262,5 @@ export function coopQuizHostStreamSession(questions: readonly unknown[], stopOnW
   } else {
     getCoopInteractionRelay()?.sendInteractionOutcome(seq, "mePresent", outcome);
   }
+  return operationId;
 }

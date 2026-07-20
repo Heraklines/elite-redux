@@ -46,6 +46,11 @@ export interface CoopV2InteractionSurfaceObservation {
 interface InteractionControlClaim {
   readonly revision: number;
   readonly sourceOperationId: string;
+  /**
+   * Exact immutable entry that authored this successor. Executable shared interactions cannot be
+   * reconstructed from a control address alone after recovery destroys the old Phaser phase tree.
+   */
+  readonly sourceEntry: CoopAuthorityEntry | null;
   readonly control: CoopV2ClaimedControl;
   materialApplied: boolean;
   superseded: boolean;
@@ -133,6 +138,7 @@ export class CoopV2ControlLedger {
     this.claims.set(controlId, {
       revision: entry.revision,
       sourceOperationId: entry.operationId,
+      sourceEntry: structuredClone(entry),
       control: structuredClone(control),
       materialApplied: false,
       superseded: false,
@@ -331,6 +337,14 @@ export class CoopV2ControlLedger {
     return this.latestUnsupersededClaim()?.control ?? null;
   }
 
+  /** Exact immutable entry behind one unsuperseded control, used by ordinary and recovery projection. */
+  sourceEntryOf(control: CoopV2ClaimedControl): CoopAuthorityEntry | null {
+    const claim = this.claims.get(controlIdOf(control));
+    return claim != null && !claim.superseded && controlsEqual(claim.control, control)
+      ? structuredClone(claim.sourceEntry)
+      : null;
+  }
+
   /** Whether the exact unsuperseded control's immutable material has really applied. */
   isMaterialApplied(control: CoopV2ClaimedControl): boolean {
     const claim = this.claims.get(controlIdOf(control));
@@ -344,22 +358,33 @@ export class CoopV2ControlLedger {
    */
   adoptRecoveryFrontier(entry: CoopAuthorityEntry | null): boolean {
     this.clear();
-    return entry == null || this.adoptRecoveryControl(entry.revision, entry.operationId, entry.nextControl);
+    return entry == null || this.adoptRecoveryControl(entry.revision, entry.operationId, entry.nextControl, entry);
   }
 
   /**
    * Replace every old engine-generation proof with one materially-applied, deliberately uninstalled claim.
    *
-   * Empty-tail recovery has only the retained frontier identity/control, not the retired entry body. It must
-   * still invalidate the destroyed phase tree instead of reusing an old `mechanical` marker.
+   * A non-interaction frontier may be reconstructed from its typed control plus the recovered battle image.
+   * A SHARED_INTERACTION is deliberately stricter: its phase-local immutable presentation must be supplied
+   * as the exact source entry, or recovery would have to guess from ambient state.
    */
-  adoptRecoveryControl(revision: number, sourceOperationId: string, control: CoopV2ClaimedControl): boolean {
+  adoptRecoveryControl(
+    revision: number,
+    sourceOperationId: string,
+    control: CoopV2ClaimedControl,
+    sourceEntry: CoopAuthorityEntry | null = null,
+  ): boolean {
     this.clear();
     if (
       !Number.isSafeInteger(revision)
       || revision <= 0
       || sourceOperationId.length === 0
       || (control.kind === "AWAIT_SUCCESSOR" && control.afterOperationId !== sourceOperationId)
+      || (control.kind === "SHARED_INTERACTION" && sourceEntry == null)
+      || (sourceEntry != null
+        && (sourceEntry.revision !== revision
+          || sourceEntry.operationId !== sourceOperationId
+          || !controlsEqual(sourceEntry.nextControl, control)))
     ) {
       return false;
     }
@@ -367,6 +392,7 @@ export class CoopV2ControlLedger {
     this.claims.set(controlId, {
       revision,
       sourceOperationId,
+      sourceEntry: sourceEntry == null ? null : structuredClone(sourceEntry),
       control: structuredClone(control),
       materialApplied: true,
       superseded: false,
@@ -397,6 +423,7 @@ export class CoopV2ControlLedger {
         controlId,
         {
           ...claim,
+          sourceEntry: claim.sourceEntry == null ? null : structuredClone(claim.sourceEntry),
           control: structuredClone(claim.control),
           installed:
             claim.installed == null

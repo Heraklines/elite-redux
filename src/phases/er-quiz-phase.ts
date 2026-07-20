@@ -24,7 +24,13 @@ import {
   coopQuizHostStreamSession,
   coopQuizPublishAnswer,
 } from "#data/elite-redux/coop/coop-quiz-mirror";
-import { coopSessionGeneration, getCoopController, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  coopSessionGeneration,
+  failCoopSharedSession,
+  getCoopController,
+  getCoopRuntime,
+  notifyCoopV2InteractionSurfaceReady,
+} from "#data/elite-redux/coop/coop-runtime";
 import { erRecordQuizPerfect } from "#data/elite-redux/er-achievement-detection";
 import type { ErQuizQuestion } from "#data/elite-redux/er-quiz";
 import { erQuizOptionName, getErFootprintAsset } from "#data/elite-redux/er-quiz";
@@ -57,10 +63,14 @@ export interface ErQuizSessionConfig {
   stopOnWrong?: boolean;
   /** Called once when the session ends. */
   onComplete: (result: ErQuizResult) => void;
+  /** Exact Authority V2 ME_PRESENT address inherited by a watcher-side mirror quiz. */
+  coopV2ControlOperationId?: string | null;
 }
 
 export class ErQuizPhase extends Phase {
   public readonly phaseName = "ErQuizPhase";
+  /** Exact immutable ME_PRESENT address that authorized this quiz generation. */
+  public coopV2ControlOperationId: string | null;
 
   private readonly questions: ErQuizQuestion[];
   private readonly stopOnWrong: boolean;
@@ -103,6 +113,7 @@ export class ErQuizPhase extends Phase {
     this.questions = config.questions;
     this.stopOnWrong = config.stopOnWrong ?? false;
     this.onComplete = config.onComplete;
+    this.coopV2ControlOperationId = config.coopV2ControlOperationId ?? null;
   }
 
   start(): void {
@@ -119,8 +130,26 @@ export class ErQuizPhase extends Phase {
     // #818 co-op quiz mirroring: the HOST (sole engine) streams the whole question session so BOTH
     // clients render the SAME quiz off it. The function gates itself on host role + a live mirrored ME,
     // so this is a no-op in solo play and safe to call unconditionally.
-    coopQuizHostStreamSession(this.questions, this.stopOnWrong);
+    const streamedOperationId = coopQuizHostStreamSession(this.questions, this.stopOnWrong);
+    if (
+      streamedOperationId != null
+      && this.coopV2ControlOperationId != null
+      && this.coopV2ControlOperationId !== streamedOperationId
+    ) {
+      failCoopSharedSession("Quiz phase received two different Authority V2 presentation addresses");
+      return;
+    }
+    if (streamedOperationId != null) {
+      this.coopV2ControlOperationId = streamedOperationId;
+    }
     void this.run();
+  }
+
+  /** Republish only after the exact ER_QUIZ handler is active for this phase generation. */
+  private notifyCoopV2SurfaceReady(): void {
+    if (this.boundaryStillLive() && this.coopV2ControlOperationId != null) {
+      notifyCoopV2InteractionSurfaceReady(this.coopBoundary?.runtime ?? getCoopRuntime());
+    }
   }
 
   /**
@@ -236,6 +265,7 @@ export class ErQuizPhase extends Phase {
       if (opened === "superseded") {
         return;
       }
+      this.notifyCoopV2SurfaceReady();
       this.armRemoteAnswer();
       return;
     }
@@ -261,6 +291,7 @@ export class ErQuizPhase extends Phase {
       if (opened === "superseded") {
         return;
       }
+      this.notifyCoopV2SurfaceReady();
       this.armRemoteAnswer();
       return;
     }
@@ -285,6 +316,7 @@ export class ErQuizPhase extends Phase {
       if (opened === "superseded") {
         return;
       }
+      this.notifyCoopV2SurfaceReady();
       this.armRemoteAnswer();
       return;
     }
@@ -344,6 +376,7 @@ export class ErQuizPhase extends Phase {
     if (opened === "superseded") {
       return;
     }
+    this.notifyCoopV2SurfaceReady();
     this.armRemoteAnswer();
   }
 

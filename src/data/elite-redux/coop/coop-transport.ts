@@ -37,6 +37,7 @@ import type { CoopFrozenAckQuorumV1, CoopMembershipSnapshotV1 } from "#data/elit
 // CoopAuthoritativeBattleStateV1 TYPE from here, so the cycle is fully type-level (no runtime cycle).
 import type {
   CoopAuthoritativeEnvelopeV1,
+  CoopMarketProjectionKind,
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import type {
@@ -120,7 +121,9 @@ export type CoopRole = "host" | "guest";
 // so mixed builds must refuse pairing rather than silently accepting different lifecycle semantics.
 // er-coop-42 authenticates non-mechanical quiz presentation carriers by their exact Authority V2 operation
 // identity. Older builds drop host-owned quiz answers after V2 suppresses the raw legacy authority stream.
-export const COOP_PROTOCOL_VERSION = "er-coop-42";
+// er-coop-43 makes the exact market subclass and stock vector part of every authoritative option
+// presentation/continuation. Older builds rebuild curated shops as generic 99-stock markets after recovery.
+export const COOP_PROTOCOL_VERSION = "er-coop-43";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1798,6 +1801,9 @@ export type CoopMessage =
       reroll: number;
       options: CoopSerializedRewardOption[];
       rewardSurface?: CoopRewardSurfaceIdentity | undefined;
+      /** Present for a market pool; exact phase subclass and stock are mechanical, not cosmetic. */
+      marketKind?: CoopMarketProjectionKind | undefined;
+      remainingStock?: number[] | undefined;
     }
   /** Watcher -> option owner: replay the exact cached reward/market option payload for this key. */
   | {

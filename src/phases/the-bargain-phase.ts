@@ -97,6 +97,22 @@ export class TheBargainPhase extends Phase {
   /** Exact runtime that owns this phase across its post-terminal publication callback. */
   private readonly coopOwningRuntime = getCoopRuntime();
 
+  /** Bind a recovered immutable offer before start() may consult the live interaction cursor. */
+  public installCoopV2BargainPresentation(operationId: string, pinned: number): boolean {
+    if (
+      operationId.length === 0
+      || !Number.isSafeInteger(pinned)
+      || pinned < 0
+      || (this.coopBargainStart >= 0 && this.coopBargainStart !== pinned)
+      || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
+    ) {
+      return false;
+    }
+    this.coopBargainStart = pinned;
+    this.coopV2ControlOperationId = operationId;
+    return true;
+  }
+
   start(): void {
     super.start();
     // Co-op (#795): the Bargain ALTERNATES like the market. The OWNER plays the real

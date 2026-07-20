@@ -32,6 +32,7 @@ import { setCoopMeActivePresentation } from "#data/elite-redux/coop/coop-me-pin-
 import {
   COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
   COOP_ME_REWARD_SURFACE_LIMIT,
+  type CoopMarketProjectionKind,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 // #840: seq bands now live in the single-source-of-truth registry; re-exported below under their
 // historical names so no call site changes (pure re-export, zero behavior change).
@@ -69,6 +70,16 @@ export {
 
 /** Sentinel choices shared across interaction screens. */
 export const COOP_INTERACTION_LEAVE = -1;
+
+/** Phase-local constructor data paired with a market option pool. Reward screens leave this absent. */
+export interface CoopRewardOptionsProjection {
+  readonly marketKind: CoopMarketProjectionKind;
+  readonly remainingStock: readonly number[];
+}
+
+function isCoopMarketProjectionKind(value: unknown): value is CoopMarketProjectionKind {
+  return value === "biome" || value === "exotic" || value === "black-market" || value === "import-bazaar";
+}
 
 /**
  * #829: the faint-replacement seq band is `COOP_FAINT_SWITCH_SEQ_BASE + fieldIndex` (the audit's 0-3
@@ -277,6 +288,7 @@ export interface CoopInteractionRelayOptions {
     reroll: number,
     options: readonly CoopSerializedRewardOption[],
     rewardSurface?: CoopRewardSurfaceIdentity,
+    projection?: CoopRewardOptionsProjection,
   ) => string | null;
 }
 
@@ -403,14 +415,7 @@ export class CoopInteractionRelay {
   private readonly validateV2QuizAnswerObservation: NonNullable<
     CoopInteractionRelayOptions["validateV2QuizAnswerObservation"]
   >;
-  private readonly publishRewardOptions:
-    | ((
-        seq: number,
-        reroll: number,
-        options: readonly CoopSerializedRewardOption[],
-        rewardSurface?: CoopRewardSurfaceIdentity,
-      ) => string | null)
-    | null;
+  private readonly publishRewardOptions: NonNullable<CoopInteractionRelayOptions["publishRewardOptions"]> | null;
   private readonly offMessage: () => void;
   private readonly offState: () => void;
   /** Raw outcomes awaiting their matching journal carrier; keyed by seq + exact JSON payload. */
@@ -449,10 +454,13 @@ export class CoopInteractionRelay {
   private readonly rewardOptionsInbox = new Map<string, CoopSerializedRewardOption[]>();
   /** Exact V2 presentation operation paired with a buffered or just-delivered option pool. */
   private readonly committedRewardOptionsOperationIds = new Map<string, string>();
+  /** Exact market constructor/stock paired with a raw or committed option pool. */
+  private readonly rewardOptionsProjections = new Map<string, CoopRewardOptionsProjection>();
   /** "seq:reroll" -> resolver for the in-flight {@linkcode awaitRewardOptions}. */
   private readonly rewardOptionsPending = new Map<string, (res: CoopSerializedRewardOption[] | null) => void>();
   /** Owner-side replay cache for exact option payloads. Bounded; cleared at session boundaries. */
   private readonly sentRewardOptions = new Map<string, CoopSerializedRewardOption[]>();
+  private readonly sentRewardOptionsProjections = new Map<string, CoopRewardOptionsProjection>();
 
   /**
    * #698 resync-rescue: seqs that have been STICKY-cancelled by {@linkcode cancelWaiters}. Any await
@@ -894,9 +902,13 @@ export class CoopInteractionRelay {
     reroll: number,
     options: CoopSerializedRewardOption[],
     rewardSurface?: CoopRewardSurfaceIdentity,
+    projection?: CoopRewardOptionsProjection,
   ): string | null {
     const key = rewardOptionsKey(seq, reroll, rewardSurface);
     this.sentRewardOptions.set(key, options);
+    if (projection != null) {
+      this.sentRewardOptionsProjections.set(key, structuredClone(projection));
+    }
     if (this.sentRewardOptions.size > 64) {
       const oldest = this.sentRewardOptions.keys().next().value;
       if (oldest !== undefined) {
@@ -914,7 +926,7 @@ export class CoopInteractionRelay {
         coopWarn("v2-interaction", `refused non-authority rewardOptions key=${key}`);
         return null;
       }
-      const operationId = this.publishRewardOptions?.(seq, reroll, options, rewardSurface) ?? null;
+      const operationId = this.publishRewardOptions?.(seq, reroll, options, rewardSurface, projection) ?? null;
       if (operationId == null) {
         coopWarn("v2-interaction", `could not retain authoritative rewardOptions key=${key}`);
         return null;
@@ -928,6 +940,9 @@ export class CoopInteractionRelay {
       reroll,
       options,
       ...(rewardSurface == null ? {} : { rewardSurface }),
+      ...(projection == null
+        ? {}
+        : { marketKind: projection.marketKind, remainingStock: [...projection.remainingStock] }),
     });
     return null;
   }
@@ -1016,11 +1031,15 @@ export class CoopInteractionRelay {
     options: CoopSerializedRewardOption[],
     rewardSurface?: CoopRewardSurfaceIdentity,
     operationId?: string,
+    projection?: CoopRewardOptionsProjection,
   ): void {
     const key = rewardOptionsKey(seq, reroll, rewardSurface);
     const copy = structuredClone(options);
     if (operationId != null && operationId.length > 0) {
       this.committedRewardOptionsOperationIds.set(key, operationId);
+    }
+    if (projection != null) {
+      this.rewardOptionsProjections.set(key, structuredClone(projection));
     }
     const waiter = this.rewardOptionsPending.get(key);
     if (waiter != null) {
@@ -1048,6 +1067,18 @@ export class CoopInteractionRelay {
     const operationId = this.committedRewardOptionsOperationIds.get(key) ?? null;
     this.committedRewardOptionsOperationIds.delete(key);
     return operationId;
+  }
+
+  /** Consume exact market constructor/stock metadata paired with the option pool just adopted. */
+  consumeRewardOptionsProjection(
+    seq: number,
+    reroll: number,
+    rewardSurface?: CoopRewardSurfaceIdentity,
+  ): CoopRewardOptionsProjection | null {
+    const key = rewardOptionsKey(seq, reroll, rewardSurface);
+    const projection = this.rewardOptionsProjections.get(key) ?? null;
+    this.rewardOptionsProjections.delete(key);
+    return projection == null ? null : structuredClone(projection);
   }
 
   /**
@@ -1224,7 +1255,9 @@ export class CoopInteractionRelay {
     this.rewardOptionsPending.clear();
     this.rewardOptionsInbox.clear();
     this.committedRewardOptionsOperationIds.clear();
+    this.rewardOptionsProjections.clear();
     this.sentRewardOptions.clear();
+    this.sentRewardOptionsProjections.clear();
     this.cancelledSeqs.clear();
   }
 
@@ -1263,7 +1296,9 @@ export class CoopInteractionRelay {
     this.committedCatchFullPromptCredits.clear();
     this.rewardOptionsInbox.clear();
     this.committedRewardOptionsOperationIds.clear();
+    this.rewardOptionsProjections.clear();
     this.sentRewardOptions.clear();
+    this.sentRewardOptionsProjections.clear();
     // A seq sticky-cancelled in the PRIOR epoch must not keep resolving null in the NEW epoch (seqs reuse
     // low counters), so clear the cancel marks alongside the buffers.
     this.cancelledSeqs.clear();
@@ -1416,6 +1451,22 @@ export class CoopInteractionRelay {
         return;
       }
       const key = rewardOptionsKey(msg.seq, msg.reroll, msg.rewardSurface);
+      const carriesProjection = msg.marketKind !== undefined || msg.remainingStock !== undefined;
+      if (carriesProjection) {
+        if (
+          !isCoopMarketProjectionKind(msg.marketKind)
+          || !Array.isArray(msg.remainingStock)
+          || msg.remainingStock.length !== msg.options.length
+          || !msg.remainingStock.every(stock => Number.isSafeInteger(stock) && stock >= 0)
+        ) {
+          coopWarn("relay", `RECV rewardOptions key=${key} -> malformed market projection`);
+          return;
+        }
+        this.rewardOptionsProjections.set(key, {
+          marketKind: msg.marketKind,
+          remainingStock: [...msg.remainingStock],
+        });
+      }
       const waiter = this.rewardOptionsPending.get(key);
       if (waiter) {
         if (isCoopDebug()) {
@@ -1455,6 +1506,7 @@ export class CoopInteractionRelay {
       }
       const key = rewardOptionsKey(msg.seq, msg.reroll, msg.rewardSurface);
       const options = this.sentRewardOptions.get(key);
+      const projection = this.sentRewardOptionsProjections.get(key);
       if (options == null) {
         coopWarn("relay", `RECV requestRewardOptions key=${key} -> no authoritative cache`);
         return;
@@ -1466,6 +1518,9 @@ export class CoopInteractionRelay {
         reroll: msg.reroll,
         options,
         ...(msg.rewardSurface == null ? {} : { rewardSurface: msg.rewardSurface }),
+        ...(projection == null
+          ? {}
+          : { marketKind: projection.marketKind, remainingStock: [...projection.remainingStock] }),
       });
       return;
     }

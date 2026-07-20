@@ -187,20 +187,41 @@ export interface CoopRewardActionPayload {
   /** Complete reward-surface state after this action; proposals omit it, committed results require it. */
   readonly result?: {
     readonly lockModifierTiers: boolean;
+    /**
+     * Complete executable continuation after a non-terminal action. Recovery cannot recreate a reward
+     * phase from the battle snapshot alone: the option pool, reroll generation, and ordered Mystery
+     * surface are phase-local mechanical material. Terminal actions deliberately omit this field.
+     */
+    readonly continuation?: Extract<CoopRewardPresentationPayload, { readonly surface: "reward" }>;
   };
 }
+
+/** Exact concrete market phase. Curated Mystery markets cannot be reconstructed as a generic biome shop. */
+export type CoopMarketProjectionKind = "biome" | "exotic" | "black-market" | "import-bazaar";
 
 /**
  * Authority-owned option presentation. Option pools affect valid indices, costs, RNG consumption, and the
  * resulting mutation, so they are immutable mechanical material rather than a lossy cosmetic relay.
  */
-export interface CoopRewardPresentationPayload {
-  readonly surface: "reward" | "market";
-  readonly pinned: number;
-  readonly reroll: number;
-  readonly options: readonly CoopSerializedRewardOption[];
-  readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
-}
+export type CoopRewardPresentationPayload =
+  | {
+      readonly surface: "reward";
+      readonly pinned: number;
+      readonly reroll: number;
+      readonly options: readonly CoopSerializedRewardOption[];
+      readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
+    }
+  | {
+      readonly surface: "market";
+      readonly pinned: number;
+      readonly reroll: number;
+      readonly options: readonly CoopSerializedRewardOption[];
+      /** The exact subclass whose rules and presentation this stock belongs to. */
+      readonly marketKind: CoopMarketProjectionKind;
+      /** Exact stock vector shown by that phase; indices correspond one-to-one with `options`. */
+      readonly remainingStock: readonly number[];
+      readonly rewardSurface?: CoopRewardSurfaceIdentity | undefined;
+    };
 
 /**
  * SHOP_BUY intent/outcome (Wave-2d, #5, SHOP): one relayed biome-market (BiomeShop / BlackMarket / Exotic /
@@ -218,6 +239,11 @@ export interface CoopShopBuyPayload {
   /** Exact post-action stock vector; committed results apply it verbatim instead of decrementing locally. */
   readonly result?: {
     readonly remainingStock: readonly number[];
+    /**
+     * Complete market generation that remains executable after a non-terminal buy. Terminal LEAVE results
+     * omit it. This closes recovery over the phase-local catalog/subclass/stock state.
+     */
+    readonly continuation?: Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>;
   };
 }
 

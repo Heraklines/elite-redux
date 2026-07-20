@@ -210,6 +210,45 @@ describe("co-op alternating-interaction relay (#633)", () => {
       expect(res).toEqual(options);
     });
 
+    it("carries the concrete market subclass and exact stock beside the option pool", async () => {
+      const { host, guest } = createLoopbackPair();
+      const owner = new CoopInteractionRelay(host);
+      const watcher = new CoopInteractionRelay(guest);
+      const projection = { marketKind: "black-market" as const, remainingStock: [2, 1] };
+
+      owner.sendRewardOptions(7, 777, options, undefined, projection);
+      await new Promise(r => setTimeout(r, 0));
+
+      expect(await watcher.awaitRewardOptions(7, 777)).toEqual(options);
+      expect(watcher.consumeRewardOptionsProjection(7, 777)).toEqual(projection);
+    });
+
+    it("drops a partial or stock-mismatched market projection instead of adopting guessed stock", async () => {
+      const { host, guest } = createLoopbackPair();
+      const timer: { fire?: () => void } = {};
+      const watcher = new CoopInteractionRelay(guest, {
+        schedule: cb => {
+          timer.fire = cb;
+          return () => {};
+        },
+      });
+      const awaited = watcher.awaitRewardOptions(7, 777, 1000);
+
+      host.send({
+        t: "rewardOptions",
+        seq: 7,
+        reroll: 777,
+        options,
+        marketKind: "exotic",
+        remainingStock: [1],
+      });
+      await new Promise(r => setTimeout(r, 0));
+      timer.fire?.();
+
+      expect(await awaited).toBeNull();
+      expect(watcher.consumeRewardOptionsProjection(7, 777)).toBeNull();
+    });
+
     it("re-requests and recovers the exact cached owner options when the first stream frame is lost", async () => {
       const pair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 81017 });
       const owner = new CoopInteractionRelay(pair.host);

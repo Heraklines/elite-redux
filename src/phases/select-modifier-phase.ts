@@ -8,6 +8,7 @@ import {
   COOP_INTERACTION_REROLL,
   type CoopInteractionChoice,
 } from "#data/elite-redux/coop/coop-interaction-relay";
+import type { CoopRewardPresentationPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
@@ -286,6 +287,33 @@ export class SelectModifierPhase extends BattlePhase {
     }
     this.coopV2ControlOperationId = operationId;
     settleCoopV2InteractionOperation(operationId);
+  }
+
+  /**
+   * Install the immutable reward generation before a recovery-created phase starts. The phase may still
+   * consume the serialized options through the normal relay adapter, but its control address, pin and
+   * reroll generation are never derived from the recovered controller's ambient cursor.
+   */
+  public installCoopV2RewardProjection(
+    operationId: string,
+    projection: Extract<CoopRewardPresentationPayload, { readonly surface: "reward" }>,
+  ): boolean {
+    const sameRewardSurface =
+      JSON.stringify(projection.rewardSurface ?? null) === JSON.stringify(this.coopRewardSurface ?? null);
+    if (
+      operationId.length === 0
+      || projection.surface !== "reward"
+      || projection.pinned < 0
+      || projection.reroll < 0
+      || !sameRewardSurface
+      || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
+    ) {
+      return false;
+    }
+    this.coopInteractionStart = projection.pinned;
+    this.rerollCount = projection.reroll;
+    this.coopV2ControlOperationId = operationId;
+    return true;
   }
 
   constructor(
@@ -1695,7 +1723,15 @@ export class SelectModifierPhase extends BattlePhase {
     if (getCoopController()?.role !== "host") {
       return false;
     }
-    const committed = commitRewardAuthoritativeResult(operationId, undefined, this.coopRewardOperationBinding);
+    const committed = commitRewardAuthoritativeResult(operationId, undefined, this.coopRewardOperationBinding, {
+      continuation: {
+        surface: "reward",
+        pinned: this.coopInteractionStart,
+        reroll: this.rerollCount,
+        options: serializeRewardOptions(this.typeOptions),
+        ...(this.coopRewardSurface == null ? {} : { rewardSurface: this.coopRewardSurface }),
+      },
+    });
     if (committed == null) {
       getCoopRuntime()?.durability?.reconnect();
       failCoopSharedSession(`Reward result ${operationId} could not capture/retain complete host state`);

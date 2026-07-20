@@ -51,6 +51,7 @@ import {
   getCoopInteractionRelay,
   getCoopRuntime,
   getCoopUiMirror,
+  notifyCoopV2InteractionSurfaceReady,
   setCoopMeBattleInteractionCounter,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_TERMINAL_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
@@ -244,6 +245,8 @@ interface CoopMeBattleSettlementResume {
 
 export class CoopReplayMePhase extends Phase {
   public readonly phaseName = "CoopReplayMePhase";
+  /** Exact immutable V2 presentation address owned by this replay generation. */
+  public coopV2ControlOperationId: string | null;
 
   private readonly interactionCounter: number;
   /** Guest->host pick / sub-pick + host->guest present / outcome channel (`8_000_000 + counter`). */
@@ -290,9 +293,23 @@ export class CoopReplayMePhase extends Phase {
     return globalScene.ui.setModeBoundedWhen(mode, 2_000, () => this.boundaryStillLive(), ...args);
   }
 
-  constructor(interactionCounter: number, resumeSettlement?: CoopMeBattleSettlementResume) {
+  /** Open the exact Mystery handler, then publish readiness only for this still-live addressed generation. */
+  private openV2MysterySurface(): void {
+    void this.openModeBounded(UiMode.MYSTERY_ENCOUNTER, undefined).then(opened => {
+      if (opened !== "superseded" && this.boundaryStillLive() && this.coopV2ControlOperationId != null) {
+        notifyCoopV2InteractionSurfaceReady(this.boundRuntime);
+      }
+    });
+  }
+
+  constructor(
+    interactionCounter: number,
+    resumeSettlement?: CoopMeBattleSettlementResume,
+    operationId: string | null = null,
+  ) {
     super();
     this.interactionCounter = interactionCounter;
+    this.coopV2ControlOperationId = operationId;
     this.seq = COOP_ME_PUMP_SEQ_BASE + interactionCounter;
     this.seqTerm = COOP_ME_TERM_SEQ_BASE + interactionCounter;
     this.boundRuntime = getCoopRuntime();
@@ -305,6 +322,24 @@ export class CoopReplayMePhase extends Phase {
         ...resumeSettlement,
       };
     }
+  }
+
+  /** Bind a redelivered/recovered host presentation to this exact replay generation. */
+  public installCoopV2MePresentation(
+    operationId: string,
+    interactionCounter: number,
+    presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }>,
+  ): boolean {
+    if (operationId.length === 0 || interactionCounter !== this.interactionCounter || presentation.k !== "mePresent") {
+      return false;
+    }
+    // A multi-round Mystery reuses this replay shell but every authoritative presentation has a distinct
+    // ordered operation ID. The V2 runtime is the sole caller and has already admitted that newer entry;
+    // replacing the address here is the required generation handoff, not local successor derivation.
+    this.coopV2ControlOperationId = operationId;
+    setCoopMeHostPresentation(structuredClone(presentation));
+    notifyCoopV2InteractionSurfaceReady(this.boundRuntime);
+    return true;
   }
 
   /**
@@ -551,7 +586,7 @@ export class CoopReplayMePhase extends Phase {
         branch: ownsMe ? "guest renders selector + relays picks" : "pure renderer (await outcome+terminal)",
       });
       showCoopControllerTagFor(ownsMe);
-      void this.openModeBounded(UiMode.MYSTERY_ENCOUNTER, undefined);
+      this.openV2MysterySurface();
       if (!ownsMe) {
         this.awaitOutcomeThenTerminal(relay);
       }
@@ -1126,13 +1161,13 @@ export class CoopReplayMePhase extends Phase {
       // would double-consume the host's next round outcome).
       this.pickSent = false;
       showCoopControllerTagFor(true); // #817: green = you drive this round
-      void this.openModeBounded(UiMode.MYSTERY_ENCOUNTER, undefined);
+      this.openV2MysterySurface();
       return;
     }
     // Watcher: adopt the presentation for display (the real selector, input-blocked for non-owners) + re-arm
     // the outcome/terminal race INHERITING the live terminalArm, and keep waiting for the next round / terminal.
     showCoopControllerTagFor(false); // #817: amber = partner drives this round
-    void this.openModeBounded(UiMode.MYSTERY_ENCOUNTER, undefined);
+    this.openV2MysterySurface();
     this.awaitOutcomeThenTerminal(relay, terminalArm);
   }
 
@@ -1849,7 +1884,7 @@ export class CoopReplayMePhase extends Phase {
     if (snapshot.presentation.subPrompt == null) {
       const ownsMe = this.canLocalPlayerSelect();
       showCoopControllerTagFor(ownsMe);
-      void this.openModeBounded(UiMode.MYSTERY_ENCOUNTER, undefined);
+      this.openV2MysterySurface();
       if (!this.initialPresentationEntered) {
         this.initialPresentationEntered = true;
       }
@@ -2325,6 +2360,7 @@ export class CoopReplayMePhase extends Phase {
     globalScene.phaseManager.unshiftNew("ErQuizPhase", {
       questions: sub.questions as ErQuizQuestion[],
       stopOnWrong: sub.stopOnWrong,
+      coopV2ControlOperationId: this.coopV2ControlOperationId,
       onComplete: (result: ErQuizResult) => {
         if (!this.boundaryStillLive()) {
           return;

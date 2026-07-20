@@ -128,6 +128,10 @@ function outcome(value: unknown): boolean {
 }
 
 function rewardPayload(value: unknown): boolean {
+  const continuing =
+    isPlainObject(value)
+    && value.terminal === false
+    && (value.label === "shop" || value.label === "check" || value.label === "transfer" || value.label === "lock");
   return (
     isPlainObject(value)
     && (value.label === "reward"
@@ -143,6 +147,7 @@ function rewardPayload(value: unknown): boolean {
     && (!value.terminal || (value.label === "skip" && value.choice === -1))
     && isPlainObject(value.result)
     && typeof value.result.lockModifierTiers === "boolean"
+    && (!continuing || rewardPresentationPayload(value.result.continuation, "reward"))
   );
 }
 
@@ -155,6 +160,23 @@ function shopPayload(value: unknown): boolean {
     && isPlainObject(value.result)
     && integerArray(value.result.remainingStock)
     && value.result.remainingStock.every(stock => stock >= 0)
+    && (value.terminal === true
+      || marketContinuationMatchesStock(value.result.continuation, value.result.remainingStock))
+  );
+}
+
+const COOP_MARKET_PROJECTION_KINDS = new Set(["biome", "exotic", "black-market", "import-bazaar"]);
+
+function arraysEqual(a: readonly unknown[], b: readonly unknown[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function marketContinuationMatchesStock(value: unknown, remainingStock: readonly number[]): boolean {
+  return (
+    rewardPresentationPayload(value, "market")
+    && isPlainObject(value)
+    && integerArray(value.remainingStock)
+    && arraysEqual(remainingStock, value.remainingStock)
   );
 }
 
@@ -167,6 +189,15 @@ function rewardPresentationPayload(value: unknown, surface: "reward" | "market")
     || !integer(value.reroll)
     || value.reroll < 0
     || !Array.isArray(value.options)
+  ) {
+    return false;
+  }
+  if (
+    surface === "market"
+    && (!COOP_MARKET_PROJECTION_KINDS.has(value.marketKind as string)
+      || !integerArray(value.remainingStock)
+      || value.remainingStock.length !== value.options.length
+      || value.remainingStock.some(stock => stock < 0))
   ) {
     return false;
   }

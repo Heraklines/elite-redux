@@ -38,6 +38,10 @@ import {
   coopBiomeShopSeq,
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
+import type {
+  CoopMarketProjectionKind,
+  CoopRewardPresentationPayload,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   adoptRewardWatcherChoice,
   captureCoopRewardOperationBinding,
@@ -133,6 +137,62 @@ export class BiomeShopPhase extends SelectModifierPhase {
    * watcher already owns). Carried by the overridden {@linkcode copy}.
    */
   private coopBiomeContinuation = false;
+
+  /** Closed Authority V2 constructor identity; curated Mystery markets override this explicitly. */
+  protected coopMarketProjectionKind(): CoopMarketProjectionKind {
+    return "biome";
+  }
+
+  /** Concrete public identity for the V2 proof ledger; legacy mechanics still see SelectModifierPhase. */
+  public get coopV2ProofPhaseName():
+    | "BiomeShopPhase"
+    | "ExoticShopPhase"
+    | "BlackMarketShopPhase"
+    | "ImportBazaarShopPhase" {
+    const phaseNameByMarket = {
+      biome: "BiomeShopPhase",
+      exotic: "ExoticShopPhase",
+      "black-market": "BlackMarketShopPhase",
+      "import-bazaar": "ImportBazaarShopPhase",
+    } as const satisfies Record<
+      CoopMarketProjectionKind,
+      "BiomeShopPhase" | "ExoticShopPhase" | "BlackMarketShopPhase" | "ImportBazaarShopPhase"
+    >;
+    return phaseNameByMarket[this.coopMarketProjectionKind()];
+  }
+
+  /** Complete phase-local market generation needed by ordinary projection and correlated recovery. */
+  private coopMarketContinuation(): Extract<CoopRewardPresentationPayload, { readonly surface: "market" }> {
+    return {
+      surface: "market",
+      pinned: this.coopBiomeStart,
+      reroll: COOP_BIOME_STOCK_REROLL,
+      options: serializeRewardOptions(this.shopOptions),
+      marketKind: this.coopMarketProjectionKind(),
+      remainingStock: [...this.qtys],
+    };
+  }
+
+  /** Bind a recovered market generation before it can roll, rebuild, or open a public handler. */
+  public installCoopV2MarketProjection(
+    operationId: string,
+    projection: Extract<CoopRewardPresentationPayload, { readonly surface: "market" }>,
+  ): boolean {
+    if (
+      operationId.length === 0
+      || projection.surface !== "market"
+      || projection.marketKind !== this.coopMarketProjectionKind()
+      || projection.pinned < 0
+      || projection.reroll !== COOP_BIOME_STOCK_REROLL
+      || projection.remainingStock.length !== projection.options.length
+      || (this.coopV2ControlOperationId != null && this.coopV2ControlOperationId !== operationId)
+    ) {
+      return false;
+    }
+    this.coopBiomeStart = projection.pinned;
+    this.coopV2ControlOperationId = operationId;
+    return true;
+  }
 
   /** The biome market re-appears (not the vanilla reward screen) after the
    * party-target menu closes on a held-item / TM purchase. */
@@ -288,6 +348,11 @@ export class BiomeShopPhase extends SelectModifierPhase {
         this.coopBiomeStart,
         COOP_BIOME_STOCK_REROLL,
         serializeRewardOptions(this.shopOptions),
+        undefined,
+        {
+          marketKind: this.coopMarketProjectionKind(),
+          remainingStock: [...this.qtys],
+        },
       );
       if (operationId != null) {
         this.coopV2ControlOperationId = operationId;
@@ -737,6 +802,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
             && (commit == null
               || commitRewardAuthoritativeResult(commit.operationId, undefined, this.coopRewardOperationBinding, {
                 remainingStock: this.qtys,
+                continuation: this.coopMarketContinuation(),
               }) == null)
           ) {
             if (v2HostAdvanced) {
@@ -884,13 +950,19 @@ export class BiomeShopPhase extends SelectModifierPhase {
     if (presentationOperationId != null) {
       this.coopV2ControlOperationId = presentationOperationId;
     }
+    const projection = relay.consumeRewardOptionsProjection(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL);
+    if (isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability) && projection == null) {
+      this.coopBiomeAuthoritativeStockUnavailable("guest owner received V2 market options without exact stock");
+      return;
+    }
     if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
       return;
     }
     this.shopOptions = rebuilt;
-    // Per-slot stock counts are NOT streamed (only the options are); recompute them from each option's
-    // resolved tier - erBiomeStockCount is pure, so this matches the host's buildStock quantities exactly.
-    this.qtys = this.shopOptions.map(o => erBiomeStockCount(o.type.getOrInferTier() ?? ModifierTier.GREAT));
+    this.qtys =
+      projection?.remainingStock == null
+        ? this.shopOptions.map(o => erBiomeStockCount(o.type.getOrInferTier() ?? ModifierTier.GREAT))
+        : [...projection.remainingStock];
     if (this.shopOptions.length === 0) {
       void this.finishEmptyCoopBiomeShop();
       return;
@@ -938,6 +1010,11 @@ export class BiomeShopPhase extends SelectModifierPhase {
           this.coopBiomeStart,
           COOP_BIOME_STOCK_REROLL,
           serializeRewardOptions(this.shopOptions),
+          undefined,
+          {
+            marketKind: this.coopMarketProjectionKind(),
+            remainingStock: [...this.qtys],
+          },
         );
         if (operationId != null) {
           this.coopV2ControlOperationId = operationId;
@@ -960,11 +1037,16 @@ export class BiomeShopPhase extends SelectModifierPhase {
       if (presentationOperationId != null) {
         this.coopV2ControlOperationId = presentationOperationId;
       }
+      const projection = relay.consumeRewardOptionsProjection(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL);
+      if (isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability) && projection == null) {
+        this.coopBiomeAuthoritativeStockUnavailable("watcher received V2 market options without exact stock");
+        return;
+      }
       if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
         return;
       }
       this.shopOptions = rebuilt;
-      this.qtys = this.shopOptions.map(() => 99);
+      this.qtys = projection?.remainingStock == null ? this.shopOptions.map(() => 99) : [...projection.remainingStock];
     }
     // Stock awaits can span another UI transition. Revalidate (and reopen only when actually lost) at the
     // instant readiness is published; a buffered owner terminal remains safe until the loop below.
@@ -1053,6 +1135,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
           if (
             commitRewardAuthoritativeResult(decision.operationId, undefined, this.coopRewardOperationBinding, {
               remainingStock: this.qtys,
+              continuation: this.coopMarketContinuation(),
             }) == null
           ) {
             failCoopSharedSession(`Biome market terminal result ${decision.operationId} could not be retained`);
@@ -1149,6 +1232,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         && decision.operationId != null
         && commitRewardAuthoritativeResult(decision.operationId!, undefined, this.coopRewardOperationBinding, {
           remainingStock: this.qtys,
+          continuation: this.coopMarketContinuation(),
         }) == null
       ) {
         failCoopSharedSession(`Biome market buy result ${decision.operationId} could not be retained`);
@@ -1384,6 +1468,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         if (
           commitRewardAuthoritativeResult(operationIdToCommit, undefined, this.coopRewardOperationBinding, {
             remainingStock: this.qtys,
+            continuation: this.coopMarketContinuation(),
           }) == null
         ) {
           throw new Error(`authoritative result ${operationIdToCommit} could not be retained`);
