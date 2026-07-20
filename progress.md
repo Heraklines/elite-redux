@@ -205,3 +205,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The architecture contract now inspects the public-journey workflow in addition to gate, campaign, and
   staging. A future flag omission therefore fails before Chrome starts instead of producing a misleading
   multi-minute legacy campaign.
+
+2026-07-20 — Authority V2 Showdown replacement fixture ordering
+
+- Exact-SHA full gate `29760814283` proved S4's replacement fixtures still asserted against the speculative
+  live-event `CoopGuestFaintSwitchPhase`. Under V2 that first object must retire unopened until the settled
+  `TURN_COMMIT` applies; production then reconstructs the same address as a fresh picker generation.
+- The common Showdown guest-pick driver now advances the real queued reconstruction after replay/finalize,
+  and the idle-fallback race explicitly proves the speculative generation exposes no input before opening
+  exactly one ordered picker. No production authority rule or timeout was relaxed.
+- Local verification remains static-only under `AGENTS.md`; exact-SHA remote S4 qualification is required.

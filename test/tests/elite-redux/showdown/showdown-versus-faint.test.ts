@@ -191,10 +191,12 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
   }
 
   /**
-   * Drive the guest's replay for `turn`, intercepting the ONE `UiMode.PARTY` open (its own-team faint
-   * picker, {@linkcode CoopGuestFaintSwitchPhase}) to pick {@linkcode GUEST_PICK_SLOT} - the relay send +
-   * seq keying stay fully real. Returns whether the picker actually OPENED (the gate fired - the crisp
-   * red-proof anchor: with the co-op ownership gate un-branched the picker never opens on the versus guest).
+   * Drive the guest's replay for `turn`, then advance the real V2 reconstruction when the live-event picker
+   * arrived before its ordered TURN_COMMIT. The first object must retire unopened; material application
+   * enqueues a fresh address-exact {@linkcode CoopGuestFaintSwitchPhase}, which is the ONE `UiMode.PARTY`
+   * surface intercepted here to pick {@linkcode GUEST_PICK_SLOT}. The relay send + seq keying stay fully real.
+   * Returns whether the authorized picker actually OPENED (the gate fired - the crisp red-proof anchor:
+   * with the co-op ownership gate un-branched the picker never opens on the versus guest).
    */
   async function driveGuestReplayPickingBench(rig: ShowdownDuoRig, turn: number): Promise<boolean> {
     let pickerOpened = false;
@@ -215,6 +217,19 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       };
       try {
         await driveGuestReplayTurn(rig.guestScene, turn);
+        if (V2_REPLACEMENT_CUTOVER && !pickerOpened) {
+          const authorizedPicker = await driveClientPhaseQueueTo(
+            rig.guestScene,
+            "ordered Showdown guest replacement picker",
+            {
+              matches: phase => phase.phaseName === "CoopGuestFaintSwitchPhase",
+              perPhaseTimeoutMs: 5_000,
+              pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+            },
+          );
+          authorizedPicker.start();
+          await drainLoopback();
+        }
       } finally {
         ui.setMode = realSetMode;
       }
@@ -704,12 +719,23 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
         rig.guestScene.currentBattle.turn = turn + 1;
         replay.start();
         await drainLoopback();
-        const picker = await driveClientPhaseQueueTo(rig.guestScene, "Showdown idle guest picker", {
+        const earlyPicker = await driveClientPhaseQueueTo(rig.guestScene, "Showdown early idle guest picker", {
           matches: phase => phase.phaseName === "CoopGuestFaintSwitchPhase",
           perPhaseTimeoutMs: 5_000,
         });
-        picker.start();
+        earlyPicker.start();
         await drainLoopback();
+        let picker = earlyPicker;
+        if (V2_REPLACEMENT_CUTOVER) {
+          expect(pickerOpens, "the speculative picker retired without exposing unlogged input").toBe(0);
+          picker = await driveClientPhaseQueueTo(rig.guestScene, "Showdown ordered idle guest picker", {
+            matches: phase => phase.phaseName === "CoopGuestFaintSwitchPhase" && phase !== earlyPicker,
+            perPhaseTimeoutMs: 5_000,
+            pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+          });
+          picker.start();
+          await drainLoopback();
+        }
         expect(pickerOpens, "the real Showdown replacement picker opened exactly once").toBe(1);
         expect(rig.guestScene.phaseManager.getCurrentPhase()).toBe(picker);
       });
