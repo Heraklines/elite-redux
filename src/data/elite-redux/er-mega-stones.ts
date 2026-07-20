@@ -263,6 +263,9 @@ const ER_STONE_DEFS: ReadonlyArray<readonly [string, string]> = [
   ["PLANETARY_ORB", "lucarionite"],
   ["EMBRYONIC_ORB", "lucarionite"],
   ["SKARMORITE_Z", "lucarionite"],
+  ["KINGDRANITE_Y", "lucarionite"],
+  ["DURALUDONITE", "lucarionite"],
+  ["FIDOUGHITE", "lucarionite"],
 ];
 
 type FcRecord = Record<string, number>;
