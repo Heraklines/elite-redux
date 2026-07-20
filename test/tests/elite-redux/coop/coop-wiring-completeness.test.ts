@@ -451,6 +451,32 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     }
   });
 
+  it("retries retained reward and market claims from their real public-handler readiness edges", () => {
+    const phaseRoot = join(__dirname, "..", "..", "..", "..", "src", "phases");
+    const reward = readFileSync(join(phaseRoot, "select-modifier-phase.ts"), "utf8");
+    const market = readFileSync(join(phaseRoot, "biome-shop-phase.ts"), "utf8");
+    const rewardStart = reward.indexOf("private notifyCoopContinuationSurfaceReady(): void");
+    const rewardEnd = reward.indexOf("updateSeed(): void", rewardStart);
+    const marketStart = market.indexOf("private notifyCoopBiomeContinuationSurfaceReady(): void");
+    const marketEnd = market.indexOf("private coopBiomeAuthoritativeStockUnavailable(", marketStart);
+    expect(rewardStart, "the reward public-ready funnel exists").toBeGreaterThanOrEqual(0);
+    expect(rewardEnd, "the reward public-ready funnel has a bounded source section").toBeGreaterThan(rewardStart);
+    expect(marketStart, "the market public-ready funnel exists").toBeGreaterThanOrEqual(0);
+    expect(marketEnd, "the market public-ready funnel has a bounded source section").toBeGreaterThan(marketStart);
+
+    for (const [label, body] of [
+      ["reward", reward.slice(rewardStart, rewardEnd)],
+      ["market", market.slice(marketStart, marketEnd)],
+    ] as const) {
+      expect(body, `${label} preserves retained wave continuation proof`).toContain(
+        "notifyCoopWaveContinuationSurfaceReady(",
+      );
+      expect(body, `${label} also retries the global V2 presentation claim`).toContain(
+        "notifyCoopV2InteractionSurfaceReady(",
+      );
+    }
+  });
+
   it("retires late replacement authority only after the retained wave continuation is durably released", () => {
     const source = readFileSync(
       join(__dirname, "..", "..", "..", "..", "src", "data", "elite-redux", "coop", "coop-runtime.ts"),

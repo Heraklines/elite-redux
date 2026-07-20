@@ -33,6 +33,7 @@ import {
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
+  notifyCoopV2InteractionSurfaceReady,
   notifyCoopWaveContinuationSurfaceReady,
   resolveCoopRetainedWaveContinuationIdentity,
   retainCoopV2InteractionProposal,
@@ -1348,7 +1349,14 @@ export class SelectModifierPhase extends BattlePhase {
 
   /** Preserve the phase's runtime across async UI completion in the two-engine fidelity harness. */
   private notifyCoopContinuationSurfaceReady(): void {
-    const notify = () => notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
+    const notify = () => {
+      notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
+      // REWARD_PRESENT is retained before this phase receives its operation ID and before the rendezvous
+      // opens MODIFIER_SELECT. The authority-local ledger therefore cannot prove the successor in the
+      // commit stack itself. Publish the same address-exact phase/handler proof used by recovery only after
+      // the real handler is active; otherwise the first reward result cannot consume its presentation.
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+    };
     if (this.coopOwningRuntime == null) {
       notify();
       return;

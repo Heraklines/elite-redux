@@ -58,6 +58,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
+  notifyCoopV2InteractionSurfaceReady,
   notifyCoopWaveContinuationSurfaceReady,
   runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -1277,11 +1278,16 @@ export class BiomeShopPhase extends SelectModifierPhase {
 
   /** Publish readiness only while this phase's scene and runtime are installed together. */
   private notifyCoopBiomeContinuationSurfaceReady(): void {
-    const notify = () =>
+    const notify = () => {
       notifyCoopWaveContinuationSurfaceReady(
         this.coopSourceAddress?.wave,
         this.coopBiomeOwner ? undefined : "biomeMarketWatcher",
       );
+      // SHOP_PRESENT is committed while its concrete market handler is still opening. Bind the immutable
+      // presentation to this exact BIOME_SHOP (or watcher MESSAGE) generation once it is genuinely live,
+      // so the next SHOP_BUY can consume an installed predecessor instead of racing an unproven claim.
+      notifyCoopV2InteractionSurfaceReady(this.coopBiomeOwningRuntime);
+    };
     if (this.coopBiomeOwningRuntime == null) {
       notify();
       return;
