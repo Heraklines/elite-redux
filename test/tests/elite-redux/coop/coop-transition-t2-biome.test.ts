@@ -616,6 +616,14 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
             nextWave: 11,
           }),
         ).toBe(true);
+        expect(
+          adoptCoopBiomeTransitionSwitchPermit({
+            sourceBiomeId: BiomeId.VOLCANO,
+            destinationBiomeId: BiomeId.VOLCANO,
+            wave: 10,
+          }),
+          "an exact result may materialize the destination arena before its queued Switch tail first adopts",
+        ).not.toBeNull();
         const laterOperationId = coopAuthoritativeBiomeTransitionOperationId(15);
         expect(laterOperationId).not.toBeNull();
         expect(

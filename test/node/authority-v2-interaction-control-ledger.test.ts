@@ -13,6 +13,7 @@ import {
   CoopV2InteractionControlLedger,
   type CoopV2InteractionSurfaceObservation,
 } from "#data/elite-redux/coop/authority-v2/interaction-control-ledger";
+import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import { describe, expect, it } from "vitest";
 
 const CONTEXT: CoopFrameContextV2 = {
@@ -295,5 +296,62 @@ describe("Authority V2 interaction control ledger", () => {
     rollback?.();
     expect(ledger.latestControl).toBeNull();
     expect(ledger.activeControl).toBeNull();
+  });
+
+  it("reopens a superseded command address as a new lease generation after an ordered modal", () => {
+    const ledger = new CoopV2InteractionControlLedger();
+    const command: Extract<CoopNextControl, { kind: "COMMAND_FRONTIER" }> = {
+      kind: "COMMAND_FRONTIER",
+      epoch: CONTEXT.sessionEpoch,
+      wave: 5,
+      turn: 1,
+      commands: [{ ownerSeatId: 0, fieldIndex: 0, pokemonId: 25 }],
+    };
+    const firstCommand: CoopAuthorityEntry = {
+      ...interactionEntry(1, "command-open-1", command),
+      kind: "CONTROL_COMMIT",
+      material: {
+        digest: "digest-command-open-1",
+        payload: { kind: "command-open", wave: 5, turn: 1 },
+      },
+    };
+    expect(ledger.registerEntry(firstCommand)).toBe(true);
+    expect(ledger.markMaterialApplied(firstCommand)).toBe(true);
+    expect(
+      ledger.projectMechanical(command, () => ({ kind: "installed", controlId: controlIdOf(command) })),
+    ).toMatchObject({ kind: "installed" });
+
+    const modalResultOperationId = "modal-result";
+    const modalWait = wait(modalResultOperationId, null, [
+      "TURN_COMMIT",
+      "INTERACTION_COMMIT",
+      "CONTROL_COMMIT",
+      "WAVE_ADVANCE",
+      "TERMINAL_COMMIT",
+    ]);
+    const modalResult: CoopAuthorityEntry = {
+      ...interactionEntry(2, modalResultOperationId, modalWait),
+      kind: "TURN_COMMIT",
+      material: {
+        digest: "digest-modal-result",
+        payload: { epoch: CONTEXT.sessionEpoch, wave: 5, turn: 1 },
+      },
+    };
+    expect(ledger.admitSuccessor(modalResult)).toBe(true);
+    expect(ledger.registerEntry(modalResult)).toBe(true);
+    expect(ledger.markMaterialApplied(modalResult)).toBe(true);
+    expect(ledger.project(modalWait, null)).toMatchObject({ kind: "installed" });
+
+    const reopenedCommand: CoopAuthorityEntry = {
+      ...firstCommand,
+      revision: 3,
+      operationId: "command-open-2",
+      material: {
+        digest: "digest-command-open-2",
+        payload: { kind: "command-open", wave: 5, turn: 1 },
+      },
+    };
+    expect(ledger.prepareAuthorityEntry(reopenedCommand)).not.toBeNull();
+    expect(ledger.sourceEntryOf(command)).toMatchObject({ revision: 3, operationId: "command-open-2" });
   });
 });

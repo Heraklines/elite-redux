@@ -41,6 +41,9 @@ const interactionCutover = readFileSync(
   "utf8",
 );
 const nextControl = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/next-control.ts", root), "utf8");
+const controlLedger = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/control-ledger.ts", root), "utf8");
+const rendererGate = readFileSync(new URL("src/data/elite-redux/coop/coop-renderer-gate.ts", root), "utf8");
+const switchBiomePhase = readFileSync(new URL("src/phases/switch-biome-phase.ts", root), "utf8");
 
 function jobBlock(workflow, job) {
   const lines = workflow.split(/\r?\n/gu);
@@ -600,5 +603,50 @@ test("overlapping duo scopes cannot overwrite a newer browser-local biome permit
     ].length,
     2,
     "both synchronous and asynchronous client windows fence stale biome-state save-back",
+  );
+});
+
+test("superseded control addresses can reopen without weakening live-address conflicts", () => {
+  const registerStart = controlLedger.indexOf("registerEntry(entry: CoopAuthorityEntry): boolean");
+  const registerEnd = controlLedger.indexOf("\n  /**", registerStart + 1);
+  assert.notEqual(registerStart, -1, "the global ledger exposes its registration boundary");
+  assert.ok(registerEnd > registerStart, "the registration boundary has a bounded source block");
+  const register = controlLedger.slice(registerStart, registerEnd);
+  assert.match(register, /if \(!prior\.superseded \|\| entry\.revision <= prior\.revision\) \{\s*return false;/u);
+  assert.ok(
+    register.indexOf("if (duplicate)") < register.indexOf("if (!prior.superseded"),
+    "identical redelivery stays idempotent before a newer lease generation is considered",
+  );
+});
+
+test("biome result materialization cannot invalidate its exact queued transition tail", () => {
+  const adoptStart = rendererGate.indexOf("export function adoptCoopBiomeTransitionSwitchPermit(");
+  const adoptEnd = rendererGate.indexOf("\nexport function markCoopBiomeTransitionHistoryRecorded", adoptStart);
+  assert.notEqual(adoptStart, -1, "the renderer gate exposes the biome permit adopter");
+  assert.ok(adoptEnd > adoptStart, "the biome permit adopter has a bounded source block");
+  const adopt = rendererGate.slice(adoptStart, adoptEnd);
+  assert.match(
+    adopt,
+    /const destinationAlreadyMaterialized =[\s\S]*permit\.destinationBiomeId === params\.sourceBiomeId[\s\S]*permit\.wave === params\.wave/u,
+    "an exact same-wave destination state may precede first tail adoption",
+  );
+  assert.match(
+    switchBiomePhase,
+    /erRecordBiomeEntry\(permit\.sourceBiomeId as BiomeId\)/u,
+    "history is derived from immutable source authority instead of the already-materialized arena",
+  );
+});
+
+test("the replacement harness preserves an already-installed command frontier", () => {
+  const helperStart = duoHarness.indexOf("export async function materializeGuestInputAfterReplacement(");
+  const helperEnd = duoHarness.indexOf("\n/**", helperStart + 1);
+  assert.notEqual(helperStart, -1, "the duo harness exposes its post-replacement materializer");
+  assert.ok(helperEnd > helperStart, "the post-replacement materializer has a bounded source block");
+  const helper = duoHarness.slice(helperStart, helperEnd);
+  const commandReturn = helper.indexOf('if (scene.phaseManager.getCurrentPhase()?.phaseName === "CommandPhase")');
+  const bootFallback = helper.indexOf("materializeMirroredGuestInputTurn(scene)");
+  assert.ok(
+    commandReturn >= 0 && bootFallback > commandReturn,
+    "an exact V2 CommandPhase is retained before the mirrored-boot fallback is considered",
   );
 });

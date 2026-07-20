@@ -492,6 +492,14 @@ export function adoptCoopBiomeTransitionSwitchPermit(params: {
   readonly wave: number;
 }): CoopBiomeTransitionTailPermit | null {
   const permit = biomeTransitionTailPermit;
+  // Applying the immutable BIOME_PICK result can install its complete authoritative state before the queued
+  // SwitchBiome presentation tail starts. In that valid ordering the live arena already names the committed
+  // destination even though this local tail has not adopted its permit yet. The exact permit identity,
+  // destination, and source-wave still fence the mutation; only the ambient source image has advanced.
+  const destinationAlreadyMaterialized =
+    permit?.switchAdopted === false
+    && permit.destinationBiomeId === params.sourceBiomeId
+    && permit.wave === params.wave;
   const replayAfterNewBattle =
     permit?.switchAdopted === true
     && permit.destinationBiomeId === params.sourceBiomeId
@@ -501,6 +509,7 @@ export function adoptCoopBiomeTransitionSwitchPermit(params: {
     || permit.destinationBiomeId !== params.destinationBiomeId
     || (permit.wave !== params.wave && !replayAfterNewBattle)
     || (permit.sourceBiomeId !== params.sourceBiomeId
+      && !destinationAlreadyMaterialized
       && !(permit.switchAdopted && permit.destinationBiomeId === params.sourceBiomeId))
   ) {
     return null;

@@ -129,11 +129,21 @@ export class CoopV2ControlLedger {
     const controlId = controlIdOf(control);
     const prior = this.claims.get(controlId);
     if (prior != null) {
-      return (
+      const duplicate =
         prior.revision === entry.revision
         && prior.sourceOperationId === entry.operationId
-        && controlsEqual(prior.control, control)
-      );
+        && controlsEqual(prior.control, control);
+      if (duplicate) {
+        return true;
+      }
+      // A modal interaction can temporarily supersede command control and then return to the exact same
+      // wave/turn/seat frontier. That is a NEW lease generation even though its semantic control address is
+      // identical. Keep active/unsuperseded address reuse fail-closed, but replace a provably superseded
+      // older claim with the immediately admitted newer revision. Otherwise a legal
+      // Command -> Interaction -> AWAIT_SUCCESSOR -> Command chain is permanently unrepresentable.
+      if (!prior.superseded || entry.revision <= prior.revision) {
+        return false;
+      }
     }
     this.claims.set(controlId, {
       revision: entry.revision,

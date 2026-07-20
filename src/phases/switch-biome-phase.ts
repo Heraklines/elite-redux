@@ -303,7 +303,9 @@ export class SwitchBiomePhase extends BattlePhase {
   ): void {
     let permit = initialPermit;
     if (!permit.historyRecorded) {
-      erRecordBiomeEntry(globalScene.arena?.biomeId ?? null);
+      // The immutable result state may already have installed the destination arena before this presentation
+      // tail runs. History still records the committed source, never whichever arena image happens to be live.
+      erRecordBiomeEntry(permit.sourceBiomeId as BiomeId);
       permit = markCoopBiomeTransitionHistoryRecorded(permit.operationId) ?? permit;
       if (!permit.historyRecorded) {
         throw new Error("Could not record exact biome history stage");

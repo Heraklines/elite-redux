@@ -1948,6 +1948,12 @@ export async function materializeGuestInputAfterReplacement(scene: BattleScene):
       }
     }
   }
+  // The V2 replacement projector may already have installed the exact post-replacement CommandPhase while
+  // the peer pump above was closing the retained checkpoint. That live phase is the desired production
+  // boundary; a queued cosmetic replay tail does not turn it back into the builders' untouched boot shape.
+  if (scene.phaseManager.getCurrentPhase()?.phaseName === "CommandPhase") {
+    return;
+  }
   // Authority V2 replacement material can release the parked finalizer directly into its ordinary
   // TurnInit successor. That phase is already the production structural route to CommandPhase; replacing
   // it with a synthetic boot edge both loses identity and makes the one-process fixture reject a state two

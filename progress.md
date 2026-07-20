@@ -597,3 +597,33 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   that exact host phase via `overridePhase` before starting it, matching the
   production queue identity. Static Authority contracts are 19/19; both fixes
   await the next remote C1/C2 qualification.
+
+2026-07-20 - Reentrant control and pre-materialized biome closure
+
+- Exact-SHA `f616ea69f` disproved the first C1 hypothesis without weakening the
+  fail-closed path: the biome permit no longer disappeared. Revision 28 armed
+  it on both clients, but applying the complete BIOME_PICK result had already
+  changed each live arena from source biome 0 to destination biome 1.
+  `SwitchBiomePhase` then required the old source because the permit had not
+  previously been adopted and terminated both clients. First adoption now
+  accepts that exact same-wave, exact-destination pre-materialized ordering;
+  it still requires the immutable permit identity and records history from the
+  permit's source rather than the already-updated arena.
+- C2 completed the real guest-owned learn-move UI, committed its terminal as
+  revision 16, and installed the ordered successor wait. Rebuilding the same
+  command turn then exposed a global-ledger defect: revision 14's command
+  address remained indexed after being superseded by the modal, so the legal
+  revision 17 command lease was rejected solely because its semantic address
+  was identical. The ledger now replaces only an older *superseded* claim with
+  a newer revision; duplicate delivery remains idempotent and any live address
+  conflict still fails closed.
+- S4's sole red was another strict-oracle mismatch. V2 had already installed
+  the desired post-replacement `CommandPhase`, with a cosmetic replay tail
+  queued behind it. The helper treated that healthy frontier as an untouched
+  boot scene and tried to reconstruct it, then failed loudly. It now preserves
+  the already-current command boundary before considering the mirrored-boot
+  fallback.
+- Local validation remains static-only: Authority source contracts are 22/22,
+  scoped formatting has no errors, `git diff --check` is clean, and full
+  TypeScript has 222 repository-baseline diagnostics with zero touched-path
+  diagnostics. Behavioral qualification remains GitHub-hosted.
