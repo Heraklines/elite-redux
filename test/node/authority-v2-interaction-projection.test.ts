@@ -7,8 +7,11 @@ import type { CoopAuthorityEntry, CoopFrameContextV2 } from "#data/elite-redux/c
 import { CoopV2ControlLedger } from "#data/elite-redux/coop/authority-v2/control-ledger";
 import { buildCoopV2InteractionEnvelopeEntry } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { projectionPlanOfCoopV2InteractionEntry } from "#data/elite-redux/coop/authority-v2/interaction-projection";
-import { COOP_ABILITY_ACTION_STRIDE } from "#data/elite-redux/coop/coop-ability-operation";
-import { COOP_COLOSSEUM_ACTION_STRIDE } from "#data/elite-redux/coop/coop-colosseum-operation";
+import {
+  COOP_ABILITY_ACTION_STRIDE,
+  COOP_COLOSSEUM_ACTION_STRIDE,
+  COOP_REWARD_ACTION_STRIDE,
+} from "#data/elite-redux/coop/coop-operation-address";
 import type {
   CoopAuthoritativeEnvelopeV1,
   CoopLogicalPhase,
@@ -16,7 +19,6 @@ import type {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import type { CoopOperationSurfaceClass } from "#data/elite-redux/coop/coop-operation-surface-registry";
-import { COOP_REWARD_ACTION_STRIDE } from "#data/elite-redux/coop/coop-reward-operation";
 import { COOP_CROSSROADS_SEQ_BASE, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";

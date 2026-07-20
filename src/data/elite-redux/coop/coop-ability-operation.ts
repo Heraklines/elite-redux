@@ -7,6 +7,7 @@ import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/co
 import { COOP_CAP_OP_ABILITY, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
+import { COOP_ABILITY_ACTION_STRIDE } from "#data/elite-redux/coop/coop-operation-address";
 import {
   type CoopAbilityPickPayload,
   type CoopAbilityPresentationPayload,
@@ -41,7 +42,8 @@ import {
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 
-export const COOP_ABILITY_ACTION_STRIDE = 100;
+export { COOP_ABILITY_ACTION_STRIDE };
+
 const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_ABILITY_OP === "off");
 
 let enabled = DEFAULT_ENABLED;

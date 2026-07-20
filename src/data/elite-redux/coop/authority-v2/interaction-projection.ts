@@ -16,8 +16,10 @@
 
 import type { CoopAuthorityEntry } from "#data/elite-redux/coop/authority-v2/contract";
 import { decodeCoopV2InteractionEnvelope } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
-import { COOP_ABILITY_ACTION_STRIDE } from "#data/elite-redux/coop/coop-ability-operation";
-import { COOP_COLOSSEUM_ACTION_STRIDE } from "#data/elite-redux/coop/coop-colosseum-operation";
+import {
+  COOP_ABILITY_ACTION_STRIDE,
+  COOP_COLOSSEUM_ACTION_STRIDE,
+} from "#data/elite-redux/coop/coop-operation-address";
 import type {
   CoopAbilityPresentationPayload,
   CoopBargainPresentationPayload,

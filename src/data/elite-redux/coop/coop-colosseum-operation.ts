@@ -12,6 +12,7 @@ import {
   restoreCoopMeControlTransactionState,
   setCoopMeColosseumControl,
 } from "#data/elite-redux/coop/coop-me-pin-state";
+import { COOP_COLOSSEUM_ACTION_STRIDE } from "#data/elite-redux/coop/coop-operation-address";
 import {
   type CoopAuthoritativeEnvelopeV1,
   type CoopColosseumPayload,
@@ -43,7 +44,8 @@ import {
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 
-export const COOP_COLOSSEUM_ACTION_STRIDE = 100;
+export { COOP_COLOSSEUM_ACTION_STRIDE };
+
 const COOP_COLOSSEUM_MAX_ROUND = Math.floor((COOP_COLOSSEUM_ACTION_STRIDE - 2) / 2);
 const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_COLOSSEUM_OP === "off");
 

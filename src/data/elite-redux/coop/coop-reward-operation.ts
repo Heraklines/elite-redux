@@ -30,6 +30,7 @@ import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
 import { COOP_INTERACTION_LEAVE, COOP_INTERACTION_REROLL } from "#data/elite-redux/coop/coop-interaction-relay";
+import { COOP_REWARD_ACTION_STRIDE } from "#data/elite-redux/coop/coop-operation-address";
 import {
   COOP_ME_REWARD_SURFACE_ID_MAX_LENGTH,
   COOP_ME_REWARD_SURFACE_LIMIT,
@@ -169,7 +170,7 @@ function freshWatcherRoleState(): RewardWatcherRoleState {
 }
 
 /** ACTION ORDINAL stride: pin * STRIDE + ordinal must not overflow into the next pin's op-id space. */
-export const COOP_REWARD_ACTION_STRIDE = 100_000;
+export { COOP_REWARD_ACTION_STRIDE };
 
 /** Disjoint action range for the ambient stream and each of the at most 16 P36 Mystery surfaces. */
 export const COOP_REWARD_SURFACE_ACTION_STRIDE = 5_000;
