@@ -2653,7 +2653,129 @@
         "species": 279
       }
     ],
-    "trainerClass": "VETERAN",
+    "trainerClass": "BIRD_KEEPER",
+    "weight": 100
+  },
+  "TRAINER_70017": {
+    "battleType": "double",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70017,
+    "maxWave": 170,
+    "minWave": 70,
+    "name": "Suggest a name 002",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "HYPER_VOICE",
+          "SLACK_OFF",
+          "CURSE",
+          "FLAME_BURST"
+        ],
+        "species": 911
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "PSYCHIC_NOISE",
+          "BOOMBURST",
+          "ICE_BEAM",
+          "ALLURING_VOICE"
+        ],
+        "species": 730
+      },
+      {
+        "abilitySlot": 1,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 295
+        },
+        "level": null,
+        "moves": [
+          "BOOMBURST",
+          "ECHOED_VOICE",
+          "GHASTLY_ECHO",
+          "HELPING_HAND"
+        ],
+        "species": 10726
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 2,
+              "formIndex": 0,
+              "species": 441
+            },
+            "level": null,
+            "moves": [
+              "QUICK_GUARD",
+              "BEAT_UP",
+              "PERISH_SONG",
+              "DIG"
+            ],
+            "species": 424,
+            "weight": 2
+          },
+          {
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 1,
+              "formIndex": 0,
+              "species": 441
+            },
+            "level": null,
+            "moves": [
+              "BADDY_BAD",
+              "DARK_VOID",
+              "HYPER_VOICE",
+              "LIGHT_SCREEN"
+            ],
+            "species": 97,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 2,
+            "fusion": {
+              "abilitySlot": 0,
+              "formIndex": 0,
+              "species": 441
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "EVIOLITE"
+              },
+              {
+                "count": 1,
+                "item": "SITRUS_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "PARTING_SHOT",
+              "DOUBLE_SHOCK",
+              "ELECTROWEB",
+              "VOLT_SWITCH"
+            ],
+            "species": 125,
+            "weight": 1
+          }
+        ]
+      }
+    ],
+    "trainerClass": "MUSICIAN",
     "weight": 100
   }
 }
