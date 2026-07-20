@@ -1124,6 +1124,13 @@ export class EvidenceSink {
     return this.events.slice(from).find(event => event.kind === "browser-binding");
   }
 
+  findLastBinding(from = 0) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(event => event.kind === "browser-binding");
+  }
+
   findResponse(pathname, { from = 0, status = null, method = null, slot = null, mode = null } = {}) {
     return this.events
       .slice(from)

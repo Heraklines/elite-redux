@@ -81,6 +81,7 @@ test("two public clients must prove one positive gameplay epoch before locking t
     harness.indexOf("async completePairingBinding()"),
     harness.indexOf("\n  async assertSharedSurface(", harness.indexOf("async completePairingBinding()")),
   );
+  assert.match(binding, /findLastBinding\(roleCursors\[client\.label\]\)/u);
   assert.match(binding, /epochs\.some\(epoch => !Number\.isSafeInteger\(epoch\) \|\| epoch <= 0\)/u);
   assert.match(binding, /new Set\(epochs\)\.size !== 1/u);
   assert.match(binding, /paired-binding-address-proof/u);

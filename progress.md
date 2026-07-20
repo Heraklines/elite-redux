@@ -345,3 +345,28 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   green; scoped Biome has no errors; full TypeScript reports 222 repository
   baseline diagnostics and zero in the touched TypeScript paths. The exact-SHA
   two-browser journey and complete sharded co-op gate remain remote-only.
+
+2026-07-20 - Latest-binding proof and ordered replacement result
+
+- Exact-SHA Showdown journey `29773713537` proved the production admission fix:
+  both real browsers reached the Friendly wager surface with the same final
+  positive gameplay epoch. The red verdict was evidence-layer only. The
+  authority emitted its permitted provisional binding before the fresh-run P33
+  transaction completed, and the harness compared that first event with the
+  replica's final event.
+- Pairing proof now observes each browser's latest authenticated binding until
+  host/guest, seats `0/1`, and one positive gameplay epoch converge. It retains
+  the hard deadline and fails closed on a real mismatch. A source contract pins
+  latest-event selection so the harness cannot regress to first-event latching.
+- Compact surface evidence from campaign `29770309511` exposed a separate real
+  ordered-control defect. A settled `TURN_COMMIT` installed executable
+  `REPLACEMENT`, and the globally-next exact `REPLACEMENT_COMMIT` arrived, but
+  the turn finalizer recognized later results only behind `AWAIT_SUCCESSOR`.
+  The immutable replacement checkpoint was consequently buffered forever and
+  recovery rejected it because the live replica still carried the prior turn.
+- The finalizer now accepts only the exact operation-addressed, globally-next
+  replacement result for its executable replacement control. It does not treat
+  picker installation as progression permission. Local static validation is
+  11/11 Authority V2 contracts, 5/5 Showdown evidence contracts, a green public
+  browser boundary, clean scoped Biome, and zero TypeScript diagnostics in the
+  touched co-op paths. Remote exact-SHA requalification remains required.

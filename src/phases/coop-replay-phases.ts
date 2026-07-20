@@ -1114,7 +1114,19 @@ export class CoopFinalizeTurnPhase extends Phase {
       && statedControl.afterOperationId === `TURN/e${this.epoch}/w${this.wave}/t${this.turn}`
       && statedControl.allowedKinds.includes(successor.kind)
       && (statedControl.expectedOperationId == null || statedControl.expectedOperationId === successor.operationId);
-    if (!sameEntryReplacement && !orderedSuccessor) {
+    // An executable REPLACEMENT is both the turn's immediate human-input control and the address of its
+    // eventual immutable answer. The picker opening is NOT permission to advance the turn: the finalizer
+    // must remain parked until the globally-next REPLACEMENT_COMMIT installs the complete post-summon
+    // carrier. This result is not an AWAIT_SUCCESSOR edge (the picker itself was executable), so recognize
+    // it explicitly by consecutive log revision + exact operation id. Without this edge a perfectly valid
+    // guest-owned faint reaches rev N+1, buffers its replacement checkpoint, and leaves rev N's finalizer
+    // parked forever; recovery then sees the replica's old live turn and rejects the newer snapshot.
+    const orderedReplacementResult =
+      successor.revision === this.authorityRevision + 1
+      && statedControl?.kind === "REPLACEMENT"
+      && successor.kind === "REPLACEMENT_COMMIT"
+      && successor.operationId === statedControl.operationId;
+    if (!sameEntryReplacement && !orderedSuccessor && !orderedReplacementResult) {
       return false;
     }
     const prior = this.authoritySuccessorReady;

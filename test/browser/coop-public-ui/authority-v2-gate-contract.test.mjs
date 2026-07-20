@@ -270,6 +270,11 @@ test("a committed replacement wake cannot be stranded behind its own turn finali
   assert.match(release, /successor\.revision === this\.authorityRevision/u);
   assert.match(release, /statedControl\?\.kind === "REPLACEMENT"/u);
   assert.match(release, /controlIdOf\(successor\.nextControl\) === controlIdOf\(statedControl\)/u);
+  assert.match(
+    release,
+    /successor\.revision === this\.authorityRevision \+ 1[\s\S]*statedControl\?\.kind === "REPLACEMENT"[\s\S]*successor\.kind === "REPLACEMENT_COMMIT"[\s\S]*successor\.operationId === statedControl\.operationId/u,
+    "the executable replacement control releases only through its exact globally-next immutable result",
+  );
   assert.match(release, /this\.authoritySuccessorReady \?\?= successor/u);
 
   const parkStart = replayPhases.indexOf("} else if (v2NoImmediateCommand) {");

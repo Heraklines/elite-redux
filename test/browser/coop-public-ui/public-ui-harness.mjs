@@ -2237,27 +2237,52 @@ export class DuoPublicUiRig {
       throw new Error("completePairingBinding called before pair()");
     }
     await Promise.all(Object.values(this.clients).map(client => client.waitForPublicRole(roleCursors[client.label])));
-    const bindings = Object.values(this.clients).map(client => ({
-      client,
-      event: client.evidence.findBinding(roleCursors[client.label]),
-    }));
+    // The authority can publish its provisional positive epoch before the guest receives and ACKs the
+    // fresh-run identity. That first event proves a role, but it is not the final cross-seat address: the
+    // authority emits a second binding after the P33 identity transaction converges. Compare the LATEST
+    // authenticated binding on each browser and keep observing until they agree. Using findBinding (the
+    // first event) made a healthy Showdown pair fail while both real wager surfaces already carried the
+    // same final epoch.
+    const deadline = Date.now() + this.config.timeoutMs;
+    let bindings = [];
+    let roles = [];
+    let seats = [];
+    let epochs = [];
+    while (Date.now() < deadline) {
+      bindings = Object.values(this.clients).map(client => ({
+        client,
+        event: client.evidence.findLastBinding(roleCursors[client.label]),
+      }));
+      roles = bindings
+        .map(binding => binding.event?.observation.role)
+        .filter(Boolean)
+        .sort();
+      seats = bindings
+        .map(binding => binding.event?.observation.seat)
+        .filter(Number.isSafeInteger)
+        .sort();
+      epochs = bindings.map(binding => binding.event?.observation.epoch ?? null);
+      const complete =
+        bindings.every(binding => binding.event != null)
+        && JSON.stringify(roles) === JSON.stringify(["guest", "host"])
+        && JSON.stringify(seats) === "[0,1]"
+        && epochs.every(epoch => Number.isSafeInteger(epoch) && epoch > 0)
+        && new Set(epochs).size === 1;
+      if (complete) {
+        break;
+      }
+      await delay(100);
+    }
     if (bindings.some(binding => binding.event == null)) {
       throw new Error("Stable-seat binding disappeared before exact address verification");
     }
-    const roles = Object.values(this.clients)
-      .map(client => client.publicRole)
-      .sort();
-    const seats = Object.values(this.clients)
-      .map(client => client.publicSeat)
-      .sort();
     if (JSON.stringify(roles) !== JSON.stringify(["guest", "host"]) || JSON.stringify(seats) !== "[0,1]") {
       throw new Error(
         `Stable-seat binding invalid after launch decision: roles=${JSON.stringify(roles)} seats=${JSON.stringify(seats)}`,
       );
     }
-    const epochs = bindings.map(binding => binding.event.observation.epoch);
     if (epochs.some(epoch => !Number.isSafeInteger(epoch) || epoch <= 0) || new Set(epochs).size !== 1) {
-      throw new Error(`Stable-seat bindings disagree on gameplay epoch: ${JSON.stringify(epochs)}`);
+      throw new Error(`Latest stable-seat bindings did not converge on one gameplay epoch: ${JSON.stringify(epochs)}`);
     }
     for (const binding of bindings) {
       binding.client.evidence.record("paired-binding-address-proof", {

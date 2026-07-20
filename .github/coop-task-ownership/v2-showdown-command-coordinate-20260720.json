@@ -22,6 +22,7 @@
     "test/browser/coop-public-ui/browser-workflow-fanout.test.mjs",
     "test/browser/coop-public-ui/check-public-boundary.mjs",
     "test/browser/coop-public-ui/config.mjs",
+    "test/browser/coop-public-ui/evidence.mjs",
     "test/browser/coop-public-ui/journeys.mjs",
     "test/browser/coop-public-ui/public-ui-harness.mjs",
     "test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs",
