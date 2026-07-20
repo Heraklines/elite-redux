@@ -128,8 +128,10 @@ export type ReplacementResolutionMode = "owner-pick" | "fallback-auto";
  *   - "resume-command-frontier" - the last faint in the chain resolved; resume
  *                          every independently-controlled active battler.
  *   - "next-replacement" - another faint remains in the SAME turn; the current
- *                          entry installs an exact ordered wait for that next
- *                          REPLACEMENT_COMMIT operation.
+ *                          post-summon batch installs an exact ordered permit for
+ *                          that already-resolved REPLACEMENT_COMMIT operation.
+ *                          It must not fabricate a second executable picker after
+ *                          both replacement choices and summons already completed.
  *   - "terminal"         - no executable control follows the replacement; the
  *                          entry waits explicitly for interaction/wave/terminal authority.
  */
@@ -412,8 +414,14 @@ export function successorControl(
       };
     case "next-replacement":
       return {
-        kind: "REPLACEMENT",
-        operationId: replacementOperationId(
+        kind: "AWAIT_SUCCESSOR",
+        afterOperationId: sourceOperationId,
+        epoch: address.epoch,
+        wave: address.wave,
+        turn: address.turn,
+        allowedKinds: ["REPLACEMENT_COMMIT"],
+        allowNextWaveStart: false,
+        expectedOperationId: replacementOperationId(
           {
             epoch: address.epoch,
             wave: address.wave,
@@ -423,12 +431,6 @@ export function successorControl(
           },
           successor.ownerSeatId,
         ),
-        ownerSeatId: successor.ownerSeatId,
-        epoch: address.epoch,
-        wave: address.wave,
-        turn: address.turn,
-        occurrence: successor.occurrence,
-        fieldIndex: successor.fieldIndex,
       };
     case "terminal":
       return {

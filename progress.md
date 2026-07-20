@@ -393,3 +393,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   prevent either live phase from restoring the turn-zero sentinel. Local
   static architecture coverage is 13/13; remote node and real-engine shards
   remain the behavioral qualification.
+
+2026-07-20 - Replacement public-proof timing and atomic double-KO ordering
+
+- Exact-SHA S4 evidence at `b1f4e0e9d` reproduced the tester-facing safety abort
+  on a single guest faint. Revision 2 had applied the complete turn and opened
+  the reconstructed PARTY picker, but its readiness callback ran in an earlier
+  microtask than asynchronous `setMode`. The replica therefore remained at
+  `2/2/1`; the exact replacement revision 3 was a permanent gap even while the
+  human successfully chose a mon.
+- The replacement phase now retains the actual `setMode` completion and retries
+  V2 projection only after the real PARTY handler exists. A phase token or UI
+  request alone still cannot prove `controlInstalled`.
+- The same shard exposed the independent double-KO abort. Both replacement
+  choices and summons were already complete when the post-summon transaction
+  committed its two result entries, yet occurrence 0 stated a second executable
+  replacement picker. The authority-local ledger correctly refused occurrence
+  1 because that already-spent picker could never be installed.
+- Same-carrier replacement results now chain through an exact
+  `AWAIT_SUCCESSOR` restricted to the expected next `REPLACEMENT_COMMIT`
+  operation. No UI lease is granted and no local continuation is guessed; the
+  final result alone states the real command or terminal successor. Node and
+  source contracts pin both invariants. Remote S4 and browser qualification are
+  required; no co-op engine test was run locally.

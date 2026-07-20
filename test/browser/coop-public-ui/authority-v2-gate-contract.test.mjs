@@ -18,6 +18,7 @@ const duoHarness = readFileSync(new URL("test/tools/coop-duo-harness.ts", root),
 const phaseManager = readFileSync(new URL("src/phase-manager.ts", root), "utf8");
 const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), "utf8");
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
+const guestFaintSwitchPhase = readFileSync(new URL("src/phases/coop-guest-faint-switch-phase.ts", root), "utf8");
 const replayPhases = readFileSync(new URL("src/phases/coop-replay-phases.ts", root), "utf8");
 const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts", root), "utf8");
 const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
@@ -25,6 +26,10 @@ const titlePhase = readFileSync(new URL("src/phases/title-phase.ts", root), "utf
 const shadow = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/shadow.ts", root), "utf8");
 const waveAdapter = readFileSync(
   new URL("src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts", root),
+  "utf8",
+);
+const replacementAdapter = readFileSync(
+  new URL("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts", root),
   "utf8",
 );
 
@@ -319,6 +324,31 @@ test("ordinary replacement projection has an immutable fallback when cosmetic fa
   assert.ok(projectEnd > projectStart, "ordinary interaction projector has a bounded source block");
   const project = coopRuntime.slice(projectStart, projectEnd);
   assert.match(project, /prepareCoopV2OrdinaryReplacementControlSurface\(runtime, control\)/u);
+});
+
+test("replacement controls are proven by the real async PARTY surface and batched results never fabricate a spent picker", () => {
+  const openParty = guestFaintSwitchPhase.indexOf("const openedParty = scene.ui.setMode(");
+  const awaitParty = guestFaintSwitchPhase.indexOf("Promise.resolve(openedParty).then(", openParty);
+  const notifyReady = guestFaintSwitchPhase.indexOf("notifyCoopV2InteractionSurfaceReady(runtime)", awaitParty);
+  assert.notEqual(openParty, -1, "the replacement phase retains the real setMode completion");
+  assert.ok(
+    awaitParty > openParty && notifyReady > awaitParty,
+    "control readiness is published only after PARTY's asynchronous public handler opens",
+  );
+
+  const successorStart = replacementAdapter.indexOf('case "next-replacement":');
+  const successorEnd = replacementAdapter.indexOf('\n    case "terminal":', successorStart);
+  assert.notEqual(successorStart, -1, "the replacement adapter exposes its same-batch successor");
+  assert.ok(successorEnd > successorStart, "the same-batch successor has a bounded source block");
+  const successor = replacementAdapter.slice(successorStart, successorEnd);
+  assert.match(successor, /kind: "AWAIT_SUCCESSOR"/u);
+  assert.match(successor, /allowedKinds: \["REPLACEMENT_COMMIT"\]/u);
+  assert.match(successor, /expectedOperationId: replacementOperationId\(/u);
+  assert.doesNotMatch(
+    successor,
+    /kind: "REPLACEMENT"/u,
+    "an already-resolved double-KO batch may not demand a second executable picker",
+  );
 });
 
 test("Crossroads result envelopes retain the exact V2 control turn instead of a legacy turn-zero sentinel", () => {

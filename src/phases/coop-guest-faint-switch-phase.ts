@@ -210,8 +210,25 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       },
       operationBinding,
     );
+    let openFailureHandled = false;
+    const handleOpenFailure = (): void => {
+      if (openFailureHandled) {
+        return;
+      }
+      openFailureHandled = true;
+      // A UI failure must never hang the guest's replay; the host auto-picks after its wait.
+      endCoopFaintSwitchWindow();
+      unregisterTerminal();
+      coopWarn("replay", `guest own-faint picker slot=${this.fieldIndex} failed to open (handled, host auto-picks)`);
+      if (!boundaryStillLive()) {
+        failCoopSharedSession("The replacement picker failed after losing its exact phase boundary.");
+        return;
+      }
+      scene.phaseManager.shiftPhase();
+      markPickerMaterialized();
+    };
     try {
-      scene.ui.setMode(
+      const openedParty = scene.ui.setMode(
         UiMode.PARTY,
         PartyUiMode.FAINT_SWITCH,
         this.fieldIndex,
@@ -273,18 +290,16 @@ export class CoopGuestFaintSwitchPhase extends Phase {
         },
         PartyUiHandler.FilterNonFainted,
       );
-      queueMicrotask(() => runWhenCoopRuntimeActive(runtime, () => notifyCoopV2InteractionSurfaceReady(runtime)));
+      // setMode is asynchronous: the phase token exists before PARTY's real handler is active. A
+      // microtask scheduled immediately after the call can therefore observe MESSAGE/the previous
+      // handler and leave this ordered REPLACEMENT control permanently materialApplied-but-uninstalled.
+      // Publish readiness only after setMode's own completion promise proves the public PARTY surface.
+      Promise.resolve(openedParty).then(
+        () => runWhenCoopRuntimeActive(runtime, () => notifyCoopV2InteractionSurfaceReady(runtime)),
+        () => runWhenCoopRuntimeActive(runtime, handleOpenFailure),
+      );
     } catch {
-      // A UI failure must never hang the guest's replay; the host auto-picks after its wait.
-      endCoopFaintSwitchWindow();
-      unregisterTerminal();
-      coopWarn("replay", `guest own-faint picker slot=${this.fieldIndex} failed to open (handled, host auto-picks)`);
-      if (!boundaryStillLive()) {
-        failCoopSharedSession("The replacement picker failed after losing its exact phase boundary.");
-        return;
-      }
-      scene.phaseManager.shiftPhase();
-      markPickerMaterialized();
+      handleOpenFailure();
     }
   }
 }

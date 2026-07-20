@@ -275,7 +275,7 @@ describe("authority-v2 replacement staged transaction", () => {
     duo.dispose();
   });
 
-  it("orders a same-boundary double faint and chains occurrence 0 to the exact occurrence 1 control", () => {
+  it("orders a same-boundary double faint through an exact result permit without fabricating a spent picker", () => {
     const duo = buildDuo();
     const cutover = new CoopV2ReplacementCutover(duo.host);
     const second = proposal({
@@ -303,14 +303,14 @@ describe("authority-v2 replacement staged transaction", () => {
       expect.objectContaining({ sourceAddress: expect.objectContaining({ occurrence: 9, fieldIndex: 1 }) }),
     ]);
     expect(result.entries[0].nextControl).toEqual({
-      kind: "REPLACEMENT",
-      operationId: result.entries[1].operationId,
-      ownerSeatId: 1,
+      kind: "AWAIT_SUCCESSOR",
+      afterOperationId: result.entries[0].operationId,
       epoch: SESSION.epoch,
       wave: 8,
       turn: 4,
-      occurrence: 9,
-      fieldIndex: 1,
+      allowedKinds: ["REPLACEMENT_COMMIT"],
+      allowNextWaveStart: false,
+      expectedOperationId: result.entries[1].operationId,
     });
     expect(result.entries[1].nextControl?.kind).toBe("COMMAND_FRONTIER");
     expect(duo.host.diagnostics().retained).toBe(0);

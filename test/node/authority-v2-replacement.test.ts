@@ -15,8 +15,8 @@
 //     ACTIVE time, driven through the REAL foundation scheduler with a manual
 //     clock + pause/resume (a suspended window does not burn its deadline);
 //   - a same-turn double-KO commits two occurrence-addressed entries with the
-//     correct successor chaining (occurrence 0 -> next REPLACEMENT, occurrence 1
-//     -> resume COMMAND);
+//     correct successor chaining (occurrence 0 -> exact ordered permit for the
+//     already-resolved next REPLACEMENT_COMMIT, occurrence 1 -> resume COMMAND);
 //   - a committed entry closes an open local picker (the seam-level anti-softlock
 //     authority-close) and adopts the committed pick;
 //   - zero scheduler timers survive after the entry retires.
@@ -320,7 +320,8 @@ describe("double-KO chaining", () => {
     const sent: CoopAuthorityWire[] = [];
     const log = makeAuthorityLog(sent, scheduler);
 
-    // Occurrence 0 faints on field slot 0; its successor is the exact executable NEXT picker.
+    // Occurrence 0 faints on field slot 0; both summons already completed before this batch
+    // commits, so its successor is an exact permit for the next committed result, not a new picker.
     const entry0Input = buildReplacementCommitEntry({
       context: FRAME,
       proposal: proposal({ sourceAddress: address({ occurrence: 0, fieldIndex: 0 }), ownerSeatId: 1 }),
@@ -353,13 +354,12 @@ describe("double-KO chaining", () => {
     expect(entry0.operationId).toBe(replacementOperationId(address({ occurrence: 0, fieldIndex: 0 }), 1));
     expect(entry1.operationId).toBe(replacementOperationId(address({ occurrence: 1, fieldIndex: 1 }), 0));
 
-    // Successor chaining: entry0 -> exact REPLACEMENT picker/commit operation, entry1 -> COMMAND.
+    // Successor chaining: entry0 -> exact ordered REPLACEMENT_COMMIT permit, entry1 -> COMMAND.
     expect(entry0.nextControl).toMatchObject({
-      kind: "REPLACEMENT",
-      operationId: entry1.operationId,
-      ownerSeatId: 0,
-      occurrence: 1,
-      fieldIndex: 1,
+      kind: "AWAIT_SUCCESSOR",
+      afterOperationId: entry0.operationId,
+      allowedKinds: ["REPLACEMENT_COMMIT"],
+      expectedOperationId: entry1.operationId,
     });
     expect(entry1.nextControl).toMatchObject({
       kind: "COMMAND_FRONTIER",
@@ -370,14 +370,14 @@ describe("double-KO chaining", () => {
     const entry0SuccessorId = entry0.nextControl == null ? null : controlIdOf(entry0.nextControl);
     expect(entry0SuccessorId).toBe(
       controlIdOf({
-        kind: "REPLACEMENT",
-        operationId: entry1.operationId,
-        ownerSeatId: 0,
+        kind: "AWAIT_SUCCESSOR",
+        afterOperationId: entry0.operationId,
         epoch: 1,
         wave: 3,
         turn: 2,
-        occurrence: 1,
-        fieldIndex: 1,
+        allowedKinds: ["REPLACEMENT_COMMIT"],
+        allowNextWaveStart: false,
+        expectedOperationId: entry1.operationId,
       }),
     );
 
