@@ -86,7 +86,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ${{ inputs.operation == 'import_music' && 'er-bgm-import' || 'deploy-staging' }}
+  group: ${{ inputs.operation == 'import_music' && 'er-youtube-bgm-import' || 'deploy-staging' }}
   # Queue every promotion. Cancelling between Worker and Pages deploys can expose mismatched
   # save/co-op protocol versions to staging players.
   cancel-in-progress: false
