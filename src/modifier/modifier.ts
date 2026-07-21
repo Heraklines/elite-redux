@@ -7,6 +7,7 @@ import { erIsHeldItemDisabled } from "#data/battler-tags";
 import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { erIsHeldItemSuppressed } from "#data/elite-redux/abilities/item-suppression";
+import { claimCommandAbilityProvenance } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
@@ -1604,6 +1605,7 @@ export class BypassSpeedChanceModifier extends PokemonHeldItemModifier {
       const hasQuickClaw = this.type.is("PokemonHeldItemModifierType") && this.type.id === "QUICK_CLAW";
 
       if (hasQuickClaw) {
+        claimCommandAbilityProvenance(pokemon, "quick-claw:proc");
         globalScene.phaseManager.queueMessage(
           i18next.t("modifier:bypassSpeedChanceApply", {
             pokemonName: getPokemonNameWithAffix(pokemon),

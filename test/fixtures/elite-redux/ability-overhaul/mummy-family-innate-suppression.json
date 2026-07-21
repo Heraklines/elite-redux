@@ -1,0 +1,35 @@
+{
+  "v": 1,
+  "name": "Mummy disables the first innate until switch",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "mummy-family-innate-suppression"
+  },
+  "party": [
+    {
+      "species": "SNORLAX",
+      "ability": "BALL_FETCH",
+      "passiveAbility": "RUN_AWAY",
+      "moves": ["BITE", "PROTECT", "GROWL", "SPLASH"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "YAMASK",
+        "level": 100,
+        "ability": "MUMMY",
+        "moves": ["GROWL"]
+      }
+    ]
+  },
+  "script": [{ "move": "BITE", "enemyMove": "GROWL" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Mummy",
+    "playerInnateSlotsSuppressed": [0]
+  }
+}

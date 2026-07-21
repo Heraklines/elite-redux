@@ -93,6 +93,23 @@ export class Ability {
     return (this.flags & AB_FLAG_BYPASS_FAINT) !== 0;
   }
   /**
+   * Allow an already-built ability to activate after its holder faints.
+   *
+   * Elite Redux appends a small number of post-faint effects during its
+   * post-build upgrade pass. Those effects need the same flag that
+   * {@linkcode AbBuilder.bypassFaint} sets during normal construction.
+   */
+  public makeBypassFaint(): this {
+    (this as unknown as { flags: number }).flags |= AB_FLAG_BYPASS_FAINT;
+    return this;
+  }
+
+  /** Remove builder-time gates when ER fully replaces an ability's behavior. */
+  public clearConditions(): this {
+    (this.conditions as AbAttrCondition[]).length = 0;
+    return this;
+  }
+  /**
    * Whether this ability can be ignored by effects like
    * {@linkcode MoveId.SUNSTEEL_STRIKE | Sunsteel Strike} or {@linkcode AbilityId.MOLD_BREAKER | Mold Breaker}.
    */

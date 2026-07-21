@@ -174,7 +174,7 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   844: { erAbilityId: 844, parts: [{ kind: "er", erAbilityId: 505 }], unresolvedParts: ["use 20% of spdef during moves"], hasRider: true },
   845: { erAbilityId: 845, parts: [{ kind: "er", erAbilityId: 390 }], unresolvedParts: ["30% Bleed chance on horn moves"], hasRider: true },
   846: { erAbilityId: 846, parts: [{ kind: "er", erAbilityId: 433 }, { kind: "er", erAbilityId: 844 }], hasRider: false },
-  848: { erAbilityId: 848, parts: [{ kind: "pokerogue", abilityId: 80 }], unresolvedParts: ["blocks phasing moves"], hasRider: true },
+  848: { erAbilityId: 848, parts: [{ kind: "pokerogue", abilityId: 80 }, { kind: "pokerogue", abilityId: 134 }], unresolvedParts: ["blocks phasing moves"], hasRider: true },
   // 849 World Serpent reclassified composite -> bespoke (the Long Reach + Grip
   // Pincer resolution was WRONG per the 2.65 dex); its vestigial parts entry is
   // removed so the side-table count stays in lockstep with the archetype config.

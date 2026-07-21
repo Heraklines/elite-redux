@@ -2622,6 +2622,116 @@ AURA.phosphor = (r, g, b, x, y, t) => {
   return [clamp(base[0] + glow * 0.25), clamp(base[1] + glow), clamp(base[2] + glow * 0.45), 1];
 };
 
+// ===========================================================================
+// Exotic topology effects (Phase D graduation of the exotic-FX lab).
+// These read the renderer's cached silhouette topology via ctx.topo
+// (inside-distance, medial midlines, normals, per-pixel identity) and the
+// frame/stable anchors, so their ornament knows the mon's anatomy. DEEP is
+// the inside-distance treated as "deep body" for normalizing depth.
+// ===========================================================================
+const EXOTIC_DEEP = 22;
+
+// Gilded Bones: engraved gold inlay following the mon's TRUE midline skeleton
+// (the interior Voronoi border field), fading to dark lacquer near the rim.
+AURA.gildedbones = (r, g, b, x, y, t, ctx) => {
+  const topo = ctx?.topo;
+  if (!topo) return [r, g, b, 1];
+  const i = ctx.py * ctx.W + ctx.px;
+  const v = topo.voro[i];
+  const d = Math.min(topo.sdf[i], EXOTIC_DEEP) / EXOTIC_DEEP;
+  // Wire sits on the midline; a faint echo at half strength gives the inlay a
+  // chased double-line look. A slight shimmer travels along depth.
+  const wire = smooth(0.45, 0.95, v);
+  const echo = smooth(0.2, 0.5, v) * 0.35;
+  const shimmer = 0.75 + 0.25 * Math.sin(d * 9 - t * 1.4);
+  const gold = ramp(G.gold, clamp(wire * shimmer + echo));
+  // Base: darkened lacquer of the source color so the wire pops.
+  const lacq = [r * 0.5, g * 0.48, b * 0.52];
+  const m = clamp(wire * (0.4 + 0.6 * d) + echo * d);
+  return [mix(lacq[0], gold[0], m), mix(lacq[1], gold[1], m), mix(lacq[2], gold[2], m), 1];
+};
+
+// Carved Relief: flat pixel art re-lit as cast metal / carved gem. A fake
+// relief sphere (matcapZ from the inside-distance) is lit by a fixed key
+// light against the outward normals, with a cool rim at the silhouette.
+AURA.carvedrelief = (r, g, b, x, y, t, ctx) => {
+  const topo = ctx?.topo;
+  if (!topo) return [r, g, b, 1];
+  const i = ctx.py * ctx.W + ctx.px;
+  const nx = topo.nx[i];
+  const ny = topo.ny[i];
+  const z = topo.matcapZ[i];
+  // Fixed key light from upper-left + cool rim from the rim itself.
+  const key = clamp(0.5 + 0.55 * (-nx * 0.7 - ny * 0.7) * z + 0.35 * z);
+  const rim = Math.pow(1 - z, 2.5) * 0.35;
+  const [h, s, v] = rgb2hsv(r, g, b);
+  const lit = hsv2rgb(h, s, clamp(v * (0.35 + 0.85 * key)));
+  return [clamp(lit[0] + rim * 0.6), clamp(lit[1] + rim * 0.75), clamp(lit[2] + rim), 1];
+};
+
+// Inner Ember: translucent skin over a breathing furnace. A depth-normalized
+// glow lives DEEP inside the body; rim pixels keep the body's own shading.
+AURA.innerember = (r, g, b, x, y, t, ctx) => {
+  const topo = ctx?.topo;
+  if (!topo) return [r, g, b, 1];
+  const i = ctx.py * ctx.W + ctx.px;
+  const d = Math.min(topo.sdf[i], EXOTIC_DEEP) / EXOTIC_DEEP;
+  const n = vnoise(x * 3.1 + t * 0.13, y * 3.1 - t * 0.09);
+  const breathe = 0.72 + 0.28 * Math.sin(t * 0.9 + topo.pixId[i] * 0.6);
+  const fire = Math.pow(d, 1.8) * (0.55 + 0.75 * n) * breathe;
+  const hot = ramp(G.inferno, clamp(fire * 1.15));
+  // Rim pixels keep the body's own shading ("skin"); the core replaces it.
+  const m = Math.pow(d, 2.1) * 0.85;
+  const skin = mix3([r * 0.8, g * 0.8, b * 0.8], hot, m);
+  return [skin[0], skin[1], skin[2], 1];
+};
+
+// Nested Portrait: a dim ghost-plaque near the chest holds a recursively
+// scaled miniature of the whole sprite, 2 levels deep. The window tracks the
+// BODY (frame anchors) so it moves with the chest; the live pixel stays
+// partially present so the window never reads as a hole.
+AURA.nestedportrait = (r, g, b, x, y, t, ctx) => {
+  const a = ctx?.anchors;
+  if (!a) return [r, g, b, 1];
+  const wx = a.frameCx;
+  const wy = a.frameCy * 0.92;
+  const dx = x - wx;
+  const dy = y - wy;
+  const rad = Math.hypot(dx, dy);
+  const R = 0.2;
+  if (rad >= R) return [r, g, b, 1];
+  const ghostify = s => {
+    const [h, sat, val] = rgb2hsv(s[0], s[1], s[2]);
+    return hsv2rgb(mix(h, 0.62, 0.75), clamp(sat * 0.5 + 0.1), clamp(val * 0.55 + 0.28));
+  };
+  // Map window space onto the FULL sprite, centered on the window (so the mini
+  // frames the mon's own chest/face, not empty padding).
+  const span = 0.62;
+  const map = (u, v) => [
+    clamp(wx + (u - 0.5) * span, 0.005, 0.995),
+    clamp(wy + (v - 0.5) * span * (ctx.H / Math.max(ctx.W, 1)), 0.005, 0.995),
+  ];
+  const u = (dx / R) * 0.5 + 0.5;
+  const v = (dy / R) * 0.5 + 0.5;
+  let [mu, mv] = map(u, v);
+  let s = ctx.sa(mu, mv);
+  if (rad < R * 0.48) {
+    const u2 = (dx / (R * 0.48)) * 0.5 + 0.5;
+    const v2 = (dy / (R * 0.48)) * 0.5 + 0.5;
+    [mu, mv] = map(u2, v2);
+    const s2 = ctx.sa(mu, mv);
+    if (s2[3] > 0.02) s = s2;
+  }
+  const pulse = 0.92 + 0.08 * Math.sin(t * 1.1);
+  if (s[3] <= 0.02) {
+    // Empty window: smoked glass over the live pixel.
+    return [r * 0.55 + 0.04, g * 0.55 + 0.05, b * 0.6 + 0.09, 1];
+  }
+  const gh = ghostify(s);
+  const m = 0.82 * pulse;
+  return [mix(r, gh[0] * pulse, m), mix(g, gh[1] * pulse, m), mix(b, gh[2] * pulse, m), 1];
+};
+
 // --- v5 around: PokeMMO-style colored auras ---
 AROUND.rainbowglitter = (nx, ny, df, t) => {
   const glow = Math.pow(clamp(1 - df / 22), 1.5) * 0.4;
@@ -4067,6 +4177,45 @@ AROUND.paperlanterns = (nx, ny, df, t) => {
     ];
   }
   return [1, 0.7, 0.3, glow * warm * m];
+};
+
+// Warp Well: a small mass slowly orbiting the mon's shoulder visibly bends
+// space - pad pixels near it sample the SPRITE pulled toward the mass, so the
+// mon's own image warps around a solid near-black disc with a violet
+// accretion rim. Unlike the older `eventhorizon` (a static disc behind the
+// mon), this one ORBITS and lenses the sprite itself. The orbit is anchored
+// to the STABLE centroid (fxGroup), so it never wobbles with the pose.
+AROUND.warpwell = (nx, ny, df, t, ctx) => {
+  const ang = t * 0.35;
+  const mxp = (ctx?.stableCx ?? 0.5) + Math.cos(ang) * 0.16;
+  const myp = (ctx?.stableCy ?? 0.45) * 0.75 + Math.sin(ang) * 0.1;
+  const dx = nx - mxp;
+  const dy = ny - myp;
+  const r = Math.hypot(dx, dy);
+  const horizon = 0.045;
+  const reach = 0.24;
+  if (r > reach) return [0, 0, 0, 0];
+  if (r < horizon) {
+    // Inside the horizon: solid near-black disc with a violet accretion rim.
+    const rimGlow = smooth(horizon * 0.6, horizon, r);
+    return [0.02 + rimGlow * 0.14, 0.0, 0.05 + rimGlow * 0.22, 1];
+  }
+  // Outside: pull the sample point toward the mass (lensed copy of the mon).
+  const pull = (reach - r) / (reach - horizon);
+  const bend = pull * pull * 0.55;
+  const s = ctx?.spr ? ctx.spr(nx - dx * bend, ny - dy * bend) : [0, 0, 0, 0];
+  const fade = 1 - smooth(horizon, reach, r);
+  const glow = smooth(horizon, horizon * 1.6, r) * (1 - smooth(horizon * 1.6, reach * 0.7, r));
+  if (s[3] > 0.02) {
+    const lum = luma(s[0], s[1], s[2]);
+    return [
+      s[0] * 0.85 + glow * 0.25,
+      s[1] * 0.8 + glow * 0.18,
+      clamp(s[2] * 0.9 + glow * 0.4 + lum * 0.05),
+      s[3] * (0.3 + 0.6 * fade),
+    ];
+  }
+  return [glow * 0.3, glow * 0.2, glow * 0.5, glow * 0.6 * fade];
 };
 
 export const ALL_PALETTE = Object.keys(PALETTE);

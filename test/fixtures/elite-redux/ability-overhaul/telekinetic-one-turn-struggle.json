@@ -1,0 +1,34 @@
+{
+  "v": 1,
+  "name": "Telekinetic forces Struggle for exactly one turn",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "telekinetic-one-turn-struggle"
+  },
+  "party": [
+    {
+      "species": "BLISSEY",
+      "ability": 5240,
+      "moves": ["GROWL"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "RUN_AWAY",
+        "moves": ["SPLASH"]
+      }
+    ]
+  },
+  "script": [{ "move": "GROWL" }, { "move": "GROWL" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Telekinetic",
+    "enemyUsedMoves": ["STRUGGLE", "SPLASH"]
+  }
+}

@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { AbilityId } from "#enums/ability-id";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
@@ -33,6 +34,7 @@ export class PokemonTransformPhase extends PokemonPhase {
       return;
     }
 
+    user.summonData.erImposterCopiedAttackBoost = user.getAbility().id === AbilityId.IMPOSTER;
     user.summonData.speciesForm = target.getSpeciesForm();
     user.summonData.ability = target.getAbility().id;
     user.summonData.gender = target.getGender();

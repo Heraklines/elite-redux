@@ -1,0 +1,36 @@
+{
+  "v": 1,
+  "name": "Catastrophe boosts Rock moves in hail",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "weather": "HAIL",
+    "difficulty": "ace",
+    "seed": "catastrophe-hail-rock"
+  },
+  "party": [
+    {
+      "species": "SNORLAX",
+      "ability": 5296,
+      "moves": ["ROCK_SLIDE"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "RUN_AWAY",
+        "moves": ["SPLASH"]
+      }
+    ]
+  },
+  "script": [{ "move": "ROCK_SLIDE", "enemyMove": "SPLASH" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Catastrophe",
+    "weather": "HAIL",
+    "enemyDamaged": true
+  }
+}

@@ -9,6 +9,7 @@ import { erBatch3OnTargetHit } from "#data/elite-redux/abilities/batch3-on-hit";
 import { erBatch4OnTargetHit } from "#data/elite-redux/abilities/batch4-on-hit";
 import { consumeDualTypePrimeOnUse, dualTypePrimeApplies } from "#data/elite-redux/abilities/dual-type-move";
 import { erCapacitorBankConsumeOnElectricUse } from "#data/elite-redux/abilities/electivire";
+import { requestedFieldNormalizesAbilityAccuracy } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import {
   ConditionalAlwaysHitAbAttr,
   erMoveAlwaysHitsForUserType,
@@ -570,15 +571,17 @@ export class MoveEffectPhase extends PokemonPhase {
    */
   public checkBypassAccAndInvuln(target: Pokemon) {
     const user = this.getUserPokemon();
-    if (user.hasAbilityWithAttr("AlwaysHitAbAttr") || target.hasAbilityWithAttr("AlwaysHitAbAttr")) {
-      return true;
-    }
-    // Elite Redux: per-move conditional always-hit (Hypnotist on Hypnosis,
-    // Roundhouse on KICKING_MOVE, Artillery on PULSE_MOVE, Sweeping Edge on
-    // SLICING_MOVE, Gifted Mind on status moves, Angel's Wrath on specific
-    // move IDs). See src/data/elite-redux/archetypes/conditional-always-hit.ts.
-    if (erUserHasConditionalAlwaysHit(user, this.move, target)) {
-      return true;
+    if (!requestedFieldNormalizesAbilityAccuracy()) {
+      if (user.hasAbilityWithAttr("AlwaysHitAbAttr") || target.hasAbilityWithAttr("AlwaysHitAbAttr")) {
+        return true;
+      }
+      // Elite Redux: per-move conditional always-hit (Hypnotist on Hypnosis,
+      // Roundhouse on KICKING_MOVE, Artillery on PULSE_MOVE, Sweeping Edge on
+      // SLICING_MOVE, Gifted Mind on status moves, Angel's Wrath on specific
+      // move IDs). See src/data/elite-redux/archetypes/conditional-always-hit.ts.
+      if (erUserHasConditionalAlwaysHit(user, this.move, target)) {
+        return true;
+      }
     }
     if (this.move.hasAttr("ToxicAccuracyAttr") && user.isOfType(PokemonType.POISON)) {
       return true;

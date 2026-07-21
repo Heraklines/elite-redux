@@ -1,8 +1,11 @@
-import { allAbilities } from "#data/data-lists";
+import { applyAbAttrs } from "#abilities/apply-ab-attrs";
+import { allAbilities, allMoves } from "#data/data-lists";
+import { claimCommandAbilityProvenance } from "#data/elite-redux/ability-upgrades/attrs/index";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
+import { NumberHolder } from "#utils/common";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -85,5 +88,32 @@ describe("Abilities - Quick Draw", () => {
     expect(pokemon.isFainted()).toBe(true);
     expect(enemy.isFainted()).toBe(false);
     expect(pokemon.waveData.abilitiesApplied).toContain(AbilityId.QUICK_DRAW);
+  });
+
+  it("doubles a procced attack only against another eligible Quick Draw holder", async () => {
+    game.override.enemyAbility(AbilityId.QUICK_DRAW);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const pokemon = game.field.getPlayerPokemon();
+    const enemy = game.field.getEnemyPokemon();
+    const power = new NumberHolder(40);
+
+    claimCommandAbilityProvenance(pokemon, "quick-draw:proc");
+    applyAbAttrs("MovePowerBoostAbAttr", {
+      pokemon,
+      opponent: enemy,
+      move: allMoves[MoveId.TACKLE],
+      power,
+    });
+
+    expect(power.value).toBe(80);
+    enemy.summonData.abilitySuppressed = true;
+    power.value = 40;
+    applyAbAttrs("MovePowerBoostAbAttr", {
+      pokemon,
+      opponent: enemy,
+      move: allMoves[MoveId.TACKLE],
+      power,
+    });
+    expect(power.value).toBe(40);
   });
 });

@@ -1210,6 +1210,12 @@ const RECIPES: Record<string, Recipe> = {
     prepare: () => [buildTournamentBracketDemoConfig({ size: 16, advancedRounds: 2, card: "playable" })],
     diffTolerance: 0,
   },
+  // Bracket tree (4-field, the Sample Cup shape): semifinals + final, fresh bracket.
+  "tournament-bracket-4": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" })],
+    diffTolerance: 0,
+  },
   // Bracket with BYES (5-field padded to 8): top seeds auto-advance, "(bye)" slots shown.
   "tournament-bracket-byes": {
     mode: UiMode.TOURNAMENT_BRACKET,
@@ -1226,6 +1232,41 @@ const RECIPES: Record<string, Recipe> = {
   "tournament-bracket-champion": {
     mode: UiMode.TOURNAMENT_BRACKET,
     prepare: () => [buildTournamentBracketDemoConfig({ size: 8, advancedRounds: 3, card: "champion" })],
+    diffTolerance: 0,
+  },
+  // P1.5 BOARD — the Sample Cup (4-field) player-journey states. Ghost-trainer icons + connecting
+  // lines + champion slot column throughout; trainer atlases resolve via the two-pass injector.
+  // Fresh 4-bracket, YOUR fight gold-highlighted + VS marker, opponent card (portrait + presence).
+  "tournament-board-4-yourfight": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 4, advancedRounds: 0, card: "playable" })],
+    diffTolerance: 0,
+  },
+  // Mid-round: the OTHER semifinal resolved — winner advanced into the final slot along the gold
+  // line, loser slot dimmed with an X; your semi still live.
+  "tournament-board-4-midround": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 4, resolvedSemi: true, card: "playable" })],
+    diffTolerance: 0,
+  },
+  // Browsing ANOTHER match (cyan cursor on a non-your match): its pairing card shows read-only.
+  "tournament-board-4-browse-other": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [
+      buildTournamentBracketDemoConfig({ size: 4, resolvedSemi: true, browseOther: true, card: "playable" }),
+    ],
+    diffTolerance: 0,
+  },
+  // Eliminated: your round-0 match lost (dimmed + X); read-only spectator card, no fight.
+  "tournament-board-4-eliminated": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 4, eliminated: true, card: "none" })],
+    diffTolerance: 0,
+  },
+  // Champion (4-field): winner's trainer art center-stage over the dimmed bracket + "CHAMPION - <name>".
+  "tournament-board-4-champion": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 4, card: "champion" })],
     diffTolerance: 0,
   },
   // Showdown SET EDITOR (P1 layout core). The full-screen teambuilder Layer-3 editor for one

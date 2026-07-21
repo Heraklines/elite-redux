@@ -1843,9 +1843,33 @@ const CTR_MEMBER_FIELDS = [
   "insanity",
   "fusion",
   "heldItems",
+  "vitamins",
   "shiny",
   "sanityOff",
 ];
+
+const CTR_VITAMIN_OPTIONS = [
+  { key: "hp", item: "HP Up", stat: "HP" },
+  { key: "atk", item: "Protein", stat: "Attack" },
+  { key: "def", item: "Iron", stat: "Defense" },
+  { key: "spatk", item: "Calcium", stat: "Sp. Atk" },
+  { key: "spdef", item: "Zinc", stat: "Sp. Def" },
+  { key: "spd", item: "Carbos", stat: "Speed" },
+];
+
+function clampCtrVitaminCount(value) {
+  const count = Number(value);
+  return Number.isFinite(count) ? Math.max(0, Math.min(31, Math.floor(count))) : 0;
+}
+
+function ctrNormVitamins(value) {
+  const raw = value && typeof value === "object" ? value : {};
+  const out = {};
+  for (const { key } of CTR_VITAMIN_OPTIONS) {
+    out[key] = clampCtrVitaminCount(raw[key]);
+  }
+  return out;
+}
 
 /** Coerce a raw/edit shiny value into the editor shape { palette, surface, around, name }
  *  (strings; empty = none). Accepts null/undefined and the saved JSON shape alike. */
@@ -1902,6 +1926,7 @@ function blankCtrMemberFields() {
     insanity: null,
     fusion: null,
     heldItems: [],
+    vitamins: ctrNormVitamins(null),
     // Shiny Lab visual effect the mon fields with (empty = none).
     shiny: ctrNormShiny(null),
     // Editor metadata: when true, this member's moves are NOT legality-checked.
@@ -1921,6 +1946,7 @@ function ctrCopyMemberFields(src) {
     insanity: ctrNormInsanity(src.insanity),
     fusion: src.fusion ? { ...src.fusion } : null,
     heldItems: (src.heldItems || []).map(h => ({ item: h.item || "", count: Number.isInteger(h.count) ? h.count : 1 })),
+    vitamins: ctrNormVitamins(src.vitamins),
     shiny: ctrNormShiny(src.shiny),
     sanityOff: src.sanityOff === true,
   };
@@ -2082,6 +2108,7 @@ function ctrLiveMemberFieldsToEdit(m) {
       item: h.item || "",
       count: Number.isInteger(h.count) ? h.count : 1,
     })),
+    vitamins: ctrNormVitamins(m.vitamins),
     shiny: ctrNormShiny(m.shiny),
     sanityOff: m.sanityOff === true,
   };
@@ -2729,6 +2756,14 @@ function ctrMemberHtml(m, i) {
         <button type="button" class="ctr-held-del" data-idx="${i}" data-heldidx="${hi}">✕</button></span>`,
     )
     .join("");
+  m.vitamins = ctrNormVitamins(m.vitamins);
+  const vitaminInputs = CTR_VITAMIN_OPTIONS.map(
+    ({ key, item, stat }) =>
+      `<label class="ctr-vitamin" title="${item} raises ${stat}; maximum 31 per Pokemon.">
+        <span>${item}</span><small>${stat}</small>
+        <input type="number" class="ctr-vitamin-count" data-idx="${i}" data-stat="${key}" value="${m.vitamins[key]}" min="0" max="31" step="1" />
+      </label>`,
+  ).join("");
   const fus = m.fusion;
   const insanity = ctrNormInsanity(m.insanity);
   const insanityInput = (label, value, slot) => {
@@ -2775,6 +2810,10 @@ function ctrMemberHtml(m, i) {
       }
     </div>
     <div class="ctr-held">Held items: ${heldRows}<button type="button" class="ctr-held-add" data-idx="${i}">＋ item</button></div>
+    <div class="ctr-vitamins">
+      <span class="ctr-vitamins-title">Vitamins</span>
+      <div class="ctr-vitamin-grid">${vitaminInputs}</div>
+    </div>
     ${ctrShinyPickerHtml(m, i)}
   </fieldset>`;
 }
@@ -3329,6 +3368,9 @@ function onCustomTrainerInput(el) {
     if (h) {
       h.count = Number(el.value) || 1;
     }
+  } else if (el.classList.contains("ctr-vitamin-count") && m) {
+    m.vitamins = ctrNormVitamins(m.vitamins);
+    m.vitamins[el.dataset.stat] = el.value === "" ? 0 : clampCtrVitaminCount(el.value);
   } else if (el.classList.contains("ctr-shiny-name") && m) {
     m.shiny = ctrNormShiny(m.shiny);
     m.shiny.name = el.value;
@@ -3505,6 +3547,10 @@ function onCustomTrainerChange(el) {
   } else if (el.classList.contains("ctr-move") && m) {
     // Blur after a manual move edit: re-render so the error line + set dropdown
     // reflect the change (the live red border already updated on input).
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-vitamin-count") && m) {
+    m.vitamins = ctrNormVitamins(m.vitamins);
     render();
     return true;
   } else if (el.classList.contains("ctr-diff")) {
@@ -3748,21 +3794,58 @@ function renderAssets(root) {
     <section class="asset-panel">
       <h2>Battle music</h2>
       <div class="asset-form">
-        <label>YouTube videos or playlists<textarea id="asset-media-urls" placeholder="https://www.youtube.com/watch?v=...\nhttps://www.youtube.com/playlist?list=..."></textarea></label>
-        <div class="asset-row">
-          <label>Key prefix <input id="asset-media-prefix" value="battle_custom" maxlength="40" /></label>
-          <label>Staff name <input id="asset-media-author" maxlength="40" /></label>
+        <div class="asset-source-tabs">
+          <button type="button" class="active" data-media-source="youtube">YouTube</button>
+          <button type="button" data-media-source="upload">Upload file</button>
         </div>
-        <div class="asset-row">
-          <label><input type="checkbox" id="asset-split" checked /> Split chapters and timestamps</label>
-          <label><input type="checkbox" id="asset-require-cc" /> Require Creative Commons</label>
-          <label><input type="checkbox" id="asset-deploy" checked /> Deploy staging</label>
+        <div class="asset-source-pane" data-media-pane="youtube">
+          <div class="asset-form">
+            <label>YouTube videos or playlists<textarea id="asset-media-urls" placeholder="https://www.youtube.com/watch?v=...\nhttps://www.youtube.com/playlist?list=..."></textarea></label>
+            <div class="asset-row">
+              <label>Key prefix <input id="asset-media-prefix" value="battle_custom" maxlength="40" /></label>
+              <label>Staff name <input id="asset-media-author" maxlength="40" /></label>
+            </div>
+            <div class="asset-row">
+              <label><input type="checkbox" id="asset-split" checked /> Split chapters and timestamps</label>
+              <label><input type="checkbox" id="asset-require-cc" /> Require Creative Commons</label>
+              <label><input type="checkbox" id="asset-deploy" checked /> Deploy staging</label>
+            </div>
+            <label><span><input type="checkbox" id="asset-media-rights" /> I confirm we may use and store this audio.</span></label>
+            <button type="button" id="asset-import" class="primary">Queue import</button>
+          </div>
         </div>
-        <label><span><input type="checkbox" id="asset-media-rights" /> I confirm we may use and store this audio.</span></label>
-        <div class="asset-row">
-          <button type="button" id="asset-import" class="primary">Queue import</button>
-          <button type="button" id="asset-refresh-jobs">Refresh jobs</button>
+        <div class="asset-source-pane" data-media-pane="upload" hidden>
+          <div class="asset-form">
+            <label class="asset-upload-box">
+              Audio or video file
+              <input id="asset-media-file" type="file" accept="audio/*,video/*,.mp3,.mp4,.m4a,.aac,.ogg,.oga,.opus,.wav,.flac,.webm,.mov,.mkv,.avi,.mpeg,.mpg,.ts,.wma,.aiff,.aif,.caf,.3gp" />
+              <span id="asset-media-file-name" class="asset-upload-file">No file selected</span>
+            </label>
+            <div class="asset-row">
+              <label>Title <input id="asset-upload-title" maxlength="160" /></label>
+              <label>Artist <input id="asset-upload-artist" maxlength="120" /></label>
+            </div>
+            <div class="asset-row">
+              <label>License <select id="asset-upload-license"><option value="original">Original</option><option value="permission">Permission</option><option value="cc0">CC0</option><option value="cc-by">CC BY</option><option value="unknown">Unknown</option></select></label>
+              <label>Source URL <input id="asset-upload-source" type="url" maxlength="500" /></label>
+            </div>
+            <label>Attribution <input id="asset-upload-attribution" maxlength="500" /></label>
+            <div class="asset-row">
+              <label>Key prefix <input id="asset-upload-prefix" value="battle_custom" maxlength="40" /></label>
+              <label>Staff name <input id="asset-upload-author" maxlength="40" /></label>
+            </div>
+            <div class="asset-row">
+              <label><input type="checkbox" id="asset-upload-rights" /> I confirm we may use and store this audio.</label>
+              <label><input type="checkbox" id="asset-upload-deploy" checked /> Deploy staging</label>
+            </div>
+            <button type="button" id="asset-upload-media" class="primary">Upload and convert</button>
+            <div class="asset-upload-progress">
+              <progress id="asset-upload-progress" max="100" value="0"></progress>
+              <small id="asset-upload-progress-label">Ready</small>
+            </div>
+          </div>
         </div>
+        <button type="button" id="asset-refresh-jobs">Refresh jobs</button>
         <div id="asset-jobs" class="asset-jobs"></div>
       </div>
       <h2 style="margin-top:18px">Music catalog</h2>
@@ -3981,6 +4064,172 @@ async function queueMediaImport() {
   await refreshMediaJobs();
 }
 
+function setMediaSource(source) {
+  document.querySelectorAll("[data-media-source]").forEach(button => {
+    button.classList.toggle("active", button.dataset.mediaSource === source);
+  });
+  document.querySelectorAll("[data-media-pane]").forEach(pane => {
+    pane.hidden = pane.dataset.mediaPane !== source;
+  });
+}
+
+function mediaFileTitle(fileName) {
+  return fileName
+    .replace(/\.[^.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatMediaBytes(bytes) {
+  if (bytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KiB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(bytes >= 100 * 1024 * 1024 ? 0 : 1)} MiB`;
+}
+
+function setMediaUploadProgress(value, label) {
+  const progress = document.getElementById("asset-upload-progress");
+  const text = document.getElementById("asset-upload-progress-label");
+  if (progress) {
+    progress.value = Math.max(0, Math.min(100, value));
+  }
+  if (text) {
+    text.textContent = label;
+  }
+}
+
+function onMediaFileChange(input) {
+  const file = input.files?.[0];
+  const name = document.getElementById("asset-media-file-name");
+  if (!file) {
+    if (name) {
+      name.textContent = "No file selected";
+    }
+    setMediaUploadProgress(0, "Ready");
+    return;
+  }
+  if (name) {
+    name.textContent = `${file.name} | ${formatMediaBytes(file.size)}`;
+  }
+  const title = document.getElementById("asset-upload-title");
+  if (title && !title.value.trim()) {
+    title.value = mediaFileTitle(file.name);
+  }
+  setMediaUploadProgress(0, "Ready");
+}
+
+async function responseJson(response) {
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.error || `HTTP ${response.status}`);
+  }
+  return result;
+}
+
+async function abortMediaUpload(password, session) {
+  if (!session?.id || !session?.uploadId) {
+    return;
+  }
+  await fetch(`${WORKER_URL}/media-upload/abort`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password, id: session.id, uploadId: session.uploadId }),
+  }).catch(() => {});
+}
+
+async function uploadMediaFile() {
+  const password = (document.getElementById("password")?.value || "").trim();
+  const file = document.getElementById("asset-media-file")?.files?.[0];
+  if (!file) {
+    throw new Error("Choose an audio or video file");
+  }
+  if (!document.getElementById("asset-upload-rights")?.checked) {
+    throw new Error("Rights confirmation is required");
+  }
+  const title = document.getElementById("asset-upload-title")?.value.trim();
+  if (!title) {
+    throw new Error("Track title is required");
+  }
+  const license = document.getElementById("asset-upload-license")?.value;
+  const sourceUrl = document.getElementById("asset-upload-source")?.value.trim();
+  const attribution = document.getElementById("asset-upload-attribution")?.value.trim();
+  if (license === "cc-by" && (!sourceUrl || !attribution)) {
+    throw new Error("CC BY uploads require attribution and a public source URL");
+  }
+
+  let session = null;
+  try {
+    setMediaUploadProgress(0, "Opening upload");
+    session = await responseJson(
+      await fetch(`${WORKER_URL}/media-upload/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password,
+          fileName: file.name,
+          fileSize: file.size,
+          contentType: file.type || "application/octet-stream",
+        }),
+      }),
+    );
+    const partSize = Number(session.partSize);
+    if (!Number.isSafeInteger(partSize) || partSize < 5 * 1024 * 1024) {
+      throw new Error("Upload service returned an invalid part size");
+    }
+
+    const parts = [];
+    const totalParts = Math.ceil(file.size / partSize);
+    for (let index = 0; index < totalParts; index++) {
+      const partNumber = index + 1;
+      const chunk = file.slice(index * partSize, Math.min(file.size, partNumber * partSize));
+      setMediaUploadProgress(Math.round((index / totalParts) * 90), `Uploading ${partNumber}/${totalParts}`);
+      const result = await responseJson(
+        await fetch(
+          `${WORKER_URL}/media-upload/${encodeURIComponent(session.id)}/parts/${partNumber}?uploadId=${encodeURIComponent(session.uploadId)}`,
+          {
+            method: "POST",
+            headers: { "X-Editor-Password": password },
+            body: chunk,
+          },
+        ),
+      );
+      parts.push(result.part);
+    }
+
+    setMediaUploadProgress(94, "Queueing conversion");
+    const result = await responseJson(
+      await fetch(`${WORKER_URL}/media-upload/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password,
+          id: session.id,
+          uploadId: session.uploadId,
+          parts,
+          title,
+          artist: document.getElementById("asset-upload-artist")?.value.trim(),
+          license,
+          sourceUrl,
+          attribution,
+          keyPrefix: document.getElementById("asset-upload-prefix")?.value.trim(),
+          author: document.getElementById("asset-upload-author")?.value.trim(),
+          deployStaging: document.getElementById("asset-upload-deploy")?.checked,
+          rightsConfirmed: true,
+        }),
+      }),
+    );
+    session = null;
+    setMediaUploadProgress(100, "Queued for conversion");
+    setStatus(`${result.fileName || file.name} uploaded. Conversion is queued.`);
+    await refreshMediaJobs();
+  } catch (error) {
+    await abortMediaUpload(password, session);
+    setMediaUploadProgress(0, "Upload failed");
+    throw error;
+  }
+}
+
 async function refreshMediaJobs() {
   const password = (document.getElementById("password")?.value || "").trim();
   const response = await fetch(`${WORKER_URL}/media-jobs`, {
@@ -4052,6 +4301,11 @@ async function uploadTrainerSprite() {
 }
 
 function onAssetsClick(event) {
+  const mediaSource = event.target.closest("[data-media-source]");
+  if (mediaSource) {
+    setMediaSource(mediaSource.dataset.mediaSource);
+    return true;
+  }
   const bgm = event.target.closest("[data-asset-bgm]");
   if (bgm) {
     bgmPlay(bgm.dataset.assetBgm);
@@ -4082,6 +4336,10 @@ function onAssetsClick(event) {
   }
   if (event.target.closest("#asset-refresh-jobs")) {
     void action(refreshMediaJobs);
+    return true;
+  }
+  if (event.target.closest("#asset-upload-media")) {
+    void action(uploadMediaFile);
     return true;
   }
   if (event.target.closest("#asset-upload-sprite")) {
@@ -4907,6 +5165,16 @@ function buildDeltas() {
       if (held.length > 0) {
         out.heldItems = held;
       }
+      const vitamins = ctrNormVitamins(m.vitamins);
+      const savedVitamins = {};
+      for (const { key: vitaminKey } of CTR_VITAMIN_OPTIONS) {
+        if (vitamins[vitaminKey] > 0) {
+          savedVitamins[vitaminKey] = vitamins[vitaminKey];
+        }
+      }
+      if (Object.keys(savedVitamins).length > 0) {
+        out.vitamins = savedVitamins;
+      }
       // Shiny Lab look: serialize only the non-empty categories (+ trimmed name)
       // when at least one effect is picked; otherwise omit (renders normally).
       const shiny = ctrNormShiny(m.shiny);
@@ -5562,6 +5830,10 @@ async function init() {
     // `change` fires once per completed edit (blur / pick from list) → one undo step,
     // and on the Trainers tab it refreshes the default/overridden badges.
     content.addEventListener("change", e => {
+      if (activeTab === "assets" && e.target.id === "asset-media-file") {
+        onMediaFileChange(e.target);
+        return;
+      }
       if (activeTab === "assets" && e.target.id?.startsWith("asset-file-")) {
         void onAssetFileChange(e.target);
         return;

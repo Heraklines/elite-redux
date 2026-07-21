@@ -46,6 +46,11 @@ export interface PpReductionOnContactOptions {
    * @defaultValue `true`
    */
   readonly contactRequired?: boolean;
+  /**
+   * Restores the PP actually removed to one random depleted move belonging to
+   * the holder. This models Spiteful's PP theft rather than plain PP deletion.
+   */
+  readonly refundHolder?: boolean;
 }
 
 /**
@@ -67,6 +72,7 @@ export interface PpReductionOnContactOptions {
 export class PpReductionOnContactAbAttr extends PostDefendAbAttr {
   private readonly reduction: number;
   private readonly contactRequired: boolean;
+  private readonly refundHolder: boolean;
 
   constructor(opts: PpReductionOnContactOptions) {
     if (!Number.isInteger(opts.reduction) || opts.reduction <= 0) {
@@ -75,6 +81,7 @@ export class PpReductionOnContactAbAttr extends PostDefendAbAttr {
     super();
     this.reduction = opts.reduction;
     this.contactRequired = opts.contactRequired ?? true;
+    this.refundHolder = opts.refundHolder ?? false;
   }
 
   /** Read-only accessor: how many PP points the proc deducts. */
@@ -106,11 +113,21 @@ export class PpReductionOnContactAbAttr extends PostDefendAbAttr {
     if (params.simulated) {
       return;
     }
-    const { move, opponent: attacker } = params;
+    const { move, opponent: attacker, pokemon } = params;
     const movesetMove = attacker.moveset.find(m => m.moveId === move.id);
     if (movesetMove === undefined) {
       return;
     }
+    const ppBefore = movesetMove.ppUsed;
     movesetMove.usePp(this.reduction);
+    const stolenPp = movesetMove.ppUsed - ppBefore;
+    if (!this.refundHolder || stolenPp <= 0) {
+      return;
+    }
+    const depletedMoves = pokemon.moveset.filter(holderMove => holderMove.ppUsed > 0);
+    if (depletedMoves.length > 0) {
+      const refundedMove = depletedMoves[pokemon.randBattleSeedInt(depletedMoves.length)];
+      refundedMove.ppUsed = Math.max(0, refundedMove.ppUsed - stolenPp);
+    }
   }
 }

@@ -21,7 +21,7 @@ import {
   type ShowdownSetEditorUiHandler,
 } from "#ui/showdown-set-editor-ui-handler";
 import Phaser from "phaser";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -223,3 +223,123 @@ describe.runIf(RUN)("showdown editor - team-mon switch keys (G prev / V next)", 
     expect(dirs, "G -> prev (-1), V -> next (+1)").toEqual([-1, 1]);
   });
 });
+
+// =============================================================================
+// LIVE BUG (maintainer): "when I click on open the moves it just opens, closes, opens, closes ...
+// endlessly and it seems to be pressing E or space on repeat". Opening the MOVES dropdown in the Set
+// Editor with the ACTION key (Space, or the classic Z - both PRINTABLE) enters an endless open/close
+// oscillation.
+//
+// MECHANISM (event-order trace, reproduced below through the REAL inputs-controller):
+//   1. Space is pressed on a browsing MOVE field. At keyDOWN time NO DOM text field is focused, so the
+//      printable-key suppression (ae7356b92) does NOT fire. keyboardKeyDown emits ACTION once AND arms a
+//      250ms auto-repeat setInterval + pushes ACTION onto buttonLock.
+//   2. ACTION -> openPane() -> syncCapture() -> the hidden rex InputText grabs keyboard focus.
+//   3. Space is RELEASED. Now a DOM text field IS focused, so keyboardKeyUp's SAME printable+focus guard
+//      DOES fire and returns early - the armed interval is never cleared and buttonLock never released.
+//   => the stranded interval keeps re-emitting ACTION every 250ms; each ACTION toggles the pane
+//      (open -> select+close -> open ...) forever, even after the key is physically up. The asymmetry
+//      (keydown NOT suppressed, keyup suppressed, because focus changed IN BETWEEN) is the regression.
+//
+// These drive the real InputsController with synthetic KeyboardEvents + a real focused <input> (the same
+// harness the suppression tests above use) and fake ONLY setInterval/clearInterval so the auto-repeat is
+// deterministic without disturbing Phaser's own clock.
+// =============================================================================
+describe.runIf(RUN)(
+  "showdown editor - ACTION auto-repeat must not oscillate the search pane (endless open/close)",
+  () => {
+    let phaserGame: Phaser.Game;
+    let game: GameManager;
+    let domInput: HTMLInputElement | null = null;
+
+    beforeAll(() => {
+      phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+      game = new GameManager(phaserGame);
+    });
+    afterAll(() => phaserGame.destroy(true));
+    afterEach(() => {
+      // Blur, then release the key on the REAL clock so no stranded interval bleeds into the next test.
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      try {
+        game.scene.inputController.keyboardKeyUp({ key: " ", keyCode: 32 } as KeyboardEvent);
+      } catch {
+        /* best-effort cleanup */
+      }
+      vi.useRealTimers();
+      domInput?.remove();
+      domInput = null;
+    });
+
+    // KEY_SPACE -> Button.ACTION in the qwerty config, and " " is a single character -> a PRINTABLE key.
+    const SPACE = { key: " ", keyCode: 32 } as KeyboardEvent;
+
+    /** Count the "input_down" ACTION emissions produced while running `fn`. */
+    const countActionDowns = (fn: () => void): number => {
+      const ic = game.scene.inputController;
+      let n = 0;
+      const listener = (p: { button: Button }) => {
+        if (p.button === Button.ACTION) {
+          n += 1;
+        }
+      };
+      ic.events.on("input_down", listener);
+      try {
+        fn();
+      } finally {
+        ic.events.off("input_down", listener);
+      }
+      return n;
+    };
+
+    /** Model openPane()'s hidden search capture grabbing keyboard focus (rex InputText.setFocus). */
+    const raiseCapture = () => {
+      domInput = document.createElement("input");
+      document.body.appendChild(domInput);
+      domInput.focus();
+      expect(document.activeElement).toBe(domInput);
+    };
+
+    it("releasing the Space that opened the pane stops the auto-repeat - no endless open/close after release", () => {
+      const ic = game.scene.inputController;
+      ic.ensureKeyboardIsInit();
+      // Fake ONLY the interval timers the auto-repeat uses; leave Phaser's own clock alone.
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+
+      // 1) Space DOWN while browsing a move field - NO DOM capture yet (the real order). ACTION fires once and
+      //    the 250ms auto-repeat is armed.
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      const downEmits = countActionDowns(() => ic.keyboardKeyDown(SPACE));
+      expect(downEmits, "the opening Space emits ACTION exactly once").toBe(1);
+
+      // 2) openPane() raises the hidden capture -> it grabs focus.
+      raiseCapture();
+
+      // 3) Space UP while the capture holds focus - the keyup where the regression strands the repeat timer.
+      ic.keyboardKeyUp(SPACE);
+
+      // 4) The pane picks/closes and focus returns; let real-world time pass.
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      const repeatsAfterRelease = countActionDowns(() => vi.advanceTimersByTime(1500));
+
+      // RED (bug): the stranded interval keeps firing ACTION every 250ms -> the pane oscillates forever.
+      // GREEN (fixed): the keyup cleared the timer + buttonLock -> zero ACTION after the key is released.
+      expect(repeatsAfterRelease, "a released ACTION key must not keep auto-firing (endless open/close)").toBe(0);
+    });
+
+    it("a held Space stops auto-repeating once the search capture grabs focus (no toggle-on-repeat while held)", () => {
+      const ic = game.scene.inputController;
+      ic.ensureKeyboardIsInit();
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      ic.keyboardKeyDown(SPACE); // opens the pane, arms the repeat timer
+
+      raiseCapture(); // openPane raised the capture; the printable key now belongs to that text field
+
+      // While Space is HELD and the capture holds focus, the auto-repeat must NOT re-drive ACTION as a game
+      // button (that is what toggled the pane closed->open->closed several times a second).
+      const repeatsWhileHeld = countActionDowns(() => vi.advanceTimersByTime(1000));
+      expect(repeatsWhileHeld, "a held printable key does not auto-repeat while a text field is focused").toBe(0);
+    });
+  },
+);

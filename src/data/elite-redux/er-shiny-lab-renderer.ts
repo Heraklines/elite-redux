@@ -24,6 +24,14 @@ export const ER_SHINY_LAB_RENDER_PAD = 22;
 
 interface RenderOptions {
   pad?: number;
+  /**
+   * Animation-group key registered via {@linkcode registerFxGroup}. Rendering
+   * every frame of one animation under the SAME key gives landmark-driven
+   * effects (Event Horizon's orbit, Nested Portrait's window) a single stable
+   * anchor instead of the per-frame centroid, which wobbles as the pose
+   * changes. Without a group the stable anchor falls back to the frame anchor.
+   */
+  fxGroup?: string;
 }
 
 export interface ErShinyLabSourcePixels {
@@ -45,11 +53,55 @@ interface RenderAmounts {
   aro: number;
 }
 
+/**
+ * Per-pixel topology fields in SOURCE pixel space (W x H), computed lazily on
+ * first use by an exotic effect and cached on the prep. All five fields come
+ * from the silhouette only, so they are deterministic per source.
+ */
+interface FxTopology {
+  /** Inside-distance in pixels (0 outside, grows inward). */
+  sdf: Float32Array;
+  /** Interior Voronoi border proximity: 1 ON a medial midline -> 0 away. */
+  voro: Float32Array;
+  /** Outward unit normal (x), meaningful near the silhouette. */
+  nx: Float32Array;
+  /** Outward unit normal (y). */
+  ny: Float32Array;
+  /** Unit tangent along the silhouette (x). */
+  tx: Float32Array;
+  /** Unit tangent along the silhouette (y). */
+  ty: Float32Array;
+  /** Fake relief-sphere z in [0,1] derived from the inside-distance. */
+  matcapZ: Float32Array;
+  /** Deterministic per-pixel identity hash in [0,1). */
+  pixId: Float32Array;
+}
+
+/**
+ * Frame-local vs animation-stable anchors, both in PADDED-normalized space.
+ * frame* follows the current pose (centroid + feet line of THIS frame);
+ * stable* is the union silhouette across every frame of the registered
+ * fxGroup (or mirrors frame* when no group is registered).
+ */
+interface FxAnchors {
+  cx: number;
+  cy: number;
+  fy: number;
+  frameCx: number;
+  frameCy: number;
+  frameFy: number;
+  stableCx: number;
+  stableCy: number;
+  stableFy: number;
+}
+
 interface RenderPrep {
   buf: Float32Array;
   ef: Float32Array;
   dist: ReturnType<typeof computeDist>;
   clusters: ReturnType<typeof computeClusters>;
+  /** Lazily filled by {@linkcode getFxTopology}; null until an exotic effect needs it. */
+  topo: FxTopology | null;
 }
 
 type FxContext = {
@@ -60,6 +112,17 @@ type FxContext = {
   K: number;
   clRank: (r: number, g: number, b: number) => number;
   clColor: (i: number) => number[];
+  /** Source pixel coords of the CURRENT pixel (set per pixel, like `e`). */
+  px: number;
+  py: number;
+  /** Silhouette topology for exotic effects; null for tiny sources. */
+  topo: FxTopology | null;
+  /** Frame + stable anchors. */
+  anchors: FxAnchors;
+  /** Sample another frame of the same fxGroup by 0-based index (wraps). */
+  frameSample: (index: number, x: number, y: number) => number[];
+  frameCount: number;
+  frameIndex: number;
 };
 
 function toFloatBuffer(src: ErShinyLabSourcePixels): Float32Array | null {
@@ -75,6 +138,213 @@ function toFloatBuffer(src: ErShinyLabSourcePixels): Float32Array | null {
     out[i + 3] = src.data[i + 3] / 255;
   }
   return out;
+}
+
+const INSIDE_INF = 1e6;
+
+/** Two-pass chamfer INSIDE distance (0 outside -> grows inward). */
+function computeInsideDist(buf: Float32Array, W: number, H: number): Float32Array {
+  const d = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      d[y * W + x] = buf[(y * W + x) * 4 + 3] > 0.02 ? INSIDE_INF : 0;
+    }
+  }
+  const A = 1;
+  const B = Math.SQRT2;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let v = d[y * W + x];
+      if (x > 0) v = Math.min(v, d[y * W + x - 1] + A);
+      if (y > 0) v = Math.min(v, d[(y - 1) * W + x] + A);
+      if (x > 0 && y > 0) v = Math.min(v, d[(y - 1) * W + x - 1] + B);
+      if (x < W - 1 && y > 0) v = Math.min(v, d[(y - 1) * W + x + 1] + B);
+      d[y * W + x] = v;
+    }
+  }
+  for (let y = H - 1; y >= 0; y--) {
+    for (let x = W - 1; x >= 0; x--) {
+      let v = d[y * W + x];
+      if (x < W - 1) v = Math.min(v, d[y * W + x + 1] + A);
+      if (y < H - 1) v = Math.min(v, d[(y + 1) * W + x] + A);
+      if (x < W - 1 && y < H - 1) v = Math.min(v, d[(y + 1) * W + x + 1] + B);
+      if (x > 0 && y < H - 1) v = Math.min(v, d[(y + 1) * W + x - 1] + B);
+      d[y * W + x] = v;
+    }
+  }
+  return d;
+}
+
+/**
+ * Interior Voronoi border field ("medial axis strength"): every edge pixel is
+ * a seed propagated inward with the chamfer; a pixel whose 4-neighbour carries
+ * a DIFFERENT seed sits on the internal midline between limbs/edges. The
+ * midline is dilated ~2 px so strokes riding it have width.
+ */
+function computeVoroField(buf: Float32Array, W: number, H: number): Float32Array {
+  const N = W * H;
+  const seed = new Int32Array(N);
+  const dist = new Float32Array(N);
+  let nextSeed = 1;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (buf[i * 4 + 3] <= 0.02) {
+        seed[i] = 0;
+        dist[i] = 0;
+        continue;
+      }
+      const edge =
+        x === 0 || y === 0 || x === W - 1 || y === H - 1
+        || buf[(y * W + x - 1) * 4 + 3] <= 0.02
+        || buf[(y * W + x + 1) * 4 + 3] <= 0.02
+        || buf[((y - 1) * W + x) * 4 + 3] <= 0.02
+        || buf[((y + 1) * W + x) * 4 + 3] <= 0.02;
+      if (edge) {
+        seed[i] = nextSeed++;
+        dist[i] = 0;
+      } else {
+        seed[i] = -1;
+        dist[i] = INSIDE_INF;
+      }
+    }
+  }
+  const spread = (x: number, y: number, nx: number, ny: number, w: number) => {
+    if (nx < 0 || ny < 0 || nx >= W || ny >= H) return;
+    const i = y * W + x;
+    const j = ny * W + nx;
+    if (seed[j] === 0) return;
+    const nd = dist[i] + w;
+    if (seed[i] > 0 && (seed[j] < 0 || nd < dist[j] - 0.5)) {
+      seed[j] = seed[i];
+      dist[j] = nd;
+    }
+  };
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (seed[y * W + x] <= 0) continue;
+      spread(x, y, x - 1, y, 1);
+      spread(x, y, x, y - 1, 1);
+      spread(x, y, x - 1, y - 1, Math.SQRT2);
+      spread(x, y, x + 1, y - 1, Math.SQRT2);
+    }
+  }
+  for (let y = H - 1; y >= 0; y--) {
+    for (let x = W - 1; x >= 0; x--) {
+      if (seed[y * W + x] <= 0) continue;
+      spread(x, y, x + 1, y, 1);
+      spread(x, y, x, y + 1, 1);
+      spread(x, y, x + 1, y + 1, Math.SQRT2);
+      spread(x, y, x - 1, y + 1, Math.SQRT2);
+    }
+  }
+  const border = new Float32Array(N);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (seed[i] <= 0) continue;
+      const s = seed[i];
+      const diff =
+        (x > 0 && seed[i - 1] > 0 && seed[i - 1] !== s)
+        || (x < W - 1 && seed[i + 1] > 0 && seed[i + 1] !== s)
+        || (y > 0 && seed[i - W] > 0 && seed[i - W] !== s)
+        || (y < H - 1 && seed[i + W] > 0 && seed[i + W] !== s);
+      if (diff) {
+        border[i] = 1;
+      }
+    }
+  }
+  for (let pass = 0; pass < 2; pass++) {
+    const src = border.slice();
+    for (let y = 1; y < H - 1; y++) {
+      for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x;
+        if (src[i] > 0) continue;
+        const m = Math.max(src[i - 1], src[i + 1], src[i - W], src[i + W]);
+        if (m > 0) {
+          border[i] = m * 0.55;
+        }
+      }
+    }
+  }
+  return border;
+}
+
+/** Outward normals + tangents from the inside-distance gradient. */
+function computeFxNormals(sdf: Float32Array, W: number, H: number) {
+  const N = W * H;
+  const nx = new Float32Array(N);
+  const ny = new Float32Array(N);
+  const tx = new Float32Array(N);
+  const ty = new Float32Array(N);
+  const at = (x: number, y: number) => {
+    const cx = x < 0 ? 0 : x >= W ? W - 1 : x;
+    const cy = y < 0 ? 0 : y >= H ? H - 1 : y;
+    return sdf[cy * W + cx];
+  };
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      // sdf grows INWARD, so the outward normal is the negative gradient.
+      const gx = at(x + 1, y) - at(x - 1, y);
+      const gy = at(x, y + 1) - at(x, y - 1);
+      const len = Math.hypot(gx, gy);
+      if (len > 1e-5) {
+        nx[i] = -gx / len;
+        ny[i] = -gy / len;
+        tx[i] = gy / len;
+        ty[i] = -gx / len;
+      }
+    }
+  }
+  return { nx, ny, tx, ty };
+}
+
+/** Fake relief-sphere z: 0 at the silhouette rim, 1 once ~12 px deep. */
+function computeMatcapZ(sdf: Float32Array, W: number, H: number): Float32Array {
+  const z = new Float32Array(W * H);
+  const R = 12;
+  for (let i = 0; i < W * H; i++) {
+    const dd = Math.min(sdf[i], R) / R;
+    z[i] = Math.sqrt(Math.max(0, 1 - (1 - dd) * (1 - dd)));
+  }
+  return z;
+}
+
+/** Deterministic per-pixel identity (integer lattice hash -> [0,1)). */
+function computePixId(W: number, H: number): Float32Array {
+  const id = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let h = (x * 0x85ebca6b) ^ (y * 0xc2b2ae35) ^ 0x27d4eb2f;
+      h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+      h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
+      h ^= h >>> 15;
+      id[y * W + x] = (h >>> 0) / 4294967296;
+    }
+  }
+  return id;
+}
+
+/**
+ * Lazily compute + cache the topology fields on the prep. Only exotic effects
+ * (gildedbones / carvedrelief / innerember / eventhorizon) pay this; every
+ * pre-existing effect renders without touching it.
+ */
+function getFxTopology(prep: RenderPrep, buf: Float32Array, W: number, H: number): FxTopology {
+  if (prep.topo) {
+    return prep.topo;
+  }
+  const sdf = computeInsideDist(buf, W, H);
+  const normals = computeFxNormals(sdf, W, H);
+  prep.topo = {
+    sdf,
+    voro: computeVoroField(buf, W, H),
+    ...normals,
+    matcapZ: computeMatcapZ(sdf, W, H),
+    pixId: computePixId(W, H),
+  };
+  return prep.topo;
 }
 
 const renderPrepCache = new WeakMap<ErShinyLabSourcePixels, Map<number, RenderPrep>>();
@@ -101,9 +371,90 @@ function getRenderPrep(source: ErShinyLabSourcePixels, width: number, height: nu
     ef: computeEdge(buf, width, height),
     dist: computeDist(buf, width, height, pad),
     clusters: computeClusters(buf, width, height, 5),
+    topo: null,
   };
   byPad.set(pad, prep);
   return prep;
+}
+
+// ---------------------------------------------------------------------------
+// Animation groups: stable anchors + cross-frame sampling
+// ---------------------------------------------------------------------------
+
+interface FxGroup {
+  frames: ErShinyLabSourcePixels[];
+  /** Cached per pad; null until first computed. */
+  anchors: Map<number, FxAnchors>;
+}
+
+const fxGroups = new Map<string, FxGroup>();
+
+/**
+ * Register the frames of one animation under a key. All frames rendered with
+ * that `fxGroup` share ONE stable anchor: the union-silhouette centroid + feet
+ * line across every frame, so landmark geometry (orbiting masses, pinned
+ * windows) stops wobbling as the pose changes. Frame-local anchors stay
+ * available separately for effects that want body-following behavior.
+ */
+export function registerFxGroup(key: string, frames: ErShinyLabSourcePixels[]): void {
+  fxGroups.set(key, { frames, anchors: new Map() });
+}
+
+export function clearFxGroups(): void {
+  fxGroups.clear();
+}
+
+/** Union-silhouette centroid + feet line across every frame, cached per pad. */
+function anchorsForGroup(group: FxGroup, pad: number): FxAnchors | null {
+  const cached = group.anchors.get(pad);
+  if (cached) {
+    return cached;
+  }
+  let sx = 0;
+  let sy = 0;
+  let cnt = 0;
+  let maxY = -1;
+  let PW = 0;
+  let PH = 0;
+  for (const frame of group.frames) {
+    const prep = getRenderPrep(frame, Math.floor(frame.width), Math.floor(frame.height), pad);
+    if (!prep) {
+      continue;
+    }
+    PW = prep.dist.PW;
+    PH = prep.dist.PH;
+    const buf = prep.buf;
+    const fw = Math.floor(frame.width);
+    const fh = Math.floor(frame.height);
+    for (let y = 0; y < fh; y++) {
+      for (let x = 0; x < fw; x++) {
+        if (buf[(y * fw + x) * 4 + 3] > 0.02) {
+          sx += x + pad;
+          sy += y + pad;
+          cnt++;
+          if (y + pad > maxY) {
+            maxY = y + pad;
+          }
+        }
+      }
+    }
+  }
+  if (!cnt || !PW || !PH) {
+    return null;
+  }
+  const anchors: FxAnchors = {
+    cx: sx / cnt / PW,
+    cy: sy / cnt / PH,
+    fy: (maxY + 1) / PH,
+    frameCx: 0.5,
+    frameCy: 0.45,
+    frameFy: 0.82,
+    stableCx: sx / cnt / PW,
+    stableCy: sy / cnt / PH,
+    stableFy: (maxY + 1) / PH,
+  };
+  group.anchors.set(pad, anchors);
+  return anchors;
 }
 
 function makeSampler(buf: Float32Array, width: number, height: number): (x: number, y: number) => number[] {
@@ -203,10 +554,64 @@ export function renderErShinyLabLook(
     K: clusters?.K ?? 1,
     clRank: (r, g, b) => (clusters ? clusterRank(clusters, r, g, b) : 0),
     clColor: i => (clusters ? clusters.cent[i] : [0.5, 0.5, 0.5]),
+    px: 0,
+    py: 0,
+    topo: null,
+    anchors: {
+      cx: 0.5,
+      cy: 0.45,
+      fy: 0.82,
+      frameCx: 0.5,
+      frameCy: 0.45,
+      frameFy: 0.82,
+      stableCx: 0.5,
+      stableCy: 0.45,
+      stableFy: 0.82,
+    },
+    frameSample: () => [0, 0, 0, 0],
+    frameCount: 0,
+    frameIndex: 0,
   };
   const pal = slots.palette && slots.palette !== "base" && PALETTE[slots.palette] ? slots.palette : null;
   const surf = slots.surface && AURA[slots.surface] ? slots.surface : null;
   const aro = slots.around && AROUND[slots.around] ? slots.around : null;
+
+  // Anchors: group-stable when a group is registered under options.fxGroup,
+  // else the stable slots mirror the frame-local ones so effects can use
+  // either without a null check.
+  const group = options?.fxGroup ? fxGroups.get(options.fxGroup) : undefined;
+  const groupAnchors = group ? anchorsForGroup(group, pad) : null;
+  const frameCx = dist.cx;
+  const frameCy = dist.cy;
+  const frameFy = dist.fy;
+  const anchors: FxAnchors = {
+    cx: groupAnchors?.cx ?? frameCx,
+    cy: groupAnchors?.cy ?? frameCy,
+    fy: groupAnchors?.fy ?? frameFy,
+    frameCx,
+    frameCy,
+    frameFy,
+    stableCx: groupAnchors?.stableCx ?? frameCx,
+    stableCy: groupAnchors?.stableCy ?? frameCy,
+    stableFy: groupAnchors?.stableFy ?? frameFy,
+  };
+
+  // Only the exotic surfaces/around read silhouette topology; compute it lazily
+  // so the 370+ pre-existing effects never pay for it.
+  const needsTopo =
+    surf === "gildedbones" || surf === "carvedrelief" || surf === "innerember" || aro === "warpwell";
+  const topo = needsTopo ? getFxTopology(prep, buf, fw, fh) : null;
+
+  // Cross-frame samplers for the registered group (empty without one).
+  const frameSamplers: ((x: number, y: number) => number[])[] = [];
+  if (group) {
+    for (const f of group.frames) {
+      const fp = getRenderPrep(f, Math.floor(f.width), Math.floor(f.height), pad);
+      frameSamplers.push(fp ? makeSampler(fp.buf, Math.floor(f.width), Math.floor(f.height)) : () => [0, 0, 0, 0]);
+    }
+  }
+  const frameIndex = group ? Math.max(0, group.frames.indexOf(source)) : 0;
+
   const sa = pal
     ? (x: number, y: number) => {
         const s = rawSa(x, y);
@@ -221,6 +626,15 @@ export function renderErShinyLabLook(
       }
     : rawSa;
   ctx.sa = sa;
+  ctx.topo = topo;
+  ctx.anchors = anchors;
+  ctx.frameSample = (index, x, y) => {
+    const n = frameSamplers.length;
+    const s = n ? frameSamplers[((index % n) + n) % n] : null;
+    return s ? s(x, y) : [0, 0, 0, 0];
+  };
+  ctx.frameCount = frameSamplers.length;
+  ctx.frameIndex = frameIndex;
 
   const doTint = params.tintMode > 0;
   const [tintH, tintS] = params.tintMode === 1 ? resolvePaletteTint(pal, ctx, clusters) : [0.58, 0.85];
@@ -248,7 +662,23 @@ export function renderErShinyLabLook(
       }
     }
   }
-  const ac = { cx: dist.cx, cy: dist.cy, fy: dist.fy, spr: sprPad, main: mainCol };
+  const ac = {
+    cx: anchors.cx,
+    cy: anchors.cy,
+    fy: anchors.fy,
+    frameCx,
+    frameCy,
+    frameFy,
+    stableCx: anchors.stableCx,
+    stableCy: anchors.stableCy,
+    stableFy: anchors.stableFy,
+    spr: sprPad,
+    main: mainCol,
+    topo,
+    frameSample: ctx.frameSample,
+    frameCount: ctx.frameCount,
+    frameIndex,
+  };
 
   for (let py = 0; py < ph; py++) {
     for (let px = 0; px < pw; px++) {
@@ -262,6 +692,8 @@ export function renderErShinyLabLook(
         const x = (sx + 0.5) / fw;
         const y = (sy + 0.5) / fh;
         ctx.e = ef[sy * fw + sx];
+        ctx.px = sx;
+        ctx.py = sy;
         const r = buf[i];
         const g = buf[i + 1];
         const b = buf[i + 2];

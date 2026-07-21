@@ -1,6 +1,10 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import {
+  recoverUsedPokeballsAfterBattle,
+  snapshotBattleMoneyGainMultiplier,
+} from "#data/elite-redux/archetypes/ability-meta-consumers";
+import {
   applyCoopAuthoritativeBattleState,
   coopAppliedStateTick,
   reapplyAcceptedCoopAuthoritativeBattleState,
@@ -205,6 +209,7 @@ export class BattleEndPhase extends BattlePhase {
     // Legacy/no-journal guest compatibility. Retained peers ignore raw waveEndState entirely.
     this.applyLegacyCoopWaveEndProgression();
 
+    snapshotBattleMoneyGainMultiplier();
     this.recordLocalBattleStats();
 
     if (this.isVictory) {
@@ -228,6 +233,9 @@ export class BattleEndPhase extends BattlePhase {
 
     for (const pokemon of globalScene.getPokemonAllowedInBattle()) {
       applyAbAttrs("PostBattleAbAttr", { pokemon, victory: this.isVictory });
+    }
+    if (!isCoopAuthoritativeGuest()) {
+      recoverUsedPokeballsAfterBattle();
     }
 
     if (globalScene.currentBattle.moneyScattered) {

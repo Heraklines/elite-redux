@@ -27,17 +27,45 @@
 //     for three turns on entry."
 // =============================================================================
 
-import { FullHpResistTypeAbAttr } from "#abilities/ab-attrs";
+import { type AbAttrBaseParams, FullHpResistTypeAbAttr, PostSummonAbAttr } from "#abilities/ab-attrs";
 import type { TypeMultiplierAbAttrParams } from "#types/ability-types";
 import { NumberHolder } from "#utils/common";
 
 export interface TimeLimitedEffectivenessFloorOptions {
   /** Number of turns from entry the effectiveness floor stays active. */
   readonly turns: number;
+  /** Optional entry-window token required for the floor to apply. */
+  readonly activeWindowKey?: string;
+}
+
+/** Opens an entry-local window only on the holder's first summon of a battle. */
+export class ActivateOncePerBattleEntryWindowAbAttr extends PostSummonAbAttr {
+  private readonly key: string;
+
+  constructor(key: string) {
+    super(true);
+    if (key.trim().length === 0) {
+      throw new Error("[ActivateOncePerBattleEntryWindowAbAttr] key must be non-empty");
+    }
+    this.key = key;
+  }
+
+  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+    return !pokemon.waveData.entryEffectsFired.has(this.key);
+  }
+
+  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
+    if (simulated || pokemon.waveData.entryEffectsFired.has(this.key)) {
+      return;
+    }
+    pokemon.waveData.entryEffectsFired.add(this.key);
+    pokemon.tempSummonData.abilityEntryWindows.add(this.key);
+  }
 }
 
 export class TimeLimitedEffectivenessFloorAbAttr extends FullHpResistTypeAbAttr {
   private readonly turns: number;
+  private readonly activeWindowKey?: string;
 
   constructor(options: TimeLimitedEffectivenessFloorOptions) {
     super();
@@ -45,6 +73,7 @@ export class TimeLimitedEffectivenessFloorAbAttr extends FullHpResistTypeAbAttr 
       throw new Error("[TimeLimitedEffectivenessFloorAbAttr] turns must be positive");
     }
     this.turns = options.turns;
+    this.activeWindowKey = options.activeWindowKey;
   }
 
   override canApply({ typeMultiplier, move, pokemon }: TypeMultiplierAbAttrParams): boolean {
@@ -53,7 +82,8 @@ export class TimeLimitedEffectivenessFloorAbAttr extends FullHpResistTypeAbAttr 
     // covers turns 1..turns inclusive — i.e. a full `turns`-turn window from entry.
     const turnNumber = pokemon.tempSummonData?.turnCount ?? 1;
     return (
-      turnNumber <= this.turns
+      (this.activeWindowKey === undefined || pokemon.tempSummonData.abilityEntryWindows.has(this.activeWindowKey))
+      && turnNumber <= this.turns
       && typeMultiplier instanceof NumberHolder
       && !move?.hasAttr("FixedDamageAttr")
       && typeMultiplier.value > 0.5

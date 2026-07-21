@@ -1,0 +1,35 @@
+{
+  "v": 1,
+  "name": "Toxic Spill makes active Pokemon Poison-weak on entry",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "toxic-spill-poison-weakness"
+  },
+  "party": [
+    {
+      "species": "MUK",
+      "ability": 5147,
+      "moves": ["SLUDGE_BOMB"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "SNORLAX",
+        "level": 100,
+        "ability": "RUN_AWAY",
+        "moves": ["SPLASH"]
+      }
+    ]
+  },
+  "script": [{ "move": "SLUDGE_BOMB", "enemyMove": "SPLASH" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Toxic Spill",
+    "enemyDamaged": true,
+    "logIncludes": ["super effective"]
+  }
+}

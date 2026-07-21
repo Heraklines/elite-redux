@@ -32,8 +32,10 @@
 import {
   type AbAttr,
   ConditionalCritAbAttr,
+  MovePowerBoostAbAttr,
   PostDefendContactDamageAbAttr,
   PostFaintAbAttr,
+  ReceivedMoveDamageMultiplierAbAttr,
   RedirectTypeMoveAbAttr,
 } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
@@ -66,6 +68,12 @@ import {
   OverloadedPowerAbAttr,
   OverloadedPriorityAbAttr,
 } from "#data/elite-redux/abilities/electivire";
+import {
+  ER_SUGAR_RUSH_ABILITY_ID,
+  ER_UPCYCLE_ABILITY_ID,
+  holderHasUpcycle,
+  isErFoodPokemon,
+} from "#data/elite-redux/abilities/food-based";
 import { ER_GENESIS_SUPERNOVA_ABILITY_ID, GenesisSupernovaAbAttr } from "#data/elite-redux/abilities/genesis-supernova";
 import { ER_HEARTBREAK_ABILITY_ID, HeartbreakAbAttr } from "#data/elite-redux/abilities/heartbreak";
 import { ER_HYDRAPEX_ABILITY_ID, HydrapexAbAttr } from "#data/elite-redux/abilities/hydrapex";
@@ -540,6 +548,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
     },
     {
       draft: {
+        id: ER_UPCYCLE_ABILITY_ID,
+        name: "Upcycle",
+        description:
+          "All Pokemon on the field count as Food. With Sugar Rush, Poison-type targets take 2x damage instead of 1.5x.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_UPCYCLE_ABILITY_ID,
+    },
+    {
+      draft: {
         id: ER_CLOSED_CIRCUIT_ABILITY_ID,
         name: "Closed Circuit",
         description:
@@ -786,7 +804,7 @@ export function refreshEliteReduxComposites(): RefreshEliteReduxCompositesResult
   const result: RefreshEliteReduxCompositesResult = { refreshed: 0, errors: [] };
   for (const draft of ER_ABILITIES) {
     const row = ER_ABILITY_ARCHETYPES[draft.id];
-    if (row === undefined || row.archetype !== "composite-vanilla-mashup") {
+    if (row === undefined || row.archetype !== "composite-vanilla-mashup" || draft.id === 652) {
       continue;
     }
     const pokerogueId = ER_ID_MAP.abilities[draft.id];
@@ -864,8 +882,29 @@ function buildCustomAbility(
   // to the dispatcher so composite-vanilla-mashup rows can find their
   // resolved-parts entry in `ER_COMPOSITE_PARTS`.
   const archetypeRow = ER_ABILITY_ARCHETYPES[draft.id];
-  if (archetypeRow !== undefined) {
+  if (archetypeRow !== undefined && pokerogueId !== ER_SUGAR_RUSH_ABILITY_ID) {
     wireArchetypeAttrs(builder, draft.id, archetypeRow.archetype, archetypeRow.params, result);
+  }
+
+  if (pokerogueId === ER_SUGAR_RUSH_ABILITY_ID) {
+    builder.attr(
+      MovePowerBoostAbAttr,
+      (user, target) =>
+        !!target
+        && (holderHasUpcycle(user) || isErFoodPokemon(target))
+        && !(holderHasUpcycle(user) && target.isOfType(PokemonType.POISON)),
+      1.5,
+    );
+    builder.attr(
+      MovePowerBoostAbAttr,
+      (user, target) => !!target && holderHasUpcycle(user) && target.isOfType(PokemonType.POISON),
+      2,
+    );
+    builder.attr(
+      ReceivedMoveDamageMultiplierAbAttr,
+      (holder, attacker) => !!attacker && (holderHasUpcycle(holder) || isErFoodPokemon(attacker)),
+      0.5,
+    );
   }
 
   // ER abilities whose ROM text marks them uncopiable / unsuppressable. Keyed by
@@ -1111,7 +1150,10 @@ function buildCustomAbility(
     writable: false,
   });
   Object.defineProperty(ability, "description", {
-    value: draft.description,
+    value:
+      pokerogueId === ER_SUGAR_RUSH_ABILITY_ID
+        ? "Deals 1.5x damage to Food Pokemon and takes 0.5x damage from them. With Upcycle, Poison targets take 2x damage."
+        : draft.description,
     configurable: true,
     enumerable: true,
     writable: false,

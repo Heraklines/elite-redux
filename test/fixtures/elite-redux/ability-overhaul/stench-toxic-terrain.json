@@ -1,0 +1,50 @@
+{
+  "v": 1,
+  "name": "Stench protects Toxic Terrain from replacement",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "stench-toxic-terrain"
+  },
+  "party": [
+    {
+      "species": "MUK",
+      "ability": "STENCH",
+      "moves": [5163, "SPLASH", "POISON_JAB", "MINIMIZE"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "MUK",
+        "level": 100,
+        "moves": ["SPLASH", "GRASSY_TERRAIN", "MISTY_TERRAIN", "ELECTRIC_TERRAIN"]
+      }
+    ]
+  },
+  "start": {
+    "playerAbilitySuppression": {
+      "ability": 1,
+      "sourceAbility": 237,
+      "turns": 1
+    }
+  },
+  "script": [
+    { "move": 5163, "enemyMove": "SPLASH" },
+    { "move": "MINIMIZE", "enemyMove": "MISTY_TERRAIN" },
+    { "move": "MINIMIZE", "enemyMove": "ELECTRIC_TERRAIN" },
+    { "move": "MINIMIZE", "enemyMove": "PSYCHIC_TERRAIN" },
+    { "move": "MINIMIZE", "enemyMove": "GRASSY_TERRAIN" },
+    { "move": "MINIMIZE", "enemyMove": "MISTY_TERRAIN" },
+    { "move": "MINIMIZE", "enemyMove": "ELECTRIC_TERRAIN" },
+    { "move": "MINIMIZE", "enemyMove": "PSYCHIC_TERRAIN" }
+  ],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "terrain": "TOXIC",
+    "terrainTurnsLeft": 7,
+    "playerAbility": "Stench"
+  }
+}

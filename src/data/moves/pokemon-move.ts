@@ -60,6 +60,9 @@ export class PokemonMove {
     if (!move) {
       return [false, ""];
     }
+    if (pokemon.tempSummonData.erTelekineticStruggle && this.moveId !== MoveId.STRUGGLE) {
+      return [false, ""];
+    }
     const moveName = move.name;
 
     // TODO: Add Sky Drop's 1 turn stall

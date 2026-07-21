@@ -21,6 +21,7 @@ import { type DevEnemyMonSpec, setPendingDevEnemyParty } from "#app/dev-tools/re
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
+import { suppressAbilityIdForTurns } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
@@ -85,6 +86,13 @@ export interface SpecEnemyMon extends SpecMon {
    * Frisk / Knock Off / Trick / Bug Bite / berry tests.
    */
   heldItems?: SpecItemRow[] | undefined;
+}
+
+/** One ability id disabled for a fixed number of completed turns. */
+export interface SpecAbilitySuppression {
+  ability: number;
+  turns: number;
+  sourceAbility?: number | undefined;
 }
 
 /** A player item/modifier row: a modifierTypes key + optional count/sub-type. */
@@ -161,6 +169,12 @@ export interface ScenarioSpec {
         triple?: boolean | undefined;
         /** Pin the run seed for a fully deterministic repro. */
         seed?: string | undefined;
+        /**
+         * Headless runner only: pin every battle RNG call to its minimum result.
+         * Useful for deterministic coverage of low-chance procs. Ignored by the
+         * in-game scenario path, where the real seeded RNG remains authoritative.
+         */
+        battleRng?: "min" | undefined;
         difficulty?: "youngster" | "ace" | "elite" | "hell" | undefined;
         challenges?: { id: number; value: number }[] | undefined;
       }
@@ -216,6 +230,9 @@ export interface ScenarioSpec {
         enemy3HpPct?: number | undefined;
         player3Status?: number | undefined;
         enemy3Status?: number | undefined;
+        /** Optional timed suppression staged on the lead after both sides are summoned. */
+        playerAbilitySuppression?: SpecAbilitySuppression | undefined;
+        enemyAbilitySuppression?: SpecAbilitySuppression | undefined;
       }
     | undefined;
   /**
@@ -367,6 +384,21 @@ function applyStatus(side: "player" | "enemy", idx: number, status: number | und
   fieldMon(side, idx)?.trySetStatus(status as StatusEffect);
 }
 
+function applyAbilitySuppression(side: "player" | "enemy", suppression: SpecAbilitySuppression | undefined): void {
+  if (!suppression) {
+    return;
+  }
+  const mon = fieldMon(side, 0);
+  if (mon) {
+    suppressAbilityIdForTurns(
+      mon,
+      suppression.ability as AbilityId,
+      suppression.turns,
+      (suppression.sourceAbility ?? suppression.ability) as AbilityId,
+    );
+  }
+}
+
 /**
  * Apply a specific set of held-item rows to ONE already-spawned enemy mon (not
  * the whole side). Reuses the engine's own {@linkcode overrideHeldItems} builder
@@ -444,6 +476,7 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     O.ENEMY_HEALTH_SEGMENTS_OVERRIDE = 0;
     O.ENEMY_SHINY_OVERRIDE = null;
     O.ENEMY_VARIANT_OVERRIDE = null;
+    O.ENEMY_NATURE_OVERRIDE = null;
     O.ENEMY_HELD_ITEMS_OVERRIDE = [];
     // Ability/passive overrides (not all are in the dev-defaults reset table).
     O.HAS_PASSIVE_ABILITY_OVERRIDE = null;
@@ -505,6 +538,9 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
       if (w.status) {
         O.ENEMY_STATUS_OVERRIDE = w.status as StatusEffect;
       }
+      if (w.nature !== undefined) {
+        O.ENEMY_NATURE_OVERRIDE = w.nature as Nature;
+      }
       if (w.shiny) {
         O.ENEMY_SHINY_OVERRIDE = true;
         O.ENEMY_VARIANT_OVERRIDE = (w.variant ?? 0) as MutableOverrides["ENEMY_VARIANT_OVERRIDE"];
@@ -540,6 +576,9 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
         }
         if (p.abilitySlot !== undefined) {
           m.abilitySlot = p.abilitySlot;
+        }
+        if (p.nature !== undefined) {
+          m.nature = p.nature;
         }
         if (p.formIndex !== undefined) {
           m.formIndex = p.formIndex;
@@ -599,6 +638,8 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     applyStatus("enemy", 1, start.enemy2Status);
     applyStatus("player", 2, start.player3Status);
     applyStatus("enemy", 2, start.enemy3Status);
+    applyAbilitySuppression("player", start.playerAbilitySuppression);
+    applyAbilitySuppression("enemy", start.enemyAbilitySuppression);
     // Wild ability slot: applied live (simplest reliable path).
     const wildSlot = spec.enemy?.kind === "wild" ? spec.enemy.wild?.abilitySlot : undefined;
     if (wildSlot !== undefined) {
@@ -652,6 +693,10 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     // downstream roll (wave seed, ER trainer/factory/ghost picks) derives from it.
     if (run.seed?.trim()) {
       globalScene.setSeed(run.seed.trim());
+    }
+    if (run.money !== undefined && run.money >= 0) {
+      globalScene.money = Math.floor(run.money);
+      globalScene.updateMoneyText(false);
     }
     // Challenges need the new run's gameMode (created by startRunWithMode).
     for (const ch of run.challenges ?? []) {

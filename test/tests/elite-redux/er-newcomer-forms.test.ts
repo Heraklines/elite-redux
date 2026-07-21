@@ -86,6 +86,9 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
 
   it("each mega stone is registered and has a base-form form-change edge (reachability)", () => {
     for (const def of ER_NEWCOMER_FORMS) {
+      if (def.item === undefined) {
+        continue;
+      }
       expect(isErMegaStone(def.item), `${def.formName} stone is an ER mega stone`).toBe(true);
       const species = getPokemonSpecies(def.baseSpecies);
       // The live non-mega base form keys the edge's preFormKey must match (both the
@@ -129,8 +132,8 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
     expect(moves.some(([, moveId]) => moveId === MoveId.LEAF_BLADE)).toBe(true);
   });
 
-  it("covers all 12 newcomer forms incl. the two additive mega-z rows (collision resolved)", () => {
-    expect(ER_NEWCOMER_FORMS).toHaveLength(12);
+  it("covers all 17 newcomer and Alpha forms incl. the additive mega-z rows", () => {
+    expect(ER_NEWCOMER_FORMS).toHaveLength(17);
 
     // Mega Skarmory Z is ADDITIVE: it does not disturb the existing ER Mega
     // Skarmory Y, and lands on a distinct `mega-z` formIndex.
@@ -162,5 +165,15 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
     expect(new Set([drZ!.type1, drZ!.type2, ...drZ!.getExtraTypes()])).toEqual(
       new Set([PokemonType.DRAGON, PokemonType.FLYING, PokemonType.STEEL]),
     );
+
+    const fidough = getPokemonSpecies(SpeciesId.FIDOUGH);
+    const partner = fidough.forms.find(f => f.formKey === "partner");
+    expect(partner?.isStarterSelectable).toBe(true);
+    const megaEdge = (pokemonFormChanges[SpeciesId.FIDOUGH] ?? []).find(fc => fc.formKey === "mega");
+    expect(megaEdge?.preFormKey).toBe("partner");
+
+    const lucarioZ = getPokemonSpecies(SpeciesId.LUCARIO).forms.find(f => f.formKey === "mega");
+    expect(lucarioZ?.formName).toBe("Mega Z");
+    expect(lucarioZ?.type2).toBe(PokemonType.ELECTRIC);
   });
 });

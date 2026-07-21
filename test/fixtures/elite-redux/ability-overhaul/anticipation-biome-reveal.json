@@ -1,0 +1,28 @@
+{
+  "v": 1,
+  "name": "Anticipation reveals an extra biome route",
+  "run": {
+    "wave": 10,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "meta-route-0",
+    "waves": 1
+  },
+  "party": [
+    {
+      "species": "MEWTWO",
+      "ability": "ANTICIPATION",
+      "moves": ["PSYCHIC", "AURA_SPHERE", "ICE_BEAM", "RECOVER"]
+    }
+  ],
+  "enemy": {
+    "kind": "trainer",
+    "trainerType": "YOUNGSTER"
+  },
+  "script": [{ "move": "PSYCHIC" }, { "move": "PSYCHIC" }, { "move": "PSYCHIC" }, { "move": "PSYCHIC" }],
+  "rewards": ["SKIP"],
+  "expect": {
+    "outcome": "victory",
+    "biomeOptionCount": 4
+  }
+}

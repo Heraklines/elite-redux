@@ -393,6 +393,7 @@ export interface DevEnemyMonSpec {
   moveIds?: number[];
   /** 0 = ability1, 1 = ability2, 2 = hidden. */
   abilitySlot?: number;
+  nature?: number;
   formIndex?: number;
   isBoss?: boolean;
   shiny?: boolean;

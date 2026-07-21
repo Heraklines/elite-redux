@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { getCapturedBattleMoneyGainMultiplier } from "#data/elite-redux/archetypes/ability-meta-consumers";
 import { isCoopAuthoritativeGuest } from "#data/elite-redux/coop/coop-runtime";
 import { erGamblersCoinPayoutMultiplier } from "#data/elite-redux/er-relics";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -10,7 +11,7 @@ import i18next from "i18next";
 
 export class MoneyRewardPhase extends BattlePhase {
   public readonly phaseName = "MoneyRewardPhase";
-  private moneyMultiplier: number;
+  private readonly moneyMultiplier: number;
 
   constructor(moneyMultiplier: number) {
     super();
@@ -26,6 +27,8 @@ export class MoneyRewardPhase extends BattlePhase {
     if (globalScene.arena.getTag(ArenaTagType.HAPPY_HOUR)) {
       moneyAmount.value *= 2;
     }
+
+    moneyAmount.value = Math.floor(moneyAmount.value * getCapturedBattleMoneyGainMultiplier());
 
     // ER relic (#439): Gambler's Coin - after a TRAINER battle, the payout is doubled
     // 50% of the time and lost (zeroed) the other 50%. The coin flip is seeded per wave

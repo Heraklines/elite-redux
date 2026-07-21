@@ -1,0 +1,35 @@
+{
+  "v": 1,
+  "name": "Liquid Ooze reverses Energy Tap recovery",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "liquid-ooze-ability-drain"
+  },
+  "party": [
+    {
+      "species": "FEEBAS",
+      "ability": "ENERGY_TAP",
+      "moves": ["NIGHT_SHADE", "PROTECT", "GROWL", "SPLASH"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "BLISSEY",
+        "level": 100,
+        "ability": "LIQUID_OOZE",
+        "moves": ["GROWL"]
+      }
+    ]
+  },
+  "script": [{ "move": "NIGHT_SHADE", "enemyMove": "GROWL" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "playerAbility": "Energy Tap",
+    "enemyAbility": "Liquid Ooze",
+    "playerDamaged": true
+  }
+}

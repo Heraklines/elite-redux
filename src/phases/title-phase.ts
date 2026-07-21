@@ -47,9 +47,12 @@ import { buildTeamMenuPresetViews, runShowdownPresetBuild } from "#data/elite-re
 import {
   getTournamentBracket,
   listTournaments,
+  pingTournamentPresence,
   registerForTournament,
 } from "#data/elite-redux/showdown/tournament-client";
+import { buildOwnGhostIconSummary } from "#data/elite-redux/showdown/tournament-ghost-icon";
 import { setTournamentMatchContext } from "#data/elite-redux/showdown/tournament-match-context";
+import { setTournamentFlowOpener, type TournamentDeepLink } from "#data/elite-redux/showdown/tournament-notifications";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -161,7 +164,23 @@ export class TitlePhase extends Phase {
     }
   }
 
+  /** Set the launch game mode + tear the title menu down into the run (shared by every entry). */
+  private launchGameMode(gameMode: GameModes): void {
+    // Disable the tournament deep-link the moment we leave the title for a run, so a challenge
+    // notification can NEVER open the board mid-battle (re-armed by showOptions back at title).
+    setTournamentFlowOpener(null);
+    this.gameMode = gameMode;
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.clearText();
+    this.end();
+  }
+
   private async showOptions(lastSessionSlot: number): Promise<void> {
+    // Register the tournament deep-link opener while at the title (cleared on teardown). A
+    // challenge notification in the inbox uses this to jump straight to the board on its match.
+    setTournamentFlowOpener((target: TournamentDeepLink) =>
+      this.openShowdownTournaments(gm => this.launchGameMode(gm), target),
+    );
     const options: OptionSelectItem[] = [];
     // Add a "continue" menu if the session slot ID is >-1
     if (lastSessionSlot > NO_SAVE_SLOT) {
@@ -179,12 +198,7 @@ export class TitlePhase extends Phase {
         semanticId: "new-game",
         label: i18next.t("menu:newGame"),
         handler: () => {
-          const setModeAndEnd = (gameMode: GameModes) => {
-            this.gameMode = gameMode;
-            globalScene.ui.setMode(UiMode.MESSAGE);
-            globalScene.ui.clearText();
-            this.end();
-          };
+          const setModeAndEnd = (gameMode: GameModes) => this.launchGameMode(gameMode);
           const { gameData } = globalScene;
           const options: OptionSelectItem[] = [];
           options.push({
@@ -571,7 +585,7 @@ export class TitlePhase extends Phase {
    * the inter-screen hops are instant. A worker fetch failure (offline / unconfigured endpoint) drops to a
    * message and back to the title - it never strands a blank screen.
    */
-  private openShowdownTournaments(setModeAndEnd: (gameMode: GameModes) => void): void {
+  private openShowdownTournaments(setModeAndEnd: (gameMode: GameModes) => void, deepLink?: TournamentDeepLink): void {
     const { gameData } = globalScene;
     const ownName = loggedInUser?.username ?? "Player";
 
@@ -605,7 +619,7 @@ export class TitlePhase extends Phase {
       this.openCoopLobby(setModeAndEnd, "authoritative", "versus", GameModes.SHOWDOWN);
     };
 
-    const openBracket = async (id: string): Promise<void> => {
+    const openBracket = async (id: string, initialBrowse?: { round: number; slot: number }): Promise<void> => {
       const res = await getTournamentBracket(id);
       if (!res.ok) {
         notice(res.error, () => void showList());
@@ -618,6 +632,13 @@ export class TitlePhase extends Phase {
         now: Date.now(),
         onPlayMatch: (matchId: string, opponent: string) => enterMatch(t.id, matchId, opponent),
         onBack: () => void showList(),
+        // P1.5 live board: poll the worker for the advancing bracket + ping presence while open.
+        onPoll: async () => {
+          const fresh = await getTournamentBracket(t.id);
+          return fresh.ok ? fresh.data.tournament : null;
+        },
+        onPing: () => void pingTournamentPresence(t.id),
+        ...(initialBrowse ? { initialBrowse } : {}),
       });
     };
 
@@ -627,7 +648,9 @@ export class TitlePhase extends Phase {
         notice("You need a saved team preset to register. Build one in the Showdown menu.", () => void showList());
         return;
       }
-      void registerForTournament(id, presets[0].name).then(res => {
+      // P1.5: carry the player's ghost-trainer appearance summary so the board can draw their
+      // slot icon + name + title. Registering may AUTO-CLOSE the tournament at cap (server-side).
+      void registerForTournament(id, presets[0].name, buildOwnGhostIconSummary()).then(res => {
         if (res.ok) {
           void showList();
         } else {
@@ -655,7 +678,12 @@ export class TitlePhase extends Phase {
     void (async () => {
       await globalScene.ui.setMode(UiMode.MESSAGE);
       globalScene.ui.resetModeChain();
-      await showList();
+      // Deep-link (from a challenge notification): jump straight to the board on the match.
+      if (deepLink == null) {
+        await showList();
+      } else {
+        await openBracket(deepLink.tournamentId, { round: deepLink.round, slot: deepLink.slot });
+      }
     })();
   }
 

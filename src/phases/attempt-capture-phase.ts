@@ -88,6 +88,7 @@ export class AttemptCapturePhase extends PokemonPhase {
     }
 
     globalScene.pokeballCounts[this.pokeballType]--;
+    globalScene.currentBattle.recordUsedPokeball(this.pokeballType);
 
     this.originalY = pokemon.y;
 

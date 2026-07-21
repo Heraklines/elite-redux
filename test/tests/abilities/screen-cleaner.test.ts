@@ -30,23 +30,23 @@ describe("Abilities - Screen Cleaner", () => {
     { name: "Reflect", tagType: ArenaTagType.REFLECT },
     { name: "Light Screen", tagType: ArenaTagType.LIGHT_SCREEN },
     { name: "Aurora Veil", tagType: ArenaTagType.AURORA_VEIL },
-  ])("should remove all instances of $name on entrance", async ({ tagType }) => {
+  ])("should remove only opposing $name on entrance", async ({ tagType }) => {
     game.scene.arena.addTag(tagType, 0, 0, 0, ArenaTagSide.PLAYER);
     game.scene.arena.addTag(tagType, 0, 0, 0, ArenaTagSide.ENEMY);
-    game.scene.arena.addTag(tagType, 0, 0, 0, ArenaTagSide.BOTH);
     expect(game).toHaveArenaTag(tagType);
 
     await game.classicMode.startBattle(SpeciesId.SLOWKING);
 
     const slowking = game.field.getPlayerPokemon();
     expect(slowking).toHaveAbilityApplied(AbilityId.SCREEN_CLEANER);
-    expect(game).not.toHaveArenaTag(tagType);
+    expect(game.scene.arena.getTagOnSide(tagType, ArenaTagSide.PLAYER)).toBeDefined();
+    expect(game.scene.arena.getTagOnSide(tagType, ArenaTagSide.ENEMY)).toBeUndefined();
   });
 
   it("should remove all tag types at once", async () => {
-    game.scene.arena.addTag(ArenaTagType.REFLECT, 0, 0, 0);
-    game.scene.arena.addTag(ArenaTagType.LIGHT_SCREEN, 0, 0, 0);
-    game.scene.arena.addTag(ArenaTagType.AURORA_VEIL, 0, 0, 0);
+    game.scene.arena.addTag(ArenaTagType.REFLECT, 0, 0, 0, ArenaTagSide.ENEMY);
+    game.scene.arena.addTag(ArenaTagType.LIGHT_SCREEN, 0, 0, 0, ArenaTagSide.ENEMY);
+    game.scene.arena.addTag(ArenaTagType.AURORA_VEIL, 0, 0, 0, ArenaTagSide.ENEMY);
     expect(game).toHaveArenaTag(ArenaTagType.REFLECT);
     expect(game).toHaveArenaTag(ArenaTagType.LIGHT_SCREEN);
     expect(game).toHaveArenaTag(ArenaTagType.AURORA_VEIL);

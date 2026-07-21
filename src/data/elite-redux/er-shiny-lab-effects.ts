@@ -523,6 +523,11 @@ const SURFACE_IDS = [
   "genone",
   "marchingants",
   "phosphor",
+  // Exotic topology effects (2026-07-20) - APPEND ONLY, never reorder above.
+  "gildedbones",
+  "carvedrelief",
+  "innerember",
+  "nestedportrait",
 ] as const;
 
 const AROUND_IDS = [
@@ -632,6 +637,8 @@ const AROUND_IDS = [
   "zaps",
   "blossoms",
   "paperlanterns",
+  // Exotic topology effect (2026-07-20) - APPEND ONLY, never reorder above.
+  "warpwell",
 ] as const;
 
 const LABELS: Record<string, string> = {
@@ -861,6 +868,11 @@ const LABELS: Record<string, string> = {
   genone: "Gen 1",
   marchingants: "Marching Ants",
   phosphor: "Phosphor",
+  // --- exotic topology surfaces (2026-07-20) ---
+  gildedbones: "Gilded Bones",
+  carvedrelief: "Carved Relief",
+  innerember: "Inner Ember",
+  nestedportrait: "Nested Portrait",
   // --- v6/v7 around FX ---
   helix: "Energy Helix",
   atomrings: "Atomic Orbit",
@@ -926,6 +938,8 @@ const LABELS: Record<string, string> = {
   zaps: "Lightning Zaps",
   blossoms: "Sakura Blossoms",
   paperlanterns: "Paper Lanterns",
+  // --- exotic topology around (2026-07-20) ---
+  warpwell: "Warp Well",
 };
 
 /**
@@ -1281,6 +1295,12 @@ const ACCENTS: Record<string, string> = {
   goldenglow: "#ffcf52",
   shadowaura: "#9b6cff",
   rainbowoutline: "#a0e0ff",
+  // exotic topology effects (2026-07-20)
+  gildedbones: "#ffd070",
+  carvedrelief: "#d7e2f0",
+  innerember: "#ff6a24",
+  nestedportrait: "#9fefff",
+  warpwell: "#b06cff",
 };
 
 function labelFor(id: string): string {
@@ -1328,6 +1348,10 @@ export const ER_SHINY_LAB_EFFECT_DEFS: ErShinyLabEffectDefinition[] = [
   ...makeDefinitions(SURFACE_IDS, "surface"),
   ...makeDefinitions(AROUND_IDS, "around"),
 ];
+
+// Raw id arrays, exported for the append-only registry gate (saved looks
+// encode an effect by POSITION in these arrays, so the order is load-bearing).
+export { PALETTE_IDS, SURFACE_IDS, AROUND_IDS };
 
 export const ER_SHINY_LAB_EFFECTS_BY_CATEGORY: Record<ErShinyLabCategory, ErShinyLabEffectDefinition[]> = {
   palette: ER_SHINY_LAB_EFFECT_DEFS.filter(e => e.category === "palette"),

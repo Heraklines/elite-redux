@@ -364,4 +364,8 @@ export enum FormChangeItem {
   // Mega Skarmory Z (fakemon patch): additive `mega-z` alongside the existing ER
   // Mega Skarmory Y. Dragonite Z reuses DRAGONINITE_Z above.
   SKARMORITE_Z,
+  // Alpha-dex additions. Appended for save compatibility.
+  KINGDRANITE_Y,
+  DURALUDONITE,
+  FIDOUGHITE,
 }

@@ -1,0 +1,36 @@
+{
+  "v": 1,
+  "name": "Intimidate fears after a successful drop",
+  "run": {
+    "wave": 146,
+    "level": 100,
+    "difficulty": "ace",
+    "seed": "intimidate-successful-drop-fear",
+    "battleRng": "min"
+  },
+  "party": [
+    {
+      "species": "BLASTOISE",
+      "ability": "INTIMIDATE",
+      "moves": ["MAGIC_ROOM"]
+    }
+  ],
+  "enemy": {
+    "kind": "party",
+    "party": [
+      {
+        "species": "RATTATA",
+        "level": 100,
+        "ability": "BALL_FETCH",
+        "moves": ["SPLASH"],
+        "heldItems": [{ "name": "LUCKY_EGG" }]
+      }
+    ]
+  },
+  "script": [{ "move": "MAGIC_ROOM", "enemyMove": "SPLASH" }],
+  "expect": {
+    "outcome": "max-turns-reached",
+    "enemyStage": { "stat": "ATK", "value": -1 },
+    "enemyTags": ["ER_FEAR"]
+  }
+}

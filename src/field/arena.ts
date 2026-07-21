@@ -9,6 +9,10 @@ import { EntryHazardTag, getArenaTag } from "#data/arena-tag";
 import { biomeBgmLoopPoints } from "#data/biome-bgm-loop-points";
 import { getDailyForcedWaveBiomePoolTier } from "#data/daily-seed/daily-run";
 import { allBiomes } from "#data/data-lists";
+import {
+  getEncounterSpeciesWeightMultiplier,
+  isToxicTerrainProtected,
+} from "#data/elite-redux/archetypes/ability-meta-consumers";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { erApplyTerrainSeeds } from "#data/elite-redux/er-terrain-seeds";
@@ -460,6 +464,19 @@ export class Arena {
     }
 
     this.weather = weather ? new Weather(weather, weatherDuration.value, weatherDuration.value) : null;
+
+    if (
+      [WeatherType.HAIL, WeatherType.SNOW].includes(oldWeatherType)
+      && ![WeatherType.HAIL, WeatherType.SNOW].includes(weather)
+    ) {
+      for (const side of [ArenaTagSide.PLAYER, ArenaTagSide.ENEMY]) {
+        const veil = this.getTagOnSide(ArenaTagType.AURORA_VEIL, side);
+        if (veil?.turnCount != null && veil.turnCount <= 0) {
+          this.removeTagOnSide(ArenaTagType.AURORA_VEIL, side);
+        }
+      }
+    }
+
     this.eventTarget.dispatchEvent(
       new WeatherChangedEvent(oldWeatherType, this.weather?.weatherType!, this.weather?.turnsLeft!),
     ); // TODO: this `x?.y!` is dumb, fix this
@@ -571,6 +588,9 @@ export class Arena {
    */
   public trySetTerrain(terrain: TerrainType, ignoreAnim = false, user?: Pokemon, turnsOverride?: number): boolean {
     if (!this.canSetTerrain(terrain)) {
+      return false;
+    }
+    if (this.terrainType === TerrainType.TOXIC && terrain !== TerrainType.TOXIC && isToxicTerrainProtected()) {
       return false;
     }
 
@@ -774,7 +794,17 @@ export class Arena {
     if (tierPool.length === 0) {
       species = globalScene.randomSpecies(waveIndex, level);
     } else {
-      species = getPokemonSpecies(randSeedItem(tierPool));
+      const encounterWeights = tierPool.map(speciesId =>
+        getEncounterSpeciesWeightMultiplier(getPokemonSpecies(speciesId)),
+      );
+      if (encounterWeights.every(weight => weight === 1)) {
+        species = getPokemonSpecies(randSeedItem(tierPool));
+      } else {
+        const weightedIndices = new Map<number, number>(
+          encounterWeights.map((weight, index) => [index, Math.max(1, Math.round(weight * 1000))]),
+        );
+        species = getPokemonSpecies(tierPool[weightedPick(weightedIndices)]);
+      }
     }
 
     // ER biome identity (#439 §3): the ISLAND favors regional variants. When the

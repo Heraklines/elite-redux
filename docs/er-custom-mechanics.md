@@ -43,8 +43,8 @@ Effects (affect all **grounded** Pokemon):
 - Moves that **drain HP instead cause injury** (recoil-style) if the target is
   Poison-type.
 - **Stench** keeps its 10% flinch chance AND additionally makes Toxic Terrain
-  **permanent while the user (with Stench) is on the field** (the terrain can still
-  be removed or displaced by another terrain).
+  **permanent while the user (with Stench) is on the field**. During that time,
+  terrain setters and terrain-clearing moves cannot remove or replace it.
 
 ## New / reworked status effects
 

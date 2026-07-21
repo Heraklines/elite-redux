@@ -23,6 +23,7 @@
 
 import { AbAttr } from "#abilities/ab-attrs";
 import { MoveFlags } from "#enums/move-flags";
+import type { MoveId } from "#enums/move-id";
 import { type EffectiveStat, Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
@@ -45,14 +46,17 @@ export interface AttackStatSubstituteOptions {
    * Attack as the offensive stat (Equinox). Overrides physicalStat/specialStat.
    */
   readonly useHigherOffense?: boolean;
+  /** Optional exact move allowlist. */
+  readonly moveIds?: readonly MoveId[];
 }
 
 export class AttackStatSubstituteAbAttr extends AbAttr {
-  private readonly physicalStat?: EffectiveStat;
-  private readonly specialStat?: EffectiveStat;
+  private readonly physicalStat: EffectiveStat | undefined;
+  private readonly specialStat: EffectiveStat | undefined;
   private readonly contactOnly: boolean;
-  private readonly flag?: MoveFlags;
+  private readonly flag: MoveFlags | undefined;
   private readonly useHigherOffense: boolean;
+  private readonly moveIds: readonly MoveId[] | undefined;
 
   constructor(options: AttackStatSubstituteOptions) {
     super(false);
@@ -61,6 +65,7 @@ export class AttackStatSubstituteAbAttr extends AbAttr {
     this.contactOnly = options.contactOnly ?? false;
     this.flag = options.flag;
     this.useHigherOffense = options.useHigherOffense ?? false;
+    this.moveIds = options.moveIds;
   }
 
   /**
@@ -68,6 +73,9 @@ export class AttackStatSubstituteAbAttr extends AbAttr {
    * when this ability does not substitute for the given move.
    */
   public resolveStat(move: Move, isPhysical: boolean, source: Pokemon): EffectiveStat | null {
+    if (this.moveIds !== undefined && !this.moveIds.includes(move.id)) {
+      return null;
+    }
     if (this.contactOnly && !move.hasFlag(MoveFlags.MAKES_CONTACT)) {
       return null;
     }

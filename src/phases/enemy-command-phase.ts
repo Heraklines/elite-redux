@@ -5,6 +5,8 @@ import {
   isVersusSession,
   recordCoopV2CommandControlStarted,
 } from "#data/elite-redux/coop/coop-runtime";
+import { isReleasedCommander } from "#data/elite-redux/ability-upgrades/requested-field-effects";
+import { getCoopController, isAuthoritativeBattleSession, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
 import { isReplayRecording, recordReplayCommand } from "#data/elite-redux/replay-recorder";
@@ -211,6 +213,7 @@ export class EnemyCommandPhase extends FieldPhase {
     if (
       battle.getBattlerCount() > 1
       && enemyPokemon.hasAbility(AbilityId.COMMANDER)
+      && !isReleasedCommander(enemyPokemon)
       && enemyPokemon
         .getAllies()
         .some(ally => ally.getTag(BattlerTagType.COMMANDED)?.getSourcePokemon() === enemyPokemon)

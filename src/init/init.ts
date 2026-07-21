@@ -14,6 +14,7 @@ import {
   injectErNewcomerSpecies,
 } from "#data/elite-redux/er-newcomer-species";
 import { applyErTypeNativization } from "#data/elite-redux/er-type-nativization";
+import { initEliteReduxAbilityUpgrades } from "#data/elite-redux/init-elite-redux-ability-upgrades";
 import {
   initEliteReduxCSourceCorrections,
   remapEliteReduxMoveIdsByName,
@@ -259,6 +260,12 @@ function initPhaseErSpritesRebalance(): void {
   const manualCompositeResult = wireEliteReduxManualComposites();
   console.info(
     `[er-manual-composite] wired ${manualCompositeResult.wired} newcomer composites${manualCompositeResult.emptyConstituents.length > 0 ? ` (${manualCompositeResult.emptyConstituents.length} empty constituents: ${manualCompositeResult.emptyConstituents.map(e => `${e.compositeId}<-${e.constituentId}`).join(", ")})` : ""}`,
+  );
+  // Final ability-upgrade pass. This must run after both composite passes so
+  // additions copy the final patched packages and are not overwritten later.
+  const abilityUpgradeResult = initEliteReduxAbilityUpgrades();
+  console.info(
+    `[er-ability-upgrades] applied ${abilityUpgradeResult.applied} upgrades${abilityUpgradeResult.missingDraftIds.length > 0 ? ` (${abilityUpgradeResult.missingDraftIds.length} missing draft ids)` : ""}`,
   );
 }
 

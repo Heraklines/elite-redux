@@ -22,7 +22,9 @@ import {
   closeRegistration,
   createTournament,
   type EntrantRecord,
+  type GhostIconSummary,
   registerEntrant,
+  sanitizeGhostIcon,
   syncCompletion,
   type TournamentRecord,
   withdrawEntrant,
@@ -86,10 +88,25 @@ async function ensureTournamentTables(env: TournamentEnv): Promise<void> {
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS tournament_entrants (
        tournament_id TEXT NOT NULL, participant TEXT NOT NULL, name TEXT NOT NULL, preset_name TEXT NOT NULL,
-       seed INTEGER, registered_at INTEGER NOT NULL, PRIMARY KEY (tournament_id, participant) )`,
+       seed INTEGER, registered_at INTEGER NOT NULL, ghost_json TEXT, last_seen INTEGER,
+       PRIMARY KEY (tournament_id, participant) )`,
   ).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_entrant_tour ON tournament_entrants (tournament_id)").run();
+  // Additive online migration for tables created BEFORE the P1.5 board columns existed (the
+  // LIVE sample-cup rows): SQLite has no "ADD COLUMN IF NOT EXISTS", so attempt each ALTER and
+  // swallow the "duplicate column name" error once the column is already present.
+  await addColumnIfMissing(env, "tournament_entrants", "ghost_json", "TEXT");
+  await addColumnIfMissing(env, "tournament_entrants", "last_seen", "INTEGER");
   tablesReady = true;
+}
+
+/** Best-effort `ALTER TABLE ... ADD COLUMN` that no-ops when the column already exists. */
+async function addColumnIfMissing(env: TournamentEnv, table: string, column: string, type: string): Promise<void> {
+  try {
+    await env.DB.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`).run();
+  } catch {
+    // Column already present (duplicate column name) — expected on every warm start.
+  }
 }
 
 interface TournamentRow {
@@ -125,12 +142,31 @@ async function loadTournament(env: TournamentEnv, id: string): Promise<Tournamen
   return row ? rowToRecord(row) : null;
 }
 
+function parseGhost(raw: string | null | undefined): GhostIconSummary | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    return sanitizeGhostIcon(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
 async function loadEntrants(env: TournamentEnv, id: string): Promise<EntrantRecord[]> {
   const res = await env.DB.prepare(
-    "SELECT participant, name, preset_name, seed, registered_at FROM tournament_entrants WHERE tournament_id = ? ORDER BY registered_at",
+    "SELECT participant, name, preset_name, seed, registered_at, ghost_json, last_seen FROM tournament_entrants WHERE tournament_id = ? ORDER BY registered_at",
   )
     .bind(id)
-    .all<{ participant: string; name: string; preset_name: string; seed: number | null; registered_at: number }>();
+    .all<{
+      participant: string;
+      name: string;
+      preset_name: string;
+      seed: number | null;
+      registered_at: number;
+      ghost_json?: string | null;
+      last_seen?: number | null;
+    }>();
   return (res.results ?? []).map(r => ({
     tournamentId: id,
     participant: r.participant,
@@ -138,6 +174,8 @@ async function loadEntrants(env: TournamentEnv, id: string): Promise<EntrantReco
     presetName: r.preset_name,
     seed: r.seed,
     registeredAt: r.registered_at,
+    ghost: parseGhost(r.ghost_json),
+    lastSeen: r.last_seen ?? null,
   }));
 }
 
@@ -183,7 +221,13 @@ function tournamentView(t: TournamentRecord, entrants: EntrantRecord[]) {
     startedAt: t.startedAt,
     champion: t.champion,
     entrantCount: entrants.length,
-    entrants: entrants.map(e => ({ participant: e.participant, name: e.name, seed: e.seed })),
+    entrants: entrants.map(e => ({
+      participant: e.participant,
+      name: e.name,
+      seed: e.seed,
+      ghost: e.ghost ?? null,
+      lastSeen: e.lastSeen ?? null,
+    })),
     bracket: t.bracket,
   };
 }
@@ -258,16 +302,47 @@ async function handleRegister(body: any, caller: Caller, env: TournamentEnv, cor
     return json({ error: "tournament not found" }, 404, cors);
   }
   const entrants = await loadEntrants(env, t.id);
-  const res = registerEntrant(t, entrants, caller.u, String(body?.presetName ?? ""), Date.now());
+  const now = Date.now();
+  const res = registerEntrant(t, entrants, caller.u, String(body?.presetName ?? ""), now);
   if (!res.ok) {
     return json({ error: res.error }, 422, cors);
   }
+  // P1.5: the registration payload carries the entrant's ghost-trainer appearance summary
+  // (sprite key / name / title). Sanitize on receipt (the ghost-profile rule) before persisting.
+  const ghost = sanitizeGhostIcon(body?.ghost);
   await env.DB.prepare(
-    "INSERT INTO tournament_entrants (tournament_id, participant, name, preset_name, seed, registered_at) VALUES (?1,?2,?3,?4,?5,?6)",
+    "INSERT INTO tournament_entrants (tournament_id, participant, name, preset_name, seed, registered_at, ghost_json, last_seen) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
   )
-    .bind(t.id, res.entrant.participant, res.entrant.name, res.entrant.presetName, null, res.entrant.registeredAt)
+    .bind(
+      t.id,
+      res.entrant.participant,
+      res.entrant.name,
+      res.entrant.presetName,
+      null,
+      res.entrant.registeredAt,
+      ghost ? JSON.stringify(ghost) : null,
+      now,
+    )
     .run();
-  return json({ ok: true }, 200, cors);
+
+  // P1.5 AUTO-CLOSE AT CAP: the moment this successful insert fills maxEntrants, run the SAME
+  // seeded close/generate path the admin close-registration route uses — no organizer step.
+  // Byes are n/a at an exact cap. Seeded by registration order (P1: no ladder rank wired).
+  const afterInsert = await loadEntrants(env, t.id);
+  let autoClosed = false;
+  if (t.state === "registration" && afterInsert.length >= t.maxEntrants) {
+    const closed = closeRegistration(t, afterInsert, () => null, now);
+    if (closed.ok) {
+      await updateTournament(env, closed.tournament);
+      for (const s of closed.seeded) {
+        await env.DB.prepare("UPDATE tournament_entrants SET seed=?3 WHERE tournament_id=?1 AND participant=?2")
+          .bind(t.id, s.participant, s.seed)
+          .run();
+      }
+      autoClosed = true;
+    }
+  }
+  return json({ ok: true, autoClosed }, 200, cors);
 }
 
 async function handleWithdraw(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
@@ -282,6 +357,23 @@ async function handleWithdraw(body: any, caller: Caller, env: TournamentEnv, cor
   }
   await env.DB.prepare("DELETE FROM tournament_entrants WHERE tournament_id=?1 AND participant=?2")
     .bind(t.id, caller.u)
+    .run();
+  return json({ ok: true }, 200, cors);
+}
+
+/**
+ * P1.5 PRESENCE PING: the client pings while sitting on the board / in the tournament lobby;
+ * the worker stamps `last_seen` for this entrant so the board can show "A: FIGHT" (present) vs
+ * "last seen <ago>". DISPLAY-only for now — the P2 activity-win logic is out of scope. No-op
+ * (still 200) if the caller is not an entrant of this tournament.
+ */
+async function handlePing(body: any, caller: Caller, env: TournamentEnv, cors: Cors): Promise<Response> {
+  const t = await loadTournament(env, String(body?.id ?? body?.tournamentId));
+  if (!t) {
+    return json({ error: "tournament not found" }, 404, cors);
+  }
+  await env.DB.prepare("UPDATE tournament_entrants SET last_seen=?3 WHERE tournament_id=?1 AND participant=?2")
+    .bind(t.id, caller.u, Date.now())
     .run();
   return json({ ok: true }, 200, cors);
 }
@@ -376,6 +468,11 @@ export async function handleTournamentRoute(
     return json({ error: "unauthorized" }, 401, cors);
   }
 
+  // Ensure the schema (incl. the additive P1.5 ghost_json / last_seen columns) exists
+  // BEFORE any handler reads it — every route, GET included, since handleBracket/handleResult
+  // SELECT the new columns and the LIVE table was created before they existed. Idempotent.
+  await ensureTournamentTables(env);
+
   // GET routes
   if (request.method === "GET") {
     if (url.pathname === "/tournament/list") {
@@ -398,7 +495,6 @@ export async function handleTournamentRoute(
     return json({ error: "invalid json" }, 400, cors);
   }
 
-  await ensureTournamentTables(env);
   switch (url.pathname) {
     case "/tournament/create":
       return handleCreate(body, caller, env, cors);
@@ -410,6 +506,8 @@ export async function handleTournamentRoute(
       return handleRegister(body, caller, env, cors);
     case "/tournament/withdraw":
       return handleWithdraw(body, caller, env, cors);
+    case "/tournament/ping":
+      return handlePing(body, caller, env, cors);
     case "/tournament/result":
       return handleResult(body, caller, env, cors);
     case "/tournament/resolve":
