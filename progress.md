@@ -876,3 +876,33 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   production/public journeys. Extend the same proposal-ingress descriptor to
   every other remote-owned registered interaction before treating six-seat
   ownership as complete.
+
+2026-07-21 - Retried reward and market proposals are identity-idempotent
+
+- A fresh architecture audit found that the guest proposal lease retained an
+  exact operation ID locally but retried only raw `seq/kind/choice/data`.
+  Because shops reuse one sequence for multiple actions, a retry buffered after
+  action N could be consumed under the host's newly advanced ordinal N+1 and
+  execute the same purchase, reroll, lock, transfer, or check twice.
+- The frozen interaction carrier now transports the already-retained proposal
+  ID through its existing optional exact-ID slot; no transport union or
+  protocol-version change was made. A session-scoped, bounded authority
+  admission ledger records one immutable fingerprint per ID. Same-ID/same-
+  fingerprint retries are dropped before the FIFO, conflicting reuse fails the
+  shared session, and capacity exhaustion fails closed rather than evicting
+  exactly-once history.
+- The reward/market authority adapter independently requires that identity to
+  equal the exact operation ID derived for the current surface ordinal.
+  Therefore a retry that survives a relay recreation still cannot become the
+  next action. Reward actions, market purchases, and market leave now all carry
+  and retain the same ID; V2 market buys also gained the proposal lease they
+  previously lacked.
+- Added a pure admission-ledger contract and a production-relay regression that
+  sends repeated action-N proposals while result delivery is delayed, opens
+  the same-sequence action-N+1 waiter, proves it remains parked, then admits a
+  byte-identical real action only under the next operation ID. Conflicting
+  material for one ID is also proven fail-closed.
+- Local permitted evidence: public source contract 30/30 green, scoped Biome
+  clean, ownership guard green, `git diff --check` clean, and zero TypeScript
+  diagnostics in touched files (repository baseline remains non-zero). The
+  Vitest regression is intentionally reserved for GitHub-hosted co-op shards.

@@ -20,6 +20,7 @@
 // author state or advance its ordinal.
 // =============================================================================
 
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import {
   applyCoopAuthoritativeBattleState,
@@ -1299,6 +1300,9 @@ export function adoptRewardWatcherChoice(
     // executes it exactly once, then calls commitRewardAuthoritativeResult at the post-action safe seam.
     if (params.localRole === "host") {
       if (journalActive(binding)) {
+        if (isCoopV2InteractionCutoverActive(binding?.durability) && params.action.operationId !== opId) {
+          return { adopt: false, reason: "proposal-operation-id-mismatch" };
+        }
         if (!ownerParityValidator(params.pinned)(intent).ok) {
           return { adopt: false, reason: "host-wrong-owner" };
         }

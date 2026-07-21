@@ -10283,6 +10283,7 @@ export function assembleCoopRuntime(
         revokeCoopV2AuthorityProposalWait(runtime, wait);
       }
     },
+    onV2AuthorityProposalViolation: reason => failCoopRuntimeSharedSession(runtime, reason),
     validateV2QuizAnswerObservation: ({ seq, choice, questionIndex, operationId }) => {
       const control = runtime?.v2ControlLedger.activeControl;
       if (

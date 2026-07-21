@@ -1662,6 +1662,7 @@ export class SelectModifierPhase extends BattlePhase {
         choice,
         wire,
         this.coopRewardSurface,
+        prepared?.operationId,
       );
     if (
       controller.role === "guest"

@@ -51,7 +51,13 @@ const interactionCutover = readFileSync(
 );
 const nextControl = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/next-control.ts", root), "utf8");
 const controlLedger = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/control-ledger.ts", root), "utf8");
+const proposalAdmission = readFileSync(
+  new URL("src/data/elite-redux/coop/authority-v2/proposal-admission.ts", root),
+  "utf8",
+);
 const interactionRelay = readFileSync(new URL("src/data/elite-redux/coop/coop-interaction-relay.ts", root), "utf8");
+const rewardOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-reward-operation.ts", root), "utf8");
+const selectModifierPhase = readFileSync(new URL("src/phases/select-modifier-phase.ts", root), "utf8");
 const rendererGate = readFileSync(new URL("src/data/elite-redux/coop/coop-renderer-gate.ts", root), "utf8");
 const switchBiomePhase = readFileSync(new URL("src/phases/switch-biome-phase.ts", root), "utf8");
 
@@ -780,6 +786,49 @@ test("guest-owned Mystery control is installed only by an exact authority propos
     interactionRelay,
     /res == null && authorityWait != null[\s\S]*?revokeV2AuthorityProposalWait\(authorityWait\)/u,
     "timeout, cancellation, and supersession retire the exact waiter generation",
+  );
+});
+
+test("retained V2 shop proposals are identity-idempotent before any later waiter", () => {
+  assert.match(
+    proposalAdmission,
+    /return existing === proposal\.fingerprint \? "duplicate" : "conflict"/u,
+    "one proposal ID has one immutable fingerprint for the whole epoch",
+  );
+  assert.match(
+    proposalAdmission,
+    /capacity-exhausted[\s\S]*Eviction would make a sufficiently late retry executable again/u,
+    "the admission ledger fails closed instead of evicting exactly-once history",
+  );
+  assert.match(
+    interactionRelay,
+    /cosmeticOperationId: proposalOperationId/u,
+    "the frozen interaction carrier transports the retained proposal's stable operation ID",
+  );
+  assert.match(
+    interactionRelay,
+    /if \(admission === "duplicate"\)[\s\S]*return;/u,
+    "same-ID retries are dropped before the per-sequence FIFO can feed a later action",
+  );
+  assert.match(
+    interactionRelay,
+    /if \(admission !== "admitted"\)[\s\S]*onV2AuthorityProposalViolation\(reason\)/u,
+    "same-ID conflicting material terminates instead of being reinterpreted",
+  );
+  assert.match(
+    rewardOperation,
+    /isCoopV2InteractionCutoverActive\(binding\?\.durability\)[\s\S]*params\.action\.operationId !== opId[\s\S]*proposal-operation-id-mismatch/u,
+    "the authority accepts only the exact operation ID derived for its current shop ordinal",
+  );
+  assert.match(
+    selectModifierPhase,
+    /sendInteractionChoice\([\s\S]*this\.coopRewardSurface,[\s\S]*prepared\?\.operationId/u,
+    "reward, reroll, lock, transfer, and check proposals carry the ID retained by the owner",
+  );
+  assert.match(
+    biomeShopPhase,
+    /retainCoopV2InteractionProposal\([\s\S]*operationId: preparedOperationId[\s\S]*resend/u,
+    "non-terminal market purchases use the same durable identity lease",
   );
 });
 

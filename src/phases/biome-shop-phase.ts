@@ -60,6 +60,7 @@ import {
   getCoopRuntime,
   notifyCoopV2InteractionSurfaceReady,
   notifyCoopWaveContinuationSurfaceReady,
+  retainCoopV2InteractionProposal,
   runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_SHOP_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
@@ -791,7 +792,14 @@ export class BiomeShopPhase extends SelectModifierPhase {
             this.coopProveV2RewardOperationComplete(commit.operationId);
           }
           const resend = (): void =>
-            relay?.sendInteractionChoice(coopBiomeShopSeq(pinned), "biomeShop", COOP_INTERACTION_LEAVE);
+            relay?.sendInteractionChoice(
+              coopBiomeShopSeq(pinned),
+              "biomeShop",
+              COOP_INTERACTION_LEAVE,
+              undefined,
+              undefined,
+              commit?.operationId,
+            );
           // The authority must retain the complete terminal result before exposing the legacy companion.
           // Otherwise a transient journal failure lets the watcher consume LEAVE and advance while the
           // authority retries the same still-unretained terminal. A guest-owned intent still has to travel
@@ -813,27 +821,61 @@ export class BiomeShopPhase extends SelectModifierPhase {
             getCoopRuntime()?.durability?.reconnect();
             continue;
           }
-          try {
-            resend();
-          } catch {
-            /* the retained journal or the next exact resend remains authoritative */
+          let retainedV2Proposal = false;
+          if (role === "guest" && v2 && commit != null) {
+            const runtime = getCoopRuntime();
+            const lease = retainCoopV2InteractionProposal(
+              {
+                operationId: commit.operationId,
+                fingerprint: JSON.stringify([
+                  coopBiomeShopSeq(pinned),
+                  "biomeShop",
+                  COOP_INTERACTION_LEAVE,
+                  null,
+                  null,
+                ]),
+                resend,
+                onExhausted: operationId => {
+                  if (this.coopAsyncBoundaryStillLive(generation, wave, pinned) && getCoopRuntime() === runtime) {
+                    failCoopSharedSession(`Biome market proposal ${operationId} exhausted before V2 commit`);
+                  }
+                },
+              },
+              runtime,
+            );
+            if (lease === "conflict" || lease === "invalid" || lease === "disposed") {
+              failCoopSharedSession(
+                `Biome market proposal ${commit.operationId} could not obtain a V2 resend lease (${lease})`,
+              );
+              return false;
+            }
+            retainedV2Proposal = true;
+          }
+          if (!retainedV2Proposal) {
+            try {
+              resend();
+            } catch {
+              /* the retained journal or the next exact resend remains authoritative */
+            }
           }
           if (role === "guest" && isCoopRewardOperationEnabled()) {
             let resendTimer: ReturnType<typeof setInterval> | null = null;
-            resendTimer = setInterval(() => {
-              if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
-                if (resendTimer != null) {
-                  clearInterval(resendTimer);
-                  resendTimer = null;
+            if (!v2) {
+              resendTimer = setInterval(() => {
+                if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+                  if (resendTimer != null) {
+                    clearInterval(resendTimer);
+                    resendTimer = null;
+                  }
+                  return;
                 }
-                return;
-              }
-              try {
-                resend();
-              } catch {
-                /* retry remains armed */
-              }
-            }, 1_000);
+                try {
+                  resend();
+                } catch {
+                  /* retry remains armed */
+                }
+              }, 1_000);
+            }
             const action =
               relay == null
                 ? null
@@ -1424,17 +1466,49 @@ export class BiomeShopPhase extends SelectModifierPhase {
         failCoopSharedSession(`Biome market owner purchase at stock ${coopBoughtSlot} could not prepare its intent`);
         return false;
       }
-      getCoopInteractionRelay()?.sendInteractionChoice(
-        coopBiomeShopSeq(this.coopBiomeStart),
-        "biomeShop",
-        coopBoughtSlot,
-        [partySlot, resultingMoney, this.coopResolvedModifierOption, cost],
-      );
+      const relay = getCoopInteractionRelay();
+      const proposalData = [partySlot, resultingMoney, this.coopResolvedModifierOption, cost];
+      const resend = (): void =>
+        relay?.sendInteractionChoice(
+          coopBiomeShopSeq(this.coopBiomeStart),
+          "biomeShop",
+          coopBoughtSlot,
+          proposalData,
+          undefined,
+          preparedOperationId ?? undefined,
+        );
       if (
         getCoopController()?.role === "guest"
         && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
         && preparedOperationId != null
       ) {
+        if (isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
+          const runtime = getCoopRuntime();
+          const generation = coopSessionGeneration();
+          const pinned = this.coopBiomeStart;
+          const wave = globalScene.currentBattle?.waveIndex ?? -1;
+          const lease = retainCoopV2InteractionProposal(
+            {
+              operationId: preparedOperationId,
+              fingerprint: JSON.stringify([coopBiomeShopSeq(pinned), "biomeShop", coopBoughtSlot, proposalData, null]),
+              resend,
+              onExhausted: operationId => {
+                if (this.coopAsyncBoundaryStillLive(generation, wave, pinned) && getCoopRuntime() === runtime) {
+                  failCoopSharedSession(`Biome market proposal ${operationId} exhausted before V2 commit`);
+                }
+              },
+            },
+            runtime,
+          );
+          if (lease === "conflict" || lease === "invalid" || lease === "disposed") {
+            failCoopSharedSession(
+              `Biome market proposal ${preparedOperationId} could not obtain a V2 resend lease (${lease})`,
+            );
+            return false;
+          }
+        } else {
+          resend();
+        }
         this.coopPendingAuthorityOperationId = preparedOperationId;
         this.hideShopForOverlay();
         void globalScene.ui.setMode(UiMode.MESSAGE);
@@ -1446,6 +1520,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         );
         return true;
       }
+      resend();
     }
     const controller = getCoopController();
     const retainedResultMode = isCoopRewardRetainedResultMode(this.coopRewardOperationBinding);

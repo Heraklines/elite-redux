@@ -26,6 +26,7 @@
 // =============================================================================
 
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
+import { CoopV2ProposalAdmissionLedger } from "#data/elite-redux/coop/authority-v2/proposal-admission";
 import { isCoopV2ShadowActive, tapCoopV2ShadowInteractionChoice } from "#data/elite-redux/coop/authority-v2/shadow";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { setCoopMeActivePresentation } from "#data/elite-redux/coop/coop-me-pin-state";
@@ -308,6 +309,8 @@ export interface CoopInteractionRelayOptions {
   projectV2AuthorityProposalWait?: (wait: CoopV2AuthorityProposalWait) => boolean;
   /** Revoke only a timed-out, cancelled, or superseded waiter generation. */
   revokeV2AuthorityProposalWait?: (wait: CoopV2AuthorityProposalWait) => void;
+  /** Fail the shared session when one proposal identity is reused for conflicting material. */
+  onV2AuthorityProposalViolation?: (reason: string) => void;
   /**
    * Authority-owned option-pool commit. Called before a V2 reward/market surface is exposed; success means
    * the immutable INTERACTION_COMMIT is retained and replaces the raw rewardOptions carrier.
@@ -450,6 +453,9 @@ export class CoopInteractionRelay {
   private readonly revokeV2AuthorityProposalWait: NonNullable<
     CoopInteractionRelayOptions["revokeV2AuthorityProposalWait"]
   >;
+  private readonly onV2AuthorityProposalViolation: NonNullable<
+    CoopInteractionRelayOptions["onV2AuthorityProposalViolation"]
+  >;
   private readonly publishRewardOptions: NonNullable<CoopInteractionRelayOptions["publishRewardOptions"]> | null;
   private readonly offMessage: () => void;
   private readonly offState: () => void;
@@ -469,6 +475,11 @@ export class CoopInteractionRelay {
   /** Raw/journal wild catch-full prompt echo credits, keyed by the prompt operation id. */
   private readonly rawCatchFullPromptCredits = new Map<string, number>();
   private readonly committedCatchFullPromptCredits = new Map<string, number>();
+  /**
+   * Non-mechanical remote proposal identities retained for the whole session epoch.
+   * A same-ID retry is discarded before it can enter a later same-sequence waiter.
+   */
+  private readonly authorityProposalAdmissions = new CoopV2ProposalAdmissionLedger();
 
   /** seq -> FIFO queue of choices that arrived before their waiter. */
   private readonly inbox = new Map<number, CoopInteractionChoice[]>();
@@ -518,6 +529,7 @@ export class CoopInteractionRelay {
     this.validateV2QuizAnswerObservation = opts.validateV2QuizAnswerObservation ?? (() => false);
     this.projectV2AuthorityProposalWait = opts.projectV2AuthorityProposalWait ?? (() => false);
     this.revokeV2AuthorityProposalWait = opts.revokeV2AuthorityProposalWait ?? (() => {});
+    this.onV2AuthorityProposalViolation = opts.onV2AuthorityProposalViolation ?? (() => {});
     this.publishRewardOptions = opts.publishRewardOptions ?? null;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offState = transport.onStateChange(state => {
@@ -595,6 +607,7 @@ export class CoopInteractionRelay {
     choice: number,
     data?: number[],
     rewardSurface?: CoopRewardSurfaceIdentity,
+    proposalOperationId?: string,
   ): void {
     recordCoopUiRelayCarrier("interactionChoice", `seq=${seq} kind=${kind} choice=${choice}`);
     if (isCoopDebug()) {
@@ -613,6 +626,13 @@ export class CoopInteractionRelay {
         choice,
         ...(data === undefined ? {} : { data }),
         ...(rewardSurface == null ? {} : { rewardSurface }),
+        // The negotiated/frozen carrier already owns this optional exact-ID
+        // slot. On the non-authority -> authority direction it identifies the
+        // retained V2 proposal; it remains non-mechanical and allocates no log
+        // revision. Legacy sends and unretained observations leave it absent.
+        ...(this.isInteractionAuthorityV2() && proposalOperationId != null && proposalOperationId.length > 0
+          ? { cosmeticOperationId: proposalOperationId }
+          : {}),
       });
     }
     // #record-replay: capture this OWNER-sent interaction pick (no-op unless recording on the host).
@@ -1349,6 +1369,7 @@ export class CoopInteractionRelay {
     this.rewardOptionsProjections.clear();
     this.sentRewardOptions.clear();
     this.sentRewardOptionsProjections.clear();
+    this.authorityProposalAdmissions.reset();
     this.cancelledSeqs.clear();
   }
 
@@ -1390,6 +1411,7 @@ export class CoopInteractionRelay {
     this.rewardOptionsProjections.clear();
     this.sentRewardOptions.clear();
     this.sentRewardOptionsProjections.clear();
+    this.authorityProposalAdmissions.reset();
     // A seq sticky-cancelled in the PRIOR epoch must not keep resolving null in the NEW epoch (seqs reuse
     // low counters), so clear the cancel marks alongside the buffers.
     this.cancelledSeqs.clear();
@@ -1652,6 +1674,28 @@ export class CoopInteractionRelay {
     if (msg.rewardSurface != null && !isWireRewardSurfaceIdentity(msg.rewardSurface)) {
       coopWarn("relay", "RECV interactionChoice -> invalid ordered reward surface");
       return;
+    }
+    if (this.isInteractionAuthorityV2() && this.isLocalAuthority() && msg.cosmeticOperationId != null) {
+      const fingerprint = JSON.stringify([msg.seq, msg.kind, msg.choice, msg.data ?? null, msg.rewardSurface ?? null]);
+      const admission = this.authorityProposalAdmissions.admit({
+        operationId: msg.cosmeticOperationId,
+        fingerprint,
+      });
+      if (admission === "duplicate") {
+        coopLog(
+          "v2-proposal",
+          `dropped duplicate proposal id=${msg.cosmeticOperationId} seq=${msg.seq} kind=${msg.kind}`,
+        );
+        return;
+      }
+      if (admission !== "admitted") {
+        const reason =
+          `Authority V2 proposal ${msg.cosmeticOperationId} was refused (${admission})`
+          + ` at seq=${msg.seq} kind=${msg.kind}`;
+        coopWarn("v2-proposal", reason);
+        this.onV2AuthorityProposalViolation(reason);
+        return;
+      }
     }
     // #829 malicious-peer hardening: drop a forged cross-owner faint-replacement switch pick before it
     // is ever recorded / buffered / delivered / applied.

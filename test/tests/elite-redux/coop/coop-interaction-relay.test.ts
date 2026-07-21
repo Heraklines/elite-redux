@@ -132,6 +132,71 @@ describe("co-op alternating-interaction relay (#633)", () => {
     expect(third?.choice).toBe(COOP_INTERACTION_LEAVE);
   });
 
+  it("drops retained proposal retries before they can resolve the next same-sequence shop waiter", async () => {
+    const { host, guest } = createLoopbackPair();
+    const violations: string[] = [];
+    const owner = new CoopInteractionRelay(guest, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => false,
+    });
+    const authority = new CoopInteractionRelay(host, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => true,
+      onV2AuthorityProposalViolation: reason => violations.push(reason),
+    });
+    const firstOperationId = "1:1:300:REWARD";
+    const secondOperationId = "1:1:301:REWARD";
+
+    const firstWait = authority.awaitInteractionChoice(3, 1_000, ["lock"]);
+    owner.sendInteractionChoice(3, "lock", 0, [3], undefined, firstOperationId);
+    await expect(firstWait).resolves.toMatchObject({ operationId: firstOperationId, choice: 0, data: [3] });
+
+    // Model a result delayed past several 250 ms proposal-lease retries. None
+    // may enter the FIFO that the next action on this same shop sequence uses.
+    owner.sendInteractionChoice(3, "lock", 0, [3], undefined, firstOperationId);
+    owner.sendInteractionChoice(3, "lock", 0, [3], undefined, firstOperationId);
+    owner.sendInteractionChoice(3, "lock", 0, [3], undefined, firstOperationId);
+    await Promise.resolve();
+
+    const nextWait = authority.awaitInteractionChoice(3, 1_000, ["lock"]);
+    let nextSettled = false;
+    void nextWait.then(() => {
+      nextSettled = true;
+    });
+    await Promise.resolve();
+    expect(nextSettled).toBe(false);
+
+    // A second real human action may be byte-identical but has the next stable
+    // operation ID, so it remains distinguishable from retries and is admitted.
+    owner.sendInteractionChoice(3, "lock", 0, [3], undefined, secondOperationId);
+    await expect(nextWait).resolves.toMatchObject({ operationId: secondOperationId, choice: 0, data: [3] });
+    expect(violations).toEqual([]);
+  });
+
+  it("fails closed when one V2 proposal ID is reused with conflicting payload", async () => {
+    const { host, guest } = createLoopbackPair();
+    const violations: string[] = [];
+    const owner = new CoopInteractionRelay(guest, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => false,
+    });
+    const authority = new CoopInteractionRelay(host, {
+      isInteractionAuthorityV2: () => true,
+      isLocalAuthority: () => true,
+      onV2AuthorityProposalViolation: reason => violations.push(reason),
+    });
+    const operationId = "1:1:300:REWARD";
+
+    const firstWait = authority.awaitInteractionChoice(3, 1_000, ["reward"]);
+    owner.sendInteractionChoice(3, "reward", 0, [0], undefined, operationId);
+    await expect(firstWait).resolves.toMatchObject({ operationId, choice: 0, data: [0] });
+
+    owner.sendInteractionChoice(3, "reward", 1, [0], undefined, operationId);
+    await Promise.resolve();
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain("conflict");
+  });
+
   it("deduplicates journal-first then raw interaction-choice carriers", async () => {
     const { host, guest } = createLoopbackPair();
     const owner = new CoopInteractionRelay(host);
