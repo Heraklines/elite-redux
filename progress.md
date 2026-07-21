@@ -748,6 +748,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   phase token for a handler rebind and the physical input gate still requires
   the exact newly installed handler token, operation ID, owner seat, and active
   actionable handler. No cross-phase or address inheritance was added.
-- The Authority source contract now pins both real mode transitions and the
+ - The Authority source contract now pins both real mode transitions and the
   ledger's same-generation/exact-handler invariants so direct helper coverage
   cannot mask this public-input path again.
+
+2026-07-21 - Public post-turn liveness budget correction
+
+- Exact-SHA public run 29792007134 did not expose a V2 desync or shared
+  terminal. At the apparent failure, both browsers were replaying the same wave
+  1 turn and the host was still appending unique authoritative events. The old
+  six-minute total-time ceiling fired at 01:34:28; event sequences 19 and 20
+  arrived afterward, both replicas received them, and `TURN_COMMIT` admitted
+  and applied at 01:34:59. The failure screenshots were therefore transient
+  host/renderer positions inside one ordered stream.
+- The 90-second no-progress watchdog remains unchanged and is still refreshed
+  only by new phases, authoritative sequence numbers, renderer sequence
+  numbers, or unique semantic surfaces. Repeated semantic projections,
+  heartbeats, and transport retries still buy no time. The independent
+  absolute circuit breaker is now fifteen minutes so a severely CPU-dilated
+  but causally advancing turn is not misreported as a production softlock; the
+  workflow keeps its separate 35-minute supervisor.
+- The source-pure budget contract now proves that real authority and renderer
+  progress can cross the former short wall-clock boundary while remaining
+  bounded by the separate absolute ceiling.

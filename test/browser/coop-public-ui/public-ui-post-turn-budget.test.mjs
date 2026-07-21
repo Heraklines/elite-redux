@@ -294,7 +294,7 @@ for (const language of ["German", "French", "Japanese", "Arabic", "Cyrillic", "f
   });
 }
 
-test("post-turn progress extends the soft deadline but never the immutable hard ceiling", () => {
+test("post-turn progress refreshes the stall watchdog until a separate absolute ceiling", () => {
   let nowMs = 1_000;
   const authority = { label: "authority", evidence: new FakeEvidence("authority") };
   const renderer = { label: "renderer", evidence: new FakeEvidence("renderer") };
@@ -302,7 +302,7 @@ test("post-turn progress extends the soft deadline but never the immutable hard 
   const budget = createPublicBattleProgressBudget(rig, { authority: 0, renderer: 0 }, 100, {
     now: () => nowMs,
     progressAllowanceMs: 80,
-    hardCeilingMs: 300,
+    hardCeilingMs: 500,
   });
 
   assert.equal(budget.deadline(), 1_100);
@@ -341,16 +341,28 @@ test("post-turn progress extends the soft deadline but never the immutable hard 
     kind: "console",
     text: "[coop:turn] host recorder: append turn=1 seq=12 k=faint total=13 live=true",
   });
-  assert.equal(budget.observe(), 1_300, "causal progress is capped at the hard deadline");
+  assert.equal(
+    budget.observe(),
+    1_340,
+    "unique authority progress may extend beyond the former short total-time ceiling",
+  );
 
-  nowMs = 1_299;
+  nowMs = 1_335;
   renderer.evidence.push({
     at: at(nowMs),
     kind: "console",
     text: "[coop:replay] guest replay turn=1: live increment seq=12..12",
   });
-  assert.equal(budget.observe(), 1_300);
-  assert.equal(budget.hardDeadline(), 1_300);
+  assert.equal(budget.observe(), 1_415, "unique renderer progress refreshes the same stall watchdog");
+
+  nowMs = 1_450;
+  authority.evidence.push({
+    at: at(nowMs),
+    kind: "console",
+    text: "[coop:turn] host recorder: append turn=1 seq=13 k=message total=14 live=true",
+  });
+  assert.equal(budget.observe(), 1_500, "causal progress remains capped by the absolute circuit breaker");
+  assert.equal(budget.hardDeadline(), 1_500);
 });
 
 test("repeated semantic projections cannot refresh the same causal progress token", () => {

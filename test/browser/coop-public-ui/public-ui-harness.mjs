@@ -65,7 +65,13 @@ const MAGIKARP_SPECIES_ID = 129;
 const BULBASAUR_SPECIES_ID = 1;
 const SEEL_SPECIES_ID = 86;
 const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;
-const POST_TURN_HARD_CEILING_MS = 360_000;
+// This is an absolute circuit breaker, not the normal liveness timeout. Exact-SHA run
+// 29792007134 was still producing and replaying unique turn events when the previous six-minute
+// wall-clock ceiling fired; TURN_COMMIT landed 31s after that false abort. The rolling
+// POST_TURN_PROGRESS_ALLOWANCE_MS watchdog remains the fast failure path for a real stall, while
+// this larger bound leaves a heavily CPU-dilated but causally progressing turn alive. The journey
+// job retains its independent 35-minute supervisor.
+const POST_TURN_ABSOLUTE_CEILING_MS = 900_000;
 const GAME_OVER_POST_TURN_PROGRESS_ALLOWANCE_MS = 180_000;
 const GAME_OVER_POST_TURN_HARD_CEILING_MS = 900_000;
 const COLD_REJOIN_RELEASE_MS = 160_000;
@@ -193,7 +199,8 @@ function recordPostTurnBudgetExtension(progress, previousDeadlineMs, deadlineMs,
  * four-core runner; runs 29330330915 and 29332163279 reached real command/narration surfaces after
  * the ordinary timeout. Phase transitions, new authoritative turn events, renderer sequence
  * increments, and semantic command/battle-prompt instances may extend the soft deadline, but
- * signaling heartbeats/retries may not. The immutable hard deadline still makes every wait terminate.
+ * signaling heartbeats/retries may not. A separate absolute circuit breaker still makes every wait
+ * terminate even if a pathological loop keeps manufacturing unique progress.
  */
 export function createPublicBattleProgressBudget(
   rig,
@@ -202,7 +209,7 @@ export function createPublicBattleProgressBudget(
   {
     now = () => Date.now(),
     progressAllowanceMs = POST_TURN_PROGRESS_ALLOWANCE_MS,
-    hardCeilingMs = POST_TURN_HARD_CEILING_MS,
+    hardCeilingMs = POST_TURN_ABSOLUTE_CEILING_MS,
   } = {},
 ) {
   const clients = Object.values(rig.clients);
